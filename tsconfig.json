@@ -1,0 +1,27 @@
+{
+  "include": ["apps/*/src/**/*", "libs/*/src/**/*"],
+  "compilerOptions": {
+    "module": "commonjs",
+    "declaration": true,
+    "removeComments": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true,
+    "target": "ES2022",
+    "sourceMap": true,
+    "outDir": "./dist",
+    "ignoreDeprecations": "6.0",
+    "baseUrl": "./",
+    "incremental": true,
+    "skipLibCheck": true,
+    "strictNullChecks": true,
+    "noImplicitAny": false,
+    "types": ["node"],
+    "paths": {
+      "@synapsedesk/common": ["libs/common/src"],
+      "@synapsedesk/common/*": ["libs/common/src/*"],
+      "@synapsedesk/grpc-proto": ["libs/grpc-proto/src"],
+      "@synapsedesk/grpc-proto/*": ["libs/grpc-proto/src/*"]
+    }
+  }
+}
