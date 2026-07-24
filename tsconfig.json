@@ -1,5 +1,6 @@
 {
   "include": ["apps/*/src/**/*", "libs/*/src/**/*"],
+  "exclude": ["node_modules", "dist"],
   "compilerOptions": {
     "module": "commonjs",
     "declaration": true,
@@ -22,6 +23,6 @@
       "@synapsedesk/common/*": ["libs/common/src/*"],
       "@synapsedesk/grpc-proto": ["libs/grpc-proto/src"],
       "@synapsedesk/grpc-proto/*": ["libs/grpc-proto/src/*"]
-    }
+    },
   }
 }
