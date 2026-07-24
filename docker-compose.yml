@@ -1,0 +1,104 @@
+services:
+  # ---------------------------------------------------------------------------
+  # Database Layer (Isolated Postgres Databases per Domain)
+  # ---------------------------------------------------------------------------
+  postgres-auth:
+    image: postgres:18.4-alpine
+    container_name: synapsedesk-postgres-auth
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${AUTH_DB_NAME}
+    ports:
+      - '${AUTH_DB_PORT}:5432'
+    volumes:
+      - pgdata_auth:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  postgres-ticket:
+    image: postgres:18.4-alpine
+    container_name: synapsedesk-postgres-ticket
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${TICKET_DB_NAME}
+    ports:
+      - '${TICKET_DB_PORT}:5432'
+    volumes:
+      - pgdata_ticket:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  postgres-ingestion:
+    image: postgres:18.4-alpine
+    container_name: synapsedesk-postgres-ingestion
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${INGESTION_DB_NAME}
+    ports:
+      - '${INGESTION_DB_PORT}:5432'
+    volumes:
+      - pgdata_ingestion:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ---------------------------------------------------------------------------
+  # Message Queue & Cache Layer
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:8.8.0-alpine
+    container_name: synapsedesk-redis
+    ports:
+      - '${REDIS_PORT}:6379'
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  nats:
+    image: nats:2.10-alpine
+    container_name: synapsedesk-nats
+    command: ['-js', '-m', '${NATS_DASHBOARD_PORT}'] # Enable JetStream (-js) and Monitoring Dashboard (-m 8222)
+    ports:
+      - '${NATS_PORT}:4222' # NATS Client Port
+      - '${NATS_DASHBOARD_PORT}:8222' # HTTP Management/Monitoring UI
+    volumes:
+      - nats_data:/data
+
+  # ---------------------------------------------------------------------------
+  # AI & Vector Search Engine Layer
+  # ---------------------------------------------------------------------------
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: synapsedesk-qdrant
+    ports:
+      - '${QDRANT_PORT}:6333' # HTTP API / Dashboard
+      - '${QDRANT_GRPC_PORT}:6334' # gRPC API
+    volumes:
+      - qdrant_data:/qdrant/storage
+
+volumes:
+  pgdata_auth:
+  pgdata_ticket:
+  pgdata_ingestion:
+  redis_data:
+  nats_data:
+  qdrant_data:
+
+networks:
+  default:
+    name: synapsedesk-network
