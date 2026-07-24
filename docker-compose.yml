@@ -12,7 +12,7 @@ services:
     ports:
       - '${AUTH_DB_PORT}:5432'
     volumes:
-      - pgdata_auth:/var/lib/postgresql/data
+      - pgdata_auth:/var/lib/postgresql
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U postgres']
       interval: 5s
@@ -29,7 +29,7 @@ services:
     ports:
       - '${TICKET_DB_PORT}:5432'
     volumes:
-      - pgdata_ticket:/var/lib/postgresql/data
+      - pgdata_ticket:/var/lib/postgresql
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U postgres']
       interval: 5s
@@ -46,7 +46,7 @@ services:
     ports:
       - '${INGESTION_DB_PORT}:5432'
     volumes:
-      - pgdata_ingestion:/var/lib/postgresql/data
+      - pgdata_ingestion:/var/lib/postgresql
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U postgres']
       interval: 5s
