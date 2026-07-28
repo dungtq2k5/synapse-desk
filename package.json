@@ -6,6 +6,8 @@
     "libs/*"
   ],
   "scripts": {
+    "test:all": "jest --projects apps/*/jest.config.ts",
+    "test:auth": "jest --config apps/auth-service/jest.config.ts",
     "build": "turbo run build",
     "dev": "turbo run dev",
     "lint": "turbo run lint",

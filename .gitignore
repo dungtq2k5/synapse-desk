@@ -3,3 +3,5 @@ node_modules/
 docs/
 cspell.json
 .env
+*.tsbuildinfo
+.claude/

@@ -1,0 +1,288 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ==========================================
+// 1. ORGANIZATIONS (Tenant Boundary)
+// ==========================================
+model Organization {
+  id     String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name   String  @db.VarChar(255)
+  slug   String  @unique @db.VarChar(100)
+  domain String? @unique @db.VarChar(255)
+
+  // Tenant state & governance
+  status              String   @db.VarChar(50)
+  enforceTwoFactor    Boolean  @default(false) @map("enforce_two_factor")
+  allowedEmailDomains String[] @map("allowed_email_domains") @db.VarChar(255)
+
+  // Quotas & metering
+  maxAgentSeats        Int      @default(10) @map("max_agent_seats")
+  maxStorageBytes      BigInt   @default(5368709120) @map("max_storage_bytes")
+  monthlyAiTokenBudget BigInt   @default(1000000) @map("monthly_ai_token_budget")
+  billingCycleStart    DateTime @default(now()) @map("billing_cycle_start") @db.Timestamptz
+
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+  deletedById String?   @map("deleted_by_id") @db.Uuid
+
+  // Relations
+  deletedBy   User?        @relation("OrganizationDeletedBy", fields: [deletedById], references: [id], onDelete: Restrict)
+  departments Department[]
+  users       User[]       @relation("UserOrganization")
+  roles       Role[]       @relation("RoleOrganization")
+
+  @@map("organizations")
+}
+
+// ==========================================
+// 2. DEPARTMENTS (Functional Sub-Units)
+// ==========================================
+model Department {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  name           String    @db.VarChar(100)
+  description    String?   @db.Text
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz
+  deletedById    String?   @map("deleted_by_id") @db.Uuid
+
+  // Relations
+  organization    Organization     @relation(fields: [organizationId], references: [id])
+  deletedBy       User?            @relation("DepartmentDeletedBy", fields: [deletedById], references: [id], onDelete: Restrict)
+  userDepartments UserDepartment[]
+
+  @@map("departments")
+}
+
+// ==========================================
+// 3. USERS (Central Identity)
+// ==========================================
+model User {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  // NULL organizationId identifies a SaaS platform Super Admin operating across
+  // tenants. Kept in lockstep with isSuperAdmin by a DB CHECK constraint added
+  // via migration: (organization_id IS NULL) = is_super_admin
+  organizationId String? @map("organization_id") @db.Uuid
+  isSuperAdmin   Boolean @default(false) @map("is_super_admin")
+
+  email              String    @unique @db.VarChar(255)
+  isEmailVerified    Boolean   @default(false) @map("is_email_verified")
+  passwordHash       String?   @map("password_hash") @db.VarChar(255)
+  fullName           String    @map("full_name") @db.VarChar(150)
+  avatarUrl          String?   @map("avatar_url") @db.Text
+  phoneNumber        String?   @map("phone_number") @db.VarChar(30)
+  isPhoneVerified    Boolean   @default(false) @map("is_phone_verified")
+  dob                DateTime? @db.Date
+  gender             String?   @db.VarChar(20)
+  isTwoFactorEnabled Boolean   @default(false) @map("is_two_factor_enabled")
+  twoFactorSecret    String?   @map("two_factor_secret") @db.VarChar(255)
+  isLocked           Boolean   @default(false) @map("is_locked")
+  lastLoginAt        DateTime? @map("last_login_at") @db.Timestamptz
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt          DateTime? @map("deleted_at") @db.Timestamptz
+  deletedById        String?   @map("deleted_by_id") @db.Uuid
+
+  // Relations
+  organization Organization? @relation("UserOrganization", fields: [organizationId], references: [id])
+  deletedBy    User?         @relation("UserDeletedBy", fields: [deletedById], references: [id], onDelete: Restrict)
+
+  // Junction Relations
+  userDepartments         UserDepartment[] @relation("UserDepartments")
+  assignedUserDepartments UserDepartment[] @relation("UserDepartmentAssignedBy")
+
+  // Audit and self-referential relations
+  deletedUsers         User[]         @relation("UserDeletedBy")
+  deletedOrganizations Organization[] @relation("OrganizationDeletedBy")
+  deletedDepartments   Department[]   @relation("DepartmentDeletedBy")
+  createdRoles         Role[]         @relation("RoleCreatedBy")
+
+  // Child Session & Security Relations
+  deviceSessions       DeviceSession[]
+  twoFactorBackupCodes TwoFactorBackupCode[]
+  otps                 Otp[]
+  passwordResetTokens  PasswordResetToken[]
+
+  // IMPLICIT Many-to-Many: user_roles
+  roles Role[] @relation("user_roles")
+
+  @@map("users")
+}
+
+// ==========================================
+// 4. USER DEPARTMENTS (Explicit Junction)
+// ==========================================
+model UserDepartment {
+  userId       String   @map("user_id") @db.Uuid
+  departmentId String   @map("department_id") @db.Uuid
+  isPrimary    Boolean  @default(false) @map("is_primary")
+  assignedById String?  @map("assigned_by_id") @db.Uuid
+  assignedAt   DateTime @default(now()) @map("assigned_at") @db.Timestamptz
+
+  // Relations
+  user       User       @relation("UserDepartments", fields: [userId], references: [id], onDelete: Cascade)
+  department Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  assignedBy User?      @relation("UserDepartmentAssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
+
+  @@id([userId, departmentId])
+  @@map("user_departments")
+}
+
+// ==========================================
+// 5. ROLES
+// ==========================================
+model Role {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  organizationId String? @map("organization_id") @db.Uuid
+
+  name         String   @db.VarChar(100)
+  description  String?  @db.Text
+  isSystemRole Boolean  @default(false) @map("is_system_role")
+  userAssigned Int      @default(0) @map("user_assigned")
+  createdById  String   @map("created_by_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  organization Organization? @relation("RoleOrganization", fields: [organizationId], references: [id])
+  createdBy    User          @relation("RoleCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+
+  // IMPLICIT Many-to-Many Relations
+  users       User[]       @relation("user_roles")
+  permissions Permission[] @relation("role_permissions")
+
+  // Two tenants may each define a role named "Tier 2 Lead".
+  // Postgres does not treat NULLs as equal here, so global system roles are
+  // additionally guarded by a partial unique index added via migration:
+  //   CREATE UNIQUE INDEX roles_global_name_key ON roles (name) WHERE organization_id IS NULL;
+  @@unique([organizationId, name])
+  @@map("roles")
+}
+
+// ==========================================
+// 6. PERMISSIONS
+// ==========================================
+model Permission {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String   @unique @db.VarChar(100)
+  code      String   @unique @db.VarChar(100)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  // IMPLICIT Many-to-Many: role_permissions
+  roles Role[] @relation("role_permissions")
+
+  @@map("permissions")
+}
+
+// ==========================================
+// 7. DEVICE SESSIONS
+// ==========================================
+model DeviceSession {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId           String   @map("user_id") @db.Uuid
+  refreshTokenHash String   @unique @map("refresh_token_hash") @db.VarChar(255)
+  deviceName       String?  @map("device_name") @db.VarChar(100)
+  ipAddress        String   @map("ip_address") @db.VarChar(45)
+  userAgent        String   @map("user_agent") @db.Text
+  isTrusted        Boolean  @default(false) @map("is_trusted")
+  expiresAt        DateTime @map("expires_at") @db.Timestamptz
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("device_sessions")
+}
+
+// ==========================================
+// 8. TWO-FACTOR BACKUP CODES
+// ==========================================
+model TwoFactorBackupCode {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  codeHash  String   @map("code_hash") @db.VarChar(255)
+  isUsed    Boolean  @default(false) @map("is_used")
+  expiresAt DateTime @map("expires_at") @db.Timestamptz
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("two_factor_backup_codes")
+}
+
+// ==========================================
+// 9. OTPS (Email & Phone Verification Codes)
+// ==========================================
+model Otp {
+  id     String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId String @map("user_id") @db.Uuid
+
+  // 'email_verification' | 'phone_verification'
+  purpose String @db.VarChar(50)
+
+  // The exact email address or phone number the code was dispatched to. Kept
+  // separate from users.email/phone_number so a pending change can be verified
+  // before it is written onto the user record.
+  target   String @db.VarChar(255)
+  codeHash String @map("code_hash") @db.VarChar(255)
+
+  // Brute-force guard: the verify handler increments attemptsCount and flips
+  // isUsed to true once attemptsCount reaches maxAttempts, burning the code.
+  attemptsCount Int @default(0) @map("attempts_count")
+  maxAttempts   Int @default(5) @map("max_attempts")
+
+  isUsed    Boolean  @default(false) @map("is_used")
+  expiresAt DateTime @map("expires_at") @db.Timestamptz
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, purpose])
+  @@index([expiresAt])
+  @@map("otps")
+}
+
+// ==========================================
+// 10. PASSWORD RESET TOKENS
+// ==========================================
+model PasswordResetToken {
+  id        String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String @map("user_id") @db.Uuid
+  tokenHash String @unique @map("token_hash") @db.VarChar(255)
+
+  // Request provenance, surfaced in the reset email ("this request came from
+  // Chrome on macOS, 203.0.113.7") and in audit_logs.
+  ipAddress String? @map("ip_address") @db.VarChar(45)
+  userAgent String? @map("user_agent") @db.Text
+
+  isUsed    Boolean  @default(false) @map("is_used")
+  expiresAt DateTime @map("expires_at") @db.Timestamptz
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
+}

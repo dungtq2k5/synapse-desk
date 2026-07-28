@@ -1,5 +1,5 @@
 {
-  "include": ["apps/*/src/**/*", "libs/*/src/**/*"],
+  "include": ["apps/*/src/**/*", "apps/*/prisma.config.ts", "apps/*/jest.config.ts", "libs/*/src/**/*", "jest.config.base.ts"],
   "exclude": ["node_modules", "dist"],
   "compilerOptions": {
     "module": "commonjs",
@@ -12,16 +12,18 @@
     "sourceMap": true,
     "outDir": "./dist",
     "ignoreDeprecations": "6.0",
+    "moduleResolution": "node",
+    "rootDir": ".",
     "baseUrl": "./",
     "incremental": true,
     "skipLibCheck": true,
     "strictNullChecks": true,
     "noImplicitAny": false,
-    "types": ["node"],
+    "types": ["node", "jest"],
     "paths": {
-      "@synapsedesk/common": ["libs/common/src"],
+      "@synapsedesk/common": ["libs/common/src/main.ts"],
       "@synapsedesk/common/*": ["libs/common/src/*"],
-      "@synapsedesk/grpc-proto": ["libs/grpc-proto/src"],
+      "@synapsedesk/grpc-proto": ["libs/grpc-proto/src/index.ts"],
       "@synapsedesk/grpc-proto/*": ["libs/grpc-proto/src/*"]
     },
   }

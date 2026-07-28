@@ -5,5 +5,8 @@
   "types": "src/main.ts",
   "scripts": {
     "build": "tsc"
+  },
+  "dependencies": {
+    "class-validator": "^0.15.1"
   }
 }

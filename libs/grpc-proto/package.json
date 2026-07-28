@@ -4,9 +4,14 @@
   "main": "src/index.ts",
   "types": "src/index.ts",
   "scripts": {
-    "build": "tsc"
+    "build": "tsc",
+    "proto:generate": "protoc --plugin=../../node_modules/.bin/protoc-gen-ts_proto --ts_proto_out=./src/generated --ts_proto_opt=nestJs=true,esModuleInterop=true -I ./src/proto ./src/proto/*.proto"
   },
   "devDependencies": {
-    "@types/node": "^26.1.1"
+    "@types/node": "^26.1.1",
+    "ts-proto": "^2.12.0"
+  },
+  "dependencies": {
+    "@nestjs/microservices": "^11.1.28"
   }
 }
