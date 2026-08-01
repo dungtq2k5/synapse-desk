@@ -1,10 +1,12 @@
-import { Gender, IsNullable } from '@synapsedesk/common/main';
+import { Gender } from '@synapsedesk/common/main';
+import { IsNullable } from '../../../../common/decorators/is-nullable.decorator';
 import { Type } from 'class-transformer';
 import {
   IsBoolean,
   IsDate,
   IsEmail,
   IsEnum,
+  IsISO8601,
   IsPhoneNumber,
   IsString,
   IsUrl,
@@ -15,8 +17,14 @@ export class UserBase {
   @IsUUID()
   readonly id!: string;
 
+  /**
+   * null for platform Super Admins, who belong to no tenant (RDM §1.7). Typed
+   * non-nullable, this field made the seeded super admin impossible to return
+   * from the API at all.
+   */
+  @IsNullable()
   @IsUUID()
-  readonly organizationId!: string;
+  readonly organizationId!: string | null;
 
   @IsString()
   readonly fullName!: string;
@@ -40,10 +48,14 @@ export class UserBase {
   @IsBoolean()
   readonly isPhoneVerified!: boolean;
 
-  @Type(() => Date)
+  /**
+   * ISO 'YYYY-MM-DD', not a Date. The column is `@db.Date` — a calendar date
+   * with no time and no zone — so carrying it as an absolute instant would let
+   * a birthday shift a day depending on the reader's offset.
+   */
   @IsNullable()
-  @IsDate()
-  readonly dob!: Date | null;
+  @IsISO8601({ strict: true })
+  readonly dob!: string | null;
 
   @IsEnum(Gender)
   readonly gender!: Gender;

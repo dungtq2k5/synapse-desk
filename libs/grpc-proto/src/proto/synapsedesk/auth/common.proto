@@ -1,0 +1,47 @@
+syntax = "proto3";
+
+package synapsedesk.auth;
+
+import "google/protobuf/timestamp.proto";
+
+// Types shared by more than one service in this package.
+//
+// Split out so `user.proto`, `two-factor.proto` and `invitation.proto` can each
+// return a UserResponse without redefining it -- protobuf has no way to merge
+// two definitions of one message name, so a copy would be a silent divergence
+// waiting to happen the first time a field is added to only one of them.
+
+// In Proto3, the first enum value must be 0 and serves as the default.
+//
+// Values are prefixed with the enum name because protobuf enum values use C++
+// scoping: they are SIBLINGS of their type, not children. A bare `UNSPECIFIED`
+// here would make `InvitationStatus.UNSPECIFIED` in this same package a hard
+// compile error ("already defined"), not a style complaint.
+enum Gender {
+  GENDER_UNSPECIFIED = 0;
+  GENDER_MALE = 1;
+  GENDER_FEMALE = 2;
+  GENDER_OTHER = 3;
+}
+
+// Only use 'optional' on primitive scalar fields because google.protobuf fields are always optional by default
+message UserResponse {
+  string id = 1;
+  optional string organization_id = 2;
+  string full_name = 3;
+  optional string avatar_url = 4;
+  string email = 5;
+  bool is_email_verified = 6;
+  optional string phone_number = 7;
+  bool is_phone_verified = 8;
+  // ISO 'YYYY-MM-DD', NOT a Timestamp: the column is `@db.Date` (date-only,
+  // no time, no zone). Carrying it as an absolute instant would let a birthday
+  // shift a day depending on the server's UTC offset.
+  optional string dob = 9;
+  Gender gender = 10;
+  optional google.protobuf.Timestamp last_login_at = 11;
+  bool is_locked = 12;
+  bool is_two_factor_enabled = 13;
+  google.protobuf.Timestamp created_at = 14;
+  google.protobuf.Timestamp updated_at = 15;
+}

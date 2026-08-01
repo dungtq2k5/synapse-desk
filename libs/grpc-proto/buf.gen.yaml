@@ -1,0 +1,25 @@
+version: v2
+
+# Replaces the raw `protoc` invocation. protoc was a system binary
+# (/usr/bin/protoc) declared in no manifest, so codegen only worked on a machine
+# where someone had installed it by hand — not on a fresh clone, not in CI, not
+# in a Docker build. buf ships as an npm dependency, so `npm i` is enough.
+plugins:
+  # `local` and `out` resolve against the CWD buf runs in, which the npm scripts
+  # pin to this directory. The plugin itself is two levels up because npm
+  # workspaces hoist binaries to the repo-root node_modules/.bin.
+  - local: ../../node_modules/.bin/protoc-gen-ts_proto
+    out: src/generated
+    opt:
+      # Emits AuthServiceClient / AuthServiceController / the
+      # @AuthServiceControllerMethods() decorator instead of hand-written
+      # interfaces and hardcoded @GrpcMethod('AuthService', 'Register') strings.
+      - nestJs=true
+      - esModuleInterop=true
+      # Adds the optional `metadata` parameter to client methods, which is how
+      # BaseGrpcClient attaches the deadline and request origin.
+      - addGrpcMetadata=true
+      # Suppresses protobufPackage/AUTH_PACKAGE_NAME in every generated module.
+      # `export *` in the barrel silently DROPS any name two modules both
+      # export, so without this the constants would vanish from the public API.
+      - exportCommonSymbols=false

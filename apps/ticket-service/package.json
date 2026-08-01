@@ -4,7 +4,8 @@
   "scripts": {
     "build": "nest build",
     "dev": "nest start --watch",
-    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\""
+    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\"",
+    "clean": "rimraf dist *.tsbuildinfo"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.28",

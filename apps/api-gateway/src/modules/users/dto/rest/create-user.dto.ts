@@ -7,7 +7,7 @@ import {
   IsUrl,
   IsUUID,
 } from 'class-validator';
-import { IsNullable } from '@synapsedesk/common';
+import { IsNullable } from '../../../../common/decorators/is-nullable.decorator';
 import { Type } from 'class-transformer';
 
 export class CreateUserDto extends PickType(UserBase, [

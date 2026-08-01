@@ -1,0 +1,15 @@
+# Build output
+dist/
+node_modules/
+*.tsbuildinfo
+
+# Generated code — rewritten by `buf generate` / `prisma generate`, so
+# formatting it only produces a diff that comes straight back on the next run.
+# ESLint already skips these via the `**/generated/**` ignore in eslint.config.mjs.
+**/generated/
+
+# Secrets and env
+secrets/
+*.key
+*.pem
+.env*

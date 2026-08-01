@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package synapsedesk.auth;
+
+import "synapsedesk/auth/common.proto";
+
+// Profile reads. Kept apart from auth.proto because this is the only service a
+// caller reaches with an ALREADY valid session -- everything in auth.proto is
+// about obtaining one.
+
+message GetCurrentUserRequest {
+  string user_id = 1;
+}
+
+message CurrentUserResponse {
+  UserResponse user = 1;
+  repeated string permission_codes = 2;
+  repeated string department_ids = 3;
+}
+
+service UserService {
+  rpc GetCurrentUser(GetCurrentUserRequest) returns (CurrentUserResponse);
+}

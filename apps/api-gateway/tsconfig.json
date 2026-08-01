@@ -3,6 +3,9 @@
   "compilerOptions": {
     "outDir": "./dist"
   },
-  "include": ["src/**/*"],
+  "include": [
+    "src/**/*",
+    "../auth-service/src/common/interceptors/tenant-isolation.interceptor.ts"
+  ],
   "exclude": ["node_modules", "dist"]
 }

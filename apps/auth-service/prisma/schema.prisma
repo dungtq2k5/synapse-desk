@@ -38,10 +38,11 @@ model Organization {
   deletedById String?   @map("deleted_by_id") @db.Uuid
 
   // Relations
-  deletedBy   User?        @relation("OrganizationDeletedBy", fields: [deletedById], references: [id], onDelete: Restrict)
+  deletedBy   User?            @relation("OrganizationDeletedBy", fields: [deletedById], references: [id], onDelete: Restrict)
   departments Department[]
-  users       User[]       @relation("UserOrganization")
-  roles       Role[]       @relation("RoleOrganization")
+  users       User[]           @relation("UserOrganization")
+  roles       Role[]           @relation("RoleOrganization")
+  invitations UserInvitation[]
 
   @@map("organizations")
 }
@@ -79,7 +80,23 @@ model User {
   organizationId String? @map("organization_id") @db.Uuid
   isSuperAdmin   Boolean @default(false) @map("is_super_admin")
 
-  email              String    @unique @db.VarChar(255)
+  /// Unique per TENANT, not globally (RDM §1.10). One person may hold accounts
+  /// in several tenants — a contractor serving two clients, a re-hire, an
+  /// inherited mailbox.
+  ///
+  /// Deliberately NOT `@@unique([organizationId, email])`: that compiles to a
+  /// FULL unique index, which keeps soft-deleted rows enrolled and so re-breaks
+  /// the re-hire case this change exists to fix. Postgres also does not treat
+  /// NULLs as equal, so Super Admins (organization_id IS NULL) need a second
+  /// guard. Both constraints are partial and therefore inexpressible here —
+  /// `applyPartialIndexes()` in seed.ts creates them:
+  ///   CREATE UNIQUE INDEX users_org_email_key
+  ///     ON users (organization_id, email) WHERE deleted_at IS NULL;
+  ///   CREATE UNIQUE INDEX users_super_admin_email_key
+  ///     ON users (email) WHERE organization_id IS NULL AND deleted_at IS NULL;
+  ///
+  /// Same split as Role.name below.
+  email              String    @db.VarChar(255)
   isEmailVerified    Boolean   @default(false) @map("is_email_verified")
   passwordHash       String?   @map("password_hash") @db.VarChar(255)
   fullName           String    @map("full_name") @db.VarChar(150)
@@ -120,6 +137,14 @@ model User {
   // IMPLICIT Many-to-Many: user_roles
   roles Role[] @relation("user_roles")
 
+  // Invitations this user sent, accepted and revoked
+  invitationsSent    UserInvitation[] @relation("InvitationInvitedBy")
+  invitationAccepted UserInvitation[] @relation("InvitationAcceptedUser")
+  invitationsRevoked UserInvitation[] @relation("InvitationRevokedBy")
+
+  // Plain lookup index, NOT a constraint. Login now loads every candidate row
+  // for an address across tenants, so this is the index that read walks.
+  @@index([email])
   @@map("users")
 }
 
@@ -193,20 +218,50 @@ model Permission {
 // 7. DEVICE SESSIONS
 // ==========================================
 model DeviceSession {
-  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId           String   @map("user_id") @db.Uuid
-  refreshTokenHash String   @unique @map("refresh_token_hash") @db.VarChar(255)
-  deviceName       String?  @map("device_name") @db.VarChar(100)
-  ipAddress        String   @map("ip_address") @db.VarChar(45)
-  userAgent        String   @map("user_agent") @db.Text
-  isTrusted        Boolean  @default(false) @map("is_trusted")
-  expiresAt        DateTime @map("expires_at") @db.Timestamptz
-  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  id     String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId String @map("user_id") @db.Uuid
+
+  // SHA-256 (hex) of the opaque refresh token, NOT bcrypt. bcrypt salts
+  // randomly, so the same token hashes differently every time and could never
+  // be found by this unique index -- you would have to scan every session and
+  // compare one by one. SHA-256 is safe here precisely because the token is 32
+  // random bytes: bcrypt's slowness exists to protect LOW-entropy human
+  // passwords from guessing, which is not the threat model for a 256-bit secret.
+  refreshTokenHash String @unique @map("refresh_token_hash") @db.VarChar(64)
+
+  // Constant across refresh-token rotations. Presenting an already-rotated
+  // token is evidence of theft, and the correct response is to revoke the whole
+  // family rather than just the one row.
+  familyId String @default(dbgenerated("gen_random_uuid()")) @map("family_id") @db.Uuid
+
+  // Set when this token is exchanged for a successor. The row is KEPT rather
+  // than deleted precisely so a later replay of the spent token is detectable:
+  // if it were deleted, replay would look identical to an unknown token and the
+  // theft would go unnoticed. Pruned by a scheduled job once expiresAt passes.
+  rotatedAt DateTime? @map("rotated_at") @db.Timestamptz
+
+  // SHA-256 of the "remember this device" secret. Deliberately a SEPARATE
+  // column from refreshTokenHash: the refresh token rotates on every use, while
+  // device trust must survive those rotations for its full 30-day life.
+  deviceTokenHash String? @unique @map("device_token_hash") @db.VarChar(64)
+
+  // When trust lapses, independent of the session's own expiresAt.
+  trustedUntil DateTime? @map("trusted_until") @db.Timestamptz
+
+  deviceName String?  @map("device_name") @db.VarChar(100)
+  ipAddress  String   @map("ip_address") @db.VarChar(45)
+  userAgent  String   @map("user_agent") @db.Text
+  isTrusted  Boolean  @default(false) @map("is_trusted")
+  expiresAt  DateTime @map("expires_at") @db.Timestamptz
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId])
+  @@index([familyId])
+  @@index([expiresAt])
   @@map("device_sessions")
 }
 
@@ -265,9 +320,14 @@ model Otp {
 // 10. PASSWORD RESET TOKENS
 // ==========================================
 model PasswordResetToken {
-  id        String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId    String @map("user_id") @db.Uuid
-  tokenHash String @unique @map("token_hash") @db.VarChar(255)
+  id     String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId String @map("user_id") @db.Uuid
+
+  // SHA-256 (hex) of the emailed token, for the same reason as
+  // DeviceSession.refreshTokenHash: a @unique column must be looked up BY VALUE,
+  // which a randomly-salted bcrypt hash makes impossible. The raw token exists
+  // only in the email; it is never stored.
+  tokenHash String @unique @map("token_hash") @db.VarChar(64)
 
   // Request provenance, surfaced in the reset email ("this request came from
   // Chrome on macOS, 203.0.113.7") and in audit_logs.
@@ -285,4 +345,74 @@ model PasswordResetToken {
   @@index([userId])
   @@index([expiresAt])
   @@map("password_reset_tokens")
+}
+
+// ==========================================
+// 11. USER INVITATIONS
+// ==========================================
+/// Tokenized offer of tenant membership (RDM Table 28).
+///
+/// A sibling of Otp and PasswordResetToken, but keyed to an organization +
+/// address rather than a user_id — the recipient has no account yet, which is
+/// the entire point. Invitations are how someone whose email domain does NOT
+/// match the tenant gets in.
+model UserInvitation {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  organizationId String @map("organization_id") @db.Uuid
+  email          String @db.VarChar(255)
+
+  /// SHA-256 hex of a 32-byte URL-safe token. The raw value exists only in the
+  /// emailed link — same by-value-lookup discipline as PasswordResetToken, and
+  /// the same reason it is not bcrypt (see utils.hashToken).
+  tokenHash String @unique @map("token_hash") @db.VarChar(64)
+
+  /// A plain string, not a Prisma enum — same convention as
+  /// `organizations.status`.
+  ///
+  /// The allowed values live in `InvitationStatus` in `@synapsedesk/common`,
+  /// which is the single definition both services already share. A Postgres
+  /// enum would be a SECOND source of truth that only auth-service can see, and
+  /// adding a member to it requires a migration rather than an edit.
+  status String @default("PENDING") @db.VarChar(50)
+
+  /// PROPOSALS, not facts — deliberately arrays rather than FK relations.
+  /// Validated at redemption, so a role or department deleted during the 7-day
+  /// window is skipped and reported, never fatal. An FK would make the delete
+  /// either impossible or silently destructive.
+  roleIds             String[] @map("role_ids") @db.Uuid
+  departmentIds       String[] @map("department_ids") @db.Uuid
+  primaryDepartmentId String?  @map("primary_department_id") @db.Uuid
+
+  invitedById String? @map("invited_by_id") @db.Uuid
+
+  /// Groups one bulk import so a 200-row paste can be reported on as a unit.
+  batchId String? @map("batch_id") @db.Uuid
+
+  resentCount Int      @default(0) @map("resent_count")
+  lastSentAt  DateTime @default(now()) @map("last_sent_at") @db.Timestamptz
+
+  acceptedUserId String?   @map("accepted_user_id") @db.Uuid
+  acceptedAt     DateTime? @map("accepted_at") @db.Timestamptz
+  revokedById    String?   @map("revoked_by_id") @db.Uuid
+  revokedAt      DateTime? @map("revoked_at") @db.Timestamptz
+
+  expiresAt DateTime @map("expires_at") @db.Timestamptz
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invitedBy    User?        @relation("InvitationInvitedBy", fields: [invitedById], references: [id], onDelete: SetNull)
+  acceptedUser User?        @relation("InvitationAcceptedUser", fields: [acceptedUserId], references: [id], onDelete: SetNull)
+  revokedBy    User?        @relation("InvitationRevokedBy", fields: [revokedById], references: [id], onDelete: SetNull)
+
+  /// One OUTSTANDING invite per address per tenant. Partial (status = PENDING),
+  /// so it cannot be @@unique — applied by applyPartialIndexes() in the seed,
+  /// same as users.email:
+  ///   CREATE UNIQUE INDEX user_invitations_pending_key
+  ///     ON user_invitations (organization_id, email) WHERE status = 'PENDING';
+  @@index([organizationId, status])
+  @@index([expiresAt])
+  @@index([batchId])
+  @@map("user_invitations")
 }

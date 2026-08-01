@@ -1,0 +1,89 @@
+syntax = "proto3";
+
+package synapsedesk.auth;
+
+import "google/protobuf/timestamp.proto";
+import "synapsedesk/auth/common.proto";
+
+// TOTP enrolment, the login challenge, and backup codes.
+
+message GenerateTwoFactorRequest {
+  string user_id = 1;
+}
+
+message GenerateTwoFactorResponse {
+  // otpauth:// URI, for users who type the secret in manually.
+  string otpauth_uri = 1;
+  // The same URI as a QR data URL, ready to drop into an <img src>.
+  string qr_code_data_url = 2;
+}
+
+message ActivateTwoFactorRequest {
+  string user_id = 1;
+  string code = 2;
+}
+
+message ActivateTwoFactorResponse {
+  // Shown to the user EXACTLY once -- only hashes are stored.
+  repeated string backup_codes = 1;
+}
+
+// Second leg of login: exchanges the short-lived two_factor_token for real
+// tokens. Accepts either a TOTP code or a backup code.
+message AuthenticateTwoFactorRequest {
+  string two_factor_token = 1;
+  optional string code = 2;
+  optional string backup_code = 3;
+
+  // "Remember this device for 30 days" -- the only sanctioned way to be issued
+  // a device_token.
+  bool remember_device = 4;
+  optional string device_name = 5;
+}
+
+message AuthenticateTwoFactorResponse {
+  string access_token = 1;
+  string refresh_token = 2;
+  UserResponse user = 3;
+  // Set only when remember_device was true.
+  optional string device_token = 4;
+  // e.g. "You only have 2 backup codes left."
+  optional string warning = 5;
+}
+
+message DisableTwoFactorRequest {
+  string user_id = 1;
+  string code = 2;
+  string password = 3;
+}
+
+message DisableTwoFactorResponse {}
+
+message RegenerateBackupCodesRequest {
+  string user_id = 1;
+  string password = 2;
+}
+
+message RegenerateBackupCodesResponse {
+  repeated string backup_codes = 1;
+}
+
+message BackupCodesStatusRequest {
+  string user_id = 1;
+}
+
+// Metadata only -- never hashes, never plaintext.
+message BackupCodesStatusResponse {
+  int32 remaining = 1;
+  int32 used = 2;
+  optional google.protobuf.Timestamp expires_at = 3;
+}
+
+service TwoFactorAuthService {
+  rpc GenerateTwoFactor(GenerateTwoFactorRequest) returns (GenerateTwoFactorResponse);
+  rpc ActivateTwoFactor(ActivateTwoFactorRequest) returns (ActivateTwoFactorResponse);
+  rpc AuthenticateTwoFactor(AuthenticateTwoFactorRequest) returns (AuthenticateTwoFactorResponse);
+  rpc DisableTwoFactor(DisableTwoFactorRequest) returns (DisableTwoFactorResponse);
+  rpc RegenerateBackupCodes(RegenerateBackupCodesRequest) returns (RegenerateBackupCodesResponse);
+  rpc GetBackupCodesStatus(BackupCodesStatusRequest) returns (BackupCodesStatusResponse);
+}

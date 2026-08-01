@@ -1,0 +1,41 @@
+version: v2
+
+# Paths are relative to THIS file, so buf config lives next to the protos it
+# governs and `libs/grpc-proto` stays self-contained.
+modules:
+  - path: src/proto
+
+lint:
+  use:
+    - STANDARD
+  except:
+    # STANDARD requires a version suffix (`synapsedesk.auth.v1`). Skipped
+    # deliberately: this package is internal to the monorepo — both peers ship
+    # from one repo, so there is never a need to run two incompatible versions
+    # side by side, and additive-only changes cover the rolling-deploy window.
+    #
+    # The tradeoff is that `buf breaking` becomes the ONLY guard against a
+    # wire-incompatible change, since there is no v2 escape hatch. Keep it in CI.
+    - PACKAGE_VERSION_SUFFIX
+    # STANDARD requires every RPC to have its own uniquely-named request and
+    # response message (`<Method>Request` / `<Method>Response`). That rule exists
+    # so one RPC's payload can evolve without dragging another's along, and it is
+    # a good default — but here the sharing is deliberate and load-bearing:
+    #
+    #   Login / LoginWithTenant / GoogleSignIn  -> all return LoginResponse
+    #   VerifyEmail / VerifyPhone               -> share VerifyOtpRequest/Response
+    #
+    # The gateway's `toLoginResult()` exists precisely because those three RPCs
+    # return one shape; splitting them would mean three identical messages and
+    # three identical mappers — the exact silent-divergence hazard that
+    # common.proto was created to avoid.
+    #
+    # Revisit if any of these responses ever needs to diverge: at that point the
+    # split is real work rather than a rename, and the rule should come back on.
+    - RPC_REQUEST_RESPONSE_UNIQUE
+    - RPC_REQUEST_STANDARD_NAME
+    - RPC_RESPONSE_STANDARD_NAME
+
+breaking:
+  use:
+    - FILE

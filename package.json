@@ -1,19 +1,32 @@
 {
   "name": "synapsedesk",
   "private": true,
+  "packageManager": "npm@11.9.0",
   "workspaces": [
     "apps/*",
     "libs/*"
   ],
   "scripts": {
+    "test": "jest --projects apps/*/jest.config.ts",
     "test:all": "jest --projects apps/*/jest.config.ts",
     "test:auth": "jest --config apps/auth-service/jest.config.ts",
+    "test:watch": "jest --projects apps/*/jest.config.ts --watch",
     "build": "turbo run build",
     "dev": "turbo run dev",
     "lint": "turbo run lint",
-    "clean": "turbo run clean && rimraf node_modules"
+    "lint:fix": "turbo run lint -- --fix",
+    "format": "prettier --write \"{apps,libs,scripts}/**/*.{ts,mjs,json}\" \"*.{ts,mjs,json,yaml}\"",
+    "format:check": "prettier --check \"{apps,libs,scripts}/**/*.{ts,mjs,json}\" \"*.{ts,mjs,json,yaml}\"",
+    "typecheck": "tsc -p tsconfig.json --noEmit --tsBuildInfoFile node_modules/.cache/typecheck.tsbuildinfo",
+    "clean": "turbo run clean",
+    "clean:all": "turbo run clean && rimraf node_modules \"apps/*/node_modules\" \"libs/*/node_modules\" \".turbo\" \"apps/*/.turbo\" \"libs/*/.turbo\"",
+    "keys:generate": "node scripts/generate-jwt-keys.mjs",
+    "proto:generate": "npm run proto:generate -w @synapsedesk/grpc-proto",
+    "proto:lint": "npm run proto:lint -w @synapsedesk/grpc-proto",
+    "proto:breaking": "npm run proto:breaking -w @synapsedesk/grpc-proto"
   },
   "devDependencies": {
+    "@bufbuild/buf": "^1.72.0",
     "@eslint/js": "^10.0.1",
     "@types/node": "^26.1.1",
     "eslint": "^10.7.0",

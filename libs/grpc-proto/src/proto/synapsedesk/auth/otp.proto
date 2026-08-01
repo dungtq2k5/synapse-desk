@@ -1,0 +1,71 @@
+syntax = "proto3";
+
+package synapsedesk.auth;
+
+import "google/protobuf/timestamp.proto";
+
+// Email and phone ownership challenges. No common.proto import -- nothing here
+// returns a user.
+
+message RequestEmailVerificationRequest {
+  string user_id = 1;
+}
+
+message RequestPhoneVerificationRequest {
+  string user_id = 1;
+  // Becomes otps.target. Carrying it here lets ONE endpoint serve both
+  // first-time verification and change-of-number: users.phone_number is not
+  // touched until a code for that exact target verifies.
+  string phone_number = 2;
+}
+
+message RequestOtpResponse {
+  // Masked, so the UI can say "we sent a code to +44 ***** 1234".
+  string target = 1;
+  int32 expires_in_minutes = 2;
+}
+
+message VerifyOtpRequest {
+  string user_id = 1;
+  string code = 2;
+}
+
+message VerifyOtpResponse {
+  bool verified = 1;
+  int32 attempts_remaining = 2;
+  // True once the code is burned: the client must request a new one rather than
+  // keep retrying.
+  bool must_request_new_code = 3;
+}
+
+// Enumerated rather than a free string, so an unknown purpose is impossible to
+// send instead of something the server has to validate and reject. protoc emits
+// it as a numeric enum on both sides; the mapper bridges it to the domain enum
+// that `otps.purpose` stores as text.
+enum OtpPurpose {
+  // Proto3 requires a 0 member, and it doubles as "the caller forgot this
+  // field" — rejected explicitly rather than defaulting to a real purpose.
+  OTP_PURPOSE_UNSPECIFIED = 0;
+  OTP_PURPOSE_EMAIL_VERIFICATION = 1;
+  OTP_PURPOSE_PHONE_VERIFICATION = 2;
+}
+
+message OtpStatusRequest {
+  string user_id = 1;
+  OtpPurpose purpose = 2;
+}
+
+message OtpStatusResponse {
+  bool pending = 1;
+  optional string target = 2;
+  optional google.protobuf.Timestamp expires_at = 3;
+  int32 attempts_remaining = 4;
+}
+
+service OtpService {
+  rpc RequestEmailVerification(RequestEmailVerificationRequest) returns (RequestOtpResponse);
+  rpc VerifyEmail(VerifyOtpRequest) returns (VerifyOtpResponse);
+  rpc RequestPhoneVerification(RequestPhoneVerificationRequest) returns (RequestOtpResponse);
+  rpc VerifyPhone(VerifyOtpRequest) returns (VerifyOtpResponse);
+  rpc GetOtpStatus(OtpStatusRequest) returns (OtpStatusResponse);
+}

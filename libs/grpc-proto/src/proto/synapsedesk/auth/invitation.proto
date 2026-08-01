@@ -1,0 +1,129 @@
+syntax = "proto3";
+
+package synapsedesk.auth;
+
+import "google/protobuf/timestamp.proto";
+import "synapsedesk/auth/common.proto";
+
+// Tokenized offers of tenant membership.
+
+enum InvitationStatus {
+  INVITATION_STATUS_UNSPECIFIED = 0;
+  INVITATION_STATUS_PENDING = 1;
+  INVITATION_STATUS_ACCEPTED = 2;
+  INVITATION_STATUS_REVOKED = 3;
+  INVITATION_STATUS_EXPIRED = 4;
+}
+
+message InviteUserInput {
+  string email = 1;
+  repeated string role_ids = 2;
+  repeated string department_ids = 3;
+  optional string primary_department_id = 4;
+}
+
+// Accepts a BATCH always -- a single invite is a one-element list. One typo in
+// a 200-row paste must not discard 199 good invitations, which is why the
+// response reports per-address outcomes rather than failing as a unit.
+message CreateInvitationsRequest {
+  string organization_id = 1;
+  string invited_by_id = 2;
+  repeated InviteUserInput invitations = 3;
+}
+
+message InvitationResponse {
+  string id = 1;
+  string email = 2;
+  InvitationStatus status = 3;
+  repeated string role_ids = 4;
+  repeated string department_ids = 5;
+  optional string primary_department_id = 6;
+  optional string invited_by_name = 7;
+  int32 resent_count = 8;
+  google.protobuf.Timestamp last_sent_at = 9;
+  google.protobuf.Timestamp expires_at = 10;
+  google.protobuf.Timestamp created_at = 11;
+}
+
+message FailedInvitation {
+  string email = 1;
+  string reason = 2;
+}
+
+message CreateInvitationsResponse {
+  repeated InvitationResponse created = 1;
+  repeated FailedInvitation failed = 2;
+  optional string batch_id = 3;
+}
+
+message ListInvitationsRequest {
+  string organization_id = 1;
+  optional InvitationStatus status = 2;
+  int32 page = 3;
+  int32 limit = 4;
+  optional string search_term = 5;
+}
+
+message ListInvitationsResponse {
+  repeated InvitationResponse items = 1;
+  int32 total_items = 2;
+}
+
+message InvitationIdRequest {
+  string organization_id = 1;
+  string invitation_id = 2;
+  // Stamped onto revoked_by_id / used for the resend audit trail.
+  string actor_id = 3;
+}
+
+message RevokeInvitationResponse {}
+
+// PUBLIC preview, so the invitee sees who invited them before signing up.
+// Discloses org and inviter name, hence the IP rate limit at the gateway.
+message PreviewInvitationRequest {
+  string token = 1;
+}
+
+message PreviewInvitationResponse {
+  bool valid = 1;
+  optional string organization_name = 2;
+  optional string inviter_name = 3;
+  // Masked -- the token holder already knows the address, but a guesser must
+  // not learn one.
+  optional string email = 4;
+  repeated string role_names = 5;
+  optional google.protobuf.Timestamp expires_at = 6;
+}
+
+message AcceptInvitationRequest {
+  string token = 1;
+  string full_name = 2;
+  string password = 3;
+  optional string device_name = 4;
+}
+
+message AcceptInvitationResponse {
+  string access_token = 1;
+  string refresh_token = 2;
+  UserResponse user = 3;
+  // Role or department ids that no longer resolved at redemption. Reported,
+  // never fatal: a department deleted on day 3 must not strand a legitimate
+  // invitee on day 6.
+  repeated string skipped = 4;
+}
+
+message ExpireStaleInvitationsRequest {}
+
+message ExpireStaleInvitationsResponse {
+  int32 expired_count = 1;
+}
+
+service InvitationService {
+  rpc CreateInvitations(CreateInvitationsRequest) returns (CreateInvitationsResponse);
+  rpc ListInvitations(ListInvitationsRequest) returns (ListInvitationsResponse);
+  rpc ResendInvitation(InvitationIdRequest) returns (InvitationResponse);
+  rpc RevokeInvitation(InvitationIdRequest) returns (RevokeInvitationResponse);
+  rpc PreviewInvitation(PreviewInvitationRequest) returns (PreviewInvitationResponse);
+  rpc AcceptInvitation(AcceptInvitationRequest) returns (AcceptInvitationResponse);
+  rpc ExpireStaleInvitations(ExpireStaleInvitationsRequest) returns (ExpireStaleInvitationsResponse);
+}

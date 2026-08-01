@@ -3,6 +3,13 @@
   "compilerOptions": {
     "outDir": "./dist"
   },
+  // Own source only. A library MUST NOT compile application source — the
+  // dependency runs the other way, and `libs/common/src` references api-gateway
+  // nowhere. These three entries were left behind by the decorator move, and
+  // one of them (`src/types`) no longer exists: `express.d.ts` now lives in
+  // `src/common/types`. Pulling the gateway's guards in WITHOUT that
+  // augmentation is what made `req.user` resolve as `User` instead of
+  // `MaybeJwtPayload` and broke `tsc` here while the gateway's own build passed.
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]
 }

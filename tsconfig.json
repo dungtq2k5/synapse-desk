@@ -1,5 +1,10 @@
 {
-  "include": ["apps/*/src/**/*", "apps/*/prisma.config.ts", "apps/*/jest.config.ts", "libs/*/src/**/*", "jest.config.base.ts"],
+  // jest.config.ts / jest.config.base.ts are deliberately absent: jest evaluates
+  // them itself as ESM, which requires the explicit `.ts` import extension that
+  // tsc rejects (TS5097) unless `allowImportingTsExtensions` is set — and that
+  // flag demands noEmit, which would break `nest build`. They are tooling
+  // config, not part of the compiled program.
+  "include": ["apps/*/src/**/*", "apps/*/prisma.config.ts", "libs/*/src/**/*"],
   "exclude": ["node_modules", "dist"],
   "compilerOptions": {
     "module": "commonjs",
@@ -25,6 +30,6 @@
       "@synapsedesk/common/*": ["libs/common/src/*"],
       "@synapsedesk/grpc-proto": ["libs/grpc-proto/src/index.ts"],
       "@synapsedesk/grpc-proto/*": ["libs/grpc-proto/src/*"]
-    },
+    }
   }
 }

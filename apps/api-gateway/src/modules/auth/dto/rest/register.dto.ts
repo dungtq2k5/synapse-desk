@@ -1,8 +1,14 @@
 import {
+  MAX_FULL_NAME_LENGTH,
+  MIN_FULL_NAME_LENGTH,
+} from 'apps/api-gateway/src/common/config/app.config';
+import {
   IsEmail,
   IsNotEmpty,
   IsString,
   IsStrongPassword,
+  MaxLength,
+  MinLength,
 } from 'class-validator';
 
 export class RegisterDto {
@@ -14,5 +20,17 @@ export class RegisterDto {
 
   @IsNotEmpty()
   @IsString()
+  @MinLength(MIN_FULL_NAME_LENGTH)
+  @MaxLength(MAX_FULL_NAME_LENGTH)
   readonly fullName!: string;
+}
+
+export class RegisterResponseDto {
+  readonly userId!: string;
+
+  readonly organizationId!: string;
+
+  readonly email!: string;
+
+  readonly requiresEmailVerification!: boolean;
 }

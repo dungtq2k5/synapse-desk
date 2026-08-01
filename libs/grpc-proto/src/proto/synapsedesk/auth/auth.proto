@@ -1,0 +1,154 @@
+syntax = "proto3";
+
+package synapsedesk.auth;
+
+import "synapsedesk/auth/common.proto";
+
+// Sessions and credentials: register, login (with its tenant-selection and 2FA
+// branches), logout, refresh, Google sign-in and password reset.
+
+message RegisterRequest {
+  string email = 1;
+  string password = 2;
+  string full_name = 3;
+}
+
+message RegisterResponse {
+  string user_id = 1;
+  string organization_id = 2;
+  string email = 3;
+  bool requires_email_verification = 4;
+}
+
+message LoginRequest {
+  string email = 1;
+  string password = 2;
+
+  // Display label for the "your active sessions" screen ("Chrome on macOS").
+  // Client-supplied and therefore NEVER usable for a security decision.
+  optional string device_name = 3;
+
+  // Opaque secret issued by the server after a successful 2FA challenge when
+  // the user asked to remember the device. Travels in its own HttpOnly cookie,
+  // never in the REST body. Its security value is that it is unguessable, not
+  // merely hard to forge -- which is exactly why device_name cannot do this job.
+  optional string device_token = 4;
+}
+
+// One tenant a caller may sign in to. Emitted ONLY after a password verified —
+// before that it would be an unauthenticated "which tenants own this address?"
+// oracle.
+message TenantOption {
+  string organization_id = 1;
+  string name = 2;
+  string slug = 3;
+}
+
+// A single response message because a gRPC method returns exactly one type.
+// THREE success shapes, and clients must branch in this order:
+//   requires_tenant_selection -> tenant_selection_token + tenants are set
+//   requires_two_factor       -> two_factor_token is set
+//   neither                   -> access_token / refresh_token / user are set
+//
+// Tenant selection is checked FIRST because 2FA policy is per-tenant
+// (organizations.enforce_two_factor), so it is unanswerable until the tenant is
+// known.
+message LoginResponse {
+  bool requires_two_factor = 1;
+
+  optional string access_token = 2;
+  optional string refresh_token = 3;
+  UserResponse user = 4;
+
+  optional string two_factor_token = 5;
+
+  bool requires_tenant_selection = 6;
+  optional string tenant_selection_token = 7;
+  repeated TenantOption tenants = 8;
+}
+
+// Second leg of a multi-tenant login. The token is what authorizes it: the
+// organization_id alone is a claim, and would let anyone select any tenant.
+message LoginWithTenantRequest {
+  string tenant_selection_token = 1;
+  string organization_id = 2;
+  optional string device_name = 3;
+  optional string device_token = 4;
+}
+
+// Google sign-in via Firebase. The gateway forwards the ID token the Firebase
+// client SDK obtained in the browser; auth-service verifies it against Google's
+// public keys, so no password ever exists for these accounts.
+message GoogleSignInRequest {
+  string id_token = 1;
+  optional string device_name = 2;
+  optional string device_token = 3;
+}
+
+message LogoutRequest {
+  // Identifies WHICH session to end. The gateway reads it from the refresh
+  // cookie; there is no user_id, because possession of the token is the proof.
+  string refresh_token = 1;
+
+  // "Log out of all devices" (RDM §1.5) -- revokes every session for the owner
+  // of that token, trusted devices included.
+  bool all_devices = 2;
+}
+
+message LogoutResponse {
+  int32 revoked_session_count = 1;
+}
+
+message RefreshTokenRequest {
+  string refresh_token = 1;
+}
+
+message RefreshTokenResponse {
+  string access_token = 1;
+  // Rotated: every refresh mints a new token and burns the old one.
+  string refresh_token = 2;
+  UserResponse user = 3;
+}
+
+message ForgotPasswordRequest {
+  string email = 1;
+}
+
+// Deliberately carries no state: the endpoint answers identically whether or
+// not the address exists, so it cannot be used to enumerate accounts.
+message ForgotPasswordResponse {}
+
+message ValidatePasswordResetTokenRequest {
+  string token = 1;
+}
+
+message ValidatePasswordResetTokenResponse {
+  bool valid = 1;
+  // Masked, and only ever set when valid = true.
+  optional string email = 2;
+}
+
+message ResetPasswordRequest {
+  string token = 1;
+  string new_password = 2;
+}
+
+message ResetPasswordResponse {
+  // Sessions destroyed by the reset -- surfaced so the UI can say
+  // "you have been signed out of N devices".
+  int32 revoked_session_count = 1;
+}
+
+service AuthService {
+  rpc Register(RegisterRequest) returns (RegisterResponse);
+  rpc Login(LoginRequest) returns (LoginResponse);
+  rpc LoginWithTenant(LoginWithTenantRequest) returns (LoginResponse);
+  // Returns the same LoginResponse as Login: a Google account may still have
+  // 2FA enabled, so the challenge branch has to be reachable here too.
+  rpc GoogleSignIn(GoogleSignInRequest) returns (LoginResponse);
+  rpc Logout(LogoutRequest) returns (LogoutResponse);
+  rpc RefreshToken(RefreshTokenRequest) returns (RefreshTokenResponse);
+  rpc ForgotPassword(ForgotPasswordRequest) returns (ForgotPasswordResponse);
+  rpc ValidatePasswordResetToken(ValidatePasswordResetTokenRequest) returns (ValidatePasswordResetTokenResponse);
+  rpc ResetPassword(ResetPasswordRequest) returns (ResetPasswordResponse);
+}

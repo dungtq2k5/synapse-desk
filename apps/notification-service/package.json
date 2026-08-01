@@ -1,0 +1,29 @@
+{
+  "name": "@synapsedesk/notification-service",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "nest build",
+    "dev": "nest start --watch",
+    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\"",
+    "clean": "rimraf dist *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@nestjs/common": "^11.1.28",
+    "@nestjs/config": "^4.0.4",
+    "@nestjs/core": "^11.1.28",
+    "@nestjs/microservices": "^11.1.28",
+    "@synapsedesk/common": "*",
+    "dotenv": "^17.4.2",
+    "joi": "^18.2.3",
+    "nats": "^2.29.3",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "nodemailer": "^8.0.1",
+    "twilio": "^5.10.2"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^11.0.24",
+    "@types/nodemailer": "^8.0.1",
+    "typescript": "^6.0.3"
+  }
+}

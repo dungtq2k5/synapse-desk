@@ -6,7 +6,13 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['eslint.config.mjs', '**/dist/**', '**/node_modules/**'],
+    ignores: [
+      'eslint.config.mjs',
+      '**/dist/**',
+      '**/node_modules/**',
+      // Prisma client output — regenerated from schema.prisma, never hand-edited.
+      '**/generated/**',
+    ],
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
@@ -19,7 +25,11 @@ export default tseslint.config(
       },
       sourceType: 'commonjs',
       parserOptions: {
-        project: ['./tsconfig.json', './apps/*/tsconfig.json', './libs/*/tsconfig.json'],
+        project: [
+          './tsconfig.json',
+          './apps/*/tsconfig.json',
+          './libs/*/tsconfig.json',
+        ],
         tsconfigRootDir: import.meta.dirname,
       },
     },
@@ -29,7 +39,7 @@ export default tseslint.config(
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-floating-promises': 'warn',
       '@typescript-eslint/no-unsafe-argument': 'warn',
-      "prettier/prettier": ["error", { endOfLine: "auto" }],
+      'prettier/prettier': ['error', { endOfLine: 'auto' }],
     },
   },
   {

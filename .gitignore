@@ -5,3 +5,17 @@ cspell.json
 .env
 *.tsbuildinfo
 .claude/
+
+# Turborepo per-package task logs and local cache. One appears in every
+# workspace the moment a turbo task runs, and the contents are machine-specific.
+.turbo/
+
+# Prisma client output — rebuilt by `prisma generate` (wired to postinstall).
+# Deliberately narrow: libs/grpc-proto/src/generated IS committed.
+**/src/generated/prisma/
+
+# Credentials — never commit. Regenerate keys with scripts/generate-jwt-keys.mjs
+secrets/
+*.key
+*.pem
+**/serviceAccountKey.json
