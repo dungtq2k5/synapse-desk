@@ -1,13 +1,18 @@
 #!/usr/bin/env node
 /**
- * Copies the .proto files into a service's build output.
+ * Copies the .proto files into the grpc-proto library's build output.
  *
- *   node ../../scripts/copy-protos.mjs dist/libs/grpc-proto/src/proto
+ *   node ../../scripts/copy-protos.mjs dist/proto
  *
- * `nest build` only emits JavaScript, and `PROTO_ROOT` resolves relative to the
+ * `tsc` only emits JavaScript, and `PROTO_ROOT` resolves relative to the
  * compiled file's own directory (`__dirname`) — so at runtime the built code
  * looks for a .proto that tsc never copied. gRPC's loader reads the .proto at
  * startup, which means a production container fails to boot, not later.
+ *
+ * Run by the LIBRARY's build rather than each service's, because services now
+ * resolve `@synapsedesk/grpc-proto` through node_modules to
+ * `libs/grpc-proto/dist/index.js` — so that is the only `__dirname` the loader
+ * ever sees, no matter which service is running.
  *
  * The copy is recursive and preserves the synapsedesk/auth/ tree, which the
  * loader's includeDirs depends on to resolve `import` statements between protos.

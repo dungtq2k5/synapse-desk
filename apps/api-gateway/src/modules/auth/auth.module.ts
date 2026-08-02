@@ -23,6 +23,7 @@ import { Jwt2faStrategy } from '../../strategies/jwt-2fa.strategy';
 import { Jwt2faGuard } from '../../common/guards/jwt-2fa.guard';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { GuestGuard } from '../../common/guards/guest.guard';
+import { TwoFactorEnrolmentGuard } from '../../common/guards/two-factor-enrolment.guard';
 
 @Module({
   imports: [
@@ -68,15 +69,26 @@ import { GuestGuard } from '../../common/guards/guest.guard';
     JwtAuthGuard,
     Jwt2faGuard,
     GuestGuard,
+    TwoFactorEnrolmentGuard,
   ],
-  // ClientsModule is re-exported so sibling modules (OtpModule) can inject the
-  // same AUTH_GRPC_CLIENT rather than opening a second connection to one peer.
+  // ClientsModule is re-exported so sibling modules (OtpModule, DepartmentsModule)
+  // can inject the same AUTH_GRPC_CLIENT rather than opening a second connection
+  // to one peer.
+  //
+  // JwtModule is re-exported because a guard applied with `@UseGuards(Class)` is
+  // instantiated by the module that declares the CONTROLLER, not by the module
+  // that provides the guard — so `JwtService` has to be resolvable in the
+  // importing module's injector. Exporting GuestGuard alone is not enough, and
+  // the failure is a boot-time UnknownDependenciesException naming the importing
+  // module rather than this one.
   exports: [
     AuthService,
     JwtAuthGuard,
     GuestGuard,
     JwtCookieService,
     ClientsModule,
+    JwtModule,
+    PassportModule,
   ],
 })
 export class AuthModule {}

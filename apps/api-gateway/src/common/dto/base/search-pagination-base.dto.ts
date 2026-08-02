@@ -4,7 +4,7 @@ import {
   DEFAULT_SEARCH,
   SORT_ORDER_OPTIONS,
   type SortOrder,
-} from '../../config/app.config';
+} from '@synapsedesk/common';
 
 export class SearchPaginationBase {
   @IsOptional()
@@ -25,6 +25,16 @@ export class SearchPaginationBase {
   @IsString()
   searchTerm?: string;
 
+  /**
+   * Default sort column. `createdAt` suits most resources, but NOT all —
+   * `user_departments` has `assignedAt` and no `createdAt` at all — so a list
+   * DTO whose resource differs MUST override this default.
+   *
+   * Getting it wrong is not a cosmetic problem: the service allowlists sortable
+   * columns and rejects anything else with 400, so an unoverridden default
+   * makes the endpoint fail on a request with NO query parameters at all —
+   * i.e. every default call from the UI.
+   */
   @IsOptional()
   @IsString()
   sortBy: string = DEFAULT_SEARCH.SORT_BY;

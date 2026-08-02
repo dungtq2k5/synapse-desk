@@ -1,0 +1,165 @@
+syntax = "proto3";
+
+package synapsedesk.auth;
+
+import "google/protobuf/timestamp.proto";
+
+// The caller's OWN tenant. Every RPC here resolves the organization from the
+// verified caller context -- there is no id field anywhere in this file, so
+// there is no request in which a tenant admin can name someone else's
+// workspace. Cross-tenant reads belong to the platform API.
+
+message OrganizationResponse {
+  string id = 1;
+  string name = 2;
+  string slug = 3;
+  optional string domain = 4;
+
+  // PENDING_ONBOARDING | ACTIVE | SUSPENDED_PAST_DUE | FROZEN
+  string status = 5;
+
+  bool enforce_two_factor = 6;
+  repeated string allowed_email_domains = 7;
+
+  int32 max_agent_seats = 8;
+  // int64 on the wire; both are byte counts that exceed 2^31 on any real plan.
+  int64 max_storage_bytes = 9;
+  int64 monthly_ai_token_budget = 10;
+  google.protobuf.Timestamp billing_cycle_start = 11;
+
+  google.protobuf.Timestamp created_at = 12;
+  google.protobuf.Timestamp updated_at = 13;
+}
+
+message GetCurrentOrganizationRequest {}
+
+/**
+ * The tenant lifecycle gate's lookup. Deliberately TINY and by-id.
+ *
+ * It runs on essentially every authenticated request, so it must not be
+ * `GetCurrentOrganization` — that returns quotas, domains and timestamps the
+ * gate never reads, and the gateway would pay to serialize all of it a few
+ * hundred times a second. The gateway caches the answer, so this is cheap even
+ * before the cache.
+ */
+message GetOrganizationStatusRequest {
+  string organization_id = 1;
+}
+
+message OrganizationStatusResponse {
+  string status = 1;
+  // True once the tenant has been offboarded. Distinct from any status: a
+  // deleted tenant must be refused even if its status still reads ACTIVE.
+  bool deleted = 2;
+}
+
+// Absent means "leave unchanged" for all three.
+message UpdateOrganizationRequest {
+  optional string name = 1;
+  optional string slug = 2;
+  // Empty string clears it.
+  optional string domain = 3;
+}
+
+message OrganizationSettingsResponse {
+  bool enforce_two_factor = 1;
+  repeated string allowed_email_domains = 2;
+
+  // Free-mail domains that were ACCEPTED but are worth a second look: anyone
+  // holding such an address could then auto-join the tenant. Reported rather
+  // than rejected, because no blocklist of these can be exhaustive -- so the
+  // useful thing is to tell the admin, not to pretend we caught them all.
+  repeated string public_domain_warnings = 3;
+}
+
+message GetOrganizationSettingsRequest {}
+
+message UpdateOrganizationSettingsRequest {
+  optional bool enforce_two_factor = 1;
+
+  // REPLACE semantics. These decide WHO CAN AUTO-JOIN the tenant at
+  // registration, so this is a security setting rather than a preference --
+  // adding a free-mail domain here would let anyone with such an address in.
+  repeated string allowed_email_domains = 2;
+  // Distinguishes "leave the list alone" from "clear it": a repeated field
+  // cannot express absence on its own, so without this an update that only
+  // touches enforce_two_factor would wipe the domains.
+  bool replace_allowed_email_domains = 3;
+}
+
+// ---------------------------------------------------------------------------
+// Usage
+// ---------------------------------------------------------------------------
+
+/**
+ * One meter. `available` is false for meters whose owning domain does not exist
+ * yet, and the numbers are then unset -- deliberately NOT zero, which would
+ * read as "no usage" rather than "unknown".
+ */
+message UsageMeter {
+  bool available = 1;
+  optional int64 used = 2;
+  optional int64 limit = 3;
+  // Why it is unavailable, for the UI to show in place of a number.
+  optional string unavailable_reason = 4;
+}
+
+message GetOrganizationUsageRequest {}
+
+message OrganizationUsageResponse {
+  // Active members PLUS pending invitations -- pending invites RESERVE seats,
+  // so this must match what the invitation path enforces or an invite gets
+  // rejected by a counter this page says has room.
+  UsageMeter seats = 1;
+  UsageMeter storage = 2;
+  UsageMeter ai_tokens = 3;
+  google.protobuf.Timestamp billing_cycle_start = 4;
+}
+
+// ---------------------------------------------------------------------------
+// Onboarding & offboarding
+// ---------------------------------------------------------------------------
+
+message OnboardingStep {
+  string key = 1;
+  string label = 2;
+  bool complete = 3;
+}
+
+message GetOnboardingRequest {}
+
+message OnboardingResponse {
+  // Derived LIVE from the data, never stored. A stored checklist drifts from
+  // reality the moment someone deletes the department they created.
+  repeated OnboardingStep steps = 1;
+  bool can_complete = 2;
+  string status = 3;
+}
+
+message CompleteOnboardingRequest {}
+
+message DeleteOrganizationRequest {
+  // Recorded in the audit trail. Offboarding is not self-service-final: a
+  // Super Admin finalises it, and they will want to know why.
+  string reason = 1;
+}
+
+message DeleteOrganizationResponse {
+  int32 revoked_session_count = 1;
+}
+
+service OrganizationService {
+  rpc GetCurrentOrganization(GetCurrentOrganizationRequest) returns (OrganizationResponse);
+  rpc GetOrganizationStatus(GetOrganizationStatusRequest) returns (OrganizationStatusResponse);
+  rpc UpdateOrganization(UpdateOrganizationRequest) returns (OrganizationResponse);
+
+  rpc GetOrganizationSettings(GetOrganizationSettingsRequest) returns (OrganizationSettingsResponse);
+  rpc UpdateOrganizationSettings(UpdateOrganizationSettingsRequest) returns (OrganizationSettingsResponse);
+
+  rpc GetOrganizationUsage(GetOrganizationUsageRequest) returns (OrganizationUsageResponse);
+
+  rpc GetOnboarding(GetOnboardingRequest) returns (OnboardingResponse);
+  rpc CompleteOnboarding(CompleteOnboardingRequest) returns (OrganizationResponse);
+
+  rpc DeleteOrganization(DeleteOrganizationRequest) returns (DeleteOrganizationResponse);
+}

@@ -10,3 +10,7 @@ export class LogoutDto {
 export class LogoutResponseDto {
   readonly revokedSessionCount!: number;
 }
+
+export class LogoutAllResponseDto {
+  readonly revokedSessionCount!: number;
+}

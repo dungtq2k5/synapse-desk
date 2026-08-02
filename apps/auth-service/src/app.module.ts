@@ -7,6 +7,10 @@ import { UsersModule } from './modules/users/users.module';
 import { OtpModule } from './modules/otp/otp.module';
 import { InvitationsModule } from './modules/invitations/invitations.module';
 import { ScheduleModule } from '@nestjs/schedule';
+import { DepartmentsModule } from './modules/departments/departments.module';
+import { SessionsModule } from './modules/sessions/sessions.module';
+import { OrganizationsModule } from './modules/organizations/organizations.module';
+import { PlatformModule } from './modules/platform/platform.module';
 
 @Module({
   imports: [
@@ -24,6 +28,10 @@ import { ScheduleModule } from '@nestjs/schedule';
     UsersModule,
     OtpModule,
     InvitationsModule,
+    DepartmentsModule,
+    SessionsModule,
+    OrganizationsModule,
+    PlatformModule,
   ],
 })
 export class AppModule {}

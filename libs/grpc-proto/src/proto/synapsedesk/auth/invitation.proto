@@ -59,14 +59,16 @@ message CreateInvitationsResponse {
 message ListInvitationsRequest {
   string organization_id = 1;
   optional InvitationStatus status = 2;
-  int32 page = 3;
-  int32 limit = 4;
-  optional string search_term = 5;
+  // Was page/limit/search_term inline. Replaced by the shared PageRequest so
+  // this list obeys the same sort allowlist and limit clamp as every other --
+  // the inline fields carried no sort_by at all, so the gateway accepted one
+  // and the service silently ignored it.
+  PageRequest page = 3;
 }
 
 message ListInvitationsResponse {
   repeated InvitationResponse items = 1;
-  int32 total_items = 2;
+  PageMeta meta = 2;
 }
 
 message InvitationIdRequest {
@@ -112,6 +114,46 @@ message AcceptInvitationResponse {
   repeated string skipped = 4;
 }
 
+// Dry run: validates a batch and reports what WOULD happen. No writes, no mail.
+//
+// For a 200-row paste this is the difference between a clean import and forty
+// support tickets -- the caller sees the already-registered addresses, the
+// typos and the projected seat overrun before committing to any of it.
+message PreviewInvitationsRequest {
+  string organization_id = 1;
+  repeated InviteUserInput invitations = 2;
+}
+
+message InvitationPreviewRow {
+  string email = 1;
+  // False when this row would be rejected; `reason` says why.
+  bool ok = 2;
+  optional string reason = 3;
+  // Role/department ids in the row that do not resolve. Reported per row so the
+  // caller can fix the mapping rather than guess which entry was wrong.
+  repeated string unknown_role_ids = 4;
+  repeated string unknown_department_ids = 5;
+}
+
+message PreviewInvitationsResponse {
+  repeated InvitationPreviewRow rows = 1;
+  int32 seats_in_use = 2;
+  int32 max_agent_seats = 3;
+  // How many of the OK rows exceed the remaining seats. Non-zero means the
+  // batch would be partially rejected at commit time.
+  int32 seat_overrun = 4;
+}
+
+// Administrative detail for ONE invitation, by id.
+//
+// Distinct from PreviewInvitation, which is the PUBLIC lookup by token: this
+// one is permission-gated and discloses the full row, that one is unauthenticated
+// and masks the address.
+message GetInvitationRequest {
+  string organization_id = 1;
+  string invitation_id = 2;
+}
+
 message ExpireStaleInvitationsRequest {}
 
 message ExpireStaleInvitationsResponse {
@@ -125,5 +167,7 @@ service InvitationService {
   rpc RevokeInvitation(InvitationIdRequest) returns (RevokeInvitationResponse);
   rpc PreviewInvitation(PreviewInvitationRequest) returns (PreviewInvitationResponse);
   rpc AcceptInvitation(AcceptInvitationRequest) returns (AcceptInvitationResponse);
+  rpc PreviewInvitations(PreviewInvitationsRequest) returns (PreviewInvitationsResponse);
+  rpc GetInvitation(GetInvitationRequest) returns (InvitationResponse);
   rpc ExpireStaleInvitations(ExpireStaleInvitationsRequest) returns (ExpireStaleInvitationsResponse);
 }

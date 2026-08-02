@@ -13,15 +13,21 @@ import {
   InvitationIdRequest,
   InvitationResponse,
   ListInvitationsRequest,
+  CallerContext,
+  GetInvitationRequest,
   ListInvitationsResponse,
+  PreviewInvitationsRequest,
+  PreviewInvitationsResponse,
   PreviewInvitationRequest,
   PreviewInvitationResponse,
   RevokeInvitationResponse,
+  toPageMeta,
   toProtoInvitationStatus,
   toTimestamp,
 } from '@synapsedesk/grpc-proto';
 import {
   EmailTemplateName,
+  INVITATION_SORTABLE_FIELDS,
   InvitationStatus,
   normalizeEmail,
   OrgStatus,
@@ -29,8 +35,16 @@ import {
   WEB_ROUTES,
 } from '@synapsedesk/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { requireTenant } from '../../common/utils/tenant-scope';
 import { AuthService } from '../auth/auth.service';
+import { RolesService } from '../roles/roles.service';
+import { OrganizationsService } from '../organizations/organizations.service';
 import { NotificationPublisher } from '../notifications/notification-publisher.service';
+import {
+  emptyPage,
+  toPrismaPage,
+  toSearchFilter,
+} from '../../common/utils/pagination';
 import {
   addDays,
   generateSecureToken,
@@ -47,6 +61,14 @@ import { Prisma, UserInvitation } from '../../generated/prisma/client';
  * A Set, not an array: membership is the only question ever asked of it, and
  * `has()` says that at the call site where `includes()` reads as a scan.
  */
+/**
+ * Good enough to catch a paste-error in a spreadsheet column, which is all the
+ * preview claims to do. The authoritative check is `@IsEmail()` on the create
+ * DTO — this one exists so a dry run can REPORT a bad row instead of rejecting
+ * the whole batch at the edge before the admin has seen it.
+ */
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 const JOINABLE_ORG_STATUSES: ReadonlySet<string> = new Set([
   OrgStatus.ACTIVE,
   OrgStatus.PENDING_ONBOARDING,
@@ -73,6 +95,8 @@ export class InvitationsService {
     private readonly configService: ConfigService,
     private readonly notifications: NotificationPublisher,
     private readonly authService: AuthService,
+    private readonly rolesService: RolesService,
+    private readonly organizationsService: OrganizationsService,
   ) {
     this.INVITATION_TTL_DAYS = this.configService.getOrThrow<number>(
       'INVITATION_TTL_DAYS',
@@ -183,8 +207,10 @@ export class InvitationsService {
       }
 
       if (
-        (await this.seatsInUse(tx, context.organizationId)) >=
-        context.maxAgentSeats
+        (await this.organizationsService.seatsInUse(
+          tx,
+          context.organizationId,
+        )) >= context.maxAgentSeats
       ) {
         throw new RpcException({
           code: status.RESOURCE_EXHAUSTED,
@@ -227,31 +253,6 @@ export class InvitationsService {
     return invitation;
   }
 
-  /**
-   * PENDING invitations RESERVE seats.
-   *
-   * Counting only active users would let an admin send 50 invites against 10
-   * seats and blow the quota the moment they were accepted (RDM §1.8). Expiry
-   * is what releases a reservation — which is what the 7-day window is for.
-   */
-  private async seatsInUse(
-    tx: Prisma.TransactionClient,
-    organizationId: string,
-  ): Promise<number> {
-    const [active, pending] = await Promise.all([
-      tx.user.count({ where: { organizationId, deletedAt: null } }),
-      tx.userInvitation.count({
-        where: {
-          organizationId,
-          status: InvitationStatus.PENDING,
-          expiresAt: { gt: new Date() },
-        },
-      }),
-    ]);
-
-    return active + pending;
-  }
-
   async listInvitations(
     request: ListInvitationsRequest,
   ): Promise<ListInvitationsResponse> {
@@ -259,21 +260,26 @@ export class InvitationsService {
       ? fromProtoInvitationStatus(request.status)
       : null;
 
+    const page = request.page ?? emptyPage();
+    const { skip, take, orderBy } = toPrismaPage(
+      page,
+      INVITATION_SORTABLE_FIELDS,
+    );
+    const search = toSearchFilter(page.searchTerm);
+
     const where: Prisma.UserInvitationWhereInput = {
       organizationId: request.organizationId,
       ...(statusFilter ? { status: statusFilter } : {}),
-      ...(request.searchTerm
-        ? { email: { contains: request.searchTerm, mode: 'insensitive' } }
-        : {}),
+      ...(search ? { email: search } : {}),
     };
 
     const [items, totalItems] = await Promise.all([
       this.prisma.userInvitation.findMany({
         where,
         include: { invitedBy: { select: { fullName: true } } },
-        orderBy: { createdAt: 'desc' },
-        skip: (request.page - 1) * request.limit,
-        take: request.limit,
+        orderBy,
+        skip,
+        take,
       }),
       this.prisma.userInvitation.count({ where }),
     ]);
@@ -282,8 +288,156 @@ export class InvitationsService {
       items: items.map((item) =>
         this.toResponse(item, item.invitedBy?.fullName ?? null),
       ),
-      totalItems,
+      meta: toPageMeta(page, totalItems, items.length),
     };
+  }
+
+  /**
+   * Dry run. Validates the whole batch and reports what WOULD happen.
+   *
+   * No writes and no mail — which is the point: for a 200-row paste this turns
+   * a partially-failed import into a reviewable list. Every check the real
+   * create performs is repeated here, so a row reported OK is one that would
+   * actually be created (barring a race in between).
+   */
+  async previewInvitations(
+    request: PreviewInvitationsRequest,
+    context: CallerContext,
+  ): Promise<PreviewInvitationsResponse> {
+    const organizationId = requireTenant(context);
+
+    const organization = await this.prisma.organization.findFirst({
+      where: { id: organizationId, deletedAt: null },
+      select: { maxAgentSeats: true },
+    });
+    if (!organization) {
+      throw new RpcException({
+        code: status.NOT_FOUND,
+        message: 'Organization not found',
+      });
+    }
+
+    const seatsInUse = await this.organizationsService.seatsInUse(
+      this.prisma,
+      organizationId,
+    );
+
+    const emails = request.invitations.map((input) =>
+      normalizeEmail(input.email),
+    );
+
+    // Three bulk reads rather than three per row: a 200-row paste would
+    // otherwise be 600 queries.
+    const [existingUsers, pendingInvites, roles, departments] =
+      await Promise.all([
+        this.prisma.user.findMany({
+          where: { email: { in: emails }, organizationId, deletedAt: null },
+          select: { email: true },
+        }),
+        this.prisma.userInvitation.findMany({
+          where: {
+            email: { in: emails },
+            organizationId,
+            status: InvitationStatus.PENDING,
+            expiresAt: { gt: new Date() },
+          },
+          select: { email: true },
+        }),
+        this.prisma.role.findMany({
+          where: {
+            OR: [
+              { organizationId },
+              { organizationId: null, isSystemRole: true },
+            ],
+          },
+          select: { id: true },
+        }),
+        this.prisma.department.findMany({
+          where: { organizationId, deletedAt: null },
+          select: { id: true },
+        }),
+      ]);
+
+    const taken = new Set(existingUsers.map((user) => user.email));
+    const pending = new Set(pendingInvites.map((invite) => invite.email));
+    const liveRoleIds = new Set(roles.map((role) => role.id));
+    const liveDepartmentIds = new Set(
+      departments.map((department) => department.id),
+    );
+
+    // Duplicates WITHIN the paste are a distinct failure from "already
+    // invited", and the commonest one in a spreadsheet export.
+    const seen = new Set<string>();
+    let okCount = 0;
+
+    const rows = request.invitations.map((input, index) => {
+      const email = emails[index];
+      const unknownRoleIds = input.roleIds.filter((id) => !liveRoleIds.has(id));
+      const unknownDepartmentIds = input.departmentIds.filter(
+        (id) => !liveDepartmentIds.has(id),
+      );
+
+      let reason: string | undefined;
+      if (!EMAIL_PATTERN.test(email)) {
+        reason = 'Not a valid email address';
+      } else if (seen.has(email)) {
+        reason = 'Duplicated within this batch';
+      } else if (taken.has(email)) {
+        reason = 'Already has an account here';
+      } else if (pending.has(email)) {
+        reason = 'An invitation is already pending';
+      }
+      seen.add(email);
+
+      const ok = reason === undefined;
+      if (ok) okCount++;
+
+      return {
+        email,
+        ok,
+        reason,
+        // Reported even on an OK row: unresolvable ids are SKIPPED at
+        // redemption rather than fatal, so the caller should still see them.
+        unknownRoleIds,
+        unknownDepartmentIds,
+      };
+    });
+
+    const remaining = Math.max(0, organization.maxAgentSeats - seatsInUse);
+
+    return {
+      rows,
+      seatsInUse,
+      maxAgentSeats: organization.maxAgentSeats,
+      seatOverrun: Math.max(0, okCount - remaining),
+    };
+  }
+
+  /**
+   * Administrative detail for one invitation.
+   *
+   * Tenant-scoped and unmasked, unlike `previewInvitation` which is the public
+   * by-token lookup. Any status, not just PENDING — an admin asking "what
+   * happened to that invite?" needs to see the revoked and expired ones.
+   */
+  async getInvitation(
+    request: GetInvitationRequest,
+  ): Promise<InvitationResponse> {
+    const invitation = await this.prisma.userInvitation.findFirst({
+      where: {
+        id: request.invitationId,
+        organizationId: request.organizationId,
+      },
+      include: { invitedBy: { select: { fullName: true } } },
+    });
+    if (!invitation) {
+      throw new RpcException({
+        code: status.NOT_FOUND,
+        message: 'No invitation with that id',
+      });
+    }
+
+    return this.toResponse(invitation, invitation.invitedBy?.fullName ?? null);
   }
 
   /**
@@ -439,8 +593,10 @@ export class InvitationsService {
         }
 
         if (
-          (await this.seatsInUse(tx, invitation.organizationId)) >=
-          invitation.organization.maxAgentSeats
+          (await this.organizationsService.seatsInUse(
+            tx,
+            invitation.organizationId,
+          )) >= invitation.organization.maxAgentSeats
         ) {
           throw new RpcException({
             code: status.RESOURCE_EXHAUSTED,
@@ -506,10 +662,16 @@ export class InvitationsService {
             // Delivery to the address IS the ownership proof — the same one
             // `otps` provides. A second challenge would be theatre.
             isEmailVerified: true,
-            roles: { connect: [...liveRoleIds].map((id) => ({ id })) },
           },
           select: { id: true },
         });
+
+        // Through RolesService rather than a `roles: { connect }` above,
+        // because `roles.user_assigned` is a denormalized counter that must be
+        // bumped in the SAME transaction as the junction write. Connecting
+        // inline left the count short by one on every accepted invitation —
+        // and that count is what gates DELETE /roles/:id.
+        await this.rolesService.grantRoles(tx, user.id, [...liveRoleIds]);
 
         if (liveDepartmentIds.size > 0) {
           await tx.userDepartment.createMany({

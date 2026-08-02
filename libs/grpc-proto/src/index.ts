@@ -4,6 +4,11 @@ export * from './generated/synapsedesk/auth/user';
 export * from './generated/synapsedesk/auth/two_factor';
 export * from './generated/synapsedesk/auth/otp';
 export * from './generated/synapsedesk/auth/invitation';
+export * from './generated/synapsedesk/auth/department';
+export * from './generated/synapsedesk/auth/session';
+export * from './generated/synapsedesk/auth/role';
+export * from './generated/synapsedesk/auth/organization';
+export * from './generated/synapsedesk/auth/platform';
 
 export * from './constants';
 export * from './metadata';

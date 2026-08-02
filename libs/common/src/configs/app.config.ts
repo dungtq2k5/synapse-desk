@@ -7,6 +7,101 @@ export type LogLevel = (typeof LOG_LEVELS)[number];
 export const COOKIE_SAMESITE_OPTIONS = ['strict', 'lax', 'none'] as const;
 export type CookieSameSite = (typeof COOKIE_SAMESITE_OPTIONS)[number];
 
+export const SORT_ORDER_OPTIONS = ['ASC', 'DESC'] as const;
+export type SortOrder = (typeof SORT_ORDER_OPTIONS)[number];
+
+/**
+ * Pagination defaults and bounds, shared by BOTH edges.
+ *
+ * The gateway DTO enforces them with class-validator; every list RPC in
+ * auth-service clamps `limit` against MAX_LIMIT again. That is not belt-and-
+ * braces — a service is reachable from other services over gRPC, where no
+ * ValidationPipe ever ran, so an unclamped limit there is an unbounded query.
+ * One definition, because two would eventually disagree.
+ */
+export const DEFAULT_SEARCH = {
+  PAGE: 1,
+  LIMIT: 10,
+  MIN_LIMIT: 1,
+  MAX_LIMIT: 100,
+  SORT_BY: 'createdAt',
+  SORT_ORDER: 'ASC' satisfies SortOrder,
+} as const;
+
+/**
+ * Sortable columns, per entity, declared ONCE for both edges.
+ *
+ * Each array drives four things that must agree and previously did not:
+ *   1. `@IsIn(...)` on the entity's list DTO — a bad value is a 400 naming the
+ *      field at the REST edge, not a gRPC INVALID_ARGUMENT from two hops away.
+ *   2. The DTO's `sortBy` TYPE, so a typo in gateway code is a compile error
+ *      rather than a runtime rejection.
+ *   3. That DTO's DEFAULT, which must be a member of its own allowlist. This is
+ *      the one that actually bit: the base default is `createdAt`, and
+ *      `user_departments` has no such column, so listing members with NO query
+ *      parameters returned 400 until the default was overridden.
+ *   4. The service-side allowlist passed to `toPrismaPage`, which stays as
+ *      defence in depth — auth-service is reachable from other services over
+ *      gRPC, where no ValidationPipe ever ran.
+ *
+ * The `as const` + derived type is what makes (2) work; keep both.
+ */
+export const USER_SORTABLE_FIELDS = [
+  'createdAt',
+  'updatedAt',
+  'fullName',
+  'email',
+  'lastLoginAt',
+] as const;
+export type UserSortableField = (typeof USER_SORTABLE_FIELDS)[number];
+
+export const ROLE_SORTABLE_FIELDS = [
+  'createdAt',
+  'updatedAt',
+  'name',
+  'userAssigned',
+] as const;
+export type RoleSortableField = (typeof ROLE_SORTABLE_FIELDS)[number];
+
+export const DEPARTMENT_SORTABLE_FIELDS = [
+  'createdAt',
+  'updatedAt',
+  'name',
+] as const;
+export type DepartmentSortableField =
+  (typeof DEPARTMENT_SORTABLE_FIELDS)[number];
+
+/**
+ * Members sort by their own JOIN columns. `user_departments` has `assignedAt`
+ * and no `createdAt` at all, which is why this list shares no member with the
+ * base default — see point 3 above.
+ */
+export const DEPARTMENT_MEMBER_SORTABLE_FIELDS = [
+  'assignedAt',
+  'isPrimary',
+] as const;
+export type DepartmentMemberSortableField =
+  (typeof DEPARTMENT_MEMBER_SORTABLE_FIELDS)[number];
+
+export const ORGANIZATION_SORTABLE_FIELDS = [
+  'createdAt',
+  'updatedAt',
+  'name',
+  'slug',
+  'status',
+] as const;
+export type OrganizationSortableField =
+  (typeof ORGANIZATION_SORTABLE_FIELDS)[number];
+
+export const INVITATION_SORTABLE_FIELDS = [
+  'createdAt',
+  'expiresAt',
+  'email',
+  'status',
+] as const;
+export type InvitationSortableField =
+  (typeof INVITATION_SORTABLE_FIELDS)[number];
+
 export enum Gender {
   UNSPECIFIED = 'UNSPECIFIED',
   MALE = 'MALE',
@@ -20,6 +115,77 @@ export enum OrgStatus {
   SUSPENDED_PAST_DUE = 'SUSPENDED_PAST_DUE',
   FROZEN = 'FROZEN',
 }
+
+/**
+ * What a tenant may do in each lifecycle state (api-endpoints-plan §0.4).
+ *
+ * The table is the whole policy, declared once so the gateway gate and any
+ * future consumer read the same rules rather than each encoding their own idea
+ * of what SUSPENDED_PAST_DUE permits.
+ *
+ *   PENDING_ONBOARDING  auth + the onboarding flow only
+ *   ACTIVE              everything
+ *   SUSPENDED_PAST_DUE  reads only, plus auth and billing — a past-due tenant
+ *                       must still be able to see its data and pay, or
+ *                       suspension becomes indistinguishable from deletion
+ *   FROZEN              auth only; every business route refused
+ */
+export enum OrgAccess {
+  /** Signing in, refreshing, logging out, password reset. Never blocked — a
+   * user of a frozen tenant must still be able to authenticate and be told
+   * why they cannot proceed. */
+  AUTH = 'AUTH',
+  /** Reading business data. */
+  READ = 'READ',
+  /** Changing business data. */
+  WRITE = 'WRITE',
+  /** The onboarding flow itself, which by definition runs before ACTIVE. */
+  ONBOARDING = 'ONBOARDING',
+  /** Billing and the usage pages a past-due tenant needs to settle up. */
+  BILLING = 'BILLING',
+}
+
+export const ORG_STATUS_ACCESS: Record<OrgStatus, readonly OrgAccess[]> = {
+  [OrgStatus.PENDING_ONBOARDING]: [
+    OrgAccess.AUTH,
+    OrgAccess.ONBOARDING,
+    // Reads and writes are permitted while onboarding: the checklist asks the
+    // admin to create a department and invite a colleague, which they cannot do
+    // from a read-only tenant. Onboarding is a state of NOT-YET-BILLED, not of
+    // restricted trust.
+    OrgAccess.READ,
+    OrgAccess.WRITE,
+    OrgAccess.BILLING,
+  ],
+  [OrgStatus.ACTIVE]: [
+    OrgAccess.AUTH,
+    OrgAccess.READ,
+    OrgAccess.WRITE,
+    OrgAccess.ONBOARDING,
+    OrgAccess.BILLING,
+  ],
+  [OrgStatus.SUSPENDED_PAST_DUE]: [
+    OrgAccess.AUTH,
+    OrgAccess.READ,
+    OrgAccess.BILLING,
+  ],
+  [OrgStatus.FROZEN]: [OrgAccess.AUTH],
+};
+
+/**
+ * Legal `organizations.status` transitions (§8.2).
+ *
+ * An explicit allowlist rather than "anything goes with a reason": the illegal
+ * ones matter. FROZEN -> SUSPENDED_PAST_DUE would silently restore read access
+ * to a tenant frozen for abuse, and PENDING_ONBOARDING is unreachable once
+ * left — a tenant cannot un-onboard.
+ */
+export const ORG_STATUS_TRANSITIONS: Record<OrgStatus, readonly OrgStatus[]> = {
+  [OrgStatus.PENDING_ONBOARDING]: [OrgStatus.ACTIVE, OrgStatus.FROZEN],
+  [OrgStatus.ACTIVE]: [OrgStatus.SUSPENDED_PAST_DUE, OrgStatus.FROZEN],
+  [OrgStatus.SUSPENDED_PAST_DUE]: [OrgStatus.ACTIVE, OrgStatus.FROZEN],
+  [OrgStatus.FROZEN]: [OrgStatus.ACTIVE],
+};
 
 export type JwtPayload = {
   sub: string;

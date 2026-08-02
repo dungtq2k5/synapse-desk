@@ -1,0 +1,683 @@
+import { Injectable } from '@nestjs/common';
+import { RpcException } from '@nestjs/microservices';
+import { status } from '@grpc/grpc-js';
+import {
+  CallerContext,
+  CreateGlobalRoleRequest,
+  CreatePlatformOrganizationRequest,
+  CreatePlatformOrganizationResponse,
+  ListGlobalRolesRequest,
+  ListGlobalRolesResponse,
+  ListPlatformOrganizationsRequest,
+  ListPlatformOrganizationsResponse,
+  ListPlatformUsersRequest,
+  ListPlatformUsersResponse,
+  OffboardOrganizationRequest,
+  OffboardOrganizationResponse,
+  PlatformMetricsResponse,
+  PlatformOrganizationIdRequest,
+  PlatformOrganizationResponse,
+  ResetBillingCycleRequest,
+  RoleResponse,
+  SetOrganizationStatusRequest,
+  toPageMeta,
+  toTimestamp,
+  UpdatePlatformOrganizationRequest,
+} from '@synapsedesk/grpc-proto';
+import {
+  AuditAction,
+  AuditResourceType,
+  InvitationStatus,
+  normalizeEmail,
+  ORG_STATUS_TRANSITIONS,
+  ORGANIZATION_SORTABLE_FIELDS,
+  OrgStatus,
+  SystemRoleName,
+  USER_SORTABLE_FIELDS,
+} from '@synapsedesk/common';
+import { PrismaService } from '../prisma/prisma.service';
+import { AuditPublisher } from '../audit/audit-publisher.service';
+import { SessionsService } from '../sessions/sessions.service';
+import { RolesService } from '../roles/roles.service';
+import { toOrganizationResponse } from '../organizations/organization.mapper';
+import { toUserResponse } from '../users/user.mapper';
+import { ROLE_INCLUDE, toRoleResponse } from '../roles/role.mapper';
+import { requireActor } from '../../common/utils/tenant-scope';
+import {
+  emptyPage,
+  toPrismaPage,
+  toSearchFilter,
+} from '../../common/utils/pagination';
+import { restoreData, softDeleteData } from '../../common/utils/soft-delete';
+import { isUniqueConstraintViolation } from '../../common/utils/utils';
+import { Organization, Prisma } from '../../generated/prisma/client';
+
+/** The rollups every tenant row carries. */
+const ORGANIZATION_COUNTS = {
+  _count: {
+    select: { users: true, departments: true, invitations: true },
+  },
+} satisfies Prisma.OrganizationInclude;
+
+type OrganizationRow = Organization & {
+  _count: { users: number; departments: number; invitations: number };
+};
+
+/**
+ * Cross-tenant administration.
+ *
+ * NOTHING here calls `tenantScope`, which is the entire point and also the
+ * entire risk: these queries deliberately span every customer. That is why the
+ * surface lives in its own service behind `SuperAdminGuard` rather than as
+ * extra methods on the tenant-facing ones, where a missing filter would be
+ * indistinguishable from the surrounding code.
+ *
+ * Every write here audits with `organizationId: null` (RDM §1.7): the event
+ * belongs to the PLATFORM, not to the customer it touched.
+ */
+@Injectable()
+export class PlatformService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditPublisher,
+    private readonly sessionsService: SessionsService,
+    private readonly rolesService: RolesService,
+  ) {}
+
+  // -------------------------------------------------------------------------
+  // Tenants
+  // -------------------------------------------------------------------------
+
+  async listOrganizations(
+    request: ListPlatformOrganizationsRequest,
+  ): Promise<ListPlatformOrganizationsResponse> {
+    const page = request.page ?? emptyPage();
+    const { skip, take, orderBy } = toPrismaPage(
+      page,
+      ORGANIZATION_SORTABLE_FIELDS,
+    );
+
+    const search = toSearchFilter(page.searchTerm);
+    const where: Prisma.OrganizationWhereInput = {
+      ...(request.includeDeleted ? {} : { deletedAt: null }),
+      ...(request.status ? { status: request.status } : {}),
+      ...(search ? { OR: [{ name: search }, { slug: search }] } : {}),
+    };
+
+    const [items, totalItems] = await Promise.all([
+      this.prisma.organization.findMany({
+        where,
+        include: ORGANIZATION_COUNTS,
+        orderBy,
+        skip,
+        take,
+      }),
+      this.prisma.organization.count({ where }),
+    ]);
+
+    return {
+      items: items.map(toPlatformOrganizationResponse),
+      meta: toPageMeta(page, totalItems, items.length),
+    };
+  }
+
+  async getOrganization(
+    request: PlatformOrganizationIdRequest,
+  ): Promise<PlatformOrganizationResponse> {
+    return toPlatformOrganizationResponse(
+      await this.load(request.organizationId),
+    );
+  }
+
+  /**
+   * Tenant AND its first Org Admin, in ONE transaction.
+   *
+   * Half of this is useless: an organization nobody can administer, or an admin
+   * with no organization. The admin gets no password — they set one through the
+   * reset flow, which is also the only thing that proves they hold the address.
+   */
+  async createOrganization(
+    request: CreatePlatformOrganizationRequest,
+    context: CallerContext,
+  ): Promise<CreatePlatformOrganizationResponse> {
+    const adminEmail = normalizeEmail(request.adminEmail);
+    const slug = request.slug.trim().toLowerCase();
+
+    try {
+      const created = await this.prisma.$transaction(async (tx) => {
+        const organization = await tx.organization.create({
+          data: {
+            name: request.name.trim(),
+            slug,
+            domain: request.domain?.trim().toLowerCase() || null,
+            status: OrgStatus.PENDING_ONBOARDING,
+            allowedEmailDomains: request.allowedEmailDomains.map((domain) =>
+              domain.trim().toLowerCase(),
+            ),
+            // Absent takes the schema default rather than 0 — a tenant created
+            // with zero seats could never be used.
+            ...(request.maxAgentSeats !== undefined
+              ? { maxAgentSeats: request.maxAgentSeats }
+              : {}),
+            ...(request.maxStorageBytes !== undefined
+              ? { maxStorageBytes: BigInt(request.maxStorageBytes) }
+              : {}),
+            ...(request.monthlyAiTokenBudget !== undefined
+              ? { monthlyAiTokenBudget: BigInt(request.monthlyAiTokenBudget) }
+              : {}),
+          },
+        });
+
+        const admin = await tx.user.create({
+          data: {
+            organizationId: organization.id,
+            email: adminEmail,
+            fullName: request.adminFullName.trim(),
+          },
+        });
+
+        const orgAdminRoleId = await this.rolesService.getSystemRoleId(
+          SystemRoleName.ORG_ADMIN,
+          tx,
+        );
+        // Through RolesService so `roles.user_assigned` moves with the grant.
+        await this.rolesService.grantRoles(tx, admin.id, [orgAdminRoleId]);
+
+        return { organization, admin };
+      });
+
+      this.audit.record(context, {
+        action: AuditAction.PLATFORM_ORGANIZATION_CREATED,
+        resourceType: AuditResourceType.ORGANIZATION,
+        resourceId: created.organization.id,
+        // null: a platform act belongs to the platform, not to the customer.
+        organizationId: null,
+        metadata: { slug, adminEmail },
+      });
+
+      const withCounts = await this.load(created.organization.id);
+
+      return {
+        organization: toPlatformOrganizationResponse(withCounts),
+        admin: toUserResponse(created.admin),
+      };
+    } catch (error) {
+      if (isUniqueConstraintViolation(error)) {
+        throw new RpcException({
+          code: status.ALREADY_EXISTS,
+          message: 'That slug, domain or admin address is already taken',
+        });
+      }
+      throw error;
+    }
+  }
+
+  /** Everything the tenant-facing update allows, PLUS quotas. */
+  async updateOrganization(
+    request: UpdatePlatformOrganizationRequest,
+    context: CallerContext,
+  ): Promise<PlatformOrganizationResponse> {
+    const existing = await this.load(request.organizationId);
+
+    const data: Prisma.OrganizationUpdateInput = {};
+    if (request.name !== undefined) data.name = request.name.trim();
+    if (request.slug !== undefined)
+      data.slug = request.slug.trim().toLowerCase();
+    if (request.domain !== undefined) {
+      data.domain = request.domain.trim().toLowerCase() || null;
+    }
+    if (request.maxAgentSeats !== undefined) {
+      data.maxAgentSeats = request.maxAgentSeats;
+    }
+    if (request.maxStorageBytes !== undefined) {
+      data.maxStorageBytes = BigInt(request.maxStorageBytes);
+    }
+    if (request.monthlyAiTokenBudget !== undefined) {
+      data.monthlyAiTokenBudget = BigInt(request.monthlyAiTokenBudget);
+    }
+
+    const organization = await this.updateOrConflict(existing.id, data);
+
+    this.audit.record(context, {
+      action: AuditAction.PLATFORM_ORGANIZATION_UPDATED,
+      resourceType: AuditResourceType.ORGANIZATION,
+      resourceId: organization.id,
+      organizationId: null,
+      metadata: {
+        before: {
+          name: existing.name,
+          slug: existing.slug,
+          maxAgentSeats: existing.maxAgentSeats,
+        },
+        after: {
+          name: organization.name,
+          slug: organization.slug,
+          maxAgentSeats: organization.maxAgentSeats,
+        },
+      },
+    });
+
+    return toPlatformOrganizationResponse(organization);
+  }
+
+  /**
+   * The tenant lifecycle machine.
+   *
+   * Legal transitions ONLY — the illegal ones are the point. FROZEN ->
+   * SUSPENDED_PAST_DUE would silently restore read access to a tenant frozen
+   * for abuse, and nothing can return to PENDING_ONBOARDING once it has left.
+   *
+   * Freezing revokes every session as well as flipping the column. Without
+   * that, "frozen" would take effect only as each access token expired, and the
+   * gateway gate's cache would still be serving the old answer for its TTL.
+   */
+  async setOrganizationStatus(
+    request: SetOrganizationStatusRequest,
+    context: CallerContext,
+  ): Promise<PlatformOrganizationResponse> {
+    const existing = await this.load(request.organizationId);
+
+    const from = existing.status as OrgStatus;
+    const to = request.status as OrgStatus;
+
+    if (!Object.values(OrgStatus).includes(to)) {
+      throw new RpcException({
+        code: status.INVALID_ARGUMENT,
+        message: `'${request.status}' is not a valid status`,
+      });
+    }
+
+    const legal = ORG_STATUS_TRANSITIONS[from] ?? [];
+    if (!legal.includes(to)) {
+      throw new RpcException({
+        // ABORTED -> 409: a conflict with the current state.
+        code: status.ABORTED,
+        message: `Cannot move a workspace from ${from} to ${to}. Legal from ${from}: ${legal.join(', ') || 'none'}.`,
+      });
+    }
+
+    const organization = await this.prisma.organization.update({
+      where: { id: existing.id },
+      data: { status: to },
+      include: ORGANIZATION_COUNTS,
+    });
+
+    // Losing access is immediate; regaining it needs no session surgery.
+    let revokedSessionCount = 0;
+    if (to === OrgStatus.FROZEN) {
+      revokedSessionCount = await this.revokeAllTenantSessions(existing.id);
+    }
+
+    this.audit.record(context, {
+      action: AuditAction.PLATFORM_ORGANIZATION_STATUS_CHANGED,
+      resourceType: AuditResourceType.ORGANIZATION,
+      resourceId: organization.id,
+      organizationId: null,
+      metadata: { from, to, reason: request.reason, revokedSessionCount },
+    });
+
+    return toPlatformOrganizationResponse(organization);
+  }
+
+  /** Rolls the metering window; AI token usage is measured from this instant. */
+  async resetBillingCycle(
+    request: ResetBillingCycleRequest,
+    context: CallerContext,
+  ): Promise<PlatformOrganizationResponse> {
+    const existing = await this.load(request.organizationId);
+
+    const organization = await this.prisma.organization.update({
+      where: { id: existing.id },
+      data: { billingCycleStart: new Date() },
+      include: ORGANIZATION_COUNTS,
+    });
+
+    this.audit.record(context, {
+      action: AuditAction.PLATFORM_BILLING_CYCLE_RESET,
+      resourceType: AuditResourceType.ORGANIZATION,
+      resourceId: organization.id,
+      organizationId: null,
+      metadata: {
+        previousCycleStart: existing.billingCycleStart.toISOString(),
+      },
+    });
+
+    return toPlatformOrganizationResponse(organization);
+  }
+
+  /**
+   * Offboards a tenant for real: soft-deletes the row and cuts off access.
+   *
+   * This is the irreversible-ish half that `DELETE /organizations/current` only
+   * REQUESTS. Child rows are deliberately not marked: `tenantScope` already
+   * excludes rows whose organization is gone, and the gateway's lifecycle gate
+   * refuses a deleted tenant outright — so marking them would be a large write
+   * that has to be undone one by one on restore.
+   */
+  async offboardOrganization(
+    request: OffboardOrganizationRequest,
+    context: CallerContext,
+  ): Promise<OffboardOrganizationResponse> {
+    const existing = await this.load(request.organizationId);
+    const actorId = requireActor(context);
+
+    await this.prisma.organization.update({
+      where: { id: existing.id },
+      data: softDeleteData(actorId),
+    });
+
+    const revokedSessionCount = await this.revokeAllTenantSessions(existing.id);
+
+    this.audit.record(context, {
+      action: AuditAction.PLATFORM_ORGANIZATION_OFFBOARDED,
+      resourceType: AuditResourceType.ORGANIZATION,
+      resourceId: existing.id,
+      organizationId: null,
+      metadata: { reason: request.reason, revokedSessionCount },
+    });
+
+    return { revokedSessionCount };
+  }
+
+  /** Restored tenants get no sessions back — everyone signs in again. */
+  async restoreOrganization(
+    request: PlatformOrganizationIdRequest,
+    context: CallerContext,
+  ): Promise<PlatformOrganizationResponse> {
+    const existing = await this.prisma.organization.findFirst({
+      where: { id: request.organizationId, deletedAt: { not: null } },
+      select: { id: true, slug: true },
+    });
+    if (!existing) {
+      throw new RpcException({
+        code: status.NOT_FOUND,
+        message: 'No offboarded workspace with that id',
+      });
+    }
+
+    const organization = await this.updateOrConflict(
+      existing.id,
+      restoreData(),
+    );
+
+    this.audit.record(context, {
+      action: AuditAction.PLATFORM_ORGANIZATION_RESTORED,
+      resourceType: AuditResourceType.ORGANIZATION,
+      resourceId: organization.id,
+      organizationId: null,
+      metadata: { slug: organization.slug },
+    });
+
+    return toPlatformOrganizationResponse(organization);
+  }
+
+  // -------------------------------------------------------------------------
+  // Cross-tenant search
+  // -------------------------------------------------------------------------
+
+  /**
+   * Every row carries its tenant.
+   *
+   * Not decoration: a support engineer looking at a bare list of addresses,
+   * several of which legitimately repeat across tenants (RDM §1.10), has no way
+   * to tell which account they are about to act on.
+   */
+  async listUsers(
+    request: ListPlatformUsersRequest,
+  ): Promise<ListPlatformUsersResponse> {
+    const page = request.page ?? emptyPage();
+    const { skip, take, orderBy } = toPrismaPage(page, USER_SORTABLE_FIELDS);
+
+    const search = toSearchFilter(page.searchTerm);
+    const where: Prisma.UserWhereInput = {
+      ...(request.includeDeleted ? {} : { deletedAt: null }),
+      ...(request.organizationId
+        ? { organizationId: request.organizationId }
+        : {}),
+      ...(search ? { OR: [{ fullName: search }, { email: search }] } : {}),
+    };
+
+    const [items, totalItems] = await Promise.all([
+      this.prisma.user.findMany({
+        where,
+        include: {
+          organization: { select: { name: true } },
+          roles: { select: { name: true } },
+        },
+        orderBy,
+        skip,
+        take,
+      }),
+      this.prisma.user.count({ where }),
+    ]);
+
+    return {
+      items: items.map((user) => ({
+        user: toUserResponse(user),
+        organizationId: user.organizationId ?? undefined,
+        organizationName: user.organization?.name ?? undefined,
+        roleNames: user.roles.map((role) => role.name),
+        deletedAt: toTimestamp(user.deletedAt),
+      })),
+      meta: toPageMeta(page, totalItems, items.length),
+    };
+  }
+
+  // -------------------------------------------------------------------------
+  // Global roles
+  // -------------------------------------------------------------------------
+
+  async listGlobalRoles(
+    request: ListGlobalRolesRequest,
+  ): Promise<ListGlobalRolesResponse> {
+    const page = request.page ?? emptyPage();
+    const { skip, take, orderBy } = toPrismaPage(page, [
+      'createdAt',
+      'updatedAt',
+      'name',
+      'userAssigned',
+    ]);
+
+    const where: Prisma.RoleWhereInput = { organizationId: null };
+
+    const [items, totalItems] = await Promise.all([
+      this.prisma.role.findMany({
+        where,
+        include: ROLE_INCLUDE,
+        orderBy,
+        skip,
+        take,
+      }),
+      this.prisma.role.count({ where }),
+    ]);
+
+    return {
+      items: items.map(toRoleResponse),
+      meta: toPageMeta(page, totalItems, items.length),
+    };
+  }
+
+  /**
+   * A GLOBAL role — visible and assignable in every tenant, which is why only
+   * the platform may create one.
+   *
+   * No no-escalation check: a Super Admin holds no tenant RBAC rows at all, so
+   * a subset test would forbid them from creating any role whatsoever. Their
+   * authority comes from `SuperAdminGuard`, not from a permission set.
+   */
+  async createGlobalRole(
+    request: CreateGlobalRoleRequest,
+    context: CallerContext,
+  ): Promise<RoleResponse> {
+    const actorId = requireActor(context);
+
+    try {
+      const role = await this.prisma.role.create({
+        data: {
+          organizationId: null,
+          name: request.name.trim(),
+          description: request.description?.trim() || null,
+          isSystemRole: true,
+          createdById: actorId,
+          permissions: {
+            connect: request.permissionCodes.map((code) => ({ code })),
+          },
+        },
+        include: ROLE_INCLUDE,
+      });
+
+      this.audit.record(context, {
+        action: AuditAction.PLATFORM_GLOBAL_ROLE_CREATED,
+        resourceType: AuditResourceType.ROLE,
+        resourceId: role.id,
+        organizationId: null,
+        metadata: { name: role.name, permissionCodes: request.permissionCodes },
+      });
+
+      return toRoleResponse(role);
+    } catch (error) {
+      // `roles_global_name_key` is the partial index guarding global names.
+      if (isUniqueConstraintViolation(error)) {
+        throw new RpcException({
+          code: status.ALREADY_EXISTS,
+          message: 'A global role with that name already exists',
+        });
+      }
+      throw error;
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Metrics
+  // -------------------------------------------------------------------------
+
+  /**
+   * Platform-wide rollups.
+   *
+   * Every figure is a COUNT over a full table, so this must never be joined
+   * into a per-request path — the gateway caches it. Storage and AI spend are
+   * absent rather than zeroed: those meters belong to domains that do not
+   * exist, and a zero would read as "nothing spent".
+   */
+  async getMetrics(): Promise<PlatformMetricsResponse> {
+    const now = new Date();
+
+    const [
+      organizations,
+      byStatus,
+      totalUsers,
+      activeUsers,
+      pendingInvitations,
+      liveSessions,
+      seatAllocation,
+    ] = await Promise.all([
+      this.prisma.organization.count({ where: { deletedAt: null } }),
+      this.prisma.organization.groupBy({
+        by: ['status'],
+        where: { deletedAt: null },
+        _count: { _all: true },
+      }),
+      this.prisma.user.count(),
+      this.prisma.user.count({ where: { deletedAt: null, isLocked: false } }),
+      this.prisma.userInvitation.count({
+        where: { status: InvitationStatus.PENDING, expiresAt: { gt: now } },
+      }),
+      this.prisma.deviceSession.count({
+        where: { rotatedAt: null, expiresAt: { gt: now } },
+      }),
+      this.prisma.organization.aggregate({
+        where: { deletedAt: null },
+        _sum: { maxAgentSeats: true },
+      }),
+    ]);
+
+    return {
+      totalOrganizations: organizations,
+      organizationsByStatus: Object.fromEntries(
+        byStatus.map((row) => [row.status, row._count._all]),
+      ),
+      totalUsers,
+      activeUsers,
+      pendingInvitations,
+      liveSessions,
+      seatsAllocated: seatAllocation._sum.maxAgentSeats ?? 0,
+      // The same definition the tenant usage page and the invitation gate use.
+      seatsInUse: activeUsers + pendingInvitations,
+      generatedAt: toTimestamp(now),
+    };
+  }
+
+  // -------------------------------------------------------------------------
+
+  /** Every live session for every member of a tenant. */
+  private async revokeAllTenantSessions(
+    organizationId: string,
+  ): Promise<number> {
+    const members = await this.prisma.user.findMany({
+      where: { organizationId },
+      select: { id: true },
+    });
+
+    let revoked = 0;
+    for (const member of members) {
+      revoked += await this.sessionsService.revokeAllForUser(member.id);
+    }
+
+    return revoked;
+  }
+
+  /**
+   * Loads ANY tenant, deleted included.
+   *
+   * Deliberately unscoped — that is what this service is for — and deliberately
+   * inclusive of soft-deleted rows, since restore and audit both need to reach
+   * them.
+   */
+  private async load(organizationId: string): Promise<OrganizationRow> {
+    const organization = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      include: ORGANIZATION_COUNTS,
+    });
+    if (!organization) {
+      throw new RpcException({
+        code: status.NOT_FOUND,
+        message: 'No workspace with that id',
+      });
+    }
+
+    return organization;
+  }
+
+  private async updateOrConflict(
+    id: string,
+    data: Prisma.OrganizationUpdateInput,
+  ): Promise<OrganizationRow> {
+    try {
+      return await this.prisma.organization.update({
+        where: { id },
+        data,
+        include: ORGANIZATION_COUNTS,
+      });
+    } catch (error) {
+      if (isUniqueConstraintViolation(error)) {
+        throw new RpcException({
+          code: status.ALREADY_EXISTS,
+          message: 'That slug or domain is already taken',
+        });
+      }
+      throw error;
+    }
+  }
+}
+
+function toPlatformOrganizationResponse(
+  row: OrganizationRow,
+): PlatformOrganizationResponse {
+  return {
+    organization: toOrganizationResponse(row),
+    userCount: row._count.users,
+    pendingInvitationCount: row._count.invitations,
+    departmentCount: row._count.departments,
+    deletedAt: toTimestamp(row.deletedAt),
+  };
+}

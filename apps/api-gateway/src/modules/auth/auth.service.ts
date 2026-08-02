@@ -7,10 +7,11 @@ import {
   AuthServiceGrpcClient,
   type LoginResult,
 } from './auth-service-grpc.client';
-import { RequestOrigin } from '@synapsedesk/common';
+import { RequestContext, RequestOrigin } from '@synapsedesk/common';
 import { LoginDto, LoginWithTenantDto } from './dto/rest/login.dto';
 import { GoogleSignInDto } from './dto/rest/google-sign-in.dto';
 import {
+  ChangePasswordDto,
   ResetPasswordResponseDto,
   ValidatePasswordResetTokenResponseDto,
 } from './dto/rest/reset-password.dto';
@@ -62,6 +63,18 @@ export class AuthService {
     origin: RequestOrigin,
   ): Promise<number> {
     return this.authGrpcClient.logout(refreshToken, allDevices, origin);
+  }
+
+  logoutAll(context: RequestContext): Promise<number> {
+    return this.authGrpcClient.logoutAll(context);
+  }
+
+  changePassword(
+    dto: ChangePasswordDto,
+    refreshToken: string | undefined,
+    context: RequestContext,
+  ): Promise<number> {
+    return this.authGrpcClient.changePassword(dto, refreshToken, context);
   }
 
   refreshToken(refreshToken: string, origin: RequestOrigin) {

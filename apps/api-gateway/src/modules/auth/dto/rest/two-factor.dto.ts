@@ -21,6 +21,17 @@ import { Type } from 'class-transformer';
  */
 export class TwoFactorRequiredResponseDto {
   readonly requiresTwoFactor!: true;
+
+  /**
+   * True when the tenant REQUIRES 2FA and this account has not enrolled.
+   *
+   * The client must branch on it: `false` means prompt for a code, `true` means
+   * open the enrolment screen and call `POST /auth/2fa/setup` — which accepts
+   * the challenge cookie precisely for this case. Showing a code box here would
+   * ask for a code that does not exist yet, which is how a tenant-wide
+   * `enforce_two_factor` becomes a tenant-wide lockout.
+   */
+  readonly requiresTwoFactorSetup!: boolean;
 }
 
 export class ActivateTwoFactorDto {

@@ -101,3 +101,14 @@ export function maskPhoneNumber(phoneNumber: string): string {
 
   return `${prefix}${'*'.repeat(Math.max(3, trimmed.length - prefix.length - 4))}${suffix}`;
 }
+
+/**
+ * Trims a string value, leaving anything else alone for the validators to
+ * reject.
+ *
+ * Trimming BEFORE validation is the point: without it `"  "` satisfies
+ * `@MinLength(2)` and reaches the service as an empty name.
+ */
+export function trimIfString({ value }: { value: unknown }): unknown {
+  return typeof value === 'string' ? value.trim() : value;
+}

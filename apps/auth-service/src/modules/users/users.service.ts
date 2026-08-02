@@ -1,30 +1,89 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
 import { RpcException } from '@nestjs/microservices';
 import { status } from '@grpc/grpc-js';
-import { CurrentUserResponse } from '@synapsedesk/grpc-proto';
-import { toUserResponse } from './user.mapper';
+import {
+  CallerContext,
+  CreateUserRequest,
+  CreateUserResponse,
+  CurrentUserResponse,
+  DeleteUserResponse,
+  fromProtoGender,
+  GetUserPermissionsResponse,
+  ListUsersRequest,
+  ListUsersResponse,
+  LockUserRequest,
+  LockUserResponse,
+  ResetUserTwoFactorResponse,
+  SetUserDepartmentsRequest,
+  SetUserRolesRequest,
+  toPageMeta,
+  UnlockUserResponse,
+  UpdateOwnProfileRequest,
+  UpdateUserRequest,
+  UserIdRequest,
+  UserResponse,
+  UserSummaryResponse,
+} from '@synapsedesk/grpc-proto';
+import {
+  AuditAction,
+  AuditResourceType,
+  EmailTemplateName,
+  normalizeEmail,
+  SystemRoleName,
+  USER_SORTABLE_FIELDS,
+} from '@synapsedesk/common';
+import { PrismaService } from '../prisma/prisma.service';
+import { AuditPublisher } from '../audit/audit-publisher.service';
+import { NotificationPublisher } from '../notifications/notification-publisher.service';
+import { RolesService } from '../roles/roles.service';
+import { SessionsService } from '../sessions/sessions.service';
+import { OrganizationsService } from '../organizations/organizations.service';
+import {
+  toUserResponse,
+  toUserSummaryResponse,
+  USER_SUMMARY_INCLUDE,
+  UserSummaryRow,
+} from './user.mapper';
+import { flattenPermissionCodes } from '../../common/utils/permissions';
+import {
+  requireActor,
+  requireTenant,
+  tenantScope,
+} from '../../common/utils/tenant-scope';
+import {
+  emptyPage,
+  toPrismaPage,
+  toSearchFilter,
+} from '../../common/utils/pagination';
+import { restoreData, softDeleteData } from '../../common/utils/soft-delete';
+import { isUniqueConstraintViolation } from '../../common/utils/utils';
+import { Prisma } from '../../generated/prisma/client';
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditPublisher,
+    private readonly notifications: NotificationPublisher,
+    private readonly rolesService: RolesService,
+    private readonly sessionsService: SessionsService,
+    private readonly organizationsService: OrganizationsService,
+  ) {}
 
   /**
-   * Get current user profile + effective permissions.
-   *
-   * This is the SPA's bootstrap call, so it returns everything the client needs
-   * to render its navigation in one round trip.
+   * The SPA's bootstrap call: profile plus everything needed to render its
+   * navigation, in one round trip.
    */
   async getCurrentUser(userId: string): Promise<CurrentUserResponse> {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, deletedAt: null },
       include: {
         organization: true,
-        userDepartments: { include: { department: true } }, // explicit junction — this one is right
-        roles: { include: { permissions: true } }, // implicit M2M — direct
+        userDepartments: { include: { department: true } },
+        roles: { include: { permissions: true } },
       },
     });
-    if (!user || user.deletedAt) {
+    if (!user) {
       throw new RpcException({
         code: status.NOT_FOUND,
         message: 'User not found',
@@ -33,12 +92,686 @@ export class UsersService {
 
     return {
       user: toUserResponse(user),
-      // Flattened across roles and de-duplicated: two roles granting
-      // `ticket.read` must not produce it twice.
-      permissionCodes: [
-        ...new Set(user.roles.flatMap((r) => r.permissions.map((p) => p.code))),
-      ],
+      permissionCodes: flattenPermissionCodes(user.roles),
       departmentIds: user.userDepartments.map((ud) => ud.departmentId),
     };
+  }
+
+  /**
+   * Own profile. The set of writable fields is the security decision here, and
+   * it lives in the proto message — `email`, `phoneNumber`, `isEmailVerified`,
+   * `isLocked`, roles and departments are all deliberately absent.
+   */
+  async updateOwnProfile(
+    request: UpdateOwnProfileRequest,
+    context: CallerContext,
+  ): Promise<UserResponse> {
+    const userId = requireActor(context);
+
+    const user = await this.prisma.user.update({
+      where: { id: userId },
+      data: this.toProfileData(request),
+    });
+
+    this.audit.record(context, {
+      action: AuditAction.USER_UPDATED,
+      resourceType: AuditResourceType.USER,
+      // Actor and target are the same row here, and both are recorded anyway —
+      // a later query for "everything done TO this user" must find it.
+      resourceId: userId,
+      metadata: {
+        self: true,
+        fields: Object.keys(this.toProfileData(request)),
+      },
+    });
+
+    return toUserResponse(user);
+  }
+
+  // -------------------------------------------------------------------------
+  // Read
+  // -------------------------------------------------------------------------
+
+  async listUsers(
+    request: ListUsersRequest,
+    context: CallerContext,
+  ): Promise<ListUsersResponse> {
+    const page = request.page ?? emptyPage();
+    const { skip, take, orderBy } = toPrismaPage(page, USER_SORTABLE_FIELDS);
+
+    const search = toSearchFilter(page.searchTerm);
+    const where: Prisma.UserWhereInput = {
+      ...tenantScope(context),
+      ...(request.includeDeleted ? { deletedAt: undefined } : {}),
+      ...(request.departmentId
+        ? { userDepartments: { some: { departmentId: request.departmentId } } }
+        : {}),
+      ...(request.roleId ? { roles: { some: { id: request.roleId } } } : {}),
+      ...(request.isLocked !== undefined ? { isLocked: request.isLocked } : {}),
+      ...(search ? { OR: [{ fullName: search }, { email: search }] } : {}),
+    };
+
+    const [items, totalItems] = await Promise.all([
+      this.prisma.user.findMany({
+        where,
+        include: USER_SUMMARY_INCLUDE,
+        orderBy,
+        skip,
+        take,
+      }),
+      this.prisma.user.count({ where }),
+    ]);
+
+    return {
+      items: items.map(toUserSummaryResponse),
+      meta: toPageMeta(page, totalItems, items.length),
+    };
+  }
+
+  async getUser(
+    request: UserIdRequest,
+    context: CallerContext,
+  ): Promise<UserSummaryResponse> {
+    return toUserSummaryResponse(await this.load(request.id, context));
+  }
+
+  /**
+   * Computed by the SAME function that builds the JWT claim, so the token and
+   * this endpoint cannot disagree about what a user may do.
+   */
+  async getUserPermissions(
+    request: UserIdRequest,
+    context: CallerContext,
+  ): Promise<GetUserPermissionsResponse> {
+    // Scoped first, so a foreign id 404s rather than leaking a permission set.
+    await this.load(request.id, context);
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: request.id },
+      select: { roles: { include: { permissions: true } } },
+    });
+
+    return { permissionCodes: flattenPermissionCodes(user?.roles ?? []) };
+  }
+
+  // -------------------------------------------------------------------------
+  // Write
+  // -------------------------------------------------------------------------
+
+  /**
+   * Creates an account directly, with NO password.
+   *
+   * `passwordHash` stays null and `isEmailVerified` stays false, which is the
+   * honest state: nobody has proved they hold the address, and an
+   * admin-chosen password would have to reach the human out of band anyway.
+   * They set one through the password-reset flow. For the normal path the
+   * gateway prefers `POST /users/invitations`, which mails a token.
+   */
+  async createUser(
+    request: CreateUserRequest,
+    context: CallerContext,
+  ): Promise<CreateUserResponse> {
+    const organizationId = requireTenant(context);
+    const actorId = requireActor(context);
+    const email = normalizeEmail(request.email);
+
+    const organization = await this.prisma.organization.findFirst({
+      where: { id: organizationId, deletedAt: null },
+      select: { maxAgentSeats: true },
+    });
+    if (!organization) {
+      throw new RpcException({
+        code: status.NOT_FOUND,
+        message: 'Organization not found',
+      });
+    }
+
+    try {
+      const created = await this.prisma.$transaction(async (tx) => {
+        // The SAME definition of "seats used" the invitation path applies —
+        // extracted so a create rejected here cannot contradict what the usage
+        // page reports.
+        if (
+          (await this.organizationsService.seatsInUse(tx, organizationId)) >=
+          organization.maxAgentSeats
+        ) {
+          throw new RpcException({
+            code: status.RESOURCE_EXHAUSTED,
+            message: 'No seats remaining on this plan',
+          });
+        }
+
+        const user = await tx.user.create({
+          data: { organizationId, email, fullName: request.fullName },
+          select: { id: true },
+        });
+
+        const roleIds =
+          request.roleIds.length > 0
+            ? request.roleIds
+            : [await this.rolesService.getEndUserRoleId(tx)];
+        await this.rolesService.setUserRoles(tx, user.id, roleIds, context);
+
+        if (request.departmentIds.length > 0) {
+          await this.assignDepartments(
+            tx,
+            user.id,
+            request.departmentIds.map((departmentId) => ({
+              departmentId,
+              isPrimary: departmentId === request.primaryDepartmentId,
+            })),
+            context,
+            actorId,
+          );
+        }
+
+        return tx.user.findUniqueOrThrow({
+          where: { id: user.id },
+          include: USER_SUMMARY_INCLUDE,
+        });
+      });
+
+      this.audit.record(context, {
+        action: AuditAction.USER_CREATED,
+        resourceType: AuditResourceType.USER,
+        resourceId: created.id,
+        metadata: { email: created.email, roleIds: request.roleIds },
+      });
+
+      return { user: toUserSummaryResponse(created) };
+    } catch (error) {
+      // The race the pre-check cannot cover: two concurrent creates of the same
+      // address both see it free. `users_org_email_key` is what makes the
+      // duplicate impossible; this reports the loser's violation as a conflict.
+      if (isUniqueConstraintViolation(error)) {
+        throw new RpcException({
+          code: status.ALREADY_EXISTS,
+          message: 'That address already has an account here',
+        });
+      }
+      throw error;
+    }
+  }
+
+  async updateUser(
+    request: UpdateUserRequest,
+    context: CallerContext,
+  ): Promise<UserSummaryResponse> {
+    const existing = await this.load(request.id, context);
+
+    const user = await this.prisma.user.update({
+      where: { id: existing.id },
+      data: {
+        ...this.toProfileData(request),
+        ...(request.phoneNumber !== undefined
+          ? { phoneNumber: request.phoneNumber.trim() || null }
+          : {}),
+      },
+      include: USER_SUMMARY_INCLUDE,
+    });
+
+    this.audit.record(context, {
+      action: AuditAction.USER_UPDATED,
+      resourceType: AuditResourceType.USER,
+      resourceId: user.id,
+      metadata: {
+        before: {
+          fullName: existing.fullName,
+          phoneNumber: existing.phoneNumber,
+        },
+        after: { fullName: user.fullName, phoneNumber: user.phoneNumber },
+      },
+    });
+
+    return toUserSummaryResponse(user);
+  }
+
+  /**
+   * Deactivate: soft delete AND revoke every session.
+   *
+   * Without the revocation a deactivated user keeps working until their access
+   * token expires — up to 15 minutes of access after being fired, which is the
+   * exact window this endpoint exists to close.
+   */
+  async deleteUser(
+    request: UserIdRequest,
+    context: CallerContext,
+  ): Promise<DeleteUserResponse> {
+    const target = await this.load(request.id, context);
+    const actorId = requireActor(context);
+
+    await this.assertRemovable(target, actorId, context);
+
+    await this.prisma.$transaction(async (tx) => {
+      // Releases the roles first so `user_assigned` reflects reality: a
+      // deactivated user is not occupying the role, and leaving the count
+      // inflated would block a legitimate role delete forever.
+      await this.rolesService.releaseUserRoles(tx, target.id);
+      await tx.user.update({
+        where: { id: target.id },
+        data: softDeleteData(actorId),
+      });
+    });
+
+    const revokedSessionCount = await this.sessionsService.revokeAllForUser(
+      target.id,
+    );
+
+    this.audit.record(context, {
+      action: AuditAction.USER_DELETED,
+      resourceType: AuditResourceType.USER,
+      resourceId: target.id,
+      metadata: { email: target.email, revokedSessionCount },
+    });
+
+    return { revokedSessionCount };
+  }
+
+  /** Restored users get NO sessions back — they sign in again. */
+  async restoreUser(
+    request: UserIdRequest,
+    context: CallerContext,
+  ): Promise<UserSummaryResponse> {
+    const organizationId = requireTenant(context);
+
+    const existing = await this.prisma.user.findFirst({
+      where: {
+        id: request.id,
+        organizationId,
+        deletedAt: { not: null },
+      },
+      select: { id: true, email: true },
+    });
+    if (!existing) {
+      throw new RpcException({
+        code: status.NOT_FOUND,
+        message: 'No deactivated user with that id',
+      });
+    }
+
+    try {
+      const user = await this.prisma.user.update({
+        where: { id: existing.id },
+        data: restoreData(),
+        include: USER_SUMMARY_INCLUDE,
+      });
+
+      this.audit.record(context, {
+        action: AuditAction.USER_RESTORED,
+        resourceType: AuditResourceType.USER,
+        resourceId: user.id,
+        metadata: { email: user.email },
+      });
+
+      return toUserSummaryResponse(user);
+    } catch (error) {
+      // Clearing `deleted_at` re-enters `users_org_email_key`, which is partial
+      // on `deleted_at IS NULL`. Someone may have taken the address in the
+      // meantime — a 409 naming the conflict, not a 500.
+      if (isUniqueConstraintViolation(error)) {
+        throw new RpcException({
+          code: status.ALREADY_EXISTS,
+          message: `${existing.email} is already in use by another account here`,
+        });
+      }
+      throw error;
+    }
+  }
+
+  /** Same "otherwise they keep working" reasoning as delete. */
+  async lockUser(
+    request: LockUserRequest,
+    context: CallerContext,
+  ): Promise<LockUserResponse> {
+    const target = await this.load(request.id, context);
+    const actorId = requireActor(context);
+
+    await this.assertRemovable(target, actorId, context);
+
+    await this.prisma.user.update({
+      where: { id: target.id },
+      data: { isLocked: true },
+    });
+
+    const revokedSessionCount = await this.sessionsService.revokeAllForUser(
+      target.id,
+    );
+
+    this.audit.record(context, {
+      action: AuditAction.USER_LOCKED,
+      resourceType: AuditResourceType.USER,
+      resourceId: target.id,
+      metadata: { reason: request.reason, revokedSessionCount },
+    });
+
+    this.notifications.sendEmail({
+      template: EmailTemplateName.SECURITY_ALERT,
+      to: target.email,
+      data: {
+        fullName: target.fullName,
+        headline: 'Your account has been locked',
+        detail: `An administrator locked your account. Reason: ${request.reason}`,
+        origin: { ip: context.ip, userAgent: context.userAgent },
+      },
+    });
+
+    return { revokedSessionCount };
+  }
+
+  /** No sessions restored: unlocking permits signing in, it does not sign in. */
+  async unlockUser(
+    request: UserIdRequest,
+    context: CallerContext,
+  ): Promise<UnlockUserResponse> {
+    const target = await this.load(request.id, context);
+
+    await this.prisma.user.update({
+      where: { id: target.id },
+      data: { isLocked: false },
+    });
+
+    this.audit.record(context, {
+      action: AuditAction.USER_UNLOCKED,
+      resourceType: AuditResourceType.USER,
+      resourceId: target.id,
+      metadata: { email: target.email },
+    });
+
+    return {};
+  }
+
+  /**
+   * Clears 2FA entirely — for the user who lost their authenticator.
+   *
+   * Un-trusting every device is not optional here: leaving `device_token_hash`
+   * alive would let the lost device keep bypassing the 2FA that no longer
+   * exists, which turns a recovery action into a permanent hole.
+   *
+   * This REMOVES a security control, so it is audited and the user is told.
+   */
+  async resetUserTwoFactor(
+    request: UserIdRequest,
+    context: CallerContext,
+  ): Promise<ResetUserTwoFactorResponse> {
+    const target = await this.load(request.id, context);
+
+    const untrustedDeviceCount = await this.prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: target.id },
+        data: { twoFactorSecret: null, isTwoFactorEnabled: false },
+      });
+      await tx.twoFactorBackupCode.deleteMany({ where: { userId: target.id } });
+
+      const { count } = await tx.deviceSession.updateMany({
+        where: { userId: target.id },
+        data: {
+          deviceTokenHash: null,
+          trustedUntil: null,
+          isTrusted: false,
+        },
+      });
+
+      return count;
+    });
+
+    this.audit.record(context, {
+      action: AuditAction.USER_TWO_FACTOR_RESET,
+      resourceType: AuditResourceType.USER,
+      resourceId: target.id,
+      // NEVER the secret or any code hash (§8.3 of the conventions).
+      metadata: { untrustedDeviceCount },
+    });
+
+    this.notifications.sendEmail({
+      template: EmailTemplateName.SECURITY_ALERT,
+      to: target.email,
+      data: {
+        fullName: target.fullName,
+        headline: 'Two-factor authentication was reset',
+        detail:
+          'An administrator reset two-factor authentication on your account and removed all trusted devices. If this was not expected, contact them immediately.',
+        origin: { ip: context.ip, userAgent: context.userAgent },
+      },
+    });
+
+    return { untrustedDeviceCount };
+  }
+
+  // -------------------------------------------------------------------------
+  // Assignment
+  // -------------------------------------------------------------------------
+
+  async setUserRoles(
+    request: SetUserRolesRequest,
+    context: CallerContext,
+  ): Promise<UserSummaryResponse> {
+    const target = await this.load(request.id, context);
+
+    const user = await this.prisma.$transaction(async (tx) => {
+      // Tenant validation, the no-escalation rule and the `user_assigned`
+      // counter all live in RolesService, so every grant path shares them.
+      await this.rolesService.setUserRoles(
+        tx,
+        target.id,
+        request.roleIds,
+        context,
+      );
+
+      return tx.user.findUniqueOrThrow({
+        where: { id: target.id },
+        include: USER_SUMMARY_INCLUDE,
+      });
+    });
+
+    this.audit.record(context, {
+      action: AuditAction.USER_ROLES_UPDATED,
+      resourceType: AuditResourceType.USER,
+      resourceId: target.id,
+      metadata: {
+        before: target.roles.map((role) => role.id),
+        after: request.roleIds,
+      },
+    });
+
+    return toUserSummaryResponse(user);
+  }
+
+  async setUserDepartments(
+    request: SetUserDepartmentsRequest,
+    context: CallerContext,
+  ): Promise<UserSummaryResponse> {
+    const target = await this.load(request.id, context);
+    const actorId = requireActor(context);
+
+    const user = await this.prisma.$transaction(async (tx) => {
+      await tx.userDepartment.deleteMany({ where: { userId: target.id } });
+
+      if (request.departments.length > 0) {
+        await this.assignDepartments(
+          tx,
+          target.id,
+          request.departments,
+          context,
+          actorId,
+        );
+      }
+
+      return tx.user.findUniqueOrThrow({
+        where: { id: target.id },
+        include: USER_SUMMARY_INCLUDE,
+      });
+    });
+
+    this.audit.record(context, {
+      action: AuditAction.USER_DEPARTMENTS_UPDATED,
+      resourceType: AuditResourceType.USER,
+      resourceId: target.id,
+      metadata: {
+        before: target.userDepartments.map((ud) => ud.departmentId),
+        after: request.departments.map((d) => d.departmentId),
+      },
+    });
+
+    return toUserSummaryResponse(user);
+  }
+
+  // -------------------------------------------------------------------------
+
+  /**
+   * Writes department memberships, enforcing the primary invariant.
+   *
+   * **Exactly one primary when the list is non-empty.** Zero is as invalid as
+   * two: the partial unique index only catches the "two" case, so a submission
+   * with no primary would be accepted and silently leave the user with no
+   * ticket routing and no document scope.
+   */
+  private async assignDepartments(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    departments: { departmentId: string; isPrimary: boolean }[],
+    context: CallerContext,
+    actorId: string,
+  ): Promise<void> {
+    const primaryCount = departments.filter((d) => d.isPrimary).length;
+    if (primaryCount !== 1) {
+      throw new RpcException({
+        code: status.INVALID_ARGUMENT,
+        message: `Exactly one department must be primary; received ${primaryCount}`,
+      });
+    }
+
+    const ids = departments.map((d) => d.departmentId);
+    // Every department must be in the caller's tenant. Nothing in the junction
+    // table's FKs prevents linking a foreign department, because both ids are
+    // individually valid.
+    const valid = await tx.department.findMany({
+      where: { id: { in: ids }, ...tenantScope(context) },
+      select: { id: true },
+    });
+    if (valid.length !== new Set(ids).size) {
+      const known = new Set(valid.map((d) => d.id));
+      throw new RpcException({
+        code: status.NOT_FOUND,
+        message: `Unknown department(s): ${ids.filter((id) => !known.has(id)).join(', ')}`,
+      });
+    }
+
+    await tx.userDepartment.createMany({
+      data: departments.map((department) => ({
+        userId,
+        departmentId: department.departmentId,
+        isPrimary: department.isPrimary,
+        assignedById: actorId,
+      })),
+    });
+  }
+
+  /**
+   * Guards shared by delete and lock — both take an account out of service, so
+   * both need the same three.
+   */
+  private async assertRemovable(
+    target: UserSummaryRow,
+    actorId: string,
+    context: CallerContext,
+  ): Promise<void> {
+    if (target.id === actorId) {
+      throw new RpcException({
+        code: status.ABORTED,
+        message: 'You cannot deactivate or lock your own account',
+      });
+    }
+
+    // Only a Super Admin may take another Super Admin out of service.
+    if (target.isSuperAdmin && !context.isSuperAdmin) {
+      throw new RpcException({
+        code: status.PERMISSION_DENIED,
+        message: 'Only a platform administrator can do this to a Super Admin',
+      });
+    }
+
+    // The last Org Admin. Without this the tenant becomes unadministrable and
+    // there is no in-product way back — the same failure the founder-role fix
+    // exists to prevent, arrived at from the other direction.
+    // `String(...)` because `roles.name` is a plain VarChar while
+    // SystemRoleName is a TS enum — comparing them directly is an unsafe-enum
+    // comparison, and the enum's VALUE is deliberately the column's contents.
+    const isOrgAdmin = target.roles.some(
+      (role) => role.name === String(SystemRoleName.ORG_ADMIN),
+    );
+    if (!isOrgAdmin) return;
+
+    const remaining = await this.prisma.user.count({
+      where: {
+        organizationId: target.organizationId,
+        deletedAt: null,
+        isLocked: false,
+        id: { not: target.id },
+        roles: { some: { name: SystemRoleName.ORG_ADMIN } },
+      },
+    });
+    if (remaining === 0) {
+      throw new RpcException({
+        code: status.ABORTED,
+        message:
+          'This is the last active Org Admin. Promote another before removing this one.',
+      });
+    }
+  }
+
+  /**
+   * Single-row read, always `findFirst` with the tenant filter.
+   *
+   * `findUnique({ id })` cannot express that filter, so it would return another
+   * tenant's user and the handler would serialize it.
+   */
+  private async load(
+    id: string,
+    context: CallerContext,
+  ): Promise<UserSummaryRow> {
+    const user = await this.prisma.user.findFirst({
+      where: { id, ...tenantScope(context) },
+      include: USER_SUMMARY_INCLUDE,
+    });
+    if (!user) {
+      throw new RpcException({
+        code: status.NOT_FOUND,
+        message: 'No user with that id',
+      });
+    }
+
+    return user;
+  }
+
+  /**
+   * The profile columns shared by `updateOwnProfile` and `updateUser`.
+   *
+   * An absent field means "leave unchanged"; an empty string clears. Collapsing
+   * the two would make a date of birth impossible to remove once set.
+   */
+  private toProfileData(request: {
+    fullName?: string;
+    dob?: string;
+    gender?: number;
+    avatarUrl?: string;
+  }): Prisma.UserUpdateInput {
+    const data: Prisma.UserUpdateInput = {};
+
+    if (request.fullName !== undefined) data.fullName = request.fullName.trim();
+    if (request.avatarUrl !== undefined) {
+      data.avatarUrl = request.avatarUrl.trim() || null;
+    }
+    if (request.gender !== undefined) {
+      data.gender = fromProtoGender(request.gender);
+    }
+    if (request.dob !== undefined) {
+      // `@db.Date` is a calendar date. Parsed as UTC midnight so the stored day
+      // cannot shift for a server west of UTC.
+      data.dob = request.dob.trim()
+        ? new Date(`${request.dob}T00:00:00Z`)
+        : null;
+    }
+
+    return data;
   }
 }

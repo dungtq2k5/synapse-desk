@@ -43,6 +43,11 @@ export const AUTH_PROTO_PATHS = [
   'two_factor.proto',
   'otp.proto',
   'invitation.proto',
+  'department.proto',
+  'session.proto',
+  'role.proto',
+  'organization.proto',
+  'platform.proto',
 ].map((file) => join(PROTO_ROOT, 'synapsedesk', 'auth', file));
 
 /**

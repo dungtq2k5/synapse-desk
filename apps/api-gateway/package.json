@@ -2,7 +2,7 @@
   "name": "@synapsedesk/api-gateway",
   "version": "1.0.0",
   "scripts": {
-    "build": "nest build && node ../../scripts/copy-protos.mjs dist/libs/grpc-proto/src/proto",
+    "build": "nest build",
     "dev": "nest start --watch",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\"",
     "clean": "rimraf dist *.tsbuildinfo"
@@ -10,13 +10,16 @@
   "dependencies": {
     "@grpc/grpc-js": "^1.14.4",
     "@grpc/proto-loader": "^0.8.1",
+    "@nest-lab/throttler-storage-redis": "^1.2.0",
     "@nestjs/common": "^11.1.28",
     "@nestjs/config": "^4.0.4",
     "@nestjs/core": "^11.1.28",
     "@nestjs/graphql": "^13.4.2",
     "@nestjs/microservices": "^11.1.28",
+    "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.1.28",
     "@nestjs/swagger": "^11.4.6",
+    "@nestjs/throttler": "^6.5.0",
     "@synapsedesk/common": "*",
     "@synapsedesk/grpc-proto": "*",
     "@types/cookie-parser": "^1.4.10",
@@ -24,17 +27,17 @@
     "class-validator": "^0.15.1",
     "cookie-parser": "^1.4.7",
     "graphql": "^16.14.2",
+    "ioredis": "^6.0.0",
     "joi": "^18.2.3",
     "nats": "^2.19.3",
-    "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.2",
-    "@nestjs/passport": "^11.0.5",
     "passport": "^0.7.0",
-    "passport-jwt": "^4.0.1"
+    "passport-jwt": "^4.0.1",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2"
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.24",
-    "typescript": "^6.0.3",
-    "@types/passport-jwt": "^4.0.1"
+    "@types/passport-jwt": "^4.0.1",
+    "typescript": "^6.0.3"
   }
 }

@@ -26,3 +26,27 @@ export class ResetPasswordResponseDto {
   /** Surfaced so the UI can say "you have been signed out of N devices". */
   readonly revokedSessionCount!: number;
 }
+
+/**
+ * Changing a password you KNOW, as opposed to resetting one you have forgotten.
+ *
+ * `currentPassword` is the whole security value of this endpoint: without it a
+ * hijacked session could be turned into permanent account takeover. It is
+ * verified server-side and never trusted from the client.
+ */
+export class ChangePasswordDto {
+  @IsString()
+  @IsNotEmpty()
+  readonly currentPassword!: string;
+
+  // Same strength rule as the reset flow. Applying a weaker one here would let
+  // a user downgrade a password that the reset form would have rejected.
+  @IsString()
+  @IsStrongPassword()
+  readonly newPassword!: string;
+}
+
+export class ChangePasswordResponseDto {
+  /** Other devices signed out by the change. The caller keeps this session. */
+  readonly revokedSessionCount!: number;
+}

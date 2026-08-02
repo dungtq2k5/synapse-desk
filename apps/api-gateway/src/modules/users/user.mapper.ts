@@ -3,8 +3,10 @@ import {
   fromTimestamp,
   requireTimestamp,
   UserResponse,
+  UserSummaryResponse,
 } from '@synapsedesk/grpc-proto';
 import { UserResponseDto } from './dto/rest/user-response.dto';
+import { UserSummaryResponseDto } from './dto/rest/user-admin.dto';
 
 /**
  * Wire -> REST boundary, the mirror of auth-service's `toUserResponse`.
@@ -34,5 +36,19 @@ export function toUserResponseDto(user: UserResponse): UserResponseDto {
     // rather than something to paper over with a fallback date.
     createdAt: requireTimestamp(user.createdAt, 'createdAt'),
     updatedAt: requireTimestamp(user.updatedAt, 'updatedAt'),
+  };
+}
+
+/** Wire -> REST for an admin list row. */
+export function toUserSummaryDto(
+  summary: UserSummaryResponse,
+): UserSummaryResponseDto {
+  return {
+    user: toUserResponseDto(summary.user!),
+    roleIds: summary.roleIds,
+    roleNames: summary.roleNames,
+    departmentIds: summary.departmentIds,
+    deletedAt: fromTimestamp(summary.deletedAt) ?? null,
+    deletedByName: summary.deletedByName ?? null,
   };
 }

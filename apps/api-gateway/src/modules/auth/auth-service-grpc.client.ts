@@ -6,7 +6,7 @@ import {
   AuthServiceClient,
   type LoginResponse as ProtoLoginResponse,
 } from '@synapsedesk/grpc-proto';
-import { RequestOrigin } from '@synapsedesk/common';
+import { RequestContext, RequestOrigin } from '@synapsedesk/common';
 import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
 import { RegisterDto, RegisterResponseDto } from './dto/rest/register.dto';
 import {
@@ -38,6 +38,12 @@ export type LoginResult =
   | {
       requiresTenantSelection: false;
       requiresTwoFactor: true;
+      /**
+       * The challenge is an ENROLMENT one: the tenant requires 2FA and this
+       * account has none yet, so the client must open setup rather than prompt
+       * for a code that does not exist.
+       */
+      requiresTwoFactorSetup: boolean;
       twoFactorToken: string;
     }
   | {
@@ -69,6 +75,7 @@ function toLoginResult(response: ProtoLoginResponse): LoginResult {
     return {
       requiresTenantSelection: false,
       requiresTwoFactor: true,
+      requiresTwoFactorSetup: response.requiresTwoFactorSetup,
       twoFactorToken: response.twoFactorToken ?? '',
     };
   }
@@ -210,6 +217,42 @@ export class AuthServiceGrpcClient
       (metadata) =>
         this.authGrpcService.logout({ refreshToken, allDevices }, metadata),
       origin,
+    );
+
+    return response.revokedSessionCount;
+  }
+
+  /**
+   * Takes the full `RequestContext`, not an origin: the RPC is keyed off the
+   * authenticated caller rather than a presented refresh token, so the identity
+   * has to cross the hop.
+   */
+  async logoutAll(context: RequestContext): Promise<number> {
+    const response = await this.call(
+      (metadata) => this.authGrpcService.logoutAll({}, metadata),
+      context,
+    );
+
+    return response.revokedSessionCount;
+  }
+
+  async changePassword(
+    dto: { currentPassword: string; newPassword: string },
+    refreshToken: string | undefined,
+    context: RequestContext,
+  ): Promise<number> {
+    const response = await this.call(
+      (metadata) =>
+        this.authGrpcService.changePassword(
+          {
+            currentPassword: dto.currentPassword,
+            newPassword: dto.newPassword,
+            // Identifies the ONE session the change spares.
+            refreshToken,
+          },
+          metadata,
+        ),
+      context,
     );
 
     return response.revokedSessionCount;

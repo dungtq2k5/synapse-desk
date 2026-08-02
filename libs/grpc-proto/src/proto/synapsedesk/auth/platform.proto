@@ -1,0 +1,188 @@
+syntax = "proto3";
+
+package synapsedesk.auth;
+
+import "google/protobuf/timestamp.proto";
+import "synapsedesk/auth/common.proto";
+import "synapsedesk/auth/organization.proto";
+import "synapsedesk/auth/role.proto";
+
+// Platform administration (RDM §1.7).
+//
+// Every RPC here reads or writes ACROSS tenants, which is exactly why it is a
+// separate service rather than extra methods on the tenant-facing ones: the
+// tenant services apply `tenantScope` unconditionally, and a cross-tenant
+// method living beside them would be one forgotten filter away from leaking.
+// The gateway gates the whole surface with SuperAdminGuard.
+
+message PlatformOrganizationResponse {
+  OrganizationResponse organization = 1;
+
+  // Rollups, so the tenant list is useful without N follow-up calls.
+  int32 user_count = 2;
+  int32 pending_invitation_count = 3;
+  int32 department_count = 4;
+
+  optional google.protobuf.Timestamp deleted_at = 5;
+}
+
+message ListPlatformOrganizationsRequest {
+  PageRequest page = 1;
+  // PENDING_ONBOARDING | ACTIVE | SUSPENDED_PAST_DUE | FROZEN
+  optional string status = 2;
+  bool include_deleted = 3;
+}
+
+message ListPlatformOrganizationsResponse {
+  repeated PlatformOrganizationResponse items = 1;
+  PageMeta meta = 2;
+}
+
+message PlatformOrganizationIdRequest {
+  string organization_id = 1;
+}
+
+/**
+ * Creates a tenant AND its first Org Admin in ONE transaction.
+ *
+ * Half of this is useless: an organization nobody can administer, or an admin
+ * with no organization. They are created together or not at all.
+ */
+message CreatePlatformOrganizationRequest {
+  string name = 1;
+  string slug = 2;
+  optional string domain = 3;
+  repeated string allowed_email_domains = 4;
+
+  // The first Org Admin. No password: the account is created without one and
+  // the human sets it through the reset flow, which is also what proves they
+  // hold the address.
+  string admin_email = 5;
+  string admin_full_name = 6;
+
+  // Quotas. Absent takes the schema default rather than zero -- a tenant
+  // created with 0 seats could never be used.
+  optional int32 max_agent_seats = 7;
+  optional int64 max_storage_bytes = 8;
+  optional int64 monthly_ai_token_budget = 9;
+}
+
+message CreatePlatformOrganizationResponse {
+  PlatformOrganizationResponse organization = 1;
+  UserResponse admin = 2;
+}
+
+// Anything a Super Admin may change, INCLUDING quotas -- which is the whole
+// difference from the tenant-facing update.
+message UpdatePlatformOrganizationRequest {
+  string organization_id = 1;
+  optional string name = 2;
+  optional string slug = 3;
+  optional string domain = 4;
+  optional int32 max_agent_seats = 5;
+  optional int64 max_storage_bytes = 6;
+  optional int64 monthly_ai_token_budget = 7;
+}
+
+message SetOrganizationStatusRequest {
+  string organization_id = 1;
+  string status = 2;
+  // Required. "Why is Acme frozen?" is asked six months later, by someone else.
+  string reason = 3;
+}
+
+message ResetBillingCycleRequest {
+  string organization_id = 1;
+}
+
+message OffboardOrganizationRequest {
+  string organization_id = 1;
+  string reason = 2;
+}
+
+message OffboardOrganizationResponse {
+  int32 revoked_session_count = 1;
+}
+
+// ---------------------------------------------------------------------------
+// Cross-tenant search
+// ---------------------------------------------------------------------------
+
+message PlatformUserResponse {
+  UserResponse user = 1;
+  // ALWAYS present. A bare user list with no tenant column is how a support
+  // engineer acts on the wrong account.
+  optional string organization_id = 2;
+  optional string organization_name = 3;
+  repeated string role_names = 4;
+  optional google.protobuf.Timestamp deleted_at = 5;
+}
+
+message ListPlatformUsersRequest {
+  PageRequest page = 1;
+  optional string organization_id = 2;
+  bool include_deleted = 3;
+}
+
+message ListPlatformUsersResponse {
+  repeated PlatformUserResponse items = 1;
+  PageMeta meta = 2;
+}
+
+// ---------------------------------------------------------------------------
+// Global roles
+// ---------------------------------------------------------------------------
+
+message ListGlobalRolesRequest {
+  PageRequest page = 1;
+}
+
+message ListGlobalRolesResponse {
+  repeated RoleResponse items = 1;
+  PageMeta meta = 2;
+}
+
+// A GLOBAL role: organization_id IS NULL, is_system_role = true. Visible to
+// every tenant, which is why only the platform may mint one.
+message CreateGlobalRoleRequest {
+  string name = 1;
+  optional string description = 2;
+  repeated string permission_codes = 3;
+}
+
+// ---------------------------------------------------------------------------
+// Metrics
+// ---------------------------------------------------------------------------
+
+message GetPlatformMetricsRequest {}
+
+message PlatformMetricsResponse {
+  int32 total_organizations = 1;
+  // Keyed by status, so a new status does not need a new field.
+  map<string, int32> organizations_by_status = 2;
+  int32 total_users = 3;
+  int32 active_users = 4;
+  int32 pending_invitations = 5;
+  int32 live_sessions = 6;
+  int32 seats_allocated = 7;
+  int32 seats_in_use = 8;
+  google.protobuf.Timestamp generated_at = 9;
+}
+
+service PlatformService {
+  rpc ListOrganizations(ListPlatformOrganizationsRequest) returns (ListPlatformOrganizationsResponse);
+  rpc CreateOrganization(CreatePlatformOrganizationRequest) returns (CreatePlatformOrganizationResponse);
+  rpc GetOrganization(PlatformOrganizationIdRequest) returns (PlatformOrganizationResponse);
+  rpc UpdateOrganization(UpdatePlatformOrganizationRequest) returns (PlatformOrganizationResponse);
+  rpc SetOrganizationStatus(SetOrganizationStatusRequest) returns (PlatformOrganizationResponse);
+  rpc ResetBillingCycle(ResetBillingCycleRequest) returns (PlatformOrganizationResponse);
+  rpc OffboardOrganization(OffboardOrganizationRequest) returns (OffboardOrganizationResponse);
+  rpc RestoreOrganization(PlatformOrganizationIdRequest) returns (PlatformOrganizationResponse);
+
+  rpc ListUsers(ListPlatformUsersRequest) returns (ListPlatformUsersResponse);
+
+  rpc ListGlobalRoles(ListGlobalRolesRequest) returns (ListGlobalRolesResponse);
+  rpc CreateGlobalRole(CreateGlobalRoleRequest) returns (RoleResponse);
+
+  rpc GetMetrics(GetPlatformMetricsRequest) returns (PlatformMetricsResponse);
+}

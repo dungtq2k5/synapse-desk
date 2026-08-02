@@ -23,6 +23,18 @@ export enum Gender {
   UNRECOGNIZED = -1,
 }
 
+export enum SortOrder {
+  /**
+   * SORT_ORDER_UNSPECIFIED - proto3 requires a 0 member. Here it means "the caller did not choose",
+   * which takes the default rather than being rejected -- direction is a
+   * presentation preference, not something a request is wrong without.
+   */
+  SORT_ORDER_UNSPECIFIED = 0,
+  SORT_ORDER_ASC = 1,
+  SORT_ORDER_DESC = 2,
+  UNRECOGNIZED = -1,
+}
+
 /** Only use 'optional' on primitive scalar fields because google.protobuf fields are always optional by default */
 export interface UserResponse {
   id: string;
@@ -45,4 +57,50 @@ export interface UserResponse {
   isTwoFactorEnabled: boolean;
   createdAt: Timestamp | undefined;
   updatedAt: Timestamp | undefined;
+}
+
+/**
+ * Shared by every list RPC in the package. Mirrors SearchPaginationBase at the
+ * REST edge so the gateway hands its query DTO straight through.
+ */
+export interface PageRequest {
+  /**
+   * 1-based, matching the REST contract. Page 0 is a client bug and is rejected,
+   * not silently coerced -- a silent coercion means the caller keeps sending it.
+   */
+  page: number;
+  limit: number;
+  /**
+   * Empty means "no filter". proto3 has no null for scalars, and `optional`
+   * would only add a presence bit that says nothing an empty string does not.
+   */
+  searchTerm: string;
+  /**
+   * Validated against a per-module allowlist in the SERVICE, never passed
+   * through to `orderBy` as received -- an arbitrary column name there either
+   * throws a Prisma validation error or sorts by something never meant to be
+   * exposed.
+   */
+  sortBy: string;
+  /**
+   * An enum, unlike sort_by, because the legal values are FIXED and knowable
+   * here. Sortable columns differ per module -- users sort by lastLoginAt,
+   * departments do not -- so no enum in this shared file could enumerate them,
+   * which is why that field stays a string and is allowlisted per service.
+   * Direction has exactly two values for every list in the system, so protoc
+   * can make an illegal one unrepresentable and nothing needs to validate it.
+   */
+  sortOrder: SortOrder;
+}
+
+/**
+ * Field names deliberately match PaginationMetaDataResponseBase at the REST
+ * edge, so the gateway mapper is a rename-free copy.
+ */
+export interface PageMeta {
+  totalItems: number;
+  itemCount: number;
+  itemsPerPage: number;
+  totalPages: number;
+  currentPage: number;
 }

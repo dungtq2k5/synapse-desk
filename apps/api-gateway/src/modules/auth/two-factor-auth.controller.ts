@@ -18,6 +18,11 @@ import {
   TwoFactorJwtPayload,
 } from '@synapsedesk/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { TwoFactorEnrolmentGuard } from '../../common/guards/two-factor-enrolment.guard';
+import {
+  CurrentEnrollee,
+  type EnrolleeContext,
+} from '../../common/decorators/current-enrollee.decorator';
 import { Jwt2faGuard } from '../../common/guards/jwt-2fa.guard';
 import { Current2faUser } from '../../common/decorators/current-2fa-user.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -33,6 +38,14 @@ import {
   RegenerateBackupCodesDto,
   TwoFactorAuthenticatedResponseDto,
 } from './dto/rest/two-factor.dto';
+import { AuthThrottle } from '../../common/decorators/auth-throttle.decorator';
+import { Throttle } from '@nestjs/throttler';
+import {
+  AUTH_THROTTLER_TIER,
+  ROUTE_THROTTLE,
+} from '../../common/config/app.config';
+import { OrgAccessKind } from '../../common/decorators/org-access.decorator';
+import { OrgAccess } from '@synapsedesk/common';
 
 /**
  * `/auth/2fa` — enrolment and recovery (api-endpoints-plan §1.2).
@@ -42,6 +55,8 @@ import {
  * exception because it is the second half of a login that has not completed
  * yet, and is authorized by the short-lived 2FA cookie instead.
  */
+@AuthThrottle()
+@OrgAccessKind(OrgAccess.AUTH)
 @Controller('auth/2fa')
 export class TwoFactorAuthController {
   private readonly logger = new Logger(TwoFactorAuthController.name);
@@ -51,28 +66,44 @@ export class TwoFactorAuthController {
     private readonly jwtCookieService: JwtCookieService,
   ) {}
 
-  /** Returns a QR code to scan. Does NOT enable 2FA — `activate` does. */
+  /**
+   * Returns a QR code to scan. Does NOT enable 2FA — `activate` does.
+   *
+   * `TwoFactorEnrolmentGuard`, not `JwtAuthGuard`: a user whose TENANT has just
+   * turned on `enforce_two_factor` holds only a challenge token, and this is
+   * the door they have to come through. auth-service still refuses an account
+   * whose 2FA is already enabled, so the challenge token cannot be used to
+   * replace a live secret.
+   */
   @Post('setup')
   @HttpCode(HttpStatus.OK)
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(TwoFactorEnrolmentGuard)
   generate(
-    @CurrentUser() context: RequestContext,
+    @CurrentEnrollee() enrollee: EnrolleeContext,
   ): Promise<GenerateTwoFactorResponseDto> {
-    return this.twoFactorAuthService.generate(context.sub, context);
+    return this.twoFactorAuthService.generate(enrollee.sub, enrollee);
   }
 
-  /** Confirms the authenticator works, enables 2FA, returns the backup codes. */
+  /**
+   * Confirms the authenticator works, enables 2FA, returns the backup codes.
+   *
+   * A caller who arrived on a challenge token is still NOT signed in
+   * afterwards: they finish by calling `POST /auth/2fa/authenticate` with the
+   * same challenge cookie and their first code, which is the one path that
+   * mints a session. Issuing tokens here instead would give enrolment a second
+   * session-minting door to keep correct.
+   */
   @Post('enable')
   @HttpCode(HttpStatus.OK)
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(TwoFactorEnrolmentGuard)
   async activate(
-    @CurrentUser() context: RequestContext,
+    @CurrentEnrollee() enrollee: EnrolleeContext,
     @Body() activateTwoFactorDto: ActivateTwoFactorDto,
   ): Promise<BackupCodesResponseDto> {
     const backupCodes = await this.twoFactorAuthService.activate(
-      context.sub,
+      enrollee.sub,
       activateTwoFactorDto.code,
-      context,
+      enrollee,
     );
 
     // The only time these are ever readable. Only hashes are stored.
@@ -93,6 +124,7 @@ export class TwoFactorAuthController {
    * whether the challenge is live, and the gateway only pre-screens.
    */
   @Post('authenticate')
+  @Throttle({ [AUTH_THROTTLER_TIER]: ROUTE_THROTTLE.twoFactorAuthenticate })
   @HttpCode(HttpStatus.OK)
   @UseGuards(Jwt2faGuard)
   async authenticate(

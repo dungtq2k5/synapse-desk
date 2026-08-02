@@ -9,7 +9,7 @@ import type { Metadata } from "@grpc/grpc-js";
 import { GrpcMethod, GrpcStreamMethod } from "@nestjs/microservices";
 import { Observable } from "rxjs";
 import { Timestamp } from "../../google/protobuf/timestamp";
-import { UserResponse } from "./common";
+import { PageMeta, PageRequest, UserResponse } from "./common";
 
 export enum InvitationStatus {
   INVITATION_STATUS_UNSPECIFIED = 0,
@@ -65,15 +65,21 @@ export interface CreateInvitationsResponse {
 
 export interface ListInvitationsRequest {
   organizationId: string;
-  status?: InvitationStatus | undefined;
-  page: number;
-  limit: number;
-  searchTerm?: string | undefined;
+  status?:
+    | InvitationStatus
+    | undefined;
+  /**
+   * Was page/limit/search_term inline. Replaced by the shared PageRequest so
+   * this list obeys the same sort allowlist and limit clamp as every other --
+   * the inline fields carried no sort_by at all, so the gateway accepted one
+   * and the service silently ignored it.
+   */
+  page: PageRequest | undefined;
 }
 
 export interface ListInvitationsResponse {
   items: InvitationResponse[];
-  totalItems: number;
+  meta: PageMeta | undefined;
 }
 
 export interface InvitationIdRequest {
@@ -130,6 +136,56 @@ export interface AcceptInvitationResponse {
   skipped: string[];
 }
 
+/**
+ * Dry run: validates a batch and reports what WOULD happen. No writes, no mail.
+ *
+ * For a 200-row paste this is the difference between a clean import and forty
+ * support tickets -- the caller sees the already-registered addresses, the
+ * typos and the projected seat overrun before committing to any of it.
+ */
+export interface PreviewInvitationsRequest {
+  organizationId: string;
+  invitations: InviteUserInput[];
+}
+
+export interface InvitationPreviewRow {
+  email: string;
+  /** False when this row would be rejected; `reason` says why. */
+  ok: boolean;
+  reason?:
+    | string
+    | undefined;
+  /**
+   * Role/department ids in the row that do not resolve. Reported per row so the
+   * caller can fix the mapping rather than guess which entry was wrong.
+   */
+  unknownRoleIds: string[];
+  unknownDepartmentIds: string[];
+}
+
+export interface PreviewInvitationsResponse {
+  rows: InvitationPreviewRow[];
+  seatsInUse: number;
+  maxAgentSeats: number;
+  /**
+   * How many of the OK rows exceed the remaining seats. Non-zero means the
+   * batch would be partially rejected at commit time.
+   */
+  seatOverrun: number;
+}
+
+/**
+ * Administrative detail for ONE invitation, by id.
+ *
+ * Distinct from PreviewInvitation, which is the PUBLIC lookup by token: this
+ * one is permission-gated and discloses the full row, that one is unauthenticated
+ * and masks the address.
+ */
+export interface GetInvitationRequest {
+  organizationId: string;
+  invitationId: string;
+}
+
 export interface ExpireStaleInvitationsRequest {
 }
 
@@ -149,6 +205,10 @@ export interface InvitationServiceClient {
   previewInvitation(request: PreviewInvitationRequest, metadata?: Metadata): Observable<PreviewInvitationResponse>;
 
   acceptInvitation(request: AcceptInvitationRequest, metadata?: Metadata): Observable<AcceptInvitationResponse>;
+
+  previewInvitations(request: PreviewInvitationsRequest, metadata?: Metadata): Observable<PreviewInvitationsResponse>;
+
+  getInvitation(request: GetInvitationRequest, metadata?: Metadata): Observable<InvitationResponse>;
 
   expireStaleInvitations(
     request: ExpireStaleInvitationsRequest,
@@ -187,6 +247,16 @@ export interface InvitationServiceController {
     metadata?: Metadata,
   ): Promise<AcceptInvitationResponse> | Observable<AcceptInvitationResponse> | AcceptInvitationResponse;
 
+  previewInvitations(
+    request: PreviewInvitationsRequest,
+    metadata?: Metadata,
+  ): Promise<PreviewInvitationsResponse> | Observable<PreviewInvitationsResponse> | PreviewInvitationsResponse;
+
+  getInvitation(
+    request: GetInvitationRequest,
+    metadata?: Metadata,
+  ): Promise<InvitationResponse> | Observable<InvitationResponse> | InvitationResponse;
+
   expireStaleInvitations(
     request: ExpireStaleInvitationsRequest,
     metadata?: Metadata,
@@ -205,6 +275,8 @@ export function InvitationServiceControllerMethods() {
       "revokeInvitation",
       "previewInvitation",
       "acceptInvitation",
+      "previewInvitations",
+      "getInvitation",
       "expireStaleInvitations",
     ];
     for (const method of grpcMethods) {

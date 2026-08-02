@@ -110,7 +110,12 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
         // loser dies on a unique violation and takes the service down with it.
         // Whoever arrives second blocks here, then finds everything present and
         // no-ops. The lock is transaction-scoped, so it always releases.
-        await tx.$queryRaw`SELECT pg_advisory_xact_lock(${SEED_ADVISORY_LOCK_KEY}::bigint)`;
+        // `$executeRaw`, NOT `$queryRaw`: pg_advisory_xact_lock() returns
+        // `void`, and $queryRaw tries to deserialize the result set — which
+        // fails with UnsupportedNativeDataType and takes the whole boot with
+        // it. $executeRaw only reports a row count, which is all we want here;
+        // the lock is the side effect, not the value.
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(${SEED_ADVISORY_LOCK_KEY}::bigint)`;
 
         const permissions = await this.seedPermissions(tx);
         const systemUser = await this.seedSystemUser(tx);
@@ -231,6 +236,22 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
       CREATE UNIQUE INDEX IF NOT EXISTS "user_invitations_pending_key"
         ON user_invitations (organization_id, email)
         WHERE status = 'PENDING';
+
+      -- Department names are unique per tenant among ACTIVE rows only. Partial
+      -- for the same reason as users_org_email_key: a full @@unique would keep
+      -- soft-deleted rows enrolled, so the name of a deleted department could
+      -- never be re-used.
+      CREATE UNIQUE INDEX IF NOT EXISTS "departments_org_name_key"
+        ON departments (organization_id, name)
+        WHERE deleted_at IS NULL;
+
+      -- At most ONE primary department per user. The service also demotes the
+      -- previous primary when setting a new one, but that check races: two
+      -- concurrent "set primary" requests both read "none set" and both write.
+      -- This index is the only thing that makes two primaries impossible.
+      CREATE UNIQUE INDEX IF NOT EXISTS "user_departments_primary_key"
+        ON user_departments (user_id)
+        WHERE is_primary = true;
     `);
   }
 

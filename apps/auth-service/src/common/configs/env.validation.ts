@@ -90,13 +90,26 @@ export const envValidationSchema = Joi.object({
   OTP_EXPIRY_MINUTES: Joi.number().required(),
   OTP_MAX_ATTEMPTS: Joi.number().required(),
 
+  // Mirrors every audit event to the log as well as publishing it to NATS.
+  // A stopgap until ticket-service owns `audit_logs` and subscribes — see the
+  // docblock on AuditPublisher. Set false once a real consumer exists.
+  AUDIT_LOG_TO_CONSOLE: Joi.boolean().default(true),
+
   // Bootstrap seeding (see src/modules/prisma/database.seeder.ts). Runs on every startup and is
   // idempotent; set SEED_ON_BOOTSTRAP=false to skip it entirely.
   SEED_ON_BOOTSTRAP: Joi.boolean().default(true),
 
   // The non-login platform actor that owns rows no human created — currently
   // roles.created_by_id on the global system roles.
-  SYSTEM_USER_EMAIL: Joi.string().email().required(),
+  // `tlds: false` because this address is deliberately UNDELIVERABLE — the
+  // system actor is not a mailbox, and the convention for it is a reserved TLD
+  // (`system@synapsedesk.internal`). Joi's default checks the TLD against the
+  // IANA list, which rejects `.internal` precisely because nothing may route
+  // there. Validating the syntax is still worth doing; validating routability
+  // is the opposite of what this field wants.
+  SYSTEM_USER_EMAIL: Joi.string()
+    .email({ tlds: { allow: false } })
+    .required(),
   SYSTEM_USER_FULL_NAME: Joi.string().required(),
 
   // The first real Super Admin account. The password is only applied when the

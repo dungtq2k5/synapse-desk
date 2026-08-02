@@ -45,3 +45,49 @@ message UserResponse {
   google.protobuf.Timestamp created_at = 14;
   google.protobuf.Timestamp updated_at = 15;
 }
+
+// Shared by every list RPC in the package. Mirrors SearchPaginationBase at the
+// REST edge so the gateway hands its query DTO straight through.
+message PageRequest {
+  // 1-based, matching the REST contract. Page 0 is a client bug and is rejected,
+  // not silently coerced -- a silent coercion means the caller keeps sending it.
+  int32 page = 1;
+  int32 limit = 2;
+
+  // Empty means "no filter". proto3 has no null for scalars, and `optional`
+  // would only add a presence bit that says nothing an empty string does not.
+  string search_term = 3;
+
+  // Validated against a per-module allowlist in the SERVICE, never passed
+  // through to `orderBy` as received -- an arbitrary column name there either
+  // throws a Prisma validation error or sorts by something never meant to be
+  // exposed.
+  string sort_by = 4;
+
+  // An enum, unlike sort_by, because the legal values are FIXED and knowable
+  // here. Sortable columns differ per module -- users sort by lastLoginAt,
+  // departments do not -- so no enum in this shared file could enumerate them,
+  // which is why that field stays a string and is allowlisted per service.
+  // Direction has exactly two values for every list in the system, so protoc
+  // can make an illegal one unrepresentable and nothing needs to validate it.
+  SortOrder sort_order = 5;
+}
+
+enum SortOrder {
+  // proto3 requires a 0 member. Here it means "the caller did not choose",
+  // which takes the default rather than being rejected -- direction is a
+  // presentation preference, not something a request is wrong without.
+  SORT_ORDER_UNSPECIFIED = 0;
+  SORT_ORDER_ASC = 1;
+  SORT_ORDER_DESC = 2;
+}
+
+// Field names deliberately match PaginationMetaDataResponseBase at the REST
+// edge, so the gateway mapper is a rename-free copy.
+message PageMeta {
+  int32 total_items = 1;
+  int32 item_count = 2;
+  int32 items_per_page = 3;
+  int32 total_pages = 4;
+  int32 current_page = 5;
+}

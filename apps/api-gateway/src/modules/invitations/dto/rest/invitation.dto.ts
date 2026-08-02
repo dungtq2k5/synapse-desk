@@ -1,4 +1,5 @@
 import { Type } from 'class-transformer';
+import { OmitType } from '@nestjs/swagger';
 import {
   ArrayMaxSize,
   ArrayMinSize,
@@ -12,7 +13,12 @@ import {
   MinLength,
   ValidateNested,
 } from 'class-validator';
-import { InvitationStatus } from '@synapsedesk/common';
+import {
+  DEFAULT_SEARCH,
+  INVITATION_SORTABLE_FIELDS,
+  InvitationStatus,
+  type InvitationSortableField,
+} from '@synapsedesk/common';
 import { SearchPaginationBase } from '../../../../common/dto/base/search-pagination-base.dto';
 import {
   MAX_DEVICE_NAME_LENGTH,
@@ -58,10 +64,17 @@ export class CreateInvitationsDto {
   readonly invitations!: InviteUserDto[];
 }
 
-export class ListInvitationsQueryDto extends SearchPaginationBase {
+export class ListInvitationsQueryDto extends OmitType(SearchPaginationBase, [
+  'sortBy',
+] as const) {
   @IsOptional()
   @IsIn(Object.values(InvitationStatus))
   readonly status?: InvitationStatus;
+
+  @IsOptional()
+  @IsString()
+  @IsIn(INVITATION_SORTABLE_FIELDS)
+  readonly sortBy: InvitationSortableField = DEFAULT_SEARCH.SORT_BY;
 }
 
 export class AcceptInvitationDto {
@@ -125,4 +138,66 @@ export class AcceptInvitationResponseDto {
   readonly user!: unknown;
   /** Role/department ids that no longer resolved. Reported, never fatal. */
   readonly skipped!: string[];
+}
+
+/**
+ * A row in a DRY RUN. Deliberately looser than `InviteUserDto`.
+ *
+ * `@IsEmail()` and `@IsUUID()` are absent ON PURPOSE. Inheriting them (as this
+ * class first did) makes the endpoint reject the whole batch at the edge the
+ * moment one row has a typo — which is precisely the batch a user reaches for
+ * the preview to inspect. The service classifies each row instead, so a
+ * malformed address comes back as `ok: false, reason: 'Not a valid email
+ * address'` beside the 199 good ones.
+ *
+ * Lengths are still bounded: the point is to accept bad DATA, not unbounded
+ * input.
+ */
+export class PreviewInviteUserDto {
+  @IsString()
+  @MaxLength(320)
+  readonly email!: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  @MaxLength(64, { each: true })
+  readonly roleIds?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  @MaxLength(64, { each: true })
+  readonly departmentIds?: string[];
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  readonly primaryDepartmentId?: string;
+}
+
+export class PreviewInvitationsDto {
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(MAX_INVITATIONS_PER_BATCH)
+  @ValidateNested({ each: true })
+  @Type(() => PreviewInviteUserDto)
+  readonly invitations!: PreviewInviteUserDto[];
+}
+
+export class InvitationPreviewRowDto {
+  readonly email!: string;
+  readonly ok!: boolean;
+  readonly reason!: string | null;
+  /** Reported even on an OK row: these are skipped at redemption, not fatal. */
+  readonly unknownRoleIds!: string[];
+  readonly unknownDepartmentIds!: string[];
+}
+
+export class PreviewInvitationsResponseDto {
+  readonly rows!: InvitationPreviewRowDto[];
+  readonly seatsInUse!: number;
+  readonly maxAgentSeats!: number;
+  /** Non-zero means the batch would be partially rejected at commit time. */
+  readonly seatOverrun!: number;
 }

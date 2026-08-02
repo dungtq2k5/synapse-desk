@@ -1,7 +1,18 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "outDir": "./dist"
+    "outDir": "./dist",
+    // Overrides the repo-root rootDir so output is dist/<entry>.js rather than
+    // dist/libs/<name>/src/<entry>.js -- package.json "main" has to point at a
+    // stable path, and a nested one would also put the copied .proto tree at a
+    // depth PROTO_ROOT does not expect.
+    "rootDir": "./src",
+    // Clears the repo-root path aliases. Those map @synapsedesk/* at SOURCE,
+    // which drags the other library's .ts files into this program and breaks
+    // rootDir. A library must consume its siblings as built PACKAGES -- which
+    // is also what the runtime does, so this keeps compile-time and run-time
+    // resolution telling the same story.
+    "paths": {}
   },
   // Own source only. A library MUST NOT compile application source — the
   // dependency runs the other way, and `libs/common/src` references api-gateway

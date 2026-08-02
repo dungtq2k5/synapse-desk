@@ -1,7 +1,7 @@
 import { GatewayTimeoutException } from '@nestjs/common';
 import { Metadata } from '@grpc/grpc-js';
-import { GRPC_DEADLINE_MS, packRequestOrigin } from '@synapsedesk/grpc-proto';
-import { RequestOrigin } from '@synapsedesk/common';
+import { GRPC_DEADLINE_MS, packRequestContext } from '@synapsedesk/grpc-proto';
+import { RequestContext, RequestOrigin } from '@synapsedesk/common';
 import {
   catchError,
   firstValueFrom,
@@ -29,19 +29,25 @@ export abstract class BaseGrpcClient {
   protected abstract readonly serviceName: string;
 
   /**
-   * Runs a unary call with the shared deadline, packing the caller's origin
+   * Runs a unary call with the shared deadline, packing the caller's context
    * into metadata first.
    *
    * `invoke` receives the metadata rather than the caller building it, so no
    * call site can forget to pass it.
+   *
+   * Takes the union deliberately. An authenticated controller passes its full
+   * `RequestContext` and the tenant travels with the call automatically; an
+   * unauthenticated one (login, register, invitation preview) passes a bare
+   * origin, and the service sees a caller with no identity — which is exactly
+   * what it is.
    */
   protected call<T>(
     invoke: (metadata: Metadata) => Observable<T>,
-    origin: RequestOrigin,
+    origin: RequestOrigin | RequestContext,
     deadlineMs: number = GRPC_DEADLINE_MS,
   ): Promise<T> {
     return firstValueFrom(
-      invoke(packRequestOrigin(origin)).pipe(
+      invoke(packRequestContext(origin)).pipe(
         timeout(deadlineMs),
         catchError((error: unknown) =>
           throwError(() =>

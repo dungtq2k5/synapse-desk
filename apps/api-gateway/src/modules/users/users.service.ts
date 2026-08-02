@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { UserServiceGrpcClient } from './users-service-grpc.client';
 import { RequestOrigin } from '@synapsedesk/common';
-import { CurrentUserResponseDto } from './dto/rest/current-user-response.dto';
+import { CurrentUserResponseDto } from './dto/rest/user-response.dto';
 
 @Injectable()
 export class UsersService {

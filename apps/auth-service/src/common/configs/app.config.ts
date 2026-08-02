@@ -20,3 +20,36 @@ export const BACKUP_CODE_LENGTH = 10;
 
 /** DI token for the NATS client proxy used to reach notification-service. */
 export const NATS_CLIENT = Symbol('NATS_CLIENT');
+
+/**
+ * Free-mail domains that should never appear in `allowed_email_domains`.
+ *
+ * Adding one there lets ANYONE with such an address auto-join the tenant at
+ * registration. Surfaced as a warning rather than a hard rejection: the list
+ * cannot be exhaustive, so treating it as authoritative would block legitimate
+ * niche providers while still missing others. The block that matters is the
+ * admin reading the warning.
+ */
+export const PUBLIC_EMAIL_DOMAINS: ReadonlySet<string> = new Set([
+  'gmail.com',
+  'googlemail.com',
+  'outlook.com',
+  'hotmail.com',
+  'live.com',
+  'yahoo.com',
+  'icloud.com',
+  'proton.me',
+  'protonmail.com',
+  'aol.com',
+  'gmx.com',
+  'mail.com',
+  'yandex.com',
+  'zoho.com',
+]);
+
+/** Lowercase, dot-separated, no scheme or path. */
+export const DOMAIN_PATTERN =
+  /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/;
+
+/** Lowercase alphanumerics and hyphens — it appears in URLs. */
+export const SLUG_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;

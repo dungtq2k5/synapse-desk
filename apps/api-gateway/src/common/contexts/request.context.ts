@@ -1,12 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { Request } from 'express';
-import {
-  GRPC_CONTEXT_METADATA,
-  isFullJwtPayload,
-  PermissionCode,
-  RequestContext,
-} from '@synapsedesk/common';
-import { Metadata } from '@grpc/grpc-js';
+import { isFullJwtPayload, RequestContext } from '@synapsedesk/common';
 
 @Injectable()
 export class RequestContextService {
@@ -31,29 +25,10 @@ export class RequestContextService {
     };
   }
 
-  /** Rebuilds the caller context the gateway packed into gRPC metadata. */
-  static fromGrpcMetadata(metadata: Metadata): RequestContext {
-    const one = (key: string) =>
-      (metadata.get(key)[0] as string | undefined) ?? '';
-    const json = <T>(key: string, fallback: T): T => {
-      const raw = one(key);
-      return raw ? (JSON.parse(raw) as T) : fallback;
-    };
-
-    return {
-      sub: one(GRPC_CONTEXT_METADATA.userId),
-      organizationId: one(GRPC_CONTEXT_METADATA.organizationId) || null,
-      isSuperAdmin: one(GRPC_CONTEXT_METADATA.isSuperAdmin) === 'true',
-      departmentIds: json<string[]>(GRPC_CONTEXT_METADATA.departmentIds, []),
-      permissionCodes: json<PermissionCode[]>(
-        GRPC_CONTEXT_METADATA.permissionCodes,
-        [],
-      ),
-      isEmailVerified: one(GRPC_CONTEXT_METADATA.isEmailVerified) === 'true',
-      ip: one(GRPC_CONTEXT_METADATA.ip),
-      userAgent: one(GRPC_CONTEXT_METADATA.userAgent),
-    };
-  }
+  // The metadata READER moved to `unpackCallerContext` in
+  // libs/grpc-proto/src/metadata.ts. It never belonged here: the gateway packs
+  // metadata and services unpack it, so a reader on this side had no caller and
+  // sat unused beside a packer that wrote none of the keys it read.
 
   /**
    * Validate tenant-scoped access: request context organization must match resource organization.

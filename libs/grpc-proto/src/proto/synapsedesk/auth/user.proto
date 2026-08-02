@@ -2,11 +2,14 @@ syntax = "proto3";
 
 package synapsedesk.auth;
 
+import "google/protobuf/timestamp.proto";
 import "synapsedesk/auth/common.proto";
 
-// Profile reads. Kept apart from auth.proto because this is the only service a
-// caller reaches with an ALREADY valid session -- everything in auth.proto is
-// about obtaining one.
+// Profiles: the caller's own, and tenant administration of everyone else's.
+//
+// No message carries an organization id. The tenant travels in the verified
+// caller context, so there is no request in which an admin can name someone
+// else's workspace.
 
 message GetCurrentUserRequest {
   string user_id = 1;
@@ -18,6 +21,148 @@ message CurrentUserResponse {
   repeated string department_ids = 3;
 }
 
+// ---------------------------------------------------------------------------
+// Own profile
+// ---------------------------------------------------------------------------
+
+// Deliberately NARROW. `email`, `phone_number` and `is_email_verified` are
+// absent because those change through the OTP flow that already exists, and
+// `is_locked` / roles / departments are administrative. A field added here is a
+// field a user can set about themselves -- which is the whole security question
+// this message answers.
+message UpdateOwnProfileRequest {
+  optional string full_name = 1;
+  // ISO 'YYYY-MM-DD'. Empty string clears it; absent leaves it unchanged.
+  optional string dob = 2;
+  optional Gender gender = 3;
+  optional string avatar_url = 4;
+}
+
+// ---------------------------------------------------------------------------
+// Administration
+// ---------------------------------------------------------------------------
+
+message UserSummaryResponse {
+  UserResponse user = 1;
+  repeated string role_ids = 2;
+  repeated string role_names = 3;
+  repeated string department_ids = 4;
+
+  // Populated only on soft-deleted rows, so a list including them renders
+  // differently rather than showing a deactivated user as live.
+  optional google.protobuf.Timestamp deleted_at = 5;
+  optional string deleted_by_name = 6;
+}
+
+message ListUsersRequest {
+  PageRequest page = 1;
+
+  optional string department_id = 2;
+  optional string role_id = 3;
+  optional bool is_locked = 4;
+
+  // Honoured only when the caller holds user.delete -- checked at the gateway.
+  bool include_deleted = 5;
+}
+
+message ListUsersResponse {
+  repeated UserSummaryResponse items = 1;
+  PageMeta meta = 2;
+}
+
+message UserIdRequest {
+  string id = 1;
+}
+
+message GetUserPermissionsResponse {
+  // The flattened union across the user's roles -- computed by the SAME
+  // function that builds the JWT claim, so the token and this endpoint cannot
+  // disagree.
+  repeated string permission_codes = 1;
+}
+
+message CreateUserRequest {
+  string email = 1;
+  string full_name = 2;
+  repeated string role_ids = 3;
+  repeated string department_ids = 4;
+  optional string primary_department_id = 5;
+}
+
+message CreateUserResponse {
+  UserSummaryResponse user = 1;
+}
+
+// Same narrowing rule as UpdateOwnProfileRequest, and for the same reason:
+// `email` is tenant-unique and needs re-verification, `is_email_verified` is
+// what OTP is for, and `is_super_admin` is paired with organization_id by a
+// CHECK constraint that flipping it here would violate.
+message UpdateUserRequest {
+  string id = 1;
+  optional string full_name = 2;
+  optional string phone_number = 3;
+  optional string dob = 4;
+  optional Gender gender = 5;
+  optional string avatar_url = 6;
+}
+
+message DeleteUserResponse {
+  // Sessions destroyed alongside the deactivation. Surfaced so the UI can say
+  // "signed out of N devices" rather than leaving it implicit.
+  int32 revoked_session_count = 1;
+}
+
+message LockUserRequest {
+  string id = 1;
+  // Stored in the audit metadata and quoted in the email to the user. Required:
+  // "why is this account locked?" is asked months later, by someone else.
+  string reason = 2;
+}
+
+message LockUserResponse {
+  int32 revoked_session_count = 1;
+}
+
+message UnlockUserResponse {}
+
+message ResetUserTwoFactorResponse {
+  int32 untrusted_device_count = 1;
+}
+
+// REPLACE semantics -- safe to retry, unlike an append.
+message SetUserRolesRequest {
+  string id = 1;
+  repeated string role_ids = 2;
+}
+
+message DepartmentAssignment {
+  string department_id = 1;
+  bool is_primary = 2;
+}
+
+message SetUserDepartmentsRequest {
+  string id = 1;
+  // Exactly ONE must be primary when the list is non-empty. Zero is as invalid
+  // as two: the partial unique index only catches the "two" case.
+  repeated DepartmentAssignment departments = 2;
+}
+
 service UserService {
   rpc GetCurrentUser(GetCurrentUserRequest) returns (CurrentUserResponse);
+  rpc UpdateOwnProfile(UpdateOwnProfileRequest) returns (UserResponse);
+
+  rpc ListUsers(ListUsersRequest) returns (ListUsersResponse);
+  rpc GetUser(UserIdRequest) returns (UserSummaryResponse);
+  rpc GetUserPermissions(UserIdRequest) returns (GetUserPermissionsResponse);
+
+  rpc CreateUser(CreateUserRequest) returns (CreateUserResponse);
+  rpc UpdateUser(UpdateUserRequest) returns (UserSummaryResponse);
+  rpc DeleteUser(UserIdRequest) returns (DeleteUserResponse);
+  rpc RestoreUser(UserIdRequest) returns (UserSummaryResponse);
+  rpc LockUser(LockUserRequest) returns (LockUserResponse);
+  rpc UnlockUser(UserIdRequest) returns (UnlockUserResponse);
+  rpc ResetUserTwoFactor(UserIdRequest) returns (ResetUserTwoFactorResponse);
+
+  rpc SetUserRoles(SetUserRolesRequest) returns (UserSummaryResponse);
+  rpc SetUserDepartments(SetUserDepartmentsRequest) returns (UserSummaryResponse);
 }

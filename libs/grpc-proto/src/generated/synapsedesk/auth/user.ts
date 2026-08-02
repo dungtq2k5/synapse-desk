@@ -8,7 +8,8 @@
 import type { Metadata } from "@grpc/grpc-js";
 import { GrpcMethod, GrpcStreamMethod } from "@nestjs/microservices";
 import { Observable } from "rxjs";
-import { UserResponse } from "./common";
+import { Timestamp } from "../../google/protobuf/timestamp";
+import { Gender, PageMeta, PageRequest, UserResponse } from "./common";
 
 export interface GetCurrentUserRequest {
   userId: string;
@@ -20,8 +21,168 @@ export interface CurrentUserResponse {
   departmentIds: string[];
 }
 
+/**
+ * Deliberately NARROW. `email`, `phone_number` and `is_email_verified` are
+ * absent because those change through the OTP flow that already exists, and
+ * `is_locked` / roles / departments are administrative. A field added here is a
+ * field a user can set about themselves -- which is the whole security question
+ * this message answers.
+ */
+export interface UpdateOwnProfileRequest {
+  fullName?:
+    | string
+    | undefined;
+  /** ISO 'YYYY-MM-DD'. Empty string clears it; absent leaves it unchanged. */
+  dob?: string | undefined;
+  gender?: Gender | undefined;
+  avatarUrl?: string | undefined;
+}
+
+export interface UserSummaryResponse {
+  user: UserResponse | undefined;
+  roleIds: string[];
+  roleNames: string[];
+  departmentIds: string[];
+  /**
+   * Populated only on soft-deleted rows, so a list including them renders
+   * differently rather than showing a deactivated user as live.
+   */
+  deletedAt?: Timestamp | undefined;
+  deletedByName?: string | undefined;
+}
+
+export interface ListUsersRequest {
+  page: PageRequest | undefined;
+  departmentId?: string | undefined;
+  roleId?: string | undefined;
+  isLocked?:
+    | boolean
+    | undefined;
+  /** Honoured only when the caller holds user.delete -- checked at the gateway. */
+  includeDeleted: boolean;
+}
+
+export interface ListUsersResponse {
+  items: UserSummaryResponse[];
+  meta: PageMeta | undefined;
+}
+
+export interface UserIdRequest {
+  id: string;
+}
+
+export interface GetUserPermissionsResponse {
+  /**
+   * The flattened union across the user's roles -- computed by the SAME
+   * function that builds the JWT claim, so the token and this endpoint cannot
+   * disagree.
+   */
+  permissionCodes: string[];
+}
+
+export interface CreateUserRequest {
+  email: string;
+  fullName: string;
+  roleIds: string[];
+  departmentIds: string[];
+  primaryDepartmentId?: string | undefined;
+}
+
+export interface CreateUserResponse {
+  user: UserSummaryResponse | undefined;
+}
+
+/**
+ * Same narrowing rule as UpdateOwnProfileRequest, and for the same reason:
+ * `email` is tenant-unique and needs re-verification, `is_email_verified` is
+ * what OTP is for, and `is_super_admin` is paired with organization_id by a
+ * CHECK constraint that flipping it here would violate.
+ */
+export interface UpdateUserRequest {
+  id: string;
+  fullName?: string | undefined;
+  phoneNumber?: string | undefined;
+  dob?: string | undefined;
+  gender?: Gender | undefined;
+  avatarUrl?: string | undefined;
+}
+
+export interface DeleteUserResponse {
+  /**
+   * Sessions destroyed alongside the deactivation. Surfaced so the UI can say
+   * "signed out of N devices" rather than leaving it implicit.
+   */
+  revokedSessionCount: number;
+}
+
+export interface LockUserRequest {
+  id: string;
+  /**
+   * Stored in the audit metadata and quoted in the email to the user. Required:
+   * "why is this account locked?" is asked months later, by someone else.
+   */
+  reason: string;
+}
+
+export interface LockUserResponse {
+  revokedSessionCount: number;
+}
+
+export interface UnlockUserResponse {
+}
+
+export interface ResetUserTwoFactorResponse {
+  untrustedDeviceCount: number;
+}
+
+/** REPLACE semantics -- safe to retry, unlike an append. */
+export interface SetUserRolesRequest {
+  id: string;
+  roleIds: string[];
+}
+
+export interface DepartmentAssignment {
+  departmentId: string;
+  isPrimary: boolean;
+}
+
+export interface SetUserDepartmentsRequest {
+  id: string;
+  /**
+   * Exactly ONE must be primary when the list is non-empty. Zero is as invalid
+   * as two: the partial unique index only catches the "two" case.
+   */
+  departments: DepartmentAssignment[];
+}
+
 export interface UserServiceClient {
   getCurrentUser(request: GetCurrentUserRequest, metadata?: Metadata): Observable<CurrentUserResponse>;
+
+  updateOwnProfile(request: UpdateOwnProfileRequest, metadata?: Metadata): Observable<UserResponse>;
+
+  listUsers(request: ListUsersRequest, metadata?: Metadata): Observable<ListUsersResponse>;
+
+  getUser(request: UserIdRequest, metadata?: Metadata): Observable<UserSummaryResponse>;
+
+  getUserPermissions(request: UserIdRequest, metadata?: Metadata): Observable<GetUserPermissionsResponse>;
+
+  createUser(request: CreateUserRequest, metadata?: Metadata): Observable<CreateUserResponse>;
+
+  updateUser(request: UpdateUserRequest, metadata?: Metadata): Observable<UserSummaryResponse>;
+
+  deleteUser(request: UserIdRequest, metadata?: Metadata): Observable<DeleteUserResponse>;
+
+  restoreUser(request: UserIdRequest, metadata?: Metadata): Observable<UserSummaryResponse>;
+
+  lockUser(request: LockUserRequest, metadata?: Metadata): Observable<LockUserResponse>;
+
+  unlockUser(request: UserIdRequest, metadata?: Metadata): Observable<UnlockUserResponse>;
+
+  resetUserTwoFactor(request: UserIdRequest, metadata?: Metadata): Observable<ResetUserTwoFactorResponse>;
+
+  setUserRoles(request: SetUserRolesRequest, metadata?: Metadata): Observable<UserSummaryResponse>;
+
+  setUserDepartments(request: SetUserDepartmentsRequest, metadata?: Metadata): Observable<UserSummaryResponse>;
 }
 
 export interface UserServiceController {
@@ -29,11 +190,91 @@ export interface UserServiceController {
     request: GetCurrentUserRequest,
     metadata?: Metadata,
   ): Promise<CurrentUserResponse> | Observable<CurrentUserResponse> | CurrentUserResponse;
+
+  updateOwnProfile(
+    request: UpdateOwnProfileRequest,
+    metadata?: Metadata,
+  ): Promise<UserResponse> | Observable<UserResponse> | UserResponse;
+
+  listUsers(
+    request: ListUsersRequest,
+    metadata?: Metadata,
+  ): Promise<ListUsersResponse> | Observable<ListUsersResponse> | ListUsersResponse;
+
+  getUser(
+    request: UserIdRequest,
+    metadata?: Metadata,
+  ): Promise<UserSummaryResponse> | Observable<UserSummaryResponse> | UserSummaryResponse;
+
+  getUserPermissions(
+    request: UserIdRequest,
+    metadata?: Metadata,
+  ): Promise<GetUserPermissionsResponse> | Observable<GetUserPermissionsResponse> | GetUserPermissionsResponse;
+
+  createUser(
+    request: CreateUserRequest,
+    metadata?: Metadata,
+  ): Promise<CreateUserResponse> | Observable<CreateUserResponse> | CreateUserResponse;
+
+  updateUser(
+    request: UpdateUserRequest,
+    metadata?: Metadata,
+  ): Promise<UserSummaryResponse> | Observable<UserSummaryResponse> | UserSummaryResponse;
+
+  deleteUser(
+    request: UserIdRequest,
+    metadata?: Metadata,
+  ): Promise<DeleteUserResponse> | Observable<DeleteUserResponse> | DeleteUserResponse;
+
+  restoreUser(
+    request: UserIdRequest,
+    metadata?: Metadata,
+  ): Promise<UserSummaryResponse> | Observable<UserSummaryResponse> | UserSummaryResponse;
+
+  lockUser(
+    request: LockUserRequest,
+    metadata?: Metadata,
+  ): Promise<LockUserResponse> | Observable<LockUserResponse> | LockUserResponse;
+
+  unlockUser(
+    request: UserIdRequest,
+    metadata?: Metadata,
+  ): Promise<UnlockUserResponse> | Observable<UnlockUserResponse> | UnlockUserResponse;
+
+  resetUserTwoFactor(
+    request: UserIdRequest,
+    metadata?: Metadata,
+  ): Promise<ResetUserTwoFactorResponse> | Observable<ResetUserTwoFactorResponse> | ResetUserTwoFactorResponse;
+
+  setUserRoles(
+    request: SetUserRolesRequest,
+    metadata?: Metadata,
+  ): Promise<UserSummaryResponse> | Observable<UserSummaryResponse> | UserSummaryResponse;
+
+  setUserDepartments(
+    request: SetUserDepartmentsRequest,
+    metadata?: Metadata,
+  ): Promise<UserSummaryResponse> | Observable<UserSummaryResponse> | UserSummaryResponse;
 }
 
 export function UserServiceControllerMethods() {
   return function (constructor: Function) {
-    const grpcMethods: string[] = ["getCurrentUser"];
+    const grpcMethods: string[] = [
+      "getCurrentUser",
+      "updateOwnProfile",
+      "listUsers",
+      "getUser",
+      "getUserPermissions",
+      "createUser",
+      "updateUser",
+      "deleteUser",
+      "restoreUser",
+      "lockUser",
+      "unlockUser",
+      "resetUserTwoFactor",
+      "setUserRoles",
+      "setUserDepartments",
+    ];
     for (const method of grpcMethods) {
       const descriptor: any = Reflect.getOwnPropertyDescriptor(constructor.prototype, method);
       GrpcMethod("UserService", method)(constructor.prototype[method], method, descriptor);

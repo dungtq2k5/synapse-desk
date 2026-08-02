@@ -13,7 +13,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import type { Response } from 'express';
-import { RequestContext, RequestOrigin } from '@synapsedesk/common';
+import { OrgAccess, RequestContext, RequestOrigin } from '@synapsedesk/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionGuard } from '../../common/guards/permission.guard';
 import { EmailVerifiedGuard } from '../../common/guards/email-verified.guard';
@@ -31,9 +31,18 @@ import {
   InvitationResponseDto,
   ListInvitationsQueryDto,
   PreviewInvitationResponseDto,
+  PreviewInvitationsDto,
+  PreviewInvitationsResponseDto,
 } from './dto/rest/invitation.dto';
 import { PaginationResponseBase } from '../../common/dto/base/pagination-response-base.dto';
 import { LoginResponseDto } from '../auth/dto/rest/login.dto';
+import { Throttle } from '@nestjs/throttler';
+import {
+  AUTH_THROTTLER_TIER,
+  ROUTE_THROTTLE,
+} from '../../common/config/app.config';
+import { AuthThrottle } from '../../common/decorators/auth-throttle.decorator';
+import { OrgAccessKind } from '../../common/decorators/org-access.decorator';
 
 /**
  * Invitations (api-endpoints-plan §1.1).
@@ -89,25 +98,19 @@ export class InvitationsController {
     @CurrentUser() context: RequestContext,
     @Query() query: ListInvitationsQueryDto,
   ): Promise<PaginationResponseBase<InvitationResponseDto>> {
-    const { items, totalItems } = await this.invitationsGrpcClient.list(
+    // The envelope is built by the SERVICE now, via the shared PageMeta —
+    // this used to recompute it here from `totalItems`, which meant the page
+    // maths existed twice and only one copy honoured the service-side clamp.
+    return this.invitationsGrpcClient.list(
       context.organizationId!,
       query,
       context,
     );
-
-    return {
-      items,
-      meta: {
-        totalItems,
-        itemCount: items.length,
-        itemsPerPage: query.limit,
-        totalPages: Math.ceil(totalItems / query.limit),
-        currentPage: query.page,
-      },
-    };
   }
 
   /** Rotates the token — the previous link stops working immediately. */
+  @AuthThrottle()
+  @Throttle({ [AUTH_THROTTLER_TIER]: ROUTE_THROTTLE.invitationResend })
   @Post(':id/resend')
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard, EmailVerifiedGuard, PermissionGuard)
@@ -145,18 +148,26 @@ export class InvitationsController {
   /**
    * PUBLIC preview, so the invitee sees who invited them before signing up.
    *
+   * Mounted at `token/:token`, NOT `:token`. The bare form is indistinguishable
+   * from `:id` below, and Nest matches in declaration order — so whichever were
+   * registered first would swallow the other, and an admin fetching a perfectly
+   * valid invitation id would get a 410 that looks like a data problem.
+   *
    * No guard: the recipient has no account yet, which is the entire point.
    * It discloses organization and inviter name, so a token-guessing attacker
    * would otherwise learn the customer list — the 32-byte token makes that
    * impractical, and an IP rate limit belongs here once the throttler lands
    * (see the gap noted in the module docblock).
    */
-  @Get(':token')
-  preview(
+  @AuthThrottle()
+  @Throttle({ [AUTH_THROTTLER_TIER]: ROUTE_THROTTLE.invitationPreview })
+  @OrgAccessKind(OrgAccess.AUTH)
+  @Get('token/:token')
+  previewByToken(
     @Param('token') token: string,
     @CurrentOrigin() origin: RequestOrigin,
   ): Promise<PreviewInvitationResponseDto> {
-    return this.invitationsGrpcClient.preview(token, origin);
+    return this.invitationsGrpcClient.previewByToken(token, origin);
   }
 
   /**
@@ -167,6 +178,7 @@ export class InvitationsController {
    * `GuestGuard` for the same reason `/auth/login` has it: accepting while
    * already signed in would silently replace the current session.
    */
+  @OrgAccessKind(OrgAccess.AUTH)
   @Post('accept')
   @HttpCode(HttpStatus.OK)
   @UseGuards(GuestGuard)
@@ -190,5 +202,42 @@ export class InvitationsController {
     }
 
     return { user: result.user, requiresTwoFactor: false };
+  }
+  /**
+   * Dry run over a batch: no writes, no mail.
+   *
+   * `EmailVerifiedGuard` is deliberately ABSENT, unlike `POST /users/invitations`
+   * — nothing is sent, so the reason that gate exists (an unproven address
+   * spraying invitations) does not apply to a validation call.
+   */
+  @Post('preview')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @RequirePermission('user.invite')
+  previewBatch(
+    @CurrentUser() context: RequestContext,
+    @Body() previewInvitationsDto: PreviewInvitationsDto,
+  ): Promise<PreviewInvitationsResponseDto> {
+    return this.invitationsGrpcClient.previewBatch(
+      context.organizationId!,
+      previewInvitationsDto,
+      context,
+    );
+  }
+
+  /**
+   * Administrative detail by id, in ANY status — an admin asking "what happened
+   * to that invite?" needs the revoked and expired ones too.
+   *
+   * Declared AFTER `token/:token` and `preview`, so those literals win.
+   */
+  @Get(':id')
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @RequirePermission('user.read')
+  get(
+    @CurrentUser() context: RequestContext,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<InvitationResponseDto> {
+    return this.invitationsGrpcClient.get(context.organizationId!, id, context);
   }
 }

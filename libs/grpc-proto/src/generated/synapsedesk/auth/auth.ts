@@ -73,6 +73,16 @@ export interface LoginResponse {
   requiresTenantSelection: boolean;
   tenantSelectionToken?: string | undefined;
   tenants: TenantOption[];
+  /**
+   * The tenant REQUIRES 2FA and this account has not enrolled yet, so
+   * `two_factor_token` is an ENROLMENT challenge rather than a code prompt: the
+   * client must send the user to setup, not to "enter your 6-digit code".
+   *
+   * Only ever true alongside requires_two_factor. Without it the two cases are
+   * indistinguishable on the wire and the client shows a code box for a code
+   * that does not exist yet.
+   */
+  requiresTwoFactorSetup: boolean;
 }
 
 /**
@@ -159,6 +169,28 @@ export interface ResetPasswordResponse {
   revokedSessionCount: number;
 }
 
+export interface LogoutAllRequest {
+}
+
+export interface LogoutAllResponse {
+  revokedSessionCount: number;
+}
+
+export interface ChangePasswordRequest {
+  currentPassword: string;
+  newPassword: string;
+  /**
+   * Identifies the caller's OWN session family, which is the one session the
+   * change deliberately spares. Read from the refresh cookie by the gateway --
+   * the user stays signed in here while every other device is kicked.
+   */
+  refreshToken?: string | undefined;
+}
+
+export interface ChangePasswordResponse {
+  revokedSessionCount: number;
+}
+
 export interface AuthServiceClient {
   register(request: RegisterRequest, metadata?: Metadata): Observable<RegisterResponse>;
 
@@ -175,6 +207,13 @@ export interface AuthServiceClient {
 
   logout(request: LogoutRequest, metadata?: Metadata): Observable<LogoutResponse>;
 
+  /**
+   * Distinct from Logout, which ends ONE family. This is the "my laptop was
+   * stolen" button: every family, and every device trust with them.
+   */
+
+  logoutAll(request: LogoutAllRequest, metadata?: Metadata): Observable<LogoutAllResponse>;
+
   refreshToken(request: RefreshTokenRequest, metadata?: Metadata): Observable<RefreshTokenResponse>;
 
   forgotPassword(request: ForgotPasswordRequest, metadata?: Metadata): Observable<ForgotPasswordResponse>;
@@ -185,6 +224,14 @@ export interface AuthServiceClient {
   ): Observable<ValidatePasswordResetTokenResponse>;
 
   resetPassword(request: ResetPasswordRequest, metadata?: Metadata): Observable<ResetPasswordResponse>;
+
+  /**
+   * For a caller who KNOWS their current password, unlike ResetPassword whose
+   * actor is unauthenticated by definition -- which is why this one spares the
+   * caller's own session and that one revokes everything.
+   */
+
+  changePassword(request: ChangePasswordRequest, metadata?: Metadata): Observable<ChangePasswordResponse>;
 }
 
 export interface AuthServiceController {
@@ -215,6 +262,16 @@ export interface AuthServiceController {
     metadata?: Metadata,
   ): Promise<LogoutResponse> | Observable<LogoutResponse> | LogoutResponse;
 
+  /**
+   * Distinct from Logout, which ends ONE family. This is the "my laptop was
+   * stolen" button: every family, and every device trust with them.
+   */
+
+  logoutAll(
+    request: LogoutAllRequest,
+    metadata?: Metadata,
+  ): Promise<LogoutAllResponse> | Observable<LogoutAllResponse> | LogoutAllResponse;
+
   refreshToken(
     request: RefreshTokenRequest,
     metadata?: Metadata,
@@ -237,6 +294,17 @@ export interface AuthServiceController {
     request: ResetPasswordRequest,
     metadata?: Metadata,
   ): Promise<ResetPasswordResponse> | Observable<ResetPasswordResponse> | ResetPasswordResponse;
+
+  /**
+   * For a caller who KNOWS their current password, unlike ResetPassword whose
+   * actor is unauthenticated by definition -- which is why this one spares the
+   * caller's own session and that one revokes everything.
+   */
+
+  changePassword(
+    request: ChangePasswordRequest,
+    metadata?: Metadata,
+  ): Promise<ChangePasswordResponse> | Observable<ChangePasswordResponse> | ChangePasswordResponse;
 }
 
 export function AuthServiceControllerMethods() {
@@ -247,10 +315,12 @@ export function AuthServiceControllerMethods() {
       "loginWithTenant",
       "googleSignIn",
       "logout",
+      "logoutAll",
       "refreshToken",
       "forgotPassword",
       "validatePasswordResetToken",
       "resetPassword",
+      "changePassword",
     ];
     for (const method of grpcMethods) {
       const descriptor: any = Reflect.getOwnPropertyDescriptor(constructor.prototype, method);

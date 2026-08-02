@@ -9,6 +9,9 @@ import {
   LoginRequest,
   LoginResponse,
   LoginWithTenantRequest,
+  ChangePasswordRequest,
+  ChangePasswordResponse,
+  LogoutAllResponse,
   LogoutRequest,
   LogoutResponse,
   RefreshTokenRequest,
@@ -19,6 +22,7 @@ import {
   ResetPasswordResponse,
   ValidatePasswordResetTokenRequest,
   ValidatePasswordResetTokenResponse,
+  unpackCallerContext,
   unpackRequestOrigin,
 } from '@synapsedesk/grpc-proto';
 import { AuthService } from './auth.service';
@@ -96,5 +100,25 @@ export class AuthGrpcController implements AuthServiceController {
 
   resetPassword(request: ResetPasswordRequest): Promise<ResetPasswordResponse> {
     return this.authService.resetPassword(request);
+  }
+  /**
+   * Unlike `logout`, this is keyed off the AUTHENTICATED caller rather than a
+   * presented refresh token — so the full context is unpacked, not just origin.
+   */
+  logoutAll(
+    _request: unknown,
+    metadata?: Metadata,
+  ): Promise<LogoutAllResponse> {
+    return this.authService.logoutAll(unpackCallerContext(metadata));
+  }
+
+  changePassword(
+    request: ChangePasswordRequest,
+    metadata?: Metadata,
+  ): Promise<ChangePasswordResponse> {
+    return this.authService.changePassword(
+      request,
+      unpackCallerContext(metadata),
+    );
   }
 }

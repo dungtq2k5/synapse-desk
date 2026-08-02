@@ -1,11 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common';
 import {
+  CallerContext,
+  ChangePasswordRequest,
+  ChangePasswordResponse,
   ForgotPasswordRequest,
   ForgotPasswordResponse,
   GoogleSignInRequest,
   LoginRequest,
   LoginResponse,
   LoginWithTenantRequest,
+  LogoutAllResponse,
   LogoutRequest,
   LogoutResponse,
   RefreshTokenRequest,
@@ -21,11 +25,13 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import {
+  AuditAction,
+  AuditResourceType,
   EmailTemplateName,
   extractEmailDomain,
   JwtPayload,
   OrgStatus,
-  PermissionCode,
+  SystemRoleName,
   RequestOrigin,
   normalizeEmail,
   TenantSelectionJwtPayload,
@@ -53,6 +59,10 @@ import { toUserResponse } from '../users/user.mapper';
 import { NotificationPublisher } from '../notifications/notification-publisher.service';
 import { OtpService } from '../otp/otp.service';
 import { RolesService } from '../roles/roles.service';
+import { flattenPermissionCodes } from '../../common/utils/permissions';
+import { SessionsService } from '../sessions/sessions.service';
+import { AuditPublisher } from '../audit/audit-publisher.service';
+import { requireActor, tenantScope } from '../../common/utils/tenant-scope';
 import {
   FirebaseService,
   type GoogleIdentity,
@@ -106,6 +116,8 @@ export class AuthService {
     private readonly firebase: FirebaseService,
     private readonly otpService: OtpService,
     private readonly rolesService: RolesService,
+    private readonly sessionsService: SessionsService,
+    private readonly audit: AuditPublisher,
   ) {
     this.JWT_2FA_EXPIRES_IN =
       this.configService.getOrThrow<string>('JWT_2FA_EXPIRES_IN');
@@ -235,14 +247,16 @@ export class AuthService {
 
     try {
       return await this.prisma.$transaction(async (tx) => {
+        const existingOrg = await tx.organization.findFirst({
+          where: {
+            allowedEmailDomains: { has: emailDomain },
+            deletedAt: null,
+          },
+          select: { id: true, name: true },
+        });
+
         const org =
-          (await tx.organization.findFirst({
-            where: {
-              allowedEmailDomains: { has: emailDomain },
-              deletedAt: null,
-            },
-            select: { id: true, name: true },
-          })) ??
+          existingOrg ??
           (await tx.organization.create({
             data: {
               name: `Workspace for ${email}`,
@@ -252,6 +266,17 @@ export class AuthService {
             },
             select: { id: true, name: true },
           }));
+
+        // Whoever CREATES a tenant becomes its Org Admin; everyone who joins an
+        // existing one by domain match gets End User.
+        //
+        // Without this a self-registered workspace has no administrator at all:
+        // nobody can invite, create a department, or complete onboarding, and
+        // there is no other path to the first admin because inviting one
+        // already requires `user.invite`. Domain-matched joiners must NOT get
+        // it — that would hand full tenant control to anyone with a matching
+        // address.
+        const isFounder = existingOrg === null;
 
         // Now that the tenant is known, the conflict question is answerable.
         const existing = await tx.user.findFirst({
@@ -265,7 +290,10 @@ export class AuthService {
           });
         }
 
-        const endUserRoleId = await this.rolesService.getEndUserRoleId(tx);
+        const roleId = await this.rolesService.getSystemRoleId(
+          isFounder ? SystemRoleName.ORG_ADMIN : SystemRoleName.END_USER,
+          tx,
+        );
 
         const created = await tx.user.create({
           data: {
@@ -274,7 +302,7 @@ export class AuthService {
             email,
             passwordHash,
             isEmailVerified: false,
-            roles: { connect: { id: endUserRoleId } },
+            roles: { connect: { id: roleId } },
           },
           include: USER_WITH_ACCESS,
         });
@@ -350,6 +378,7 @@ export class AuthService {
       // this address?" oracle.
       return {
         requiresTwoFactor: false,
+        requiresTwoFactorSetup: false,
         requiresTenantSelection: true,
         tenantSelectionToken: this.generateTenantSelectionToken(
           matched.map((candidate) => candidate.id),
@@ -456,8 +485,15 @@ export class AuthService {
       });
     }
 
-    const enforces2fa =
-      user.isTwoFactorEnabled || user.organization?.enforceTwoFactor === true;
+    // Two DIFFERENT reasons to challenge, and the client has to tell them apart:
+    //   - the user enrolled voluntarily          -> ask for a code
+    //   - the TENANT requires it, user has none  -> send them to enrolment
+    // Collapsing them is what turns `enforce_two_factor` into a tenant-wide
+    // lockout: everyone without a secret gets a code prompt for a code that
+    // does not exist, and there is no other door.
+    const requiresSetup =
+      user.organization?.enforceTwoFactor === true && !user.isTwoFactorEnabled;
+    const enforces2fa = user.isTwoFactorEnabled || requiresSetup;
 
     if (
       enforces2fa &&
@@ -465,6 +501,7 @@ export class AuthService {
     ) {
       return {
         requiresTwoFactor: true,
+        requiresTwoFactorSetup: requiresSetup,
         requiresTenantSelection: false,
         twoFactorToken: this.generate2faToken(user.id),
         tenants: [],
@@ -479,6 +516,7 @@ export class AuthService {
 
     return {
       requiresTwoFactor: false,
+      requiresTwoFactorSetup: false,
       requiresTenantSelection: false,
       accessToken: session.accessToken,
       refreshToken: session.refreshToken,
@@ -526,6 +564,7 @@ export class AuthService {
     if (candidates.length > 1) {
       return {
         requiresTwoFactor: false,
+        requiresTwoFactorSetup: false,
         requiresTenantSelection: true,
         tenantSelectionToken: this.generateTenantSelectionToken(
           candidates.map((candidate) => candidate.id),
@@ -580,6 +619,128 @@ export class AuthService {
     });
 
     return { revokedSessionCount: count };
+  }
+
+  /**
+   * "Log out of every device" (RDM §1.5) — the stolen-laptop button.
+   *
+   * Keyed off the AUTHENTICATED caller rather than a presented refresh token,
+   * unlike `logout`. That is the whole point: someone reaching for this has
+   * usually lost the device holding the refresh cookie, so requiring one would
+   * fail exactly when it is needed.
+   *
+   * Takes device TRUST with it — `revokeAllForUser` deletes the rows, and
+   * `device_token_hash` lives on them. Leaving trust intact would let the thief
+   * skip 2FA on their next login, which defeats the entire purpose.
+   */
+  async logoutAll(context: CallerContext): Promise<LogoutAllResponse> {
+    const userId = requireActor(context);
+    const count = await this.sessionsService.revokeAllForUser(userId);
+
+    this.audit.record(context, {
+      action: AuditAction.USER_LOGOUT_ALL,
+      resourceType: AuditResourceType.USER,
+      resourceId: userId,
+      metadata: { revokedSessionCount: count },
+    });
+
+    return { revokedSessionCount: count };
+  }
+
+  /**
+   * Change a password when the caller KNOWS the current one.
+   *
+   * Distinct from `resetPassword`, whose actor is unauthenticated by
+   * definition — which is why that one revokes every session and this one
+   * spares the caller's own. Verifying the current password is what stops a
+   * hijacked session from being upgraded into permanent account takeover, so it
+   * is not a usability nicety.
+   */
+  async changePassword(
+    request: ChangePasswordRequest,
+    context: CallerContext,
+  ): Promise<ChangePasswordResponse> {
+    const userId = requireActor(context);
+
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, ...tenantScope(context) },
+      select: { id: true, email: true, fullName: true, passwordHash: true },
+    });
+    if (!user) {
+      throw new RpcException({
+        code: status.NOT_FOUND,
+        message: 'Account not found',
+      });
+    }
+
+    // A Google-only account has no password to verify. Told plainly rather than
+    // failed as a bad-credentials error, which would send them hunting for a
+    // password that never existed.
+    if (!user.passwordHash) {
+      throw new RpcException({
+        code: status.FAILED_PRECONDITION,
+        message:
+          'This account has no password. Use the password reset flow to set one.',
+      });
+    }
+
+    const matches = await bcrypt.compare(
+      request.currentPassword,
+      user.passwordHash,
+    );
+    if (!matches) {
+      throw new RpcException({
+        code: status.UNAUTHENTICATED,
+        message: 'Current password is incorrect',
+      });
+    }
+
+    if (request.newPassword === request.currentPassword) {
+      throw new RpcException({
+        code: status.INVALID_ARGUMENT,
+        message: 'The new password must differ from the current one',
+      });
+    }
+
+    const passwordHash = await bcrypt.hash(
+      request.newPassword,
+      this.BCRYPT_ROUNDS,
+    );
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { passwordHash },
+    });
+
+    // Everyone EXCEPT this caller. If the password was changed because it was
+    // compromised, every other session is suspect; kicking this one too would
+    // just be hostile.
+    const revokedSessionCount =
+      await this.sessionsService.revokeAllExceptFamily(
+        user.id,
+        request.refreshToken,
+      );
+
+    this.notifications.sendEmail({
+      template: EmailTemplateName.PASSWORD_CHANGED,
+      to: user.email,
+      data: {
+        fullName: user.fullName,
+        revokedSessionCount,
+        origin: { ip: context.ip, userAgent: context.userAgent },
+      },
+    });
+
+    this.audit.record(context, {
+      action: AuditAction.PASSWORD_CHANGED,
+      resourceType: AuditResourceType.USER,
+      resourceId: user.id,
+      // NEVER the hash, old or new (§8.3 of the conventions). The count is the
+      // only fact here worth recording.
+      metadata: { revokedSessionCount },
+    });
+
+    return { revokedSessionCount };
   }
 
   /**
@@ -994,15 +1155,10 @@ export class AuthService {
       isSuperAdmin: user.isSuperAdmin,
       departmentIds: user.userDepartments.map((ud) => ud.departmentId),
       isEmailVerified: user.isEmailVerified,
-      // The Set matters: two roles both granting `ticket.read` would otherwise
-      // duplicate it in every token for the user's whole session.
-      permissionCodes: [
-        ...new Set(
-          user.roles.flatMap((r) =>
-            r.permissions.map((p) => p.code as PermissionCode),
-          ),
-        ),
-      ],
+      // Shared with UserService.GetUserPermissions. Two copies of this would
+      // drift silently: the token would grant a set the "what can this user
+      // do?" endpoint disagrees with, and only one of them decides reality.
+      permissionCodes: flattenPermissionCodes(user.roles),
     };
   }
 

@@ -65,6 +65,15 @@ message LoginResponse {
   bool requires_tenant_selection = 6;
   optional string tenant_selection_token = 7;
   repeated TenantOption tenants = 8;
+
+  // The tenant REQUIRES 2FA and this account has not enrolled yet, so
+  // `two_factor_token` is an ENROLMENT challenge rather than a code prompt: the
+  // client must send the user to setup, not to "enter your 6-digit code".
+  //
+  // Only ever true alongside requires_two_factor. Without it the two cases are
+  // indistinguishable on the wire and the client shows a code box for a code
+  // that does not exist yet.
+  bool requires_two_factor_setup = 9;
 }
 
 // Second leg of a multi-tenant login. The token is what authorizes it: the
@@ -139,6 +148,25 @@ message ResetPasswordResponse {
   int32 revoked_session_count = 1;
 }
 
+message LogoutAllRequest {}
+
+message LogoutAllResponse {
+  int32 revoked_session_count = 1;
+}
+
+message ChangePasswordRequest {
+  string current_password = 1;
+  string new_password = 2;
+  // Identifies the caller's OWN session family, which is the one session the
+  // change deliberately spares. Read from the refresh cookie by the gateway --
+  // the user stays signed in here while every other device is kicked.
+  optional string refresh_token = 3;
+}
+
+message ChangePasswordResponse {
+  int32 revoked_session_count = 1;
+}
+
 service AuthService {
   rpc Register(RegisterRequest) returns (RegisterResponse);
   rpc Login(LoginRequest) returns (LoginResponse);
@@ -147,8 +175,15 @@ service AuthService {
   // 2FA enabled, so the challenge branch has to be reachable here too.
   rpc GoogleSignIn(GoogleSignInRequest) returns (LoginResponse);
   rpc Logout(LogoutRequest) returns (LogoutResponse);
+  // Distinct from Logout, which ends ONE family. This is the "my laptop was
+  // stolen" button: every family, and every device trust with them.
+  rpc LogoutAll(LogoutAllRequest) returns (LogoutAllResponse);
   rpc RefreshToken(RefreshTokenRequest) returns (RefreshTokenResponse);
   rpc ForgotPassword(ForgotPasswordRequest) returns (ForgotPasswordResponse);
   rpc ValidatePasswordResetToken(ValidatePasswordResetTokenRequest) returns (ValidatePasswordResetTokenResponse);
   rpc ResetPassword(ResetPasswordRequest) returns (ResetPasswordResponse);
+  // For a caller who KNOWS their current password, unlike ResetPassword whose
+  // actor is unauthenticated by definition -- which is why this one spares the
+  // caller's own session and that one revokes everything.
+  rpc ChangePassword(ChangePasswordRequest) returns (ChangePasswordResponse);
 }

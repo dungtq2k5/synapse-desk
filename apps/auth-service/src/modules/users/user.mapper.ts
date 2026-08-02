@@ -3,8 +3,9 @@ import {
   toProtoGender,
   toTimestamp,
   UserResponse,
+  UserSummaryResponse,
 } from '@synapsedesk/grpc-proto';
-import type { User } from '../../generated/prisma/client';
+import type { Prisma, User } from '../../generated/prisma/client';
 
 /**
  * The Prisma row -> wire boundary for `User`.
@@ -55,5 +56,38 @@ export function toUserResponse(user: User): UserResponse {
     // permission to omit these.
     createdAt: toTimestamp(user.createdAt),
     updatedAt: toTimestamp(user.updatedAt),
+  };
+}
+
+/**
+ * The joins an admin list row needs.
+ *
+ * `select` on the nested relations rather than `include`, so `passwordHash` and
+ * `twoFactorSecret` cannot reach the result object at all — a stronger
+ * guarantee than remembering to strip them in the mapper (§7.3 of the
+ * conventions). The top-level user columns still come through whole because
+ * `toUserResponse` is itself an allow-list.
+ */
+export const USER_SUMMARY_INCLUDE = {
+  roles: { select: { id: true, name: true } },
+  userDepartments: { select: { departmentId: true } },
+  deletedBy: { select: { fullName: true } },
+} satisfies Prisma.UserInclude;
+
+export type UserSummaryRow = Prisma.UserGetPayload<{
+  include: typeof USER_SUMMARY_INCLUDE;
+}>;
+
+export function toUserSummaryResponse(
+  user: UserSummaryRow,
+): UserSummaryResponse {
+  return {
+    user: toUserResponse(user),
+    roleIds: user.roles.map((role) => role.id),
+    roleNames: user.roles.map((role) => role.name),
+    departmentIds: user.userDepartments.map((ud) => ud.departmentId),
+    // Only ever set on a soft-deleted row.
+    deletedAt: toTimestamp(user.deletedAt),
+    deletedByName: user.deletedBy?.fullName ?? undefined,
   };
 }

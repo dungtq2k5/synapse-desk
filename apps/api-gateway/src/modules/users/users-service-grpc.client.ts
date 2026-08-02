@@ -5,10 +5,29 @@ import {
   USER_SERVICE_NAME,
   UserServiceClient,
 } from '@synapsedesk/grpc-proto';
-import { PermissionCode, RequestOrigin } from '@synapsedesk/common';
+import {
+  PermissionCode,
+  RequestContext,
+  RequestOrigin,
+} from '@synapsedesk/common';
+import { toPageRequest, toProtoGender } from '@synapsedesk/grpc-proto';
 import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
-import { CurrentUserResponseDto } from '../users/dto/rest/current-user-response.dto';
-import { toUserResponseDto } from './user.mapper';
+import { PaginationResponseBase } from '../../common/dto/base/pagination-response-base.dto';
+import { toPaginationMeta } from '../../common/mappers/pagination.mapper';
+import { toUserResponseDto, toUserSummaryDto } from './user.mapper';
+import {
+  CurrentUserResponseDto,
+  UserResponseDto,
+} from './dto/rest/user-response.dto';
+import { UpdateOwnProfileDto, UpdateUserDto } from './dto/rest/update-user.dto';
+import {
+  CreateUserDto,
+  ListUsersQueryDto,
+  LockUserDto,
+  SetUserDepartmentsDto,
+  SetUserRolesDto,
+  UserSummaryResponseDto,
+} from './dto/rest/user-admin.dto';
 
 @Injectable()
 export class UserServiceGrpcClient
@@ -46,4 +65,197 @@ export class UserServiceGrpcClient
       departmentIds: response.departmentIds,
     };
   }
+  updateOwnProfile(
+    dto: UpdateOwnProfileDto,
+    context: RequestContext,
+  ): Promise<UserResponseDto> {
+    return this.call(
+      (metadata) =>
+        this.userGrpcService.updateOwnProfile(toProfileFields(dto), metadata),
+      context,
+    ).then(toUserResponseDto);
+  }
+
+  async list(
+    query: ListUsersQueryDto,
+    context: RequestContext,
+  ): Promise<PaginationResponseBase<UserSummaryResponseDto>> {
+    const response = await this.call(
+      (metadata) =>
+        this.userGrpcService.listUsers(
+          {
+            page: toPageRequest(query),
+            departmentId: query.departmentId,
+            roleId: query.roleId,
+            isLocked: query.isLocked,
+            includeDeleted: query.includeDeleted,
+          },
+          metadata,
+        ),
+      context,
+    );
+
+    return {
+      items: response.items.map(toUserSummaryDto),
+      meta: toPaginationMeta(response.meta),
+    };
+  }
+
+  get(id: string, context: RequestContext): Promise<UserSummaryResponseDto> {
+    return this.call(
+      (metadata) => this.userGrpcService.getUser({ id }, metadata),
+      context,
+    ).then(toUserSummaryDto);
+  }
+
+  async getPermissions(id: string, context: RequestContext): Promise<string[]> {
+    const response = await this.call(
+      (metadata) => this.userGrpcService.getUserPermissions({ id }, metadata),
+      context,
+    );
+
+    return response.permissionCodes;
+  }
+
+  async create(
+    dto: CreateUserDto,
+    context: RequestContext,
+  ): Promise<UserSummaryResponseDto> {
+    const response = await this.call(
+      (metadata) =>
+        this.userGrpcService.createUser(
+          {
+            email: dto.email,
+            fullName: dto.fullName,
+            roleIds: dto.roleIds ?? [],
+            departmentIds: dto.departmentIds ?? [],
+            primaryDepartmentId: dto.primaryDepartmentId,
+          },
+          metadata,
+        ),
+      context,
+    );
+
+    return toUserSummaryDto(response.user!);
+  }
+
+  update(
+    id: string,
+    dto: UpdateUserDto,
+    context: RequestContext,
+  ): Promise<UserSummaryResponseDto> {
+    return this.call(
+      (metadata) =>
+        this.userGrpcService.updateUser(
+          {
+            id,
+            ...toProfileFields(dto),
+            phoneNumber: dto.phoneNumber ?? undefined,
+          },
+          metadata,
+        ),
+      context,
+    ).then(toUserSummaryDto);
+  }
+
+  async remove(
+    id: string,
+    context: RequestContext,
+  ): Promise<{ revokedSessionCount: number }> {
+    return this.call(
+      (metadata) => this.userGrpcService.deleteUser({ id }, metadata),
+      context,
+    );
+  }
+
+  restore(
+    id: string,
+    context: RequestContext,
+  ): Promise<UserSummaryResponseDto> {
+    return this.call(
+      (metadata) => this.userGrpcService.restoreUser({ id }, metadata),
+      context,
+    ).then(toUserSummaryDto);
+  }
+
+  lock(
+    id: string,
+    dto: LockUserDto,
+    context: RequestContext,
+  ): Promise<{ revokedSessionCount: number }> {
+    return this.call(
+      (metadata) =>
+        this.userGrpcService.lockUser({ id, reason: dto.reason }, metadata),
+      context,
+    );
+  }
+
+  async unlock(id: string, context: RequestContext): Promise<void> {
+    await this.call(
+      (metadata) => this.userGrpcService.unlockUser({ id }, metadata),
+      context,
+    );
+  }
+
+  resetTwoFactor(
+    id: string,
+    context: RequestContext,
+  ): Promise<{ untrustedDeviceCount: number }> {
+    return this.call(
+      (metadata) => this.userGrpcService.resetUserTwoFactor({ id }, metadata),
+      context,
+    );
+  }
+
+  setRoles(
+    id: string,
+    dto: SetUserRolesDto,
+    context: RequestContext,
+  ): Promise<UserSummaryResponseDto> {
+    return this.call(
+      (metadata) =>
+        this.userGrpcService.setUserRoles(
+          { id, roleIds: dto.roleIds },
+          metadata,
+        ),
+      context,
+    ).then(toUserSummaryDto);
+  }
+
+  setDepartments(
+    id: string,
+    dto: SetUserDepartmentsDto,
+    context: RequestContext,
+  ): Promise<UserSummaryResponseDto> {
+    return this.call(
+      (metadata) =>
+        this.userGrpcService.setUserDepartments(
+          { id, departments: dto.departments },
+          metadata,
+        ),
+      context,
+    ).then(toUserSummaryDto);
+  }
+}
+
+/**
+ * The profile fields shared by own-profile and admin updates.
+ *
+ * `null` from the REST DTO becomes an EMPTY STRING on the wire, not
+ * `undefined`: proto3 has no null, so the service distinguishes "leave
+ * unchanged" (absent) from "clear it" (empty) — and mapping null to undefined
+ * would silently turn every clear into a no-op.
+ */
+function toProfileFields(dto: {
+  fullName?: string;
+  avatarUrl?: string | null;
+  gender?: string;
+  dob?: string | null;
+}) {
+  return {
+    fullName: dto.fullName,
+    avatarUrl: dto.avatarUrl === null ? '' : dto.avatarUrl,
+    gender: dto.gender === undefined ? undefined : toProtoGender(dto.gender),
+    dob: dto.dob === null ? '' : dto.dob,
+  };
 }

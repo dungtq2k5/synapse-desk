@@ -2,7 +2,7 @@
   "name": "@synapsedesk/auth-service",
   "version": "1.0.0",
   "scripts": {
-    "build": "nest build && node ../../scripts/copy-protos.mjs dist/libs/grpc-proto/src/proto",
+    "build": "nest build",
     "dev": "nest start --watch",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\"",
     "db:generate": "prisma generate",

@@ -15,6 +15,10 @@ import {
   PreviewInvitationRequest,
   PreviewInvitationResponse,
   RevokeInvitationResponse,
+  GetInvitationRequest,
+  PreviewInvitationsRequest,
+  PreviewInvitationsResponse,
+  unpackCallerContext,
   unpackRequestOrigin,
 } from '@synapsedesk/grpc-proto';
 import { InvitationsService } from './invitations.service';
@@ -75,5 +79,20 @@ export class InvitationsGrpcController implements InvitationServiceController {
 
   expireStaleInvitations(): Promise<ExpireStaleInvitationsResponse> {
     return this.invitationsService.expireStaleInvitations();
+  }
+  /** Dry run: no writes, no mail. */
+  previewInvitations(
+    request: PreviewInvitationsRequest,
+    metadata?: Metadata,
+  ): Promise<PreviewInvitationsResponse> {
+    return this.invitationsService.previewInvitations(
+      request,
+      unpackCallerContext(metadata),
+    );
+  }
+
+  /** Administrative detail by id, as opposed to the public by-token preview. */
+  getInvitation(request: GetInvitationRequest): Promise<InvitationResponse> {
+    return this.invitationsService.getInvitation(request);
   }
 }

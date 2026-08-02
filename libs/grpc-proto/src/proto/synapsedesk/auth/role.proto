@@ -1,0 +1,102 @@
+syntax = "proto3";
+
+package synapsedesk.auth;
+
+import "google/protobuf/timestamp.proto";
+import "synapsedesk/auth/common.proto";
+
+// Roles and the permission catalogue.
+//
+// A tenant sees its OWN roles plus the global system roles
+// (`organization_id IS NULL`). That union is the point: SUPPORT_AGENT must be
+// assignable in every tenant without each one redefining it.
+
+message RoleResponse {
+  string id = 1;
+  string name = 2;
+  optional string description = 3;
+
+  // True for a GLOBAL role: readable by every tenant, mutable by none. The
+  // gateway uses it to grey out edit controls; the service enforces it.
+  bool is_system_role = 4;
+
+  // Denormalized counter on `roles.user_assigned`, maintained in the same
+  // transaction as every junction write. It is a CACHE -- authoritative enough
+  // to gate deletion, not authoritative enough to be the only copy.
+  int32 user_assigned = 5;
+
+  repeated string permission_codes = 6;
+
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp updated_at = 8;
+}
+
+message ListRolesRequest {
+  PageRequest page = 1;
+
+  // When false the response carries tenant roles only. Default (proto3 zero) is
+  // false, so a caller that wants the assignable set must ask for it -- which
+  // is the safer direction than silently widening a list.
+  bool include_system = 2;
+}
+
+message ListRolesResponse {
+  repeated RoleResponse items = 1;
+  PageMeta meta = 2;
+}
+
+message RoleIdRequest {
+  string id = 1;
+}
+
+message CreateRoleRequest {
+  string name = 1;
+  optional string description = 2;
+  // Applied at creation so a role is never briefly live with no permissions.
+  repeated string permission_codes = 3;
+}
+
+message UpdateRoleRequest {
+  string id = 1;
+  // Absent means "leave unchanged"; empty description means "clear it".
+  optional string name = 2;
+  optional string description = 3;
+}
+
+message DeleteRoleResponse {}
+
+// REPLACE semantics, which is what makes it safe to retry: sending the same set
+// twice is a no-op rather than a double grant.
+message SetRolePermissionsRequest {
+  string id = 1;
+  repeated string permission_codes = 2;
+}
+
+// ---------------------------------------------------------------------------
+// Permission catalogue
+// ---------------------------------------------------------------------------
+
+message PermissionResponse {
+  string id = 1;
+  string code = 2;
+  string name = 3;
+  // The `target` prefix of the code ('user' from 'user.read'). Derived, not
+  // stored -- it is what makes the role editor groupable without a new column.
+  string group = 4;
+}
+
+message ListPermissionsRequest {}
+
+message ListPermissionsResponse {
+  repeated PermissionResponse items = 1;
+}
+
+service RoleService {
+  rpc ListRoles(ListRolesRequest) returns (ListRolesResponse);
+  rpc GetRole(RoleIdRequest) returns (RoleResponse);
+  rpc CreateRole(CreateRoleRequest) returns (RoleResponse);
+  rpc UpdateRole(UpdateRoleRequest) returns (RoleResponse);
+  rpc DeleteRole(RoleIdRequest) returns (DeleteRoleResponse);
+  rpc SetRolePermissions(SetRolePermissionsRequest) returns (RoleResponse);
+  rpc ListPermissions(ListPermissionsRequest) returns (ListPermissionsResponse);
+}

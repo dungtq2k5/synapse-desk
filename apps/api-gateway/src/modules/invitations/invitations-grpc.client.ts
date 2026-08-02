@@ -5,11 +5,14 @@ import {
   fromTimestamp,
   INVITATION_SERVICE_NAME,
   InvitationServiceClient,
+  toPageRequest,
   toProtoInvitationStatus,
 } from '@synapsedesk/grpc-proto';
-import { RequestOrigin } from '@synapsedesk/common';
+import { RequestContext, RequestOrigin } from '@synapsedesk/common';
 import { toInvitationDto } from './invitation.mapper';
 import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
+import { PaginationResponseBase } from '../../common/dto/base/pagination-response-base.dto';
+import { toPaginationMeta } from '../../common/mappers/pagination.mapper';
 import { toUserResponseDto } from '../users/user.mapper';
 import { UserResponseDto } from '../users/dto/rest/user-response.dto';
 import {
@@ -19,6 +22,8 @@ import {
   InvitationResponseDto,
   ListInvitationsQueryDto,
   PreviewInvitationResponseDto,
+  PreviewInvitationsDto,
+  PreviewInvitationsResponseDto,
 } from './dto/rest/invitation.dto';
 
 /** Accepting signs the invitee in, so the controller needs the raw tokens. */
@@ -82,7 +87,7 @@ export class InvitationsGrpcClient
     organizationId: string,
     query: ListInvitationsQueryDto,
     origin: RequestOrigin,
-  ): Promise<{ items: InvitationResponseDto[]; totalItems: number }> {
+  ): Promise<PaginationResponseBase<InvitationResponseDto>> {
     const response = await this.call(
       (metadata) =>
         this.invitationGrpcService.listInvitations(
@@ -91,9 +96,7 @@ export class InvitationsGrpcClient
             status: query.status
               ? toProtoInvitationStatus(query.status)
               : undefined,
-            page: query.page,
-            limit: query.limit,
-            searchTerm: query.searchTerm,
+            page: toPageRequest(query),
           },
           metadata,
         ),
@@ -102,7 +105,7 @@ export class InvitationsGrpcClient
 
     return {
       items: response.items.map(toInvitationDto),
-      totalItems: response.totalItems,
+      meta: toPaginationMeta(response.meta),
     };
   }
 
@@ -140,7 +143,7 @@ export class InvitationsGrpcClient
     );
   }
 
-  async preview(
+  async previewByToken(
     token: string,
     origin: RequestOrigin,
   ): Promise<PreviewInvitationResponseDto> {
@@ -184,5 +187,57 @@ export class InvitationsGrpcClient
       refreshToken: response.refreshToken,
       skipped: response.skipped,
     };
+  }
+  async previewBatch(
+    organizationId: string,
+    dto: PreviewInvitationsDto,
+    context: RequestContext,
+  ): Promise<PreviewInvitationsResponseDto> {
+    const response = await this.call(
+      (metadata) =>
+        this.invitationGrpcService.previewInvitations(
+          {
+            organizationId,
+            invitations: dto.invitations.map((invitation) => ({
+              email: invitation.email,
+              roleIds: invitation.roleIds ?? [],
+              departmentIds: invitation.departmentIds ?? [],
+              primaryDepartmentId: invitation.primaryDepartmentId,
+            })),
+          },
+          metadata,
+        ),
+      context,
+    );
+
+    return {
+      rows: response.rows.map((row) => ({
+        email: row.email,
+        ok: row.ok,
+        reason: row.reason ?? null,
+        unknownRoleIds: row.unknownRoleIds,
+        unknownDepartmentIds: row.unknownDepartmentIds,
+      })),
+      seatsInUse: response.seatsInUse,
+      maxAgentSeats: response.maxAgentSeats,
+      seatOverrun: response.seatOverrun,
+    };
+  }
+
+  async get(
+    organizationId: string,
+    invitationId: string,
+    context: RequestContext,
+  ): Promise<InvitationResponseDto> {
+    return toInvitationDto(
+      await this.call(
+        (metadata) =>
+          this.invitationGrpcService.getInvitation(
+            { organizationId, invitationId },
+            metadata,
+          ),
+        context,
+      ),
+    );
   }
 }

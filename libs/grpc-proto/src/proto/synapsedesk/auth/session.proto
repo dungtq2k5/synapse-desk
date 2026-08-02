@@ -1,0 +1,93 @@
+syntax = "proto3";
+
+package synapsedesk.auth;
+
+import "google/protobuf/timestamp.proto";
+
+// Device sessions -- the rows behind "where am I signed in?".
+//
+// No message carries a user id for the caller's OWN sessions: that comes from
+// the verified caller context in gRPC metadata. Only the admin RPCs name a
+// target user, and those are permission-gated at the gateway.
+
+message SessionResponse {
+  string id = 1;
+  optional string device_name = 2;
+  string ip_address = 3;
+  string user_agent = 4;
+
+  // True for the session the request itself arrived on, matched by FAMILY id
+  // against the presented refresh token -- not by IP or user agent, which two
+  // browsers on one machine share.
+  bool current = 5;
+
+  bool is_trusted = 6;
+  optional google.protobuf.Timestamp trusted_until = 7;
+  google.protobuf.Timestamp expires_at = 8;
+  google.protobuf.Timestamp created_at = 9;
+}
+
+message ListSessionsRequest {
+  // The caller's presented refresh token, used ONLY to mark `current`. Optional
+  // because a caller may list sessions without holding one (a fresh access
+  // token from a 2FA flow); the list is simply returned with nothing marked.
+  optional string refresh_token = 1;
+}
+
+message ListSessionsResponse {
+  repeated SessionResponse items = 1;
+}
+
+message SessionIdRequest {
+  string session_id = 1;
+
+  // The caller's own refresh token, so the service can report whether the
+  // revoked family was the one this request arrived on. The gateway cannot work
+  // that out itself -- it never sees a family id -- and it needs the answer to
+  // decide whether to clear the caller's cookies.
+  optional string refresh_token = 2;
+}
+
+message RevokeSessionResponse {
+  // True when the revoked family is the caller's own, so the gateway knows to
+  // clear cookies. The gateway cannot work this out for itself: it never sees
+  // the family id.
+  bool was_current = 1;
+  int32 revoked_count = 2;
+}
+
+message RevokeTrustResponse {
+  int32 untrusted_count = 1;
+}
+
+// Distinct from ListSessionsRequest despite being empty today: reusing that
+// message would tie "revoke all trust" to a field that exists only to mark the
+// current session, and adding one there later would silently change this RPC's
+// contract.
+message RevokeAllTrustRequest {}
+
+// ---------------------------------------------------------------------------
+// Administrative (perm:user.session.read / user.session.revoke)
+// ---------------------------------------------------------------------------
+
+message ListUserSessionsRequest {
+  string user_id = 1;
+}
+
+message RevokeUserSessionsRequest {
+  string user_id = 1;
+}
+
+message RevokeUserSessionsResponse {
+  int32 revoked_count = 1;
+}
+
+service SessionService {
+  rpc ListSessions(ListSessionsRequest) returns (ListSessionsResponse);
+  rpc RevokeSession(SessionIdRequest) returns (RevokeSessionResponse);
+  rpc RevokeSessionTrust(SessionIdRequest) returns (RevokeTrustResponse);
+  rpc RevokeAllTrust(RevokeAllTrustRequest) returns (RevokeTrustResponse);
+
+  rpc ListUserSessions(ListUserSessionsRequest) returns (ListSessionsResponse);
+  rpc RevokeUserSessions(RevokeUserSessionsRequest) returns (RevokeUserSessionsResponse);
+}

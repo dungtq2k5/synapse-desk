@@ -5,6 +5,7 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  Patch,
   Post,
   Req,
   Res,
@@ -15,10 +16,15 @@ import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { RegisterDto, RegisterResponseDto } from './dto/rest/register.dto';
 import { JwtCookieService } from './jwt-cookie.service';
-import { RequestOrigin } from '@synapsedesk/common';
+import { RequestContext, RequestOrigin } from '@synapsedesk/common';
 import { CurrentOrigin } from '../../common/decorators/current-origin.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { ResponseMessage } from '../../common/decorators/response-message.decorator';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { ForgotPasswordDto } from './dto/rest/forgot-password.dto';
 import {
+  ChangePasswordDto,
+  ChangePasswordResponseDto,
   ResetPasswordDto,
   ResetPasswordResponseDto,
   ValidatePasswordResetTokenResponseDto,
@@ -32,8 +38,22 @@ import {
 } from './dto/rest/login.dto';
 import type { LoginResult } from './auth-service-grpc.client';
 import { GoogleSignInDto } from './dto/rest/google-sign-in.dto';
-import { LogoutDto, LogoutResponseDto } from './dto/rest/logout.dto';
+import {
+  LogoutAllResponseDto,
+  LogoutDto,
+  LogoutResponseDto,
+} from './dto/rest/logout.dto';
+import { AuthThrottle } from '../../common/decorators/auth-throttle.decorator';
+import { Throttle } from '@nestjs/throttler';
+import {
+  AUTH_THROTTLER_TIER,
+  ROUTE_THROTTLE,
+} from '../../common/config/app.config';
+import { OrgAccessKind } from '../../common/decorators/org-access.decorator';
+import { OrgAccess } from '@synapsedesk/common';
 
+@AuthThrottle()
+@OrgAccessKind(OrgAccess.AUTH)
 @Controller('auth')
 export class AuthController {
   constructor(
@@ -42,6 +62,7 @@ export class AuthController {
   ) {}
 
   @Post('register')
+  @Throttle({ [AUTH_THROTTLER_TIER]: ROUTE_THROTTLE.register })
   @UseGuards(GuestGuard)
   register(
     @Body() registerDto: RegisterDto,
@@ -56,6 +77,7 @@ export class AuthController {
    * transform.
    */
   @Post('login')
+  @Throttle({ [AUTH_THROTTLER_TIER]: ROUTE_THROTTLE.login })
   @HttpCode(HttpStatus.OK)
   @UseGuards(GuestGuard)
   async login(
@@ -132,7 +154,13 @@ export class AuthController {
 
     if (result.requiresTwoFactor) {
       this.jwtCookieService.set2faTokenCookie(response, result.twoFactorToken);
-      return { requiresTwoFactor: true };
+      // The setup flag has to reach the client: the same cookie means "enter
+      // your code" in one case and "enrol now" in the other, and only the
+      // server knows which.
+      return {
+        requiresTwoFactor: true,
+        requiresTwoFactorSetup: result.requiresTwoFactorSetup,
+      };
     }
 
     this.jwtCookieService.setAccessTokenCookie(response, result.accessToken);
@@ -206,6 +234,61 @@ export class AuthController {
   }
 
   /**
+   * "Sign out everywhere" — the stolen-device button.
+   *
+   * Behind `JwtAuthGuard` rather than keyed off the refresh cookie, unlike
+   * `/auth/logout`. Someone reaching for this has often lost the device holding
+   * that cookie, so requiring one would fail exactly when it is needed.
+   *
+   * Takes device TRUST with it, so the thief cannot skip 2FA on the next login.
+   */
+  @Post('logout/all')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  @ResponseMessage('Signed out of all devices')
+  async logoutAll(
+    @CurrentUser() context: RequestContext,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<LogoutAllResponseDto> {
+    const revokedSessionCount = await this.authService.logoutAll(context);
+
+    this.jwtCookieService.clearSessionCookies(response);
+    this.jwtCookieService.clearDeviceTokenCookie(response);
+
+    return { revokedSessionCount };
+  }
+
+  /**
+   * Change a password you know. Distinct from `/auth/password/reset`, whose
+   * caller is unauthenticated by definition — which is why that one revokes
+   * every session and this one deliberately spares the caller's own.
+   *
+   * KNOWN GAP: this needs a rate limit. Without the current-password check it
+   * would be a session-hijack escalation; with the check but no limit it is an
+   * online password oracle for an attacker who already holds a session.
+   * `@nestjs/throttler` is not installed yet (§1.5 of the remaining-work plan).
+   */
+  @Patch('password')
+  @Throttle({ [AUTH_THROTTLER_TIER]: ROUTE_THROTTLE.changePassword })
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  @ResponseMessage('Password changed')
+  async changePassword(
+    @CurrentUser() context: RequestContext,
+    @Body() changePasswordDto: ChangePasswordDto,
+    @Req() request: Request,
+  ): Promise<ChangePasswordResponseDto> {
+    const revokedSessionCount = await this.authService.changePassword(
+      changePasswordDto,
+      // Identifies the session to SPARE. Read from the cookie, never the body.
+      this.jwtCookieService.readRefreshToken(request),
+      context,
+    );
+
+    return { revokedSessionCount };
+  }
+
+  /**
    * Rotates the refresh token and re-issues the access token.
    *
    * NO guard — an expired access token is the entire reason to be here, so
@@ -238,6 +321,7 @@ export class AuthController {
    * into the account-enumeration oracle avoided everywhere else.
    */
   @Post('password/forgot')
+  @Throttle({ [AUTH_THROTTLER_TIER]: ROUTE_THROTTLE.forgotPassword })
   @HttpCode(HttpStatus.ACCEPTED)
   async forgotPassword(
     @Body() forgotPasswordDto: ForgotPasswordDto,

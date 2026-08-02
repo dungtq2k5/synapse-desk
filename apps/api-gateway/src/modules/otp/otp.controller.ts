@@ -20,6 +20,14 @@ import {
   VerifyOtpDto,
   VerifyOtpResponseDto,
 } from '../auth/dto/rest/otp.dto';
+import { AuthThrottle } from '../../common/decorators/auth-throttle.decorator';
+import { Throttle } from '@nestjs/throttler';
+import {
+  AUTH_THROTTLER_TIER,
+  ROUTE_THROTTLE,
+} from '../../common/config/app.config';
+import { OrgAccessKind } from '../../common/decorators/org-access.decorator';
+import { OrgAccess } from '@synapsedesk/common';
 
 /**
  * Email and phone ownership challenges (api-endpoints-plan §1.1).
@@ -45,6 +53,8 @@ import {
  * session and a real identity — they are simply LIMITED, and that limit is
  * enforced on business routes by `EmailVerifiedGuard`, not here.
  */
+@AuthThrottle()
+@OrgAccessKind(OrgAccess.AUTH)
 @Controller('auth')
 @UseGuards(JwtAuthGuard)
 export class OtpController {
@@ -55,6 +65,7 @@ export class OtpController {
    * the first one; this is the resend path.
    */
   @Post('email/verify/request')
+  @Throttle({ [AUTH_THROTTLER_TIER]: ROUTE_THROTTLE.otpRequest })
   @HttpCode(HttpStatus.ACCEPTED)
   requestEmailVerification(
     @CurrentUser() context: RequestContext,
@@ -68,6 +79,7 @@ export class OtpController {
    * until the token rotates.
    */
   @Post('email/verify')
+  @Throttle({ [AUTH_THROTTLER_TIER]: ROUTE_THROTTLE.otpVerify })
   @HttpCode(HttpStatus.OK)
   verifyEmail(
     @CurrentUser() context: RequestContext,
@@ -81,6 +93,7 @@ export class OtpController {
   }
 
   @Post('phone/verify/request')
+  @Throttle({ [AUTH_THROTTLER_TIER]: ROUTE_THROTTLE.otpRequest })
   @HttpCode(HttpStatus.ACCEPTED)
   requestPhoneVerification(
     @CurrentUser() context: RequestContext,
@@ -94,6 +107,7 @@ export class OtpController {
   }
 
   @Post('phone/verify')
+  @Throttle({ [AUTH_THROTTLER_TIER]: ROUTE_THROTTLE.otpVerify })
   @HttpCode(HttpStatus.OK)
   verifyPhone(
     @CurrentUser() context: RequestContext,

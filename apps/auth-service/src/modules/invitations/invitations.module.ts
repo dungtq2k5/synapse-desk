@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { PrismaModule } from '../prisma/prisma.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { AuthModule } from '../auth/auth.module';
+import { RolesModule } from '../roles/roles.module';
+import { OrganizationsModule } from '../organizations/organizations.module';
 import { InvitationsService } from './invitations.service';
 import { InvitationsGrpcController } from './invitations-grpc.controller';
 import { InvitationsExpiryJob } from './invitations-expiry.job';
@@ -11,7 +13,13 @@ import { InvitationsExpiryJob } from './invitations-expiry.job';
  * session, and session minting lives there.
  */
 @Module({
-  imports: [PrismaModule, NotificationsModule, AuthModule],
+  imports: [
+    PrismaModule,
+    NotificationsModule,
+    AuthModule,
+    RolesModule,
+    OrganizationsModule,
+  ],
   controllers: [InvitationsGrpcController],
   providers: [InvitationsService, InvitationsExpiryJob],
 })

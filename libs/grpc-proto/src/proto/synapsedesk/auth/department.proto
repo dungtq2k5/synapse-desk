@@ -1,0 +1,124 @@
+syntax = "proto3";
+
+package synapsedesk.auth;
+
+import "google/protobuf/timestamp.proto";
+import "synapsedesk/auth/common.proto";
+
+// Departments and their membership.
+//
+// No message carries an organization_id. The tenant travels in gRPC metadata as
+// part of the verified caller context, so a field here would be a SECOND source
+// of truth that a caller could set independently of the token they presented.
+
+message DepartmentResponse {
+  string id = 1;
+  string name = 2;
+  optional string description = 3;
+
+  // Computed via Prisma's `_count`, so listing N departments stays one query
+  // rather than N+1.
+  int32 member_count = 4;
+
+  // Populated only for soft-deleted rows, so a list including them can be
+  // rendered differently rather than silently showing them as live.
+  optional google.protobuf.Timestamp deleted_at = 5;
+  optional string deleted_by_name = 6;
+
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp updated_at = 8;
+
+  // `open_ticket_count` is deliberately ABSENT until Domain B exists. Omitting
+  // the field is honest; shipping a hardcoded 0 reads as "no open tickets",
+  // which is a different and wrong claim.
+}
+
+message ListDepartmentsRequest {
+  PageRequest page = 1;
+
+  // Honoured only when the caller holds department.delete — the gateway checks
+  // that; this service trusts the flag it is handed.
+  bool include_deleted = 2;
+}
+
+message ListDepartmentsResponse {
+  repeated DepartmentResponse items = 1;
+  PageMeta meta = 2;
+}
+
+message GetDepartmentRequest {
+  string id = 1;
+}
+
+message CreateDepartmentRequest {
+  string name = 1;
+  optional string description = 2;
+}
+
+message UpdateDepartmentRequest {
+  string id = 1;
+  // Absent means "leave unchanged" -- distinct from an empty description, which
+  // means "clear it". A non-optional string could not express the difference.
+  optional string name = 2;
+  optional string description = 3;
+}
+
+message DepartmentIdRequest {
+  string id = 1;
+}
+
+message DeleteDepartmentResponse {}
+
+// ---------------------------------------------------------------------------
+// Membership
+// ---------------------------------------------------------------------------
+
+message DepartmentMemberResponse {
+  UserResponse user = 1;
+  bool is_primary = 2;
+  optional string assigned_by_name = 3;
+  google.protobuf.Timestamp assigned_at = 4;
+}
+
+message ListDepartmentMembersRequest {
+  string department_id = 1;
+  PageRequest page = 2;
+}
+
+message ListDepartmentMembersResponse {
+  repeated DepartmentMemberResponse items = 1;
+  PageMeta meta = 2;
+}
+
+message AddDepartmentMembersRequest {
+  string department_id = 1;
+  repeated string user_ids = 2;
+  // Applies to every id in the batch. Setting it for several users is legal --
+  // the partial unique index is per USER, not per department.
+  bool is_primary = 3;
+}
+
+message AddDepartmentMembersResponse {
+  int32 added_count = 1;
+  int32 updated_count = 2;
+}
+
+message RemoveDepartmentMemberRequest {
+  string department_id = 1;
+  string user_id = 2;
+}
+
+message RemoveDepartmentMemberResponse {}
+
+service DepartmentService {
+  rpc ListDepartments(ListDepartmentsRequest) returns (ListDepartmentsResponse);
+  rpc GetDepartment(GetDepartmentRequest) returns (DepartmentResponse);
+  rpc CreateDepartment(CreateDepartmentRequest) returns (DepartmentResponse);
+  rpc UpdateDepartment(UpdateDepartmentRequest) returns (DepartmentResponse);
+  rpc DeleteDepartment(DepartmentIdRequest) returns (DeleteDepartmentResponse);
+  rpc RestoreDepartment(DepartmentIdRequest) returns (DepartmentResponse);
+
+  rpc ListDepartmentMembers(ListDepartmentMembersRequest) returns (ListDepartmentMembersResponse);
+  rpc AddDepartmentMembers(AddDepartmentMembersRequest) returns (AddDepartmentMembersResponse);
+  rpc RemoveDepartmentMember(RemoveDepartmentMemberRequest) returns (RemoveDepartmentMemberResponse);
+}
