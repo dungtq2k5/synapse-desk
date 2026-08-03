@@ -25,7 +25,7 @@ import { OrgAccessKind } from '../../common/decorators/org-access.decorator';
 import { OrgAccess } from '@synapsedesk/common';
 
 /**
- * The caller's own device sessions (api-endpoints-plan §1.3).
+ * The caller's own device sessions (api-endpoints-plan).
  *
  * `/auth/sessions` rather than `/users/me/sessions`: these are credentials, and
  * they sit beside `/auth/logout` which does the same job for one session.

@@ -24,7 +24,7 @@ import {
 } from '../fixtures/wire';
 
 /**
- * §5 — the cookie sweep.
+ * the cookie sweep.
  *
  * Two properties, on every cookie the gateway sets, parametrized rather than
  * re-asserted per route:
@@ -54,7 +54,7 @@ type CookieProbe = {
   }>;
 };
 
-describe('§5 cookie sweep (e2e)', () => {
+describe('cookie sweep (e2e)', () => {
   let fx: E2eFixture;
 
   const PROBES: CookieProbe[] = [

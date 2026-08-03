@@ -14,7 +14,7 @@ import { NotificationPublisher } from './notification-publisher.service';
 import { AuditPublisher } from '../audit/audit-publisher.service';
 
 /**
- * §5 — the NATS emit sweep.
+ * the NATS emit sweep.
  *
  * Both publishers are fire-and-forget by design: they emit and never await, so
  * a slow or dead broker adds no latency to the request that triggered them.
@@ -29,7 +29,7 @@ import { AuditPublisher } from '../audit/audit-publisher.service';
  * These are unit tests: the point is what happens when the transport fails, and
  * a real broker is the one thing that cannot be relied on to fail on cue.
  */
-describe('§5 NATS emit sweep (unit)', () => {
+describe('NATS emit sweep (unit)', () => {
   /** A ClientProxy whose `emit` does whatever the test needs. */
   function buildClient(emit: () => Observable<unknown>) {
     return { emit: jest.fn(emit) } as unknown as jest.Mocked<ClientProxy>;

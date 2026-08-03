@@ -47,7 +47,7 @@ type SeedSummary = {
  *                       the source and rows in the DB cannot drift.
  *   2. system user    — the non-login actor that owns rows no human created
  *                       (`roles.created_by_id` on global system roles).
- *   3. super admin    — the first real platform operator (RDM §1.7).
+ *   3. super admin    — the first real platform operator (RDM).
  *   4. system roles   — Org Admin / Knowledge Manager / Support Agent / End
  *                       User, `organization_id IS NULL`, `is_system_role`.
  *
@@ -298,7 +298,7 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
    * The system actor. It satisfies `roles.created_by_id` (non-nullable) on the
    * global system roles without attributing them to a tenant admin.
    *
-   * It carries `organizationId = null`, which per RDM §1.7 forces
+   * It carries `organizationId = null`, which per RDM forces
    * `isSuperAdmin = true`. It is therefore hardened against ever being used as
    * a login: no password hash, and `isLocked = true` — which `AuthService.login`
    * rejects before any token is minted.
@@ -341,7 +341,7 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
   }
 
   /**
-   * The first platform Super Admin (RDM §1.7) — the account that onboards
+   * The first platform Super Admin (RDM) — the account that onboards
    * tenants before any tenant exists.
    *
    * Only created when absent. If the account already exists the .env password

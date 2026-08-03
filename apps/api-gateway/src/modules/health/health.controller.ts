@@ -5,7 +5,7 @@ import {
 } from './service-registry.service';
 
 /**
- * Liveness and readiness probes (api-endpoints-plan §6). Both PUBLIC — an
+ * Liveness and readiness probes (api-endpoints-plan). Both PUBLIC — an
  * orchestrator has no credentials, and a probe behind auth cannot restart a
  * process whose auth is broken.
  */

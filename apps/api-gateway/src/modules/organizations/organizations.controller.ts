@@ -31,7 +31,7 @@ import {
 import { OrgAccessKind } from '../../common/decorators/org-access.decorator';
 
 /**
- * The caller's OWN tenant (api-endpoints-plan §1.4).
+ * The caller's OWN tenant (api-endpoints-plan).
  *
  * Every route is `/organizations/current` — there is no `/organizations/:id`
  * here at all, which is the structural reason a tenant admin cannot reach

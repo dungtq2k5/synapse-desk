@@ -23,7 +23,7 @@ async function expectRpc(promise: Promise<unknown>, code: number) {
   await promise.catch((error: unknown) => expect(rpcCode(error)).toBe(code));
 }
 
-describe('§3.1 Sessions (e2e)', () => {
+describe('Sessions (e2e)', () => {
   let fx: E2eFixture;
   let sessions: SessionsService;
   let auth: AuthService;

@@ -7,7 +7,7 @@
  * with "Hello undefined". Both ends importing these declarations turns that into
  * a compile error.
  *
- * Per docs/api-endpoints-plan §8.1: gRPC for synchronous cross-service reads,
+ * Per the api-endpoints-plan: gRPC for synchronous cross-service reads,
  * NATS for background side effects. Sending mail is the archetypal side effect —
  * the caller must not wait for an SMTP round trip, and a mail outage must not
  * fail a registration.

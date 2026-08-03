@@ -622,7 +622,7 @@ export class AuthService {
   }
 
   /**
-   * "Log out of every device" (RDM §1.5) — the stolen-laptop button.
+   * "Log out of every device" (RDM) — the stolen-laptop button.
    *
    * Keyed off the AUTHENTICATED caller rather than a presented refresh token,
    * unlike `logout`. That is the whole point: someone reaching for this has
@@ -735,7 +735,7 @@ export class AuthService {
       action: AuditAction.PASSWORD_CHANGED,
       resourceType: AuditResourceType.USER,
       resourceId: user.id,
-      // NEVER the hash, old or new (§8.3 of the conventions). The count is the
+      // NEVER the hash, old or new (see the conventions). The count is the
       // only fact here worth recording.
       metadata: { revokedSessionCount },
     });

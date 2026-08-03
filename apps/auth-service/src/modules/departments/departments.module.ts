@@ -8,7 +8,7 @@ import { DepartmentsGrpcController } from './departments-grpc.controller';
   imports: [PrismaModule, AuditModule],
   controllers: [DepartmentsGrpcController],
   providers: [DepartmentsService],
-  // Exported for §6: assigning a user's departments needs the same tenant and
+  // Exported for UsersModule: assigning a user's departments needs the same tenant and
   // primary-department validation this service already owns.
   exports: [DepartmentsService],
 })

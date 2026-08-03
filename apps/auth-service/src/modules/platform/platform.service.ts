@@ -72,7 +72,7 @@ type OrganizationRow = Organization & {
  * extra methods on the tenant-facing ones, where a missing filter would be
  * indistinguishable from the surrounding code.
  *
- * Every write here audits with `organizationId: null` (RDM §1.7): the event
+ * Every write here audits with `organizationId: null` (RDM): the event
  * belongs to the PLATFORM, not to the customer it touched.
  */
 @Injectable()
@@ -419,7 +419,7 @@ export class PlatformService {
    * Every row carries its tenant.
    *
    * Not decoration: a support engineer looking at a bare list of addresses,
-   * several of which legitimately repeat across tenants (RDM §1.10), has no way
+   * several of which legitimately repeat across tenants (RDM), has no way
    * to tell which account they are about to act on.
    */
   async listUsers(

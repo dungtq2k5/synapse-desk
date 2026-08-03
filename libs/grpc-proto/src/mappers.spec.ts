@@ -27,7 +27,7 @@ import {
 } from './mappers';
 
 /**
- * §5 — the mapper round-trip sweep.
+ * the mapper round-trip sweep.
  *
  * Two enums share every one of these names: a STRING domain enum ('MALE') and a
  * NUMERIC proto enum (1). They are not interchangeable, and these functions are
@@ -38,7 +38,7 @@ import {
  * hand-written list, so adding a member without a mapping fails HERE rather
  * than in whichever service first sends it.
  */
-describe('§5 mapper round-trip sweep (unit)', () => {
+describe('mapper round-trip sweep (unit)', () => {
   describe('Gender', () => {
     it('round-trips EVERY domain member', () => {
       for (const gender of Object.values(Gender)) {

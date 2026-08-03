@@ -1,6 +1,10 @@
 import { RpcException } from '@nestjs/microservices';
 import { status } from '@grpc/grpc-js';
-import { PERMISSION_CODES, SystemRoleName } from '@synapsedesk/common';
+import {
+  compareAlphabetically,
+  PERMISSION_CODES,
+  SystemRoleName,
+} from '@synapsedesk/common';
 import { bootstrapE2eTest, E2eFixture } from '../utils/bootstrap';
 import { memberContext, pageRequest } from '../utils/context';
 import {
@@ -22,7 +26,7 @@ async function expectRpc(promise: Promise<unknown>, code: number) {
   await promise.catch((error: unknown) => expect(rpcCode(error)).toBe(code));
 }
 
-describe('§4.2 Roles & Permissions (e2e)', () => {
+describe('Roles & Permissions (e2e)', () => {
   let fx: E2eFixture;
   let roles: RolesService;
 
@@ -348,9 +352,9 @@ describe('§4.2 Roles & Permissions (e2e)', () => {
       // without a column that could disagree with the code it is grouping.
       const result = await roles.listPermissions();
 
-      expect(result.items.map((p) => p.code).sort()).toEqual(
-        [...PERMISSION_CODES].sort(),
-      );
+      expect(
+        result.items.map((p) => p.code).sort(compareAlphabetically),
+      ).toEqual([...PERMISSION_CODES].sort(compareAlphabetically));
 
       for (const permission of result.items) {
         expect(permission.code.startsWith(`${permission.group}.`)).toBe(true);

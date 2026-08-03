@@ -518,7 +518,7 @@ export class UsersService {
       action: AuditAction.USER_TWO_FACTOR_RESET,
       resourceType: AuditResourceType.USER,
       resourceId: target.id,
-      // NEVER the secret or any code hash (§8.3 of the conventions).
+      // NEVER the secret or any code hash (see the conventions).
       metadata: { untrustedDeviceCount },
     });
 

@@ -16,7 +16,7 @@ import {
  * the failure would be reported three layers away from the arithmetic that
  * actually broke.
  */
-describe('§2.2 backup-code generation (unit)', () => {
+describe('backup-code generation (unit)', () => {
   it('12. a generated set contains NO duplicates', () => {
     // Direct test of the Set-based loop. A naive `Array.from({length: n})`
     // could emit the same code twice, which silently reduces the number of

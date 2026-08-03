@@ -198,7 +198,7 @@ export class DepartmentsService {
         // the gateway maps FAILED_PRECONDITION to 400 and ABORTED to 409 per
         // the canonical gRPC/HTTP table. This is a conflict with the CURRENT
         // state of the resource -- retryable once the members move -- which is
-        // what 409 means and what api-endpoints-plan §1.5 specifies.
+        // what 409 means and what api-endpoints-plan specifies.
         code: status.ABORTED,
         message: `This department still has ${memberCount} member(s). Reassign them before deleting it.`,
       });

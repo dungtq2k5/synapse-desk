@@ -105,7 +105,7 @@ export function anonymousAgent(app: INestApplication<Server>): TestAgent {
 /**
  * Parses a `Set-Cookie` header into a name -> attributes map.
  *
- * Written once because the cookie sweep (§5) asserts on flags — HttpOnly,
+ * Written once because the cookie sweep asserts on flags — HttpOnly,
  * SameSite, Max-Age — on every cookie the gateway sets, and reading those off a
  * raw header string in each test is where the assertion quietly stops matching
  * what it claims to.

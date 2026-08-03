@@ -12,9 +12,10 @@ import { AllHttpExceptionFilter } from '../../src/common/filters/all-http-except
 import { LoggingInterceptor } from '../../src/common/interceptors/logging.interceptor';
 import { TransformInterceptor } from '../../src/common/interceptors/transform.interceptor';
 import { GrpcStubs, stubGrpcServices } from './grpc-stub';
+import { Server } from 'node:http';
 
 export type E2eFixture = {
-  app: INestApplication;
+  app: INestApplication<Server>;
   moduleRef: TestingModule;
   stubs: GrpcStubs;
   close: () => Promise<void>;

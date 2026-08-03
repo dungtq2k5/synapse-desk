@@ -21,7 +21,7 @@ async function expectRpc(promise: Promise<unknown>, code: number) {
   await promise.catch((error: unknown) => expect(rpcCode(error)).toBe(code));
 }
 
-describe('§3.3 Departments (e2e)', () => {
+describe('Departments (e2e)', () => {
   let fx: E2eFixture;
   let departments: DepartmentsService;
 

@@ -1,6 +1,7 @@
 import { RpcException } from '@nestjs/microservices';
 import { status } from '@grpc/grpc-js';
 import {
+  compareAlphabetically,
   EmailTemplateName,
   OrgStatus,
   SystemRoleName,
@@ -41,7 +42,7 @@ async function expectRpc(promise: Promise<unknown>, code: number) {
   await promise.catch((error: unknown) => expect(rpcCode(error)).toBe(code));
 }
 
-describe('§2.1 Auth core (e2e)', () => {
+describe('Auth core (e2e)', () => {
   let fx: E2eFixture;
   let auth: AuthService;
   let sessions: SessionsService;
@@ -163,7 +164,7 @@ describe('§2.1 Auth core (e2e)', () => {
     });
 
     it('4. the same address in TWO tenants both succeed', async () => {
-      // The contractor / re-hire case: uniqueness is per tenant (RDM §1.10).
+      // The contractor / re-hire case: uniqueness is per tenant (RDM).
       const orgA = await createOrganization(fx.prisma, {
         allowedEmailDomains: ['client-a.test'],
       });
@@ -350,9 +351,9 @@ describe('§2.1 Auth core (e2e)', () => {
       );
 
       expect(result.requiresTenantSelection).toBe(true);
-      expect(result.tenants.map((t) => t.organizationId).sort()).toEqual(
-        [first.org.id, third.org.id].sort(),
-      );
+      expect(
+        result.tenants.map((t) => t.organizationId).sort(compareAlphabetically),
+      ).toEqual([first.org.id, third.org.id].sort(compareAlphabetically));
     });
 
     it('13. a wrong password and an unknown address fail identically', async () => {
@@ -716,9 +717,11 @@ describe('§2.1 Auth core (e2e)', () => {
         { data: { links: { organizationName: string; url: string }[] } },
       ];
       expect(command.data.links).toHaveLength(2);
-      expect(command.data.links.map((l) => l.organizationName).sort()).toEqual(
-        [a.org.name, b.org.name].sort(),
-      );
+      expect(
+        command.data.links
+          .map((l) => l.organizationName)
+          .sort(compareAlphabetically),
+      ).toEqual([a.org.name, b.org.name].sort(compareAlphabetically));
 
       // One row per account, so each link resets its own tenant's password.
       expect(
@@ -921,7 +924,7 @@ describe('§2.1 Auth core (e2e)', () => {
       ).resolves.toMatchObject({ requiresTwoFactor: false });
     });
 
-    it('sessions service is reachable for the §3.1 suite', () => {
+    it('sessions service is reachable for the sessions suite', () => {
       expect(sessions).toBeDefined();
     });
   });

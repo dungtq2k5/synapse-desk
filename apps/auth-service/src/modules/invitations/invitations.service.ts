@@ -583,8 +583,8 @@ export class InvitationsService {
           });
         }
 
-        // §0.4 permits auth-only traffic on a FROZEN tenant, and joining one is
-        // not auth.
+        // The tenant lifecycle gate permits auth-only traffic on a FROZEN
+        // tenant, and joining one is not auth.
         if (!JOINABLE_ORG_STATUSES.has(invitation.organization.status)) {
           throw new RpcException({
             code: status.PERMISSION_DENIED,
@@ -808,7 +808,7 @@ export class InvitationsService {
    *
    * Only messages this service authored are surfaced; anything else collapses
    * to a generic string rather than leaking an internal error into a response
-   * body (§8.4).
+   * body (production silence, per the conventions).
    */
   private describeFailure(error: unknown): string {
     if (error instanceof RpcException) {

@@ -19,10 +19,11 @@ import {
   GRPC_CHANNEL_OPTIONS,
   GRPC_LOADER_OPTIONS,
 } from '@synapsedesk/grpc-proto';
+import { compareAlphabetically } from '@synapsedesk/common';
 import { AppModule } from '../src/app.module';
 
 /**
- * §1.9 — the cross-service gRPC contract test.
+ * the cross-service gRPC contract test.
  *
  * The one test with no equivalent in a single-process app, because this is the
  * one place a mocked peer hides the exact failure `GRPC_LOADER_OPTIONS`' own
@@ -36,7 +37,8 @@ import { AppModule } from '../src/app.module';
  * care whether the business logic succeeded: a `NOT_FOUND` for an empty request
  * is a perfectly good outcome, because it means the request crossed the wire,
  * was decoded, reached a handler, and the handler's answer came back decoded.
- * The business rules are §2–§5's job, with fixtures that make them meaningful.
+ * The business rules are the per-module suites' job, with fixtures that make
+ * them meaningful.
  *
  * **The method list comes from the PROTOS**, read through the same
  * `@grpc/proto-loader` the runtime uses — not from a hand-written array. A new
@@ -49,7 +51,7 @@ import { AppModule } from '../src/app.module';
  *   - a loader option that drifts between the two peers -> the mismatch shows
  *     up as a serialisation failure rather than as silently wrong values.
  */
-describe('§1.9 gRPC wire contract (e2e)', () => {
+describe('gRPC wire contract (e2e)', () => {
   let app: INestMicroservice;
   let url: string;
 
@@ -166,7 +168,7 @@ describe('§1.9 gRPC wire contract (e2e)', () => {
   it('the protos declare every service the gateway consumes', () => {
     // A sanity check on the enumeration itself: if this found two services, the
     // sweep below would be green and prove nothing.
-    const services = [...clients.keys()].sort((a, b) => a.localeCompare(b));
+    const services = [...clients.keys()].sort(compareAlphabetically);
 
     expect(services).toEqual(
       [
@@ -180,7 +182,7 @@ describe('§1.9 gRPC wire contract (e2e)', () => {
         'SessionService',
         'TwoFactorAuthService',
         'UserService',
-      ].sort((a, b) => a.localeCompare(b)),
+      ].sort(compareAlphabetically),
     );
     expect(rpcs.length).toBeGreaterThan(60);
   });

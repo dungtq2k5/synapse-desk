@@ -16,7 +16,7 @@ async function expectRpc(promise: Promise<unknown>, code: number) {
   await promise.catch((error: unknown) => expect(rpcCode(error)).toBe(code));
 }
 
-describe('§2.3 OTP (e2e)', () => {
+describe('OTP (e2e)', () => {
   let fx: E2eFixture;
   let otp: OtpService;
 

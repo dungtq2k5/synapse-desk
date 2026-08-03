@@ -30,7 +30,7 @@ import {
 } from './dto/rest/role.dto';
 
 /**
- * Roles (api-endpoints-plan §1.7).
+ * Roles (api-endpoints-plan).
  *
  * A tenant sees its own roles plus the four global system roles, and may modify
  * none of the latter — enforced in auth-service, not just greyed out here. A

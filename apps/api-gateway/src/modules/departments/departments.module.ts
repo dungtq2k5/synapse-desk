@@ -9,7 +9,7 @@ import { DepartmentsGrpcClient } from './departments-grpc.client';
  * same peer.
  *
  * KNOWN GAP: no rate limiting. `@nestjs/throttler` is not installed, so the
- * blanket "100/min/user" backstop in §1.5 of the remaining-work plan does not
+ * blanket "100/min/user" backstop in the remaining-work plan does not
  * apply to these routes yet.
  */
 @Module({

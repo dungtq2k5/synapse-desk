@@ -65,7 +65,7 @@ export const AUTH_THROTTLER_TIER = 'authTier';
 export const GENERAL_THROTTLER_TIERS = ['short', 'medium', 'long'] as const;
 
 /**
- * Per-route limits the endpoint plan promises (§1.5 of the remaining-work doc).
+ * Per-route limits the endpoint plan promises (see the remaining-work doc).
  *
  * Declared here rather than inline at each `@Throttle()` so the whole policy is
  * readable in one place — a limit is a product decision, and hunting six

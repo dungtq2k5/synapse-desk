@@ -237,7 +237,7 @@ export class OrganizationsService {
   }
 
   /**
-   * Three meters (RDM §1.8), two of which belong to domains that do not exist.
+   * Three meters (RDM), two of which belong to domains that do not exist.
    *
    * Those report `available: false` with no number rather than 0 — a zero reads
    * as "you have used nothing", which is a claim we cannot make.
@@ -425,7 +425,7 @@ export class OrganizationsService {
    * UsersService — which is how an invite gets rejected by a counter the usage
    * page says has room.
    *
-   * Pending invitations reserve a seat (RDM §1.8): counting only active users
+   * Pending invitations reserve a seat (RDM): counting only active users
    * would let an admin send 50 invites against 10 seats and blow the quota the
    * moment they were accepted. Expiry is what releases a reservation.
    *

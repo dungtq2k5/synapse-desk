@@ -7,7 +7,7 @@ import "synapsedesk/auth/common.proto";
 import "synapsedesk/auth/organization.proto";
 import "synapsedesk/auth/role.proto";
 
-// Platform administration (RDM §1.7).
+// Platform administration (RDM).
 //
 // Every RPC here reads or writes ACROSS tenants, which is exactly why it is a
 // separate service rather than extra methods on the tenant-facing ones: the

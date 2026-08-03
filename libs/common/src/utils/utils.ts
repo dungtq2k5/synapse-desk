@@ -7,7 +7,7 @@ import { HttpException } from '@nestjs/common';
  */
 /**
  * The single normalization applied to every address before it is stored or
- * compared (RDM §1.10).
+ * compared (RDM).
  *
  * Shared rather than per-service because the partial unique index
  * `users_org_email_key` is byte-exact: if register lower-cases and invite does
@@ -24,6 +24,31 @@ export function extractEmailDomain(email: string): string | null {
 
   const domain = email.split('@')[1];
   return domain || null;
+}
+
+/**
+ * The comparator for sorting strings alphabetically.
+ *
+ * `Array.prototype.sort()` with no argument compares by UTF-16 code unit, not
+ * alphabetically — `'Z'` sorts before `'a'`, and anything non-ASCII sorts by
+ * code point rather than by how the alphabet actually reads. For the ASCII
+ * identifiers most call sites pass (permission codes, service names, object
+ * keys) the two agree, which is exactly what makes the bare form easy to reach
+ * for and easy to get wrong the first time a value is a display name, a slug,
+ * or anything a user typed.
+ *
+ * Shared rather than redeclared per file because it had already been written
+ * three separate times under three different names, and a comparator that
+ * differs between two suites is a test that passes in one and not the other for
+ * reasons unrelated to the code under test.
+ *
+ *   [...codes].sort(compareAlphabetically)
+ *
+ * Note this does NOT copy: `.sort()` still mutates in place. Spread first when
+ * the array belongs to something the assertion also inspects.
+ */
+export function compareAlphabetically(a: string, b: string): number {
+  return a.localeCompare(b);
 }
 
 export function formatErrorMsg(

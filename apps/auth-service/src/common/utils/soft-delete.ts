@@ -3,7 +3,7 @@ import { RpcException } from '@nestjs/microservices';
 import { isUniqueConstraintViolation } from './utils';
 
 /**
- * The write for a soft delete (§7.1 of the conventions).
+ * The write for a soft delete (see the conventions).
  *
  * `prisma.x.delete()` is never correct for `users`, `departments` or
  * `organizations`: the rows are referenced by audit trails, ticket history and

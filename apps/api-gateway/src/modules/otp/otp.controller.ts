@@ -30,7 +30,7 @@ import { OrgAccessKind } from '../../common/decorators/org-access.decorator';
 import { OrgAccess } from '@synapsedesk/common';
 
 /**
- * Email and phone ownership challenges (api-endpoints-plan §1.1).
+ * Email and phone ownership challenges (api-endpoints-plan).
  *
  * Every route is SELF-scoped: the user id comes from the JWT, never from the
  * path or body, so one user cannot trigger or consume another's codes.

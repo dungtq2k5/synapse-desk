@@ -8,7 +8,7 @@ import { RolesGrpcClient } from './roles-grpc.client';
 import { PermissionResponseDto } from './dto/rest/role.dto';
 
 /**
- * The seeded permission catalogue (api-endpoints-plan §1.7).
+ * The seeded permission catalogue (api-endpoints-plan).
  *
  * Read-only by design: `PERMISSION_CODES` in libs/common is the source of
  * truth, the table is seeded from it, and a new permission ships with a deploy

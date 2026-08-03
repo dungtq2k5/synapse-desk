@@ -1,6 +1,7 @@
 import { RpcException } from '@nestjs/microservices';
 import { status } from '@grpc/grpc-js';
 import {
+  compareAlphabetically,
   ORG_STATUS_TRANSITIONS,
   OrgStatus,
   SystemRoleName,
@@ -25,7 +26,7 @@ async function expectRpc(promise: Promise<unknown>, code: number) {
   await promise.catch((error: unknown) => expect(rpcCode(error)).toBe(code));
 }
 
-describe('§4.3 Platform (e2e)', () => {
+describe('Platform (e2e)', () => {
   let fx: E2eFixture;
   let platform: PlatformService;
   let ctx: ReturnType<typeof superAdminContext>;
@@ -376,9 +377,12 @@ describe('§4.3 Platform (e2e)', () => {
       for (const row of rows) {
         expect(row.organizationName).toBeTruthy();
       }
-      expect(rows.map((r) => r.organizationName).sort()).toEqual(
-        [a.org.name, b.org.name].sort(),
-      );
+      expect(
+        // `!` is earned by the toBeTruthy() loop directly above — the proto
+        // types this optional, and the bare `.sort()` this replaced was
+        // silently sorting a `(string | undefined)[]`.
+        rows.map((r) => r.organizationName!).sort(compareAlphabetically),
+      ).toEqual([a.org.name, b.org.name].sort(compareAlphabetically));
     });
 
     it('the platform sees across tenants; a tenant service never would', async () => {
@@ -466,7 +470,7 @@ describe('§4.3 Platform (e2e)', () => {
   describe('audit + getOrganization', () => {
     it('3. every platform write records organizationId: null', async () => {
       // A platform act belongs to the platform, not to the customer it touched
-      // (RDM §1.7) — filing it under the tenant would put an operator action in
+      // (RDM) — filing it under the tenant would put an operator action in
       // that customer's own audit trail.
       const t = await seedTenantWithUser(fx.prisma, {
         organization: { status: OrgStatus.ACTIVE },

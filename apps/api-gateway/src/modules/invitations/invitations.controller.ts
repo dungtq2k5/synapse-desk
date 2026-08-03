@@ -45,7 +45,7 @@ import { AuthThrottle } from '../../common/decorators/auth-throttle.decorator';
 import { OrgAccessKind } from '../../common/decorators/org-access.decorator';
 
 /**
- * Invitations (api-endpoints-plan §1.1).
+ * Invitations (api-endpoints-plan).
  *
  * The tenant is ALWAYS the caller's own — `context.organizationId`, never a
  * body or path value — so an admin cannot invite into someone else's workspace.

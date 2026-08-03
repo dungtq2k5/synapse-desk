@@ -33,7 +33,7 @@ import {
 } from './dto/rest/department.dto';
 
 /**
- * Departments (api-endpoints-plan §1.5).
+ * Departments (api-endpoints-plan).
  *
  * The tenant is never a parameter. It travels in the caller's verified context,
  * which `BaseGrpcClient` packs into gRPC metadata — so there is no request in

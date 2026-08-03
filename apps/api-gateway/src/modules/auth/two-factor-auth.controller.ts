@@ -48,7 +48,7 @@ import { OrgAccessKind } from '../../common/decorators/org-access.decorator';
 import { OrgAccess } from '@synapsedesk/common';
 
 /**
- * `/auth/2fa` — enrolment and recovery (api-endpoints-plan §1.2).
+ * `/auth/2fa` — enrolment and recovery (api-endpoints-plan).
  *
  * Every route here except `authenticate` requires a full session: you must
  * already be logged in to change your own second factor. `authenticate` is the

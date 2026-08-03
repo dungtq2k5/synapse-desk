@@ -1,6 +1,7 @@
 import { RpcException } from '@nestjs/microservices';
 import { status } from '@grpc/grpc-js';
 import { generateSync } from 'otplib';
+import { compareAlphabetically } from '@synapsedesk/common';
 import { bootstrapE2eTest, E2eFixture } from '../utils/bootstrap';
 import { requestOrigin } from '../utils/context';
 import {
@@ -22,7 +23,22 @@ async function expectRpc(promise: Promise<unknown>, code: number) {
   await promise.catch((error: unknown) => expect(rpcCode(error)).toBe(code));
 }
 
-describe('§2.2 Two-factor auth (e2e)', () => {
+/**
+ * Reads the shared secret out of the otpauth:// URI.
+ *
+ * The setup RPC deliberately does NOT return the raw secret — only the URI
+ * and its QR rendering, which is what a real authenticator app consumes. So
+ * the test extracts it the same way the app does, rather than reaching into
+ * the database and decrypting `two_factor_secret`, which would test the
+ * fixture's knowledge of the storage format instead of the enrolment flow.
+ */
+function secretFromUri(otpauthUri: string): string {
+  const secret = new URL(otpauthUri).searchParams.get('secret');
+  if (!secret) throw new Error(`No secret in otpauth URI: ${otpauthUri}`);
+  return secret;
+}
+
+describe('Two-factor auth (e2e)', () => {
   let fx: E2eFixture;
   let twoFactor: TwoFactorAuthService;
   let auth: AuthService;
@@ -36,21 +52,6 @@ describe('§2.2 Two-factor auth (e2e)', () => {
   beforeEach(() => fx.reset());
 
   afterAll(() => fx.close());
-
-  /**
-   * Reads the shared secret out of the otpauth:// URI.
-   *
-   * The setup RPC deliberately does NOT return the raw secret — only the URI
-   * and its QR rendering, which is what a real authenticator app consumes. So
-   * the test extracts it the same way the app does, rather than reaching into
-   * the database and decrypting `two_factor_secret`, which would test the
-   * fixture's knowledge of the storage format instead of the enrolment flow.
-   */
-  function secretFromUri(otpauthUri: string): string {
-    const secret = new URL(otpauthUri).searchParams.get('secret');
-    if (!secret) throw new Error(`No secret in otpauth URI: ${otpauthUri}`);
-    return secret;
-  }
 
   /** Enrols a user end to end and returns their TOTP secret + backup codes. */
   async function enrol(userId: string) {
@@ -417,8 +418,8 @@ describe('§2.2 Two-factor auth (e2e)', () => {
 
       const result = await twoFactor.getBackupCodesStatus({ userId: user.id });
 
-      expect(Object.keys(result).sort()).toEqual(
-        ['expiresAt', 'remaining', 'used'].sort(),
+      expect(Object.keys(result).sort(compareAlphabetically)).toEqual(
+        ['expiresAt', 'remaining', 'used'].sort(compareAlphabetically),
       );
     });
 

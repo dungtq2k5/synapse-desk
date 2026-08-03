@@ -295,7 +295,7 @@ export class TwoFactorAuthService {
 
   /**
    * Turn 2FA off. Requires a current TOTP code AND the account password
-   * (api-endpoints-plan §1.2): one proves possession of the authenticator, the
+   * (api-endpoints-plan): one proves possession of the authenticator, the
    * other proves the person at the keyboard owns the account, so a hijacked
    * session alone cannot strip the second factor.
    */

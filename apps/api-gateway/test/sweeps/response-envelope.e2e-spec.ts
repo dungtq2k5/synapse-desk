@@ -10,7 +10,7 @@ import { anonymousAgent, API, authenticatedAgent } from '../utils/auth';
 import { grpcError, timestamp, wirePage, wireUser } from '../fixtures/wire';
 
 /**
- * §5 — the response envelope sweep.
+ * the response envelope sweep.
  *
  * `success` is the ONE field a client branches on, which only works if it is
  * present on every response from every controller. A route that returns a bare
@@ -165,7 +165,7 @@ const PROBES: Probe[] = [
   },
 ];
 
-describe('§5 response envelope sweep (e2e)', () => {
+describe('response envelope sweep (e2e)', () => {
   let fx: E2eFixture;
 
   beforeAll(async () => {

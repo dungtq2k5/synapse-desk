@@ -36,7 +36,7 @@ import {
 } from './dto/rest/user-admin.dto';
 
 /**
- * Tenant administration of OTHER users (api-endpoints-plan §1.6).
+ * Tenant administration of OTHER users (api-endpoints-plan).
  *
  * Every route is permission-gated and every query is tenant-scoped in
  * auth-service — a user id from another tenant 404s, never 403, because

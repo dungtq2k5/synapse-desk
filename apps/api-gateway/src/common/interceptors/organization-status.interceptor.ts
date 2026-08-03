@@ -18,7 +18,7 @@ import { ORG_ACCESS_KEY } from '../decorators/org-access.decorator';
 import { OrganizationStatusService } from '../services/organization-status.service';
 
 /**
- * Enforces the tenant lifecycle (api-endpoints-plan §0.4).
+ * Enforces the tenant lifecycle (api-endpoints-plan).
  *
  * Without this, setting a tenant to FROZEN changes a column and nothing else —
  * a button that appears to suspend a customer and does not. Every business

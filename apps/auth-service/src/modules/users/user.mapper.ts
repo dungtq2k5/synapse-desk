@@ -38,7 +38,7 @@ import type { Prisma, User } from '../../generated/prisma/client';
 export function toUserResponse(user: User): UserResponse {
   return {
     id: user.id,
-    // null for platform Super Admins, who belong to no tenant (RDM §1.7).
+    // null for platform Super Admins, who belong to no tenant (RDM).
     organizationId: user.organizationId ?? undefined,
     fullName: user.fullName,
     avatarUrl: user.avatarUrl ?? undefined,
@@ -64,7 +64,7 @@ export function toUserResponse(user: User): UserResponse {
  *
  * `select` on the nested relations rather than `include`, so `passwordHash` and
  * `twoFactorSecret` cannot reach the result object at all — a stronger
- * guarantee than remembering to strip them in the mapper (§7.3 of the
+ * guarantee than remembering to strip them in the mapper (see the
  * conventions). The top-level user columns still come through whole because
  * `toUserResponse` is itself an allow-list.
  */

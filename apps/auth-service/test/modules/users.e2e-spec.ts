@@ -1,6 +1,10 @@
 import { RpcException } from '@nestjs/microservices';
 import { status } from '@grpc/grpc-js';
-import { PERMISSION_CODES, SystemRoleName } from '@synapsedesk/common';
+import {
+  compareAlphabetically,
+  PERMISSION_CODES,
+  SystemRoleName,
+} from '@synapsedesk/common';
 import { bootstrapE2eTest, E2eFixture } from '../utils/bootstrap';
 import { memberContext } from '../utils/context';
 import {
@@ -26,7 +30,7 @@ async function expectRpc(promise: Promise<unknown>, code: number) {
   await promise.catch((error: unknown) => expect(rpcCode(error)).toBe(code));
 }
 
-describe('§4.1 Users (e2e)', () => {
+describe('Users (e2e)', () => {
   let fx: E2eFixture;
   let users: UsersService;
 
@@ -66,9 +70,9 @@ describe('§4.1 Users (e2e)', () => {
       });
       const viaClaimBuilder = flattenPermissionCodes(rows.roles);
 
-      expect(viaService.permissionCodes.sort()).toEqual(
-        [...viaClaimBuilder].sort(),
-      );
+      expect(
+        [...viaService.permissionCodes].sort(compareAlphabetically),
+      ).toEqual([...viaClaimBuilder].sort(compareAlphabetically));
     });
 
     it('2b. a foreign user 404s rather than leaking a permission set', async () => {
@@ -159,8 +163,8 @@ describe('§4.1 Users (e2e)', () => {
 
   describe('deleteUser', () => {
     it('5. delete revokes every session for the target', async () => {
-      // The gap §6.2 named as a real risk: without this an access token issued a
-      // second earlier keeps working until it expires.
+      // The gap the remaining-work doc named as a real risk: without this an
+      // access token issued a second earlier keeps working until it expires.
       const t = await seedTenantWithUser(fx.prisma);
       const target = await addMember(fx.prisma, t.org.id);
       await createTrustedDeviceSession(fx.prisma, target.id);
@@ -244,11 +248,12 @@ describe('§4.1 Users (e2e)', () => {
       const active = await addMember(fx.prisma, t.org.id, {
         grantSystemRole: SystemRoleName.ORG_ADMIN,
       });
-      const locked = await addMember(fx.prisma, t.org.id, {
+      // Not assigned: the ROW is the fixture — the whole point of the test is
+      // that this admin does not count, so nothing here refers to it again.
+      await addMember(fx.prisma, t.org.id, {
         grantSystemRole: SystemRoleName.ORG_ADMIN,
         user: { isLocked: true },
       });
-      void locked;
 
       await expectRpc(
         users.deleteUser({ id: active.id }, superuser(t)),

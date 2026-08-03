@@ -16,7 +16,7 @@ import { UsersService } from '../../src/modules/users/users.service';
 import { InvitationsService } from '../../src/modules/invitations/invitations.service';
 
 /**
- * §5 — the tenant isolation sweep.
+ * the tenant isolation sweep.
  *
  * Every by-id read and write, against a resource belonging to someone else,
  * parametrized over one table rather than written per module. Adding an
@@ -32,7 +32,7 @@ import { InvitationsService } from '../../src/modules/invitations/invitations.se
  * the one that catches an endpoint added WITHOUT it, because a new row here is
  * the obvious place to look and a missing test in someone else's file is not.
  */
-describe('§5 tenant isolation sweep (e2e)', () => {
+describe('tenant isolation sweep (e2e)', () => {
   let fx: E2eFixture;
 
   /** Every by-id operation, with the ids resolved per-test. */

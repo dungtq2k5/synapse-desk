@@ -21,7 +21,7 @@ async function expectRpc(promise: Promise<unknown>, code: number) {
   await promise.catch((error: unknown) => expect(rpcCode(error)).toBe(code));
 }
 
-describe('§3.2 Organizations (e2e)', () => {
+describe('Organizations (e2e)', () => {
   let fx: E2eFixture;
   let organizations: OrganizationsService;
 
@@ -75,7 +75,7 @@ describe('§3.2 Organizations (e2e)', () => {
   describe('updateOrganizationSettings', () => {
     it('3. enabling enforce_two_factor does not lock out an unenrolled admin', async () => {
       // The setting is written, and the account keeps working — the door out is
-      // the enrolment challenge (§2.2 test 3), not an exemption here.
+      // the enrolment challenge (see the two-factor suite), not an exemption here.
       const t = await seedTenantWithUser(fx.prisma);
 
       const result = await organizations.updateOrganizationSettings(
@@ -228,7 +228,7 @@ describe('§3.2 Organizations (e2e)', () => {
 
   describe('getOrganizationUsage / seatsInUse', () => {
     it('6. usage seats and the invitation seat gate count identically', async () => {
-      // The parity check §4.5 of the remaining-work doc calls out by name.
+      // The parity check the remaining-work doc calls out by name.
       // `seatsInUse()` is now a single function owned by this service, and both
       // callers go through it — this test is what stops a future edit
       // reintroducing a second definition, which is how an invite gets rejected

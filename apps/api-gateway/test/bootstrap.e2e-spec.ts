@@ -35,7 +35,7 @@ describe('e2e bootstrap', () => {
     const res = await authenticatedAgent(fx.app).get(`${API}/users/me`);
 
     // Anything but 401 proves the signature verified. The route's own
-    // behaviour is §4.1's business.
+    // behaviour is the users suite's business.
     expect(res.status).not.toBe(401);
   });
 

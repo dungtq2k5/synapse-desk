@@ -8,7 +8,7 @@ import { PrismaService } from '../prisma/prisma.service';
  *
  * Three tables grow without bound today, and `device_sessions` is the worst of
  * them: a spent rotation row is retained on purpose so a replayed refresh token
- * is DETECTABLE rather than merely unknown (RDM §1.5) — which means one row per
+ * is DETECTABLE rather than merely unknown (RDM) — which means one row per
  * refresh, per user, forever. At a 15-minute access-token TTL that is ~96 rows
  * per user per day.
  *

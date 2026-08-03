@@ -18,7 +18,7 @@ export class UserBase {
   readonly id!: string;
 
   /**
-   * null for platform Super Admins, who belong to no tenant (RDM §1.7). Typed
+   * null for platform Super Admins, who belong to no tenant (RDM). Typed
    * non-nullable, this field made the seeded super admin impossible to return
    * from the API at all.
    */

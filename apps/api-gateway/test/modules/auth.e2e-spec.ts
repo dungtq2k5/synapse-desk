@@ -1,5 +1,6 @@
 import { of, throwError } from 'rxjs';
 import { status as GrpcStatus } from '@grpc/grpc-js';
+import { compareAlphabetically } from '@synapsedesk/common';
 import {
   bootstrapE2eTest,
   E2eFixture,
@@ -25,14 +26,14 @@ import {
 } from '../fixtures/wire';
 
 /**
- * The gateway half of §2.1–§2.3: the rows the plan marks "e2e".
+ * The gateway half of auth, 2FA and OTP: the rows the test plan marks "e2e".
  *
  * Everything here is about the HTTP boundary — which cookies are set, what the
  * body does and does not carry, which guard admits which caller. The business
  * rules behind them live in the integration suites, and auth-service is stubbed
  * precisely so a failure here can only mean the gateway.
  */
-describe('§2.1–2.3 auth at the HTTP boundary (e2e)', () => {
+describe('auth at the HTTP boundary (e2e)', () => {
   let fx: E2eFixture;
 
   beforeAll(async () => {
@@ -295,7 +296,7 @@ describe('§2.1–2.3 auth at the HTTP boundary (e2e)', () => {
     // ------------------------------------------------- TwoFactorEnrolmentGuard
   });
 
-  describe('§2.2 TwoFactorEnrolmentGuard', () => {
+  describe('TwoFactorEnrolmentGuard', () => {
     it('2. a full session is admitted to setup and enable', async () => {
       fx.stubs.twoFactor.generateTwoFactor.mockReturnValue(
         of({
@@ -313,7 +314,7 @@ describe('§2.1–2.3 auth at the HTTP boundary (e2e)', () => {
     });
 
     it('3. a mid-challenge caller is admitted to setup — the deadlock door', async () => {
-      // The case §4.4 of the remaining-work doc flagged: a tenant turns on
+      // The case the remaining-work doc flagged: a tenant turns on
       // `enforce_two_factor`, and a member with no secret gets a challenge
       // cookie and nothing else. Without this door they can neither
       // authenticate (no code exists) nor enrol (no full session) — a
@@ -376,15 +377,17 @@ describe('§2.1–2.3 auth at the HTTP boundary (e2e)', () => {
 
       expect(res.status).toBe(200);
       expect(JSON.stringify(res.body)).not.toMatch(/codeHash|backupCodes/);
-      expect(Object.keys(res.body.data).sort()).toEqual(
-        ['expiresAt', 'remaining', 'used'].sort(),
-      );
+      expect(
+        Object.keys(res.body.data as Record<string, unknown>).sort(
+          compareAlphabetically,
+        ),
+      ).toEqual(['expiresAt', 'remaining', 'used'].sort(compareAlphabetically));
     });
   });
 
-  // -------------------------------------------------------------- §2.3 OTP
+  //  OTP
 
-  describe('§2.3 OTP at the boundary', () => {
+  describe('OTP at the boundary', () => {
     it('5. the status response carries a masked target and no hash', async () => {
       fx.stubs.otp.getOtpStatus.mockReturnValue(
         of({

@@ -16,7 +16,7 @@ import { anonymousAgent, API, authenticatedAgent } from '../utils/auth';
 import { grpcError, wireLoginSuccess, wirePage } from '../fixtures/wire';
 
 /**
- * §2.4 — the throttler.
+ * the throttler.
  *
  * Runs at the e2e layer with the REAL `ThrottlerModule` and REAL Redis-backed
  * storage (DB 15, see .env.test). An in-memory stub would prove nothing:
@@ -30,7 +30,7 @@ import { grpcError, wireLoginSuccess, wirePage } from '../fixtures/wire';
  */
 const TIGHT_GENERAL_LIMIT = 3;
 
-describe('§2.4 SmartThrottlerGuard (e2e)', () => {
+describe('SmartThrottlerGuard (e2e)', () => {
   let fx: E2eFixture;
 
   beforeAll(async () => {

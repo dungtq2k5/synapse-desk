@@ -13,7 +13,7 @@ import { API, authenticatedAgent } from '../utils/auth';
 import { timestamp, wirePage, wireUser } from '../fixtures/wire';
 
 /**
- * §5 — `PermissionGuard` ANY semantics.
+ * `PermissionGuard` ANY semantics.
  *
  * The rule is `.some()`, not `.every()`: several codes on one route means
  * "either of these may do this". It was `.every()` once, while the 403 message
@@ -25,7 +25,7 @@ import { timestamp, wirePage, wireUser } from '../fixtures/wire';
  * through — the e2e half covers the shape that exists, and the unit half covers
  * the rule itself, which is the part that regressed before.
  */
-describe('§5 PermissionGuard ANY semantics (unit)', () => {
+describe('PermissionGuard ANY semantics (unit)', () => {
   function buildGuard() {
     const reflector = new Reflector();
     const config = {
@@ -129,7 +129,7 @@ describe('§5 PermissionGuard ANY semantics (unit)', () => {
   });
 });
 
-describe('§5 PermissionGuard on real routes (e2e)', () => {
+describe('PermissionGuard on real routes (e2e)', () => {
   let fx: E2eFixture;
 
   /**

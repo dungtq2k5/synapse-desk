@@ -99,7 +99,7 @@ message LogoutRequest {
   // cookie; there is no user_id, because possession of the token is the proof.
   string refresh_token = 1;
 
-  // "Log out of all devices" (RDM §1.5) -- revokes every session for the owner
+  // "Log out of all devices" (RDM) -- revokes every session for the owner
   // of that token, trusted devices included.
   bool all_devices = 2;
 }

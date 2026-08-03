@@ -37,7 +37,7 @@ import {
 } from './dto/rest/platform.dto';
 
 /**
- * Platform administration (api-endpoints-plan §1.8).
+ * Platform administration (api-endpoints-plan).
  *
  * `SuperAdminGuard` is applied at CLASS level, never per method. One forgotten
  * decorator on a route here is a full cross-tenant breach, and a class-level

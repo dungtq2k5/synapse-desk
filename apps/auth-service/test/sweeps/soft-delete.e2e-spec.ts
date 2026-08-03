@@ -11,7 +11,7 @@ import { UsersService } from '../../src/modules/users/users.service';
 import { PlatformService } from '../../src/modules/platform/platform.service';
 
 /**
- * §5 — the soft-delete sweep.
+ * the soft-delete sweep.
  *
  * Soft deletion only works if EVERY list honours it. One endpoint that forgets
  * the `deletedAt: null` filter puts a deactivated employee back on a directory
@@ -22,7 +22,7 @@ import { PlatformService } from '../../src/modules/platform/platform.service';
  * is the other way to get this wrong: an override that works without the
  * permission behind it is not an override, it is the filter not being applied.
  */
-describe('§5 soft-delete sweep (e2e)', () => {
+describe('soft-delete sweep (e2e)', () => {
   let fx: E2eFixture;
   let departments: DepartmentsService;
   let users: UsersService;

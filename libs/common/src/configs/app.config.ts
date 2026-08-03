@@ -117,7 +117,7 @@ export enum OrgStatus {
 }
 
 /**
- * What a tenant may do in each lifecycle state (api-endpoints-plan §0.4).
+ * What a tenant may do in each lifecycle state (api-endpoints-plan).
  *
  * The table is the whole policy, declared once so the gateway gate and any
  * future consumer read the same rules rather than each encoding their own idea
@@ -173,7 +173,7 @@ export const ORG_STATUS_ACCESS: Record<OrgStatus, readonly OrgAccess[]> = {
 };
 
 /**
- * Legal `organizations.status` transitions (§8.2).
+ * Legal `organizations.status` transitions (see the remaining-work doc).
  *
  * An explicit allowlist rather than "anything goes with a reason": the illegal
  * ones matter. FROZEN -> SUSPENDED_PAST_DUE would silently restore read access
@@ -296,7 +296,7 @@ export const GRPC_CONTEXT_METADATA = {
 } as const;
 
 /**
- * The canonical permission registry (api-endpoints-plan §9), in `target.action`
+ * The canonical permission registry (api-endpoints-plan), in `target.action`
  * form per RDM Table 6.
  *
  * This array is the single source of truth twice over: it derives the
@@ -429,7 +429,7 @@ export const PERMISSION_NAMES: Record<PermissionCode, string> = {
 /**
  * Global system roles — `organization_id IS NULL`, `is_system_role = true`.
  * Seeded once by auth-service and shared by every tenant; tenant admins may not
- * rename or delete them (api-endpoints-plan §1.7).
+ * rename or delete them (api-endpoints-plan).
  *
  * The value IS the `roles.name` column, so it is also what the UI displays.
  */
@@ -441,7 +441,7 @@ export enum SystemRoleName {
 }
 
 /**
- * Default grants per system role (api-endpoints-plan §9).
+ * Default grants per system role (api-endpoints-plan).
  *
  * END_USER holds no permission rows on purpose: own-ticket access, `/chat/*`
  * and `/knowledge/search` are authorized by ownership and tenancy, not RBAC.

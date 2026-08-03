@@ -115,7 +115,7 @@ export type RecordAuditCommand = {
   action: AuditAction;
 
   /**
-   * null for platform-level acts (RDM §1.7) — the event belongs to the
+   * null for platform-level acts (RDM) — the event belongs to the
    * platform, not to the customer it touched.
    */
   organizationId: string | null;

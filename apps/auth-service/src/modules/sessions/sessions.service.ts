@@ -28,7 +28,7 @@ import { Prisma } from '../../generated/prisma/client';
 /**
  * What counts as a session a human would recognise.
  *
- * Spent rotation rows are RETAINED deliberately (RDM §1.5): presenting an
+ * Spent rotation rows are RETAINED deliberately (RDM): presenting an
  * already-rotated token is evidence of theft, and deleting the row would make
  * that replay indistinguishable from an unknown token. The cost is that the
  * table holds one row per refresh performed — so any listing that forgets this

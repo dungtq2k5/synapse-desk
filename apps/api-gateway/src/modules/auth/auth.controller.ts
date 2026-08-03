@@ -266,7 +266,7 @@ export class AuthController {
    * KNOWN GAP: this needs a rate limit. Without the current-password check it
    * would be a session-hijack escalation; with the check but no limit it is an
    * online password oracle for an attacker who already holds a session.
-   * `@nestjs/throttler` is not installed yet (§1.5 of the remaining-work plan).
+   * `@nestjs/throttler` is not installed yet (see the remaining-work plan).
    */
   @Patch('password')
   @Throttle({ [AUTH_THROTTLER_TIER]: ROUTE_THROTTLE.changePassword })
