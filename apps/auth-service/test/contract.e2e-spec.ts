@@ -1,10 +1,18 @@
 import { INestMicroservice } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
-import { credentials, loadPackageDefinition, Metadata } from '@grpc/grpc-js';
-import type { GrpcObject, ServiceClientConstructor } from '@grpc/grpc-js';
+import {
+  credentials,
+  loadPackageDefinition,
+  Metadata,
+  status as GrpcStatus,
+} from '@grpc/grpc-js';
+import type {
+  CallOptions,
+  GrpcObject,
+  ServiceClientConstructor,
+} from '@grpc/grpc-js';
 import { loadSync, PackageDefinition } from '@grpc/proto-loader';
-import { status as GrpcStatus } from '@grpc/grpc-js';
 import {
   AUTH_PACKAGE_NAME,
   AUTH_PROTO_PATHS,
@@ -95,14 +103,7 @@ describe('§1.9 gRPC wire contract (e2e)', () => {
       const ctor = entry as ServiceClientConstructor;
       if (typeof ctor !== 'function' || !ctor.service) continue;
 
-      clients.set(
-        serviceName,
-        // NOW This assertion is unnecessary since the receiver accepts the original type of the expression.
-        new ctor(url, credentials.createInsecure()) as unknown as Record<
-          string,
-          unknown
-        >,
-      );
+      clients.set(serviceName, new ctor(url, credentials.createInsecure()));
 
       for (const method of Object.values(ctor.service)) {
         rpcs.push({
@@ -136,6 +137,7 @@ describe('§1.9 gRPC wire contract (e2e)', () => {
     const fn = client[rpc.method] as (
       request: unknown,
       metadata: Metadata,
+      options: CallOptions,
       callback: (
         error: (Error & { code?: number }) | null,
         value?: unknown,
@@ -147,22 +149,24 @@ describe('§1.9 gRPC wire contract (e2e)', () => {
       metadata.set('ip_address', '203.0.113.1');
       metadata.set('user_agent', 'contract-test');
 
+      // Without this, a single hung stub blocks the whole sweep — 60+ RPCs
+      // across six `it()` blocks — with nothing but jest's own 120s timeout to
+      // eventually kill it, and no indication of which RPC was the culprit.
       const deadline = new Date(Date.now() + 10_000);
-      fn.call(client, {}, metadata, (error, value) => {
+      fn.call(client, {}, metadata, { deadline }, (error, value) => {
         if (error) {
           resolve({ ok: false, code: error.code, message: error.message });
           return;
         }
         resolve({ ok: true, message: JSON.stringify(value)?.slice(0, 80) });
       });
-      void deadline;
     });
   }
 
   it('the protos declare every service the gateway consumes', () => {
     // A sanity check on the enumeration itself: if this found two services, the
     // sweep below would be green and prove nothing.
-    const services = [...clients.keys()].sort();
+    const services = [...clients.keys()].sort((a, b) => a.localeCompare(b));
 
     expect(services).toEqual(
       [
@@ -176,7 +180,7 @@ describe('§1.9 gRPC wire contract (e2e)', () => {
         'SessionService',
         'TwoFactorAuthService',
         'UserService',
-      ].sort(),
+      ].sort((a, b) => a.localeCompare(b)),
     );
     expect(rpcs.length).toBeGreaterThan(60);
   });
