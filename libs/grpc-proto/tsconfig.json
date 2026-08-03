@@ -13,7 +13,11 @@
     // is also what the runtime does, so this keeps compile-time and run-time
     // resolution telling the same story.
     "paths": {},
-    "types": ["node"]
+    // `jest` alongside `node`: the mapper specs live beside their source
+    // (`src/mappers.spec.ts`), so the program ts-jest compiles has to know
+    // `describe`/`it`. The BUILD uses tsconfig.build.json, which excludes
+    // `**/*spec.ts` — so nothing test-only reaches dist.
+    "types": ["node", "jest"]
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]

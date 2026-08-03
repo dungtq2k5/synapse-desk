@@ -4,7 +4,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc && node ../../scripts/copy-protos.mjs dist/proto",
+    "build": "tsc -p tsconfig.build.json && node ../../scripts/copy-protos.mjs dist/proto",
     "proto:generate": "buf generate",
     "proto:lint": "buf lint",
     "proto:breaking": "buf breaking --against '../../.git#branch=main,subdir=libs/grpc-proto'",

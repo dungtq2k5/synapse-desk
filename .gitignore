@@ -5,6 +5,7 @@ cspell.json
 .env
 *.tsbuildinfo
 .claude/
+coverage/
 
 # Turborepo per-package task logs and local cache. One appears in every
 # workspace the moment a turbo task runs, and the contents are machine-specific.
@@ -19,6 +20,14 @@ secrets/
 *.key
 *.pem
 **/serviceAccountKey.json
+
+# EXCEPTION: the test-only JWT keypair. It signs fixtures inside the e2e suite
+# and nothing else — no running service ever loads it, and .env.test points the
+# gateway's PUBLIC key paths here rather than at secrets/. It is committed on
+# purpose: without it, a fresh clone cannot run `npm run test:e2e`, and the
+# alternative (generate-on-first-run) means the suite silently passes against
+# whatever key happens to be lying around.
+!apps/api-gateway/test/fixtures/keys/*.key
 
 # Compiler output that lands in src/ when a tsconfig is misconfigured (an
 # outDir/rootDir mismatch emits .js and .d.ts beside the .ts they came from).

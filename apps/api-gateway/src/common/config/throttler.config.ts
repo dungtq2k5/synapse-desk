@@ -1,7 +1,6 @@
 import { ConfigService } from '@nestjs/config';
 import { ThrottlerModuleOptions } from '@nestjs/throttler';
 import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
-import Redis from 'ioredis';
 import { AUTH_THROTTLER_TIER } from './app.config';
 
 /**
@@ -48,11 +47,22 @@ export const getThrottlerConfig = (
       limit: configService.getOrThrow<number>('THROTTLER_AUTH_LIMIT'),
     },
   ],
+  /**
+   * The URL is handed over rather than a pre-built `new Redis(...)`.
+   *
+   * That is not a style choice. `ThrottlerStorageRedisService` closes the
+   * connection in `onModuleDestroy` ONLY when it constructed the client itself
+   * — it sets `disconnectRequired` in the url/options branches and not in the
+   * "caller supplied an instance" one. Passing an instance therefore leaks the
+   * connection past shutdown: harmless in a long-lived pod, but it is exactly
+   * what makes a test process hang after `app.close()` with no visible cause.
+   */
   storage: new ThrottlerStorageRedisService(
-    new Redis(configService.getOrThrow<string>('REDIS_URL'), {
+    configService.getOrThrow<string>('REDIS_URL'),
+    {
       // Bounded rather than infinite: a hung Redis must surface as an error the
       // guard can decide about, not as a request that never returns.
       maxRetriesPerRequest: 3,
-    }),
+    },
   ),
 });

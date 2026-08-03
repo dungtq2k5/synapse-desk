@@ -13,6 +13,22 @@ const baseConfig: Config = {
   testEnvironment: 'node',
 
   /**
+   * Resolve dual-published packages through their CommonJS entry.
+   *
+   * Jest's node environment otherwise picks the `import` condition, which hands
+   * ts-jest an ESM file it does not transform — the symptom is
+   * `SyntaxError: Unexpected token 'export'` from deep inside a dependency
+   * (firebase-admin/auth is the one that surfaced it here) with a stack that
+   * points at library internals rather than at anything in this repo.
+   *
+   * These services are compiled to CommonJS in production, so the `require`
+   * entry is also the one that actually ships.
+   */
+  testEnvironmentOptions: {
+    customExportConditions: ['node', 'require', 'default'],
+  },
+
+  /**
    * Only `*.spec.ts` / `*.test.ts`.
    *
    * The previous pattern was `(.[jt]s)$`, in which `.` is "any character" — so
@@ -20,6 +36,18 @@ const baseConfig: Config = {
    * each source module as a test suite.
    */
   testRegex: '\\.(spec|test)\\.[jt]s$',
+
+  /**
+   * `testRegex` above matches `*.e2e-spec.ts` too — it ends in `.spec.ts`.
+   * Excluding it here is what keeps `npm test` a pure unit run: the e2e layer
+   * needs a live Postgres (auth-service) or a bound HTTP port and Redis
+   * (gateway), so left in, the default script fails on a machine with nothing
+   * running and stops being the thing anyone runs.
+   *
+   * Each service's e2e project re-includes itself by overriding this in its own
+   * `jest.e2e.config.ts`.
+   */
+  testPathIgnorePatterns: ['/node_modules/', '\\.e2e-spec\\.ts$'],
 
   transform: {
     '^.+\\.(t|j)s$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.json' }],
@@ -34,17 +62,29 @@ const baseConfig: Config = {
     '^@synapsedesk/grpc-proto/(.*)$': '<rootDir>/../../libs/grpc-proto/src/$1',
   },
 
-  // These ship ESM-only builds, so they must be transformed rather than skipped.
+  /**
+   * These ship ESM-only builds, so they must be transformed rather than skipped.
+   *
+   * `jose` is here transitively, not because anything imports it directly:
+   * firebase-admin -> jwks-rsa -> jose, and jose v6 publishes a single
+   * `default` export condition pointing at ESM. Node 22 resolves that from CJS
+   * on its own (which is why the service runs); jest does not, and fails with
+   * `Unexpected token 'export'` from a file three dependencies deep.
+   */
   transformIgnorePatterns: [
-    'node_modules/(?!.*(@scure|otplib|@otplib|@noble|@faker-js))',
+    'node_modules/(?!.*(@scure|otplib|@otplib|@noble|@faker-js|jose))',
   ],
 
   // Generated Prisma/proto clients are not worth covering and slow the run down.
   coveragePathIgnorePatterns: ['/node_modules/', '/generated/'],
 
-  // A service with no specs yet is not a failure. Without this, `test:all` goes
-  // red the moment a new workspace is scaffolded.
-  passWithNoTests: true,
+  // `passWithNoTests` is deliberately NOT here: it's a root-only option, and
+  // this object gets spread into every apps/*/jest.config.ts, which run under
+  // `--projects` (multi-project mode). There, each project config is validated
+  // against a stricter per-project schema that rejects root-only options —
+  // "not supported in an individual project configuration". Passed as the
+  // `--passWithNoTests` CLI flag on the npm scripts instead, which works the
+  // same in both single-config and multi-project invocations.
 };
 
 export default baseConfig;

@@ -4,7 +4,12 @@
   // tsc rejects (TS5097) unless `allowImportingTsExtensions` is set — and that
   // flag demands noEmit, which would break `nest build`. They are tooling
   // config, not part of the compiled program.
-  "include": ["apps/*/src/**/*", "apps/*/prisma.config.ts", "libs/*/src/**/*"],
+  "include": [
+    "apps/*/src/**/*",
+    "apps/*/test/**/*",
+    "apps/*/prisma.config.ts",
+    "libs/*/src/**/*"
+  ],
   "exclude": ["node_modules", "dist"],
   "compilerOptions": {
     "module": "commonjs",

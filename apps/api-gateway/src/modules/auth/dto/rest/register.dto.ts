@@ -1,7 +1,7 @@
 import {
   MAX_FULL_NAME_LENGTH,
   MIN_FULL_NAME_LENGTH,
-} from 'apps/api-gateway/src/common/config/app.config';
+} from '../../../../common/config/app.config';
 import {
   IsEmail,
   IsNotEmpty,

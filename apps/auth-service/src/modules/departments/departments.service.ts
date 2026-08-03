@@ -357,6 +357,30 @@ export class DepartmentsService {
       });
       const existingIds = new Set(existing.map((row) => row.userId));
 
+      // Demote FIRST, before anything is written to this department.
+      //
+      // Only one membership per user may be primary, and
+      // `user_departments_primary_key` enforces it immediately — the index is
+      // not DEFERRABLE, so it is checked per statement rather than at commit.
+      // Promoting someone whose primary is currently elsewhere therefore has to
+      // clear the old row before the new one exists, or the insert violates the
+      // index and the whole batch dies.
+      //
+      // This ran AFTER the writes below until a test caught it: adding a user
+      // to a new department as their primary failed outright whenever they
+      // already had a primary somewhere else — which is the single most common
+      // way the operation is used.
+      if (request.isPrimary) {
+        await tx.userDepartment.updateMany({
+          where: {
+            userId: { in: userIds },
+            departmentId: { not: department.id },
+            isPrimary: true,
+          },
+          data: { isPrimary: false },
+        });
+      }
+
       // `updateMany` + `createMany` rather than N upserts: two statements
       // regardless of batch size.
       if (existingIds.size > 0) {
@@ -378,21 +402,6 @@ export class DepartmentsService {
             isPrimary: request.isPrimary,
             assignedById: actorId,
           })),
-        });
-      }
-
-      // Only one membership per user may be primary, enforced by a partial
-      // unique index. Demoting the others HERE, inside the same transaction, is
-      // what keeps that true — doing it afterwards leaves a window in which the
-      // index rejects the write and the whole batch fails.
-      if (request.isPrimary) {
-        await tx.userDepartment.updateMany({
-          where: {
-            userId: { in: userIds },
-            departmentId: { not: department.id },
-            isPrimary: true,
-          },
-          data: { isPrimary: false },
         });
       }
 

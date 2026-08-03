@@ -9,10 +9,17 @@ services:
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: ${AUTH_DB_NAME}
+      # Read by init-test-db.sh below — POSTGRES_DB only auto-creates ONE
+      # database on first init, so the test database needs its own script.
+      AUTH_TEST_DB_NAME: ${AUTH_TEST_DB_NAME}
     ports:
       - '${AUTH_DB_PORT}:5432'
     volumes:
       - pgdata_auth:/var/lib/postgresql
+      # Postgres executes every file here exactly once, on first init against
+      # an EMPTY volume — see the script's own header for what that means for
+      # an already-initialized `pgdata_auth`.
+      - ./docker/postgres-auth/init-test-db.sh:/docker-entrypoint-initdb.d/init-test-db.sh:ro
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U postgres']
       interval: 5s

@@ -5,6 +5,7 @@
   },
   "include": [
     "src/**/*",
+    "test/**/*",
     "../auth-service/src/common/interceptors/tenant-isolation.interceptor.ts"
   ],
   "exclude": ["node_modules", "dist"]
