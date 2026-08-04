@@ -98,6 +98,22 @@ services:
     volumes:
       - qdrant_data:/qdrant/storage
 
+  # The Firebase Storage EMULATOR — §1.7.
+  #
+  # Tests point here instead of at a real bucket, for the same reason they point
+  # at a test database instead of the dev one: a suite that deletes objects
+  # would otherwise delete real customer files. It is also what lets the storage
+  # suite run on a fresh clone with no Google project at all.
+  firebase-storage:
+    image: andreysenov/firebase-tools:latest
+    container_name: synapsedesk-firebase-storage
+    working_dir: /home/node
+    command: firebase emulators:start --only storage --project synapsedesk-test
+    ports:
+      - '9199:9199'
+    volumes:
+      - ./docker/firebase:/home/node
+
 volumes:
   pgdata_auth:
   pgdata_ticket:

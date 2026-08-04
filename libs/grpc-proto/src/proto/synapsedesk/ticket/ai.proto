@@ -1,0 +1,79 @@
+syntax = "proto3";
+
+package synapsedesk.ticket;
+
+import "google/protobuf/timestamp.proto";
+
+// The AI co-pilot surface.
+//
+// CONTRACT-FIRST: rag-service (Python) is not started, so every RPC here
+// answers UNAVAILABLE today. The messages exist now so the wiring is real and
+// Domain C's implementation is a service swap rather than new plumbing — and
+// so the 503 is a distinguishable "not built yet" rather than a 500.
+
+message AiSummaryResponse {
+  string id = 1;
+  string ticket_id = 2;
+  string summary_text = 3;
+  string suggested_action = 4;
+  double confidence_score = 5;
+  string model_name = 6;
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp updated_at = 8;
+}
+
+message TicketAiRequest {
+  string ticket_id = 1;
+}
+
+// Drafting takes the thread plus an optional steer from the agent ("shorter",
+// "offer the refund").
+message GenerateDraftRequest {
+  string ticket_id = 1;
+  optional string instruction = 2;
+}
+
+message GenerateDraftResponse {
+  string content = 1;
+  string model_name = 2;
+  int32 prompt_tokens = 3;
+  int32 completion_tokens = 4;
+}
+
+message SuggestionResponse {
+  string title = 1;
+  string body = 2;
+  double confidence_score = 3;
+}
+
+message GetSuggestionsResponse {
+  repeated SuggestionResponse items = 1;
+}
+
+message ClassifyTicketResponse {
+  string suggested_department_id = 1;
+  string suggested_priority = 2;
+  double confidence_score = 3;
+}
+
+message SimilarTicketResponse {
+  string ticket_id = 1;
+  int64 ticket_number = 2;
+  string title = 3;
+  double similarity_score = 4;
+}
+
+message ListSimilarTicketsResponse {
+  repeated SimilarTicketResponse items = 1;
+}
+
+service AiService {
+  // An UPSERT on the 1:1 relation — re-generating replaces the row rather than
+  // appending a second summary of a thread that has since moved on.
+  rpc GenerateSummary(TicketAiRequest) returns (AiSummaryResponse);
+  rpc GetSummary(TicketAiRequest) returns (AiSummaryResponse);
+  rpc GenerateDraft(GenerateDraftRequest) returns (GenerateDraftResponse);
+  rpc GetSuggestions(TicketAiRequest) returns (GetSuggestionsResponse);
+  rpc ClassifyTicket(TicketAiRequest) returns (ClassifyTicketResponse);
+  rpc ListSimilarTickets(TicketAiRequest) returns (ListSimilarTicketsResponse);
+}

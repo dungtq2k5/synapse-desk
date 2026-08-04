@@ -5,8 +5,8 @@ import {
   NOTIFICATION_PATTERNS,
   SendEmailCommand,
   SendSmsCommand,
+  NATS_CLIENT,
 } from '@synapsedesk/common';
-import { NATS_CLIENT } from '../../common/configs/app.config';
 
 /**
  * Fire-and-forget publisher for Domain E.

@@ -18,9 +18,6 @@ export const AES_KEY_BYTES = 32;
 export const BACKUP_CODE_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTVWXYZ';
 export const BACKUP_CODE_LENGTH = 10;
 
-/** DI token for the NATS client proxy used to reach notification-service. */
-export const NATS_CLIENT = Symbol('NATS_CLIENT');
-
 /**
  * Free-mail domains that should never appear in `allowed_email_domains`.
  *

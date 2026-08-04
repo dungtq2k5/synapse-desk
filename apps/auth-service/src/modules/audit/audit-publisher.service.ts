@@ -7,9 +7,9 @@ import {
   AuditResourceType,
   formatErrorMsg,
   RecordAuditCommand,
+  NATS_CLIENT,
 } from '@synapsedesk/common';
 import { CallerContext } from '@synapsedesk/grpc-proto';
-import { NATS_CLIENT } from '../../common/configs/app.config';
 
 /** Everything about an event except who did it and where from. */
 export type AuditEvent = {

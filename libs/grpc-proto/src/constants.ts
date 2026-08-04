@@ -13,6 +13,26 @@ import { join } from 'node:path';
 export const AUTH_GRPC_CLIENT = Symbol('AUTH_GRPC_CLIENT');
 
 /**
+ * Nest DI token for the ticket-service gRPC client.
+ *
+ * Same shape and the same reasoning as `AUTH_GRPC_CLIENT` above: a Symbol, and
+ * deliberately NOT equal to any generated `*_SERVICE_NAME`, because the token
+ * Nest injects under and the service name declared inside the proto are
+ * different concepts. Two consumers today — the gateway, and ticket-service
+ * itself pointing back at auth-service through `AUTH_GRPC_CLIENT`.
+ */
+export const TICKET_GRPC_CLIENT = Symbol('TICKET_GRPC_CLIENT');
+
+/**
+ * The DI token for the connection to `storage-service`.
+ *
+ * A third peer, and the last one for now. Same shape as the two above: one
+ * channel per service, injected by symbol so a typo is a compile error rather
+ * than an `undefined` provider at boot.
+ */
+export const STORAGE_GRPC_CLIENT = Symbol('STORAGE_GRPC_CLIENT');
+
+/**
  * Root of the proto tree — the `-I` include path. Every `import` inside a
  * .proto is resolved relative to THIS directory, which is why they read
  * `import "synapsedesk/auth/v1/common.proto"` rather than `import "common.proto"`.
@@ -49,6 +69,38 @@ export const AUTH_PROTO_PATHS = [
   'organization.proto',
   'platform.proto',
 ].map((file) => join(PROTO_ROOT, 'synapsedesk', 'auth', file));
+
+/**
+ * The service-bearing .proto files of the `synapsedesk.ticket` package.
+ *
+ * `common.proto` is absent for the same reason it is absent from the auth list:
+ * it declares no service, and its messages arrive transitively through the
+ * files that import it.
+ *
+ * `synapsedesk/auth/common.proto` is likewise absent, and that one is worth
+ * saying out loud: these files import it for `PageRequest`/`PageMeta`, so it is
+ * loaded transitively — but listing it here would ALSO register the whole
+ * `synapsedesk.auth` package on a ticket-service server that implements none of
+ * it, and every auth RPC would then answer UNIMPLEMENTED rather than not
+ * existing. The include path (`PROTO_ROOT`) is what makes the import resolve;
+ * this array is only about which services to serve.
+ */
+export const TICKET_PROTO_PATHS = [
+  'ticket.proto',
+  'assignment.proto',
+  'message.proto',
+  'ai.proto',
+  'feedback.proto',
+  'audit.proto',
+].map((file) => join(PROTO_ROOT, 'synapsedesk', 'ticket', file));
+
+/**
+ * One file, one service. `storage-service` has a deliberately small surface —
+ * three RPCs and no delete — so there is nothing to split.
+ */
+export const STORAGE_PROTO_PATHS = [
+  join(PROTO_ROOT, 'synapsedesk', 'storage', 'storage.proto'),
+];
 
 /**
  * @grpc/proto-loader options, pinned so the runtime shape matches the types

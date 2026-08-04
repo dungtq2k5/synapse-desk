@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { RpcException } from '@nestjs/microservices';
 import { status } from '@grpc/grpc-js';
+import { isEmail } from 'class-validator';
 import * as bcrypt from 'bcrypt';
 import {
   AcceptInvitationRequest,
@@ -24,32 +25,30 @@ import {
   toPageMeta,
   toProtoInvitationStatus,
   toTimestamp,
+  emptyPage,
+  toPrismaPage,
+  toSearchFilter,
 } from '@synapsedesk/grpc-proto';
 import {
   EmailTemplateName,
   INVITATION_SORTABLE_FIELDS,
   InvitationStatus,
-  normalizeEmail,
   OrgStatus,
   RequestOrigin,
   WEB_ROUTES,
+  isUniqueConstraintViolation,
+  normalizeEmail,
+  requireTenant,
 } from '@synapsedesk/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { requireTenant } from '../../common/utils/tenant-scope';
 import { AuthService } from '../auth/auth.service';
 import { RolesService } from '../roles/roles.service';
 import { OrganizationsService } from '../organizations/organizations.service';
 import { NotificationPublisher } from '../notifications/notification-publisher.service';
 import {
-  emptyPage,
-  toPrismaPage,
-  toSearchFilter,
-} from '../../common/utils/pagination';
-import {
   addDays,
   generateSecureToken,
   hashToken,
-  isUniqueConstraintViolation,
   maskEmail,
   stripTrailingSlashes,
 } from '../../common/utils/utils';
@@ -61,14 +60,6 @@ import { Prisma, UserInvitation } from '../../generated/prisma/client';
  * A Set, not an array: membership is the only question ever asked of it, and
  * `has()` says that at the call site where `includes()` reads as a scan.
  */
-/**
- * Good enough to catch a paste-error in a spreadsheet column, which is all the
- * preview claims to do. The authoritative check is `@IsEmail()` on the create
- * DTO — this one exists so a dry run can REPORT a bad row instead of rejecting
- * the whole batch at the edge before the admin has seen it.
- */
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
 const JOINABLE_ORG_STATUSES: ReadonlySet<string> = new Set([
   OrgStatus.ACTIVE,
   OrgStatus.PENDING_ONBOARDING,
@@ -378,7 +369,7 @@ export class InvitationsService {
       );
 
       let reason: string | undefined;
-      if (!EMAIL_PATTERN.test(email)) {
+      if (!isEmail(email)) {
         reason = 'Not a valid email address';
       } else if (seen.has(email)) {
         reason = 'Duplicated within this batch';

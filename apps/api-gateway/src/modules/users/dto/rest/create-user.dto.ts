@@ -1,12 +1,6 @@
 import { PickType } from '@nestjs/swagger';
 import { UserBase } from '../base/user.base';
-import {
-  IsDate,
-  IsOptional,
-  IsPhoneNumber,
-  IsUrl,
-  IsUUID,
-} from 'class-validator';
+import { IsDate, IsOptional, IsPhoneNumber, IsUUID } from 'class-validator';
 import { IsNullable } from '../../../../common/decorators/is-nullable.decorator';
 import { Type } from 'class-transformer';
 
@@ -21,10 +15,9 @@ export class CreateUserDto extends PickType(UserBase, [
   @IsUUID()
   readonly departmentId?: string | null;
 
-  @IsOptional()
-  @IsNullable()
-  @IsUrl()
-  readonly avatarUrl?: string | null;
+  // No `avatarUrl`. CreateUserRequest has no such field, so this accepted a URL
+  // and silently discarded it — and a new user has nothing to show an avatar
+  // for yet anyway. It arrives through the avatar confirm endpoint.
 
   @IsOptional()
   @IsNullable()

@@ -45,9 +45,10 @@ export type DepartmentMemberRow = {
 
 export function toDepartmentMemberResponse(
   row: DepartmentMemberRow,
+  avatarUrls: Record<string, string> = {},
 ): DepartmentMemberResponse {
   return {
-    user: toUserResponse(row.user),
+    user: toUserResponse(row.user, avatarUrls),
     isPrimary: row.isPrimary,
     assignedByName: row.assignedBy?.fullName ?? undefined,
     assignedAt: toTimestamp(row.assignedAt),

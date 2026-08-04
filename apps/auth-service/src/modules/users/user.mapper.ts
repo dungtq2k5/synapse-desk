@@ -35,13 +35,31 @@ import type { Prisma, User } from '../../generated/prisma/client';
  * it was added, with no test to catch it. Listing fields explicitly means a new
  * proto field is a compile error instead.
  */
-export function toUserResponse(user: User): UserResponse {
+/**
+ * `avatarUrls` maps a stored object path -> a fresh signed read URL, as
+ * produced by `UsersService.resolveAvatarUrls`.
+ *
+ * The column holds an internal path, and a path is not renderable and leaks the
+ * storage scheme to every API consumer — so the wire value has to be the signed
+ * URL. Resolution needs a gRPC call, which a mapper must not make, so the
+ * caller resolves in a batch and passes the result down.
+ *
+ * It DEFAULTS TO `{}`, and that default is load-bearing twice over. An
+ * unresolved avatar renders as absent rather than as a leaked path — failing to
+ * a missing picture, never to an internal string. And it lets the platform
+ * paths opt out in one word: a Super Admin has no tenant, so asking
+ * storage-service would be a guaranteed FAILED_PRECONDITION.
+ */
+export function toUserResponse(
+  user: User,
+  avatarUrls: Record<string, string> = {},
+): UserResponse {
   return {
     id: user.id,
     // null for platform Super Admins, who belong to no tenant (RDM).
     organizationId: user.organizationId ?? undefined,
     fullName: user.fullName,
-    avatarUrl: user.avatarUrl ?? undefined,
+    avatarUrl: user.avatarUrl ? avatarUrls[user.avatarUrl] : undefined,
     email: user.email,
     isEmailVerified: user.isEmailVerified,
     phoneNumber: user.phoneNumber ?? undefined,
@@ -80,9 +98,10 @@ export type UserSummaryRow = Prisma.UserGetPayload<{
 
 export function toUserSummaryResponse(
   user: UserSummaryRow,
+  avatarUrls: Record<string, string> = {},
 ): UserSummaryResponse {
   return {
-    user: toUserResponse(user),
+    user: toUserResponse(user, avatarUrls),
     roleIds: user.roles.map((role) => role.id),
     roleNames: user.roles.map((role) => role.name),
     departmentIds: user.userDepartments.map((ud) => ud.departmentId),

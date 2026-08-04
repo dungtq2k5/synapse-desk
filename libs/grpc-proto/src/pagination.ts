@@ -1,12 +1,21 @@
+/**
+ * Wire `PageRequest` -> database query arguments.
+ *
+ * Lives HERE rather than in a service because two services now page: auth-
+ * service since it was written, and ticket-service from its first list RPC.
+ * And it lives in grpc-proto rather than in libs/common because it reads the
+ * wire types (`PageRequest`, `SortOrder`, `clampLimit`) — putting it in common
+ * would make common import grpc-proto, and grpc-proto already imports common: a
+ * package cycle turbo's `dependsOn: ["^build"]` rejects outright.
+ *
+ * The output is a plain object shaped like Prisma's `findMany` arguments, not a
+ * Prisma type — this package has no Prisma dependency and must not grow one,
+ * since it is imported by the gateway too.
+ */
 import { status } from '@grpc/grpc-js';
 import { RpcException } from '@nestjs/microservices';
-import {
-  clampLimit,
-  fromProtoSortOrder,
-  normalizePage,
-  PageRequest,
-  SortOrder,
-} from '@synapsedesk/grpc-proto';
+import { clampLimit, fromProtoSortOrder, normalizePage } from './mappers';
+import { PageRequest, SortOrder } from './generated/synapsedesk/auth/common';
 
 /** What Prisma needs to execute a paged, sorted query. */
 export type PrismaPage = {

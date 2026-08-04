@@ -2,6 +2,11 @@ import * as Joi from 'joi';
 import { LOG_LEVELS, NODE_ENV_OPTIONS } from '@synapsedesk/common';
 
 export const envValidationSchema = Joi.object({
+  // The gRPC client pointed at storage-service, for avatar uploads. Required
+  // rather than optional: an avatar endpoint that silently 500s because a URL
+  // was never configured is worse than a service that refuses to boot.
+  STORAGE_SERVICE_URL: Joi.string().required(),
+
   DATABASE_URL: Joi.string().required(),
 
   REDIS_URL: Joi.string().required(),

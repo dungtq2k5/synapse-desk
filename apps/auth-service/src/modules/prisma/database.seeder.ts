@@ -91,6 +91,8 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
   async seed(): Promise<void> {
     const startedAt = Date.now();
 
+    await this.assertSchemaExists();
+
     // Deliberately OUTSIDE the transaction. `CREATE INDEX` takes an ACCESS
     // EXCLUSIVE lock on `roles` that is held until commit, so running it inside
     // would block every other reader of the table for the seed's full duration.
@@ -253,6 +255,34 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
         ON user_departments (user_id)
         WHERE is_primary = true;
     `);
+  }
+
+  /**
+   * Fail with an ACTIONABLE message when the database has no schema at all.
+   *
+   * Without this the first statement of the seed is a `CREATE INDEX ... ON
+   * roles`, so an unmigrated database reports `relation "roles" does not exist`
+   * from deep inside a raw-SQL helper — a symptom that reads like a seeder bug
+   * and takes a stack trace to trace back to the real cause, which is simply
+   * that nothing ever pushed the schema here. The e2e suites cannot hit it
+   * (`test:e2e:auth` runs `db:test:push` first) and neither can a long-running
+   * environment, so the only people who ever see it are on a fresh clone or a
+   * fresh Docker volume — exactly the audience least able to interpret it.
+   */
+  private async assertSchemaExists(): Promise<void> {
+    const [{ present }] = await this.prisma.$queryRaw<[{ present: boolean }]>`
+      SELECT EXISTS (
+        SELECT 1 FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = 'roles'
+      ) AS present
+    `;
+
+    if (!present) {
+      throw new Error(
+        'The database has no schema — nothing has been pushed to it yet. ' +
+          'Run `npm run db:push` (dev) or `npm run db:test:push` (test) and start again.',
+      );
+    }
   }
 
   private async ensureGlobalRoleNameIndex(): Promise<void> {

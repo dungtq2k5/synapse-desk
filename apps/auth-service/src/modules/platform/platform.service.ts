@@ -23,17 +23,24 @@ import {
   toPageMeta,
   toTimestamp,
   UpdatePlatformOrganizationRequest,
+  emptyPage,
+  toPrismaPage,
+  toSearchFilter,
 } from '@synapsedesk/grpc-proto';
 import {
   AuditAction,
   AuditResourceType,
   InvitationStatus,
-  normalizeEmail,
-  ORG_STATUS_TRANSITIONS,
   ORGANIZATION_SORTABLE_FIELDS,
+  ORG_STATUS_TRANSITIONS,
   OrgStatus,
   SystemRoleName,
   USER_SORTABLE_FIELDS,
+  isUniqueConstraintViolation,
+  normalizeEmail,
+  requireActor,
+  restoreData,
+  softDeleteData,
 } from '@synapsedesk/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditPublisher } from '../audit/audit-publisher.service';
@@ -42,14 +49,6 @@ import { RolesService } from '../roles/roles.service';
 import { toOrganizationResponse } from '../organizations/organization.mapper';
 import { toUserResponse } from '../users/user.mapper';
 import { ROLE_INCLUDE, toRoleResponse } from '../roles/role.mapper';
-import { requireActor } from '../../common/utils/tenant-scope';
-import {
-  emptyPage,
-  toPrismaPage,
-  toSearchFilter,
-} from '../../common/utils/pagination';
-import { restoreData, softDeleteData } from '../../common/utils/soft-delete';
-import { isUniqueConstraintViolation } from '../../common/utils/utils';
 import { Organization, Prisma } from '../../generated/prisma/client';
 
 /** The rollups every tenant row carries. */
@@ -199,6 +198,7 @@ export class PlatformService {
 
       return {
         organization: toPlatformOrganizationResponse(withCounts),
+        // No avatar url map, deliberately — see listPlatformUsers below.
         admin: toUserResponse(created.admin),
       };
     } catch (error) {
@@ -451,6 +451,18 @@ export class PlatformService {
       this.prisma.user.count({ where }),
     ]);
 
+    // Avatars are NOT resolved on the platform paths, and that is deliberate
+    // rather than an oversight to fix later.
+    //
+    // A Super Admin's `organizationId` is null, and `getSignedReadUrls` opens
+    // with `requireTenant`, which for a null tenant throws FAILED_PRECONDITION
+    // — it does not return an empty map. Resolving here would therefore add a
+    // guaranteed-failing round trip to every platform request, and because
+    // `resolveReadUrls` catches and returns `{}`, it would fail SILENTLY: the
+    // avatars would still be absent, just more slowly.
+    //
+    // Cross-tenant administrative lists show no avatars, by design. The default
+    // `{}` parameter on `toUserResponse` is what makes that a one-word choice.
     return {
       items: items.map((user) => ({
         user: toUserResponse(user),

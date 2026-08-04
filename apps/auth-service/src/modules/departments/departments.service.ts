@@ -18,36 +18,31 @@ import {
   RemoveDepartmentMemberResponse,
   toPageMeta,
   UpdateDepartmentRequest,
+  emptyPage,
+  toPrismaPage,
+  toSearchFilter,
 } from '@synapsedesk/grpc-proto';
 import {
   AuditAction,
   AuditResourceType,
   DEPARTMENT_MEMBER_SORTABLE_FIELDS,
   DEPARTMENT_SORTABLE_FIELDS,
+  isUniqueConstraintViolation,
+  requireActor,
+  requireTenant,
+  tenantScope,
+  restoreData,
+  restoreOrConflict,
+  softDeleteData,
 } from '@synapsedesk/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditPublisher } from '../audit/audit-publisher.service';
+import { StorageReferenceService } from '../storage-client/storage-reference.service';
 import {
   DepartmentRow,
   toDepartmentMemberResponse,
   toDepartmentResponse,
 } from './department.mapper';
-import {
-  requireActor,
-  requireTenant,
-  tenantScope,
-} from '../../common/utils/tenant-scope';
-import {
-  emptyPage,
-  toPrismaPage,
-  toSearchFilter,
-} from '../../common/utils/pagination';
-import {
-  restoreData,
-  restoreOrConflict,
-  softDeleteData,
-} from '../../common/utils/soft-delete';
-import { isUniqueConstraintViolation } from '../../common/utils/utils';
 import { Prisma } from '../../generated/prisma/client';
 
 /** The joins every DepartmentResponse needs. */
@@ -61,6 +56,8 @@ export class DepartmentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditPublisher,
+    // Member listings embed a user, whose avatar is a storage object path.
+    private readonly storage: StorageReferenceService,
   ) {}
 
   async listDepartments(
@@ -115,6 +112,9 @@ export class DepartmentsService {
     const organizationId = requireTenant(context);
     const name = request.name.trim();
 
+    // The include is NOT on the write. A write that also loads relations makes
+    // Prisma open an implicit transaction and run those loads concurrently on
+    // its single connection — deprecated in pg today, removed in pg@9.
     const department = await this.createOrConflict(() =>
       this.prisma.department.create({
         data: {
@@ -122,7 +122,7 @@ export class DepartmentsService {
           name,
           description: request.description?.trim() || null,
         },
-        include: DEPARTMENT_INCLUDE,
+        select: { id: true, name: true },
       }),
     );
 
@@ -133,7 +133,7 @@ export class DepartmentsService {
       metadata: { name: department.name },
     });
 
-    return toDepartmentResponse(department);
+    return toDepartmentResponse(await this.loadWithCounts(department.id));
   }
 
   async updateDepartment(
@@ -155,7 +155,7 @@ export class DepartmentsService {
       this.prisma.department.update({
         where: { id: existing.id },
         data,
-        include: DEPARTMENT_INCLUDE,
+        select: { id: true, name: true, description: true },
       }),
     );
 
@@ -171,7 +171,7 @@ export class DepartmentsService {
       },
     });
 
-    return toDepartmentResponse(department);
+    return toDepartmentResponse(await this.loadWithCounts(department.id));
   }
 
   /**
@@ -248,7 +248,7 @@ export class DepartmentsService {
         this.prisma.department.update({
           where: { id: existing.id },
           data: restoreData(),
-          include: DEPARTMENT_INCLUDE,
+          select: { id: true, name: true },
         }),
       `Another department is already named '${existing.name}'. Rename it before restoring this one.`,
     );
@@ -260,7 +260,7 @@ export class DepartmentsService {
       metadata: { name: department.name },
     });
 
-    return toDepartmentResponse(department);
+    return toDepartmentResponse(await this.loadWithCounts(department.id));
   }
 
   // -------------------------------------------------------------------------
@@ -304,8 +304,18 @@ export class DepartmentsService {
       this.prisma.userDepartment.count({ where }),
     ]);
 
+    // Member rows embed a user, so they leak a raw object path exactly as the
+    // user endpoints did. One batched call for the page; the arrow is required
+    // so `map` cannot pass the INDEX as the url map.
+    const avatarUrls = await this.storage.resolveReadUrls(
+      items
+        .map((item) => item.user.avatarUrl)
+        .filter((path): path is string => !!path),
+      context,
+    );
+
     return {
-      items: items.map(toDepartmentMemberResponse),
+      items: items.map((item) => toDepartmentMemberResponse(item, avatarUrls)),
       meta: toPageMeta(page, totalItems, items.length),
     };
   }
@@ -518,6 +528,22 @@ export class DepartmentsService {
     }
 
     return department;
+  }
+
+  /**
+   * Re-reads a row the caller just wrote, with its counts.
+   *
+   * Exists so the writes above can stay plain statements: attaching
+   * DEPARTMENT_INCLUDE to a create/update makes Prisma wrap the write in an
+   * implicit transaction and issue the relation loads concurrently on that
+   * transaction's single connection. No tenant filter — the caller has already
+   * proved the row is theirs by writing to it.
+   */
+  private loadWithCounts(id: string): Promise<DepartmentRow> {
+    return this.prisma.department.findUniqueOrThrow({
+      where: { id },
+      include: DEPARTMENT_INCLUDE,
+    });
   }
 
   /**

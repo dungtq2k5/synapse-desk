@@ -17,12 +17,13 @@ import {
   AuditAction,
   AuditResourceType,
   EmailTemplateName,
+  requireActor,
+  tenantScope,
 } from '@synapsedesk/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditPublisher } from '../audit/audit-publisher.service';
 import { NotificationPublisher } from '../notifications/notification-publisher.service';
 import { hashToken } from '../../common/utils/utils';
-import { requireActor, tenantScope } from '../../common/utils/tenant-scope';
 import { Prisma } from '../../generated/prisma/client';
 
 /**

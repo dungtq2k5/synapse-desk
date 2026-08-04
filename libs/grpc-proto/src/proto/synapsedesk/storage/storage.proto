@@ -1,0 +1,64 @@
+syntax = "proto3";
+
+package synapsedesk.storage;
+
+import "google/protobuf/timestamp.proto";
+
+// Object storage, behind one service that is the ONLY holder of Storage-write
+// credentials (§1.4). Every other service asks; none of them can write
+// directly, because none of them holds a key that could.
+
+enum StoragePurpose {
+  STORAGE_PURPOSE_UNSPECIFIED = 0;
+  STORAGE_PURPOSE_AVATAR = 1;
+  STORAGE_PURPOSE_TICKET_ATTACHMENT = 2;
+  // Reserved — Domain C's ingestion-service. No caller today.
+  STORAGE_PURPOSE_DOCUMENT = 3;
+}
+
+message PresignUploadRequest {
+  StoragePurpose purpose = 1;
+  // userId for AVATAR; ticketId for TICKET_ATTACHMENT.
+  string owner_id = 2;
+  string content_type = 3;
+  int64 size_bytes = 4;
+  // For the content-disposition on later reads. Deliberately NOT part of the
+  // object path — the extension is derived from content_type instead, so a
+  // `.php` disguised as `.jpg` cannot decide where it lands.
+  string original_file_name = 5;
+  // A second owner segment, used only by TICKET_ATTACHMENT (the messageId).
+  // Empty for every other purpose.
+  string secondary_owner_id = 6;
+}
+
+message PresignUploadResponse {
+  string upload_url = 1;
+  string object_path = 2;
+  google.protobuf.Timestamp expires_at = 3;
+}
+
+message ConfirmUploadRequest { string object_path = 1; }
+
+message ConfirmUploadResponse {
+  string object_path = 1;
+  // The REAL values, read back from the object's own metadata — never the ones
+  // the client claimed at presign time.
+  int64 size_bytes = 2;
+  string content_type = 3;
+}
+
+message GetSignedReadUrlsRequest { repeated string object_paths = 1; }
+
+// Absent key = the object no longer exists. A missing avatar is the caller's
+// rendering decision, not an error for the whole batch.
+message GetSignedReadUrlsResponse { map<string, string> urls_by_path = 1; }
+
+service StorageService {
+  rpc PresignUpload(PresignUploadRequest) returns (PresignUploadResponse);
+  rpc ConfirmUpload(ConfirmUploadRequest) returns (ConfirmUploadResponse);
+  rpc GetSignedReadUrls(GetSignedReadUrlsRequest) returns (GetSignedReadUrlsResponse);
+
+  // No DeleteObject RPC, deliberately. Deletion is NATS-only (§1.6) — the same
+  // "no write path exists in the contract" discipline audit_logs uses, so a
+  // contributor cannot add one without first noticing there is none.
+}

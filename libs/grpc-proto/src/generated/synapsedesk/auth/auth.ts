@@ -114,7 +114,7 @@ export interface LogoutRequest {
    */
   refreshToken: string;
   /**
-   * "Log out of all devices" (RDM §1.5) -- revokes every session for the owner
+   * "Log out of all devices" (RDM) -- revokes every session for the owner
    * of that token, trusted devices included.
    */
   allDevices: boolean;

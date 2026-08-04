@@ -21,6 +21,9 @@ import { grpcError, timestamp, wirePage, wireUser } from '../fixtures/wire';
  * Parametrized over one representative success and one guaranteed failure per
  * controller, so a new controller is one row rather than a new file.
  */
+/** A fixed uuid for the routes that need one in the path. */
+const SWEEP_TICKET_ID = '11111111-1111-4111-8111-111111111111';
+
 type Probe = {
   controller: string;
   path: string;
@@ -162,6 +165,130 @@ const PROBES: Probe[] = [
         throwError(() => grpcError(GrpcStatus.INTERNAL, 'boom')),
       ),
     expectedFailureStatus: 500,
+  },
+
+  // ---------------------------------------------------------------------
+  // Domain B. Rows, not a second sweep file — §3.5 says to reuse this
+  // harness, and a parallel one would be a second definition of "the
+  // envelope" that could drift from this one.
+  // ---------------------------------------------------------------------
+  {
+    controller: 'TicketsController',
+    path: '/tickets',
+    as: [],
+    succeed: (f) =>
+      f.stubs.ticket.listTickets.mockReturnValue(of(wirePage([]))),
+    fail: (f) =>
+      f.stubs.ticket.listTickets.mockReturnValue(
+        throwError(() => grpcError(GrpcStatus.NOT_FOUND, 'gone')),
+      ),
+    expectedFailureStatus: 404,
+  },
+  {
+    controller: 'MessagesController',
+    path: `/tickets/${SWEEP_TICKET_ID}/messages`,
+    as: [],
+    succeed: (f) =>
+      f.stubs.message.listMessages.mockReturnValue(
+        of({ items: [], meta: wirePage([]).meta }),
+      ),
+    fail: (f) =>
+      f.stubs.message.listMessages.mockReturnValue(
+        throwError(() => grpcError(GrpcStatus.NOT_FOUND, 'gone')),
+      ),
+    expectedFailureStatus: 404,
+  },
+  {
+    controller: 'TicketsController (assignments)',
+    path: `/tickets/${SWEEP_TICKET_ID}/assignments`,
+    as: [],
+    succeed: (f) =>
+      f.stubs.assignment.listAssignments.mockReturnValue(of({ items: [] })),
+    fail: (f) =>
+      f.stubs.assignment.listAssignments.mockReturnValue(
+        throwError(() => grpcError(GrpcStatus.NOT_FOUND, 'gone')),
+      ),
+    expectedFailureStatus: 404,
+  },
+  {
+    controller: 'AiController',
+    path: `/tickets/${SWEEP_TICKET_ID}/ai/summary`,
+    as: ['ticket.read.all'],
+    succeed: (f) =>
+      f.stubs.ai.getSummary.mockReturnValue(
+        of({
+          id: SWEEP_TICKET_ID,
+          ticketId: SWEEP_TICKET_ID,
+          summaryText: 's',
+          suggestedAction: 'a',
+          confidenceScore: 0.5,
+          modelName: 'm',
+          createdAt: timestamp(),
+          updatedAt: timestamp(),
+        }),
+      ),
+    fail: (f) =>
+      f.stubs.ai.getSummary.mockReturnValue(
+        // The 503 every AI route answers today. It has to carry the envelope
+        // too — a client parsing `success` must not hit a bare body on the one
+        // status it will actually see in production right now.
+        throwError(() => grpcError(GrpcStatus.UNAVAILABLE, 'not yet')),
+      ),
+    expectedFailureStatus: 503,
+  },
+  {
+    controller: 'ChatController',
+    path: '/chat/conversations',
+    as: [],
+    succeed: (f) =>
+      f.stubs.ticket.listTickets.mockReturnValue(of(wirePage([]))),
+    fail: (f) =>
+      f.stubs.ticket.listTickets.mockReturnValue(
+        throwError(() => grpcError(GrpcStatus.ABORTED, 'conflict')),
+      ),
+    expectedFailureStatus: 409,
+  },
+  {
+    controller: 'FeedbackController',
+    path: '/feedback',
+    as: ['analytics.read'],
+    succeed: (f) =>
+      f.stubs.feedback.listFeedback.mockReturnValue(
+        of({ items: [], meta: wirePage([]).meta }),
+      ),
+    fail: (f) =>
+      f.stubs.feedback.listFeedback.mockReturnValue(
+        throwError(() => grpcError(GrpcStatus.INTERNAL, 'boom')),
+      ),
+    expectedFailureStatus: 500,
+  },
+  {
+    controller: 'AuditLogsController',
+    path: '/audit-logs',
+    as: ['audit.read'],
+    succeed: (f) =>
+      f.stubs.audit.listAuditLogs.mockReturnValue(
+        of({ items: [], meta: wirePage([]).meta }),
+      ),
+    fail: (f) =>
+      f.stubs.audit.listAuditLogs.mockReturnValue(
+        throwError(() => grpcError(GrpcStatus.PERMISSION_DENIED, 'no')),
+      ),
+    expectedFailureStatus: 403,
+  },
+  {
+    controller: 'AttachmentsController',
+    path: `/attachments/${SWEEP_TICKET_ID}/download`,
+    as: [],
+    succeed: (f) =>
+      f.stubs.message.downloadAttachment.mockReturnValue(
+        of({ downloadUrl: 'https://example/x', expiresAt: timestamp() }),
+      ),
+    fail: (f) =>
+      f.stubs.message.downloadAttachment.mockReturnValue(
+        throwError(() => grpcError(GrpcStatus.UNAVAILABLE, 'not yet')),
+      ),
+    expectedFailureStatus: 503,
   },
 ];
 

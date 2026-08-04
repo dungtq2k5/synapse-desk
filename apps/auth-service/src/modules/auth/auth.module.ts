@@ -11,6 +11,7 @@ import { FirebaseModule } from '../firebase/firebase.module';
 import { OtpModule } from '../otp/otp.module';
 import { RolesModule } from '../roles/roles.module';
 import { SessionsModule } from '../sessions/sessions.module';
+import { StorageClientModule } from '../storage-client/storage-client.module';
 import { AuditModule } from '../audit/audit.module';
 import { readFileSync } from 'node:fs';
 
@@ -23,6 +24,7 @@ import { readFileSync } from 'node:fs';
     RolesModule,
     SessionsModule,
     AuditModule,
+    StorageClientModule,
     // Access-token defaults live here; generate2faToken() overrides them
     // per-call with the 2FA secret and TTL.
     JwtModule.registerAsync({

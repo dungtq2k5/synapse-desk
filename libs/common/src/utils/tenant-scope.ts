@@ -1,6 +1,6 @@
 import { status } from '@grpc/grpc-js';
 import { RpcException } from '@nestjs/microservices';
-import { CallerContext, hasIdentity } from '@synapsedesk/grpc-proto';
+import { CallerContext, hasIdentity } from '../configs/app.config';
 
 /** The filter every tenant-scoped query starts from. */
 export type TenantScope = {
@@ -9,7 +9,13 @@ export type TenantScope = {
 };
 
 /**
- * The tenant filter every Domain A query starts from.
+ * The tenant filter every tenant-scoped query starts from, in EVERY service.
+ *
+ * Lives in `libs/common` rather than in one service because it is now needed by
+ * two: auth-service since it was written, and ticket-service from its first
+ * query. A second copy is exactly the drift `libs/` exists to prevent — and
+ * this function is the one place a copy would be most expensive, since a
+ * divergence in it is a cross-tenant read rather than a cosmetic difference.
  *
  * A Super Admin (`organizationId === null`) legitimately reads across tenants,
  * so for them the filter collapses to soft-delete only. That is exactly the
@@ -25,7 +31,7 @@ export type TenantScope = {
  *     `findUnique({ where: { id } })`. `findUnique` CANNOT express the tenant
  *     filter — its `where` accepts only unique fields — so it returns another
  *     tenant's row and the handler happily 200s it. This is the single most
- *     likely security bug in the remaining Domain A work.
+ *     likely security bug in any service that owns tenant-scoped rows.
  *   - A miss returns NOT_FOUND, never PERMISSION_DENIED. "You may not see this"
  *     confirms the row exists, which turns id enumeration into a
  *     tenant-membership oracle.

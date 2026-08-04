@@ -35,7 +35,6 @@ export interface UpdateOwnProfileRequest {
   /** ISO 'YYYY-MM-DD'. Empty string clears it; absent leaves it unchanged. */
   dob?: string | undefined;
   gender?: Gender | undefined;
-  avatarUrl?: string | undefined;
 }
 
 export interface UserSummaryResponse {
@@ -104,7 +103,6 @@ export interface UpdateUserRequest {
   phoneNumber?: string | undefined;
   dob?: string | undefined;
   gender?: Gender | undefined;
-  avatarUrl?: string | undefined;
 }
 
 export interface DeleteUserResponse {
@@ -155,6 +153,25 @@ export interface SetUserDepartmentsRequest {
   departments: DepartmentAssignment[];
 }
 
+export interface PresignAvatarUploadRequest {
+  contentType: string;
+  sizeBytes: number;
+  originalFileName: string;
+}
+
+export interface PresignAvatarUploadResponse {
+  uploadUrl: string;
+  objectPath: string;
+  expiresAt: Timestamp | undefined;
+}
+
+export interface ConfirmAvatarUploadRequest {
+  objectPath: string;
+}
+
+export interface DeleteAvatarRequest {
+}
+
 export interface UserServiceClient {
   getCurrentUser(request: GetCurrentUserRequest, metadata?: Metadata): Observable<CurrentUserResponse>;
 
@@ -179,6 +196,21 @@ export interface UserServiceClient {
   unlockUser(request: UserIdRequest, metadata?: Metadata): Observable<UnlockUserResponse>;
 
   resetUserTwoFactor(request: UserIdRequest, metadata?: Metadata): Observable<ResetUserTwoFactorResponse>;
+
+  /**
+   * Avatars — 10-storage-service.md §3.1. auth-service owns `users.avatar_url`,
+   * so it initiates the upload and calls storage-service internally; the
+   * gateway never talks to storage-service directly (§1.5).
+   */
+
+  presignAvatarUpload(
+    request: PresignAvatarUploadRequest,
+    metadata?: Metadata,
+  ): Observable<PresignAvatarUploadResponse>;
+
+  confirmAvatarUpload(request: ConfirmAvatarUploadRequest, metadata?: Metadata): Observable<UserResponse>;
+
+  deleteAvatar(request: DeleteAvatarRequest, metadata?: Metadata): Observable<UserResponse>;
 
   setUserRoles(request: SetUserRolesRequest, metadata?: Metadata): Observable<UserSummaryResponse>;
 
@@ -246,6 +278,27 @@ export interface UserServiceController {
     metadata?: Metadata,
   ): Promise<ResetUserTwoFactorResponse> | Observable<ResetUserTwoFactorResponse> | ResetUserTwoFactorResponse;
 
+  /**
+   * Avatars — 10-storage-service.md §3.1. auth-service owns `users.avatar_url`,
+   * so it initiates the upload and calls storage-service internally; the
+   * gateway never talks to storage-service directly (§1.5).
+   */
+
+  presignAvatarUpload(
+    request: PresignAvatarUploadRequest,
+    metadata?: Metadata,
+  ): Promise<PresignAvatarUploadResponse> | Observable<PresignAvatarUploadResponse> | PresignAvatarUploadResponse;
+
+  confirmAvatarUpload(
+    request: ConfirmAvatarUploadRequest,
+    metadata?: Metadata,
+  ): Promise<UserResponse> | Observable<UserResponse> | UserResponse;
+
+  deleteAvatar(
+    request: DeleteAvatarRequest,
+    metadata?: Metadata,
+  ): Promise<UserResponse> | Observable<UserResponse> | UserResponse;
+
   setUserRoles(
     request: SetUserRolesRequest,
     metadata?: Metadata,
@@ -272,6 +325,9 @@ export function UserServiceControllerMethods() {
       "lockUser",
       "unlockUser",
       "resetUserTwoFactor",
+      "presignAvatarUpload",
+      "confirmAvatarUpload",
+      "deleteAvatar",
       "setUserRoles",
       "setUserDepartments",
     ];

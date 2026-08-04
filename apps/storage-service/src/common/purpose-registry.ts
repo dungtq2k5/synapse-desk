@@ -1,0 +1,78 @@
+import { StoragePurpose } from '@synapsedesk/common';
+
+/**
+ * What each purpose allows — §2.1.
+ *
+ * ONE table, not a `switch` scattered across handlers. Three things have to
+ * move together whenever a purpose changes (the allowlist, the cap, and the
+ * path prefix), and three `switch` statements in three files is how two of them
+ * end up updated.
+ *
+ * `Record<StoragePurpose, …>` rather than a partial map: adding a purpose to
+ * the enum without a policy is then a compile error, which is the only moment
+ * anyone is thinking about it.
+ */
+export type PurposePolicy = {
+  mimeAllowlist: readonly string[];
+  maxSizeBytes: number;
+  /** The path segment under `organizations/{orgId}/`. */
+  prefix: string;
+  /** Whether the path needs a SECOND owner id (a message, for an attachment). */
+  requiresSecondaryOwner: boolean;
+};
+
+export const PURPOSE_POLICY: Record<StoragePurpose, PurposePolicy> = {
+  [StoragePurpose.AVATAR]: {
+    // Images only, and no SVG — an SVG is a document that can carry script, so
+    // it is the one image type that behaves like an executable when served.
+    mimeAllowlist: ['image/png', 'image/jpeg', 'image/webp'],
+    maxSizeBytes: 2 * 1024 * 1024,
+    prefix: 'avatars',
+    requiresSecondaryOwner: false,
+  },
+  [StoragePurpose.TICKET_ATTACHMENT]: {
+    mimeAllowlist: [
+      'image/png',
+      'image/jpeg',
+      'image/webp',
+      'application/pdf',
+      'text/plain',
+    ],
+    maxSizeBytes: 10 * 1024 * 1024,
+    prefix: 'tickets',
+    requiresSecondaryOwner: true,
+  },
+  [StoragePurpose.DOCUMENT]: {
+    // Reserved for Domain C. Present so the map is total and the enum stays
+    // exhaustive; `ingestion-service` will widen the allowlist when it exists.
+    mimeAllowlist: ['application/pdf', 'text/plain', 'text/markdown'],
+    maxSizeBytes: 25 * 1024 * 1024,
+    prefix: 'documents',
+    requiresSecondaryOwner: false,
+  },
+};
+
+/**
+ * The extension a stored object gets, derived from its MIME TYPE.
+ *
+ * Never from the client's filename. `invoice.pdf.php` is a perfectly plausible
+ * upload, and taking the extension from the name is how it becomes a `.php`
+ * object sitting in a bucket. The name is preserved separately, for the
+ * content-disposition on reads.
+ *
+ * An unknown type yields `bin` rather than throwing: by the time this runs the
+ * type has already passed the allowlist, so the only way here is an allowlist
+ * entry with no mapping — a naming gap, not a security one.
+ */
+const EXTENSION_BY_MIME: Record<string, string> = {
+  'image/png': 'png',
+  'image/jpeg': 'jpg',
+  'image/webp': 'webp',
+  'application/pdf': 'pdf',
+  'text/plain': 'txt',
+  'text/markdown': 'md',
+};
+
+export function extensionFor(contentType: string): string {
+  return EXTENSION_BY_MIME[contentType] ?? 'bin';
+}

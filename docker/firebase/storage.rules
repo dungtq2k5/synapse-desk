@@ -1,0 +1,14 @@
+rules_version = '2';
+
+// The EMULATOR's rules only. Production access is not governed here at all:
+// every read and write goes through a signed URL minted by storage-service,
+// which is the sole holder of Storage credentials (§1.4). These rules exist so
+// the emulator will start, and are deliberately permissive because the emulator
+// is reachable only from the test host.
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /{allPaths=**} {
+      allow read, write: if true;
+    }
+  }
+}

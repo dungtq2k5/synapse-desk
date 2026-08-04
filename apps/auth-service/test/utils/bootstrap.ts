@@ -4,7 +4,9 @@ import { PrismaService } from '../../src/modules/prisma/prisma.service';
 import { DatabaseSeeder } from '../../src/modules/prisma/database.seeder';
 import { NotificationPublisher } from '../../src/modules/notifications/notification-publisher.service';
 import { AuditPublisher } from '../../src/modules/audit/audit-publisher.service';
-import { SystemRoleName } from '@synapsedesk/common';
+import { avatarObjectPath, SystemRoleName } from '@synapsedesk/common';
+import { randomUUID } from 'node:crypto';
+import { StorageReferenceService } from '../../src/modules/storage-client/storage-reference.service';
 
 /**
  * The global roles the seeder owns — the ONLY `organization_id IS NULL` roles
@@ -33,10 +35,33 @@ export type E2eFixture = {
     sendSms: jest.SpyInstance;
   };
   audit: { record: jest.SpyInstance };
+  /**
+   * Spies on the storage-service boundary.
+   *
+   * Stubbed for the same reason NATS is: `StorageReferenceService` speaks gRPC
+   * to a separate process that this suite does not run. Left real, every call
+   * would fail the deadline and `resolveReadUrls` would swallow it into `{}` —
+   * so an avatar assertion would pass or fail for reasons having nothing to do
+   * with the code under test.
+   *
+   * `resolveReadUrls` returns a recognisable fake signed URL per path, which is
+   * what lets a test assert the response carries a URL rather than the raw
+   * `organizations/...` object path.
+   */
+  storage: {
+    presignAvatar: jest.SpyInstance;
+    confirmAvatar: jest.SpyInstance;
+    resolveReadUrls: jest.SpyInstance;
+    emitSuperseded: jest.SpyInstance;
+  };
   /** TRUNCATE every tenant table, re-seed, and clear the spies. Call in `beforeEach`. */
   reset: () => Promise<void>;
   close: () => Promise<void>;
 };
+
+/** The stand-in a stubbed `resolveReadUrls` hands back for a given path. */
+export const signedUrlFor = (objectPath: string): string =>
+  `https://signed.test/${objectPath}?X-Goog-Signature=stub`;
 
 /**
  * Boots the real auth-service wiring — real Prisma, real services, real
@@ -85,6 +110,38 @@ export async function bootstrapE2eTest(): Promise<E2eFixture> {
   };
   const audit = {
     record: jest.spyOn(auditPublisher, 'record').mockImplementation(() => {}),
+  };
+
+  const storageReference = moduleRef.get(StorageReferenceService);
+  const storage = {
+    presignAvatar: jest
+      .spyOn(storageReference, 'presignAvatar')
+      .mockImplementation((_input, context) =>
+        Promise.resolve({
+          uploadUrl: 'https://upload.test/signed',
+          objectPath: avatarObjectPath(
+            context.organizationId ?? 'no-tenant',
+            context.sub ?? 'no-actor',
+            `${randomUUID()}.png`,
+          ),
+          expiresAt: new Date(Date.now() + 15 * 60 * 1000),
+        }),
+      ),
+    confirmAvatar: jest
+      .spyOn(storageReference, 'confirmAvatar')
+      .mockResolvedValue(undefined),
+    resolveReadUrls: jest
+      .spyOn(storageReference, 'resolveReadUrls')
+      .mockImplementation((objectPaths: string[]) =>
+        Promise.resolve(
+          Object.fromEntries(
+            objectPaths.filter(Boolean).map((p) => [p, signedUrlFor(p)]),
+          ),
+        ),
+      ),
+    emitSuperseded: jest
+      .spyOn(storageReference, 'emitSuperseded')
+      .mockImplementation(() => {}),
   };
 
   const reset = async (): Promise<void> => {
@@ -161,11 +218,15 @@ export async function bootstrapE2eTest(): Promise<E2eFixture> {
     notifications.sendEmail.mockClear();
     notifications.sendSms.mockClear();
     audit.record.mockClear();
+    storage.presignAvatar.mockClear();
+    storage.confirmAvatar.mockClear();
+    storage.resolveReadUrls.mockClear();
+    storage.emitSuperseded.mockClear();
   };
 
   const close = async (): Promise<void> => {
     await moduleRef.close();
   };
 
-  return { moduleRef, prisma, notifications, audit, reset, close };
+  return { moduleRef, prisma, notifications, audit, storage, reset, close };
 }

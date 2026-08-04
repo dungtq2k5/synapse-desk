@@ -1,0 +1,135 @@
+syntax = "proto3";
+
+package synapsedesk.ticket;
+
+import "google/protobuf/timestamp.proto";
+import "synapsedesk/auth/common.proto";
+
+// The ticket thread, plus attachments.
+//
+// `is_internal_note` is stripped in the WHERE clause for a non-agent, never
+// fetched-then-filtered: filtering at serialization leaks the note's existence
+// through response timing and through any client that forgets to filter.
+
+message AttachmentResponse {
+  string id = 1;
+  string message_id = 2;
+  string file_name = 3;
+  string file_url = 4;
+  int64 file_size_bytes = 5;
+  string mime_type = 6;
+  google.protobuf.Timestamp created_at = 7;
+}
+
+message MessageResponse {
+  string id = 1;
+  string ticket_id = 2;
+  // Absent for an AI-generated message: no user wrote it, and naming one would
+  // put words in a real person's mouth in the audit trail.
+  optional string sender_id = 3;
+  string content = 4;
+  bool is_ai_generated = 5;
+  bool is_internal_note = 6;
+  optional string model_name = 7;
+  optional int32 prompt_tokens = 8;
+  optional int32 completion_tokens = 9;
+  optional google.protobuf.Timestamp edited_at = 10;
+  optional google.protobuf.Timestamp redacted_at = 11;
+  google.protobuf.Timestamp created_at = 12;
+  repeated AttachmentResponse attachments = 13;
+}
+
+message CreateMessageRequest {
+  string ticket_id = 1;
+  string content = 2;
+  bool is_internal_note = 3;
+  // Persists the caller's message FIRST, then asks for an AI draft as a second,
+  // separate write. Two writes on purpose: the draft can legitimately fail
+  // (rag-service down) without losing what the human typed.
+  bool invoke_ai = 4;
+}
+
+message ListMessagesRequest {
+  string ticket_id = 1;
+  synapsedesk.auth.PageRequest page = 2;
+}
+
+message ListMessagesResponse {
+  repeated MessageResponse items = 1;
+  synapsedesk.auth.PageMeta meta = 2;
+}
+
+message UpdateMessageRequest {
+  string ticket_id = 1;
+  string message_id = 2;
+  string content = 3;
+}
+
+message RedactMessageRequest {
+  string ticket_id = 1;
+  string message_id = 2;
+}
+
+// Redaction, not deletion — the row's POSITION in the timeline is the thing
+// worth preserving, so the response still carries the message.
+message RedactMessageResponse {
+  MessageResponse message = 1;
+}
+
+// Presign → upload → confirm, per 10-storage-service.md §3.2. The bytes go
+// straight from the client to Firebase Storage; ticket-service only decides
+// whether the upload may happen and records it once it has.
+message UploadAttachmentRequest {
+  string ticket_id = 1;
+  string message_id = 2;
+  string file_name = 3;
+  int64 file_size_bytes = 4;
+  string mime_type = 5;
+}
+
+message PresignAttachmentResponse {
+  string upload_url = 1;
+  string object_path = 2;
+  google.protobuf.Timestamp expires_at = 3;
+}
+
+message ConfirmAttachmentRequest {
+  string ticket_id = 1;
+  string message_id = 2;
+  string object_path = 3;
+  string file_name = 4;
+}
+
+message DeleteAttachmentRequest { string attachment_id = 1; }
+message DeleteAttachmentResponse {}
+
+message ListAttachmentsRequest {
+  string ticket_id = 1;
+  string message_id = 2;
+}
+
+message ListAttachmentsResponse { repeated AttachmentResponse items = 1; }
+
+message DownloadAttachmentRequest {
+  string attachment_id = 1;
+}
+
+message DownloadAttachmentResponse {
+  string download_url = 1;
+  google.protobuf.Timestamp expires_at = 2;
+}
+
+service MessageService {
+  rpc CreateMessage(CreateMessageRequest) returns (MessageResponse);
+  rpc ListMessages(ListMessagesRequest) returns (ListMessagesResponse);
+  rpc UpdateMessage(UpdateMessageRequest) returns (MessageResponse);
+  rpc RedactMessage(RedactMessageRequest) returns (RedactMessageResponse);
+
+  // UploadAttachment is now the PRESIGN step — it returns a URL rather than a
+  // stored row, because no row exists until the bytes have actually landed.
+  rpc UploadAttachment(UploadAttachmentRequest) returns (PresignAttachmentResponse);
+  rpc ConfirmAttachment(ConfirmAttachmentRequest) returns (AttachmentResponse);
+  rpc DownloadAttachment(DownloadAttachmentRequest) returns (DownloadAttachmentResponse);
+  rpc DeleteAttachment(DeleteAttachmentRequest) returns (DeleteAttachmentResponse);
+  rpc ListAttachments(ListAttachmentsRequest) returns (ListAttachmentsResponse);
+}

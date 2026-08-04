@@ -22,13 +22,13 @@ import {
   EmailTemplateName,
   InvitationStatus,
   OrgStatus,
+  isUniqueConstraintViolation,
+  requireTenant,
 } from '@synapsedesk/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditPublisher } from '../audit/audit-publisher.service';
 import { SessionsService } from '../sessions/sessions.service';
 import { NotificationPublisher } from '../notifications/notification-publisher.service';
-import { requireTenant } from '../../common/utils/tenant-scope';
-import { isUniqueConstraintViolation } from '../../common/utils/utils';
 import { Organization, Prisma } from '../../generated/prisma/client';
 import {
   DOMAIN_PATTERN,

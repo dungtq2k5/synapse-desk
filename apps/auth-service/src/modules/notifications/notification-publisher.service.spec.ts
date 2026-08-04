@@ -9,7 +9,7 @@ import {
   EmailTemplateName,
   NOTIFICATION_PATTERNS,
 } from '@synapsedesk/common';
-import { NATS_CLIENT } from '../../common/configs/app.config';
+import { NATS_CLIENT } from '@synapsedesk/common';
 import { NotificationPublisher } from './notification-publisher.service';
 import { AuditPublisher } from '../audit/audit-publisher.service';
 

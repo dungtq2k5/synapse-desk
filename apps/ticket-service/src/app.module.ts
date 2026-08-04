@@ -1,4 +1,34 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
+import { envValidationSchema } from './common/configs/env.validation';
+import { PrismaModule } from './modules/prisma/prisma.module';
+import { EventsModule } from './modules/events/events.module';
+import { AuditModule } from './modules/audit/audit.module';
+import { AuthClientModule } from './modules/auth-client/auth-client.module';
+import { TicketsModule } from './modules/tickets/tickets.module';
+import { AssignmentsModule } from './modules/assignments/assignments.module';
+import { MessagesModule } from './modules/messages/messages.module';
+import { AiModule } from './modules/ai/ai.module';
+import { FeedbackModule } from './modules/feedback/feedback.module';
 
-@Module({})
+@Module({
+  imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+      validationSchema: envValidationSchema,
+      validationOptions: {
+        allowUnknown: true, // Ignore env vars not declared in the schema
+      },
+    }),
+    PrismaModule,
+    EventsModule,
+    AuthClientModule,
+    AuditModule,
+    TicketsModule,
+    AssignmentsModule,
+    MessagesModule,
+    AiModule,
+    FeedbackModule,
+  ],
+})
 export class AppModule {}

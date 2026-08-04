@@ -1,12 +1,13 @@
 import { Test, TestingModuleBuilder, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import cookieParser from 'cookie-parser';
 import Redis from 'ioredis';
 import { of } from 'rxjs';
 import { OrgStatus } from '@synapsedesk/common';
-import { AUTH_GRPC_CLIENT } from '@synapsedesk/grpc-proto';
+import { AUTH_GRPC_CLIENT, TICKET_GRPC_CLIENT } from '@synapsedesk/grpc-proto';
 import { AppModule } from '../../src/app.module';
 import { AllHttpExceptionFilter } from '../../src/common/filters/all-http-exception.filter';
 import { LoggingInterceptor } from '../../src/common/interceptors/logging.interceptor';
@@ -51,15 +52,20 @@ export async function bootstrapE2eTest(
   );
 
   const builder = Test.createTestingModule({ imports: [AppModule] })
-    // One override covers all ten services: every gRPC client in the gateway
-    // injects this single token and calls getService() on it.
+    // ONE stub serves BOTH peers. Every gRPC client in the gateway injects one
+    // of these two tokens and calls `getService(name)` on it — and service
+    // names are unique across the two proto packages, so a single map answers
+    // for auth-service's ten services and ticket-service's six alike.
     .overrideProvider(AUTH_GRPC_CLIENT)
+    .useValue(clientGrpc)
+    .overrideProvider(TICKET_GRPC_CLIENT)
     .useValue(clientGrpc);
 
   configure?.(builder);
 
   const moduleRef = await builder.compile();
   const app = moduleRef.createNestApplication<NestExpressApplication>();
+  const configService = app.get(ConfigService);
 
   // Everything below mirrors main.ts. A suite that skips ValidationPipe and
   // then asserts a 400 on a malformed body is asserting on code that never
@@ -69,7 +75,7 @@ export async function bootstrapE2eTest(
   // anonymous callers on req.ip, so without it every request in a test that
   // sets X-Forwarded-For lands in the same bucket.
   app.set('trust proxy', 1);
-  app.setGlobalPrefix(process.env.GLOBAL_PREFIX ?? '/api/v1');
+  app.setGlobalPrefix(configService.getOrThrow<string>('GLOBAL_PREFIX'));
   app.use(cookieParser());
   app.useGlobalFilters(new AllHttpExceptionFilter(false));
   app.useGlobalInterceptors(new LoggingInterceptor(true));

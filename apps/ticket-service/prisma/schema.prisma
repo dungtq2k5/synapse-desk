@@ -1,0 +1,310 @@
+// ticket-service owns Domain B (tickets, assignments, messages, attachments,
+// AI summaries) plus the two Domain D tables the ownership map assigns here:
+// ai_response_feedbacks and audit_logs.
+//
+// This is a SEPARATE physical database from postgres_auth. Every id below that
+// names a user, department or organization is therefore a plain @db.Uuid with
+// NO foreign key — Postgres cannot enforce one across databases, and that is
+// the correct shape for service-per-database rather than a shortcut. The
+// obligation it creates is validation at WRITE time over gRPC; see §1.1 of
+// docs/09-domain-b-support-engine.md and TicketsService.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ==========================================
+// 1. TICKETS
+// ==========================================
+model Ticket {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  /// ONE GLOBAL SEQUENCE, not per tenant.
+  ///
+  /// Every tenant draws from the same counter, so org A may hold #1 and #7 while
+  /// org B holds #2 through #6. A per-tenant sequence is a nicer product surface
+  /// but needs a Postgres sequence per organization, created at onboarding —
+  /// real complexity for a cosmetic gain. Revisit only if a customer-facing
+  /// "our ticket numbers start at 1" requirement appears.
+  ticketNumber BigInt @unique @default(autoincrement()) @map("ticket_number")
+
+  /// The tenant boundary. No FK: `organizations` lives in postgres_auth.
+  organizationId String @map("organization_id") @db.Uuid
+
+  /// No FK: `users` lives in postgres_auth. Validated at write time via
+  /// UserService.GetUser, never re-validated afterwards — Domain A only ever
+  /// SOFT-deletes users, so this reference can never dangle.
+  authorId String @map("author_id") @db.Uuid
+
+  // Enumerated columns are plain strings, per conventions §7.3. The legal
+  // values live in TicketSource / TicketStatus / TicketPriority in
+  // @synapsedesk/common, which both this service and the gateway import.
+  source   String @default("WEB") @db.VarChar(20)
+  status   String @default("NEW") @db.VarChar(20)
+  priority String @default("MEDIUM") @db.VarChar(20)
+
+  title       String @db.VarChar(255)
+  description String @db.Text
+
+  /// DENORMALIZED cache of the current `ticket_assignments` row.
+  ///
+  /// Duplicated on purpose: the queue list filters and displays from these two
+  /// columns rather than joining the assignment history on every row, and a
+  /// join there is the difference between an indexed scan and a sort over every
+  /// assignment a tenant ever made. The cost is that every assign/reassign/
+  /// unassign must update BOTH — see TicketAssignment below.
+  currentAssigneeId   String? @map("current_assignee_id") @db.Uuid
+  currentDepartmentId String? @map("current_department_id") @db.Uuid
+
+  escalatedAt DateTime? @map("escalated_at") @db.Timestamptz
+  resolvedAt  DateTime? @map("resolved_at") @db.Timestamptz
+
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+  deletedById String?   @map("deleted_by_id") @db.Uuid
+
+  assignments TicketAssignment[]
+  messages    TicketMessage[]
+  aiSummary   AiSummary?
+
+  /// The queue view: "this tenant's tickets in status X".
+  @@index([organizationId, status])
+  /// "my tickets" for an agent.
+  @@index([currentAssigneeId])
+  /// A department's queue.
+  @@index([currentDepartmentId])
+  /// The non-agent visibility filter reads author_id inside the tenant scope.
+  @@index([organizationId, authorId])
+  @@map("tickets")
+}
+
+// ==========================================
+// 2. TICKET ASSIGNMENTS (full history, one current)
+// ==========================================
+/// Every assignment a ticket has ever had, not just the live one.
+///
+/// The history is the point: "who was working this when it went wrong?" is not
+/// answerable from a single mutable column. `is_current` marks the live row,
+/// and a partial unique index applied by the seeder guarantees there is at most
+/// one of them per ticket:
+///
+///   CREATE UNIQUE INDEX ticket_assignments_current_key
+///     ON ticket_assignments (ticket_id) WHERE is_current = true;
+///
+/// Partial, so it cannot be expressed as `@@unique` here — the same discipline
+/// as Domain A's `users_org_email_key` and `user_departments_primary_key`, and
+/// the same reason: it is the only thing that makes two concurrent reassign
+/// calls resolve to one winner rather than two live assignments.
+model TicketAssignment {
+  id       String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ticketId String @map("ticket_id") @db.Uuid
+
+  /// No FK: postgres_auth. Validated at write time.
+  assignedToId String @map("assigned_to_id") @db.Uuid
+
+  /// null when the system assigned it — auto-routing, escalation rules — rather
+  /// than a person.
+  assignedById String? @map("assigned_by_id") @db.Uuid
+
+  /// No FK: `departments` lives in postgres_auth.
+  departmentId String @map("department_id") @db.Uuid
+
+  assignedAt   DateTime  @default(now()) @map("assigned_at") @db.Timestamptz
+  unassignedAt DateTime? @map("unassigned_at") @db.Timestamptz
+
+  /// ReassignmentReason. Recorded because "why did this move?" is the question
+  /// an escalation review actually asks.
+  reason String @default("INITIAL") @db.VarChar(20)
+
+  isCurrent Boolean  @default(false) @map("is_current")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId, isCurrent])
+  @@index([assignedToId, createdAt(sort: Desc)])
+  @@map("ticket_assignments")
+}
+
+// ==========================================
+// 3. TICKET MESSAGES (the thread)
+// ==========================================
+model TicketMessage {
+  id       String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ticketId String @map("ticket_id") @db.Uuid
+
+  /// null for an AI-generated message: no user wrote it, and attributing one
+  /// would put words in a real person's mouth in the audit trail.
+  senderId String? @map("sender_id") @db.Uuid
+
+  content String @db.Text
+
+  isAiGenerated Boolean @default(false) @map("is_ai_generated")
+
+  /// Agent-only. Stripped in the WHERE clause for a non-agent's fetch, never
+  /// fetched-then-filtered — see TicketMessagesService.
+  isInternalNote Boolean @default(false) @map("is_internal_note")
+
+  /// Token metering, populated only for a persisted AI reply. Deliberately here
+  /// rather than on ai_summaries, which the RDM gives no token columns.
+  modelName        String? @map("model_name") @db.VarChar(100)
+  promptTokens     Int?    @map("prompt_tokens")
+  completionTokens Int?    @map("completion_tokens")
+
+  /// Set when a message is EDITED, so the thread can show "edited" without a
+  /// separate revision table.
+  editedAt DateTime? @map("edited_at") @db.Timestamptz
+
+  /// Set when a message is REDACTED. The row survives — its position in the
+  /// timeline is the thing worth keeping, so `content` is replaced rather than
+  /// the row deleted. Same reasoning as Domain E's notifications choosing
+  /// `archived_at` over `deleted_at`.
+  redactedAt   DateTime? @map("redacted_at") @db.Timestamptz
+  redactedById String?   @map("redacted_by_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  ticket      Ticket              @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  attachments MessageAttachment[]
+
+  @@index([ticketId, createdAt])
+  @@map("ticket_messages")
+}
+
+// ==========================================
+// 4. MESSAGE ATTACHMENTS
+// ==========================================
+/// The table and its validation exist now; the actual upload does not.
+///
+/// No object storage is decided anywhere in this repo yet — the same deferral
+/// Domain A made for `/users/me/avatar`. The DTO enforces the mime allowlist,
+/// the size cap and the per-message count; the upload endpoint answers 503
+/// UNAVAILABLE rather than not existing, so a client can tell "not built yet"
+/// from "broken".
+model MessageAttachment {
+  id        String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  messageId String @map("message_id") @db.Uuid
+
+  fileName      String @db.VarChar(255)
+  fileUrl       String @db.Text
+  fileSizeBytes BigInt @map("file_size_bytes")
+  mimeType      String @map("mime_type") @db.VarChar(100)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  /// Cascade: an attachment has no meaning without its message, and a redacted
+  /// message keeps its row, so this only fires when a ticket is hard-deleted.
+  message TicketMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
+  @@map("message_attachments")
+}
+
+// ==========================================
+// 5. AI SUMMARIES (one per ticket)
+// ==========================================
+/// 1:1 with a ticket — `@unique` on ticket_id is what makes re-generation an
+/// UPSERT rather than an append. A ticket has one current summary; the old one
+/// is not history worth keeping, because it summarised a thread that has since
+/// moved on.
+model AiSummary {
+  id       String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ticketId String @unique @map("ticket_id") @db.Uuid
+
+  summaryText     String @map("summary_text") @db.Text
+  suggestedAction String @map("suggested_action") @db.Text
+  confidenceScore Float  @map("confidence_score")
+  modelName       String @map("model_name") @db.VarChar(100)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@map("ai_summaries")
+}
+
+// ==========================================
+// 6. AI RESPONSE FEEDBACK (Domain D table, owned here)
+// ==========================================
+/// `@@unique([ticketMessageId, userId])` makes submitting feedback an UPSERT:
+/// a user may change their mind from a thumbs-up to a thumbs-down, and a second
+/// row would double-count them in every quality metric.
+///
+/// No FK to ticket_messages despite both living in this database: the message
+/// may be redacted and the feedback should survive it, and a cascade here would
+/// silently delete the signal that a bad answer was reported.
+model AiResponseFeedback {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  ticketMessageId String @map("ticket_message_id") @db.Uuid
+
+  /// No FK: postgres_auth.
+  userId String @map("user_id") @db.Uuid
+
+  /// Carried so the list endpoint can scope without joining back through
+  /// messages to tickets. Denormalized for the same reason as
+  /// `tickets.current_assignee_id`.
+  organizationId String @map("organization_id") @db.Uuid
+
+  /// 1 or -1 — a thumb, not a scale. Constrained in the application layer and
+  /// by a CHECK the seeder applies; Prisma expresses neither.
+  rating Int
+
+  feedbackText     String?  @map("feedback_text") @db.Text
+  citationAccurate Boolean? @map("citation_accurate")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@unique([ticketMessageId, userId])
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@map("ai_response_feedbacks")
+}
+
+// ==========================================
+// 7. AUDIT LOGS (Domain D table, owned here)
+// ==========================================
+/// Populated ONLY by the NATS consumer, never by an RPC.
+///
+/// The proto for this module deliberately declares no Create message: a write
+/// path that does not exist in the contract cannot be added by accident, and
+/// the trail's value depends entirely on nobody being able to write to it
+/// directly.
+model AuditLog {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  /// NULL for a platform-level act (RDM §1.7) — the event belongs to the
+  /// platform, not to the customer it touched. That is why this is nullable and
+  /// why the consumer must never coerce it to the actor's own tenant.
+  organizationId String? @map("organization_id") @db.Uuid
+
+  /// null for system and cron actors, which have no user row acting for them.
+  userId String? @map("user_id") @db.Uuid
+
+  action       String  @db.VarChar(100)
+  resourceType String? @map("resource_type") @db.VarChar(50)
+  resourceId   String? @map("resource_id") @db.Uuid
+
+  ipAddress String? @map("ip_address") @db.VarChar(45)
+  userAgent String? @map("user_agent") @db.Text
+
+  /// A REDACTED before/after diff. Never a password hash, a 2FA secret or any
+  /// token hash — the publisher whitelists what it records.
+  metadata Json @default("{}")
+
+  /// The PUBLISHER's clock, not the consumer's: a consumer restart must not
+  /// backdate a backlog of events to the moment it caught up.
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@index([organizationId, action])
+  @@index([userId])
+  @@map("audit_logs")
+}

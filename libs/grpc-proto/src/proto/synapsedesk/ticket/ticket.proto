@@ -1,0 +1,109 @@
+syntax = "proto3";
+
+package synapsedesk.ticket;
+
+import "synapsedesk/auth/common.proto";
+import "synapsedesk/ticket/common.proto";
+
+// Ticket lifecycle: create, read, list, update, the state machine, and soft
+// delete. The tenant and the caller's identity travel in gRPC METADATA, not in
+// these messages — see libs/grpc-proto/src/metadata.ts for why that is what
+// makes the tenant filter hard to forget.
+
+message CreateTicketRequest {
+  string title = 1;
+  string description = 2;
+  TicketPriority priority = 3;
+  TicketSource source = 4;
+  // Defaults to the caller. Present so an agent can raise a ticket on behalf of
+  // an end user — validated against auth-service before the insert.
+  optional string author_id = 5;
+}
+
+message GetTicketRequest {
+  string id = 1;
+}
+
+message GetTicketByNumberRequest {
+  int64 ticket_number = 1;
+}
+
+message ListTicketsRequest {
+  synapsedesk.auth.PageRequest page = 1;
+  // Empty means "no filter" for each of these — proto3 scalars have no null,
+  // and the UNSPECIFIED enum member carries the same meaning for the enums.
+  TicketStatus status = 2;
+  TicketPriority priority = 3;
+  TicketSource source = 4;
+  string assignee_id = 5;
+  string department_id = 6;
+  string author_id = 7;
+  bool include_deleted = 8;
+}
+
+message ListTicketsResponse {
+  repeated TicketResponse items = 1;
+  synapsedesk.auth.PageMeta meta = 2;
+}
+
+message UpdateTicketRequest {
+  string id = 1;
+  // Absent means "leave unchanged"; that is why these are `optional` rather
+  // than relying on the empty string, which would make clearing a field
+  // indistinguishable from not touching it.
+  optional string title = 2;
+  optional string description = 3;
+  TicketPriority priority = 4;
+}
+
+// The generic status change. `escalate`/`resolve`/`reopen`/`close` below are
+// convenience RPCs over this same validator — there is exactly one encoding of
+// the transition table (TICKET_STATUS_TRANSITIONS in @synapsedesk/common), or
+// the two entry points would diverge the first time one was updated.
+message ChangeTicketStatusRequest {
+  string id = 1;
+  TicketStatus status = 2;
+  optional string reason = 3;
+}
+
+message TicketIdRequest {
+  string id = 1;
+}
+
+message DeleteTicketResponse {}
+
+// Each id is processed INDEPENDENTLY: one failing transition must not abort the
+// other 49, which is why this returns both lists rather than throwing.
+message BulkTicketStatusRequest {
+  repeated string ticket_ids = 1;
+  TicketStatus status = 2;
+  optional string reason = 3;
+}
+
+message BulkTicketFailure {
+  string id = 1;
+  string reason = 2;
+}
+
+message BulkTicketStatusResponse {
+  repeated string updated = 1;
+  repeated BulkTicketFailure failed = 2;
+}
+
+service TicketService {
+  rpc CreateTicket(CreateTicketRequest) returns (TicketResponse);
+  rpc GetTicket(GetTicketRequest) returns (TicketResponse);
+  rpc GetTicketByNumber(GetTicketByNumberRequest) returns (TicketResponse);
+  rpc ListTickets(ListTicketsRequest) returns (ListTicketsResponse);
+  rpc UpdateTicket(UpdateTicketRequest) returns (TicketResponse);
+
+  rpc ChangeTicketStatus(ChangeTicketStatusRequest) returns (TicketResponse);
+  rpc EscalateTicket(TicketIdRequest) returns (TicketResponse);
+  rpc ResolveTicket(TicketIdRequest) returns (TicketResponse);
+  rpc ReopenTicket(TicketIdRequest) returns (TicketResponse);
+  rpc CloseTicket(TicketIdRequest) returns (TicketResponse);
+  rpc BulkChangeTicketStatus(BulkTicketStatusRequest) returns (BulkTicketStatusResponse);
+
+  rpc DeleteTicket(TicketIdRequest) returns (DeleteTicketResponse);
+  rpc RestoreTicket(TicketIdRequest) returns (TicketResponse);
+}

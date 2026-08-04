@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+package synapsedesk.ticket;
+
+import "google/protobuf/timestamp.proto";
+import "synapsedesk/ticket/common.proto";
+
+// Assignment history. Every assign/reassign/unassign is one transaction that
+// closes the previous row, opens the new one and updates the denormalized
+// columns on `tickets` — see TicketAssignment in schema.prisma.
+
+message AssignmentResponse {
+  string id = 1;
+  string ticket_id = 2;
+  string assigned_to_id = 3;
+  optional string assigned_by_id = 4;
+  string department_id = 5;
+  google.protobuf.Timestamp assigned_at = 6;
+  optional google.protobuf.Timestamp unassigned_at = 7;
+  ReassignmentReason reason = 8;
+  bool is_current = 9;
+  google.protobuf.Timestamp created_at = 10;
+}
+
+message AssignTicketRequest {
+  string ticket_id = 1;
+  string assignee_id = 2;
+  string department_id = 3;
+  ReassignmentReason reason = 4;
+}
+
+// `assign/self` is the SAME write path with assignee_id = the caller — it is a
+// distinct RPC only so the gateway can permission it separately
+// (`ticket.assign.self` vs `ticket.assign`). It must never grow its own
+// implementation.
+message AssignTicketToSelfRequest {
+  string ticket_id = 1;
+  string department_id = 2;
+}
+
+message UnassignTicketRequest {
+  string ticket_id = 1;
+  optional string reason = 2;
+}
+
+message ListAssignmentsRequest {
+  string ticket_id = 1;
+}
+
+message ListAssignmentsResponse {
+  repeated AssignmentResponse items = 1;
+}
+
+message UnassignTicketResponse {}
+
+service AssignmentService {
+  rpc AssignTicket(AssignTicketRequest) returns (AssignmentResponse);
+  rpc AssignTicketToSelf(AssignTicketToSelfRequest) returns (AssignmentResponse);
+  rpc ReassignTicket(AssignTicketRequest) returns (AssignmentResponse);
+  rpc UnassignTicket(UnassignTicketRequest) returns (UnassignTicketResponse);
+  rpc ListAssignments(ListAssignmentsRequest) returns (ListAssignmentsResponse);
+}

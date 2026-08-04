@@ -19,6 +19,10 @@ import {
   UpdateOwnProfileRequest,
   UpdateUserRequest,
   UserIdRequest,
+  ConfirmAvatarUploadRequest,
+  DeleteAvatarRequest,
+  PresignAvatarUploadRequest,
+  PresignAvatarUploadResponse,
   UserResponse,
   UserServiceController,
   UserServiceControllerMethods,
@@ -149,5 +153,39 @@ export class UsersGrpcController implements UserServiceController {
       request,
       unpackCallerContext(metadata),
     );
+  }
+
+  // ---------------------------------------------------------------- avatars
+
+  presignAvatarUpload(
+    request: PresignAvatarUploadRequest,
+    metadata?: Metadata,
+  ): Promise<PresignAvatarUploadResponse> {
+    return this.usersService.presignAvatarUpload(
+      request,
+      unpackCallerContext(metadata),
+    );
+  }
+
+  confirmAvatarUpload(
+    request: ConfirmAvatarUploadRequest,
+    metadata?: Metadata,
+  ): Promise<UserResponse> {
+    return this.usersService.confirmAvatarUpload(
+      request,
+      unpackCallerContext(metadata),
+    );
+  }
+
+  /**
+   * The request message is empty on purpose — the avatar being cleared is
+   * always the CALLER'S. A `userId` field would be a way to clear somebody
+   * else's.
+   */
+  deleteAvatar(
+    _request: DeleteAvatarRequest,
+    metadata?: Metadata,
+  ): Promise<UserResponse> {
+    return this.usersService.deleteAvatar(unpackCallerContext(metadata));
   }
 }

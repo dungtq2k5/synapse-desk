@@ -8,7 +8,6 @@ import {
   timingSafeEqual,
 } from 'node:crypto';
 import { extractEmailDomain } from '@synapsedesk/common';
-import { Prisma } from '../../generated/prisma/client';
 import {
   AES_ALGORITHM,
   AES_IV_BYTES,
@@ -205,49 +204,4 @@ export function stripTrailingSlashes(value: string): string {
   while (end > 0 && value[end - 1] === '/') end--;
 
   return value.slice(0, end);
-}
-
-/**
- * Postgres unique-constraint violation, detected BY CODE rather than by message.
- *
- * `P2002` is Prisma's stable code for it. Matching on the code — never on the
- * error text, which changes between versions and is localized — is what makes
- * this safe to rely on.
- *
- * **Why catch this at all when the service already pre-checks?** Because the
- * pre-check cannot be race-free. Two concurrent requests both run
- * `findFirst` → both see the address free → both insert. That is not a
- * hypothetical; it is what a double-clicked submit button produces. The
- * partial unique index is the ONLY thing that makes the duplicate impossible,
- * and this turns the loser's raw constraint violation into the same clean
- * conflict the pre-check produces for everyone else.
- *
- * So the two layers have different jobs and both are needed:
- *   pre-check → a good error in the 99.99% non-racing case
- *   this      → correctness in the remaining case
- *
- * `target` names the index, so callers can distinguish which constraint fired.
- */
-export function isUniqueConstraintViolation(
-  error: unknown,
-  index?: string,
-): boolean {
-  if (
-    !(error instanceof Prisma.PrismaClientKnownRequestError) ||
-    error.code !== 'P2002'
-  ) {
-    return false;
-  }
-  if (!index) return true;
-
-  // meta.target is the index NAME for a raw-SQL partial index, and a field-name
-  // array for one Prisma declared. Only those two shapes are matched — anything
-  // else is treated as "not this index" rather than stringified, because
-  // `String({})` yields '[object Object]' and would match nothing usefully
-  // while looking like it had checked.
-  const target: unknown = error.meta?.target;
-  if (typeof target === 'string') return target.includes(index);
-  if (Array.isArray(target)) return target.includes(index);
-
-  return false;
 }

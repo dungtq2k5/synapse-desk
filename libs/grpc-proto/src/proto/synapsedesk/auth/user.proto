@@ -35,7 +35,14 @@ message UpdateOwnProfileRequest {
   // ISO 'YYYY-MM-DD'. Empty string clears it; absent leaves it unchanged.
   optional string dob = 2;
   optional Gender gender = 3;
-  optional string avatar_url = 4;
+
+  // 4 was `avatar_url`. A writable avatar_url here bypassed the whole
+  // presign -> upload -> confirm flow: it accepted any string, so it never
+  // proved the object existed or belonged to the caller, never emitted
+  // USER_AVATAR_UPDATED, and never superseded the previous object (which then
+  // leaked in the bucket forever). ConfirmAvatarUpload is the only writer.
+  reserved 4;
+  reserved "avatar_url";
 }
 
 // ---------------------------------------------------------------------------
@@ -103,7 +110,12 @@ message UpdateUserRequest {
   optional string phone_number = 3;
   optional string dob = 4;
   optional Gender gender = 5;
-  optional string avatar_url = 6;
+
+  // 6 was `avatar_url` — removed for the reason given on
+  // UpdateOwnProfileRequest. An administrator setting another user's avatar to
+  // an arbitrary string was the same hole with a wider blast radius.
+  reserved 6;
+  reserved "avatar_url";
 }
 
 message DeleteUserResponse {
@@ -147,6 +159,22 @@ message SetUserDepartmentsRequest {
   repeated DepartmentAssignment departments = 2;
 }
 
+message PresignAvatarUploadRequest {
+  string content_type = 1;
+  int64 size_bytes = 2;
+  string original_file_name = 3;
+}
+
+message PresignAvatarUploadResponse {
+  string upload_url = 1;
+  string object_path = 2;
+  google.protobuf.Timestamp expires_at = 3;
+}
+
+message ConfirmAvatarUploadRequest { string object_path = 1; }
+
+message DeleteAvatarRequest {}
+
 service UserService {
   rpc GetCurrentUser(GetCurrentUserRequest) returns (CurrentUserResponse);
   rpc UpdateOwnProfile(UpdateOwnProfileRequest) returns (UserResponse);
@@ -162,6 +190,13 @@ service UserService {
   rpc LockUser(LockUserRequest) returns (LockUserResponse);
   rpc UnlockUser(UserIdRequest) returns (UnlockUserResponse);
   rpc ResetUserTwoFactor(UserIdRequest) returns (ResetUserTwoFactorResponse);
+
+  // Avatars — 10-storage-service.md §3.1. auth-service owns `users.avatar_url`,
+  // so it initiates the upload and calls storage-service internally; the
+  // gateway never talks to storage-service directly (§1.5).
+  rpc PresignAvatarUpload(PresignAvatarUploadRequest) returns (PresignAvatarUploadResponse);
+  rpc ConfirmAvatarUpload(ConfirmAvatarUploadRequest) returns (UserResponse);
+  rpc DeleteAvatar(DeleteAvatarRequest) returns (UserResponse);
 
   rpc SetUserRoles(SetUserRolesRequest) returns (UserSummaryResponse);
   rpc SetUserDepartments(SetUserDepartmentsRequest) returns (UserSummaryResponse);

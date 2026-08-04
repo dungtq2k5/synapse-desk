@@ -1,14 +1,14 @@
 import { status } from '@grpc/grpc-js';
 import { RpcException } from '@nestjs/microservices';
-import { isUniqueConstraintViolation } from './utils';
+import { isUniqueConstraintViolation } from './prisma-errors';
 
 /**
  * The write for a soft delete (see the conventions).
  *
- * `prisma.x.delete()` is never correct for `users`, `departments` or
- * `organizations`: the rows are referenced by audit trails, ticket history and
- * `deleted_by_id` back-references, and a hard delete either cascades those away
- * or fails on a Restrict FK.
+ * `prisma.x.delete()` is never correct for a row anything else references:
+ * `users`, `departments`, `organizations` and `tickets` are all pointed at by
+ * audit trails, assignment history and `deleted_by_id` back-references, and a
+ * hard delete either cascades those away or fails on a Restrict FK.
  */
 export function softDeleteData(actorId: string): {
   deletedAt: Date;

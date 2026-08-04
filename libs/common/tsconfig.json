@@ -12,7 +12,12 @@
     // rootDir. A library must consume its siblings as built PACKAGES -- which
     // is also what the runtime does, so this keeps compile-time and run-time
     // resolution telling the same story.
-    "paths": {}
+    "paths": {},
+    // `jest` alongside the defaults: the contract specs live beside their
+    // source, so the program ts-jest compiles has to know `describe`/`it`. The
+    // BUILD uses tsconfig.build.json, which excludes `**/*spec.ts` — nothing
+    // test-only reaches dist.
+    "types": ["node", "jest"]
   },
   // Own source only. A library MUST NOT compile application source — the
   // dependency runs the other way, and `libs/common/src` references api-gateway

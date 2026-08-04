@@ -1,6 +1,14 @@
 import { faker } from '@faker-js/faker';
 import {
+  AssignmentResponse,
+  AttachmentResponse,
+  MessageResponse,
+  ReassignmentReason as ProtoReassignmentReason,
   Gender as ProtoGender,
+  TicketPriority as ProtoTicketPriority,
+  TicketResponse,
+  TicketSource as ProtoTicketSource,
+  TicketStatus as ProtoTicketStatus,
   PageMeta,
   ProtoTimestamp,
   UserResponse,
@@ -162,4 +170,99 @@ export function wireLoginTwoFactor(requiresTwoFactorSetup = false) {
  */
 export function grpcError(code: number, details: string) {
   return Object.assign(new Error(details), { code, details });
+}
+
+/**
+ * A ticket as ticket-service puts it on the wire.
+ *
+ * Enum fields carry their NUMERIC proto values, not the domain strings: that is
+ * what actually travels, and a fixture using `'OPEN'` would make the gateway's
+ * enum mapper look correct while it silently produced null for every row.
+ */
+export function wireTicket(
+  overrides: Partial<TicketResponse> = {},
+): TicketResponse {
+  return {
+    id: faker.string.uuid(),
+    ticketNumber: faker.number.int({ min: 1, max: 9999 }),
+    organizationId: faker.string.uuid(),
+    authorId: faker.string.uuid(),
+    source: ProtoTicketSource.TICKET_SOURCE_WEB,
+    status: ProtoTicketStatus.TICKET_STATUS_OPEN,
+    priority: ProtoTicketPriority.TICKET_PRIORITY_MEDIUM,
+    title: faker.hacker.phrase(),
+    description: faker.lorem.paragraph(),
+    currentAssigneeId: undefined,
+    currentDepartmentId: undefined,
+    escalatedAt: undefined,
+    resolvedAt: undefined,
+    createdAt: timestamp(),
+    updatedAt: timestamp(),
+    deletedAt: undefined,
+    deletedById: undefined,
+    ...overrides,
+  };
+}
+
+/**
+ * An assignment entry as ticket-service puts it on the wire.
+ *
+ * `isCurrent: true` and a `undefined` `unassignedAt` together — the live entry.
+ * A fixture that set one without the other would describe a row the service
+ * cannot produce, and a mapper test built on it would prove nothing.
+ */
+export function wireAssignment(
+  overrides: Partial<AssignmentResponse> = {},
+): AssignmentResponse {
+  return {
+    id: faker.string.uuid(),
+    ticketId: faker.string.uuid(),
+    assignedToId: faker.string.uuid(),
+    assignedById: faker.string.uuid(),
+    departmentId: faker.string.uuid(),
+    assignedAt: timestamp(),
+    unassignedAt: undefined,
+    reason: ProtoReassignmentReason.REASSIGNMENT_REASON_INITIAL,
+    isCurrent: true,
+    createdAt: timestamp(),
+    ...overrides,
+  };
+}
+
+/** A message as ticket-service puts it on the wire. */
+export function wireMessage(
+  overrides: Partial<MessageResponse> = {},
+): MessageResponse {
+  return {
+    id: faker.string.uuid(),
+    ticketId: faker.string.uuid(),
+    senderId: faker.string.uuid(),
+    content: faker.lorem.sentences(2),
+    isAiGenerated: false,
+    isInternalNote: false,
+    modelName: undefined,
+    promptTokens: undefined,
+    completionTokens: undefined,
+    editedAt: undefined,
+    redactedAt: undefined,
+    createdAt: timestamp(),
+    attachments: [],
+    ...overrides,
+  };
+}
+
+export function wireAttachment(
+  overrides: Partial<AttachmentResponse> = {},
+): AttachmentResponse {
+  return {
+    id: faker.string.uuid(),
+    messageId: faker.string.uuid(),
+    fileName: 'screenshot.png',
+    // An object PATH, not a URL — what the column actually holds.
+    fileUrl: 'organizations/org/tickets/t/attachments/m/abc.png',
+    fileSizeBytes: 2048,
+    mimeType: 'image/png',
+    createdAt: timestamp(),
+    ...overrides,
+  };
 }

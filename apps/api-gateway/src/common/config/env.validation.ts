@@ -54,6 +54,11 @@ export const envValidationSchema = Joi.object({
     .valid(...COOKIE_SAMESITE_OPTIONS),
 
   AUTH_SERVICE_URL: Joi.string().required(),
+  TICKET_SERVICE_URL: Joi.string().required(),
+
+  // The gateway is a hybrid app: HTTP for clients, and a NATS CONSUMER for the
+  // domain events it relays to WebSocket rooms. It publishes nothing.
+  NATS_URL: Joi.string().required(),
 
   // Rate-limit counters live in Redis rather than in-process memory: with the
   // in-memory default every replica keeps its own tally, so a 5-per-15-minutes
@@ -71,4 +76,12 @@ export const envValidationSchema = Joi.object({
   THROTTLER_LONG_LIMIT: Joi.number().required(),
   THROTTLER_AUTH_TTL: Joi.number().required(),
   THROTTLER_AUTH_LIMIT: Joi.number().required(),
+
+  // WebSocket handshake flood control. Separate numbers from the HTTP tiers
+  // because they meter a different thing: opening a connection, not making a
+  // request. Sized generously — a browser reconnects on every network blip, and
+  // the cost of exhausting this is a retry rather than a lockout.
+  WS_HANDSHAKE_LIMIT: Joi.number().required(),
+  WS_HANDSHAKE_TTL: Joi.number().required(),
+  WS_HANDSHAKE_BLOCK_DURATION: Joi.number().required(),
 });

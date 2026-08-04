@@ -278,6 +278,42 @@ export type RequestContext = JwtPayload & {
 export type RequestOrigin = Pick<RequestContext, 'ip' | 'userAgent'>;
 
 /**
+ * Provenance a service can trust, having been OBSERVED by the gateway rather
+ * than claimed by the caller.
+ *
+ * The auth fields are nullable because the gateway calls auth-service before
+ * anyone is authenticated — login, register, password reset and the public
+ * invitation preview all travel with origin alone. A service that needs an
+ * identity must therefore check for one; it may not assume it is there.
+ * `hasIdentity` below, and `requireActor`/`requireTenant` in
+ * `utils/tenant-scope.ts`, are what that check looks like.
+ *
+ * **Lives here rather than in `libs/grpc-proto`, where it started.** It is a
+ * DOMAIN concept — who is calling — with no dependency on gRPC at all, and
+ * `tenantScope()` needs it. Leaving it next to `packRequestContext` (which does
+ * touch `Metadata` and therefore must stay in grpc-proto) would have forced
+ * `libs/common` to import `libs/grpc-proto`, and grpc-proto already imports
+ * common: a package cycle turbo's `dependsOn: ["^build"]` rejects outright.
+ * grpc-proto re-exports both symbols, so every existing import site is
+ * unchanged.
+ */
+export type CallerContext = RequestOrigin & {
+  sub: string | null;
+  organizationId: string | null;
+  isSuperAdmin: boolean;
+  departmentIds: string[];
+  permissionCodes: PermissionCode[];
+  isEmailVerified: boolean;
+};
+
+/** Narrows to a caller with an identity. */
+export function hasIdentity(
+  context: CallerContext,
+): context is CallerContext & { sub: string } {
+  return context.sub !== null;
+}
+
+/**
  * gRPC metadata keys carrying RequestContext across a service hop.
  *
  * Metadata is stringly-typed: a typo on either side does not fail, it silently

@@ -1,0 +1,73 @@
+import { Transform, Type } from 'class-transformer';
+import {
+  IsBoolean,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
+import {
+  FEEDBACK_RATINGS,
+  FeedbackRating,
+  MAX_MESSAGE_CONTENT_LENGTH,
+  trimIfString,
+} from '@synapsedesk/common';
+import { SearchPaginationBase } from '../../../../common/dto/base/search-pagination-base.dto';
+import { ToBoolean } from '../../../../common/decorators/to-boolean.decorator';
+
+export class SubmitFeedbackDto {
+  /**
+   * A thumb, not a scale.
+   *
+   * `@IsIn` over the shared constant rather than a `@Min(-1) @Max(1)` range,
+   * which would also admit 0 — and 0 is the proto zero value the LIST request
+   * reads as "no filter". A rating of zero would mean two different things in
+   * two places.
+   */
+  @Type(() => Number)
+  @IsInt()
+  @IsIn(FEEDBACK_RATINGS)
+  readonly rating!: FeedbackRating;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(MAX_MESSAGE_CONTENT_LENGTH)
+  @Transform(trimIfString)
+  readonly feedbackText?: string;
+
+  /**
+   * Whether the citations the model gave were accurate.
+   *
+   * Tri-state on purpose — absent means "not assessed", which is different from
+   * "assessed and wrong". Collapsing the two would make every un-assessed reply
+   * look like a citation failure in the quality report.
+   */
+  @IsOptional()
+  @IsBoolean()
+  @ToBoolean()
+  readonly citationAccurate?: boolean;
+}
+
+export class ListFeedbackQueryDto extends SearchPaginationBase {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @IsIn(FEEDBACK_RATINGS)
+  readonly rating?: FeedbackRating;
+
+  @IsOptional()
+  @IsBoolean()
+  @ToBoolean()
+  readonly citationAccurate?: boolean;
+
+  @IsOptional()
+  @Type(() => Date)
+  readonly from?: Date;
+
+  @IsOptional()
+  @Type(() => Date)
+  readonly to?: Date;
+}

@@ -1,10 +1,31 @@
 import { Metadata } from '@grpc/grpc-js';
 import {
   GRPC_CONTEXT_METADATA,
+  type CallerContext,
   type PermissionCode,
   type RequestContext,
   type RequestOrigin,
 } from '@synapsedesk/common';
+
+/**
+ * Re-exported, not redefined.
+ *
+ * `CallerContext` and `hasIdentity` moved to `libs/common` so `tenantScope()`
+ * could join them there without `common` importing `grpc-proto` — which would
+ * be a package cycle, since grpc-proto already imports common. Re-exporting
+ * keeps every `from '@synapsedesk/grpc-proto'` call site working: the context
+ * still reads as a gRPC-boundary concept at the places that unpack it from
+ * metadata, which is where it is most legible.
+ *
+ * `hasIdentity` is re-exported via `export … from` directly — it is never
+ * called in this file, only handed onward. `CallerContext` still needs its own
+ * `import` above as well, because it IS used locally (see `unpackCallerContext`
+ * below); `export … from` does not create a local binding, only an `import`
+ * does. The two coexist without conflict — one is a value import for local
+ * use, the other a pure re-export.
+ */
+export { hasIdentity } from '@synapsedesk/common';
+export type { CallerContext };
 
 /**
  * The single round trip for caller context across a service hop.
@@ -15,25 +36,6 @@ import {
  * absent. Keeping pack and unpack adjacent, both driven by
  * `GRPC_CONTEXT_METADATA`, is what stops the two ends drifting.
  */
-
-/**
- * Provenance a service can trust, having been OBSERVED by the gateway rather
- * than claimed by the caller.
- *
- * The auth fields are optional because the gateway calls auth-service before
- * anyone is authenticated — login, register, password reset and the public
- * invitation preview all travel with origin alone. A service that needs an
- * identity must therefore check for one; it may not assume it is there. That is
- * what `requireCallerContext` below is for.
- */
-export type CallerContext = RequestOrigin & {
-  sub: string | null;
-  organizationId: string | null;
-  isSuperAdmin: boolean;
-  departmentIds: string[];
-  permissionCodes: PermissionCode[];
-  isEmailVerified: boolean;
-};
 
 /**
  * Packs whatever the caller has.
@@ -117,13 +119,6 @@ export function unpackCallerContext(metadata?: Metadata): CallerContext {
     isEmailVerified:
       readOne(metadata, GRPC_CONTEXT_METADATA.isEmailVerified) === 'true',
   };
-}
-
-/** Narrows to a caller with an identity. */
-export function hasIdentity(
-  context: CallerContext,
-): context is CallerContext & { sub: string } {
-  return context.sub !== null;
 }
 
 export function readOne(metadata: Metadata | undefined, key: string): string {

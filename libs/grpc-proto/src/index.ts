@@ -10,9 +10,20 @@ export * from './generated/synapsedesk/auth/role';
 export * from './generated/synapsedesk/auth/organization';
 export * from './generated/synapsedesk/auth/platform';
 
+export * from './generated/synapsedesk/ticket/common';
+export * from './generated/synapsedesk/ticket/ticket';
+export * from './generated/synapsedesk/ticket/assignment';
+export * from './generated/synapsedesk/ticket/message';
+export * from './generated/synapsedesk/ticket/ai';
+export * from './generated/synapsedesk/ticket/feedback';
+export * from './generated/synapsedesk/ticket/audit';
+
+export * from './generated/synapsedesk/storage/storage';
+
 export * from './constants';
 export * from './metadata';
 export * from './mappers';
+export * from './pagination';
 
 /**
  * The protobuf package every generated module above belongs to. Passed as the
@@ -38,3 +49,17 @@ export * from './mappers';
  * emitting it, the symbol would vanish from this barrel entirely.
  */
 export const AUTH_PACKAGE_NAME = 'synapsedesk.auth';
+
+/**
+ * Domain B's protobuf package, declared here for the same reason as
+ * AUTH_PACKAGE_NAME above: `exportCommonSymbols=false` suppresses ts-proto's
+ * own copy, because `export *` silently DROPS any name two modules both export
+ * — and with seven generated modules all emitting it, the symbol would vanish
+ * from this barrel entirely.
+ *
+ * Both peers must pass the identical string to `createMicroservice` and
+ * `ClientsModule.register`, or `getService()` returns undefined at boot.
+ */
+export const TICKET_PACKAGE_NAME = 'synapsedesk.ticket';
+
+export const STORAGE_PACKAGE_NAME = 'synapsedesk.storage';

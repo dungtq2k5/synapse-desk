@@ -8,6 +8,9 @@ import {
   PermissionCode,
   ROLE_SORTABLE_FIELDS,
   SystemRoleName,
+  isUniqueConstraintViolation,
+  requireActor,
+  requireTenant,
 } from '@synapsedesk/common';
 import {
   CallerContext,
@@ -21,17 +24,13 @@ import {
   SetRolePermissionsRequest,
   toPageMeta,
   UpdateRoleRequest,
+  emptyPage,
+  toPrismaPage,
+  toSearchFilter,
 } from '@synapsedesk/grpc-proto';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditPublisher } from '../audit/audit-publisher.service';
 import { ROLE_INCLUDE, RoleRow, toRoleResponse } from './role.mapper';
-import { requireActor, requireTenant } from '../../common/utils/tenant-scope';
-import {
-  emptyPage,
-  toPrismaPage,
-  toSearchFilter,
-} from '../../common/utils/pagination';
-import { isUniqueConstraintViolation } from '../../common/utils/utils';
 import { Prisma } from '../../generated/prisma/client';
 
 /**

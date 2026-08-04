@@ -3,6 +3,7 @@ import { RpcException } from '@nestjs/microservices';
 import { status } from '@grpc/grpc-js';
 import {
   CallerContext,
+  ConfirmAvatarUploadRequest,
   CreateUserRequest,
   CreateUserResponse,
   CurrentUserResponse,
@@ -13,24 +14,37 @@ import {
   ListUsersResponse,
   LockUserRequest,
   LockUserResponse,
+  PresignAvatarUploadRequest,
+  PresignAvatarUploadResponse,
   ResetUserTwoFactorResponse,
   SetUserDepartmentsRequest,
   SetUserRolesRequest,
   toPageMeta,
+  toTimestamp,
   UnlockUserResponse,
   UpdateOwnProfileRequest,
   UpdateUserRequest,
   UserIdRequest,
   UserResponse,
   UserSummaryResponse,
+  emptyPage,
+  toPrismaPage,
+  toSearchFilter,
 } from '@synapsedesk/grpc-proto';
 import {
   AuditAction,
   AuditResourceType,
   EmailTemplateName,
-  normalizeEmail,
   SystemRoleName,
   USER_SORTABLE_FIELDS,
+  isUniqueConstraintViolation,
+  normalizeEmail,
+  requireActor,
+  requireTenant,
+  tenantScope,
+  restoreData,
+  softDeleteData,
+  SupersededReason,
 } from '@synapsedesk/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditPublisher } from '../audit/audit-publisher.service';
@@ -38,6 +52,7 @@ import { NotificationPublisher } from '../notifications/notification-publisher.s
 import { RolesService } from '../roles/roles.service';
 import { SessionsService } from '../sessions/sessions.service';
 import { OrganizationsService } from '../organizations/organizations.service';
+import { StorageReferenceService } from '../storage-client/storage-reference.service';
 import {
   toUserResponse,
   toUserSummaryResponse,
@@ -45,18 +60,6 @@ import {
   UserSummaryRow,
 } from './user.mapper';
 import { flattenPermissionCodes } from '../../common/utils/permissions';
-import {
-  requireActor,
-  requireTenant,
-  tenantScope,
-} from '../../common/utils/tenant-scope';
-import {
-  emptyPage,
-  toPrismaPage,
-  toSearchFilter,
-} from '../../common/utils/pagination';
-import { restoreData, softDeleteData } from '../../common/utils/soft-delete';
-import { isUniqueConstraintViolation } from '../../common/utils/utils';
 import { Prisma } from '../../generated/prisma/client';
 
 @Injectable()
@@ -68,6 +71,7 @@ export class UsersService {
     private readonly rolesService: RolesService,
     private readonly sessionsService: SessionsService,
     private readonly organizationsService: OrganizationsService,
+    private readonly storage: StorageReferenceService,
   ) {}
 
   /**
@@ -90,8 +94,16 @@ export class UsersService {
       });
     }
 
+    // No CallerContext here — the gateway calls this DURING token
+    // verification, before one exists. See `resolveOwnReadUrls`.
+    const avatarUrls = await this.storage.resolveOwnReadUrls(
+      user.avatarUrl ? [user.avatarUrl] : [],
+      user.organizationId,
+      user.id,
+    );
+
     return {
-      user: toUserResponse(user),
+      user: toUserResponse(user, avatarUrls),
       permissionCodes: flattenPermissionCodes(user.roles),
       departmentIds: user.userDepartments.map((ud) => ud.departmentId),
     };
@@ -125,7 +137,7 @@ export class UsersService {
       },
     });
 
-    return toUserResponse(user);
+    return toUserResponse(user, await this.resolveAvatarUrls([user], context));
   }
 
   // -------------------------------------------------------------------------
@@ -162,8 +174,15 @@ export class UsersService {
       this.prisma.user.count({ where }),
     ]);
 
+    // ONE storage call for the whole page, not one per row — the N+1 the
+    // batched `getSignedReadUrls` exists to prevent.
+    //
+    // The arrow is required, not style: `items.map(toUserSummaryResponse)`
+    // would hand the array INDEX to the second parameter.
+    const avatarUrls = await this.resolveAvatarUrls(items, context);
+
     return {
-      items: items.map(toUserSummaryResponse),
+      items: items.map((item) => toUserSummaryResponse(item, avatarUrls)),
       meta: toPageMeta(page, totalItems, items.length),
     };
   }
@@ -172,7 +191,11 @@ export class UsersService {
     request: UserIdRequest,
     context: CallerContext,
   ): Promise<UserSummaryResponse> {
-    return toUserSummaryResponse(await this.load(request.id, context));
+    const user = await this.load(request.id, context);
+    return toUserSummaryResponse(
+      user,
+      await this.resolveAvatarUrls([user], context),
+    );
   }
 
   /**
@@ -227,7 +250,7 @@ export class UsersService {
     }
 
     try {
-      const created = await this.prisma.$transaction(async (tx) => {
+      const createdId = await this.prisma.$transaction(async (tx) => {
         // The SAME definition of "seats used" the invitation path applies —
         // extracted so a create rejected here cannot contradict what the usage
         // page reports.
@@ -265,10 +288,23 @@ export class UsersService {
           );
         }
 
-        return tx.user.findUniqueOrThrow({
-          where: { id: user.id },
-          include: USER_SUMMARY_INCLUDE,
-        });
+        return user.id;
+      });
+
+      // Read AFTER the transaction, deliberately.
+      //
+      // `USER_SUMMARY_INCLUDE` pulls three relations, and Prisma's query
+      // interpreter loads them CONCURRENTLY. Inside a transaction that means
+      // three simultaneous queries on the one connection the transaction has
+      // pinned, which pg only tolerates because it queues them — it warns
+      // today and removes the queue in pg@9.
+      //
+      // Outside, they run on the pool where concurrency is the point. It is
+      // also simply less work to hold a transaction open for: every statement
+      // above is a write, and this is a pure read-back of committed rows.
+      const created = await this.prisma.user.findUniqueOrThrow({
+        where: { id: createdId },
+        include: USER_SUMMARY_INCLUDE,
       });
 
       this.audit.record(context, {
@@ -278,7 +314,12 @@ export class UsersService {
         metadata: { email: created.email, roleIds: request.roleIds },
       });
 
-      return { user: toUserSummaryResponse(created) };
+      return {
+        user: toUserSummaryResponse(
+          created,
+          await this.resolveAvatarUrls([created], context),
+        ),
+      };
     } catch (error) {
       // The race the pre-check cannot cover: two concurrent creates of the same
       // address both see it free. `users_org_email_key` is what makes the
@@ -299,6 +340,8 @@ export class UsersService {
   ): Promise<UserSummaryResponse> {
     const existing = await this.load(request.id, context);
 
+    // Write, then re-read — see restoreUser for why the include cannot ride
+    // along on the write.
     const user = await this.prisma.user.update({
       where: { id: existing.id },
       data: {
@@ -307,7 +350,7 @@ export class UsersService {
           ? { phoneNumber: request.phoneNumber.trim() || null }
           : {}),
       },
-      include: USER_SUMMARY_INCLUDE,
+      select: { id: true, fullName: true, phoneNumber: true },
     });
 
     this.audit.record(context, {
@@ -323,7 +366,15 @@ export class UsersService {
       },
     });
 
-    return toUserSummaryResponse(user);
+    const updated = await this.prisma.user.findUniqueOrThrow({
+      where: { id: user.id },
+      include: USER_SUMMARY_INCLUDE,
+    });
+
+    return toUserSummaryResponse(
+      updated,
+      await this.resolveAvatarUrls([updated], context),
+    );
   }
 
   /**
@@ -390,10 +441,15 @@ export class UsersService {
     }
 
     try {
+      // The write does NOT carry the include. Prisma has to make a write plus
+      // its relation reads atomic, so it opens an implicit transaction — and
+      // the include's relation loads then run concurrently on that
+      // transaction's single connection, which is the pg deprecation. Splitting
+      // the read out keeps the write a plain statement.
       const user = await this.prisma.user.update({
         where: { id: existing.id },
         data: restoreData(),
-        include: USER_SUMMARY_INCLUDE,
+        select: { id: true, email: true },
       });
 
       this.audit.record(context, {
@@ -403,7 +459,15 @@ export class UsersService {
         metadata: { email: user.email },
       });
 
-      return toUserSummaryResponse(user);
+      const restored = await this.prisma.user.findUniqueOrThrow({
+        where: { id: user.id },
+        include: USER_SUMMARY_INCLUDE,
+      });
+
+      return toUserSummaryResponse(
+        restored,
+        await this.resolveAvatarUrls([restored], context),
+      );
     } catch (error) {
       // Clearing `deleted_at` re-enters `users_org_email_key`, which is partial
       // on `deleted_at IS NULL`. Someone may have taken the address in the
@@ -547,7 +611,7 @@ export class UsersService {
   ): Promise<UserSummaryResponse> {
     const target = await this.load(request.id, context);
 
-    const user = await this.prisma.$transaction(async (tx) => {
+    await this.prisma.$transaction(async (tx) => {
       // Tenant validation, the no-escalation rule and the `user_assigned`
       // counter all live in RolesService, so every grant path shares them.
       await this.rolesService.setUserRoles(
@@ -556,11 +620,14 @@ export class UsersService {
         request.roleIds,
         context,
       );
+    });
 
-      return tx.user.findUniqueOrThrow({
-        where: { id: target.id },
-        include: USER_SUMMARY_INCLUDE,
-      });
+    // Read-back AFTER the transaction — see createUser for why: a multi-relation
+    // include issues its relation loads concurrently, which inside a
+    // transaction means several queries on one pinned connection.
+    const user = await this.prisma.user.findUniqueOrThrow({
+      where: { id: target.id },
+      include: USER_SUMMARY_INCLUDE,
     });
 
     this.audit.record(context, {
@@ -573,7 +640,10 @@ export class UsersService {
       },
     });
 
-    return toUserSummaryResponse(user);
+    return toUserSummaryResponse(
+      user,
+      await this.resolveAvatarUrls([user], context),
+    );
   }
 
   async setUserDepartments(
@@ -583,7 +653,7 @@ export class UsersService {
     const target = await this.load(request.id, context);
     const actorId = requireActor(context);
 
-    const user = await this.prisma.$transaction(async (tx) => {
+    await this.prisma.$transaction(async (tx) => {
       await tx.userDepartment.deleteMany({ where: { userId: target.id } });
 
       if (request.departments.length > 0) {
@@ -595,11 +665,12 @@ export class UsersService {
           actorId,
         );
       }
+    });
 
-      return tx.user.findUniqueOrThrow({
-        where: { id: target.id },
-        include: USER_SUMMARY_INCLUDE,
-      });
+    // Read-back AFTER the transaction — see createUser for why.
+    const user = await this.prisma.user.findUniqueOrThrow({
+      where: { id: target.id },
+      include: USER_SUMMARY_INCLUDE,
     });
 
     this.audit.record(context, {
@@ -612,7 +683,10 @@ export class UsersService {
       },
     });
 
-    return toUserSummaryResponse(user);
+    return toUserSummaryResponse(
+      user,
+      await this.resolveAvatarUrls([user], context),
+    );
   }
 
   // -------------------------------------------------------------------------
@@ -743,24 +817,162 @@ export class UsersService {
     return user;
   }
 
+  // -------------------------------------------------------------------------
+  // Avatars — 10-storage-service.md §3.1
+  // -------------------------------------------------------------------------
+
+  /**
+   * Step 1 of presign → upload → confirm.
+   *
+   * `ownerId` is the CALLER, taken from the verified context inside
+   * `StorageReferenceService` — there is no parameter here through which one
+   * user could presign an upload into another user's avatar prefix.
+   */
+  async presignAvatarUpload(
+    request: PresignAvatarUploadRequest,
+    context: CallerContext,
+  ): Promise<PresignAvatarUploadResponse> {
+    requireActor(context);
+
+    try {
+      const presigned = await this.storage.presignAvatar(
+        {
+          contentType: request.contentType,
+          sizeBytes: request.sizeBytes,
+          fileName: request.originalFileName,
+        },
+        context,
+      );
+
+      return {
+        uploadUrl: presigned.uploadUrl,
+        objectPath: presigned.objectPath,
+        expiresAt: toTimestamp(presigned.expiresAt),
+      };
+    } catch (error) {
+      throw StorageReferenceService.asClientError(error);
+    }
+  }
+
+  /**
+   * Step 6: confirm, then commit.
+   *
+   * The OLD path is read BEFORE the column is overwritten, and that ordering is
+   * the whole method. Reading it afterwards would give back the new path, and
+   * the supersede event would then delete the avatar the user just uploaded —
+   * a one-line mistake with a very confusing symptom.
+   */
+  async confirmAvatarUpload(
+    request: ConfirmAvatarUploadRequest,
+    context: CallerContext,
+  ): Promise<UserResponse> {
+    const actorId = requireActor(context);
+
+    try {
+      await this.storage.confirmAvatar(request.objectPath, context);
+    } catch (error) {
+      throw StorageReferenceService.asClientError(error);
+    }
+
+    const existing = await this.prisma.user.findUniqueOrThrow({
+      where: { id: actorId },
+      select: { avatarUrl: true },
+    });
+
+    const user = await this.prisma.user.update({
+      where: { id: actorId },
+      data: { avatarUrl: request.objectPath },
+    });
+
+    this.audit.record(context, {
+      action: AuditAction.USER_AVATAR_UPDATED,
+      resourceType: AuditResourceType.USER,
+      resourceId: actorId,
+      metadata: { after: { avatarUrl: request.objectPath } },
+    });
+
+    // ONLY if there was one. A first-ever upload has nothing to supersede, and
+    // emitting for an empty path would ask storage-service to delete "whatever
+    // the empty string resolves to".
+    if (existing.avatarUrl) {
+      this.storage.emitSuperseded(
+        existing.avatarUrl,
+        SupersededReason.REPLACED,
+      );
+    }
+
+    return toUserResponse(user, await this.resolveAvatarUrls([user], context));
+  }
+
+  async deleteAvatar(context: CallerContext): Promise<UserResponse> {
+    const actorId = requireActor(context);
+
+    const existing = await this.prisma.user.findUniqueOrThrow({
+      where: { id: actorId },
+      select: { avatarUrl: true },
+    });
+
+    const user = await this.prisma.user.update({
+      where: { id: actorId },
+      data: { avatarUrl: null },
+    });
+
+    this.audit.record(context, {
+      action: AuditAction.USER_AVATAR_UPDATED,
+      resourceType: AuditResourceType.USER,
+      resourceId: actorId,
+      metadata: { before: { avatarUrl: existing.avatarUrl } },
+    });
+
+    if (existing.avatarUrl) {
+      this.storage.emitSuperseded(
+        existing.avatarUrl,
+        SupersededReason.RECORD_DELETED,
+      );
+    }
+
+    return toUserResponse(user, await this.resolveAvatarUrls([user], context));
+  }
+
+  /**
+   * Turns stored object PATHS into signed read URLs — §1.3.
+   *
+   * Batched across a whole page rather than one call per row: a list of fifty
+   * users each showing an avatar would otherwise be fifty signing calls. A path
+   * that will not resolve is simply absent, and the caller renders null.
+   */
+  async resolveAvatarUrls(
+    users: Array<{ avatarUrl: string | null }>,
+    context: CallerContext,
+  ): Promise<Record<string, string>> {
+    return this.storage.resolveReadUrls(
+      users
+        .map((user) => user.avatarUrl)
+        .filter((path): path is string => !!path),
+      context,
+    );
+  }
+
   /**
    * The profile columns shared by `updateOwnProfile` and `updateUser`.
    *
    * An absent field means "leave unchanged"; an empty string clears. Collapsing
    * the two would make a date of birth impossible to remove once set.
    */
+  /**
+   * Deliberately cannot write `avatarUrl`. That column is owned by the
+   * presign -> upload -> confirm flow, which is what proves the object exists
+   * and belongs to the caller, and what supersedes the previous one. A profile
+   * update that could set it to any string bypassed all three.
+   */
   private toProfileData(request: {
     fullName?: string;
     dob?: string;
     gender?: number;
-    avatarUrl?: string;
   }): Prisma.UserUpdateInput {
     const data: Prisma.UserUpdateInput = {};
 
     if (request.fullName !== undefined) data.fullName = request.fullName.trim();
-    if (request.avatarUrl !== undefined) {
-      data.avatarUrl = request.avatarUrl.trim() || null;
-    }
     if (request.gender !== undefined) {
       data.gender = fromProtoGender(request.gender);
     }

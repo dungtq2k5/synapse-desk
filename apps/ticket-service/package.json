@@ -4,23 +4,40 @@
   "scripts": {
     "build": "nest build",
     "dev": "nest start --watch",
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "db:studio": "prisma studio",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\"",
-    "clean": "rimraf dist *.tsbuildinfo"
+    "clean": "rimraf dist *.tsbuildinfo",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
-    "@nestjs/common": "^11.1.28",
-    "@nestjs/core": "^11.1.28",
-    "@nestjs/microservices": "^11.1.28",
     "@grpc/grpc-js": "^1.14.4",
     "@grpc/proto-loader": "^0.8.1",
-    "nats": "^2.29.3",
+    "@nestjs/common": "^11.1.28",
+    "@nestjs/config": "^4.0.4",
+    "@nestjs/core": "^11.1.28",
+    "@nestjs/microservices": "^11.1.28",
+    "@nestjs/platform-express": "^11.1.28",
+    "@prisma/adapter-pg": "^7.9.1",
+    "@prisma/client": "^7.9.1",
     "@synapsedesk/common": "*",
     "@synapsedesk/grpc-proto": "*",
+    "dotenv": "^17.4.2",
+    "joi": "^18.2.3",
+    "nats": "^2.29.3",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2"
   },
   "devDependencies": {
+    "@faker-js/faker": "^10.5.0",
     "@nestjs/cli": "^11.0.24",
+    "@nestjs/testing": "^11.1.28",
+    "@types/jest": "^30.0.0",
+    "jest": "^30.4.2",
+    "jest-mock-extended": "^4.0.1",
+    "prisma": "^7.9.1",
+    "ts-jest": "^29.4.12",
     "typescript": "^6.0.3"
   }
 }

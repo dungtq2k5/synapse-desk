@@ -4,12 +4,7 @@
   "sourceRoot": "src",
   "compilerOptions": {
     "deleteOutDir": true,
-    "tsConfigPath": "tsconfig.build.json",
-    "assets": [
-      {
-        "include": "**/*.proto",
-        "outDir": "dist/src"
-      }
-    ]
-  }
+    "tsConfigPath": "tsconfig.build.json"
+  },
+  "entryFile": "apps/ticket-service/src/main"
 }

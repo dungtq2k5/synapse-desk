@@ -28,22 +28,24 @@ import {
   AuditAction,
   AuditResourceType,
   EmailTemplateName,
-  extractEmailDomain,
   JwtPayload,
   OrgStatus,
-  SystemRoleName,
   RequestOrigin,
-  normalizeEmail,
+  SystemRoleName,
   TenantSelectionJwtPayload,
   TwoFactorJwtPayload,
   WEB_ROUTES,
+  extractEmailDomain,
+  isUniqueConstraintViolation,
+  normalizeEmail,
+  requireActor,
+  tenantScope,
 } from '@synapsedesk/common';
 import { JwtService, JwtSignOptions } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import {
   addDays,
   addMinutes,
-  isUniqueConstraintViolation,
   stripTrailingSlashes,
   generateSecureToken,
   generateUniqueOrganizationSlug,
@@ -62,7 +64,7 @@ import { RolesService } from '../roles/roles.service';
 import { flattenPermissionCodes } from '../../common/utils/permissions';
 import { SessionsService } from '../sessions/sessions.service';
 import { AuditPublisher } from '../audit/audit-publisher.service';
-import { requireActor, tenantScope } from '../../common/utils/tenant-scope';
+import { StorageReferenceService } from '../storage-client/storage-reference.service';
 import {
   FirebaseService,
   type GoogleIdentity,
@@ -118,6 +120,9 @@ export class AuthService {
     private readonly rolesService: RolesService,
     private readonly sessionsService: SessionsService,
     private readonly audit: AuditPublisher,
+    // Login and register embed a user, so they need avatars resolved too — a
+    // raw object path is the same leak there as on GET /users/me.
+    private readonly storage: StorageReferenceService,
   ) {
     this.JWT_2FA_EXPIRES_IN =
       this.configService.getOrThrow<string>('JWT_2FA_EXPIRES_IN');
@@ -242,7 +247,15 @@ export class AuthService {
     fullName: string;
     passwordHash: string;
     emailDomain: string;
-  }): Promise<{ created: UserWithAccess; organizationName: string }> {
+  }): Promise<{
+    created: {
+      id: string;
+      email: string;
+      fullName: string;
+      organizationId: string | null;
+    };
+    organizationName: string;
+  }> {
     const { email, fullName, passwordHash, emailDomain } = input;
 
     try {
@@ -295,6 +308,15 @@ export class AuthService {
           tx,
         );
 
+        // `select`, not `include: USER_WITH_ACCESS`. The caller reads four
+        // scalars off this row and never touches the relations, so including
+        // them fetched an organization, every department and every role WITH
+        // its permissions to throw all of it away.
+        //
+        // It also cost correctness noise: a multi-relation include issues its
+        // relation loads concurrently, and inside a transaction those land on
+        // the single connection the transaction has pinned — which pg only
+        // tolerates by queueing them, a queue it removes in pg@9.
         const created = await tx.user.create({
           data: {
             organizationId: org.id,
@@ -304,7 +326,12 @@ export class AuthService {
             isEmailVerified: false,
             roles: { connect: { id: roleId } },
           },
-          include: USER_WITH_ACCESS,
+          select: {
+            id: true,
+            email: true,
+            fullName: true,
+            organizationId: true,
+          },
         });
 
         return { created, organizationName: org.name };
@@ -853,7 +880,16 @@ export class AuthService {
     return {
       accessToken: this.generateAccessToken(this.buildJwtPayload(user)),
       refreshToken,
-      user: toUserResponse(user),
+      user: toUserResponse(
+        user,
+        // Pre-auth path: no CallerContext exists yet, so the tenant comes
+        // from the row. See `resolveOwnReadUrls`.
+        await this.storage.resolveOwnReadUrls(
+          user.avatarUrl ? [user.avatarUrl] : [],
+          user.organizationId,
+          user.id,
+        ),
+      ),
     };
   }
 
@@ -930,7 +966,16 @@ export class AuthService {
       // Returned so the 2FA flow can mark THIS session trusted; there is no
       // other way to name the row it just created.
       sessionId: session.id,
-      user: toUserResponse(user),
+      user: toUserResponse(
+        user,
+        // Pre-auth path: no CallerContext exists yet, so the tenant comes
+        // from the row. See `resolveOwnReadUrls`.
+        await this.storage.resolveOwnReadUrls(
+          user.avatarUrl ? [user.avatarUrl] : [],
+          user.organizationId,
+          user.id,
+        ),
+      ),
     };
   }
 
@@ -1221,9 +1266,17 @@ export class AuthService {
   /**
    * Backfills profile fields Google can supply and we do not have yet.
    *
-   * Only ever FILLS GAPS: a name or avatar the user has since edited here is
-   * never overwritten from their Google profile, because ours is the more
-   * deliberate choice.
+   * Only ever FILLS GAPS: a name the user has since edited here is never
+   * overwritten from their Google profile, because ours is the more deliberate
+   * choice.
+   *
+   * `avatar_url` is deliberately NOT backfilled. It holds an internal storage
+   * object path, and `identity.avatarUrl` is Google's CDN URL — a different
+   * kind of value entirely. Storing it made the column mean two things, so
+   * `organizationIdFromObjectPath` and `resolveReadUrls` silently mishandled
+   * those rows, and replacing such an avatar emitted an external URL as an
+   * `objectPath` to storage-service's delete path. A Google user has no avatar
+   * until they upload one through presign -> confirm.
    */
   private async linkGoogleIdentity(
     user: UserWithAccess,
@@ -1236,15 +1289,20 @@ export class AuthService {
     if (!user.isEmailVerified && identity.emailVerified) {
       patch.isEmailVerified = true;
     }
-    if (!user.avatarUrl && identity.avatarUrl) {
-      patch.avatarUrl = identity.avatarUrl;
-    }
 
     if (Object.keys(patch).length === 0) return user;
 
-    return this.prisma.user.update({
+    // Write, then re-read. A write carrying a multi-relation include makes
+    // Prisma open an implicit transaction and load the relations concurrently
+    // on its one connection — the pg deprecation. Two plain statements instead.
+    await this.prisma.user.update({
       where: { id: user.id },
       data: patch,
+      select: { id: true },
+    });
+
+    return this.prisma.user.findUniqueOrThrow({
+      where: { id: user.id },
       include: USER_WITH_ACCESS,
     });
   }
@@ -1285,27 +1343,37 @@ export class AuthService {
           // Google may withhold the name; the local part is a usable stand-in
           // and fullName is NOT NULL.
           fullName: identity.fullName ?? identity.email.split('@')[0],
-          avatarUrl: identity.avatarUrl,
+          // No `avatarUrl` — see linkGoogleIdentity. Google's CDN URL is not a
+          // storage object path, and this column holds only the latter.
           passwordHash: null,
           isEmailVerified: identity.emailVerified,
           roles: { connect: { id: endUserRoleId } },
         },
-        include: USER_WITH_ACCESS,
+        select: { id: true },
       });
 
-      return { user, organizationName: org.name };
+      return { userId: user.id, organizationName: org.name };
+    });
+
+    // Hydrated AFTER the transaction. Unlike the password path, the relations
+    // really are needed here — buildJwtPayload reads them — so the read stays,
+    // it just moves off the transaction's single pinned connection, where the
+    // include's concurrent relation loads had to queue behind one another.
+    const user = await this.prisma.user.findUniqueOrThrow({
+      where: { id: created.userId },
+      include: USER_WITH_ACCESS,
     });
 
     this.notifications.sendEmail({
       template: EmailTemplateName.WELCOME,
-      to: created.user.email,
+      to: user.email,
       data: {
-        fullName: created.user.fullName,
+        fullName: user.fullName,
         organizationName: created.organizationName,
         origin: device,
       },
     });
 
-    return created.user;
+    return user;
   }
 }

@@ -1,0 +1,67 @@
+syntax = "proto3";
+
+package synapsedesk.ticket;
+
+import "google/protobuf/timestamp.proto";
+import "synapsedesk/auth/common.proto";
+
+// READ ONLY, and deliberately so.
+//
+// There is no CreateAuditLog message anywhere in this file. The table is
+// populated exclusively by the NATS consumer subscribed to `audit.record`, and
+// the trail's value depends entirely on nobody being able to write to it
+// directly. Expressing that in the CONTRACT rather than only in the gateway's
+// route table means a future contributor cannot add a write path without first
+// noticing there is none to extend.
+
+message AuditLogResponse {
+  string id = 1;
+  // Absent for a platform-level act (RDM §1.7): the event belongs to the
+  // platform, not to the customer it touched.
+  optional string organization_id = 2;
+  optional string user_id = 3;
+  string action = 4;
+  optional string resource_type = 5;
+  optional string resource_id = 6;
+  optional string ip_address = 7;
+  optional string user_agent = 8;
+  // JSON, carried as a string: the shape differs per action, so a typed message
+  // could only be a `map<string, string>` that lost every nested value.
+  string metadata = 9;
+  google.protobuf.Timestamp created_at = 10;
+}
+
+message ListAuditLogsRequest {
+  synapsedesk.auth.PageRequest page = 1;
+  string action = 2;
+  string user_id = 3;
+  string resource_type = 4;
+  string resource_id = 5;
+  optional google.protobuf.Timestamp from = 6;
+  optional google.protobuf.Timestamp to = 7;
+  // Platform scope: reads the `organization_id IS NULL` rows instead of a
+  // tenant's. Refused for anyone but a Super Admin, in the service — never
+  // mixed into a tenant's own view.
+  bool platform_scope = 8;
+}
+
+message ListAuditLogsResponse {
+  repeated AuditLogResponse items = 1;
+  synapsedesk.auth.PageMeta meta = 2;
+}
+
+message ListAuditActionsRequest {
+  bool platform_scope = 1;
+}
+
+// Only the actions that ACTUALLY occurred for this tenant, not the full
+// AuditAction enum — a filter dropdown offering PLATFORM_* to a customer who
+// can never trigger it is a worse experience than a shorter list.
+message ListAuditActionsResponse {
+  repeated string actions = 1;
+}
+
+service AuditService {
+  rpc ListAuditLogs(ListAuditLogsRequest) returns (ListAuditLogsResponse);
+  rpc ListAuditActions(ListAuditActionsRequest) returns (ListAuditActionsResponse);
+}

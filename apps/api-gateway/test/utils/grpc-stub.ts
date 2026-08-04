@@ -21,16 +21,34 @@ import {
   TwoFactorAuthServiceClient,
   USER_SERVICE_NAME,
   UserServiceClient,
+  AI_SERVICE_NAME,
+  AiServiceClient,
+  ASSIGNMENT_SERVICE_NAME,
+  AssignmentServiceClient,
+  AUDIT_SERVICE_NAME,
+  AuditServiceClient,
+  FEEDBACK_SERVICE_NAME,
+  FeedbackServiceClient,
+  MESSAGE_SERVICE_NAME,
+  MessageServiceClient,
+  TICKET_SERVICE_NAME,
+  TicketServiceClient,
 } from '@synapsedesk/grpc-proto';
 
 /**
  * Every proto service the gateway consumes, mocked.
  *
  * Auto-mocked via `mock<T>()` rather than hand-listed method by method: there
- * are ten services and roughly sixty RPCs between them, and a hand-written
- * literal is a second place to update every time an RPC is added — one that
- * fails at runtime with `undefined is not a function`, several layers below the
- * test that actually broke.
+ * are sixteen services and well over a hundred RPCs between them, and a
+ * hand-written literal is a second place to update every time an RPC is added —
+ * one that fails at runtime with `undefined is not a function`, several layers
+ * below the test that actually broke.
+ *
+ * Both PEERS are covered here — auth-service's ten services and ticket-service's
+ * six. They arrive at the gateway through different DI tokens
+ * (`AUTH_GRPC_CLIENT`, `TICKET_GRPC_CLIENT`), and `bootstrapE2eTest` overrides
+ * both with this one `ClientGrpc`: the map is keyed by SERVICE name, which is
+ * unique across both packages, so one stub can serve both tokens.
  */
 export type GrpcStubs = {
   auth: MockProxy<AuthServiceClient>;
@@ -43,6 +61,16 @@ export type GrpcStubs = {
   user: MockProxy<UserServiceClient>;
   role: MockProxy<RoleServiceClient>;
   platform: MockProxy<PlatformServiceClient>;
+
+  // Domain B. Served by a DIFFERENT peer (ticket-service) behind a different
+  // DI token, but stubbed through the same map: a test asserting on a gateway
+  // route should not have to know which service answers it.
+  ticket: MockProxy<TicketServiceClient>;
+  assignment: MockProxy<AssignmentServiceClient>;
+  message: MockProxy<MessageServiceClient>;
+  ai: MockProxy<AiServiceClient>;
+  feedback: MockProxy<FeedbackServiceClient>;
+  audit: MockProxy<AuditServiceClient>;
 };
 
 export type GrpcStubFixture = {
@@ -71,6 +99,13 @@ export function stubGrpcServices(): GrpcStubFixture {
     user: mock<UserServiceClient>(),
     role: mock<RoleServiceClient>(),
     platform: mock<PlatformServiceClient>(),
+
+    ticket: mock<TicketServiceClient>(),
+    assignment: mock<AssignmentServiceClient>(),
+    message: mock<MessageServiceClient>(),
+    ai: mock<AiServiceClient>(),
+    feedback: mock<FeedbackServiceClient>(),
+    audit: mock<AuditServiceClient>(),
   };
 
   const byServiceName: Record<string, unknown> = {
@@ -84,6 +119,13 @@ export function stubGrpcServices(): GrpcStubFixture {
     [USER_SERVICE_NAME]: stubs.user,
     [ROLE_SERVICE_NAME]: stubs.role,
     [PLATFORM_SERVICE_NAME]: stubs.platform,
+
+    [TICKET_SERVICE_NAME]: stubs.ticket,
+    [ASSIGNMENT_SERVICE_NAME]: stubs.assignment,
+    [MESSAGE_SERVICE_NAME]: stubs.message,
+    [AI_SERVICE_NAME]: stubs.ai,
+    [FEEDBACK_SERVICE_NAME]: stubs.feedback,
+    [AUDIT_SERVICE_NAME]: stubs.audit,
   };
 
   const clientGrpc: ClientGrpc = {

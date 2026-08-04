@@ -4,13 +4,20 @@ import {
   AUTH_GRPC_CLIENT,
   USER_SERVICE_NAME,
   UserServiceClient,
+  requireTimestamp,
+  toPageRequest,
+  toProtoGender,
 } from '@synapsedesk/grpc-proto';
 import {
   PermissionCode,
   RequestContext,
   RequestOrigin,
 } from '@synapsedesk/common';
-import { toPageRequest, toProtoGender } from '@synapsedesk/grpc-proto';
+import {
+  ConfirmAvatarDto,
+  PresignAvatarDto,
+  PresignAvatarResponseDto,
+} from './dto/rest/avatar.dto';
 import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
 import { PaginationResponseBase } from '../../common/dto/base/pagination-response-base.dto';
 import { toPaginationMeta } from '../../common/mappers/pagination.mapper';
@@ -72,6 +79,51 @@ export class UserServiceGrpcClient
     return this.call(
       (metadata) =>
         this.userGrpcService.updateOwnProfile(toProfileFields(dto), metadata),
+      context,
+    ).then(toUserResponseDto);
+  }
+
+  // ------------------------------------------------------------- avatars
+
+  presignAvatar(
+    dto: PresignAvatarDto,
+    context: RequestContext,
+  ): Promise<PresignAvatarResponseDto> {
+    return this.call(
+      (metadata) =>
+        this.userGrpcService.presignAvatarUpload(
+          {
+            contentType: dto.contentType,
+            sizeBytes: dto.sizeBytes,
+            originalFileName: dto.fileName,
+          },
+          metadata,
+        ),
+      context,
+    ).then((response) => ({
+      uploadUrl: response.uploadUrl,
+      objectPath: response.objectPath,
+      expiresAt: requireTimestamp(response.expiresAt, 'expiresAt'),
+    }));
+  }
+
+  confirmAvatar(
+    dto: ConfirmAvatarDto,
+    context: RequestContext,
+  ): Promise<UserResponseDto> {
+    return this.call(
+      (metadata) =>
+        this.userGrpcService.confirmAvatarUpload(
+          { objectPath: dto.objectPath },
+          metadata,
+        ),
+      context,
+    ).then(toUserResponseDto);
+  }
+
+  deleteAvatar(context: RequestContext): Promise<UserResponseDto> {
+    return this.call(
+      (metadata) => this.userGrpcService.deleteAvatar({}, metadata),
       context,
     ).then(toUserResponseDto);
   }
@@ -248,13 +300,11 @@ export class UserServiceGrpcClient
  */
 function toProfileFields(dto: {
   fullName?: string;
-  avatarUrl?: string | null;
   gender?: string;
   dob?: string | null;
 }) {
   return {
     fullName: dto.fullName,
-    avatarUrl: dto.avatarUrl === null ? '' : dto.avatarUrl,
     gender: dto.gender === undefined ? undefined : toProtoGender(dto.gender),
     dob: dto.dob === null ? '' : dto.dob,
   };

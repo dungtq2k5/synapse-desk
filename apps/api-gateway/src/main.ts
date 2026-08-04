@@ -7,7 +7,9 @@ import cookieParser from 'cookie-parser';
 import { AllHttpExceptionFilter } from './common/filters/all-http-exception.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
-import { NodeEnv } from '@synapsedesk/common';
+import { MicroserviceOptions } from '@nestjs/microservices';
+import { createNatsTransport, NodeEnv } from '@synapsedesk/common';
+import { RedisIoAdapter } from './common/adapters/redis-io.adapter';
 
 async function bootstrap() {
   const logger = new Logger(AppModule.name);
@@ -72,6 +74,35 @@ async function bootstrap() {
       transform: true,
     }),
   );
+
+  /**
+   * Socket.IO over Redis pub/sub.
+   *
+   * Awaited BEFORE `useWebSocketAdapter`, because `createIOServer` runs
+   * synchronously the moment the first gateway initialises and cannot wait for
+   * a connection that has not been made — attaching the adapter afterwards is a
+   * no-op that presents as "works locally, drops half the events in staging".
+   */
+  const redisIoAdapter = new RedisIoAdapter(app, configService);
+  await redisIoAdapter.connect();
+  app.useWebSocketAdapter(redisIoAdapter);
+
+  /**
+   * The gateway is a HYBRID app: HTTP for clients, plus a NATS consumer.
+   *
+   * It subscribes to the `ticket.*` domain events ticket-service publishes and
+   * relays them into WebSocket rooms. It publishes nothing — the direction is
+   * one-way by design, and a gateway that emitted domain events would be a
+   * gateway with business logic in it.
+   *
+   * `startAllMicroservices` before `listen`: a client that connects the instant
+   * the HTTP port opens must not find a socket layer with no event source
+   * behind it.
+   */
+  app.connectMicroservice<MicroserviceOptions>(
+    createNatsTransport(configService),
+  );
+  await app.startAllMicroservices();
 
   const port = configService.getOrThrow<number>('PORT');
   await app.listen(port);

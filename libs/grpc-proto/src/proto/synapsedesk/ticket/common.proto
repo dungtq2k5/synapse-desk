@@ -1,0 +1,91 @@
+syntax = "proto3";
+
+package synapsedesk.ticket;
+
+import "google/protobuf/timestamp.proto";
+
+// Types shared by more than one service in the ticket package.
+//
+// PageRequest / PageMeta / SortOrder are NOT redeclared in this package. Each
+// file that needs them imports `synapsedesk/auth/common.proto` directly and
+// refers to them fully qualified, because protobuf has no way to merge two
+// definitions of one message name — a second copy here would be a silent
+// divergence the first time a field is added to only one of them, which is the
+// exact hazard the auth package's own common.proto was created to avoid.
+// (This file imports it only where it uses it; buf lint rejects an unused
+// import, which is how it stays honest.)
+//
+// The cross-package import reads oddly (a ticket RPC taking a
+// `synapsedesk.auth.PageRequest`), and the alternative was considered: promote
+// them to a package-neutral `synapsedesk/common.proto`. That is the tidier end
+// state, but moving them RENAMES every generated symbol the gateway and
+// auth-service already import, and `buf breaking` would rightly flag it. Worth
+// doing when there is a third consumer; not worth a breaking change for the
+// second.
+
+// Enumerated ticket columns.
+//
+// Values carry the enum-name prefix because protobuf enum values use C++
+// scoping — they are SIBLINGS of their type, not children — so a bare
+// `UNSPECIFIED` in two enums of one package is a compile error, not a style
+// complaint.
+enum TicketStatus {
+  TICKET_STATUS_UNSPECIFIED = 0;
+  TICKET_STATUS_NEW = 1;
+  TICKET_STATUS_OPEN = 2;
+  TICKET_STATUS_PENDING_AGENT = 3;
+  TICKET_STATUS_ESCALATED = 4;
+  TICKET_STATUS_RESOLVED = 5;
+  TICKET_STATUS_CLOSED = 6;
+}
+
+enum TicketPriority {
+  TICKET_PRIORITY_UNSPECIFIED = 0;
+  TICKET_PRIORITY_LOW = 1;
+  TICKET_PRIORITY_MEDIUM = 2;
+  TICKET_PRIORITY_HIGH = 3;
+  TICKET_PRIORITY_URGENT = 4;
+}
+
+enum TicketSource {
+  TICKET_SOURCE_UNSPECIFIED = 0;
+  TICKET_SOURCE_WEB = 1;
+  TICKET_SOURCE_CHAT = 2;
+  TICKET_SOURCE_EMAIL = 3;
+  TICKET_SOURCE_API = 4;
+}
+
+enum ReassignmentReason {
+  REASSIGNMENT_REASON_UNSPECIFIED = 0;
+  REASSIGNMENT_REASON_INITIAL = 1;
+  REASSIGNMENT_REASON_DEPARTMENT_CHANGE = 2;
+  REASSIGNMENT_REASON_ESCALATION = 3;
+  REASSIGNMENT_REASON_UNAVAILABLE = 4;
+  REASSIGNMENT_REASON_LOAD_BALANCING = 5;
+  REASSIGNMENT_REASON_SELF_ASSIGNED = 6;
+  REASSIGNMENT_REASON_MANUAL = 7;
+}
+
+// A ticket as every read RPC returns it.
+message TicketResponse {
+  string id = 1;
+  // int64 rather than the DB's BIGINT-as-BigInt: `longs: Number` in
+  // GRPC_LOADER_OPTIONS makes this a plain JS number on both ends, which is
+  // exact up to 2^53 and therefore fine for a ticket counter.
+  int64 ticket_number = 2;
+  string organization_id = 3;
+  string author_id = 4;
+  TicketSource source = 5;
+  TicketStatus status = 6;
+  TicketPriority priority = 7;
+  string title = 8;
+  string description = 9;
+  optional string current_assignee_id = 10;
+  optional string current_department_id = 11;
+  optional google.protobuf.Timestamp escalated_at = 12;
+  optional google.protobuf.Timestamp resolved_at = 13;
+  google.protobuf.Timestamp created_at = 14;
+  google.protobuf.Timestamp updated_at = 15;
+  optional google.protobuf.Timestamp deleted_at = 16;
+  optional string deleted_by_id = 17;
+}
