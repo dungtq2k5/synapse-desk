@@ -613,7 +613,24 @@ def _clamped_limit(requested: int, default: int) -> int:
 
 
 async def build_dependencies(config: Config) -> Dependencies:
-    """Constructs the real collaborators. Tests build their own."""
+    """Constructs the real collaborators. Tests build their own.
+
+    Which is why the key check lives HERE and not in `load_config`: the suite
+    never reaches this function, so a developer running the tests needs no
+    Gemini key — the embedding client is substituted outright — while anyone
+    starting a real server needs one before the first question, not after it.
+    """
+    if not config.gemini_api_key:
+        # Checked before constructing anything. Without it the first failure is
+        # `ValueError: Missing key inputs argument!` raised inside
+        # `google.genai`, eight frames deep, naming neither this service nor the
+        # variable that is actually missing.
+        raise RuntimeError(
+            "GEMINI_API_KEY is empty. The server needs it for embeddings and "
+            "generation; set it in apps/rag-service/.env. (The test suite does "
+            "not — it substitutes the embedding client.)"
+        )
+
     qdrant = AsyncQdrantClient(url=config.qdrant_url)
     await ensure_collection(qdrant)
 
