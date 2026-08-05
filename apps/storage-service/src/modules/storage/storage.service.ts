@@ -3,9 +3,12 @@ import { ConfigService } from '@nestjs/config';
 import { RpcException } from '@nestjs/microservices';
 import { status } from '@grpc/grpc-js';
 import { randomUUID } from 'node:crypto';
+import { Observable, throwError } from 'rxjs';
 import {
   CallerContext,
   ConfirmUploadRequest,
+  DownloadObjectChunk,
+  DownloadObjectRequest,
   ConfirmUploadResponse,
   GetSignedReadUrlsRequest,
   GetSignedReadUrlsResponse,
@@ -292,6 +295,66 @@ export class StorageService {
     return {
       urlsByPath: Object.fromEntries(entries.filter((entry) => entry !== null)),
     };
+  }
+
+  /**
+   * The bytes, STREAMED, for a service rather than a browser.
+   *
+   * The tenant check is the same one `getSignedReadUrls` applies and it is the
+   * only one this service can make: it does not know a document's department
+   * scoping and never will — `ingestion-service` checks that before it asks.
+   * What this owns is the coarser boundary, that a caller in one tenant cannot
+   * read another tenant's object, and that check must not be skipped merely
+   * because the caller is an internal service. "Internal" is not a tenant.
+   *
+   * Streamed rather than returned whole: a 25 MB document against a 10 MB gRPC
+   * message limit fails, and it fails on the first real 200-page PDF rather
+   * than on any fixture.
+   */
+  downloadObject(
+    request: DownloadObjectRequest,
+    context: CallerContext,
+  ): Observable<DownloadObjectChunk> {
+    const organizationId = requireTenant(context);
+    const objectPath = request.objectPath;
+
+    if (organizationIdFromObjectPath(objectPath) !== organizationId) {
+      // NOT_FOUND rather than PERMISSION_DENIED, matching every other read in
+      // this system: "you may not read this" confirms the object exists, which
+      // turns path enumeration into an oracle.
+      return throwError(
+        () =>
+          new RpcException({
+            code: status.NOT_FOUND,
+            message: 'No such object',
+          }),
+      );
+    }
+
+    return new Observable<DownloadObjectChunk>((subscriber) => {
+      const stream = this.firebase.bucket
+        .file(objectPath)
+        .createReadStream({ validation: false });
+
+      stream.on('data', (data: Buffer) => subscriber.next({ data }));
+      stream.on('end', () => subscriber.complete());
+      stream.on('error', (error: unknown) => {
+        this.logger.warn(
+          `Could not read '${objectPath}': ${formatErrorMsg(error)}`,
+        );
+        subscriber.error(
+          new RpcException({
+            code: status.NOT_FOUND,
+            message: 'No such object',
+          }),
+        );
+      });
+
+      // Unsubscribing must destroy the stream, or a cancelled download leaks a
+      // socket per call — and the worker cancels routinely, because a job that
+      // times out mid-download is the ordinary case rather than the strange one.
+      return () => stream.destroy();
+    });
   }
 
   // -------------------------------------------------------------------------

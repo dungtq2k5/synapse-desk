@@ -1,0 +1,114 @@
+import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { formatErrorMsg } from '@synapsedesk/common';
+import { PrismaService } from './prisma.service';
+
+/**
+ * Bootstrap DDL for ingestion-service.
+ *
+ * Like ticket-service's, this seeds no ROWS — Domain C has no reference data.
+ * What it applies is the five indexes `schema.prisma` cannot express, and two
+ * of them are not optimisations:
+ *
+ *   - `documents_org_hash_key` is the PER-TENANT dedup rule. A plain
+ *     `@@unique([organizationId, fileHash])` would survive a soft delete and
+ *     block re-uploading a document you had deleted; the partial index releases
+ *     the slot, which is the whole reason it is partial.
+ *   - `document_chunks_fts_idx` is the lexical retrieval arm's index, and it is
+ *     COMPOSITE for a security-adjacent reason (11-doc §1.4): tenant filtering
+ *     must happen BEFORE text matching. A GIN index on the tsvector alone
+ *     matches text across every tenant's chunks and filters afterwards — not a
+ *     leak, but a query that degrades exactly as the corpus grows.
+ *
+ * All idempotent (`IF NOT EXISTS`), so running on every boot is safe and so is
+ * running concurrently across replicas: `CREATE ... IF NOT EXISTS` has no
+ * read-then-write race to lose.
+ */
+@Injectable()
+export class DatabaseSeeder implements OnApplicationBootstrap {
+  private readonly logger = new Logger(DatabaseSeeder.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly configService: ConfigService,
+  ) {}
+
+  async onApplicationBootstrap(): Promise<void> {
+    if (!this.configService.getOrThrow<boolean>('SEED_ON_BOOTSTRAP')) {
+      this.logger.log('SEED_ON_BOOTSTRAP is false — skipping schema seed');
+      return;
+    }
+
+    await this.seed();
+  }
+
+  async seed(): Promise<void> {
+    try {
+      await this.applyIndexes();
+      this.logger.log('ingestion-service schema seed complete');
+    } catch (error) {
+      this.logger.error(`Schema seed failed: ${formatErrorMsg(error)}`);
+      throw error;
+    }
+  }
+
+  /**
+   * The five indexes Prisma cannot express — §7.2 discipline.
+   *
+   * `pg_trgm` is deliberately absent: the lexical arm is full-text search, not
+   * fuzzy matching, and adding an extension nothing queries would be one more
+   * thing that has to exist in every environment.
+   */
+  private async applyIndexes(): Promise<void> {
+    // Per-tenant dedup. Two tenants uploading the same public PDF are two
+    // documents — global dedup would leak the existence of one tenant's upload
+    // to another, which is the kind of leak nobody looks for.
+    //
+    // `WHERE deleted_at IS NULL` so a soft delete releases the slot. Restoring
+    // into a hash somebody else has since taken is then a P2002 the service
+    // catches and names, exactly as Domain A's user restore does.
+    await this.prisma.$executeRawUnsafe(`
+      CREATE UNIQUE INDEX IF NOT EXISTS "documents_org_hash_key"
+        ON "documents" ("organization_id", "file_hash")
+        WHERE "deleted_at" IS NULL;
+    `);
+
+    // The lexical retrieval arm's index — COMPOSITE, not a bare tsvector GIN.
+    //
+    // `'simple'` and not `'english'`: the corpus is multilingual because the
+    // embedding model is, and the english dictionary stems and stop-words
+    // non-English text into nonsense. Per-tenant language configuration is a
+    // later decision, and only if a tenant demonstrably needs stemming.
+    //
+    // btree_gin is what lets a GIN index carry the plain `organization_id`
+    // alongside the tsvector; without the extension Postgres rejects the mixed
+    // operator classes.
+    await this.prisma.$executeRawUnsafe(
+      `CREATE EXTENSION IF NOT EXISTS btree_gin;`,
+    );
+    await this.prisma.$executeRawUnsafe(`
+      CREATE INDEX IF NOT EXISTS "document_chunks_fts_idx"
+        ON "document_chunks"
+        USING GIN ("organization_id", to_tsvector('simple', "content_text"));
+    `);
+
+    // `department_ids` is queried with && (array overlap) on every retrieval.
+    await this.prisma.$executeRawUnsafe(`
+      CREATE INDEX IF NOT EXISTS "document_chunks_dept_idx"
+        ON "document_chunks" USING GIN ("department_ids");
+    `);
+
+    // The daily chunk-usage projection is an array-containment scan over the
+    // largest table in the system. Without these it is a sequential scan, and
+    // the job that keeps Table 19's counters honest becomes the slowest thing
+    // running.
+    await this.prisma.$executeRawUnsafe(`
+      CREATE INDEX IF NOT EXISTS "ai_generations_retrieved_idx"
+        ON "ai_generations" USING GIN ("retrieved_chunk_ids");
+    `);
+    await this.prisma.$executeRawUnsafe(`
+      CREATE INDEX IF NOT EXISTS "ai_generations_cited_idx"
+        ON "ai_generations" USING GIN ("cited_chunk_ids");
+    `);
+  }
+}

@@ -51,6 +51,16 @@ export interface CreateMessageRequest {
    * (rag-service down) without losing what the human typed.
    */
   invokeAi: boolean;
+  /**
+   * The `ai_generations` row this reply came from, when an agent is posting a
+   * co-pilot draft. Closes the ACCEPTANCE LOOP: ticket-service compares the
+   * sent text against the stored draft and records ACCEPTED or EDITED, which
+   * is the one number that justifies the co-pilot existing.
+   *
+   * Absent for an ordinary reply, and absent is not an error — most replies
+   * are typed by a human from nothing.
+   */
+  generatedFromId?: string | undefined;
 }
 
 export interface ListMessagesRequest {

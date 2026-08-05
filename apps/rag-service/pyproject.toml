@@ -1,0 +1,100 @@
+[project]
+name = "rag-service"
+version = "1.0.0"
+requires-python = ">=3.12"
+
+[tool.ruff]
+# The Python half's answer to eslint + prettier on the TypeScript side. It
+# exists because this service has no compiler to lean on, which is the same
+# reason `check-model-literals.mjs` scans `.py` as well as `.ts`.
+target-version = "py312"
+src = ["src", "."]
+
+# protoc writes these and rewrites them on every `npm run proto:generate`, so
+# any fix applied here is undone by the next generation and shows up as diff
+# noise in between. The same exclusion the TypeScript half makes for
+# `**/generated/` in `.prettierignore` and `eslint.config.mjs`.
+extend-exclude = ["src/rag_service/generated", "**/__pycache__"]
+
+[tool.ruff.lint]
+# Chosen from the findings that were ACTUALLY present, rather than by taking
+# ruff's defaults wholesale. Those defaults add ~99 `Optional[X]` -> `X | None`
+# rewrites across files with nothing else wrong with them, which is a
+# reasonable modernization and a separate, mechanical commit — not something to
+# bury a set of real fixes inside.
+select = [
+  "E",      # pycodestyle
+  "F",      # pyflakes — unused imports and names
+  "I",      # isort — import order, deterministic and auto-fixable
+  "B",      # bugbear — including B014, redundant exception in an `except`
+  "ASYNC",  # async correctness, incl. ASYNC109 timeout-parameter
+  "PT",     # pytest style, incl. PT012 over-broad `pytest.raises` blocks
+  "TRY400", # logging.error in an `except` where .exception belongs
+  "FURB",   # incl. FURB167, `re.S` and friends
+  "UP035",  # deprecated typing imports (`typing.AsyncIterator`)
+  "UP037",  # quotes around an annotation that needs none
+  "RUF012", # mutable class attribute without ClassVar
+  "RUF100", # `noqa` for a rule that is not enabled
+]
+
+ignore = [
+  # Line length is a FORMATTER's job, and this service has no formatter
+  # configured — the TypeScript half gets prettier, the Python half currently
+  # gets nothing, so the code was never written to a limit. Turning E501 on now
+  # reports ~49 lines that are not wrong, only unwrapped. Adopting
+  # `ruff format` is the real answer and is its own commit, since it rewrites
+  # every file in the service.
+  "E501",
+]
+
+[tool.pyright]
+# Pylance resolves imports against the WORKSPACE interpreter, which for a
+# TypeScript monorepo with one Python service is never this service's venv. The
+# symptom is "Cannot find module 'qdrant_client'" on packages that are plainly
+# installed — an editor-only error, invisible to pytest, and one that trains
+# people to ignore the squiggles that matter.
+#
+# Read from pyproject by pyright and by Pylance, so it needs no per-editor file.
+venvPath = "."
+venv = ".venv"
+extraPaths = ["src", "."]
+
+[tool.pytest.ini_options]
+# `src` layout, so tests import `rag_service.*` the same way the service does
+# rather than by relative path — a test that imported differently from
+# production would be testing a different module graph.
+#
+# `.` as well as `src`: `conftest.py` does `from tests.fakes import ...`, and
+# without the project root on the path that import fails before a single test
+# is collected — `pytest` from this directory dies with "No module named
+# 'tests'". `src` alone is enough for the service's own modules, which is why
+# it looked complete.
+pythonpath = ["src", "."]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+asyncio_mode = "auto"
+# Real Qdrant and real Postgres. Same discipline as the TypeScript e2e layer:
+# no mocks between the test and what a query actually does.
+asyncio_default_fixture_loop_scope = "function"
+
+[tool.pyrefly]
+# Pyrefly reads `[tool.pyright]` above when it finds no config of its own, which
+# is why the CLI looked healthy long after the editor stopped being — the two
+# were resolving different settings.
+search-path = ["src", "."]
+infer-with-first-use = false
+
+# The line that actually fixes "Cannot find module `asyncpg`" in the editor.
+#
+# Running `.venv/bin/pyrefly` hides the problem: a checker launched from inside
+# a venv defaults to that venv, so the CLI resolves every import and reports
+# zero errors. The EDITOR runs its own bundled binary from outside, and without
+# this it queries whatever `python3` it finds — turning every third-party import
+# in this service into a red squiggle over a package that is plainly installed.
+#
+# Verified rather than assumed: pointing this at `/usr/bin/python3` reproduces
+# all 51 errors, including the exact `asyncpg` / `grpc` / `redis.asyncio` /
+# `qdrant_client` ones; pointing it here gives 0.
+#
+# Relative to this file, so it survives being checked out anywhere.
+python-interpreter = ".venv/bin/python"

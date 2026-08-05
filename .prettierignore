@@ -3,6 +3,11 @@ dist/
 node_modules/
 *.tsbuildinfo
 
+# Python virtualenvs. `node_modules`' opposite number: third-party code this
+# repo neither authors nor formats. Without this, `format:check` fails on the
+# JSON that ships inside installed packages (SBOMs, JSON Schemas).
+**/.venv/
+
 # Generated code — rewritten by `buf generate` / `prisma generate`, so
 # formatting it only produces a diff that comes straight back on the next run.
 # ESLint already skips these via the `**/generated/**` ignore in eslint.config.mjs.

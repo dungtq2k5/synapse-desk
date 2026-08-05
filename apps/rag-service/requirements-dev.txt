@@ -1,0 +1,22 @@
+-r requirements.txt
+
+pytest==8.3.4
+pytest-asyncio==0.25.0
+
+# Lints and import-sorts the Python half. Configured in pyproject under
+# [tool.ruff]; the rule set is deliberately narrow — see the comment there.
+ruff==0.16.1
+
+# Generates `*_pb2_grpc.pyi`. Without it the servicer base class is unannotated
+# — its methods `raise NotImplementedError`, so a checker infers `-> Never` and
+# reports every real implementation as an inconsistent override.
+mypy-protobuf==5.1.0
+
+# Type checker. `[tool.pyright]` in pyproject is what points it (and Pylance)
+# at this service's venv rather than the workspace interpreter.
+pyrefly==1.2.0
+
+# grpc ships no inline type information, so a checker reads every `grpc.*` as
+# untyped and silently stops verifying that half of the servicer. Stubs only —
+# nothing imports this at runtime.
+types-grpcio==1.83.0.20260730

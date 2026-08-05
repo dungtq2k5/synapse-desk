@@ -1,0 +1,144 @@
+syntax = "proto3";
+
+package synapsedesk.ingestion;
+
+import "google/protobuf/timestamp.proto";
+import "synapsedesk/auth/common.proto";
+
+// Domain C's document surface.
+//
+// The upload is presign -> client PUT -> confirm, the same mechanism avatars
+// and attachments already use. Two orderings are easy to get backwards and
+// both are specified in 12-doc §2.1:
+//
+//   - the STORAGE QUOTA is checked at presign, before signing, so a tenant over
+//     `max_storage_bytes` never receives a usable upload URL rather than
+//     discovering it after uploading 25 MB;
+//   - the `documents` ROW is created at CONFIRM, so a presigned upload the
+//     client abandons leaves nothing pointing at an object that never arrived.
+
+message DocumentResponse {
+  string id = 1;
+  string organization_id = 2;
+  string created_by_id = 3;
+  string title = 4;
+  // An object PATH, not a URL. Reads resolve it per request.
+  string file_url = 5;
+  string file_type = 6;
+  int64 file_size_bytes = 7;
+  bool is_organization_wide = 8;
+  string status = 9;
+  repeated string department_ids = 10;
+  int32 chunk_count = 11;
+  google.protobuf.Timestamp created_at = 12;
+  google.protobuf.Timestamp updated_at = 13;
+  optional google.protobuf.Timestamp deleted_at = 14;
+  optional string deleted_by_id = 15;
+}
+
+message PresignDocumentRequest {
+  string content_type = 1;
+  int64 size_bytes = 2;
+  string file_name = 3;
+}
+
+message PresignDocumentResponse {
+  string upload_url = 1;
+  string object_path = 2;
+  google.protobuf.Timestamp expires_at = 3;
+}
+
+message ConfirmDocumentRequest {
+  string object_path = 1;
+  string title = 2;
+  bool is_organization_wide = 3;
+  repeated string department_ids = 4;
+  string file_name = 5;
+}
+
+message ListDocumentsRequest {
+  synapsedesk.auth.PageRequest page = 1;
+  string status = 2;
+  string department_id = 3;
+  string file_type = 4;
+  bool include_deleted = 5;
+}
+
+message ListDocumentsResponse {
+  repeated DocumentResponse items = 1;
+  synapsedesk.auth.PageMeta meta = 2;
+}
+
+message DocumentIdRequest { string id = 1; }
+
+message UpdateDocumentRequest {
+  string id = 1;
+  optional string title = 2;
+  optional bool is_organization_wide = 3;
+}
+
+message SetDocumentDepartmentsRequest {
+  string id = 1;
+  repeated string department_ids = 2;
+}
+
+message ListDocumentDepartmentsResponse { repeated string department_ids = 1; }
+
+message DeleteDocumentResponse {}
+
+message DownloadDocumentResponse {
+  string download_url = 1;
+  google.protobuf.Timestamp expires_at = 2;
+}
+
+message DocumentChunkResponse {
+  string id = 1;
+  string document_id = 2;
+  int32 chunk_index = 3;
+  string content_text = 4;
+  optional int32 page_number = 5;
+  int32 token_count = 6;
+  optional string vector_point_id = 7;
+  google.protobuf.Timestamp created_at = 8;
+}
+
+message ListDocumentChunksRequest {
+  string document_id = 1;
+  synapsedesk.auth.PageRequest page = 2;
+}
+
+message ListDocumentChunksResponse {
+  repeated DocumentChunkResponse items = 1;
+  synapsedesk.auth.PageMeta meta = 2;
+}
+
+message GetDocumentChunkRequest {
+  string document_id = 1;
+  string chunk_id = 2;
+}
+
+message StorageUsageResponse {
+  int64 used_bytes = 1;
+  int64 limit_bytes = 2;
+  int32 document_count = 3;
+}
+
+service DocumentService {
+  rpc PresignDocument(PresignDocumentRequest) returns (PresignDocumentResponse);
+  rpc ConfirmDocument(ConfirmDocumentRequest) returns (DocumentResponse);
+
+  rpc ListDocuments(ListDocumentsRequest) returns (ListDocumentsResponse);
+  rpc GetDocument(DocumentIdRequest) returns (DocumentResponse);
+  rpc UpdateDocument(UpdateDocumentRequest) returns (DocumentResponse);
+  rpc DeleteDocument(DocumentIdRequest) returns (DeleteDocumentResponse);
+  rpc RestoreDocument(DocumentIdRequest) returns (DocumentResponse);
+  rpc DownloadDocument(DocumentIdRequest) returns (DownloadDocumentResponse);
+
+  rpc ListDocumentDepartments(DocumentIdRequest) returns (ListDocumentDepartmentsResponse);
+  rpc SetDocumentDepartments(SetDocumentDepartmentsRequest) returns (DocumentResponse);
+
+  rpc ListDocumentChunks(ListDocumentChunksRequest) returns (ListDocumentChunksResponse);
+  rpc GetDocumentChunk(GetDocumentChunkRequest) returns (DocumentChunkResponse);
+
+  rpc GetStorageUsage(DocumentIdRequest) returns (StorageUsageResponse);
+}

@@ -1,0 +1,19 @@
+# Pinned, like every npm dependency in this repo. An unpinned range means two
+# developers resolve different versions of the client that talks to the vector
+# store, and "works on my machine" for a similarity search is not a debuggable
+# state.
+
+# The vector store. `qdrant-client` bundles both the REST and gRPC transports.
+qdrant-client==1.12.1
+
+# Postgres, async. rag-service is READ-ONLY against postgres_ingestion — it
+# never writes chunk rows — so no ORM: the lexical arm is one hand-written
+# query whose predicate is a security boundary, and an ORM would hide it.
+asyncpg==0.30.0
+
+# The quota counter. rag-service increments `quota:{org}:{cycle}` DIRECTLY
+# rather than over gRPC, because a cross-service hop on the charge path would
+# add a network round trip to every AI request (RDM §1.14).
+redis==5.2.1
+
+python-dotenv==1.0.1

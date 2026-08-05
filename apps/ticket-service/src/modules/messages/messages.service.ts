@@ -41,6 +41,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { TicketEventPublisher } from '../events/ticket-event.publisher';
 import { TicketsService } from '../tickets/tickets.service';
 import { RagClientService } from '../ai-client/rag-client.service';
+import { LedgerClientService } from '../ai-client/ledger-client.service';
 import { StorageReferenceService } from '../storage-client/storage-reference.service';
 import {
   MessageAttachment,
@@ -81,6 +82,7 @@ export class MessagesService {
     private readonly events: TicketEventPublisher,
     private readonly tickets: TicketsService,
     private readonly rag: RagClientService,
+    private readonly ledger: LedgerClientService,
     private readonly storage: StorageReferenceService,
     configService: ConfigService,
   ) {
@@ -169,6 +171,22 @@ export class MessagesService {
     });
 
     this.publishCreated(ticket.organizationId, message);
+
+    if (request.generatedFromId) {
+      // AFTER the message is committed, and non-blocking on failure. The reply
+      // is already sent and the user has already seen it — losing it to
+      // protect a metric would be exactly the wrong trade.
+      //
+      // Awaited rather than fire-and-forget because the comparison is what
+      // decides ACCEPTED vs EDITED, and a sweep that later marked a SENT draft
+      // DISCARDED would corrupt the one number justifying the co-pilot.
+      await this.ledger.recordOutcome(
+        request.generatedFromId,
+        message.id,
+        message.content,
+        context,
+      );
+    }
 
     if (request.invokeAi) {
       // Awaited, but its failure is swallowed — the caller's own message is

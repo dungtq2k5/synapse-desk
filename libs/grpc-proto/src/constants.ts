@@ -32,6 +32,12 @@ export const TICKET_GRPC_CLIENT = Symbol('TICKET_GRPC_CLIENT');
  */
 export const STORAGE_GRPC_CLIENT = Symbol('STORAGE_GRPC_CLIENT');
 
+/** The DI token for the connection to `ingestion-service` — Domain C. */
+export const INGESTION_GRPC_CLIENT = Symbol('INGESTION_GRPC_CLIENT');
+
+/** The DI token for the connection to `rag-service` — the one Python peer. */
+export const RAG_GRPC_CLIENT = Symbol('RAG_GRPC_CLIENT');
+
 /**
  * Root of the proto tree — the `-I` include path. Every `import` inside a
  * .proto is resolved relative to THIS directory, which is why they read
@@ -100,6 +106,22 @@ export const TICKET_PROTO_PATHS = [
  */
 export const STORAGE_PROTO_PATHS = [
   join(PROTO_ROOT, 'synapsedesk', 'storage', 'storage.proto'),
+];
+
+export const INGESTION_PROTO_PATHS = [
+  join(PROTO_ROOT, 'synapsedesk', 'ingestion', 'document.proto'),
+  join(PROTO_ROOT, 'synapsedesk', 'ingestion', 'ledger.proto'),
+];
+
+/**
+ * `rag-service` is the one Python peer, and this path is consumed from BOTH
+ * sides: TypeScript loads it to build a client, and `grpcio-tools` compiles the
+ * same file into Python stubs. One file, two languages, no hand-written mirror
+ * — which is the only reason the enum drift that 13-doc §1.1 warns about is
+ * confined to the few values the proto does not carry.
+ */
+export const RAG_PROTO_PATHS = [
+  join(PROTO_ROOT, 'synapsedesk', 'rag', 'rag.proto'),
 ];
 
 /**

@@ -1,7 +1,10 @@
 import { Controller } from '@nestjs/common';
 import type { Metadata } from '@grpc/grpc-js';
+import { Observable } from 'rxjs';
 import {
   ConfirmUploadRequest,
+  DownloadObjectChunk,
+  DownloadObjectRequest,
   ConfirmUploadResponse,
   GetSignedReadUrlsRequest,
   GetSignedReadUrlsResponse,
@@ -14,7 +17,7 @@ import {
 import { StorageService } from './storage.service';
 
 /**
- * Three methods. There is no delete — that is NATS-only (§1.6), and the absence
+ * Four methods. There is no delete — that is NATS-only (§1.6), and the absence
  * is expressed in the proto so a contributor cannot add one here without first
  * noticing the contract has none to extend.
  */
@@ -45,5 +48,18 @@ export class StorageGrpcController implements StorageServiceController {
       request,
       unpackCallerContext(metadata),
     );
+  }
+
+  /**
+   * Returns an Observable, not a Promise — that is what makes it a gRPC SERVER
+   * STREAM. Nest infers the streaming shape from the return type, so a
+   * `Promise<Chunk[]>` here would compile, run, and silently be a unary call
+   * that hits the message-size limit it was added to avoid.
+   */
+  downloadObject(
+    request: DownloadObjectRequest,
+    metadata?: Metadata,
+  ): Observable<DownloadObjectChunk> {
+    return this.storage.downloadObject(request, unpackCallerContext(metadata));
   }
 }

@@ -9,7 +9,7 @@ import {
 import type { GqlContextType } from '@nestjs/graphql';
 import { status as GrpcStatus } from '@grpc/grpc-js';
 import type { Request, Response } from 'express';
-import { formatErrorMsg } from '@synapsedesk/common';
+import { formatErrorMsg, readHttpStatusHint } from '@synapsedesk/common';
 import type { ErrorResponse } from '../interfaces/http-response.interface';
 
 /**
@@ -110,9 +110,19 @@ export class AllHttpExceptionFilter implements ExceptionFilter {
     if (isGrpcError(exception)) {
       const mapped = GRPC_TO_HTTP[exception.code];
       if (mapped !== undefined) {
+        // A downstream service may override the table for the few cases where
+        // no gRPC code means the right thing — 402 Payment Required being the
+        // one that exists today. The hint rides in the details because extra
+        // fields on an RpcException do not survive the wire; see
+        // `withHttpStatus`. Unmarked messages (almost all of them) fall through
+        // to the table unchanged.
+        const hint = readHttpStatusHint(
+          formatErrorMsg(exception.details ?? exception.message),
+        );
+
         return {
-          statusCode: mapped,
-          message: formatErrorMsg(exception.details ?? exception.message),
+          statusCode: hint.httpStatus ?? mapped,
+          message: hint.message,
         };
       }
 

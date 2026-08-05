@@ -1,0 +1,14 @@
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+.ruff_cache/
+.mypy_cache/
+
+# Virtual environment
+.venv/
+
+# Testing
+.pytest_cache/
+
+# Environment configurations / secrets
+.env

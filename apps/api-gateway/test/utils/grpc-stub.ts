@@ -33,6 +33,8 @@ import {
   MessageServiceClient,
   TICKET_SERVICE_NAME,
   TicketServiceClient,
+  DOCUMENT_SERVICE_NAME,
+  DocumentServiceClient,
 } from '@synapsedesk/grpc-proto';
 
 /**
@@ -71,6 +73,11 @@ export type GrpcStubs = {
   ai: MockProxy<AiServiceClient>;
   feedback: MockProxy<FeedbackServiceClient>;
   audit: MockProxy<AuditServiceClient>;
+
+  // Domain C. A THIRD peer (ingestion-service) behind a third DI token,
+  // stubbed through the same map for the same reason: a test asserting on a
+  // gateway route should not have to know which service answers it.
+  document: MockProxy<DocumentServiceClient>;
 };
 
 export type GrpcStubFixture = {
@@ -106,6 +113,8 @@ export function stubGrpcServices(): GrpcStubFixture {
     ai: mock<AiServiceClient>(),
     feedback: mock<FeedbackServiceClient>(),
     audit: mock<AuditServiceClient>(),
+
+    document: mock<DocumentServiceClient>(),
   };
 
   const byServiceName: Record<string, unknown> = {
@@ -126,6 +135,8 @@ export function stubGrpcServices(): GrpcStubFixture {
     [AI_SERVICE_NAME]: stubs.ai,
     [FEEDBACK_SERVICE_NAME]: stubs.feedback,
     [AUDIT_SERVICE_NAME]: stubs.audit,
+
+    [DOCUMENT_SERVICE_NAME]: stubs.document,
   };
 
   const clientGrpc: ClientGrpc = {

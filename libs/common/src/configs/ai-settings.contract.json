@@ -1,0 +1,57 @@
+{
+  "$comment": [
+    "The cross-language contract for the settings layer — doc 15 §1.4 test 6.",
+    "",
+    "Two implementations of one resolver (TypeScript in ingestion-service, Python",
+    "in rag-service) is the same class of duplication as the quota key and the",
+    "purpose enums (13-doc §1.1), and it drifts the same way: someone retunes",
+    "finalContextK on one side, both services keep working, and the two halves of",
+    "a single AI request now disagree about how much context an answer gets.",
+    "",
+    "This file is NOT read at runtime by either service, and that is deliberate.",
+    "Loading shared JSON from disk would make a Python container's boot depend on",
+    "a path inside a TypeScript library — a packaging problem traded for a",
+    "correctness one. Instead both sides hold their own literals and both test",
+    "suites assert equality against this file, so a change on either side that is",
+    "not made on the other fails that side's own tests, in that side's own CI job.",
+    "",
+    "Changing a default therefore means editing three files. That friction is the",
+    "feature: it is exactly one file more than the number of places the value has",
+    "to be correct in."
+  ],
+  "qdrant": {
+    "collection": "document_chunks",
+    "embeddingDimension": 768,
+    "payloadFields": {
+      "organizationId": "organization_id",
+      "isDeleted": "is_deleted",
+      "departmentIds": "department_ids",
+      "isOrganizationWide": "is_organization_wide",
+      "documentId": "document_id",
+      "chunkId": "chunk_id"
+    }
+  },
+  "cheapModel": "gemini-2.0-flash-lite",
+  "embeddingModel": "text-embedding-004",
+  "generationModelByTier": {
+    "FAST": "gemini-2.0-flash",
+    "QUALITY": "gemini-2.5-pro"
+  },
+  "defaultTier": "FAST",
+  "retrievalDefaults": {
+    "semanticWeight": 0.6,
+    "lexicalWeight": 0.4,
+    "topN": 20,
+    "finalContextK": 5,
+    "escalationThreshold": 0.3,
+    "coRagMaxRetries": 0
+  },
+  "clamps": {
+    "semanticWeight": { "min": 0, "max": 1 },
+    "lexicalWeight": { "min": 0, "max": 1 },
+    "topN": { "min": 1, "max": 100 },
+    "finalContextK": { "min": 1, "max": 20 },
+    "escalationThreshold": { "min": 0, "max": 1 },
+    "coRagMaxRetries": { "min": 0, "max": 3 }
+  }
+}

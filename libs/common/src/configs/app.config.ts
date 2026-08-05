@@ -306,6 +306,38 @@ export type CallerContext = RequestOrigin & {
   isEmailVerified: boolean;
 };
 
+/**
+ * The context a BACKGROUND JOB acts under.
+ *
+ * Background work has a tenant but no user: the ingestion worker embeds a
+ * document on behalf of an organization, and the person who uploaded it is long
+ * gone. `sub: null` states that honestly, which matters because it is what
+ * makes `ai_generations.user_id` NULL for system work rather than attributing
+ * spend to whoever happened to trigger it.
+ *
+ * **Deliberately NOT a super admin and holding NO permissions.** The temptation
+ * is to give background jobs a bypass so they never hit an authorization edge;
+ * the consequence is that a bug in a job runs with more authority than any real
+ * user has. A job that needs to read across the tenant boundary is a job whose
+ * design should be questioned, and it should fail loudly rather than succeed
+ * quietly.
+ */
+export function systemContext(organizationId: string): CallerContext {
+  return {
+    sub: null,
+    organizationId,
+    isSuperAdmin: false,
+    departmentIds: [],
+    permissionCodes: [],
+    isEmailVerified: true,
+    // Empty rather than null: `RequestOrigin` is what the gateway OBSERVED, and
+    // there is no request to observe here. An audit row reading "" for a
+    // background job is the truthful answer.
+    ip: '',
+    userAgent: '',
+  };
+}
+
 /** Narrows to a caller with an identity. */
 export function hasIdentity(
   context: CallerContext,

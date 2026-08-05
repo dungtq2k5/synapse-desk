@@ -47,6 +47,14 @@ message CreateMessageRequest {
   // separate write. Two writes on purpose: the draft can legitimately fail
   // (rag-service down) without losing what the human typed.
   bool invoke_ai = 4;
+  // The `ai_generations` row this reply came from, when an agent is posting a
+  // co-pilot draft. Closes the ACCEPTANCE LOOP: ticket-service compares the
+  // sent text against the stored draft and records ACCEPTED or EDITED, which
+  // is the one number that justifies the co-pilot existing.
+  //
+  // Absent for an ordinary reply, and absent is not an error — most replies
+  // are typed by a human from nothing.
+  optional string generated_from_id = 5;
 }
 
 message ListMessagesRequest {

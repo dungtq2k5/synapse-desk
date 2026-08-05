@@ -99,3 +99,6 @@ export const ROUTE_THROTTLE = {
   /** Brute-forcing the second factor. */
   twoFactorAuthenticate: { ttl: 15 * 60_000, limit: 10 },
 } as const;
+
+/** A document belongs to a handful of departments, not hundreds. */
+export const MAX_DOCUMENT_DEPARTMENTS = 50;

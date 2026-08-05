@@ -47,6 +47,21 @@ message ConfirmUploadResponse {
   string content_type = 3;
 }
 
+// A SERVER-side byte read, for services rather than browsers.
+//
+// Signed URLs exist so a CLIENT can talk to Storage without our credentials.
+// The ingestion worker is not a client: it runs inside the trust boundary, and
+// routing it through a signed URL would mean this service minting a public,
+// time-limited, unauthenticated link purely so its own sibling can read a file
+// it is already entitled to. Asking is both simpler and narrower — and it keeps
+// §1.4's rule intact, that every other service ASKS rather than holding a key.
+message DownloadObjectRequest { string object_path = 1; }
+
+// STREAMED, because a document may be 25 MB against a 10 MB gRPC message
+// limit. A unary response would work for every test fixture and fail on the
+// first real 200-page PDF — the worst possible place to discover a size cap.
+message DownloadObjectChunk { bytes data = 1; }
+
 message GetSignedReadUrlsRequest { repeated string object_paths = 1; }
 
 // Absent key = the object no longer exists. A missing avatar is the caller's
@@ -57,6 +72,7 @@ service StorageService {
   rpc PresignUpload(PresignUploadRequest) returns (PresignUploadResponse);
   rpc ConfirmUpload(ConfirmUploadRequest) returns (ConfirmUploadResponse);
   rpc GetSignedReadUrls(GetSignedReadUrlsRequest) returns (GetSignedReadUrlsResponse);
+  rpc DownloadObject(DownloadObjectRequest) returns (stream DownloadObjectChunk);
 
   // No DeleteObject RPC, deliberately. Deletion is NATS-only (§1.6) — the same
   // "no write path exists in the contract" discipline audit_logs uses, so a

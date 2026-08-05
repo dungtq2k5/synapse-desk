@@ -22,7 +22,11 @@ import { TicketsModule } from './modules/tickets/tickets.module';
 import { ChatModule } from './modules/chat/chat.module';
 import { FeedbackModule } from './modules/feedback/feedback.module';
 import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
+import { DocumentsModule } from './modules/documents/documents.module';
+import { KnowledgeModule } from './modules/knowledge/knowledge.module';
 import { TicketGrpcModule } from './common/grpc/ticket-grpc.module';
+import { IngestionGrpcModule } from './common/grpc/ingestion-grpc.module';
+import { RagGrpcModule } from './common/grpc/rag-grpc.module';
 
 @Module({
   imports: [
@@ -61,6 +65,8 @@ import { TicketGrpcModule } from './common/grpc/ticket-grpc.module';
     // `common/grpc/` alongside `base-grpc.client.ts` — the other thing here
     // that isn't owned by one feature.
     TicketGrpcModule,
+    IngestionGrpcModule,
+    RagGrpcModule,
     AuthModule,
 
     // ORDER MATTERS for everything mounted under /users.
@@ -87,6 +93,8 @@ import { TicketGrpcModule } from './common/grpc/ticket-grpc.module';
     ChatModule,
     FeedbackModule,
     AuditLogsModule,
+    DocumentsModule,
+    KnowledgeModule,
     RealtimeModule,
     HealthModule,
   ],

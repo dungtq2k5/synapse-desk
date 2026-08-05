@@ -76,7 +76,7 @@ describe('§2.5 Ticket messages at the HTTP boundary (e2e)', () => {
             wireMessage({
               senderId: undefined,
               isAiGenerated: true,
-              modelName: 'gpt-test',
+              modelName: 'stub-model',
               promptTokens: 120,
               completionTokens: 80,
             }),
@@ -90,7 +90,7 @@ describe('§2.5 Ticket messages at the HTTP boundary (e2e)', () => {
       );
 
       expect(res.body.data.items[0]).toHaveProperty('senderId', null);
-      expect(res.body.data.items[0].modelName).toBe('gpt-test');
+      expect(res.body.data.items[0].modelName).toBe('stub-model');
       expect(res.body.data.items[0].promptTokens).toBe(120);
     });
 

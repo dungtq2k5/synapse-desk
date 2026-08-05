@@ -1,0 +1,239 @@
+syntax = "proto3";
+
+package synapsedesk.rag;
+
+// The retrieval and generation surface — `rag-service`, in Python.
+//
+// **This contract names no model, anywhere.** Doc 15 §1.2: every model choice
+// is resolved inside rag-service from `settings_for(organization_id)`, so no
+// endpoint takes a model name today and none would once tiers ship. A
+// `model_name` field here would be the one place a caller could route itself to
+// the premium tier for free, and its absence is the reason the tier is a data
+// change rather than an API change.
+//
+// The gateway never calls this directly for chat: Tier 1 chat goes through
+// ticket-service, which owns the conversation rows. `/knowledge/*` does come
+// straight here, because there is nothing to persist.
+
+// The caller's departments arrive in gRPC METADATA like every other context in
+// this system, never in the request body — a request body is something a caller
+// asserts, and the department boundary is not theirs to assert.
+
+message SearchRequest {
+  string query = 1;
+  // Clamped server-side regardless of what is asked for. An unclamped limit is
+  // a direct path to enormous prompts downstream (doc 15 §1.4).
+  int32 limit = 2;
+  // Skips the cross-encoder. The diagnostic path a Knowledge Manager uses to
+  // see what the RETRIEVER found before the reranker had an opinion.
+  bool skip_rerank = 3;
+}
+
+message RetrievedChunk {
+  string chunk_id = 1;
+  string document_id = 2;
+  string document_title = 3;
+  // Absent for formats with no pages — a DOCX has none until something
+  // paginates it, and "page 1" of a fifty-page file is confidently wrong.
+  optional int32 page_number = 4;
+  int32 chunk_index = 5;
+  string content_text = 6;
+  double score = 7;
+  // The common fusion key, and the id a citation resolves through.
+  string vector_point_id = 8;
+}
+
+// Why a result set is thinner than usual, so a caller can SAY so rather than
+// silently presenting degraded results as normal ones.
+enum SearchDegradation {
+  SEARCH_DEGRADATION_UNSPECIFIED = 0;
+  // The tenant is at the AI cap. The lexical arm needs no embedding and
+  // therefore costs nothing, so corpus diagnostics survive rather than 402ing
+  // a Knowledge Manager at exactly the moment they are working out what
+  // happened (RDM §1.14).
+  SEARCH_DEGRADATION_LEXICAL_ONLY = 1;
+}
+
+message SearchResponse {
+  repeated RetrievedChunk chunks = 1;
+  SearchDegradation degraded = 2;
+}
+
+// One prior turn, oldest first. Sent by the caller because rag-service owns no
+// conversation rows — `ticket-service` does, and a second copy of a
+// conversation in a second database is a consistency problem nobody asked for.
+message ConversationTurn {
+  string role = 1;
+  string content = 2;
+}
+
+message ChatRequest {
+  string message = 1;
+  repeated ConversationTurn history = 2;
+  // Present for a ticket conversation, absent for `/knowledge/ask`. It decides
+  // `ai_generations.ticket_id`, which is how spend is attributed to a ticket.
+  optional string ticket_id = 3;
+}
+
+// What a generation concluded, kept from Self-RAG's taxonomy even though
+// Self-RAG itself is deferred (11-doc §1.1). It maps onto a PRODUCT decision
+// the notebook app never had: whether to answer or to hand off.
+enum AnswerStatus {
+  ANSWER_STATUS_UNSPECIFIED = 0;
+  // Answered from the corpus, with citations.
+  ANSWER_STATUS_DOC_ANSWER = 1;
+  // Nothing retrieved above threshold. **Not an invitation to improvise** —
+  // an enterprise support bot inventing a policy is worse than one that
+  // escalates (11-doc §1.6).
+  ANSWER_STATUS_DOC_MISSING = 2;
+  // A greeting, answered from the canned table. No LLM call, no ledger row.
+  ANSWER_STATUS_GREETING = 3;
+  // The tenant is at the AI cap. The caller escalates rather than erroring.
+  ANSWER_STATUS_AT_CAP = 4;
+}
+
+message Citation {
+  string chunk_id = 1;
+  string document_id = 2;
+  string document_title = 3;
+  optional int32 page_number = 4;
+  // The id a citation RESOLVES THROUGH — 13-doc §4.1 test 2.
+  //
+  // Carried alongside `chunk_id` even though either would find the row,
+  // because this is the key the two arms fuse on and the one Qdrant returns
+  // natively. A citation resolvable only by `chunk_id` is resolvable only from
+  // Postgres, and the point of the bridge is that a hit in EITHER store leads
+  // back to the same passage.
+  string vector_point_id = 5;
+}
+
+// One frame of a streamed answer. Exactly one field is set per message.
+message ChatChunk {
+  oneof payload {
+    // An incremental token span. The product IS the instant answer, so these
+    // start arriving before the generation finishes.
+    string token = 1;
+    // The terminal frame — status, citations and the ledger id.
+    ChatCompletion completion = 2;
+  }
+}
+
+message ChatCompletion {
+  AnswerStatus status = 1;
+  repeated Citation citations = 2;
+  // The `ai_generations` row id. Becomes `generatedFromId` when an agent posts
+  // a draft-derived reply, which is what closes the acceptance loop.
+  string generation_id = 3;
+  // The whole answer, for a caller that needs to persist it rather than
+  // reassemble the tokens it already forwarded.
+  string content = 4;
+}
+
+message DraftRequest {
+  string ticket_id = 1;
+  // The ticket conversation so far. Same reasoning as ChatRequest.history.
+  repeated ConversationTurn history = 2;
+  // 1-2 for the co-pilot, which is not streamed and can absorb the latency.
+  // Clamped server-side regardless.
+  int32 max_retries = 3;
+}
+
+message DraftResponse {
+  string draft = 1;
+  repeated Citation citations = 2;
+  string generation_id = 3;
+  AnswerStatus status = 4;
+}
+
+message SummaryRequest {
+  string ticket_id = 1;
+  repeated ConversationTurn history = 2;
+  // An escalation-triggered summary runs inside the 10% grace at the cap; a
+  // manual one does not. The asymmetry is deliberate (RDM §1.14): at the cap
+  // deflection stops, so ticket volume spikes 3-5x — and without this every
+  // one of those tickets reaches an agent with no context.
+  bool triggered_by_escalation = 3;
+}
+
+message SummaryResponse {
+  string summary_text = 1;
+  string suggested_action = 2;
+  double confidence_score = 3;
+  string model_name = 4;
+  string generation_id = 5;
+}
+
+message ClassifyRequest {
+  string ticket_id = 1;
+  string title = 2;
+  string body = 3;
+  // The departments this tenant actually has. Sent by the caller because
+  // rag-service cannot see postgres_auth, and a suggestion naming a
+  // department that does not exist is worse than no suggestion.
+  repeated DepartmentOption departments = 4;
+}
+
+message DepartmentOption {
+  string id = 1;
+  string name = 2;
+}
+
+message ClassifyResponse {
+  string suggested_department_id = 1;
+  string suggested_priority = 2;
+  double confidence_score = 3;
+  string generation_id = 4;
+}
+
+message SuggestionsRequest {
+  string ticket_id = 1;
+  repeated ConversationTurn history = 2;
+}
+
+message Suggestion {
+  string title = 1;
+  string body = 2;
+  double confidence_score = 3;
+  repeated Citation citations = 4;
+}
+
+message SuggestionsResponse {
+  repeated Suggestion suggestions = 1;
+  string generation_id = 2;
+}
+
+service RagService {
+  // Retrieval with NO generation — the test seam (13-doc §2.3). It exists
+  // before anything calls an LLM because it is the only point where isolation
+  // and relevance can be proven cheaply and deterministically; once generation
+  // is layered on, those tests become slow, non-deterministic and skipped.
+  rpc Search(SearchRequest) returns (SearchResponse);
+
+  // Tier 1 chat — STREAMED, because the product is the instant answer.
+  //
+  // Self-RAG cannot stream, structurally: it generates N candidates, judges
+  // them, then picks a winner, and you cannot stream an answer you have not
+  // chosen. Co-RAG's Mode A draft is a single generation, streamable from the
+  // first token (11-doc §1.1).
+  rpc Chat(ChatRequest) returns (stream ChatChunk);
+
+  // One-shot Q&A with no conversation to escalate into. `DOC_MISSING` here
+  // returns an explicit "nothing covers this" rather than offering a handoff
+  // it cannot perform.
+  rpc Ask(ChatRequest) returns (ChatResponse);
+
+  // The co-pilot surface. Not streamed — an agent absorbs the latency, and in
+  // exchange gets a review loop the hot path cannot afford.
+  rpc Draft(DraftRequest) returns (DraftResponse);
+  rpc Summarize(SummaryRequest) returns (SummaryResponse);
+  rpc Classify(ClassifyRequest) returns (ClassifyResponse);
+  rpc Suggest(SuggestionsRequest) returns (SuggestionsResponse);
+}
+
+// The unary form of a ChatCompletion, for `Ask`.
+message ChatResponse {
+  string content = 1;
+  AnswerStatus status = 2;
+  repeated Citation citations = 3;
+  string generation_id = 4;
+}

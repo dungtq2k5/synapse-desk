@@ -1,0 +1,276 @@
+// Domain C — postgres_ingestion.
+//
+// Six models, RDM Tables 17-20, 27 and 29. Enumerated columns are `String` per
+// development-conventions.md §7.3; the values live as TS enums in
+// `@synapsedesk/common` so the gateway, this service and the tests share one
+// definition.
+//
+// Cross-service ids carry NO foreign key (RDM §1.13): `created_by_id` and
+// `department_id` point into postgres_auth, a different physical database.
+// They are validated at WRITE time over gRPC and never re-validated after —
+// Domain A only soft-deletes, so a reference that resolved once cannot dangle.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// RDM Table 17.
+model Document {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  organizationId String @map("organization_id") @db.Uuid
+
+  /// No FK: `users` lives in postgres_auth. Validated at write time.
+  createdById String @map("created_by_id") @db.Uuid
+
+  title String @db.VarChar(255)
+
+  /// An internal Firebase Storage object PATH, not a URL despite the name —
+  /// the same discipline as `users.avatar_url` and `message_attachments.file_url`.
+  /// Reads resolve it to a fresh signed URL per request.
+  fileUrl String @map("file_url") @db.Text
+
+  fileType      String @map("file_type") @db.VarChar(50)
+  fileSizeBytes BigInt @map("file_size_bytes")
+
+  /// Dedup is PER TENANT — see `documents_org_hash_key` in the seeder. Global
+  /// dedup would leak the existence of one tenant's upload to another.
+  fileHash String @map("file_hash") @db.VarChar(64)
+
+  /// RDM §1.2's department boundary, clause 1. True means every department in
+  /// the tenant can see it; false means only those in `departmentLinks`.
+  isOrganizationWide Boolean @default(true) @map("is_organization_wide")
+
+  /// DocumentStatus.
+  status String @default("PENDING") @db.VarChar(20)
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz
+
+  deletedById String? @map("deleted_by_id") @db.Uuid
+
+  departmentLinks DepartmentDocument[]
+  chunks          DocumentChunk[]
+  ingestionJobs   IngestionJob[]
+  flags           DocumentFlag[]       @relation("FlaggedDocument")
+  relatedFlags    DocumentFlag[]       @relation("RelatedDocument")
+
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@index([organizationId, status])
+  @@map("documents")
+}
+
+/// RDM Table 18. The many-to-many between documents and departments.
+model DepartmentDocument {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  documentId String @map("document_id") @db.Uuid
+
+  /// No FK: `departments` lives in postgres_auth.
+  departmentId String @map("department_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, departmentId])
+  @@index([departmentId])
+  @@map("department_documents")
+}
+
+/// RDM Table 19.
+model DocumentChunk {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  documentId String @map("document_id") @db.Uuid
+
+  chunkIndex  Int    @map("chunk_index")
+  contentText String @map("content_text") @db.Text
+
+  /// PDF only. The citation payload — "page 4" comes from here.
+  pageNumber Int? @map("page_number")
+
+  tokenCount Int @map("token_count")
+
+  /// The Postgres <-> Qdrant bridge. NULLABLE despite RDM saying NOT NULL, and
+  /// deliberately: the pipeline writes chunk rows BEFORE the Qdrant upsert and
+  /// fills this in after (12-doc §3). A NOT NULL column would force the
+  /// reversed order, which leaves Postgres claiming vectors that were never
+  /// stored — the exact failure the write-back ordering exists to prevent.
+  vectorPointId String? @unique @map("vector_point_id") @db.Uuid
+
+  // ---------------------------------------------------------------------
+  // The four DENORMALISED scope columns — 11-doc §1.4.
+  //
+  // Not a cache: they are the lexical retrieval arm's half of the security
+  // boundary. Without them that arm expresses the same rule as a join through
+  // `documents` plus an EXISTS against `department_documents` — a structurally
+  // DIFFERENT query from the Qdrant filter it is supposed to mirror, with one
+  // test standing between them and an invisible drift.
+  //
+  // With them, both arms are the same four clauses over the same four fields.
+  // The cost is that every visibility change fans out here too, which is the
+  // fan-out already accepted for Qdrant rather than a new class of work.
+  // ---------------------------------------------------------------------
+
+  organizationId     String   @map("organization_id") @db.Uuid
+  isOrganizationWide Boolean  @default(true) @map("is_organization_wide")
+  departmentIds      String[] @default([]) @map("department_ids") @db.Uuid
+  isDeleted          Boolean  @default(false) @map("is_deleted")
+
+  // ---------------------------------------------------------------------
+  // Usage counters — a daily PROJECTION, never a hot-path write.
+  //
+  // They exist because `ai_generations` is retention-rolled and the rollups do
+  // not carry chunk ids, so a flag defined as "never retrieved in N months"
+  // would silently stop working the moment retention ships.
+  // ---------------------------------------------------------------------
+
+  retrievalCount  Int       @default(0) @map("retrieval_count")
+  lastRetrievedAt DateTime? @map("last_retrieved_at") @db.Timestamptz
+  citationCount   Int       @default(0) @map("citation_count")
+  lastCitedAt     DateTime? @map("last_cited_at") @db.Timestamptz
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  document Document       @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  flags    DocumentFlag[]
+
+  @@unique([documentId, chunkIndex])
+  @@index([documentId])
+  @@index([organizationId])
+  @@map("document_chunks")
+}
+
+/// RDM Table 20. The job is observable so a stuck 200-page PDF is locatable.
+model IngestionJob {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  documentId String @map("document_id") @db.Uuid
+
+  bullmqJobId String @map("bullmq_job_id") @db.VarChar(100)
+
+  /// IngestionJobStatus.
+  status String @default("QUEUED") @db.VarChar(20)
+
+  errorLog String? @map("error_log") @db.Text
+
+  processedAt DateTime? @map("processed_at") @db.Timestamptz
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([bullmqJobId])
+  @@index([documentId, createdAt(sort: Desc)])
+  @@index([status])
+  @@map("ingestion_jobs")
+}
+
+/// RDM Table 27. Quality signals over the knowledge base.
+model DocumentFlag {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  organizationId String @map("organization_id") @db.Uuid
+  documentId     String @map("document_id") @db.Uuid
+
+  relatedDocumentId String? @map("related_document_id") @db.Uuid
+  relatedChunkId    String? @map("related_chunk_id") @db.Uuid
+
+  /// DocumentFlagType.
+  flagType String @map("flag_type") @db.VarChar(30)
+
+  /// DocumentFlagSeverity.
+  severity String @default("INFO") @db.VarChar(20)
+
+  detail          String @db.Text
+  confidenceScore Float? @map("confidence_score")
+
+  detectedAt DateTime  @default(now()) @map("detected_at") @db.Timestamptz
+  resolvedAt DateTime? @map("resolved_at") @db.Timestamptz
+
+  resolvedById String? @map("resolved_by_id") @db.Uuid
+
+  /// DocumentFlagResolution.
+  resolution String? @db.VarChar(30)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  document        Document       @relation("FlaggedDocument", fields: [documentId], references: [id], onDelete: Cascade)
+  relatedDocument Document?      @relation("RelatedDocument", fields: [relatedDocumentId], references: [id])
+  relatedChunk    DocumentChunk? @relation(fields: [relatedChunkId], references: [id])
+
+  @@index([organizationId, flagType])
+  @@index([documentId])
+  @@map("document_flags")
+}
+
+/// RDM Table 29 — the append-only ledger of EVERY LLM and embedding call.
+///
+/// Lives here rather than in ticket-service despite being an RDM Domain D
+/// table: it is written by every service that calls a model, and the quota gate
+/// reads it on every AI request, so it belongs one hop from the spend.
+///
+/// Append-only. There is no soft delete and nothing edits a row except the
+/// draft-outcome write-back, which is a deliberate update to two columns.
+model AiGeneration {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  organizationId String @map("organization_id") @db.Uuid
+
+  /// NULL for system-initiated work — ingestion embeddings, scheduled jobs.
+  userId String? @map("user_id") @db.Uuid
+
+  /// NULL for ingestion and knowledge search.
+  ticketId String? @map("ticket_id") @db.Uuid
+
+  /// AiGenerationPurpose.
+  purpose String @db.VarChar(30)
+
+  /// The exact model string. Required for cost attribution — the same token
+  /// count costs different money per model.
+  modelName String @map("model_name") @db.VarChar(100)
+
+  promptTokens     Int @default(0) @map("prompt_tokens")
+  completionTokens Int @default(0) @map("completion_tokens")
+
+  /// MONEY, not tokens — millionths of a currency unit, computed at write time
+  /// from `model_name` x tokens. A budget protects margin, and cost per token
+  /// varies by an order of magnitude across tiers, so a token budget stops
+  /// meaning anything the moment model choice becomes sellable (RDM §1.14).
+  estimatedCostMicros BigInt @default(0) @map("estimated_cost_micros")
+
+  latencyMs Int? @map("latency_ms")
+
+  /// AiGenerationStatus. A FAILED call still consumed prompt tokens.
+  status String @default("SUCCESS") @db.VarChar(20)
+
+  /// Populated for DRAFT and SUMMARY; NULL for EMBEDDING and the
+  /// classification purposes, where it has no value and is most of the bytes.
+  content String? @db.Text
+
+  /// What this generation SAW. Empty is the knowledge-gap signal.
+  retrievedChunkIds String[] @default([]) @map("retrieved_chunk_ids") @db.Uuid
+
+  /// The subset it actually CITED. Always a subset; the difference is what the
+  /// model was given and chose not to use, and without it `UNCITED` is not
+  /// computable and degrades into `UNRETRIEVED` under a misleading name.
+  citedChunkIds String[] @default([]) @map("cited_chunk_ids") @db.Uuid
+
+  /// AiGenerationOutcome — drafts only, set later. NULL until the agent acts.
+  outcome String? @db.VarChar(20)
+
+  resultingMessageId String? @map("resulting_message_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@index([organizationId, purpose, createdAt])
+  @@index([ticketId])
+  @@map("ai_generations")
+}

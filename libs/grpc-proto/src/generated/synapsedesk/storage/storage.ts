@@ -58,6 +58,29 @@ export interface ConfirmUploadResponse {
   contentType: string;
 }
 
+/**
+ * A SERVER-side byte read, for services rather than browsers.
+ *
+ * Signed URLs exist so a CLIENT can talk to Storage without our credentials.
+ * The ingestion worker is not a client: it runs inside the trust boundary, and
+ * routing it through a signed URL would mean this service minting a public,
+ * time-limited, unauthenticated link purely so its own sibling can read a file
+ * it is already entitled to. Asking is both simpler and narrower — and it keeps
+ * §1.4's rule intact, that every other service ASKS rather than holding a key.
+ */
+export interface DownloadObjectRequest {
+  objectPath: string;
+}
+
+/**
+ * STREAMED, because a document may be 25 MB against a 10 MB gRPC message
+ * limit. A unary response would work for every test fixture and fail on the
+ * first real 200-page PDF — the worst possible place to discover a size cap.
+ */
+export interface DownloadObjectChunk {
+  data: Uint8Array;
+}
+
 export interface GetSignedReadUrlsRequest {
   objectPaths: string[];
 }
@@ -81,6 +104,8 @@ export interface StorageServiceClient {
   confirmUpload(request: ConfirmUploadRequest, metadata?: Metadata): Observable<ConfirmUploadResponse>;
 
   getSignedReadUrls(request: GetSignedReadUrlsRequest, metadata?: Metadata): Observable<GetSignedReadUrlsResponse>;
+
+  downloadObject(request: DownloadObjectRequest, metadata?: Metadata): Observable<DownloadObjectChunk>;
 }
 
 export interface StorageServiceController {
@@ -98,11 +123,13 @@ export interface StorageServiceController {
     request: GetSignedReadUrlsRequest,
     metadata?: Metadata,
   ): Promise<GetSignedReadUrlsResponse> | Observable<GetSignedReadUrlsResponse> | GetSignedReadUrlsResponse;
+
+  downloadObject(request: DownloadObjectRequest, metadata?: Metadata): Observable<DownloadObjectChunk>;
 }
 
 export function StorageServiceControllerMethods() {
   return function (constructor: Function) {
-    const grpcMethods: string[] = ["presignUpload", "confirmUpload", "getSignedReadUrls"];
+    const grpcMethods: string[] = ["presignUpload", "confirmUpload", "getSignedReadUrls", "downloadObject"];
     for (const method of grpcMethods) {
       const descriptor: any = Reflect.getOwnPropertyDescriptor(constructor.prototype, method);
       GrpcMethod("StorageService", method)(constructor.prototype[method], method, descriptor);

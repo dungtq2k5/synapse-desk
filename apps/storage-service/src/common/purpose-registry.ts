@@ -43,8 +43,10 @@ export const PURPOSE_POLICY: Record<StoragePurpose, PurposePolicy> = {
     requiresSecondaryOwner: true,
   },
   [StoragePurpose.DOCUMENT]: {
-    // Reserved for Domain C. Present so the map is total and the enum stays
-    // exhaustive; `ingestion-service` will widen the allowlist when it exists.
+    // Domain C's knowledge base. `ingestion-service` is the caller, and
+    // `ALLOWED_DOCUMENT_MIME_TYPES` in libs/common mirrors this list — widen
+    // BOTH together when the real parser handles more formats, or the gateway
+    // starts accepting a type this refuses.
     mimeAllowlist: ['application/pdf', 'text/plain', 'text/markdown'],
     maxSizeBytes: 25 * 1024 * 1024,
     prefix: 'documents',

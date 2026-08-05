@@ -1,0 +1,115 @@
+syntax = "proto3";
+
+package synapsedesk.ingestion;
+
+// The AI ledger's REMOTE write path — `ai_generations` keeps one writer.
+//
+// `rag-service` and `ticket-service` both produce spend, and neither reaches
+// into postgres_ingestion to record it: service-per-database means the table
+// has exactly one owner, and this is how the other two ask that owner to write.
+//
+// **The quota COUNTER is deliberately not here.** Every spending service
+// increments `quota:{org}:{cycle}` in Redis directly (RDM §1.14, 12-doc §1.3).
+// Routing the charge through this service would put a network round trip on the
+// hot path of every AI request in order to avoid duplicating one key format —
+// the wrong trade. The duplication is real and is handled by making the key
+// builder a shared constant with a contract test on both sides.
+
+// The ledger's enumerated values, declared HERE so both languages GENERATE
+// them — 13-doc §1.1.
+//
+// These values now exist in TypeScript and in Python, and a hand-copied
+// `GREETING_CLASSIFY` that becomes `GREETING_CLASSIFICATION` on one side meters
+// into a purpose nothing queries. Nothing fails: rows are written, the counter
+// increments, and every dashboard grouped by purpose simply omits them.
+//
+// The wire field stays a STRING (see `purpose` below) — what these enums fix is
+// the VALUES, which is where the drift actually happens. A contract test on
+// each side asserts its own enum matches this declaration.
+enum AiGenerationPurpose {
+  AI_GENERATION_PURPOSE_UNSPECIFIED = 0;
+  AI_GENERATION_PURPOSE_CHAT_ANSWER = 1;
+  AI_GENERATION_PURPOSE_DRAFT = 2;
+  AI_GENERATION_PURPOSE_SUMMARY = 3;
+  AI_GENERATION_PURPOSE_CLASSIFY = 4;
+  AI_GENERATION_PURPOSE_SUGGESTIONS = 5;
+  AI_GENERATION_PURPOSE_GREETING_CLASSIFY = 6;
+  AI_GENERATION_PURPOSE_REFORMULATION = 7;
+  AI_GENERATION_PURPOSE_EMBEDDING = 8;
+  // The co-pilot's review pass (13-doc §4.2). A distinct purpose because it is
+  // a distinct cost: a draft with two review passes is three generations, and
+  // folding them under DRAFT would make the per-draft cost look like one call.
+  AI_GENERATION_PURPOSE_REVIEW = 9;
+}
+
+enum AiGenerationStatus {
+  AI_GENERATION_STATUS_UNSPECIFIED = 0;
+  AI_GENERATION_STATUS_SUCCESS = 1;
+  // A failed call still consumed prompt tokens.
+  AI_GENERATION_STATUS_FAILED = 2;
+  // A cancelled stream still spent money on the tokens it produced.
+  AI_GENERATION_STATUS_CANCELLED = 3;
+}
+
+message RecordGenerationRequest {
+  string organization_id = 1;
+  // Absent for system work — ingestion embeddings, scheduled jobs. Attributing
+  // that spend to whoever last touched the tenant would be a guess.
+  optional string user_id = 2;
+  optional string ticket_id = 3;
+
+  // AiGenerationPurpose, as a string. Enumerated columns are strings across
+  // this system (development-conventions §7.3), and here it buys something
+  // extra: a purpose added on one side does not need a proto change to be
+  // recordable, so the two languages cannot deadlock on an enum bump.
+  string purpose = 4;
+  string model_name = 5;
+
+  int32 prompt_tokens = 6;
+  int32 completion_tokens = 7;
+  optional int32 latency_ms = 8;
+  // AiGenerationStatus. A FAILED call still consumed prompt tokens.
+  string status = 9;
+
+  // Populated for DRAFT and SUMMARY; absent for EMBEDDING and the
+  // classification purposes, where it has no value and is most of the bytes.
+  optional string content = 10;
+
+  // What the generation SAW. Empty is the knowledge-gap signal, and it is a
+  // signal rather than an omission — 11-doc §1.6.
+  repeated string retrieved_chunk_ids = 11;
+  // The subset it CITED. Always a subset; the difference is what the model was
+  // given and chose not to use, and without it `UNCITED` is not computable.
+  repeated string cited_chunk_ids = 12;
+}
+
+message RecordGenerationResponse {
+  // Returned immediately, before the row is durable. The caller needs an id to
+  // hand back to a client — it becomes `generatedFromId` on the reply that
+  // closes the acceptance loop — and blocking on the write would make
+  // bookkeeping a latency cost on a path that already spent the money.
+  string generation_id = 1;
+}
+
+message RecordGenerationOutcomeRequest {
+  string generation_id = 1;
+  string resulting_message_id = 2;
+  // The text as SENT. Compared against the stored draft to classify the
+  // outcome, and compared NORMALISED — NFC, whitespace collapse, trim — or a
+  // trailing newline reports as EDITED and understates the one metric that
+  // justifies the co-pilot.
+  string sent_text = 3;
+}
+
+message RecordGenerationOutcomeResponse {
+  // AiGenerationOutcome — ACCEPTED or EDITED. The caller needs this in its own
+  // response, which is why this is a gRPC call rather than an event: it is an
+  // UPDATE to an existing row, not an append of spend, so at-least-once
+  // delivery buys nothing and a queue's ordering ambiguity is a liability.
+  string outcome = 1;
+}
+
+service AiLedgerService {
+  rpc RecordGeneration(RecordGenerationRequest) returns (RecordGenerationResponse);
+  rpc RecordGenerationOutcome(RecordGenerationOutcomeRequest) returns (RecordGenerationOutcomeResponse);
+}

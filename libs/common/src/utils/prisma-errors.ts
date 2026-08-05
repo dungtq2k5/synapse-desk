@@ -17,7 +17,20 @@
 /** The subset of a Prisma known-request error this file reads. */
 type PrismaKnownRequestError = {
   code: string;
-  meta?: { target?: unknown };
+  meta?: {
+    target?: unknown;
+    /**
+     * Prisma 7 + a driver adapter reports the constraint HERE and leaves
+     * `target` undefined entirely. Two shapes, one error class — see
+     * `constraintNameFrom` for why both have to be read.
+     */
+    driverAdapterError?: {
+      cause?: {
+        originalMessage?: unknown;
+        constraint?: { fields?: unknown; index?: unknown };
+      };
+    };
+  };
 };
 
 function asKnownRequestError(error: unknown): PrismaKnownRequestError | null {
@@ -50,16 +63,53 @@ export function isUniqueConstraintViolation(
   if (known?.code !== 'P2002') return false;
   if (!index) return true;
 
-  // `meta.target` is the index NAME for a raw-SQL partial index, and a
-  // field-name ARRAY for one Prisma declared. Only those two shapes are
-  // matched — anything else is treated as "not this index" rather than
-  // stringified, because `String({})` yields '[object Object]' and would match
-  // nothing usefully while looking like it had checked.
-  const target: unknown = known.meta?.target;
-  if (typeof target === 'string') return target.includes(index);
-  if (Array.isArray(target)) return target.includes(index);
+  return constraintNameFrom(known).some((name) => name.includes(index));
+}
 
-  return false;
+/**
+ * Every place a P2002 might name its constraint. All of them are read.
+ *
+ * There are TWO shapes because Prisma reports this differently depending on how
+ * the client talks to Postgres, and the difference is silent:
+ *
+ *   - **Without a driver adapter**, `meta.target` carries the index name (raw
+ *     SQL index) or a field-name array (Prisma-declared `@@unique`).
+ *   - **With a driver adapter** — which is what this repo uses on Prisma 7 —
+ *     `meta.target` is ABSENT and the name appears only inside
+ *     `meta.driverAdapterError.cause.originalMessage`, as
+ *     `duplicate key value violates unique constraint "documents_org_hash_key"`.
+ *
+ * Reading only `target` therefore made every raw-SQL-index check return false
+ * under the adapter, which is how this was found: a partial unique index fired
+ * correctly in Postgres, the service failed to recognise it, and a clean 409
+ * surfaced as an unhandled 500. Exactly the failure mode the `instanceof` note
+ * above describes, arriving by a second route.
+ *
+ * `constraint.fields` is deliberately NOT consulted: it lists COLUMN names, and
+ * matching an index name against columns would make `documents_org_hash_key`
+ * and any other index over the same two columns indistinguishable — which is
+ * the whole thing the `index` argument exists to tell apart.
+ */
+function constraintNameFrom(known: PrismaKnownRequestError): string[] {
+  const names: string[] = [];
+
+  const target: unknown = known.meta?.target;
+  if (typeof target === 'string') names.push(target);
+  if (Array.isArray(target)) {
+    names.push(
+      ...target.filter((entry): entry is string => typeof entry === 'string'),
+    );
+  }
+
+  const originalMessage: unknown =
+    known.meta?.driverAdapterError?.cause?.originalMessage;
+  if (typeof originalMessage === 'string') names.push(originalMessage);
+
+  const indexName: unknown =
+    known.meta?.driverAdapterError?.cause?.constraint?.index;
+  if (typeof indexName === 'string') names.push(indexName);
+
+  return names;
 }
 
 /** A foreign-key constraint violation — `P2003`. */

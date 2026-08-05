@@ -11,6 +11,17 @@ coverage/
 # workspace the moment a turbo task runs, and the contents are machine-specific.
 .turbo/
 
+# Python. `apps/rag-service/.gitignore` already covers its own subtree; these
+# are here so the next Python thing added anywhere else starts out ignored
+# rather than being discovered later, after `git add -A` has staged it.
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
 # Prisma client output — rebuilt by `prisma generate` (wired to postinstall).
 # Deliberately narrow: libs/grpc-proto/src/generated IS committed.
 **/src/generated/prisma/

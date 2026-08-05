@@ -135,3 +135,48 @@ export type SendSmsCommand = {
     expiresInMinutes: number;
   };
 };
+
+// ---------------------------------------------------------------------------
+// In-app notifications — Domain E's table, published to before it exists
+// ---------------------------------------------------------------------------
+
+/**
+ * The subject Domain E will subscribe to for in-app notifications.
+ *
+ * Published to now, with nothing consuming it, for the same reason
+ * `audit.record` was: the producer's obligation is real today and retrofitting
+ * it across every call site once the consumer exists is far worse than emitting
+ * into a subject that is currently quiet.
+ */
+export const IN_APP_NOTIFICATION_PATTERN =
+  'notification.in_app.create' as const;
+
+export enum NotificationPriority {
+  NORMAL = 'NORMAL',
+  /** Bypasses quiet hours and digest batching (RDM Table 25). */
+  CRITICAL = 'CRITICAL',
+}
+
+/**
+ * A notification for the people holding a given permission.
+ *
+ * Addressed by PERMISSION rather than by a recipient list, because the producer
+ * does not know who holds `organization.update` in a tenant — that is
+ * auth-service's answer, and resolving it here would mean a second cross-service
+ * read on a path that is already fire-and-forget.
+ */
+export type CreateInAppNotificationCommand = {
+  organizationId: string;
+  /** Everyone holding this permission in the tenant receives it. */
+  audiencePermission: string;
+  /**
+   * `UNIQUE (recipient_id, event_id)` in Domain E is what makes redelivery
+   * harmless. The id must therefore be DERIVED from the thing that happened,
+   * never generated — a uuid here would make every retry a new notification.
+   */
+  eventId: string;
+  title: string;
+  body: string;
+  priority: NotificationPriority;
+  occurredAt: string;
+};

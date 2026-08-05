@@ -56,6 +56,14 @@ export const envValidationSchema = Joi.object({
   AUTH_SERVICE_URL: Joi.string().required(),
   TICKET_SERVICE_URL: Joi.string().required(),
 
+  // ingestion-service — Domain C's document and knowledge surface.
+  INGESTION_SERVICE_URL: Joi.string().required(),
+
+  // rag-service — the one Python peer, and the only service the gateway calls
+  // that is not a NestJS app. Required like the rest: a gateway that boots
+  // without it answers `/knowledge/*` with a 500 that names no cause.
+  RAG_SERVICE_URL: Joi.string().required(),
+
   // The gateway is a hybrid app: HTTP for clients, and a NATS CONSUMER for the
   // domain events it relays to WebSocket rooms. It publishes nothing.
   NATS_URL: Joi.string().required(),

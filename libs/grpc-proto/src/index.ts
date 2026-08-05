@@ -20,6 +20,10 @@ export * from './generated/synapsedesk/ticket/audit';
 
 export * from './generated/synapsedesk/storage/storage';
 
+export * from './generated/synapsedesk/ingestion/document';
+export * from './generated/synapsedesk/ingestion/ledger';
+export * from './generated/synapsedesk/rag/rag';
+
 export * from './constants';
 export * from './metadata';
 export * from './mappers';
@@ -63,3 +67,15 @@ export const AUTH_PACKAGE_NAME = 'synapsedesk.auth';
 export const TICKET_PACKAGE_NAME = 'synapsedesk.ticket';
 
 export const STORAGE_PACKAGE_NAME = 'synapsedesk.storage';
+
+export const INGESTION_PACKAGE_NAME = 'synapsedesk.ingestion';
+
+/**
+ * Domain C's Python peer.
+ *
+ * The one package name that must match a string in ANOTHER LANGUAGE — Python's
+ * generated stubs derive their service path from the same `package` line, so a
+ * mismatch is not a compile error on either side. It is an UNIMPLEMENTED at
+ * runtime, from a server that is running and healthy.
+ */
+export const RAG_PACKAGE_NAME = 'synapsedesk.rag';

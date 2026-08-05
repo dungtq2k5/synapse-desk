@@ -7,7 +7,11 @@ import cookieParser from 'cookie-parser';
 import Redis from 'ioredis';
 import { of } from 'rxjs';
 import { OrgStatus } from '@synapsedesk/common';
-import { AUTH_GRPC_CLIENT, TICKET_GRPC_CLIENT } from '@synapsedesk/grpc-proto';
+import {
+  AUTH_GRPC_CLIENT,
+  INGESTION_GRPC_CLIENT,
+  TICKET_GRPC_CLIENT,
+} from '@synapsedesk/grpc-proto';
 import { AppModule } from '../../src/app.module';
 import { AllHttpExceptionFilter } from '../../src/common/filters/all-http-exception.filter';
 import { LoggingInterceptor } from '../../src/common/interceptors/logging.interceptor';
@@ -52,13 +56,16 @@ export async function bootstrapE2eTest(
   );
 
   const builder = Test.createTestingModule({ imports: [AppModule] })
-    // ONE stub serves BOTH peers. Every gRPC client in the gateway injects one
-    // of these two tokens and calls `getService(name)` on it — and service
-    // names are unique across the two proto packages, so a single map answers
-    // for auth-service's ten services and ticket-service's six alike.
+    // ONE stub serves ALL THREE peers. Every gRPC client in the gateway injects
+    // one of these tokens and calls `getService(name)` on it — and service
+    // names are unique across the three proto packages, so a single map answers
+    // for auth-service's ten services, ticket-service's six and
+    // ingestion-service's one alike.
     .overrideProvider(AUTH_GRPC_CLIENT)
     .useValue(clientGrpc)
     .overrideProvider(TICKET_GRPC_CLIENT)
+    .useValue(clientGrpc)
+    .overrideProvider(INGESTION_GRPC_CLIENT)
     .useValue(clientGrpc);
 
   configure?.(builder);
