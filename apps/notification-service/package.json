@@ -5,7 +5,10 @@
     "build": "nest build",
     "dev": "nest start --watch",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\"",
-    "clean": "rimraf dist *.tsbuildinfo"
+    "clean": "rimraf dist *.tsbuildinfo",
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.28",
@@ -19,11 +22,17 @@
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
     "nodemailer": "^8.0.1",
-    "twilio": "^5.10.2"
+    "twilio": "^5.10.2",
+    "@prisma/adapter-pg": "^7.9.1",
+    "@prisma/client": "^7.9.1",
+    "@grpc/grpc-js": "^1.14.4",
+    "@grpc/proto-loader": "^0.8.1",
+    "@synapsedesk/grpc-proto": "*"
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.24",
     "@types/nodemailer": "^8.0.1",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "prisma": "^7.9.1"
   }
 }

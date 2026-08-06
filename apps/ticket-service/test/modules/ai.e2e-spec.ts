@@ -85,7 +85,18 @@ describe('§2.6 AI Co-Pilot (e2e)', () => {
 
   // ------------------------------------------------------- the 503 contract
 
-  describe('the contract-first stub', () => {
+  /**
+   * Renamed in 16-doc §4: this was `describe('the contract-first stub')`, and
+   * the adapter has not been a stub since Domain C — it calls rag-service for
+   * draft, summary, classify and suggest.
+   *
+   * The assertions were still passing, which is the point of the finding: an
+   * unset `RAG_SERVICE_URL` is a legitimate configuration, so a suite named for
+   * a state that no longer exists goes on being green while describing the
+   * wrong system. It reads as "this feature is not built yet" to the next
+   * person, and nobody re-opens a file that says that.
+   */
+  describe('degrades to UNAVAILABLE when rag-service is unconfigured', () => {
     it('1. answers UNAVAILABLE from EVERY generation RPC — never a 500', async () => {
       // §2.6 test 1. Parametrized over every RPC rather than spot-checked: a
       // new one added without the gate would answer 500, and a 500 sends
@@ -154,6 +165,95 @@ describe('§2.6 AI Co-Pilot (e2e)', () => {
       expect(
         await fx.prisma.aiSummary.count({ where: { ticketId: ticket.id } }),
       ).toBe(0);
+    });
+  });
+
+  // ------------------------------------------- configured AND reachable
+
+  /**
+   * The case that matters now — 16-doc §4.
+   *
+   * The suite above proves the system degrades. Nothing proved it *works*:
+   * every RPC could have answered UNAVAILABLE for a second reason — a wrong
+   * client token, a broken mapper, a deadline of zero — and the whole file
+   * would still be green, because "unconfigured" and "configured but broken"
+   * produce the same status code.
+   *
+   * So this mirrors test 1 exactly, with the adapter available, and asserts the
+   * opposite: nothing 503s, and each response carries the model's content
+   * rather than a shape that merely type-checks.
+   */
+  describe('serves every generation RPC when rag-service is reachable', () => {
+    beforeEach(() => {
+      isAvailable.mockReturnValue(true);
+
+      generateSummary.mockResolvedValue(CANNED);
+      jest.spyOn(rag, 'generateReplyDraft').mockResolvedValue({
+        content: 'A suggested reply',
+        modelName: CANNED.modelName,
+        promptTokens: 10,
+        completionTokens: 20,
+        generationId: 'gen-draft-1',
+        citations: [],
+      });
+      jest.spyOn(rag, 'getSuggestions').mockResolvedValue([
+        {
+          title: 'Check the toner sensor',
+          body: 'Step one…',
+          confidenceScore: 0.6,
+        },
+      ]);
+      jest.spyOn(rag, 'classifyTicket').mockResolvedValue({
+        suggestedDepartmentId: '',
+        suggestedPriority: 'HIGH',
+        confidenceScore: 0.55,
+      });
+    });
+
+    it('1. returns the MODEL’S OWN content from each RPC', async () => {
+      const ticket = await createTicket(fx.prisma, tenant);
+      const context = agent();
+
+      const summary = await ai.generateSummary(
+        { ticketId: ticket.id },
+        context,
+      );
+      expect(summary.summaryText).toBe(CANNED.summaryText);
+      expect(summary.modelName).toBe(CANNED.modelName);
+
+      const draft = await ai.generateDraft(
+        { ticketId: ticket.id, instruction: undefined },
+        context,
+      );
+      expect(draft.content).toBe('A suggested reply');
+      // The id the agent posts back as `generatedFromId` — without it the
+      // review loop has nothing to join on.
+      expect(draft.generationId).toBe('gen-draft-1');
+
+      const suggestions = await ai.getSuggestions(
+        { ticketId: ticket.id },
+        context,
+      );
+      expect(suggestions.items[0].title).toBe('Check the toner sensor');
+
+      const classification = await ai.classifyTicket(
+        { ticketId: ticket.id },
+        context,
+      );
+      expect(classification.suggestedPriority).toBe('HIGH');
+    });
+
+    it('2. STILL checks the ACL — availability is not authorization', async () => {
+      // The unconfigured suite proves the ACL runs before the 503. This proves
+      // it also runs before a successful generation, which is the path that
+      // would actually leak a ticket's contents into another tenant's summary.
+      const ticket = await createTicket(fx.prisma, tenant);
+
+      await expectRpc(
+        ai.generateSummary({ ticketId: ticket.id }, agent(buildTenant())),
+        status.NOT_FOUND,
+      );
+      expect(generateSummary).not.toHaveBeenCalled();
     });
   });
 

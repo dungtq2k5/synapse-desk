@@ -116,6 +116,39 @@ export interface GetDocumentChunkRequest {
   chunkId: string;
 }
 
+export interface DocumentFlagResponse {
+  id: string;
+  documentId: string;
+  documentTitle: string;
+  /** DocumentFlagType — OUTDATED, UNRETRIEVED, UNCITED, DUPLICATE. */
+  flagType: string;
+  /** DocumentFlagSeverity. */
+  severity: string;
+  detail: string;
+  confidenceScore?: number | undefined;
+  detectedAt: Timestamp | undefined;
+}
+
+export interface ListDocumentFlagsRequest {
+  /**
+   * EMPTY means every type, and the filter accepts more than one.
+   *
+   * 16-doc §5: `UNRETRIEVED` and `UNCITED` were once a single flag under a name
+   * that fitted only one of them. A filter that accepts only `UNCITED` would
+   * quietly re-merge them in the UI, because the type nobody can select is the
+   * type nobody sees.
+   */
+  flagTypes: string[];
+  /** Unresolved only, by default — a resolved flag is history, not a task. */
+  includeResolved: boolean;
+  page: PageRequest | undefined;
+}
+
+export interface ListDocumentFlagsResponse {
+  items: DocumentFlagResponse[];
+  meta: PageMeta | undefined;
+}
+
 export interface StorageUsageResponse {
   usedBytes: number;
   limitBytes: number;
@@ -146,6 +179,8 @@ export interface DocumentServiceClient {
   listDocumentChunks(request: ListDocumentChunksRequest, metadata?: Metadata): Observable<ListDocumentChunksResponse>;
 
   getDocumentChunk(request: GetDocumentChunkRequest, metadata?: Metadata): Observable<DocumentChunkResponse>;
+
+  listDocumentFlags(request: ListDocumentFlagsRequest, metadata?: Metadata): Observable<ListDocumentFlagsResponse>;
 
   getStorageUsage(request: DocumentIdRequest, metadata?: Metadata): Observable<StorageUsageResponse>;
 }
@@ -214,6 +249,11 @@ export interface DocumentServiceController {
     metadata?: Metadata,
   ): Promise<DocumentChunkResponse> | Observable<DocumentChunkResponse> | DocumentChunkResponse;
 
+  listDocumentFlags(
+    request: ListDocumentFlagsRequest,
+    metadata?: Metadata,
+  ): Promise<ListDocumentFlagsResponse> | Observable<ListDocumentFlagsResponse> | ListDocumentFlagsResponse;
+
   getStorageUsage(
     request: DocumentIdRequest,
     metadata?: Metadata,
@@ -235,6 +275,7 @@ export function DocumentServiceControllerMethods() {
       "setDocumentDepartments",
       "listDocumentChunks",
       "getDocumentChunk",
+      "listDocumentFlags",
       "getStorageUsage",
     ];
     for (const method of grpcMethods) {

@@ -21,8 +21,13 @@ import { QdrantService } from '../../src/modules/qdrant/qdrant.service';
 import { StorageReferenceService } from '../../src/modules/storage-client/storage-reference.service';
 import { AuthReferenceService } from '../../src/modules/auth-client/auth-reference.service';
 import { QUOTA_REDIS } from '../../src/modules/ai-ledger/quota-counter.service';
+import { faultInjector } from '@synapsedesk/common/testing/fault';
 
 describe('§3 The ingestion pipeline (e2e)', () => {
+  // Every injected fault in this file is registered here and restored in an
+  // `afterEach` that runs whether the test passed, failed or threw — 16-doc §9.
+  const faults = faultInjector();
+
   let fx: E2eFixture;
   let processor: IngestionProcessor;
   let qdrant: QdrantService;
@@ -357,13 +362,18 @@ describe('§3 The ingestion pipeline (e2e)', () => {
         releaseEmbedding = resolve;
       });
 
-      const embedBatch = jest
-        .spyOn(fx.embeddings, 'embedBatch')
-        .mockImplementation(async (texts: string[], model: string) => {
+      // Restores itself so the SECOND call runs for real — and is registered
+      // with the injector too, so a failure before the gate opens does not
+      // leave the whole embedding client mocked for the rest of the file.
+      const embedBatch = faults.replace(
+        fx.embeddings,
+        'embedBatch',
+        async (texts: string[], model: string) => {
           await gate;
           embedBatch.mockRestore();
           return fx.embeddings.embedBatch(texts, model);
-        });
+        },
+      );
 
       const data = await queueDocument();
       const running = processor.process(data);

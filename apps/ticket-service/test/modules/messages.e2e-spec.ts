@@ -26,6 +26,7 @@ import { MessagesService } from '../../src/modules/messages/messages.service';
 import { TicketEventPublisher } from '../../src/modules/events/ticket-event.publisher';
 import { RagClientService } from '../../src/modules/ai-client/rag-client.service';
 import { StorageReferenceService } from '../../src/modules/storage-client/storage-reference.service';
+import { LedgerClientService } from '../../src/modules/ai-client/ledger-client.service';
 
 describe('§2.5 Ticket messages & attachments (e2e)', () => {
   let fx: E2eFixture;
@@ -931,6 +932,91 @@ describe('§2.5 Ticket messages & attachments (e2e)', () => {
         ),
         status.NOT_FOUND,
       );
+    });
+  });
+
+  // ---------------------------------------- §16 §4 — the review loop's join
+
+  describe('generatedFromId', () => {
+    let recordOutcome: jest.SpyInstance;
+
+    beforeEach(() => {
+      recordOutcome = jest
+        .spyOn(fx.moduleRef.get(LedgerClientService), 'recordOutcome')
+        .mockResolvedValue('ACCEPTED');
+    });
+
+    it('1. records the outcome against the GENERATION the agent sent', async () => {
+      // The whole point of the field. Without this join, `ai_generations` knows
+      // a draft was produced and nothing about whether a human used it — and
+      // "was the co-pilot worth paying for" is the one question the ledger
+      // exists to answer.
+      const ticket = await createTicket(fx.prisma, tenant);
+      const generationId = faker.string.uuid();
+
+      const message = await messages.createMessage(
+        {
+          ticketId: ticket.id,
+          content: 'Have you tried restarting it?',
+          isInternalNote: false,
+          invokeAi: false,
+          generatedFromId: generationId,
+        },
+        agent(),
+      );
+
+      expect(recordOutcome).toHaveBeenCalledWith(
+        generationId,
+        message.id,
+        // The SENT text, so rag-service can compare it against what it drafted
+        // and decide ACCEPTED vs EDITED. Sending the draft back instead would
+        // make every message look accepted.
+        'Have you tried restarting it?',
+        expect.anything(),
+      );
+    });
+
+    it('2. posts normally WITHOUT it — the field is optional', async () => {
+      // Most messages are typed by a human with no draft involved, and a
+      // required field here would break the ordinary path.
+      const ticket = await createTicket(fx.prisma, tenant);
+
+      const message = await messages.createMessage(
+        {
+          ticketId: ticket.id,
+          content: 'Typed from scratch',
+          isInternalNote: false,
+          invokeAi: false,
+        },
+        agent(),
+      );
+
+      expect(message.id).toBeTruthy();
+      expect(recordOutcome).not.toHaveBeenCalled();
+    });
+
+    it('3. still SENDS the message when the outcome write fails', async () => {
+      // The deliberate order: the message is committed first and the outcome
+      // recorded after, non-blocking. Losing a customer's reply to protect a
+      // metric is exactly the wrong trade — the sweep marking it DISCARDED is
+      // the honest cost, and it is logged.
+      recordOutcome.mockResolvedValue(null);
+      const ticket = await createTicket(fx.prisma, tenant);
+
+      const message = await messages.createMessage(
+        {
+          ticketId: ticket.id,
+          content: 'Sent anyway',
+          isInternalNote: false,
+          invokeAi: false,
+          generatedFromId: faker.string.uuid(),
+        },
+        agent(),
+      );
+
+      await expect(
+        fx.prisma.ticketMessage.findUnique({ where: { id: message.id } }),
+      ).resolves.not.toBeNull();
     });
   });
 });

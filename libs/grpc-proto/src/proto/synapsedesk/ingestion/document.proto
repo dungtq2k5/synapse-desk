@@ -117,6 +117,37 @@ message GetDocumentChunkRequest {
   string chunk_id = 2;
 }
 
+message DocumentFlagResponse {
+  string id = 1;
+  string document_id = 2;
+  string document_title = 3;
+  // DocumentFlagType — OUTDATED, UNRETRIEVED, UNCITED, DUPLICATE.
+  string flag_type = 4;
+  // DocumentFlagSeverity.
+  string severity = 5;
+  string detail = 6;
+  optional double confidence_score = 7;
+  google.protobuf.Timestamp detected_at = 8;
+}
+
+message ListDocumentFlagsRequest {
+  // EMPTY means every type, and the filter accepts more than one.
+  //
+  // 16-doc §5: `UNRETRIEVED` and `UNCITED` were once a single flag under a name
+  // that fitted only one of them. A filter that accepts only `UNCITED` would
+  // quietly re-merge them in the UI, because the type nobody can select is the
+  // type nobody sees.
+  repeated string flag_types = 1;
+  // Unresolved only, by default — a resolved flag is history, not a task.
+  bool include_resolved = 2;
+  synapsedesk.auth.PageRequest page = 3;
+}
+
+message ListDocumentFlagsResponse {
+  repeated DocumentFlagResponse items = 1;
+  synapsedesk.auth.PageMeta meta = 2;
+}
+
 message StorageUsageResponse {
   int64 used_bytes = 1;
   int64 limit_bytes = 2;
@@ -139,6 +170,8 @@ service DocumentService {
 
   rpc ListDocumentChunks(ListDocumentChunksRequest) returns (ListDocumentChunksResponse);
   rpc GetDocumentChunk(GetDocumentChunkRequest) returns (DocumentChunkResponse);
+
+  rpc ListDocumentFlags(ListDocumentFlagsRequest) returns (ListDocumentFlagsResponse);
 
   rpc GetStorageUsage(DocumentIdRequest) returns (StorageUsageResponse);
 }

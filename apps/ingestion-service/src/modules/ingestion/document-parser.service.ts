@@ -107,6 +107,24 @@ export class DocumentParserService {
     // service may never use in that process.
     const { default: pdfParse } = await import('pdf-parse-fork');
 
+    // KNOWN FRAGILITY, recorded rather than worked around here.
+    //
+    // `pdf-parse-fork` bundles pdf.js v1.10.100 (2018), and its handling of
+    // cross-reference STREAMS — the PDF 1.5+ layout that Word, Acrobat and
+    // browser print-to-PDF all emit — is state-dependent: the same bytes parse
+    // in one process and fail in another with
+    // `FormatError: Unknown compression method in flate stream`, which surfaces
+    // as `InvalidPDFException` and fails the job as though the customer's file
+    // were corrupt.
+    //
+    // Found by running the e2e suite with `--randomize`: the page-attribution
+    // test passed in file order and failed in isolation on identical bytes, and
+    // the fixture only became reliable once it was written with a classic xref
+    // TABLE instead of an xref stream.
+    //
+    // Not fixed here because the fix is a parser change, not a call-site one.
+    // The retry a failed job already gets is the current mitigation, and it
+    // works precisely because the failure is state-dependent.
     await pdfParse(bytes, { pagerender: renderPage });
 
     return pages.filter((page) => page.markdown.trim().length > 0);

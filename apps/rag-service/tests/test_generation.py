@@ -9,6 +9,7 @@ implementation is the broken one.
 from __future__ import annotations
 
 import asyncio
+import logging
 from datetime import datetime, timezone
 
 import pytest
@@ -173,6 +174,19 @@ class TestGrounding:
         assert "ONLY the numbered sources" in prompt
         assert "do not answer from general knowledge" in prompt
 
+    def test_the_prompt_PINS_THE_RESPONSE_LANGUAGE(self):
+        # 17-doc §2.1. The rest of the pipeline is multilingual by design —
+        # the greeting regex, `canned_reply`, and the `'simple'` FTS
+        # configuration — and this prompt was the one place that stopped.
+        #
+        # The failure it prevents is quiet: a Vietnamese question against an
+        # English handbook retrieves correctly, generates successfully, cites a
+        # real source, and comes back in English. Every metric reads green and
+        # the user gives up.
+        prompt = build_prompt("q", [chunk(1)])
+
+        assert "same language as the question" in prompt
+
     def test_the_prompt_carries_the_title_and_page_a_citation_needs(self):
         prompt = build_prompt("q", [chunk(1, title="Expense Policy", page=7)])
 
@@ -290,3 +304,212 @@ class TestCancellation:
         # Partial generation is real spend.
         assert quota.charges
         assert quota.charges[0] > 0
+
+
+class TestTruncationIsDiagnosable:
+    """17-doc §1.2 Gap 2 — `MAX_TOKENS` must leave a trace.
+
+    Truncation and a badly-answered question produce the SAME downstream
+    symptom: the JSON is cut off mid-object, `_json_object` returns `{}`, and
+    the caller renders "not available". One is fixed by raising a constant and
+    the other is a model problem, and nothing distinguished them.
+    """
+
+    class FakeCandidate:
+        def __init__(self, reason):
+            self.finish_reason = reason
+
+    class FakeResponse:
+        def __init__(self, text, reason=None, usage=None):
+            self.text = text
+            self.candidates = (
+                [TestTruncationIsDiagnosable.FakeCandidate(reason)] if reason else []
+            )
+            self.usage_metadata = usage
+
+    def _generator(self, responses):
+        """A `GeminiGenerator` whose provider call is replaced.
+
+        Constructed WITHOUT `__init__`, because that builds a real
+        `genai.Client` and would need an API key to test a log line.
+        """
+        from rag_service.generation.gemini import GeminiGenerator
+
+        generator = GeminiGenerator.__new__(GeminiGenerator)
+
+        class FakeModels:
+            async def generate_content_stream(self, **kwargs):
+                async def iterate():
+                    for response in responses:
+                        yield response
+
+                return iterate()
+
+        class FakeAio:
+            models = FakeModels()
+
+        class FakeClient:
+            aio = FakeAio()
+
+        # The provider client, replaced. Structural rather than a `genai.Client`
+        # — building a real one needs an API key to test a log line.
+        generator._client = FakeClient()  # type: ignore[bad-assignment]
+
+        return generator
+
+    async def _drain(self, generator):
+        return [
+            delta async for delta in generator.stream("prompt", "some-model", 32)
+        ]
+
+    async def test_a_MAX_TOKENS_finish_is_logged_at_WARNING(self, caplog):
+        generator = self._generator(
+            [self.FakeResponse('{"summary": "cut off mid-', reason="MAX_TOKENS")]
+        )
+
+        with caplog.at_level(logging.WARNING, logger="rag_service.generation.gemini"):
+            await self._drain(generator)
+
+        # `getMessage()` rather than `.message`: the log call uses %-style
+        # lazy formatting, so the raw template is what is stored.
+        assert any(
+            "max_output_tokens" in record.getMessage()
+            and record.levelname == "WARNING"
+            for record in caplog.records
+        )
+
+    async def test_a_NORMAL_finish_logs_NOTHING(self, caplog):
+        # A warning on every successful generation is a warning nobody reads,
+        # which would cost the signal this exists to create.
+        generator = self._generator([self.FakeResponse("all done", reason="STOP")])
+
+        with caplog.at_level(logging.WARNING, logger="rag_service.generation.gemini"):
+            await self._drain(generator)
+
+        assert caplog.records == []
+
+    async def test_still_YIELDS_the_text_and_the_done_frame(self, caplog):
+        # The return shape is unchanged on purpose: the empty/short result is
+        # still the right outcome, and this is only about being able to find
+        # out why.
+        generator = self._generator(
+            [self.FakeResponse("partial", reason="MAX_TOKENS")]
+        )
+
+        deltas = await self._drain(generator)
+
+        assert deltas[0].text == "partial"
+        assert deltas[-1].done is True
+
+    async def test_an_UNREADABLE_finish_reason_does_not_break_generation(self):
+        # Diagnostics must never be able to fail the thing they observe. A
+        # provider SDK that changes the shape of `candidates` costs a log line.
+        class Weird:
+            @property
+            def candidates(self):
+                raise RuntimeError("shape changed")
+
+            text = "still fine"
+            usage_metadata = None
+
+        generator = self._generator([Weird()])
+
+        deltas = await self._drain(generator)
+
+        assert deltas[-1].done is True
+
+
+class TestJsonExtraction:
+    """17-doc §1.2 Gap 1 — the greedy regex, and what it silently cost.
+
+    `re.search(r"\{.*\}", text, re.DOTALL)` spans from the FIRST opening brace
+    to the LAST one in the response. One object: correct. Anything else — prose
+    containing a brace, an example object before the real one, a trailing
+    sentence with a brace in it — and the captured span is not valid JSON, so
+    `json.loads` fails and the caller gets `{}`.
+
+    The outcome is degraded-but-safe, which is why it survived: it arrives as
+    "summary not available" with a perfectly good object sitting inside the text
+    and nothing in the logs saying so.
+
+    Fixed AFTER the eval harness existed (17-doc build order step 6), so the
+    change could be shown not to regress anything.
+    """
+
+    def test_TWO_objects_takes_the_FIRST_rather_than_failing(self):
+        from rag_service.generation.copilot import _json_object
+
+        # The exact regression: greedy matching spans `{"a"} … {"b"}` and
+        # parses neither.
+        assert _json_object('{"summary": "a"} {"summary": "b"}') == {"summary": "a"}
+
+    def test_a_BRACE_IN_THE_PROSE_before_the_JSON_no_longer_swallows_it(self):
+        from rag_service.generation.copilot import _json_object
+
+        assert _json_object('The set {a, b}. {"summary": "real"}') == {
+            "summary": "real"
+        }
+
+    def test_a_BRACE_INSIDE_A_STRING_does_not_unbalance_the_span(self):
+        from rag_service.generation.copilot import _json_object
+
+        # The bug a naive depth counter introduces while fixing the greedy one:
+        # a brace inside a quoted value is content, not structure.
+        assert _json_object('{"detail": "use {braces} carefully"}') == {
+            "detail": "use {braces} carefully"
+        }
+
+    def test_an_ESCAPED_QUOTE_does_not_end_the_string_early(self):
+        from rag_service.generation.copilot import _json_object
+
+        assert _json_object(r'{"detail": "say \"hi\" {here}"}') == {
+            "detail": 'say "hi" {here}'
+        }
+
+    def test_a_FENCED_object_still_parses(self):
+        from rag_service.generation.copilot import _json_object
+
+        # The ordinary case, and the reason searching beats parsing whole:
+        # models wrap JSON in fences regardless of the prompt.
+        assert _json_object('```json\n{"summary": "fenced"}\n```') == {
+            "summary": "fenced"
+        }
+
+    def test_TRUNCATION_still_returns_an_empty_object(self):
+        from rag_service.generation.copilot import _json_object
+
+        # Unchanged behaviour on purpose. The empty result IS right here — the
+        # object genuinely is not there. `gemini.py` logs `MAX_TOKENS` so the
+        # cause is findable.
+        assert _json_object('```json\n{"summary":') == {}
+
+    def test_an_ARRAY_is_not_accepted_where_an_OBJECT_was_asked_for(self):
+        from rag_service.generation.copilot import _json_object
+
+        assert _json_object("[1, 2, 3]") == {}
+
+    def test_an_OBJECT_is_not_accepted_where_an_ARRAY_was_asked_for(self):
+        from rag_service.generation.copilot import _json_array
+
+        assert _json_array('{"a": 1}') == []
+
+    def test_an_array_of_objects_parses_as_the_ARRAY(self):
+        from rag_service.generation.copilot import _json_array
+
+        # The shape `suggest` actually returns, and the case that makes the
+        # "keep scanning past an unclosed opener" branch necessary.
+        assert _json_array('Here you go: [{"title": "t"}]') == [{"title": "t"}]
+
+    def test_the_FIRST_PARSABLE_span_wins_even_when_an_earlier_one_is_broken(self):
+        from rag_service.generation.copilot import _json_object
+
+        assert _json_object('{not json} then {"summary": "good"}') == {
+            "summary": "good"
+        }
+
+    def test_empty_and_None_are_empty(self):
+        from rag_service.generation.copilot import _json_array, _json_object
+
+        assert _json_object("") == {}
+        assert _json_object(None) == {}  # type: ignore[arg-type]
+        assert _json_array("") == []

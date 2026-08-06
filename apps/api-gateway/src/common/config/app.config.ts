@@ -61,6 +61,20 @@ export type ApiErrorResponse = {
  */
 export const AUTH_THROTTLER_TIER = 'authTier';
 
+/**
+ * The tier AI routes override — 16-doc §2.
+ *
+ * **A general tier, deliberately NOT `authTier`.** The guard skips `authTier`
+ * on any route not marked `@AuthThrottle()`, so overriding it here would have
+ * been a decoration: the decorator present, the policy readable, and the limit
+ * never evaluated. The tier a route actually sees is the one it must override.
+ *
+ * `medium` rather than `short` because an AI limit is a per-minute budget and
+ * `short` is a burst window measured in seconds — overriding it would replace
+ * the burst protection rather than add a rate limit on top of it.
+ */
+export const AI_THROTTLER_TIER = 'medium';
+
 /** The blunt backstop every authenticated route gets. */
 export const GENERAL_THROTTLER_TIERS = ['short', 'medium', 'long'] as const;
 
@@ -98,6 +112,37 @@ export const ROUTE_THROTTLE = {
   invitationResend: { ttl: 60 * 60_000, limit: 3 },
   /** Brute-forcing the second factor. */
   twoFactorAuthenticate: { ttl: 15 * 60_000, limit: 10 },
+
+  // ---------------------------------------------------------------------
+  // AI surfaces — 16-doc §2.
+  //
+  // **The monthly quota does not cover this, and the reasoning was already
+  // written down one entry up.** `otpRequest` is throttled specifically
+  // because "this one costs real money per request"; every AI route is that
+  // route. The quota is a MONTH budget checked per request, and nothing in it
+  // stops one user spending the whole month in ten minutes — a script looping
+  // on `/knowledge/ask`, or a broken client retrying `/ai/draft`. The tenant's
+  // month ends at lunchtime and every symptom points at a cap working exactly
+  // as designed.
+  //
+  // The limits below are per USER, because `SmartThrottlerGuard.getTracker()`
+  // keys authenticated callers on `user:{sub}`. A per-IP limit here would put
+  // ten agents behind one office NAT in the same bucket, and would not really
+  // be a limit on an authenticated route anyway.
+  // ---------------------------------------------------------------------
+
+  /** Interactive — a human clicks a few times, not two hundred. */
+  aiDraft: { ttl: 60_000, limit: 10 },
+  aiSuggestions: { ttl: 60_000, limit: 10 },
+  /** Re-summarising a ticket is rare; a loop doing it is a bug. */
+  aiSummary: { ttl: 60_000, limit: 5 },
+  aiClassify: { ttl: 60_000, limit: 10 },
+  /** The most human-paced surface in the product — and still not 200/min. */
+  chatMessage: { ttl: 60_000, limit: 20 },
+  /** Search is cheap: one embedding, no generation. */
+  knowledgeSearch: { ttl: 60_000, limit: 30 },
+  /** Ask GENERATES, so it costs an order of magnitude more than search. */
+  knowledgeAsk: { ttl: 60_000, limit: 10 },
 } as const;
 
 /** A document belongs to a handful of departments, not hundreds. */

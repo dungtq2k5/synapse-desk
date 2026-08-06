@@ -1,0 +1,71 @@
+// Domain E — postgres_notification.
+//
+// ONE model for now: `notifications` (RDM Table 23). The rest of Domain E —
+// `notification_deliveries`, `notification_preferences`, and the feed
+// endpoints — is phase 3b and deliberately not built here.
+//
+// This slice exists because the AI quota alert became the first LOAD-BEARING
+// consumer of `notification.in_app.create` (16-doc §1): the alert was published
+// correctly, idempotently, to the right audience, into a subject with no
+// subscriber. Everything about it looked finished except that nobody was ever
+// told — and RDM §1.14 is explicit that hitting the cap is a 3-5x spike in
+// agent queue volume, so discovering it from the queue rather than from an 80%
+// warning is the difference between a planned upgrade and an incident.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// RDM Table 23 — the per-recipient in-app feed.
+///
+/// One row per RECIPIENT rather than one per event with a recipient list: the
+/// read pattern is "my unread notifications", and a list column would make that
+/// a scan with an array predicate on the largest table Domain E will have.
+model Notification {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  /// No FK: `organizations` lives in postgres_auth. Validated by the producer.
+  organizationId String @map("organization_id") @db.Uuid
+
+  /// No FK either — `users` is in postgres_auth. Resolved from the audience
+  /// permission at delivery time by asking auth-service.
+  recipientId String @map("recipient_id") @db.Uuid
+
+  /// Mirrors the NATS subject that produced it, so routing is producer-driven.
+  type String @db.VarChar(100)
+
+  /// NotificationPriority. CRITICAL bypasses quiet hours and digest batching.
+  priority String @default("NORMAL") @db.VarChar(20)
+
+  title String  @db.VarChar(255)
+  body  String? @db.Text
+
+  /// Deep-link payload for the SPA.
+  data Json @default("{}") @db.JsonB
+
+  actionUrl String? @map("action_url") @db.Text
+
+  /// **The idempotency key, and it is DERIVED rather than generated.**
+  ///
+  /// `UNIQUE (recipient_id, event_id)` is what makes NATS redelivery harmless:
+  /// the same threshold crossing produces the same id, so a second delivery is
+  /// a duplicate-key violation the consumer catches rather than a second
+  /// notification. A uuid here would make every retry a new row — and the quota
+  /// alert is exactly the producer that retries.
+  eventId String? @map("event_id") @db.VarChar(100)
+
+  readAt     DateTime? @map("read_at") @db.Timestamptz
+  archivedAt DateTime? @map("archived_at") @db.Timestamptz
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@unique([recipientId, eventId])
+  @@index([recipientId, createdAt(sort: Desc)])
+  @@index([organizationId])
+  @@map("notifications")
+}

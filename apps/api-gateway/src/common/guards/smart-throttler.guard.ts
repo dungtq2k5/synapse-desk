@@ -6,6 +6,8 @@ import {
   ThrottlerRequest,
 } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
+import { readFileSync } from 'node:fs';
+import { verify } from 'jsonwebtoken';
 import { AUTH_THROTTLER_TIER } from '../config/app.config';
 import { IS_AUTH_ROUTE_KEY } from '../decorators/auth-throttle.decorator';
 
@@ -29,6 +31,32 @@ import { IS_AUTH_ROUTE_KEY } from '../decorators/auth-throttle.decorator';
 @Injectable()
 export class SmartThrottlerGuard extends ThrottlerGuard {
   private readonly logger = new Logger(SmartThrottlerGuard.name);
+
+  /**
+   * Read from `process.env` rather than injected, and lazily.
+   *
+   * `ThrottlerGuard`'s constructor signature is the library's — adding a
+   * `ConfigService` parameter means re-declaring all three of its arguments and
+   * keeping them in step across upgrades, for two values that
+   * `envValidationSchema` has already made a boot-time failure if absent. The
+   * same reasoning `SecureGateway` uses for its CORS list.
+   *
+   * Lazy so that importing this class in a unit test does not require a key
+   * file on disk.
+   */
+  private cachedAccessPublicKey?: Buffer;
+
+  private get accessCookieName(): string {
+    return process.env.JWT_ACCESS_NAME ?? 'access_token';
+  }
+
+  private get accessPublicKey(): Buffer {
+    this.cachedAccessPublicKey ??= readFileSync(
+      process.env.JWT_ACCESS_PUBLIC_KEY_PATH as string,
+    );
+
+    return this.cachedAccessPublicKey;
+  }
 
   /**
    * The counter key: per USER, else per IP **and submitted account**.
@@ -63,13 +91,61 @@ export class SmartThrottlerGuard extends ThrottlerGuard {
    * happened to equal an IP string would share a counter with that address.
    */
   protected override getTracker(req: Request): Promise<string> {
-    const userId = req.user?.sub;
+    // `req.user` is populated by `JwtAuthGuard`, which is a ROUTE-level guard —
+    // and Nest runs GLOBAL guards first, so it is always undefined here.
+    //
+    // That was a silent bug for as long as this guard existed: the branch below
+    // read as "authenticated callers are keyed per user" and never once
+    // executed, so every authenticated route was quietly rate-limited per IP.
+    // Harmless for the auth routes this guard was written for (they are
+    // unauthenticated by definition) and exactly wrong for the AI routes added
+    // in 16-doc §2, where ten agents behind one office NAT would share one
+    // budget.
+    //
+    // It is kept as the first check because a future refactor that made this
+    // guard route-level would populate it, and reading it is free.
+    const userId = req.user?.sub ?? this.subjectFromToken(req);
     if (userId) return Promise.resolve(`user:${userId}`);
 
     const ip = req.ip ?? 'unknown';
     const account = extractAccountIdentifier(req);
 
     return Promise.resolve(account ? `ip:${ip}|acct:${account}` : `ip:${ip}`);
+  }
+
+  /**
+   * The caller's id, VERIFIED here rather than trusted.
+   *
+   * Decoding without verifying would be worse than the IP fallback it replaces:
+   * an attacker could mint an unsigned token with a random `sub` per request
+   * and get a fresh bucket every time, which is a rate limiter that raises the
+   * cost of evading it to zero. So the signature is checked with the same
+   * public key `JwtStrategy` uses.
+   *
+   * The cost is one asymmetric verify per request that `JwtAuthGuard` will then
+   * repeat — real, and the right trade: the alternative is a per-user limit
+   * that is not per user.
+   *
+   * Returns null for anything that does not verify, and the caller falls back
+   * to the IP-based keys. A request with a bad token is refused by the auth
+   * guard moments later anyway; what matters here is that it cannot choose its
+   * own bucket.
+   */
+  private subjectFromToken(req: Request): string | null {
+    const token = extractAccessToken(req, this.accessCookieName);
+    if (!token) return null;
+
+    try {
+      const payload = verify(token, this.accessPublicKey, {
+        algorithms: ['RS256'],
+      });
+
+      return typeof payload === 'object' && typeof payload.sub === 'string'
+        ? payload.sub
+        : null;
+    } catch {
+      return null;
+    }
   }
 
   protected override async handleRequest(
@@ -204,4 +280,21 @@ function isThrottlerException(error: unknown): boolean {
     (error.name === 'ThrottlerException' ||
       error.constructor?.name === 'ThrottlerException')
   );
+}
+
+/**
+ * The access token, cookie first and `Authorization` second.
+ *
+ * The SAME order `JwtStrategy` uses, and for the same reason: a request
+ * carrying both resolves to the browser's own session rather than an injected
+ * header. Duplicated rather than shared because the strategy expresses it as
+ * passport extractors, which are not callable outside a passport strategy.
+ */
+function extractAccessToken(req: Request, cookieName: string): string | null {
+  const cookie = req.cookies?.[cookieName] as string | undefined;
+  if (cookie) return cookie;
+
+  const [scheme, token] = req.headers.authorization?.split(' ') ?? [];
+
+  return scheme === 'Bearer' && token ? token : null;
 }

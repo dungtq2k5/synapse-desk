@@ -50,6 +50,31 @@ export interface UserSummaryResponse {
   deletedByName?: string | undefined;
 }
 
+/**
+ * Who should receive a notification addressed by PERMISSION.
+ *
+ * The producer of an in-app notification does not know who holds
+ * `organization.update` in a tenant — that is auth-service's answer, and
+ * resolving it at the producer would mean a cross-service read on a path that
+ * is deliberately fire-and-forget. So the producer names the permission and
+ * notification-service asks this.
+ */
+export interface ListPermissionHoldersRequest {
+  organizationId: string;
+  /** A `target.action` code from the canonical registry. */
+  permissionCode: string;
+}
+
+export interface PermissionHolder {
+  userId: string;
+  email: string;
+  fullName: string;
+}
+
+export interface ListPermissionHoldersResponse {
+  items: PermissionHolder[];
+}
+
 export interface ListUsersRequest {
   page: PageRequest | undefined;
   departmentId?: string | undefined;
@@ -183,6 +208,17 @@ export interface UserServiceClient {
 
   getUserPermissions(request: UserIdRequest, metadata?: Metadata): Observable<GetUserPermissionsResponse>;
 
+  /**
+   * Service-to-service only: notification-service resolves an audience from a
+   * permission code. Never routed by the gateway — it enumerates a tenant's
+   * users and their addresses, which no client has business asking for.
+   */
+
+  listPermissionHolders(
+    request: ListPermissionHoldersRequest,
+    metadata?: Metadata,
+  ): Observable<ListPermissionHoldersResponse>;
+
   createUser(request: CreateUserRequest, metadata?: Metadata): Observable<CreateUserResponse>;
 
   updateUser(request: UpdateUserRequest, metadata?: Metadata): Observable<UserSummaryResponse>;
@@ -242,6 +278,17 @@ export interface UserServiceController {
     request: UserIdRequest,
     metadata?: Metadata,
   ): Promise<GetUserPermissionsResponse> | Observable<GetUserPermissionsResponse> | GetUserPermissionsResponse;
+
+  /**
+   * Service-to-service only: notification-service resolves an audience from a
+   * permission code. Never routed by the gateway — it enumerates a tenant's
+   * users and their addresses, which no client has business asking for.
+   */
+
+  listPermissionHolders(
+    request: ListPermissionHoldersRequest,
+    metadata?: Metadata,
+  ): Promise<ListPermissionHoldersResponse> | Observable<ListPermissionHoldersResponse> | ListPermissionHoldersResponse;
 
   createUser(
     request: CreateUserRequest,
@@ -318,6 +365,7 @@ export function UserServiceControllerMethods() {
       "listUsers",
       "getUser",
       "getUserPermissions",
+      "listPermissionHolders",
       "createUser",
       "updateUser",
       "deleteUser",

@@ -31,6 +31,24 @@ export class DocumentChunkResponseDto {
   createdAt!: Date;
 }
 
+export class DocumentFlagResponseDto {
+  id!: string;
+  documentId!: string;
+  /**
+   * Joined in rather than left to the client.
+   *
+   * This list is read as a worklist — "which documents need attention" — and a
+   * page of uuids is one a reviewer has to resolve by hand before it says
+   * anything.
+   */
+  documentTitle!: string;
+  flagType!: string;
+  severity!: string;
+  detail!: string;
+  confidenceScore!: number | null;
+  detectedAt!: Date;
+}
+
 export class PresignDocumentResponseDto {
   uploadUrl!: string;
   objectPath!: string;

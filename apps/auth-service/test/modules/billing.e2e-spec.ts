@@ -21,8 +21,13 @@ import { BillingEventPublisher } from '../../src/modules/billing/billing-event.p
 import { PlatformService } from '../../src/modules/platform/platform.service';
 import { OrganizationsService } from '../../src/modules/organizations/organizations.service';
 import { AuditPublisher } from '../../src/modules/audit/audit-publisher.service';
+import { faultInjector } from '@synapsedesk/common/testing/fault';
 
 describe('§2-§4 Billing and entitlements (e2e)', () => {
+  // Every injected fault in this file is registered here and restored in an
+  // `afterEach` that runs whether the test passed, failed or threw — 16-doc §9.
+  const faults = faultInjector();
+
   let fx: E2eFixture;
   let writer: EntitlementWriterService;
   let billing: BillingService;
@@ -564,7 +569,7 @@ describe('§2-§4 Billing and entitlements (e2e)', () => {
       // they do — and this is the page a customer opens when something is
       // already wrong.
       const organization = await subscribedOrganization('cus_read');
-      const apiSpy = jest.spyOn(stripe, 'api', 'get');
+      const apiSpy = faults.spy(stripe, 'api', 'get');
 
       const response = await billing.getSubscription(
         memberContext({ id: 'u', organizationId: organization.id }),
@@ -573,8 +578,6 @@ describe('§2-§4 Billing and entitlements (e2e)', () => {
       expect(apiSpy).not.toHaveBeenCalled();
       expect(response.stripeCustomerId).toBe('cus_read');
       expect(response.maxAgentSeats).toBe(organization.maxAgentSeats);
-
-      apiSpy.mockRestore();
     });
 
     it('4. Answers coherently for a tenant with NO stripe_customer_id', async () => {

@@ -12,6 +12,8 @@ import {
   GetDocumentChunkRequest,
   ListDocumentChunksRequest,
   ListDocumentChunksResponse,
+  ListDocumentFlagsRequest,
+  ListDocumentFlagsResponse,
   ListDocumentDepartmentsResponse,
   ListDocumentsRequest,
   ListDocumentsResponse,
@@ -134,6 +136,16 @@ export class DocumentsGrpcController implements DocumentServiceController {
     metadata?: Metadata,
   ): Promise<ListDocumentChunksResponse> {
     return this.documents.listDocumentChunks(
+      request,
+      unpackCallerContext(metadata),
+    );
+  }
+
+  listDocumentFlags(
+    request: ListDocumentFlagsRequest,
+    metadata?: Metadata,
+  ): Promise<ListDocumentFlagsResponse> {
+    return this.documents.listDocumentFlags(
       request,
       unpackCallerContext(metadata),
     );

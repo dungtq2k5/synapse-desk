@@ -43,6 +43,8 @@ export function renderEmail(
       return invitation(command.data, branding);
     case EmailTemplateName.SECURITY_ALERT:
       return securityAlert(command.data, branding);
+    case EmailTemplateName.QUOTA_ALERT:
+      return quotaAlert(command.data, branding);
   }
 }
 
@@ -271,5 +273,28 @@ function securityAlert(
     ),
     text:
       `Hi ${data.fullName}, ${data.detail}` + textOrigin(data.origin, 'action'),
+  };
+}
+
+/**
+ * A budget threshold crossing.
+ *
+ * Deliberately plain — the value is entirely in `detail`, which the producer
+ * writes to say what happens at 100% rather than merely which percentage was
+ * crossed. Decorating it would bury the one sentence that makes it actionable.
+ */
+function quotaAlert(
+  data: Data<EmailTemplateName.QUOTA_ALERT>,
+  branding: TemplateBranding,
+): RenderedEmail {
+  return {
+    subject: `${branding.appName}: ${data.headline}`,
+    html: layout(
+      branding,
+      data.headline,
+      `<p style="margin:0 0 12px;">Hi ${esc(data.fullName)},</p>
+       <p style="margin:0;">${esc(data.detail)}</p>`,
+    ),
+    text: `${data.headline}\n\nHi ${data.fullName},\n\n${data.detail}`,
   };
 }

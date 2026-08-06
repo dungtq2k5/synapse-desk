@@ -1,10 +1,13 @@
 import { Controller, Logger } from '@nestjs/common';
 import { Ctx, EventPattern, NatsContext, Payload } from '@nestjs/microservices';
 import {
+  CreateInAppNotificationCommand,
+  IN_APP_NOTIFICATION_PATTERN,
   NOTIFICATION_PATTERNS,
   SendEmailCommand,
   SendSmsCommand,
 } from '@synapsedesk/common';
+import { InAppNotificationService } from './in-app/in-app-notification.service';
 import { EmailService } from './email/email.service';
 import { SmsService } from './sms/sms.service';
 
@@ -22,6 +25,7 @@ export class NotificationsController {
   constructor(
     private readonly emailService: EmailService,
     private readonly smsService: SmsService,
+    private readonly inApp: InAppNotificationService,
   ) {}
 
   @EventPattern(NOTIFICATION_PATTERNS.sendEmail)
@@ -44,6 +48,40 @@ export class NotificationsController {
     await this.dispatch(
       () => this.smsService.send(command),
       `${command.template} SMS`,
+      context,
+    );
+  }
+
+  /**
+   * The subscriber this subject did not have — 16-doc §1.
+   *
+   * `IN_APP_NOTIFICATION_PATTERN` was published to from the moment the quota
+   * alert existed, on the same reasoning that had `audit.record` emitting
+   * before its consumer did: the producer's obligation is real immediately, and
+   * retrofitting it across every call site later is far worse than emitting
+   * into a quiet subject. This is the other half finally arriving — and the
+   * quota alert is what made it urgent, because a cap nobody is warned about
+   * arrives as a 3-5x queue spike rather than as a billing notice.
+   */
+  @EventPattern(IN_APP_NOTIFICATION_PATTERN)
+  async handleInAppNotification(
+    @Payload() command: CreateInAppNotificationCommand,
+    @Ctx() context: NatsContext,
+  ): Promise<void> {
+    if (!command?.organizationId || !command.audiencePermission) {
+      // Dropped rather than guessed at. An audience of "everyone" is the one
+      // interpretation a malformed command must never receive.
+      this.logger.error(
+        `${IN_APP_NOTIFICATION_PATTERN} arrived without a tenant or an audience`,
+      );
+      return;
+    }
+
+    await this.dispatch(
+      async () => {
+        await this.inApp.deliver(command);
+      },
+      `in-app '${command.title}'`,
       context,
     );
   }

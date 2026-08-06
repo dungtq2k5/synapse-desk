@@ -1,9 +1,14 @@
 import {
   DocumentChunkResponse,
+  DocumentFlagResponse,
   DocumentResponse,
   toTimestamp,
 } from '@synapsedesk/grpc-proto';
-import { Document, DocumentChunk } from '../../generated/prisma/client';
+import {
+  Document,
+  DocumentChunk,
+  DocumentFlag,
+} from '../../generated/prisma/client';
 
 /**
  * Prisma row -> wire.
@@ -58,5 +63,27 @@ export function toDocumentChunkResponse(
     // reported rather than defaulted.
     vectorPointId: chunk.vectorPointId ?? undefined,
     createdAt: toTimestamp(chunk.createdAt),
+  };
+}
+
+/**
+ * A flag, WITH its document's title.
+ *
+ * The title is joined in rather than left to the client: a flag list is read as
+ * a worklist ("which documents need attention"), and a page of uuids is one the
+ * reviewer has to resolve by hand before it means anything.
+ */
+export function toDocumentFlagResponse(
+  flag: DocumentFlag & { document: { title: string } },
+): DocumentFlagResponse {
+  return {
+    id: flag.id,
+    documentId: flag.documentId,
+    documentTitle: flag.document.title,
+    flagType: flag.flagType,
+    severity: flag.severity,
+    detail: flag.detail,
+    confidenceScore: flag.confidenceScore ?? undefined,
+    detectedAt: toTimestamp(flag.detectedAt),
   };
 }

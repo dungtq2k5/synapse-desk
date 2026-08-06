@@ -60,6 +60,29 @@ services:
       timeout: 5s
       retries: 5
 
+  # Domain E's own database — 16-doc §1.
+  #
+  # Added when the quota alert became the first LOAD-BEARING consumer of the
+  # in-app notification subject: the alert was published correctly, idempotently
+  # and to the right audience, into a subject with no subscriber. Everything
+  # about it looked finished except that nobody was ever told.
+  postgres-notification:
+    image: postgres:18.4-alpine
+    container_name: synapsedesk-postgres-notification
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${NOTIFICATION_DB_NAME}
+    ports:
+      - '${NOTIFICATION_DB_PORT}:5432'
+    volumes:
+      - pgdata_notification:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   # ---------------------------------------------------------------------------
   # Message Queue & Cache Layer
   # ---------------------------------------------------------------------------
@@ -118,6 +141,7 @@ volumes:
   pgdata_auth:
   pgdata_ticket:
   pgdata_ingestion:
+  pgdata_notification:
   redis_data:
   nats_data:
   qdrant_data:

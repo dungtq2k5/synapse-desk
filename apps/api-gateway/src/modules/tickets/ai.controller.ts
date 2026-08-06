@@ -9,7 +9,12 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { RequestContext } from '@synapsedesk/common';
+import {
+  AI_THROTTLER_TIER,
+  ROUTE_THROTTLE,
+} from '../../common/config/app.config';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionGuard } from '../../common/guards/permission.guard';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
@@ -62,6 +67,10 @@ export class AiController {
    * first, and a client keying off 201 would treat a replacement as a new
    * resource.
    */
+  // A per-USER minute limit, on top of the monthly quota — 16-doc §2. The
+  // quota is a month budget checked per request and does nothing to stop one
+  // user spending the whole month in ten minutes.
+  @Throttle({ [AI_THROTTLER_TIER]: ROUTE_THROTTLE.aiSummary })
   @Post('summary')
   @RequirePermission('ticket.ai.use')
   @HttpCode(HttpStatus.OK)
@@ -80,6 +89,10 @@ export class AiController {
    * `invokeAi` is the path that does persist, and keeping the two separate is
    * what stops an unreviewed generated reply reaching a customer.
    */
+  // A per-USER minute limit, on top of the monthly quota — 16-doc §2. The
+  // quota is a month budget checked per request and does nothing to stop one
+  // user spending the whole month in ten minutes.
+  @Throttle({ [AI_THROTTLER_TIER]: ROUTE_THROTTLE.aiDraft })
   @Post('draft')
   @RequirePermission('ticket.ai.use')
   @HttpCode(HttpStatus.OK)
@@ -91,6 +104,10 @@ export class AiController {
     return this.aiGrpcClient.generateDraft(ticketId, dto, context);
   }
 
+  // A per-USER minute limit, on top of the monthly quota — 16-doc §2. The
+  // quota is a month budget checked per request and does nothing to stop one
+  // user spending the whole month in ten minutes.
+  @Throttle({ [AI_THROTTLER_TIER]: ROUTE_THROTTLE.aiSuggestions })
   @Post('suggestions')
   @RequirePermission('ticket.ai.use')
   @HttpCode(HttpStatus.OK)
@@ -101,6 +118,10 @@ export class AiController {
     return this.aiGrpcClient.getSuggestions(ticketId, context);
   }
 
+  // A per-USER minute limit, on top of the monthly quota — 16-doc §2. The
+  // quota is a month budget checked per request and does nothing to stop one
+  // user spending the whole month in ten minutes.
+  @Throttle({ [AI_THROTTLER_TIER]: ROUTE_THROTTLE.aiClassify })
   @Post('classify')
   @RequirePermission('ticket.ai.use')
   @HttpCode(HttpStatus.OK)

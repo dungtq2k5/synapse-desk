@@ -14,6 +14,8 @@ import {
   GetDocumentChunkRequest,
   ListDocumentChunksRequest,
   ListDocumentChunksResponse,
+  ListDocumentFlagsRequest,
+  ListDocumentFlagsResponse,
   ListDocumentDepartmentsResponse,
   ListDocumentsRequest,
   ListDocumentsResponse,
@@ -30,6 +32,9 @@ import {
 import {
   ALLOWED_DOCUMENT_MIME_TYPES,
   DOCUMENT_CHUNK_SORTABLE_FIELDS,
+  DOCUMENT_FLAG_SORTABLE_FIELDS,
+  DOCUMENT_FLAG_TYPES,
+  DocumentFlagType,
   DOCUMENT_PATTERNS,
   DOCUMENT_SORTABLE_FIELDS,
   DocumentStatus,
@@ -50,7 +55,11 @@ import { DocumentEventPublisher } from '../events/document-event.publisher';
 import { ScopeWriterService } from '../ingestion/scope-writer.service';
 import { ScopeFanoutQueueService } from '../ingestion/scope-fanout-queue.service';
 import { Prisma } from '../../generated/prisma/client';
-import { toDocumentChunkResponse, toDocumentResponse } from './document.mapper';
+import {
+  toDocumentChunkResponse,
+  toDocumentFlagResponse,
+  toDocumentResponse,
+} from './document.mapper';
 
 /** The partial unique index the seeder applies: one live hash per tenant. */
 const DOCUMENT_HASH_INDEX = 'documents_org_hash_key';
@@ -417,6 +426,72 @@ export class DocumentsService {
 
     return {
       items: items.map(toDocumentChunkResponse),
+      meta: toPageMeta(page, totalItems, items.length),
+    };
+  }
+
+  /**
+   * The flag worklist — 16-doc §5.
+   *
+   * **Accepts EVERY flag type, and more than one at a time.** `UNRETRIEVED` and
+   * `UNCITED` were one flag under a name that fitted only `UNRETRIEVED`, and
+   * they were split because they are different findings with different fixes: a
+   * document nobody's question came near may simply be mis-titled, while one
+   * retrieved twenty times and cited never is actively displacing the sources
+   * that would have answered. A filter that accepted only one of them would
+   * quietly re-merge them, because a type nobody can select is a type nobody
+   * sees.
+   *
+   * Unresolved by default: a resolved flag is history, and mixing history into
+   * a worklist is how a worklist stops being read.
+   */
+  async listDocumentFlags(
+    request: ListDocumentFlagsRequest,
+    context: CallerContext,
+  ): Promise<ListDocumentFlagsResponse> {
+    const organizationId = requireTenant(context);
+    const page = request.page ?? emptyPage();
+    const { skip, take, orderBy } = toPrismaPage(
+      page,
+      DOCUMENT_FLAG_SORTABLE_FIELDS,
+    );
+
+    const requested = request.flagTypes ?? [];
+    const unknown = requested.filter(
+      (type) => !DOCUMENT_FLAG_TYPES.includes(type as DocumentFlagType),
+    );
+    if (unknown.length > 0) {
+      // Refused rather than ignored. Silently dropping an unknown filter
+      // answers a DIFFERENT question than the one asked — and a caller reading
+      // "no OUTDTAED flags" as "nothing is outdated" is the whole failure.
+      throw new RpcException({
+        code: status.INVALID_ARGUMENT,
+        message: `Unknown flag type(s): ${unknown.join(', ')}`,
+      });
+    }
+
+    const where: Prisma.DocumentFlagWhereInput = {
+      organizationId,
+      // The scope boundary. A flag names a document, so an unscoped list would
+      // leak another tenant's document titles through the join below.
+      document: { deletedAt: null },
+      ...(requested.length > 0 ? { flagType: { in: requested } } : {}),
+      ...(request.includeResolved ? {} : { resolvedAt: null }),
+    };
+
+    const [items, totalItems] = await Promise.all([
+      this.prisma.documentFlag.findMany({
+        where,
+        orderBy,
+        skip,
+        take,
+        include: { document: { select: { title: true } } },
+      }),
+      this.prisma.documentFlag.count({ where }),
+    ]);
+
+    return {
+      items: items.map(toDocumentFlagResponse),
       meta: toPageMeta(page, totalItems, items.length),
     };
   }

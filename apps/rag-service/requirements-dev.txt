@@ -20,3 +20,13 @@ pyrefly==1.2.0
 # untyped and silently stops verifying that half of the servicer. Stubs only —
 # nothing imports this at runtime.
 types-grpcio==1.83.0.20260730
+
+# The eval harness (`npm run eval:rag`) reads its golden set from YAML — 17-doc
+# §3. A dev dependency rather than a runtime one: the harness is run
+# deliberately, by a person, and never by the service.
+PyYAML==6.0.2
+
+# Language identification for the eval's fourth metric. OPTIONAL at runtime —
+# `eval/run.py` falls back to marker words if the import fails, because a
+# harness that cannot start without a dependency is a harness nobody runs.
+langdetect==1.0.9

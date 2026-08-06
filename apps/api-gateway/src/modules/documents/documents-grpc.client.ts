@@ -13,6 +13,7 @@ import { PaginationResponseBase } from '../../common/dto/base/pagination-respons
 import { toPaginationMeta } from '../../common/mappers/pagination.mapper';
 import {
   ConfirmDocumentDto,
+  ListDocumentFlagsQueryDto,
   ListDocumentsQueryDto,
   PresignDocumentDto,
   SetDocumentDepartmentsDto,
@@ -20,12 +21,13 @@ import {
 } from './dto/rest/document.dto';
 import {
   DocumentChunkResponseDto,
+  DocumentFlagResponseDto,
   DocumentResponseDto,
   DownloadDocumentResponseDto,
   PresignDocumentResponseDto,
   StorageUsageResponseDto,
 } from './dto/rest/document-response.dto';
-import { toChunkDto, toDocumentDto } from './document.mapper';
+import { toChunkDto, toDocumentDto, toFlagDto } from './document.mapper';
 
 @Injectable()
 export class DocumentsGrpcClient
@@ -253,6 +255,36 @@ export class DocumentsGrpcClient
         context,
       ),
     );
+  }
+
+  /**
+   * The flag worklist.
+   *
+   * `type` is forwarded as an ARRAY and an empty one means "every type" — the
+   * filter must be able to express `UNRETRIEVED` and `UNCITED` separately AND
+   * together, because they are different findings with different fixes.
+   */
+  async listFlags(
+    query: ListDocumentFlagsQueryDto,
+    context: RequestContext,
+  ): Promise<PaginationResponseBase<DocumentFlagResponseDto>> {
+    const response = await this.call(
+      (metadata) =>
+        this.documentGrpcService.listDocumentFlags(
+          {
+            flagTypes: query.type ?? [],
+            includeResolved: query.includeResolved ?? false,
+            page: toPageRequest(query),
+          },
+          metadata,
+        ),
+      context,
+    );
+
+    return {
+      items: response.items.map(toFlagDto),
+      meta: toPaginationMeta(response.meta),
+    };
   }
 
   async storageUsage(

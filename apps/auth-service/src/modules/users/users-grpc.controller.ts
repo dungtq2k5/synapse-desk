@@ -7,6 +7,8 @@ import {
   DeleteUserResponse,
   GetCurrentUserRequest,
   GetUserPermissionsResponse,
+  ListPermissionHoldersRequest,
+  ListPermissionHoldersResponse,
   ListUsersRequest,
   ListUsersResponse,
   LockUserRequest,
@@ -78,6 +80,20 @@ export class UsersGrpcController implements UserServiceController {
       request,
       unpackCallerContext(metadata),
     );
+  }
+
+  /**
+   * Service-to-service only — notification-service resolving an audience.
+   *
+   * Reads no caller context: the tenant is a FIELD of the request because the
+   * caller is a background consumer with no user. It is never routed by the
+   * gateway, which is what keeps a tenant's user list and addresses out of
+   * reach of any client.
+   */
+  listPermissionHolders(
+    request: ListPermissionHoldersRequest,
+  ): Promise<ListPermissionHoldersResponse> {
+    return this.usersService.listPermissionHolders(request);
   }
 
   createUser(

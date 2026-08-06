@@ -33,8 +33,13 @@ import {
   QuotaCounterService,
 } from '../../src/modules/ai-ledger/quota-counter.service';
 import { AuthReferenceService } from '../../src/modules/auth-client/auth-reference.service';
+import { faultInjector } from '@synapsedesk/common/testing/fault';
 
 describe('§1.3 The AI ledger and quota gate (e2e)', () => {
+  // Every injected fault in this file is registered here and restored in an
+  // `afterEach` that runs whether the test passed, failed or threw — 16-doc §9.
+  const faults = faultInjector();
+
   let fx: E2eFixture;
   let ledger: AiLedgerService;
   let counter: QuotaCounterService;
@@ -272,33 +277,53 @@ describe('§1.3 The AI ledger and quota gate (e2e)', () => {
       // The one place a cache miss must not mean "allow". Returning zero on a
       // connection error would open the gate for every tenant at once, at
       // exactly the moment nobody can see what is being spent.
-      const spy = jest
-        .spyOn(counter, 'spentMicros')
-        .mockRejectedValue(new Error('ECONNREFUSED'));
+      faults.fail(counter, 'spentMicros', new Error('ECONNREFUSED'));
 
       const decision = await ledger.checkBudget(
         tenant.organizationId,
         AiSurface.DRAFT,
         context(),
       );
-      spy.mockRestore();
 
       expect(decision.allowed).toBe(false);
+    });
+
+    it('8b. FAILS CLOSED when AUTH-SERVICE is unreachable — 16-doc §4', async () => {
+      // The row 16-doc §4 says to check first, and the one that goes the
+      // OPPOSITE way from `listDepartments`.
+      //
+      // `listDepartments` returning empty on an unreachable auth-service is a
+      // good decision for classification: a convenience degrades and the ticket
+      // still gets filed. The same decision applied to the entitlement read
+      // would be a disaster — a tenant whose budget cannot be fetched must not
+      // be treated as unlimited, because that spends money that may not exist
+      // and does so at the moment nobody can see the meter.
+      //
+      // The two are meant to disagree, so both directions are pinned.
+      // The suite's own spy, not the fault injector: `getAiEntitlement` is
+      // already spied in `beforeAll`, and `jest.spyOn` on an existing mock
+      // returns that same instance — so restoring it would strip the shared
+      // spy for every later test. `beforeEach` re-states the implementation,
+      // which is what makes this safe.
+      getAiEntitlement.mockRejectedValue(
+        new Error('auth-service is unreachable'),
+      );
+
+      await expect(
+        ledger.checkBudget(tenant.organizationId, AiSurface.DRAFT, context()),
+      ).rejects.toBeDefined();
     });
 
     it('9. still ESCALATES chat during a Redis outage, rather than erroring', async () => {
       // Failing closed must not turn into failing hard: a user mid-conversation
       // gets a human, not a stack trace.
-      const spy = jest
-        .spyOn(counter, 'spentMicros')
-        .mockRejectedValue(new Error('ECONNREFUSED'));
+      faults.fail(counter, 'spentMicros', new Error('ECONNREFUSED'));
 
       const decision = await ledger.checkBudget(
         tenant.organizationId,
         AiSurface.CHAT_ANSWER,
         context(),
       );
-      spy.mockRestore();
 
       expect(decision).toMatchObject({
         allowed: false,
@@ -392,14 +417,11 @@ describe('§1.3 The AI ledger and quota gate (e2e)', () => {
       // The deliberate asymmetry: the GATE fails closed, the CHARGE fails open.
       // By the time we are charging, the model has run and the money is spent —
       // refusing the caller their answer would lose the work as well.
-      const spy = jest
-        .spyOn(counter, 'charge')
-        .mockRejectedValue(new Error('ECONNREFUSED'));
+      faults.fail(counter, 'charge', new Error('ECONNREFUSED'));
 
       await expect(
         ledger.charge(tenant.organizationId, 1_000n, context()),
       ).resolves.toBeUndefined();
-      spy.mockRestore();
     });
 
     it('4. ignores a zero or negative charge', async () => {
@@ -426,13 +448,14 @@ describe('§1.3 The AI ledger and quota gate (e2e)', () => {
     });
 
     it('2. SWALLOWS a write failure and still returns an id — §1.3 test 4', async () => {
-      const spy = jest
-        .spyOn(fx.prisma.aiGeneration, 'create')
-        .mockRejectedValue(new Error('injected failure'));
+      faults.fail(
+        fx.prisma.aiGeneration,
+        'create',
+        new Error('injected failure'),
+      );
 
       const id = ledger.record(entry());
       await new Promise((resolve) => setTimeout(resolve, 100));
-      spy.mockRestore();
 
       expect(id).toMatch(/^[0-9a-f-]{36}$/);
       expect(await fx.prisma.aiGeneration.count()).toBe(0);
@@ -532,12 +555,18 @@ describe('§1.3 The AI ledger and quota gate (e2e)', () => {
 
       // Now a charge whose ledger write fails — the counter moves, the ledger
       // does not.
-      const spy = jest
-        .spyOn(fx.prisma.aiGeneration, 'create')
-        .mockRejectedValue(new Error('injected failure'));
+      // Restored by the injector's `afterEach` — but this test needs the write
+      // working again BEFORE its own next assertion, so it is restored here as
+      // well. `mockRestore()` twice is a no-op; not restoring at all would make
+      // the reconciliation below write into a mock that always rejects.
+      const create = faults.fail(
+        fx.prisma.aiGeneration,
+        'create',
+        new Error('injected failure'),
+      );
       await ledger.chargeAndRecord(entry(), context());
       await new Promise((resolve) => setTimeout(resolve, 100));
-      spy.mockRestore();
+      create.mockRestore();
 
       const drifted = await counter.spentMicros(
         tenant.organizationId,

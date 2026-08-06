@@ -134,11 +134,23 @@ export class RagClientService implements OnModuleInit {
 
     return {
       content: response.draft,
-      // Empty because rag-service records the spend itself — the ledger row it
-      // already wrote carries the model and the tokens. Duplicating them onto
-      // `ticket_messages` from a second source is how a second metering path
-      // starts; the columns there are a denormalized convenience the gate does
-      // not read (doc 15 §3.2).
+      // **THE RULE: populate model/token fields only where they cannot be read
+      // as the meter.** — 16-doc §8.
+      //
+      // Written down because this looks exactly like an inconsistency with
+      // `generateSummary` below, which passes `modelName` straight through, and
+      // an inconsistency is what a tidying pass removes in one line.
+      //
+      // The asymmetry is the design:
+      //   - a DRAFT lands on `ticket_messages`, which HAS token columns, so
+      //     filling them creates a second number that looks like spend beside
+      //     `ai_generations` — the one the quota gate actually sums;
+      //   - a SUMMARY lands on `ai_summaries`, where `model_name` is NOT NULL
+      //     and there are no token columns at all, so it can only ever be
+      //     display metadata.
+      //
+      // rag-service has already written the ledger row carrying the real model
+      // and tokens (doc 15 §3.2). `rag-client.service.spec.ts` pins both sides.
       modelName: '',
       promptTokens: 0,
       completionTokens: 0,

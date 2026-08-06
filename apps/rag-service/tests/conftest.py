@@ -344,10 +344,19 @@ class RecordingLedger:
     def record(self, entry):
         self.entries.append(entry)
 
-        async def _noop():
-            return None
+        # Returns an ID, like the real client does.
+        #
+        # It used to resolve to `None`, and that made the fake NOT substitutable
+        # for `LedgerClient`: the reviewed-draft path awaits this task to learn
+        # `generation_id`, so every draft in every test came back with an empty
+        # one — and a test asserting the acceptance loop had something to join
+        # on could not have been written.
+        generation_id = str(uuid.uuid4())
 
-        return asyncio.ensure_future(_noop())
+        async def _recorded():
+            return generation_id
+
+        return asyncio.ensure_future(_recorded())
 
     # Mirrors LedgerClient.drain's signature deliberately — a fake that
     # dropped the parameter would not be substitutable for the real one. Same

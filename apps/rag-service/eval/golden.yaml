@@ -1,0 +1,220 @@
+# The golden set — 17-doc §3.1.
+#
+# ~30 questions against a fixed corpus (`corpus/`), weighted toward the cases
+# that ACTUALLY break rather than spread evenly over the ones that are easy to
+# write. The distribution is the design:
+#
+#   8-10 straightforward — one document, one clear answer. The baseline; a
+#        regression here means retrieval itself broke.
+#   5    multilingual    — 17-doc §2.1 made permanently visible. Retrieval
+#        works (the embedding model is multilingual), the sources are English,
+#        and before the prompt fix the answers came back in English.
+#   5    exact-string    — policy numbers and error codes. The ONLY proof the
+#        lexical arm contributes anything: semantic search paraphrases, and a
+#        question whose answer is "P-4471" is answered by BM25 or not at all.
+#   5    DOC_MISSING     — nothing in the corpus covers it. Any answer at all
+#        is a failure, and this is the class with real product consequences:
+#        an invented policy is worse than no answer, every time.
+#   5    ambiguous       — spread across documents, or answerable two ways.
+#        Where reranking earns its cost.
+#
+# `must_contain` is deliberately a SUBSTRING rather than a full expected
+# answer. Grading generated prose against a reference is its own research
+# problem; asking whether the number that matters appears is not.
+
+- id: leave-carryover
+  category: straightforward
+  q: "how much annual leave carries over?"
+  must_cite: [handbook.md]
+  must_contain: ["5 days"]
+  language: en
+
+- id: leave-request-notice
+  category: straightforward
+  q: "how much notice do I need to give for annual leave?"
+  must_cite: [handbook.md]
+  must_contain: ["two weeks"]
+  language: en
+
+- id: probation-length
+  category: straightforward
+  q: "how long is the probation period?"
+  must_cite: [handbook.md]
+  must_contain: ["six months"]
+  language: en
+
+- id: expense-limit-meals
+  category: straightforward
+  q: "what is the daily meal allowance when travelling?"
+  must_cite: [expenses.md]
+  must_contain: ["45"]
+  language: en
+
+- id: expense-receipt-threshold
+  category: straightforward
+  q: "do I need a receipt for a small expense?"
+  must_cite: [expenses.md]
+  must_contain: ["25"]
+  language: en
+
+- id: vpn-setup
+  category: straightforward
+  q: "how do I connect to the VPN?"
+  must_cite: [it-support.md]
+  must_contain: ["GlobalConnect"]
+  language: en
+
+- id: password-reset
+  category: straightforward
+  q: "how do I reset my password?"
+  must_cite: [it-support.md]
+  must_contain: ["self-service"]
+  language: en
+
+- id: laptop-replacement-cycle
+  category: straightforward
+  q: "how often are laptops replaced?"
+  must_cite: [it-support.md]
+  must_contain: ["three years"]
+  language: en
+
+- id: sick-leave-certificate
+  category: straightforward
+  q: "when do I need a doctor's note for sick leave?"
+  must_cite: [handbook.md]
+  must_contain: ["three consecutive"]
+  language: en
+
+# --- multilingual: the answer must come back in the QUESTION's language,
+#     even though every source document is English.
+
+- id: leave-carryover-vi
+  category: multilingual
+  q: "tôi được chuyển bao nhiêu ngày phép sang năm sau?"
+  must_cite: [handbook.md]
+  language: vi
+
+- id: vpn-setup-vi
+  category: multilingual
+  q: "làm thế nào để kết nối VPN?"
+  must_cite: [it-support.md]
+  language: vi
+
+- id: expense-meals-es
+  category: multilingual
+  q: "¿cuál es la dieta diaria para comidas en viaje?"
+  must_cite: [expenses.md]
+  language: es
+
+- id: probation-fr
+  category: multilingual
+  q: "quelle est la durée de la période d'essai ?"
+  must_cite: [handbook.md]
+  language: fr
+
+- id: password-reset-de
+  category: multilingual
+  q: "wie setze ich mein passwort zurück?"
+  must_cite: [it-support.md]
+  language: de
+
+# --- exact-string: the lexical arm, or nothing.
+
+- id: policy-number-expenses
+  category: exact-string
+  q: "what does policy P-4471 cover?"
+  must_cite: [expenses.md]
+  must_contain: ["P-4471"]
+  language: en
+
+- id: error-code-vpn
+  category: exact-string
+  q: "what does error VPN-0x8007 mean?"
+  must_cite: [it-support.md]
+  must_contain: ["certificate"]
+  language: en
+
+- id: form-number-leave
+  category: exact-string
+  q: "which form is HR-22?"
+  must_cite: [handbook.md]
+  must_contain: ["HR-22"]
+  language: en
+
+- id: asset-tag-format
+  category: exact-string
+  q: "what is the format of an asset tag?"
+  must_cite: [it-support.md]
+  must_contain: ["AC-"]
+  language: en
+
+- id: cost-centre-travel
+  category: exact-string
+  q: "which cost centre is travel booked to?"
+  must_cite: [expenses.md]
+  must_contain: ["CC-1180"]
+  language: en
+
+# --- DOC_MISSING: nothing in the corpus. ANY answer is a failure.
+
+- id: wifi-password
+  category: doc-missing
+  q: "what is the wifi password"
+  expect: DOC_MISSING
+  language: en
+
+- id: parental-leave
+  category: doc-missing
+  q: "how much parental leave do I get?"
+  expect: DOC_MISSING
+  language: en
+
+- id: stock-options
+  category: doc-missing
+  q: "when do my stock options vest?"
+  expect: DOC_MISSING
+  language: en
+
+- id: office-dog-policy
+  category: doc-missing
+  q: "can I bring my dog to the office?"
+  expect: DOC_MISSING
+  language: en
+
+- id: pension-provider-vi
+  category: doc-missing
+  q: "nhà cung cấp quỹ hưu trí của công ty là ai?"
+  expect: DOC_MISSING
+  language: vi
+
+# --- ambiguous / multi-document: where reranking earns its cost.
+
+- id: travel-booking-and-claim
+  category: ambiguous
+  q: "how do I book a flight and claim it back?"
+  must_cite: [expenses.md]
+  language: en
+
+- id: new-starter-first-week
+  category: ambiguous
+  q: "what do I need to do in my first week?"
+  must_cite: [handbook.md, it-support.md]
+  language: en
+
+- id: leave-while-on-probation
+  category: ambiguous
+  q: "can I take annual leave during probation?"
+  must_cite: [handbook.md]
+  language: en
+
+- id: expense-for-home-office
+  category: ambiguous
+  q: "can I expense a monitor for working from home?"
+  must_cite: [expenses.md, it-support.md]
+  language: en
+
+- id: laptop-broken-while-travelling
+  category: ambiguous
+  q: "my laptop broke while I was abroad, what do I do?"
+  must_cite: [it-support.md]
+  language: en

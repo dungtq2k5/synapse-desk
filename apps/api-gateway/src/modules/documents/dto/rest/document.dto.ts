@@ -15,6 +15,8 @@ import {
 } from 'class-validator';
 import {
   ALLOWED_DOCUMENT_MIME_TYPES,
+  DOCUMENT_FLAG_TYPES,
+  DocumentFlagType,
   DOCUMENT_STATUSES,
   DocumentStatus,
   MAX_DOCUMENT_BYTES,
@@ -143,4 +145,35 @@ export class ListDocumentsQueryDto extends SearchPaginationBase {
   @IsBoolean()
   @ToBoolean()
   readonly includeDeleted?: boolean = false;
+}
+
+/**
+ * The flag worklist filter — 16-doc §5.
+ *
+ * `type` accepts EVERY member of `DocumentFlagType` and any number of them.
+ * `UNRETRIEVED` and `UNCITED` were once one flag under a name that fitted only
+ * the first, and a filter that offered only `UNCITED` would quietly re-merge
+ * them: the type nobody can select is the type nobody sees.
+ */
+export class ListDocumentFlagsQueryDto extends SearchPaginationBase {
+  // `detectedAt`, because the base default is `createdAt` and the service
+  // allowlists exactly one sortable column here. Left unoverridden, a request
+  // with NO query parameters at all — every default call from the UI — would
+  // 400.
+  override sortBy: string = 'detectedAt';
+
+  @IsOptional()
+  // A single `?type=UNCITED` arrives as a string, not an array. Normalising
+  // here rather than in the client keeps `@IsIn` meaningful for both shapes.
+  @Transform(({ value }) =>
+    value === undefined ? undefined : Array.isArray(value) ? value : [value],
+  )
+  @IsArray()
+  @IsIn(DOCUMENT_FLAG_TYPES, { each: true })
+  readonly type?: DocumentFlagType[];
+
+  @IsOptional()
+  @IsBoolean()
+  @ToBoolean()
+  readonly includeResolved?: boolean = false;
 }

@@ -148,6 +148,23 @@ def build_prompt(query: str, chunks: list[HydratedChunk]) -> str:
     return (
         "You are a support assistant. Answer the user's question using ONLY the "
         "numbered sources below.\n"
+        # 17-doc §2.1 — the one confirmed prompt defect, and the highest-value
+        # line available.
+        #
+        # Everything around this is multilingual BY DESIGN: Layer 1's greeting
+        # regex covers several languages on purpose, `canned_reply` is keyed by
+        # detected language, and the FTS index uses `'simple'` rather than
+        # `'english'` specifically because the corpus is multilingual. The
+        # generation prompt was the one place that assumption stopped.
+        #
+        # Without this line, a Vietnamese question against an English handbook
+        # retrieves correctly — the embedding model is multilingual — and then
+        # the model takes its cue from the English instruction and the English
+        # sources and answers in English. Deflection fails, and no metric
+        # attributes it correctly: retrieval hit, generation succeeded, citation
+        # present, user gave up.
+        "Answer in the same language as the question, even when the sources "
+        "are in another language.\n"
         "Cite the sources you use as [1], [2] and so on, inline.\n"
         "If the sources do not answer the question, say so plainly and do not "
         "answer from general knowledge — a wrong policy is worse than no "

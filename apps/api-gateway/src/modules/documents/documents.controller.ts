@@ -23,6 +23,7 @@ import { PaginationResponseBase } from '../../common/dto/base/pagination-respons
 import { DocumentsGrpcClient } from './documents-grpc.client';
 import {
   ConfirmDocumentDto,
+  ListDocumentFlagsQueryDto,
   ListDocumentsQueryDto,
   PresignDocumentDto,
   SetDocumentDepartmentsDto,
@@ -30,6 +31,7 @@ import {
 } from './dto/rest/document.dto';
 import {
   DocumentChunkResponseDto,
+  DocumentFlagResponseDto,
   DocumentResponseDto,
   DownloadDocumentResponseDto,
   PresignDocumentResponseDto,
@@ -73,6 +75,23 @@ export class DocumentsController {
     @CurrentUser() context: RequestContext,
   ): Promise<StorageUsageResponseDto> {
     return this.documentsGrpcClient.storageUsage(context);
+  }
+
+  /**
+   * The flag worklist — 16-doc §5. Declared before `@Get(':id')`, like
+   * `storage`.
+   *
+   * `document.read` rather than open to every member: a flag names a document
+   * as stale, unread or redundant, which is a judgement about somebody's work
+   * and belongs with the people who curate the knowledge base.
+   */
+  @Get('flags')
+  @RequirePermission('document.read')
+  listFlags(
+    @CurrentUser() context: RequestContext,
+    @Query() query: ListDocumentFlagsQueryDto,
+  ): Promise<PaginationResponseBase<DocumentFlagResponseDto>> {
+    return this.documentsGrpcClient.listFlags(query, context);
   }
 
   /**

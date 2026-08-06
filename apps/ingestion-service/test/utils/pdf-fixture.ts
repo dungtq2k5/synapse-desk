@@ -39,5 +39,14 @@ export async function buildPdf(
     });
   }
 
-  return Buffer.from(await pdf.save());
+  // `useObjectStreams: false` writes a classic cross-reference TABLE rather
+  // than an xref STREAM. Not a stylistic choice: with the default, this fixture
+  // parses when the suite runs in file order and fails on identical bytes when
+  // the test runs alone — the bundled pdf.js v1.10 handles xref streams in a
+  // way that depends on process state.
+  //
+  // Pinned here so the test measures page attribution rather than that
+  // fragility. **It also means this test does not cover xref streams**, which
+  // most real PDFs use — see the note in `document-parser.service.ts`.
+  return Buffer.from(await pdf.save({ useObjectStreams: false }));
 }

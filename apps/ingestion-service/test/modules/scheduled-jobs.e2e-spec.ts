@@ -22,8 +22,13 @@ import { ScopeWriterService } from '../../src/modules/ingestion/scope-writer.ser
 import { ScopeFanoutQueueService } from '../../src/modules/ingestion/scope-fanout-queue.service';
 import { QdrantService } from '../../src/modules/qdrant/qdrant.service';
 import { QuotaCounterService } from '../../src/modules/ai-ledger/quota-counter.service';
+import { faultInjector } from '@synapsedesk/common/testing/fault';
 
 describe('§2.3, §4 The fan-out and the scheduled jobs (e2e)', () => {
+  // Every injected fault in this file is registered here and restored in an
+  // `afterEach` that runs whether the test passed, failed or threw — 16-doc §9.
+  const faults = faultInjector();
+
   let fx: E2eFixture;
   let projection: ChunkUsageProjection;
   let sweep: DiscardedDraftSweep;
@@ -165,9 +170,7 @@ describe('§2.3, §4 The fan-out and the scheduled jobs (e2e)', () => {
       // outcome worse than an error.
       const document = await documentWithChunks(3);
 
-      const setScope = jest
-        .spyOn(qdrant, 'setDocumentScope')
-        .mockRejectedValueOnce(new Error('qdrant is down'));
+      faults.failOnce(qdrant, 'setDocumentScope', new Error('qdrant is down'));
 
       await expect(
         scopeWriter.apply(
@@ -187,8 +190,6 @@ describe('§2.3, §4 The fan-out and the scheduled jobs (e2e)', () => {
         where: { documentId: document.id },
       });
       expect(chunks.every((chunk) => chunk.isOrganizationWide)).toBe(true);
-
-      setScope.mockRestore();
     });
 
     it('4. DEFERS rather than fails when Qdrant is unreachable during a GRANT', async () => {
@@ -200,9 +201,7 @@ describe('§2.3, §4 The fan-out and the scheduled jobs (e2e)', () => {
         isOrganizationWide: false,
       });
 
-      const setScope = jest
-        .spyOn(qdrant, 'setDocumentScope')
-        .mockRejectedValueOnce(new Error('qdrant is down'));
+      faults.failOnce(qdrant, 'setDocumentScope', new Error('qdrant is down'));
 
       await expect(
         scopeWriter.apply(
@@ -217,8 +216,6 @@ describe('§2.3, §4 The fan-out and the scheduled jobs (e2e)', () => {
         where: { documentId: document.id },
       });
       expect(chunks.every((chunk) => chunk.isOrganizationWide)).toBe(true);
-
-      setScope.mockRestore();
     });
 
     it('5. Detects DRIFT between a document and its chunk rows', async () => {

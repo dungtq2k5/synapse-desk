@@ -2,6 +2,8 @@ import { of, throwError } from 'rxjs';
 import { faker } from '@faker-js/faker';
 import { status as GrpcStatus } from '@grpc/grpc-js';
 import {
+  DocumentFlagSeverity,
+  DocumentFlagType,
   DocumentStatus,
   MAX_DOCUMENT_BYTES,
   withHttpStatus,
@@ -541,6 +543,130 @@ describe('§3.1 Documents at the HTTP boundary (e2e)', () => {
       );
 
       expect(res.status).toBe(404);
+    });
+  });
+
+  // ------------------------------------------------- §16 §5 — the flag list
+
+  describe('GET /documents/flags', () => {
+    const wireFlag = (overrides: Record<string, unknown> = {}) => ({
+      id: faker.string.uuid(),
+      documentId,
+      documentTitle: '2019 Expense Policy',
+      flagType: DocumentFlagType.UNRETRIEVED,
+      severity: DocumentFlagSeverity.INFO,
+      detail: 'Indexed and never retrieved.',
+      confidenceScore: undefined,
+      detectedAt: timestamp(),
+      ...overrides,
+    });
+
+    const stubFlags = (items: ReturnType<typeof wireFlag>[]) =>
+      fx.stubs.document.listDocumentFlags.mockReturnValue(
+        of({ items, meta: wirePage([]).meta }),
+      );
+
+    it('1. is not swallowed by :id', async () => {
+      // Same hazard as `storage` and `presign` — `:id` matches `flags` and
+      // `ParseUUIDPipe` turns it into a 400 that reads as a client bug.
+      stubFlags([wireFlag()]);
+
+      const res = await authenticatedAgent(fx.app, {
+        permissionCodes: ['document.read'],
+      }).get(`${API}/documents/flags`);
+
+      expect(res.status).toBe(200);
+      expect(fx.stubs.document.getDocument).not.toHaveBeenCalled();
+    });
+
+    it('2. accepts UNRETRIEVED as well as UNCITED', async () => {
+      // The point of 16-doc §5. They were one flag under a name that fitted
+      // only `UNRETRIEVED`, and a filter that offered only `UNCITED` would
+      // re-merge them in practice: the type nobody can select is the type
+      // nobody sees.
+      stubFlags([]);
+
+      const agent = authenticatedAgent(fx.app, {
+        permissionCodes: ['document.read'],
+      });
+
+      for (const type of [
+        DocumentFlagType.UNRETRIEVED,
+        DocumentFlagType.UNCITED,
+      ]) {
+        const res = await agent.get(`${API}/documents/flags?type=${type}`);
+
+        expect(res.status).toBe(200);
+        expect(fx.stubs.document.listDocumentFlags).toHaveBeenLastCalledWith(
+          expect.objectContaining({ flagTypes: [type] }),
+          expect.anything(),
+        );
+      }
+    });
+
+    it('3. accepts BOTH types in one request', async () => {
+      stubFlags([]);
+
+      const res = await authenticatedAgent(fx.app, {
+        permissionCodes: ['document.read'],
+      }).get(
+        `${API}/documents/flags?type=${DocumentFlagType.UNRETRIEVED}&type=${DocumentFlagType.UNCITED}`,
+      );
+
+      expect(res.status).toBe(200);
+      expect(fx.stubs.document.listDocumentFlags).toHaveBeenCalledWith(
+        expect.objectContaining({
+          flagTypes: [DocumentFlagType.UNRETRIEVED, DocumentFlagType.UNCITED],
+        }),
+        expect.anything(),
+      );
+    });
+
+    it('4. sends an EMPTY filter when none is given', async () => {
+      // Empty means every type. A default of one type would hide the others
+      // from anyone who never touched the filter — which is most people.
+      stubFlags([]);
+
+      await authenticatedAgent(fx.app, {
+        permissionCodes: ['document.read'],
+      }).get(`${API}/documents/flags`);
+
+      expect(fx.stubs.document.listDocumentFlags).toHaveBeenCalledWith(
+        expect.objectContaining({ flagTypes: [], includeResolved: false }),
+        expect.anything(),
+      );
+    });
+
+    it('5. rejects an unknown type with 400, without calling the service', async () => {
+      const res = await authenticatedAgent(fx.app, {
+        permissionCodes: ['document.read'],
+      }).get(`${API}/documents/flags?type=OUTDTAED`);
+
+      expect(res.status).toBe(400);
+      expect(fx.stubs.document.listDocumentFlags).not.toHaveBeenCalled();
+    });
+
+    it('6. requires document.read', async () => {
+      // A flag names somebody's document as stale, unread or redundant. That is
+      // a judgement about their work, and it belongs with the people who curate
+      // the knowledge base rather than with every member.
+      const res = await authenticatedAgent(fx.app, {
+        permissionCodes: [],
+      }).get(`${API}/documents/flags`);
+
+      expect(res.status).toBe(403);
+    });
+
+    it('7. carries the document TITLE through to the client', async () => {
+      stubFlags([wireFlag({ documentTitle: 'Expense policy 2019' })]);
+
+      const res = await authenticatedAgent(fx.app, {
+        permissionCodes: ['document.read'],
+      }).get(`${API}/documents/flags`);
+
+      expect(res.body.data.items[0].documentTitle).toBe('Expense policy 2019');
+      // Absent on a rule-raised flag, and that is different from zero.
+      expect(res.body.data.items[0].confidenceScore).toBeNull();
     });
   });
 });

@@ -1,4 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { getQueueToken } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
+import { INGESTION_QUEUE, SCOPE_FANOUT_QUEUE } from '@synapsedesk/common';
 import { AppModule } from '../../src/app.module';
 import { PrismaService } from '../../src/modules/prisma/prisma.service';
 import { DatabaseSeeder } from '../../src/modules/prisma/database.seeder';
@@ -51,7 +54,29 @@ export async function bootstrapE2eTest(): Promise<E2eFixture> {
   // test passes on nothing, because the constraint it targets was never made.
   await seeder.seed();
 
+  // Live workers, on queues shared by every suite in this run.
+  //
+  // `ScopeFanoutProcessor` and `IngestionWorker` are `@Processor`s, so booting
+  // the app starts them consuming — and a job enqueued by one test is picked up
+  // whenever the worker gets to it, which may be during the NEXT test or the
+  // next FILE.
+  //
+  // That is how `documents.e2e-spec › restore un-flips the chunks` failed under
+  // `--randomize` and passed in isolation: the delete had enqueued a fan-out
+  // carrying `isDeleted: true`, the restore un-flipped the chunks, and then the
+  // deferred job re-applied the stale scope. Identical in shape to the mock
+  // leak in 16-doc §9, and it needs the same rule — WORK must not escape its
+  // test either.
+  const queues = [INGESTION_QUEUE, SCOPE_FANOUT_QUEUE].map((name) =>
+    moduleRef.get<Queue>(getQueueToken(name)),
+  );
+
   const reset = async (): Promise<void> => {
+    // BEFORE the truncate, and `obliterate` rather than `drain`: `drain` leaves
+    // jobs that are already ACTIVE running, and an active job is exactly the
+    // one about to write to the table this is emptying.
+    await Promise.all(queues.map((queue) => queue.obliterate({ force: true })));
+
     await prisma.$executeRawUnsafe(`
       TRUNCATE TABLE
         "document_flags",

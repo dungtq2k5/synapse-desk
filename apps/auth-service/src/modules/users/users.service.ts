@@ -10,6 +10,8 @@ import {
   DeleteUserResponse,
   fromProtoGender,
   GetUserPermissionsResponse,
+  ListPermissionHoldersRequest,
+  ListPermissionHoldersResponse,
   ListUsersRequest,
   ListUsersResponse,
   LockUserRequest,
@@ -215,6 +217,67 @@ export class UsersService {
     });
 
     return { permissionCodes: flattenPermissionCodes(user?.roles ?? []) };
+  }
+
+  /**
+   * Everyone in a tenant holding a given permission — the notification
+   * AUDIENCE (16-doc §1).
+   *
+   * Resolved HERE because auth-service owns roles and permissions. The producer
+   * of a quota alert knows it should reach "whoever can act on this" and cannot
+   * know who that is; making it ask would put a cross-service read on a path
+   * that is deliberately fire-and-forget, and would duplicate this join in
+   * every service that ever notifies anyone.
+   *
+   * **Deleted and locked users are excluded.** A notification to a deactivated
+   * account is a row nobody will ever read and an email to an address that may
+   * now belong to someone else.
+   */
+  async listPermissionHolders(
+    request: ListPermissionHoldersRequest,
+  ): Promise<ListPermissionHoldersResponse> {
+    // Validated rather than left to Prisma, which is what the other 51 RPCs
+    // achieve with `requireActor()`. This one has no actor to require — the
+    // caller is a background consumer and the tenant is a FIELD — so the check
+    // is on the field instead.
+    //
+    // Without it, an empty `organizationId` reaches a `@db.Uuid` column, the
+    // driver raises, Nest wraps it as UNKNOWN, and the gateway would answer 500
+    // to something that is plainly a bad request. `contract.e2e-spec` bounds
+    // the count of RPCs that do that, and it caught this one on the way in.
+    if (!request.organizationId || !request.permissionCode) {
+      throw new RpcException({
+        code: status.INVALID_ARGUMENT,
+        message: 'organizationId and permissionCode are both required',
+      });
+    }
+
+    const users = await this.prisma.user.findMany({
+      where: {
+        organizationId: request.organizationId,
+        deletedAt: null,
+        // A locked account cannot act on the alert, which is the whole point
+        // of addressing it by permission.
+        lockedUntil: null,
+        // `user_roles` and `role_permissions` are IMPLICIT many-to-many
+        // relations, so the nesting is user → roles → permissions directly.
+        // A join-model shape (`some: { role: { ... } }`) compiles against an
+        // explicit relation and is a type error here — which is the schema
+        // telling the truth about itself.
+        roles: {
+          some: { permissions: { some: { code: request.permissionCode } } },
+        },
+      },
+      select: { id: true, email: true, fullName: true },
+    });
+
+    return {
+      items: users.map((user) => ({
+        userId: user.id,
+        email: user.email,
+        fullName: user.fullName,
+      })),
+    };
   }
 
   // -------------------------------------------------------------------------

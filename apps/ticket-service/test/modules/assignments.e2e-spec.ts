@@ -19,8 +19,13 @@ import {
 import { AssignmentsService } from '../../src/modules/assignments/assignments.service';
 import { AuthReferenceService } from '../../src/modules/auth-client/auth-reference.service';
 import { TicketEventPublisher } from '../../src/modules/events/ticket-event.publisher';
+import { faultInjector } from '@synapsedesk/common/testing/fault';
 
 describe('§2.4 Assignment & reassignment (e2e)', () => {
+  // Every injected fault in this file is registered here and restored in an
+  // `afterEach` that runs whether the test passed, failed or threw — 16-doc §9.
+  const faults = faultInjector();
+
   let fx: E2eFixture;
   let assignments: AssignmentsService;
   let authReference: AuthReferenceService;
@@ -297,12 +302,11 @@ describe('§2.4 Assignment & reassignment (e2e)', () => {
         fx.prisma,
         tenant,
       );
-      const sync = jest
-        .spyOn(
-          assignments as unknown as { syncTicketCache: () => Promise<void> },
-          'syncTicketCache',
-        )
-        .mockRejectedValue(new Error('injected failure at step 3'));
+      faults.fail(
+        assignments as unknown as { syncTicketCache: () => Promise<void> },
+        'syncTicketCache',
+        new Error('injected failure at step 3'),
+      );
 
       await expect(
         assignments.assignTicket(
@@ -313,8 +317,6 @@ describe('§2.4 Assignment & reassignment (e2e)', () => {
           supervisor(),
         ),
       ).rejects.toThrow('injected failure at step 3');
-
-      sync.mockRestore();
 
       const state = await readState(ticket.id);
       expect(state.rows).toHaveLength(1);

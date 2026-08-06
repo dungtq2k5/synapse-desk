@@ -6,7 +6,12 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { RequestContext } from '@synapsedesk/common';
+import {
+  AI_THROTTLER_TIER,
+  ROUTE_THROTTLE,
+} from '../../common/config/app.config';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionGuard } from '../../common/guards/permission.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -36,6 +41,10 @@ import { KnowledgeSearchResponseDto } from './dto/rest/knowledge-response.dto';
 export class KnowledgeController {
   constructor(private readonly knowledge: KnowledgeGrpcClient) {}
 
+  // A per-USER minute limit, on top of the monthly quota — 16-doc §2. The
+  // quota is a month budget checked per request and does nothing to stop one
+  // user spending the whole month in ten minutes.
+  @Throttle({ [AI_THROTTLER_TIER]: ROUTE_THROTTLE.knowledgeSearch })
   @Post('search')
   @HttpCode(HttpStatus.OK)
   @ResponseMessage('Search completed')

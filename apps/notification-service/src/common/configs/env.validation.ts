@@ -33,4 +33,15 @@ export const envValidationSchema = Joi.object({
   LOG_LEVEL: Joi.string()
     .required()
     .valid(...LOG_LEVELS),
+
+  // Domain E's own database — added with in-app notifications (16-doc §1).
+  // Email and SMS carry their recipient in the command and need no storage; a
+  // feed is storage by definition.
+  DATABASE_URL: Joi.string().required(),
+
+  // For resolving a notification AUDIENCE from a permission code. Required:
+  // an in-app notification whose recipients cannot be resolved reaches nobody,
+  // and a service that boots without this would drop every one of them while
+  // looking healthy.
+  AUTH_SERVICE_URL: Joi.string().required(),
 });

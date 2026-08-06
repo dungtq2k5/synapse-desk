@@ -1,5 +1,9 @@
 import { faker } from '@faker-js/faker';
-import { DocumentStatus } from '@synapsedesk/common';
+import {
+  DocumentFlagSeverity,
+  DocumentFlagType,
+  DocumentStatus,
+} from '@synapsedesk/common';
 import { Prisma } from '../../src/generated/prisma/client';
 import { PrismaService } from '../../src/modules/prisma/prisma.service';
 
@@ -114,4 +118,22 @@ export async function createChunks(
       },
     });
   }
+}
+
+/** A raised flag, unresolved unless the caller says otherwise. */
+export function createFlag(
+  prisma: PrismaService,
+  document: { id: string; organizationId: string },
+  overrides: Partial<Prisma.DocumentFlagUncheckedCreateInput> = {},
+) {
+  return prisma.documentFlag.create({
+    data: {
+      organizationId: document.organizationId,
+      documentId: document.id,
+      flagType: DocumentFlagType.UNRETRIEVED,
+      severity: DocumentFlagSeverity.INFO,
+      detail: 'Indexed and never retrieved.',
+      ...overrides,
+    },
+  });
 }

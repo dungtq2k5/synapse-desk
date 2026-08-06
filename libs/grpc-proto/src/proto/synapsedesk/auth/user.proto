@@ -61,6 +61,27 @@ message UserSummaryResponse {
   optional string deleted_by_name = 6;
 }
 
+// Who should receive a notification addressed by PERMISSION.
+//
+// The producer of an in-app notification does not know who holds
+// `organization.update` in a tenant — that is auth-service's answer, and
+// resolving it at the producer would mean a cross-service read on a path that
+// is deliberately fire-and-forget. So the producer names the permission and
+// notification-service asks this.
+message ListPermissionHoldersRequest {
+  string organization_id = 1;
+  // A `target.action` code from the canonical registry.
+  string permission_code = 2;
+}
+
+message PermissionHolder {
+  string user_id = 1;
+  string email = 2;
+  string full_name = 3;
+}
+
+message ListPermissionHoldersResponse { repeated PermissionHolder items = 1; }
+
 message ListUsersRequest {
   PageRequest page = 1;
 
@@ -182,6 +203,11 @@ service UserService {
   rpc ListUsers(ListUsersRequest) returns (ListUsersResponse);
   rpc GetUser(UserIdRequest) returns (UserSummaryResponse);
   rpc GetUserPermissions(UserIdRequest) returns (GetUserPermissionsResponse);
+
+  // Service-to-service only: notification-service resolves an audience from a
+  // permission code. Never routed by the gateway — it enumerates a tenant's
+  // users and their addresses, which no client has business asking for.
+  rpc ListPermissionHolders(ListPermissionHoldersRequest) returns (ListPermissionHoldersResponse);
 
   rpc CreateUser(CreateUserRequest) returns (CreateUserResponse);
   rpc UpdateUser(UpdateUserRequest) returns (UserSummaryResponse);

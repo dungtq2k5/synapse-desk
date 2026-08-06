@@ -10,6 +10,11 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
+import {
+  AI_THROTTLER_TIER,
+  ROUTE_THROTTLE,
+} from '../../common/config/app.config';
 import { RequestContext, TicketSource } from '@synapsedesk/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionGuard } from '../../common/guards/permission.guard';
@@ -130,6 +135,10 @@ export class ChatController {
    * mean the only thing stopping a chat client from writing one is a permission
    * check it could not see. It is refused here, at the shape.
    */
+  // A per-USER minute limit, on top of the monthly quota — 16-doc §2. The
+  // quota is a month budget checked per request and does nothing to stop one
+  // user spending the whole month in ten minutes.
+  @Throttle({ [AI_THROTTLER_TIER]: ROUTE_THROTTLE.chatMessage })
   @Post('conversations/:id/messages')
   @ResponseMessage('Message sent')
   sendMessage(

@@ -1,11 +1,13 @@
 import {
   DocumentChunkResponse,
+  DocumentFlagResponse,
   DocumentResponse,
   fromTimestamp,
   requireTimestamp,
 } from '@synapsedesk/grpc-proto';
 import {
   DocumentChunkResponseDto,
+  DocumentFlagResponseDto,
   DocumentResponseDto,
 } from './dto/rest/document-response.dto';
 import { DocumentStatus } from '@synapsedesk/common';
@@ -47,5 +49,20 @@ export function toChunkDto(
     tokenCount: chunk.tokenCount,
     vectorPointId: chunk.vectorPointId ?? null,
     createdAt: requireTimestamp(chunk.createdAt, 'createdAt'),
+  };
+}
+
+export function toFlagDto(flag: DocumentFlagResponse): DocumentFlagResponseDto {
+  return {
+    id: flag.id,
+    documentId: flag.documentId,
+    documentTitle: flag.documentTitle,
+    flagType: flag.flagType,
+    severity: flag.severity,
+    detail: flag.detail,
+    // `?? null`: a flag raised by a rule rather than a model has no score, and
+    // that is different from a score of zero.
+    confidenceScore: flag.confidenceScore ?? null,
+    detectedAt: requireTimestamp(flag.detectedAt, 'detectedAt'),
   };
 }

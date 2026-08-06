@@ -223,30 +223,26 @@ describe('SmartThrottlerGuard (e2e)', () => {
     });
 
     /**
-     * KNOWN DEFECT — marked `failing` so the suite records it rather than
-     * asserting the broken behaviour is correct.
+     * WAS a `it.failing` known defect; FIXED in 16-doc §2.
      *
-     * `SmartThrottlerGuard.getTracker` documents a per-user branch:
-     * "Authenticated -> `user:<id>`. Keying an authenticated route by IP would
-     * put a whole corporate NAT in one bucket, so one heavy user throttles their
-     * colleagues." That branch is currently unreachable.
+     * The defect: `SmartThrottlerGuard` is registered with `APP_GUARD`, and Nest
+     * runs global guards BEFORE controller- and route-level ones — so
+     * `JwtAuthGuard` had not run when the tracker was computed, `req.user` was
+     * always undefined, and the documented per-user branch was unreachable.
+     * Every authenticated route silently fell back to `ip:<ip>`, which is the
+     * corporate-NAT problem the branch's own comment said it avoided.
      *
-     * The guard is registered with `APP_GUARD`, and Nest runs global guards
-     * BEFORE controller- and route-level ones — so `JwtAuthGuard` has not run
-     * when the tracker is computed and `req.user` is always undefined. Every
-     * authenticated route therefore falls through to `ip:<ip>`, which is exactly
-     * the NAT problem the comment says it avoids. Verified directly: the same
-     * user from two different IPs gets two independent buckets.
+     * The fix could not be "read `req.user` harder": the guard now verifies the
+     * access token itself, cookie-first then Bearer, with the same RS256 public
+     * key `JwtStrategy` uses. Decoding without verifying would have been worse
+     * than the IP fallback — anyone could forge a `sub` and mint a fresh bucket
+     * per request, which is a rate limiter with a zero-cost bypass.
      *
-     * Fixing it means the throttler guard must verify the access-token cookie
-     * itself (decoding without verifying would let anyone forge `sub` for a fresh
-     * bucket — worse than IP keying). That is a change to production auth code,
-     * so it is reported rather than made silently here.
-     *
-     * When it is fixed this test starts passing, and `it.failing` turns that into
-     * a loud "passed unexpectedly" — which is the reminder to delete this comment.
+     * It became urgent when the AI routes got limits: those cost real money per
+     * request, and ten agents behind one office address sharing one budget is a
+     * support ticket rather than a policy.
      */
-    it.failing('an authenticated route keys per USER, not per IP', async () => {
+    it('an authenticated route keys per USER, not per IP', async () => {
       fx.stubs.department.listDepartments.mockReturnValue(of(wirePage([])));
 
       const heavy = authenticatedAgent(fx.app, {
@@ -264,9 +260,11 @@ describe('SmartThrottlerGuard (e2e)', () => {
       expect((await colleague.get(`${API}/departments`)).status).not.toBe(429);
     });
 
-    it('today, an authenticated route keys per IP — the current behaviour', async () => {
-      // The companion to the failing test above: this pins what the code ACTUALLY
-      // does, so the defect cannot quietly change shape while nobody is looking.
+    it('the SAME user from two addresses shares ONE budget', async () => {
+      // The other half of "keys per user", and the half that a per-IP tracker
+      // passed by accident: an identity must not get a fresh budget by moving
+      // between a laptop and a phone. Before the fix this test's expectation
+      // was inverted and recorded as the CURRENT behaviour.
       fx.stubs.department.listDepartments.mockReturnValue(of(wirePage([])));
 
       const agent = authenticatedAgent(fx.app, {
@@ -278,23 +276,34 @@ describe('SmartThrottlerGuard (e2e)', () => {
           .get(`${API}/departments`)
           .set('X-Forwarded-For', '10.0.0.1');
       }
-      expect(
-        (
-          await agent
-            .get(`${API}/departments`)
-            .set('X-Forwarded-For', '10.0.0.1')
-        ).status,
-      ).toBe(429);
 
-      // Same user, different IP: a fresh budget, which is the proof it is the IP
-      // and not the identity doing the keying.
       expect(
         (
           await agent
             .get(`${API}/departments`)
             .set('X-Forwarded-For', '10.0.0.2')
         ).status,
-      ).not.toBe(429);
+      ).toBe(429);
+    });
+
+    it('an ANONYMOUS route still keys per IP, because there is no identity', async () => {
+      // The fallback the fix deliberately keeps. `/auth/login` has no caller
+      // yet by definition, so IP plus submitted account is the only tracker
+      // available — and it is the one the brute-force limit depends on.
+      stubSuccessfulLogin();
+
+      const login = (ip: string) =>
+        anonymousAgent(fx.app)
+          .post(`${API}/auth/login`)
+          .set('X-Forwarded-For', ip)
+          .send({ email: 'anon@isolation.test', password: 'Passw0rd!' });
+
+      for (let i = 0; i < 6; i++) await login('10.0.1.1');
+      expect((await login('10.0.1.1')).status).toBe(429);
+
+      // A different address is a different bucket — which is exactly why the
+      // per-user tracker matters for the routes that DO have an identity.
+      expect((await login('10.0.1.2')).status).not.toBe(429);
     });
 
     it('a failing gRPC call still consumes budget — a limiter is not a success meter', async () => {

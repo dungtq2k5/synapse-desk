@@ -30,6 +30,15 @@ export enum EmailTemplateName {
   PASSWORD_CHANGED = 'PASSWORD_CHANGED',
   INVITATION = 'INVITATION',
   SECURITY_ALERT = 'SECURITY_ALERT',
+  /**
+   * A budget threshold crossing — 16-doc §1.
+   *
+   * Its own template rather than reusing SECURITY_ALERT, because the two say
+   * genuinely different things: a security alert asks "was this you?", and this
+   * one says "here is what happens at 100%". Reusing the security shape would
+   * put a quota warning under a heading that trains people to ignore it.
+   */
+  QUOTA_ALERT = 'QUOTA_ALERT',
 }
 
 export enum SmsTemplateName {
@@ -124,6 +133,25 @@ export type SendEmailCommand =
         headline: string;
         detail: string;
         origin: NotificationOrigin;
+      };
+    }
+  | {
+      template: EmailTemplateName.QUOTA_ALERT;
+      to: string;
+      data: {
+        fullName: string;
+        /** e.g. "AI budget 80% used". */
+        headline: string;
+        /**
+         * **States the OPERATIONAL consequence, not just the number.**
+         *
+         * api-endpoints-plan is explicit that the 80% message must say *"at
+         * 100%, all self-service questions will route to your agents"* —
+         * because at a 70-80% deflection rate, hitting the cap is a 3-5x spike
+         * in agent queue volume rather than a billing footnote. A percentage
+         * with no consequence beside it reads as noise.
+         */
+        detail: string;
       };
     };
 

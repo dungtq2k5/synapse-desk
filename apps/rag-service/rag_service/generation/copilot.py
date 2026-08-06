@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import json
 import logging
-import re
 import time
 from dataclasses import dataclass
 
@@ -297,29 +296,94 @@ def _json_object(text: str) -> dict:
     which the caller can render as "not available" — instead of a 500 on a
     request that already cost money.
     """
-    match = re.search(r"\{.*\}", text or "", re.DOTALL)
-    if not match:
-        return {}
-
-    try:
-        parsed = json.loads(match.group(0))
-    except ValueError:
-        return {}
-
-    return parsed if isinstance(parsed, dict) else {}
+    return _first_parsable(text, "{", "}", dict)
 
 
 def _json_array(text: str) -> list:
-    match = re.search(r"\[.*\]", text or "", re.DOTALL)
-    if not match:
-        return []
+    return _first_parsable(text, "[", "]", list)
 
-    try:
-        parsed = json.loads(match.group(0))
-    except ValueError:
-        return []
 
-    return parsed if isinstance(parsed, list) else []
+def _first_parsable(text: str, opening: str, closing: str, kind: type):
+    r"""The first BALANCED span that parses — 17-doc §1.2 Gap 1.
+
+    The previous implementation was `re.search(r"\{.*\}", text, re.DOTALL)`,
+    which with a greedy `.*` spans from the FIRST opening brace to the LAST one
+    in the whole response. One object: correct. Prose containing a brace before
+    the JSON, or a model that emits an example object followed by the real one,
+    and the captured span is not valid JSON — so `json.loads` fails, the caller
+    gets `{}`, and a perfectly good object sitting inside the text is reported
+    to the user as "summary not available".
+
+    Degraded but safe, and completely undiagnosable: nothing in the logs says a
+    parseable object was there.
+
+    So: walk the text, and for each opening delimiter take the span that CLOSES
+    it, tracking string literals so a brace inside a quoted value does not
+    unbalance the count. First span that parses to the right type wins.
+
+    Still returns an empty value rather than raising — the rule in
+    `development-conventions.md` §8.5 is unchanged, and this only widens what
+    counts as a successful parse.
+    """
+    source = text or ""
+    empty = kind()
+
+    for start, character in enumerate(source):
+        if character != opening:
+            continue
+
+        span = _balanced_span(source, start, opening, closing)
+        if span is None:
+            # Unclosed — the truncated-mid-object case. A later opening
+            # delimiter cannot close either, but the loop is cheap and a
+            # `break` here would be wrong for `[{...}` where the object closes
+            # and the array does not.
+            continue
+
+        try:
+            parsed = json.loads(span)
+        except ValueError:
+            continue
+
+        if isinstance(parsed, kind):
+            return parsed
+
+    return empty
+
+
+def _balanced_span(source: str, start: int, opening: str, closing: str) -> str | None:
+    """The substring from `start` to its matching delimiter, or None.
+
+    String-aware, because a brace inside a quoted value is not structure —
+    `{"detail": "use {braces} carefully"}` counts to zero at the wrong place
+    without this, and the resulting span is a parse failure on valid JSON.
+    """
+    depth = 0
+    in_string = False
+    escaped = False
+
+    for index in range(start, len(source)):
+        character = source[index]
+
+        if in_string:
+            if escaped:
+                escaped = False
+            elif character == "\\":
+                escaped = True
+            elif character == '"':
+                in_string = False
+            continue
+
+        if character == '"':
+            in_string = True
+        elif character == opening:
+            depth += 1
+        elif character == closing:
+            depth -= 1
+            if depth == 0:
+                return source[start : index + 1]
+
+    return None
 
 
 def _confidence(raw: object) -> float:

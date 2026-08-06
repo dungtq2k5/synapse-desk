@@ -36,6 +36,8 @@ import {
   BILLING_SERVICE_NAME,
   BillingServiceClient,
   DOCUMENT_SERVICE_NAME,
+  RAG_SERVICE_NAME,
+  RagServiceClient,
   DocumentServiceClient,
 } from '@synapsedesk/grpc-proto';
 
@@ -81,6 +83,9 @@ export type GrpcStubs = {
   // gateway route should not have to know which service answers it.
   document: MockProxy<DocumentServiceClient>;
   billing: MockProxy<BillingServiceClient>;
+  /** Domain C's Python peer. Stubbed like every other, and for the same
+   *  reason: what the gateway can prove alone is its own boundary. */
+  rag: MockProxy<RagServiceClient>;
 };
 
 export type GrpcStubFixture = {
@@ -119,6 +124,7 @@ export function stubGrpcServices(): GrpcStubFixture {
 
     document: mock<DocumentServiceClient>(),
     billing: mock<BillingServiceClient>(),
+    rag: mock<RagServiceClient>(),
   };
 
   const byServiceName: Record<string, unknown> = {
@@ -142,6 +148,7 @@ export function stubGrpcServices(): GrpcStubFixture {
 
     [DOCUMENT_SERVICE_NAME]: stubs.document,
     [BILLING_SERVICE_NAME]: stubs.billing,
+    [RAG_SERVICE_NAME]: stubs.rag,
   };
 
   const clientGrpc: ClientGrpc = {

@@ -180,6 +180,18 @@ export const DOCUMENT_SORTABLE_FIELDS = [
 export type DocumentSortableField = (typeof DOCUMENT_SORTABLE_FIELDS)[number];
 
 export const DOCUMENT_CHUNK_SORTABLE_FIELDS = ['chunkIndex'] as const;
+
+/**
+ * Newest first is the only ordering a flag list wants.
+ *
+ * `severity` is deliberately absent: it is a `VarChar` holding an enum, so
+ * ordering by it would sort CRITICAL, INFO, WARNING alphabetically — an order
+ * that looks deliberate and is meaningless.
+ */
+export const DOCUMENT_FLAG_SORTABLE_FIELDS = ['detectedAt'] as const;
+
+export type DocumentFlagSortableField =
+  (typeof DOCUMENT_FLAG_SORTABLE_FIELDS)[number];
 export type DocumentChunkSortableField =
   (typeof DOCUMENT_CHUNK_SORTABLE_FIELDS)[number];
 

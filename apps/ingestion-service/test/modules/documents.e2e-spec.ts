@@ -4,6 +4,8 @@ import { status } from '@grpc/grpc-js';
 import { faker } from '@faker-js/faker';
 import {
   DOCUMENT_PATTERNS,
+  DocumentFlagSeverity,
+  DocumentFlagType,
   DocumentStatus,
   IngestionJobStatus,
 } from '@synapsedesk/common';
@@ -17,6 +19,7 @@ import {
   buildTenant,
   createChunks,
   createDocument,
+  createFlag,
   createScopedDocument,
   TenantFixture,
 } from '../factories';
@@ -25,8 +28,13 @@ import { QdrantService } from '../../src/modules/qdrant/qdrant.service';
 import { AuthReferenceService } from '../../src/modules/auth-client/auth-reference.service';
 import { StorageReferenceService } from '../../src/modules/storage-client/storage-reference.service';
 import { DocumentEventPublisher } from '../../src/modules/events/document-event.publisher';
+import { faultInjector } from '@synapsedesk/common/testing/fault';
 
 describe('§2 Documents (e2e)', () => {
+  // Every injected fault in this file is registered here and restored in an
+  // `afterEach` that runs whether the test passed, failed or threw — 16-doc §9.
+  const faults = faultInjector();
+
   let fx: E2eFixture;
   let documents: DocumentsService;
   let qdrant: QdrantService;
@@ -284,20 +292,17 @@ describe('§2 Documents (e2e)', () => {
       // the callback lets the real work run and then fails the transaction,
       // which is what actually exercises the rollback.
       const real = fx.prisma.$transaction.bind(fx.prisma);
-      const spy = jest
-        .spyOn(fx.prisma, '$transaction')
-        .mockImplementationOnce(((
-          callback: (tx: unknown) => Promise<unknown>,
-        ) =>
-          real(async (tx: unknown) => {
-            await callback(tx);
-            throw new Error('injected failure');
-          })) as never);
+      faults.replace(fx.prisma, '$transaction', ((
+        callback: (tx: unknown) => Promise<unknown>,
+      ) =>
+        real(async (tx: unknown) => {
+          await callback(tx);
+          throw new Error('injected failure');
+        })) as never);
 
       await expect(
         documents.confirmDocument(confirmRequest(), manager()),
       ).rejects.toThrow('injected failure');
-      spy.mockRestore();
 
       // Neither survived — which is the point. A document with no job is a
       // document nothing will ever process.
@@ -641,25 +646,18 @@ describe('§2 Documents (e2e)', () => {
       await createChunks(fx.prisma, document, 2);
 
       const order: string[] = [];
-      const qdrantSpy = jest
-        .spyOn(qdrant, 'setDocumentScope')
-        .mockImplementation(() => {
-          order.push('qdrant');
-          return Promise.resolve();
-        });
-      const chunkSpy = jest
-        .spyOn(fx.prisma.documentChunk, 'updateMany')
-        .mockImplementation((() => {
-          order.push('chunks');
-          return Promise.resolve({ count: 2 });
-        }) as never);
+      faults.replace(qdrant, 'setDocumentScope', () => {
+        order.push('qdrant');
+        return Promise.resolve();
+      });
+      faults.replace(fx.prisma.documentChunk, 'updateMany', (() => {
+        order.push('chunks');
+        return Promise.resolve({ count: 2 });
+      }) as never);
 
       await documents.deleteDocument({ id: document.id }, manager());
 
       expect(order).toEqual(['qdrant', 'chunks']);
-
-      qdrantSpy.mockRestore();
-      chunkSpy.mockRestore();
     });
 
     it('2b. Leaves the document LISTED but unretrievable when `documents` fails', async () => {
@@ -669,14 +667,15 @@ describe('§2 Documents (e2e)', () => {
       // every screen says is deleted and the RAG pipeline keeps serving.
       const document = await createDocument(fx.prisma, tenant);
       await createChunks(fx.prisma, document, 2);
-      const spy = jest
-        .spyOn(fx.prisma.document, 'update')
-        .mockRejectedValueOnce(new Error('injected failure'));
+      faults.failOnce(
+        fx.prisma.document,
+        'update',
+        new Error('injected failure'),
+      );
 
       await expect(
         documents.deleteDocument({ id: document.id }, manager()),
       ).rejects.toThrow('injected failure');
-      spy.mockRestore();
 
       const chunks = await fx.prisma.documentChunk.findMany({
         where: { documentId: document.id },
@@ -862,6 +861,175 @@ describe('§2 Documents (e2e)', () => {
       expect(usage.usedBytes).toBe(3000);
       expect(usage.limitBytes).toBe(DEFAULT_STORAGE_LIMIT);
       expect(usage.documentCount).toBe(2);
+    });
+  });
+
+  // ------------------------------------------------- §16 §5 — the flag list
+
+  describe('listDocumentFlags', () => {
+    /**
+     * The filter must express `UNRETRIEVED` and `UNCITED` SEPARATELY.
+     *
+     * They were one flag under a name that fitted only the first, and were
+     * split because they are different findings with different fixes: a
+     * document nobody's question came near may just be mis-titled, while one
+     * retrieved twenty times and cited never is displacing the sources that
+     * would have answered. A filter offering only `UNCITED` re-merges them in
+     * practice — the type nobody can select is the type nobody sees.
+     */
+    async function seedFlags() {
+      const unretrieved = await createDocument(fx.prisma, tenant, {
+        title: 'Never found',
+      });
+      const uncited = await createDocument(fx.prisma, tenant, {
+        title: 'Found and ignored',
+      });
+
+      await createFlag(fx.prisma, unretrieved, {
+        flagType: DocumentFlagType.UNRETRIEVED,
+      });
+      await createFlag(fx.prisma, uncited, {
+        flagType: DocumentFlagType.UNCITED,
+        severity: DocumentFlagSeverity.WARNING,
+      });
+
+      return { unretrieved, uncited };
+    }
+
+    const flagsRequest = (
+      overrides: Partial<{
+        flagTypes: string[];
+        includeResolved: boolean;
+      }> = {},
+    ) => ({
+      flagTypes: [],
+      includeResolved: false,
+      page: pageRequest({ sortBy: 'detectedAt' }),
+      ...overrides,
+    });
+
+    it('1. returns EVERY type when no filter is given', async () => {
+      await seedFlags();
+
+      const { items } = await documents.listDocumentFlags(
+        flagsRequest(),
+        manager(),
+      );
+
+      expect(items.map((flag) => flag.flagType).sort()).toEqual([
+        DocumentFlagType.UNCITED,
+        DocumentFlagType.UNRETRIEVED,
+      ]);
+    });
+
+    it('2. filters to UNRETRIEVED alone', async () => {
+      await seedFlags();
+
+      const { items } = await documents.listDocumentFlags(
+        flagsRequest({ flagTypes: [DocumentFlagType.UNRETRIEVED] }),
+        manager(),
+      );
+
+      expect(items).toHaveLength(1);
+      expect(items[0].documentTitle).toBe('Never found');
+    });
+
+    it('3. filters to UNCITED alone', async () => {
+      await seedFlags();
+
+      const { items } = await documents.listDocumentFlags(
+        flagsRequest({ flagTypes: [DocumentFlagType.UNCITED] }),
+        manager(),
+      );
+
+      expect(items).toHaveLength(1);
+      expect(items[0].documentTitle).toBe('Found and ignored');
+    });
+
+    it('4. accepts BOTH at once', async () => {
+      await seedFlags();
+
+      const { items } = await documents.listDocumentFlags(
+        flagsRequest({
+          flagTypes: [DocumentFlagType.UNRETRIEVED, DocumentFlagType.UNCITED],
+        }),
+        manager(),
+      );
+
+      expect(items).toHaveLength(2);
+    });
+
+    it('5. REFUSES an unknown type rather than ignoring it', async () => {
+      // Silently dropping the filter answers a different question than the one
+      // asked, and "no OUTDTAED flags" reads as "nothing is outdated".
+      await expectRpc(
+        documents.listDocumentFlags(
+          flagsRequest({ flagTypes: ['OUTDTAED'] }),
+          manager(),
+        ),
+        status.INVALID_ARGUMENT,
+      );
+    });
+
+    it('6. hides RESOLVED flags unless asked', async () => {
+      // A resolved flag is history. Mixing history into a worklist is how a
+      // worklist stops being read.
+      const document = await createDocument(fx.prisma, tenant);
+      await createFlag(fx.prisma, document, { resolvedAt: new Date() });
+
+      const hidden = await documents.listDocumentFlags(
+        flagsRequest(),
+        manager(),
+      );
+      expect(hidden.items).toHaveLength(0);
+
+      const shown = await documents.listDocumentFlags(
+        flagsRequest({ includeResolved: true }),
+        manager(),
+      );
+      expect(shown.items).toHaveLength(1);
+    });
+
+    it('7. carries the document TITLE, so the list is readable', async () => {
+      const document = await createDocument(fx.prisma, tenant, {
+        title: 'Expense policy 2019',
+      });
+      await createFlag(fx.prisma, document);
+
+      const { items } = await documents.listDocumentFlags(
+        flagsRequest(),
+        manager(),
+      );
+
+      expect(items[0].documentTitle).toBe('Expense policy 2019');
+    });
+
+    it('8. shows NOTHING from another tenant', async () => {
+      const other = buildTenant();
+      const document = await createDocument(fx.prisma, other);
+      await createFlag(fx.prisma, document);
+
+      const { items } = await documents.listDocumentFlags(
+        flagsRequest(),
+        manager(),
+      );
+
+      expect(items).toHaveLength(0);
+    });
+
+    it('9. drops a DELETED document’s flags from the worklist', async () => {
+      // Otherwise the list keeps asking a reviewer to act on a document that no
+      // longer exists, and the join would still surface its title.
+      const document = await createDocument(fx.prisma, tenant);
+      await createFlag(fx.prisma, document);
+      await documents.deleteDocument({ id: document.id }, manager());
+
+      const { items } = await documents.listDocumentFlags(
+        flagsRequest(),
+        manager(),
+      );
+
+      expect(items).toHaveLength(0);
     });
   });
 });

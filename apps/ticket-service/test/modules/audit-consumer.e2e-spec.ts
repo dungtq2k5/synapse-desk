@@ -18,6 +18,7 @@ import {
 } from '@synapsedesk/common';
 import { AppModule } from '../../src/app.module';
 import { PrismaService } from '../../src/modules/prisma/prisma.service';
+import { faultInjector } from '@synapsedesk/common/testing/fault';
 
 /**
  * The audit consumer, driven over a REAL NATS connection.
@@ -38,6 +39,10 @@ import { PrismaService } from '../../src/modules/prisma/prisma.service';
  * one test of its own.
  */
 describe('AuditConsumer over NATS (e2e)', () => {
+  // Every injected fault in this file is registered here and restored in an
+  // `afterEach` that runs whether the test passed, failed or threw — 16-doc §9.
+  const faults = faultInjector();
+
   let app: INestApplication;
   let prisma: PrismaService;
   let nats: NatsConnection;
@@ -293,12 +298,19 @@ describe('AuditConsumer over NATS (e2e)', () => {
   it('the handler logs and swallows a PERSISTENCE failure', async () => {
     // The other half of "never throws": a database error is not a malformed
     // payload, and it must not escape either.
-    const error = jest
-      .spyOn(Logger.prototype, 'error')
-      .mockImplementation(() => {});
-    const create = jest
-      .spyOn(prisma.auditLog, 'create')
-      .mockRejectedValue(new Error('database is on fire'));
+    const error = faults.replace(
+      Logger.prototype,
+      'error',
+      (() => {}) as never,
+    );
+    // Restored mid-test on purpose — the recovery assertion below needs the
+    // write working again. The injector still restores it at teardown, so a
+    // failure before that line cannot leak the fault.
+    const create = faults.fail(
+      prisma.auditLog,
+      'create',
+      new Error('database is on fire'),
+    );
 
     await publishAndWait(auditCommand(), () =>
       Promise.resolve(error.mock.calls.length > 0),
@@ -313,6 +325,5 @@ describe('AuditConsumer over NATS (e2e)', () => {
       async () => (await prisma.auditLog.count()) === 1,
     );
     expect(recovered).toBe(true);
-    error.mockRestore();
   });
 });

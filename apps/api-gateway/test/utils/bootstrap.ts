@@ -10,6 +10,7 @@ import { OrgStatus } from '@synapsedesk/common';
 import {
   AUTH_GRPC_CLIENT,
   INGESTION_GRPC_CLIENT,
+  RAG_GRPC_CLIENT,
   TICKET_GRPC_CLIENT,
   toProtoOrgStatus,
 } from '@synapsedesk/grpc-proto';
@@ -67,6 +68,8 @@ export async function bootstrapE2eTest(
     .overrideProvider(TICKET_GRPC_CLIENT)
     .useValue(clientGrpc)
     .overrideProvider(INGESTION_GRPC_CLIENT)
+    .useValue(clientGrpc)
+    .overrideProvider(RAG_GRPC_CLIENT)
     .useValue(clientGrpc);
 
   configure?.(builder);
