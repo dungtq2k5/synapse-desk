@@ -1,4 +1,4 @@
-import { bootstrapE2eTest, E2eFixture, uploadTo } from '../utils/bootstrap';
+import { bootstrapE2eTest, E2eFixture, uploadTo } from '../utils';
 
 /**
  * §2.1 test 1 — the bootstrap smoke test.

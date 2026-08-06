@@ -1,4 +1,4 @@
-import { RpcException } from '@nestjs/microservices';
+import { expectRpc } from '@synapsedesk/common/testing/rpc';
 import { status } from '@grpc/grpc-js';
 import { faker } from '@faker-js/faker';
 import { StoragePurpose as ProtoStoragePurpose } from '@synapsedesk/grpc-proto';
@@ -6,21 +6,15 @@ import {
   compareAlphabetically,
   organizationIdFromObjectPath,
 } from '@synapsedesk/common';
-import { bootstrapE2eTest, E2eFixture } from '../utils/bootstrap';
-import { memberContext } from '../utils/context';
+import {
+  DISGUISED_BYTES,
+  E2eFixture,
+  bootstrapE2eTest,
+  bytesFor,
+  memberContext,
+} from '../utils';
 import { StorageService } from '../../src/modules/storage/storage.service';
-import { bytesFor, DISGUISED_BYTES } from '../utils/sample-bytes';
 import { PendingUploadStore } from '../../src/modules/storage/pending-upload.store';
-
-function rpcCode(error: unknown): number | undefined {
-  if (!(error instanceof RpcException)) return undefined;
-  return (error.getError() as { code?: number }).code;
-}
-
-async function expectRpc(promise: Promise<unknown>, code: number) {
-  await expect(promise).rejects.toBeInstanceOf(RpcException);
-  await promise.catch((error: unknown) => expect(rpcCode(error)).toBe(code));
-}
 
 /**
  * §2.2–2.4 Presign, Confirm and batched read URLs.
@@ -42,16 +36,7 @@ describe('§2.2–2.4 Storage presign, confirm and read URLs (e2e)', () => {
   const organizationId = faker.string.uuid();
   const userId = faker.string.uuid();
 
-  beforeAll(async () => {
-    fx = await bootstrapE2eTest();
-    storage = fx.moduleRef.get(StorageService);
-    pendingStore = fx.moduleRef.get(PendingUploadStore);
-  });
-
-  beforeEach(() => fx.reset());
-  afterAll(() => fx.close());
-
-  const caller = (org = organizationId, sub = userId) =>
+  const caller = (org: string = organizationId, sub: string = userId) =>
     memberContext({ id: sub, organizationId: org });
 
   const avatarRequest = (overrides: Record<string, unknown> = {}) => ({
@@ -89,6 +74,16 @@ describe('§2.2–2.4 Storage presign, confirm and read URLs (e2e)', () => {
     fx.firebase.bucket
       .file(objectPath)
       .save(body, { contentType, resumable: false });
+
+  beforeAll(async () => {
+    fx = await bootstrapE2eTest();
+    storage = fx.moduleRef.get(StorageService);
+    pendingStore = fx.moduleRef.get(PendingUploadStore);
+  });
+
+  beforeEach(() => fx.reset());
+
+  afterAll(() => fx.close());
 
   // ------------------------------------------------------------- §2.2 presign
 
@@ -246,7 +241,7 @@ describe('§2.2–2.4 Storage presign, confirm and read URLs (e2e)', () => {
       await expectRpc(
         storage.presignUpload(
           avatarRequest(),
-          memberContext({ id: userId, organizationId: null as never }),
+          memberContext({ id: userId, organizationId: null }),
         ),
         status.FAILED_PRECONDITION,
       );

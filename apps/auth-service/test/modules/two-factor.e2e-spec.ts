@@ -1,9 +1,9 @@
 import { RpcException } from '@nestjs/microservices';
+import { expectRpc } from '@synapsedesk/common/testing/rpc';
 import { status } from '@grpc/grpc-js';
 import { generateSync } from 'otplib';
 import { compareAlphabetically } from '@synapsedesk/common';
-import { bootstrapE2eTest, E2eFixture } from '../utils/bootstrap';
-import { requestOrigin } from '../utils/context';
+import { E2eFixture, bootstrapE2eTest, requestOrigin } from '../utils';
 import {
   createBackupCode,
   createTrustedDeviceSession,
@@ -13,35 +13,25 @@ import {
 import { TwoFactorAuthService } from '../../src/modules/auth/two-factor-auth.service';
 import { AuthService } from '../../src/modules/auth/auth.service';
 
-function rpcCode(error: unknown): number | undefined {
-  if (!(error instanceof RpcException)) return undefined;
-  return (error.getError() as { code?: number }).code;
-}
-
-async function expectRpc(promise: Promise<unknown>, code: number) {
-  await expect(promise).rejects.toBeInstanceOf(RpcException);
-  await promise.catch((error: unknown) => expect(rpcCode(error)).toBe(code));
-}
-
-/**
- * Reads the shared secret out of the otpauth:// URI.
- *
- * The setup RPC deliberately does NOT return the raw secret — only the URI
- * and its QR rendering, which is what a real authenticator app consumes. So
- * the test extracts it the same way the app does, rather than reaching into
- * the database and decrypting `two_factor_secret`, which would test the
- * fixture's knowledge of the storage format instead of the enrolment flow.
- */
-function secretFromUri(otpauthUri: string): string {
-  const secret = new URL(otpauthUri).searchParams.get('secret');
-  if (!secret) throw new Error(`No secret in otpauth URI: ${otpauthUri}`);
-  return secret;
-}
-
 describe('Two-factor auth (e2e)', () => {
   let fx: E2eFixture;
   let twoFactor: TwoFactorAuthService;
   let auth: AuthService;
+
+  /**
+   * Reads the shared secret out of the otpauth:// URI.
+   *
+   * The setup RPC deliberately does NOT return the raw secret — only the URI
+   * and its QR rendering, which is what a real authenticator app consumes. So
+   * the test extracts it the same way the app does, rather than reaching into
+   * the database and decrypting `two_factor_secret`, which would test the
+   * fixture's knowledge of the storage format instead of the enrolment flow.
+   */
+  const secretFromUri = (otpauthUri: string): string => {
+    const secret = new URL(otpauthUri).searchParams.get('secret');
+    if (!secret) throw new Error(`No secret in otpauth URI: ${otpauthUri}`);
+    return secret;
+  };
 
   beforeAll(async () => {
     fx = await bootstrapE2eTest();

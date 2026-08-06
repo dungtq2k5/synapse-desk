@@ -1,4 +1,5 @@
 import { Global, Module } from '@nestjs/common';
+import { AuthClientModule } from '../auth-client/auth-client.module';
 import { AiSettingsService } from './ai-settings.service';
 import { EntitlementsConsumer } from './entitlements.consumer';
 
@@ -16,6 +17,7 @@ import { EntitlementsConsumer } from './entitlements.consumer';
  */
 @Global()
 @Module({
+  imports: [AuthClientModule],
   controllers: [EntitlementsConsumer],
   providers: [AiSettingsService],
   exports: [AiSettingsService],

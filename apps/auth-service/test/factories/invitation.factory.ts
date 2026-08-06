@@ -3,7 +3,7 @@ import { randomBytes } from 'node:crypto';
 import { InvitationStatus } from '@synapsedesk/common';
 import { Prisma } from '../../src/generated/prisma/client';
 import { PrismaService } from '../../src/modules/prisma/prisma.service';
-import { addDays, hashToken } from '../../src/common/utils/utils';
+import { addDays, hashToken } from '../../src/common/utils';
 
 let inviteIdx = 0;
 

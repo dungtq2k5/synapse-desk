@@ -260,6 +260,88 @@ class TestSummarize:
         assert "[http:402]" in raised.value.details
 
 
+class TestTheEscalationAsymmetry:
+    """§4.2 tests 7-8 and doc 15 §3.2 — deliberately NOT uniform.
+
+    At the cap, deflection stops: every question that would have been answered
+    by AI now becomes a ticket, so volume spikes 3-5x. The escalation summary is
+    the cheapest call the system makes and it is worth most exactly when the
+    queue floods — without it, every one of those tickets reaches an agent with
+    no context, and the two failures compound.
+
+    Bounded, because an unbounded exemption is not a cap.
+    """
+
+    async def test_a_MANUAL_summary_and_an_ESCALATION_summary_differ_at_the_cap(
+        self, servicer, tenant_a, generator, budget_limit, redis_client
+    ):
+        # Both calls, same tenant, same cap — and only one of them refuses.
+        # A test that checked each in isolation would pass against an
+        # implementation that had accidentally made them uniform in either
+        # direction.
+        generator.answer = json.dumps({"summary": "s", "action": "a", "confidence": 1})
+
+        budget_limit["limit_micros"] = 1_000
+        await redis_client.set(_quota_key(tenant_a), "1050")
+
+        escalation = await servicer.Summarize(
+            rag_pb2.SummaryRequest(
+                ticket_id=TICKET_ID,
+                history=turns(("user", "hi")),
+                triggered_by_escalation=True,
+            ),
+            FakeServicerContext(tenant_a.outsider()),
+        )
+        assert escalation.summary_text
+
+        with pytest.raises(FakeAbort) as raised:
+            await servicer.Summarize(
+                rag_pb2.SummaryRequest(
+                    ticket_id=TICKET_ID,
+                    history=turns(("user", "hi")),
+                    triggered_by_escalation=False,
+                ),
+                FakeServicerContext(tenant_a.outsider()),
+            )
+        assert "[http:402]" in raised.value.details
+
+    async def test_the_grace_is_a_CEILING_not_an_exemption(
+        self, servicer, tenant_a, budget_limit, redis_client
+    ):
+        # 10% past the cap, and no further. An escalation summary at 5x the
+        # allowance is not "the cheapest call the system makes" — it is an
+        # uncapped one.
+        budget_limit["limit_micros"] = 1_000
+        await redis_client.set(_quota_key(tenant_a), "1101")
+
+        with pytest.raises(FakeAbort):
+            await servicer.Summarize(
+                rag_pb2.SummaryRequest(
+                    ticket_id=TICKET_ID,
+                    history=turns(("user", "hi")),
+                    triggered_by_escalation=True,
+                ),
+                FakeServicerContext(tenant_a.outsider()),
+            )
+
+    async def test_an_unreadable_counter_REFUSES_the_grace(
+        self, servicer, tenant_a, broken_redis
+    ):
+        # Fails closed, like every other gate. The grace is an exemption from
+        # the CAP, not from knowing where the cap is — granting it on an
+        # unreadable counter would make an outage the cheapest way to get free
+        # generations.
+        with pytest.raises(FakeAbort):
+            await servicer.Summarize(
+                rag_pb2.SummaryRequest(
+                    ticket_id=TICKET_ID,
+                    history=turns(("user", "hi")),
+                    triggered_by_escalation=True,
+                ),
+                FakeServicerContext(tenant_a.outsider()),
+            )
+
+
 class TestClassify:
     async def test_routes_to_a_department_the_caller_actually_HAS(
         self, servicer, tenant_a, generator

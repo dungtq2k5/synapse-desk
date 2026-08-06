@@ -23,6 +23,37 @@ export enum Gender {
   UNRECOGNIZED = -1,
 }
 
+/**
+ * The tenant lifecycle, mirroring `OrgStatus` in `@synapsedesk/common`.
+ *
+ * An ENUM rather than the string it used to be, per conventions §7.3: the wire
+ * format rejects an unknown value before any handler runs, which is a stronger
+ * gate than a runtime check that somebody has to remember to write. It was the
+ * last enumerated domain crossing this package as a bare string.
+ */
+export enum OrgStatus {
+  ORG_STATUS_UNSPECIFIED = 0,
+  ORG_STATUS_PENDING_ONBOARDING = 1,
+  ORG_STATUS_ACTIVE = 2,
+  ORG_STATUS_SUSPENDED_PAST_DUE = 3,
+  ORG_STATUS_FROZEN = 4,
+  UNRECOGNIZED = -1,
+}
+
+/**
+ * The AI tier a plan grants — doc 15 §2.1, mirroring `AiModelTier` in
+ * `@synapsedesk/common`.
+ *
+ * Two values, because two is a decision a customer makes in five seconds and
+ * three is a comparison table.
+ */
+export enum AiModelTier {
+  AI_MODEL_TIER_UNSPECIFIED = 0,
+  AI_MODEL_TIER_FAST = 1,
+  AI_MODEL_TIER_QUALITY = 2,
+  UNRECOGNIZED = -1,
+}
+
 export enum SortOrder {
   /**
    * SORT_ORDER_UNSPECIFIED - proto3 requires a 0 member. Here it means "the caller did not choose",

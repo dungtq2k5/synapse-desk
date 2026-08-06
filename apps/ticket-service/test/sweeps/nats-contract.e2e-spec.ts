@@ -1,4 +1,5 @@
 import { Controller, INestApplication, Module } from '@nestjs/common';
+import { waitUntil } from '@synapsedesk/common/testing/wait';
 import { NestFactory } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import {
@@ -22,18 +23,6 @@ import {
 } from '@synapsedesk/common';
 
 /** Waits for a condition rather than sleeping a fixed interval. */
-async function waitFor(
-  predicate: () => boolean,
-  timeoutMs = 5_000,
-): Promise<boolean> {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    if (predicate()) return true;
-    await new Promise((resolve) => setTimeout(resolve, 25));
-  }
-  return false;
-}
-
 /**
  * A consumer that records whatever arrives, per pattern.
  *
@@ -187,6 +176,16 @@ describe('§3.4 NATS contract sweep (e2e)', () => {
     },
   ];
 
+  const publish = (event: TicketDomainEvent) =>
+    new Promise<void>((resolve, reject) => {
+      client.emit(event.pattern, event).subscribe({
+        error: (error: Error) => reject(error),
+        complete: () => resolve(),
+      });
+    });
+
+  const arrivalsFor = (pattern: TicketPattern) => received.get(pattern) ?? [];
+
   beforeAll(async () => {
     app = await NestFactory.create(ProbeModule, { logger: false });
     const configService = app.get(ConfigService);
@@ -209,22 +208,12 @@ describe('§3.4 NATS contract sweep (e2e)', () => {
     await app?.close();
   });
 
-  const publish = (event: TicketDomainEvent) =>
-    new Promise<void>((resolve, reject) => {
-      client.emit(event.pattern, event).subscribe({
-        error: (error: Error) => reject(error),
-        complete: () => resolve(),
-      });
-    });
-
-  const arrivalsFor = (pattern: TicketPattern) => received.get(pattern) ?? [];
-
   it.each(EVENTS.map((event) => [event.pattern, event] as const))(
     '%s round-trips with EVERY field intact',
     async (pattern, event) => {
       await publish(event);
 
-      const arrived = await waitFor(() => arrivalsFor(pattern).length > 0);
+      const arrived = await waitUntil(() => arrivalsFor(pattern).length > 0);
       expect([pattern, arrived]).toEqual([pattern, true]);
 
       // Deep equality over the WHOLE event, not a spot-check of two fields.
@@ -263,7 +252,7 @@ describe('§3.4 NATS contract sweep (e2e)', () => {
     };
 
     await publish(systemAssigned);
-    await waitFor(() => arrivalsFor(TICKET_PATTERNS.assigned).length > 0);
+    await waitUntil(() => arrivalsFor(TICKET_PATTERNS.assigned).length > 0);
 
     const arrival = arrivalsFor(TICKET_PATTERNS.assigned)[0];
     expect(arrival).toHaveProperty('assignedById', null);
@@ -287,7 +276,9 @@ describe('§3.4 NATS contract sweep (e2e)', () => {
     };
 
     await publish(event);
-    await waitFor(() => arrivalsFor(TICKET_PATTERNS.messageCreated).length > 0);
+    await waitUntil(
+      () => arrivalsFor(TICKET_PATTERNS.messageCreated).length > 0,
+    );
 
     const arrival = arrivalsFor(TICKET_PATTERNS.messageCreated)[0];
     expect(arrival).toHaveProperty('isInternalNote', false);
@@ -312,7 +303,9 @@ describe('§3.4 NATS contract sweep (e2e)', () => {
     };
 
     await publish(event);
-    await waitFor(() => arrivalsFor(TICKET_PATTERNS.messageCreated).length > 0);
+    await waitUntil(
+      () => arrivalsFor(TICKET_PATTERNS.messageCreated).length > 0,
+    );
 
     expect(arrivalsFor(TICKET_PATTERNS.messageCreated)[0].groupKey).toBe(
       `ticket:${ticketId}:message`,
@@ -328,7 +321,7 @@ describe('§3.4 NATS contract sweep (e2e)', () => {
       await publish(event);
     }
 
-    await waitFor(
+    await waitUntil(
       () =>
         Object.values(TICKET_PATTERNS).every(
           (pattern) => arrivalsFor(pattern).length > 0,

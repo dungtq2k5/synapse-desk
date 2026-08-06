@@ -129,4 +129,19 @@ export const envValidationSchema = Joi.object({
   LOG_LEVEL: Joi.string()
     .required()
     .valid(...LOG_LEVELS),
+
+  // ---------------------------------------------------------------------
+  // Billing — OPTIONAL, and deliberately so (14-doc §2.1).
+  //
+  // Every existing tenant is grandfathered: no Stripe objects at all, and on
+  // the day this ships that is all of them. A service that refused to boot
+  // without billing configured would take down LOGIN for a system where
+  // billing is not yet in use — so the keys are optional and `StripeService`
+  // degrades to UNAVAILABLE on the billing endpoints alone.
+  // ---------------------------------------------------------------------
+  STRIPE_SECRET_KEY: Joi.string().optional(),
+  STRIPE_WEBHOOK_SECRET: Joi.string().optional(),
+  // JSON keyed by price id. Absent means the built-in test-mode catalog, which
+  // is what lets a fresh clone run the suite.
+  STRIPE_PLAN_CATALOG: Joi.string().optional(),
 });

@@ -1,12 +1,16 @@
 import {
+  type AiModelTier,
   DEFAULT_SEARCH,
   Gender,
   InvitationStatus,
+  OrgStatus,
   OtpPurpose,
   type SortOrder,
 } from '@synapsedesk/common';
 import {
+  AiModelTier as ProtoAiModelTier,
   Gender as ProtoGender,
+  OrgStatus as ProtoOrgStatus,
   PageMeta,
   PageRequest,
   SortOrder as ProtoSortOrder,
@@ -187,6 +191,90 @@ export function toProtoInvitationStatus(
   status: InvitationStatus,
 ): ProtoInvitationStatus {
   return PROTO_INVITATION_STATUS_BY_DOMAIN[status];
+}
+
+// ---------------------------------------------------------------------------
+// Tenant lifecycle
+// ---------------------------------------------------------------------------
+
+/**
+ * `UNSPECIFIED` maps to null rather than to a status.
+ *
+ * proto3's zero value means "the field was not set" (§6.5), and there is no
+ * safe status to read that as: defaulting to ACTIVE would let an unset field
+ * unfreeze a tenant, and defaulting to FROZEN would lock one out. The caller is
+ * given null and decides how to complain, because it knows its own transport.
+ */
+const DOMAIN_ORG_STATUS_BY_PROTO: Record<number, OrgStatus> = {
+  [ProtoOrgStatus.ORG_STATUS_PENDING_ONBOARDING]: OrgStatus.PENDING_ONBOARDING,
+  [ProtoOrgStatus.ORG_STATUS_ACTIVE]: OrgStatus.ACTIVE,
+  [ProtoOrgStatus.ORG_STATUS_SUSPENDED_PAST_DUE]: OrgStatus.SUSPENDED_PAST_DUE,
+  [ProtoOrgStatus.ORG_STATUS_FROZEN]: OrgStatus.FROZEN,
+};
+
+const PROTO_ORG_STATUS_BY_DOMAIN: Record<OrgStatus, ProtoOrgStatus> = {
+  [OrgStatus.PENDING_ONBOARDING]: ProtoOrgStatus.ORG_STATUS_PENDING_ONBOARDING,
+  [OrgStatus.ACTIVE]: ProtoOrgStatus.ORG_STATUS_ACTIVE,
+  [OrgStatus.SUSPENDED_PAST_DUE]: ProtoOrgStatus.ORG_STATUS_SUSPENDED_PAST_DUE,
+  [OrgStatus.FROZEN]: ProtoOrgStatus.ORG_STATUS_FROZEN,
+};
+
+export function fromProtoOrgStatus(status: ProtoOrgStatus): OrgStatus | null {
+  return DOMAIN_ORG_STATUS_BY_PROTO[status] ?? null;
+}
+
+/**
+ * Takes the domain enum, but also the bare `string` Prisma hands back for a
+ * `VarChar` column (§7.3 — enumerated columns are strings in Postgres).
+ *
+ * An unknown string maps to UNSPECIFIED rather than throwing: this runs on the
+ * RESPONSE path, and a row carrying a status nobody recognises should surface
+ * as "unset" to the client rather than failing a read the caller is entitled
+ * to. The write paths validate before storing, so it should not arise.
+ */
+export function toProtoOrgStatus(status: OrgStatus | string): ProtoOrgStatus {
+  return (
+    PROTO_ORG_STATUS_BY_DOMAIN[status as OrgStatus] ??
+    ProtoOrgStatus.ORG_STATUS_UNSPECIFIED
+  );
+}
+
+/**
+ * The AI tier — doc 15 §2.1.
+ *
+ * Same UNSPECIFIED-is-null rule as above, and it matters more here: the tier
+ * selects which MODEL a tenant's questions are answered by, so reading an unset
+ * field as FAST would silently downgrade a paying customer and reading it as
+ * QUALITY would hand the expensive model to everyone.
+ */
+const DOMAIN_AI_MODEL_TIER_BY_PROTO: Record<number, AiModelTier> = {
+  [ProtoAiModelTier.AI_MODEL_TIER_FAST]: 'FAST',
+  [ProtoAiModelTier.AI_MODEL_TIER_QUALITY]: 'QUALITY',
+};
+
+const PROTO_AI_MODEL_TIER_BY_DOMAIN: Record<AiModelTier, ProtoAiModelTier> = {
+  FAST: ProtoAiModelTier.AI_MODEL_TIER_FAST,
+  QUALITY: ProtoAiModelTier.AI_MODEL_TIER_QUALITY,
+};
+
+export function fromProtoAiModelTier(
+  tier: ProtoAiModelTier,
+): AiModelTier | null {
+  return DOMAIN_AI_MODEL_TIER_BY_PROTO[tier] ?? null;
+}
+
+/**
+ * Takes a plain `string`, not `AiModelTier | string` — that union collapses to
+ * `string` and the linter is right to say so. The parameter is wide ON PURPOSE:
+ * the caller is usually handing over a Prisma `VarChar` column (§7.3), and an
+ * unrecognised value maps to UNSPECIFIED rather than throwing, for the same
+ * reason `toProtoOrgStatus` does.
+ */
+export function toProtoAiModelTier(tier: string): ProtoAiModelTier {
+  return (
+    PROTO_AI_MODEL_TIER_BY_DOMAIN[tier as AiModelTier] ??
+    ProtoAiModelTier.AI_MODEL_TIER_UNSPECIFIED
+  );
 }
 
 // ---------------------------------------------------------------------------

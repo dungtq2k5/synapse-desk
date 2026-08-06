@@ -1,4 +1,5 @@
 import { RpcException } from '@nestjs/microservices';
+import { expectRpc, rpcCode } from '@synapsedesk/common/testing/rpc';
 import { status } from '@grpc/grpc-js';
 import {
   compareAlphabetically,
@@ -6,8 +7,12 @@ import {
   OrgStatus,
   SystemRoleName,
 } from '@synapsedesk/common';
-import { bootstrapE2eTest, E2eFixture } from '../utils/bootstrap';
-import { memberContext, requestOrigin } from '../utils/context';
+import {
+  E2eFixture,
+  bootstrapE2eTest,
+  memberContext,
+  requestOrigin,
+} from '../utils';
 import {
   addMember,
   createDeviceSession,
@@ -21,26 +26,7 @@ import {
 } from '../factories';
 import { AuthService } from '../../src/modules/auth/auth.service';
 import { SessionsService } from '../../src/modules/sessions/sessions.service';
-import { hashToken } from '../../src/common/utils/utils';
-
-/** Extracts the gRPC status code from a thrown RpcException. */
-function rpcCode(error: unknown): number | undefined {
-  if (!(error instanceof RpcException)) return undefined;
-  return (error.getError() as { code?: number }).code;
-}
-
-/**
- * Asserts a call rejects with a specific gRPC status.
- *
- * A helper rather than a bare `.rejects.toThrow(RpcException)`, because the
- * CODE is the contract: the gateway maps ALREADY_EXISTS to 409 and
- * FAILED_PRECONDITION to 400, so a test that only checks "it threw" would pass
- * while the client received the wrong HTTP status.
- */
-async function expectRpc(promise: Promise<unknown>, code: number) {
-  await expect(promise).rejects.toBeInstanceOf(RpcException);
-  await promise.catch((error: unknown) => expect(rpcCode(error)).toBe(code));
-}
+import { hashToken } from '../../src/common/utils';
 
 describe('Auth core (e2e)', () => {
   let fx: E2eFixture;
@@ -171,7 +157,6 @@ describe('Auth core (e2e)', () => {
       const orgB = await createOrganization(fx.prisma, {
         allowedEmailDomains: ['client-a.test'],
       });
-      void orgB;
 
       const first = await auth.register(
         {
@@ -692,6 +677,8 @@ describe('Auth core (e2e)', () => {
   // --------------------------------------------------------- password reset
 
   describe('forgot / reset password', () => {
+    const RESET_PASSWORD = 'AfterReset1!';
+
     it('22. an unknown address is accepted silently — no enumeration', async () => {
       await expect(
         auth.forgotPassword({ email: 'ghost@nowhere.test' }, requestOrigin()),
@@ -796,7 +783,7 @@ describe('Auth core (e2e)', () => {
 
       const result = await auth.resetPassword({
         token,
-        newPassword: 'AfterReset1!',
+        newPassword: RESET_PASSWORD,
       });
 
       expect(result.revokedSessionCount).toBe(2);
@@ -809,7 +796,7 @@ describe('Auth core (e2e)', () => {
       const { user } = await seedTenantWithUser(fx.prisma);
       const { token } = await createPasswordResetToken(fx.prisma, user.id);
 
-      await auth.resetPassword({ token, newPassword: 'AfterReset1!' });
+      await auth.resetPassword({ token, newPassword: RESET_PASSWORD });
 
       await expectRpc(
         auth.login(
@@ -820,7 +807,7 @@ describe('Auth core (e2e)', () => {
       );
       await expect(
         auth.login(
-          { email: user.email, password: 'AfterReset1!' },
+          { email: user.email, password: RESET_PASSWORD },
           requestOrigin(),
         ),
       ).resolves.toMatchObject({ requiresTenantSelection: false });
@@ -830,7 +817,7 @@ describe('Auth core (e2e)', () => {
       const { user } = await seedTenantWithUser(fx.prisma);
       const { token } = await createPasswordResetToken(fx.prisma, user.id);
 
-      await auth.resetPassword({ token, newPassword: 'AfterReset1!' });
+      await auth.resetPassword({ token, newPassword: RESET_PASSWORD });
 
       await expectRpc(
         auth.resetPassword({ token, newPassword: 'AgainAgain1!' }),
@@ -871,7 +858,9 @@ describe('Auth core (e2e)', () => {
 
     it('a Google-created account cannot then log in with a password', async () => {
       const { org } = await seedTenantWithUser(fx.prisma);
-      const googleUser = await fx.prisma.user.create({
+      // Not bound, for the same reason: the row must EXIST for the login
+      // below to find it, and nothing here needs the object.
+      await fx.prisma.user.create({
         data: {
           email: 'oauth-only@google-signin.test',
           fullName: 'OAuth Only',
@@ -879,7 +868,6 @@ describe('Auth core (e2e)', () => {
           passwordHash: null,
         },
       });
-      void googleUser;
 
       await expectRpc(
         auth.login(

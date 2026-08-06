@@ -174,6 +174,11 @@ export async function bootstrapE2eTest(): Promise<E2eFixture> {
       prisma.$executeRawUnsafe('UPDATE departments SET deleted_by_id = NULL'),
       prisma.$executeRawUnsafe('UPDATE users SET deleted_by_id = NULL'),
 
+      // Billing events reference organizations with ON DELETE SetNull, so they
+      // would survive the sweep as orphans and the idempotency test would then
+      // hit a UNIQUE violation on a re-used event id from a previous test.
+      prisma.$executeRawUnsafe('DELETE FROM billing_events'),
+
       prisma.$executeRawUnsafe('DELETE FROM user_departments'),
       prisma.$executeRawUnsafe('DELETE FROM user_invitations'),
       prisma.$executeRawUnsafe('DELETE FROM device_sessions'),

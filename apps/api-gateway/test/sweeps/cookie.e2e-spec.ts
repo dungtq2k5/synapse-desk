@@ -1,21 +1,19 @@
 import { of } from 'rxjs';
 import {
-  bootstrapE2eTest,
-  E2eFixture,
-  flushTestRedis,
-} from '../utils/bootstrap';
-import {
   ACCESS_COOKIE,
-  anonymousAgent,
   API,
-  authenticatedAgent,
   DEVICE_COOKIE,
-  parseSetCookie,
+  E2eFixture,
   REFRESH_COOKIE,
   TENANT_SELECTION_COOKIE,
-  twoFactorChallengeAgent,
   TWO_FA_COOKIE,
-} from '../utils/auth';
+  anonymousAgent,
+  authenticatedAgent,
+  bootstrapE2eTest,
+  flushTestRedis,
+  parseSetCookie,
+  twoFactorChallengeAgent,
+} from '../utils';
 import {
   wireLoginSuccess,
   wireLoginTenantSelection,

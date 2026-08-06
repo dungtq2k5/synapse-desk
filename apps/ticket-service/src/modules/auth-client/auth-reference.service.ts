@@ -6,6 +6,7 @@ import {
   AUTH_GRPC_CLIENT,
   CallerContext,
   DEPARTMENT_SERVICE_NAME,
+  SortOrder,
   DepartmentServiceClient,
   GRPC_DEADLINE_MS,
   packRequestContext,
@@ -91,6 +92,58 @@ export class AuthReferenceService implements OnModuleInit {
       `No department with id '${departmentId}' in this workspace`,
       `department ${departmentId}`,
     );
+  }
+
+  /**
+   * The tenant's departments, as classification candidates — doc 15 §3.2.
+   *
+   * Sent WITH the classify request because rag-service cannot see
+   * `postgres_auth`, and a suggestion naming a department that does not exist
+   * is worse than no suggestion: it either fails a write or silently routes a
+   * ticket nowhere.
+   *
+   * **Returns an empty list rather than throwing when auth-service is
+   * unreachable.** Classification is a convenience — the agent routes the
+   * ticket either way — and an empty candidate list simply produces no
+   * suggestion. Failing the request would turn a neighbouring service's
+   * hiccup into a broken button.
+   */
+  async listDepartments(
+    context: CallerContext,
+  ): Promise<Array<{ id: string; name: string }>> {
+    try {
+      const response = await firstValueFrom(
+        this.departmentService
+          .listDepartments(
+            // A generous page: the candidate list is what the model chooses
+            // from, and a truncated one silently removes departments a ticket
+            // could legitimately be routed to.
+            {
+              page: {
+                page: 1,
+                limit: 200,
+                searchTerm: '',
+                sortBy: '',
+                sortOrder: SortOrder.SORT_ORDER_UNSPECIFIED,
+              },
+              includeDeleted: false,
+            },
+            packRequestContext(context),
+          )
+          .pipe(timeout(GRPC_DEADLINE_MS)),
+      );
+
+      return response.items.map((department) => ({
+        id: department.id,
+        name: department.name,
+      }));
+    } catch (error) {
+      this.logger.warn(
+        `Could not list departments for classification: ${formatErrorMsg(error)}`,
+      );
+
+      return [];
+    }
   }
 
   /**

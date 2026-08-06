@@ -28,7 +28,7 @@ import {
   hashToken,
   maskEmail,
   safeCompareHex,
-} from '../../common/utils/utils';
+} from '../../common/utils';
 
 /**
  * The outcome of checking a code, plus the row it was checked against.

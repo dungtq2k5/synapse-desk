@@ -1,4 +1,4 @@
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
@@ -10,7 +10,6 @@ import {
   MinLength,
 } from 'class-validator';
 import { trimIfString } from '@synapsedesk/common';
-import { Transform } from 'class-transformer';
 
 /**
  * Profile only. Quotas (`maxAgentSeats`, storage, token budget) and `status`
@@ -121,6 +120,18 @@ export class OrganizationUsageResponseDto {
   readonly storage!: UsageMeterDto;
   readonly aiTokens!: UsageMeterDto;
   readonly billingCycleStart!: Date;
+
+  /**
+   * The plan, beside the meters — doc 15 §3.1.
+   *
+   * This is the page a customer opens when they hit a limit, and a limit with
+   * no plan next to it is a number they cannot act on: the next question is
+   * always "what would I get if I upgraded".
+   */
+  readonly aiModelTier!: string | null;
+  readonly planName!: string;
+  /** NULL for a grandfathered tenant, who has no invoice period at all. */
+  readonly currentPeriodEnd!: Date | null;
 }
 
 export class OnboardingStepDto {

@@ -38,6 +38,24 @@ message GenerateDraftResponse {
   string model_name = 2;
   int32 prompt_tokens = 3;
   int32 completion_tokens = 4;
+
+  // The `ai_generations` row this draft was recorded as — doc 15 §3.2.
+  //
+  // The client hands it back as `generatedFromId` when the agent posts, which
+  // is what closes the ACCEPTANCE LOOP. Without it the outcome is never
+  // written, the hourly sweep marks the draft DISCARDED, and acceptance rate —
+  // the one number justifying the co-pilot — counts a sent draft as ignored.
+  string generation_id = 5;
+
+  // What the draft cited, so the agent can check it before pressing send.
+  repeated DraftCitation citations = 6;
+}
+
+message DraftCitation {
+  string chunk_id = 1;
+  string document_id = 2;
+  string document_title = 3;
+  optional int32 page_number = 4;
 }
 
 message SuggestionResponse {

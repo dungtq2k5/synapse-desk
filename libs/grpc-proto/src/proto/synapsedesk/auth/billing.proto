@@ -1,0 +1,106 @@
+syntax = "proto3";
+
+package synapsedesk.auth;
+
+import "google/protobuf/timestamp.proto";
+import "synapsedesk/auth/common.proto";
+
+// Billing lives in `auth-service` because it owns `organizations`, and
+// entitlements ARE columns on that row. A separate billing service would need
+// write access to another service's table — the thing service-per-database
+// exists to prevent.
+
+// The webhook, forwarded from the gateway.
+//
+// **`payload` is the RAW BYTES, not a parsed object**, and that is the whole
+// point of this message shape. Stripe's signature is computed over the exact
+// bytes of the request; a JSON round trip through the gateway would re-serialize
+// them — different key order, different whitespace — and verification would
+// fail for every event forever (14-doc §3.2).
+//
+// Verification happens HERE rather than at the gateway, so the webhook secret
+// lives with the service that owns the rows it authorises writes to. The
+// gateway stays a pipe that cannot forge an entitlement change.
+message StripeWebhookRequest {
+  bytes payload = 1;
+  // Stripe's `Stripe-Signature` header, verbatim.
+  string signature = 2;
+}
+
+message StripeWebhookResponse {
+  // BillingEventStatus, or empty when the event type is one we do not act on.
+  // Stripe only needs a 2xx; this is for the gateway's log and for tests.
+  string status = 1;
+  // Present when a `billing_events` row was written.
+  optional string billing_event_id = 2;
+}
+
+message SubscriptionResponse {
+  // Absent for a grandfathered tenant — free, internal, or onboarded before
+  // billing existed. NOT an error: it will be every tenant on the day this
+  // ships, and a 500 there would take the billing page down for all of them.
+  optional string stripe_customer_id = 1;
+  optional string stripe_subscription_id = 2;
+
+  // The plan's label, for display only. Never an authorization input.
+  string plan_name = 3;
+
+  // The five ENTITLEMENTS, read from Postgres. Never from Stripe: a dashboard
+  // that fans out to a third party on every load fails when they do.
+  int32 max_agent_seats = 4;
+  int64 max_storage_bytes = 5;
+  int64 monthly_ai_token_budget = 6;
+  AiModelTier ai_model_tier = 7;
+  google.protobuf.Timestamp billing_cycle_start = 8;
+
+  // The tenant lifecycle status the subscription drove.
+  OrgStatus status = 9;
+}
+
+message CreateCheckoutSessionRequest {
+  string price_id = 1;
+  string success_url = 2;
+  string cancel_url = 3;
+}
+
+// A URL and nothing else. **Checkout grants nothing** (14-doc §4): entitlements
+// are written when the webhook confirms, so a user who closes the tab mid-flow
+// is not upgraded and a user who pays does not depend on their browser making
+// it back to a redirect.
+message CheckoutSessionResponse { string url = 1; }
+
+message CreatePortalSessionRequest { string return_url = 1; }
+
+message PortalSessionResponse { string url = 1; }
+
+message InvoiceResponse {
+  string id = 1;
+  string number = 2;
+  int64 amount_due = 3;
+  string currency = 4;
+  string status = 5;
+  google.protobuf.Timestamp created = 6;
+  string hosted_invoice_url = 7;
+}
+
+// The ONE place a live Stripe read is correct, because invoices are
+// deliberately not mirrored.
+message ListInvoicesResponse { repeated InvoiceResponse items = 1; }
+
+message ListInvoicesRequest { int32 limit = 1; }
+
+message BillingEmptyRequest {}
+
+service BillingService {
+  // **Bypasses the auth guard, the lifecycle gate, tenant scoping and
+  // per-tenant rate limiting** — 14-doc §3.3, and each for a different reason.
+  // The lifecycle bypass is the one that matters most: this endpoint WRITES
+  // `organizations.status`, so gating it on that status would make suspension
+  // a one-way door.
+  rpc HandleStripeWebhook(StripeWebhookRequest) returns (StripeWebhookResponse);
+
+  rpc GetSubscription(BillingEmptyRequest) returns (SubscriptionResponse);
+  rpc CreateCheckoutSession(CreateCheckoutSessionRequest) returns (CheckoutSessionResponse);
+  rpc CreatePortalSession(CreatePortalSessionRequest) returns (PortalSessionResponse);
+  rpc ListInvoices(ListInvoicesRequest) returns (ListInvoicesResponse);
+}

@@ -7,11 +7,13 @@ import {
   withHttpStatus,
 } from '@synapsedesk/common';
 import {
-  bootstrapE2eTest,
+  API,
   E2eFixture,
+  anonymousAgent,
+  authenticatedAgent,
+  bootstrapE2eTest,
   flushTestRedis,
-} from '../utils/bootstrap';
-import { anonymousAgent, API, authenticatedAgent } from '../utils/auth';
+} from '../utils';
 import { grpcError, timestamp, wirePage } from '../fixtures/wire';
 
 /**
@@ -28,18 +30,6 @@ describe('§3.1 Documents at the HTTP boundary (e2e)', () => {
 
   const documentId = faker.string.uuid();
   const chunkId = faker.string.uuid();
-
-  beforeAll(async () => {
-    await flushTestRedis();
-    fx = await bootstrapE2eTest();
-  });
-
-  beforeEach(async () => {
-    await flushTestRedis();
-    jest.clearAllMocks();
-  });
-
-  afterAll(() => fx.close());
 
   const wireDocument = (overrides: Record<string, unknown> = {}) => ({
     id: documentId,
@@ -70,6 +60,18 @@ describe('§3.1 Documents at the HTTP boundary (e2e)', () => {
     objectPath: 'organizations/o/documents/d/abc.pdf',
     title: '2026 Employee Handbook',
   };
+
+  beforeAll(async () => {
+    await flushTestRedis();
+    fx = await bootstrapE2eTest();
+  });
+
+  beforeEach(async () => {
+    await flushTestRedis();
+    jest.clearAllMocks();
+  });
+
+  afterAll(() => fx.close());
 
   describe('GET /documents', () => {
     it('1. is readable by a member with NO permissions', async () => {

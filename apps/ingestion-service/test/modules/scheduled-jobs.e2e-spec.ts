@@ -10,7 +10,7 @@ import {
   GENERATION_MODEL_BY_TIER,
   QDRANT_PAYLOAD_FIELDS,
 } from '@synapsedesk/common';
-import { bootstrapE2eTest, E2eFixture } from '../utils/bootstrap';
+import { bootstrapE2eTest, CYCLE_START, E2eFixture } from '../utils';
 import { buildTenant, createDocument, TenantFixture } from '../factories';
 import { ChunkUsageProjection } from '../../src/modules/scheduled/chunk-usage.projection';
 import { DiscardedDraftSweep } from '../../src/modules/scheduled/discarded-draft.sweep';
@@ -22,9 +22,6 @@ import { ScopeWriterService } from '../../src/modules/ingestion/scope-writer.ser
 import { ScopeFanoutQueueService } from '../../src/modules/ingestion/scope-fanout-queue.service';
 import { QdrantService } from '../../src/modules/qdrant/qdrant.service';
 import { QuotaCounterService } from '../../src/modules/ai-ledger/quota-counter.service';
-
-const CYCLE_START = new Date('2026-08-01T00:00:00.000Z');
-const HOUR = 3_600_000;
 
 describe('§2.3, §4 The fan-out and the scheduled jobs (e2e)', () => {
   let fx: E2eFixture;
@@ -38,6 +35,30 @@ describe('§2.3, §4 The fan-out and the scheduled jobs (e2e)', () => {
   let counter: QuotaCounterService;
 
   let tenant: TenantFixture;
+
+  const HOUR = 3_600_000;
+
+  /** A document with `count` chunks, all fresh and never retrieved. */
+  const documentWithChunks = async (count: number, overrides = {}) => {
+    const document = await createDocument(fx.prisma, tenant, {
+      status: DocumentStatus.INDEXED,
+      ...overrides,
+    });
+
+    await fx.prisma.documentChunk.createMany({
+      data: Array.from({ length: count }, (_, index) => ({
+        documentId: document.id,
+        chunkIndex: index,
+        contentText: `Chunk ${index} of policy text.`,
+        tokenCount: 20,
+        organizationId: tenant.organizationId,
+        isOrganizationWide: document.isOrganizationWide,
+        departmentIds: [],
+      })),
+    });
+
+    return document;
+  };
 
   beforeAll(async () => {
     fx = await bootstrapE2eTest();
@@ -59,28 +80,6 @@ describe('§2.3, §4 The fan-out and the scheduled jobs (e2e)', () => {
   afterAll(async () => {
     await fx.close();
   });
-
-  /** A document with `count` chunks, all fresh and never retrieved. */
-  async function documentWithChunks(count: number, overrides = {}) {
-    const document = await createDocument(fx.prisma, tenant, {
-      status: DocumentStatus.INDEXED,
-      ...overrides,
-    });
-
-    await fx.prisma.documentChunk.createMany({
-      data: Array.from({ length: count }, (_, index) => ({
-        documentId: document.id,
-        chunkIndex: index,
-        contentText: `Chunk ${index} of policy text.`,
-        tokenCount: 20,
-        organizationId: tenant.organizationId,
-        isOrganizationWide: document.isOrganizationWide,
-        departmentIds: [],
-      })),
-    });
-
-    return document;
-  }
 
   describe('§2.3 the scope fan-out', () => {
     it('1. Re-scopes EVERY chunk row, not just the first page', async () => {
@@ -324,11 +323,11 @@ describe('§2.3, §4 The fan-out and the scheduled jobs (e2e)', () => {
   });
 
   describe('§4.1 the chunk-usage projection', () => {
-    async function ledgerRow(
+    const ledgerRow = async (
       retrieved: string[],
       cited: string[],
       createdAt = new Date(),
-    ) {
+    ) => {
       return fx.prisma.aiGeneration.create({
         data: {
           organizationId: tenant.organizationId,
@@ -342,7 +341,7 @@ describe('§2.3, §4 The fan-out and the scheduled jobs (e2e)', () => {
           createdAt,
         },
       });
-    }
+    };
 
     it('6. Projects retrieval and citation counts onto the chunk rows', async () => {
       const document = await documentWithChunks(2);
@@ -482,7 +481,7 @@ describe('§2.3, §4 The fan-out and the scheduled jobs (e2e)', () => {
   });
 
   describe('§4.3 the DISCARDED sweep', () => {
-    async function draft(createdAt: Date, overrides = {}) {
+    const draft = async (createdAt: Date, overrides = {}) => {
       return fx.prisma.aiGeneration.create({
         data: {
           organizationId: tenant.organizationId,
@@ -496,7 +495,7 @@ describe('§2.3, §4 The fan-out and the scheduled jobs (e2e)', () => {
           ...overrides,
         },
       });
-    }
+    };
 
     it('13. Sweeps a draft nobody referenced within 24 hours', async () => {
       await draft(new Date(Date.now() - 25 * HOUR));
@@ -565,7 +564,7 @@ describe('§2.3, §4 The fan-out and the scheduled jobs (e2e)', () => {
           organizationId: tenant.organizationId,
           purpose: AiGenerationPurpose.EMBEDDING,
           modelName: EMBEDDING_MODEL,
-          promptTokens: 1000,
+          promptTokens: 1_000,
           completionTokens: 0,
           estimatedCostMicros: 25n,
           createdAt: new Date(CYCLE_START.getTime() + HOUR),
@@ -591,7 +590,7 @@ describe('§2.3, §4 The fan-out and the scheduled jobs (e2e)', () => {
           organizationId: tenant.organizationId,
           purpose: AiGenerationPurpose.EMBEDDING,
           modelName: EMBEDDING_MODEL,
-          promptTokens: 1000,
+          promptTokens: 1_000,
           completionTokens: 0,
           estimatedCostMicros: 25n,
           createdAt: new Date(CYCLE_START.getTime() + HOUR),
@@ -615,7 +614,7 @@ describe('§2.3, §4 The fan-out and the scheduled jobs (e2e)', () => {
           organizationId: tenant.organizationId,
           purpose: AiGenerationPurpose.EMBEDDING,
           modelName: EMBEDDING_MODEL,
-          promptTokens: 1000,
+          promptTokens: 1_000,
           completionTokens: 0,
           estimatedCostMicros: 500n,
           createdAt: new Date(CYCLE_START.getTime() - HOUR),

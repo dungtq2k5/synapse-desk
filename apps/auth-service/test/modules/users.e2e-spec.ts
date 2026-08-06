@@ -1,12 +1,12 @@
-import { RpcException } from '@nestjs/microservices';
+import { expectRpc } from '@synapsedesk/common/testing/rpc';
 import { status } from '@grpc/grpc-js';
+import { compareAlphabetically, SystemRoleName } from '@synapsedesk/common';
 import {
-  compareAlphabetically,
-  PERMISSION_CODES,
-  SystemRoleName,
-} from '@synapsedesk/common';
-import { bootstrapE2eTest, E2eFixture } from '../utils/bootstrap';
-import { memberContext } from '../utils/context';
+  E2eFixture,
+  bootstrapE2eTest,
+  memberContext,
+  superuser,
+} from '../utils';
 import {
   addMember,
   createDepartment,
@@ -18,17 +18,7 @@ import {
   seedTenantWithUser,
 } from '../factories';
 import { UsersService } from '../../src/modules/users/users.service';
-import { flattenPermissionCodes } from '../../src/common/utils/permissions';
-
-function rpcCode(error: unknown): number | undefined {
-  if (!(error instanceof RpcException)) return undefined;
-  return (error.getError() as { code?: number }).code;
-}
-
-async function expectRpc(promise: Promise<unknown>, code: number) {
-  await expect(promise).rejects.toBeInstanceOf(RpcException);
-  await promise.catch((error: unknown) => expect(rpcCode(error)).toBe(code));
-}
+import { flattenPermissionCodes } from '../../src/common/utils';
 
 describe('Users (e2e)', () => {
   let fx: E2eFixture;
@@ -42,11 +32,6 @@ describe('Users (e2e)', () => {
   beforeEach(() => fx.reset());
 
   afterAll(() => fx.close());
-
-  /** See roles.e2e-spec.ts for why the default actor holds everything. */
-  const superuser = (t: {
-    user: { id: string; organizationId: string | null };
-  }) => memberContext(t.user, [...PERMISSION_CODES]);
 
   // ------------------------------------------------------------- permissions
 

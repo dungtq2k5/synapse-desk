@@ -2,7 +2,7 @@ import { faker } from '@faker-js/faker';
 import { randomBytes } from 'node:crypto';
 import { Prisma } from '../../src/generated/prisma/client';
 import { PrismaService } from '../../src/modules/prisma/prisma.service';
-import { addDays, hashToken } from '../../src/common/utils/utils';
+import { addDays, hashToken } from '../../src/common/utils';
 
 /**
  * Creates a device session and returns the RAW refresh token alongside the row.

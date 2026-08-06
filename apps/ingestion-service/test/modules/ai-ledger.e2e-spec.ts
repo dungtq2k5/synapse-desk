@@ -1,4 +1,5 @@
 import { RpcException } from '@nestjs/microservices';
+import { waitUntil } from '@synapsedesk/common/testing/wait';
 import { status } from '@grpc/grpc-js';
 import { faker } from '@faker-js/faker';
 import Redis from 'ioredis';
@@ -16,10 +17,15 @@ import {
   quotaCounterKey,
   quotaThresholdEventId,
   readHttpStatusHint,
+  NATS_CLIENT,
 } from '@synapsedesk/common';
-import { NATS_CLIENT } from '@synapsedesk/common';
-import { bootstrapE2eTest, E2eFixture } from '../utils/bootstrap';
-import { memberContext } from '../utils/context';
+import {
+  BUDGET_MICROS,
+  CYCLE_START,
+  E2eFixture,
+  bootstrapE2eTest,
+  memberContext,
+} from '../utils';
 import { buildTenant, TenantFixture } from '../factories';
 import { AiLedgerService } from '../../src/modules/ai-ledger/ai-ledger.service';
 import {
@@ -27,10 +33,6 @@ import {
   QuotaCounterService,
 } from '../../src/modules/ai-ledger/quota-counter.service';
 import { AuthReferenceService } from '../../src/modules/auth-client/auth-reference.service';
-
-/** A round 1,000,000-micro allowance keeps the percentage arithmetic readable. */
-const BUDGET_MICROS = 1_000_000n;
-const CYCLE_START = new Date('2026-08-01T00:00:00.000Z');
 
 describe('§1.3 The AI ledger and quota gate (e2e)', () => {
   let fx: E2eFixture;
@@ -43,6 +45,33 @@ describe('§1.3 The AI ledger and quota gate (e2e)', () => {
   let natsEmit: jest.SpyInstance;
 
   let tenant: TenantFixture;
+
+  const context = () =>
+    memberContext({ id: tenant.userId, organizationId: tenant.organizationId });
+
+  const entry = (overrides: Record<string, unknown> = {}) => ({
+    organizationId: tenant.organizationId,
+    userId: tenant.userId,
+    purpose: AiGenerationPurpose.CHAT_ANSWER,
+    modelName: GENERATION_MODEL_BY_TIER.FAST,
+    promptTokens: 1_000,
+    completionTokens: 500,
+    ...overrides,
+  });
+
+  /** Puts the tenant at an exact spend, bypassing `charge`. */
+  const setSpend = (micros: bigint) =>
+    redis.set(
+      quotaCounterKey(tenant.organizationId, CYCLE_START),
+      micros.toString(),
+    );
+
+  /** Waits for the fire-and-forget ledger write to land. */
+  const waitForRows = (expected: number, timeoutMs = 2_000): Promise<boolean> =>
+    waitUntil(
+      async () => (await fx.prisma.aiGeneration.count()) >= expected,
+      timeoutMs,
+    );
 
   beforeAll(async () => {
     fx = await bootstrapE2eTest();
@@ -81,36 +110,6 @@ describe('§1.3 The AI ledger and quota gate (e2e)', () => {
   });
 
   afterAll(() => fx.close());
-
-  const context = () =>
-    memberContext({ id: tenant.userId, organizationId: tenant.organizationId });
-
-  const entry = (overrides: Record<string, unknown> = {}) => ({
-    organizationId: tenant.organizationId,
-    userId: tenant.userId,
-    purpose: AiGenerationPurpose.CHAT_ANSWER,
-    modelName: GENERATION_MODEL_BY_TIER.FAST,
-    promptTokens: 1000,
-    completionTokens: 500,
-    ...overrides,
-  });
-
-  /** Puts the tenant at an exact spend, bypassing `charge`. */
-  const setSpend = (micros: bigint) =>
-    redis.set(
-      quotaCounterKey(tenant.organizationId, CYCLE_START),
-      micros.toString(),
-    );
-
-  /** Waits for the fire-and-forget ledger write to land. */
-  const waitForRows = async (expected: number, timeoutMs = 2000) => {
-    const deadline = Date.now() + timeoutMs;
-    while (Date.now() < deadline) {
-      if ((await fx.prisma.aiGeneration.count()) >= expected) return true;
-      await new Promise((resolve) => setTimeout(resolve, 10));
-    }
-    return false;
-  };
 
   // ----------------------------------------------------------------- the gate
 
@@ -398,7 +397,7 @@ describe('§1.3 The AI ledger and quota gate (e2e)', () => {
         .mockRejectedValue(new Error('ECONNREFUSED'));
 
       await expect(
-        ledger.charge(tenant.organizationId, 1000n, context()),
+        ledger.charge(tenant.organizationId, 1_000n, context()),
       ).resolves.toBeUndefined();
       spy.mockRestore();
     });
@@ -734,6 +733,20 @@ describe('§4.2 The acceptance loop (e2e)', () => {
 
   const MESSAGE_ID = '55555555-5555-4555-8555-555555555555';
 
+  const draft = async (content: string) => {
+    return fx.prisma.aiGeneration.create({
+      data: {
+        organizationId: tenant.organizationId,
+        purpose: AiGenerationPurpose.DRAFT,
+        modelName: GENERATION_MODEL_BY_TIER.FAST,
+        promptTokens: 500,
+        completionTokens: 100,
+        estimatedCostMicros: 90n,
+        content,
+      },
+    });
+  };
+
   beforeAll(async () => {
     fx = await bootstrapE2eTest();
     ledger = fx.moduleRef.get(AiLedgerService);
@@ -747,20 +760,6 @@ describe('§4.2 The acceptance loop (e2e)', () => {
   afterAll(async () => {
     await fx.close();
   });
-
-  async function draft(content: string) {
-    return fx.prisma.aiGeneration.create({
-      data: {
-        organizationId: tenant.organizationId,
-        purpose: AiGenerationPurpose.DRAFT,
-        modelName: GENERATION_MODEL_BY_TIER.FAST,
-        promptTokens: 500,
-        completionTokens: 100,
-        estimatedCostMicros: 90n,
-        content,
-      },
-    });
-  }
 
   it('1. Posting a draft VERBATIM records ACCEPTED and the resulting message', async () => {
     const row = await draft('The expense limit is 500 per claim.');

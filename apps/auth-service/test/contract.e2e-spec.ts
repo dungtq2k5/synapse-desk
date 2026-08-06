@@ -62,6 +62,57 @@ describe('gRPC wire contract (e2e)', () => {
   /** One live client per service, keyed by service name. */
   const clients = new Map<string, Record<string, unknown>>();
 
+  /**
+   * Per-test budget for the contract suite.
+   *
+   * Long because each of these boots BOTH peers and drives a real gRPC round trip
+   * — the jest default trips on the boot alone. One constant rather than five
+   * copies: they are one budget, and a run where four tests share a limit and the
+   * fifth does not is a run whose slowest test fails for a different reason.
+   */
+  const CONTRACT_TIMEOUT_MS = 120_000;
+
+  /**
+   * Calls one RPC with an empty request and reports what came back.
+   *
+   * Empty is valid for EVERY message: proto3 has no required fields, and
+   * `defaults: true` materialises the zero value for each one. So this
+   * exercises the encode/decode path without needing a fixture per RPC — which
+   * is what keeps the list proto-driven.
+   */
+  const call = (
+    rpc: Rpc,
+  ): Promise<{ ok: boolean; code?: number; message?: string }> => {
+    const client = clients.get(rpc.service)!;
+    const fn = client[rpc.method] as (
+      request: unknown,
+      metadata: Metadata,
+      options: CallOptions,
+      callback: (
+        error: (Error & { code?: number }) | null,
+        value?: unknown,
+      ) => void,
+    ) => void;
+
+    return new Promise((resolve) => {
+      const metadata = new Metadata();
+      metadata.set('ip_address', '203.0.113.1');
+      metadata.set('user_agent', 'contract-test');
+
+      // Without this, a single hung stub blocks the whole sweep — 60+ RPCs
+      // across six `it()` blocks — with nothing but jest's own 120s timeout to
+      // eventually kill it, and no indication of which RPC was the culprit.
+      const deadline = new Date(Date.now() + 10_000);
+      fn.call(client, {}, metadata, { deadline }, (error, value) => {
+        if (error) {
+          resolve({ ok: false, code: error.code, message: error.message });
+          return;
+        }
+        resolve({ ok: true, message: JSON.stringify(value)?.slice(0, 80) });
+      });
+    });
+  };
+
   beforeAll(async () => {
     // A high, fixed port rather than 0: Nest's gRPC transport binds during
     // `listen()` and does not report back which port it took, so there is
@@ -124,47 +175,6 @@ describe('gRPC wire contract (e2e)', () => {
     await app.close();
   });
 
-  /**
-   * Calls one RPC with an empty request and reports what came back.
-   *
-   * Empty is valid for EVERY message: proto3 has no required fields, and
-   * `defaults: true` materialises the zero value for each one. So this
-   * exercises the encode/decode path without needing a fixture per RPC — which
-   * is what keeps the list proto-driven.
-   */
-  function call(
-    rpc: Rpc,
-  ): Promise<{ ok: boolean; code?: number; message?: string }> {
-    const client = clients.get(rpc.service)!;
-    const fn = client[rpc.method] as (
-      request: unknown,
-      metadata: Metadata,
-      options: CallOptions,
-      callback: (
-        error: (Error & { code?: number }) | null,
-        value?: unknown,
-      ) => void,
-    ) => void;
-
-    return new Promise((resolve) => {
-      const metadata = new Metadata();
-      metadata.set('ip_address', '203.0.113.1');
-      metadata.set('user_agent', 'contract-test');
-
-      // Without this, a single hung stub blocks the whole sweep — 60+ RPCs
-      // across six `it()` blocks — with nothing but jest's own 120s timeout to
-      // eventually kill it, and no indication of which RPC was the culprit.
-      const deadline = new Date(Date.now() + 10_000);
-      fn.call(client, {}, metadata, { deadline }, (error, value) => {
-        if (error) {
-          resolve({ ok: false, code: error.code, message: error.message });
-          return;
-        }
-        resolve({ ok: true, message: JSON.stringify(value)?.slice(0, 80) });
-      });
-    });
-  }
-
   it('the protos declare every service the gateway consumes', () => {
     // A sanity check on the enumeration itself: if this found two services, the
     // sweep below would be green and prove nothing.
@@ -173,6 +183,10 @@ describe('gRPC wire contract (e2e)', () => {
     expect(services).toEqual(
       [
         'AuthService',
+        // Doc 14. Its webhook RPC is reachable like any other — the four
+        // things it bypasses are gateway-level (auth guard, lifecycle gate,
+        // tenant scoping, throttling), and none of them exist at this layer.
+        'BillingService',
         'DepartmentService',
         'InvitationService',
         'OrganizationService',
@@ -187,108 +201,128 @@ describe('gRPC wire contract (e2e)', () => {
     expect(rpcs.length).toBeGreaterThan(60);
   });
 
-  it('EVERY declared RPC is reachable — none answers UNIMPLEMENTED', async () => {
-    // `UNIMPLEMENTED` is the signature of a proto regenerated on one side and
-    // not the other: the method exists in the contract and no handler is
-    // registered for it. Nothing else in the test suite can see that, because
-    // every other suite calls the service class directly and never goes through
-    // the `@GrpcMethod` registration at all.
-    const unimplemented: string[] = [];
+  it(
+    'EVERY declared RPC is reachable — none answers UNIMPLEMENTED',
+    async () => {
+      // `UNIMPLEMENTED` is the signature of a proto regenerated on one side and
+      // not the other: the method exists in the contract and no handler is
+      // registered for it. Nothing else in the test suite can see that, because
+      // every other suite calls the service class directly and never goes through
+      // the `@GrpcMethod` registration at all.
+      const unimplemented: string[] = [];
 
-    for (const rpc of rpcs) {
-      const result = await call(rpc);
-      if (!result.ok && result.code === GrpcStatus.UNIMPLEMENTED) {
-        unimplemented.push(`${rpc.service}.${rpc.method}`);
+      for (const rpc of rpcs) {
+        const result = await call(rpc);
+        if (!result.ok && result.code === GrpcStatus.UNIMPLEMENTED) {
+          unimplemented.push(`${rpc.service}.${rpc.method}`);
+        }
       }
-    }
 
-    expect(unimplemented).toEqual([]);
-  }, 120_000);
+      expect(unimplemented).toEqual([]);
+    },
+    CONTRACT_TIMEOUT_MS,
+  );
 
-  it('EVERY reply decodes — no serialisation mismatch between the peers', async () => {
-    // The other half. A reply that cannot be decoded surfaces as INTERNAL with
-    // a message from the protobuf layer rather than from any handler, so those
-    // are the ones worth separating out: a business `INTERNAL` says something
-    // threw, a serialisation one says the two ends disagree about the shape.
-    const undecodable: string[] = [];
+  it(
+    'EVERY reply decodes — no serialisation mismatch between the peers',
+    async () => {
+      // The other half. A reply that cannot be decoded surfaces as INTERNAL with
+      // a message from the protobuf layer rather than from any handler, so those
+      // are the ones worth separating out: a business `INTERNAL` says something
+      // threw, a serialisation one says the two ends disagree about the shape.
+      const undecodable: string[] = [];
 
-    for (const rpc of rpcs) {
-      const result = await call(rpc);
-      if (result.ok) continue;
+      for (const rpc of rpcs) {
+        const result = await call(rpc);
+        if (result.ok) continue;
 
-      const message = result.message ?? '';
-      if (
-        /deserialize|serialize|Invalid wire type|no such field|Expected .* but got/i.test(
-          message,
-        )
-      ) {
-        undecodable.push(`${rpc.service}.${rpc.method}: ${message}`);
+        const message = result.message ?? '';
+        if (
+          /deserialize|serialize|Invalid wire type|no such field|Expected .* but got/i.test(
+            message,
+          )
+        ) {
+          undecodable.push(`${rpc.service}.${rpc.method}: ${message}`);
+        }
       }
-    }
 
-    expect(undecodable).toEqual([]);
-  }, 120_000);
+      expect(undecodable).toEqual([]);
+    },
+    CONTRACT_TIMEOUT_MS,
+  );
 
-  it('an error crossing the wire arrives with its STATUS CODE and DETAILS intact', async () => {
-    // The mapping the gateway's exception filter depends on entirely: it reads
-    // `.code` off the error to choose an HTTP status, and `.details` for the
-    // message. If either did not survive the hop, every failure would land as a
-    // 500 with no explanation regardless of what actually happened.
-    const results = await Promise.all(rpcs.map((rpc) => call(rpc)));
-    const failures = results.filter((r) => !r.ok);
+  it(
+    'an error crossing the wire arrives with its STATUS CODE and DETAILS intact',
+    async () => {
+      // The mapping the gateway's exception filter depends on entirely: it reads
+      // `.code` off the error to choose an HTTP status, and `.details` for the
+      // message. If either did not survive the hop, every failure would land as a
+      // 500 with no explanation regardless of what actually happened.
+      const results = await Promise.all(rpcs.map((rpc) => call(rpc)));
+      const failures = results.filter((r) => !r.ok);
 
-    // Empty requests are invalid for most RPCs, so there must BE failures —
-    // otherwise this assertion is vacuous.
-    expect(failures.length).toBeGreaterThan(0);
-    for (const failure of failures) {
-      expect(typeof failure.code).toBe('number');
-      expect(failure.message).toBeTruthy();
-    }
-  }, 120_000);
+      // Empty requests are invalid for most RPCs, so there must BE failures —
+      // otherwise this assertion is vacuous.
+      expect(failures.length).toBeGreaterThan(0);
+      for (const failure of failures) {
+        expect(typeof failure.code).toBe('number');
+        expect(failure.message).toBeTruthy();
+      }
+    },
+    CONTRACT_TIMEOUT_MS,
+  );
 
-  it('an unauthenticated call is refused with UNAUTHENTICATED on the routes that check', async () => {
-    // Most of the surface calls `requireActor()`/`requireTenant()`, which raise
-    // a proper `RpcException` — so an identity-less request gets a decided
-    // UNAUTHENTICATED that the gateway maps to 401.
-    const results = await Promise.all(
-      rpcs.map(async (rpc) => ({ rpc, result: await call(rpc) })),
-    );
+  it(
+    'an unauthenticated call is refused with UNAUTHENTICATED on the routes that check',
+    async () => {
+      // Most of the surface calls `requireActor()`/`requireTenant()`, which raise
+      // a proper `RpcException` — so an identity-less request gets a decided
+      // UNAUTHENTICATED that the gateway maps to 401.
+      const results = await Promise.all(
+        rpcs.map(async (rpc) => ({ rpc, result: await call(rpc) })),
+      );
 
-    const unauthenticated = results.filter(
-      (r) => r.result.code === GrpcStatus.UNAUTHENTICATED,
-    );
-    expect(unauthenticated.length).toBeGreaterThan(40);
-  }, 120_000);
+      const unauthenticated = results.filter(
+        (r) => r.result.code === GrpcStatus.UNAUTHENTICATED,
+      );
+      expect(unauthenticated.length).toBeGreaterThan(40);
+    },
+    CONTRACT_TIMEOUT_MS,
+  );
 
-  it('KNOWN GAP: some RPCs surface a missing identity as UNKNOWN, not UNAUTHENTICATED', async () => {
-    // Recorded rather than asserted away, and bounded so it cannot grow quietly.
-    //
-    // These handlers reach a database call before any identity check, so the
-    // failure is a Prisma validation error rather than an `RpcException` — Nest
-    // wraps that as UNKNOWN, which `GRPC_TO_HTTP` has no entry for, so the
-    // gateway answers 500 where it should answer 401.
-    //
-    // Not exploitable today: the gateway's own guards refuse an unauthenticated
-    // caller long before the RPC is dialled, so nothing reaches these handlers
-    // without an identity in practice. It is a defence-in-depth gap and a
-    // consistency one — two RPCs answering the same malformed request with
-    // different statuses is the kind of thing that costs an afternoon later.
-    //
-    // The fix is a `requireActor()` at the top of each, exactly as the other 51
-    // already do. Left as a reported finding rather than a silent edit across
-    // twenty-two handlers.
-    const results = await Promise.all(
-      rpcs.map(async (rpc) => ({ rpc, result: await call(rpc) })),
-    );
+  it(
+    'KNOWN GAP: some RPCs surface a missing identity as UNKNOWN, not UNAUTHENTICATED',
+    async () => {
+      // Recorded rather than asserted away, and bounded so it cannot grow quietly.
+      //
+      // These handlers reach a database call before any identity check, so the
+      // failure is a Prisma validation error rather than an `RpcException` — Nest
+      // wraps that as UNKNOWN, which `GRPC_TO_HTTP` has no entry for, so the
+      // gateway answers 500 where it should answer 401.
+      //
+      // Not exploitable today: the gateway's own guards refuse an unauthenticated
+      // caller long before the RPC is dialled, so nothing reaches these handlers
+      // without an identity in practice. It is a defence-in-depth gap and a
+      // consistency one — two RPCs answering the same malformed request with
+      // different statuses is the kind of thing that costs an afternoon later.
+      //
+      // The fix is a `requireActor()` at the top of each, exactly as the other 51
+      // already do. Left as a reported finding rather than a silent edit across
+      // twenty-two handlers.
+      const results = await Promise.all(
+        rpcs.map(async (rpc) => ({ rpc, result: await call(rpc) })),
+      );
 
-    const unknown = results
-      .filter((r) => r.result.code === GrpcStatus.UNKNOWN)
-      .map((r) => `${r.rpc.service}.${r.rpc.method}`);
+      const unknown = results
+        .filter((r) => r.result.code === GrpcStatus.UNKNOWN)
+        .map((r) => `${r.rpc.service}.${r.rpc.method}`);
 
-    // A ceiling, not an equality: fixing one is welcome and must not fail the
-    // suite, while adding a twenty-third is a regression that should.
-    expect(unknown.length).toBeLessThanOrEqual(22);
-  }, 120_000);
+      // A ceiling, not an equality: fixing one is welcome and must not fail the
+      // suite, while adding a twenty-third is a regression that should.
+      expect(unknown.length).toBeLessThanOrEqual(22);
+    },
+    CONTRACT_TIMEOUT_MS,
+  );
 
   it('caller CONTEXT survives the hop — the metadata round trip', async () => {
     // `packRequestContext`/`unpackCallerContext` is what carries the tenant

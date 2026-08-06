@@ -7,19 +7,32 @@ import {
   MODEL_PRICING,
 } from '@synapsedesk/common';
 import { AiSettingsService } from './ai-settings.service';
+import { AuthReferenceService } from '../auth-client/auth-reference.service';
 import { EntitlementsConsumer } from './entitlements.consumer';
 
 describe('§3b AiSettingsService (unit)', () => {
   let service: AiSettingsService;
   let consumer: EntitlementsConsumer;
+  let authReference: jest.Mocked<AuthReferenceService>;
 
   const ORG_A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
   const ORG_B = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 
   beforeEach(async () => {
+    // The tier now comes from auth-service over gRPC (doc 14 step 6), so the
+    // collaborator is substituted rather than the whole tier being a constant.
+    // Its RETURN VALUE is what these tests vary — which is the point of the
+    // indirection: shipping the tier changed one method body and nothing else.
+    authReference = {
+      getAiModelTier: jest.fn().mockResolvedValue(DEFAULT_AI_MODEL_TIER),
+    } as unknown as jest.Mocked<AuthReferenceService>;
+
     const moduleRef = await Test.createTestingModule({
       controllers: [EntitlementsConsumer],
-      providers: [AiSettingsService],
+      providers: [
+        AiSettingsService,
+        { provide: AuthReferenceService, useValue: authReference },
+      ],
     }).compile();
 
     service = moduleRef.get(AiSettingsService);
@@ -63,10 +76,7 @@ describe('§3b AiSettingsService (unit)', () => {
     });
 
     it('4. Serves a repeat call from CACHE rather than re-resolving', async () => {
-      const resolveTier = jest.spyOn(
-        service as unknown as { resolveTier: () => Promise<string> },
-        'resolveTier',
-      );
+      const resolveTier = authReference.getAiModelTier;
 
       await service.settingsFor(ORG_A);
       await service.settingsFor(ORG_A);
@@ -76,26 +86,69 @@ describe('§3b AiSettingsService (unit)', () => {
     });
 
     it('5. Caches per TENANT, never globally', async () => {
-      const resolveTier = jest.spyOn(
-        service as unknown as { resolveTier: () => Promise<string> },
-        'resolveTier',
-      );
+      const resolveTier = authReference.getAiModelTier;
 
       await service.settingsFor(ORG_A);
       await service.settingsFor(ORG_B);
 
       expect(resolveTier).toHaveBeenCalledTimes(2);
-      expect(resolveTier).toHaveBeenCalledWith(ORG_A);
-      expect(resolveTier).toHaveBeenCalledWith(ORG_B);
+      // The tenant travels in a SYSTEM context — background work has a tenant
+      // but no user, and attributing this read to whoever happened to trigger
+      // it would be a guess.
+      expect(resolveTier).toHaveBeenCalledWith(
+        expect.objectContaining({ organizationId: ORG_A, sub: null }),
+      );
+      expect(resolveTier).toHaveBeenCalledWith(
+        expect.objectContaining({ organizationId: ORG_B }),
+      );
+    });
+  });
+
+  describe('the tier — doc 14 step 6', () => {
+    it('12. Resolves the QUALITY generation model for a QUALITY tenant', async () => {
+      // The whole tier feature, end to end. Nothing but `resolveTier` changed
+      // to ship it: no caller moved, no endpoint signature moved, and no call
+      // site learned a model name.
+      authReference.getAiModelTier.mockResolvedValue('QUALITY');
+
+      const settings = await service.settingsFor(ORG_A);
+
+      expect(settings.generationModel).toBe(GENERATION_MODEL_BY_TIER.QUALITY);
+    });
+
+    it('13. Changes the generation model and NOTHING else', async () => {
+      // Doc 15 §2.2. Scaling the embedding model with the tier is a full
+      // re-embed migration of every tenant; scaling the cheap model multiplies
+      // a premium tenant's bill on volume calls nobody can tell apart.
+      authReference.getAiModelTier.mockResolvedValue('QUALITY');
+      const quality = await service.settingsFor(ORG_A);
+
+      service.invalidate(ORG_A);
+      authReference.getAiModelTier.mockResolvedValue('FAST');
+      const fast = await service.settingsFor(ORG_A);
+
+      expect(quality.generationModel).not.toBe(fast.generationModel);
+      expect(quality.embeddingModel).toBe(fast.embeddingModel);
+      expect(quality.cheapModel).toBe(fast.cheapModel);
+    });
+
+    it('14. Degrades an UNKNOWN tier value to the cheap one', async () => {
+      // The column can carry a value written by a newer deployment. Indexing
+      // the mapping to `undefined` would hand a model name of `undefined` to
+      // the pricing table, which throws — on a user's question.
+      authReference.getAiModelTier.mockResolvedValue('PLATINUM');
+
+      const settings = await service.settingsFor(ORG_A);
+
+      expect(settings.generationModel).toBe(
+        GENERATION_MODEL_BY_TIER[DEFAULT_AI_MODEL_TIER],
+      );
     });
   });
 
   describe('invalidation', () => {
     it('6. Re-resolves after invalidate, so a downgrade takes effect on the NEXT request', async () => {
-      const resolveTier = jest.spyOn(
-        service as unknown as { resolveTier: () => Promise<string> },
-        'resolveTier',
-      );
+      const resolveTier = authReference.getAiModelTier;
 
       await service.settingsFor(ORG_A);
       service.invalidate(ORG_A);
@@ -108,10 +161,7 @@ describe('§3b AiSettingsService (unit)', () => {
       // Doc 15 §1.4 test 4. A global flush on every webhook is a thundering
       // herd, and webhooks arrive in bursts — a plan change, an invoice and a
       // subscription update within seconds of each other.
-      const resolveTier = jest.spyOn(
-        service as unknown as { resolveTier: () => Promise<string> },
-        'resolveTier',
-      );
+      const resolveTier = authReference.getAiModelTier;
 
       await service.settingsFor(ORG_A);
       await service.settingsFor(ORG_B);

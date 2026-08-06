@@ -1,10 +1,15 @@
 import { RpcException } from '@nestjs/microservices';
+import { expectRpc } from '@synapsedesk/common/testing/rpc';
 import { status } from '@grpc/grpc-js';
 import { faker } from '@faker-js/faker';
 import { ReassignmentReason, TICKET_PATTERNS } from '@synapsedesk/common';
 import { ReassignmentReason as ProtoReassignmentReason } from '@synapsedesk/grpc-proto';
-import { bootstrapE2eTest, E2eFixture } from '../utils/bootstrap';
-import { memberContext, superAdminContext } from '../utils/context';
+import {
+  E2eFixture,
+  bootstrapE2eTest,
+  memberContext,
+  superAdminContext,
+} from '../utils';
 import {
   buildTenant,
   createAssignedTicket,
@@ -14,16 +19,6 @@ import {
 import { AssignmentsService } from '../../src/modules/assignments/assignments.service';
 import { AuthReferenceService } from '../../src/modules/auth-client/auth-reference.service';
 import { TicketEventPublisher } from '../../src/modules/events/ticket-event.publisher';
-
-function rpcCode(error: unknown): number | undefined {
-  if (!(error instanceof RpcException)) return undefined;
-  return (error.getError() as { code?: number }).code;
-}
-
-async function expectRpc(promise: Promise<unknown>, code: number) {
-  await expect(promise).rejects.toBeInstanceOf(RpcException);
-  await promise.catch((error: unknown) => expect(rpcCode(error)).toBe(code));
-}
 
 describe('§2.4 Assignment & reassignment (e2e)', () => {
   let fx: E2eFixture;
@@ -36,33 +31,6 @@ describe('§2.4 Assignment & reassignment (e2e)', () => {
   let publish: jest.SpyInstance;
 
   let tenant: TenantFixture;
-
-  beforeAll(async () => {
-    fx = await bootstrapE2eTest();
-    assignments = fx.moduleRef.get(AssignmentsService);
-    authReference = fx.moduleRef.get(AuthReferenceService);
-    events = fx.moduleRef.get(TicketEventPublisher);
-
-    // auth-service and NATS are not running for this suite. Both boundaries
-    // have their own dedicated coverage — the validation failure below, and
-    // §2.2's real publish/subscribe test.
-    assertUserExists = jest.spyOn(authReference, 'assertUserExists');
-    assertDepartmentExists = jest.spyOn(
-      authReference,
-      'assertDepartmentExists',
-    );
-    publish = jest.spyOn(events, 'publish').mockImplementation(() => {});
-  });
-
-  beforeEach(async () => {
-    await fx.reset();
-    jest.clearAllMocks();
-    assertUserExists.mockResolvedValue(undefined);
-    assertDepartmentExists.mockResolvedValue(undefined);
-    tenant = buildTenant();
-  });
-
-  afterAll(() => fx.close());
 
   /** A supervisor: may hand work to anyone, and may see the whole queue. */
   const supervisor = (t = tenant) =>
@@ -97,6 +65,33 @@ describe('§2.4 Assignment & reassignment (e2e)', () => {
       live: rows.filter((row) => row.isCurrent),
     };
   };
+
+  beforeAll(async () => {
+    fx = await bootstrapE2eTest();
+    assignments = fx.moduleRef.get(AssignmentsService);
+    authReference = fx.moduleRef.get(AuthReferenceService);
+    events = fx.moduleRef.get(TicketEventPublisher);
+
+    // auth-service and NATS are not running for this suite. Both boundaries
+    // have their own dedicated coverage — the validation failure below, and
+    // §2.2's real publish/subscribe test.
+    assertUserExists = jest.spyOn(authReference, 'assertUserExists');
+    assertDepartmentExists = jest.spyOn(
+      authReference,
+      'assertDepartmentExists',
+    );
+    publish = jest.spyOn(events, 'publish').mockImplementation(() => {});
+  });
+
+  beforeEach(async () => {
+    await fx.reset();
+    jest.clearAllMocks();
+    assertUserExists.mockResolvedValue(undefined);
+    assertDepartmentExists.mockResolvedValue(undefined);
+    tenant = buildTenant();
+  });
+
+  afterAll(() => fx.close());
 
   // ------------------------------------------------------------------ assign
 

@@ -7,6 +7,9 @@ import {
   INGESTION_GRPC_CLIENT,
   INGESTION_PACKAGE_NAME,
   INGESTION_PROTO_PATHS,
+  RAG_GRPC_CLIENT,
+  RAG_PACKAGE_NAME,
+  RAG_PROTO_PATHS,
 } from '@synapsedesk/grpc-proto';
 import { RagClientService } from './rag-client.service';
 import { LedgerClientService } from './ledger-client.service';
@@ -18,7 +21,25 @@ import { LedgerClientService } from './ledger-client.service';
  */
 @Module({
   imports: [
+    // Optional at the URL level, not at the module level: the client is always
+    // registered so DI resolves, and `RagClientService` refuses at call time
+    // when `RAG_SERVICE_URL` is unset. A conditional registration would make a
+    // missing URL a boot crash for a feature that is allowed to be absent.
     ClientsModule.registerAsync([
+      {
+        name: RAG_GRPC_CLIENT,
+        useFactory: (configService: ConfigService) => ({
+          transport: Transport.GRPC,
+          options: {
+            package: RAG_PACKAGE_NAME,
+            protoPath: RAG_PROTO_PATHS,
+            url: configService.get<string>('RAG_SERVICE_URL') ?? 'localhost:0',
+            ...GRPC_CHANNEL_OPTIONS,
+            loader: GRPC_LOADER_OPTIONS,
+          },
+        }),
+        inject: [ConfigService],
+      },
       {
         name: INGESTION_GRPC_CLIENT,
         useFactory: (configService: ConfigService) => ({

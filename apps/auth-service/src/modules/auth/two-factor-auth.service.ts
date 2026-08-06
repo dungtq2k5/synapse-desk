@@ -40,7 +40,7 @@ import {
   hashToken,
   normalizeBackupCode,
   safeCompareHex,
-} from '../../common/utils/utils';
+} from '../../common/utils';
 
 /**
  * TOTP enrolment, verification and backup codes.

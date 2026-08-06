@@ -3,6 +3,7 @@ syntax = "proto3";
 package synapsedesk.auth;
 
 import "google/protobuf/timestamp.proto";
+import "synapsedesk/auth/common.proto";
 
 // The caller's OWN tenant. Every RPC here resolves the organization from the
 // verified caller context -- there is no id field anywhere in this file, so
@@ -15,8 +16,7 @@ message OrganizationResponse {
   string slug = 3;
   optional string domain = 4;
 
-  // PENDING_ONBOARDING | ACTIVE | SUSPENDED_PAST_DUE | FROZEN
-  string status = 5;
+  OrgStatus status = 5;
 
   bool enforce_two_factor = 6;
   repeated string allowed_email_domains = 7;
@@ -25,6 +25,10 @@ message OrganizationResponse {
   // int64 on the wire; both are byte counts that exceed 2^31 on any real plan.
   int64 max_storage_bytes = 9;
   int64 monthly_ai_token_budget = 10;
+  // Read by `ingestion-service`'s settings layer so it can resolve a
+  // generation model without a Postgres reach-across, and cached there against
+  // `billing.entitlements_changed` — doc 15 §3.1.
+  AiModelTier ai_model_tier = 14;
   google.protobuf.Timestamp billing_cycle_start = 11;
 
   google.protobuf.Timestamp created_at = 12;
@@ -47,7 +51,7 @@ message GetOrganizationStatusRequest {
 }
 
 message OrganizationStatusResponse {
-  string status = 1;
+  OrgStatus status = 1;
   // True once the tenant has been offboarded. Distinct from any status: a
   // deleted tenant must be refused even if its status still reads ACTIVE.
   bool deleted = 2;
@@ -106,6 +110,32 @@ message UsageMeter {
 
 message GetOrganizationUsageRequest {}
 
+// Everything a spending service needs to gate a request, in ONE call.
+//
+// `ingestion-service` and `rag-service` both need the tier AND the quota
+// columns, and neither may reach into postgres_auth to get them (RDM §1.13).
+// A dedicated message rather than reusing `OrganizationResponse` because the
+// callers are on the HOT PATH of every AI request: shipping them a tenant's
+// name, slug, allowed email domains and onboarding state on every gate check
+// is bytes nobody reads, and it invites a caller to start depending on a field
+// that has nothing to do with entitlements.
+message OrganizationEntitlementsResponse {
+  int32 max_agent_seats = 1;
+  int64 max_storage_bytes = 2;
+  // MICROS of currency, not tokens — RDM §1.14. The name is kept for continuity.
+  int64 monthly_ai_token_budget = 3;
+  AiModelTier ai_model_tier = 4;
+  // The quota window. Its EPOCH is inside the Redis counter key, so a caller
+  // that read a different value from this one would meter into a key nothing
+  // else reads.
+  google.protobuf.Timestamp billing_cycle_start = 5;
+  // Carried so a caller can refuse a request from a tenant whose lifecycle
+  // already forbids it, without a second round trip.
+  OrgStatus status = 6;
+}
+
+message GetOrganizationEntitlementsRequest {}
+
 message OrganizationUsageResponse {
   // Active members PLUS pending invitations -- pending invites RESERVE seats,
   // so this must match what the invitation path enforces or an invite gets
@@ -114,6 +144,17 @@ message OrganizationUsageResponse {
   UsageMeter storage = 2;
   UsageMeter ai_tokens = 3;
   google.protobuf.Timestamp billing_cycle_start = 4;
+
+  // Added by doc 15 §3.1: this becomes the page a customer opens when they hit
+  // a limit, so it has to say what they are ON as well as what they have used.
+  //
+  // A limit with no plan beside it is a number the reader cannot act on — the
+  // next question is always "what would I get if I upgraded", and answering it
+  // elsewhere means a second page load at the exact moment someone is blocked.
+  AiModelTier ai_model_tier = 5;
+  string plan_name = 6;
+  // Absent for a grandfathered tenant, who has no invoice period at all.
+  optional google.protobuf.Timestamp current_period_end = 7;
 }
 
 // ---------------------------------------------------------------------------
@@ -133,7 +174,7 @@ message OnboardingResponse {
   // reality the moment someone deletes the department they created.
   repeated OnboardingStep steps = 1;
   bool can_complete = 2;
-  string status = 3;
+  OrgStatus status = 3;
 }
 
 message CompleteOnboardingRequest {}
@@ -157,6 +198,11 @@ service OrganizationService {
   rpc UpdateOrganizationSettings(UpdateOrganizationSettingsRequest) returns (OrganizationSettingsResponse);
 
   rpc GetOrganizationUsage(GetOrganizationUsageRequest) returns (OrganizationUsageResponse);
+
+  // Read by ingestion-service and rag-service on the AI hot path, and CACHED
+  // there against `billing.entitlements_changed` (doc 15 §1.3) — so this is a
+  // cache fill rather than a per-request call.
+  rpc GetOrganizationEntitlements(GetOrganizationEntitlementsRequest) returns (OrganizationEntitlementsResponse);
 
   rpc GetOnboarding(GetOnboardingRequest) returns (OnboardingResponse);
   rpc CompleteOnboarding(CompleteOnboardingRequest) returns (OrganizationResponse);

@@ -11,8 +11,9 @@ import {
   ORGANIZATION_SERVICE_NAME,
   OrganizationServiceClient,
   packRequestContext,
+  fromProtoAiModelTier,
 } from '@synapsedesk/grpc-proto';
-import { formatErrorMsg } from '@synapsedesk/common';
+import { DEFAULT_AI_MODEL_TIER, formatErrorMsg } from '@synapsedesk/common';
 
 /**
  * Validates the ids this service stores but does not own, and reads the one
@@ -132,16 +133,21 @@ export class AuthReferenceService implements OnModuleInit {
     context: CallerContext,
   ): Promise<{ budgetMicros: bigint; billingCycleStart: Date }> {
     try {
-      const organization = await firstValueFrom(
+      // `GetOrganizationEntitlements`, not `GetCurrentOrganization` — doc 15
+      // §3.1. The latter ships a tenant's name, slug, allowed email domains
+      // and onboarding state on a call that reads two numbers, and it invites
+      // a gate to start depending on a field that has nothing to do with
+      // entitlements.
+      const entitlements = await firstValueFrom(
         this.organizationService
-          .getCurrentOrganization({}, packRequestContext(context))
+          .getOrganizationEntitlements({}, packRequestContext(context))
           .pipe(timeout(GRPC_DEADLINE_MS)),
       );
 
-      const cycleStart = organization.billingCycleStart;
+      const cycleStart = entitlements.billingCycleStart;
 
       return {
-        budgetMicros: BigInt(organization.monthlyAiTokenBudget),
+        budgetMicros: BigInt(entitlements.monthlyAiTokenBudget),
         // A missing cycle start would silently share one Redis key across every
         // cycle, so a tenant's spend would never reset. Falling back to the
         // epoch makes that visible as "spend since 1970" rather than hiding it.
@@ -160,6 +166,46 @@ export class AuthReferenceService implements OnModuleInit {
         code: status.UNAVAILABLE,
         message: 'Could not verify the AI allowance',
       });
+    }
+  }
+
+  /**
+   * The tenant's AI TIER — doc 15 §3.1, doc 14 step 6.
+   *
+   * Read over gRPC rather than from a column this service does not own, and
+   * cached by `AiSettingsService` against `billing.entitlements_changed` — so
+   * the hot path is a map lookup and a downgrade still takes effect on the next
+   * request rather than at the end of a TTL.
+   *
+   * **Falls back to the DEFAULT tier when auth-service cannot be reached**,
+   * which is the opposite of how the AI budget behaves two methods up. The
+   * asymmetry is deliberate: an unreadable BUDGET must fail closed, because
+   * guessing "unlimited" spends money that may not exist. An unreadable TIER
+   * fails to FAST — the cheaper model — so the failure costs answer quality
+   * rather than money, and refusing the request outright would take AI down
+   * for every tenant whenever auth-service hiccuped.
+   */
+  async getAiModelTier(context: CallerContext): Promise<string> {
+    try {
+      const organization = await firstValueFrom(
+        this.organizationService
+          .getCurrentOrganization({}, packRequestContext(context))
+          .pipe(timeout(GRPC_DEADLINE_MS)),
+      );
+
+      // `?? DEFAULT` rather than `||`: the enum's UNSPECIFIED maps to null,
+      // which is the same "we could not read it" case the empty string used to
+      // signal — and falling back to the cheap tier is the safe direction. The
+      // expensive one would be chosen for every tenant on a read failure.
+      return (
+        fromProtoAiModelTier(organization.aiModelTier) ?? DEFAULT_AI_MODEL_TIER
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Could not read the AI tier; falling back to ${DEFAULT_AI_MODEL_TIER}: ${formatErrorMsg(error)}`,
+      );
+
+      return DEFAULT_AI_MODEL_TIER;
     }
   }
 

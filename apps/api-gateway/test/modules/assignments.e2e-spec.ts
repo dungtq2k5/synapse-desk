@@ -4,11 +4,13 @@ import { status as GrpcStatus } from '@grpc/grpc-js';
 import { ReassignmentReason } from '@synapsedesk/common';
 import { ReassignmentReason as ProtoReassignmentReason } from '@synapsedesk/grpc-proto';
 import {
-  bootstrapE2eTest,
+  API,
   E2eFixture,
+  anonymousAgent,
+  authenticatedAgent,
+  bootstrapE2eTest,
   flushTestRedis,
-} from '../utils/bootstrap';
-import { anonymousAgent, API, authenticatedAgent } from '../utils/auth';
+} from '../utils';
 import { grpcError, timestamp, wireAssignment } from '../fixtures/wire';
 
 /**

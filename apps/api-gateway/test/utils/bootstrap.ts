@@ -11,6 +11,7 @@ import {
   AUTH_GRPC_CLIENT,
   INGESTION_GRPC_CLIENT,
   TICKET_GRPC_CLIENT,
+  toProtoOrgStatus,
 } from '@synapsedesk/grpc-proto';
 import { AppModule } from '../../src/app.module';
 import { AllHttpExceptionFilter } from '../../src/common/filters/all-http-exception.filter';
@@ -52,7 +53,7 @@ export async function bootstrapE2eTest(
   // ACTIVE and not deleted is the state almost every test wants. A test about
   // the gate itself overrides it.
   stubs.organization.getOrganizationStatus.mockReturnValue(
-    of({ status: OrgStatus.ACTIVE, deleted: false }),
+    of({ status: toProtoOrgStatus(OrgStatus.ACTIVE), deleted: false }),
   );
 
   const builder = Test.createTestingModule({ imports: [AppModule] })
@@ -71,7 +72,15 @@ export async function bootstrapE2eTest(
   configure?.(builder);
 
   const moduleRef = await builder.compile();
-  const app = moduleRef.createNestApplication<NestExpressApplication>();
+  // `rawBody: true` mirrors main.ts, and this suite is the reason it can be
+  // trusted: 14-doc §3.2 test 5 asserts the webhook receives the RAW body even
+  // with the global JSON parser registered. Without the option here the test
+  // would pass against a bootstrap that does not resemble production, which is
+  // the failure mode the doc calls "caught by a test rather than by a
+  // production outage".
+  const app = moduleRef.createNestApplication<NestExpressApplication>({
+    rawBody: true,
+  });
   const configService = app.get(ConfigService);
 
   // Everything below mirrors main.ts. A suite that skips ValidationPipe and

@@ -71,6 +71,15 @@ const READ_URL_GRACE_MS = 14 * 60 * 1000;
  * The first is a security property, the second an audit one, and both are
  * easier to get subtly wrong than to get right — see the comments at each.
  */
+/**
+ * How many messages the `invokeAi` reply path sends as context.
+ *
+ * The same bound the co-pilot uses and for the same reason: a long thread is
+ * prompt tokens charged on every generation, and the tail is what the reply is
+ * actually answering.
+ */
+const AI_REPLY_TRANSCRIPT_TURNS = 40;
+
 @Injectable()
 export class MessagesService {
   private readonly logger = new Logger(MessagesService.name);
@@ -193,7 +202,7 @@ export class MessagesService {
       // already committed and is what this RPC promises to return. An AI draft
       // that could not be produced is a missing SECOND message, not a failed
       // request.
-      await this.tryAppendAiReply(ticket.organizationId, ticket.id);
+      await this.tryAppendAiReply(ticket.organizationId, ticket.id, context);
     }
 
     return toMessageResponse(message);
@@ -537,6 +546,7 @@ export class MessagesService {
   private async tryAppendAiReply(
     organizationId: string,
     ticketId: string,
+    context: CallerContext,
   ): Promise<void> {
     if (!this.rag.isAvailable) {
       this.logger.debug(
@@ -546,7 +556,31 @@ export class MessagesService {
     }
 
     try {
-      const draft = await this.rag.generateReplyDraft();
+      // The thread so far, so the reply answers the conversation rather than
+      // the last line of it. rag-service owns no conversation rows — a second
+      // copy in a second database is a consistency problem nobody asked for.
+      const history = await this.prisma.ticketMessage.findMany({
+        where: { ticketId },
+        orderBy: { createdAt: 'asc' },
+        select: { content: true, senderId: true, isAiGenerated: true },
+        take: AI_REPLY_TRANSCRIPT_TURNS,
+      });
+
+      const draft = await this.rag.generateReplyDraft(
+        ticketId,
+        history.map((message) => ({
+          role:
+            message.isAiGenerated || !message.senderId ? 'assistant' : 'user',
+          content: message.content,
+        })),
+        context,
+        // No review pass on this path. It appends a message to a
+        // customer-visible thread rather than handing an agent a draft to
+        // check, so the latency an agent would absorb is latency a customer
+        // watches — and 13-doc §4.2's review loop is for the surface where a
+        // human reads before sending.
+        0,
+      );
 
       const reply = await this.prisma.ticketMessage.create({
         data: {

@@ -3,10 +3,12 @@ import {
   AiModelTier,
   AiSettings,
   ALL_CONFIGURED_MODELS,
-  DEFAULT_AI_MODEL_TIER,
+  asAiModelTier,
   assertPricingTableCovers,
   resolveAiSettings,
+  systemContext,
 } from '@synapsedesk/common';
+import { AuthReferenceService } from '../auth-client/auth-reference.service';
 
 /** How long a tenant's resolved settings survive without an invalidation. */
 const CACHE_TTL_MS = 5 * 60 * 1000;
@@ -29,6 +31,8 @@ const CACHE_TTL_MS = 5 * 60 * 1000;
 @Injectable()
 export class AiSettingsService implements OnApplicationBootstrap {
   private readonly logger = new Logger(AiSettingsService.name);
+
+  constructor(private readonly authReference: AuthReferenceService) {}
 
   private readonly cache = new Map<
     string,
@@ -89,25 +93,23 @@ export class AiSettingsService implements OnApplicationBootstrap {
   }
 
   /**
-   * Where the tier will come from — and today it comes from nowhere.
+   * The tenant's tier, read over gRPC — doc 14 step 6.
    *
-   * `organizations.ai_model_tier` does not exist yet: it is written by the
-   * Stripe webhook (doc 14 §3) and read here over `GetOrganizationEntitlements`
-   * (doc 15 §3.1). Until then every tenant resolves to the default.
+   * **This method body is the entire tier feature**, and the claim doc 15 §1.1
+   * makes is now visible: nothing else changed to ship it. No caller moved, no
+   * endpoint signature moved, and no call site learned a model name — the
+   * mapping the settings layer already went through simply started receiving a
+   * real value instead of a constant.
    *
-   * **The constant is returned from HERE rather than from `settingsFor`**, and
-   * that is the difference between this being finished work and a stub. The
-   * call sites already go through the mapping; shipping the tier is replacing
-   * this method body, with no caller and no endpoint signature moving —
-   * which is the claim doc 15 §1.1 makes about step 3 being a data change.
+   * Narrowed through `asAiModelTier`, so a column value from a newer deployment
+   * degrades to the cheap tier rather than indexing the mapping to `undefined`
+   * and handing a model name of `undefined` to the pricing table.
    */
-  private resolveTier(organizationId: string): Promise<AiModelTier> {
-    this.logger.debug(`Resolving AI tier for org ${organizationId}`);
+  private async resolveTier(organizationId: string): Promise<AiModelTier> {
+    const tier = await this.authReference.getAiModelTier(
+      systemContext(organizationId),
+    );
 
-    // Returns a promise without being `async`: there is nothing to await yet,
-    // and `async` on a body with no `await` is a lint error in this repo. The
-    // RETURN TYPE is what callers depend on, and it is already the one a gRPC
-    // entitlements read will need.
-    return Promise.resolve(DEFAULT_AI_MODEL_TIER);
+    return asAiModelTier(tier);
   }
 }

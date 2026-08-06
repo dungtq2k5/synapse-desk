@@ -36,8 +36,21 @@ export const envValidationSchema = Joi.object({
   // than a hardcoded number, the same treatment OTP_EXPIRY_MINUTES gets.
   MESSAGE_EDIT_WINDOW_MINUTES: Joi.number().required(),
 
-  // rag-service (Python) does not exist yet. Absent means every AI RPC answers
-  // UNAVAILABLE — which is why this is optional rather than required: making it
-  // required would mean this service could not boot until Domain C ships.
-  RAG_SERVICE_URL: Joi.string().optional(),
+  // Required now that Domain C has shipped. It was optional for one reason —
+  // "this service cannot boot until rag-service exists" — and that reason has
+  // expired: the co-pilot RPCs are implemented on both sides.
+  //
+  // Required rather than optional for the same reason `STORAGE_SERVICE_URL` is
+  // in auth-service: an AI endpoint that answers 503 because a URL was never
+  // configured is indistinguishable, to whoever is on call, from rag-service
+  // being down — and it stays that way until a customer complains. A service
+  // that refuses to boot says which of the two it is, immediately.
+  //
+  // Optional in TEST only, where the suite drives `isAvailable` directly to
+  // exercise both branches without standing up a Python service.
+  RAG_SERVICE_URL: Joi.string().when('NODE_ENV', {
+    is: 'test',
+    then: Joi.optional(),
+    otherwise: Joi.required(),
+  }),
 });

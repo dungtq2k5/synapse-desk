@@ -1,4 +1,5 @@
 import { NestFactory } from '@nestjs/core';
+import { waitUntil } from '@synapsedesk/common/testing/wait';
 import { INestApplication, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
@@ -17,37 +18,6 @@ import {
 } from '@synapsedesk/common';
 import { AppModule } from '../../src/app.module';
 import { PrismaService } from '../../src/modules/prisma/prisma.service';
-
-/* Waits for a condition rather than sleeping a fixed interval. */
-async function waitFor(
-  predicate: () => Promise<boolean>,
-  timeoutMs = 5_000,
-): Promise<boolean> {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    if (await predicate()) return true;
-    await new Promise((resolve) => setTimeout(resolve, 50));
-  }
-  return false;
-}
-
-/** A valid RecordAuditCommand with sane defaults, one field overridable at a
- * time. Module scope for the same reason as waitFor() above — no closure. */
-function auditCommand(
-  overrides: Partial<RecordAuditCommand> = {},
-): RecordAuditCommand {
-  return {
-    action: AuditAction.USER_CREATED,
-    organizationId: faker.string.uuid(),
-    userId: faker.string.uuid(),
-    origin: { ip: '203.0.113.7', userAgent: 'jest' },
-    resourceType: AuditResourceType.USER,
-    resourceId: faker.string.uuid(),
-    metadata: { before: { fullName: 'Old' }, after: { fullName: 'New' } },
-    occurredAt: new Date().toISOString(),
-    ...overrides,
-  };
-}
 
 /**
  * The audit consumer, driven over a REAL NATS connection.
@@ -73,6 +43,24 @@ describe('AuditConsumer over NATS (e2e)', () => {
   let nats: NatsConnection;
   let client: ClientProxy;
 
+  /** A valid RecordAuditCommand with sane defaults, one field overridable at a
+   * time. Module scope for the same reason as waitUntil() above — no closure. */
+  const auditCommand = (
+    overrides: Partial<RecordAuditCommand> = {},
+  ): RecordAuditCommand => {
+    return {
+      action: AuditAction.USER_CREATED,
+      organizationId: faker.string.uuid(),
+      userId: faker.string.uuid(),
+      origin: { ip: '203.0.113.7', userAgent: 'jest' },
+      resourceType: AuditResourceType.USER,
+      resourceId: faker.string.uuid(),
+      metadata: { before: { fullName: 'Old' }, after: { fullName: 'New' } },
+      occurredAt: new Date().toISOString(),
+      ...overrides,
+    };
+  };
+
   /**
    * Publishes the way auth-service actually does — through a Nest `ClientProxy`,
    * which wraps the payload as `{ pattern, data }`.
@@ -94,7 +82,7 @@ describe('AuditConsumer over NATS (e2e)', () => {
       });
     });
 
-    return waitFor(predicate, timeoutMs);
+    return waitUntil(predicate, timeoutMs);
   }
 
   /** Publishes with no Nest envelope at all, as a non-Nest producer would. */
@@ -109,7 +97,7 @@ describe('AuditConsumer over NATS (e2e)', () => {
     );
     await nats.flush();
 
-    return waitFor(predicate, timeoutMs);
+    return waitUntil(predicate, timeoutMs);
   }
 
   beforeAll(async () => {

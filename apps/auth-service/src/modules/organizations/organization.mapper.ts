@@ -1,4 +1,9 @@
-import { OrganizationResponse, toTimestamp } from '@synapsedesk/grpc-proto';
+import {
+  OrganizationResponse,
+  toProtoAiModelTier,
+  toProtoOrgStatus,
+  toTimestamp,
+} from '@synapsedesk/grpc-proto';
 import { Organization } from '../../generated/prisma/client';
 
 /**
@@ -16,12 +21,13 @@ export function toOrganizationResponse(
     name: organization.name,
     slug: organization.slug,
     domain: organization.domain ?? undefined,
-    status: organization.status,
+    status: toProtoOrgStatus(organization.status),
     enforceTwoFactor: organization.enforceTwoFactor,
     allowedEmailDomains: organization.allowedEmailDomains,
     maxAgentSeats: organization.maxAgentSeats,
     maxStorageBytes: Number(organization.maxStorageBytes),
     monthlyAiTokenBudget: Number(organization.monthlyAiTokenBudget),
+    aiModelTier: toProtoAiModelTier(organization.aiModelTier),
     billingCycleStart: toTimestamp(organization.billingCycleStart),
     createdAt: toTimestamp(organization.createdAt),
     updatedAt: toTimestamp(organization.updatedAt),

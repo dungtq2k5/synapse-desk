@@ -1,4 +1,4 @@
-import { bootstrapE2eTest, E2eFixture } from '../utils/bootstrap';
+import { bootstrapE2eTest, E2eFixture } from '../utils';
 
 type IndexRow = { indexname: string };
 type ConstraintRow = { count: bigint };

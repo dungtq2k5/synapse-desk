@@ -1,10 +1,11 @@
-import { PERMISSION_CODES } from '@synapsedesk/common';
-import { bootstrapE2eTest, E2eFixture } from '../utils/bootstrap';
 import {
+  E2eFixture,
+  bootstrapE2eTest,
   memberContext,
   pageRequest,
   superAdminContext,
-} from '../utils/context';
+  superuser,
+} from '../utils';
 import { addMember, createDepartment, seedTenantWithUser } from '../factories';
 import { DepartmentsService } from '../../src/modules/departments/departments.service';
 import { UsersService } from '../../src/modules/users/users.service';
@@ -39,20 +40,17 @@ describe('soft-delete sweep (e2e)', () => {
 
   afterAll(() => fx.close());
 
-  const admin = (t: { user: { id: string; organizationId: string | null } }) =>
-    memberContext(t.user, [...PERMISSION_CODES]);
-
   describe('departments', () => {
     it('a soft-deleted department is ABSENT from the default list', async () => {
       const t = await seedTenantWithUser(fx.prisma);
       const gone = await createDepartment(fx.prisma, t.org.id);
       const kept = await createDepartment(fx.prisma, t.org.id);
 
-      await departments.deleteDepartment({ id: gone.id }, admin(t));
+      await departments.deleteDepartment({ id: gone.id }, superuser(t));
 
       const list = await departments.listDepartments(
         { page: pageRequest(), includeDeleted: false },
-        admin(t),
+        superuser(t),
       );
 
       const ids = list.items.map((d) => d.id);
@@ -66,11 +64,11 @@ describe('soft-delete sweep (e2e)', () => {
       const t = await seedTenantWithUser(fx.prisma);
       const gone = await createDepartment(fx.prisma, t.org.id);
 
-      await departments.deleteDepartment({ id: gone.id }, admin(t));
+      await departments.deleteDepartment({ id: gone.id }, superuser(t));
 
       const list = await departments.listDepartments(
         { page: pageRequest(), includeDeleted: true },
-        admin(t),
+        superuser(t),
       );
 
       const row = list.items.find((d) => d.id === gone.id);
@@ -86,15 +84,15 @@ describe('soft-delete sweep (e2e)', () => {
       const gone = await createDepartment(fx.prisma, t.org.id);
       await createDepartment(fx.prisma, t.org.id);
 
-      await departments.deleteDepartment({ id: gone.id }, admin(t));
+      await departments.deleteDepartment({ id: gone.id }, superuser(t));
 
       const hidden = await departments.listDepartments(
         { page: pageRequest(), includeDeleted: false },
-        admin(t),
+        superuser(t),
       );
       const shown = await departments.listDepartments(
         { page: pageRequest(), includeDeleted: true },
-        admin(t),
+        superuser(t),
       );
 
       expect(hidden.meta!.totalItems).toBe(hidden.items.length);
@@ -108,10 +106,10 @@ describe('soft-delete sweep (e2e)', () => {
       const t = await seedTenantWithUser(fx.prisma);
       const gone = await createDepartment(fx.prisma, t.org.id);
 
-      await departments.deleteDepartment({ id: gone.id }, admin(t));
+      await departments.deleteDepartment({ id: gone.id }, superuser(t));
 
       await expect(
-        departments.getDepartment({ id: gone.id }, admin(t)),
+        departments.getDepartment({ id: gone.id }, superuser(t)),
       ).rejects.toBeDefined();
     });
   });
@@ -122,7 +120,7 @@ describe('soft-delete sweep (e2e)', () => {
       const gone = await addMember(fx.prisma, t.org.id);
       const kept = await addMember(fx.prisma, t.org.id);
 
-      await users.deleteUser({ id: gone.id }, admin(t));
+      await users.deleteUser({ id: gone.id }, superuser(t));
 
       const list = await users.listUsers(
         {
@@ -131,7 +129,7 @@ describe('soft-delete sweep (e2e)', () => {
           departmentId: '',
           roleId: '',
         },
-        admin(t),
+        superuser(t),
       );
 
       const ids = list.items.map((i) => i.user!.id);
@@ -143,7 +141,7 @@ describe('soft-delete sweep (e2e)', () => {
       const t = await seedTenantWithUser(fx.prisma);
       const gone = await addMember(fx.prisma, t.org.id);
 
-      await users.deleteUser({ id: gone.id }, admin(t));
+      await users.deleteUser({ id: gone.id }, superuser(t));
 
       const list = await users.listUsers(
         {
@@ -152,7 +150,7 @@ describe('soft-delete sweep (e2e)', () => {
           departmentId: '',
           roleId: '',
         },
-        admin(t),
+        superuser(t),
       );
 
       const row = list.items.find((i) => i.user!.id === gone.id);
@@ -164,10 +162,10 @@ describe('soft-delete sweep (e2e)', () => {
       const t = await seedTenantWithUser(fx.prisma);
       const gone = await addMember(fx.prisma, t.org.id);
 
-      await users.deleteUser({ id: gone.id }, admin(t));
+      await users.deleteUser({ id: gone.id }, superuser(t));
 
       await expect(
-        users.getUser({ id: gone.id }, admin(t)),
+        users.getUser({ id: gone.id }, superuser(t)),
       ).rejects.toBeDefined();
     });
 
@@ -177,7 +175,7 @@ describe('soft-delete sweep (e2e)', () => {
       const t = await seedTenantWithUser(fx.prisma);
       const gone = await addMember(fx.prisma, t.org.id);
 
-      await users.deleteUser({ id: gone.id }, admin(t));
+      await users.deleteUser({ id: gone.id }, superuser(t));
 
       const candidates = await fx.prisma.user.findMany({
         where: { email: gone.email, deletedAt: null },
@@ -196,7 +194,7 @@ describe('soft-delete sweep (e2e)', () => {
       const before = await fx.prisma.user.count({
         where: { organizationId: t.org.id, deletedAt: null },
       });
-      await users.deleteUser({ id: gone.id }, admin(t));
+      await users.deleteUser({ id: gone.id }, superuser(t));
 
       expect(
         await fx.prisma.user.count({
@@ -224,7 +222,7 @@ describe('soft-delete sweep (e2e)', () => {
       const list = await platform.listOrganizations({
         page: pageRequest(),
         includeDeleted: false,
-        status: '',
+        status: undefined,
       });
 
       const ids = list.items.map((i) => i.organization!.id);
@@ -246,7 +244,7 @@ describe('soft-delete sweep (e2e)', () => {
       const list = await platform.listOrganizations({
         page: pageRequest(),
         includeDeleted: true,
-        status: '',
+        status: undefined,
       });
 
       expect(list.items.map((i) => i.organization!.id)).toContain(gone.org.id);
@@ -266,7 +264,7 @@ describe('soft-delete sweep (e2e)', () => {
       // sweep is where that is enforced.
       const t = await seedTenantWithUser(fx.prisma);
       const gone = await createDepartment(fx.prisma, t.org.id);
-      await departments.deleteDepartment({ id: gone.id }, admin(t));
+      await departments.deleteDepartment({ id: gone.id }, superuser(t));
 
       const narrowActor = memberContext(t.user, ['department.read']);
       const list = await departments.listDepartments(

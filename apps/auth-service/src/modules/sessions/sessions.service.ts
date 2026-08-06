@@ -23,7 +23,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditPublisher } from '../audit/audit-publisher.service';
 import { NotificationPublisher } from '../notifications/notification-publisher.service';
-import { hashToken } from '../../common/utils/utils';
+import { hashToken } from '../../common/utils';
 import { Prisma } from '../../generated/prisma/client';
 
 /**

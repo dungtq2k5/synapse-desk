@@ -9,7 +9,7 @@ import {
   generateBackupCode,
   hashToken,
   normalizeBackupCode,
-} from '../../src/common/utils/utils';
+} from '../../src/common/utils';
 
 /**
  * Backup codes, OTPs and password-reset tokens share one file because they

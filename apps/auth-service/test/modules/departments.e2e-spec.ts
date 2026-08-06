@@ -1,7 +1,12 @@
 import { RpcException } from '@nestjs/microservices';
+import { expectRpc, rpcCode } from '@synapsedesk/common/testing/rpc';
 import { status } from '@grpc/grpc-js';
-import { bootstrapE2eTest, E2eFixture } from '../utils/bootstrap';
-import { memberContext, pageRequest } from '../utils/context';
+import {
+  E2eFixture,
+  bootstrapE2eTest,
+  memberContext,
+  pageRequest,
+} from '../utils';
 import {
   addMember,
   createDepartment,
@@ -11,28 +16,9 @@ import {
 } from '../factories';
 import { DepartmentsService } from '../../src/modules/departments/departments.service';
 
-function rpcCode(error: unknown): number | undefined {
-  if (!(error instanceof RpcException)) return undefined;
-  return (error.getError() as { code?: number }).code;
-}
-
-async function expectRpc(promise: Promise<unknown>, code: number) {
-  await expect(promise).rejects.toBeInstanceOf(RpcException);
-  await promise.catch((error: unknown) => expect(rpcCode(error)).toBe(code));
-}
-
 describe('Departments (e2e)', () => {
   let fx: E2eFixture;
   let departments: DepartmentsService;
-
-  beforeAll(async () => {
-    fx = await bootstrapE2eTest();
-    departments = fx.moduleRef.get(DepartmentsService);
-  });
-
-  beforeEach(() => fx.reset());
-
-  afterAll(() => fx.close());
 
   /** The caller context for a tenant's own admin. */
   const ctx = (t: { user: { id: string; organizationId: string | null } }) =>
@@ -43,6 +29,15 @@ describe('Departments (e2e)', () => {
       'department.delete',
       'department.member.assign',
     ]);
+
+  beforeAll(async () => {
+    fx = await bootstrapE2eTest();
+    departments = fx.moduleRef.get(DepartmentsService);
+  });
+
+  beforeEach(() => fx.reset());
+
+  afterAll(() => fx.close());
 
   describe('createDepartment', () => {
     it('1. the name is unique among ACTIVE rows only', async () => {

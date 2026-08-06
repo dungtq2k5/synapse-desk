@@ -26,6 +26,7 @@ import {
   emptyPage,
   toPrismaPage,
   toSearchFilter,
+  fromProtoOrgStatus,
 } from '@synapsedesk/grpc-proto';
 import {
   AuditAction,
@@ -97,9 +98,15 @@ export class PlatformService {
     );
 
     const search = toSearchFilter(page.searchTerm);
+    const statusFilter =
+      request.status === undefined ? null : fromProtoOrgStatus(request.status);
     const where: Prisma.OrganizationWhereInput = {
       ...(request.includeDeleted ? {} : { deletedAt: null }),
-      ...(request.status ? { status: request.status } : {}),
+      // The wire carries the enum; Prisma's column is a VarChar (§7.3), so the
+      // filter is the DOMAIN value. UNSPECIFIED and absent both mean "every
+      // status" — `fromProtoOrgStatus` maps the former to null, which is
+      // exactly the same branch.
+      ...(statusFilter ? { status: statusFilter } : {}),
       ...(search ? { OR: [{ name: search }, { slug: search }] } : {}),
     };
 
@@ -212,7 +219,20 @@ export class PlatformService {
     }
   }
 
-  /** Everything the tenant-facing update allows, PLUS quotas. */
+  /**
+   * Everything the tenant-facing update allows, PLUS quotas.
+   *
+   * **The quota fields are an OVERRIDE with a lifetime, not a setting** —
+   * 14-doc §5. Since billing shipped, `max_agent_seats`, `max_storage_bytes`
+   * and `monthly_ai_token_budget` are written by the Stripe entitlement
+   * webhook, so a manual edit here survives exactly until the next
+   * `subscription.updated` and is then reverted with no notice.
+   *
+   * That is CORRECT for a support gesture — "here's an extra 5 GB while we sort
+   * this out" — and wrong as a way to sell an upgrade. The response says so,
+   * because the alternative is someone discovering the revert weeks later and
+   * reporting it as data loss.
+   */
   async updateOrganization(
     request: UpdatePlatformOrganizationRequest,
     context: CallerContext,
@@ -249,6 +269,14 @@ export class PlatformService {
           slug: existing.slug,
           maxAgentSeats: existing.maxAgentSeats,
         },
+        // Recorded so the revert is attributable when it happens: a tenant
+        // with a subscription had a quota set by hand, and the next webhook
+        // will overwrite it.
+        overridesStripeEntitlements:
+          existing.stripeSubscriptionId !== null &&
+          (request.maxAgentSeats !== undefined ||
+            request.maxStorageBytes !== undefined ||
+            request.monthlyAiTokenBudget !== undefined),
         after: {
           name: organization.name,
           slug: organization.slug,
@@ -278,12 +306,19 @@ export class PlatformService {
     const existing = await this.load(request.organizationId);
 
     const from = existing.status as OrgStatus;
-    const to = request.status as OrgStatus;
+    const to = fromProtoOrgStatus(request.status);
 
-    if (!Object.values(OrgStatus).includes(to)) {
+    // Only UNSPECIFIED reaches here now. The membership check this replaces
+    // existed because the field was a bare string and ANY string arrived
+    // intact; the enum moved that gate onto the wire, where protobuf rejects
+    // an unknown value before the handler runs (conventions §7.3). What is
+    // left is proto3's zero value, which means "not set" and is never a
+    // status — §6.5 says reject rather than default, and there is no safe
+    // default here: ACTIVE would unfreeze a tenant, FROZEN would lock one out.
+    if (to === null) {
       throw new RpcException({
         code: status.INVALID_ARGUMENT,
-        message: `'${request.status}' is not a valid status`,
+        message: 'A target status is required',
       });
     }
 
@@ -319,12 +354,41 @@ export class PlatformService {
     return toPlatformOrganizationResponse(organization);
   }
 
-  /** Rolls the metering window; AI token usage is measured from this instant. */
+  /**
+   * Rolls the metering window. **BREAK-GLASS since billing shipped** — 14-doc §5.
+   *
+   * It was routine tenant administration. Two things changed underneath it:
+   *
+   *   - `billing_cycle_start` now follows Stripe's `current_period_start`, so a
+   *     manual roll desynchronizes the quota window from the invoice period —
+   *     and the next `subscription.updated` silently re-synchronizes it, which
+   *     means the effect is temporary in a way nobody is told about;
+   *   - the cycle epoch is inside the Redis quota key, so this also ZEROES AI
+   *     spend and re-arms every threshold alert. That is a budget grant, and it
+   *     does not appear anywhere in the response.
+   *
+   * Kept, because it is genuinely needed to make a tenant whole after an
+   * incident. The mandatory reason is what separates that from using it as a
+   * way to sell an upgrade — the audit row is read months later by someone who
+   * was not there.
+   */
   async resetBillingCycle(
     request: ResetBillingCycleRequest,
     context: CallerContext,
   ): Promise<PlatformOrganizationResponse> {
     const existing = await this.load(request.organizationId);
+
+    const reason = request.reason?.trim() ?? '';
+    if (!reason) {
+      // Refused rather than defaulted. "Reset by an operator" in an audit row
+      // answers no question anyone will actually have — and this endpoint now
+      // grants a fresh AI budget, so the row is the only record of why.
+      throw new RpcException({
+        code: status.INVALID_ARGUMENT,
+        message:
+          'A reason is required: rolling the billing cycle desynchronizes the quota window from the Stripe invoice period and grants a fresh AI budget',
+      });
+    }
 
     const organization = await this.prisma.organization.update({
       where: { id: existing.id },
@@ -339,6 +403,11 @@ export class PlatformService {
       organizationId: null,
       metadata: {
         previousCycleStart: existing.billingCycleStart.toISOString(),
+        reason,
+        // Recorded because the two are now coupled: a tenant with a
+        // subscription had their invoice period overridden by hand, and
+        // whoever reads this row later needs to know whether that mattered.
+        hadStripeSubscription: existing.stripeSubscriptionId !== null,
       },
     });
 

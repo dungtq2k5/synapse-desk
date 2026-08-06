@@ -5,7 +5,7 @@ import {
   maskEmail,
   normalizeBackupCode,
   safeCompareHex,
-} from './utils';
+} from './index';
 
 /**
  * Unit tests for the pure helpers, beside the source they cover — no database,

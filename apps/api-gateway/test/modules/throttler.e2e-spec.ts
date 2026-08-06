@@ -8,30 +8,31 @@ import { THROTTLER_OPTIONS } from '@nestjs/throttler/dist/throttler.constants';
 import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
 import { AUTH_THROTTLER_TIER } from '../../src/common/config/app.config';
 import {
-  bootstrapE2eTest,
+  API,
   E2eFixture,
+  anonymousAgent,
+  authenticatedAgent,
+  bootstrapE2eTest,
   flushTestRedis,
-} from '../utils/bootstrap';
-import { anonymousAgent, API, authenticatedAgent } from '../utils/auth';
+} from '../utils';
 import { grpcError, wireLoginSuccess, wirePage } from '../fixtures/wire';
-
-/**
- * the throttler.
- *
- * Runs at the e2e layer with the REAL `ThrottlerModule` and REAL Redis-backed
- * storage (DB 15, see .env.test). An in-memory stub would prove nothing:
- * whether the counter is keyed correctly, and whether it is shared across
- * replicas at all, is exactly what this suite is for.
- *
- * The general tiers are deliberately tightened here — `.env.test` leaves them
- * loose so no OTHER suite 429s itself halfway through — and `authTier` is left
- * as the app configures it, because every auth route overrides it with a
- * hardcoded per-route limit anyway (`ROUTE_THROTTLE.login` = 5 per 15 minutes).
- */
-const TIGHT_GENERAL_LIMIT = 3;
 
 describe('SmartThrottlerGuard (e2e)', () => {
   let fx: E2eFixture;
+  /**
+   * the throttler.
+   *
+   * Runs at the e2e layer with the REAL `ThrottlerModule` and REAL Redis-backed
+   * storage (DB 15, see .env.test). An in-memory stub would prove nothing:
+   * whether the counter is keyed correctly, and whether it is shared across
+   * replicas at all, is exactly what this suite is for.
+   *
+   * The general tiers are deliberately tightened here — `.env.test` leaves them
+   * loose so no OTHER suite 429s itself halfway through — and `authTier` is left
+   * as the app configures it, because every auth route overrides it with a
+   * hardcoded per-route limit anyway (`ROUTE_THROTTLE.login` = 5 per 15 minutes).
+   */
+  const TIGHT_GENERAL_LIMIT = 3;
 
   beforeAll(async () => {
     await flushTestRedis();
@@ -58,6 +59,7 @@ describe('SmartThrottlerGuard (e2e)', () => {
   });
 
   beforeEach(() => flushTestRedis());
+
   afterAll(() => fx.close());
 
   /** A login that would succeed if it reached the handler. */

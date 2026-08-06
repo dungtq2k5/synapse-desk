@@ -27,6 +27,7 @@ import {
   ListPlatformOrganizationsQueryDto,
   ListPlatformUsersQueryDto,
   OffboardOrganizationDto,
+  ResetBillingCycleDto,
   OffboardResponseDto,
   PlatformMetricsResponseDto,
   PlatformOrganizationResponseDto,
@@ -130,15 +131,30 @@ export class PlatformController {
     return result;
   }
 
-  /** Rolls the metering window — AI usage is counted from this instant. */
+  /**
+   * Rolls the metering window. **BREAK-GLASS, not routine** — 14-doc §5.
+   *
+   * Two things happen that the response cannot show. `billing_cycle_start` now
+   * follows Stripe's `current_period_start`, so a manual roll desynchronizes
+   * the quota window from the invoice period; and the cycle epoch is inside
+   * the Redis quota key, so it also zeroes AI spend and re-arms every
+   * threshold alert — a silent budget grant.
+   *
+   * Kept because it is genuinely needed to make a tenant whole after an
+   * incident. The mandatory reason and the audit row are what separate that
+   * from someone using it as a way to sell an upgrade.
+   */
   @Post('organizations/:id/billing-cycle/reset')
   @HttpCode(HttpStatus.OK)
-  @ResponseMessage('Billing cycle reset')
+  @ResponseMessage(
+    'Billing cycle reset — this desynchronizes the quota window from the Stripe invoice period and grants a fresh AI budget',
+  )
   resetBillingCycle(
     @CurrentUser() context: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: ResetBillingCycleDto,
   ): Promise<PlatformOrganizationResponseDto> {
-    return this.platformGrpcClient.resetBillingCycle(id, context);
+    return this.platformGrpcClient.resetBillingCycle(id, dto.reason, context);
   }
 
   /** The irreversible half that `DELETE /organizations/current` only requests. */

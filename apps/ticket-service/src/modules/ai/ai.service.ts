@@ -9,13 +9,24 @@ import {
   GenerateDraftResponse,
   GetSuggestionsResponse,
   ListSimilarTicketsResponse,
+  ConversationTurn,
   TicketAiRequest,
   toTimestamp,
 } from '@synapsedesk/grpc-proto';
 import { formatErrorMsg } from '@synapsedesk/common';
+
+/**
+ * How many messages a generation prompt carries.
+ *
+ * Bounded because a 300-message thread is prompt tokens charged on every draft
+ * — and the tail is what a reply is actually answering. Generous enough that a
+ * normal support conversation fits whole.
+ */
+const TRANSCRIPT_TURNS = 40;
 import { PrismaService } from '../prisma/prisma.service';
 import { TicketAccessService } from '../ticket-access/ticket-access.service';
 import { RagClientService } from '../ai-client/rag-client.service';
+import { AuthReferenceService } from '../auth-client/auth-reference.service';
 import { AiSummary } from '../../generated/prisma/client';
 
 function toAiSummaryResponse(summary: AiSummary): AiSummaryResponse {
@@ -53,6 +64,7 @@ export class AiService {
     private readonly prisma: PrismaService,
     private readonly access: TicketAccessService,
     private readonly rag: RagClientService,
+    private readonly authReference: AuthReferenceService,
   ) {}
 
   /**
@@ -97,9 +109,16 @@ export class AiService {
   ): Promise<AiSummaryResponse> {
     const ticket = await this.access.load(request.ticketId, context);
 
-    // Throws UNAVAILABLE while rag-service is absent — BEFORE any write, so a
-    // failed generation never leaves a half-written summary behind.
-    const draft = await this.rag.generateSummary();
+    // BEFORE any write, so a failed generation never leaves a half-written
+    // summary behind — and at the cap this is where the 402 comes from.
+    const draft = await this.rag.generateSummary(
+      ticket.id,
+      await this.transcript(ticket.id),
+      context,
+      // MANUAL. A discretionary summary refuses at the cap like everything
+      // else; the escalation path below is the one exemption (RDM §1.14).
+      false,
+    );
 
     const summary = await this.prisma.aiSummary.upsert({
       where: { ticketId: ticket.id },
@@ -145,7 +164,7 @@ export class AiService {
     }
 
     try {
-      await this.generateSummary({ ticketId }, context);
+      await this.summarize(ticketId, context, { triggeredByEscalation: true });
     } catch (error) {
       this.logger.error(
         `Escalation summary failed for ticket ${ticketId}: ${formatErrorMsg(error)}`,
@@ -165,15 +184,31 @@ export class AiService {
     request: GenerateDraftRequest,
     context: CallerContext,
   ): Promise<GenerateDraftResponse> {
-    await this.access.load(request.ticketId, context);
+    const ticket = await this.access.load(request.ticketId, context);
 
-    const draft = await this.rag.generateReplyDraft();
+    const draft = await this.rag.generateReplyDraft(
+      ticket.id,
+      await this.transcript(ticket.id),
+      context,
+    );
 
     return {
       content: draft.content,
       modelName: draft.modelName,
       promptTokens: draft.promptTokens,
       completionTokens: draft.completionTokens,
+      // **Returned so the acceptance loop can close.** The client hands this
+      // back as `generatedFromId` when the agent posts; without it the outcome
+      // is never written, the hourly sweep marks the draft DISCARDED, and
+      // acceptance rate counts a sent draft as ignored — understating the one
+      // number that justifies the co-pilot.
+      generationId: draft.generationId,
+      citations: draft.citations.map((citation) => ({
+        chunkId: citation.chunkId,
+        documentId: citation.documentId,
+        documentTitle: citation.documentTitle,
+        pageNumber: citation.pageNumber ?? undefined,
+      })),
     };
   }
 
@@ -183,7 +218,13 @@ export class AiService {
   ): Promise<GetSuggestionsResponse> {
     await this.access.load(request.ticketId, context);
 
-    return { items: await this.rag.getSuggestions() };
+    return {
+      items: await this.rag.getSuggestions(
+        request.ticketId,
+        await this.transcript(request.ticketId),
+        context,
+      ),
+    };
   }
 
   async classifyTicket(
@@ -192,10 +233,95 @@ export class AiService {
   ): Promise<ClassifyTicketResponse> {
     await this.access.load(request.ticketId, context);
 
+    const ticket = await this.access.load(request.ticketId, context);
+
     // A SUGGESTION, never applied here. Auto-routing on a model's guess without
     // an agent confirming it would move tickets between teams on a confidence
     // score nobody looked at.
-    return this.rag.classifyTicket();
+    return this.rag.classifyTicket(
+      ticket.id,
+      ticket.title,
+      ticket.description ?? '',
+      // The candidate departments travel WITH the request: rag-service cannot
+      // see postgres_auth, and a suggestion naming a department that does not
+      // exist is worse than no suggestion.
+      await this.departmentOptions(context),
+      context,
+    );
+  }
+
+  /**
+   * Generate and store, with the ESCALATION flag decided by the caller.
+   *
+   * Shared by the manual endpoint and the escalation hook so the two cannot
+   * drift in what they persist — only in which gate they pass through.
+   */
+  private async summarize(
+    ticketId: string,
+    context: CallerContext,
+    { triggeredByEscalation }: { triggeredByEscalation: boolean },
+  ): Promise<AiSummaryResponse> {
+    const ticket = await this.access.load(ticketId, context);
+
+    const draft = await this.rag.generateSummary(
+      ticket.id,
+      await this.transcript(ticket.id),
+      context,
+      triggeredByEscalation,
+    );
+
+    const summary = await this.prisma.aiSummary.upsert({
+      where: { ticketId: ticket.id },
+      create: {
+        ticketId: ticket.id,
+        summaryText: draft.summaryText,
+        suggestedAction: draft.suggestedAction,
+        confidenceScore: draft.confidenceScore,
+        modelName: draft.modelName,
+      },
+      update: {
+        summaryText: draft.summaryText,
+        suggestedAction: draft.suggestedAction,
+        confidenceScore: draft.confidenceScore,
+        modelName: draft.modelName,
+      },
+    });
+
+    return toAiSummaryResponse(summary);
+  }
+
+  /**
+   * The ticket's conversation, oldest first.
+   *
+   * Sent with every generation request because rag-service owns no
+   * conversation rows — `ticket_messages` lives here, and a second copy in a
+   * second database is a consistency problem nobody asked for.
+   *
+   * Internal notes are INCLUDED: they are what an agent wrote about the ticket
+   * and are exactly the context a summary or a draft should have. They never
+   * reach the customer, because the draft is reviewed before anything is sent.
+   */
+  private async transcript(ticketId: string): Promise<ConversationTurn[]> {
+    const messages = await this.prisma.ticketMessage.findMany({
+      where: { ticketId },
+      orderBy: { createdAt: 'asc' },
+      select: { content: true, senderId: true, isAiGenerated: true },
+      // Bounded. A 300-message thread is prompt tokens charged on every draft,
+      // and the tail is what the reply is actually answering.
+      take: TRANSCRIPT_TURNS,
+    });
+
+    return messages.map((message) => ({
+      role: message.isAiGenerated || !message.senderId ? 'assistant' : 'user',
+      content: message.content,
+    }));
+  }
+
+  /** The tenant's departments, as classification candidates. */
+  private async departmentOptions(
+    context: CallerContext,
+  ): Promise<Array<{ id: string; name: string }>> {
+    return this.authReference.listDepartments(context);
   }
 
   async listSimilarTickets(

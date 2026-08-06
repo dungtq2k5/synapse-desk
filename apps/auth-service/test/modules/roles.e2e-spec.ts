@@ -1,12 +1,18 @@
 import { RpcException } from '@nestjs/microservices';
+import { expectRpc, rpcCode } from '@synapsedesk/common/testing/rpc';
 import { status } from '@grpc/grpc-js';
 import {
   compareAlphabetically,
   PERMISSION_CODES,
   SystemRoleName,
 } from '@synapsedesk/common';
-import { bootstrapE2eTest, E2eFixture } from '../utils/bootstrap';
-import { memberContext, pageRequest } from '../utils/context';
+import {
+  E2eFixture,
+  bootstrapE2eTest,
+  memberContext,
+  pageRequest,
+  superuser,
+} from '../utils';
 import {
   addMember,
   createRole,
@@ -15,16 +21,6 @@ import {
   seedTenantWithUser,
 } from '../factories';
 import { RolesService } from '../../src/modules/roles/roles.service';
-
-function rpcCode(error: unknown): number | undefined {
-  if (!(error instanceof RpcException)) return undefined;
-  return (error.getError() as { code?: number }).code;
-}
-
-async function expectRpc(promise: Promise<unknown>, code: number) {
-  await expect(promise).rejects.toBeInstanceOf(RpcException);
-  await promise.catch((error: unknown) => expect(rpcCode(error)).toBe(code));
-}
 
 describe('Roles & Permissions (e2e)', () => {
   let fx: E2eFixture;
@@ -38,19 +34,6 @@ describe('Roles & Permissions (e2e)', () => {
   beforeEach(() => fx.reset());
 
   afterAll(() => fx.close());
-
-  /**
-   * An actor holding EVERY permission.
-   *
-   * The no-escalation rule means a caller can only grant what they hold, so a
-   * fixture with an empty permission set could never create a role with any
-   * permission at all — and every test here would fail for that reason rather
-   * than the one it is about. Tests OF the rule build a narrower actor
-   * deliberately.
-   */
-  const superuser = (t: {
-    user: { id: string; organizationId: string | null };
-  }) => memberContext(t.user, [...PERMISSION_CODES]);
 
   // ------------------------------------------------------------------ listing
 

@@ -13,6 +13,7 @@ import {
   ORGANIZATION_SERVICE_NAME,
   OrganizationServiceClient,
   packRequestContext,
+  fromProtoOrgStatus,
 } from '@synapsedesk/grpc-proto';
 import { firstValueFrom } from 'rxjs';
 import { OrgStatus, UNKNOWN_ORIGIN } from '@synapsedesk/common';
@@ -90,7 +91,11 @@ export class OrganizationStatusService
     );
 
     const state: OrganizationState = {
-      status: response.status as OrgStatus,
+      // `?? OrgStatus.FROZEN` — an UNSPECIFIED status means the tenant's state
+      // could not be read, and this cache gates every request. Failing CLOSED
+      // is the only safe reading: the alternative caches "usable" for a tenant
+      // whose real status is unknown.
+      status: fromProtoOrgStatus(response.status) ?? OrgStatus.FROZEN,
       deleted: response.deleted,
     };
 

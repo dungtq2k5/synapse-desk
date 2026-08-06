@@ -9,6 +9,7 @@ export function buildDepartment(
   overrides: Partial<Prisma.DepartmentUncheckedCreateInput> = {},
 ): Prisma.DepartmentUncheckedCreateInput {
   deptIdx++;
+
   return {
     organizationId,
     name: `${faker.commerce.department()} ${deptIdx}`,

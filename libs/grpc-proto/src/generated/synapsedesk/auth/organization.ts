@@ -9,22 +9,26 @@ import type { Metadata } from "@grpc/grpc-js";
 import { GrpcMethod, GrpcStreamMethod } from "@nestjs/microservices";
 import { Observable } from "rxjs";
 import { Timestamp } from "../../google/protobuf/timestamp";
+import { AiModelTier, OrgStatus } from "./common";
 
 export interface OrganizationResponse {
   id: string;
   name: string;
   slug: string;
-  domain?:
-    | string
-    | undefined;
-  /** PENDING_ONBOARDING | ACTIVE | SUSPENDED_PAST_DUE | FROZEN */
-  status: string;
+  domain?: string | undefined;
+  status: OrgStatus;
   enforceTwoFactor: boolean;
   allowedEmailDomains: string[];
   maxAgentSeats: number;
   /** int64 on the wire; both are byte counts that exceed 2^31 on any real plan. */
   maxStorageBytes: number;
   monthlyAiTokenBudget: number;
+  /**
+   * Read by `ingestion-service`'s settings layer so it can resolve a
+   * generation model without a Postgres reach-across, and cached there against
+   * `billing.entitlements_changed` — doc 15 §3.1.
+   */
+  aiModelTier: AiModelTier;
   billingCycleStart: Timestamp | undefined;
   createdAt: Timestamp | undefined;
   updatedAt: Timestamp | undefined;
@@ -47,7 +51,7 @@ export interface GetOrganizationStatusRequest {
 }
 
 export interface OrganizationStatusResponse {
-  status: string;
+  status: OrgStatus;
   /**
    * True once the tenant has been offboarded. Distinct from any status: a
    * deleted tenant must be refused even if its status still reads ACTIVE.
@@ -116,6 +120,41 @@ export interface UsageMeter {
 export interface GetOrganizationUsageRequest {
 }
 
+/**
+ * Everything a spending service needs to gate a request, in ONE call.
+ *
+ * `ingestion-service` and `rag-service` both need the tier AND the quota
+ * columns, and neither may reach into postgres_auth to get them (RDM §1.13).
+ * A dedicated message rather than reusing `OrganizationResponse` because the
+ * callers are on the HOT PATH of every AI request: shipping them a tenant's
+ * name, slug, allowed email domains and onboarding state on every gate check
+ * is bytes nobody reads, and it invites a caller to start depending on a field
+ * that has nothing to do with entitlements.
+ */
+export interface OrganizationEntitlementsResponse {
+  maxAgentSeats: number;
+  maxStorageBytes: number;
+  /** MICROS of currency, not tokens — RDM §1.14. The name is kept for continuity. */
+  monthlyAiTokenBudget: number;
+  aiModelTier: AiModelTier;
+  /**
+   * The quota window. Its EPOCH is inside the Redis counter key, so a caller
+   * that read a different value from this one would meter into a key nothing
+   * else reads.
+   */
+  billingCycleStart:
+    | Timestamp
+    | undefined;
+  /**
+   * Carried so a caller can refuse a request from a tenant whose lifecycle
+   * already forbids it, without a second round trip.
+   */
+  status: OrgStatus;
+}
+
+export interface GetOrganizationEntitlementsRequest {
+}
+
 export interface OrganizationUsageResponse {
   /**
    * Active members PLUS pending invitations -- pending invites RESERVE seats,
@@ -125,7 +164,21 @@ export interface OrganizationUsageResponse {
   seats: UsageMeter | undefined;
   storage: UsageMeter | undefined;
   aiTokens: UsageMeter | undefined;
-  billingCycleStart: Timestamp | undefined;
+  billingCycleStart:
+    | Timestamp
+    | undefined;
+  /**
+   * Added by doc 15 §3.1: this becomes the page a customer opens when they hit
+   * a limit, so it has to say what they are ON as well as what they have used.
+   *
+   * A limit with no plan beside it is a number the reader cannot act on — the
+   * next question is always "what would I get if I upgraded", and answering it
+   * elsewhere means a second page load at the exact moment someone is blocked.
+   */
+  aiModelTier: AiModelTier;
+  planName: string;
+  /** Absent for a grandfathered tenant, who has no invoice period at all. */
+  currentPeriodEnd?: Timestamp | undefined;
 }
 
 export interface OnboardingStep {
@@ -144,7 +197,7 @@ export interface OnboardingResponse {
    */
   steps: OnboardingStep[];
   canComplete: boolean;
-  status: string;
+  status: OrgStatus;
 }
 
 export interface CompleteOnboardingRequest {
@@ -187,6 +240,17 @@ export interface OrganizationServiceClient {
     metadata?: Metadata,
   ): Observable<OrganizationUsageResponse>;
 
+  /**
+   * Read by ingestion-service and rag-service on the AI hot path, and CACHED
+   * there against `billing.entitlements_changed` (doc 15 §1.3) — so this is a
+   * cache fill rather than a per-request call.
+   */
+
+  getOrganizationEntitlements(
+    request: GetOrganizationEntitlementsRequest,
+    metadata?: Metadata,
+  ): Observable<OrganizationEntitlementsResponse>;
+
   getOnboarding(request: GetOnboardingRequest, metadata?: Metadata): Observable<OnboardingResponse>;
 
   completeOnboarding(request: CompleteOnboardingRequest, metadata?: Metadata): Observable<OrganizationResponse>;
@@ -225,6 +289,20 @@ export interface OrganizationServiceController {
     metadata?: Metadata,
   ): Promise<OrganizationUsageResponse> | Observable<OrganizationUsageResponse> | OrganizationUsageResponse;
 
+  /**
+   * Read by ingestion-service and rag-service on the AI hot path, and CACHED
+   * there against `billing.entitlements_changed` (doc 15 §1.3) — so this is a
+   * cache fill rather than a per-request call.
+   */
+
+  getOrganizationEntitlements(
+    request: GetOrganizationEntitlementsRequest,
+    metadata?: Metadata,
+  ):
+    | Promise<OrganizationEntitlementsResponse>
+    | Observable<OrganizationEntitlementsResponse>
+    | OrganizationEntitlementsResponse;
+
   getOnboarding(
     request: GetOnboardingRequest,
     metadata?: Metadata,
@@ -250,6 +328,7 @@ export function OrganizationServiceControllerMethods() {
       "getOrganizationSettings",
       "updateOrganizationSettings",
       "getOrganizationUsage",
+      "getOrganizationEntitlements",
       "getOnboarding",
       "completeOnboarding",
       "deleteOrganization",

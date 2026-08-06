@@ -1,8 +1,7 @@
 import { RpcException } from '@nestjs/microservices';
 import { status } from '@grpc/grpc-js';
 import { PERMISSION_CODES } from '@synapsedesk/common';
-import { bootstrapE2eTest, E2eFixture } from '../utils/bootstrap';
-import { memberContext } from '../utils/context';
+import { E2eFixture, bootstrapE2eTest, memberContext } from '../utils';
 import {
   createDeviceSession,
   createInvitation,
@@ -54,6 +53,58 @@ describe('tenant isolation sweep (e2e)', () => {
   };
 
   let probes: Probe[];
+
+  /**
+   * Builds a tenant whose every id belongs to SOMEONE ELSE, plus a caller from
+   * a different tenant holding every permission.
+   *
+   * The permissions matter: with a narrow set a probe could 403 on the
+   * permission check and never reach the tenant filter, and the test would pass
+   * having proved nothing about isolation.
+   */
+  const setUp = async () => {
+    const mine = await seedTenantWithUser(fx.prisma);
+    const theirs = await seedForeignTenant(fx.prisma);
+
+    const { session } = await createDeviceSession(fx.prisma, theirs.user.id);
+    const { row: invitation } = await createInvitation(
+      fx.prisma,
+      theirs.org.id,
+    );
+
+    const foreign: Foreign = {
+      userId: theirs.user.id,
+      departmentId: theirs.department.id,
+      roleId: theirs.role.id,
+      sessionId: session.id,
+      invitationId: invitation.id,
+    };
+
+    return {
+      foreign,
+      actor: memberContext(mine.user, [...PERMISSION_CODES]),
+    };
+  };
+
+  const snapshot = async (foreign: Foreign) => {
+    const [user, department, role, session, invitation] = await Promise.all([
+      fx.prisma.user.findUnique({ where: { id: foreign.userId } }),
+      fx.prisma.department.findUnique({ where: { id: foreign.departmentId } }),
+      fx.prisma.role.findUnique({ where: { id: foreign.roleId } }),
+      fx.prisma.deviceSession.findUnique({ where: { id: foreign.sessionId } }),
+      fx.prisma.userInvitation.findUnique({
+        where: { id: foreign.invitationId },
+      }),
+    ]);
+
+    return JSON.stringify({
+      user: { ...user, updatedAt: undefined },
+      department: { ...department, updatedAt: undefined },
+      role: { ...role, updatedAt: undefined },
+      session: { ...session, updatedAt: undefined },
+      invitation: { ...invitation, updatedAt: undefined },
+    });
+  };
 
   beforeAll(async () => {
     fx = await bootstrapE2eTest();
@@ -246,38 +297,6 @@ describe('tenant isolation sweep (e2e)', () => {
 
   afterAll(() => fx.close());
 
-  /**
-   * Builds a tenant whose every id belongs to SOMEONE ELSE, plus a caller from
-   * a different tenant holding every permission.
-   *
-   * The permissions matter: with a narrow set a probe could 403 on the
-   * permission check and never reach the tenant filter, and the test would pass
-   * having proved nothing about isolation.
-   */
-  async function setUp() {
-    const mine = await seedTenantWithUser(fx.prisma);
-    const theirs = await seedForeignTenant(fx.prisma);
-
-    const { session } = await createDeviceSession(fx.prisma, theirs.user.id);
-    const { row: invitation } = await createInvitation(
-      fx.prisma,
-      theirs.org.id,
-    );
-
-    const foreign: Foreign = {
-      userId: theirs.user.id,
-      departmentId: theirs.department.id,
-      roleId: theirs.role.id,
-      sessionId: session.id,
-      invitationId: invitation.id,
-    };
-
-    return {
-      foreign,
-      actor: memberContext(mine.user, [...PERMISSION_CODES]),
-    };
-  }
-
   it('every by-id operation refuses a foreign resource with NOT_FOUND, never PERMISSION_DENIED', async () => {
     const { foreign, actor } = await setUp();
 
@@ -321,24 +340,4 @@ describe('tenant isolation sweep (e2e)', () => {
 
     expect(await snapshot(foreign)).toEqual(before);
   });
-
-  async function snapshot(foreign: Foreign) {
-    const [user, department, role, session, invitation] = await Promise.all([
-      fx.prisma.user.findUnique({ where: { id: foreign.userId } }),
-      fx.prisma.department.findUnique({ where: { id: foreign.departmentId } }),
-      fx.prisma.role.findUnique({ where: { id: foreign.roleId } }),
-      fx.prisma.deviceSession.findUnique({ where: { id: foreign.sessionId } }),
-      fx.prisma.userInvitation.findUnique({
-        where: { id: foreign.invitationId },
-      }),
-    ]);
-
-    return JSON.stringify({
-      user: { ...user, updatedAt: undefined },
-      department: { ...department, updatedAt: undefined },
-      role: { ...role, updatedAt: undefined },
-      session: { ...session, updatedAt: undefined },
-      invitation: { ...invitation, updatedAt: undefined },
-    });
-  }
 });

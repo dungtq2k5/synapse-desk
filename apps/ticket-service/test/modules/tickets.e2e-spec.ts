@@ -1,4 +1,5 @@
 import { RpcException } from '@nestjs/microservices';
+import { expectRpc, rpcCode } from '@synapsedesk/common/testing/rpc';
 import { status } from '@grpc/grpc-js';
 import { faker } from '@faker-js/faker';
 import {
@@ -14,37 +15,18 @@ import {
   TicketSource as ProtoTicketSource,
   TicketStatus as ProtoTicketStatus,
 } from '@synapsedesk/grpc-proto';
-import { bootstrapE2eTest, E2eFixture } from '../utils/bootstrap';
 import {
+  E2eFixture,
+  bootstrapE2eTest,
   memberContext,
   pageRequest,
   superAdminContext,
-} from '../utils/context';
+} from '../utils';
 import { buildTenant, createTicket, TenantFixture } from '../factories';
 import { TicketsService } from '../../src/modules/tickets/tickets.service';
 import { AuthReferenceService } from '../../src/modules/auth-client/auth-reference.service';
 import { TicketEventPublisher } from '../../src/modules/events/ticket-event.publisher';
 import { toProtoStatus } from '../../src/modules/tickets/ticket.mapper';
-
-function rpcCode(error: unknown): number | undefined {
-  if (!(error instanceof RpcException)) return undefined;
-  return (error.getError() as { code?: number }).code;
-}
-
-async function expectRpc(promise: Promise<unknown>, code: number) {
-  await expect(promise).rejects.toBeInstanceOf(RpcException);
-  await promise.catch((error: unknown) => expect(rpcCode(error)).toBe(code));
-}
-
-function createRequest(overrides: Record<string, unknown> = {}) {
-  return {
-    title: 'Printer is on fire',
-    description: 'It really is, and the alarm is going',
-    priority: ProtoTicketPriority.TICKET_PRIORITY_UNSPECIFIED,
-    source: ProtoTicketSource.TICKET_SOURCE_UNSPECIFIED,
-    ...overrides,
-  };
-}
 
 describe('Tickets (e2e)', () => {
   let fx: E2eFixture;
@@ -57,6 +39,29 @@ describe('Tickets (e2e)', () => {
   let publish: jest.SpyInstance;
 
   let tenant: TenantFixture;
+
+  const createRequest = (overrides: Record<string, unknown> = {}) => {
+    return {
+      title: 'Printer is on fire',
+      description: 'It really is, and the alarm is going',
+      priority: ProtoTicketPriority.TICKET_PRIORITY_UNSPECIFIED,
+      source: ProtoTicketSource.TICKET_SOURCE_UNSPECIFIED,
+      ...overrides,
+    };
+  };
+
+  /** An ordinary member: their own tickets and nothing else. */
+  const member = (t = tenant) =>
+    memberContext({ id: t.userId, organizationId: t.organizationId });
+
+  /** An agent holding the tenant queue. */
+  const agent = (t = tenant) =>
+    memberContext({ id: t.agentId, organizationId: t.organizationId }, [
+      'ticket.read.all',
+      'ticket.create',
+      'ticket.update',
+      'ticket.delete',
+    ]);
 
   beforeAll(async () => {
     fx = await bootstrapE2eTest();
@@ -86,19 +91,6 @@ describe('Tickets (e2e)', () => {
   });
 
   afterAll(() => fx.close());
-
-  /** An ordinary member: their own tickets and nothing else. */
-  const member = (t = tenant) =>
-    memberContext({ id: t.userId, organizationId: t.organizationId });
-
-  /** An agent holding the tenant queue. */
-  const agent = (t = tenant) =>
-    memberContext({ id: t.agentId, organizationId: t.organizationId }, [
-      'ticket.read.all',
-      'ticket.create',
-      'ticket.update',
-      'ticket.delete',
-    ]);
 
   // --------------------------------------------------------------- create
 
@@ -620,7 +612,10 @@ describe('Tickets (e2e)', () => {
         agent(),
       );
 
-      expect(result.updated.sort(compareAlphabetically)).toEqual(
+      // Spread before sorting: `.sort()` mutates, and `result.updated` is the
+      // object under assertion — sorting it in place edits the value being
+      // checked. (`toSorted` would be the other answer; the target is ES2022.)
+      expect([...result.updated].sort(compareAlphabetically)).toEqual(
         ok.map((t) => t.id).sort(compareAlphabetically),
       );
       expect(result.failed).toHaveLength(1);

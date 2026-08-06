@@ -28,8 +28,9 @@ message PlatformOrganizationResponse {
 
 message ListPlatformOrganizationsRequest {
   PageRequest page = 1;
-  // PENDING_ONBOARDING | ACTIVE | SUSPENDED_PAST_DUE | FROZEN
-  optional string status = 2;
+  // Absent means "every status"; the enum's UNSPECIFIED is not used as a
+  // filter value, so presence is explicit.
+  optional OrgStatus status = 2;
   bool include_deleted = 3;
 }
 
@@ -86,13 +87,20 @@ message UpdatePlatformOrganizationRequest {
 
 message SetOrganizationStatusRequest {
   string organization_id = 1;
-  string status = 2;
+  OrgStatus status = 2;
   // Required. "Why is Acme frozen?" is asked six months later, by someone else.
   string reason = 3;
 }
 
 message ResetBillingCycleRequest {
   string organization_id = 1;
+  // **Mandatory since billing shipped** (14-doc §5). `billing_cycle_start` now
+  // follows Stripe's `current_period_start` AND its epoch sits inside the Redis
+  // quota key — so a manual roll both desynchronizes the quota window from the
+  // invoice period and silently grants a fresh AI budget. The endpoint stays
+  // because it is genuinely needed to make a tenant whole after an incident;
+  // the reason is what makes it break-glass rather than routine.
+  string reason = 2;
 }
 
 message OffboardOrganizationRequest {

@@ -6,12 +6,15 @@ import {
   TicketStatus as ProtoTicketStatus,
 } from '@synapsedesk/grpc-proto';
 import {
-  bootstrapE2eTest,
+  API,
   E2eFixture,
+  anonymousAgent,
+  authenticatedAgent,
+  bootstrapE2eTest,
   flushTestRedis,
-} from '../utils/bootstrap';
-import { anonymousAgent, API, authenticatedAgent } from '../utils/auth';
+} from '../utils';
 import { wireMessage, wirePage, wireTicket } from '../fixtures/wire';
+import { StartConversationDto } from 'apps/api-gateway/src/modules/chat/dto/rest/chat.dto';
 
 /**
  * §2.7 Self-service chat — proving it is a WRAPPER, not a second implementation.
@@ -25,6 +28,10 @@ describe('§2.7 Self-service chat at the HTTP boundary (e2e)', () => {
   let fx: E2eFixture;
 
   const conversationId = faker.string.uuid();
+  const start: StartConversationDto = {
+    title: 'Cannot log in',
+    message: 'It says bad password',
+  };
 
   beforeAll(async () => {
     await flushTestRedis();
@@ -37,8 +44,6 @@ describe('§2.7 Self-service chat at the HTTP boundary (e2e)', () => {
   });
 
   afterAll(() => fx.close());
-
-  const start = { title: 'Cannot log in', message: 'It says bad password' };
 
   describe('POST /chat/conversations', () => {
     it('1. creates a ticket with source CHAT', async () => {

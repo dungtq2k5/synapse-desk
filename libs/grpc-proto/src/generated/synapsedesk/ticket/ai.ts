@@ -39,6 +39,24 @@ export interface GenerateDraftResponse {
   modelName: string;
   promptTokens: number;
   completionTokens: number;
+  /**
+   * The `ai_generations` row this draft was recorded as — doc 15 §3.2.
+   *
+   * The client hands it back as `generatedFromId` when the agent posts, which
+   * is what closes the ACCEPTANCE LOOP. Without it the outcome is never
+   * written, the hourly sweep marks the draft DISCARDED, and acceptance rate —
+   * the one number justifying the co-pilot — counts a sent draft as ignored.
+   */
+  generationId: string;
+  /** What the draft cited, so the agent can check it before pressing send. */
+  citations: DraftCitation[];
+}
+
+export interface DraftCitation {
+  chunkId: string;
+  documentId: string;
+  documentTitle: string;
+  pageNumber?: number | undefined;
 }
 
 export interface SuggestionResponse {

@@ -13,20 +13,9 @@ import {
   SupersededReason,
 } from '@synapsedesk/common';
 import { AppModule } from '../../src/app.module';
-import { bytesFor } from '../utils/sample-bytes';
+import { bytesFor } from '../utils';
+import { waitUntil } from '@synapsedesk/common/testing/wait';
 import { FirebaseStorageService } from '../../src/modules/firebase/firebase-storage.service';
-
-async function waitFor(
-  predicate: () => Promise<boolean>,
-  timeoutMs = 5_000,
-): Promise<boolean> {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    if (await predicate()) return true;
-    await new Promise((resolve) => setTimeout(resolve, 50));
-  }
-  return false;
-}
 
 /**
  * §2.5 The async delete consumer, driven over a REAL NATS connection.
@@ -42,6 +31,38 @@ describe('§2.5 storage delete consumer over NATS (e2e)', () => {
   let app: INestApplication;
   let firebase: FirebaseStorageService;
   let client: ClientProxy;
+
+  /**
+   * Publishes the way the owning services actually do — through a Nest
+   * `ClientProxy`, which wraps the payload as `{ pattern, data }`. Publishing
+   * raw would take a different branch of Nest's deserializer and would prove
+   * something other than the production path.
+   */
+  const publish = (
+    objectPath: string,
+    reason: SupersededReason,
+  ): Promise<void> =>
+    new Promise<void>((resolve, reject) => {
+      client
+        .emit(STORAGE_PATTERNS.objectSuperseded, { objectPath, reason })
+        .subscribe({
+          error: (error: Error) => reject(error),
+          complete: () => resolve(),
+        });
+    });
+
+  const seed = async (objectPath: string): Promise<string> => {
+    await firebase.bucket.file(objectPath).save(bytesFor('image/png'), {
+      contentType: 'image/png',
+      resumable: false,
+    });
+    return objectPath;
+  };
+
+  const exists = async (objectPath: string): Promise<boolean> => {
+    const [found] = await firebase.bucket.file(objectPath).exists();
+    return found;
+  };
 
   beforeAll(async () => {
     app = await NestFactory.create(AppModule, { logger: false });
@@ -70,35 +91,6 @@ describe('§2.5 storage delete consumer over NATS (e2e)', () => {
     await app?.close();
   });
 
-  /**
-   * Publishes the way the owning services actually do — through a Nest
-   * `ClientProxy`, which wraps the payload as `{ pattern, data }`. Publishing
-   * raw would take a different branch of Nest's deserializer and would prove
-   * something other than the production path.
-   */
-  const publish = (objectPath: string, reason: SupersededReason) =>
-    new Promise<void>((resolve, reject) => {
-      client
-        .emit(STORAGE_PATTERNS.objectSuperseded, { objectPath, reason })
-        .subscribe({
-          error: (error: Error) => reject(error),
-          complete: () => resolve(),
-        });
-    });
-
-  const seed = async (objectPath: string) => {
-    await firebase.bucket.file(objectPath).save(bytesFor('image/png'), {
-      contentType: 'image/png',
-      resumable: false,
-    });
-    return objectPath;
-  };
-
-  const exists = async (objectPath: string) => {
-    const [found] = await firebase.bucket.file(objectPath).exists();
-    return found;
-  };
-
   it('1. DELETES an existing object — §2.5 test 1', async () => {
     const path = await seed(
       `organizations/${faker.string.uuid()}/avatars/${faker.string.uuid()}/old.png`,
@@ -106,7 +98,7 @@ describe('§2.5 storage delete consumer over NATS (e2e)', () => {
 
     await publish(path, SupersededReason.REPLACED);
 
-    expect(await waitFor(async () => !(await exists(path)))).toBe(true);
+    expect(await waitUntil(async () => !(await exists(path)))).toBe(true);
   });
 
   it('2. is a silent NO-OP for a path that never existed — §2.5 test 2', async () => {
@@ -125,7 +117,7 @@ describe('§2.5 storage delete consumer over NATS (e2e)', () => {
       `organizations/${faker.string.uuid()}/avatars/y/live.png`,
     );
     await publish(live, SupersededReason.REPLACED);
-    expect(await waitFor(async () => !(await exists(live)))).toBe(true);
+    expect(await waitUntil(async () => !(await exists(live)))).toBe(true);
   });
 
   it('3. survives a REDELIVERY of the same event', async () => {
@@ -134,7 +126,7 @@ describe('§2.5 storage delete consumer over NATS (e2e)', () => {
     );
 
     await publish(path, SupersededReason.REPLACED);
-    await waitFor(async () => !(await exists(path)));
+    await waitUntil(async () => !(await exists(path)));
     await publish(path, SupersededReason.REPLACED);
 
     // Still gone, and nothing threw. Idempotency is what makes at-most-once
@@ -156,7 +148,7 @@ describe('§2.5 storage delete consumer over NATS (e2e)', () => {
     await publish(removed, SupersededReason.RECORD_DELETED);
 
     expect(
-      await waitFor(
+      await waitUntil(
         async () => !(await exists(replaced)) && !(await exists(removed)),
       ),
     ).toBe(true);
@@ -188,7 +180,7 @@ describe('§2.5 storage delete consumer over NATS (e2e)', () => {
     );
 
     await publish(doomed, SupersededReason.REPLACED);
-    await waitFor(async () => !(await exists(doomed)));
+    await waitUntil(async () => !(await exists(doomed)));
 
     expect(await exists(sibling)).toBe(true);
   });

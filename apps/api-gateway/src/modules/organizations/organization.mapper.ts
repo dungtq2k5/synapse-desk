@@ -1,4 +1,5 @@
 import {
+  fromProtoOrgStatus,
   OrganizationResponse,
   requireTimestamp,
 } from '@synapsedesk/grpc-proto';
@@ -19,7 +20,7 @@ export function toOrganizationDto(
     name: organization.name,
     slug: organization.slug,
     domain: organization.domain ?? null,
-    status: organization.status,
+    status: fromProtoOrgStatus(organization.status) ?? '',
     enforceTwoFactor: organization.enforceTwoFactor,
     allowedEmailDomains: organization.allowedEmailDomains,
     maxAgentSeats: organization.maxAgentSeats,

@@ -1,4 +1,5 @@
 import { RpcException } from '@nestjs/microservices';
+import { rpcCode } from '@synapsedesk/common/testing/rpc';
 import { status } from '@grpc/grpc-js';
 import { faker } from '@faker-js/faker';
 import { StoragePurpose as ProtoStoragePurpose } from '@synapsedesk/grpc-proto';
@@ -6,17 +7,15 @@ import {
   organizationIdFromObjectPath,
   StoragePurpose,
 } from '@synapsedesk/common';
-import { bootstrapE2eTest, E2eFixture } from '../utils/bootstrap';
-import { memberContext } from '../utils/context';
+import {
+  E2eFixture,
+  bootstrapE2eTest,
+  bytesFor,
+  memberContext,
+} from '../utils';
 import { StorageService } from '../../src/modules/storage/storage.service';
 import { PURPOSE_POLICY } from '../../src/common/purpose-registry';
-import { bytesFor } from '../utils/sample-bytes';
 import { VALIDATED_MIME_TYPES } from '../../src/common/content-signature';
-
-function rpcCode(error: unknown): number | undefined {
-  if (!(error instanceof RpcException)) return undefined;
-  return (error.getError() as { code?: number }).code;
-}
 
 /**
  * §4 The cross-cutting storage sweeps.
@@ -39,15 +38,7 @@ describe('§4 storage boundary sweeps (e2e)', () => {
   const organizationId = faker.string.uuid();
   const userId = faker.string.uuid();
 
-  beforeAll(async () => {
-    fx = await bootstrapE2eTest();
-    storage = fx.moduleRef.get(StorageService);
-  });
-
-  beforeEach(() => fx.reset());
-  afterAll(() => fx.close());
-
-  const caller = (org = organizationId) =>
+  const caller = (org: string = organizationId) =>
     memberContext({ id: userId, organizationId: org });
 
   /**
@@ -91,6 +82,14 @@ describe('§4 storage boundary sweeps (e2e)', () => {
       },
       context,
     );
+
+  beforeAll(async () => {
+    fx = await bootstrapE2eTest();
+    storage = fx.moduleRef.get(StorageService);
+  });
+
+  beforeEach(() => fx.reset());
+  afterAll(() => fx.close());
 
   // ----------------------------------------------------- tenant-boundary sweep
 

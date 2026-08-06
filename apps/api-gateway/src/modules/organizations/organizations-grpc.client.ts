@@ -4,8 +4,10 @@ import {
   AUTH_GRPC_CLIENT,
   ORGANIZATION_SERVICE_NAME,
   OrganizationServiceClient,
+  fromProtoAiModelTier,
   requireTimestamp,
   UsageMeter,
+  fromProtoOrgStatus,
 } from '@synapsedesk/grpc-proto';
 import { RequestContext } from '@synapsedesk/common';
 import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
@@ -113,6 +115,14 @@ export class OrganizationsGrpcClient
       seats: toMeterDto(response.seats),
       storage: toMeterDto(response.storage),
       aiTokens: toMeterDto(response.aiTokens),
+      // Mapped back to the DOMAIN string rather than passed through as a proto
+      // enum number: `aiModelTier: 1` in a JSON body is meaningless to the
+      // client that has to render it.
+      aiModelTier: fromProtoAiModelTier(response.aiModelTier),
+      planName: response.planName,
+      currentPeriodEnd: response.currentPeriodEnd
+        ? requireTimestamp(response.currentPeriodEnd, 'currentPeriodEnd')
+        : null,
       billingCycleStart: requireTimestamp(
         response.billingCycleStart,
         'billingCycleStart',
@@ -120,11 +130,16 @@ export class OrganizationsGrpcClient
     };
   }
 
-  getOnboarding(context: RequestContext): Promise<OnboardingResponseDto> {
-    return this.call(
+  async getOnboarding(context: RequestContext): Promise<OnboardingResponseDto> {
+    const response = await this.call(
       (metadata) => this.organizationGrpcService.getOnboarding({}, metadata),
       context,
     );
+
+    // Mapped rather than passed through: `status` is a proto enum on the wire
+    // and a string in the DTO, so returning the response verbatim would ship a
+    // NUMBER to the client under a field the contract types as a string.
+    return { ...response, status: fromProtoOrgStatus(response.status) ?? '' };
   }
 
   async completeOnboarding(

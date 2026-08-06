@@ -1,21 +1,16 @@
 import { RpcException } from '@nestjs/microservices';
+import { rpcCode } from '@synapsedesk/common/testing/rpc';
 import { status } from '@grpc/grpc-js';
 import {
   canTransition,
   TERMINAL_TICKET_STATUSES,
   TicketStatus,
 } from '@synapsedesk/common';
-import { bootstrapE2eTest, E2eFixture } from '../utils/bootstrap';
-import { memberContext } from '../utils/context';
+import { E2eFixture, bootstrapE2eTest, memberContext } from '../utils';
 import { buildTenant, createTicket, TenantFixture } from '../factories';
 import { TicketsService } from '../../src/modules/tickets/tickets.service';
 import { TicketEventPublisher } from '../../src/modules/events/ticket-event.publisher';
 import { toProtoStatus } from '../../src/modules/tickets/ticket.mapper';
-
-function rpcCode(error: unknown): number | undefined {
-  if (!(error instanceof RpcException)) return undefined;
-  return (error.getError() as { code?: number }).code;
-}
 
 /**
  * §3.3 The state-machine sweep — the full 6×6 grid, against a real database.
@@ -39,6 +34,15 @@ describe('§3.3 state machine sweep (e2e)', () => {
 
   const ALL = Object.values(TicketStatus);
 
+  const agent = () =>
+    memberContext(
+      { id: tenant.agentId, organizationId: tenant.organizationId },
+      ['ticket.read.all', 'ticket.update', 'ticket.escalate', 'ticket.resolve'],
+    );
+
+  /** Every ordered pair, including the self-transitions. */
+  const GRID = ALL.flatMap((from) => ALL.map((to) => [from, to] as const));
+
   beforeAll(async () => {
     fx = await bootstrapE2eTest();
     tickets = fx.moduleRef.get(TicketsService);
@@ -53,15 +57,6 @@ describe('§3.3 state machine sweep (e2e)', () => {
   });
 
   afterAll(() => fx.close());
-
-  const agent = () =>
-    memberContext(
-      { id: tenant.agentId, organizationId: tenant.organizationId },
-      ['ticket.read.all', 'ticket.update', 'ticket.escalate', 'ticket.resolve'],
-    );
-
-  /** Every ordered pair, including the self-transitions. */
-  const GRID = ALL.flatMap((from) => ALL.map((to) => [from, to] as const));
 
   it.each(GRID.map(([from, to]) => [`${from} -> ${to}`, from, to] as const))(
     '%s behaves exactly as canTransition says',

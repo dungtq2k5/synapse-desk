@@ -174,7 +174,7 @@ export class StorageService {
 
     // Absent covers three cases that must be indistinguishable: never
     // presigned, expired, and already confirmed once.
-    if (!pending || pending.organizationId !== organizationId) {
+    if (pending?.organizationId !== organizationId) {
       throw new RpcException({
         code: status.NOT_FOUND,
         message: 'No pending upload for that object path',

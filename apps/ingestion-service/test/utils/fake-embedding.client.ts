@@ -77,7 +77,7 @@ export class FakeEmbeddingClient implements EmbeddingClient {
 function vectorFor(text: string): number[] {
   let seed = 2_166_136_261;
   for (let index = 0; index < text.length; index += 1) {
-    seed ^= text.charCodeAt(index);
+    seed ^= text.codePointAt(index) ?? 0;
     seed = Math.imul(seed, 16_777_619);
   }
 

@@ -51,7 +51,8 @@ import {
   generateUniqueOrganizationSlug,
   hashToken,
   maskEmail,
-} from '../../common/utils/utils';
+  flattenPermissionCodes,
+} from '../../common/utils';
 import { createPublicKey } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { RpcException } from '@nestjs/microservices';
@@ -61,7 +62,6 @@ import { toUserResponse } from '../users/user.mapper';
 import { NotificationPublisher } from '../notifications/notification-publisher.service';
 import { OtpService } from '../otp/otp.service';
 import { RolesService } from '../roles/roles.service';
-import { flattenPermissionCodes } from '../../common/utils/permissions';
 import { SessionsService } from '../sessions/sessions.service';
 import { AuditPublisher } from '../audit/audit-publisher.service';
 import { StorageReferenceService } from '../storage-client/storage-reference.service';

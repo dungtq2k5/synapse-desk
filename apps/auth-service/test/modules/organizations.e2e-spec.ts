@@ -1,8 +1,13 @@
-import { RpcException } from '@nestjs/microservices';
+import { expectRpc } from '@synapsedesk/common/testing/rpc';
 import { status } from '@grpc/grpc-js';
+import { toProtoOrgStatus } from '@synapsedesk/grpc-proto';
 import { InvitationStatus, OrgStatus } from '@synapsedesk/common';
-import { bootstrapE2eTest, E2eFixture } from '../utils/bootstrap';
-import { memberContext, superAdminContext } from '../utils/context';
+import {
+  E2eFixture,
+  bootstrapE2eTest,
+  memberContext,
+  superAdminContext,
+} from '../utils';
 import {
   addMember,
   createDeviceSession,
@@ -11,19 +16,16 @@ import {
 } from '../factories';
 import { OrganizationsService } from '../../src/modules/organizations/organizations.service';
 
-function rpcCode(error: unknown): number | undefined {
-  if (!(error instanceof RpcException)) return undefined;
-  return (error.getError() as { code?: number }).code;
-}
-
-async function expectRpc(promise: Promise<unknown>, code: number) {
-  await expect(promise).rejects.toBeInstanceOf(RpcException);
-  await promise.catch((error: unknown) => expect(rpcCode(error)).toBe(code));
-}
-
 describe('Organizations (e2e)', () => {
   let fx: E2eFixture;
   let organizations: OrganizationsService;
+
+  const ctx = (t: { user: { id: string; organizationId: string | null } }) =>
+    memberContext(t.user, [
+      'organization.read',
+      'organization.update',
+      'organization.delete',
+    ]);
 
   beforeAll(async () => {
     fx = await bootstrapE2eTest();
@@ -33,13 +35,6 @@ describe('Organizations (e2e)', () => {
   beforeEach(() => fx.reset());
 
   afterAll(() => fx.close());
-
-  const ctx = (t: { user: { id: string; organizationId: string | null } }) =>
-    memberContext(t.user, [
-      'organization.read',
-      'organization.update',
-      'organization.delete',
-    ]);
 
   describe('getCurrentOrganization', () => {
     it('1. the tenant is resolved from the caller context, never from the request', async () => {
@@ -222,7 +217,7 @@ describe('Organizations (e2e)', () => {
 
       const result = await organizations.completeOnboarding({}, ctx(t));
 
-      expect(result.status).toBe(OrgStatus.ACTIVE);
+      expect(result.status).toBe(toProtoOrgStatus(OrgStatus.ACTIVE));
     });
   });
 
@@ -385,7 +380,10 @@ describe('Organizations (e2e)', () => {
 
       await expect(
         organizations.getOrganizationStatus({ organizationId: t.org.id }),
-      ).resolves.toEqual({ status: OrgStatus.ACTIVE, deleted: false });
+      ).resolves.toEqual({
+        status: toProtoOrgStatus(OrgStatus.ACTIVE),
+        deleted: false,
+      });
 
       await fx.prisma.organization.update({
         where: { id: t.org.id },
@@ -394,7 +392,10 @@ describe('Organizations (e2e)', () => {
 
       await expect(
         organizations.getOrganizationStatus({ organizationId: t.org.id }),
-      ).resolves.toEqual({ status: OrgStatus.ACTIVE, deleted: true });
+      ).resolves.toEqual({
+        status: toProtoOrgStatus(OrgStatus.ACTIVE),
+        deleted: true,
+      });
     });
 
     it('an unknown organization id is NOT_FOUND, so the gate can fail closed', async () => {

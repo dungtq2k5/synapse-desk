@@ -151,8 +151,20 @@ model TicketMessage {
   /// fetched-then-filtered — see TicketMessagesService.
   isInternalNote Boolean @default(false) @map("is_internal_note")
 
-  /// Token metering, populated only for a persisted AI reply. Deliberately here
-  /// rather than on ai_summaries, which the RDM gives no token columns.
+  /// A DENORMALIZED CONVENIENCE for per-message display — doc 15 §3.2.
+  ///
+  /// These were token metering before the ledger existed. They are not any
+  /// more: **the quota gate sums `ai_generations`, never these**, and
+  /// `rag-service` writes that ledger row itself at the moment it spends. Kept
+  /// so a thread can show "answered by X, 400 tokens" without a cross-service
+  /// join.
+  ///
+  /// **Do not let a second metering path grow back here.** A column that looks
+  /// like spend and is not gated on is worse than no column: someone sums it,
+  /// gets a number close enough to be believable, and reports a figure the cap
+  /// was never computed from. They are nullable and frequently NULL — the
+  /// `invokeAi` path leaves them empty because the authoritative numbers are
+  /// already in the ledger row rag-service wrote.
   modelName        String? @map("model_name") @db.VarChar(100)
   promptTokens     Int?    @map("prompt_tokens")
   completionTokens Int?    @map("completion_tokens")

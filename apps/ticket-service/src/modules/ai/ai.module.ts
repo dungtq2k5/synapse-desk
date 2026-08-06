@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TicketAccessModule } from '../ticket-access/ticket-access.module';
+import { AuthClientModule } from '../auth-client/auth-client.module';
 import { AiClientModule } from '../ai-client/ai-client.module';
 import { AiService } from './ai.service';
 import { AiGrpcController } from './ai-grpc.controller';
@@ -12,7 +13,9 @@ import { AiGrpcController } from './ai-grpc.controller';
  * way would be a cycle.
  */
 @Module({
-  imports: [TicketAccessModule, AiClientModule],
+  // `AuthClientModule` for the classification candidates: rag-service cannot
+  // see postgres_auth, so the department list travels WITH the request.
+  imports: [TicketAccessModule, AiClientModule, AuthClientModule],
   controllers: [AiGrpcController],
   providers: [AiService],
   exports: [AiService],

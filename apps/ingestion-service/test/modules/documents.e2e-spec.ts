@@ -1,4 +1,5 @@
 import { RpcException } from '@nestjs/microservices';
+import { expectRpc } from '@synapsedesk/common/testing/rpc';
 import { status } from '@grpc/grpc-js';
 import { faker } from '@faker-js/faker';
 import {
@@ -6,8 +7,12 @@ import {
   DocumentStatus,
   IngestionJobStatus,
 } from '@synapsedesk/common';
-import { bootstrapE2eTest, E2eFixture } from '../utils/bootstrap';
-import { memberContext, pageRequest } from '../utils/context';
+import {
+  E2eFixture,
+  bootstrapE2eTest,
+  memberContext,
+  pageRequest,
+} from '../utils';
 import {
   buildTenant,
   createChunks,
@@ -20,19 +25,6 @@ import { QdrantService } from '../../src/modules/qdrant/qdrant.service';
 import { AuthReferenceService } from '../../src/modules/auth-client/auth-reference.service';
 import { StorageReferenceService } from '../../src/modules/storage-client/storage-reference.service';
 import { DocumentEventPublisher } from '../../src/modules/events/document-event.publisher';
-
-function rpcCode(error: unknown): number | undefined {
-  if (!(error instanceof RpcException)) return undefined;
-  return (error.getError() as { code?: number }).code;
-}
-
-async function expectRpc(promise: Promise<unknown>, code: number) {
-  await expect(promise).rejects.toBeInstanceOf(RpcException);
-  await promise.catch((error: unknown) => expect(rpcCode(error)).toBe(code));
-}
-
-/** 5 GB — the RDM default for `max_storage_bytes`. */
-const DEFAULT_STORAGE_LIMIT = 5 * 1024 * 1024 * 1024;
 
 describe('§2 Documents (e2e)', () => {
   let fx: E2eFixture;
@@ -50,6 +42,52 @@ describe('§2 Documents (e2e)', () => {
   let publish: jest.SpyInstance;
 
   let tenant: TenantFixture;
+
+  /** 5 GB — the RDM default for `max_storage_bytes`. */
+  const DEFAULT_STORAGE_LIMIT = 5 * 1024 * 1024 * 1024;
+
+  /** A knowledge manager: may upload, and belongs to one department. */
+  const manager = (t = tenant) =>
+    memberContext(
+      { id: t.userId, organizationId: t.organizationId },
+      ['document.create', 'document.update', 'document.delete'],
+      { departmentIds: [t.departmentId] },
+    );
+
+  /** A member of NO department — sees only organization-wide documents. */
+  const outsider = (t = tenant) =>
+    memberContext(
+      { id: faker.string.uuid(), organizationId: t.organizationId },
+      [],
+      {
+        departmentIds: [],
+      },
+    );
+
+  const presignRequest = (overrides: Record<string, unknown> = {}) => ({
+    contentType: 'application/pdf',
+    sizeBytes: 2048,
+    fileName: 'handbook.pdf',
+    ...overrides,
+  });
+
+  const confirmRequest = (overrides: Record<string, unknown> = {}) => ({
+    objectPath: `organizations/${tenant.organizationId}/documents/${faker.string.uuid()}/x.pdf`,
+    title: '2026 Employee Handbook',
+    isOrganizationWide: true,
+    departmentIds: [] as string[],
+    fileName: 'handbook.pdf',
+    ...overrides,
+  });
+
+  const listRequest = (overrides: Record<string, unknown> = {}) => ({
+    page: pageRequest(),
+    status: '',
+    departmentId: '',
+    fileType: '',
+    includeDeleted: false,
+    ...overrides,
+  });
 
   beforeAll(async () => {
     fx = await bootstrapE2eTest();
@@ -105,49 +143,6 @@ describe('§2 Documents (e2e)', () => {
   });
 
   afterAll(() => fx.close());
-
-  /** A knowledge manager: may upload, and belongs to one department. */
-  const manager = (t = tenant) =>
-    memberContext(
-      { id: t.userId, organizationId: t.organizationId },
-      ['document.create', 'document.update', 'document.delete'],
-      { departmentIds: [t.departmentId] },
-    );
-
-  /** A member of NO department — sees only organization-wide documents. */
-  const outsider = (t = tenant) =>
-    memberContext(
-      { id: faker.string.uuid(), organizationId: t.organizationId },
-      [],
-      {
-        departmentIds: [],
-      },
-    );
-
-  const presignRequest = (overrides: Record<string, unknown> = {}) => ({
-    contentType: 'application/pdf',
-    sizeBytes: 2048,
-    fileName: 'handbook.pdf',
-    ...overrides,
-  });
-
-  const confirmRequest = (overrides: Record<string, unknown> = {}) => ({
-    objectPath: `organizations/${tenant.organizationId}/documents/${faker.string.uuid()}/x.pdf`,
-    title: '2026 Employee Handbook',
-    isOrganizationWide: true,
-    departmentIds: [] as string[],
-    fileName: 'handbook.pdf',
-    ...overrides,
-  });
-
-  const listRequest = (overrides: Record<string, unknown> = {}) => ({
-    page: pageRequest(),
-    status: '',
-    departmentId: '',
-    fileType: '',
-    includeDeleted: false,
-    ...overrides,
-  });
 
   // ------------------------------------------------------------- §2.1 upload
 

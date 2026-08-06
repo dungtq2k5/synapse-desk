@@ -11,6 +11,8 @@ import {
   OrganizationServiceController,
   OrganizationServiceControllerMethods,
   OrganizationSettingsResponse,
+  GetOrganizationEntitlementsRequest,
+  OrganizationEntitlementsResponse,
   OrganizationUsageResponse,
   unpackCallerContext,
   UpdateOrganizationRequest,
@@ -77,6 +79,19 @@ export class OrganizationsGrpcController implements OrganizationServiceControlle
     metadata?: Metadata,
   ): Promise<OrganizationUsageResponse> {
     return this.organizationsService.getOrganizationUsage(
+      unpackCallerContext(metadata),
+    );
+  }
+
+  /**
+   * Read by the two spending services and CACHED there, so this is a cache
+   * fill rather than a per-request call (doc 15 §1.3, §3.1).
+   */
+  getOrganizationEntitlements(
+    _request: GetOrganizationEntitlementsRequest,
+    metadata?: Metadata,
+  ): Promise<OrganizationEntitlementsResponse> {
+    return this.organizationsService.getOrganizationEntitlements(
       unpackCallerContext(metadata),
     );
   }

@@ -2,11 +2,13 @@ import { of, throwError } from 'rxjs';
 import { faker } from '@faker-js/faker';
 import { status as GrpcStatus } from '@grpc/grpc-js';
 import {
-  bootstrapE2eTest,
+  API,
   E2eFixture,
+  anonymousAgent,
+  authenticatedAgent,
+  bootstrapE2eTest,
   flushTestRedis,
-} from '../utils/bootstrap';
-import { anonymousAgent, API, authenticatedAgent } from '../utils/auth';
+} from '../utils';
 import { grpcError, timestamp, wirePage } from '../fixtures/wire';
 
 describe('§2.8 AI feedback at the HTTP boundary (e2e)', () => {

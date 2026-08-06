@@ -20,6 +20,7 @@ export * from './generated/synapsedesk/ticket/audit';
 
 export * from './generated/synapsedesk/storage/storage';
 
+export * from './generated/synapsedesk/auth/billing';
 export * from './generated/synapsedesk/ingestion/document';
 export * from './generated/synapsedesk/ingestion/ledger';
 export * from './generated/synapsedesk/rag/rag';

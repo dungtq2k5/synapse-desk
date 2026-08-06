@@ -30,7 +30,40 @@ model Organization {
   maxAgentSeats        Int      @default(10) @map("max_agent_seats")
   maxStorageBytes      BigInt   @default(5368709120) @map("max_storage_bytes")
   monthlyAiTokenBudget BigInt   @default(1000000) @map("monthly_ai_token_budget")
-  billingCycleStart    DateTime @default(now()) @map("billing_cycle_start") @db.Timestamptz
+
+  /// Follows Stripe's `current_period_start` once billing is live (§1.15).
+  ///
+  /// **Load-bearing beyond its own column:** its epoch is inside the Redis
+  /// quota key, so anything that writes this implicitly re-arms every quota
+  /// threshold alert and zeroes the counter. That is exactly right at a genuine
+  /// renewal and a silent budget grant if it fires by accident — which is why
+  /// `POST /platform/organizations/:id/billing-cycle/reset` is now break-glass.
+  billingCycleStart DateTime @default(now()) @map("billing_cycle_start") @db.Timestamptz
+
+  /// `FAST | QUALITY` — the sellable AI entitlement (doc 15).
+  ///
+  /// Defaults to FAST, and the default is what makes the migration safe: every
+  /// existing row gets a usable tier without a backfill, and a NULL reaching
+  /// the settings layer would be an unresolvable model name at request time.
+  aiModelTier String @default("FAST") @map("ai_model_tier") @db.VarChar(20)
+
+  // -------------------------------------------------------------------------
+  // Stripe — exactly TWO columns, and no more (RDM §1.15).
+  //
+  // Plan names, price points and feature lists are deliberately NOT mirrored.
+  // Copying them here creates a second source of truth that diverges the first
+  // time someone edits a price in the Stripe dashboard — silently, because both
+  // sides keep answering questions confidently.
+  //
+  // **Both are nullable, and the nullability IS the migration path.** A tenant
+  // with NULL on both is a perfectly valid free/internal/grandfathered account
+  // whose entitlements were set by hand and are never overwritten, because no
+  // webhook will ever name them. Backfilling placeholder customers to make
+  // these non-null would break exactly that.
+  // -------------------------------------------------------------------------
+
+  stripeCustomerId     String? @unique @map("stripe_customer_id") @db.VarChar(255)
+  stripeSubscriptionId String? @unique @map("stripe_subscription_id") @db.VarChar(255)
 
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
@@ -42,7 +75,8 @@ model Organization {
   departments Department[]
   users       User[]           @relation("UserOrganization")
   roles       Role[]           @relation("RoleOrganization")
-  invitations UserInvitation[]
+  invitations   UserInvitation[]
+  billingEvents BillingEvent[]
 
   @@map("organizations")
 }
@@ -415,4 +449,61 @@ model UserInvitation {
   @@index([expiresAt])
   @@index([batchId])
   @@map("user_invitations")
+}
+
+/// RDM Table 30 — every Stripe webhook the system ACCEPTED as genuine.
+///
+/// Exists for idempotency and ordering, not for reporting. Append-only and
+/// never edited: §1.6's audit-field policy does not apply, because this is an
+/// event log — the closest thing to it here is `audit_logs`, which is
+/// append-only for the same reason.
+///
+/// **Signature verification happens BEFORE this table.** An event that fails
+/// Stripe's check is rejected at the edge and never recorded, so a row here
+/// means "we believed this and acted on it" — which is what makes the table
+/// useful during an incident.
+model BillingEvent {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  /// Stripe's `evt_…` id. **The unique constraint IS the idempotency
+  /// mechanism**: a redelivered webhook is a duplicate-key violation the
+  /// handler catches and acknowledges, not a second entitlement write. Delivery
+  /// is at-least-once, so this is the normal path rather than a defensive one.
+  stripeEventId String @unique @map("stripe_event_id") @db.VarChar(255)
+
+  /// Resolved from `stripe_customer_id`. NULLABLE because an event can arrive
+  /// for a customer with no tenant yet — checkout can complete before
+  /// onboarding does — and losing the event would be worse than storing it
+  /// unattached.
+  organizationId String? @map("organization_id") @db.Uuid
+
+  eventType String @map("event_type") @db.VarChar(100)
+
+  /// **Stripe's `created`, not ours** — the monotonic guard. An entitlement
+  /// write is applied only when this is newer than the newest already applied
+  /// for the subscription. Webhooks arrive out of order, and without this a
+  /// delayed `subscription.updated` carrying the old plan lands after an
+  /// upgrade and silently downgrades a paying tenant.
+  stripeCreatedAt DateTime @map("stripe_created_at") @db.Timestamptz
+
+  /// The raw event. Kept because entitlement-mapping bugs are only diagnosable
+  /// against what Stripe actually sent, and a re-derivation needs the original.
+  payload Json @db.JsonB
+
+  /// BillingEventStatus. `SKIPPED_STALE` is the monotonic guard firing, and
+  /// seeing it regularly is information rather than noise.
+  status String @default("PROCESSED") @db.VarChar(20)
+
+  /// Why a FAILED event failed, for replay.
+  errorLog String? @map("error_log") @db.Text
+
+  processedAt DateTime @default(now()) @map("processed_at") @db.Timestamptz
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  /// The monotonic check reads the newest applied event per tenant on every
+  /// webhook, so this index is on the hot path of the integration.
+  @@index([organizationId, stripeCreatedAt(sort: Desc)])
+  @@index([eventType])
+  @@map("billing_events")
 }

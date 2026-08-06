@@ -1,4 +1,4 @@
-import { RpcException } from '@nestjs/microservices';
+import { expectRpc } from '@synapsedesk/common/testing/rpc';
 import { status } from '@grpc/grpc-js';
 import { faker } from '@faker-js/faker';
 import {
@@ -8,8 +8,12 @@ import {
   TICKET_PATTERNS,
   ticketMessageGroupKey,
 } from '@synapsedesk/common';
-import { bootstrapE2eTest, E2eFixture } from '../utils/bootstrap';
-import { memberContext, pageRequest } from '../utils/context';
+import {
+  E2eFixture,
+  bootstrapE2eTest,
+  memberContext,
+  pageRequest,
+} from '../utils';
 import {
   buildTenant,
   createAiMessage,
@@ -23,16 +27,6 @@ import { TicketEventPublisher } from '../../src/modules/events/ticket-event.publ
 import { RagClientService } from '../../src/modules/ai-client/rag-client.service';
 import { StorageReferenceService } from '../../src/modules/storage-client/storage-reference.service';
 
-function rpcCode(error: unknown): number | undefined {
-  if (!(error instanceof RpcException)) return undefined;
-  return (error.getError() as { code?: number }).code;
-}
-
-async function expectRpc(promise: Promise<unknown>, code: number) {
-  await expect(promise).rejects.toBeInstanceOf(RpcException);
-  await promise.catch((error: unknown) => expect(rpcCode(error)).toBe(code));
-}
-
 describe('§2.5 Ticket messages & attachments (e2e)', () => {
   let fx: E2eFixture;
   let messages: MessagesService;
@@ -44,6 +38,28 @@ describe('§2.5 Ticket messages & attachments (e2e)', () => {
   let generateReplyDraft: jest.SpyInstance;
 
   let tenant: TenantFixture;
+
+  /** The ticket's author: an end user, no permissions at all. */
+  const author = (t = tenant) =>
+    memberContext({ id: t.userId, organizationId: t.organizationId });
+
+  /** An agent: queue access, so internal notes are visible. */
+  const agent = (t = tenant) =>
+    memberContext({ id: t.agentId, organizationId: t.organizationId }, [
+      'ticket.read.all',
+    ]);
+
+  /** An agent who may also redact. */
+  const moderator = (t = tenant) =>
+    memberContext({ id: t.agentId, organizationId: t.organizationId }, [
+      'ticket.read.all',
+      'ticket.message.moderate',
+    ]);
+
+  const listRequest = (ticketId: string) => ({
+    ticketId,
+    page: pageRequest(),
+  });
 
   beforeAll(async () => {
     fx = await bootstrapE2eTest();
@@ -76,28 +92,6 @@ describe('§2.5 Ticket messages & attachments (e2e)', () => {
   });
 
   afterAll(() => fx.close());
-
-  /** The ticket's author: an end user, no permissions at all. */
-  const author = (t = tenant) =>
-    memberContext({ id: t.userId, organizationId: t.organizationId });
-
-  /** An agent: queue access, so internal notes are visible. */
-  const agent = (t = tenant) =>
-    memberContext({ id: t.agentId, organizationId: t.organizationId }, [
-      'ticket.read.all',
-    ]);
-
-  /** An agent who may also redact. */
-  const moderator = (t = tenant) =>
-    memberContext({ id: t.agentId, organizationId: t.organizationId }, [
-      'ticket.read.all',
-      'ticket.message.moderate',
-    ]);
-
-  const listRequest = (ticketId: string) => ({
-    ticketId,
-    page: pageRequest(),
-  });
 
   // -------------------------------------------------------- internal notes
 

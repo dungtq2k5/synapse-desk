@@ -2,11 +2,13 @@ import { of, throwError } from 'rxjs';
 import { faker } from '@faker-js/faker';
 import { status as GrpcStatus } from '@grpc/grpc-js';
 import {
-  bootstrapE2eTest,
+  API,
   E2eFixture,
+  anonymousAgent,
+  authenticatedAgent,
+  bootstrapE2eTest,
   flushTestRedis,
-} from '../utils/bootstrap';
-import { anonymousAgent, API, authenticatedAgent } from '../utils/auth';
+} from '../utils';
 import { grpcError, timestamp } from '../fixtures/wire';
 
 /**
@@ -22,18 +24,6 @@ describe('§2.6 AI Co-Pilot at the HTTP boundary (e2e)', () => {
   let fx: E2eFixture;
 
   const ticketId = faker.string.uuid();
-
-  beforeAll(async () => {
-    await flushTestRedis();
-    fx = await bootstrapE2eTest();
-  });
-
-  beforeEach(async () => {
-    await flushTestRedis();
-    jest.clearAllMocks();
-  });
-
-  afterAll(() => fx.close());
 
   const unavailable = () =>
     throwError(() =>
@@ -53,6 +43,18 @@ describe('§2.6 AI Co-Pilot at the HTTP boundary (e2e)', () => {
     createdAt: timestamp(),
     updatedAt: timestamp(),
   });
+
+  beforeAll(async () => {
+    await flushTestRedis();
+    fx = await bootstrapE2eTest();
+  });
+
+  beforeEach(async () => {
+    await flushTestRedis();
+    jest.clearAllMocks();
+  });
+
+  afterAll(() => fx.close());
 
   describe('the 503 contract', () => {
     it('1. answers 503 — not 500 — from every generation route', async () => {
@@ -157,6 +159,10 @@ describe('§2.6 AI Co-Pilot at the HTTP boundary (e2e)', () => {
           modelName: 'm',
           promptTokens: 1,
           completionTokens: 2,
+          // The ledger row the client hands back as `generatedFromId` when the
+          // agent posts — without it the acceptance loop cannot close.
+          generationId: 'gen-1',
+          citations: [],
         }),
       );
 
@@ -175,6 +181,10 @@ describe('§2.6 AI Co-Pilot at the HTTP boundary (e2e)', () => {
           modelName: 'm',
           promptTokens: 1,
           completionTokens: 2,
+          // The ledger row the client hands back as `generatedFromId` when the
+          // agent posts — without it the acceptance loop cannot close.
+          generationId: 'gen-1',
+          citations: [],
         }),
       );
 
@@ -208,6 +218,8 @@ describe('§2.6 AI Co-Pilot at the HTTP boundary (e2e)', () => {
           modelName: 'm',
           promptTokens: 10,
           completionTokens: 20,
+          generationId: 'gen-2',
+          citations: [],
         }),
       );
 

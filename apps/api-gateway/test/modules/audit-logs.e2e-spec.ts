@@ -1,11 +1,13 @@
 import { of } from 'rxjs';
 import { faker } from '@faker-js/faker';
 import {
-  bootstrapE2eTest,
+  API,
   E2eFixture,
+  anonymousAgent,
+  authenticatedAgent,
+  bootstrapE2eTest,
   flushTestRedis,
-} from '../utils/bootstrap';
-import { anonymousAgent, API, authenticatedAgent } from '../utils/auth';
+} from '../utils';
 import { timestamp, wirePage } from '../fixtures/wire';
 
 /**

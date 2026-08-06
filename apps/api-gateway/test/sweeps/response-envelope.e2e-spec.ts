@@ -1,12 +1,15 @@
 import { of, throwError } from 'rxjs';
 import { status as GrpcStatus } from '@grpc/grpc-js';
 import type { PermissionCode } from '@synapsedesk/common';
+import { AiModelTier } from '@synapsedesk/grpc-proto';
 import {
-  bootstrapE2eTest,
+  API,
   E2eFixture,
+  anonymousAgent,
+  authenticatedAgent,
+  bootstrapE2eTest,
   flushTestRedis,
-} from '../utils/bootstrap';
-import { anonymousAgent, API, authenticatedAgent } from '../utils/auth';
+} from '../utils';
 import { grpcError, timestamp, wirePage, wireUser } from '../fixtures/wire';
 
 /**
@@ -108,6 +111,8 @@ const PROBES: Probe[] = [
           storage: { available: false, unavailableReason: 'n/a' },
           aiTokens: { available: false, unavailableReason: 'n/a' },
           billingCycleStart: timestamp(),
+          aiModelTier: AiModelTier.AI_MODEL_TIER_FAST,
+          planName: 'Free',
         }),
       ),
     fail: (f) =>

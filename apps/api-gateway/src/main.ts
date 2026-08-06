@@ -15,7 +15,28 @@ async function bootstrap() {
   const logger = new Logger(AppModule.name);
 
   // Cast the app to NestExpressApplication to access underlying Express settings
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  //
+  // `rawBody: true` is NOT optional — it is the fix for 14-doc §3.2, the single
+  // most common way a Stripe integration fails on first deploy. Stripe's
+  // signature is computed over the EXACT BYTES of the request; the global JSON
+  // parser deserializes and re-serializes them, and verification then fails for
+  // every event. This buffers the original bytes before that happens, and
+  // `POST /webhooks/stripe` reads them from `req.rawBody`.
+  //
+  // Buffering globally rather than mounting a raw parser on the webhook path
+  // costs a little memory per request and removes a coupling that would
+  // otherwise bite: a path-mounted parser has to know the GLOBAL PREFIX, so
+  // changing `GLOBAL_PREFIX` would silently stop it applying — and the symptom
+  // is exactly the one this option exists to prevent, arriving from a config
+  // change nobody would connect to billing.
+  //
+  // The failure shape is what makes it worth this comment: locally it often
+  // works (fewer middleware layers), in production every webhook 400s, and
+  // entitlements silently stop tracking subscriptions while the app looks
+  // entirely healthy.
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    rawBody: true,
+  });
 
   // CRITICAL FOR PRODUCTION: tells Express to read X-Forwarded-For, which is
   // what makes `req.ip` the real client rather than the load balancer. Set

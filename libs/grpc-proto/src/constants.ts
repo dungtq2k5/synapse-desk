@@ -74,6 +74,7 @@ export const AUTH_PROTO_PATHS = [
   'role.proto',
   'organization.proto',
   'platform.proto',
+  'billing.proto',
 ].map((file) => join(PROTO_ROOT, 'synapsedesk', 'auth', file));
 
 /**

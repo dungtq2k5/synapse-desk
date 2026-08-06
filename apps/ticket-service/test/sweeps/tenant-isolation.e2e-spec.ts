@@ -1,9 +1,14 @@
 import { RpcException } from '@nestjs/microservices';
+import { rpcCode } from '@synapsedesk/common/testing/rpc';
 import { status } from '@grpc/grpc-js';
 import { faker } from '@faker-js/faker';
 import { TicketStatus } from '@synapsedesk/common';
-import { bootstrapE2eTest, E2eFixture } from '../utils/bootstrap';
-import { memberContext, pageRequest } from '../utils/context';
+import {
+  E2eFixture,
+  bootstrapE2eTest,
+  memberContext,
+  pageRequest,
+} from '../utils';
 import {
   buildTenant,
   createAiMessage,
@@ -23,11 +28,6 @@ import { FeedbackService } from '../../src/modules/feedback/feedback.service';
 import { AuditReadService } from '../../src/modules/audit/audit-read.service';
 import { AuthReferenceService } from '../../src/modules/auth-client/auth-reference.service';
 import { TicketEventPublisher } from '../../src/modules/events/ticket-event.publisher';
-
-function rpcCode(error: unknown): number | undefined {
-  if (!(error instanceof RpcException)) return undefined;
-  return (error.getError() as { code?: number }).code;
-}
 
 /**
  * §3.1 The tenant-isolation sweep.
@@ -59,33 +59,6 @@ describe('§3.1 tenant isolation sweep (e2e)', () => {
   let owner: TenantFixture;
   /** The tenant doing the reaching. Fully permissioned, wrong workspace. */
   let stranger: TenantFixture;
-
-  beforeAll(async () => {
-    fx = await bootstrapE2eTest();
-    tickets = fx.moduleRef.get(TicketsService);
-    assignments = fx.moduleRef.get(AssignmentsService);
-    messages = fx.moduleRef.get(MessagesService);
-    ai = fx.moduleRef.get(AiService);
-    feedback = fx.moduleRef.get(FeedbackService);
-    auditRead = fx.moduleRef.get(AuditReadService);
-
-    const authReference = fx.moduleRef.get(AuthReferenceService);
-    jest.spyOn(authReference, 'assertUserExists').mockResolvedValue(undefined);
-    jest
-      .spyOn(authReference, 'assertDepartmentExists')
-      .mockResolvedValue(undefined);
-    jest
-      .spyOn(fx.moduleRef.get(TicketEventPublisher), 'publish')
-      .mockImplementation(() => {});
-  });
-
-  beforeEach(async () => {
-    await fx.reset();
-    owner = buildTenant();
-    stranger = buildTenant();
-  });
-
-  afterAll(() => fx.close());
 
   /**
    * EVERY permission the tenant can hold.
@@ -367,6 +340,33 @@ describe('§3.1 tenant isolation sweep (e2e)', () => {
         ),
     },
   ];
+
+  beforeAll(async () => {
+    fx = await bootstrapE2eTest();
+    tickets = fx.moduleRef.get(TicketsService);
+    assignments = fx.moduleRef.get(AssignmentsService);
+    messages = fx.moduleRef.get(MessagesService);
+    ai = fx.moduleRef.get(AiService);
+    feedback = fx.moduleRef.get(FeedbackService);
+    auditRead = fx.moduleRef.get(AuditReadService);
+
+    const authReference = fx.moduleRef.get(AuthReferenceService);
+    jest.spyOn(authReference, 'assertUserExists').mockResolvedValue(undefined);
+    jest
+      .spyOn(authReference, 'assertDepartmentExists')
+      .mockResolvedValue(undefined);
+    jest
+      .spyOn(fx.moduleRef.get(TicketEventPublisher), 'publish')
+      .mockImplementation(() => {});
+  });
+
+  beforeEach(async () => {
+    await fx.reset();
+    owner = buildTenant();
+    stranger = buildTenant();
+  });
+
+  afterAll(() => fx.close());
 
   it.each(PROBES.map((p) => [`${p.module}.${p.operation}`, p] as const))(
     '%s answers NOT_FOUND across tenants',

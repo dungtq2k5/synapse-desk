@@ -11,13 +11,13 @@ import {
   TicketStatus,
 } from '@synapsedesk/common';
 import {
+  ACCESS_COOKIE,
+  RealtimeFixture,
   bootstrapRealtimeTest,
   expectNoEvent,
-  RealtimeFixture,
+  signTwoFactorToken,
   waitForEvent,
-} from '../utils/realtime';
-import { ACCESS_COOKIE } from '../utils/auth';
-import { signTwoFactorToken } from '../utils/tokens';
+} from '../utils';
 import { grpcError, timestamp } from '../fixtures/wire';
 import {
   CLIENT_EVENTS,
@@ -41,7 +41,7 @@ describe('the real-time relay (e2e)', () => {
   const agentId = faker.string.uuid();
 
   /** A ticket the stubbed peer will hand back for the join authorization. */
-  function wireTicket(overrides: Record<string, unknown> = {}) {
+  const wireTicket = (overrides: Record<string, unknown> = {}) => {
     return {
       id: ticketId,
       ticketNumber: 1,
@@ -58,13 +58,13 @@ describe('the real-time relay (e2e)', () => {
       updatedAt: timestamp(),
       ...overrides,
     };
-  }
+  };
 
   // Return type narrowed to the variant, not the union: a test that reads
   // `.messageId` needs the compiler to know which member it has.
-  function messageEvent(): TicketEventOf<
+  const messageEvent = (): TicketEventOf<
     typeof TICKET_PATTERNS.messageCreated
-  > {
+  > => {
     return {
       pattern: TICKET_PATTERNS.messageCreated,
       organizationId,
@@ -76,7 +76,7 @@ describe('the real-time relay (e2e)', () => {
       isInternalNote: false,
       groupKey: ticketMessageGroupKey(ticketId),
     };
-  }
+  };
 
   beforeAll(async () => {
     fx = await bootstrapRealtimeTest();

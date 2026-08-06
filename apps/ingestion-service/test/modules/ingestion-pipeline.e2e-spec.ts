@@ -7,39 +7,20 @@ import {
   QDRANT_PAYLOAD_FIELDS,
 } from '@synapsedesk/common';
 import Redis from 'ioredis';
-import { bootstrapE2eTest, E2eFixture } from '../utils/bootstrap';
-import { buildPdf } from '../utils/pdf-fixture';
+import { waitFor } from '@synapsedesk/common/testing/wait';
+import {
+  BUDGET_MICROS,
+  CYCLE_START,
+  E2eFixture,
+  bootstrapE2eTest,
+  buildPdf,
+} from '../utils';
 import { buildTenant, createDocument, TenantFixture } from '../factories';
 import { IngestionProcessor } from '../../src/modules/ingestion/ingestion.processor';
 import { QdrantService } from '../../src/modules/qdrant/qdrant.service';
 import { StorageReferenceService } from '../../src/modules/storage-client/storage-reference.service';
 import { AuthReferenceService } from '../../src/modules/auth-client/auth-reference.service';
 import { QUOTA_REDIS } from '../../src/modules/ai-ledger/quota-counter.service';
-
-const BUDGET_MICROS = 1_000_000n;
-const CYCLE_START = new Date('2026-08-01T00:00:00.000Z');
-
-/**
- * A markdown document with real headings, so the chunker's structure pass has
- * something to split on and the chunks carry a heading path a citation could
- * name.
- */
-function markdownFixture(sections: number): Buffer {
-  const body = Array.from({ length: sections }, (_, index) =>
-    [
-      `## Section ${index + 1}`,
-      '',
-      `This section covers policy area ${index + 1}. `.repeat(20),
-      '',
-      `### Subsection ${index + 1}.1`,
-      '',
-      `Detailed guidance for area ${index + 1} follows here. `.repeat(20),
-      '',
-    ].join('\n'),
-  ).join('\n');
-
-  return Buffer.from(`# Employee Handbook\n\n${body}`, 'utf8');
-}
 
 describe('§3 The ingestion pipeline (e2e)', () => {
   let fx: E2eFixture;
@@ -51,6 +32,53 @@ describe('§3 The ingestion pipeline (e2e)', () => {
   let getAiEntitlement: jest.SpyInstance;
 
   let tenant: TenantFixture;
+
+  /**
+   * A markdown document with real headings, so the chunker's structure pass has
+   * something to split on and the chunks carry a heading path a citation could
+   * name.
+   */
+  const markdownFixture = (sections: number): Buffer => {
+    const body = Array.from({ length: sections }, (_, index) =>
+      [
+        `## Section ${index + 1}`,
+        '',
+        `This section covers policy area ${index + 1}. `.repeat(20),
+        '',
+        `### Subsection ${index + 1}.1`,
+        '',
+        `Detailed guidance for area ${index + 1} follows here. `.repeat(20),
+        '',
+      ].join('\n'),
+    ).join('\n');
+
+    return Buffer.from(`# Employee Handbook\n\n${body}`, 'utf8');
+  };
+
+  /** Creates the document + its job row, as `confirmDocument` would. */
+  const queueDocument = async (
+    overrides: Parameters<typeof createDocument>[2] = {},
+  ) => {
+    const document = await createDocument(fx.prisma, tenant, {
+      fileType: 'md',
+      ...overrides,
+    });
+    const job = await fx.prisma.ingestionJob.create({
+      data: {
+        documentId: document.id,
+        bullmqJobId: '',
+        status: IngestionJobStatus.QUEUED,
+      },
+    });
+
+    return {
+      organizationId: tenant.organizationId,
+      documentId: document.id,
+      ingestionJobId: job.id,
+      objectPath: document.fileUrl,
+      fileType: document.fileType,
+    };
+  };
 
   beforeAll(async () => {
     fx = await bootstrapE2eTest();
@@ -92,31 +120,6 @@ describe('§3 The ingestion pipeline (e2e)', () => {
   afterAll(async () => {
     await fx.close();
   });
-
-  /** Creates the document + its job row, as `confirmDocument` would. */
-  async function queueDocument(
-    overrides: Parameters<typeof createDocument>[2] = {},
-  ) {
-    const document = await createDocument(fx.prisma, tenant, {
-      fileType: 'md',
-      ...overrides,
-    });
-    const job = await fx.prisma.ingestionJob.create({
-      data: {
-        documentId: document.id,
-        bullmqJobId: '',
-        status: IngestionJobStatus.QUEUED,
-      },
-    });
-
-    return {
-      organizationId: tenant.organizationId,
-      documentId: document.id,
-      ingestionJobId: job.id,
-      objectPath: document.fileUrl,
-      fileType: document.fileType,
-    };
-  }
 
   afterEach(async () => {
     // Qdrant is shared with rag-service's suite and lives outside the database
@@ -582,25 +585,3 @@ describe('§3 The ingestion pipeline (e2e)', () => {
     });
   });
 });
-
-/**
- * Polls until `predicate` holds.
- *
- * `record()` is fire-and-forget by design, so the row it writes lands after the
- * call that triggered it returns. A bare `setImmediate` is not enough — the
- * write is a real round trip to Postgres — and asserting immediately makes the
- * test fail on timing rather than on behaviour.
- */
-async function waitFor(
-  predicate: () => Promise<boolean>,
-  timeoutMs = 5_000,
-): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
-
-  while (Date.now() < deadline) {
-    if (await predicate()) return;
-    await new Promise((resolve) => setTimeout(resolve, 25));
-  }
-
-  throw new Error('waitFor timed out');
-}

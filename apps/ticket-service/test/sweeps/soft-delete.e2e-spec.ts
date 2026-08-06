@@ -1,8 +1,12 @@
-import { RpcException } from '@nestjs/microservices';
+import { rpcCode } from '@synapsedesk/common/testing/rpc';
 import { status } from '@grpc/grpc-js';
 import { TicketStatus } from '@synapsedesk/common';
-import { bootstrapE2eTest, E2eFixture } from '../utils/bootstrap';
-import { memberContext, pageRequest } from '../utils/context';
+import {
+  E2eFixture,
+  bootstrapE2eTest,
+  memberContext,
+  pageRequest,
+} from '../utils';
 import {
   buildTenant,
   createAssignedTicket,
@@ -15,11 +19,6 @@ import { MessagesService } from '../../src/modules/messages/messages.service';
 import { AssignmentsService } from '../../src/modules/assignments/assignments.service';
 import { AuthReferenceService } from '../../src/modules/auth-client/auth-reference.service';
 import { TicketEventPublisher } from '../../src/modules/events/ticket-event.publisher';
-
-function rpcCode(error: unknown): number | undefined {
-  if (!(error instanceof RpcException)) return undefined;
-  return (error.getError() as { code?: number }).code;
-}
 
 /**
  * §3.2 The soft-delete sweep.
@@ -41,29 +40,6 @@ describe('§3.2 soft-delete sweep (e2e)', () => {
   let assignments: AssignmentsService;
 
   let tenant: TenantFixture;
-
-  beforeAll(async () => {
-    fx = await bootstrapE2eTest();
-    tickets = fx.moduleRef.get(TicketsService);
-    messages = fx.moduleRef.get(MessagesService);
-    assignments = fx.moduleRef.get(AssignmentsService);
-
-    const authReference = fx.moduleRef.get(AuthReferenceService);
-    jest.spyOn(authReference, 'assertUserExists').mockResolvedValue(undefined);
-    jest
-      .spyOn(authReference, 'assertDepartmentExists')
-      .mockResolvedValue(undefined);
-    jest
-      .spyOn(fx.moduleRef.get(TicketEventPublisher), 'publish')
-      .mockImplementation(() => {});
-  });
-
-  beforeEach(async () => {
-    await fx.reset();
-    tenant = buildTenant();
-  });
-
-  afterAll(() => fx.close());
 
   const admin = () =>
     memberContext(
@@ -102,6 +78,29 @@ describe('§3.2 soft-delete sweep (e2e)', () => {
     await tickets.deleteTicket({ id: ticket.id }, admin());
     return ticket;
   };
+
+  beforeAll(async () => {
+    fx = await bootstrapE2eTest();
+    tickets = fx.moduleRef.get(TicketsService);
+    messages = fx.moduleRef.get(MessagesService);
+    assignments = fx.moduleRef.get(AssignmentsService);
+
+    const authReference = fx.moduleRef.get(AuthReferenceService);
+    jest.spyOn(authReference, 'assertUserExists').mockResolvedValue(undefined);
+    jest
+      .spyOn(authReference, 'assertDepartmentExists')
+      .mockResolvedValue(undefined);
+    jest
+      .spyOn(fx.moduleRef.get(TicketEventPublisher), 'publish')
+      .mockImplementation(() => {});
+  });
+
+  beforeEach(async () => {
+    await fx.reset();
+    tenant = buildTenant();
+  });
+
+  afterAll(() => fx.close());
 
   describe('a soft-deleted ticket is INVISIBLE by default', () => {
     it('1. is absent from the list', async () => {

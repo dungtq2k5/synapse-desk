@@ -1,13 +1,21 @@
-import { RpcException } from '@nestjs/microservices';
+import { expectRpc } from '@synapsedesk/common/testing/rpc';
 import { status } from '@grpc/grpc-js';
+import {
+  OrgStatus as ProtoOrgStatus,
+  toProtoOrgStatus,
+} from '@synapsedesk/grpc-proto';
 import {
   compareAlphabetically,
   ORG_STATUS_TRANSITIONS,
   OrgStatus,
   SystemRoleName,
 } from '@synapsedesk/common';
-import { bootstrapE2eTest, E2eFixture } from '../utils/bootstrap';
-import { pageRequest, superAdminContext } from '../utils/context';
+import {
+  E2eFixture,
+  bootstrapE2eTest,
+  pageRequest,
+  superAdminContext,
+} from '../utils';
 import {
   addMember,
   createDeviceSession,
@@ -15,16 +23,6 @@ import {
   seedTenantWithUser,
 } from '../factories';
 import { PlatformService } from '../../src/modules/platform/platform.service';
-
-function rpcCode(error: unknown): number | undefined {
-  if (!(error instanceof RpcException)) return undefined;
-  return (error.getError() as { code?: number }).code;
-}
-
-async function expectRpc(promise: Promise<unknown>, code: number) {
-  await expect(promise).rejects.toBeInstanceOf(RpcException);
-  await promise.catch((error: unknown) => expect(rpcCode(error)).toBe(code));
-}
 
 describe('Platform (e2e)', () => {
   let fx: E2eFixture;
@@ -148,7 +146,7 @@ describe('Platform (e2e)', () => {
       );
 
       const org = result.organization!.organization!;
-      expect(org.status).toBe(OrgStatus.PENDING_ONBOARDING);
+      expect(org.status).toBe(toProtoOrgStatus(OrgStatus.PENDING_ONBOARDING));
       expect(org.maxAgentSeats).toBeGreaterThan(0);
     });
 
@@ -169,14 +167,22 @@ describe('Platform (e2e)', () => {
 
           if (legal) {
             const result = await platform.setOrganizationStatus(
-              { organizationId: org.id, status: to, reason: 'matrix test' },
+              {
+                organizationId: org.id,
+                status: toProtoOrgStatus(to),
+                reason: 'matrix test',
+              },
               ctx,
             );
-            expect(result.organization!.status).toBe(to);
+            expect(result.organization!.status).toBe(toProtoOrgStatus(to));
           } else {
             await expectRpc(
               platform.setOrganizationStatus(
-                { organizationId: org.id, status: to, reason: 'matrix test' },
+                {
+                  organizationId: org.id,
+                  status: toProtoOrgStatus(to),
+                  reason: 'matrix test',
+                },
                 ctx,
               ),
               status.ABORTED,
@@ -190,16 +196,27 @@ describe('Platform (e2e)', () => {
       }
     });
 
-    it('2b. a status outside the enum is INVALID_ARGUMENT, not ABORTED', async () => {
+    it('2b. an UNSET status is INVALID_ARGUMENT, not ABORTED', async () => {
       // Different failure, different code: ABORTED means "legal value, wrong
       // moment" and a client may retry it; this one will never work.
+      //
+      // This used to send the string 'NONSENSE'. Since `status` became a proto
+      // enum it cannot: an unknown value is rejected by the WIRE before the
+      // handler runs, which is the stronger gate conventions §7.3 asks for and
+      // is no longer expressible as a test. What survives is proto3's zero
+      // value — "the field was not set" — which is the one invalid input a
+      // client can still send.
       const org = await createOrganization(fx.prisma, {
         status: OrgStatus.ACTIVE,
       });
 
       await expectRpc(
         platform.setOrganizationStatus(
-          { organizationId: org.id, status: 'NONSENSE', reason: 'x' },
+          {
+            organizationId: org.id,
+            status: ProtoOrgStatus.ORG_STATUS_UNSPECIFIED,
+            reason: 'x',
+          },
           ctx,
         ),
         status.INVALID_ARGUMENT,
@@ -217,7 +234,11 @@ describe('Platform (e2e)', () => {
       await createDeviceSession(fx.prisma, other.id);
 
       await platform.setOrganizationStatus(
-        { organizationId: t.org.id, status: OrgStatus.FROZEN, reason: 'abuse' },
+        {
+          organizationId: t.org.id,
+          status: toProtoOrgStatus(OrgStatus.FROZEN),
+          reason: 'abuse',
+        },
         ctx,
       );
 
@@ -237,7 +258,7 @@ describe('Platform (e2e)', () => {
       await platform.setOrganizationStatus(
         {
           organizationId: t.org.id,
-          status: OrgStatus.ACTIVE,
+          status: toProtoOrgStatus(OrgStatus.ACTIVE),
           reason: 'resolved',
         },
         ctx,
@@ -258,7 +279,7 @@ describe('Platform (e2e)', () => {
       await platform.setOrganizationStatus(
         {
           organizationId: frozen.org.id,
-          status: OrgStatus.FROZEN,
+          status: toProtoOrgStatus(OrgStatus.FROZEN),
           reason: 'abuse',
         },
         ctx,
@@ -293,7 +314,10 @@ describe('Platform (e2e)', () => {
         organization: { billingCycleStart: new Date('2020-01-01T00:00:00Z') },
       });
 
-      await platform.resetBillingCycle({ organizationId: t.org.id }, ctx);
+      await platform.resetBillingCycle(
+        { organizationId: t.org.id, reason: 'incident make-good' },
+        ctx,
+      );
 
       const org = await fx.prisma.organization.findUniqueOrThrow({
         where: { id: t.org.id },
@@ -340,12 +364,12 @@ describe('Platform (e2e)', () => {
       const hidden = await platform.listOrganizations({
         page: pageRequest(),
         includeDeleted: false,
-        status: '',
+        status: undefined,
       });
       const shown = await platform.listOrganizations({
         page: pageRequest(),
         includeDeleted: true,
-        status: '',
+        status: undefined,
       });
 
       expect(hidden.items.map((i) => i.organization!.id)).not.toContain(
@@ -493,10 +517,17 @@ describe('Platform (e2e)', () => {
         ctx,
       );
       await platform.setOrganizationStatus(
-        { organizationId: t.org.id, status: OrgStatus.FROZEN, reason: 'test' },
+        {
+          organizationId: t.org.id,
+          status: toProtoOrgStatus(OrgStatus.FROZEN),
+          reason: 'test',
+        },
         ctx,
       );
-      await platform.resetBillingCycle({ organizationId: t.org.id }, ctx);
+      await platform.resetBillingCycle(
+        { organizationId: t.org.id, reason: 'incident make-good' },
+        ctx,
+      );
       await platform.offboardOrganization(
         { organizationId: t.org.id, reason: 'test' },
         ctx,

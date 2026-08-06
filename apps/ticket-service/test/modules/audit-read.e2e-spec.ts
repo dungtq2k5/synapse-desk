@@ -1,44 +1,23 @@
-import { RpcException } from '@nestjs/microservices';
+import { expectRpc } from '@synapsedesk/common/testing/rpc';
 import { status } from '@grpc/grpc-js';
 import { faker } from '@faker-js/faker';
 import { toTimestamp } from '@synapsedesk/grpc-proto';
 import { compareAlphabetically } from '@synapsedesk/common';
-import { bootstrapE2eTest, E2eFixture } from '../utils/bootstrap';
 import {
+  E2eFixture,
+  bootstrapE2eTest,
   memberContext,
   pageRequest,
   superAdminContext,
-} from '../utils/context';
+} from '../utils';
 import { buildTenant, createAuditLog, TenantFixture } from '../factories';
 import { AuditReadService } from '../../src/modules/audit/audit-read.service';
-
-function rpcCode(error: unknown): number | undefined {
-  if (!(error instanceof RpcException)) return undefined;
-  return (error.getError() as { code?: number }).code;
-}
-
-async function expectRpc(promise: Promise<unknown>, code: number) {
-  await expect(promise).rejects.toBeInstanceOf(RpcException);
-  await promise.catch((error: unknown) => expect(rpcCode(error)).toBe(code));
-}
 
 describe('§2.9 Audit logs read API (e2e)', () => {
   let fx: E2eFixture;
   let audit: AuditReadService;
 
   let tenant: TenantFixture;
-
-  beforeAll(async () => {
-    fx = await bootstrapE2eTest();
-    audit = fx.moduleRef.get(AuditReadService);
-  });
-
-  beforeEach(async () => {
-    await fx.reset();
-    tenant = buildTenant();
-  });
-
-  afterAll(() => fx.close());
 
   const auditor = (t = tenant) =>
     memberContext({ id: t.agentId, organizationId: t.organizationId }, [
@@ -56,6 +35,18 @@ describe('§2.9 Audit logs read API (e2e)', () => {
     platformScope: false,
     ...overrides,
   });
+
+  beforeAll(async () => {
+    fx = await bootstrapE2eTest();
+    audit = fx.moduleRef.get(AuditReadService);
+  });
+
+  beforeEach(async () => {
+    await fx.reset();
+    tenant = buildTenant();
+  });
+
+  afterAll(() => fx.close());
 
   // ------------------------------------------------------------- scoping
 

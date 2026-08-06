@@ -9,7 +9,7 @@ import type { Metadata } from "@grpc/grpc-js";
 import { GrpcMethod, GrpcStreamMethod } from "@nestjs/microservices";
 import { Observable } from "rxjs";
 import { Timestamp } from "../../google/protobuf/timestamp";
-import { PageMeta, PageRequest, UserResponse } from "./common";
+import { OrgStatus, PageMeta, PageRequest, UserResponse } from "./common";
 import { OrganizationResponse } from "./organization";
 import { RoleResponse } from "./role";
 
@@ -28,8 +28,11 @@ export interface ListPlatformOrganizationsRequest {
   page:
     | PageRequest
     | undefined;
-  /** PENDING_ONBOARDING | ACTIVE | SUSPENDED_PAST_DUE | FROZEN */
-  status?: string | undefined;
+  /**
+   * Absent means "every status"; the enum's UNSPECIFIED is not used as a
+   * filter value, so presence is explicit.
+   */
+  status?: OrgStatus | undefined;
   includeDeleted: boolean;
 }
 
@@ -90,13 +93,22 @@ export interface UpdatePlatformOrganizationRequest {
 
 export interface SetOrganizationStatusRequest {
   organizationId: string;
-  status: string;
+  status: OrgStatus;
   /** Required. "Why is Acme frozen?" is asked six months later, by someone else. */
   reason: string;
 }
 
 export interface ResetBillingCycleRequest {
   organizationId: string;
+  /**
+   * *Mandatory since billing shipped** (14-doc §5). `billing_cycle_start` now
+   * follows Stripe's `current_period_start` AND its epoch sits inside the Redis
+   * quota key — so a manual roll both desynchronizes the quota window from the
+   * invoice period and silently grants a fresh AI budget. The endpoint stays
+   * because it is genuinely needed to make a tenant whole after an incident;
+   * the reason is what makes it break-glass rather than routine.
+   */
+  reason: string;
 }
 
 export interface OffboardOrganizationRequest {

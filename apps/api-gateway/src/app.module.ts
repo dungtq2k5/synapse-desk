@@ -24,6 +24,7 @@ import { FeedbackModule } from './modules/feedback/feedback.module';
 import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
 import { DocumentsModule } from './modules/documents/documents.module';
 import { KnowledgeModule } from './modules/knowledge/knowledge.module';
+import { BillingModule } from './modules/billing/billing.module';
 import { TicketGrpcModule } from './common/grpc/ticket-grpc.module';
 import { IngestionGrpcModule } from './common/grpc/ingestion-grpc.module';
 import { RagGrpcModule } from './common/grpc/rag-grpc.module';
@@ -95,6 +96,7 @@ import { RagGrpcModule } from './common/grpc/rag-grpc.module';
     AuditLogsModule,
     DocumentsModule,
     KnowledgeModule,
+    BillingModule,
     RealtimeModule,
     HealthModule,
   ],

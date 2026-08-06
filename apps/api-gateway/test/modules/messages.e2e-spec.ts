@@ -6,11 +6,13 @@ import {
   REDACTED_MESSAGE_PLACEHOLDER,
 } from '@synapsedesk/common';
 import {
-  bootstrapE2eTest,
+  API,
   E2eFixture,
+  anonymousAgent,
+  authenticatedAgent,
+  bootstrapE2eTest,
   flushTestRedis,
-} from '../utils/bootstrap';
-import { anonymousAgent, API, authenticatedAgent } from '../utils/auth';
+} from '../utils';
 import {
   grpcError,
   timestamp,

@@ -1,20 +1,10 @@
-import { RpcException } from '@nestjs/microservices';
+import { expectRpc, rpcCode } from '@synapsedesk/common/testing/rpc';
 import { status } from '@grpc/grpc-js';
 import { OtpPurpose } from '@synapsedesk/common';
 import { OtpPurpose as ProtoOtpPurpose } from '@synapsedesk/grpc-proto';
-import { bootstrapE2eTest, E2eFixture } from '../utils/bootstrap';
+import { bootstrapE2eTest, E2eFixture } from '../utils';
 import { createOtp, seedTenantWithUser } from '../factories';
 import { OtpService } from '../../src/modules/otp/otp.service';
-
-function rpcCode(error: unknown): number | undefined {
-  if (!(error instanceof RpcException)) return undefined;
-  return (error.getError() as { code?: number }).code;
-}
-
-async function expectRpc(promise: Promise<unknown>, code: number) {
-  await expect(promise).rejects.toBeInstanceOf(RpcException);
-  await promise.catch((error: unknown) => expect(rpcCode(error)).toBe(code));
-}
 
 describe('OTP (e2e)', () => {
   let fx: E2eFixture;

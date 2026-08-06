@@ -1,8 +1,7 @@
-import { RpcException } from '@nestjs/microservices';
+import { expectRpc } from '@synapsedesk/common/testing/rpc';
 import { status } from '@grpc/grpc-js';
 import { EmailTemplateName } from '@synapsedesk/common';
-import { bootstrapE2eTest, E2eFixture } from '../utils/bootstrap';
-import { memberContext } from '../utils/context';
+import { bootstrapE2eTest, E2eFixture, memberContext } from '../utils';
 import {
   addMember,
   createDeviceSession,
@@ -13,20 +12,18 @@ import {
 import { SessionsService } from '../../src/modules/sessions/sessions.service';
 import { AuthService } from '../../src/modules/auth/auth.service';
 
-function rpcCode(error: unknown): number | undefined {
-  if (!(error instanceof RpcException)) return undefined;
-  return (error.getError() as { code?: number }).code;
-}
-
-async function expectRpc(promise: Promise<unknown>, code: number) {
-  await expect(promise).rejects.toBeInstanceOf(RpcException);
-  await promise.catch((error: unknown) => expect(rpcCode(error)).toBe(code));
-}
-
 describe('Sessions (e2e)', () => {
   let fx: E2eFixture;
   let sessions: SessionsService;
   let auth: AuthService;
+
+  /** The caller acting on their OWN sessions. */
+  const own = (t: { user: { id: string; organizationId: string | null } }) =>
+    memberContext(t.user);
+
+  /** An administrator acting on someone else's. */
+  const admin = (t: { user: { id: string; organizationId: string | null } }) =>
+    memberContext(t.user, ['user.session.read', 'user.session.revoke']);
 
   beforeAll(async () => {
     fx = await bootstrapE2eTest();
@@ -37,14 +34,6 @@ describe('Sessions (e2e)', () => {
   beforeEach(() => fx.reset());
 
   afterAll(() => fx.close());
-
-  /** The caller acting on their OWN sessions. */
-  const own = (t: { user: { id: string; organizationId: string | null } }) =>
-    memberContext(t.user);
-
-  /** An administrator acting on someone else's. */
-  const admin = (t: { user: { id: string; organizationId: string | null } }) =>
-    memberContext(t.user, ['user.session.read', 'user.session.revoke']);
 
   // ------------------------------------------------------------------ listing
 

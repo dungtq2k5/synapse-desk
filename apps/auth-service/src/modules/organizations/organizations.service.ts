@@ -11,14 +11,18 @@ import {
   OnboardingResponse,
   OrganizationResponse,
   OrganizationSettingsResponse,
+  OrganizationEntitlementsResponse,
   OrganizationUsageResponse,
   toTimestamp,
   UpdateOrganizationRequest,
   UpdateOrganizationSettingsRequest,
+  toProtoAiModelTier,
+  toProtoOrgStatus,
 } from '@synapsedesk/grpc-proto';
 import {
   AuditAction,
   AuditResourceType,
+  DEFAULT_PLAN_CATALOG,
   EmailTemplateName,
   InvitationStatus,
   OrgStatus,
@@ -78,7 +82,7 @@ export class OrganizationsService {
     }
 
     return {
-      status: organization.status,
+      status: toProtoOrgStatus(organization.status),
       deleted: organization.deletedAt !== null,
     };
   }
@@ -249,6 +253,14 @@ export class OrganizationsService {
     const seatsUsed = await this.seatsInUse(this.prisma, organization.id);
 
     return {
+      // The PLAN, alongside the meters — doc 15 §3.1. This is the page a
+      // customer opens when they hit a limit, and a limit with no plan beside
+      // it is a number they cannot act on: the next question is always "what
+      // would I get if I upgraded", and answering it on a different page means
+      // a second load at the moment someone is already blocked.
+      aiModelTier: toProtoAiModelTier(organization.aiModelTier),
+      planName: planLabelFor(organization),
+      currentPeriodEnd: undefined,
       seats: {
         available: true,
         used: seatsUsed,
@@ -265,6 +277,39 @@ export class OrganizationsService {
           'AI usage metering is not enabled for this workspace yet',
       },
       billingCycleStart: toTimestamp(organization.billingCycleStart),
+    };
+  }
+
+  /**
+   * Everything a spending service needs to gate a request — doc 15 §3.1.
+   *
+   * `ingestion-service` and `rag-service` both need the tier AND the quota
+   * columns, and neither may read `postgres_auth` directly (RDM §1.13). This is
+   * the one call that answers both, and callers CACHE it against
+   * `billing.entitlements_changed` — so it is a cache fill rather than a
+   * per-request read, which is what keeps a third-party-shaped dependency off
+   * the hot path of every AI question.
+   *
+   * Deliberately NOT `getCurrentOrganization`. That returns a tenant's name,
+   * slug, allowed email domains and onboarding state, none of which a quota
+   * gate reads — and shipping them on every cache fill invites a caller to
+   * start depending on a field that has nothing to do with entitlements.
+   */
+  async getOrganizationEntitlements(
+    context: CallerContext,
+  ): Promise<OrganizationEntitlementsResponse> {
+    const organization = await this.load(context);
+
+    return {
+      maxAgentSeats: organization.maxAgentSeats,
+      maxStorageBytes: Number(organization.maxStorageBytes),
+      monthlyAiTokenBudget: Number(organization.monthlyAiTokenBudget),
+      aiModelTier: toProtoAiModelTier(organization.aiModelTier),
+      // The quota window, and its EPOCH is inside the Redis counter key — so a
+      // caller reading a different value from this one would meter into a key
+      // nothing else reads, and the tenant would appear to have spent nothing.
+      billingCycleStart: toTimestamp(organization.billingCycleStart),
+      status: toProtoOrgStatus(organization.status),
     };
   }
 
@@ -322,7 +367,7 @@ export class OrganizationsService {
       canComplete:
         organization.status === String(OrgStatus.PENDING_ONBOARDING) &&
         steps.every((step) => step.complete),
-      status: organization.status,
+      status: toProtoOrgStatus(organization.status),
     };
   }
 
@@ -540,4 +585,26 @@ export class OrganizationsService {
       throw error;
     }
   }
+}
+
+/**
+ * A display label derived from the TIER, never stored.
+ *
+ * Storing a plan name would be the mirroring RDM §1.15 refuses: it diverges the
+ * first time someone renames a product in the Stripe dashboard, silently,
+ * because both sides keep answering confidently. Deriving it is approximate —
+ * two plans can share a tier — and that is fine for a LABEL. It would not be
+ * fine for anything that made a decision, and nothing does.
+ */
+function planLabelFor(organization: {
+  aiModelTier: string;
+  stripeSubscriptionId: string | null;
+}): string {
+  if (!organization.stripeSubscriptionId) return 'Free';
+
+  const match = Object.values(DEFAULT_PLAN_CATALOG).find(
+    (plan) => plan.aiModelTier === organization.aiModelTier,
+  );
+
+  return match?.displayName ?? organization.aiModelTier;
 }

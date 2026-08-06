@@ -1,9 +1,10 @@
 import { RpcException } from '@nestjs/microservices';
+import { waitFor } from '@synapsedesk/common/testing/wait';
+import { expectRpc, rpcCode } from '@synapsedesk/common/testing/rpc';
 import { status } from '@grpc/grpc-js';
 import { faker } from '@faker-js/faker';
 import { TicketStatus } from '@synapsedesk/common';
-import { bootstrapE2eTest, E2eFixture } from '../utils/bootstrap';
-import { memberContext } from '../utils/context';
+import { E2eFixture, bootstrapE2eTest, memberContext } from '../utils';
 import {
   buildTenant,
   createAiSummary,
@@ -14,38 +15,6 @@ import { AiService } from '../../src/modules/ai/ai.service';
 import { TicketsService } from '../../src/modules/tickets/tickets.service';
 import { RagClientService } from '../../src/modules/ai-client/rag-client.service';
 import { TicketEventPublisher } from '../../src/modules/events/ticket-event.publisher';
-
-function rpcCode(error: unknown): number | undefined {
-  if (!(error instanceof RpcException)) return undefined;
-  return (error.getError() as { code?: number }).code;
-}
-
-async function expectRpc(promise: Promise<unknown>, code: number) {
-  await expect(promise).rejects.toBeInstanceOf(RpcException);
-  await promise.catch((error: unknown) => expect(rpcCode(error)).toBe(code));
-}
-
-/**
- * Polls until `predicate` holds, or gives up.
- *
- * The escalation summary is fire-and-forget: it is started and never awaited,
- * and it does real database work before it reaches the model. One `setImmediate`
- * is not enough to let it finish, and a fixed sleep would be either flaky or
- * slow. Polling is neither.
- */
-async function waitFor(
-  predicate: () => boolean | Promise<boolean>,
-  timeoutMs = 2000,
-): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
-
-  while (!(await predicate())) {
-    if (Date.now() > deadline) {
-      throw new Error('Timed out waiting for the background call');
-    }
-    await new Promise((resolve) => setTimeout(resolve, 10));
-  }
-}
 
 describe('§2.6 AI Co-Pilot (e2e)', () => {
   let fx: E2eFixture;
@@ -64,6 +33,20 @@ describe('§2.6 AI Co-Pilot (e2e)', () => {
     suggestedAction: 'Dispatch a field engineer.',
     confidenceScore: 0.82,
     modelName: 'test-model-v1',
+  };
+
+  /** An agent with the queue and the AI grant. */
+  const agent = (t = tenant) =>
+    memberContext({ id: t.agentId, organizationId: t.organizationId }, [
+      'ticket.read.all',
+      'ticket.ai.use',
+      'ticket.escalate',
+    ]);
+
+  /** Makes the canned model available for the tests that need a real write. */
+  const withCannedModel = () => {
+    isAvailable.mockReturnValue(true);
+    generateSummary.mockResolvedValue(CANNED);
   };
 
   beforeAll(async () => {
@@ -99,20 +82,6 @@ describe('§2.6 AI Co-Pilot (e2e)', () => {
   });
 
   afterAll(() => fx.close());
-
-  /** An agent with the queue and the AI grant. */
-  const agent = (t = tenant) =>
-    memberContext({ id: t.agentId, organizationId: t.organizationId }, [
-      'ticket.read.all',
-      'ticket.ai.use',
-      'ticket.escalate',
-    ]);
-
-  /** Makes the canned model available for the tests that need a real write. */
-  const withCannedModel = () => {
-    isAvailable.mockReturnValue(true);
-    generateSummary.mockResolvedValue(CANNED);
-  };
 
   // ------------------------------------------------------- the 503 contract
 
@@ -401,6 +370,8 @@ describe('§2.6 AI Co-Pilot (e2e)', () => {
         modelName: 'test-model-v1',
         promptTokens: 10,
         completionTokens: 20,
+        generationId: 'gen-draft-1',
+        citations: [],
       });
       const ticket = await createTicket(fx.prisma, tenant);
 

@@ -175,6 +175,23 @@ export class SetOrganizationStatusDto {
   readonly reason!: string;
 }
 
+/**
+ * A reason, required — 14-doc §5.
+ *
+ * This endpoint used to be routine tenant administration. Since billing
+ * shipped it is BREAK-GLASS: `billing_cycle_start` follows Stripe's invoice
+ * period, and its epoch is inside the Redis quota key, so rolling it by hand
+ * desynchronizes the two AND hands the tenant a fresh AI budget. Neither
+ * effect is visible in the response, which is why the audit row has to say who
+ * did it and why.
+ */
+export class ResetBillingCycleDto {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(500)
+  readonly reason!: string;
+}
+
 export class OffboardOrganizationDto {
   @IsString()
   @IsNotEmpty()

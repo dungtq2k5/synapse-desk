@@ -51,7 +51,7 @@ import {
   hashToken,
   maskEmail,
   stripTrailingSlashes,
-} from '../../common/utils/utils';
+} from '../../common/utils';
 import { Prisma, UserInvitation } from '../../generated/prisma/client';
 
 /**

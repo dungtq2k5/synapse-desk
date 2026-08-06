@@ -8,6 +8,7 @@ import {
   PlatformServiceClient,
   requireTimestamp,
   toPageRequest,
+  toProtoOrgStatus,
 } from '@synapsedesk/grpc-proto';
 import { RequestContext } from '@synapsedesk/common';
 import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
@@ -57,7 +58,10 @@ export class PlatformGrpcClient extends BaseGrpcClient implements OnModuleInit {
         this.platformGrpcService.listOrganizations(
           {
             page: toPageRequest(query),
-            status: query.status,
+            status:
+              query.status === undefined
+                ? undefined
+                : toProtoOrgStatus(query.status),
             includeDeleted: query.includeDeleted,
           },
           metadata,
@@ -142,7 +146,11 @@ export class PlatformGrpcClient extends BaseGrpcClient implements OnModuleInit {
       await this.call(
         (metadata) =>
           this.platformGrpcService.setOrganizationStatus(
-            { organizationId, status: dto.status, reason: dto.reason },
+            {
+              organizationId,
+              status: toProtoOrgStatus(dto.status),
+              reason: dto.reason,
+            },
             metadata,
           ),
         context,
@@ -152,13 +160,14 @@ export class PlatformGrpcClient extends BaseGrpcClient implements OnModuleInit {
 
   async resetBillingCycle(
     organizationId: string,
+    reason: string,
     context: RequestContext,
   ): Promise<PlatformOrganizationResponseDto> {
     return toPlatformOrganizationDto(
       await this.call(
         (metadata) =>
           this.platformGrpcService.resetBillingCycle(
-            { organizationId },
+            { organizationId, reason },
             metadata,
           ),
         context,

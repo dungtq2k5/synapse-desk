@@ -1,15 +1,17 @@
 import { of } from 'rxjs';
+import { AiModelTier } from '@synapsedesk/grpc-proto';
 import { ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import type { PermissionCode } from '@synapsedesk/common';
 import { PermissionGuard } from '../../src/common/guards/permission.guard';
 import {
-  bootstrapE2eTest,
+  API,
   E2eFixture,
+  authenticatedAgent,
+  bootstrapE2eTest,
   flushTestRedis,
-} from '../utils/bootstrap';
-import { API, authenticatedAgent } from '../utils/auth';
+} from '../utils';
 import { timestamp, wirePage, wireUser } from '../fixtures/wire';
 
 /**
@@ -25,8 +27,10 @@ import { timestamp, wirePage, wireUser } from '../fixtures/wire';
  * through — the e2e half covers the shape that exists, and the unit half covers
  * the rule itself, which is the part that regressed before.
  */
+class TestController {}
+
 describe('PermissionGuard ANY semantics (unit)', () => {
-  function buildGuard() {
+  const buildGuard = () => {
     const reflector = new Reflector();
     const config = {
       getOrThrow: jest.fn().mockReturnValue('test'),
@@ -34,13 +38,13 @@ describe('PermissionGuard ANY semantics (unit)', () => {
     } as unknown as ConfigService;
 
     return { guard: new PermissionGuard(reflector, config), reflector };
-  }
+  };
 
   /** An ExecutionContext carrying a caller with exactly these permissions. */
-  function contextFor(
+  const contextFor = (
     permissionCodes: PermissionCode[],
     overrides: Record<string, unknown> = {},
-  ): ExecutionContext {
+  ): ExecutionContext => {
     const request = {
       user: {
         sub: 'actor',
@@ -64,16 +68,19 @@ describe('PermissionGuard ANY semantics (unit)', () => {
     return {
       switchToHttp: () => ({ getRequest: () => request }),
       getHandler: () => () => undefined,
-      getClass: () => class {},
+      // A named stand-in for the controller class. The guard only ever passes
+      // this to `reflector.getAllAndOverride`, which reads metadata off it and
+      // never instantiates it — so it needs an identity, not members.
+      getClass: () => TestController,
     } as unknown as ExecutionContext;
-  }
+  };
 
-  function requiring(
+  const requiring = (
     reflector: Reflector,
     codes: PermissionCode[] | undefined,
-  ) {
+  ) => {
     jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(codes);
-  }
+  };
 
   it('admits a caller holding ONLY the second of two required codes', () => {
     // The regression this whole file exists for.
@@ -183,6 +190,8 @@ describe('PermissionGuard on real routes (e2e)', () => {
             // value rather than substituting a date, so omitting it here
             // produces a 500 and the route never reports on its guard.
             billingCycleStart: timestamp(),
+            aiModelTier: AiModelTier.AI_MODEL_TIER_FAST,
+            planName: 'Free',
           }),
         ),
     },

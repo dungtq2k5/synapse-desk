@@ -33,6 +33,8 @@ import {
   MessageServiceClient,
   TICKET_SERVICE_NAME,
   TicketServiceClient,
+  BILLING_SERVICE_NAME,
+  BillingServiceClient,
   DOCUMENT_SERVICE_NAME,
   DocumentServiceClient,
 } from '@synapsedesk/grpc-proto';
@@ -78,6 +80,7 @@ export type GrpcStubs = {
   // stubbed through the same map for the same reason: a test asserting on a
   // gateway route should not have to know which service answers it.
   document: MockProxy<DocumentServiceClient>;
+  billing: MockProxy<BillingServiceClient>;
 };
 
 export type GrpcStubFixture = {
@@ -115,6 +118,7 @@ export function stubGrpcServices(): GrpcStubFixture {
     audit: mock<AuditServiceClient>(),
 
     document: mock<DocumentServiceClient>(),
+    billing: mock<BillingServiceClient>(),
   };
 
   const byServiceName: Record<string, unknown> = {
@@ -137,6 +141,7 @@ export function stubGrpcServices(): GrpcStubFixture {
     [AUDIT_SERVICE_NAME]: stubs.audit,
 
     [DOCUMENT_SERVICE_NAME]: stubs.document,
+    [BILLING_SERVICE_NAME]: stubs.billing,
   };
 
   const clientGrpc: ClientGrpc = {

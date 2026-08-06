@@ -1,9 +1,13 @@
-import { RpcException } from '@nestjs/microservices';
+import { expectRpc } from '@synapsedesk/common/testing/rpc';
 import { status } from '@grpc/grpc-js';
 import { faker } from '@faker-js/faker';
 import { toTimestamp } from '@synapsedesk/grpc-proto';
-import { bootstrapE2eTest, E2eFixture } from '../utils/bootstrap';
-import { memberContext, pageRequest } from '../utils/context';
+import {
+  E2eFixture,
+  bootstrapE2eTest,
+  memberContext,
+  pageRequest,
+} from '../utils';
 import {
   buildTenant,
   createAiMessage,
@@ -13,34 +17,11 @@ import {
 } from '../factories';
 import { FeedbackService } from '../../src/modules/feedback/feedback.service';
 
-function rpcCode(error: unknown): number | undefined {
-  if (!(error instanceof RpcException)) return undefined;
-  return (error.getError() as { code?: number }).code;
-}
-
-async function expectRpc(promise: Promise<unknown>, code: number) {
-  await expect(promise).rejects.toBeInstanceOf(RpcException);
-  await promise.catch((error: unknown) => expect(rpcCode(error)).toBe(code));
-}
-
 describe('§2.8 AI feedback (e2e)', () => {
   let fx: E2eFixture;
   let feedback: FeedbackService;
 
   let tenant: TenantFixture;
-
-  beforeAll(async () => {
-    fx = await bootstrapE2eTest();
-    feedback = fx.moduleRef.get(FeedbackService);
-  });
-
-  beforeEach(async () => {
-    await fx.reset();
-    jest.clearAllMocks();
-    tenant = buildTenant();
-  });
-
-  afterAll(() => fx.close());
 
   const author = (t = tenant) =>
     memberContext({ id: t.userId, organizationId: t.organizationId });
@@ -66,6 +47,19 @@ describe('§2.8 AI feedback (e2e)', () => {
     to: undefined,
     ...overrides,
   });
+
+  beforeAll(async () => {
+    fx = await bootstrapE2eTest();
+    feedback = fx.moduleRef.get(FeedbackService);
+  });
+
+  beforeEach(async () => {
+    await fx.reset();
+    jest.clearAllMocks();
+    tenant = buildTenant();
+  });
+
+  afterAll(() => fx.close());
 
   // -------------------------------------------------------------- upsert
 

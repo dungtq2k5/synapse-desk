@@ -59,7 +59,7 @@ import {
   USER_SUMMARY_INCLUDE,
   UserSummaryRow,
 } from './user.mapper';
-import { flattenPermissionCodes } from '../../common/utils/permissions';
+import { flattenPermissionCodes } from '../../common/utils';
 import { Prisma } from '../../generated/prisma/client';
 
 @Injectable()

@@ -2,12 +2,16 @@ import {
   avatarObjectPath,
   compareAlphabetically,
   isStorageObjectPath,
-  PERMISSION_CODES,
   SupersededReason,
 } from '@synapsedesk/common';
 import { randomUUID } from 'node:crypto';
-import { bootstrapE2eTest, E2eFixture, signedUrlFor } from '../utils/bootstrap';
-import { memberContext, requestOrigin } from '../utils/context';
+import {
+  E2eFixture,
+  bootstrapE2eTest,
+  requestOrigin,
+  signedUrlFor,
+  superuser,
+} from '../utils';
 import { seedTenantWithUser } from '../factories';
 import { UsersService } from '../../src/modules/users/users.service';
 import { AuthService } from '../../src/modules/auth/auth.service';
@@ -31,6 +35,10 @@ describe('§2 avatar_url end to end (e2e)', () => {
   let users: UsersService;
   let auth: AuthService;
 
+  /** A stored avatar for `userId`, in the shape storage-service would produce. */
+  const storedAvatar = (organizationId: string, userId: string) =>
+    avatarObjectPath(organizationId, userId, `${randomUUID()}.png`);
+
   beforeAll(async () => {
     fx = await bootstrapE2eTest();
     users = fx.moduleRef.get(UsersService);
@@ -38,15 +46,8 @@ describe('§2 avatar_url end to end (e2e)', () => {
   });
 
   beforeEach(() => fx.reset());
+
   afterAll(() => fx.close());
-
-  const superuser = (t: {
-    user: { id: string; organizationId: string | null };
-  }) => memberContext(t.user, [...PERMISSION_CODES]);
-
-  /** A stored avatar for `userId`, in the shape storage-service would produce. */
-  const storedAvatar = (organizationId: string, userId: string) =>
-    avatarObjectPath(organizationId, userId, `${randomUUID()}.png`);
 
   // --------------------------------------------------------------- read path
 
