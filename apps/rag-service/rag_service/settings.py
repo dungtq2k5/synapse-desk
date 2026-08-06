@@ -224,6 +224,7 @@ class AiSettingsResolver:
         """
         self._cache.pop(organization_id, None)
 
+    # FIXME Use asynchronous features in this function or remove the `async` keyword. [+1 location]
     async def _resolve_tier(self, organization_id: str) -> AiModelTier:
         """Where the tier will come from — and today it comes from nowhere.
 
@@ -251,6 +252,7 @@ def with_co_rag_retries(settings: AiSettings, retries: int) -> AiSettings:
     the tenant, so it is applied here — still through the clamp, so a surface
     cannot buy itself an unbounded retry loop by passing a large number.
     """
+    # FIXME Return a value of type "AiSettings" instead of "DataclassInstance" or update function "with_co_rag_retries" type hint. [+2 locations]
     return replace(
         settings,
         co_rag_max_retries=int(clamp_setting("co_rag_max_retries", retries)),

@@ -575,6 +575,7 @@ class CoRagGenerator:
                 self._last_generation_id = (
                     await asyncio.wait_for(asyncio.shield(task), timeout=2.0) or ""
                 )
+            # FIXME Remove this redundant Exception class; it derives from another which is already caught. [+1 location]
             except (asyncio.TimeoutError, Exception):
                 self._last_generation_id = ""
 
@@ -647,6 +648,7 @@ class CoRagGenerator:
         # bookkeeping latency, it is the value the caller returns.
         try:
             return await asyncio.wait_for(asyncio.shield(task), timeout=2.0) or ""
+          # FIXME Remove this redundant Exception class; it derives from another which is already caught. [+1 location]
         except (asyncio.TimeoutError, Exception):
             # A missing id costs the acceptance loop for one draft. Failing the
             # request would cost the user their answer, which already cost

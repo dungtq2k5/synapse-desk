@@ -8,13 +8,13 @@ requires-python = ">=3.12"
 # exists because this service has no compiler to lean on, which is the same
 # reason `check-model-literals.mjs` scans `.py` as well as `.ts`.
 target-version = "py312"
-src = ["src", "."]
+src = ["."]
 
 # protoc writes these and rewrites them on every `npm run proto:generate`, so
 # any fix applied here is undone by the next generation and shows up as diff
 # noise in between. The same exclusion the TypeScript half makes for
 # `**/generated/` in `.prettierignore` and `eslint.config.mjs`.
-extend-exclude = ["src/rag_service/generated", "**/__pycache__"]
+extend-exclude = ["rag_service/generated", "**/__pycache__"]
 
 [tool.ruff.lint]
 # Chosen from the findings that were ACTUALLY present, rather than by taking
@@ -57,19 +57,22 @@ ignore = [
 # Read from pyproject by pyright and by Pylance, so it needs no per-editor file.
 venvPath = "."
 venv = ".venv"
-extraPaths = ["src", "."]
+extraPaths = ["."]
 
 [tool.pytest.ini_options]
-# `src` layout, so tests import `rag_service.*` the same way the service does
-# rather than by relative path — a test that imported differently from
-# production would be testing a different module graph.
+# Flat layout: `rag_service/` and `tests/` are both directly under this
+# directory, so the project root is the only import root either one needs.
+# Tests import `rag_service.*` exactly as the service does rather than by
+# relative path — a test that imported differently from production would be
+# testing a different module graph — and `conftest.py`'s
+# `from tests.fakes import ...` resolves from the same entry.
 #
-# `.` as well as `src`: `conftest.py` does `from tests.fakes import ...`, and
-# without the project root on the path that import fails before a single test
-# is collected — `pytest` from this directory dies with "No module named
-# 'tests'". `src` alone is enough for the service's own modules, which is why
-# it looked complete.
-pythonpath = ["src", "."]
+# A `src/` layer used to sit in between. Its one real benefit is forcing tests
+# to import the INSTALLED package so packaging bugs surface, and that never
+# applied here: there is no `[build-system]`, nothing installs this package, and
+# it runs from source in both dev and CI. So the layer cost a directory and
+# bought nothing.
+pythonpath = ["."]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 asyncio_mode = "auto"
@@ -81,7 +84,7 @@ asyncio_default_fixture_loop_scope = "function"
 # Pyrefly reads `[tool.pyright]` above when it finds no config of its own, which
 # is why the CLI looked healthy long after the editor stopped being — the two
 # were resolving different settings.
-search-path = ["src", "."]
+search-path = ["."]
 infer-with-first-use = false
 
 # The line that actually fixes "Cannot find module `asyncpg`" in the editor.

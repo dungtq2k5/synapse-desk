@@ -23,6 +23,7 @@ from typing import ClassVar
 
 import pytest
 
+import rag_service
 from rag_service.enums import AiGenerationPurpose
 from rag_service.generation.copilot import CopilotService
 from rag_service.generation.corag import CoRagGenerator, GenerationDelta
@@ -30,7 +31,12 @@ from rag_service.preprocess.pipeline import PreprocessPipeline, Turn
 from rag_service.retrieval.service import BudgetState, HydratedChunk
 from rag_service.settings import AiSettings, resolve_ai_settings
 
-SOURCE_ROOT = Path(__file__).resolve().parents[1] / "src" / "rag_service"
+# Derived from the IMPORTED package rather than spelled as a relative path, so
+# the scan follows the package wherever it lives. The literal version silently
+# scanned nothing when the `src/` layer was removed — the guard assertions below
+# caught it, which is exactly why they are there, but the scan should not need
+# catching in the first place.
+SOURCE_ROOT = Path(rag_service.__file__).resolve().parent
 CYCLE = datetime(2026, 8, 1, tzinfo=timezone.utc)
 
 

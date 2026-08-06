@@ -122,14 +122,14 @@ class TestCrossLanguageAgreement:
 
 
 def _purposes_written_by_this_service() -> set[str]:
-    """Every `AiGenerationPurpose.X` referenced under `src/`.
+    """Every `AiGenerationPurpose.X` referenced under `rag_service/`.
 
     A source scan rather than a runtime check, because the wrong-value bug it
     guards against is on a path that only runs when a specific RPC is called —
     and a test that had to call every RPC to find it would miss the next one
     added.
     """
-    source_root = REPO_ROOT / "apps/rag-service/src/rag_service"
+    source_root = REPO_ROOT / "apps/rag-service/rag_service"
     found: set[str] = set()
 
     for path in source_root.rglob("*.py"):

@@ -46,8 +46,8 @@ const SKIP_DIRECTORIES = new Set([
 const ALLOWED = [
   join('libs', 'common', 'src', 'configs', 'ai-settings.config.ts'),
   join('libs', 'common', 'src', 'configs', 'ai-pricing.config.ts'),
-  join('apps', 'rag-service', 'src', 'rag_service', 'settings.py'),
-  join('apps', 'rag-service', 'src', 'rag_service', 'pricing.py'),
+  join('apps', 'rag-service', 'rag_service', 'settings.py'),
+  join('apps', 'rag-service', 'rag_service', 'pricing.py'),
   // This script names the patterns it searches for, which is unavoidable.
   join('scripts', 'check-model-literals.mjs'),
 ];

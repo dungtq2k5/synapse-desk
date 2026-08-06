@@ -70,6 +70,7 @@ async def semantic_arm(
             vector_point_id=str(point.id),
             chunk_id=str((point.payload or {}).get("chunk_id", "")),
             document_id=str((point.payload or {}).get("document_id", "")),
+            # FIXME Unnecessary `float()` call; argument is already of type `float`
             score=float(point.score),
         )
         for point in response.points

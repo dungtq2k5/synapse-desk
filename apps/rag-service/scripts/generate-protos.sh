@@ -10,7 +10,7 @@ set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/../../.." && pwd)"
 PROTO_ROOT="$ROOT/libs/grpc-proto/src/proto"
-OUT="$HERE/../src/rag_service/generated"
+OUT="$HERE/../rag_service/generated"
 
 mkdir -p "$OUT"
 
