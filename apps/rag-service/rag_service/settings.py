@@ -224,8 +224,14 @@ class AiSettingsResolver:
         """
         self._cache.pop(organization_id, None)
 
-    # FIXME Use asynchronous features in this function or remove the `async` keyword. [+1 location]
-    async def _resolve_tier(self, organization_id: str) -> AiModelTier:
+    # `async` with nothing awaited, deliberately.
+    #
+    # The lookup this stands in for is an RPC (`GetOrganizationEntitlements`),
+    # so the keyword describes what the method IS rather than what today's
+    # one-line body does. Dropping it now would move `settings_for`'s call site
+    # as well, and move it back when the RPC lands — the exact churn the
+    # docstring below claims this shape avoids.
+    async def _resolve_tier(self, organization_id: str) -> AiModelTier:  # NOSONAR
         """Where the tier will come from — and today it comes from nowhere.
 
         `organizations.ai_model_tier` does not exist yet: the Stripe webhook
@@ -252,8 +258,13 @@ def with_co_rag_retries(settings: AiSettings, retries: int) -> AiSettings:
     the tenant, so it is applied here — still through the clamp, so a surface
     cannot buy itself an unbounded retry loop by passing a large number.
     """
-    # FIXME Return a value of type "AiSettings" instead of "DataclassInstance" or update function "with_co_rag_retries" type hint. [+2 locations]
-    return replace(
+    # This DOES return `AiSettings`. typeshed types the stdlib helper as
+    # `replace(obj: _DataclassT, /, **changes: Any) -> _DataclassT` — a TypeVar
+    # that resolves to whatever went in — so an analyzer reporting
+    # `DataclassInstance` is showing the TypeVar's BOUND rather than its
+    # solution. Checked rather than assumed: ruff and pyrefly both accept the
+    # annotation, and the returned value is an `AiSettings` at runtime.
+    return replace(  # NOSONAR
         settings,
         co_rag_max_retries=int(clamp_setting("co_rag_max_retries", retries)),
     )

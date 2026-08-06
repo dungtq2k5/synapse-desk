@@ -12,6 +12,7 @@ and records the gap; it does not fall back to general knowledge (11-doc §1.6).
 An enterprise support bot inventing a policy is worse than one that escalates,
 and the notebook app this pipeline came from did the opposite.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -575,8 +576,15 @@ class CoRagGenerator:
                 self._last_generation_id = (
                     await asyncio.wait_for(asyncio.shield(task), timeout=2.0) or ""
                 )
-            # FIXME Remove this redundant Exception class; it derives from another which is already caught. [+1 location]
-            except (asyncio.TimeoutError, Exception):
+            # `Exception` alone. `asyncio.TimeoutError` IS the builtin
+            # `TimeoutError` on 3.11+, which derives from it, so naming both
+            # read as "the timeout is handled differently here" when nothing
+            # distinguishes it.
+            #
+            # What this does NOT catch is the point: `CancelledError` derives
+            # from `BaseException`, so cancellation still propagates — and this
+            # method's whole `shield` dance exists to get that right.
+            except Exception:
                 self._last_generation_id = ""
 
         return content
@@ -648,8 +656,10 @@ class CoRagGenerator:
         # bookkeeping latency, it is the value the caller returns.
         try:
             return await asyncio.wait_for(asyncio.shield(task), timeout=2.0) or ""
-          # FIXME Remove this redundant Exception class; it derives from another which is already caught. [+1 location]
-        except (asyncio.TimeoutError, Exception):
+        # `Exception` alone — `asyncio.TimeoutError` is the builtin
+        # `TimeoutError`, already covered. `CancelledError` is a `BaseException`
+        # and deliberately still escapes.
+        except Exception:
             # A missing id costs the acceptance loop for one draft. Failing the
             # request would cost the user their answer, which already cost
             # money to produce.

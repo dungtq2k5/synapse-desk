@@ -59,7 +59,12 @@ class TestCollection:
         # the tenant filter quietly becomes the dominant cost of every query.
         fields = await payload_index_fields(qdrant)
 
-        for field in (ORGANIZATION_ID, IS_DELETED, DEPARTMENT_IDS, IS_ORGANIZATION_WIDE):
+        for field in (
+            ORGANIZATION_ID,
+            IS_DELETED,
+            DEPARTMENT_IDS,
+            IS_ORGANIZATION_WIDE,
+        ):
             assert field in fields, f"{field} is not payload-indexed"
 
 
@@ -349,22 +354,46 @@ class TestLexicalArmSpecifics:
 
         assert results == []
 
-    async def test_matches_non_english_text(
-        self, qdrant, pool, seed, tenant_a
-    ):
+    async def test_matches_non_english_text(self, qdrant, pool, seed, tenant_a):
         # The index uses `'simple'` because the corpus is multilingual — the
         # embedding model is. The `english` dictionary would stem and
         # stop-word non-English text into nonsense, and the failure would look
         # like "search does not work in French" rather than like a config bug.
-        chunk = await seed(
-            tenant_a.organization_id, text="politique de congés annuels"
-        )
+        chunk = await seed(tenant_a.organization_id, text="politique de congés annuels")
 
         results = await lexical_arm(
             pool, tenant_scope(tenant_a.outsider()), "congés", limit=50
         )
 
         assert [result.chunk_id for result in results] == [chunk.chunk_id]
+
+
+class TestSemanticArmSpecifics:
+    """Things only the semantic arm can get wrong."""
+
+    async def test_reports_qdrant_s_REAL_similarity_score(
+        self, qdrant, seed, query_vector, tenant_a
+    ):
+        # The score is not bookkeeping: `retrieval.service` copies it onto the
+        # hydrated chunk and `server.py` puts it on the wire, so a client ranks
+        # and displays whatever this field says.
+        #
+        # Nothing asserted it before. That was demonstrated rather than assumed
+        # — replacing the assignment with a constant `0.0` left all 217 tests
+        # passing, which is the definition of an unheld invariant.
+        #
+        # `1.0` is exact rather than arbitrary: `seed` writes `[0.1] * DIM` and
+        # `query_vector` is the same vector, so their cosine similarity is 1 by
+        # construction. That pins the real value, where "is positive" would
+        # accept any constant a refactor happened to leave behind.
+        chunk = await seed(tenant_a.organization_id, text=SHARED_TEXT)
+
+        results = await semantic_arm(
+            qdrant, tenant_scope(tenant_a.outsider()), query_vector, limit=50
+        )
+
+        assert [result.chunk_id for result in results] == [chunk.chunk_id]
+        assert results[0].score == pytest.approx(1.0, abs=1e-3)
 
 
 class TestRescopeTakesEffectPerArm:
