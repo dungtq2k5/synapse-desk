@@ -19,6 +19,7 @@ import {
 import { AppModule } from '../../src/app.module';
 import { PrismaService } from '../../src/modules/prisma/prisma.service';
 import { faultInjector } from '@synapsedesk/common/testing/fault';
+import { stopExportWorker } from '../utils';
 
 /**
  * The audit consumer, driven over a REAL NATS connection.
@@ -129,6 +130,7 @@ describe('AuditConsumer over NATS (e2e)', () => {
   });
 
   afterAll(async () => {
+    await stopExportWorker(app);
     await client?.close();
     await nats?.close();
     await app?.close();

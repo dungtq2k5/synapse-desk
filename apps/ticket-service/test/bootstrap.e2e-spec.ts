@@ -19,6 +19,7 @@ import {
 import { bootstrapE2eTest, E2eFixture } from './utils/bootstrap';
 import { buildTenant, buildTicket } from './factories';
 import { AppModule } from '../src/app.module';
+import { stopExportWorker } from './utils';
 
 /**
  * Proves the ticket-service fixture itself, before any suite depends on it.
@@ -218,6 +219,8 @@ describe('2. ticket-service boots as a hybrid app (e2e)', () => {
   }, 30_000);
 
   afterAll(async () => {
+    // This app has its OWN export worker — see `stopExportWorker`.
+    await stopExportWorker(app);
     await nats?.close();
     await app?.close();
   });

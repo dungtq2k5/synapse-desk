@@ -8,3 +8,4 @@
 
 export * from './bootstrap';
 export * from './context';
+export * from './export-worker';
