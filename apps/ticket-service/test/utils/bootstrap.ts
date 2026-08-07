@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AppModule } from '../../src/app.module';
 import { PrismaService } from '../../src/modules/prisma/prisma.service';
 import { DatabaseSeeder } from '../../src/modules/prisma/database.seeder';
+import { AnalyticsExportProcessor } from '../../src/modules/analytics/analytics-export.processor';
 
 export type E2eFixture = {
   moduleRef: TestingModule;
@@ -33,6 +34,25 @@ export async function bootstrapE2eTest(): Promise<E2eFixture> {
   // want. The bootstrap smoke spec starts those explicitly.
   await moduleRef.init();
 
+  /**
+   * The export WORKER, stopped.
+   *
+   * Not an optimisation — a correctness requirement. `AnalyticsExportProcessor`
+   * is a real BullMQ `@Processor` against the same Redis the tests use, so a
+   * queued job is picked up by the live worker in this process, racing whatever
+   * the test does explicitly. The symptom was an export the test had just
+   * watched FAIL coming back READY a moment later, which reads as a bug in the
+   * code under test rather than in the fixture.
+   *
+   * Stopped rather than never started, because `@Processor` builds its Worker
+   * from the queue's own connection — replacing the queue provider leaves the
+   * explorer with nothing to build one from, and it throws at boot.
+   *
+   * The suites drive `process()` directly, which is the same discipline every
+   * other job here follows: an explicit input beats waiting on a scheduler.
+   */
+  await moduleRef.get(AnalyticsExportProcessor).worker.close();
+
   // Explicit, rather than relying on OnApplicationBootstrap: SEED_ON_BOOTSTRAP
   // is false in .env.test precisely so there is ONE seeding path. This is what
   // applies `ticket_assignments_current_key` — skip it and the concurrent-
@@ -57,6 +77,9 @@ export async function bootstrapE2eTest(): Promise<E2eFixture> {
         "ai_summaries",
         "ai_response_feedbacks",
         "audit_logs",
+        "analytics_exports",
+        "ticket_daily_stats",
+        "agent_daily_stats",
         "tickets"
       RESTART IDENTITY CASCADE;
     `);

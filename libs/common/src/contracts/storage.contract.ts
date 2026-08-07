@@ -20,6 +20,19 @@ export enum StoragePurpose {
   TICKET_ATTACHMENT = 'TICKET_ATTACHMENT',
   /** Reserved for Domain C's `ingestion-service`. No caller today. */
   DOCUMENT = 'DOCUMENT',
+  /**
+   * An analytics export — 19-doc §5.
+   *
+   * A new purpose rather than a second file path: the signed-URL discipline,
+   * the tenant path prefix and the deletion story all already exist here, and
+   * inventing a parallel mechanism for one feature is how a bucket ends up with
+   * two sets of rules.
+   *
+   * **A signed URL to a file containing a tenant's full ticket history is a
+   * CREDENTIAL.** Short expiry on the URL, and a retention policy on the
+   * object — see `PURPOSE_POLICY`.
+   */
+  EXPORT = 'EXPORT',
 }
 
 export const STORAGE_PATTERNS = {

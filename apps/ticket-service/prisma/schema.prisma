@@ -320,3 +320,177 @@ model AuditLog {
   @@index([userId])
   @@map("audit_logs")
 }
+
+/// 19-doc §2.2 — the daily ticket rollup.
+///
+/// **Why a table and not a query.** `/analytics/overview` over a quarter is an
+/// aggregation across every ticket in a tenant, ON THE TABLE SERVING TICKET
+/// CREATION. A Monday-morning dashboard load competing with the hot path is the
+/// failure mode, and no amount of endpoint design fixes it.
+///
+/// **Not a materialized view**: those cannot be expressed in Prisma, refresh
+/// whole rather than incrementally, and a `REFRESH` over a quarter is the same
+/// hot-path competition moved to a different hour. A plain table written by an
+/// idempotent daily job is testable, backfillable and incremental.
+///
+/// **SUMS AND COUNTS, never averages.** An average of daily averages is not the
+/// average — it weights a Tuesday with 3 tickets equally with a Monday with
+/// 300. Every rate and mean is computed at READ time from a sum and a count.
+/// This is the single most common way a metrics table produces confidently
+/// wrong numbers, and it is unrecoverable after the fact because the inputs are
+/// gone.
+model TicketDailyStat {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  organizationId String @map("organization_id") @db.Uuid
+
+  /// A DATE in the TENANT'S timezone, not UTC — 19-doc §2.2 test 4.
+  ///
+  /// A tenant at UTC+7 whose Monday starts at 17:00 Sunday UTC would otherwise
+  /// see every daily figure split across two rows, and no consumer could
+  /// reassemble them.
+  day DateTime @db.Date
+
+  /// NULL is the tenant-wide row for tickets with no department.
+  ///
+  /// Kept as a real dimension rather than summed away, because
+  /// `?departmentId=` has to agree with `GET /tickets?departmentId=` and a
+  /// tenant-only rollup could not answer it.
+  departmentId String? @map("department_id") @db.Uuid
+
+  ticketsCreated   Int @default(0) @map("tickets_created")
+  ticketsResolved  Int @default(0) @map("tickets_resolved")
+  ticketsEscalated Int @default(0) @map("tickets_escalated")
+
+  /// The deflection PAIR, and both are bucketed on the CONVERSATION'S day.
+  ///
+  /// A cohort rather than two independent event counts: a conversation started
+  /// Sunday and deflected Monday counts on Sunday for both, so the ratio is
+  /// "of conversations started that day, how many needed no human" and cannot
+  /// exceed 1. Bucketing the numerator on its own resolution day would produce
+  /// deflection rates above 100% on any day following a busy one.
+  ///
+  /// The cost is that today's figure is PROVISIONAL until its conversations
+  /// close — which is why the job is re-runnable and why ranges including today
+  /// cache briefly (19-doc §4).
+  chatConversations             Int @default(0) @map("chat_conversations")
+  chatResolvedWithoutEscalation Int @default(0) @map("chat_resolved_without_escalation")
+
+  firstResponseSecondsSum Int @default(0) @map("first_response_seconds_sum")
+  firstResponseCount      Int @default(0) @map("first_response_count")
+
+  /// Split from the human figures deliberately — 19-doc §3.1.
+  ///
+  /// An AI reply in 2 seconds genuinely IS a first response, and blending it
+  /// with human response time produces a headline that improves whenever AI
+  /// usage rises. That is the metric measuring itself.
+  aiFirstResponseSecondsSum Int @default(0) @map("ai_first_response_seconds_sum")
+  aiFirstResponseCount      Int @default(0) @map("ai_first_response_count")
+
+  resolutionSecondsSum Int @default(0) @map("resolution_seconds_sum")
+  resolutionCount      Int @default(0) @map("resolution_count")
+
+  feedbackPositive      Int @default(0) @map("feedback_positive")
+  feedbackNegative      Int @default(0) @map("feedback_negative")
+  citationAccurateCount Int @default(0) @map("citation_accurate_count")
+  citationRatedCount    Int @default(0) @map("citation_rated_count")
+
+  /// When the job that wrote this row ran.
+  ///
+  /// Load-bearing rather than decorative: it goes into the analytics CACHE KEY
+  /// for closed ranges (19-doc §4), so a backfill correction invalidates the
+  /// affected entries automatically instead of serving known-wrong numbers for
+  /// a day. It is also what an export records so two people exporting "last
+  /// quarter" a week apart can tell why their numbers differ.
+  computedAt DateTime @default(now()) @map("computed_at") @db.Timestamptz
+
+  /// Prisma cannot express a unique index over a NULLable column that treats
+  /// NULLs as equal, and `department_id` is NULL for unassigned tickets — so
+  /// the real constraint is a PARTIAL pair applied by the seeder. Declaring
+  /// `@@unique` here would silently permit duplicate tenant-wide rows.
+  @@index([organizationId, day])
+  @@map("ticket_daily_stats")
+}
+
+/// 19-doc §2.2 — the daily per-agent rollup.
+///
+/// Separate from `ticket_daily_stats` rather than a wider dimension on it: an
+/// agent is a person and a department is a queue, and one row per (day,
+/// department, agent) would multiply the table by agent count for every metric
+/// that has nothing to do with agents.
+model AgentDailyStat {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  organizationId String @map("organization_id") @db.Uuid
+  day            DateTime @db.Date
+
+  /// No FK — `users` lives in postgres_auth (RDM §1.13). The display name is
+  /// hydrated at read time by the gateway, which is the same cross-service
+  /// reference pattern used everywhere else.
+  agentId String @map("agent_id") @db.Uuid
+
+  assigned     Int @default(0)
+  resolved     Int @default(0)
+  messagesSent Int @default(0) @map("messages_sent")
+
+  resolutionSecondsSum Int @default(0) @map("resolution_seconds_sum")
+  resolutionCount      Int @default(0) @map("resolution_count")
+
+  computedAt DateTime @default(now()) @map("computed_at") @db.Timestamptz
+
+  /// `agent_id` is NOT NULL here, so this one CAN be expressed.
+  @@unique([organizationId, day, agentId])
+  @@index([organizationId, day])
+  @@map("agent_daily_stats")
+}
+
+/// 19-doc §5 — an async analytics export.
+///
+/// **`GET /analytics/export` is not a read**: it creates a job, produces a file
+/// and returns a download URL. So it needs an owner, and ticket-service owns
+/// most of the source data.
+///
+/// **An export is a SNAPSHOT with a timestamp in it.** Two people exporting
+/// "last quarter" a week apart get different numbers if a backfill ran between,
+/// so the file records when it was generated and from which rollup run — or it
+/// becomes a disputed number in a meeting with nothing to settle it.
+model AnalyticsExport {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  organizationId String @map("organization_id") @db.Uuid
+
+  /// No FK — postgres_auth. Who asked, so an operator can answer "who exported
+  /// our ticket history".
+  requestedById String @map("requested_by_id") @db.Uuid
+
+  /// AnalyticsExportKind.
+  kind String @db.VarChar(30)
+
+  /// The range, as the tenant's local dates — the same domain the rollups use.
+  fromDay DateTime @map("from_day") @db.Date
+  toDay   DateTime @map("to_day") @db.Date
+
+  departmentId String? @map("department_id") @db.Uuid
+
+  /// AnalyticsExportStatus.
+  status String @default("PENDING") @db.VarChar(20)
+
+  /// The object in storage. Absent until the file exists.
+  objectPath String? @map("object_path") @db.Text
+  rowCount   Int?    @map("row_count")
+
+  /// **The disputed-number guard.** The newest `computed_at` across the rollup
+  /// rows this file was built from, recorded here AND written into the file. A
+  /// reader comparing two exports can then see whether the data was recomputed
+  /// between them rather than guessing.
+  rollupComputedAt DateTime? @map("rollup_computed_at") @db.Timestamptz
+
+  /// Why it failed. Present exactly when `status = FAILED`.
+  errorLog String? @map("error_log") @db.Text
+
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  completedAt DateTime? @map("completed_at") @db.Timestamptz
+
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@map("analytics_exports")
+}

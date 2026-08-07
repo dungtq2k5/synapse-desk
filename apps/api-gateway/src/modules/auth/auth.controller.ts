@@ -16,7 +16,7 @@ import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { RegisterDto, RegisterResponseDto } from './dto/rest/register.dto';
 import { JwtCookieService } from './jwt-cookie.service';
-import { RequestContext, RequestOrigin } from '@synapsedesk/common';
+import { RequestContext, RequestOrigin, OrgAccess } from '@synapsedesk/common';
 import { CurrentOrigin } from '../../common/decorators/current-origin.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ResponseMessage } from '../../common/decorators/response-message.decorator';
@@ -50,7 +50,6 @@ import {
   ROUTE_THROTTLE,
 } from '../../common/config/app.config';
 import { OrgAccessKind } from '../../common/decorators/org-access.decorator';
-import { OrgAccess } from '@synapsedesk/common';
 
 @AuthThrottle()
 @OrgAccessKind(OrgAccess.AUTH)

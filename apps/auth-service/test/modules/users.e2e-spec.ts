@@ -716,4 +716,242 @@ describe('Users (e2e)', () => {
       ).toBe(false);
     });
   });
+
+  // ------------------------------------------------- notification audiences
+
+  /**
+   * The two AUDIENCE resolvers — 18-doc §1.3.
+   *
+   * **notification-service mocks both, in three suites.** That is correct for
+   * those tests, which are about fan-out and quiet hours rather than about
+   * roles. The consequence is that the implementations here — including the
+   * tenant scoping, which is the security boundary — were reached by nothing.
+   * The mocks would have gone on agreeing with each other indefinitely.
+   */
+  describe('listPermissionHolders', () => {
+    it('returns everyone in the tenant holding the permission', async () => {
+      const t = await seedTenantWithUser(fx.prisma, {
+        permissionCodes: ['ticket.read.all'],
+      });
+
+      const { items } = await users.listPermissionHolders({
+        organizationId: t.org.id,
+        permissionCode: 'ticket.read.all',
+      });
+
+      expect(items.map((i) => i.userId)).toEqual([t.user.id]);
+      expect(items[0]).toMatchObject({ email: t.user.email });
+    });
+
+    it('**never crosses a tenant boundary**', async () => {
+      // The caller here is a background consumer with no user and no token, so
+      // the `organizationId` field is the ONLY thing standing between a quota
+      // alert and every address in the database.
+      const mine = await seedTenantWithUser(fx.prisma, {
+        permissionCodes: ['ticket.read.all'],
+      });
+      const theirs = await seedForeignTenant(fx.prisma, {
+        permissionCodes: ['ticket.read.all'],
+      });
+
+      const { items } = await users.listPermissionHolders({
+        organizationId: mine.org.id,
+        permissionCode: 'ticket.read.all',
+      });
+
+      expect(items.map((i) => i.userId)).toEqual([mine.user.id]);
+      expect(items.map((i) => i.userId)).not.toContain(theirs.user.id);
+    });
+
+    it('excludes DELETED and LOCKED accounts', async () => {
+      // A notification to a deactivated account is a row nobody will read and
+      // mail to an address that may now belong to someone else. A locked user
+      // also cannot act on the alert, which is the entire reason for addressing
+      // it by permission rather than by name.
+      const t = await seedTenantWithUser(fx.prisma, {
+        permissionCodes: ['ticket.read.all'],
+      });
+      const deleted = await addMember(fx.prisma, t.org.id, {
+        roleIds: [t.role.id],
+      });
+      const locked = await addMember(fx.prisma, t.org.id, {
+        roleIds: [t.role.id],
+      });
+
+      await fx.prisma.user.update({
+        where: { id: deleted.id },
+        data: { deletedAt: new Date() },
+      });
+      await fx.prisma.user.update({
+        where: { id: locked.id },
+        data: { isLocked: true },
+      });
+
+      const { items } = await users.listPermissionHolders({
+        organizationId: t.org.id,
+        permissionCode: 'ticket.read.all',
+      });
+
+      expect(items.map((i) => i.userId)).toEqual([t.user.id]);
+    });
+
+    it('holders of a DIFFERENT permission are not an audience', async () => {
+      const t = await seedTenantWithUser(fx.prisma, {
+        permissionCodes: ['document.read'],
+      });
+
+      const { items } = await users.listPermissionHolders({
+        organizationId: t.org.id,
+        permissionCode: 'ticket.read.all',
+      });
+
+      expect(items).toEqual([]);
+    });
+
+    it('narrows to a DEPARTMENT when asked, and to the tenant when not', async () => {
+      // 18-doc §3.1. Absent means the whole tenant, which is right for a quota
+      // alert — one budget per organization — and wrong for a ticket
+      // escalation: every agent in the company hearing about one department's
+      // queue is the noise that makes people stop reading them.
+      const t = await seedTenantWithUser(fx.prisma, {
+        permissionCodes: ['ticket.read.all'],
+      });
+      const other = await createDepartment(fx.prisma, t.org.id);
+      const elsewhere = await addMember(fx.prisma, t.org.id, {
+        roleIds: [t.role.id],
+      });
+      await fx.prisma.userDepartment.create({
+        data: { userId: elsewhere.id, departmentId: other.id },
+      });
+
+      const scoped = await users.listPermissionHolders({
+        organizationId: t.org.id,
+        permissionCode: 'ticket.read.all',
+        departmentId: other.id,
+      });
+      expect(scoped.items.map((i) => i.userId)).toEqual([elsewhere.id]);
+
+      const tenantWide = await users.listPermissionHolders({
+        organizationId: t.org.id,
+        permissionCode: 'ticket.read.all',
+      });
+      expect(tenantWide.items.map((i) => i.userId).sort()).toEqual(
+        [t.user.id, elsewhere.id].sort(),
+      );
+    });
+
+    it('**a missing field is INVALID_ARGUMENT, not a 500**', async () => {
+      // The guard added in 16-doc. Without it an empty string reaches a
+      // `@db.Uuid` column, the driver raises, Nest wraps it as UNKNOWN and the
+      // gateway answers 500 to something that is plainly a bad request.
+      await expectRpc(
+        users.listPermissionHolders({
+          organizationId: '',
+          permissionCode: 'ticket.read.all',
+        }),
+        status.INVALID_ARGUMENT,
+      );
+
+      await expectRpc(
+        users.listPermissionHolders({
+          organizationId: '00000000-0000-4000-8000-000000000000',
+          permissionCode: '',
+        }),
+        status.INVALID_ARGUMENT,
+      );
+    });
+  });
+
+  describe('listUsersByIds', () => {
+    it('turns ids into addresses and quiet-hours settings', async () => {
+      // This read decides NOTHING about who should be notified — a ticket event
+      // already knows its assignee. Resolving `ticket.read` holders instead
+      // would tell every agent in the tenant that one of them got a ticket.
+      const t = await seedTenantWithUser(fx.prisma);
+      await fx.prisma.user.update({
+        where: { id: t.user.id },
+        data: {
+          quietHoursStart: '22:00',
+          quietHoursEnd: '07:00',
+          timezone: 'Asia/Ho_Chi_Minh',
+        },
+      });
+
+      const { items } = await users.listUsersByIds({
+        organizationId: t.org.id,
+        userIds: [t.user.id],
+      });
+
+      expect(items).toEqual([
+        {
+          userId: t.user.id,
+          email: t.user.email,
+          fullName: t.user.fullName,
+          quietHoursStart: '22:00',
+          quietHoursEnd: '07:00',
+          timezone: 'Asia/Ho_Chi_Minh',
+        },
+      ]);
+    });
+
+    it('**an id from ANOTHER tenant resolves to nothing**', async () => {
+      // Scoped by organization as well as by id. A caller supplying a foreign
+      // id gets nothing rather than a lookup that happens to succeed — which
+      // matters most here, on a path whose caller is a background consumer with
+      // no user to check.
+      const mine = await seedTenantWithUser(fx.prisma);
+      const theirs = await seedForeignTenant(fx.prisma);
+
+      const { items } = await users.listUsersByIds({
+        organizationId: mine.org.id,
+        userIds: [mine.user.id, theirs.user.id],
+      });
+
+      expect(items.map((i) => i.userId)).toEqual([mine.user.id]);
+    });
+
+    it('excludes DELETED and LOCKED accounts, like the other audience', async () => {
+      const t = await seedTenantWithUser(fx.prisma);
+      const gone = await addMember(fx.prisma, t.org.id);
+      const locked = await addMember(fx.prisma, t.org.id);
+
+      await fx.prisma.user.update({
+        where: { id: gone.id },
+        data: { deletedAt: new Date() },
+      });
+      await fx.prisma.user.update({
+        where: { id: locked.id },
+        data: { isLocked: true },
+      });
+
+      const { items } = await users.listUsersByIds({
+        organizationId: t.org.id,
+        userIds: [t.user.id, gone.id, locked.id],
+      });
+
+      expect(items.map((i) => i.userId)).toEqual([t.user.id]);
+    });
+
+    it('unset quiet hours come back ABSENT, never as an empty string', async () => {
+      // `optional` on the wire. An empty string would be indistinguishable from
+      // a user who set "00:00" — and the quiet-hours window treats those very
+      // differently.
+      const t = await seedTenantWithUser(fx.prisma);
+
+      const { items } = await users.listUsersByIds({
+        organizationId: t.org.id,
+        userIds: [t.user.id],
+      });
+
+      expect(items[0].quietHoursStart).toBeUndefined();
+      expect(items[0].quietHoursEnd).toBeUndefined();
+    });
+
+    it('a missing organizationId is INVALID_ARGUMENT', async () => {
+      await expectRpc(
+        users.listUsersByIds({ organizationId: '', userIds: [] }),
+        status.INVALID_ARGUMENT,
+      );
+    });
+  });
 });

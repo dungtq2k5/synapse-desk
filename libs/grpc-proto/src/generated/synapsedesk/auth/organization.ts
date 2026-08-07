@@ -155,6 +155,32 @@ export interface OrganizationEntitlementsResponse {
 export interface GetOrganizationEntitlementsRequest {
 }
 
+/**
+ * Tenant timezones, in BULK — 19-doc §2.2.
+ *
+ * The daily rollup jobs bucket by the tenant's local date, and they run across
+ * every tenant that had activity rather than on behalf of one caller. So this
+ * takes ids as a FIELD (there is no actor) and answers many at once: one round
+ * trip per run rather than one per tenant.
+ *
+ * Service-to-service only. It is never routed by the gateway — a tenant's
+ * timezone is not a secret, but a bulk read keyed by ids from outside is a
+ * shape no client should have.
+ */
+export interface ListOrganizationTimezonesRequest {
+  organizationIds: string[];
+}
+
+export interface OrganizationTimezone {
+  organizationId: string;
+  /** An IANA name. Absent means the tenant has not set one; the caller uses UTC. */
+  timezone?: string | undefined;
+}
+
+export interface ListOrganizationTimezonesResponse {
+  items: OrganizationTimezone[];
+}
+
 export interface OrganizationUsageResponse {
   /**
    * Active members PLUS pending invitations -- pending invites RESERVE seats,
@@ -251,6 +277,11 @@ export interface OrganizationServiceClient {
     metadata?: Metadata,
   ): Observable<OrganizationEntitlementsResponse>;
 
+  listOrganizationTimezones(
+    request: ListOrganizationTimezonesRequest,
+    metadata?: Metadata,
+  ): Observable<ListOrganizationTimezonesResponse>;
+
   getOnboarding(request: GetOnboardingRequest, metadata?: Metadata): Observable<OnboardingResponse>;
 
   completeOnboarding(request: CompleteOnboardingRequest, metadata?: Metadata): Observable<OrganizationResponse>;
@@ -303,6 +334,14 @@ export interface OrganizationServiceController {
     | Observable<OrganizationEntitlementsResponse>
     | OrganizationEntitlementsResponse;
 
+  listOrganizationTimezones(
+    request: ListOrganizationTimezonesRequest,
+    metadata?: Metadata,
+  ):
+    | Promise<ListOrganizationTimezonesResponse>
+    | Observable<ListOrganizationTimezonesResponse>
+    | ListOrganizationTimezonesResponse;
+
   getOnboarding(
     request: GetOnboardingRequest,
     metadata?: Metadata,
@@ -329,6 +368,7 @@ export function OrganizationServiceControllerMethods() {
       "updateOrganizationSettings",
       "getOrganizationUsage",
       "getOrganizationEntitlements",
+      "listOrganizationTimezones",
       "getOnboarding",
       "completeOnboarding",
       "deleteOrganization",

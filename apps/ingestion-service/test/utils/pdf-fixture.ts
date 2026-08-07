@@ -16,7 +16,15 @@ import { PDFDocument, StandardFonts } from 'pdf-lib';
  */
 export async function buildPdf(
   pages: string[],
-  { repeat = 40 }: { repeat?: number } = {},
+  {
+    repeat = 40,
+    /**
+     * `true` writes a cross-reference STREAM — the PDF 1.5+ layout that Word,
+     * Acrobat and browser print-to-PDF all emit, and so the one most customer
+     * uploads actually use. Defaulted ON now that the parser handles it.
+     */
+    useObjectStreams = true,
+  }: { repeat?: number; useObjectStreams?: boolean } = {},
 ): Promise<Buffer> {
   const pdf = await PDFDocument.create();
   const font = await pdf.embedFont(StandardFonts.Helvetica);
@@ -39,14 +47,14 @@ export async function buildPdf(
     });
   }
 
-  // `useObjectStreams: false` writes a classic cross-reference TABLE rather
-  // than an xref STREAM. Not a stylistic choice: with the default, this fixture
-  // parses when the suite runs in file order and fails on identical bytes when
-  // the test runs alone — the bundled pdf.js v1.10 handles xref streams in a
-  // way that depends on process state.
+  // This used to be pinned to `false` — a classic xref TABLE — because the
+  // fixture parsed in file order and failed on identical bytes in isolation.
+  // The cause was never the layout: `document-parser.service.ts` was handing
+  // the 2018 pdf.js a Node `Buffer`, which it misreads. Pinning the layout only
+  // moved the timing, and cost the suite any coverage of the format most real
+  // uploads use.
   //
-  // Pinned here so the test measures page attribution rather than that
-  // fragility. **It also means this test does not cover xref streams**, which
-  // most real PDFs use — see the note in `document-parser.service.ts`.
-  return Buffer.from(await pdf.save({ useObjectStreams: false }));
+  // Now that the parser passes a `Uint8Array`, the default is the REAL-WORLD
+  // layout, and `parse-boundaries.spec.ts` asserts both.
+  return Buffer.from(await pdf.save({ useObjectStreams }));
 }

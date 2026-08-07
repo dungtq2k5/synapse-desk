@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package synapsedesk.ingestion;
 
+import "google/protobuf/timestamp.proto";
+
 // The AI ledger's REMOTE write path — `ai_generations` keeps one writer.
 //
 // `rag-service` and `ticket-service` both produce spend, and neither reaches
@@ -109,7 +111,147 @@ message RecordGenerationOutcomeResponse {
   string outcome = 1;
 }
 
+// AI spend and quality, from `ai_generation_daily_stats` — 19-doc §3.2.
+//
+// Never from `ai_generations` itself: that table is retention-rolled (RDM Table
+// 29), so a query against raw rows silently loses history the moment retention
+// ships — reporting a shrinking spend for a tenant whose usage is flat.
+message AiUsageRequest {
+  // Inclusive `YYYY-MM-DD` dates in the TENANT's timezone, matching the rollup.
+  string from = 1;
+  string to = 2;
+  optional string granularity = 3;
+}
+
+// One (purpose, model) slice. **The per-purpose split is the point**: it shows
+// a tenant where their AI budget actually goes, which is rarely where they
+// assume.
+message AiUsageSlice {
+  string purpose = 1;
+  string model_name = 2;
+  int32 generations = 3;
+  int64 prompt_tokens = 4;
+  int64 completion_tokens = 5;
+  // MICROS. The unit the ledger meters in — a float of currency accumulates
+  // rounding error across a million rows (RDM §1.14).
+  int64 cost_micros = 6;
+  AiMeanValue latency_ms = 7;
+  AiRateValue failure_rate = 8;
+}
+
+message AiUsagePoint {
+  string day = 1;
+  int32 generations = 2;
+  int64 cost_micros = 3;
+}
+
+message AiUsageResponse {
+  repeated AiUsagePoint points = 1;
+  repeated AiUsageSlice by_purpose = 2;
+  repeated AiUsageSlice by_model = 3;
+
+  int64 total_cost_micros = 4;
+  int32 total_generations = 5;
+
+  // The budget the spend is measured AGAINST, so a caller does not need a
+  // second round trip to auth-service to render a progress bar.
+  int64 monthly_budget_micros = 6;
+  string ai_model_tier = 7;
+
+  // Draft quality, and its denominator needs the DISCARDED sweep (12-doc §4.3)
+  // — without it, acceptance divides by drafts that were USED and reports
+  // ~100% regardless of quality.
+  AiRateValue draft_acceptance = 8;
+
+  // **The knowledge-gap signal**: answering generations that retrieved nothing.
+  AiRateValue empty_retrieval_rate = 9;
+
+  optional google.protobuf.Timestamp computed_at = 10;
+}
+
+// The knowledge-gap backlog: what the corpus could not answer, and what it
+// answered badly.
+message KnowledgeGapsRequest {
+  string from = 1;
+  string to = 2;
+  int32 limit = 3;
+}
+
+message KnowledgeGapDocumentFlag {
+  string document_id = 1;
+  string document_title = 2;
+  string flag_type = 3;
+  string detail = 4;
+}
+
+message KnowledgeGapsResponse {
+  int32 empty_retrievals = 1;
+  int32 answering_generations = 2;
+  AiRateValue empty_retrieval_rate = 3;
+  repeated KnowledgeGapDocumentFlag flags = 4;
+}
+
+// Corpus health — which documents earn their place.
+message DocumentAnalyticsRequest {
+  int32 limit = 1;
+}
+
+message DocumentUsageStat {
+  string document_id = 1;
+  string title = 2;
+  int32 retrieval_count = 3;
+  int32 citation_count = 4;
+  int32 chunk_count = 5;
+}
+
+message DocumentAnalyticsResponse {
+  repeated DocumentUsageStat most_cited = 1;
+  // **Two DIFFERENT findings** (RDM Table 27), surfaced separately. Never
+  // retrieved may just be mis-titled; retrieved and never cited is actively
+  // displacing the sources that would have answered.
+  repeated DocumentUsageStat never_retrieved = 2;
+  repeated DocumentUsageStat retrieved_never_cited = 3;
+}
+
+message RunAiRollupRequest {
+  optional string from = 1;
+  optional string to = 2;
+}
+
+message RunAiRollupResponse {
+  int32 tenants = 1;
+  int32 rows = 2;
+}
+
+// A rate and the count it was computed over — mirrors the ticket surface.
+//
+// **Duplicated per package rather than shared, and PREFIXED.** A cross-package
+// import would make `ingestion.proto` depend on `ticket.proto` for a two-field
+// message — a dependency the ownership map deliberately does not have. The
+// prefix is because ts-proto flattens every package into one TypeScript barrel,
+// where two `RateValue` types collide at the export.
+//
+// The ARITHMETIC is not duplicated: both are produced by `analytics.config`, so
+// the two surfaces cannot disagree about what a rate means.
+message AiRateValue {
+  optional double rate = 1;
+  int32 numerator = 2;
+  int32 denominator = 3;
+}
+
+message AiMeanValue {
+  optional double mean = 1;
+  int32 count = 2;
+}
+
 service AiLedgerService {
   rpc RecordGeneration(RecordGenerationRequest) returns (RecordGenerationResponse);
   rpc RecordGenerationOutcome(RecordGenerationOutcomeRequest) returns (RecordGenerationOutcomeResponse);
+
+  rpc GetAiUsage(AiUsageRequest) returns (AiUsageResponse);
+  rpc GetKnowledgeGaps(KnowledgeGapsRequest) returns (KnowledgeGapsResponse);
+  rpc GetDocumentAnalytics(DocumentAnalyticsRequest) returns (DocumentAnalyticsResponse);
+
+  // Platform-operated, like the ticket rollup.
+  rpc RunAiRollup(RunAiRollupRequest) returns (RunAiRollupResponse);
 }

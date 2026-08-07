@@ -53,4 +53,9 @@ export const envValidationSchema = Joi.object({
     then: Joi.optional(),
     otherwise: Joi.required(),
   }),
+  // The export queue's Redis — 19-doc §5. ticket-service's FIRST queue: it had
+  // no Redis at all before analytics, which is why the whole `BullModule`
+  // registration lives in `AnalyticsModule` rather than in `AppModule`.
+  REDIS_URL: Joi.string().required(),
+  REDIS_DB: Joi.number().optional(),
 });

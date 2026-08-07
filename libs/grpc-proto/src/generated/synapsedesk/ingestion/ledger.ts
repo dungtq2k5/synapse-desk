@@ -8,6 +8,7 @@
 import type { Metadata } from "@grpc/grpc-js";
 import { GrpcMethod, GrpcStreamMethod } from "@nestjs/microservices";
 import { Observable } from "rxjs";
+import { Timestamp } from "../../google/protobuf/timestamp";
 
 /**
  * The ledger's enumerated values, declared HERE so both languages GENERATE
@@ -127,6 +128,152 @@ export interface RecordGenerationOutcomeResponse {
   outcome: string;
 }
 
+/**
+ * AI spend and quality, from `ai_generation_daily_stats` — 19-doc §3.2.
+ *
+ * Never from `ai_generations` itself: that table is retention-rolled (RDM Table
+ * 29), so a query against raw rows silently loses history the moment retention
+ * ships — reporting a shrinking spend for a tenant whose usage is flat.
+ */
+export interface AiUsageRequest {
+  /** Inclusive `YYYY-MM-DD` dates in the TENANT's timezone, matching the rollup. */
+  from: string;
+  to: string;
+  granularity?: string | undefined;
+}
+
+/**
+ * One (purpose, model) slice. **The per-purpose split is the point**: it shows
+ * a tenant where their AI budget actually goes, which is rarely where they
+ * assume.
+ */
+export interface AiUsageSlice {
+  purpose: string;
+  modelName: string;
+  generations: number;
+  promptTokens: number;
+  completionTokens: number;
+  /**
+   * MICROS. The unit the ledger meters in — a float of currency accumulates
+   * rounding error across a million rows (RDM §1.14).
+   */
+  costMicros: number;
+  latencyMs: AiMeanValue | undefined;
+  failureRate: AiRateValue | undefined;
+}
+
+export interface AiUsagePoint {
+  day: string;
+  generations: number;
+  costMicros: number;
+}
+
+export interface AiUsageResponse {
+  points: AiUsagePoint[];
+  byPurpose: AiUsageSlice[];
+  byModel: AiUsageSlice[];
+  totalCostMicros: number;
+  totalGenerations: number;
+  /**
+   * The budget the spend is measured AGAINST, so a caller does not need a
+   * second round trip to auth-service to render a progress bar.
+   */
+  monthlyBudgetMicros: number;
+  aiModelTier: string;
+  /**
+   * Draft quality, and its denominator needs the DISCARDED sweep (12-doc §4.3)
+   * — without it, acceptance divides by drafts that were USED and reports
+   * ~100% regardless of quality.
+   */
+  draftAcceptance:
+    | AiRateValue
+    | undefined;
+  /** *The knowledge-gap signal**: answering generations that retrieved nothing. */
+  emptyRetrievalRate: AiRateValue | undefined;
+  computedAt?: Timestamp | undefined;
+}
+
+/**
+ * The knowledge-gap backlog: what the corpus could not answer, and what it
+ * answered badly.
+ */
+export interface KnowledgeGapsRequest {
+  from: string;
+  to: string;
+  limit: number;
+}
+
+export interface KnowledgeGapDocumentFlag {
+  documentId: string;
+  documentTitle: string;
+  flagType: string;
+  detail: string;
+}
+
+export interface KnowledgeGapsResponse {
+  emptyRetrievals: number;
+  answeringGenerations: number;
+  emptyRetrievalRate: AiRateValue | undefined;
+  flags: KnowledgeGapDocumentFlag[];
+}
+
+/** Corpus health — which documents earn their place. */
+export interface DocumentAnalyticsRequest {
+  limit: number;
+}
+
+export interface DocumentUsageStat {
+  documentId: string;
+  title: string;
+  retrievalCount: number;
+  citationCount: number;
+  chunkCount: number;
+}
+
+export interface DocumentAnalyticsResponse {
+  mostCited: DocumentUsageStat[];
+  /**
+   * *Two DIFFERENT findings** (RDM Table 27), surfaced separately. Never
+   * retrieved may just be mis-titled; retrieved and never cited is actively
+   * displacing the sources that would have answered.
+   */
+  neverRetrieved: DocumentUsageStat[];
+  retrievedNeverCited: DocumentUsageStat[];
+}
+
+export interface RunAiRollupRequest {
+  from?: string | undefined;
+  to?: string | undefined;
+}
+
+export interface RunAiRollupResponse {
+  tenants: number;
+  rows: number;
+}
+
+/**
+ * A rate and the count it was computed over — mirrors the ticket surface.
+ *
+ * **Duplicated per package rather than shared, and PREFIXED.** A cross-package
+ * import would make `ingestion.proto` depend on `ticket.proto` for a two-field
+ * message — a dependency the ownership map deliberately does not have. The
+ * prefix is because ts-proto flattens every package into one TypeScript barrel,
+ * where two `RateValue` types collide at the export.
+ *
+ * The ARITHMETIC is not duplicated: both are produced by `analytics.config`, so
+ * the two surfaces cannot disagree about what a rate means.
+ */
+export interface AiRateValue {
+  rate?: number | undefined;
+  numerator: number;
+  denominator: number;
+}
+
+export interface AiMeanValue {
+  mean?: number | undefined;
+  count: number;
+}
+
 export interface AiLedgerServiceClient {
   recordGeneration(request: RecordGenerationRequest, metadata?: Metadata): Observable<RecordGenerationResponse>;
 
@@ -134,6 +281,16 @@ export interface AiLedgerServiceClient {
     request: RecordGenerationOutcomeRequest,
     metadata?: Metadata,
   ): Observable<RecordGenerationOutcomeResponse>;
+
+  getAiUsage(request: AiUsageRequest, metadata?: Metadata): Observable<AiUsageResponse>;
+
+  getKnowledgeGaps(request: KnowledgeGapsRequest, metadata?: Metadata): Observable<KnowledgeGapsResponse>;
+
+  getDocumentAnalytics(request: DocumentAnalyticsRequest, metadata?: Metadata): Observable<DocumentAnalyticsResponse>;
+
+  /** Platform-operated, like the ticket rollup. */
+
+  runAiRollup(request: RunAiRollupRequest, metadata?: Metadata): Observable<RunAiRollupResponse>;
 }
 
 export interface AiLedgerServiceController {
@@ -149,11 +306,40 @@ export interface AiLedgerServiceController {
     | Promise<RecordGenerationOutcomeResponse>
     | Observable<RecordGenerationOutcomeResponse>
     | RecordGenerationOutcomeResponse;
+
+  getAiUsage(
+    request: AiUsageRequest,
+    metadata?: Metadata,
+  ): Promise<AiUsageResponse> | Observable<AiUsageResponse> | AiUsageResponse;
+
+  getKnowledgeGaps(
+    request: KnowledgeGapsRequest,
+    metadata?: Metadata,
+  ): Promise<KnowledgeGapsResponse> | Observable<KnowledgeGapsResponse> | KnowledgeGapsResponse;
+
+  getDocumentAnalytics(
+    request: DocumentAnalyticsRequest,
+    metadata?: Metadata,
+  ): Promise<DocumentAnalyticsResponse> | Observable<DocumentAnalyticsResponse> | DocumentAnalyticsResponse;
+
+  /** Platform-operated, like the ticket rollup. */
+
+  runAiRollup(
+    request: RunAiRollupRequest,
+    metadata?: Metadata,
+  ): Promise<RunAiRollupResponse> | Observable<RunAiRollupResponse> | RunAiRollupResponse;
 }
 
 export function AiLedgerServiceControllerMethods() {
   return function (constructor: Function) {
-    const grpcMethods: string[] = ["recordGeneration", "recordGenerationOutcome"];
+    const grpcMethods: string[] = [
+      "recordGeneration",
+      "recordGenerationOutcome",
+      "getAiUsage",
+      "getKnowledgeGaps",
+      "getDocumentAnalytics",
+      "runAiRollup",
+    ];
     for (const method of grpcMethods) {
       const descriptor: any = Reflect.getOwnPropertyDescriptor(constructor.prototype, method);
       GrpcMethod("AiLedgerService", method)(constructor.prototype[method], method, descriptor);

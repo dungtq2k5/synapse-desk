@@ -102,6 +102,7 @@ export const TICKET_PROTO_PATHS = [
   'ai.proto',
   'feedback.proto',
   'audit.proto',
+  'analytics.proto',
 ].map((file) => join(PROTO_ROOT, 'synapsedesk', 'ticket', file));
 
 /**

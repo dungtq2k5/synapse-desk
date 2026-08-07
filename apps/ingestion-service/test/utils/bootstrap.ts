@@ -7,6 +7,8 @@ import { PrismaService } from '../../src/modules/prisma/prisma.service';
 import { DatabaseSeeder } from '../../src/modules/prisma/database.seeder';
 import { EMBEDDING_CLIENT } from '../../src/modules/embeddings/embedding.contract';
 import { FakeEmbeddingClient } from './fake-embedding.client';
+import { IngestionWorker } from '../../src/modules/ingestion/ingestion.worker';
+import { ScopeFanoutProcessor } from '../../src/modules/ingestion/scope-fanout.processor';
 
 export type E2eFixture = {
   moduleRef: TestingModule;
@@ -67,6 +69,27 @@ export async function bootstrapE2eTest(): Promise<E2eFixture> {
   // deferred job re-applied the stale scope. Identical in shape to the mock
   // leak in 16-doc §9, and it needs the same rule — WORK must not escape its
   // test either.
+  /**
+   * The live WORKERS, stopped — the other half of the fix above.
+   *
+   * Obliterating the queues stops a leftover job from being *found*; it does
+   * nothing about one already in flight, and pulling its Redis keys out from
+   * under a running worker produces `Missing key for job … moveToFinished`
+   * followed by whatever that job had already half-applied.
+   *
+   * That is what was left of the doc-18 flake: `documents.e2e › restore
+   * un-flips the chunks` failing roughly one run in five, always with a
+   * scope-fan-out job in the log. The suites that exercise the reconciler drive
+   * `process()` explicitly — the same discipline every other job here follows —
+   * so nothing needs a worker consuming in the background.
+   */
+  for (const worker of [
+    moduleRef.get(IngestionWorker),
+    moduleRef.get(ScopeFanoutProcessor),
+  ]) {
+    await worker.worker.close();
+  }
+
   const queues = [INGESTION_QUEUE, SCOPE_FANOUT_QUEUE].map((name) =>
     moduleRef.get<Queue>(getQueueToken(name)),
   );
@@ -84,6 +107,7 @@ export async function bootstrapE2eTest(): Promise<E2eFixture> {
         "ingestion_jobs",
         "department_documents",
         "ai_generations",
+        "ai_generation_daily_stats",
         "documents"
       RESTART IDENTITY CASCADE;
     `);

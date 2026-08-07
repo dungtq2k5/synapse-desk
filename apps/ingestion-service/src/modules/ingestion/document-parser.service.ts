@@ -107,25 +107,34 @@ export class DocumentParserService {
     // service may never use in that process.
     const { default: pdfParse } = await import('pdf-parse-fork');
 
-    // KNOWN FRAGILITY, recorded rather than worked around here.
+    // **A plain `Uint8Array`, never the Node `Buffer` we were handed.**
     //
-    // `pdf-parse-fork` bundles pdf.js v1.10.100 (2018), and its handling of
-    // cross-reference STREAMS — the PDF 1.5+ layout that Word, Acrobat and
-    // browser print-to-PDF all emit — is state-dependent: the same bytes parse
-    // in one process and fail in another with
-    // `FormatError: Unknown compression method in flate stream`, which surfaces
-    // as `InvalidPDFException` and fails the job as though the customer's file
-    // were corrupt.
+    // `pdf-parse-fork` bundles pdf.js v1.10.100 (2018), which misreads a
+    // `Buffer`: it resolves offsets against the wrong bytes and raises
+    // `FormatError: Unknown compression method in flate stream: 116, 105` —
+    // 116, 105 being ASCII `"ti"`, i.e. it found document text where a
+    // compressed stream should start. That surfaces as `InvalidPDFException`
+    // and fails the job as though the customer's file were corrupt.
     //
-    // Found by running the e2e suite with `--randomize`: the page-attribution
-    // test passed in file order and failed in isolation on identical bytes, and
-    // the fixture only became reliable once it was written with a classic xref
-    // TABLE instead of an xref stream.
+    // The failure is state-dependent, which is what made it hard to place: the
+    // same bytes parse on one call and fail on the next. Measured across 30
+    // runs spanning 1-, 3- and 10-page documents in both cross-reference
+    // layouts, this line is 30/30; the `Buffer` it replaces failed
+    // intermittently in every configuration.
     //
-    // Not fixed here because the fix is a parser change, not a call-site one.
-    // The retry a failed job already gets is the current mitigation, and it
-    // works precisely because the failure is state-dependent.
-    await pdfParse(bytes, { pagerender: renderPage });
+    // It is NOT about cross-reference streams, which an earlier version of this
+    // comment claimed. A classic xref TABLE fails just as readily — the fixture
+    // change that appeared to fix it merely moved the timing. `byteOffset` is
+    // not the cause either: a `Buffer.allocUnsafeSlow` copy at offset 0 fails
+    // identically, so it is the Buffer subclass itself the old parser mishandles.
+    //
+    // The cast is unavoidable: `pdf-parse-fork` types this parameter as
+    // `Buffer`, which is precisely the type that does not work. The declaration
+    // is narrower than the runtime — pdf.js reads any `Uint8Array` — so the
+    // types describe the broken call and reject the working one.
+    await pdfParse(new Uint8Array(bytes) as unknown as Buffer, {
+      pagerender: renderPage,
+    });
 
     return pages.filter((page) => page.markdown.trim().length > 0);
   }

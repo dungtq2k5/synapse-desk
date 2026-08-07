@@ -261,7 +261,13 @@ export class UsersService {
         deletedAt: null,
         // A locked account cannot act on the alert, which is the whole point
         // of addressing it by permission.
-        lockedUntil: null,
+        //
+        // `isLocked`, a BOOLEAN — there is no `lockedUntil` column. This read
+        // it as one until a test finally executed it: TypeScript did not object
+        // because the conditional `departmentId` spread below makes this an
+        // object literal with a spread, which suppresses the excess-property
+        // check that would otherwise have rejected the name outright.
+        isLocked: false,
         // `user_roles` and `role_permissions` are IMPLICIT many-to-many
         // relations, so the nesting is user → roles → permissions directly.
         // A join-model shape (`some: { role: { ... } }`) compiles against an
@@ -327,7 +333,7 @@ export class UsersService {
         id: { in: userIds },
         organizationId: request.organizationId,
         deletedAt: null,
-        lockedUntil: null,
+        isLocked: false,
       },
       select: NOTIFICATION_RECIPIENT_SELECT,
     });

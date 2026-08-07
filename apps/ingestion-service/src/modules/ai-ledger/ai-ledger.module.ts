@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 import { PrismaModule } from '../prisma/prisma.module';
+import { AiAnalyticsModule } from '../analytics/analytics.module';
 import { AuthClientModule } from '../auth-client/auth-client.module';
 import { AiLedgerService } from './ai-ledger.service';
 import { AiLedgerGrpcController } from './ai-ledger-grpc.controller';
@@ -17,7 +18,10 @@ import { QUOTA_REDIS, QuotaCounterService } from './quota-counter.service';
  */
 @Module({
   controllers: [AiLedgerGrpcController],
-  imports: [PrismaModule, AuthClientModule],
+  // `AiAnalyticsModule` for the three analytics RPCs and the rollup that feeds
+  // them (19-doc §3.2) — they hang off this controller because they read this
+  // module's projection.
+  imports: [PrismaModule, AuthClientModule, AiAnalyticsModule],
   providers: [
     AiLedgerService,
     QuotaCounterService,

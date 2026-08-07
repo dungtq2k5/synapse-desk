@@ -1,3 +1,5 @@
+// FIXME I think we should split this files into smaller or the existing one because the file name itself is to ambiguous and contains too many things
+
 export const NODE_ENV_OPTIONS = ['development', 'production', 'test'] as const;
 export type NodeEnv = (typeof NODE_ENV_OPTIONS)[number];
 

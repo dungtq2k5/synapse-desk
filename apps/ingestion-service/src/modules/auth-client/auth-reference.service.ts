@@ -250,4 +250,48 @@ export class AuthReferenceService implements OnModuleInit {
       });
     }
   }
+
+  /**
+   * Tenant timezones for a set of ids — 19-doc §2.2.
+   *
+   * Called by the daily rollup jobs, which run across every tenant that had
+   * activity rather than on behalf of a caller. Bulk, so one run costs one
+   * round trip rather than one per tenant.
+   *
+   * **Returns a MAP, and an id missing from it means "use the default".** A
+   * tenant deleted between the job reading its own tables and asking here is an
+   * ordinary race, and the caller already has to handle a tenant that never set
+   * a timezone — one code path for both.
+   *
+   * An outage returns an EMPTY map rather than throwing: every tenant then
+   * buckets in UTC for that run, which is wrong for some of them and fixable by
+   * a backfill. Failing the run instead would lose the day's numbers entirely
+   * and leave nothing to recompute from until somebody noticed.
+   */
+  async listOrganizationTimezones(
+    organizationIds: string[],
+  ): Promise<Map<string, string>> {
+    if (organizationIds.length === 0) return new Map();
+
+    try {
+      const response = await firstValueFrom(
+        this.organizationService
+          .listOrganizationTimezones({ organizationIds })
+          .pipe(timeout(GRPC_DEADLINE_MS)),
+      );
+
+      return new Map(
+        response.items
+          .filter((item) => item.timezone)
+          .map((item) => [item.organizationId, item.timezone as string]),
+      );
+    } catch (error) {
+      this.logger.error(
+        `Could not resolve timezones for ${organizationIds.length} tenant(s); ` +
+          `bucketing in UTC: ${formatErrorMsg(error)}`,
+      );
+
+      return new Map();
+    }
+  }
 }

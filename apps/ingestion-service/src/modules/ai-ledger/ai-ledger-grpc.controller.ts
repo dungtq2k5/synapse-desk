@@ -1,16 +1,28 @@
 import { Controller } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
 import { status } from '@grpc/grpc-js';
+import type { Metadata } from '@grpc/grpc-js';
 import {
   AiLedgerServiceController,
   AiLedgerServiceControllerMethods,
+  AiUsageRequest,
+  AiUsageResponse,
+  DocumentAnalyticsRequest,
+  DocumentAnalyticsResponse,
+  KnowledgeGapsRequest,
+  KnowledgeGapsResponse,
   RecordGenerationOutcomeRequest,
   RecordGenerationOutcomeResponse,
   RecordGenerationRequest,
   RecordGenerationResponse,
+  RunAiRollupRequest,
+  RunAiRollupResponse,
+  unpackCallerContext,
 } from '@synapsedesk/grpc-proto';
 import { AiGenerationPurpose, AiGenerationStatus } from '@synapsedesk/common';
 import { AiLedgerService } from './ai-ledger.service';
+import { AiAnalyticsService } from '../analytics/ai-analytics.service';
+import { AiGenerationRollupJob } from '../analytics/ai-generation-rollup.job';
 
 /**
  * The ledger's remote write path — `ai_generations` keeps ONE writer.
@@ -29,7 +41,11 @@ import { AiLedgerService } from './ai-ledger.service';
 @Controller()
 @AiLedgerServiceControllerMethods()
 export class AiLedgerGrpcController implements AiLedgerServiceController {
-  constructor(private readonly ledger: AiLedgerService) {}
+  constructor(
+    private readonly ledger: AiLedgerService,
+    private readonly analytics: AiAnalyticsService,
+    private readonly rollup: AiGenerationRollupJob,
+  ) {}
 
   /**
    * Returns the id SYNCHRONOUSLY while the row is still being written.
@@ -84,5 +100,61 @@ export class AiLedgerGrpcController implements AiLedgerServiceController {
     );
 
     return { outcome };
+  }
+  // ------------------------------------------------- 19-doc §3.2, the reads
+
+  /**
+   * Spend and quality, from the DAILY ROLLUP.
+   *
+   * On this controller rather than its own because it reads the ledger's
+   * projection and shares nothing else in the service — a second gRPC service
+   * for three read RPCs would be a second entry in every client's service map
+   * for no boundary it does not already have.
+   */
+  getAiUsage(
+    request: AiUsageRequest,
+    metadata?: Metadata,
+  ): Promise<AiUsageResponse> {
+    return this.analytics.getAiUsage(request, unpackCallerContext(metadata));
+  }
+
+  getKnowledgeGaps(
+    request: KnowledgeGapsRequest,
+    metadata?: Metadata,
+  ): Promise<KnowledgeGapsResponse> {
+    return this.analytics.getKnowledgeGaps(
+      request,
+      unpackCallerContext(metadata),
+    );
+  }
+
+  getDocumentAnalytics(
+    request: DocumentAnalyticsRequest,
+    metadata?: Metadata,
+  ): Promise<DocumentAnalyticsResponse> {
+    return this.analytics.getDocumentAnalytics(
+      request,
+      unpackCallerContext(metadata),
+    );
+  }
+
+  /**
+   * Platform-operated, and the ordering constraint is the whole risk here.
+   *
+   * This rollup reads rows retention deletes, so it must run BEFORE retention
+   * over the same window (19-doc §2.2). Exposed so the recovery path is
+   * reachable at all: once retention has eaten the raw rows, a backfill is the
+   * only way a mistake in this job can ever be corrected.
+   */
+  async runAiRollup(request: RunAiRollupRequest): Promise<RunAiRollupResponse> {
+    const outcome =
+      request.from && request.to
+        ? await this.rollup.backfill(
+            new Date(`${request.from}T00:00:00.000Z`),
+            new Date(`${request.to}T00:00:00.000Z`),
+          )
+        : await this.rollup.run();
+
+    return { tenants: outcome.tenants, rows: outcome.rows };
   }
 }

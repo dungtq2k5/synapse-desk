@@ -11,7 +11,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import { RequestContext } from '@synapsedesk/common';
+import { RequestContext, OrgAccess } from '@synapsedesk/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ResponseMessage } from '../../common/decorators/response-message.decorator';
@@ -22,7 +22,6 @@ import {
   SessionResponseDto,
 } from './dto/rest/session.dto';
 import { OrgAccessKind } from '../../common/decorators/org-access.decorator';
-import { OrgAccess } from '@synapsedesk/common';
 
 /**
  * The caller's own device sessions (api-endpoints-plan).

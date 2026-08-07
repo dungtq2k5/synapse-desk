@@ -1,0 +1,205 @@
+syntax = "proto3";
+
+package synapsedesk.ticket;
+
+import "google/protobuf/timestamp.proto";
+
+// The read projection over Domain B — 19-doc.
+//
+// **Served by ticket-service, not by an `analytics-service`.** A service with
+// no tables of its own either reads another service's database — breaking the
+// boundary every other decision depends on, and doing it as an UNDECLARED
+// dependency nothing in the repo records — or ETLs into its own store, which is
+// a real project rather than a way to serve eleven endpoints.
+//
+// Everything here reads DAILY ROLLUPS, never the OLTP tables. A dashboard load
+// aggregating a quarter of tickets competes with ticket creation, and no
+// endpoint design fixes that.
+
+// A rate and the count it was computed over — 19-doc §3.1.
+//
+// **Every rate carries its denominator.** A percentage with a hidden
+// denominator is how "our CSAT is 100%" reaches a board deck on two responses.
+message RateValue {
+  // Absent when the denominator is zero. "Nobody rated anything" and
+  // "everybody rated it negative" are different facts, and rendering the first
+  // as 0% is a wrong answer rather than a missing one.
+  optional double rate = 1;
+  int32 numerator = 2;
+  int32 denominator = 3;
+}
+
+// A mean and its count. Same reasoning as `RateValue`.
+message MeanValue {
+  optional double mean = 1;
+  int32 count = 2;
+}
+
+// The shared filter. `from`/`to` are DATES in the tenant's timezone.
+message AnalyticsRangeRequest {
+  // Inclusive, `YYYY-MM-DD`. A date rather than a timestamp because the rollups
+  // are bucketed by the tenant's local day, and an instant would invite a
+  // caller to think it selects a sub-day window that does not exist.
+  string from = 1;
+  string to = 2;
+  // Absent = every department, including tickets with none.
+  optional string department_id = 3;
+  // DAY | WEEK | MONTH.
+  optional string granularity = 4;
+}
+
+message OverviewResponse {
+  int32 tickets_created = 1;
+  int32 tickets_resolved = 2;
+  int32 tickets_escalated = 3;
+  int32 open_tickets = 4;
+
+  RateValue deflection = 5;
+  RateValue csat = 6;
+  MeanValue human_first_response_seconds = 7;
+  MeanValue ai_first_response_seconds = 8;
+  MeanValue resolution_seconds = 9;
+
+  // The counterweight to `resolution_seconds`, which is biased OPTIMISTIC
+  // because it can only see tickets that closed — a ticket open for 40 days is
+  // invisible to it (19-doc §3.1).
+  optional int64 open_ticket_median_age_seconds = 10;
+
+  // When the rollups behind this answer were computed. Carried so a caller can
+  // tell a stale answer from a quiet tenant, and so an export can record which
+  // run produced its numbers.
+  optional google.protobuf.Timestamp computed_at = 11;
+}
+
+message DeflectionPoint {
+  string day = 1;
+  RateValue deflection = 2;
+  int32 chat_conversations = 3;
+  int32 chat_resolved_without_escalation = 4;
+}
+
+message DeflectionResponse {
+  repeated DeflectionPoint points = 1;
+  RateValue total = 2;
+}
+
+message ResponseTimePoint {
+  string day = 1;
+  // Reported SEPARATELY, always. Blending them produces a headline that
+  // improves whenever AI usage rises — the metric measuring itself.
+  MeanValue human_first_response_seconds = 2;
+  MeanValue ai_first_response_seconds = 3;
+  MeanValue resolution_seconds = 4;
+}
+
+message ResponseTimesResponse {
+  repeated ResponseTimePoint points = 1;
+  MeanValue human_total = 2;
+  MeanValue ai_total = 3;
+  MeanValue resolution_total = 4;
+}
+
+message VolumePoint {
+  string day = 1;
+  int32 created = 2;
+  int32 resolved = 3;
+  int32 escalated = 4;
+}
+
+// A single dimension's breakdown — status, priority or source.
+message VolumeBreakdown {
+  string key = 1;
+  int32 count = 2;
+}
+
+message VolumeResponse {
+  repeated VolumePoint points = 1;
+  // Current state rather than a time series: "how many are OPEN right now" is
+  // not a question a daily rollup of events can answer, and pretending it is
+  // would report the status a ticket had on the day it was created.
+  repeated VolumeBreakdown by_status = 2;
+  repeated VolumeBreakdown by_priority = 3;
+  repeated VolumeBreakdown by_source = 4;
+}
+
+message SatisfactionPoint {
+  string day = 1;
+  RateValue csat = 2;
+  RateValue citation_accuracy = 3;
+}
+
+message SatisfactionResponse {
+  repeated SatisfactionPoint points = 1;
+  RateValue csat_total = 2;
+  RateValue citation_accuracy_total = 3;
+}
+
+// Per-agent productivity. Names are hydrated by the GATEWAY — this service
+// stores an agent id and nothing else about the person (RDM §1.13).
+message AgentStat {
+  string agent_id = 1;
+  int32 assigned = 2;
+  int32 resolved = 3;
+  int32 messages_sent = 4;
+  MeanValue resolution_seconds = 5;
+}
+
+message AgentStatsResponse { repeated AgentStat items = 1; }
+
+// The rollup job, exposed so a scheduler and an operator can both reach it.
+message RunRollupRequest {
+  // Both inclusive, `YYYY-MM-DD`. Absent = the routine trailing window.
+  optional string from = 1;
+  optional string to = 2;
+}
+
+message RunRollupResponse {
+  int32 tenants = 1;
+  int32 ticket_rows = 2;
+  int32 agent_rows = 3;
+}
+
+// The async export — 19-doc §5.
+message CreateExportRequest {
+  // TICKET_DAILY | AGENT_DAILY.
+  string kind = 1;
+  string from = 2;
+  string to = 3;
+  optional string department_id = 4;
+}
+
+message ExportResponse {
+  string id = 1;
+  // PENDING | READY | FAILED.
+  string status = 2;
+  string kind = 3;
+  optional int32 row_count = 4;
+  // The newest rollup run behind the file — the disputed-number guard. Two
+  // people exporting "last quarter" a week apart can see whether the data was
+  // recomputed between them rather than guessing.
+  optional google.protobuf.Timestamp rollup_computed_at = 5;
+  // Minted PER REQUEST and short-lived: a URL to a tenant's full ticket
+  // history is a credential, so it is never stored on the row.
+  optional string download_url = 6;
+  optional string error = 7;
+  google.protobuf.Timestamp created_at = 8;
+  optional google.protobuf.Timestamp completed_at = 9;
+}
+
+message GetExportRequest { string id = 1; }
+
+service AnalyticsService {
+  rpc CreateExport(CreateExportRequest) returns (ExportResponse);
+  rpc GetExport(GetExportRequest) returns (ExportResponse);
+
+  rpc GetOverview(AnalyticsRangeRequest) returns (OverviewResponse);
+  rpc GetDeflection(AnalyticsRangeRequest) returns (DeflectionResponse);
+  rpc GetResponseTimes(AnalyticsRangeRequest) returns (ResponseTimesResponse);
+  rpc GetVolume(AnalyticsRangeRequest) returns (VolumeResponse);
+  rpc GetSatisfaction(AnalyticsRangeRequest) returns (SatisfactionResponse);
+  rpc GetAgentStats(AnalyticsRangeRequest) returns (AgentStatsResponse);
+
+  // Platform-operated, never routed by the gateway for a tenant: a backfill
+  // recomputes numbers a customer may already have exported.
+  rpc RunRollup(RunRollupRequest) returns (RunRollupResponse);
+}

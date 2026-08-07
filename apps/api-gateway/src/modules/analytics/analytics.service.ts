@@ -1,0 +1,318 @@
+import { Injectable } from '@nestjs/common';
+import { RequestContext } from '@synapsedesk/common';
+import { AnalyticsCacheService } from './analytics-cache.service';
+import { AnalyticsGrpcClient, LegFailure } from './analytics-grpc.client';
+import {
+  AnalyticsRangeQueryDto,
+  AnalyticsTopNQueryDto,
+  CreateExportDto,
+  DocumentAnalyticsQueryDto,
+} from './dto/rest/analytics.dto';
+import {
+  AgentAnalyticsDto,
+  AgentStatDto,
+  DocumentAnalyticsDto,
+  KnowledgeGapsDto,
+  UnavailableBlockDto,
+} from './dto/rest/analytics-response.dto';
+
+/**
+ * The composition layer — 19-doc §1, §3.2, §4.
+ *
+ * Two responsibilities and no third:
+ *
+ *   1. **Cache**, because these reads are expensive, tolerant of staleness and
+ *      read repeatedly by a dashboard that polls.
+ *   2. **Compose**, for the three endpoints that genuinely span services —
+ *      calling the owning services in PARALLEL, joining in memory on a user or
+ *      document id, and hydrating names.
+ *
+ * **A cross-service endpoint failing one leg returns the legs it has**, with
+ * the missing block marked `unavailable`. A dashboard where nine tiles render
+ * and one names the service that is down is far more useful than a 500 — and it
+ * is what someone diagnosing an incident actually needs.
+ */
+@Injectable()
+export class AnalyticsService {
+  constructor(
+    private readonly client: AnalyticsGrpcClient,
+    private readonly cache: AnalyticsCacheService,
+  ) {}
+
+  // ------------------------------------------- the six single-service reads
+
+  overview(query: AnalyticsRangeQueryDto, context: RequestContext) {
+    return this.cached('overview', query, context, () =>
+      this.client.overview(query, context),
+    );
+  }
+
+  deflection(query: AnalyticsRangeQueryDto, context: RequestContext) {
+    return this.cached('deflection', query, context, () =>
+      this.client.deflection(query, context),
+    );
+  }
+
+  responseTimes(query: AnalyticsRangeQueryDto, context: RequestContext) {
+    return this.cached('response-times', query, context, () =>
+      this.client.responseTimes(query, context),
+    );
+  }
+
+  volume(query: AnalyticsRangeQueryDto, context: RequestContext) {
+    return this.cached('volume', query, context, () =>
+      this.client.volume(query, context),
+    );
+  }
+
+  satisfaction(query: AnalyticsRangeQueryDto, context: RequestContext) {
+    return this.cached('satisfaction', query, context, () =>
+      this.client.satisfaction(query, context),
+    );
+  }
+
+  aiUsage(query: AnalyticsRangeQueryDto, context: RequestContext) {
+    return this.cached('ai-usage', query, context, () =>
+      this.client.aiUsage(query, context),
+    );
+  }
+
+  // -------------------------------------------- the three cross-service ones
+
+  /**
+   * Per-agent productivity — ticket-service ∪ ingestion-service ∪ names.
+   *
+   * Three legs, all in PARALLEL, joined on agent id. The join is in memory
+   * because the cardinality is tens-to-hundreds of agents per tenant: a
+   * distributed query would be a bigger machine for a `Map.get`.
+   *
+   * **Draft acceptance is tenant-wide rather than per agent**, and that is a
+   * limitation stated rather than hidden: `ai_generations` records the user who
+   * triggered a generation, but the daily rollup groups by (purpose, model)
+   * only. Per-agent acceptance would need a fourth dimension on a table that
+   * already multiplies by two — and 19-doc's own §2.2 shape does not include
+   * it. Every row carries the same figure, which is honest about what it is.
+   */
+  async agents(
+    query: AnalyticsRangeQueryDto,
+    context: RequestContext,
+  ): Promise<AgentAnalyticsDto> {
+    return this.cached('agents', query, context, async () => {
+      const unavailable: UnavailableBlockDto[] = [];
+
+      const [statsLeg, usageLeg] = await Promise.all([
+        this.client.agentStats(query, context),
+        this.client.ledgerUsage(query, context),
+      ]);
+
+      const stats = unwrap(statsLeg, unavailable);
+      const usage = unwrap(usageLeg, unavailable);
+
+      const items: AgentStatDto[] = (stats?.items ?? []).map((row) => ({
+        agentId: row.agentId,
+        fullName: null,
+        assigned: row.assigned,
+        resolved: row.resolved,
+        messagesSent: row.messagesSent,
+        resolutionSeconds: {
+          mean: row.resolutionSeconds?.mean ?? null,
+          count: row.resolutionSeconds?.count ?? 0,
+        },
+        draftAcceptance: usage
+          ? {
+              rate: usage.draftAcceptance?.rate ?? null,
+              numerator: usage.draftAcceptance?.numerator ?? 0,
+              denominator: usage.draftAcceptance?.denominator ?? 0,
+            }
+          : null,
+      }));
+
+      // Hydration LAST and only if there is anything to hydrate: an empty
+      // agent list must not cost a round trip to auth-service, and a name is
+      // decoration — its absence marks the block unavailable without emptying
+      // the numbers, which are the part somebody is actually reading.
+      if (items.length > 0) {
+        const namesLeg = await this.client.hydrateNames(
+          items.map((item) => item.agentId),
+          context,
+        );
+        const names = unwrap(namesLeg, unavailable);
+
+        if (names) {
+          const byId = new Map(
+            names.items.map((user) => [user.userId, user.fullName]),
+          );
+          for (const item of items) {
+            item.fullName = byId.get(item.agentId) ?? null;
+          }
+        }
+      }
+
+      return { items, unavailable };
+    });
+  }
+
+  /**
+   * The content backlog — the empty-retrieval rate plus the document flags.
+   *
+   * One service answers both today, which makes this the cheapest of the three
+   * — but it is composed the same way, because the flags and the rate are two
+   * findings and a future split would otherwise be a rewrite.
+   */
+  async knowledgeGaps(
+    query: AnalyticsTopNQueryDto,
+    context: RequestContext,
+  ): Promise<KnowledgeGapsDto> {
+    return this.cached('knowledge-gaps', query, context, async () => {
+      const unavailable: UnavailableBlockDto[] = [];
+      const leg = await this.client.knowledgeGaps(
+        query,
+        query.limit ?? 20,
+        context,
+      );
+      const gaps = unwrap(leg, unavailable);
+
+      return {
+        emptyRetrievals: gaps?.emptyRetrievals ?? 0,
+        answeringGenerations: gaps?.answeringGenerations ?? 0,
+        emptyRetrievalRate: {
+          rate: gaps?.emptyRetrievalRate?.rate ?? null,
+          numerator: gaps?.emptyRetrievalRate?.numerator ?? 0,
+          denominator: gaps?.emptyRetrievalRate?.denominator ?? 0,
+        },
+        flags: gaps?.flags ?? [],
+        unavailable,
+      };
+    });
+  }
+
+  /**
+   * Corpus health — chunk counters from ingestion-service, citation accuracy
+   * from ticket-service's feedback rollup.
+   *
+   * The one endpoint whose two legs come from genuinely different domains, and
+   * the reason the partial-failure shape earns its place: a Knowledge Manager
+   * looking at "which documents are never cited" is not helped by a 500 because
+   * the CSAT service is restarting.
+   */
+  async documents(
+    query: DocumentAnalyticsQueryDto,
+    context: RequestContext,
+  ): Promise<DocumentAnalyticsDto> {
+    return this.cached(
+      'documents',
+      { limit: query.limit },
+      context,
+      async () => {
+        const unavailable: UnavailableBlockDto[] = [];
+
+        const [documentsLeg, satisfactionLeg] = await Promise.all([
+          this.client.documentAnalytics(query.limit ?? 20, context),
+          // Citation accuracy is a ticket-side metric — it comes from feedback on
+          // messages. A wide range so the figure means something: accuracy over
+          // three days of ratings is a number nobody should act on.
+          this.client.tryLeg('ticket-service', () =>
+            this.client.satisfaction(lastYear(), context),
+          ),
+        ]);
+
+        const documents = unwrap(documentsLeg, unavailable);
+        const satisfaction = unwrap(satisfactionLeg, unavailable);
+
+        return {
+          mostCited: documents?.mostCited ?? [],
+          neverRetrieved: documents?.neverRetrieved ?? [],
+          retrievedNeverCited: documents?.retrievedNeverCited ?? [],
+          citationAccuracy: satisfaction
+            ? satisfaction.citationAccuracyTotal
+            : null,
+          unavailable,
+        };
+      },
+    );
+  }
+
+  // ------------------------------------------------------ 19-doc §5, export
+
+  /**
+   * Deliberately NOT cached.
+   *
+   * Creating a job is a write, and polling one is a question whose answer
+   * changes on a timescale of seconds — a cached PENDING would be a spinner
+   * that never resolves, which is the one failure a progress indicator must not
+   * have.
+   */
+  createExport(dto: CreateExportDto, context: RequestContext) {
+    return this.client.createExport(dto, context);
+  }
+
+  getExport(id: string, context: RequestContext) {
+    return this.client.getExport(id, context);
+  }
+
+  /**
+   * Read-through, keyed and TTL'd per 19-doc §4.
+   *
+   * The `computedAt` freshness segment is deliberately NOT read here: it would
+   * need the answer to build the key for the answer. Closed ranges instead get
+   * a long TTL bounded by a backfill's explicit invalidation, which is the same
+   * guarantee arrived at from the other direction.
+   */
+  private cached<T>(
+    endpoint: string,
+    // `object` rather than `Record<string, unknown>`: a class DTO has no string
+    // index signature, and requiring one at every call site would mean casting
+    // the very shape the validation pipe just produced.
+    params: object,
+    context: RequestContext,
+    produce: () => Promise<T>,
+  ): Promise<T> {
+    const to = 'to' in params && typeof params.to === 'string' ? params.to : '';
+
+    return this.cache.wrap(
+      {
+        // The tenant id is the first segment of the key, so a cross-tenant hit
+        // is unreachable rather than merely unlikely.
+        organizationId: context.organizationId ?? 'no-tenant',
+        endpoint,
+        params: { ...params },
+      },
+      this.cache.ttlSecondsFor(to),
+      produce,
+    );
+  }
+}
+
+/**
+ * A leg's value, or null with the failure recorded.
+ *
+ * The shape that makes partial failure the DEFAULT rather than something each
+ * endpoint has to remember: a caller that forgets to check gets `null` and an
+ * empty list, not an exception that escapes to a 500.
+ */
+function unwrap<T>(
+  leg: { value: T } | { failure: LegFailure },
+  unavailable: UnavailableBlockDto[],
+): T | null {
+  if ('value' in leg) return leg.value;
+
+  unavailable.push(leg.failure);
+
+  return null;
+}
+
+/** The trailing year, for a rate that needs volume to mean anything. */
+function lastYear(): AnalyticsRangeQueryDto {
+  const to = new Date();
+  const from = new Date(to);
+  from.setUTCFullYear(from.getUTCFullYear() - 1);
+
+  return {
+    from: from.toISOString().slice(0, 10),
+    to: to.toISOString().slice(0, 10),
+  };
+}
+
+/** Re-exported so a consumer building a rate here uses the shared definition. */
+export { type rateOf } from '@synapsedesk/common';
+export { type RateDto } from './dto/rest/analytics-response.dto';

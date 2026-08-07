@@ -9,6 +9,8 @@ import {
   SortOrder,
   DepartmentServiceClient,
   GRPC_DEADLINE_MS,
+  ORGANIZATION_SERVICE_NAME,
+  OrganizationServiceClient,
   packRequestContext,
   USER_SERVICE_NAME,
   UserServiceClient,
@@ -41,6 +43,7 @@ export class AuthReferenceService implements OnModuleInit {
 
   private userService!: UserServiceClient;
   private departmentService!: DepartmentServiceClient;
+  private organizationService!: OrganizationServiceClient;
 
   constructor(@Inject(AUTH_GRPC_CLIENT) private readonly client: ClientGrpc) {}
 
@@ -50,6 +53,14 @@ export class AuthReferenceService implements OnModuleInit {
     this.departmentService = this.client.getService<DepartmentServiceClient>(
       DEPARTMENT_SERVICE_NAME,
     );
+
+    // Added for the rollup jobs (19-doc §2.2), which need the tenant's
+    // timezone. The first thing in this service to talk to OrganizationService
+    // — every other reference it resolves is a user or a department.
+    this.organizationService =
+      this.client.getService<OrganizationServiceClient>(
+        ORGANIZATION_SERVICE_NAME,
+      );
   }
 
   /**
@@ -185,6 +196,50 @@ export class AuthReferenceService implements OnModuleInit {
         code: status.UNAVAILABLE,
         message: 'Could not verify the request against the identity service',
       });
+    }
+  }
+
+  /**
+   * Tenant timezones for a set of ids — 19-doc §2.2.
+   *
+   * Called by the daily rollup jobs, which run across every tenant that had
+   * activity rather than on behalf of a caller. Bulk, so one run costs one
+   * round trip rather than one per tenant.
+   *
+   * **Returns a MAP, and an id missing from it means "use the default".** A
+   * tenant deleted between the job reading its own tables and asking here is an
+   * ordinary race, and the caller already has to handle a tenant that never set
+   * a timezone — one code path for both.
+   *
+   * An outage returns an EMPTY map rather than throwing: every tenant then
+   * buckets in UTC for that run, which is wrong for some of them and fixable by
+   * a backfill. Failing the run instead would lose the day's numbers entirely
+   * and leave nothing to recompute from until somebody noticed.
+   */
+  async listOrganizationTimezones(
+    organizationIds: string[],
+  ): Promise<Map<string, string>> {
+    if (organizationIds.length === 0) return new Map();
+
+    try {
+      const response = await firstValueFrom(
+        this.organizationService
+          .listOrganizationTimezones({ organizationIds })
+          .pipe(timeout(GRPC_DEADLINE_MS)),
+      );
+
+      return new Map(
+        response.items
+          .filter((item) => item.timezone)
+          .map((item) => [item.organizationId, item.timezone as string]),
+      );
+    } catch (error) {
+      this.logger.error(
+        `Could not resolve timezones for ${organizationIds.length} tenant(s); ` +
+          `bucketing in UTC: ${formatErrorMsg(error)}`,
+      );
+
+      return new Map();
     }
   }
 }

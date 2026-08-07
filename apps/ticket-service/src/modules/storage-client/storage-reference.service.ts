@@ -18,6 +18,7 @@ import {
   ObjectSupersededEvent,
   STORAGE_PATTERNS,
   SupersededReason,
+  UNKNOWN_ORIGIN,
 } from '@synapsedesk/common';
 
 export type PresignedUpload = {
@@ -86,6 +87,81 @@ export class StorageReferenceService implements OnModuleInit {
       objectPath: response.objectPath,
       expiresAt: new Date((response.expiresAt?.seconds ?? 0) * 1000),
     };
+  }
+
+  /**
+   * The analytics export's upload slot — 19-doc §5.
+   *
+   * A BACKGROUND job has no caller context: it runs from a queue, on behalf of
+   * a request that finished minutes ago. So the tenant is passed explicitly and
+   * a synthetic context is built here rather than threading a stale one through
+   * BullMQ — a serialised `CallerContext` sitting in Redis is an identity with
+   * no expiry, which is a worse thing to have than a slightly awkward signature.
+   */
+  async presignExport(
+    exportId: string,
+    sizeBytes: number,
+    organizationId: string,
+  ): Promise<PresignedUpload> {
+    const response = await firstValueFrom(
+      this.storageService
+        .presignUpload(
+          {
+            purpose: ProtoStoragePurpose.STORAGE_PURPOSE_EXPORT,
+            ownerId: exportId,
+            // An export has one owner. `EXPORT`'s policy sets
+            // `requiresSecondaryOwner: false`, so storage-service ignores this
+            // — sent as an empty string because proto3 has no absent scalar.
+            secondaryOwnerId: '',
+            contentType: 'text/csv',
+            sizeBytes,
+            originalFileName: `analytics-${exportId}.csv`,
+          },
+          packRequestContext(systemContext(organizationId)),
+        )
+        .pipe(timeout(GRPC_DEADLINE_MS)),
+    );
+
+    return {
+      uploadUrl: response.uploadUrl,
+      objectPath: response.objectPath,
+      expiresAt: new Date((response.expiresAt?.seconds ?? 0) * 1000),
+    };
+  }
+
+  /** The confirm half of the same background upload. */
+  async confirmExportUpload(
+    objectPath: string,
+    organizationId: string,
+  ): Promise<void> {
+    await firstValueFrom(
+      this.storageService
+        .confirmUpload(
+          { objectPath },
+          packRequestContext(systemContext(organizationId)),
+        )
+        .pipe(timeout(GRPC_DEADLINE_MS)),
+    );
+  }
+
+  /**
+   * A short-lived download URL for a finished export.
+   *
+   * **A signed URL to a file containing a tenant's full ticket history is a
+   * credential** (19-doc §5), so it is minted per request and expires in
+   * minutes rather than being stored on the row. Storing it would turn a
+   * database read into a durable secret.
+   */
+  async resolveExportUrl(
+    objectPath: string,
+    organizationId: string,
+  ): Promise<string | null> {
+    const resolved = await this.resolveReadUrls(
+      [objectPath],
+      systemContext(organizationId),
+    );
+
+    return resolved[objectPath] ?? null;
   }
 
   async confirmUpload(
@@ -189,4 +265,25 @@ export class StorageReferenceService implements OnModuleInit {
       message: 'File storage is currently unavailable',
     });
   }
+}
+
+/**
+ * The tenant, with no user.
+ *
+ * A background job acts for the TENANT rather than for the person who queued
+ * the work — that request finished minutes ago, and carrying their identity
+ * through a queue would mean an authorization decision made against a session
+ * that may since have been revoked. storage-service scopes by
+ * `organizationId`, which is exactly what this carries and all it carries.
+ */
+function systemContext(organizationId: string): CallerContext {
+  return {
+    sub: null,
+    organizationId,
+    isSuperAdmin: false,
+    departmentIds: [],
+    permissionCodes: [],
+    isEmailVerified: true,
+    ...UNKNOWN_ORIGIN,
+  };
 }

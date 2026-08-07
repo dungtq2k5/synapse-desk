@@ -408,6 +408,106 @@ describe('Organizations (e2e)', () => {
     });
   });
 
+  describe('listOrganizationTimezones', () => {
+    // **Every consumer of this RPC mocks it.** ticket-service and
+    // ingestion-service both `jest.spyOn(...'listOrganizationTimezones')` in
+    // their rollup suites, which is right for those tests — they are about
+    // bucketing, not about auth-service. The consequence is that without the
+    // block below the implementation is executed by nothing, and the mocks
+    // would keep agreeing with each other while the real query drifted.
+
+    it('answers MANY tenants in one round trip', async () => {
+      // The shape is the point. A rollup resolving one tenant per gRPC call
+      // would spend more time asking than aggregating.
+      const a = await seedTenantWithUser(fx.prisma);
+      const b = await seedTenantWithUser(fx.prisma);
+
+      await fx.prisma.organization.update({
+        where: { id: a.org.id },
+        data: { timezone: 'Asia/Ho_Chi_Minh' },
+      });
+      await fx.prisma.organization.update({
+        where: { id: b.org.id },
+        data: { timezone: 'America/New_York' },
+      });
+
+      const { items } = await organizations.listOrganizationTimezones({
+        organizationIds: [a.org.id, b.org.id],
+      });
+
+      expect(items).toHaveLength(2);
+      expect(new Map(items.map((i) => [i.organizationId, i.timezone]))).toEqual(
+        new Map([
+          [a.org.id, 'Asia/Ho_Chi_Minh'],
+          [b.org.id, 'America/New_York'],
+        ]),
+      );
+    });
+
+    it('**leaves an unset timezone ABSENT rather than defaulting to UTC**', async () => {
+      // The default belongs to the consumer, which already has to handle an id
+      // that came back missing entirely. Defaulting in two places is how they
+      // eventually disagree — and a tenant silently bucketed into UTC days is
+      // the kind of wrong that looks right until someone in Sydney compares a
+      // dashboard against their own inbox.
+      const t = await seedTenantWithUser(fx.prisma);
+
+      const { items } = await organizations.listOrganizationTimezones({
+        organizationIds: [t.org.id],
+      });
+
+      expect(items).toHaveLength(1);
+      expect(items[0].timezone).toBeUndefined();
+      expect(items[0].timezone).not.toBe('UTC');
+    });
+
+    it('**omits an unknown or deleted id instead of failing the whole run**', async () => {
+      // A tenant offboarded between the job reading its own tables and asking
+      // here is an ordinary race. Throwing would lose every other tenant's
+      // rollup for that day — one deleted organization taking out the whole
+      // window.
+      const live = await seedTenantWithUser(fx.prisma);
+      const gone = await seedTenantWithUser(fx.prisma);
+
+      await fx.prisma.organization.update({
+        where: { id: gone.org.id },
+        data: { deletedAt: new Date() },
+      });
+
+      const { items } = await organizations.listOrganizationTimezones({
+        organizationIds: [
+          live.org.id,
+          gone.org.id,
+          '00000000-0000-4000-8000-000000000000',
+        ],
+      });
+
+      expect(items.map((i) => i.organizationId)).toEqual([live.org.id]);
+    });
+
+    it('an empty ask is an empty answer, not an error', async () => {
+      // A rollup over a window in which no tenant was active has nothing to
+      // resolve. That is a quiet Sunday, not a fault.
+      await expect(
+        organizations.listOrganizationTimezones({ organizationIds: [] }),
+      ).resolves.toEqual({ items: [] });
+    });
+
+    it('de-duplicates ids, so a repeated id cannot double a row', async () => {
+      // The job builds its id list from activity rows, where a tenant appears
+      // once per bucket. A duplicate reaching the query would return that
+      // tenant twice and — for a consumer building a Map — merely waste work,
+      // but for one building an array it would skew whatever it counted.
+      const t = await seedTenantWithUser(fx.prisma);
+
+      const { items } = await organizations.listOrganizationTimezones({
+        organizationIds: [t.org.id, t.org.id, t.org.id],
+      });
+
+      expect(items).toHaveLength(1);
+    });
+  });
+
   describe('updateOrganization — validation', () => {
     it('an invalid slug is rejected before it reaches the database', async () => {
       const t = await seedTenantWithUser(fx.prisma);

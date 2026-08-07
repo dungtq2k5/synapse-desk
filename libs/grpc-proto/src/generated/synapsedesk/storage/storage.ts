@@ -16,6 +16,12 @@ export enum StoragePurpose {
   STORAGE_PURPOSE_TICKET_ATTACHMENT = 2,
   /** STORAGE_PURPOSE_DOCUMENT - Reserved — Domain C's ingestion-service. No caller today. */
   STORAGE_PURPOSE_DOCUMENT = 3,
+  /**
+   * STORAGE_PURPOSE_EXPORT - An analytics export — 19-doc §5. A new purpose rather than a second file
+   * path, so the signed-URL discipline and the tenant prefix are reused rather
+   * than reinvented.
+   */
+  STORAGE_PURPOSE_EXPORT = 4,
   UNRECOGNIZED = -1,
 }
 

@@ -34,6 +34,12 @@ export const VALIDATED_MIME_TYPES = [
   'application/pdf',
   'text/plain',
   'text/markdown',
+  // Analytics exports (19-doc §5). Text with no signature of their own, so
+  // both fall to `looksLikeText` below — which is the honest check: neither
+  // format has a magic number, and inventing one ("starts with a comma"?)
+  // would reject legitimate files while catching nothing.
+  'text/csv',
+  'application/json',
 ] as const;
 
 export type ValidatedMimeType = (typeof VALIDATED_MIME_TYPES)[number];
@@ -93,6 +99,11 @@ const MATCHERS: Record<ValidatedMimeType, (head: Buffer) => boolean> = {
 
   'text/plain': looksLikeText,
   'text/markdown': looksLikeText,
+  // Same treatment, same reason: a NUL byte or an invalid UTF-8 sequence is
+  // the only thing that distinguishes these from a binary payload wearing a
+  // text content-type, and it is enough to reject one.
+  'text/csv': looksLikeText,
+  'application/json': looksLikeText,
 };
 
 function isValidatedMimeType(value: string): value is ValidatedMimeType {

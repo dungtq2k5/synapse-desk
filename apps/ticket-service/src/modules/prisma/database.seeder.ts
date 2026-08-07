@@ -69,6 +69,29 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
       CREATE UNIQUE INDEX IF NOT EXISTS "ticket_assignments_current_key"
         ON "ticket_assignments" ("ticket_id") WHERE "is_current" = true;
     `);
+
+    // The analytics rollup's uniqueness guard — 19-doc §2.2.
+    //
+    // A PAIR, because `department_id` is NULLable and Postgres treats NULLs as
+    // DISTINCT in a unique index: a plain `@@unique([organizationId, day,
+    // departmentId])` would happily accept ten tenant-wide rows for the same
+    // day, and the endpoints would sum them. The pair says what is actually
+    // meant — one row per (tenant, day, department), and one per (tenant, day)
+    // for tickets with no department.
+    //
+    // The job deletes and re-inserts rather than upserting, so this is not the
+    // mechanism it relies on. It is the guard that turns a future bug into a
+    // constraint violation instead of a silently doubled number.
+    await this.prisma.$executeRawUnsafe(`
+      CREATE UNIQUE INDEX IF NOT EXISTS "ticket_daily_stats_dept_key"
+        ON "ticket_daily_stats" ("organization_id", "day", "department_id")
+        WHERE "department_id" IS NOT NULL;
+    `);
+    await this.prisma.$executeRawUnsafe(`
+      CREATE UNIQUE INDEX IF NOT EXISTS "ticket_daily_stats_org_key"
+        ON "ticket_daily_stats" ("organization_id", "day")
+        WHERE "department_id" IS NULL;
+    `);
   }
 
   /**

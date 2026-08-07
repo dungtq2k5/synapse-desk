@@ -45,16 +45,43 @@ export class ScopeFanoutProcessor extends WorkerHost {
     }
 
     const event = job.data;
-    const scope = {
-      isOrganizationWide: event.isOrganizationWide,
-      departmentIds: event.departmentIds,
-      isDeleted: event.isDeleted,
-    };
 
-    // The SAME ordering the endpoint used. Re-deriving it from `restricting`
-    // rather than hardcoding one order keeps the reconciler honest: a retry of
-    // a restriction must not be the moment the system briefly widens access
-    // again.
+    /**
+     * **The document's CURRENT scope, not the one the event carried.**
+     *
+     * A queued job is a promise to make the stores agree with `documents` —
+     * not to replay a scope that was true when it was enqueued. Those are the
+     * same thing right up until the document changes again before the job
+     * runs, and then replaying is actively wrong: delete a document, restore it
+     * a second later, and the deferred fan-out re-hides the chunks of a
+     * document every screen says is live.
+     *
+     * That is not a hypothetical. It showed up as an intermittent e2e failure —
+     * "restore un-flips the chunks" passing four runs in five — which is what a
+     * production race looks like from the inside: rare, unreproducible on
+     * demand, and blamed on the test.
+     *
+     * Reading the row also makes the job naturally idempotent: any number of
+     * stale jobs for one document now converge on the same answer instead of
+     * fighting over which snapshot wins.
+     */
+    const current = await this.writer.currentScope(event.documentId);
+    if (!current) {
+      // Hard-deleted between enqueue and pickup. Nothing to reconcile, and
+      // the Qdrant points went with it.
+      this.logger.warn(
+        `Document ${event.documentId} no longer exists; skipping fan-out`,
+      );
+      return;
+    }
+
+    const scope = current;
+
+    // The SAME ordering the endpoint used, and derived from the EVENT rather
+    // than from the current scope: `restricting` describes the direction of the
+    // change that queued this, which is what decides whether a partial failure
+    // must leave the document over- or under-exposed. A retry of a restriction
+    // must not be the moment the system briefly widens access again.
     if (event.restricting) {
       await this.writer.writeQdrant(event.documentId, scope, { fatal: true });
       await this.writer.writeChunks(event.documentId, scope);

@@ -17,6 +17,7 @@ export * from './generated/synapsedesk/ticket/message';
 export * from './generated/synapsedesk/ticket/ai';
 export * from './generated/synapsedesk/ticket/feedback';
 export * from './generated/synapsedesk/ticket/audit';
+export * from './generated/synapsedesk/ticket/analytics';
 
 export * from './generated/synapsedesk/storage/storage';
 

@@ -47,6 +47,19 @@ model Organization {
   /// the settings layer would be an unresolvable model name at request time.
   aiModelTier String @default("FAST") @map("ai_model_tier") @db.VarChar(20)
 
+  /// The tenant's business timezone — 19-doc §2.2.
+  ///
+  /// Distinct from `users.timezone`, which is a person's quiet hours. This one
+  /// answers "when does this tenant's Monday start", and every daily analytics
+  /// figure is bucketed by it: a tenant at UTC+7 whose Monday begins at 17:00
+  /// Sunday UTC would otherwise see every daily number split across two rows
+  /// with no way for a consumer to reassemble them.
+  ///
+  /// An IANA name. NULL is treated as UTC — wrong for the tenant and at least
+  /// deterministic, where the server's zone would be wrong in a way that
+  /// changes when the service is redeployed.
+  timezone String? @db.VarChar(64)
+
   // -------------------------------------------------------------------------
   // Stripe — exactly TWO columns, and no more (RDM §1.15).
   //

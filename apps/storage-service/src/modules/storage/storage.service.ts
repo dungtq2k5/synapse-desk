@@ -37,6 +37,7 @@ const DOMAIN_PURPOSE: Record<number, StoragePurpose> = {
   [ProtoStoragePurpose.STORAGE_PURPOSE_TICKET_ATTACHMENT]:
     StoragePurpose.TICKET_ATTACHMENT,
   [ProtoStoragePurpose.STORAGE_PURPOSE_DOCUMENT]: StoragePurpose.DOCUMENT,
+  [ProtoStoragePurpose.STORAGE_PURPOSE_EXPORT]: StoragePurpose.EXPORT,
 };
 
 /**

@@ -274,3 +274,71 @@ model AiGeneration {
   @@index([ticketId])
   @@map("ai_generations")
 }
+
+/// 19-doc §2.2 — the daily AI-generation rollup.
+///
+/// **This one is not an optimisation, it is the only durable record.**
+/// `ai_generations` is retention-rolled (RDM Table 29): raw rows aggregate away
+/// after ~90 days. Any analytics query written against raw rows silently loses
+/// history the moment retention ships — the same trap that made `UNCITED` a
+/// projection rather than a query (12-doc §4.1).
+///
+/// Which makes the ORDERING constraint real: this job must run BEFORE ledger
+/// retention over the same window. Reversed, retention deletes rows this has
+/// not read, and every historical figure under-reports forever with nothing to
+/// recompute it from.
+///
+/// Sums and counts, never averages — see `TicketDailyStat`.
+model AiGenerationDailyStat {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  organizationId String @map("organization_id") @db.Uuid
+
+  /// A DATE in the TENANT'S timezone, not UTC — 19-doc §2.2 test 4.
+  day DateTime @db.Date
+
+  /// AiGenerationPurpose. **The per-purpose split is the point** (19-doc §3.2):
+  /// it shows a tenant where their AI budget actually goes, which is rarely
+  /// where they assume.
+  purpose String @db.VarChar(30)
+
+  /// Carried as a dimension so a tier change is visible as a cost change rather
+  /// than as an unexplained jump.
+  modelName String @map("model_name") @db.VarChar(100)
+
+  generations      Int    @default(0)
+  promptTokens     BigInt @default(0) @map("prompt_tokens")
+  completionTokens BigInt @default(0) @map("completion_tokens")
+
+  /// MICROS, and BigInt, for the same reason the ledger uses them: a tenant's
+  /// quarterly spend in micros overflows a 32-bit int, and float dollars
+  /// accumulate rounding error across a million rows.
+  costMicros BigInt @default(0) @map("cost_micros")
+
+  latencyMsSum BigInt @default(0) @map("latency_ms_sum")
+  latencyCount Int    @default(0) @map("latency_count")
+
+  failures Int @default(0)
+
+  /// **The knowledge-gap signal.** A generation that retrieved nothing is a
+  /// question the corpus could not answer — which is a content backlog item,
+  /// not an error, and is invisible in every other counter here.
+  emptyRetrievals Int @default(0) @map("empty_retrievals")
+
+  /// The acceptance-rate numerator and its denominator's other two terms.
+  ///
+  /// `discarded` depends on the sweep (12-doc §4.3): without it the denominator
+  /// only ever contains drafts that were USED, and acceptance reports ~100%
+  /// regardless of quality.
+  draftsAccepted  Int @default(0) @map("drafts_accepted")
+  draftsEdited    Int @default(0) @map("drafts_edited")
+  draftsDiscarded Int @default(0) @map("drafts_discarded")
+
+  /// In the analytics cache key for closed ranges (19-doc §4), so a backfill
+  /// correction invalidates instead of serving known-wrong numbers for a day.
+  computedAt DateTime @default(now()) @map("computed_at") @db.Timestamptz
+
+  @@unique([organizationId, day, purpose, modelName])
+  @@index([organizationId, day])
+  @@map("ai_generation_daily_stats")
+}

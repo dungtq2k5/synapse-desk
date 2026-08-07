@@ -259,7 +259,10 @@ async def ingest_corpus(pool, qdrant, api_key: str, organization_id: str) -> Non
     that was org-wide in Qdrant and department-scoped in Postgres would make
     every retrieval number meaningless.
     """
-    documents = sorted(p for p in (EVAL_DIR / "corpus").glob("*.md"))
+    # Sorted so two runs ingest in the same order. Retrieval scores are compared
+    # against a baseline, and ties broken by insertion order would move the
+    # numbers for a reason that has nothing to do with a prompt change.
+    documents = sorted((EVAL_DIR / "corpus").glob("*.md"))
 
     for path in documents:
         document_id = str(uuid.uuid4())
@@ -529,7 +532,12 @@ async def main() -> int:
     # An unlimited allowance. The eval measures ANSWER quality; the budget gate
     # has its own suite, and a run that half-refused because it hit a cap would
     # look exactly like a quality regression.
-    async def entitlement(_organization_id: str):
+    # `async` with nothing awaited, and REQUIRED rather than stylistic: this
+    # replaces `RagServicer._entitlement`, which the servicer awaits directly
+    # (`server.py` — `await self._entitlement(...)`). Dropping the keyword makes
+    # that `await` raise "object tuple can't be used in 'await' expression" on
+    # the first question the harness asks.
+    async def entitlement(_organization_id: str):  # NOSONAR
         from datetime import datetime, timezone
 
         return datetime(2026, 1, 1, tzinfo=timezone.utc), 2**62
@@ -576,12 +584,21 @@ class _NullLedger:
     """
 
     def record(self, entry):
-        async def _noop():
+        # `async` is what makes this a COROUTINE, which is the only thing
+        # `ensure_future` below accepts — a plain function returning a str
+        # raises "a coroutine or an awaitable is required". Callers do
+        # `asyncio.wait_for(asyncio.shield(task), ...)` on the result, so a Task
+        # is the contract, not an implementation detail.
+        async def _noop():  # NOSONAR
             return str(uuid.uuid4())
 
         return asyncio.ensure_future(_noop())
 
-    async def drain(self, timeout: float = 5.0) -> None:  # noqa: ASYNC109
+    # Awaited on shutdown (`await deps.ledger.drain()`), so the keyword is the
+    # interface. A real `LedgerClient.drain` waits on its in-flight writes;
+    # this one has none to wait for, which is what makes the body empty rather
+    # than what makes the method synchronous.
+    async def drain(self, timeout: float = 5.0) -> None:  # noqa: ASYNC109  # NOSONAR
         return None
 
 

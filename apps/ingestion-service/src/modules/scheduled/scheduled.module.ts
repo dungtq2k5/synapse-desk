@@ -15,6 +15,11 @@ import { DocumentFlagService } from './document-flag.service';
  * that waits is a test that gets deleted. The scheduler that calls them is a
  * thin layer above; the ORDER it calls them in is the part that matters —
  * projection before retention, always (§4.1).
+ *
+ * `AiGenerationRollupJob` shares that constraint (19-doc §2.2) and deliberately
+ * does NOT live here: it writes `ai_generation_daily_stats`, and the module
+ * that owns a table should own its writer. Putting it beside its siblings
+ * instead would have made `AiLedgerModule` and this module import each other.
  */
 @Module({
   imports: [PrismaModule, AiLedgerModule],

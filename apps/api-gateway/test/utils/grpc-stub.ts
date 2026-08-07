@@ -36,6 +36,10 @@ import {
   BILLING_SERVICE_NAME,
   BillingServiceClient,
   DOCUMENT_SERVICE_NAME,
+  AI_LEDGER_SERVICE_NAME,
+  AiLedgerServiceClient,
+  ANALYTICS_SERVICE_NAME,
+  AnalyticsServiceClient,
   NOTIFICATION_SERVICE_NAME,
   NotificationServiceClient,
   RAG_SERVICE_NAME,
@@ -91,6 +95,12 @@ export type GrpcStubs = {
 
   /** Domain E — the feed. New in 18-doc: this peer had no gRPC server before. */
   notification: MockProxy<NotificationServiceClient>;
+
+  /** The read projection over Domain B — 19-doc. Served by ticket-service. */
+  analytics: MockProxy<AnalyticsServiceClient>;
+
+  /** Domain C's ledger, which also answers the AI-usage reads (19-doc §3.2). */
+  ledger: MockProxy<AiLedgerServiceClient>;
 };
 
 export type GrpcStubFixture = {
@@ -131,6 +141,8 @@ export function stubGrpcServices(): GrpcStubFixture {
     billing: mock<BillingServiceClient>(),
     rag: mock<RagServiceClient>(),
     notification: mock<NotificationServiceClient>(),
+    analytics: mock<AnalyticsServiceClient>(),
+    ledger: mock<AiLedgerServiceClient>(),
   };
 
   const byServiceName: Record<string, unknown> = {
@@ -156,6 +168,8 @@ export function stubGrpcServices(): GrpcStubFixture {
     [BILLING_SERVICE_NAME]: stubs.billing,
     [RAG_SERVICE_NAME]: stubs.rag,
     [NOTIFICATION_SERVICE_NAME]: stubs.notification,
+    [ANALYTICS_SERVICE_NAME]: stubs.analytics,
+    [AI_LEDGER_SERVICE_NAME]: stubs.ledger,
   };
 
   const clientGrpc: ClientGrpc = {

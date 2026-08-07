@@ -33,16 +33,6 @@ describe('Two-factor auth (e2e)', () => {
     return secret;
   };
 
-  beforeAll(async () => {
-    fx = await bootstrapE2eTest();
-    twoFactor = fx.moduleRef.get(TwoFactorAuthService);
-    auth = fx.moduleRef.get(AuthService);
-  });
-
-  beforeEach(() => fx.reset());
-
-  afterAll(() => fx.close());
-
   /** Enrols a user end to end and returns their TOTP secret + backup codes. */
   async function enrol(userId: string) {
     const setup = await twoFactor.generateTwoFactor({ userId });
@@ -53,6 +43,16 @@ describe('Two-factor auth (e2e)', () => {
     });
     return { secret, backupCodes: activated.backupCodes };
   }
+
+  beforeAll(async () => {
+    fx = await bootstrapE2eTest();
+    twoFactor = fx.moduleRef.get(TwoFactorAuthService);
+    auth = fx.moduleRef.get(AuthService);
+  });
+
+  beforeEach(() => fx.reset());
+
+  afterAll(() => fx.close());
 
   describe('generateTwoFactor (setup)', () => {
     it('1. setup on an already-enabled account is FAILED_PRECONDITION', async () => {

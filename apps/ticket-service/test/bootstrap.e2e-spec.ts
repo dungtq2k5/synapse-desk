@@ -243,6 +243,9 @@ describe('2. ticket-service boots as a hybrid app (e2e)', () => {
     expect(services).toEqual(
       [
         'AiService',
+        // The read projection over Domain B — 19-doc. Served from here rather
+        // than from an `analytics-service`, which deliberately does not exist.
+        'AnalyticsService',
         'AssignmentService',
         'AuditService',
         'FeedbackService',

@@ -11,6 +11,8 @@ import {
   OnboardingResponse,
   OrganizationResponse,
   OrganizationSettingsResponse,
+  ListOrganizationTimezonesRequest,
+  ListOrganizationTimezonesResponse,
   OrganizationEntitlementsResponse,
   OrganizationUsageResponse,
   toTimestamp,
@@ -310,6 +312,47 @@ export class OrganizationsService {
       // nothing else reads, and the tenant would appear to have spent nothing.
       billingCycleStart: toTimestamp(organization.billingCycleStart),
       status: toProtoOrgStatus(organization.status),
+    };
+  }
+
+  /**
+   * Tenant timezones, in BULK — 19-doc §2.2.
+   *
+   * **Service-to-service, with no actor.** The daily rollup jobs run across
+   * every tenant that had activity, not on behalf of a caller, so the ids are a
+   * FIELD rather than something read from metadata — the same shape
+   * `listPermissionHolders` takes and for the same reason.
+   *
+   * Answers many at once: one round trip per rollup run rather than one per
+   * tenant. A job that made a gRPC call per tenant would spend more time
+   * resolving timezones than aggregating.
+   *
+   * An unknown id is simply absent from the response rather than an error: a
+   * tenant deleted between the job reading its own tables and asking here is an
+   * ordinary race, and failing the whole run over it would lose every other
+   * tenant's rollup.
+   */
+  async listOrganizationTimezones(
+    request: ListOrganizationTimezonesRequest,
+  ): Promise<ListOrganizationTimezonesResponse> {
+    const ids = [...new Set((request.organizationIds ?? []).filter(Boolean))];
+    // An empty ask is a valid question with an empty answer, not an error: a
+    // run over a quiet window has no tenants to resolve.
+    if (ids.length === 0) return { items: [] };
+
+    const organizations = await this.prisma.organization.findMany({
+      where: { id: { in: ids }, deletedAt: null },
+      select: { id: true, timezone: true },
+    });
+
+    return {
+      items: organizations.map((organization) => ({
+        organizationId: organization.id,
+        // `?? undefined`, not `?? 'UTC'`: the DEFAULT belongs to the consumer,
+        // which already has to handle an id that came back missing entirely.
+        // Defaulting in two places is how they eventually disagree.
+        timezone: organization.timezone ?? undefined,
+      })),
     };
   }
 

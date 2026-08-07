@@ -187,4 +187,32 @@ export class ScopeWriterService {
       )
       .map((chunk) => chunk.id);
   }
+
+  /**
+   * The document's scope as it is RIGHT NOW.
+   *
+   * The reconciler's input, so a deferred job converges on the truth rather
+   * than replaying a snapshot that a later change has already overtaken. Null
+   * when the row is gone.
+   */
+  async currentScope(documentId: string): Promise<DocumentScope | null> {
+    const document = await this.prisma.document.findUnique({
+      where: { id: documentId },
+      select: {
+        isOrganizationWide: true,
+        deletedAt: true,
+        departmentLinks: { select: { departmentId: true } },
+      },
+    });
+
+    if (!document) return null;
+
+    return {
+      isOrganizationWide: document.isOrganizationWide,
+      departmentIds: document.departmentLinks.map((link) => link.departmentId),
+      // A soft delete IS the scope change, which is why retrieval reads
+      // `is_deleted` on the chunk rather than joining `documents`.
+      isDeleted: document.deletedAt !== null,
+    };
+  }
 }

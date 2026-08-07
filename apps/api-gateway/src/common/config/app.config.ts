@@ -1,3 +1,5 @@
+// FIXME I think after resolved all of the problems in this file, consider rename it to "dto.config.ts" which indicates only store constants for dto objects
+
 export const MIN_FULL_NAME_LENGTH = 2;
 export const MAX_FULL_NAME_LENGTH = 150;
 
@@ -27,11 +29,15 @@ export const MIN_ROLE_NAME_LENGTH = 2;
 /** Matches `roles.name` — `@db.VarChar(100)`. */
 export const MAX_ROLE_NAME_LENGTH = 100;
 
+/** A document belongs to a handful of departments, not hundreds. */
+export const MAX_DOCUMENT_DEPARTMENTS = 50;
+
 // SORT_ORDER_OPTIONS / SortOrder / DEFAULT_SEARCH moved to @synapsedesk/common:
 // auth-service clamps `limit` a second time (it is reachable over gRPC, where no
 // ValidationPipe ever ran), and two copies of MAX_LIMIT is how the edge and the
 // service end up disagreeing about what "too many" means.
 
+// FIXME This type should be moved to "../types/"
 export type ApiSuccessResponse<T = any> = {
   success: boolean;
   statusCode: number;
@@ -40,6 +46,7 @@ export type ApiSuccessResponse<T = any> = {
   data: T;
 };
 
+// FIXME This type should be moved to "../types/"
 export type ApiErrorResponse = {
   success: boolean;
   statusCode: number;
@@ -48,6 +55,7 @@ export type ApiErrorResponse = {
   error: string;
 };
 
+// FIXME These throttler configs should be moved to "./throttler.config.ts"
 // ---------------------------------------------------------------------------
 // Rate limiting
 // ---------------------------------------------------------------------------
@@ -144,6 +152,3 @@ export const ROUTE_THROTTLE = {
   /** Ask GENERATES, so it costs an order of magnitude more than search. */
   knowledgeAsk: { ttl: 60_000, limit: 10 },
 } as const;
-
-/** A document belongs to a handful of departments, not hundreds. */
-export const MAX_DOCUMENT_DEPARTMENTS = 50;

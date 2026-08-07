@@ -12,6 +12,8 @@ import {
   OrganizationServiceControllerMethods,
   OrganizationSettingsResponse,
   GetOrganizationEntitlementsRequest,
+  ListOrganizationTimezonesRequest,
+  ListOrganizationTimezonesResponse,
   OrganizationEntitlementsResponse,
   OrganizationUsageResponse,
   unpackCallerContext,
@@ -94,6 +96,13 @@ export class OrganizationsGrpcController implements OrganizationServiceControlle
     return this.organizationsService.getOrganizationEntitlements(
       unpackCallerContext(metadata),
     );
+  }
+
+  /** Service-to-service only — reads no caller context by design. */
+  listOrganizationTimezones(
+    request: ListOrganizationTimezonesRequest,
+  ): Promise<ListOrganizationTimezonesResponse> {
+    return this.organizationsService.listOrganizationTimezones(request);
   }
 
   getOnboarding(

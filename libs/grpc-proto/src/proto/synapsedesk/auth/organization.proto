@@ -136,6 +136,30 @@ message OrganizationEntitlementsResponse {
 
 message GetOrganizationEntitlementsRequest {}
 
+// Tenant timezones, in BULK — 19-doc §2.2.
+//
+// The daily rollup jobs bucket by the tenant's local date, and they run across
+// every tenant that had activity rather than on behalf of one caller. So this
+// takes ids as a FIELD (there is no actor) and answers many at once: one round
+// trip per run rather than one per tenant.
+//
+// Service-to-service only. It is never routed by the gateway — a tenant's
+// timezone is not a secret, but a bulk read keyed by ids from outside is a
+// shape no client should have.
+message ListOrganizationTimezonesRequest {
+  repeated string organization_ids = 1;
+}
+
+message OrganizationTimezone {
+  string organization_id = 1;
+  // An IANA name. Absent means the tenant has not set one; the caller uses UTC.
+  optional string timezone = 2;
+}
+
+message ListOrganizationTimezonesResponse {
+  repeated OrganizationTimezone items = 1;
+}
+
 message OrganizationUsageResponse {
   // Active members PLUS pending invitations -- pending invites RESERVE seats,
   // so this must match what the invitation path enforces or an invite gets
@@ -203,6 +227,7 @@ service OrganizationService {
   // there against `billing.entitlements_changed` (doc 15 §1.3) — so this is a
   // cache fill rather than a per-request call.
   rpc GetOrganizationEntitlements(GetOrganizationEntitlementsRequest) returns (OrganizationEntitlementsResponse);
+  rpc ListOrganizationTimezones(ListOrganizationTimezonesRequest) returns (ListOrganizationTimezonesResponse);
 
   rpc GetOnboarding(GetOnboardingRequest) returns (OnboardingResponse);
   rpc CompleteOnboarding(CompleteOnboardingRequest) returns (OrganizationResponse);
