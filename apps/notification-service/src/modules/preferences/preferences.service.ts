@@ -8,12 +8,20 @@ import {
   NotificationChannel,
   PREFERENCE_CHANNELS,
   PREFERENCE_WILDCARD_TYPE,
+  PreferenceSource,
   requireActor,
   requireTenant,
 } from '@synapsedesk/common';
 import {
+  DigestMode as ProtoDigestMode,
+  fromProtoDigestMode,
+  fromProtoNotificationChannel,
   ListPreferencesResponse,
+  NotificationChannel as ProtoNotificationChannel,
   PreferenceResponse,
+  toProtoDigestMode,
+  toProtoNotificationChannel,
+  toProtoPreferenceSource,
   UpdatePreferenceRequest,
 } from '@synapsedesk/grpc-proto';
 import { PreferenceResolver } from './preference-resolver.service';
@@ -57,10 +65,10 @@ export class PreferencesService {
 
         items.push({
           type: resolved.type,
-          channel: resolved.channel,
+          channel: toProtoNotificationChannel(resolved.channel),
           isEnabled: resolved.isEnabled,
-          digest: resolved.digest,
-          source: resolved.source,
+          digest: toProtoDigestMode(resolved.digest),
+          source: toProtoPreferenceSource(resolved.source),
         });
       }
     }
@@ -109,13 +117,15 @@ export class PreferencesService {
     });
 
     return {
+      // Both columns are Postgres `VarChar` (§7.3), so these are plain strings
+      // on the way out of Prisma and the mappers take them as such.
       type: row.type,
-      channel: row.channel,
+      channel: toProtoNotificationChannel(row.channel),
       isEnabled: row.isEnabled,
-      digest: row.digest,
+      digest: toProtoDigestMode(row.digest),
       // Always `explicit` after a write — that is what a write means, and it
       // is how the UI stops rendering the row as inherited.
-      source: 'explicit',
+      source: toProtoPreferenceSource(PreferenceSource.EXPLICIT),
     };
   }
 
@@ -141,34 +151,45 @@ export class PreferencesService {
     });
   }
 
-  private validateChannel(channel: string): NotificationChannel {
-    // `WEBHOOK` is deliberately absent from `PREFERENCE_CHANNELS`: it is in the
-    // channel enum for completeness and has no implementation (18-doc §8), so
-    // a preference for it would be a setting that controls nothing.
-    // Compared as STRINGS, because `channel` arrives off the wire and a
-    // direct enum comparison would be asserting the very thing being checked.
-    const match = PREFERENCE_CHANNELS.find(
-      (value) => String(value) === channel,
-    );
+  /**
+   * Still here, and no longer checking the same thing.
+   *
+   * It used to answer *"is this a channel at all?"* by comparing `String(value)`
+   * against the domain enum — a hand-written gate that existed because the
+   * field arrived off the wire as unconstrained text. The proto enum answers
+   * that now, before any handler runs, so an unknown channel never reaches
+   * this method.
+   *
+   * What remains is a POLICY, which no wire type can express: `WEBHOOK` is a
+   * real channel that is not a configurable preference. It has no
+   * implementation (18-doc §8), so a preference for it would be a setting that
+   * controls nothing. `PREFERENCE_CHANNELS` is Table 25; the enum is Table 24.
+   *
+   * `UNSPECIFIED` lands here too — a caller that omitted the field — and gets
+   * the same refusal, because a write has to know which channel it is writing.
+   */
+  private validateChannel(
+    channel: ProtoNotificationChannel,
+  ): NotificationChannel {
+    const domain = fromProtoNotificationChannel(channel);
+    const match = PREFERENCE_CHANNELS.find((value) => value === domain);
     if (match) return match;
 
     throw new RpcException({
       code: status.INVALID_ARGUMENT,
-      message: `Unknown or unsupported channel '${channel}'`,
+      message: `Unknown or unsupported channel '${ProtoNotificationChannel[channel] ?? channel}'`,
     });
   }
 
-  private validateDigest(digest: string | undefined): DigestMode | null {
-    if (!digest) return null;
-
-    const match = Object.values(DigestMode).find(
-      (value) => String(value) === digest,
-    );
-    if (match) return match;
-
-    throw new RpcException({
-      code: status.INVALID_ARGUMENT,
-      message: `Unknown digest mode '${digest}'`,
-    });
+  /**
+   * No validation left to do — only the absent/present distinction.
+   *
+   * `UNSPECIFIED` is proto3's "the client did not send one", which is exactly
+   * what the PATCH needs: a request that omits `digest` must leave a chosen
+   * digest alone rather than resetting it. Every other value is one the wire
+   * already guaranteed is a member.
+   */
+  private validateDigest(digest: ProtoDigestMode): DigestMode | null {
+    return fromProtoDigestMode(digest);
   }
 }

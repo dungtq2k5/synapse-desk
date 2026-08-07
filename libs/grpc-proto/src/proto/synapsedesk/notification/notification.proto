@@ -21,13 +21,37 @@ import "google/protobuf/timestamp.proto";
 // users' inboxes and would bypass the `event_id` idempotency that makes NATS
 // at-least-once delivery safe.
 
+// Mirrors `NotificationPriority` in `@synapsedesk/common` — RDM Table 23.
+//
+// **A CLOSED set, unlike `type` below.** The four levels come from the table
+// and no producer invents a fifth, which is exactly the property that makes an
+// enum right here and wrong there.
+//
+// `LOW` and `HIGH` are declared and nothing branches on them yet — they behave
+// as `NORMAL` (18-doc §8). They are on the wire regardless: a producer needs
+// somewhere to put "this matters more than a reply", and a value that survives
+// the round trip can be acted on later without a proto change. `CRITICAL` is
+// the one that already means something — it bypasses quiet hours and digest
+// batching, so reading it as anything else silently mutes an alert.
+enum NotificationPriority {
+  NOTIFICATION_PRIORITY_UNSPECIFIED = 0;
+  NOTIFICATION_PRIORITY_LOW = 1;
+  NOTIFICATION_PRIORITY_NORMAL = 2;
+  NOTIFICATION_PRIORITY_HIGH = 3;
+  NOTIFICATION_PRIORITY_CRITICAL = 4;
+}
+
 message NotificationResponse {
   string id = 1;
   string organization_id = 2;
   // The ORIGINATING event — `ticket.assigned`, `quota.threshold`. Never the
   // transport subject (18-doc §1.3).
+  //
+  // Stays a `string` where `priority` below became an enum, and the difference
+  // is open set versus closed: every producer that emits a new event adds a
+  // type, so an enum here would mean a proto change per notification.
   string type = 3;
-  string priority = 4;
+  NotificationPriority priority = 4;
   string title = 5;
   optional string body = 6;
   // JSON, as a string. proto3 has no map<string, any>, and a `Struct` would
@@ -89,6 +113,62 @@ message MarkReadResponse {
   int32 unread_count = 2;
 }
 
+// Enums rather than the strings these used to be, per the rule `OrgStatus`
+// established: the wire format rejects an unknown value before any handler
+// runs, which is a stronger gate than a runtime check somebody has to remember
+// to write. notification-service was writing exactly those checks by hand —
+// `validateChannel` and `validateDigest` — and comparing `String(value)`
+// against the domain enum precisely because the value arrived unconstrained.
+//
+// Values carry the enum-name prefix because protobuf enum values use C++
+// scoping: they are SIBLINGS of their type, so a bare `UNSPECIFIED` in two
+// enums of one package is a compile error.
+//
+// Note `type` stays a `string` deliberately. It is an OPEN set — every producer
+// that emits a new event adds one — so an enum there would mean a proto change
+// on every new notification, and an unknown type must degrade to "no
+// preference row" rather than being refused at the transport.
+
+// Mirrors `NotificationChannel` in `@synapsedesk/common` — RDM Table 24.
+//
+// `WEBHOOK` is present for completeness and is NOT a valid preference: it has
+// no implementation (18-doc §8), so a preference for it would control nothing.
+// That exclusion stays in the service layer, because it is a policy about which
+// channels are configurable, not a statement about which channels exist.
+enum NotificationChannel {
+  NOTIFICATION_CHANNEL_UNSPECIFIED = 0;
+  NOTIFICATION_CHANNEL_IN_APP = 1;
+  NOTIFICATION_CHANNEL_EMAIL = 2;
+  NOTIFICATION_CHANNEL_SMS = 3;
+  NOTIFICATION_CHANNEL_WEBHOOK = 4;
+}
+
+// Mirrors `DigestMode` in `@synapsedesk/common` — RDM Table 25.
+//
+// `HOURLY` and `DAILY` are read by the resolver but the SCHEDULER is deferred
+// (18-doc §8), so only `IMMEDIATE` and `OFF` change behaviour today. They are
+// on the wire anyway: a user can choose one, and the value must survive the
+// round trip rather than being silently rewritten.
+enum DigestMode {
+  DIGEST_MODE_UNSPECIFIED = 0;
+  DIGEST_MODE_IMMEDIATE = 1;
+  DIGEST_MODE_HOURLY = 2;
+  DIGEST_MODE_DAILY = 3;
+  DIGEST_MODE_OFF = 4;
+}
+
+// Where a resolved value came from — mirrors `PreferenceSource` in
+// `@synapsedesk/common`.
+enum PreferenceSource {
+  PREFERENCE_SOURCE_UNSPECIFIED = 0;
+  // A row for this exact (type, channel).
+  PREFERENCE_SOURCE_EXPLICIT = 1;
+  // A row for `'*'` on this channel.
+  PREFERENCE_SOURCE_WILDCARD = 2;
+  // No row at all — the permissive floor.
+  PREFERENCE_SOURCE_DEFAULT = 3;
+}
+
 // The RESOLVED value plus where it came from — 18-doc §4.
 //
 // `source` is what lets the UI show "inherited" rather than pretending every
@@ -96,14 +176,10 @@ message MarkReadResponse {
 // the user cannot reason about.
 message PreferenceResponse {
   string type = 1;
-  // ASK Why don't we use enum for this field? (relation "notification.contract.ts")
-  string channel = 2;
+  NotificationChannel channel = 2;
   bool is_enabled = 3;
-  // ASK Why don't we use enum for this field? (relation "notification.contract.ts")
-  string digest = 4;
-  // ASK Why don't we use enum for this field? (relation "preference-resolver.service.ts - ResolvedPreference")
-  // `explicit` | `wildcard` | `default`.
-  string source = 5;
+  DigestMode digest = 4;
+  PreferenceSource source = 5;
 }
 
 // Empty: the catalogue is for the CALLER, whose id is in metadata.
@@ -111,11 +187,18 @@ message ListPreferencesRequest {}
 
 message ListPreferencesResponse { repeated PreferenceResponse items = 1; }
 
+// The same two concepts as `PreferenceResponse`, so the same two types. A
+// request that named a channel as a string while the response answered with an
+// enum would be one field with two wire formats, and the mapping between them
+// would live in whichever caller remembered to write it.
 message UpdatePreferenceRequest {
   string type = 1;
-  string channel = 2;
+  NotificationChannel channel = 2;
   optional bool is_enabled = 3;
-  optional string digest = 4;
+  // No `optional`: `DIGEST_MODE_UNSPECIFIED` already means "the client did not
+  // send one", which is the distinction this PATCH depends on — a request that
+  // omits `digest` must not reset a digest the user chose.
+  DigestMode digest = 4;
 }
 
 service NotificationService {

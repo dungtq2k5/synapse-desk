@@ -1,4 +1,8 @@
-import { NotificationResponse, toTimestamp } from '@synapsedesk/grpc-proto';
+import {
+  NotificationResponse,
+  toProtoNotificationPriority,
+  toTimestamp,
+} from '@synapsedesk/grpc-proto';
 import { Notification } from '../../generated/prisma/client';
 
 /**
@@ -16,7 +20,9 @@ export function toNotificationResponse(
     id: notification.id,
     organizationId: notification.organizationId,
     type: notification.type,
-    priority: notification.priority,
+    // A `VarChar` column (§7.3), so this is a plain string out of Prisma and
+    // the mapper takes it as one.
+    priority: toProtoNotificationPriority(notification.priority),
     title: notification.title,
     // `?? undefined`, never `?? ''`: these fields are `optional` on the wire,
     // and an empty string is a body the SPA would render as a blank line.

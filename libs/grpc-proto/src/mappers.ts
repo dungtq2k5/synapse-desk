@@ -1,10 +1,14 @@
 import {
   type AiModelTier,
   DEFAULT_SEARCH,
+  DigestMode,
   Gender,
   InvitationStatus,
+  NotificationChannel,
+  NotificationPriority,
   OrgStatus,
   OtpPurpose,
+  PreferenceSource,
   type SortOrder,
 } from '@synapsedesk/common';
 import {
@@ -17,6 +21,12 @@ import {
 } from './generated/synapsedesk/auth/common';
 import { InvitationStatus as ProtoInvitationStatus } from './generated/synapsedesk/auth/invitation';
 import { OtpPurpose as ProtoOtpPurpose } from './generated/synapsedesk/auth/otp';
+import {
+  DigestMode as ProtoDigestMode,
+  NotificationChannel as ProtoNotificationChannel,
+  NotificationPriority as ProtoNotificationPriority,
+  PreferenceSource as ProtoPreferenceSource,
+} from './generated/synapsedesk/notification/notification';
 
 /**
  * Conversions every service needs when a Prisma row meets the wire, kept here
@@ -274,6 +284,175 @@ export function toProtoAiModelTier(tier: string): ProtoAiModelTier {
   return (
     PROTO_AI_MODEL_TIER_BY_DOMAIN[tier as AiModelTier] ??
     ProtoAiModelTier.AI_MODEL_TIER_UNSPECIFIED
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Notification preferences — 18-doc §4
+// ---------------------------------------------------------------------------
+
+/**
+ * The three enums a preference is made of.
+ *
+ * Same UNSPECIFIED-is-null rule as the pairs above, and the `to*` direction is
+ * deliberately wide (`string`) for the same reason: the caller is usually
+ * handing over a Prisma `VarChar` column, because enumerated columns are
+ * strings in Postgres (§7.3).
+ *
+ * The asymmetry is the point. `to*` is the RESPONSE path and must not throw —
+ * a row carrying a value nobody recognises should read as "unset" rather than
+ * failing a read the user is entitled to. `from*` returns null so the caller
+ * decides how to complain, because it knows its own transport.
+ */
+const DOMAIN_PRIORITY_BY_PROTO: Record<number, NotificationPriority> = {
+  [ProtoNotificationPriority.NOTIFICATION_PRIORITY_LOW]:
+    NotificationPriority.LOW,
+  [ProtoNotificationPriority.NOTIFICATION_PRIORITY_NORMAL]:
+    NotificationPriority.NORMAL,
+  [ProtoNotificationPriority.NOTIFICATION_PRIORITY_HIGH]:
+    NotificationPriority.HIGH,
+  [ProtoNotificationPriority.NOTIFICATION_PRIORITY_CRITICAL]:
+    NotificationPriority.CRITICAL,
+};
+
+const PROTO_PRIORITY_BY_DOMAIN: Record<
+  NotificationPriority,
+  ProtoNotificationPriority
+> = {
+  [NotificationPriority.LOW]:
+    ProtoNotificationPriority.NOTIFICATION_PRIORITY_LOW,
+  [NotificationPriority.NORMAL]:
+    ProtoNotificationPriority.NOTIFICATION_PRIORITY_NORMAL,
+  [NotificationPriority.HIGH]:
+    ProtoNotificationPriority.NOTIFICATION_PRIORITY_HIGH,
+  [NotificationPriority.CRITICAL]:
+    ProtoNotificationPriority.NOTIFICATION_PRIORITY_CRITICAL,
+};
+
+/**
+ * Null for UNSPECIFIED, like every other `from*` here — and note which way the
+ * damage runs.
+ *
+ * `CRITICAL` is the level that bypasses quiet hours and digest batching, so
+ * reading an unset field as `NORMAL` would mute an alert that was meant to
+ * wake someone, at 3am, silently. Reading it as `CRITICAL` would do the
+ * opposite and wake everyone. Null forces the caller to decide.
+ */
+export function fromProtoNotificationPriority(
+  priority: ProtoNotificationPriority,
+): NotificationPriority | null {
+  return DOMAIN_PRIORITY_BY_PROTO[priority] ?? null;
+}
+
+/**
+ * Takes a bare `string`: `notifications.priority` is a `VarChar` with a
+ * `"NORMAL"` default (§7.3), so this is what Prisma hands back.
+ */
+export function toProtoNotificationPriority(
+  priority: string,
+): ProtoNotificationPriority {
+  return (
+    PROTO_PRIORITY_BY_DOMAIN[priority as NotificationPriority] ??
+    ProtoNotificationPriority.NOTIFICATION_PRIORITY_UNSPECIFIED
+  );
+}
+
+const DOMAIN_CHANNEL_BY_PROTO: Record<number, NotificationChannel> = {
+  [ProtoNotificationChannel.NOTIFICATION_CHANNEL_IN_APP]:
+    NotificationChannel.IN_APP,
+  [ProtoNotificationChannel.NOTIFICATION_CHANNEL_EMAIL]:
+    NotificationChannel.EMAIL,
+  [ProtoNotificationChannel.NOTIFICATION_CHANNEL_SMS]: NotificationChannel.SMS,
+  [ProtoNotificationChannel.NOTIFICATION_CHANNEL_WEBHOOK]:
+    NotificationChannel.WEBHOOK,
+};
+
+const PROTO_CHANNEL_BY_DOMAIN: Record<
+  NotificationChannel,
+  ProtoNotificationChannel
+> = {
+  [NotificationChannel.IN_APP]:
+    ProtoNotificationChannel.NOTIFICATION_CHANNEL_IN_APP,
+  [NotificationChannel.EMAIL]:
+    ProtoNotificationChannel.NOTIFICATION_CHANNEL_EMAIL,
+  [NotificationChannel.SMS]: ProtoNotificationChannel.NOTIFICATION_CHANNEL_SMS,
+  [NotificationChannel.WEBHOOK]:
+    ProtoNotificationChannel.NOTIFICATION_CHANNEL_WEBHOOK,
+};
+
+export function fromProtoNotificationChannel(
+  channel: ProtoNotificationChannel,
+): NotificationChannel | null {
+  return DOMAIN_CHANNEL_BY_PROTO[channel] ?? null;
+}
+
+export function toProtoNotificationChannel(
+  channel: string,
+): ProtoNotificationChannel {
+  return (
+    PROTO_CHANNEL_BY_DOMAIN[channel as NotificationChannel] ??
+    ProtoNotificationChannel.NOTIFICATION_CHANNEL_UNSPECIFIED
+  );
+}
+
+const DOMAIN_DIGEST_BY_PROTO: Record<number, DigestMode> = {
+  [ProtoDigestMode.DIGEST_MODE_IMMEDIATE]: DigestMode.IMMEDIATE,
+  [ProtoDigestMode.DIGEST_MODE_HOURLY]: DigestMode.HOURLY,
+  [ProtoDigestMode.DIGEST_MODE_DAILY]: DigestMode.DAILY,
+  [ProtoDigestMode.DIGEST_MODE_OFF]: DigestMode.OFF,
+};
+
+const PROTO_DIGEST_BY_DOMAIN: Record<DigestMode, ProtoDigestMode> = {
+  [DigestMode.IMMEDIATE]: ProtoDigestMode.DIGEST_MODE_IMMEDIATE,
+  [DigestMode.HOURLY]: ProtoDigestMode.DIGEST_MODE_HOURLY,
+  [DigestMode.DAILY]: ProtoDigestMode.DIGEST_MODE_DAILY,
+  [DigestMode.OFF]: ProtoDigestMode.DIGEST_MODE_OFF,
+};
+
+/**
+ * Null for UNSPECIFIED, and that is load-bearing rather than incidental: an
+ * `UpdatePreference` that omits `digest` must leave the stored value alone.
+ * Reading "unset" as `IMMEDIATE` would switch a user off a digest they chose,
+ * on a PATCH that never mentioned it.
+ */
+export function fromProtoDigestMode(
+  digest: ProtoDigestMode,
+): DigestMode | null {
+  return DOMAIN_DIGEST_BY_PROTO[digest] ?? null;
+}
+
+export function toProtoDigestMode(digest: string): ProtoDigestMode {
+  return (
+    PROTO_DIGEST_BY_DOMAIN[digest as DigestMode] ??
+    ProtoDigestMode.DIGEST_MODE_UNSPECIFIED
+  );
+}
+
+const DOMAIN_SOURCE_BY_PROTO: Record<number, PreferenceSource> = {
+  [ProtoPreferenceSource.PREFERENCE_SOURCE_EXPLICIT]: PreferenceSource.EXPLICIT,
+  [ProtoPreferenceSource.PREFERENCE_SOURCE_WILDCARD]: PreferenceSource.WILDCARD,
+  [ProtoPreferenceSource.PREFERENCE_SOURCE_DEFAULT]: PreferenceSource.DEFAULT,
+};
+
+const PROTO_SOURCE_BY_DOMAIN: Record<PreferenceSource, ProtoPreferenceSource> =
+  {
+    [PreferenceSource.EXPLICIT]:
+      ProtoPreferenceSource.PREFERENCE_SOURCE_EXPLICIT,
+    [PreferenceSource.WILDCARD]:
+      ProtoPreferenceSource.PREFERENCE_SOURCE_WILDCARD,
+    [PreferenceSource.DEFAULT]: ProtoPreferenceSource.PREFERENCE_SOURCE_DEFAULT,
+  };
+
+export function fromProtoPreferenceSource(
+  source: ProtoPreferenceSource,
+): PreferenceSource | null {
+  return DOMAIN_SOURCE_BY_PROTO[source] ?? null;
+}
+
+export function toProtoPreferenceSource(source: string): ProtoPreferenceSource {
+  return (
+    PROTO_SOURCE_BY_DOMAIN[source as PreferenceSource] ??
+    ProtoPreferenceSource.PREFERENCE_SOURCE_UNSPECIFIED
   );
 }
 

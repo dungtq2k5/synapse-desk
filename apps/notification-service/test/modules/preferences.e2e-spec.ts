@@ -10,6 +10,11 @@ import {
   NotificationPriority,
   PREFERENCE_WILDCARD_TYPE,
 } from '@synapsedesk/common';
+import {
+  DigestMode as ProtoDigestMode,
+  NotificationChannel as ProtoNotificationChannel,
+  PreferenceSource as ProtoPreferenceSource,
+} from '@synapsedesk/grpc-proto';
 import { bootstrapE2eTest, E2eFixture } from '../utils/bootstrap';
 import { PreferenceResolver } from '../../src/modules/preferences/preference-resolver.service';
 import { PreferencesService } from '../../src/modules/preferences/preferences.service';
@@ -195,7 +200,12 @@ describe('§4 Preferences and quiet hours (e2e)', () => {
       const { items } = await preferences.list(me());
 
       expect(items.length).toBeGreaterThan(0);
-      expect(items.every((item) => item.source === 'default')).toBe(true);
+      expect(
+        items.every(
+          (item) =>
+            item.source === ProtoPreferenceSource.PREFERENCE_SOURCE_DEFAULT,
+        ),
+      ).toBe(true);
       // The wildcard is its own entry rather than folded away: it is the
       // control a user reaches for, and hiding it would leave them turning off
       // eighteen switches one at a time.
@@ -215,10 +225,13 @@ describe('§4 Preferences and quiet hours (e2e)', () => {
       const row = items.find(
         (item) =>
           item.type === NOTIFICATION_TYPES.ticketAssigned &&
-          item.channel === String(NotificationChannel.EMAIL),
+          item.channel === ProtoNotificationChannel.NOTIFICATION_CHANNEL_EMAIL,
       );
 
-      expect(row).toMatchObject({ isEnabled: false, source: 'explicit' });
+      expect(row).toMatchObject({
+        isEnabled: false,
+        source: ProtoPreferenceSource.PREFERENCE_SOURCE_EXPLICIT,
+      });
     });
 
     it('7. UPSERTS rather than duplicating — `UNIQUE (user_id, type, channel)`', async () => {
@@ -227,7 +240,8 @@ describe('§4 Preferences and quiet hours (e2e)', () => {
       await preferences.update(
         {
           type: NOTIFICATION_TYPES.ticketAssigned,
-          channel: NotificationChannel.EMAIL,
+          channel: ProtoNotificationChannel.NOTIFICATION_CHANNEL_EMAIL,
+          digest: ProtoDigestMode.DIGEST_MODE_UNSPECIFIED,
           isEnabled: false,
         },
         me(),
@@ -235,7 +249,8 @@ describe('§4 Preferences and quiet hours (e2e)', () => {
       await preferences.update(
         {
           type: NOTIFICATION_TYPES.ticketAssigned,
-          channel: NotificationChannel.EMAIL,
+          channel: ProtoNotificationChannel.NOTIFICATION_CHANNEL_EMAIL,
+          digest: ProtoDigestMode.DIGEST_MODE_UNSPECIFIED,
           isEnabled: true,
         },
         me(),
@@ -252,15 +267,16 @@ describe('§4 Preferences and quiet hours (e2e)', () => {
       await preferences.update(
         {
           type: NOTIFICATION_TYPES.ticketAssigned,
-          channel: NotificationChannel.EMAIL,
-          digest: DigestMode.DAILY,
+          channel: ProtoNotificationChannel.NOTIFICATION_CHANNEL_EMAIL,
+          digest: ProtoDigestMode.DIGEST_MODE_DAILY,
         },
         me(),
       );
       await preferences.update(
         {
           type: NOTIFICATION_TYPES.ticketAssigned,
-          channel: NotificationChannel.EMAIL,
+          channel: ProtoNotificationChannel.NOTIFICATION_CHANNEL_EMAIL,
+          digest: ProtoDigestMode.DIGEST_MODE_UNSPECIFIED,
           isEnabled: false,
         },
         me(),
@@ -279,7 +295,8 @@ describe('§4 Preferences and quiet hours (e2e)', () => {
         preferences.update(
           {
             type: 'ticket.assinged',
-            channel: NotificationChannel.EMAIL,
+            channel: ProtoNotificationChannel.NOTIFICATION_CHANNEL_EMAIL,
+            digest: ProtoDigestMode.DIGEST_MODE_UNSPECIFIED,
             isEnabled: false,
           },
           me(),
@@ -297,7 +314,8 @@ describe('§4 Preferences and quiet hours (e2e)', () => {
         preferences.update(
           {
             type: PREFERENCE_WILDCARD_TYPE,
-            channel: NotificationChannel.WEBHOOK,
+            channel: ProtoNotificationChannel.NOTIFICATION_CHANNEL_WEBHOOK,
+            digest: ProtoDigestMode.DIGEST_MODE_UNSPECIFIED,
             isEnabled: false,
           },
           me(),

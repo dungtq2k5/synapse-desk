@@ -10,15 +10,91 @@ import { GrpcMethod, GrpcStreamMethod } from "@nestjs/microservices";
 import { Observable } from "rxjs";
 import { Timestamp } from "../../google/protobuf/timestamp";
 
+/**
+ * Mirrors `NotificationPriority` in `@synapsedesk/common` — RDM Table 23.
+ *
+ * **A CLOSED set, unlike `type` below.** The four levels come from the table
+ * and no producer invents a fifth, which is exactly the property that makes an
+ * enum right here and wrong there.
+ *
+ * `LOW` and `HIGH` are declared and nothing branches on them yet — they behave
+ * as `NORMAL` (18-doc §8). They are on the wire regardless: a producer needs
+ * somewhere to put "this matters more than a reply", and a value that survives
+ * the round trip can be acted on later without a proto change. `CRITICAL` is
+ * the one that already means something — it bypasses quiet hours and digest
+ * batching, so reading it as anything else silently mutes an alert.
+ */
+export enum NotificationPriority {
+  NOTIFICATION_PRIORITY_UNSPECIFIED = 0,
+  NOTIFICATION_PRIORITY_LOW = 1,
+  NOTIFICATION_PRIORITY_NORMAL = 2,
+  NOTIFICATION_PRIORITY_HIGH = 3,
+  NOTIFICATION_PRIORITY_CRITICAL = 4,
+  UNRECOGNIZED = -1,
+}
+
+/**
+ * Mirrors `NotificationChannel` in `@synapsedesk/common` — RDM Table 24.
+ *
+ * `WEBHOOK` is present for completeness and is NOT a valid preference: it has
+ * no implementation (18-doc §8), so a preference for it would control nothing.
+ * That exclusion stays in the service layer, because it is a policy about which
+ * channels are configurable, not a statement about which channels exist.
+ */
+export enum NotificationChannel {
+  NOTIFICATION_CHANNEL_UNSPECIFIED = 0,
+  NOTIFICATION_CHANNEL_IN_APP = 1,
+  NOTIFICATION_CHANNEL_EMAIL = 2,
+  NOTIFICATION_CHANNEL_SMS = 3,
+  NOTIFICATION_CHANNEL_WEBHOOK = 4,
+  UNRECOGNIZED = -1,
+}
+
+/**
+ * Mirrors `DigestMode` in `@synapsedesk/common` — RDM Table 25.
+ *
+ * `HOURLY` and `DAILY` are read by the resolver but the SCHEDULER is deferred
+ * (18-doc §8), so only `IMMEDIATE` and `OFF` change behaviour today. They are
+ * on the wire anyway: a user can choose one, and the value must survive the
+ * round trip rather than being silently rewritten.
+ */
+export enum DigestMode {
+  DIGEST_MODE_UNSPECIFIED = 0,
+  DIGEST_MODE_IMMEDIATE = 1,
+  DIGEST_MODE_HOURLY = 2,
+  DIGEST_MODE_DAILY = 3,
+  DIGEST_MODE_OFF = 4,
+  UNRECOGNIZED = -1,
+}
+
+/**
+ * Where a resolved value came from — mirrors `PreferenceSource` in
+ * `@synapsedesk/common`.
+ */
+export enum PreferenceSource {
+  PREFERENCE_SOURCE_UNSPECIFIED = 0,
+  /** PREFERENCE_SOURCE_EXPLICIT - A row for this exact (type, channel). */
+  PREFERENCE_SOURCE_EXPLICIT = 1,
+  /** PREFERENCE_SOURCE_WILDCARD - A row for `'*'` on this channel. */
+  PREFERENCE_SOURCE_WILDCARD = 2,
+  /** PREFERENCE_SOURCE_DEFAULT - No row at all — the permissive floor. */
+  PREFERENCE_SOURCE_DEFAULT = 3,
+  UNRECOGNIZED = -1,
+}
+
 export interface NotificationResponse {
   id: string;
   organizationId: string;
   /**
    * The ORIGINATING event — `ticket.assigned`, `quota.threshold`. Never the
    * transport subject (18-doc §1.3).
+   *
+   * Stays a `string` where `priority` below became an enum, and the difference
+   * is open set versus closed: every producer that emits a new event adds a
+   * type, so an enum here would mean a proto change per notification.
    */
   type: string;
-  priority: string;
+  priority: NotificationPriority;
   title: string;
   body?:
     | string
@@ -103,11 +179,10 @@ export interface MarkReadResponse {
  */
 export interface PreferenceResponse {
   type: string;
-  channel: string;
+  channel: NotificationChannel;
   isEnabled: boolean;
-  digest: string;
-  /** `explicit` | `wildcard` | `default`. */
-  source: string;
+  digest: DigestMode;
+  source: PreferenceSource;
 }
 
 /** Empty: the catalogue is for the CALLER, whose id is in metadata. */
@@ -118,11 +193,24 @@ export interface ListPreferencesResponse {
   items: PreferenceResponse[];
 }
 
+/**
+ * The same two concepts as `PreferenceResponse`, so the same two types. A
+ * request that named a channel as a string while the response answered with an
+ * enum would be one field with two wire formats, and the mapping between them
+ * would live in whichever caller remembered to write it.
+ */
 export interface UpdatePreferenceRequest {
   type: string;
-  channel: string;
-  isEnabled?: boolean | undefined;
-  digest?: string | undefined;
+  channel: NotificationChannel;
+  isEnabled?:
+    | boolean
+    | undefined;
+  /**
+   * No `optional`: `DIGEST_MODE_UNSPECIFIED` already means "the client did not
+   * send one", which is the distinction this PATCH depends on — a request that
+   * omits `digest` must not reset a digest the user chose.
+   */
+  digest: DigestMode;
 }
 
 export interface NotificationServiceClient {

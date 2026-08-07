@@ -1,12 +1,19 @@
 import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { ClientGrpc } from '@nestjs/microservices';
 import {
+  fromProtoDigestMode,
+  fromProtoNotificationChannel,
+  fromProtoNotificationPriority,
+  fromProtoPreferenceSource,
   fromTimestamp,
   NOTIFICATION_GRPC_CLIENT,
   NOTIFICATION_SERVICE_NAME,
   NotificationResponse,
   NotificationServiceClient,
+  PreferenceResponse,
   requireTimestamp,
+  toProtoDigestMode,
+  toProtoNotificationChannel,
 } from '@synapsedesk/grpc-proto';
 import { RequestContext } from '@synapsedesk/common';
 import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
@@ -135,26 +142,33 @@ export class NotificationsGrpcClient
       context,
     );
 
-    return response.items;
+    return response.items.map((item) => toPreferenceDto(item));
   }
 
   async updatePreference(
     dto: UpdatePreferenceDto,
     context: RequestContext,
   ): Promise<PreferenceResponseDto> {
-    return this.call(
+    const updated = await this.call(
       (metadata) =>
         this.notificationGrpcService.updatePreference(
           {
             type: dto.type,
-            channel: dto.channel,
+            channel: toProtoNotificationChannel(dto.channel),
             isEnabled: dto.isEnabled,
-            digest: dto.digest,
+            // An omitted digest becomes `UNSPECIFIED`, which is what the
+            // service reads as "the client did not send one" — so a PATCH
+            // carrying only `isEnabled` leaves a chosen digest alone. The `??`
+            // is doing real work: without it an absent field would map through
+            // `undefined` rather than to the zero value.
+            digest: toProtoDigestMode(dto.digest ?? ''),
           },
           metadata,
         ),
       context,
     );
+
+    return toPreferenceDto(updated);
   }
 }
 
@@ -173,7 +187,9 @@ function toNotificationDto(
     id: notification.id,
     organizationId: notification.organizationId,
     type: notification.type,
-    priority: notification.priority,
+    // Same `?? ''` degradation as the preference fields: a client reads
+    // `"CRITICAL"`, never the wire's `4`.
+    priority: fromProtoNotificationPriority(notification.priority) ?? '',
     title: notification.title,
     body: notification.body ?? null,
     data: parseData(notification.data),
@@ -186,6 +202,31 @@ function toNotificationDto(
     readAt: fromTimestamp(notification.readAt) ?? null,
     archivedAt: fromTimestamp(notification.archivedAt) ?? null,
     createdAt: requireTimestamp(notification.createdAt, 'createdAt'),
+  };
+}
+
+/**
+ * Wire → REST for one resolved preference.
+ *
+ * The three enum fields become their domain STRINGS here. A REST client reads
+ * `"EMAIL"`, never the wire's `2` — the numbering is a protobuf encoding
+ * detail, and publishing it would make every HTTP consumer depend on the proto
+ * file to interpret a settings screen.
+ *
+ * `?? ''` on each, matching `toOrganizationDto`: `UNSPECIFIED` means the field
+ * was not set, and there is no member to honestly read that as. It should not
+ * arise — the service maps from validated rows — so degrading to empty beats
+ * failing a read the user is entitled to.
+ */
+function toPreferenceDto(
+  preference: PreferenceResponse,
+): PreferenceResponseDto {
+  return {
+    type: preference.type,
+    channel: fromProtoNotificationChannel(preference.channel) ?? '',
+    isEnabled: preference.isEnabled,
+    digest: fromProtoDigestMode(preference.digest) ?? '',
+    source: fromProtoPreferenceSource(preference.source) ?? '',
   };
 }
 

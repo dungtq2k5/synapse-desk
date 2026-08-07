@@ -5,6 +5,7 @@ import {
   NotificationChannel,
   NotificationPriority,
   PREFERENCE_WILDCARD_TYPE,
+  PreferenceSource,
 } from '@synapsedesk/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { isWithinQuietHours } from './quiet-hours';
@@ -44,7 +45,7 @@ export type ResolvedPreference = {
   channel: NotificationChannel;
   isEnabled: boolean;
   digest: DigestMode;
-  source: 'explicit' | 'wildcard' | 'default';
+  source: PreferenceSource;
 };
 
 /**
@@ -138,7 +139,7 @@ export class PreferenceResolver {
         channel,
         isEnabled: exact.isEnabled,
         digest: exact.digest as DigestMode,
-        source: 'explicit',
+        source: PreferenceSource.EXPLICIT,
       };
     }
 
@@ -149,10 +150,15 @@ export class PreferenceResolver {
         channel,
         isEnabled: wildcard.isEnabled,
         digest: wildcard.digest as DigestMode,
-        source: 'wildcard',
+        source: PreferenceSource.WILDCARD,
       };
     }
 
-    return { type, channel, ...DEFAULT_PREFERENCE, source: 'default' };
+    return {
+      type,
+      channel,
+      ...DEFAULT_PREFERENCE,
+      source: PreferenceSource.DEFAULT,
+    };
   }
 }

@@ -284,6 +284,26 @@ export enum DigestMode {
   OFF = 'OFF',
 }
 
+/**
+ * WHERE a resolved preference came from — 18-doc §4.
+ *
+ * Named here rather than left as an inline union on `ResolvedPreference`
+ * because it crosses the wire, and a value that crosses the wire needs one
+ * spelling both sides agree on. The UI renders `DEFAULT` and `WILDCARD` as
+ * "inherited"; a settings screen that showed them as chosen would be one the
+ * user cannot reason about.
+ *
+ * Lowercase values, matching the strings already stored and sent.
+ */
+export enum PreferenceSource {
+  /** A row for this exact (type, channel). */
+  EXPLICIT = 'explicit',
+  /** A row for `'*'` on this channel — "stop emailing me about anything". */
+  WILDCARD = 'wildcard',
+  /** No row at all. Permissive by design: a new account receives everything. */
+  DEFAULT = 'default',
+}
+
 /** What a notification is ABOUT — RDM Table 23's `resource_type`. */
 export enum NotificationResourceType {
   TICKET = 'ticket',

@@ -2,12 +2,17 @@ import { of, throwError } from 'rxjs';
 import { faker } from '@faker-js/faker';
 import { status as GrpcStatus } from '@grpc/grpc-js';
 import {
-  DigestMode,
   NOTIFICATION_TYPES,
   NotificationChannel,
   NotificationPriority,
   NotificationResourceType,
 } from '@synapsedesk/common';
+import {
+  DigestMode as ProtoDigestMode,
+  NotificationChannel as ProtoNotificationChannel,
+  NotificationPriority as ProtoNotificationPriority,
+  PreferenceSource as ProtoPreferenceSource,
+} from '@synapsedesk/grpc-proto';
 import {
   API,
   E2eFixture,
@@ -38,7 +43,9 @@ describe('§4b Notifications at the HTTP boundary (e2e)', () => {
     id: notificationId,
     organizationId: faker.string.uuid(),
     type: NOTIFICATION_TYPES.ticketAssigned,
-    priority: NotificationPriority.NORMAL,
+    // The WIRE value. The REST assertions read domain strings, so the gap
+    // between the two is the mapping under test.
+    priority: ProtoNotificationPriority.NOTIFICATION_PRIORITY_NORMAL,
     title: 'Ticket #1042 assigned to you',
     body: 'You are now the assignee.',
     // A JSON STRING on the wire — proto3 has no `map<string, any>`.
@@ -89,6 +96,11 @@ describe('§4b Notifications at the HTTP boundary (e2e)', () => {
         ticketNumber: 1042,
       });
       expect(res.body.data.items[0].actionUrl).toBe('/tickets/1042');
+      // `priority` crosses as a numeric enum and must reach the client as its
+      // NAME. Nothing asserted this while the field was a bare string, because
+      // the stub and the assertion were the same value and the gateway merely
+      // forwarded it — so the mapping had nothing holding it in place.
+      expect(res.body.data.items[0].priority).toBe(NotificationPriority.NORMAL);
     });
 
     it('2. Survives a MALFORMED `data` payload rather than failing the feed', async () => {
@@ -279,10 +291,14 @@ describe('§4b Notifications at the HTTP boundary (e2e)', () => {
           items: [
             {
               type: '*',
-              channel: NotificationChannel.EMAIL,
+              // Proto enums: this stub stands in for the WIRE, and the REST
+              // assertion below is a domain string. The gap between them is
+              // the mapping under test — a stub written in domain strings
+              // would prove the gateway forwards, not that it converts.
+              channel: ProtoNotificationChannel.NOTIFICATION_CHANNEL_EMAIL,
               isEnabled: true,
-              digest: DigestMode.IMMEDIATE,
-              source: 'default',
+              digest: ProtoDigestMode.DIGEST_MODE_IMMEDIATE,
+              source: ProtoPreferenceSource.PREFERENCE_SOURCE_DEFAULT,
             },
           ],
         }),
@@ -299,10 +315,10 @@ describe('§4b Notifications at the HTTP boundary (e2e)', () => {
       fx.stubs.notification.updatePreference.mockReturnValue(
         of({
           type: NOTIFICATION_TYPES.ticketAssigned,
-          channel: NotificationChannel.EMAIL,
+          channel: ProtoNotificationChannel.NOTIFICATION_CHANNEL_EMAIL,
           isEnabled: false,
-          digest: DigestMode.IMMEDIATE,
-          source: 'explicit',
+          digest: ProtoDigestMode.DIGEST_MODE_IMMEDIATE,
+          source: ProtoPreferenceSource.PREFERENCE_SOURCE_EXPLICIT,
         }),
       );
 
