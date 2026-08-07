@@ -21,11 +21,14 @@ import {
   RunAiRollupResponse,
   unpackCallerContext,
 } from '@synapsedesk/grpc-proto';
-import { AiGenerationPurpose, AiGenerationStatus } from '@synapsedesk/common';
+import {
+  AiGenerationPurpose,
+  AiGenerationStatus,
+  JobHealthService,
+} from '@synapsedesk/common';
 import { AiLedgerService } from './ai-ledger.service';
 import { AiAnalyticsService } from '../analytics/ai-analytics.service';
 import { AiGenerationRollupJob } from '../analytics/ai-generation-rollup.job';
-import { JobHealthService } from '../job-runs/job-health.service';
 
 /**
  * The ledger's remote write path — `ai_generations` keeps ONE writer.

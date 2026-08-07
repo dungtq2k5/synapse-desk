@@ -1,6 +1,8 @@
 import { getQueueToken } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import {
+  JobHealthService,
+  JobRunRecorder,
   repeatJobId,
   SCHEDULE_CRON,
   SCHEDULED_JOBS,
@@ -276,6 +278,46 @@ describe('§1 The scheduler (e2e)', () => {
 
       await expect(runJob('ledger-weekly-from-2024')).resolves.toBeUndefined();
       expect(projection).not.toHaveBeenCalled();
+    });
+  });
+
+  /**
+   * 20-doc §4.5 test 3 — the BINDING.
+   *
+   * `JobRunRecorder` now lives in `libs/common` and takes a `JobRunStore`.
+   * `JobRunsModule` binds it to THIS service's `prisma.jobRun`, and three thin
+   * bindings are three chances to wire the wrong one — a mistake that would
+   * compile, because every delegate satisfies the interface structurally.
+   *
+   * The shared behaviour is covered once, against a fake store, in
+   * `libs/common/src/utils/job-runs.spec.ts`. What is left to check here is
+   * only what is local: that a run recorded through the injected recorder lands
+   * in this service's own database, in the same failure domain as the work.
+   */
+  describe('§4.5 the shared recorder is bound to THIS database', () => {
+    it('13. a tracked run writes a row readable through this service’s Prisma', async () => {
+      const recorder = fx.moduleRef.get(JobRunRecorder);
+
+      await recorder.track('binding-probe', () => Promise.resolve(null));
+
+      const row = await fx.prisma.jobRun.findUniqueOrThrow({
+        where: { jobName: 'binding-probe' },
+      });
+      expect(row.lastSucceededAt).not.toBeNull();
+    });
+
+    it('14. and JobHealthService reads back what the recorder wrote', async () => {
+      // Both classes must be bound to the SAME delegate. Binding them to
+      // different ones would compile and would silently produce a health page
+      // that never showed the rows being written.
+      const recorder = fx.moduleRef.get(JobRunRecorder);
+      const health = fx.moduleRef.get(JobHealthService);
+
+      await recorder.track('binding-probe', () => Promise.resolve(null));
+
+      expect((await health.list()).map((row) => row.jobName)).toContain(
+        'binding-probe',
+      );
     });
   });
 });

@@ -5,8 +5,8 @@ import {
   formatErrorMsg,
   SCHEDULED_JOBS,
   SCHEDULER_QUEUE,
+  JobRunRecorder,
 } from '@synapsedesk/common';
-import { JobRunRecorder } from '../job-runs/job-run.recorder';
 import { InvitationsService } from '../invitations/invitations.service';
 import { ExpiredRecordsPruner } from '../sessions/expired-records.job';
 

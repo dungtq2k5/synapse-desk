@@ -1,3 +1,4 @@
+import { JobHealthService } from '@synapsedesk/common';
 import { Controller } from '@nestjs/common';
 import type { Metadata } from '@grpc/grpc-js';
 import {
@@ -21,7 +22,6 @@ import {
 } from '@synapsedesk/grpc-proto';
 import { AnalyticsService } from './analytics.service';
 import { TicketRollupJob } from './ticket-rollup.job';
-import { JobHealthService } from '../job-runs/job-health.service';
 import { AnalyticsExportFacade } from './analytics-export.facade';
 
 /**

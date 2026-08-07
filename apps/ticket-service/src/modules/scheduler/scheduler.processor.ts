@@ -6,9 +6,9 @@ import {
   ROLLUP_TRAILING_DAYS,
   SCHEDULED_JOBS,
   SCHEDULER_QUEUE,
+  JobRunRecorder,
 } from '@synapsedesk/common';
 import { TicketRollupJob } from '../analytics/ticket-rollup.job';
-import { JobRunRecorder } from '../job-runs/job-run.recorder';
 
 /**
  * The caller `TicketRollupJob` never had — 20-doc §1, §2.

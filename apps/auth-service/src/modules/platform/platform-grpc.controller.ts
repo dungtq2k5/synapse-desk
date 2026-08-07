@@ -1,3 +1,4 @@
+import { JobHealthService } from '@synapsedesk/common';
 import { Controller } from '@nestjs/common';
 import type { Metadata } from '@grpc/grpc-js';
 import {
@@ -25,7 +26,6 @@ import {
   unpackCallerContext,
   UpdatePlatformOrganizationRequest,
 } from '@synapsedesk/grpc-proto';
-import { JobHealthService } from '../job-runs/job-health.service';
 import { PlatformService } from './platform.service';
 
 /**

@@ -7,6 +7,7 @@ import {
   SCHEDULED_JOBS,
   SCHEDULER_QUEUE,
   trailingWindow,
+  JobRunRecorder,
 } from '@synapsedesk/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ChunkUsageProjection } from '../scheduled/chunk-usage.projection';
@@ -14,7 +15,6 @@ import { DiscardedDraftSweep } from '../scheduled/discarded-draft.sweep';
 import { DocumentFlagService } from '../scheduled/document-flag.service';
 import { QuotaReconciliationJob } from '../scheduled/quota-reconciliation.job';
 import { AiGenerationRollupJob } from '../analytics/ai-generation-rollup.job';
-import { JobRunRecorder } from '../job-runs/job-run.recorder';
 
 /**
  * The thing that was missing — 20-doc §1, §2.
