@@ -167,6 +167,11 @@ message AiUsageResponse {
   AiRateValue empty_retrieval_rate = 9;
 
   optional google.protobuf.Timestamp computed_at = 10;
+
+  // The last day `ai_generation_daily_stats` covers — 20-doc §4.3. See the note
+  // on `ticket.OverviewResponse.data_through`; this is the same fact for a
+  // different table, and the two can disagree when one scheduler is down.
+  optional string data_through = 11;
 }
 
 // The knowledge-gap backlog: what the corpus could not answer, and what it
@@ -189,6 +194,7 @@ message KnowledgeGapsResponse {
   int32 answering_generations = 2;
   AiRateValue empty_retrieval_rate = 3;
   repeated KnowledgeGapDocumentFlag flags = 4;
+  optional string data_through = 5;
 }
 
 // Corpus health — which documents earn their place.
@@ -211,6 +217,36 @@ message DocumentAnalyticsResponse {
   // displacing the sources that would have answered.
   repeated DocumentUsageStat never_retrieved = 2;
   repeated DocumentUsageStat retrieved_never_cited = 3;
+  // Reads `document_chunks` counters written by `ChunkUsageProjection`, not the
+  // daily rollup — so this reports the PROJECTION's freshness, which is the
+  // thing that actually governs these three lists.
+  optional string data_through = 4;
+}
+
+// ---------------------------------------------------------------------------
+// Job health -- 20-doc §4.1, §4.4.
+//
+// **Alerting on staleness rather than on failure.** A failed job logs; a job
+// that never ran logs nothing at all, which is precisely what happened here --
+// seven scheduled jobs with no scheduler, producing zeros that every endpoint
+// reported correctly. `last_succeeded_at` going stale fires for BOTH cases, and
+// they are indistinguishable from outside.
+message AiJobHealthRequest {}
+
+message AiJobRunStatus {
+  string job_name = 1;
+  optional google.protobuf.Timestamp last_started_at = 2;
+  // **Preserved across a failure**, deliberately -- this is what the staleness
+  // check reads, and clearing it would turn "broken since Tuesday" into
+  // "never ran".
+  optional google.protobuf.Timestamp last_succeeded_at = 3;
+  optional int32 last_duration_ms = 4;
+  optional string last_error = 5;
+  int32 consecutive_failures = 6;
+}
+
+message AiJobHealthResponse {
+  repeated AiJobRunStatus items = 1;
 }
 
 message RunAiRollupRequest {
@@ -254,4 +290,5 @@ service AiLedgerService {
 
   // Platform-operated, like the ticket rollup.
   rpc RunAiRollup(RunAiRollupRequest) returns (RunAiRollupResponse);
+  rpc GetAiJobHealth(AiJobHealthRequest) returns (AiJobHealthResponse);
 }

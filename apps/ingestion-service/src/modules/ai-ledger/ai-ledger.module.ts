@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { JobRunsModule } from '../job-runs/job-runs.module';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 import { PrismaModule } from '../prisma/prisma.module';
@@ -21,7 +22,7 @@ import { QUOTA_REDIS, QuotaCounterService } from './quota-counter.service';
   // `AiAnalyticsModule` for the three analytics RPCs and the rollup that feeds
   // them (19-doc §3.2) — they hang off this controller because they read this
   // module's projection.
-  imports: [PrismaModule, AuthClientModule, AiAnalyticsModule],
+  imports: [JobRunsModule, PrismaModule, AuthClientModule, AiAnalyticsModule],
   providers: [
     AiLedgerService,
     QuotaCounterService,

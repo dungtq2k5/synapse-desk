@@ -1,4 +1,5 @@
 import {
+  SCHEDULED_JOBS,
   TicketPriority,
   TicketSource,
   TicketStatus,
@@ -6,10 +7,9 @@ import {
 import { E2eFixture, bootstrapE2eTest } from '../utils';
 import { buildTenant, createTicket, TenantFixture } from '../factories';
 import { TicketRollupJob } from '../../src/modules/analytics/ticket-rollup.job';
+import { AnalyticsService } from '../../src/modules/analytics/analytics.service';
+import { SchedulerProcessor } from '../../src/modules/scheduler/scheduler.processor';
 import { AuthReferenceService } from '../../src/modules/auth-client/auth-reference.service';
-
-/** A tenant seven hours ahead of UTC — the bucketing case that fails silently. */
-const SAIGON = 'Asia/Ho_Chi_Minh';
 
 /**
  * 19-doc §2.2 — the daily rollup.
@@ -26,13 +26,20 @@ const SAIGON = 'Asia/Ho_Chi_Minh';
 describe('§2.2 The ticket rollup (e2e)', () => {
   let fx: E2eFixture;
   let rollup: TicketRollupJob;
+  let analytics: AnalyticsService;
+  let scheduler: SchedulerProcessor;
   let listOrganizationTimezones: jest.SpyInstance;
 
   let tenant: TenantFixture;
 
+  /** A tenant seven hours ahead of UTC — the bucketing case that fails silently. */
+  const SAIGON = 'Asia/Ho_Chi_Minh';
+
   beforeAll(async () => {
     fx = await bootstrapE2eTest();
     rollup = fx.moduleRef.get(TicketRollupJob);
+    analytics = fx.moduleRef.get(AnalyticsService);
+    scheduler = fx.moduleRef.get(SchedulerProcessor);
 
     // auth-service is not running for this suite, and the tenant's TIMEZONE is
     // the one variable half these tests exist to vary.
@@ -54,6 +61,12 @@ describe('§2.2 The ticket rollup (e2e)', () => {
   afterAll(() => fx.close());
 
   const at = (iso: string) => new Date(iso);
+
+  /** Relative to NOW — §6 test 7 must land inside the trailing window. */
+  const hoursAgo = (hours: number) =>
+    new Date(Date.now() - hours * 60 * 60 * 1000);
+
+  const isoDay = (date: Date) => date.toISOString().slice(0, 10);
 
   /** Runs the rollup over a window wide enough to cover the fixtures. */
   const runOver = (from: string, to: string) =>
@@ -557,6 +570,219 @@ describe('§2.2 The ticket rollup (e2e)', () => {
       const rows = await fx.prisma.agentDailyStat.findMany();
       expect(rows).toHaveLength(1);
       expect(rows[0].resolved).toBe(1);
+    });
+  });
+
+  /**
+   * 20-doc §4.3 — the field that makes an unrun job legible.
+   *
+   * Every analytics test in this repo passed against empty tables while the
+   * rollups had no scheduler, because a query returning zero rows is a valid
+   * query. `dataThrough` is what separates "quiet tenant" from "nothing has
+   * ever run" without reading a log.
+   */
+  describe('dataThrough — freshness, 20-doc §4.3', () => {
+    const context = () => ({ organizationId: tenant.organizationId }) as never;
+    const range = { from: '2026-03-01', to: '2026-03-31' };
+
+    it('21. **is null when no rollup has ever run**', async () => {
+      // The exact state this system was in. `null` must not be renderable as a
+      // date, and must not be confused with a tenant that simply had no
+      // tickets — those need different responses from whoever is looking.
+      await createTicket(fx.prisma, tenant, {
+        createdAt: at('2026-03-02T09:00:00.000Z'),
+      });
+
+      const overview = await analytics.getOverview(range, context());
+
+      expect(overview.dataThrough).toBeUndefined();
+      expect(overview.ticketsCreated).toBe(0);
+    });
+
+    it('22. reports the last rolled-up day once the job has run', async () => {
+      await createTicket(fx.prisma, tenant, {
+        createdAt: at('2026-03-02T09:00:00.000Z'),
+      });
+
+      await runOver('2026-03-01', '2026-03-04');
+
+      const overview = await analytics.getOverview(range, context());
+
+      // The last day with a ROW, not the end of the window that was rolled up:
+      // the job writes a row per day that had activity, so 3 and 4 March
+      // produced nothing to point at.
+      expect(overview.dataThrough).toBe('2026-03-02');
+    });
+
+    it('23. **a quiet tenant reads as stale — the known limitation, stated**', async () => {
+      // `MAX(day)` answers "what period does this dashboard cover", which is
+      // not quite "is the job running": a tenant with no tickets since Tuesday
+      // reports Tuesday however healthy the scheduler is.
+      //
+      // Accepted deliberately, because it fails in the SAFE direction. A false
+      // "your data looks old" costs someone a glance at the job status; the
+      // inverse — a broken scheduler reporting today because it ran and found
+      // nothing — is the failure this whole document exists about.
+      //
+      // The heartbeat table (20-doc §4.1) answers "is it running" separately,
+      // and `/platform/metrics` is where that question belongs.
+      await createTicket(fx.prisma, tenant, {
+        createdAt: at('2026-03-02T09:00:00.000Z'),
+      });
+
+      await runOver('2026-03-01', '2026-03-20');
+
+      const overview = await analytics.getOverview(range, context());
+
+      expect(overview.dataThrough).toBe('2026-03-02');
+    });
+
+    it('24. **does NOT change because the caller asked about a narrower range**', async () => {
+      // The whole value of the field is answering "how fresh is our data",
+      // which is a property of the tenant and not of the question. Clipping it
+      // to the range would report `2026-03-02` for a two-day query and hide
+      // that newer data exists — inverting the signal precisely when somebody
+      // is drilling into a specific week.
+      await createTicket(fx.prisma, tenant, {
+        createdAt: at('2026-03-02T09:00:00.000Z'),
+      });
+      await createTicket(fx.prisma, tenant, {
+        createdAt: at('2026-03-10T09:00:00.000Z'),
+      });
+      await runOver('2026-03-01', '2026-03-12');
+
+      const narrow = await analytics.getOverview(
+        { from: '2026-03-01', to: '2026-03-02' },
+        context(),
+      );
+
+      expect(narrow.dataThrough).toBe('2026-03-10');
+      // And the narrow query still reports only its own window's numbers.
+      expect(narrow.ticketsCreated).toBe(1);
+    });
+
+    it('25. every single-service endpoint carries it, not just the overview', async () => {
+      // A dashboard renders six tiles from six endpoints. One of them knowing
+      // the data is stale is not much use to the other five.
+      await createTicket(fx.prisma, tenant, {
+        createdAt: at('2026-03-02T09:00:00.000Z'),
+      });
+      await runOver('2026-03-01', '2026-03-04');
+
+      const [deflection, responseTimes, volume, satisfaction] =
+        await Promise.all([
+          analytics.getDeflection(range, context()),
+          analytics.getResponseTimes(range, context()),
+          analytics.getVolume(range, context()),
+          analytics.getSatisfaction(range, context()),
+        ]);
+
+      expect(deflection.dataThrough).toBe('2026-03-02');
+      expect(responseTimes.dataThrough).toBe('2026-03-02');
+      expect(volume.dataThrough).toBe('2026-03-02');
+      expect(satisfaction.dataThrough).toBe('2026-03-02');
+    });
+
+    it('26. agent stats report their OWN table’s freshness', async () => {
+      // `agent_daily_stats` is a different table from `ticket_daily_stats`. It
+      // can legitimately be staler, and a shared figure would hide that.
+      await createTicket(fx.prisma, tenant, {
+        currentAssigneeId: tenant.agentId,
+        status: TicketStatus.RESOLVED,
+        createdAt: at('2026-03-02T09:00:00.000Z'),
+        resolvedAt: at('2026-03-02T11:00:00.000Z'),
+      });
+      await runOver('2026-03-01', '2026-03-04');
+
+      const agents = await analytics.getAgentStats(range, context());
+
+      expect(agents.dataThrough).toBe('2026-03-02');
+    });
+
+    it('27. is scoped to the TENANT — another org’s rollup does not vouch for mine', async () => {
+      // The worst version of this bug: a busy neighbour making an empty
+      // tenant's dashboard look healthy.
+      const other = buildTenant();
+      await createTicket(fx.prisma, other, {
+        createdAt: at('2026-03-02T09:00:00.000Z'),
+      });
+      await runOver('2026-03-01', '2026-03-04');
+
+      const mine = await analytics.getOverview(range, context());
+
+      expect(mine.dataThrough).toBeUndefined();
+    });
+  });
+
+  /**
+   * **20-doc §6 test 7 — the test that would have caught all of this.**
+   *
+   * Every other analytics test in this repo passed while the feature returned
+   * zeros, because a query against an empty table is a valid query returning a
+   * valid answer. The rollup suite passed because it called `backfill()`
+   * directly. The endpoint suite passed because it stubbed the service. The
+   * gateway suite passed because it stubbed the wire.
+   *
+   * Nothing anywhere drove the SCHEDULER and then read the ENDPOINT — so the
+   * one thing nobody verified was that the two were connected at all.
+   */
+  describe('§6 test 7 — seed → SCHEDULER → endpoint', () => {
+    const context = () => ({ organizationId: tenant.organizationId }) as never;
+
+    it('28. **after a scheduled run on seeded data, the overview is NON-ZERO**', async () => {
+      await createTicket(fx.prisma, tenant, {
+        status: TicketStatus.RESOLVED,
+        createdAt: hoursAgo(30),
+        resolvedAt: hoursAgo(28),
+      });
+
+      // Driven through the SCHEDULER's own entry point, not through
+      // `backfill()`. The distinction is the entire point: `backfill` was
+      // always reachable and always worked, and the tick that calls `run()` on
+      // a trailing window did not exist.
+      await scheduler.process({
+        name: SCHEDULED_JOBS.ANALYTICS_DAILY,
+        data: {},
+      } as never);
+
+      const overview = await analytics.getOverview(
+        { from: isoDay(hoursAgo(48)), to: isoDay(new Date()) },
+        context(),
+      );
+
+      expect(overview.ticketsCreated).toBe(1);
+      expect(overview.ticketsResolved).toBe(1);
+      // And the freshness field moved, which is what a reader checks first.
+      expect(overview.dataThrough).not.toBeUndefined();
+    });
+
+    it('29. the same run records a heartbeat, so "did it happen" is answerable', async () => {
+      await createTicket(fx.prisma, tenant, { createdAt: hoursAgo(30) });
+
+      await scheduler.process({
+        name: SCHEDULED_JOBS.ANALYTICS_DAILY,
+        data: {},
+      } as never);
+
+      const heartbeat = await fx.prisma.jobRun.findUniqueOrThrow({
+        where: { jobName: SCHEDULED_JOBS.ANALYTICS_DAILY },
+      });
+      expect(heartbeat.lastSucceededAt).not.toBeNull();
+    });
+
+    it('30. **WITHOUT the run, the same endpoint answers zero and says so**', async () => {
+      // The state this system was actually in. Note what a reader sees: a
+      // correct answer, no error, no log line — and `dataThrough: null`, which
+      // is the only thing distinguishing this from a quiet Tuesday.
+      await createTicket(fx.prisma, tenant, { createdAt: hoursAgo(30) });
+
+      const overview = await analytics.getOverview(
+        { from: isoDay(hoursAgo(48)), to: isoDay(new Date()) },
+        context(),
+      );
+
+      expect(overview.ticketsCreated).toBe(0);
+      expect(overview.dataThrough).toBeUndefined();
     });
   });
 });

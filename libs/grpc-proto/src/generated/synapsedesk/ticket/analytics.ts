@@ -75,7 +75,23 @@ export interface OverviewResponse {
    * tell a stale answer from a quiet tenant, and so an export can record which
    * run produced its numbers.
    */
-  computedAt?: Timestamp | undefined;
+  computedAt?:
+    | Timestamp
+    | undefined;
+  /**
+   * *The last DAY the rollups cover for this tenant** (20-doc §4.3), as
+   * `YYYY-MM-DD`, or absent when no rollup has ever run.
+   *
+   * NOT the same fact as `computed_at`, and the difference is the point:
+   * `computed_at` says the job ran, `data_through` says what it covered. A
+   * scheduler that stopped a week ago still produces a recent `computed_at` on
+   * every backfill-free run, while `data_through` stops moving — which is the
+   * symptom somebody looking at a dashboard of zeros needs to see.
+   *
+   * Tenant-wide rather than clipped to the requested range: "how fresh is our
+   * data" must not change its answer because the caller asked about March.
+   */
+  dataThrough?: string | undefined;
 }
 
 export interface DeflectionPoint {
@@ -87,7 +103,11 @@ export interface DeflectionPoint {
 
 export interface DeflectionResponse {
   points: DeflectionPoint[];
-  total: RateValue | undefined;
+  total:
+    | RateValue
+    | undefined;
+  /** See `OverviewResponse.data_through`. */
+  dataThrough?: string | undefined;
 }
 
 export interface ResponseTimePoint {
@@ -105,7 +125,11 @@ export interface ResponseTimesResponse {
   points: ResponseTimePoint[];
   humanTotal: MeanValue | undefined;
   aiTotal: MeanValue | undefined;
-  resolutionTotal: MeanValue | undefined;
+  resolutionTotal:
+    | MeanValue
+    | undefined;
+  /** See `OverviewResponse.data_through`. */
+  dataThrough?: string | undefined;
 }
 
 export interface VolumePoint {
@@ -131,6 +155,8 @@ export interface VolumeResponse {
   byStatus: VolumeBreakdown[];
   byPriority: VolumeBreakdown[];
   bySource: VolumeBreakdown[];
+  /** See `OverviewResponse.data_through`. */
+  dataThrough?: string | undefined;
 }
 
 export interface SatisfactionPoint {
@@ -142,7 +168,11 @@ export interface SatisfactionPoint {
 export interface SatisfactionResponse {
   points: SatisfactionPoint[];
   csatTotal: RateValue | undefined;
-  citationAccuracyTotal: RateValue | undefined;
+  citationAccuracyTotal:
+    | RateValue
+    | undefined;
+  /** See `OverviewResponse.data_through`. */
+  dataThrough?: string | undefined;
 }
 
 /**
@@ -159,9 +189,47 @@ export interface AgentStat {
 
 export interface AgentStatsResponse {
   items: AgentStat[];
+  /**
+   * Reads `agent_daily_stats`, a DIFFERENT table from the one behind the other
+   * five — so it can legitimately be staler, and says so itself.
+   */
+  dataThrough?: string | undefined;
 }
 
-/** The rollup job, exposed so a scheduler and an operator can both reach it. */
+/**
+ * The rollup job, exposed so a scheduler and an operator can both reach it.
+ * ---------------------------------------------------------------------------
+ * Job health -- 20-doc §4.1, §4.4.
+ *
+ * **Alerting on staleness rather than on failure.** A failed job logs; a job
+ * that never ran logs nothing at all, which is precisely what happened here --
+ * seven scheduled jobs with no scheduler, producing zeros that every endpoint
+ * reported correctly. `last_succeeded_at` going stale fires for BOTH cases, and
+ * they are indistinguishable from outside.
+ */
+export interface JobHealthRequest {
+}
+
+export interface JobRunStatus {
+  jobName: string;
+  lastStartedAt?:
+    | Timestamp
+    | undefined;
+  /**
+   * *Preserved across a failure**, deliberately -- this is what the staleness
+   * check reads, and clearing it would turn "broken since Tuesday" into
+   * "never ran".
+   */
+  lastSucceededAt?: Timestamp | undefined;
+  lastDurationMs?: number | undefined;
+  lastError?: string | undefined;
+  consecutiveFailures: number;
+}
+
+export interface JobHealthResponse {
+  items: JobRunStatus[];
+}
+
 export interface RunRollupRequest {
   /** Both inclusive, `YYYY-MM-DD`. Absent = the routine trailing window. */
   from?: string | undefined;
@@ -236,6 +304,8 @@ export interface AnalyticsServiceClient {
    */
 
   runRollup(request: RunRollupRequest, metadata?: Metadata): Observable<RunRollupResponse>;
+
+  getJobHealth(request: JobHealthRequest, metadata?: Metadata): Observable<JobHealthResponse>;
 }
 
 export interface AnalyticsServiceController {
@@ -288,6 +358,11 @@ export interface AnalyticsServiceController {
     request: RunRollupRequest,
     metadata?: Metadata,
   ): Promise<RunRollupResponse> | Observable<RunRollupResponse> | RunRollupResponse;
+
+  getJobHealth(
+    request: JobHealthRequest,
+    metadata?: Metadata,
+  ): Promise<JobHealthResponse> | Observable<JobHealthResponse> | JobHealthResponse;
 }
 
 export function AnalyticsServiceControllerMethods() {
@@ -302,6 +377,7 @@ export function AnalyticsServiceControllerMethods() {
       "getSatisfaction",
       "getAgentStats",
       "runRollup",
+      "getJobHealth",
     ];
     for (const method of grpcMethods) {
       const descriptor: any = Reflect.getOwnPropertyDescriptor(constructor.prototype, method);

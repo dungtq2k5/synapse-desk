@@ -102,6 +102,10 @@ export class AnalyticsGrpcClient
       resolutionSeconds: toMean(response.resolutionSeconds),
       openTicketMedianAgeSeconds: response.openTicketMedianAgeSeconds ?? null,
       computedAt: fromTimestamp(response.computedAt) ?? null,
+      // `?? null` rather than left undefined: the REST contract says the field is
+      // always present, and a missing key reads to a client as "this build does
+      // not have freshness" rather than "nothing has been rolled up".
+      dataThrough: response.dataThrough ?? null,
     };
   }
 
@@ -123,6 +127,7 @@ export class AnalyticsGrpcClient
         chatResolvedWithoutEscalation: point.chatResolvedWithoutEscalation,
       })),
       total: toRate(response.total),
+      dataThrough: response.dataThrough ?? null,
     };
   }
 
@@ -146,6 +151,7 @@ export class AnalyticsGrpcClient
       humanTotal: toMean(response.humanTotal),
       aiTotal: toMean(response.aiTotal),
       resolutionTotal: toMean(response.resolutionTotal),
+      dataThrough: response.dataThrough ?? null,
     };
   }
 
@@ -164,6 +170,7 @@ export class AnalyticsGrpcClient
       byStatus: response.byStatus,
       byPriority: response.byPriority,
       bySource: response.bySource,
+      dataThrough: response.dataThrough ?? null,
     };
   }
 
@@ -185,6 +192,7 @@ export class AnalyticsGrpcClient
       })),
       csatTotal: toRate(response.csatTotal),
       citationAccuracyTotal: toRate(response.citationAccuracyTotal),
+      dataThrough: response.dataThrough ?? null,
     };
   }
 
@@ -220,6 +228,7 @@ export class AnalyticsGrpcClient
       draftAcceptance: toRate(response.draftAcceptance),
       emptyRetrievalRate: toRate(response.emptyRetrievalRate),
       computedAt: fromTimestamp(response.computedAt) ?? null,
+      dataThrough: response.dataThrough ?? null,
     };
   }
 

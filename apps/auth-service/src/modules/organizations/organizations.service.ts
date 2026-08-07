@@ -11,6 +11,8 @@ import {
   OnboardingResponse,
   OrganizationResponse,
   OrganizationSettingsResponse,
+  ListOrganizationCyclesRequest,
+  ListOrganizationCyclesResponse,
   ListOrganizationTimezonesRequest,
   ListOrganizationTimezonesResponse,
   OrganizationEntitlementsResponse,
@@ -352,6 +354,43 @@ export class OrganizationsService {
         // which already has to handle an id that came back missing entirely.
         // Defaulting in two places is how they eventually disagree.
         timezone: organization.timezone ?? undefined,
+      })),
+    };
+  }
+
+  /**
+   * Every tenant's BILLING CYCLE START, in bulk — 20-doc §3.1.
+   *
+   * **The read that makes per-tenant quota reconciliation possible.** The cycle
+   * start differs per tenant, so a sweep that assumed one would reconcile
+   * everybody against whichever tenant's cycle it happened to pick — and since
+   * `QuotaCounterService` keys on `quota:{org}:{cycleStartEpoch}`, the
+   * correction would land under a key the gate never reads while leaving the
+   * real one untouched. Reconciliation that reports success and fixes nothing.
+   *
+   * Same shape and same reasoning as `listOrganizationTimezones`: no actor,
+   * ids as a field, unknown ids simply absent.
+   */
+  async listOrganizationCycles(
+    request: ListOrganizationCyclesRequest,
+  ): Promise<ListOrganizationCyclesResponse> {
+    const ids = [...new Set((request.organizationIds ?? []).filter(Boolean))];
+    if (ids.length === 0) return { items: [] };
+
+    const organizations = await this.prisma.organization.findMany({
+      where: { id: { in: ids }, deletedAt: null },
+      select: { id: true, billingCycleStart: true },
+    });
+
+    return {
+      items: organizations.map((organization) => ({
+        organizationId: organization.id,
+        // Absent rather than defaulted, deliberately — see the proto note. A
+        // caller that silently substituted the epoch would reconcile against
+        // "spend since 1970", which sums every cycle the tenant has ever had.
+        billingCycleStart: organization.billingCycleStart
+          ? toTimestamp(organization.billingCycleStart)
+          : undefined,
       })),
     };
   }

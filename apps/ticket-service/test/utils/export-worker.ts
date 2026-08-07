@@ -1,9 +1,10 @@
 import { INestApplication } from '@nestjs/common';
 import { TestingModule } from '@nestjs/testing';
 import { AnalyticsExportProcessor } from '../../src/modules/analytics/analytics-export.processor';
+import { SchedulerProcessor } from '../../src/modules/scheduler/scheduler.processor';
 
 /**
- * Stops the export worker, and waits for it to be READY before doing so.
+ * Stops every live BullMQ worker, waiting for each to be READY before doing so.
  *
  * Two separate reasons, and the second is the one that is easy to get wrong.
  *
@@ -32,12 +33,22 @@ import { AnalyticsExportProcessor } from '../../src/modules/analytics/analytics-
  * Every app built from `AppModule` gets its own worker, so every spec that
  * builds one needs this — including the two that happen to pass today, because
  * what they are relying on is timing.
+ *
+ * **`SchedulerProcessor` is here for a third reason.** Its repeat entries fire
+ * on a CRON, so a suite that happened to run across 02:00 — or across the top
+ * of any hour, for ingestion-service — would have a rollup execute underneath
+ * it and rewrite the very rows it was asserting on. Rare, timing-dependent and
+ * essentially undebuggable from the failure message, which is the profile of
+ * every bug in this fixture so far.
  */
-export async function stopExportWorker(
+export async function stopWorkers(
   app: INestApplication | TestingModule,
 ): Promise<void> {
-  const { worker } = app.get(AnalyticsExportProcessor);
-
-  await worker.waitUntilReady();
-  await worker.close();
+  for (const { worker } of [
+    app.get(AnalyticsExportProcessor),
+    app.get(SchedulerProcessor),
+  ]) {
+    await worker.waitUntilReady();
+    await worker.close();
+  }
 }

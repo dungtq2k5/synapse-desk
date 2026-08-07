@@ -22,6 +22,7 @@ import { ScopeWriterService } from '../../src/modules/ingestion/scope-writer.ser
 import { ScopeFanoutQueueService } from '../../src/modules/ingestion/scope-fanout-queue.service';
 import { QdrantService } from '../../src/modules/qdrant/qdrant.service';
 import { QuotaCounterService } from '../../src/modules/ai-ledger/quota-counter.service';
+import { AuthReferenceService } from '../../src/modules/auth-client/auth-reference.service';
 import { faultInjector } from '@synapsedesk/common/testing/fault';
 
 describe('§2.3, §4 The fan-out and the scheduled jobs (e2e)', () => {
@@ -621,6 +622,135 @@ describe('§2.3, §4 The fan-out and the scheduled jobs (e2e)', () => {
       await expect(
         reconciliation.reconcile(tenant.organizationId, CYCLE_START),
       ).resolves.toBe(0n);
+    });
+
+    /**
+     * 20-doc §3.1 — the bug found while tracing the call sites.
+     *
+     * `reconcileAll(cycleStart: Date)` took ONE cycle start and applied it to
+     * every tenant, directly contradicting the warning on `reconcile()`:
+     * *"the cycle start differs per tenant, so a job that assumed one would
+     * silently reconcile everyone against whichever tenant's cycle it picked."*
+     *
+     * The consequence was not a wrong log line. `QuotaCounterService` keys on
+     * `quota:{org}:{cycleStartEpoch}`, so reconciling with the wrong cycle
+     * wrote the corrected total **under a key the gate never reads**, leaving
+     * the real key's drift untouched — a sweep that reported success and fixed
+     * nothing.
+     *
+     * **A single-tenant test passes against the broken version**, which is why
+     * these use two tenants with genuinely different cycles.
+     */
+    describe('20-doc §3.1 — every tenant against its OWN cycle', () => {
+      const OTHER_CYCLE = new Date(CYCLE_START.getTime() + 10 * 24 * HOUR);
+
+      const spend = (organizationId: string, micros: bigint, at: Date) =>
+        fx.prisma.aiGeneration.create({
+          data: {
+            organizationId,
+            purpose: AiGenerationPurpose.EMBEDDING,
+            modelName: EMBEDDING_MODEL,
+            promptTokens: 1_000,
+            completionTokens: 0,
+            estimatedCostMicros: micros,
+            createdAt: at,
+          },
+        });
+
+      it('20. **both tenants end correct under their OWN cycle key**', async () => {
+        const other = buildTenant();
+
+        await spend(
+          tenant.organizationId,
+          25n,
+          new Date(CYCLE_START.getTime() + HOUR),
+        );
+        await spend(
+          other.organizationId,
+          70n,
+          new Date(OTHER_CYCLE.getTime() + HOUR),
+        );
+
+        // Both counters drifted.
+        await counter.charge(tenant.organizationId, CYCLE_START, 999n);
+        await counter.charge(other.organizationId, OTHER_CYCLE, 888n);
+
+        jest
+          .spyOn(
+            fx.moduleRef.get(AuthReferenceService),
+            'listOrganizationCycles',
+          )
+          .mockResolvedValue(
+            new Map([
+              [tenant.organizationId, CYCLE_START],
+              [other.organizationId, OTHER_CYCLE],
+            ]),
+          );
+
+        await reconciliation.reconcileAll();
+
+        await expect(
+          counter.spentMicros(tenant.organizationId, CYCLE_START),
+        ).resolves.toBe(25n);
+        await expect(
+          counter.spentMicros(other.organizationId, OTHER_CYCLE),
+        ).resolves.toBe(70n);
+      });
+
+      it('21. does NOT write under the other tenant’s cycle key', async () => {
+        // The precise failure of the old signature: a correction landing on a
+        // key the gate never reads. Asserting the right key holds the right
+        // number is not enough — the wrong key must stay empty, or a future
+        // regression could satisfy both by writing everywhere.
+        const other = buildTenant();
+
+        await spend(
+          other.organizationId,
+          70n,
+          new Date(OTHER_CYCLE.getTime() + HOUR),
+        );
+
+        jest
+          .spyOn(
+            fx.moduleRef.get(AuthReferenceService),
+            'listOrganizationCycles',
+          )
+          .mockResolvedValue(new Map([[other.organizationId, OTHER_CYCLE]]));
+
+        await reconciliation.reconcileAll();
+
+        // Under the OTHER tenant's cycle — the date the broken version would
+        // have used for everybody — nothing was written.
+        await expect(
+          counter.spentMicros(other.organizationId, CYCLE_START),
+        ).resolves.toBe(0n);
+      });
+
+      it('22. **SKIPS a tenant whose cycle cannot be resolved**, rather than guessing', async () => {
+        // Reconciling against a guessed cycle is worse than not reconciling:
+        // the drift stays AND a wrong number is written somewhere nothing
+        // reads. Skipping leaves the existing drift for the next hourly run.
+        await spend(
+          tenant.organizationId,
+          25n,
+          new Date(CYCLE_START.getTime() + HOUR),
+        );
+        await counter.charge(tenant.organizationId, CYCLE_START, 999n);
+
+        jest
+          .spyOn(
+            fx.moduleRef.get(AuthReferenceService),
+            'listOrganizationCycles',
+          )
+          .mockResolvedValue(new Map());
+
+        await expect(reconciliation.reconcileAll()).resolves.toBe(0);
+
+        // Untouched — still drifted, and still correctable next hour.
+        await expect(
+          counter.spentMicros(tenant.organizationId, CYCLE_START),
+        ).resolves.toBe(999n);
+      });
     });
   });
 });

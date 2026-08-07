@@ -167,6 +167,30 @@ export interface CreateGlobalRoleRequest {
 export interface GetPlatformMetricsRequest {
 }
 
+/**
+ * Job health -- 20-doc §4.4. auth-service's two scheduled jobs, since it moved
+ * off `@nestjs/schedule`: the heartbeat table lives in each service's own
+ * database, so `/platform/jobs` is a three-leg fan-out.
+ */
+export interface AuthJobHealthRequest {
+}
+
+export interface AuthJobRunStatus {
+  jobName: string;
+  lastStartedAt?:
+    | Timestamp
+    | undefined;
+  /** Preserved across a failure -- this is what the staleness check reads. */
+  lastSucceededAt?: Timestamp | undefined;
+  lastDurationMs?: number | undefined;
+  lastError?: string | undefined;
+  consecutiveFailures: number;
+}
+
+export interface AuthJobHealthResponse {
+  items: AuthJobRunStatus[];
+}
+
 export interface PlatformMetricsResponse {
   totalOrganizations: number;
   /** Keyed by status, so a new status does not need a new field. */
@@ -230,6 +254,8 @@ export interface PlatformServiceClient {
   createGlobalRole(request: CreateGlobalRoleRequest, metadata?: Metadata): Observable<RoleResponse>;
 
   getMetrics(request: GetPlatformMetricsRequest, metadata?: Metadata): Observable<PlatformMetricsResponse>;
+
+  getAuthJobHealth(request: AuthJobHealthRequest, metadata?: Metadata): Observable<AuthJobHealthResponse>;
 }
 
 export interface PlatformServiceController {
@@ -298,6 +324,11 @@ export interface PlatformServiceController {
     request: GetPlatformMetricsRequest,
     metadata?: Metadata,
   ): Promise<PlatformMetricsResponse> | Observable<PlatformMetricsResponse> | PlatformMetricsResponse;
+
+  getAuthJobHealth(
+    request: AuthJobHealthRequest,
+    metadata?: Metadata,
+  ): Promise<AuthJobHealthResponse> | Observable<AuthJobHealthResponse> | AuthJobHealthResponse;
 }
 
 export function PlatformServiceControllerMethods() {
@@ -315,6 +346,7 @@ export function PlatformServiceControllerMethods() {
       "listGlobalRoles",
       "createGlobalRole",
       "getMetrics",
+      "getAuthJobHealth",
     ];
     for (const method of grpcMethods) {
       const descriptor: any = Reflect.getOwnPropertyDescriptor(constructor.prototype, method);

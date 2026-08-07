@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '../prisma/prisma.module';
 import { AiLedgerModule } from '../ai-ledger/ai-ledger.module';
+import { AuthClientModule } from '../auth-client/auth-client.module';
 import { ChunkUsageProjection } from './chunk-usage.projection';
 import { DiscardedDraftSweep } from './discarded-draft.sweep';
 import { QuotaReconciliationJob } from './quota-reconciliation.job';
@@ -22,7 +23,7 @@ import { DocumentFlagService } from './document-flag.service';
  * instead would have made `AiLedgerModule` and this module import each other.
  */
 @Module({
-  imports: [PrismaModule, AiLedgerModule],
+  imports: [PrismaModule, AiLedgerModule, AuthClientModule],
   providers: [
     ChunkUsageProjection,
     DiscardedDraftSweep,

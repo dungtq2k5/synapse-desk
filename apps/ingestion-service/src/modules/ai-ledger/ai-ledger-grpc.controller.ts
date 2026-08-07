@@ -3,6 +3,8 @@ import { RpcException } from '@nestjs/microservices';
 import { status } from '@grpc/grpc-js';
 import type { Metadata } from '@grpc/grpc-js';
 import {
+  AiJobHealthResponse,
+  toTimestamp,
   AiLedgerServiceController,
   AiLedgerServiceControllerMethods,
   AiUsageRequest,
@@ -23,6 +25,7 @@ import { AiGenerationPurpose, AiGenerationStatus } from '@synapsedesk/common';
 import { AiLedgerService } from './ai-ledger.service';
 import { AiAnalyticsService } from '../analytics/ai-analytics.service';
 import { AiGenerationRollupJob } from '../analytics/ai-generation-rollup.job';
+import { JobHealthService } from '../job-runs/job-health.service';
 
 /**
  * The ledger's remote write path — `ai_generations` keeps ONE writer.
@@ -45,6 +48,7 @@ export class AiLedgerGrpcController implements AiLedgerServiceController {
     private readonly ledger: AiLedgerService,
     private readonly analytics: AiAnalyticsService,
     private readonly rollup: AiGenerationRollupJob,
+    private readonly jobHealth: JobHealthService,
   ) {}
 
   /**
@@ -156,5 +160,31 @@ export class AiLedgerGrpcController implements AiLedgerServiceController {
         : await this.rollup.run();
 
     return { tenants: outcome.tenants, rows: outcome.rows };
+  }
+
+  /**
+   * The heartbeat — 20-doc §4.4.
+   *
+   * Every row, unjudged. The staleness decision needs the list of jobs this
+   * build EXPECTS, because a job that never ran has no row to return — which is
+   * the exact case that made seven uncalled jobs invisible.
+   */
+  async getAiJobHealth(): Promise<AiJobHealthResponse> {
+    const rows = await this.jobHealth.list();
+
+    return {
+      items: rows.map((row) => ({
+        jobName: row.jobName,
+        lastStartedAt: row.lastStartedAt
+          ? toTimestamp(row.lastStartedAt)
+          : undefined,
+        lastSucceededAt: row.lastSucceededAt
+          ? toTimestamp(row.lastSucceededAt)
+          : undefined,
+        lastDurationMs: row.lastDurationMs ?? undefined,
+        lastError: row.lastError ?? undefined,
+        consecutiveFailures: row.consecutiveFailures,
+      })),
+    };
   }
 }

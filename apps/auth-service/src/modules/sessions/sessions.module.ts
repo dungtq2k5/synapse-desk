@@ -4,7 +4,6 @@ import { AuditModule } from '../audit/audit.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { SessionsService } from './sessions.service';
 import { SessionsGrpcController } from './sessions-grpc.controller';
-import { ExpiredRecordsJob } from './expired-records.job';
 
 /**
  * Exports SessionsService because `POST /auth/logout/all`, `PATCH
@@ -15,9 +14,11 @@ import { ExpiredRecordsJob } from './expired-records.job';
 @Module({
   imports: [PrismaModule, AuditModule, NotificationsModule],
   controllers: [SessionsGrpcController],
-  // ExpiredRecordsJob is not exported: it runs itself on a schedule and
-  // nothing else should be invoking it.
-  providers: [SessionsService, ExpiredRecordsJob],
+  // The expired-records pruner has moved to `SchedulerModule` — 20-doc §3.2.
+  // It used to live here and run itself via `@Cron`; it is a plain method now,
+  // and the module that owns the CLOCK owns it, so there is one place to look
+  // for what runs when.
+  providers: [SessionsService],
   exports: [SessionsService],
 })
 export class SessionsModule {}

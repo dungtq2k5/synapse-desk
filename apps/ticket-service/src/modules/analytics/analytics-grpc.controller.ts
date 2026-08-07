@@ -1,6 +1,8 @@
 import { Controller } from '@nestjs/common';
 import type { Metadata } from '@grpc/grpc-js';
 import {
+  JobHealthResponse,
+  toTimestamp,
   AgentStatsResponse,
   AnalyticsRangeRequest,
   AnalyticsServiceController,
@@ -19,6 +21,7 @@ import {
 } from '@synapsedesk/grpc-proto';
 import { AnalyticsService } from './analytics.service';
 import { TicketRollupJob } from './ticket-rollup.job';
+import { JobHealthService } from '../job-runs/job-health.service';
 import { AnalyticsExportFacade } from './analytics-export.facade';
 
 /**
@@ -37,6 +40,7 @@ export class AnalyticsGrpcController implements AnalyticsServiceController {
     private readonly analytics: AnalyticsService,
     private readonly rollup: TicketRollupJob,
     private readonly exports: AnalyticsExportFacade,
+    private readonly jobHealth: JobHealthService,
   ) {}
 
   getOverview(
@@ -113,6 +117,32 @@ export class AnalyticsGrpcController implements AnalyticsServiceController {
       agentRows: outcome.agentRows,
     };
   }
+  /**
+   * The heartbeat — 20-doc §4.4.
+   *
+   * Platform-operated, like `runRollup` above. Returns every row unjudged: the
+   * staleness decision needs the list of jobs this build EXPECTS, and a job
+   * that never ran has no row to return.
+   */
+  async getJobHealth(): Promise<JobHealthResponse> {
+    const rows = await this.jobHealth.list();
+
+    return {
+      items: rows.map((row) => ({
+        jobName: row.jobName,
+        lastStartedAt: row.lastStartedAt
+          ? toTimestamp(row.lastStartedAt)
+          : undefined,
+        lastSucceededAt: row.lastSucceededAt
+          ? toTimestamp(row.lastSucceededAt)
+          : undefined,
+        lastDurationMs: row.lastDurationMs ?? undefined,
+        lastError: row.lastError ?? undefined,
+        consecutiveFailures: row.consecutiveFailures,
+      })),
+    };
+  }
+
   // ------------------------------------------------------ 19-doc §5, export
 
   /**

@@ -494,3 +494,38 @@ model AnalyticsExport {
   @@index([organizationId, createdAt(sort: Desc)])
   @@map("analytics_exports")
 }
+
+/// The HEARTBEAT — 20-doc §4.1.
+///
+/// **One row per job name, and the deepest fix in that document.** The jobs not
+/// running was not the real problem; the real problem was that nothing anywhere
+/// could tell you they were not running. A failed job at least logs. A job that
+/// never runs logs nothing at all, which is precisely the case that occurred —
+/// and it stayed invisible for two domains.
+///
+/// Not tenant-scoped: these jobs sweep across every tenant, so "did the rollup
+/// run" is one question with one answer per service.
+model JobRun {
+  /// The job name from `SCHEDULED_JOBS`, or a step within one. The PK, so
+  /// recording a run is a single upsert with no read first.
+  jobName String @id @map("job_name")
+
+  lastStartedAt   DateTime  @map("last_started_at")
+  /// **Preserved across a failure**, deliberately. This is what the staleness
+  /// alert reads, and clearing it on failure would turn "broken since Tuesday"
+  /// into "never ran", losing the one piece of information worth having.
+  lastSucceededAt DateTime? @map("last_succeeded_at")
+
+  lastDurationMs Int?    @map("last_duration_ms")
+  /// Truncated at the call site — a driver stack trace is kilobytes and the
+  /// first line is what anybody reads.
+  lastError      String? @map("last_error")
+
+  /// Reset to 0 on success. A count that only ever grows is how a job failing
+  /// every night for a month reads as one failure.
+  consecutiveFailures Int @default(0) @map("consecutive_failures")
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("job_runs")
+}

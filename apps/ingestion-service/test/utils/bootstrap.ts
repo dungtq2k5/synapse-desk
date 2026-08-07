@@ -1,7 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getQueueToken } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { INGESTION_QUEUE, SCOPE_FANOUT_QUEUE } from '@synapsedesk/common';
+import {
+  INGESTION_QUEUE,
+  SCHEDULER_QUEUE,
+  SCOPE_FANOUT_QUEUE,
+} from '@synapsedesk/common';
 import { AppModule } from '../../src/app.module';
 import { PrismaService } from '../../src/modules/prisma/prisma.service';
 import { DatabaseSeeder } from '../../src/modules/prisma/database.seeder';
@@ -9,6 +13,7 @@ import { EMBEDDING_CLIENT } from '../../src/modules/embeddings/embedding.contrac
 import { FakeEmbeddingClient } from './fake-embedding.client';
 import { IngestionWorker } from '../../src/modules/ingestion/ingestion.worker';
 import { ScopeFanoutProcessor } from '../../src/modules/ingestion/scope-fanout.processor';
+import { SchedulerProcessor } from '../../src/modules/scheduler/scheduler.processor';
 
 export type E2eFixture = {
   moduleRef: TestingModule;
@@ -83,15 +88,21 @@ export async function bootstrapE2eTest(): Promise<E2eFixture> {
    * `process()` explicitly — the same discipline every other job here follows —
    * so nothing needs a worker consuming in the background.
    */
+  //
+  // `SchedulerProcessor` joins them for the same reason and one more: its
+  // repeat entries fire on a CRON, so a suite that happened to run across the
+  // top of an hour would have the hourly sweep execute underneath it.
   for (const worker of [
     moduleRef.get(IngestionWorker),
     moduleRef.get(ScopeFanoutProcessor),
+    moduleRef.get(SchedulerProcessor),
   ]) {
+    await worker.worker.waitUntilReady();
     await worker.worker.close();
   }
 
-  const queues = [INGESTION_QUEUE, SCOPE_FANOUT_QUEUE].map((name) =>
-    moduleRef.get<Queue>(getQueueToken(name)),
+  const queues = [INGESTION_QUEUE, SCOPE_FANOUT_QUEUE, SCHEDULER_QUEUE].map(
+    (name) => moduleRef.get<Queue>(getQueueToken(name)),
   );
 
   const reset = async (): Promise<void> => {
@@ -108,6 +119,9 @@ export async function bootstrapE2eTest(): Promise<E2eFixture> {
         "department_documents",
         "ai_generations",
         "ai_generation_daily_stats",
+        -- The heartbeat. Not tenant data, but a row surviving into the next
+        -- test carries its consecutive_failures with it.
+        "job_runs",
         "documents"
       RESTART IDENTITY CASCADE;
     `);

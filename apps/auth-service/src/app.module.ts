@@ -6,8 +6,8 @@ import { envValidationSchema } from './common/configs/env.validation';
 import { UsersModule } from './modules/users/users.module';
 import { OtpModule } from './modules/otp/otp.module';
 import { InvitationsModule } from './modules/invitations/invitations.module';
-import { ScheduleModule } from '@nestjs/schedule';
 import { DepartmentsModule } from './modules/departments/departments.module';
+import { SchedulerModule } from './modules/scheduler/scheduler.module';
 import { SessionsModule } from './modules/sessions/sessions.module';
 import { OrganizationsModule } from './modules/organizations/organizations.module';
 import { PlatformModule } from './modules/platform/platform.module';
@@ -22,8 +22,6 @@ import { BillingModule } from './modules/billing/billing.module';
         allowUnknown: true, // Ignore env vars not declared in the schema
       },
     }),
-    // Drives InvitationsExpiryJob. Registered once, globally.
-    ScheduleModule.forRoot(),
     PrismaModule,
     AuthModule,
     UsersModule,
@@ -31,6 +29,7 @@ import { BillingModule } from './modules/billing/billing.module';
     InvitationsModule,
     DepartmentsModule,
     SessionsModule,
+    SchedulerModule,
     OrganizationsModule,
     PlatformModule,
     BillingModule,

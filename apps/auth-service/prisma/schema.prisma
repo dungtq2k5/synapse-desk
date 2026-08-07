@@ -544,3 +544,24 @@ model BillingEvent {
   @@index([eventType])
   @@map("billing_events")
 }
+
+/// The HEARTBEAT — 20-doc §4.1. Same shape as ticket-service's and
+/// ingestion-service's, deliberately: three copies of a table is bad, and three
+/// DIFFERENT shapes of the same table is worse.
+// ASK Is it ok to have the same table for each? Should we unify them within a dedicate service?
+model JobRun {
+  jobName String @id @map("job_name")
+
+  lastStartedAt   DateTime  @map("last_started_at")
+  /// Preserved across a failure — this is what the staleness alert reads.
+  lastSucceededAt DateTime? @map("last_succeeded_at")
+
+  lastDurationMs Int?    @map("last_duration_ms")
+  lastError      String? @map("last_error")
+
+  consecutiveFailures Int @default(0) @map("consecutive_failures")
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("job_runs")
+}

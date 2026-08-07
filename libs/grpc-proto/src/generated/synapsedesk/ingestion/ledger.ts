@@ -190,7 +190,15 @@ export interface AiUsageResponse {
     | undefined;
   /** *The knowledge-gap signal**: answering generations that retrieved nothing. */
   emptyRetrievalRate: AiRateValue | undefined;
-  computedAt?: Timestamp | undefined;
+  computedAt?:
+    | Timestamp
+    | undefined;
+  /**
+   * The last day `ai_generation_daily_stats` covers — 20-doc §4.3. See the note
+   * on `ticket.OverviewResponse.data_through`; this is the same fact for a
+   * different table, and the two can disagree when one scheduler is down.
+   */
+  dataThrough?: string | undefined;
 }
 
 /**
@@ -215,6 +223,7 @@ export interface KnowledgeGapsResponse {
   answeringGenerations: number;
   emptyRetrievalRate: AiRateValue | undefined;
   flags: KnowledgeGapDocumentFlag[];
+  dataThrough?: string | undefined;
 }
 
 /** Corpus health — which documents earn their place. */
@@ -239,6 +248,45 @@ export interface DocumentAnalyticsResponse {
    */
   neverRetrieved: DocumentUsageStat[];
   retrievedNeverCited: DocumentUsageStat[];
+  /**
+   * Reads `document_chunks` counters written by `ChunkUsageProjection`, not the
+   * daily rollup — so this reports the PROJECTION's freshness, which is the
+   * thing that actually governs these three lists.
+   */
+  dataThrough?: string | undefined;
+}
+
+/**
+ * ---------------------------------------------------------------------------
+ * Job health -- 20-doc §4.1, §4.4.
+ *
+ * **Alerting on staleness rather than on failure.** A failed job logs; a job
+ * that never ran logs nothing at all, which is precisely what happened here --
+ * seven scheduled jobs with no scheduler, producing zeros that every endpoint
+ * reported correctly. `last_succeeded_at` going stale fires for BOTH cases, and
+ * they are indistinguishable from outside.
+ */
+export interface AiJobHealthRequest {
+}
+
+export interface AiJobRunStatus {
+  jobName: string;
+  lastStartedAt?:
+    | Timestamp
+    | undefined;
+  /**
+   * *Preserved across a failure**, deliberately -- this is what the staleness
+   * check reads, and clearing it would turn "broken since Tuesday" into
+   * "never ran".
+   */
+  lastSucceededAt?: Timestamp | undefined;
+  lastDurationMs?: number | undefined;
+  lastError?: string | undefined;
+  consecutiveFailures: number;
+}
+
+export interface AiJobHealthResponse {
+  items: AiJobRunStatus[];
 }
 
 export interface RunAiRollupRequest {
@@ -291,6 +339,8 @@ export interface AiLedgerServiceClient {
   /** Platform-operated, like the ticket rollup. */
 
   runAiRollup(request: RunAiRollupRequest, metadata?: Metadata): Observable<RunAiRollupResponse>;
+
+  getAiJobHealth(request: AiJobHealthRequest, metadata?: Metadata): Observable<AiJobHealthResponse>;
 }
 
 export interface AiLedgerServiceController {
@@ -328,6 +378,11 @@ export interface AiLedgerServiceController {
     request: RunAiRollupRequest,
     metadata?: Metadata,
   ): Promise<RunAiRollupResponse> | Observable<RunAiRollupResponse> | RunAiRollupResponse;
+
+  getAiJobHealth(
+    request: AiJobHealthRequest,
+    metadata?: Metadata,
+  ): Promise<AiJobHealthResponse> | Observable<AiJobHealthResponse> | AiJobHealthResponse;
 }
 
 export function AiLedgerServiceControllerMethods() {
@@ -339,6 +394,7 @@ export function AiLedgerServiceControllerMethods() {
       "getKnowledgeGaps",
       "getDocumentAnalytics",
       "runAiRollup",
+      "getAiJobHealth",
     ];
     for (const method of grpcMethods) {
       const descriptor: any = Reflect.getOwnPropertyDescriptor(constructor.prototype, method);

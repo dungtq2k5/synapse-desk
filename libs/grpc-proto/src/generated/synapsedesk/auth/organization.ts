@@ -181,6 +181,36 @@ export interface ListOrganizationTimezonesResponse {
   items: OrganizationTimezone[];
 }
 
+/**
+ * Every tenant's BILLING CYCLE START, in bulk -- 20-doc §3.1.
+ *
+ * Exists because quota reconciliation is per tenant and the cycle start differs
+ * per tenant. The job it serves previously took ONE cycle start and applied it
+ * to everybody, which wrote each tenant's corrected counter under a Redis key
+ * the gate never reads -- reconciliation that appeared to succeed and corrected
+ * nothing.
+ *
+ * Bulk for the same reason as the timezone read above: one round trip per
+ * reconciliation sweep rather than one per tenant.
+ */
+export interface ListOrganizationCyclesRequest {
+  organizationIds: string[];
+}
+
+export interface OrganizationCycle {
+  organizationId: string;
+  /**
+   * Absent when the tenant has none. The caller must NOT default this to "now"
+   * or to the epoch silently -- a wrong cycle start reconciles against a key
+   * nothing reads, which is the bug this message was added to fix.
+   */
+  billingCycleStart?: Timestamp | undefined;
+}
+
+export interface ListOrganizationCyclesResponse {
+  items: OrganizationCycle[];
+}
+
 export interface OrganizationUsageResponse {
   /**
    * Active members PLUS pending invitations -- pending invites RESERVE seats,
@@ -282,6 +312,11 @@ export interface OrganizationServiceClient {
     metadata?: Metadata,
   ): Observable<ListOrganizationTimezonesResponse>;
 
+  listOrganizationCycles(
+    request: ListOrganizationCyclesRequest,
+    metadata?: Metadata,
+  ): Observable<ListOrganizationCyclesResponse>;
+
   getOnboarding(request: GetOnboardingRequest, metadata?: Metadata): Observable<OnboardingResponse>;
 
   completeOnboarding(request: CompleteOnboardingRequest, metadata?: Metadata): Observable<OrganizationResponse>;
@@ -342,6 +377,14 @@ export interface OrganizationServiceController {
     | Observable<ListOrganizationTimezonesResponse>
     | ListOrganizationTimezonesResponse;
 
+  listOrganizationCycles(
+    request: ListOrganizationCyclesRequest,
+    metadata?: Metadata,
+  ):
+    | Promise<ListOrganizationCyclesResponse>
+    | Observable<ListOrganizationCyclesResponse>
+    | ListOrganizationCyclesResponse;
+
   getOnboarding(
     request: GetOnboardingRequest,
     metadata?: Metadata,
@@ -369,6 +412,7 @@ export function OrganizationServiceControllerMethods() {
       "getOrganizationUsage",
       "getOrganizationEntitlements",
       "listOrganizationTimezones",
+      "listOrganizationCycles",
       "getOnboarding",
       "completeOnboarding",
       "deleteOrganization",

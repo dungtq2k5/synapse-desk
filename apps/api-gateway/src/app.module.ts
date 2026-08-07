@@ -17,6 +17,7 @@ import { SessionsModule } from './modules/sessions/sessions.module';
 import { RolesModule } from './modules/roles/roles.module';
 import { OrganizationsModule } from './modules/organizations/organizations.module';
 import { PlatformModule } from './modules/platform/platform.module';
+import { PlatformJobsModule } from './modules/platform-jobs/platform-jobs.module';
 import { RealtimeModule } from './modules/realtime/realtime.module';
 import { TicketsModule } from './modules/tickets/tickets.module';
 import { ChatModule } from './modules/chat/chat.module';
@@ -94,6 +95,7 @@ import { NotificationGrpcModule } from './common/grpc/notification-grpc.module';
     RolesModule,
     OrganizationsModule,
     PlatformModule,
+    PlatformJobsModule,
     TicketsModule,
     ChatModule,
     FeedbackModule,

@@ -69,6 +69,19 @@ message OverviewResponse {
   // tell a stale answer from a quiet tenant, and so an export can record which
   // run produced its numbers.
   optional google.protobuf.Timestamp computed_at = 11;
+
+  // **The last DAY the rollups cover for this tenant** (20-doc §4.3), as
+  // `YYYY-MM-DD`, or absent when no rollup has ever run.
+  //
+  // NOT the same fact as `computed_at`, and the difference is the point:
+  // `computed_at` says the job ran, `data_through` says what it covered. A
+  // scheduler that stopped a week ago still produces a recent `computed_at` on
+  // every backfill-free run, while `data_through` stops moving — which is the
+  // symptom somebody looking at a dashboard of zeros needs to see.
+  //
+  // Tenant-wide rather than clipped to the requested range: "how fresh is our
+  // data" must not change its answer because the caller asked about March.
+  optional string data_through = 12;
 }
 
 message DeflectionPoint {
@@ -81,6 +94,8 @@ message DeflectionPoint {
 message DeflectionResponse {
   repeated DeflectionPoint points = 1;
   RateValue total = 2;
+  // See `OverviewResponse.data_through`.
+  optional string data_through = 3;
 }
 
 message ResponseTimePoint {
@@ -97,6 +112,8 @@ message ResponseTimesResponse {
   MeanValue human_total = 2;
   MeanValue ai_total = 3;
   MeanValue resolution_total = 4;
+  // See `OverviewResponse.data_through`.
+  optional string data_through = 5;
 }
 
 message VolumePoint {
@@ -120,6 +137,8 @@ message VolumeResponse {
   repeated VolumeBreakdown by_status = 2;
   repeated VolumeBreakdown by_priority = 3;
   repeated VolumeBreakdown by_source = 4;
+  // See `OverviewResponse.data_through`.
+  optional string data_through = 5;
 }
 
 message SatisfactionPoint {
@@ -132,6 +151,8 @@ message SatisfactionResponse {
   repeated SatisfactionPoint points = 1;
   RateValue csat_total = 2;
   RateValue citation_accuracy_total = 3;
+  // See `OverviewResponse.data_through`.
+  optional string data_through = 4;
 }
 
 // Per-agent productivity. Names are hydrated by the GATEWAY — this service
@@ -144,9 +165,40 @@ message AgentStat {
   MeanValue resolution_seconds = 5;
 }
 
-message AgentStatsResponse { repeated AgentStat items = 1; }
+message AgentStatsResponse {
+  repeated AgentStat items = 1;
+  // Reads `agent_daily_stats`, a DIFFERENT table from the one behind the other
+  // five — so it can legitimately be staler, and says so itself.
+  optional string data_through = 2;
+}
 
 // The rollup job, exposed so a scheduler and an operator can both reach it.
+// ---------------------------------------------------------------------------
+// Job health -- 20-doc §4.1, §4.4.
+//
+// **Alerting on staleness rather than on failure.** A failed job logs; a job
+// that never ran logs nothing at all, which is precisely what happened here --
+// seven scheduled jobs with no scheduler, producing zeros that every endpoint
+// reported correctly. `last_succeeded_at` going stale fires for BOTH cases, and
+// they are indistinguishable from outside.
+message JobHealthRequest {}
+
+message JobRunStatus {
+  string job_name = 1;
+  optional google.protobuf.Timestamp last_started_at = 2;
+  // **Preserved across a failure**, deliberately -- this is what the staleness
+  // check reads, and clearing it would turn "broken since Tuesday" into
+  // "never ran".
+  optional google.protobuf.Timestamp last_succeeded_at = 3;
+  optional int32 last_duration_ms = 4;
+  optional string last_error = 5;
+  int32 consecutive_failures = 6;
+}
+
+message JobHealthResponse {
+  repeated JobRunStatus items = 1;
+}
+
 message RunRollupRequest {
   // Both inclusive, `YYYY-MM-DD`. Absent = the routine trailing window.
   optional string from = 1;
@@ -202,4 +254,5 @@ service AnalyticsService {
   // Platform-operated, never routed by the gateway for a tenant: a backfill
   // recomputes numbers a customer may already have exported.
   rpc RunRollup(RunRollupRequest) returns (RunRollupResponse);
+  rpc GetJobHealth(JobHealthRequest) returns (JobHealthResponse);
 }

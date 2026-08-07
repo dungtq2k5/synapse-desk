@@ -2,6 +2,16 @@ import { Injectable, Logger } from '@nestjs/common';
 import { formatErrorMsg } from '@synapsedesk/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { QuotaCounterService } from '../ai-ledger/quota-counter.service';
+import { AuthReferenceService } from '../auth-client/auth-reference.service';
+
+/**
+ * How far back to look for tenants worth reconciling.
+ *
+ * Only decides WHO to examine, never what to sum — each tenant's own
+ * `billing_cycle_start` decides that. Wide enough that an hourly sweep cannot
+ * miss a tenant between runs even after a long outage.
+ */
+const RECENT_SPEND_WINDOW_MS = 45 * 24 * 60 * 60 * 1000;
 
 /**
  * Re-derives spend from the LEDGER and corrects the Redis counter — §4.4.
@@ -24,6 +34,7 @@ export class QuotaReconciliationJob {
   constructor(
     private readonly prisma: PrismaService,
     private readonly counter: QuotaCounterService,
+    private readonly authReference: AuthReferenceService,
   ) {}
 
   /**
@@ -65,17 +76,60 @@ export class QuotaReconciliationJob {
     return truth;
   }
 
-  /** Every tenant that spent anything this cycle. */
-  async reconcileAll(cycleStart: Date): Promise<number> {
+  /**
+   * Every tenant with recent spend, each reconciled against **its OWN cycle**.
+   *
+   * **This took no parameter by design** — 20-doc §3.1. The previous signature
+   * was `reconcileAll(cycleStart: Date)`, which applied one date to every
+   * tenant and directly contradicted the warning on `reconcile()` above.
+   *
+   * The consequence was not a wrong log line. `QuotaCounterService` keys on
+   * `quota:{org}:{cycleStartEpoch}`, so reconciling with the wrong cycle wrote
+   * the corrected total **under a key the gate never reads** while leaving the
+   * real key's drift untouched: a sweep that reported success and corrected
+   * nothing. For a tenant whose cycle began after the passed date, the summed
+   * "truth" also included spend from before their cycle started — so the number
+   * written was wrong as well as misfiled.
+   *
+   * Cycles are resolved in ONE bulk call rather than one per tenant, and a
+   * tenant whose cycle cannot be resolved is SKIPPED rather than guessed at.
+   */
+  async reconcileAll(): Promise<number> {
+    // A window wide enough to catch anyone who has spent recently, without
+    // scanning the whole ledger. It only decides WHO to look at — each tenant's
+    // own cycle then decides what to sum, which is the part that must be right.
+    const since = new Date(Date.now() - RECENT_SPEND_WINDOW_MS);
+
     const tenants = await this.prisma.aiGeneration.groupBy({
       by: ['organizationId'],
-      where: { createdAt: { gte: cycleStart } },
+      where: { createdAt: { gte: since } },
     });
+    if (tenants.length === 0) return 0;
+
+    const cycles = await this.authReference.listOrganizationCycles(
+      tenants.map((tenant) => tenant.organizationId),
+    );
+
+    let reconciled = 0;
 
     for (const tenant of tenants) {
+      const cycleStart = cycles.get(tenant.organizationId);
+
+      if (!cycleStart) {
+        // Skipped, not defaulted. Reconciling against a guessed cycle is the
+        // bug this method was rewritten to remove, and the existing drift
+        // simply waits for the next hourly run.
+        this.logger.warn(
+          `No billing cycle for ${tenant.organizationId}; skipping its ` +
+            `reconciliation rather than using a guess`,
+        );
+        continue;
+      }
+
       await this.reconcile(tenant.organizationId, cycleStart);
+      reconciled++;
     }
 
-    return tenants.length;
+    return reconciled;
   }
 }

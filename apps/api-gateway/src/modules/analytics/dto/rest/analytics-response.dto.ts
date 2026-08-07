@@ -36,6 +36,17 @@ export class OverviewDto {
   openTicketMedianAgeSeconds!: number | null;
   /** When the rollups behind this answer ran. */
   computedAt!: Date | null;
+  /**
+   * **The last day the rollups behind this answer cover** — 20-doc §4.3,
+   * `YYYY-MM-DD`, or `null` when no rollup has ever run for this tenant.
+   *
+   * Not the same as `computedAt`, and the gap between them is the diagnosis: a
+   * recent `computedAt` beside a `dataThrough` two weeks old means the job runs
+   * and finds nothing, while `dataThrough: null` means it has never run at all.
+   * A dashboard of zeros looks identical in both cases without this field —
+   * which is how seven scheduled jobs sat uncalled and nothing complained.
+   */
+  dataThrough!: string | null;
 }
 
 export class DeflectionPointDto {
@@ -48,6 +59,8 @@ export class DeflectionPointDto {
 export class DeflectionDto {
   points!: DeflectionPointDto[];
   total!: RateDto;
+  /** See `OverviewDto.dataThrough`. */
+  dataThrough!: string | null;
 }
 
 export class ResponseTimePointDto {
@@ -62,6 +75,8 @@ export class ResponseTimesDto {
   humanTotal!: MeanDto;
   aiTotal!: MeanDto;
   resolutionTotal!: MeanDto;
+  /** See `OverviewDto.dataThrough`. */
+  dataThrough!: string | null;
 }
 
 export class VolumePointDto {
@@ -81,6 +96,8 @@ export class VolumeDto {
   byStatus!: VolumeBreakdownDto[];
   byPriority!: VolumeBreakdownDto[];
   bySource!: VolumeBreakdownDto[];
+  /** See `OverviewDto.dataThrough`. */
+  dataThrough!: string | null;
 }
 
 export class SatisfactionPointDto {
@@ -93,6 +110,8 @@ export class SatisfactionDto {
   points!: SatisfactionPointDto[];
   csatTotal!: RateDto;
   citationAccuracyTotal!: RateDto;
+  /** See `OverviewDto.dataThrough`. */
+  dataThrough!: string | null;
 }
 
 export class AiUsageSliceDto {
@@ -124,6 +143,8 @@ export class AiUsageDto {
   draftAcceptance!: RateDto;
   emptyRetrievalRate!: RateDto;
   computedAt!: Date | null;
+  /** See `OverviewDto.dataThrough`. */
+  dataThrough!: string | null;
 }
 
 /**
@@ -160,7 +181,18 @@ export class UnavailableBlockDto {
 
 export class AgentAnalyticsDto {
   items!: AgentStatDto[];
+
   /** Empty when everything answered. */
+  /**
+   * **The last day the underlying rollups cover** — 20-doc §4.3, `YYYY-MM-DD`,
+   * or `null` when nothing has ever been rolled up.
+   *
+   * This endpoint spans more than one service, so it reports the STALEST leg:
+   * a composed answer is only as fresh as its oldest input, and reporting the
+   * freshest would let one healthy service vouch for a broken one.
+   */
+  dataThrough!: string | null;
+
   unavailable!: UnavailableBlockDto[];
 }
 
@@ -176,6 +208,8 @@ export class KnowledgeGapsDto {
   answeringGenerations!: number;
   emptyRetrievalRate!: RateDto;
   flags!: KnowledgeGapFlagDto[];
+  /** See `AgentAnalyticsDto.dataThrough`. */
+  dataThrough!: string | null;
   unavailable!: UnavailableBlockDto[];
 }
 
@@ -194,6 +228,8 @@ export class DocumentAnalyticsDto {
   retrievedNeverCited!: DocumentUsageDto[];
   /** Citation accuracy from `ai_response_feedbacks` — the other service's leg. */
   citationAccuracy!: RateDto | null;
+  /** See `AgentAnalyticsDto.dataThrough`. */
+  dataThrough!: string | null;
   unavailable!: UnavailableBlockDto[];
 }
 

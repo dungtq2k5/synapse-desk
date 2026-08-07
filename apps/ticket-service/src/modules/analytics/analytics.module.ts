@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { JobRunsModule } from '../job-runs/job-runs.module';
 import { BullModule } from '@nestjs/bullmq';
 import { ConfigService } from '@nestjs/config';
 import { ANALYTICS_EXPORT_QUEUE } from '@synapsedesk/common';
@@ -32,6 +33,7 @@ import { AnalyticsExportProcessor } from './analytics-export.processor';
  */
 @Module({
   imports: [
+    JobRunsModule,
     AuthClientModule,
     StorageClientModule,
     BullModule.forRootAsync({

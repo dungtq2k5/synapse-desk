@@ -10,6 +10,7 @@ import { AiSettingsModule } from './modules/ai-settings/ai-settings.module';
 import { DocumentsModule } from './modules/documents/documents.module';
 import { IngestionModule } from './modules/ingestion/ingestion.module';
 import { ScheduledModule } from './modules/scheduled/scheduled.module';
+import { SchedulerModule } from './modules/scheduler/scheduler.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { ScheduledModule } from './modules/scheduled/scheduled.module';
     DocumentsModule,
     IngestionModule,
     ScheduledModule,
+    SchedulerModule,
   ],
 })
 export class AppModule {}

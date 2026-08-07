@@ -1,6 +1,8 @@
 import { Controller } from '@nestjs/common';
 import type { Metadata } from '@grpc/grpc-js';
 import {
+  AuthJobHealthResponse,
+  toTimestamp,
   CreateGlobalRoleRequest,
   CreatePlatformOrganizationRequest,
   CreatePlatformOrganizationResponse,
@@ -23,6 +25,7 @@ import {
   unpackCallerContext,
   UpdatePlatformOrganizationRequest,
 } from '@synapsedesk/grpc-proto';
+import { JobHealthService } from '../job-runs/job-health.service';
 import { PlatformService } from './platform.service';
 
 /**
@@ -34,7 +37,10 @@ import { PlatformService } from './platform.service';
 @Controller()
 @PlatformServiceControllerMethods()
 export class PlatformGrpcController implements PlatformServiceController {
-  constructor(private readonly platformService: PlatformService) {}
+  constructor(
+    private readonly platformService: PlatformService,
+    private readonly jobHealth: JobHealthService,
+  ) {}
 
   listOrganizations(
     request: ListPlatformOrganizationsRequest,
@@ -132,5 +138,30 @@ export class PlatformGrpcController implements PlatformServiceController {
 
   getMetrics(): Promise<PlatformMetricsResponse> {
     return this.platformService.getMetrics();
+  }
+
+  /**
+   * The heartbeat — 20-doc §4.4.
+   *
+   * Every row, unjudged: the staleness decision needs the list of jobs this
+   * build EXPECTS, because a job that has never run has no row to return.
+   */
+  async getAuthJobHealth(): Promise<AuthJobHealthResponse> {
+    const rows = await this.jobHealth.list();
+
+    return {
+      items: rows.map((row) => ({
+        jobName: row.jobName,
+        lastStartedAt: row.lastStartedAt
+          ? toTimestamp(row.lastStartedAt)
+          : undefined,
+        lastSucceededAt: row.lastSucceededAt
+          ? toTimestamp(row.lastSucceededAt)
+          : undefined,
+        lastDurationMs: row.lastDurationMs ?? undefined,
+        lastError: row.lastError ?? undefined,
+        consecutiveFailures: row.consecutiveFailures,
+      })),
+    };
   }
 }

@@ -7,6 +7,7 @@ import { AuditModule } from './modules/audit/audit.module';
 import { AuthClientModule } from './modules/auth-client/auth-client.module';
 import { TicketsModule } from './modules/tickets/tickets.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
+import { SchedulerModule } from './modules/scheduler/scheduler.module';
 import { AssignmentsModule } from './modules/assignments/assignments.module';
 import { MessagesModule } from './modules/messages/messages.module';
 import { AiModule } from './modules/ai/ai.module';
@@ -30,6 +31,7 @@ import { FeedbackModule } from './modules/feedback/feedback.module';
     // exists; analytics lives beside the data it reads and the gateway
     // composes across services.
     AnalyticsModule,
+    SchedulerModule,
     AssignmentsModule,
     MessagesModule,
     AiModule,

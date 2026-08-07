@@ -148,7 +148,15 @@ export class AnalyticsService {
         }
       }
 
-      return { items, unavailable };
+      return {
+        items,
+        // The STALEST of the two legs. `agent_daily_stats` and
+        // `ai_generation_daily_stats` are written by two schedulers in two
+        // services, so one can be days behind the other — and reporting the
+        // fresher would let the healthy one vouch for the broken one.
+        dataThrough: stalest(stats?.dataThrough, usage?.dataThrough),
+        unavailable,
+      };
     });
   }
 
@@ -181,6 +189,7 @@ export class AnalyticsService {
           denominator: gaps?.emptyRetrievalRate?.denominator ?? 0,
         },
         flags: gaps?.flags ?? [],
+        dataThrough: gaps?.dataThrough ?? null,
         unavailable,
       };
     });
@@ -226,6 +235,10 @@ export class AnalyticsService {
           citationAccuracy: satisfaction
             ? satisfaction.citationAccuracyTotal
             : null,
+          dataThrough: stalest(
+            documents?.dataThrough,
+            satisfaction?.dataThrough,
+          ),
           unavailable,
         };
       },
@@ -299,6 +312,32 @@ function unwrap<T>(
   unavailable.push(leg.failure);
 
   return null;
+}
+
+/**
+ * The OLDEST `dataThrough` among the legs — 20-doc §4.3.
+ *
+ * A composed answer is only as fresh as its stalest input. Reporting the
+ * freshest would let a healthy service vouch for a broken one, which is the
+ * exact failure `dataThrough` exists to expose.
+ *
+ * A leg that is absent because it FAILED contributes nothing rather than
+ * `null`: its block is already listed in `unavailable`, and letting a failed
+ * leg force the whole answer to "never rolled up" would confuse a service being
+ * down with a job never having run. They need different responses.
+ *
+ * `YYYY-MM-DD` sorts lexicographically, so no date parsing is needed — and
+ * comparing strings avoids inventing a timezone the days do not have.
+ */
+function stalest(...days: (string | null | undefined)[]): string | null {
+  const present = days.filter((day): day is string => Boolean(day));
+
+  if (present.length === 0) return null;
+
+  return present.reduce(
+    (oldest, day) => (day < oldest ? day : oldest),
+    present[0],
+  );
 }
 
 /** The trailing year, for a rate that needs volume to mean anything. */

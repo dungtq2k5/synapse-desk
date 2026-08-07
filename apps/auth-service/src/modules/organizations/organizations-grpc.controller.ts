@@ -12,6 +12,8 @@ import {
   OrganizationServiceControllerMethods,
   OrganizationSettingsResponse,
   GetOrganizationEntitlementsRequest,
+  ListOrganizationCyclesRequest,
+  ListOrganizationCyclesResponse,
   ListOrganizationTimezonesRequest,
   ListOrganizationTimezonesResponse,
   OrganizationEntitlementsResponse,
@@ -103,6 +105,13 @@ export class OrganizationsGrpcController implements OrganizationServiceControlle
     request: ListOrganizationTimezonesRequest,
   ): Promise<ListOrganizationTimezonesResponse> {
     return this.organizationsService.listOrganizationTimezones(request);
+  }
+
+  /** Service-to-service only — see 20-doc §3.1. */
+  listOrganizationCycles(
+    request: ListOrganizationCyclesRequest,
+  ): Promise<ListOrganizationCyclesResponse> {
+    return this.organizationsService.listOrganizationCycles(request);
   }
 
   getOnboarding(

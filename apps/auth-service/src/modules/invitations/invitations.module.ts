@@ -6,7 +6,6 @@ import { RolesModule } from '../roles/roles.module';
 import { OrganizationsModule } from '../organizations/organizations.module';
 import { InvitationsService } from './invitations.service';
 import { InvitationsGrpcController } from './invitations-grpc.controller';
-import { InvitationsExpiryJob } from './invitations-expiry.job';
 
 /**
  * Imports AuthModule for `AuthService` — accepting an invitation must issue a
@@ -21,6 +20,9 @@ import { InvitationsExpiryJob } from './invitations-expiry.job';
     OrganizationsModule,
   ],
   controllers: [InvitationsGrpcController],
-  providers: [InvitationsService, InvitationsExpiryJob],
+  providers: [InvitationsService],
+  // Exported for `SchedulerModule`, which drives the hourly expiry sweep —
+  // 20-doc §3.2. It was a `@Cron` inside this module until then.
+  exports: [InvitationsService],
 })
 export class InvitationsModule {}

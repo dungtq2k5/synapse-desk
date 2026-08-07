@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AppModule } from '../../src/app.module';
+import { SchedulerProcessor } from '../../src/modules/scheduler/scheduler.processor';
 import { PrismaService } from '../../src/modules/prisma/prisma.service';
 import { DatabaseSeeder } from '../../src/modules/prisma/database.seeder';
 import { NotificationPublisher } from '../../src/modules/notifications/notification-publisher.service';
@@ -86,6 +87,16 @@ export async function bootstrapE2eTest(): Promise<E2eFixture> {
   // creating an HTTP server or a gRPC listener — neither of which this layer
   // wants bound.
   await moduleRef.init();
+
+  // The live BullMQ worker, stopped. `SchedulerProcessor` is a real
+  // `@Processor` against the same Redis the tests use, and its repeats fire on
+  // a CRON — so a suite running across the top of an hour would have the
+  // invitation sweep execute underneath it. Same discipline as ticket-service
+  // and ingestion-service, and `waitUntilReady()` first for the same reason:
+  // closing a worker mid-connect leaves a socket nobody owns and Jest hangs.
+  const { worker } = moduleRef.get(SchedulerProcessor);
+  await worker.waitUntilReady();
+  await worker.close();
 
   // Explicit, rather than relying on OnApplicationBootstrap: SEED_ON_BOOTSTRAP
   // is false in .env.test precisely so there is ONE seeding path. This call is
@@ -177,6 +188,9 @@ export async function bootstrapE2eTest(): Promise<E2eFixture> {
       // Billing events reference organizations with ON DELETE SetNull, so they
       // would survive the sweep as orphans and the idempotency test would then
       // hit a UNIQUE violation on a re-used event id from a previous test.
+      // The heartbeat — 20-doc §4.1. Not tenant data, but a row surviving into
+      // the next test carries its consecutive_failures with it.
+      prisma.$executeRawUnsafe('DELETE FROM job_runs'),
       prisma.$executeRawUnsafe('DELETE FROM billing_events'),
 
       prisma.$executeRawUnsafe('DELETE FROM user_departments'),

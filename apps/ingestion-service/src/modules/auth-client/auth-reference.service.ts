@@ -294,4 +294,51 @@ export class AuthReferenceService implements OnModuleInit {
       return new Map();
     }
   }
+
+  /**
+   * Each tenant's BILLING CYCLE START, in bulk — 20-doc §3.1.
+   *
+   * **Reconciling against the wrong cycle is worse than not reconciling.**
+   * `QuotaCounterService` keys on `quota:{org}:{cycleStartEpoch}`, so a
+   * corrected total written under someone else's cycle lands on a key the gate
+   * never reads, while the real key keeps its drift. The sweep logs success and
+   * fixes nothing.
+   *
+   * **So this returns an empty map on failure and the caller SKIPS those
+   * tenants**, which is the opposite of `listOrganizationTimezones` directly
+   * above. The asymmetry is the point: a missing timezone gives a slightly
+   * wrong bucket that a backfill repairs, while a missing cycle start gives a
+   * confidently wrong counter that nothing repairs — and skipping leaves the
+   * existing drift for the next hourly run to correct.
+   */
+  async listOrganizationCycles(
+    organizationIds: string[],
+  ): Promise<Map<string, Date>> {
+    if (organizationIds.length === 0) return new Map();
+
+    try {
+      const response = await firstValueFrom(
+        this.organizationService
+          .listOrganizationCycles({ organizationIds })
+          .pipe(timeout(GRPC_DEADLINE_MS)),
+      );
+
+      return new Map(
+        response.items
+          .filter((item) => item.billingCycleStart)
+          .map((item) => [
+            item.organizationId,
+            new Date(Number(item.billingCycleStart!.seconds) * 1000),
+          ]),
+      );
+    } catch (error) {
+      this.logger.error(
+        `Could not resolve billing cycles for ${organizationIds.length} ` +
+          `tenant(s); SKIPPING reconciliation this run rather than ` +
+          `reconciling against a guess: ${formatErrorMsg(error)}`,
+      );
+
+      return new Map();
+    }
+  }
 }

@@ -70,13 +70,14 @@ export class AiAnalyticsService {
     const organizationId = requireTenant(context);
     const range = parseRange(request.from, request.to);
 
-    const [rows, entitlement, tier] = await Promise.all([
+    const [rows, entitlement, tier, dataThrough] = await Promise.all([
       this.dailyRows(organizationId, range),
       // The budget the spend is measured AGAINST, fetched here so a caller does
       // not need a second round trip to render a progress bar. A number with no
       // ceiling beside it is one nobody can act on.
       this.authReference.getAiEntitlement(context),
       this.authReference.getAiModelTier(context),
+      this.dataThrough(organizationId),
     ]);
 
     const totals = sumAll(rows);
@@ -117,6 +118,7 @@ export class AiAnalyticsService {
         emptyRetrievalRate(sumAll(answeringOnly(rows))),
       ),
       computedAt: latestComputedAt(rows),
+      dataThrough,
     };
   }
 
@@ -164,6 +166,7 @@ export class AiAnalyticsService {
         flagType: flag.flagType,
         detail: flag.detail,
       })),
+      dataThrough: await this.dataThrough(organizationId),
     };
   }
 
@@ -235,6 +238,29 @@ export class AiAnalyticsService {
         .sort((left, right) => right.retrievalCount - left.retrievalCount)
         .slice(0, limit),
     };
+  }
+
+  /**
+   * **The last day `ai_generation_daily_stats` covers** — 20-doc §4.3.
+   *
+   * See the note on ticket-service's equivalent: this is what lets a dashboard
+   * of zeros say *why* it is zero. Tenant-wide and not clipped to the requested
+   * range, deliberately.
+   *
+   * This service and ticket-service answer independently and can legitimately
+   * disagree — they are rolled up by two different schedulers, and one being
+   * down is precisely the condition worth surfacing rather than smoothing over.
+   */
+  private async dataThrough(
+    organizationId: string,
+  ): Promise<string | undefined> {
+    const newest = await this.prisma.aiGenerationDailyStat.findFirst({
+      where: { organizationId },
+      orderBy: { day: 'desc' },
+      select: { day: true },
+    });
+
+    return newest ? newest.day.toISOString().slice(0, 10) : undefined;
   }
 
   private async dailyRows(

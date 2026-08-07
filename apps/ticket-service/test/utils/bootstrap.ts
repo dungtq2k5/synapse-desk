@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AppModule } from '../../src/app.module';
 import { PrismaService } from '../../src/modules/prisma/prisma.service';
 import { DatabaseSeeder } from '../../src/modules/prisma/database.seeder';
-import { stopExportWorker } from './export-worker';
+import { stopWorkers } from './export-worker';
 
 export type E2eFixture = {
   moduleRef: TestingModule;
@@ -34,8 +34,8 @@ export async function bootstrapE2eTest(): Promise<E2eFixture> {
   // want. The bootstrap smoke spec starts those explicitly.
   await moduleRef.init();
 
-  // The export worker, stopped — see `stopExportWorker` for both reasons.
-  await stopExportWorker(moduleRef);
+  // The export worker, stopped — see `stopWorkers` for both reasons.
+  await stopWorkers(moduleRef);
 
   // Explicit, rather than relying on OnApplicationBootstrap: SEED_ON_BOOTSTRAP
   // is false in .env.test precisely so there is ONE seeding path. This is what
@@ -64,6 +64,10 @@ export async function bootstrapE2eTest(): Promise<E2eFixture> {
         "analytics_exports",
         "ticket_daily_stats",
         "agent_daily_stats",
+        -- The heartbeat. Not tenant data, but a row surviving into the next
+        -- test carries its consecutive_failures with it — which made a
+        -- two-failure assertion read 3.
+        "job_runs",
         "tickets"
       RESTART IDENTITY CASCADE;
     `);

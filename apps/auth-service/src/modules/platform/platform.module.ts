@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { JobRunsModule } from '../job-runs/job-runs.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { AuditModule } from '../audit/audit.module';
 import { SessionsModule } from '../sessions/sessions.module';
@@ -12,7 +13,13 @@ import { PlatformGrpcController } from './platform-grpc.controller';
  * first Org Admin's grant moves `roles.user_assigned` like every other path.
  */
 @Module({
-  imports: [PrismaModule, AuditModule, SessionsModule, RolesModule],
+  imports: [
+    JobRunsModule,
+    PrismaModule,
+    AuditModule,
+    SessionsModule,
+    RolesModule,
+  ],
   controllers: [PlatformGrpcController],
   providers: [PlatformService],
 })

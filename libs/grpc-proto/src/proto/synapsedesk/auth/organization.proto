@@ -160,6 +160,32 @@ message ListOrganizationTimezonesResponse {
   repeated OrganizationTimezone items = 1;
 }
 
+// Every tenant's BILLING CYCLE START, in bulk -- 20-doc §3.1.
+//
+// Exists because quota reconciliation is per tenant and the cycle start differs
+// per tenant. The job it serves previously took ONE cycle start and applied it
+// to everybody, which wrote each tenant's corrected counter under a Redis key
+// the gate never reads -- reconciliation that appeared to succeed and corrected
+// nothing.
+//
+// Bulk for the same reason as the timezone read above: one round trip per
+// reconciliation sweep rather than one per tenant.
+message ListOrganizationCyclesRequest {
+  repeated string organization_ids = 1;
+}
+
+message OrganizationCycle {
+  string organization_id = 1;
+  // Absent when the tenant has none. The caller must NOT default this to "now"
+  // or to the epoch silently -- a wrong cycle start reconciles against a key
+  // nothing reads, which is the bug this message was added to fix.
+  optional google.protobuf.Timestamp billing_cycle_start = 2;
+}
+
+message ListOrganizationCyclesResponse {
+  repeated OrganizationCycle items = 1;
+}
+
 message OrganizationUsageResponse {
   // Active members PLUS pending invitations -- pending invites RESERVE seats,
   // so this must match what the invitation path enforces or an invite gets
@@ -228,6 +254,7 @@ service OrganizationService {
   // cache fill rather than a per-request call.
   rpc GetOrganizationEntitlements(GetOrganizationEntitlementsRequest) returns (OrganizationEntitlementsResponse);
   rpc ListOrganizationTimezones(ListOrganizationTimezonesRequest) returns (ListOrganizationTimezonesResponse);
+  rpc ListOrganizationCycles(ListOrganizationCyclesRequest) returns (ListOrganizationCyclesResponse);
 
   rpc GetOnboarding(GetOnboardingRequest) returns (OnboardingResponse);
   rpc CompleteOnboarding(CompleteOnboardingRequest) returns (OrganizationResponse);

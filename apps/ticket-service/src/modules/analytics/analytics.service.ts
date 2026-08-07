@@ -61,10 +61,11 @@ export class AnalyticsService {
     const organizationId = requireTenant(context);
     const range = parseRange(request);
 
-    const [rows, openTickets, openMedianAge] = await Promise.all([
+    const [rows, openTickets, openMedianAge, dataThrough] = await Promise.all([
       this.dailyRows(organizationId, request, range),
       this.openTicketCount(organizationId, request),
       this.openTicketMedianAgeSeconds(organizationId, request),
+      this.dataThrough(organizationId),
     ]);
 
     const totals = rows.reduce(
@@ -90,6 +91,7 @@ export class AnalyticsService {
       // Absent for a tenant with no rows, which is how a caller tells "quiet"
       // from "the job has not run".
       computedAt: latestComputedAt(rows),
+      dataThrough,
     };
   }
 
@@ -98,11 +100,10 @@ export class AnalyticsService {
     context: CallerContext,
   ): Promise<DeflectionResponse> {
     const organizationId = requireTenant(context);
-    const rows = await this.dailyRows(
-      organizationId,
-      request,
-      parseRange(request),
-    );
+    const [rows, dataThrough] = await Promise.all([
+      this.dailyRows(organizationId, request, parseRange(request)),
+      this.dataThrough(organizationId),
+    ]);
     const buckets = bucketBy(rows, granularityOf(request));
 
     return {
@@ -117,6 +118,7 @@ export class AnalyticsService {
       // conversations equally with a Monday with 300 — the same mistake the
       // rollup schema exists to prevent, arriving one layer up.
       total: toRate(deflectionRate(sumAll(rows))),
+      dataThrough,
     };
   }
 
@@ -125,11 +127,10 @@ export class AnalyticsService {
     context: CallerContext,
   ): Promise<ResponseTimesResponse> {
     const organizationId = requireTenant(context);
-    const rows = await this.dailyRows(
-      organizationId,
-      request,
-      parseRange(request),
-    );
+    const [rows, dataThrough] = await Promise.all([
+      this.dailyRows(organizationId, request, parseRange(request)),
+      this.dataThrough(organizationId),
+    ]);
     const buckets = bucketBy(rows, granularityOf(request));
     const totals = sumAll(rows);
 
@@ -143,6 +144,7 @@ export class AnalyticsService {
       humanTotal: toMean(humanFirstResponseSeconds(totals)),
       aiTotal: toMean(aiFirstResponseSeconds(totals)),
       resolutionTotal: toMean(resolutionSeconds(totals)),
+      dataThrough,
     };
   }
 
@@ -151,11 +153,10 @@ export class AnalyticsService {
     context: CallerContext,
   ): Promise<VolumeResponse> {
     const organizationId = requireTenant(context);
-    const rows = await this.dailyRows(
-      organizationId,
-      request,
-      parseRange(request),
-    );
+    const [rows, dataThrough] = await Promise.all([
+      this.dailyRows(organizationId, request, parseRange(request)),
+      this.dataThrough(organizationId),
+    ]);
     const buckets = bucketBy(rows, granularityOf(request));
 
     // **The one place this reads `tickets` rather than the rollup**, and it is
@@ -173,6 +174,7 @@ export class AnalyticsService {
         escalated: stats.ticketsEscalated,
       })),
       ...breakdowns,
+      dataThrough,
     };
   }
 
@@ -181,11 +183,10 @@ export class AnalyticsService {
     context: CallerContext,
   ): Promise<SatisfactionResponse> {
     const organizationId = requireTenant(context);
-    const rows = await this.dailyRows(
-      organizationId,
-      request,
-      parseRange(request),
-    );
+    const [rows, dataThrough] = await Promise.all([
+      this.dailyRows(organizationId, request, parseRange(request)),
+      this.dataThrough(organizationId),
+    ]);
     const buckets = bucketBy(rows, granularityOf(request));
     const totals = sumAll(rows);
 
@@ -197,6 +198,7 @@ export class AnalyticsService {
       })),
       csatTotal: toRate(csat(totals)),
       citationAccuracyTotal: toRate(citationAccuracy(totals)),
+      dataThrough,
     };
   }
 
@@ -215,20 +217,23 @@ export class AnalyticsService {
     const organizationId = requireTenant(context);
     const range = parseRange(request);
 
-    const grouped = await this.prisma.agentDailyStat.groupBy({
-      by: ['agentId'],
-      where: {
-        organizationId,
-        day: { gte: range.from, lte: range.to },
-      },
-      _sum: {
-        assigned: true,
-        resolved: true,
-        messagesSent: true,
-        resolutionSecondsSum: true,
-        resolutionCount: true,
-      },
-    });
+    const [grouped, dataThrough] = await Promise.all([
+      this.prisma.agentDailyStat.groupBy({
+        by: ['agentId'],
+        where: {
+          organizationId,
+          day: { gte: range.from, lte: range.to },
+        },
+        _sum: {
+          assigned: true,
+          resolved: true,
+          messagesSent: true,
+          resolutionSecondsSum: true,
+          resolutionCount: true,
+        },
+      }),
+      this.dataThrough(organizationId, 'agentDailyStat'),
+    ]);
 
     return {
       items: grouped.map((row) => ({
@@ -245,7 +250,60 @@ export class AnalyticsService {
           count: row._sum.resolutionCount ?? 0,
         }),
       })),
+      dataThrough,
     };
+  }
+
+  /**
+   * **The last day the rollups cover for this tenant** — 20-doc §4.3.
+   *
+   * The cheapest thing in this file and the most valuable: a dashboard showing
+   * zeros beside *"data through 12 Aug"* diagnoses itself, where the same
+   * dashboard showing only zeros looks like a quiet tenant. That distinction is
+   * exactly what nobody could make when the rollup jobs turned out to have no
+   * scheduler at all — every endpoint answered correctly, and every answer was
+   * zero.
+   *
+   * **Deliberately NOT clipped to the requested range.** "How fresh is our
+   * data" must not change its answer because the caller asked about March. A
+   * range-clipped version would report `2026-03-31` for a March query and hide
+   * that nothing has been rolled up since.
+   *
+   * `null` for a tenant with no rows at all, which a caller must render as
+   * "never" rather than as today.
+   *
+   * **The known limitation, accepted deliberately.** This is the last day with
+   * a ROW, and the job writes a row only for days that had activity — so a
+   * tenant with no tickets since Tuesday reports Tuesday however healthy the
+   * scheduler is. It answers "what period does this dashboard cover", which is
+   * near to but not the same as "is the job running".
+   *
+   * Kept because it fails in the SAFE direction. A false "your data looks old"
+   * costs somebody a glance at the job status; the inverse — a dead scheduler
+   * reporting today because it ran and found nothing — is the exact failure
+   * 20-doc exists about. "Is it running" is answered separately by the
+   * heartbeat table (§4.1), on `/platform/metrics`, where it belongs.
+   */
+  private async dataThrough(
+    organizationId: string,
+    table: 'ticketDailyStat' | 'agentDailyStat' = 'ticketDailyStat',
+  ): Promise<string | undefined> {
+    // `MAX(day)` on the leading column of the primary key — an index-only scan,
+    // not a table scan, which is why this can sit on every endpoint.
+    const newest =
+      table === 'agentDailyStat'
+        ? await this.prisma.agentDailyStat.findFirst({
+            where: { organizationId },
+            orderBy: { day: 'desc' },
+            select: { day: true },
+          })
+        : await this.prisma.ticketDailyStat.findFirst({
+            where: { organizationId },
+            orderBy: { day: 'desc' },
+            select: { day: true },
+          });
+
+    return newest ? toIsoDay(newest.day) : undefined;
   }
 
   /**
@@ -488,6 +546,11 @@ function sumAll(rows: TicketStatSums[]): TicketStatSums {
 }
 
 /** The newest rollup run behind an answer — the cache key's freshness input. */
+/** A `date` column as `YYYY-MM-DD` — never a locale-formatted string. */
+function toIsoDay(day: Date): string {
+  return day.toISOString().slice(0, 10);
+}
+
 function latestComputedAt(rows: DailyRow[]) {
   if (rows.length === 0) return undefined;
 

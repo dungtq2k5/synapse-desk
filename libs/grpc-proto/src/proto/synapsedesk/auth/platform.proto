@@ -164,6 +164,25 @@ message CreateGlobalRoleRequest {
 
 message GetPlatformMetricsRequest {}
 
+// Job health -- 20-doc §4.4. auth-service's two scheduled jobs, since it moved
+// off `@nestjs/schedule`: the heartbeat table lives in each service's own
+// database, so `/platform/jobs` is a three-leg fan-out.
+message AuthJobHealthRequest {}
+
+message AuthJobRunStatus {
+  string job_name = 1;
+  optional google.protobuf.Timestamp last_started_at = 2;
+  // Preserved across a failure -- this is what the staleness check reads.
+  optional google.protobuf.Timestamp last_succeeded_at = 3;
+  optional int32 last_duration_ms = 4;
+  optional string last_error = 5;
+  int32 consecutive_failures = 6;
+}
+
+message AuthJobHealthResponse {
+  repeated AuthJobRunStatus items = 1;
+}
+
 message PlatformMetricsResponse {
   int32 total_organizations = 1;
   // Keyed by status, so a new status does not need a new field.
@@ -193,4 +212,5 @@ service PlatformService {
   rpc CreateGlobalRole(CreateGlobalRoleRequest) returns (RoleResponse);
 
   rpc GetMetrics(GetPlatformMetricsRequest) returns (PlatformMetricsResponse);
+  rpc GetAuthJobHealth(AuthJobHealthRequest) returns (AuthJobHealthResponse);
 }
