@@ -1,0 +1,131 @@
+syntax = "proto3";
+
+package synapsedesk.notification;
+
+import "google/protobuf/timestamp.proto";
+
+// Domain E's read surface — 18-doc §1.1, §2.
+//
+// notification-service was NATS-only until this file existed: it consumed
+// events and wrote rows nobody could read back. The feed is a synchronous read
+// on behalf of a user, so it needs gRPC exactly as ticket-service does.
+//
+// **Every RPC here is SELF-scoped.** The recipient is `ctx.sub` from gRPC
+// metadata, never a field on the request — there is no admin
+// read-someone-else's-inbox RPC and there should not be one. The feed is a
+// personal inbox, and anything a supervisor legitimately needs is in
+// `audit_logs`.
+//
+// Note what is ABSENT: there is no Create. Notifications are written by NATS
+// consumers, never by a caller. An RPC would be a spam vector into other
+// users' inboxes and would bypass the `event_id` idempotency that makes NATS
+// at-least-once delivery safe.
+
+message NotificationResponse {
+  string id = 1;
+  string organization_id = 2;
+  // The ORIGINATING event — `ticket.assigned`, `quota.threshold`. Never the
+  // transport subject (18-doc §1.3).
+  string type = 3;
+  string priority = 4;
+  string title = 5;
+  optional string body = 6;
+  // JSON, as a string. proto3 has no map<string, any>, and a `Struct` would
+  // make every client depend on the well-known types to read a deep-link
+  // payload it forwards verbatim.
+  string data = 7;
+  optional string action_url = 8;
+  optional string actor_id = 9;
+  optional string resource_type = 10;
+  optional string resource_id = 11;
+  optional string group_key = 12;
+  int32 group_count = 13;
+  optional google.protobuf.Timestamp read_at = 14;
+  optional google.protobuf.Timestamp archived_at = 15;
+  google.protobuf.Timestamp created_at = 16;
+}
+
+// CURSOR pagination, not offset — 18-doc §2.
+//
+// The feed grows at the head while it is being read, so an offset shifts rows
+// under the reader: page 2 silently repeats a row or skips one, and neither is
+// visible to the client. The cursor is the last row's id, and `created_at` is
+// carried with it because two rows can share a millisecond.
+message ListNotificationsRequest {
+  optional string type = 1;
+  bool unread_only = 2;
+  bool include_archived = 3;
+  // Opaque to the caller. Encodes (created_at, id) — see `feed.cursor.ts`.
+  optional string cursor = 4;
+  int32 limit = 5;
+}
+
+message ListNotificationsResponse {
+  repeated NotificationResponse items = 1;
+  // Absent when this was the last page, so a client stops rather than
+  // polling a cursor that returns nothing forever.
+  optional string next_cursor = 2;
+  bool has_more = 3;
+}
+
+message UnreadCountResponse { int32 count = 1; }
+
+message NotificationIdRequest { string id = 1; }
+
+// Bulk read, two shapes — 18-doc §2.
+//
+// `{ resourceType, resourceId }` is the one that makes the feature usable
+// rather than annoying: opening ticket #1042 clears all twelve of its
+// notifications in one call.
+message MarkReadRequest {
+  repeated string ids = 1;
+  optional string resource_type = 2;
+  optional string resource_id = 3;
+}
+
+message MarkReadResponse {
+  int32 updated = 1;
+  // Pushed back so the client never has to recompute a badge it can be told.
+  int32 unread_count = 2;
+}
+
+// The RESOLVED value plus where it came from — 18-doc §4.
+//
+// `source` is what lets the UI show "inherited" rather than pretending every
+// value was chosen. A settings screen that renders a default as a choice is one
+// the user cannot reason about.
+message PreferenceResponse {
+  string type = 1;
+  // ASK Why don't we use enum for this field? (relation "notification.contract.ts")
+  string channel = 2;
+  bool is_enabled = 3;
+  // ASK Why don't we use enum for this field? (relation "notification.contract.ts")
+  string digest = 4;
+  // ASK Why don't we use enum for this field? (relation "preference-resolver.service.ts - ResolvedPreference")
+  // `explicit` | `wildcard` | `default`.
+  string source = 5;
+}
+
+// Empty: the catalogue is for the CALLER, whose id is in metadata.
+message ListPreferencesRequest {}
+
+message ListPreferencesResponse { repeated PreferenceResponse items = 1; }
+
+message UpdatePreferenceRequest {
+  string type = 1;
+  string channel = 2;
+  optional bool is_enabled = 3;
+  optional string digest = 4;
+}
+
+service NotificationService {
+  rpc ListNotifications(ListNotificationsRequest) returns (ListNotificationsResponse);
+  rpc GetUnreadCount(ListNotificationsRequest) returns (UnreadCountResponse);
+
+  rpc MarkRead(NotificationIdRequest) returns (MarkReadResponse);
+  rpc Archive(NotificationIdRequest) returns (MarkReadResponse);
+  rpc MarkManyRead(MarkReadRequest) returns (MarkReadResponse);
+
+  rpc ListPreferences(ListPreferencesRequest) returns (ListPreferencesResponse);
+  rpc UpdatePreference(UpdatePreferenceRequest) returns (PreferenceResponse);
+}

@@ -69,9 +69,12 @@ describe('the real-time relay (e2e)', () => {
       pattern: TICKET_PATTERNS.messageCreated,
       organizationId,
       ticketId,
+      ticketNumber: 4211,
       occurredAt: new Date().toISOString(),
       messageId: faker.string.uuid(),
       senderId: authorId,
+      requesterId: authorId,
+      assigneeId: null,
       isAiGenerated: false,
       isInternalNote: false,
       groupKey: ticketMessageGroupKey(ticketId),
@@ -401,6 +404,7 @@ describe('the real-time relay (e2e)', () => {
         pattern: TICKET_PATTERNS.assigned,
         organizationId,
         ticketId,
+        ticketNumber: 4211,
         occurredAt: new Date().toISOString(),
         assignedToId: newAssignee,
         departmentId: faker.string.uuid(),
@@ -424,6 +428,7 @@ describe('the real-time relay (e2e)', () => {
         pattern: TICKET_PATTERNS.reassigned,
         organizationId,
         ticketId,
+        ticketNumber: 4211,
         occurredAt: new Date().toISOString(),
         fromAssigneeId: previous,
         toAssigneeId: faker.string.uuid(),
@@ -450,6 +455,8 @@ describe('the real-time relay (e2e)', () => {
         pattern: TICKET_PATTERNS.statusChanged,
         organizationId,
         ticketId,
+        ticketNumber: 4211,
+        requesterId: faker.string.uuid(),
         occurredAt: new Date().toISOString(),
         fromStatus: TicketStatus.OPEN,
         toStatus: TicketStatus.RESOLVED,
@@ -522,6 +529,120 @@ describe('the real-time relay (e2e)', () => {
       ).get;
       expect(server).toBeDefined();
       expect(process.env.REDIS_URL).toBeTruthy();
+    });
+  });
+
+  // ------------------------------------------- 18-doc §6 — Domain E's relay
+
+  describe('6. notifications reach the right socket, and only that one', () => {
+    const notificationPayload = (recipientId: string) => ({
+      organizationId,
+      recipientId,
+      notificationId: faker.string.uuid(),
+      type: 'ticket.assigned',
+      priority: 'NORMAL',
+      title: 'Ticket #1042 assigned to you',
+      body: 'You are now the assignee.',
+      data: { ticketId, ticketNumber: 1042 },
+      actionUrl: '/tickets/1042',
+      groupKey: null,
+      groupCount: 1,
+      occurredAt: new Date().toISOString(),
+    });
+
+    it('emits `notification:new` to `user:{recipientId}` and NOWHERE else', async () => {
+      // **The fan-out bug this test exists to prevent**: one `org:` emit here
+      // would broadcast a single user's personal inbox to everybody connected
+      // to the tenant. A notification is the one payload in this system where
+      // the room choice is the whole privacy decision.
+      const recipient = await fx.connectClient({
+        sub: authorId,
+        organizationId,
+      });
+      const bystander = await fx.connectClient({
+        sub: agentId,
+        organizationId,
+      });
+
+      const payload = notificationPayload(authorId);
+      const received = waitForEvent<typeof payload>(
+        recipient,
+        REALTIME_EVENTS.notificationNew,
+      );
+
+      // Anything at all on the bystander's socket is a failure, so it is
+      // watched for the SAME event rather than for a specific wrong one.
+      let leaked = false;
+      bystander.on(REALTIME_EVENTS.notificationNew, () => {
+        leaked = true;
+      });
+
+      await fx.publishOn('notification.created', payload);
+      const delivered = await received;
+
+      expect(delivered.notificationId).toBe(payload.notificationId);
+      // Enough to render and deep-link without a follow-up fetch.
+      expect(delivered.title).toBe(payload.title);
+      expect(delivered.actionUrl).toBe('/tickets/1042');
+      expect(leaked).toBe(false);
+    });
+
+    it('emits `notification:updated` for a COALESCED notification', async () => {
+      // A different client event from `new`, so the UI edits the toast it is
+      // already showing rather than stacking a twelfth. Without the
+      // distinction, grouping exists in the database and is invisible in the
+      // UI — the same shape of failure as a subject with no subscriber.
+      const recipient = await fx.connectClient({
+        sub: authorId,
+        organizationId,
+      });
+
+      const payload = {
+        ...notificationPayload(authorId),
+        groupKey: `ticket:${ticketId}:message`,
+        groupCount: 12,
+      };
+      const received = waitForEvent<typeof payload>(
+        recipient,
+        REALTIME_EVENTS.notificationUpdated,
+      );
+
+      await fx.publishOn('notification.updated', payload);
+
+      expect((await received).groupKey).toBe(`ticket:${ticketId}:message`);
+    });
+
+    it('emits BOTH `notification:read` and the authoritative unread count', async () => {
+      // `read_at` is per-row rather than per-connection, so without this two
+      // open tabs disagree until one refreshes — and dismissing on mobile
+      // leaves the desktop badge lit. The count rides along so a client never
+      // increments a local counter that is wrong the moment something is read
+      // somewhere else.
+      const recipient = await fx.connectClient({
+        sub: authorId,
+        organizationId,
+      });
+
+      const payload = {
+        recipientId: authorId,
+        notificationIds: [faker.string.uuid()],
+        change: 'read' as const,
+        unreadCount: 3,
+      };
+
+      const readEvent = waitForEvent<typeof payload>(
+        recipient,
+        REALTIME_EVENTS.notificationRead,
+      );
+      const countEvent = waitForEvent<{ count: number }>(
+        recipient,
+        REALTIME_EVENTS.notificationUnreadCount,
+      );
+
+      await fx.publishOn('notification.read', payload);
+
+      expect((await readEvent).change).toBe('read');
+      expect((await countEvent).count).toBe(3);
     });
   });
 });

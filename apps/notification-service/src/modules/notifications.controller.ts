@@ -34,7 +34,14 @@ export class NotificationsController {
     @Ctx() context: NatsContext,
   ): Promise<void> {
     await this.dispatch(
-      () => this.emailService.send(command),
+      async () => {
+        // The message id is discarded on THIS path deliberately: a bare
+        // `notification.email.send` has no `notifications` row to attach a
+        // delivery record to. Domain E's own fan-out captures it (18-doc §5);
+        // this subject predates the table and is still used for transactional
+        // mail — a password reset is not an in-app notification.
+        await this.emailService.send(command);
+      },
       `${command.template} email`,
       context,
     );
@@ -68,11 +75,13 @@ export class NotificationsController {
     @Payload() command: CreateInAppNotificationCommand,
     @Ctx() context: NatsContext,
   ): Promise<void> {
-    if (!command?.organizationId || !command.audiencePermission) {
+    if (!command?.organizationId || !command.audience || !command.type) {
       // Dropped rather than guessed at. An audience of "everyone" is the one
-      // interpretation a malformed command must never receive.
+      // interpretation a malformed command must never receive — and a missing
+      // `type` would produce a row no preference can ever silence (18-doc
+      // §1.3), which is worse than no row at all.
       this.logger.error(
-        `${IN_APP_NOTIFICATION_PATTERN} arrived without a tenant or an audience`,
+        `${IN_APP_NOTIFICATION_PATTERN} arrived without a tenant, a type or an audience`,
       );
       return;
     }

@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { RealtimeGateway } from './realtime.gateway';
 import { TicketEventsConsumer } from './ticket-events.consumer';
+import { NotificationEventsConsumer } from './notification-events.consumer';
 import { TicketAccessService } from './ticket-access.service';
 import { WsThrottlerService } from '../../common/services/ws-throttler.service';
 
@@ -11,13 +12,13 @@ import { WsThrottlerService } from '../../common/services/ws-throttler.service';
  * A second verification path would be a second thing to keep in step with key
  * rotation, and the one that gets forgotten is the one nobody exercises.
  *
- * `TicketEventsConsumer` is a `controller` rather than a provider: its
+ * Both consumers are `controllers` rather than providers: their
  * `@EventPattern` handlers are registered by Nest's transport discovery, which
  * only walks controllers.
  */
 @Module({
   imports: [AuthModule],
-  controllers: [TicketEventsConsumer],
+  controllers: [TicketEventsConsumer, NotificationEventsConsumer],
   providers: [RealtimeGateway, TicketAccessService, WsThrottlerService],
   exports: [RealtimeGateway],
 })

@@ -1,0 +1,103 @@
+import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { formatErrorMsg } from '@synapsedesk/common';
+import { PrismaService } from './prisma.service';
+
+/**
+ * Bootstrap DDL for notification-service — 18-doc §1.2.
+ *
+ * Seeds no ROWS. Domain E has no reference data: a preference row is created
+ * when a user changes something, and its absence is a permissive default rather
+ * than a gap to fill.
+ *
+ * What it applies is the four PARTIAL indexes `schema.prisma` cannot express,
+ * and one of them is not an optimisation:
+ *
+ *   - `notifications_event_key` is the NATS redelivery guard the in-app
+ *     consumer already relies on. It has to be PARTIAL (`WHERE event_id IS NOT
+ *     NULL`) rather than the `@@unique` Prisma would generate, because most
+ *     rows have no event id at all — and while Postgres does treat NULLs as
+ *     distinct today, saying so explicitly is what keeps the index small and
+ *     the intent readable.
+ *
+ * The other three are read-path indexes, and the notes below say which query
+ * each one is for, because an index whose query nobody can name is the first
+ * one somebody drops.
+ *
+ * All idempotent (`IF NOT EXISTS`), so running on every boot is safe and so is
+ * running concurrently across replicas.
+ */
+@Injectable()
+export class DatabaseSeeder implements OnApplicationBootstrap {
+  private readonly logger = new Logger(DatabaseSeeder.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly configService: ConfigService,
+  ) {}
+
+  async onApplicationBootstrap(): Promise<void> {
+    if (!this.configService.getOrThrow<boolean>('SEED_ON_BOOTSTRAP')) {
+      this.logger.log('SEED_ON_BOOTSTRAP is false — skipping schema seed');
+      return;
+    }
+
+    await this.seed();
+  }
+
+  async seed(): Promise<void> {
+    try {
+      await this.applyIndexes();
+      this.logger.log('notification-service schema seed complete');
+    } catch (error) {
+      this.logger.error(`Schema seed failed: ${formatErrorMsg(error)}`);
+      throw error;
+    }
+  }
+
+  private async applyIndexes(): Promise<void> {
+    // The feed query: `GET /notifications`, newest first, archived excluded.
+    // Partial rather than plain, because the default feed NEVER reads archived
+    // rows and they accumulate forever — an index that carried them would grow
+    // without bound in service of a query nobody runs.
+    await this.prisma.$executeRawUnsafe(`
+      CREATE INDEX IF NOT EXISTS "notifications_feed_idx"
+        ON "notifications" ("recipient_id", "created_at" DESC)
+        WHERE "archived_at" IS NULL;
+    `);
+
+    // The badge count, which is polled far more often than the feed is read.
+    // A client asks for it on every page and on every socket event; without
+    // this it degrades into a scan of every notification the user ever
+    // received, and nothing surfaces that except latency.
+    await this.prisma.$executeRawUnsafe(`
+      CREATE INDEX IF NOT EXISTS "notifications_unread_idx"
+        ON "notifications" ("recipient_id")
+        WHERE "read_at" IS NULL AND "archived_at" IS NULL;
+    `);
+
+    // NATS redelivery idempotency — the one that is not an optimisation.
+    //
+    // `in-app-notification.service.ts` catches the duplicate-key violation and
+    // treats it as SUCCESS, so this index is the mechanism rather than a
+    // safety net. Without it a redelivered quota alert is a second
+    // notification, and the quota alert is exactly the producer that retries.
+    await this.prisma.$executeRawUnsafe(`
+      CREATE UNIQUE INDEX IF NOT EXISTS "notifications_event_key"
+        ON "notifications" ("recipient_id", "event_id")
+        WHERE "event_id" IS NOT NULL;
+    `);
+
+    // Group collapse: "is there already an UNREAD row for this thread?".
+    //
+    // Scoped to unread deliberately (18-doc §3.2). Once the user has read
+    // "3 new replies", the next reply is new information and starts a fresh
+    // row — an index covering read rows would serve a lookup that must not
+    // find anything.
+    await this.prisma.$executeRawUnsafe(`
+      CREATE INDEX IF NOT EXISTS "notifications_group_idx"
+        ON "notifications" ("recipient_id", "group_key")
+        WHERE "read_at" IS NULL AND "group_key" IS NOT NULL;
+    `);
+  }
+}

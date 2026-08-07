@@ -59,6 +59,11 @@ export const envValidationSchema = Joi.object({
   // ingestion-service — Domain C's document and knowledge surface.
   INGESTION_SERVICE_URL: Joi.string().required(),
 
+  // Domain E's gRPC server, added with the feed API (18-doc §1.1). Required
+  // like every other peer: a gateway that boots without it would answer 500 on
+  // the notification bell rather than failing where the misconfiguration is.
+  NOTIFICATION_SERVICE_URL: Joi.string().required(),
+
   // rag-service — the one Python peer, and the only service the gateway calls
   // that is not a NestJS app. Required like the rest: a gateway that boots
   // without it answers `/knowledge/*` with a 500 that names no cause.

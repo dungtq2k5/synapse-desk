@@ -38,6 +38,9 @@ export const INGESTION_GRPC_CLIENT = Symbol('INGESTION_GRPC_CLIENT');
 /** The DI token for the connection to `rag-service` — the one Python peer. */
 export const RAG_GRPC_CLIENT = Symbol('RAG_GRPC_CLIENT');
 
+/** The DI token for the connection to `notification-service` — Domain E. */
+export const NOTIFICATION_GRPC_CLIENT = Symbol('NOTIFICATION_GRPC_CLIENT');
+
 /**
  * Root of the proto tree — the `-I` include path. Every `import` inside a
  * .proto is resolved relative to THIS directory, which is why they read
@@ -123,6 +126,15 @@ export const INGESTION_PROTO_PATHS = [
  */
 export const RAG_PROTO_PATHS = [
   join(PROTO_ROOT, 'synapsedesk', 'rag', 'rag.proto'),
+];
+
+/**
+ * Domain E's read surface. One file: the feed and preferences are the same
+ * user's settings for the same inbox, and splitting them would be two files
+ * that are always loaded together.
+ */
+export const NOTIFICATION_PROTO_PATHS = [
+  join(PROTO_ROOT, 'synapsedesk', 'notification', 'notification.proto'),
 ];
 
 /**

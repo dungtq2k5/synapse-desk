@@ -662,11 +662,22 @@ describe('§1.3 The AI ledger and quota gate (e2e)', () => {
       await ledger.charge(tenant.organizationId, 20_000n, context());
       await new Promise((resolve) => setTimeout(resolve, 100));
 
+      // The AUDIENCE UNION (18-doc §1.3), not the old `audiencePermission`
+      // field. This producer is the reason the `permission` kind exists: it
+      // genuinely does not know who holds `organization.update` in a tenant, so
+      // it names the permission and auth-service resolves it. A ticket event
+      // would use the `users` kind instead.
       const [, command] = alertCommands()[0] as [
         string,
-        { audiencePermission: string },
+        { audience: { kind: string; permission: string }; type: string },
       ];
-      expect(command.audiencePermission).toBe('organization.update');
+      expect(command.audience).toEqual({
+        kind: 'permission',
+        permission: 'organization.update',
+      });
+      // And the ORIGINATING event, never the transport subject — without this
+      // a user could turn every notification off or none, and nothing between.
+      expect(command.type).toBe('quota.threshold');
     });
 
     it('4. marks the 100% alert CRITICAL, the others NORMAL', async () => {

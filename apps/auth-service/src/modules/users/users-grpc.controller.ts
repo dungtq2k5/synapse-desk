@@ -9,6 +9,8 @@ import {
   GetUserPermissionsResponse,
   ListPermissionHoldersRequest,
   ListPermissionHoldersResponse,
+  ListUsersByIdsRequest,
+  ListUsersByIdsResponse,
   ListUsersRequest,
   ListUsersResponse,
   LockUserRequest,
@@ -94,6 +96,13 @@ export class UsersGrpcController implements UserServiceController {
     request: ListPermissionHoldersRequest,
   ): Promise<ListPermissionHoldersResponse> {
     return this.usersService.listPermissionHolders(request);
+  }
+
+  /** Service-to-service only, like the one above. */
+  listUsersByIds(
+    request: ListUsersByIdsRequest,
+  ): Promise<ListUsersByIdsResponse> {
+    return this.usersService.listUsersByIds(request);
   }
 
   createUser(

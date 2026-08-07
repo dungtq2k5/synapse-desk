@@ -62,10 +62,23 @@ export type TicketCreatedEvent = TicketEventBase & {
 export type TicketEscalatedEvent = TicketEventBase & {
   pattern: typeof TICKET_PATTERNS.escalated;
   escalatedAt: string;
+  /**
+   * The queue that must react — 18-doc §3.1, and the ONE ticket event addressed
+   * by permission rather than to a person.
+   *
+   * Everywhere else, notifying a queue produces the noise that trains people to
+   * ignore the badge. An escalation is the exception because the whole point is
+   * that somebody in that department picks it up. null when the ticket has no
+   * department, in which case there is nobody to address.
+   */
+  departmentId: string | null;
+  /** For the notification title. A uuid tells a reader nothing. */
+  ticketNumber: number;
 };
 
 export type TicketAssignedEvent = TicketEventBase & {
   pattern: typeof TICKET_PATTERNS.assigned;
+  ticketNumber: number;
   assignedToId: string;
   departmentId: string;
   /** null when the system assigned it — auto-routing or an escalation rule —
@@ -75,6 +88,7 @@ export type TicketAssignedEvent = TicketEventBase & {
 
 export type TicketReassignedEvent = TicketEventBase & {
   pattern: typeof TICKET_PATTERNS.reassigned;
+  ticketNumber: number;
   /** null when the ticket was previously unassigned. */
   fromAssigneeId: string | null;
   toAssigneeId: string;
@@ -90,14 +104,37 @@ export type TicketUnassignedEvent = TicketEventBase & {
 
 export type TicketStatusChangedEvent = TicketEventBase & {
   pattern: typeof TICKET_PATTERNS.statusChanged;
+  ticketNumber: number;
   fromStatus: TicketStatus;
   toStatus: TicketStatus;
   changedById: string | null;
+  /**
+   * Who opened the ticket — the person a terminal transition is FOR.
+   *
+   * Carried on the event rather than fetched by the consumer (18-doc §3 test
+   * 9): an RPC back to ticket-service per notification is what makes fan-out
+   * expensive, and it would put a synchronous cross-service read on a path that
+   * is deliberately fire-and-forget.
+   */
+  requesterId: string;
 };
 
 export type TicketMessageCreatedEvent = TicketEventBase & {
   pattern: typeof TICKET_PATTERNS.messageCreated;
+  ticketNumber: number;
   messageId: string;
+  /**
+   * The two parties, so Domain E can notify *the other one*.
+   *
+   * `ticket.message_created` notifies the requester when an agent wrote it and
+   * the assignee when the requester did — which is undecidable from `senderId`
+   * alone. Both ride on the event for the same reason as `requesterId` above:
+   * an RPC per message is what makes this fan-out expensive, and messages are
+   * the highest-volume event in the system.
+   */
+  requesterId: string;
+  /** null while the ticket sits in a queue with nobody working it. */
+  assigneeId: string | null;
   /** null for an AI-generated message. */
   senderId: string | null;
   isAiGenerated: boolean;

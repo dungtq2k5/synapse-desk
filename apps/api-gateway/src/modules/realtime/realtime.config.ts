@@ -57,6 +57,42 @@ export const REALTIME_EVENTS = {
    * talking" signal, and clients must wait for it.
    */
   connectionReady: 'connection:ready',
+
+  /**
+   * A new in-app notification — the toast payload. Room: `user:{recipientId}`.
+   *
+   * Carries the whole row so the client renders and deep-links without a
+   * follow-up fetch.
+   */
+  notificationNew: 'notification:new',
+
+  /**
+   * An existing notification was COALESCED — same group key, higher count.
+   *
+   * Without this the client stacks a twelfth toast for a thread it is already
+   * showing one for, and grouping exists in the database while being invisible
+   * in the UI — which is the same shape of failure as a subject with no
+   * subscriber.
+   */
+  notificationUpdated: 'notification:updated',
+
+  /**
+   * Read or archived ON ANOTHER DEVICE.
+   *
+   * `read_at` is per-row rather than per-connection, so without this two open
+   * tabs disagree until one of them refreshes and dismissing on mobile leaves
+   * the desktop badge lit.
+   */
+  notificationRead: 'notification:read',
+
+  /**
+   * The authoritative unread total, pushed on every change.
+   *
+   * Lets a client stop polling `GET /notifications/unread-count` and avoids the
+   * drift that comes from incrementing a local counter — which is always wrong
+   * eventually, because a notification can be read somewhere else.
+   */
+  notificationUnreadCount: 'notification:unread-count',
 } as const;
 
 /** Events the CLIENT emits to the server. */

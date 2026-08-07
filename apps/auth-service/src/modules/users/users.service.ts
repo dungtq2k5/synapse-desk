@@ -12,6 +12,9 @@ import {
   GetUserPermissionsResponse,
   ListPermissionHoldersRequest,
   ListPermissionHoldersResponse,
+  ListUsersByIdsRequest,
+  ListUsersByIdsResponse,
+  NotificationRecipient,
   ListUsersRequest,
   ListUsersResponse,
   LockUserRequest,
@@ -267,17 +270,69 @@ export class UsersService {
         roles: {
           some: { permissions: { some: { code: request.permissionCode } } },
         },
+        // Narrowed to one DEPARTMENT when the caller asked for it — 18-doc
+        // §3.1. Absent means the whole tenant, which is right for a quota
+        // alert (one budget per organization) and wrong for a ticket
+        // escalation: every agent in the company hearing about one
+        // department's queue is the noise that makes people stop reading.
+        ...(request.departmentId
+          ? {
+              userDepartments: {
+                some: { departmentId: request.departmentId },
+              },
+            }
+          : {}),
       },
-      select: { id: true, email: true, fullName: true },
+      select: NOTIFICATION_RECIPIENT_SELECT,
     });
 
-    return {
-      items: users.map((user) => ({
-        userId: user.id,
-        email: user.email,
-        fullName: user.fullName,
-      })),
-    };
+    return { items: users.map(toNotificationRecipient) };
+  }
+
+  /**
+   * The OTHER audience kind — 18-doc §1.3.
+   *
+   * A ticket event already knows who the assignee is; resolving `ticket.read`
+   * holders instead would tell every agent in the tenant that one of them got a
+   * ticket. So this read turns ids into addresses and quiet-hours settings, and
+   * decides nothing about who should be notified.
+   *
+   * **Scoped by organization as well as by id.** A caller supplying an id from
+   * another tenant gets nothing rather than a lookup that happens to succeed —
+   * the same rule every other read here follows, and the one that matters most
+   * on a path whose caller is a background consumer with no user.
+   *
+   * Deleted and locked users are excluded for the same reason as above: a
+   * notification to a deactivated account is a row nobody reads and mail to an
+   * address that may now belong to someone else.
+   */
+  async listUsersByIds(
+    request: ListUsersByIdsRequest,
+  ): Promise<ListUsersByIdsResponse> {
+    if (!request.organizationId) {
+      throw new RpcException({
+        code: status.INVALID_ARGUMENT,
+        message: 'organizationId is required',
+      });
+    }
+
+    const userIds = request.userIds ?? [];
+    // An empty request is a valid question with an empty answer, not an error:
+    // a producer whose audience filtered down to nobody (everyone was the
+    // actor) should not have to special-case the call.
+    if (userIds.length === 0) return { items: [] };
+
+    const users = await this.prisma.user.findMany({
+      where: {
+        id: { in: userIds },
+        organizationId: request.organizationId,
+        deletedAt: null,
+        lockedUntil: null,
+      },
+      select: NOTIFICATION_RECIPIENT_SELECT,
+    });
+
+    return { items: users.map(toNotificationRecipient) };
   }
 
   // -------------------------------------------------------------------------
@@ -1049,4 +1104,41 @@ export class UsersService {
 
     return data;
   }
+}
+
+/**
+ * The columns a notification recipient needs, in ONE place.
+ *
+ * Shared by both audience reads so they cannot drift: the quiet-hours fields
+ * were added for `listUsersByIds` and are just as necessary for
+ * `listPermissionHolders`, and a second copy would have gained them later or
+ * never.
+ */
+const NOTIFICATION_RECIPIENT_SELECT = {
+  id: true,
+  email: true,
+  fullName: true,
+  quietHoursStart: true,
+  quietHoursEnd: true,
+  timezone: true,
+} as const;
+
+function toNotificationRecipient(user: {
+  id: string;
+  email: string;
+  fullName: string;
+  quietHoursStart: string | null;
+  quietHoursEnd: string | null;
+  timezone: string | null;
+}): NotificationRecipient {
+  return {
+    userId: user.id,
+    email: user.email,
+    fullName: user.fullName,
+    // `?? undefined`, not `?? ''`: these are `optional` on the wire, and an
+    // empty string would be indistinguishable from a user who set "00:00".
+    quietHoursStart: user.quietHoursStart ?? undefined,
+    quietHoursEnd: user.quietHoursEnd ?? undefined,
+    timezone: user.timezone ?? undefined,
+  };
 }

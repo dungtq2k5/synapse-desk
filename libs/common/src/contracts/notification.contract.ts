@@ -179,32 +179,264 @@ export type SendSmsCommand = {
 export const IN_APP_NOTIFICATION_PATTERN =
   'notification.in_app.create' as const;
 
+/**
+ * The `type` values a notification can carry — RDM Table 23.
+ *
+ * Declared once and shared, because THREE things must agree on the exact
+ * string: the producer writing the row, `GET /notifications?type=` filtering
+ * it, and preference resolution keying `(type, channel)` on it. A typo in any
+ * one of them is a preference the user sets that silences nothing.
+ *
+ * The values mirror the NATS subjects that cause them, so routing stays
+ * producer-driven and a new event type does not need a translation table.
+ */
+export const NOTIFICATION_TYPES = {
+  ticketAssigned: 'ticket.assigned',
+  ticketReassigned: 'ticket.reassigned',
+  ticketEscalated: 'ticket.escalated',
+  ticketMessageCreated: 'ticket.message_created',
+  ticketStatusChanged: 'ticket.status_changed',
+  quotaThreshold: 'quota.threshold',
+} as const;
+
+export type NotificationType =
+  (typeof NOTIFICATION_TYPES)[keyof typeof NOTIFICATION_TYPES];
+
+/** Every type, for the preference catalogue and for validation. */
+export const NOTIFICATION_TYPE_VALUES = Object.values(
+  NOTIFICATION_TYPES,
+) as NotificationType[];
+
+/** The catch-all key in `notification_preferences` — RDM Table 25. */
+export const PREFERENCE_WILDCARD_TYPE = '*';
+
 export enum NotificationPriority {
+  /**
+   * RDM Table 23 defines four levels; only two currently MEAN anything.
+   *
+   * `LOW` and `HIGH` are in the enum because the table declares them and a
+   * producer needs somewhere to put "this matters more than a reply" — but
+   * nothing branches on them yet, so they behave as `NORMAL`. Recorded as a
+   * known gap (18-doc §8) rather than quietly implied: an enum value that looks
+   * like a control and is not is worse than one that is obviously unused.
+   */
+  LOW = 'LOW',
   NORMAL = 'NORMAL',
+  HIGH = 'HIGH',
   /** Bypasses quiet hours and digest batching (RDM Table 25). */
   CRITICAL = 'CRITICAL',
 }
 
+/** RDM Table 24 — the transports a notification can take. */
+export enum NotificationChannel {
+  IN_APP = 'IN_APP',
+  EMAIL = 'EMAIL',
+  SMS = 'SMS',
+  /**
+   * In the enum for completeness and deliberately unimplemented (18-doc §8):
+   * real webhooks need per-tenant endpoint config, signing and retry. That is a
+   * feature, not a channel.
+   */
+  WEBHOOK = 'WEBHOOK',
+}
+
+/** The channels a USER can express a preference for — Table 25, not Table 24. */
+export const PREFERENCE_CHANNELS = [
+  NotificationChannel.IN_APP,
+  NotificationChannel.EMAIL,
+  NotificationChannel.SMS,
+] as const;
+
+/** RDM Table 24. `SENT` is not `READ`, and neither is `DELIVERED`. */
+export enum DeliveryStatus {
+  PENDING = 'PENDING',
+  SENT = 'SENT',
+  /** Confirmed by the provider — needs delivery webhooks, so unused today. */
+  DELIVERED = 'DELIVERED',
+  FAILED = 'FAILED',
+  /** The valuable one. Always carries a `skipReason`. */
+  SKIPPED = 'SKIPPED',
+  BOUNCED = 'BOUNCED',
+}
+
 /**
- * A notification for the people holding a given permission.
+ * Why a delivery did not happen — RDM Table 24.
  *
- * Addressed by PERMISSION rather than by a recipient list, because the producer
- * does not know who holds `organization.update` in a tenant — that is
- * auth-service's answer, and resolving it here would mean a second cross-service
- * read on a path that is already fire-and-forget.
+ * An enum rather than free text because these are ANSWERS to a support
+ * question: *"why didn't I get an email?"* is answered by reading one of these
+ * back, and a free-text field would accumulate five spellings of the same
+ * reason within a month.
+ */
+export enum DeliverySkipReason {
+  USER_PREFERENCE = 'user_preference',
+  QUIET_HOURS = 'quiet_hours',
+  UNVERIFIED_ADDRESS = 'unverified_address',
+  ALREADY_SEEN_IN_APP = 'already_seen_in_app',
+  RATE_LIMITED = 'rate_limited',
+}
+
+/** RDM Table 25 — batching mode. Only `IMMEDIATE` and `OFF` act today. */
+export enum DigestMode {
+  IMMEDIATE = 'IMMEDIATE',
+  /** Read by the resolver; the SCHEDULER is deferred (18-doc §8). */
+  HOURLY = 'HOURLY',
+  DAILY = 'DAILY',
+  OFF = 'OFF',
+}
+
+/** What a notification is ABOUT — RDM Table 23's `resource_type`. */
+export enum NotificationResourceType {
+  TICKET = 'ticket',
+  DOCUMENT = 'document',
+  USER = 'user',
+  ORGANIZATION = 'organization',
+}
+
+/**
+ * Who receives a notification — 18-doc §1.3.
+ *
+ * **Two kinds, because addressing by permission is right for exactly one
+ * producer and wrong for every other.** The quota alert genuinely does not know
+ * who holds `organization.update` in a tenant, so it names the permission and
+ * auth-service resolves it. A ticket event knows precisely who the assignee is,
+ * and resolving `ticket.read` holders instead would tell every agent in the
+ * tenant that one of them got a ticket.
+ *
+ * A discriminated union rather than two optional fields: with both optional, a
+ * producer that sets neither compiles, and a producer that sets both leaves the
+ * consumer to invent a precedence rule.
+ */
+export type NotificationAudience =
+  /**
+   * The producer does not know who. Quota alerts, and ticket ESCALATIONS.
+   *
+   * `departmentId` narrows it to one queue and is the part that matters most:
+   * tenant-wide would page every agent in the company for one department's
+   * escalation, which is the noise that trains people to ignore the badge.
+   */
+  | { kind: 'permission'; permission: string; departmentId?: string }
+  /** The producer knows exactly who. Every ticket event. */
+  | { kind: 'users'; userIds: string[] };
+
+/**
+ * A request to write one in-app notification per resolved recipient.
+ *
+ * `type` is the ORIGINATING event (`ticket.assigned`), never the transport
+ * subject — see the field's own note.
  */
 export type CreateInAppNotificationCommand = {
   organizationId: string;
-  /** Everyone holding this permission in the tenant receives it. */
-  audiencePermission: string;
+
+  /**
+   * **The originating event, and this is load-bearing** — 18-doc §1.3.
+   *
+   * It used to be written as `IN_APP_NOTIFICATION_PATTERN`, the transport
+   * subject, which is identical on every row. Harmless with one producer and a
+   * blocker with two: `GET /notifications?type=` would match everything against
+   * everything, and preference resolution keys on `(type, channel)` — so a user
+   * could turn EVERYTHING off or everything on, and nothing in between.
+   */
+  type: string;
+
+  audience: NotificationAudience;
+
   /**
    * `UNIQUE (recipient_id, event_id)` in Domain E is what makes redelivery
    * harmless. The id must therefore be DERIVED from the thing that happened,
    * never generated — a uuid here would make every retry a new notification.
    */
   eventId: string;
+
   title: string;
   body: string;
   priority: NotificationPriority;
   occurredAt: string;
+
+  /**
+   * Who caused it. Suppressed as a recipient — an agent who assigns a ticket to
+   * themselves must not be told about it (18-doc §3.1 rule 1).
+   */
+  actorId?: string;
+
+  /** Deep-link payload for the SPA: `{ ticketId, ticketNumber, actorName }`. */
+  data?: Record<string, unknown>;
+
+  /** Relative SPA path — `/tickets/1042`. */
+  actionUrl?: string;
+
+  resourceType?: NotificationResourceType;
+  resourceId?: string;
+
+  /**
+   * Collapse key — `ticket:{ticketId}:message`.
+   *
+   * When present, an UNREAD notification with the same key for the same
+   * recipient is incremented rather than duplicated. Without it,
+   * `ticket.message_created` produces a row per reply and the user turns
+   * notifications off in week one (18-doc §3.2).
+   */
+  groupKey?: string;
+};
+
+// ---------------------------------------------------------------------------
+// Real-time — notification-service publishes, the gateway relays
+// ---------------------------------------------------------------------------
+
+/**
+ * Subjects the gateway subscribes to in order to push a notification down a
+ * socket — 18-doc §6.
+ *
+ * notification-service owns no WebSocket, and should not: the socket server
+ * lives at the gateway with the Redis adapter and the `user:{id}` rooms that
+ * every other real-time event already uses. So Domain E publishes a fact and
+ * the gateway decides which room it belongs in — the same shape
+ * `ticket-events.consumer.ts` already has, with neither side importing the
+ * other.
+ *
+ * **The socket is a delivery OPTIMISATION, not a channel of record.** The row
+ * is written first and the emit is fire-and-forget: a disconnected user must
+ * find the notification waiting on next load, not lose it. That is also why
+ * there is no `WEBHOOK`-style delivery row for the socket — the in-app row IS
+ * that record.
+ */
+export const NOTIFICATION_REALTIME_PATTERNS = {
+  /** A new row was written. */
+  created: 'notification.created',
+  /** An existing row was COALESCED — same group key, higher count. */
+  updated: 'notification.updated',
+  /** Read or archived, so a second tab can catch up. */
+  read: 'notification.read',
+} as const;
+
+/** The row, as the SPA needs it — enough to render and deep-link without a fetch. */
+export type NotificationRealtimePayload = {
+  organizationId: string;
+  recipientId: string;
+  notificationId: string;
+  type: string;
+  priority: NotificationPriority;
+  title: string;
+  body: string | null;
+  data: Record<string, unknown>;
+  actionUrl: string | null;
+  groupKey: string | null;
+  groupCount: number;
+  occurredAt: string;
+};
+
+/**
+ * A read/archive state change, fanned to every socket the user has open.
+ *
+ * `read_at` is per-row rather than per-connection, so without this event two
+ * open tabs disagree until one of them refreshes — and dismissing a badge on
+ * mobile leaves it lit on the desktop.
+ */
+export type NotificationReadPayload = {
+  recipientId: string;
+  /** The rows affected. Empty when the change was "mark everything read". */
+  notificationIds: string[];
+  /** `read` or `archived` — the client renders them differently. */
+  change: 'read' | 'archived';
+  /** The authoritative unread total, so a client never has to compute it. */
+  unreadCount: number;
 };

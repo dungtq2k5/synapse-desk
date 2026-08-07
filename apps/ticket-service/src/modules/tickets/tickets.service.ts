@@ -267,8 +267,12 @@ export class TicketsService {
       pattern: TICKET_PATTERNS.escalated,
       organizationId: ticket.organizationId,
       ticketId: ticket.id,
+      ticketNumber: Number(ticket.ticketNumber),
       occurredAt: new Date().toISOString(),
       escalatedAt: (ticket.escalatedAt ?? new Date()).toISOString(),
+      // The queue that must react. Domain E addresses this one by PERMISSION
+      // inside the department (18-doc §3.1) — the only ticket event that does.
+      departmentId: ticket.currentDepartmentId,
     });
 
     // Fire-and-forget, §1.7. Not awaited and its rejection is handled inside —
@@ -443,10 +447,15 @@ export class TicketsService {
       pattern: TICKET_PATTERNS.statusChanged,
       organizationId: ticket.organizationId,
       ticketId: ticket.id,
+      ticketNumber: Number(ticket.ticketNumber),
       occurredAt: new Date().toISOString(),
       fromStatus: from,
       toStatus: to,
       changedById: context.sub,
+      // Carried so Domain E does not need an RPC per notification (18-doc §3
+      // test 9). A terminal transition is news for the person who opened the
+      // ticket, and `changedById` is whoever closed it.
+      requesterId: ticket.authorId,
     });
 
     return ticket;

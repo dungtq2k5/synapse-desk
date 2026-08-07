@@ -63,16 +63,66 @@ export interface ListPermissionHoldersRequest {
   organizationId: string;
   /** A `target.action` code from the canonical registry. */
   permissionCode: string;
+  /**
+   * Narrows the audience to one DEPARTMENT — 18-doc §3.1.
+   *
+   * Absent means the whole tenant, which is right for a quota alert (an
+   * organization has one budget) and wrong for a ticket escalation: paging
+   * every agent in the company for one department's queue is the noise that
+   * makes people stop reading notifications.
+   */
+  departmentId?: string | undefined;
 }
 
-export interface PermissionHolder {
+/**
+ * A notification recipient, with everything needed to DECIDE about them.
+ *
+ * The quiet-hours fields ride along on this read rather than needing a second
+ * one (18-doc §4): notification-service already asks auth-service who the
+ * recipients are, and an extra round trip per notification to learn whether it
+ * is 3am for them would put a cross-service read on the fan-out path.
+ *
+ * They are GLOBAL user settings rather than per-type, which is why they live on
+ * `users` and not in `notification_preferences`.
+ */
+export interface NotificationRecipient {
   userId: string;
   email: string;
   fullName: string;
+  /** "22:00" / "07:00", local to `timezone`. Both absent = no quiet hours. */
+  quietHoursStart?: string | undefined;
+  quietHoursEnd?:
+    | string
+    | undefined;
+  /**
+   * An IANA name — "Asia/Ho_Chi_Minh". Defaults to UTC when unset, which is
+   * wrong for the user and at least deterministic.
+   */
+  timezone?: string | undefined;
 }
 
 export interface ListPermissionHoldersResponse {
-  items: PermissionHolder[];
+  items: NotificationRecipient[];
+}
+
+/**
+ * The OTHER audience kind — 18-doc §1.3.
+ *
+ * A ticket event already knows who the assignee is. Resolving `ticket.read`
+ * holders instead would notify every agent in the tenant that one of them got
+ * a ticket, which is the bug the audience union exists to prevent. This read
+ * exists only to turn ids into addresses and quiet-hours settings.
+ *
+ * Scoped by organization as well as by id: a caller that supplied an id from
+ * another tenant must get nothing back, not a lookup that happens to succeed.
+ */
+export interface ListUsersByIdsRequest {
+  organizationId: string;
+  userIds: string[];
+}
+
+export interface ListUsersByIdsResponse {
+  items: NotificationRecipient[];
 }
 
 export interface ListUsersRequest {
@@ -219,6 +269,8 @@ export interface UserServiceClient {
     metadata?: Metadata,
   ): Observable<ListPermissionHoldersResponse>;
 
+  listUsersByIds(request: ListUsersByIdsRequest, metadata?: Metadata): Observable<ListUsersByIdsResponse>;
+
   createUser(request: CreateUserRequest, metadata?: Metadata): Observable<CreateUserResponse>;
 
   updateUser(request: UpdateUserRequest, metadata?: Metadata): Observable<UserSummaryResponse>;
@@ -289,6 +341,11 @@ export interface UserServiceController {
     request: ListPermissionHoldersRequest,
     metadata?: Metadata,
   ): Promise<ListPermissionHoldersResponse> | Observable<ListPermissionHoldersResponse> | ListPermissionHoldersResponse;
+
+  listUsersByIds(
+    request: ListUsersByIdsRequest,
+    metadata?: Metadata,
+  ): Promise<ListUsersByIdsResponse> | Observable<ListUsersByIdsResponse> | ListUsersByIdsResponse;
 
   createUser(
     request: CreateUserRequest,
@@ -366,6 +423,7 @@ export function UserServiceControllerMethods() {
       "getUser",
       "getUserPermissions",
       "listPermissionHolders",
+      "listUsersByIds",
       "createUser",
       "updateUser",
       "deleteUser",

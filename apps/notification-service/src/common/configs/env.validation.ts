@@ -39,6 +39,17 @@ export const envValidationSchema = Joi.object({
   // feed is storage by definition.
   DATABASE_URL: Joi.string().required(),
 
+  // The gRPC server added with the feed API (18-doc §1.1). Required rather
+  // than defaulted: a service that bound to a wrong port would look healthy
+  // and answer nothing, which is worse than failing to boot.
+  GRPC_HOST: Joi.string().required(),
+  GRPC_PORT: Joi.number().required(),
+
+  // Applies the four partial indexes `schema.prisma` cannot express (18-doc
+  // §1.2). False in tests, which seed explicitly from the fixture so there is
+  // ONE seeding path rather than one that races module init.
+  SEED_ON_BOOTSTRAP: Joi.boolean().required(),
+
   // For resolving a notification AUDIENCE from a permission code. Required:
   // an in-app notification whose recipients cannot be resolved reaches nobody,
   // and a service that boots without this would drop every one of them while

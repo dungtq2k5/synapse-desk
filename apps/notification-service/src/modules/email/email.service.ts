@@ -4,6 +4,12 @@ import { createTransport, type Transporter } from 'nodemailer';
 import { SendEmailCommand } from '@synapsedesk/common';
 import { renderEmail, type TemplateBranding } from './email.templates';
 
+/** What the caller needs back — see `send()`. */
+export type SendEmailResult = {
+  /** The SMTP `Message-ID`, or null if the transport did not report one. */
+  messageId: string | null;
+};
+
 @Injectable()
 export class EmailService implements OnModuleInit {
   private readonly logger = new Logger(EmailService.name);
@@ -53,19 +59,33 @@ export class EmailService implements OnModuleInit {
     }
   }
 
-  async send(command: SendEmailCommand): Promise<void> {
+  /**
+   * Sends, and returns the provider's own message id.
+   *
+   * Returned rather than discarded because `notification_deliveries` stores it
+   * (RDM Table 24): an SMTP `Message-ID` is what correlates a provider bounce
+   * webhook back to the row that sent it. Nothing consumes those webhooks yet
+   * (18-doc §8), which is exactly why the id has to be captured now — it cannot
+   * be recovered later for mail that has already gone out.
+   */
+  async send(command: SendEmailCommand): Promise<SendEmailResult> {
     const { subject, html, text } = renderEmail(command, this.branding);
 
-    await this.transporter.sendMail({
+    // nodemailer types `sendMail`'s result loosely, and only `messageId` is
+    // read. Narrowed at the boundary so the `any` cannot leak into a delivery
+    // row that claims to hold a provider id.
+    const info = (await this.transporter.sendMail({
       from: this.sender,
       to: command.to,
       subject,
       html,
       text,
-    });
+    })) as { messageId?: string } | undefined;
 
     // The recipient is logged, the contents are not: verification codes and
     // reset links must never reach application logs.
     this.logger.log(`Sent ${command.template} email to ${command.to}`);
+
+    return { messageId: info?.messageId ?? null };
   }
 }

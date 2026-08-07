@@ -179,7 +179,7 @@ export class MessagesService {
       include: { attachments: true },
     });
 
-    this.publishCreated(ticket.organizationId, message);
+    this.publishCreated(ticket, message);
 
     if (request.generatedFromId) {
       // AFTER the message is committed, and non-blocking on failure. The reply
@@ -202,7 +202,7 @@ export class MessagesService {
       // already committed and is what this RPC promises to return. An AI draft
       // that could not be produced is a missing SECOND message, not a failed
       // request.
-      await this.tryAppendAiReply(ticket.organizationId, ticket.id, context);
+      await this.tryAppendAiReply(ticket, context);
     }
 
     return toMessageResponse(message);
@@ -544,10 +544,11 @@ export class MessagesService {
    * first.
    */
   private async tryAppendAiReply(
-    organizationId: string,
-    ticketId: string,
+    ticket: NotifiableTicket,
     context: CallerContext,
   ): Promise<void> {
+    const { id: ticketId } = ticket;
+
     if (!this.rag.isAvailable) {
       this.logger.debug(
         `AI reply skipped for ticket ${ticketId}: rag-service is not configured`,
@@ -596,7 +597,7 @@ export class MessagesService {
         },
       });
 
-      this.publishCreated(organizationId, reply);
+      this.publishCreated(ticket, reply);
     } catch (error) {
       this.logger.error(
         `AI reply failed for ticket ${ticketId}: ${formatErrorMsg(error)}`,
@@ -604,14 +605,30 @@ export class MessagesService {
     }
   }
 
-  private publishCreated(organizationId: string, message: TicketMessage): void {
+  /**
+   * Takes the TICKET, not just its tenant.
+   *
+   * The event now carries `requesterId` and `assigneeId` so Domain E can notify
+   * *the other party* — the requester when an agent wrote it, the assignee when
+   * the requester did — which is undecidable from `senderId` alone. Passing the
+   * ticket here rather than re-reading it in the consumer is what keeps the
+   * fan-out free of an RPC per message (18-doc §3 test 9), and messages are the
+   * highest-volume event in the system.
+   */
+  private publishCreated(
+    ticket: NotifiableTicket,
+    message: TicketMessage,
+  ): void {
     this.events.publish({
       pattern: TICKET_PATTERNS.messageCreated,
-      organizationId,
+      organizationId: ticket.organizationId,
       ticketId: message.ticketId,
+      ticketNumber: Number(ticket.ticketNumber),
       occurredAt: new Date().toISOString(),
       messageId: message.id,
       senderId: message.senderId,
+      requesterId: ticket.authorId,
+      assigneeId: ticket.currentAssigneeId,
       isAiGenerated: message.isAiGenerated,
       isInternalNote: message.isInternalNote,
       // Computed by the shared helper, never assembled here. Domain E groups on
@@ -736,3 +753,18 @@ export class MessagesService {
     return message;
   }
 }
+
+/**
+ * The ticket fields a `message_created` event needs.
+ *
+ * A structural type rather than the Prisma model, so the AI-reply path can pass
+ * the same object it already loaded without a second read — and so adding a
+ * column to `tickets` does not silently widen what this depends on.
+ */
+type NotifiableTicket = {
+  id: string;
+  organizationId: string;
+  ticketNumber: bigint | number;
+  authorId: string;
+  currentAssigneeId: string | null;
+};

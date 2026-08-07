@@ -36,6 +36,8 @@ import {
   BILLING_SERVICE_NAME,
   BillingServiceClient,
   DOCUMENT_SERVICE_NAME,
+  NOTIFICATION_SERVICE_NAME,
+  NotificationServiceClient,
   RAG_SERVICE_NAME,
   RagServiceClient,
   DocumentServiceClient,
@@ -86,6 +88,9 @@ export type GrpcStubs = {
   /** Domain C's Python peer. Stubbed like every other, and for the same
    *  reason: what the gateway can prove alone is its own boundary. */
   rag: MockProxy<RagServiceClient>;
+
+  /** Domain E — the feed. New in 18-doc: this peer had no gRPC server before. */
+  notification: MockProxy<NotificationServiceClient>;
 };
 
 export type GrpcStubFixture = {
@@ -125,6 +130,7 @@ export function stubGrpcServices(): GrpcStubFixture {
     document: mock<DocumentServiceClient>(),
     billing: mock<BillingServiceClient>(),
     rag: mock<RagServiceClient>(),
+    notification: mock<NotificationServiceClient>(),
   };
 
   const byServiceName: Record<string, unknown> = {
@@ -149,6 +155,7 @@ export function stubGrpcServices(): GrpcStubFixture {
     [DOCUMENT_SERVICE_NAME]: stubs.document,
     [BILLING_SERVICE_NAME]: stubs.billing,
     [RAG_SERVICE_NAME]: stubs.rag,
+    [NOTIFICATION_SERVICE_NAME]: stubs.notification,
   };
 
   const clientGrpc: ClientGrpc = {

@@ -9,10 +9,20 @@ import {
 } from '@synapsedesk/grpc-proto';
 import { formatErrorMsg } from '@synapsedesk/common';
 
-export type PermissionHolder = {
+/**
+ * A recipient, with everything needed to DECIDE about them.
+ *
+ * The quiet-hours fields ride along on this read rather than needing a second
+ * one (18-doc §4): an extra round trip per notification to learn whether it is
+ * 3am for the recipient would put a cross-service read on the fan-out path.
+ */
+export type NotificationRecipient = {
   userId: string;
   email: string;
   fullName: string;
+  quietHoursStart: string | null;
+  quietHoursEnd: string | null;
+  timezone: string | null;
 };
 
 /**
@@ -53,19 +63,20 @@ export class AuthReferenceService implements OnModuleInit {
   async listPermissionHolders(
     organizationId: string,
     permissionCode: string,
-  ): Promise<PermissionHolder[]> {
+    departmentId?: string,
+  ): Promise<NotificationRecipient[]> {
     try {
       const response = await firstValueFrom(
         this.userService
-          .listPermissionHolders({ organizationId, permissionCode })
+          .listPermissionHolders({
+            organizationId,
+            permissionCode,
+            departmentId,
+          })
           .pipe(timeout(GRPC_DEADLINE_MS)),
       );
 
-      return response.items.map((holder) => ({
-        userId: holder.userId,
-        email: holder.email,
-        fullName: holder.fullName,
-      }));
+      return response.items.map(toRecipient);
     } catch (error) {
       this.logger.error(
         `Could not resolve '${permissionCode}' holders for ${organizationId}: ${formatErrorMsg(error)}`,
@@ -74,4 +85,60 @@ export class AuthReferenceService implements OnModuleInit {
       return [];
     }
   }
+
+  /**
+   * Addresses for recipients the producer ALREADY NAMED — 18-doc §1.3.
+   *
+   * The distinction matters: this decides nothing about who should be
+   * notified. A ticket event knows its assignee, and asking "who holds
+   * `ticket.read`?" instead would notify every agent in the tenant that one of
+   * them got a ticket.
+   *
+   * Same empty-on-failure posture as above, and for the same reason.
+   */
+  async listUsersByIds(
+    organizationId: string,
+    userIds: string[],
+  ): Promise<NotificationRecipient[]> {
+    try {
+      const response = await firstValueFrom(
+        this.userService
+          .listUsersByIds({ organizationId, userIds })
+          .pipe(timeout(GRPC_DEADLINE_MS)),
+      );
+
+      return response.items.map(toRecipient);
+    } catch (error) {
+      this.logger.error(
+        `Could not resolve ${userIds.length} recipient(s) for ${organizationId}: ${formatErrorMsg(error)}`,
+      );
+
+      return [];
+    }
+  }
+}
+
+/**
+ * Wire → domain, with `undefined` normalised to `null`.
+ *
+ * proto3 `optional` arrives as `undefined` when unset, and the rest of this
+ * service uses `null` for "not configured". One shape, decided here, so a
+ * quiet-hours check never has to handle both.
+ */
+function toRecipient(holder: {
+  userId: string;
+  email: string;
+  fullName: string;
+  quietHoursStart?: string;
+  quietHoursEnd?: string;
+  timezone?: string;
+}): NotificationRecipient {
+  return {
+    userId: holder.userId,
+    email: holder.email,
+    fullName: holder.fullName,
+    quietHoursStart: holder.quietHoursStart ?? null,
+    quietHoursEnd: holder.quietHoursEnd ?? null,
+    timezone: holder.timezone ?? null,
+  };
 }

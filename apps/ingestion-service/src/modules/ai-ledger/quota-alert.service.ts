@@ -6,7 +6,9 @@ import {
   formatErrorMsg,
   IN_APP_NOTIFICATION_PATTERN,
   NATS_CLIENT,
+  NOTIFICATION_TYPES,
   NotificationPriority,
+  NotificationResourceType,
   QUOTA_ALERT_THRESHOLDS,
   quotaThresholdEventId,
 } from '@synapsedesk/common';
@@ -101,8 +103,15 @@ export class QuotaAlertService {
 
       const command: CreateInAppNotificationCommand = {
         organizationId,
-        // An agent cannot buy more budget. Telling them is noise.
-        audiencePermission: 'organization.update',
+        // The ORIGINATING event, not the transport subject (18-doc §1.3).
+        // Preference resolution keys on this, so a user who wants budget
+        // warnings and not ticket noise needs the two to be distinguishable.
+        type: NOTIFICATION_TYPES.quotaThreshold,
+        // Addressed by PERMISSION, and this producer is the reason that kind
+        // exists: it genuinely does not know who holds `organization.update`
+        // in a tenant. An agent cannot buy more budget, so telling them is
+        // noise.
+        audience: { kind: 'permission', permission: 'organization.update' },
         eventId,
         title: this.titleFor(threshold),
         body: this.bodyFor(threshold),
@@ -114,6 +123,13 @@ export class QuotaAlertService {
             ? NotificationPriority.CRITICAL
             : NotificationPriority.NORMAL,
         occurredAt: new Date().toISOString(),
+        resourceType: NotificationResourceType.ORGANIZATION,
+        resourceId: organizationId,
+        // Straight to the page where the plan can actually be changed. A
+        // warning that does not link to the fix is a warning people read and
+        // then have to go looking.
+        actionUrl: '/settings/billing',
+        data: { threshold },
       };
 
       // `.subscribe()` is mandatory: `emit()` is COLD and nothing is published

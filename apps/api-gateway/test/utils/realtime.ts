@@ -29,6 +29,14 @@ export type RealtimeFixture = {
   wsUrl: string;
   /** Publishes a domain event exactly as ticket-service would. */
   publish: (event: TicketDomainEvent) => Promise<void>;
+  /**
+   * Publishes on an ARBITRARY subject — Domain E's `notification.*`.
+   *
+   * `publish` above takes a `TicketDomainEvent` and reads its own `pattern`,
+   * which is right for Domain B and cannot express a payload that carries no
+   * pattern field. Notification payloads do not: the subject IS the type.
+   */
+  publishOn: (pattern: string, payload: unknown) => Promise<void>;
   /** An authenticated, connected client. Tracked and closed by `close()`. */
   connectClient: (overrides?: Partial<JwtPayload>) => Promise<ClientSocket>;
   /** A client with a deliberately bad cookie, for the rejection cases. */
@@ -123,6 +131,18 @@ export async function bootstrapRealtimeTest(
     });
   };
 
+  const publishOn = async (
+    pattern: string,
+    payload: unknown,
+  ): Promise<void> => {
+    await new Promise<void>((resolve, reject) => {
+      natsClient.emit(pattern, payload).subscribe({
+        complete: () => resolve(),
+        error: reject,
+      });
+    });
+  };
+
   const track = (socket: ClientSocket): ClientSocket => {
     clients.push(socket);
     return socket;
@@ -172,7 +192,16 @@ export async function bootstrapRealtimeTest(
     await app.close();
   };
 
-  return { app, stubs, wsUrl, publish, connectClient, connectRaw, close };
+  return {
+    app,
+    stubs,
+    wsUrl,
+    publish,
+    publishOn,
+    connectClient,
+    connectRaw,
+    close,
+  };
 }
 
 /**

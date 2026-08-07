@@ -143,6 +143,30 @@ model User {
   twoFactorSecret    String?   @map("two_factor_secret") @db.VarChar(255)
   isLocked           Boolean   @default(false) @map("is_locked")
   lastLoginAt        DateTime? @map("last_login_at") @db.Timestamptz
+
+  /// Quiet hours — GLOBAL user settings, not per notification type.
+  ///
+  /// RDM Table 25 puts them here rather than on `notification_preferences`
+  /// deliberately: "do not disturb me between 22:00 and 07:00" is a fact about
+  /// the person, and per-type quiet hours would be a setting nobody could
+  /// reason about. notification-service reads them on the same gRPC call that
+  /// already resolves recipients (18-doc §4).
+  ///
+  /// Stored as "HH:mm" strings rather than as `time` columns: they are compared
+  /// against a wall clock in `timezone`, never against a database timestamp,
+  /// and a `time` column invites exactly the mistake of comparing it to
+  /// `NOW()` in the SERVER's zone.
+  ///
+  /// A window may CROSS MIDNIGHT (22:00-07:00), which is the common case and
+  /// the one a naive `start < now < end` gets wrong — for precisely the users
+  /// who set quiet hours at all.
+  quietHoursStart String? @map("quiet_hours_start") @db.VarChar(5)
+  quietHoursEnd   String? @map("quiet_hours_end") @db.VarChar(5)
+
+  /// An IANA name — "Asia/Ho_Chi_Minh". NULL is treated as UTC, which is wrong
+  /// for the user and at least deterministic; the alternative, the server's
+  /// zone, is wrong in a way that changes when the service is redeployed.
+  timezone String? @db.VarChar(64)
   createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt          DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
   deletedAt          DateTime? @map("deleted_at") @db.Timestamptz

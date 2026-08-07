@@ -24,6 +24,7 @@ export * from './generated/synapsedesk/auth/billing';
 export * from './generated/synapsedesk/ingestion/document';
 export * from './generated/synapsedesk/ingestion/ledger';
 export * from './generated/synapsedesk/rag/rag';
+export * from './generated/synapsedesk/notification/notification';
 
 export * from './constants';
 export * from './metadata';
@@ -80,3 +81,5 @@ export const INGESTION_PACKAGE_NAME = 'synapsedesk.ingestion';
  * runtime, from a server that is running and healthy.
  */
 export const RAG_PACKAGE_NAME = 'synapsedesk.rag';
+
+export const NOTIFICATION_PACKAGE_NAME = 'synapsedesk.notification';

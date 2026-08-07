@@ -23,11 +23,13 @@ import { ChatModule } from './modules/chat/chat.module';
 import { FeedbackModule } from './modules/feedback/feedback.module';
 import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
 import { DocumentsModule } from './modules/documents/documents.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 import { KnowledgeModule } from './modules/knowledge/knowledge.module';
 import { BillingModule } from './modules/billing/billing.module';
 import { TicketGrpcModule } from './common/grpc/ticket-grpc.module';
 import { IngestionGrpcModule } from './common/grpc/ingestion-grpc.module';
 import { RagGrpcModule } from './common/grpc/rag-grpc.module';
+import { NotificationGrpcModule } from './common/grpc/notification-grpc.module';
 
 @Module({
   imports: [
@@ -68,6 +70,7 @@ import { RagGrpcModule } from './common/grpc/rag-grpc.module';
     TicketGrpcModule,
     IngestionGrpcModule,
     RagGrpcModule,
+    NotificationGrpcModule,
     AuthModule,
 
     // ORDER MATTERS for everything mounted under /users.
@@ -95,6 +98,7 @@ import { RagGrpcModule } from './common/grpc/rag-grpc.module';
     FeedbackModule,
     AuditLogsModule,
     DocumentsModule,
+    NotificationsModule,
     KnowledgeModule,
     BillingModule,
     RealtimeModule,
