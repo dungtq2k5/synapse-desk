@@ -22,7 +22,7 @@ import {
 import {
   MAX_FULL_NAME_LENGTH,
   MIN_FULL_NAME_LENGTH,
-} from '../../../../common/config/app.config';
+} from '../../../../common/config/dto.config';
 import { SearchPaginationBase } from '../../../../common/dto/base/search-pagination-base.dto';
 import { ToBoolean } from '../../../../common/decorators/to-boolean.decorator';
 import { UserResponseDto } from './user-response.dto';

@@ -1,7 +1,7 @@
 import {
   MAX_FULL_NAME_LENGTH,
   MIN_FULL_NAME_LENGTH,
-} from '../../../../common/config/app.config';
+} from '../../../../common/config/dto.config';
 import {
   IsEmail,
   IsNotEmpty,

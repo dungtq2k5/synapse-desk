@@ -40,7 +40,7 @@ import { Throttle } from '@nestjs/throttler';
 import {
   AUTH_THROTTLER_TIER,
   ROUTE_THROTTLE,
-} from '../../common/config/app.config';
+} from '../../common/config/throttler.config';
 import { AuthThrottle } from '../../common/decorators/auth-throttle.decorator';
 import { OrgAccessKind } from '../../common/decorators/org-access.decorator';
 

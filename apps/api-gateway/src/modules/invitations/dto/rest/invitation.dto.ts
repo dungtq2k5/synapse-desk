@@ -23,7 +23,7 @@ import { SearchPaginationBase } from '../../../../common/dto/base/search-paginat
 import {
   MAX_DEVICE_NAME_LENGTH,
   MAX_INVITATIONS_PER_BATCH,
-} from '../../../../common/config/app.config';
+} from '../../../../common/config/dto.config';
 
 export class InviteUserDto {
   @IsEmail()

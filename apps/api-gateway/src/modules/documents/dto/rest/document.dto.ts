@@ -25,7 +25,7 @@ import {
 } from '@synapsedesk/common';
 import { SearchPaginationBase } from '../../../../common/dto/base/search-pagination-base.dto';
 import { ToBoolean } from '../../../../common/decorators/to-boolean.decorator';
-import { MAX_DOCUMENT_DEPARTMENTS } from '../../../../common/config/app.config';
+import { MAX_DOCUMENT_DEPARTMENTS } from '../../../../common/config/dto.config';
 
 export class PresignDocumentDto {
   /**

@@ -23,7 +23,7 @@ import { ToBoolean } from '../../../../common/decorators/to-boolean.decorator';
 import {
   MAX_ROLE_NAME_LENGTH,
   MIN_ROLE_NAME_LENGTH,
-} from '../../../../common/config/app.config';
+} from '../../../../common/config/dto.config';
 
 /**
  * `OmitType` then re-declare `sortBy`, so the allowlist, the TYPE and the

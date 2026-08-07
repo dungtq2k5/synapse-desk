@@ -8,9 +8,7 @@ import {
   bootstrapE2eTest,
   flushTestRedis,
 } from '../utils';
-import { ROUTE_THROTTLE } from '../../src/common/config/app.config';
-
-const TICKET_ID = '44444444-4444-4444-8444-444444444444';
+import { ROUTE_THROTTLE } from '../../src/common/config/throttler.config';
 
 /**
  * §16 H2 — every AI route carries an explicit limit, and it FIRES.
@@ -28,6 +26,8 @@ const TICKET_ID = '44444444-4444-4444-8444-444444444444';
  */
 describe('§2 AI route rate limiting (e2e)', () => {
   let fx: E2eFixture;
+
+  const TICKET_ID = '44444444-4444-4444-8444-444444444444';
 
   beforeAll(async () => {
     fx = await bootstrapE2eTest();

@@ -21,39 +21,39 @@ import {
   wireUser,
 } from '../fixtures/wire';
 
-/**
- * the cookie sweep.
- *
- * Two properties, on every cookie the gateway sets, parametrized rather than
- * re-asserted per route:
- *
- *   1. **HttpOnly.** It is the entire reason the tokens live in cookies rather
- *      than in the body — an XSS on the page cannot read them. One cookie set
- *      without it undoes that for the whole session.
- *   2. **The body carries no raw token.** Setting an HttpOnly cookie and then
- *      echoing the same value into JSON hands it straight back to the script
- *      the flag was protecting it from.
- *
- * The fixtures use recognisable literal token values (`access-token-fixture`)
- * precisely so the second assertion can search for them: a UUID would be
- * indistinguishable from every other id in the response.
- */
-type CookieProbe = {
-  name: string;
-  /** Cookies this response MUST set, with a non-empty value. */
-  sets: string[];
-  /** Cookies it must NOT set at all. */
-  omits?: string[];
-  /** Cookies it must CLEAR (set to an empty value). */
-  clears?: string[];
-  run: (fx: E2eFixture) => Promise<{
-    headers: Record<string, string | string[] | undefined>;
-    body: unknown;
-  }>;
-};
-
 describe('cookie sweep (e2e)', () => {
   let fx: E2eFixture;
+
+  /**
+   * the cookie sweep.
+   *
+   * Two properties, on every cookie the gateway sets, parametrized rather than
+   * re-asserted per route:
+   *
+   *   1. **HttpOnly.** It is the entire reason the tokens live in cookies rather
+   *      than in the body — an XSS on the page cannot read them. One cookie set
+   *      without it undoes that for the whole session.
+   *   2. **The body carries no raw token.** Setting an HttpOnly cookie and then
+   *      echoing the same value into JSON hands it straight back to the script
+   *      the flag was protecting it from.
+   *
+   * The fixtures use recognisable literal token values (`access-token-fixture`)
+   * precisely so the second assertion can search for them: a UUID would be
+   * indistinguishable from every other id in the response.
+   */
+  type CookieProbe = {
+    name: string;
+    /** Cookies this response MUST set, with a non-empty value. */
+    sets: string[];
+    /** Cookies it must NOT set at all. */
+    omits?: string[];
+    /** Cookies it must CLEAR (set to an empty value). */
+    clears?: string[];
+    run: (fx: E2eFixture) => Promise<{
+      headers: Record<string, string | string[] | undefined>;
+      body: unknown;
+    }>;
+  };
 
   const PROBES: CookieProbe[] = [
     {
@@ -190,18 +190,6 @@ describe('cookie sweep (e2e)', () => {
     },
   ];
 
-  beforeAll(async () => {
-    await flushTestRedis();
-    fx = await bootstrapE2eTest();
-  });
-
-  beforeEach(async () => {
-    await flushTestRedis();
-    jest.clearAllMocks();
-  });
-
-  afterAll(() => fx.close());
-
   const EXPECTED_SAME_SITE = (
     process.env.COOKIE_SAMESITE ?? 'lax'
   ).toLowerCase();
@@ -214,6 +202,18 @@ describe('cookie sweep (e2e)', () => {
     'two-factor-token-fixture',
     'tenant-selection-token-fixture',
   ];
+
+  beforeAll(async () => {
+    await flushTestRedis();
+    fx = await bootstrapE2eTest();
+  });
+
+  beforeEach(async () => {
+    await flushTestRedis();
+    jest.clearAllMocks();
+  });
+
+  afterAll(() => fx.close());
 
   it('every cookie the gateway sets is HttpOnly with the configured SameSite', async () => {
     const wrong: string[] = [];

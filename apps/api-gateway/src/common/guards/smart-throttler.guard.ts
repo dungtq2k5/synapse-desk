@@ -8,7 +8,7 @@ import {
 import type { Request, Response } from 'express';
 import { readFileSync } from 'node:fs';
 import { verify } from 'jsonwebtoken';
-import { AUTH_THROTTLER_TIER } from '../config/app.config';
+import { AUTH_THROTTLER_TIER } from '../config/throttler.config';
 import { IS_AUTH_ROUTE_KEY } from '../decorators/auth-throttle.decorator';
 
 /**

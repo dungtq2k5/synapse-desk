@@ -6,7 +6,7 @@ import { ThrottlerModuleOptions } from '@nestjs/throttler';
 // instead would silently stop overriding anything if the library renamed it.
 import { THROTTLER_OPTIONS } from '@nestjs/throttler/dist/throttler.constants';
 import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
-import { AUTH_THROTTLER_TIER } from '../../src/common/config/app.config';
+import { AUTH_THROTTLER_TIER } from '../../src/common/config/throttler.config';
 import {
   API,
   E2eFixture,

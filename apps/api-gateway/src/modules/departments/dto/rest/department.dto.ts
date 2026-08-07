@@ -25,7 +25,7 @@ import {
   MAX_DEPARTMENT_MEMBERS_PER_BATCH,
   MAX_DEPARTMENT_NAME_LENGTH,
   MIN_DEPARTMENT_NAME_LENGTH,
-} from '../../../../common/config/app.config';
+} from '../../../../common/config/dto.config';
 import { trimIfString } from '@synapsedesk/common';
 
 export class ListDepartmentsQueryDto extends OmitType(SearchPaginationBase, [

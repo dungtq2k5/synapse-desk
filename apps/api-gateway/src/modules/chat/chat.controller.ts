@@ -14,7 +14,7 @@ import { Throttle } from '@nestjs/throttler';
 import {
   AI_THROTTLER_TIER,
   ROUTE_THROTTLE,
-} from '../../common/config/app.config';
+} from '../../common/config/throttler.config';
 import { RequestContext, TicketSource } from '@synapsedesk/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionGuard } from '../../common/guards/permission.guard';

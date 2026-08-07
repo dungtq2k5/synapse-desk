@@ -11,7 +11,7 @@ import {
 } from 'class-validator';
 import { UserResponseDto } from '../../../users/dto/rest/user-response.dto';
 import { TwoFactorRequiredResponseDto } from './two-factor.dto';
-import { MAX_DEVICE_NAME_LENGTH } from '../../../../common/config/app.config';
+import { MAX_DEVICE_NAME_LENGTH } from '../../../../common/config/dto.config';
 
 export class LoginDto {
   @IsEmail()

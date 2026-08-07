@@ -37,6 +37,12 @@ describe('§2.5 Ticket messages at the HTTP boundary (e2e)', () => {
   const messageId = faker.string.uuid();
   const attachmentId = faker.string.uuid();
 
+  const upload = {
+    fileName: 'screenshot.png',
+    mimeType: 'image/png',
+    fileSizeBytes: 2048,
+  };
+
   beforeAll(async () => {
     await flushTestRedis();
     fx = await bootstrapE2eTest();
@@ -48,12 +54,6 @@ describe('§2.5 Ticket messages at the HTTP boundary (e2e)', () => {
   });
 
   afterAll(() => fx.close());
-
-  const upload = {
-    fileName: 'screenshot.png',
-    mimeType: 'image/png',
-    fileSizeBytes: 2048,
-  };
 
   describe('GET /tickets/:ticketId/messages', () => {
     it('1. is readable by an end user with NO permissions', async () => {

@@ -16,6 +16,7 @@ import {
   RequestContext,
   RequestOrigin,
   TwoFactorJwtPayload,
+  OrgAccess,
 } from '@synapsedesk/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { TwoFactorEnrolmentGuard } from '../../common/guards/two-factor-enrolment.guard';
@@ -43,9 +44,8 @@ import { Throttle } from '@nestjs/throttler';
 import {
   AUTH_THROTTLER_TIER,
   ROUTE_THROTTLE,
-} from '../../common/config/app.config';
+} from '../../common/config/throttler.config';
 import { OrgAccessKind } from '../../common/decorators/org-access.decorator';
-import { OrgAccess } from '@synapsedesk/common';
 
 /**
  * `/auth/2fa` — enrolment and recovery (api-endpoints-plan).

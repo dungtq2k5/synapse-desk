@@ -1,4 +1,4 @@
-import { MAX_DEVICE_NAME_LENGTH } from '../../../../common/config/app.config';
+import { MAX_DEVICE_NAME_LENGTH } from '../../../../common/config/dto.config';
 import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class GoogleSignInDto {

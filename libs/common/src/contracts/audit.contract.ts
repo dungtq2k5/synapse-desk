@@ -1,4 +1,4 @@
-import type { RequestOrigin } from '../configs/app.config';
+import type { RequestOrigin } from '../configs/identity.config';
 
 /**
  * The NATS contract between any service and whoever owns `audit_logs`.

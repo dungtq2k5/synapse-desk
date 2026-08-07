@@ -8,7 +8,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { RequestContext } from '@synapsedesk/common';
+import { RequestContext, OrgAccess } from '@synapsedesk/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { OtpGrpcClient } from './otp-grpc.client';
@@ -25,9 +25,8 @@ import { Throttle } from '@nestjs/throttler';
 import {
   AUTH_THROTTLER_TIER,
   ROUTE_THROTTLE,
-} from '../../common/config/app.config';
+} from '../../common/config/throttler.config';
 import { OrgAccessKind } from '../../common/decorators/org-access.decorator';
-import { OrgAccess } from '@synapsedesk/common';
 
 /**
  * Email and phone ownership challenges (api-endpoints-plan).

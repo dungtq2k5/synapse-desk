@@ -1,6 +1,6 @@
 import { status } from '@grpc/grpc-js';
 import { RpcException } from '@nestjs/microservices';
-import { CallerContext, hasIdentity } from '../configs/app.config';
+import { CallerContext, hasIdentity } from '../configs/identity.config';
 
 /** The filter every tenant-scoped query starts from. */
 export type TenantScope = {

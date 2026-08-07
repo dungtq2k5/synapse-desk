@@ -14,7 +14,7 @@ import { RequestContext } from '@synapsedesk/common';
 import {
   AI_THROTTLER_TIER,
   ROUTE_THROTTLE,
-} from '../../common/config/app.config';
+} from '../../common/config/throttler.config';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionGuard } from '../../common/guards/permission.guard';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';

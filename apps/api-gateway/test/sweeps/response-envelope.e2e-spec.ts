@@ -12,293 +12,303 @@ import {
 } from '../utils';
 import { grpcError, timestamp, wirePage, wireUser } from '../fixtures/wire';
 
-/**
- * the response envelope sweep.
- *
- * `success` is the ONE field a client branches on, which only works if it is
- * present on every response from every controller. A route that returns a bare
- * body — because it used `@Res()` and bypassed the interceptor, say — breaks
- * that contract for one endpoint, and the client that trusted it fails on a
- * shape it has never seen.
- *
- * Parametrized over one representative success and one guaranteed failure per
- * controller, so a new controller is one row rather than a new file.
- */
-/** A fixed uuid for the routes that need one in the path. */
-const SWEEP_TICKET_ID = '11111111-1111-4111-8111-111111111111';
-
-type Probe = {
-  controller: string;
-  path: string;
-  /** Permissions the caller needs; `null` means "call it anonymously". */
-  as: PermissionCode[] | null;
-  /** Makes the stubbed peer succeed. */
-  succeed: (fx: E2eFixture) => void;
-  /** Makes the stubbed peer fail with a mapped gRPC status. */
-  fail: (fx: E2eFixture) => void;
-  expectedFailureStatus: number;
-};
-
-const PROBES: Probe[] = [
-  {
-    controller: 'DepartmentsController',
-    path: '/departments',
-    as: ['department.read'],
-    succeed: (f) =>
-      f.stubs.department.listDepartments.mockReturnValue(of(wirePage([]))),
-    fail: (f) =>
-      f.stubs.department.listDepartments.mockReturnValue(
-        throwError(() => grpcError(GrpcStatus.NOT_FOUND, 'nope')),
-      ),
-    expectedFailureStatus: 404,
-  },
-  {
-    controller: 'RolesController',
-    path: '/roles',
-    as: ['role.read'],
-    succeed: (f) => f.stubs.role.listRoles.mockReturnValue(of(wirePage([]))),
-    fail: (f) =>
-      f.stubs.role.listRoles.mockReturnValue(
-        throwError(() => grpcError(GrpcStatus.ABORTED, 'conflict')),
-      ),
-    expectedFailureStatus: 409,
-  },
-  {
-    controller: 'PermissionsController',
-    path: '/permissions',
-    as: ['role.read'],
-    succeed: (f) =>
-      f.stubs.role.listPermissions.mockReturnValue(of({ items: [] })),
-    fail: (f) =>
-      f.stubs.role.listPermissions.mockReturnValue(
-        throwError(() => grpcError(GrpcStatus.INTERNAL, 'boom')),
-      ),
-    expectedFailureStatus: 500,
-  },
-  {
-    controller: 'UserAdminController',
-    path: '/users',
-    as: ['user.read'],
-    succeed: (f) => f.stubs.user.listUsers.mockReturnValue(of(wirePage([]))),
-    fail: (f) =>
-      f.stubs.user.listUsers.mockReturnValue(
-        throwError(() => grpcError(GrpcStatus.PERMISSION_DENIED, 'no')),
-      ),
-    expectedFailureStatus: 403,
-  },
-  {
-    controller: 'UsersController',
-    path: '/users/me',
-    as: [],
-    succeed: (f) =>
-      f.stubs.user.getCurrentUser.mockReturnValue(
-        of({ user: wireUser(), permissionCodes: [], departmentIds: [] }),
-      ),
-    fail: (f) =>
-      f.stubs.user.getCurrentUser.mockReturnValue(
-        throwError(() => grpcError(GrpcStatus.NOT_FOUND, 'gone')),
-      ),
-    expectedFailureStatus: 404,
-  },
-  {
-    controller: 'OrganizationsController',
-    path: '/organizations/current/usage',
-    as: ['organization.read'],
-    succeed: (f) =>
-      f.stubs.organization.getOrganizationUsage.mockReturnValue(
-        of({
-          seats: { available: true, used: 1, limit: 10 },
-          storage: { available: false, unavailableReason: 'n/a' },
-          aiTokens: { available: false, unavailableReason: 'n/a' },
-          billingCycleStart: timestamp(),
-          aiModelTier: AiModelTier.AI_MODEL_TIER_FAST,
-          planName: 'Free',
-        }),
-      ),
-    fail: (f) =>
-      f.stubs.organization.getOrganizationUsage.mockReturnValue(
-        throwError(() =>
-          grpcError(GrpcStatus.FAILED_PRECONDITION, 'not a tenant'),
-        ),
-      ),
-    expectedFailureStatus: 400,
-  },
-  {
-    controller: 'SessionsController',
-    path: '/auth/sessions',
-    as: [],
-    succeed: (f) =>
-      f.stubs.session.listSessions.mockReturnValue(of({ items: [] })),
-    fail: (f) =>
-      f.stubs.session.listSessions.mockReturnValue(
-        throwError(() => grpcError(GrpcStatus.UNAUTHENTICATED, 'nope')),
-      ),
-    expectedFailureStatus: 401,
-  },
-  {
-    controller: 'InvitationsController',
-    path: '/users/invitations',
-    as: ['user.read'],
-    succeed: (f) =>
-      f.stubs.invitation.listInvitations.mockReturnValue(of(wirePage([]))),
-    fail: (f) =>
-      f.stubs.invitation.listInvitations.mockReturnValue(
-        throwError(() => grpcError(GrpcStatus.NOT_FOUND, 'gone')),
-      ),
-    expectedFailureStatus: 404,
-  },
-  {
-    controller: 'PlatformController',
-    path: '/platform/metrics',
-    as: null,
-    succeed: (f) =>
-      f.stubs.platform.getMetrics.mockReturnValue(
-        of({
-          totalOrganizations: 0,
-          organizationsByStatus: {},
-          totalUsers: 0,
-          activeUsers: 0,
-          pendingInvitations: 0,
-          liveSessions: 0,
-          seatsAllocated: 0,
-          seatsInUse: 0,
-          generatedAt: timestamp(),
-        }),
-      ),
-    fail: (f) =>
-      f.stubs.platform.getMetrics.mockReturnValue(
-        throwError(() => grpcError(GrpcStatus.INTERNAL, 'boom')),
-      ),
-    expectedFailureStatus: 500,
-  },
-
-  // ---------------------------------------------------------------------
-  // Domain B. Rows, not a second sweep file — §3.5 says to reuse this
-  // harness, and a parallel one would be a second definition of "the
-  // envelope" that could drift from this one.
-  // ---------------------------------------------------------------------
-  {
-    controller: 'TicketsController',
-    path: '/tickets',
-    as: [],
-    succeed: (f) =>
-      f.stubs.ticket.listTickets.mockReturnValue(of(wirePage([]))),
-    fail: (f) =>
-      f.stubs.ticket.listTickets.mockReturnValue(
-        throwError(() => grpcError(GrpcStatus.NOT_FOUND, 'gone')),
-      ),
-    expectedFailureStatus: 404,
-  },
-  {
-    controller: 'MessagesController',
-    path: `/tickets/${SWEEP_TICKET_ID}/messages`,
-    as: [],
-    succeed: (f) =>
-      f.stubs.message.listMessages.mockReturnValue(
-        of({ items: [], meta: wirePage([]).meta }),
-      ),
-    fail: (f) =>
-      f.stubs.message.listMessages.mockReturnValue(
-        throwError(() => grpcError(GrpcStatus.NOT_FOUND, 'gone')),
-      ),
-    expectedFailureStatus: 404,
-  },
-  {
-    controller: 'TicketsController (assignments)',
-    path: `/tickets/${SWEEP_TICKET_ID}/assignments`,
-    as: [],
-    succeed: (f) =>
-      f.stubs.assignment.listAssignments.mockReturnValue(of({ items: [] })),
-    fail: (f) =>
-      f.stubs.assignment.listAssignments.mockReturnValue(
-        throwError(() => grpcError(GrpcStatus.NOT_FOUND, 'gone')),
-      ),
-    expectedFailureStatus: 404,
-  },
-  {
-    controller: 'AiController',
-    path: `/tickets/${SWEEP_TICKET_ID}/ai/summary`,
-    as: ['ticket.read.all'],
-    succeed: (f) =>
-      f.stubs.ai.getSummary.mockReturnValue(
-        of({
-          id: SWEEP_TICKET_ID,
-          ticketId: SWEEP_TICKET_ID,
-          summaryText: 's',
-          suggestedAction: 'a',
-          confidenceScore: 0.5,
-          modelName: 'm',
-          createdAt: timestamp(),
-          updatedAt: timestamp(),
-        }),
-      ),
-    fail: (f) =>
-      f.stubs.ai.getSummary.mockReturnValue(
-        // The 503 every AI route answers today. It has to carry the envelope
-        // too — a client parsing `success` must not hit a bare body on the one
-        // status it will actually see in production right now.
-        throwError(() => grpcError(GrpcStatus.UNAVAILABLE, 'not yet')),
-      ),
-    expectedFailureStatus: 503,
-  },
-  {
-    controller: 'ChatController',
-    path: '/chat/conversations',
-    as: [],
-    succeed: (f) =>
-      f.stubs.ticket.listTickets.mockReturnValue(of(wirePage([]))),
-    fail: (f) =>
-      f.stubs.ticket.listTickets.mockReturnValue(
-        throwError(() => grpcError(GrpcStatus.ABORTED, 'conflict')),
-      ),
-    expectedFailureStatus: 409,
-  },
-  {
-    controller: 'FeedbackController',
-    path: '/feedback',
-    as: ['analytics.read'],
-    succeed: (f) =>
-      f.stubs.feedback.listFeedback.mockReturnValue(
-        of({ items: [], meta: wirePage([]).meta }),
-      ),
-    fail: (f) =>
-      f.stubs.feedback.listFeedback.mockReturnValue(
-        throwError(() => grpcError(GrpcStatus.INTERNAL, 'boom')),
-      ),
-    expectedFailureStatus: 500,
-  },
-  {
-    controller: 'AuditLogsController',
-    path: '/audit-logs',
-    as: ['audit.read'],
-    succeed: (f) =>
-      f.stubs.audit.listAuditLogs.mockReturnValue(
-        of({ items: [], meta: wirePage([]).meta }),
-      ),
-    fail: (f) =>
-      f.stubs.audit.listAuditLogs.mockReturnValue(
-        throwError(() => grpcError(GrpcStatus.PERMISSION_DENIED, 'no')),
-      ),
-    expectedFailureStatus: 403,
-  },
-  {
-    controller: 'AttachmentsController',
-    path: `/attachments/${SWEEP_TICKET_ID}/download`,
-    as: [],
-    succeed: (f) =>
-      f.stubs.message.downloadAttachment.mockReturnValue(
-        of({ downloadUrl: 'https://example/x', expiresAt: timestamp() }),
-      ),
-    fail: (f) =>
-      f.stubs.message.downloadAttachment.mockReturnValue(
-        throwError(() => grpcError(GrpcStatus.UNAVAILABLE, 'not yet')),
-      ),
-    expectedFailureStatus: 503,
-  },
-];
-
 describe('response envelope sweep (e2e)', () => {
   let fx: E2eFixture;
+
+  /**
+   * the response envelope sweep.
+   *
+   * `success` is the ONE field a client branches on, which only works if it is
+   * present on every response from every controller. A route that returns a bare
+   * body — because it used `@Res()` and bypassed the interceptor, say — breaks
+   * that contract for one endpoint, and the client that trusted it fails on a
+   * shape it has never seen.
+   *
+   * Parametrized over one representative success and one guaranteed failure per
+   * controller, so a new controller is one row rather than a new file.
+   */
+  /** A fixed uuid for the routes that need one in the path. */
+  const SWEEP_TICKET_ID = '11111111-1111-4111-8111-111111111111';
+
+  type Probe = {
+    controller: string;
+    path: string;
+    /** Permissions the caller needs; `null` means "call it anonymously". */
+    as: PermissionCode[] | null;
+    /** Makes the stubbed peer succeed. */
+    succeed: (fx: E2eFixture) => void;
+    /** Makes the stubbed peer fail with a mapped gRPC status. */
+    fail: (fx: E2eFixture) => void;
+    expectedFailureStatus: number;
+  };
+
+  const PROBES: Probe[] = [
+    {
+      controller: 'DepartmentsController',
+      path: '/departments',
+      as: ['department.read'],
+      succeed: (f) =>
+        f.stubs.department.listDepartments.mockReturnValue(of(wirePage([]))),
+      fail: (f) =>
+        f.stubs.department.listDepartments.mockReturnValue(
+          throwError(() => grpcError(GrpcStatus.NOT_FOUND, 'nope')),
+        ),
+      expectedFailureStatus: 404,
+    },
+    {
+      controller: 'RolesController',
+      path: '/roles',
+      as: ['role.read'],
+      succeed: (f) => f.stubs.role.listRoles.mockReturnValue(of(wirePage([]))),
+      fail: (f) =>
+        f.stubs.role.listRoles.mockReturnValue(
+          throwError(() => grpcError(GrpcStatus.ABORTED, 'conflict')),
+        ),
+      expectedFailureStatus: 409,
+    },
+    {
+      controller: 'PermissionsController',
+      path: '/permissions',
+      as: ['role.read'],
+      succeed: (f) =>
+        f.stubs.role.listPermissions.mockReturnValue(of({ items: [] })),
+      fail: (f) =>
+        f.stubs.role.listPermissions.mockReturnValue(
+          throwError(() => grpcError(GrpcStatus.INTERNAL, 'boom')),
+        ),
+      expectedFailureStatus: 500,
+    },
+    {
+      controller: 'UserAdminController',
+      path: '/users',
+      as: ['user.read'],
+      succeed: (f) => f.stubs.user.listUsers.mockReturnValue(of(wirePage([]))),
+      fail: (f) =>
+        f.stubs.user.listUsers.mockReturnValue(
+          throwError(() => grpcError(GrpcStatus.PERMISSION_DENIED, 'no')),
+        ),
+      expectedFailureStatus: 403,
+    },
+    {
+      controller: 'UsersController',
+      path: '/users/me',
+      as: [],
+      succeed: (f) =>
+        f.stubs.user.getCurrentUser.mockReturnValue(
+          of({ user: wireUser(), permissionCodes: [], departmentIds: [] }),
+        ),
+      fail: (f) =>
+        f.stubs.user.getCurrentUser.mockReturnValue(
+          throwError(() => grpcError(GrpcStatus.NOT_FOUND, 'gone')),
+        ),
+      expectedFailureStatus: 404,
+    },
+    {
+      controller: 'OrganizationsController',
+      path: '/organizations/current/usage',
+      as: ['organization.read'],
+      succeed: (f) =>
+        f.stubs.organization.getOrganizationUsage.mockReturnValue(
+          of({
+            seats: { available: true, used: 1, limit: 10 },
+            storage: { available: false, unavailableReason: 'n/a' },
+            aiTokens: { available: false, unavailableReason: 'n/a' },
+            billingCycleStart: timestamp(),
+            aiModelTier: AiModelTier.AI_MODEL_TIER_FAST,
+            planName: 'Free',
+          }),
+        ),
+      fail: (f) =>
+        f.stubs.organization.getOrganizationUsage.mockReturnValue(
+          throwError(() =>
+            grpcError(GrpcStatus.FAILED_PRECONDITION, 'not a tenant'),
+          ),
+        ),
+      expectedFailureStatus: 400,
+    },
+    {
+      controller: 'SessionsController',
+      path: '/auth/sessions',
+      as: [],
+      succeed: (f) =>
+        f.stubs.session.listSessions.mockReturnValue(of({ items: [] })),
+      fail: (f) =>
+        f.stubs.session.listSessions.mockReturnValue(
+          throwError(() => grpcError(GrpcStatus.UNAUTHENTICATED, 'nope')),
+        ),
+      expectedFailureStatus: 401,
+    },
+    {
+      controller: 'InvitationsController',
+      path: '/users/invitations',
+      as: ['user.read'],
+      succeed: (f) =>
+        f.stubs.invitation.listInvitations.mockReturnValue(of(wirePage([]))),
+      fail: (f) =>
+        f.stubs.invitation.listInvitations.mockReturnValue(
+          throwError(() => grpcError(GrpcStatus.NOT_FOUND, 'gone')),
+        ),
+      expectedFailureStatus: 404,
+    },
+    {
+      controller: 'PlatformController',
+      path: '/platform/metrics',
+      as: null,
+      succeed: (f) =>
+        f.stubs.platform.getMetrics.mockReturnValue(
+          of({
+            totalOrganizations: 0,
+            organizationsByStatus: {},
+            totalUsers: 0,
+            activeUsers: 0,
+            pendingInvitations: 0,
+            liveSessions: 0,
+            seatsAllocated: 0,
+            seatsInUse: 0,
+            generatedAt: timestamp(),
+          }),
+        ),
+      fail: (f) =>
+        f.stubs.platform.getMetrics.mockReturnValue(
+          throwError(() => grpcError(GrpcStatus.INTERNAL, 'boom')),
+        ),
+      expectedFailureStatus: 500,
+    },
+
+    // ---------------------------------------------------------------------
+    // Domain B. Rows, not a second sweep file — §3.5 says to reuse this
+    // harness, and a parallel one would be a second definition of "the
+    // envelope" that could drift from this one.
+    // ---------------------------------------------------------------------
+    {
+      controller: 'TicketsController',
+      path: '/tickets',
+      as: [],
+      succeed: (f) =>
+        f.stubs.ticket.listTickets.mockReturnValue(of(wirePage([]))),
+      fail: (f) =>
+        f.stubs.ticket.listTickets.mockReturnValue(
+          throwError(() => grpcError(GrpcStatus.NOT_FOUND, 'gone')),
+        ),
+      expectedFailureStatus: 404,
+    },
+    {
+      controller: 'MessagesController',
+      path: `/tickets/${SWEEP_TICKET_ID}/messages`,
+      as: [],
+      succeed: (f) =>
+        f.stubs.message.listMessages.mockReturnValue(
+          of({ items: [], meta: wirePage([]).meta }),
+        ),
+      fail: (f) =>
+        f.stubs.message.listMessages.mockReturnValue(
+          throwError(() => grpcError(GrpcStatus.NOT_FOUND, 'gone')),
+        ),
+      expectedFailureStatus: 404,
+    },
+    {
+      controller: 'TicketsController (assignments)',
+      path: `/tickets/${SWEEP_TICKET_ID}/assignments`,
+      as: [],
+      succeed: (f) =>
+        f.stubs.assignment.listAssignments.mockReturnValue(of({ items: [] })),
+      fail: (f) =>
+        f.stubs.assignment.listAssignments.mockReturnValue(
+          throwError(() => grpcError(GrpcStatus.NOT_FOUND, 'gone')),
+        ),
+      expectedFailureStatus: 404,
+    },
+    {
+      controller: 'AiController',
+      path: `/tickets/${SWEEP_TICKET_ID}/ai/summary`,
+      as: ['ticket.read.all'],
+      succeed: (f) =>
+        f.stubs.ai.getSummary.mockReturnValue(
+          of({
+            id: SWEEP_TICKET_ID,
+            ticketId: SWEEP_TICKET_ID,
+            summaryText: 's',
+            suggestedAction: 'a',
+            confidenceScore: 0.5,
+            modelName: 'm',
+            createdAt: timestamp(),
+            updatedAt: timestamp(),
+          }),
+        ),
+      fail: (f) =>
+        f.stubs.ai.getSummary.mockReturnValue(
+          // The 503 every AI route answers today. It has to carry the envelope
+          // too — a client parsing `success` must not hit a bare body on the one
+          // status it will actually see in production right now.
+          throwError(() => grpcError(GrpcStatus.UNAVAILABLE, 'not yet')),
+        ),
+      expectedFailureStatus: 503,
+    },
+    {
+      controller: 'ChatController',
+      path: '/chat/conversations',
+      as: [],
+      succeed: (f) =>
+        f.stubs.ticket.listTickets.mockReturnValue(of(wirePage([]))),
+      fail: (f) =>
+        f.stubs.ticket.listTickets.mockReturnValue(
+          throwError(() => grpcError(GrpcStatus.ABORTED, 'conflict')),
+        ),
+      expectedFailureStatus: 409,
+    },
+    {
+      controller: 'FeedbackController',
+      path: '/feedback',
+      as: ['analytics.read'],
+      succeed: (f) =>
+        f.stubs.feedback.listFeedback.mockReturnValue(
+          of({ items: [], meta: wirePage([]).meta }),
+        ),
+      fail: (f) =>
+        f.stubs.feedback.listFeedback.mockReturnValue(
+          throwError(() => grpcError(GrpcStatus.INTERNAL, 'boom')),
+        ),
+      expectedFailureStatus: 500,
+    },
+    {
+      controller: 'AuditLogsController',
+      path: '/audit-logs',
+      as: ['audit.read'],
+      succeed: (f) =>
+        f.stubs.audit.listAuditLogs.mockReturnValue(
+          of({ items: [], meta: wirePage([]).meta }),
+        ),
+      fail: (f) =>
+        f.stubs.audit.listAuditLogs.mockReturnValue(
+          throwError(() => grpcError(GrpcStatus.PERMISSION_DENIED, 'no')),
+        ),
+      expectedFailureStatus: 403,
+    },
+    {
+      controller: 'AttachmentsController',
+      path: `/attachments/${SWEEP_TICKET_ID}/download`,
+      as: [],
+      succeed: (f) =>
+        f.stubs.message.downloadAttachment.mockReturnValue(
+          of({ downloadUrl: 'https://example/x', expiresAt: timestamp() }),
+        ),
+      fail: (f) =>
+        f.stubs.message.downloadAttachment.mockReturnValue(
+          throwError(() => grpcError(GrpcStatus.UNAVAILABLE, 'not yet')),
+        ),
+      expectedFailureStatus: 503,
+    },
+  ];
+
+  /** Platform routes need a Super Admin; everything else needs its codes. */
+  const agentFor = (probe: Probe) => {
+    return probe.as === null
+      ? authenticatedAgent(fx.app, {
+          isSuperAdmin: true,
+          organizationId: null,
+        })
+      : authenticatedAgent(fx.app, { permissionCodes: probe.as });
+  };
 
   beforeAll(async () => {
     await flushTestRedis();
@@ -311,16 +321,6 @@ describe('response envelope sweep (e2e)', () => {
   });
 
   afterAll(() => fx.close());
-
-  /** Platform routes need a Super Admin; everything else needs its codes. */
-  function agentFor(probe: Probe) {
-    return probe.as === null
-      ? authenticatedAgent(fx.app, {
-          isSuperAdmin: true,
-          organizationId: null,
-        })
-      : authenticatedAgent(fx.app, { permissionCodes: probe.as });
-  }
 
   it('every 2xx carries { success: true, statusCode, message, data }', async () => {
     const wrong: string[] = [];
