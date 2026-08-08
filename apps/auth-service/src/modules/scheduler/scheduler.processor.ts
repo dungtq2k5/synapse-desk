@@ -2,12 +2,12 @@ import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import {
-  formatErrorMsg,
   SCHEDULED_JOBS,
   SCHEDULER_QUEUE,
   JobRunRecorder,
 } from '@synapsedesk/common';
 import { InvitationsService } from '../invitations/invitations.service';
+import { ExpiredLockSweep } from '../users/expired-lock.sweep';
 import { ExpiredRecordsPruner } from '../sessions/expired-records.job';
 
 /**
@@ -31,6 +31,7 @@ export class SchedulerProcessor extends WorkerHost {
   constructor(
     private readonly invitations: InvitationsService,
     private readonly pruner: ExpiredRecordsPruner,
+    private readonly expiredLocks: ExpiredLockSweep,
     private readonly runs: JobRunRecorder,
   ) {
     super();
@@ -63,6 +64,16 @@ export class SchedulerProcessor extends WorkerHost {
     if (expiredCount > 0) {
       this.logger.log(`Expired ${expiredCount} stale invitation(s)`);
     }
+
+    // **Expired temporary locks** — 21-doc §2.2, mechanism 2.
+    //
+    // The login path already unlocks lazily, so this is not what lets a user
+    // back in — that is instant. What it fixes is everything that does NOT go
+    // through login: list filters, both notification audiences and the
+    // last-Org-Admin count, none of which know about time and none of which
+    // should have to. It is why `is_locked` could stay the single authoritative
+    // boolean and this feature touched three call sites instead of 22.
+    await this.expiredLocks.sweep();
   }
 
   /**
@@ -81,4 +92,4 @@ export class SchedulerProcessor extends WorkerHost {
   }
 }
 
-export { formatErrorMsg };
+export { formatErrorMsg } from '@synapsedesk/common';

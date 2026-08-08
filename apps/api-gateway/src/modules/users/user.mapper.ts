@@ -31,6 +31,7 @@ export function toUserResponseDto(user: UserResponse): UserResponseDto {
     gender: fromProtoGender(user.gender),
     lastLoginAt: fromTimestamp(user.lastLoginAt) ?? null,
     isLocked: user.isLocked,
+    lockedUntil: fromTimestamp(user.lockedUntil) ?? null,
     isTwoFactorEnabled: user.isTwoFactorEnabled,
     // Non-optional in the proto, so a missing value is a contract violation
     // rather than something to paper over with a fallback date.

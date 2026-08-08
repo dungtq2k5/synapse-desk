@@ -65,6 +65,32 @@ export class AuditPublisher {
   }
 
   /**
+   * An act with **no actor** — a scheduled sweep, not a person.
+   *
+   * `RecordAuditCommand.userId` is already documented as *"null for system and
+   * cron actors, which have no user row acting for them"*; this is the first
+   * caller to need it. Attributing an automatic unlock to the system USER row
+   * would be worse than null: that account exists to satisfy
+   * `roles.created_by_id`, and a reader seeing it in an audit trail would
+   * reasonably conclude somebody signed in as it.
+   *
+   * The origin is the SERVICE rather than an IP, for the same reason: there was
+   * no request, and a fabricated `127.0.0.1` reads as one.
+   */
+  recordSystem(event: AuditEvent & { organizationId: string | null }): void {
+    this.publish({
+      action: event.action,
+      organizationId: event.organizationId,
+      userId: null,
+      origin: { ip: 'system', userAgent: 'auth-service/scheduler' },
+      resourceType: event.resourceType,
+      resourceId: event.resourceId,
+      metadata: event.metadata,
+      occurredAt: new Date().toISOString(),
+    });
+  }
+
+  /**
    * Derives actor, tenant and origin from the verified caller context, so a
    * call site cannot record the wrong actor by passing the wrong id.
    */
@@ -88,6 +114,11 @@ export class AuditPublisher {
       occurredAt: new Date().toISOString(),
     };
 
+    this.publish(command);
+  }
+
+  /** The shared tail: mirror to the log, then emit. */
+  private publish(command: RecordAuditCommand): void {
     if (this.logToConsole) {
       // Serialized as one field so it survives a JSON log pipeline intact and
       // cannot collide with the logger's own keys.

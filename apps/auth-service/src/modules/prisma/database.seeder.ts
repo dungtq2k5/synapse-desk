@@ -100,6 +100,7 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
     // back alongside the data.
     await this.ensureGlobalRoleNameIndex();
     await this.applyPartialIndexes();
+    await this.applyCheckConstraints();
 
     // Hash before opening the transaction: bcrypt is deliberately slow and
     // CPU-bound, and holding a pooled connection open across it is wasteful.
@@ -254,6 +255,67 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
       CREATE UNIQUE INDEX IF NOT EXISTS "user_departments_primary_key"
         ON user_departments (user_id)
         WHERE is_primary = true;
+    `);
+  }
+
+  /**
+   * Constraints Prisma cannot express — 21-doc §2.2b.
+   *
+   * **`locked_until` without `is_locked` is unrepresentable, not merely
+   * unwritten.** Two columns is four states on paper and only three mean
+   * anything:
+   *
+   *   - `true` + NULL — an indefinite lock; an admin must unlock. The existing
+   *     behaviour.
+   *   - `true` + future — a temporary lock; it auto-unlocks.
+   *   - `false` + NULL — not locked.
+   *
+   * The two the constraint prevents are both SILENT if written:
+   *
+   *   - `false` + past is stale residue that nobody reading a row should have
+   *     to interpret as "behaviourally unlocked".
+   *   - `false` + future reads like "not locked, but scheduled to stop being
+   *     locked", which is meaningless — and specifically it is NOT a scheduled
+   *     future lock. That is a plausible different feature needing its own
+   *     column (`locked_from`) and its own sweep, and leaving this state
+   *     invalid is what stops somebody half-implementing it by setting a field.
+   *
+   * Both mechanisms that clear a lock already clear the pair together, so
+   * nothing legitimate is blocked. **The constraint exists for the write that
+   * FORGETS to** — and every one of those would otherwise produce a row that
+   * looks fine.
+   *
+   * `true` + past is deliberately NOT prevented: it is the converging window
+   * between an expiry passing and a mechanism noticing, and it is a window
+   * rather than a state.
+   *
+   * `DO $$` rather than `ADD CONSTRAINT IF NOT EXISTS`: Postgres has no
+   * `IF NOT EXISTS` for constraints, so a second boot would fail without the
+   * catalogue check. Same pattern as ticket-service's `rating` constraint —
+   * which, contrary to 21-doc §2.2b, is the codebase's ONLY existing example.
+   * There is no `(organization_id IS NULL) = is_super_admin` CHECK on `users`
+   * today; that invariant is enforced in the service layer and by
+   * `users_super_admin_email_key`, not by the database. Worth adding one day,
+   * and out of scope here.
+   *
+   * Run from the SEED for the same reason as the partial indexes:
+   * `db push --force-reset` neither creates nor preserves a hand-written
+   * constraint, so a reset would silently drop it and leave a schema that looks
+   * correct.
+   */
+  private async applyCheckConstraints(): Promise<void> {
+    await this.prisma.$executeRawUnsafe(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint
+          WHERE conname = 'users_locked_until_requires_lock'
+        ) THEN
+          ALTER TABLE "users"
+            ADD CONSTRAINT "users_locked_until_requires_lock"
+            CHECK ("locked_until" IS NULL OR "is_locked");
+        END IF;
+      END $$;
     `);
   }
 

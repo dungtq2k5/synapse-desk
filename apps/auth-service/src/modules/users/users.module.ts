@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ExpiredLockSweep } from './expired-lock.sweep';
 import { UsersService } from './users.service';
 import { UsersGrpcController } from './users-grpc.controller';
 import { PrismaModule } from '../prisma/prisma.module';
@@ -34,7 +35,7 @@ import { StorageClientModule } from '../storage-client/storage-client.module';
     StorageClientModule,
   ],
   controllers: [UsersGrpcController],
-  providers: [UsersService],
-  exports: [UsersService],
+  providers: [ExpiredLockSweep, UsersService],
+  exports: [ExpiredLockSweep, UsersService],
 })
 export class UsersModule {}

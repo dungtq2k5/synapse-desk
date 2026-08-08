@@ -16,6 +16,7 @@ export type Chunk = {
   tokenCount: number;
 };
 
+// FIXME Simplify this regular expression to reduce its runtime, as it has super-linear performance due to backtracking.
 const HEADING_PATTERN = /^(#{1,6})\s+(.*)$/;
 
 /**

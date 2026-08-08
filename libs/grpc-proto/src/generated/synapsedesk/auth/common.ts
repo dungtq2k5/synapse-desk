@@ -87,7 +87,17 @@ export interface UserResponse {
   isLocked: boolean;
   isTwoFactorEnabled: boolean;
   createdAt: Timestamp | undefined;
-  updatedAt: Timestamp | undefined;
+  updatedAt:
+    | Timestamp
+    | undefined;
+  /**
+   * When a temporary lock lapses; absent means INDEFINITE -- 21-doc §2.
+   *
+   * `is_locked` stays the authoritative boolean a client should render on. This
+   * is here so an admin screen can say "locked until Friday" rather than just
+   * "locked", and so an expiry is visible before it fires.
+   */
+  lockedUntil?: Timestamp | undefined;
 }
 
 /**

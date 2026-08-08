@@ -69,6 +69,12 @@ message UserResponse {
   bool is_two_factor_enabled = 13;
   google.protobuf.Timestamp created_at = 14;
   google.protobuf.Timestamp updated_at = 15;
+  // When a temporary lock lapses; absent means INDEFINITE -- 21-doc §2.
+  //
+  // `is_locked` stays the authoritative boolean a client should render on. This
+  // is here so an admin screen can say "locked until Friday" rather than just
+  // "locked", and so an expiry is visible before it fires.
+  optional google.protobuf.Timestamp locked_until = 16;
 }
 
 // Shared by every list RPC in the package. Mirrors SearchPaginationBase at the

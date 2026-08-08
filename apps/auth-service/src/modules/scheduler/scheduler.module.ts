@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SCHEDULER_QUEUE } from '@synapsedesk/common';
 import { InvitationsModule } from '../invitations/invitations.module';
+import { UsersModule } from '../users/users.module';
 import { JobRunsModule } from '../job-runs/job-runs.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { ExpiredRecordsPruner } from '../sessions/expired-records.job';
@@ -36,6 +37,7 @@ import { SchedulerRegistrar } from './scheduler.registrar';
     PrismaModule,
     JobRunsModule,
     InvitationsModule,
+    UsersModule,
   ],
   providers: [ExpiredRecordsPruner, SchedulerProcessor, SchedulerRegistrar],
   exports: [ExpiredRecordsPruner],

@@ -195,6 +195,14 @@ export interface LockUserRequest {
    * "why is this account locked?" is asked months later, by someone else.
    */
   reason: string;
+  /**
+   * *Absent means INDEFINITE** -- the existing behaviour, unchanged (21-doc
+   * §2). Supplied, it must be in the FUTURE: a past value would lock and
+   * instantly unlock, which the database accepts and nobody understands. The
+   * gateway rejects that; this service re-checks, because the gateway is not
+   * the only possible caller.
+   */
+  lockedUntil?: Timestamp | undefined;
 }
 
 export interface LockUserResponse {

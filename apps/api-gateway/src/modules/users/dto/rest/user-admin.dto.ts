@@ -3,6 +3,7 @@ import { OmitType } from '@nestjs/swagger';
 import {
   ArrayMaxSize,
   IsArray,
+  IsISO8601,
   IsBoolean,
   IsEmail,
   IsIn,
@@ -25,6 +26,7 @@ import {
 } from '../../../../common/config/dto.config';
 import { SearchPaginationBase } from '../../../../common/dto/base/search-pagination-base.dto';
 import { ToBoolean } from '../../../../common/decorators/to-boolean.decorator';
+import { IsFutureDate } from '../../../../common/decorators/is-future-date.decorator';
 import { UserResponseDto } from './user-response.dto';
 
 export class ListUsersQueryDto extends OmitType(SearchPaginationBase, [
@@ -97,6 +99,23 @@ export class LockUserDto {
   @IsNotEmpty()
   @MaxLength(500)
   readonly reason!: string;
+
+  /**
+   * When the lock should lapse — 21-doc §2.
+   *
+   * **Absent means INDEFINITE**, which is the existing product and the default
+   * an admin gets by not thinking about it.
+   *
+   * **A PAST date is rejected**, not accepted (§2.4). The database would take
+   * it happily and the account would lock and unlock in the same instant —
+   * legal, and incomprehensible to the admin who set it and the user who got
+   * the email. Validated here and re-checked in auth-service, because the
+   * gateway is not the only possible caller.
+   */
+  @IsOptional()
+  @IsISO8601({ strict: true })
+  @IsFutureDate()
+  readonly lockedUntil?: string;
 }
 
 export class SetUserRolesDto {

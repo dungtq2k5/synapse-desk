@@ -7,6 +7,7 @@ import {
   requireTimestamp,
   toPageRequest,
   toProtoGender,
+  toTimestamp,
 } from '@synapsedesk/grpc-proto';
 import {
   PermissionCode,
@@ -220,7 +221,7 @@ export class UserServiceGrpcClient
     );
   }
 
-  restore(
+  async restore(
     id: string,
     context: RequestContext,
   ): Promise<UserSummaryResponseDto> {
@@ -237,7 +238,18 @@ export class UserServiceGrpcClient
   ): Promise<{ revokedSessionCount: number }> {
     return this.call(
       (metadata) =>
-        this.userGrpcService.lockUser({ id, reason: dto.reason }, metadata),
+        this.userGrpcService.lockUser(
+          {
+            id,
+            reason: dto.reason,
+            // Absent stays absent — an INDEFINITE lock, which is the existing
+            // behaviour and what an admin gets by not choosing (21-doc §2).
+            lockedUntil: dto.lockedUntil
+              ? toTimestamp(new Date(dto.lockedUntil))
+              : undefined,
+          },
+          metadata,
+        ),
       context,
     );
   }

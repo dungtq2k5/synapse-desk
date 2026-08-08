@@ -9,6 +9,7 @@ import {
   CurrentUserResponse,
   DeleteUserResponse,
   fromProtoGender,
+  fromTimestamp,
   GetUserPermissionsResponse,
   ListPermissionHoldersRequest,
   ListPermissionHoldersResponse,
@@ -25,6 +26,7 @@ import {
   SetUserDepartmentsRequest,
   SetUserRolesRequest,
   toPageMeta,
+  ProtoTimestamp,
   toTimestamp,
   UnlockUserResponse,
   UpdateOwnProfileRequest,
@@ -262,11 +264,19 @@ export class UsersService {
         // A locked account cannot act on the alert, which is the whole point
         // of addressing it by permission.
         //
-        // `isLocked`, a BOOLEAN — there is no `lockedUntil` column. This read
-        // it as one until a test finally executed it: TypeScript did not object
-        // because the conditional `departmentId` spread below makes this an
-        // object literal with a spread, which suppresses the excess-property
-        // check that would otherwise have rejected the name outright.
+        // **`isLocked` is the authoritative boolean, and this filter is
+        // deliberately NOT temporal** — 21-doc §2.2. A `lockedUntil` column
+        // does now exist, but it is only an EXPIRY: two mechanisms act on it
+        // (a lazy unlock on the login path and the hourly `ExpiredLockSweep`),
+        // and both clear `isLocked` when they fire. Reading the expiry here as
+        // well would be the 22-call-site version of this change, where each
+        // site is a fresh chance to get a boolean wrong in code where wrong
+        // means a locked user logs in or an unlocked one cannot.
+        //
+        // The cost is bounded and known: for up to an hour after expiry a
+        // swept-but-not-yet-swept user is missing from this audience. That is
+        // the gap the sweep exists to close, and closing it here instead would
+        // trade a one-hour delay for a permanent class of bug.
         isLocked: false,
         // `user_roles` and `role_permissions` are IMPLICIT many-to-many
         // relations, so the nesting is user → roles → permissions directly.
@@ -606,7 +616,13 @@ export class UsersService {
     }
   }
 
-  /** Same "otherwise they keep working" reasoning as delete. */
+  /**
+   * Same "otherwise they keep working" reasoning as delete.
+   *
+   * **`lockedUntil` is optional, and absent means INDEFINITE** — the existing
+   * product, unchanged (21-doc §2.5 test 1). A temporary lock stores an expiry
+   * that two mechanisms act on; nothing about the lock itself differs.
+   */
   async lockUser(
     request: LockUserRequest,
     context: CallerContext,
@@ -616,9 +632,13 @@ export class UsersService {
 
     await this.assertRemovable(target, actorId, context);
 
+    const lockedUntil = this.parseLockExpiry(request.lockedUntil);
+
     await this.prisma.user.update({
       where: { id: target.id },
-      data: { isLocked: true },
+      // `lockedUntil: null` when absent, not left alone: a re-lock must not
+      // inherit an expiry from a previous temporary lock — 21-doc §2.4.
+      data: { isLocked: true, lockedUntil },
     });
 
     const revokedSessionCount = await this.sessionsService.revokeAllForUser(
@@ -629,7 +649,14 @@ export class UsersService {
       action: AuditAction.USER_LOCKED,
       resourceType: AuditResourceType.USER,
       resourceId: target.id,
-      metadata: { reason: request.reason, revokedSessionCount },
+      metadata: {
+        reason: request.reason,
+        revokedSessionCount,
+        // Recorded so "why is this account locked, and was it meant to be
+        // permanent?" is answerable months later without reading the row,
+        // which by then may have been unlocked and re-locked.
+        lockedUntil: lockedUntil?.toISOString() ?? null,
+      },
     });
 
     this.notifications.sendEmail({
@@ -638,7 +665,10 @@ export class UsersService {
       data: {
         fullName: target.fullName,
         headline: 'Your account has been locked',
-        detail: `An administrator locked your account. Reason: ${request.reason}`,
+        // **Says when it ends** — 21-doc §2.4. For a temporary lock, "until
+        // Friday 09:00" is the difference between a support ticket and no
+        // support ticket, and the user has no other way to find out.
+        detail: lockUntilSentence(request.reason, lockedUntil, target.timezone),
         origin: { ip: context.ip, userAgent: context.userAgent },
       },
     });
@@ -646,7 +676,39 @@ export class UsersService {
     return { revokedSessionCount };
   }
 
-  /** No sessions restored: unlocking permits signing in, it does not sign in. */
+  /**
+   * Validates an optional lock expiry — 21-doc §2.4.
+   *
+   * **A past date is rejected rather than accepted.** It would lock and
+   * instantly unlock: legal in the database, and incomprehensible to the admin
+   * who set it and the user who received the email. Re-checked here as well as
+   * at the gateway, because the gateway is not the only possible caller.
+   */
+  private parseLockExpiry(
+    lockedUntil: ProtoTimestamp | undefined,
+  ): Date | null {
+    if (!lockedUntil) return null;
+
+    const expiry = fromTimestamp(lockedUntil);
+    if (!expiry) return null;
+
+    if (expiry.getTime() <= Date.now()) {
+      throw new RpcException({
+        code: status.INVALID_ARGUMENT,
+        message: 'lockedUntil must be in the future',
+      });
+    }
+
+    return expiry;
+  }
+
+  /**
+   * No sessions restored: unlocking permits signing in, it does not sign in.
+   *
+   * **Clears `lockedUntil` too** — 21-doc §2.4. An admin unlocking a
+   * temporarily-locked user must not leave a stale expiry behind for a later
+   * indefinite re-lock to inherit.
+   */
   async unlockUser(
     request: UserIdRequest,
     context: CallerContext,
@@ -655,7 +717,7 @@ export class UsersService {
 
     await this.prisma.user.update({
       where: { id: target.id },
-      data: { isLocked: false },
+      data: { isLocked: false, lockedUntil: null },
     });
 
     this.audit.record(context, {
@@ -1147,4 +1209,51 @@ function toNotificationRecipient(user: {
     quietHoursEnd: user.quietHoursEnd ?? undefined,
     timezone: user.timezone ?? undefined,
   };
+}
+
+/**
+ * The lock email's body — 21-doc §2.4.
+ *
+ * **Formatted in the RECIPIENT's timezone**, not the server's or the admin's.
+ * `users.timezone` is already there for quiet hours, and an unlock time in a
+ * zone the reader does not live in is worse than no unlock time: it invites
+ * them to try at the wrong hour and conclude the lock is permanent.
+ *
+ * Falls back to UTC with the zone named, rather than to a bare local-looking
+ * string — an unlabelled time is the thing that generates the support ticket
+ * this sentence exists to prevent.
+ */
+function lockUntilSentence(
+  reason: string,
+  lockedUntil: Date | null,
+  timezone: string | null,
+): string {
+  const base = `An administrator locked your account. Reason: ${reason}`;
+
+  if (!lockedUntil) return base;
+
+  return `${base} Your account will unlock automatically at ${formatInZone(
+    lockedUntil,
+    timezone,
+  )}.`;
+}
+
+/** A human-readable instant, always carrying the zone it is expressed in. */
+function formatInZone(instant: Date, timezone: string | null): string {
+  // FIXME Prefer default parameters over reassignment.
+  const zone = timezone ?? 'UTC';
+
+  try {
+    return new Intl.DateTimeFormat('en-GB', {
+      dateStyle: 'full',
+      timeStyle: 'short',
+      timeZone: zone,
+      timeZoneName: 'short',
+    }).format(instant);
+  } catch {
+    // An invalid stored zone must not fail the LOCK — the email is the least
+    // important part of that operation. Same reasoning as `safeTimezone` in
+    // the rollup windows: fall back, never throw.
+    return `${instant.toISOString()} (UTC)`;
+  }
 }

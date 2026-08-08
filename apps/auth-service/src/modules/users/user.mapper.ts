@@ -68,6 +68,9 @@ export function toUserResponse(
     gender: toProtoGender(user.gender),
     lastLoginAt: toTimestamp(user.lastLoginAt),
     isLocked: user.isLocked,
+    // Absent means the lock is INDEFINITE — 21-doc §2. Carried so an admin
+    // screen can say "locked until Friday" rather than just "locked".
+    lockedUntil: toTimestamp(user.lockedUntil),
     isTwoFactorEnabled: user.isTwoFactorEnabled,
     // Non-optional in the proto. ts-proto types every message-valued field as
     // `T | undefined`, which is its convention for message fields -- not

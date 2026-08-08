@@ -485,6 +485,44 @@ export class AuthService {
   }
 
   /**
+   * Clears a lock whose `lockedUntil` has passed — 21-doc §2.2, mechanism 1.
+   *
+   * **Both columns are cleared together.** Leaving `lockedUntil` set on an
+   * unlocked account would let a later indefinite re-lock silently inherit an
+   * expiry nobody asked for — the same reasoning as §2.4's rule for manual
+   * unlocks.
+   *
+   * **Returns whether the lock is still IN FORCE, not whether this call did the
+   * write.** The distinction is the whole correctness of the race, and getting
+   * it backwards is a real bug this had: at expiry the hourly sweep and the
+   * user's login attempt are independent and routinely land together, so when
+   * the sweep wins, `updateMany` matches zero rows here. Reporting that as "the
+   * lock stands" refuses a login whose lock had genuinely expired — the user
+   * sees "Account is locked", tries again, and it works, which is the kind of
+   * fault nobody can reproduce or report usefully.
+   *
+   * The write stays CONDITIONAL so the two mechanisms produce one unlock rather
+   * than two; `count` decides who writes the audit row, never who may log in.
+   */
+  private async expireLockIfLapsed(user: {
+    id: string;
+    isLocked: boolean;
+    lockedUntil: Date | null;
+  }): Promise<boolean> {
+    if (!user.isLocked || !user.lockedUntil) return false;
+    if (user.lockedUntil.getTime() > Date.now()) return false;
+
+    await this.prisma.user.updateMany({
+      where: { id: user.id, isLocked: true },
+      data: { isLocked: false, lockedUntil: null },
+    });
+
+    // The lock had lapsed before this call started. Whether this statement or
+    // the sweep's is the one that cleared the row does not change that.
+    return true;
+  }
+
+  /**
    * The shared tail of every successful first-factor check: locked → frozen →
    * 2FA → session.
    *
@@ -498,6 +536,21 @@ export class AuthService {
     device: RequestOrigin,
     client: { deviceName?: string; deviceToken?: string },
   ): Promise<LoginResponse> {
+    // **Lazy unlock, before the check** — 21-doc §2.2.
+    //
+    // The one place where being locked matters in real time, so the expiry is
+    // honoured the moment the user tries to use it, with no dependency on a
+    // job having run. The hourly sweep covers what this cannot: a user whose
+    // lock expired but who never attempts a login stays *listed* as locked and
+    // excluded from notification audiences until something else notices.
+    //
+    // Deliberately BEFORE the `isLocked` check rather than folded into it. The
+    // check stays a plain boolean read, which is what keeps the other 20 read
+    // sites in this system untouched.
+    if (await this.expireLockIfLapsed(user)) {
+      user.isLocked = false;
+    }
+
     if (user.isLocked) {
       throw new RpcException({
         code: status.UNAUTHENTICATED,

@@ -69,6 +69,18 @@ export class UserBase {
   @IsBoolean()
   readonly isLocked!: boolean;
 
+  /**
+   * When a temporary lock lapses; `null` means INDEFINITE — 21-doc §2.
+   *
+   * `isLocked` stays the field a client renders on. This is here so an admin
+   * screen can say "locked until Friday" instead of just "locked", and so an
+   * expiry is visible before it fires rather than only after.
+   */
+  @Type(() => Date)
+  @IsNullable()
+  @IsDate()
+  readonly lockedUntil!: Date | null;
+
   @Type(() => Boolean)
   @IsBoolean()
   readonly isTwoFactorEnabled!: boolean;

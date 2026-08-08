@@ -154,7 +154,29 @@ model User {
   gender             String?   @db.VarChar(20)
   isTwoFactorEnabled Boolean   @default(false) @map("is_two_factor_enabled")
   twoFactorSecret    String?   @map("two_factor_secret") @db.VarChar(255)
+  
+  /// **The one authoritative boolean.** Every read in the system asks this and
+  /// only this — login, 2FA, forgot-password, both notification audiences, the
+  /// last-Org-Admin count, list filters and the mappers. 21-doc §2.2.
   isLocked           Boolean   @default(false) @map("is_locked")
+
+  /// When a temporary lock lapses. NULL means the lock is INDEFINITE — the
+  /// existing behaviour, unchanged.
+  ///
+  /// **`is_locked` remains authoritative**, which is the entire design: this
+  /// column answers only "when should it stop", so adding it touched three call
+  /// sites rather than 22 (21-doc §2.1). The naive alternative —
+  /// `isLocked || lockedUntil > now` at every read — is 22 chances to get a
+  /// boolean wrong in code where wrong means either a locked user can log in or
+  /// an unlocked user cannot.
+  ///
+  /// Two mechanisms act on it, and the redundancy is deliberate: a lazy unlock
+  /// on the login path (instant, no job dependency) and an hourly sweep (which
+  /// is what makes lists and notification audiences correct without any of them
+  /// learning about time). Neither alone is enough — see `ExpiredLockSweep`.
+  ///
+  /// No index: the sweep scans `is_locked = true`, which is a tiny set.
+  lockedUntil        DateTime? @map("locked_until") @db.Timestamptz
   lastLoginAt        DateTime? @map("last_login_at") @db.Timestamptz
 
   /// Quiet hours — GLOBAL user settings, not per notification type.
