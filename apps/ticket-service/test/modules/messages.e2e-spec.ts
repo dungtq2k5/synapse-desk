@@ -291,6 +291,143 @@ describe('§2.5 Ticket messages & attachments (e2e)', () => {
 
   // ---------------------------------------------------------------- invokeAi
 
+  /**
+   * 22-doc §2.3 — idempotency for the WebSocket transport.
+   *
+   * **The shape of the transport creates the requirement.** A user clicks Send
+   * once; a socket reconnects, and a client holding an unacked message re-emits
+   * it. That is correct client behaviour and it double-posts. HTTP clients do
+   * not do this, which is exactly why it is easy to miss.
+   */
+  describe('§2.3 clientMessageId idempotency', () => {
+    it('20. **a repeated clientMessageId yields ONE row and the ORIGINAL id**', async () => {
+      // Returning the original rather than an error is deliberate: the client's
+      // intent was satisfied, and an error would make it retry again.
+      const ticket = await createTicket(fx.prisma, tenant);
+      const clientMessageId = faker.string.uuid();
+
+      const first = await messages.createMessage(
+        {
+          ticketId: ticket.id,
+          content: 'Sent once, emitted twice',
+          isInternalNote: false,
+          invokeAi: false,
+          clientMessageId,
+        },
+        author(),
+      );
+      const second = await messages.createMessage(
+        {
+          ticketId: ticket.id,
+          content: 'Sent once, emitted twice',
+          isInternalNote: false,
+          invokeAi: false,
+          clientMessageId,
+        },
+        author(),
+      );
+
+      expect(second.id).toBe(first.id);
+      await expect(
+        fx.prisma.ticketMessage.count({ where: { ticketId: ticket.id } }),
+      ).resolves.toBe(1);
+    });
+
+    it('21. the duplicate publishes NO second message_created event', async () => {
+      // Otherwise Domain E notifies twice and every socket in the room sees the
+      // message appear again — the dedup would be invisible where it matters.
+      const ticket = await createTicket(fx.prisma, tenant);
+      const clientMessageId = faker.string.uuid();
+      const send = () =>
+        messages.createMessage(
+          {
+            ticketId: ticket.id,
+            content: 'Once',
+            isInternalNote: false,
+            invokeAi: false,
+            clientMessageId,
+          },
+          author(),
+        );
+
+      await send();
+      publish.mockClear();
+      await send();
+
+      expect(publish).not.toHaveBeenCalled();
+    });
+
+    it('22. CONCURRENT re-emits still produce one row — the index, not the read', async () => {
+      // The check and the insert are two statements, so two concurrent
+      // re-emits both read "not seen" and both write. Only
+      // `ticket_messages_client_key` makes one of them lose, and the catch
+      // turns that loss into the same answer.
+      const ticket = await createTicket(fx.prisma, tenant);
+      const clientMessageId = faker.string.uuid();
+      const send = () =>
+        messages.createMessage(
+          {
+            ticketId: ticket.id,
+            content: 'Racing',
+            isInternalNote: false,
+            invokeAi: false,
+            clientMessageId,
+          },
+          author(),
+        );
+
+      const [a, b] = await Promise.all([send(), send()]);
+
+      expect(a.id).toBe(b.id);
+      await expect(
+        fx.prisma.ticketMessage.count({ where: { ticketId: ticket.id } }),
+      ).resolves.toBe(1);
+    });
+
+    it('23. the SAME id in a DIFFERENT ticket is two messages, not a collision', async () => {
+      // Uniqueness is per ticket, matching the index. Two threads are two
+      // intents, and collapsing them would silently drop a real message.
+      const first = await createTicket(fx.prisma, tenant);
+      const second = await createTicket(fx.prisma, tenant);
+      const clientMessageId = faker.string.uuid();
+
+      const body = {
+        content: 'Same id',
+        isInternalNote: false,
+        invokeAi: false,
+      };
+      const a = await messages.createMessage(
+        { ...body, ticketId: first.id, clientMessageId },
+        author(),
+      );
+      const b = await messages.createMessage(
+        { ...body, ticketId: second.id, clientMessageId },
+        author(),
+      );
+
+      expect(a.id).not.toBe(b.id);
+    });
+
+    it('24. an HTTP-style call with NO clientMessageId is never deduped', async () => {
+      // The column is NULL for every HTTP message, and the partial index
+      // excludes NULLs — otherwise two ordinary replies would collide.
+      const ticket = await createTicket(fx.prisma, tenant);
+      const body = {
+        ticketId: ticket.id,
+        content: 'Ordinary reply',
+        isInternalNote: false,
+        invokeAi: false,
+      };
+
+      await messages.createMessage(body, author());
+      await messages.createMessage(body, author());
+
+      await expect(
+        fx.prisma.ticketMessage.count({ where: { ticketId: ticket.id } }),
+      ).resolves.toBe(2);
+    });
+  });
+
   describe('invokeAi', () => {
     it('1. KEEPS the user message when the AI call fails', async () => {
       // §2.5's second test, and the reason the two writes are separate. A

@@ -60,7 +60,42 @@ export interface CreateMessageRequest {
    * Absent for an ordinary reply, and absent is not an error — most replies
    * are typed by a human from nothing.
    */
-  generatedFromId?: string | undefined;
+  generatedFromId?:
+    | string
+    | undefined;
+  /**
+   * The SENDER's own id, for idempotency -- 22-doc §2.3.
+   *
+   * Absent for an HTTP call and REQUIRED for the WebSocket path, because a
+   * socket that reconnects with an unacked message re-emits it. A duplicate
+   * returns the ORIGINAL message rather than an error: the client's intent was
+   * satisfied, and an error would make it retry again.
+   */
+  clientMessageId?: string | undefined;
+}
+
+/**
+ * Persists a STREAMED AI answer — 22-doc §5.1, write #2.
+ *
+ * The gateway holds the `Chat` stream, because tokens have to reach a socket
+ * and ticket-service has none. What it does NOT hold is the shape of an AI
+ * message: `sender_id` stays null, `is_ai_generated` stays true, and
+ * `ticket.message_created` still publishes from here — so the streamed reply
+ * and the unary `invoke_ai` reply produce the same row and the same event.
+ *
+ * **Service-internal.** No REST route and no socket event reaches this: it is
+ * called only by the gateway's stream relay, with content that came from
+ * rag-service. Routing a client-supplied body here would let a customer post
+ * arbitrary text attributed to the assistant, in a thread they can read.
+ */
+export interface AppendAiMessageRequest {
+  ticketId: string;
+  content: string;
+  /**
+   * The `ai_generations` row the answer came from, when there is one. Absent
+   * for a canned greeting, which never reaches an LLM and never gets a row.
+   */
+  generationId?: string | undefined;
 }
 
 export interface ListMessagesRequest {
@@ -146,6 +181,8 @@ export interface DownloadAttachmentResponse {
 export interface MessageServiceClient {
   createMessage(request: CreateMessageRequest, metadata?: Metadata): Observable<MessageResponse>;
 
+  appendAiMessage(request: AppendAiMessageRequest, metadata?: Metadata): Observable<MessageResponse>;
+
   listMessages(request: ListMessagesRequest, metadata?: Metadata): Observable<ListMessagesResponse>;
 
   updateMessage(request: UpdateMessageRequest, metadata?: Metadata): Observable<MessageResponse>;
@@ -171,6 +208,11 @@ export interface MessageServiceClient {
 export interface MessageServiceController {
   createMessage(
     request: CreateMessageRequest,
+    metadata?: Metadata,
+  ): Promise<MessageResponse> | Observable<MessageResponse> | MessageResponse;
+
+  appendAiMessage(
+    request: AppendAiMessageRequest,
     metadata?: Metadata,
   ): Promise<MessageResponse> | Observable<MessageResponse> | MessageResponse;
 
@@ -224,6 +266,7 @@ export function MessageServiceControllerMethods() {
   return function (constructor: Function) {
     const grpcMethods: string[] = [
       "createMessage",
+      "appendAiMessage",
       "listMessages",
       "updateMessage",
       "redactMessage",

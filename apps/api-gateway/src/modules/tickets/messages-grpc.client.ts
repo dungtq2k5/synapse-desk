@@ -74,6 +74,15 @@ export class MessagesGrpcClient extends BaseGrpcClient implements OnModuleInit {
     ticketId: string,
     dto: CreateMessageDto,
     context: RequestContext,
+    /**
+     * The sender's own id, for idempotency — 22-doc §2.3.
+     *
+     * Passed as an argument rather than added to `CreateMessageDto`, because it
+     * belongs to the WEBSOCKET transport and not to the HTTP body. Putting it on
+     * the DTO would advertise it on `POST /tickets/:id/messages`, where it has
+     * no meaning — HTTP clients do not re-emit unacked requests on reconnect.
+     */
+    clientMessageId?: string,
   ): Promise<MessageResponseDto> {
     return toMessageDto(
       await this.call(
@@ -86,7 +95,36 @@ export class MessagesGrpcClient extends BaseGrpcClient implements OnModuleInit {
               // means "an ordinary reply" rather than "unspecified".
               isInternalNote: dto.isInternalNote ?? false,
               invokeAi: dto.invokeAi ?? false,
+              clientMessageId,
             },
+            metadata,
+          ),
+        context,
+      ),
+    );
+  }
+
+  /**
+   * Persists a STREAMED AI answer — 22-doc §5.1, write #2.
+   *
+   * **Not reachable from any route.** There is no DTO and no controller calling
+   * this: the only caller is `AiStreamService`, with content that came from
+   * rag-service's `Chat` stream. A body-driven path to it would let a customer
+   * post arbitrary text attributed to the assistant in a thread they can read,
+   * which is why the argument list is the raw fields rather than a DTO
+   * something could bind a request to.
+   */
+  async appendAi(
+    ticketId: string,
+    content: string,
+    generationId: string | undefined,
+    context: RequestContext,
+  ): Promise<MessageResponseDto> {
+    return toMessageDto(
+      await this.call(
+        (metadata) =>
+          this.messageGrpcService.appendAiMessage(
+            { ticketId, content, generationId },
             metadata,
           ),
         context,

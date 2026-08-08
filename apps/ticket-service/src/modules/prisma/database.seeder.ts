@@ -68,6 +68,21 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
     await this.prisma.$executeRawUnsafe(`
       CREATE UNIQUE INDEX IF NOT EXISTS "ticket_assignments_current_key"
         ON "ticket_assignments" ("ticket_id") WHERE "is_current" = true;
+
+      -- The WebSocket idempotency guard — 22-doc §2.3.
+      --
+      -- A socket that reconnects holding an unacked message re-emits it. That
+      -- is correct client behaviour, and without this index it double-posts:
+      -- the service's own "have I seen this id?" read and the insert are two
+      -- statements, so two concurrent re-emits both read "no" and both write.
+      --
+      -- PARTIAL on \`client_message_id IS NOT NULL\` because the column is NULL
+      -- for every HTTP-created message, and Postgres does not treat NULLs as
+      -- equal — a full unique index would admit unlimited NULL rows while
+      -- still costing a full index. The filter makes that deliberate.
+      CREATE UNIQUE INDEX IF NOT EXISTS "ticket_messages_client_key"
+        ON "ticket_messages" ("ticket_id", "client_message_id")
+        WHERE "client_message_id" IS NOT NULL;
     `);
 
     // The analytics rollup's uniqueness guard — 19-doc §2.2.

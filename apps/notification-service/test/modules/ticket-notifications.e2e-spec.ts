@@ -1,7 +1,7 @@
 import {
   ReassignmentReason,
   TICKET_PATTERNS,
-  TicketDomainEvent,
+  TicketEventOf,
   TicketStatus,
   ticketMessageGroupKey,
 } from '@synapsedesk/common';
@@ -9,26 +9,6 @@ import { bootstrapE2eTest, E2eFixture } from '../utils/bootstrap';
 import { TicketNotificationConsumer } from '../../src/modules/in-app/ticket-notification.consumer';
 import { AuthReferenceService } from '../../src/modules/auth-client/auth-reference.service';
 import { EmailService } from '../../src/modules/email/email.service';
-
-const ORG = '11111111-1111-4111-8111-111111111111';
-const TICKET_ID = '55555555-5555-4555-8555-555555555555';
-const TICKET_NUMBER = 1042;
-const DEPARTMENT = '66666666-6666-4666-8666-666666666666';
-
-const REQUESTER = '22222222-2222-4222-8222-222222222222';
-const AGENT = '33333333-3333-4333-8333-333333333333';
-const OTHER_AGENT = '44444444-4444-4444-8444-444444444444';
-
-function recipient(userId: string, name: string) {
-  return {
-    userId,
-    email: `${name}@tenant.test`,
-    fullName: name,
-    quietHoursStart: null,
-    quietHoursEnd: null,
-    timezone: null,
-  };
-}
 
 /**
  * 18-doc §3 — the `ticket.*` producers.
@@ -46,6 +26,64 @@ describe('§3 Ticket notifications (e2e)', () => {
   let listUsersByIds: jest.SpyInstance;
   let listPermissionHolders: jest.SpyInstance;
   let sendEmail: jest.SpyInstance;
+
+  const ORG = '11111111-1111-4111-8111-111111111111';
+  const TICKET_ID = '55555555-5555-4555-8555-555555555555';
+  const TICKET_NUMBER = 1042;
+  const DEPARTMENT = '66666666-6666-4666-8666-666666666666';
+
+  const REQUESTER = '22222222-2222-4222-8222-222222222222';
+  const AGENT = '33333333-3333-4333-8333-333333333333';
+  const OTHER_AGENT = '44444444-4444-4444-8444-444444444444';
+
+  const recipient = (userId: string, name: string) => {
+    return {
+      userId,
+      email: `${name}@tenant.test`,
+      fullName: name,
+      quietHoursStart: null,
+      quietHoursEnd: null,
+      timezone: null,
+    };
+  };
+
+  const base = {
+    organizationId: ORG,
+    ticketId: TICKET_ID,
+    ticketNumber: TICKET_NUMBER,
+    occurredAt: new Date().toISOString(),
+  };
+
+  // Narrowed by PATTERN rather than by shape. `Extract<…, { messageId: string }>`
+  // used to name exactly one variant and now names three — 22-doc §6.1 added
+  // `message_updated` and `message_redacted`, which also carry a `messageId`.
+  // Structural narrowing silently widened; the pattern is the discriminant and
+  // says what it means.
+  const messageEvent = (
+    overrides: Partial<
+      TicketEventOf<typeof TICKET_PATTERNS.messageCreated>
+    > = {},
+  ) =>
+    ({
+      ...base,
+      pattern: TICKET_PATTERNS.messageCreated,
+      messageId: `msg-${Math.random().toString(36).slice(2)}`,
+      senderId: AGENT,
+      requesterId: REQUESTER,
+      assigneeId: AGENT,
+      isAiGenerated: false,
+      isInternalNote: false,
+      groupKey: ticketMessageGroupKey(TICKET_ID),
+      ...overrides,
+    }) as TicketEventOf<typeof TICKET_PATTERNS.messageCreated>;
+
+  const recipientsOf = async (): Promise<string[]> => {
+    const rows = await fx.prisma.notification.findMany({
+      orderBy: { recipientId: 'asc' },
+    });
+
+    return rows.map((row) => row.recipientId);
+  };
 
   beforeAll(async () => {
     fx = await bootstrapE2eTest();
@@ -77,37 +115,6 @@ describe('§3 Ticket notifications (e2e)', () => {
   afterAll(async () => {
     await fx.close();
   });
-
-  const base = {
-    organizationId: ORG,
-    ticketId: TICKET_ID,
-    ticketNumber: TICKET_NUMBER,
-    occurredAt: new Date().toISOString(),
-  };
-
-  const messageEvent = (
-    overrides: Partial<Extract<TicketDomainEvent, { messageId: string }>> = {},
-  ) =>
-    ({
-      ...base,
-      pattern: TICKET_PATTERNS.messageCreated,
-      messageId: `msg-${Math.random().toString(36).slice(2)}`,
-      senderId: AGENT,
-      requesterId: REQUESTER,
-      assigneeId: AGENT,
-      isAiGenerated: false,
-      isInternalNote: false,
-      groupKey: ticketMessageGroupKey(TICKET_ID),
-      ...overrides,
-    }) as Extract<TicketDomainEvent, { messageId: string }>;
-
-  const recipientsOf = async (): Promise<string[]> => {
-    const rows = await fx.prisma.notification.findMany({
-      orderBy: { recipientId: 'asc' },
-    });
-
-    return rows.map((row) => row.recipientId);
-  };
 
   describe('rule 1 — never notify the actor', () => {
     it('1. Assigning a ticket to YOURSELF notifies nobody', async () => {

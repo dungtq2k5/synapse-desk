@@ -8,7 +8,7 @@ import {
   TicketMessage,
 } from '../../generated/prisma/client';
 
-type MessageWithAttachments = TicketMessage & {
+export type MessageWithAttachments = TicketMessage & {
   attachments?: MessageAttachment[];
 };
 

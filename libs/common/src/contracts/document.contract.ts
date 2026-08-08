@@ -44,12 +44,40 @@ export type DocumentUploadedEvent = DocumentEventBase & {
 export type DocumentIndexedEvent = DocumentEventBase & {
   pattern: typeof DOCUMENT_PATTERNS.indexed;
   chunkCount: number;
+  /**
+   * Who uploaded it. The one person who is always told, whatever its scope.
+   */
+  uploaderId: string;
+  /** Rendered by the client without a follow-up fetch. */
+  title: string;
+  /**
+   * The visibility, CARRIED rather than re-read — 22-doc §6.2.
+   *
+   * The relay decides which rooms this reaches, and a department-scoped
+   * document announced tenant-wide would disclose its existence and title to
+   * exactly the people the department boundary excludes. Putting the scope on
+   * the event means the consumer never has to fetch it, and — more importantly
+   * — never has a code path where the fetch failed and it fanned out anyway.
+   * Same reasoning as `ticket.message_created` carrying its ticket.
+   */
+  isOrganizationWide: boolean;
+  departmentIds: string[];
 };
 
 export type DocumentIngestionFailedEvent = DocumentEventBase & {
   pattern: typeof DOCUMENT_PATTERNS.ingestionFailed;
   /** Already redacted for display — never a raw stack trace. */
   reason: string;
+  /**
+   * The uploader, and the ONLY recipient — 22-doc §6.2.
+   *
+   * A failure is not department news: it is one person's document not working.
+   * Carried for the same reason as above, and with a sharper edge — the
+   * fallback for a missing uploader must be "tell nobody", not "tell the
+   * tenant".
+   */
+  uploaderId: string;
+  title: string;
 };
 
 /**

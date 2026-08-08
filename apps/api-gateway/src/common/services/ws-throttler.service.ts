@@ -90,4 +90,65 @@ export class WsThrottlerService {
       return true;
     }
   }
+
+  /**
+   * Flood control for an authenticated C→S **event** — 22-doc §6.3.
+   *
+   * `allowHandshake` above guards only the connection. Every client-to-server
+   * handler needs this too, and `message:send` needs it most: it reaches the
+   * same RPC as `POST /tickets/:id/messages`, so without a limit here the socket
+   * is a rate-limit bypass for the endpoint the HTTP tier carefully throttles.
+   *
+   * **Keyed on the USER, not the IP**, which is the opposite of the handshake
+   * and for a reason that has flipped: by the time a frame arrives the token has
+   * been verified, so there is a real identity to key on — and keying on IP
+   * would make one office share one budget for sending messages, which is the
+   * NAT cost the handshake accepts and a message path should not.
+   *
+   * Returns false rather than throwing, so a caller decides whether to drop
+   * silently (typing) or tell the client (`message:send`). The two want opposite
+   * things: a dropped typing frame is invisible and correct, while a dropped
+   * message needs to surface or the user's text disappears.
+   */
+  async allowEvent(
+    client: Socket,
+    event: string,
+    limit: number,
+    ttlMs: number,
+  ): Promise<boolean> {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    const subject = (client.data.user as { sub?: string } | undefined)?.sub;
+    // No verified identity means the socket never authenticated. Refused rather
+    // than allowed — the handler would refuse it a line later anyway, and doing
+    // it here keeps an unauthenticated frame from costing a storage round trip.
+    if (!subject) return false;
+
+    const key = `ws_event:${event}:${subject}`;
+
+    try {
+      const { totalHits } = await this.storage.increment(
+        key,
+        ttlMs,
+        limit,
+        // No block duration: exceeding an event limit is ordinary client
+        // behaviour — a held key, a reconnect storm — and locking the user out
+        // for five minutes for typing too fast is a worse product than dropping
+        // the frame.
+        0,
+        event,
+      );
+
+      return totalHits <= limit;
+    } catch (error) {
+      // FAIL OPEN, like the handshake and the HTTP tier. A Redis outage must not
+      // silently stop message delivery; the log line is the signal that the
+      // limit is off.
+      this.logger.error(
+        `Event throttle storage unavailable; allowing ${event}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return true;
+    }
+  }
 }

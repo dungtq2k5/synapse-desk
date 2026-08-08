@@ -180,6 +180,19 @@ model TicketMessage {
   redactedAt   DateTime? @map("redacted_at") @db.Timestamptz
   redactedById String?   @map("redacted_by_id") @db.Uuid
 
+  /// The SENDER's own id for this message — 22-doc §2.3.
+  ///
+  /// **Exists because WebSocket clients retry in a way HTTP clients do not.** A
+  /// user clicks Send once; a socket reconnects, and a client holding an unacked
+  /// message re-emits it. That is correct client behaviour and it double-posts.
+  ///
+  /// Deduped on `(ticket_id, client_message_id)` by a PARTIAL unique index — see
+  /// `applyPartialIndexes()` in the seeder. Partial because the column is NULL
+  /// for every HTTP-created message, and Postgres does not treat NULLs as equal,
+  /// so a full unique index would admit unlimited NULL rows while still costing
+  /// a full index. The filter makes that explicit rather than accidental.
+  clientMessageId String? @map("client_message_id") @db.Uuid
+
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   ticket      Ticket              @relation(fields: [ticketId], references: [id], onDelete: Cascade)

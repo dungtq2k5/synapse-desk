@@ -1,4 +1,4 @@
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   MicroserviceOptions,
@@ -8,6 +8,7 @@ import {
 import { Test, TestingModuleBuilder } from '@nestjs/testing';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import cookieParser from 'cookie-parser';
+import Redis from 'ioredis';
 import { io, Socket as ClientSocket } from 'socket.io-client';
 import type { Server } from 'node:http';
 import {
@@ -15,7 +16,11 @@ import {
   JwtPayload,
   TicketDomainEvent,
 } from '@synapsedesk/common';
-import { AUTH_GRPC_CLIENT, TICKET_GRPC_CLIENT } from '@synapsedesk/grpc-proto';
+import {
+  AUTH_GRPC_CLIENT,
+  RAG_GRPC_CLIENT,
+  TICKET_GRPC_CLIENT,
+} from '@synapsedesk/grpc-proto';
 import { AppModule } from '../../src/app.module';
 import { RedisIoAdapter } from '../../src/common/adapters/redis-io.adapter';
 import { GrpcStubs, stubGrpcServices } from './grpc-stub';
@@ -41,6 +46,15 @@ export type RealtimeFixture = {
   connectClient: (overrides?: Partial<JwtPayload>) => Promise<ClientSocket>;
   /** A client with a deliberately bad cookie, for the rejection cases. */
   connectRaw: (cookie: string) => ClientSocket;
+  /**
+   * A direct Redis handle, for the presence tests.
+   *
+   * Used to EXPIRE a key rather than to write one: 22-doc §4 test 3 asks what
+   * happens to a user whose heartbeat stops with no disconnect, and the honest
+   * way to ask that is to remove the key the way a TTL would — not to wait sixty
+   * seconds, and not to call a method the production path never calls.
+   */
+  redis: Redis;
   close: () => Promise<void>;
 };
 
@@ -67,6 +81,13 @@ export async function bootstrapRealtimeTest(
     .overrideProvider(AUTH_GRPC_CLIENT)
     .useValue(clientGrpc)
     .overrideProvider(TICKET_GRPC_CLIENT)
+    .useValue(clientGrpc)
+    // Domain C's Python peer, for the AI streaming relay — 22-doc §5. Stubbed
+    // like the others: what the gateway can prove alone is that it RELAYS a
+    // server-stream correctly, which is a property of this process. Whether a
+    // cancelled generation writes its ledger row is rag-service's half, and is
+    // tested there (`tests/test_generation.py`).
+    .overrideProvider(RAG_GRPC_CLIENT)
     .useValue(clientGrpc);
 
   configure?.(builder);
@@ -78,6 +99,20 @@ export async function bootstrapRealtimeTest(
   app.set('trust proxy', 1);
   app.setGlobalPrefix(configService.getOrThrow<string>('GLOBAL_PREFIX'));
   app.use(cookieParser());
+
+  // **The SAME global pipe `main.ts` installs**, and it matters more than it
+  // looks. `useGlobalPipes` binds across every execution context, sockets
+  // included — so a fixture without it runs the handlers under different rules
+  // than production, and the difference only shows up the day someone types a
+  // `@MessageBody()` as a DTO and the pipe starts rejecting frames the tests
+  // never saw it reject.
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  );
 
   // The SAME adapter main.ts installs. Using the default in-memory one here
   // would leave the Redis path — the part that only fails across replicas —
@@ -185,10 +220,15 @@ export async function bootstrapRealtimeTest(
     });
   };
 
+  const redis = new Redis(configService.getOrThrow<string>('REDIS_URL'), {
+    maxRetriesPerRequest: 3,
+  });
+
   const close = async (): Promise<void> => {
     for (const socket of clients) socket.disconnect();
     clients.length = 0;
     await natsClient.close();
+    await redis.quit().catch(() => undefined);
     await app.close();
   };
 
@@ -200,6 +240,7 @@ export async function bootstrapRealtimeTest(
     publishOn,
     connectClient,
     connectRaw,
+    redis,
     close,
   };
 }

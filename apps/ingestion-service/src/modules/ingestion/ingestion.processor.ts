@@ -320,7 +320,7 @@ export class IngestionProcessor {
     data: IngestionJobData,
     chunkCount: number,
   ): Promise<void> {
-    await this.prisma.$transaction([
+    const [, document] = await this.prisma.$transaction([
       this.prisma.ingestionJob.update({
         where: { id: data.ingestionJobId },
         data: {
@@ -332,6 +332,14 @@ export class IngestionProcessor {
       this.prisma.document.update({
         where: { id: data.documentId },
         data: { status: DocumentStatus.INDEXED },
+        // The uploader, the title and the SCOPE — 22-doc §6.2. Taken from the
+        // row this write already returns rather than fetched afterwards: the
+        // relay decides which rooms the announcement reaches, and a
+        // department-scoped document announced tenant-wide would disclose its
+        // existence and title to exactly the people the department boundary
+        // excludes. Carrying it on the event means there is no code path where
+        // the lookup failed and the fan-out happened anyway.
+        include: { departmentLinks: { select: { departmentId: true } } },
       }),
     ]);
 
@@ -341,6 +349,10 @@ export class IngestionProcessor {
       documentId: data.documentId,
       occurredAt: new Date().toISOString(),
       chunkCount,
+      uploaderId: document.createdById,
+      title: document.title,
+      isOrganizationWide: document.isOrganizationWide,
+      departmentIds: document.departmentLinks.map((link) => link.departmentId),
     });
   }
 
@@ -353,6 +365,13 @@ export class IngestionProcessor {
    */
   private async fail(data: IngestionJobData, error: unknown): Promise<void> {
     const message = formatErrorMsg(error);
+    // Read BEFORE the status writes, and separately from them: the failure
+    // event must go out even if the writes below throw, and reading it there
+    // would tie the notification to the bookkeeping succeeding.
+    const document = await this.prisma.document.findUnique({
+      where: { id: data.documentId },
+      select: { createdById: true, title: true },
+    });
 
     try {
       await this.prisma.$transaction([
@@ -378,12 +397,27 @@ export class IngestionProcessor {
       );
     }
 
+    if (!document) {
+      // No row, so no uploader, so nobody to tell. Publishing with an empty
+      // recipient would put a `user:` room name of `user:` on the wire —
+      // reaching nobody at best, and everybody if a future change ever treated
+      // an empty id as a wildcard.
+      this.logger.error(
+        `Ingestion failed for a document that no longer exists: ${data.documentId}`,
+      );
+      return;
+    }
+
     this.events.publish({
       pattern: DOCUMENT_PATTERNS.ingestionFailed,
       organizationId: data.organizationId,
       documentId: data.documentId,
       occurredAt: new Date().toISOString(),
       reason: message,
+      // The uploader is the ONLY recipient — 22-doc §6.2. A failure is one
+      // person's document not working, not department news.
+      uploaderId: document.createdById,
+      title: document.title,
     });
   }
 

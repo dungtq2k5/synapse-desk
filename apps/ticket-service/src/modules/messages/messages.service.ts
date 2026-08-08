@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { RpcException } from '@nestjs/microservices';
 import { status } from '@grpc/grpc-js';
 import {
+  AppendAiMessageRequest,
   AttachmentResponse,
   CallerContext,
   ConfirmAttachmentRequest,
@@ -31,6 +32,7 @@ import {
   MAX_ATTACHMENTS_PER_MESSAGE,
   MAX_MESSAGE_CONTENT_LENGTH,
   REDACTED_MESSAGE_PLACEHOLDER,
+  isUniqueConstraintViolation,
   requireActor,
   TICKET_MESSAGE_SORTABLE_FIELDS,
   TICKET_PATTERNS,
@@ -48,7 +50,11 @@ import {
   Prisma,
   TicketMessage,
 } from '../../generated/prisma/client';
-import { toAttachmentResponse, toMessageResponse } from './message.mapper';
+import {
+  MessageWithAttachments,
+  toAttachmentResponse,
+  toMessageResponse,
+} from './message.mapper';
 
 /**
  * How long a download URL is advertised as valid.
@@ -169,15 +175,48 @@ export class MessagesService {
       });
     }
 
-    const message = await this.prisma.ticketMessage.create({
-      data: {
-        ticketId: ticket.id,
-        senderId,
-        content,
-        isInternalNote: request.isInternalNote,
-      },
-      include: { attachments: true },
-    });
+    // **Idempotency, for the WebSocket path** — 22-doc §2.3.
+    //
+    // A socket that reconnects holding an unacked message re-emits it, which is
+    // correct client behaviour and double-posts. Returning the ORIGINAL rather
+    // than an error is deliberate: the client's intent was satisfied, and an
+    // error would make it retry again.
+    //
+    // Checked before the insert AND enforced by `ticket_messages_client_key`,
+    // because this read and the write below are two statements — two concurrent
+    // re-emits both read "not seen" and both insert. The index is what makes one
+    // of them lose; the catch below turns that loss into the same answer.
+    if (request.clientMessageId) {
+      const existing = await this.findByClientMessageId(
+        ticket.id,
+        request.clientMessageId,
+      );
+      if (existing) return toMessageResponse(existing);
+    }
+
+    let message: MessageWithAttachments;
+    try {
+      message = await this.prisma.ticketMessage.create({
+        data: {
+          ticketId: ticket.id,
+          senderId,
+          content,
+          isInternalNote: request.isInternalNote,
+          clientMessageId: request.clientMessageId ?? null,
+        },
+        include: { attachments: true },
+      });
+    } catch (error) {
+      // The race the index exists for. The winner's row is the answer.
+      if (isUniqueConstraintViolation(error) && request.clientMessageId) {
+        const winner = await this.findByClientMessageId(
+          ticket.id,
+          request.clientMessageId,
+        );
+        if (winner) return toMessageResponse(winner);
+      }
+      throw error;
+    }
 
     this.publishCreated(ticket, message);
 
@@ -203,6 +242,68 @@ export class MessagesService {
       // that could not be produced is a missing SECOND message, not a failed
       // request.
       await this.tryAppendAiReply(ticket, context);
+    }
+
+    return toMessageResponse(message);
+  }
+
+  /**
+   * Persists a STREAMED AI answer — 22-doc §5.1, write #2.
+   *
+   * **The gateway holds the stream; this still holds the write.** Tokens have
+   * to reach a socket and this service has none, so `Chat` is opened at the
+   * gateway — but if the row were also written there, the streamed reply and
+   * the unary `invoke_ai` reply would be two different rows written two
+   * different ways, and the first divergence would be a generated message that
+   * never published `ticket.message_created` and so never notified anybody.
+   *
+   * So this shares everything below the surface with {@link tryAppendAiReply}:
+   * null sender, `isAiGenerated`, and the same `publishCreated`.
+   *
+   * **No `clientMessageId` and no idempotency.** The caller is a stream that
+   * completed exactly once; a retry here would mean a second generation, which
+   * is a second charge and a different answer — not the same write arriving
+   * twice.
+   */
+  async appendAiMessage(
+    request: AppendAiMessageRequest,
+    context: CallerContext,
+  ): Promise<MessageResponse> {
+    // The SAME tenant and visibility check every other write runs. It is what
+    // stops this RPC being a way to write into a ticket the caller cannot see,
+    // and it is the only check available: the content is trusted because the
+    // only caller is the gateway's relay, which took it from rag-service.
+    const ticket = await this.tickets.load(request.ticketId, context);
+    const content = this.requireContent(request.content);
+
+    const message = await this.prisma.ticketMessage.create({
+      data: {
+        ticketId: ticket.id,
+        // No sender. Attributing a generated message to a real person would
+        // put words in their mouth in a permanent record.
+        senderId: null,
+        content,
+        isAiGenerated: true,
+      },
+      include: { attachments: true },
+    });
+
+    // This is what puts `message:new` in the ticket room — 22-doc §5.1. The
+    // socket that asked for the stream gets `ai:stream:done` as well, and the
+    // two are not duplication: one settles a pending request, the other tells
+    // a thread something appeared.
+    this.publishCreated(ticket, message);
+
+    if (request.generationId) {
+      // Closes the acceptance loop for a streamed answer exactly as a
+      // co-pilot draft does — the text was sent verbatim, so this records
+      // ACCEPTED rather than leaving the row looking DISCARDED.
+      await this.ledger.recordOutcome(
+        request.generationId,
+        message.id,
+        message.content,
+        context,
+      );
     }
 
     return toMessageResponse(message);
@@ -253,6 +354,22 @@ export class MessagesService {
       include: { attachments: true },
     });
 
+    // 22-doc §6.1. Published for the same reason the create is: without it a
+    // socket showing the thread keeps the pre-edit text until it refreshes, and
+    // an edit nobody sees is indistinguishable from an edit that did not save.
+    this.events.publish({
+      pattern: TICKET_PATTERNS.messageUpdated,
+      organizationId: existing.organizationId,
+      ticketId: message.ticketId,
+      occurredAt: new Date().toISOString(),
+      messageId: message.id,
+      content: message.content,
+      // Routes the relay's room split. Read from the stored row rather than the
+      // request, because only the row knows.
+      isInternalNote: message.isInternalNote,
+      editedAt: (message.editedAt ?? new Date()).toISOString(),
+    });
+
     return toMessageResponse(message);
   }
 
@@ -301,6 +418,19 @@ export class MessagesService {
         redactedById: actorId,
       },
       include: { attachments: true },
+    });
+
+    // **No content on the wire** — 22-doc §6.1. The moderator removed those
+    // words; shipping them in the removal notice would be the most direct way
+    // to defeat the redaction.
+    this.events.publish({
+      pattern: TICKET_PATTERNS.messageRedacted,
+      organizationId: existing.organizationId,
+      ticketId: message.ticketId,
+      occurredAt: new Date().toISOString(),
+      messageId: message.id,
+      isInternalNote: message.isInternalNote,
+      redactedAt: (message.redactedAt ?? new Date()).toISOString(),
     });
 
     return { message: toMessageResponse(message) };
@@ -722,6 +852,23 @@ export class MessagesService {
   }
 
   /**
+   * An earlier message with this client id, or null — 22-doc §2.3.
+   *
+   * Scoped to the TICKET as well as the id, matching the index: uniqueness is
+   * per ticket, so a client reusing an id across threads gets two messages
+   * rather than one collision — which is right, since those are two intents.
+   */
+  private async findByClientMessageId(
+    ticketId: string,
+    clientMessageId: string,
+  ): Promise<MessageWithAttachments | null> {
+    return this.prisma.ticketMessage.findFirst({
+      where: { ticketId, clientMessageId },
+      include: { attachments: true },
+    });
+  }
+
+  /**
    * A message on a ticket the caller may see — and subject to the SAME note
    * filter as the list.
    *
@@ -733,7 +880,7 @@ export class MessagesService {
     ticketId: string,
     messageId: string,
     context: CallerContext,
-  ): Promise<TicketMessage> {
+  ): Promise<LoadedMessage> {
     const ticket = await this.tickets.load(ticketId, context);
 
     const message = await this.prisma.ticketMessage.findFirst({
@@ -750,9 +897,16 @@ export class MessagesService {
       });
     }
 
-    return message;
+    // The TENANT rides along, taken from the ticket this already loaded.
+    // `ticket_messages` has no `organization_id` of its own — it is scoped
+    // through its ticket — and the edit and redaction events both need one. The
+    // alternative is a second read of a row already in memory.
+    return { ...message, organizationId: ticket.organizationId };
   }
 }
+
+/** A message plus the tenant of the ticket it hangs off. */
+type LoadedMessage = TicketMessage & { organizationId: string };
 
 /**
  * The ticket fields a `message_created` event needs.

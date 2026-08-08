@@ -70,6 +70,16 @@ class ContractProbeConsumer {
     this.record(TICKET_PATTERNS.messageCreated, event);
   }
 
+  @EventPattern(TICKET_PATTERNS.messageUpdated)
+  messageUpdated(@Payload() event: Record<string, unknown>) {
+    this.record(TICKET_PATTERNS.messageUpdated, event);
+  }
+
+  @EventPattern(TICKET_PATTERNS.messageRedacted)
+  messageRedacted(@Payload() event: Record<string, unknown>) {
+    this.record(TICKET_PATTERNS.messageRedacted, event);
+  }
+
   private record(pattern: string, event: Record<string, unknown>) {
     received.set(pattern, [...(received.get(pattern) ?? []), event]);
   }
@@ -182,6 +192,28 @@ describe('§3.4 NATS contract sweep (e2e)', () => {
       isAiGenerated: false,
       isInternalNote: true,
       groupKey: ticketMessageGroupKey(ticketId),
+    },
+    {
+      pattern: TICKET_PATTERNS.messageUpdated,
+      organizationId,
+      ticketId,
+      occurredAt,
+      messageId: faker.string.uuid(),
+      content: 'Actually, it is only smoking.',
+      isInternalNote: true,
+      editedAt: occurredAt,
+    },
+    {
+      // **No `content` field, and the sweep is where that is pinned.** The
+      // frame this becomes announces a redaction; carrying the removed words in
+      // it would be the most direct way to defeat the redaction — 22-doc §6.1.
+      pattern: TICKET_PATTERNS.messageRedacted,
+      organizationId,
+      ticketId,
+      occurredAt,
+      messageId: faker.string.uuid(),
+      isInternalNote: true,
+      redactedAt: occurredAt,
     },
   ];
 

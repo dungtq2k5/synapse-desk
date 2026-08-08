@@ -9,6 +9,7 @@ import { RealtimeGateway } from './realtime.gateway';
 import {
   orgRoom,
   REALTIME_EVENTS,
+  ticketInternalRoom,
   ticketRoom,
   userRoom,
 } from './realtime.config';
@@ -137,13 +138,72 @@ export class TicketEventsConsumer {
     @Payload() event: TicketEventOf<typeof TICKET_PATTERNS.messageCreated>,
   ): void {
     this.relay(event.pattern, () => {
-      // ONLY the ticket room. Membership there is authorized; the org room is
-      // not, and an internal note broadcast tenant-wide would be exactly the
-      // leak `is_internal_note` exists to prevent.
+      // **Two rooms, chosen by `isInternalNote`** — 22-doc §1.
+      //
+      // The previous version sent every message to `ticket:{id}` alone, with
+      // the reasoning that membership there is authorized and the org room is
+      // not. That reasoning was right and stopped one room short:
+      // `TicketAccessService.canRead` admits the ticket's AUTHOR, so the
+      // requester was in `ticket:{id}` and received every internal note live.
+      //
+      // The REST read strips internal notes in its `WHERE` clause, so
+      // `GET /tickets/:id/messages` was safe while the push was not — a
+      // customer with the page open saw the agent-only note appear, and the
+      // same customer after a refresh did not.
       this.gateway
-        .toRoom(ticketRoom(event.ticketId))
+        .toRoom(this.messageRoom(event.ticketId, event.isInternalNote))
         .emit(REALTIME_EVENTS.messageNew, event);
     });
+  }
+
+  /**
+   * An edit — 22-doc §6.1.
+   *
+   * The same room split, by construction: it calls the same helper, so the
+   * disclosure §1 closed cannot reopen here. The new content rides on the frame,
+   * which is safe precisely because of that split — it never reaches a socket
+   * that could not already read the message.
+   */
+  @EventPattern(TICKET_PATTERNS.messageUpdated)
+  messageUpdated(
+    @Payload() event: TicketEventOf<typeof TICKET_PATTERNS.messageUpdated>,
+  ): void {
+    this.relay(event.pattern, () => {
+      this.gateway
+        .toRoom(this.messageRoom(event.ticketId, event.isInternalNote))
+        .emit(REALTIME_EVENTS.messageUpdated, event);
+    });
+  }
+
+  /**
+   * A REDACTION — 22-doc §6.1.
+   *
+   * **The event carries no content and neither does this frame.** The whole
+   * payload is forwarded rather than rebuilt precisely so that stays true: the
+   * contract has no content field, so there is nothing here to accidentally
+   * include, and adding one would be a visible change to the contract rather
+   * than a quiet change to a mapper.
+   */
+  @EventPattern(TICKET_PATTERNS.messageRedacted)
+  messageRedacted(
+    @Payload() event: TicketEventOf<typeof TICKET_PATTERNS.messageRedacted>,
+  ): void {
+    this.relay(event.pattern, () => {
+      this.gateway
+        .toRoom(this.messageRoom(event.ticketId, event.isInternalNote))
+        .emit(REALTIME_EVENTS.messageDeleted, event);
+    });
+  }
+
+  /**
+   * Which room a message-shaped event belongs in — 22-doc §1, §6.1.
+   *
+   * Shared by `message:new`, `message:updated` and `message:deleted` so the
+   * three cannot drift: the disclosure was fixed once, and the two later events
+   * inherit the fix rather than the bug.
+   */
+  private messageRoom(ticketId: string, isInternalNote: boolean) {
+    return isInternalNote ? ticketInternalRoom(ticketId) : ticketRoom(ticketId);
   }
 
   /**

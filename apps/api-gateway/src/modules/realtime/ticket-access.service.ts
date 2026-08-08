@@ -9,6 +9,7 @@ import {
   TICKET_SERVICE_NAME,
   TicketResponse,
   TicketServiceClient,
+  TicketStatus,
 } from '@synapsedesk/grpc-proto';
 import { JwtPayload } from '@synapsedesk/common';
 
@@ -73,6 +74,56 @@ export class TicketAccessService implements OnModuleInit {
     const ticket = await this.load(ticketId, caller, client);
     if (!ticket) return false;
 
+    return (
+      ticket.authorId === caller.sub || ticket.currentAssigneeId === caller.sub
+    );
+  }
+
+  /**
+   * "May this person POST into this ticket?" — 22-doc §2.2.
+   *
+   * **A distinct method, not a flag on `canRead`.** Until `message:send` existed
+   * nothing a socket could *do* depended on access: join authorization gated
+   * only what a socket RECEIVED. Writing is a different question with different
+   * answers, and a boolean parameter invites a call site to pass the wrong one
+   * and get a plausible result — two named methods make the wrong choice visible
+   * in review.
+   *
+   * The differences from `canRead`, each deliberate:
+   *
+   *   - **A `ticket.read.all` holder who is neither author nor assignee is
+   *     REFUSED.** Read-all is an oversight permission, not a licence to reply
+   *     as the support organisation. This is the row a read-predicate reuse gets
+   *     wrong, and it fails silently: the message posts and is attributed to
+   *     someone who never took the ticket.
+   *   - **A `CLOSED` ticket is refused.** History stays readable; posting into
+   *     it would reopen a ticket as a side effect of a message, and reopening is
+   *     a state transition the machine owns.
+   *
+   * > **This check exists for the ERROR, not for the security.** `ticket-service`
+   * > re-validates on its own, so removing this would not open a hole — it would
+   * > produce a gRPC error where an ack should be. Worth saying, so nobody
+   * > deletes it as redundant.
+   *
+   * Fails CLOSED on every error path, like `canRead`.
+   */
+  async canWrite(
+    ticketId: string,
+    caller: JwtPayload,
+    client: Socket,
+  ): Promise<boolean> {
+    const ticket = await this.load(ticketId, caller, client);
+    if (!ticket) return false;
+
+    // Compared against the PROTO enum rather than mapped to the domain one.
+    // `ticket.mapper.ts` already owns that mapping and its docblock warns
+    // against a second copy — and one comparison does not need the whole table.
+    if (ticket.status === TicketStatus.TICKET_STATUS_CLOSED) {
+      return false;
+    }
+
+    // Note what is NOT here: a `ticket.read.all` branch. Holding the tenant
+    // queue admits you to watch any thread and to write into none.
     return (
       ticket.authorId === caller.sub || ticket.currentAssigneeId === caller.sub
     );

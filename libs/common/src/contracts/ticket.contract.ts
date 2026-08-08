@@ -30,6 +30,16 @@ export const TICKET_PATTERNS = {
   unassigned: 'ticket.unassigned',
   statusChanged: 'ticket.status_changed',
   messageCreated: 'ticket.message_created',
+  /** An edit — 22-doc §6.1. Same room split as the message itself. */
+  messageUpdated: 'ticket.message_updated',
+  /**
+   * A REDACTION — 22-doc §6.1.
+   *
+   * Named for what happened rather than for the frame it produces: the row
+   * survives with its content replaced, and calling the event `deleted` would
+   * invite a consumer to remove it from a timeline whose gaps are the point.
+   */
+  messageRedacted: 'ticket.message_redacted',
 } as const;
 
 export type TicketPattern =
@@ -152,6 +162,42 @@ export type TicketMessageCreatedEvent = TicketEventBase & {
   groupKey: string;
 };
 
+/**
+ * An edit — 22-doc §6.1.
+ *
+ * Carries `isInternalNote` for the same reason `ticket.message_created` does:
+ * the relay routes on it, and a consumer that had to fetch the message to learn
+ * whether it was agent-only would be one failed fetch away from broadcasting an
+ * internal note's new text to the requester.
+ *
+ * The new content rides along so a client re-renders without a fetch. That is
+ * safe precisely because the room split is honoured — the frame never reaches a
+ * socket that could not already read the message.
+ */
+export type TicketMessageUpdatedEvent = TicketEventBase & {
+  pattern: typeof TICKET_PATTERNS.messageUpdated;
+  messageId: string;
+  content: string;
+  isInternalNote: boolean;
+  editedAt: string;
+};
+
+/**
+ * A REDACTION — 22-doc §6.1.
+ *
+ * **Carries no content, and that is the whole design.** The row survives with
+ * its text replaced; this announces *that* it happened plus which message. An
+ * event carrying the old content would be the most direct way to defeat the
+ * redaction it is reporting — the moderator removed the words, and the removal
+ * notice would deliver them to every socket in the room.
+ */
+export type TicketMessageRedactedEvent = TicketEventBase & {
+  pattern: typeof TICKET_PATTERNS.messageRedacted;
+  messageId: string;
+  isInternalNote: boolean;
+  redactedAt: string;
+};
+
 export type TicketDomainEvent =
   | TicketCreatedEvent
   | TicketEscalatedEvent
@@ -159,7 +205,9 @@ export type TicketDomainEvent =
   | TicketReassignedEvent
   | TicketUnassignedEvent
   | TicketStatusChangedEvent
-  | TicketMessageCreatedEvent;
+  | TicketMessageCreatedEvent
+  | TicketMessageUpdatedEvent
+  | TicketMessageRedactedEvent;
 
 /** Narrows the union by pattern — what every consumer's handler signature wants. */
 export type TicketEventOf<P extends TicketPattern> = Extract<

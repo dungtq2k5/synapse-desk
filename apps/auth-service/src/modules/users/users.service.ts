@@ -1234,15 +1234,12 @@ function lockUntilSentence(
 
   return `${base} Your account will unlock automatically at ${formatInZone(
     lockedUntil,
-    timezone,
+    timezone ?? undefined,
   )}.`;
 }
 
 /** A human-readable instant, always carrying the zone it is expressed in. */
-function formatInZone(instant: Date, timezone: string | null): string {
-  // FIXME Prefer default parameters over reassignment.
-  const zone = timezone ?? 'UTC';
-
+function formatInZone(instant: Date, zone: string = 'UTC'): string {
   try {
     return new Intl.DateTimeFormat('en-GB', {
       dateStyle: 'full',
