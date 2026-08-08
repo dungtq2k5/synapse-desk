@@ -250,24 +250,52 @@ describe('§3 The ingestion pipeline (e2e)', () => {
       }
     });
 
-    it('6. Produces a document with NO chunks without failing it', async () => {
-      // A cover sheet or an image-only scan. INDEXED with zero chunks is the
-      // truthful state; FAILED would send someone hunting a bug that is not
-      // there.
+    it('6. **A document with NO extractable text FAILS, with a reason** — §3.5 F4', async () => {
+      // This asserted the opposite until 21-doc §3.5: zero chunks reported
+      // INDEXED, on the reasoning that FAILED "would send someone hunting for
+      // a bug". That holds for a generic failure and not for a NAMED one.
+      //
+      // The tenant-visible consequence was the problem. A Knowledge Manager
+      // uploads a scanned handbook, the system reports it indexed, and it
+      // returns nothing in search forever — with the only evidence in a log
+      // line they will never see. A log is not a feedback channel to the
+      // person who caused the problem.
       downloadObject.mockResolvedValue(Buffer.from('tiny', 'utf8'));
       const data = await queueDocument();
 
-      await expect(processor.process(data)).resolves.toBe('INDEXED');
+      await expect(processor.process(data)).rejects.toThrow(
+        /no extractable text/i,
+      );
 
       const job = await fx.prisma.ingestionJob.findUniqueOrThrow({
         where: { id: data.ingestionJobId },
       });
-      expect(job.status).toBe(IngestionJobStatus.COMPLETED);
-      await expect(
-        fx.prisma.documentChunk.count({
-          where: { documentId: data.documentId },
-        }),
-      ).resolves.toBe(0);
+      expect(job.status).toBe(IngestionJobStatus.FAILED);
+      // **The reason lands on the JOB ROW**, which is what RDM Table 20 exists
+      // for: a stuck document is diagnosable by someone looking at the
+      // document, not by someone who knows to grep a container's stdout.
+      expect(job.errorLog).toMatch(/no extractable text/i);
+
+      const document = await fx.prisma.document.findUniqueOrThrow({
+        where: { id: data.documentId },
+      });
+      expect(document.status).toBe(DocumentStatus.FAILED);
+    });
+
+    it('6a. a scanned PDF names SCANNING as the likely cause', async () => {
+      // The cheap half of the scanned-PDF detection §5 argues for before OCR
+      // exists. A PDF that parses to no text at all is almost certainly an
+      // image, and saying so is the difference between an actionable message
+      // and "it did not work".
+      downloadObject.mockResolvedValue(await buildPdf([' ']));
+      const data = await queueDocument({ fileType: 'pdf' });
+
+      await expect(processor.process(data)).rejects.toThrow(/scanned/i);
+
+      const job = await fx.prisma.ingestionJob.findUniqueOrThrow({
+        where: { id: data.ingestionJobId },
+      });
+      expect(job.errorLog).toMatch(/scanned/i);
     });
   });
 

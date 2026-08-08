@@ -10,7 +10,7 @@ import { PDFDocument, StandardFonts } from 'pdf-lib';
  * a line of code beside the assertion.
  *
  * `pdf-lib` is a devDependency for exactly this. The parser under test is
- * `pdf-parse-fork`, so the fixture is written by one library and read by
+ * `pdfjs-dist`, so the fixture is written by one library and read by
  * another — which is the point, since a round trip through a single library
  * could agree with itself about a layout no real PDF uses.
  */

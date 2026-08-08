@@ -351,7 +351,3 @@ function lastYear(): AnalyticsRangeQueryDto {
     to: to.toISOString().slice(0, 10),
   };
 }
-
-/** Re-exported so a consumer building a rate here uses the shared definition. */
-export { type rateOf } from '@synapsedesk/common';
-export { type RateDto } from './dto/rest/analytics-response.dto';

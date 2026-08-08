@@ -1,10 +1,11 @@
 import { Injectable } from '@nestjs/common';
+import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
+import { getEncoding, type Tiktoken } from 'js-tiktoken';
 import {
-  approximateTokens,
   CHUNK_HEADING_LEVELS,
   CHUNK_OVERLAP_TOKENS,
   CHUNK_TARGET_TOKENS,
-  CHARS_PER_TOKEN,
+  CHUNK_TOKENIZER,
   MIN_CHUNK_TOKENS,
 } from '@synapsedesk/common';
 import { ParsedPage } from './document-parser.service';
@@ -16,35 +17,99 @@ export type Chunk = {
   tokenCount: number;
 };
 
-// FIXME Simplify this regular expression to reduce its runtime, as it has super-linear performance due to backtracking.
-const HEADING_PATTERN = /^(#{1,6})\s+(.*)$/;
+/**
+ * A markdown ATX heading.
+ *
+ * **Anchored and non-ambiguous**, which the previous pattern was not: it was
+ * `/^(#{1,6})\s+(.*)$/` and carried a standing linter suppression for
+ * super-linear backtracking, because `\s+` followed by `.*` can divide the
+ * whitespace between the two groups in many ways. `[^\S\n]` is "whitespace but
+ * not a newline", so there is exactly one way to match and nothing to
+ * backtrack over.
+ */
+const HEADING_PATTERN = /^(#{1,6})[^\S\n]+(\S.*)$/;
+
+/** The separators pass 2 splits on, largest natural boundary first. */
+const RECURSIVE_SEPARATORS = [
+  // Paragraph, then line, then sentence, then word. Written as real escapes,
+  // which is **trap 3 of 21-doc §3.2**: separators written `['nn', 'n', …]` are
+  // the literal letters `n` and `s` rather than `\n` and `\s`, and a splitter
+  // configured that way splits text on the letter "n".
+  '\n\n',
+  '\n',
+  '。',
+  '！',
+  '？',
+  '. ',
+  '! ',
+  '? ',
+  ' ',
+  '',
+];
 
 /**
- * Markdown -> chunks, splitting on STRUCTURE first and length second.
+ * Markdown -> chunks, splitting on STRUCTURE first and length second — 21-doc §3.
  *
- * This is `ingestion.md`'s `MarkdownHeaderTextSplitter` with a recursive
- * fallback, and the ordering is the whole design. Splitting purely by length
- * cuts through the middle of sections, so a chunk begins mid-sentence under no
- * heading and the citation it produces can only be a character offset.
- * Splitting on headings first means a chunk is a section, and "page 4, §2.1" is
- * a fact about the document rather than a computed position.
+ * The ordering is the whole design. Splitting purely by length cuts through the
+ * middle of sections, so a chunk begins mid-sentence under no heading and the
+ * citation it produces can only be a character offset. Splitting on headings
+ * first means a chunk is a section, and "page 4, §2.1" is a fact about the
+ * document rather than a computed position.
  *
  * **The heading path is kept IN the chunk text, not only in metadata.** A
  * paragraph reading "this must be approved in advance" is ambiguous alone and
- * unambiguous under "## Expense Policy › ### Travel" — and the embedding sees
- * only the text, so a heading held in a metadata column is invisible to the
- * one component that most needs it.
+ * unambiguous under "Expense Policy › Travel" — and the embedding sees only the
+ * text, so a heading held in a metadata column is invisible to the one
+ * component that most needs it.
+ *
+ * **Pass 1 is ours; pass 2 is `RecursiveCharacterTextSplitter`** — 21-doc §3.1,
+ * which states that heading extraction stays custom.
+ *
+ * `MarkdownHeaderTextSplitter` is the obvious candidate for pass 1 and is
+ * **trap 5 of §3.2: it does not exist in `@langchain/textsplitters`**. It is a
+ * Python-LangChain class; the JS package exports `CharacterTextSplitter`,
+ * `LatexTextSplitter`, `MarkdownTextSplitter`, `RecursiveCharacterTextSplitter`,
+ * `TextSplitter` and `TokenTextSplitter`. `MarkdownTextSplitter` is not a
+ * substitute: it splits on markdown syntax without extracting the heading path,
+ * which is the one thing that pass exists to produce.
+ *
+ * So the heading walk below stays, and the library does the length-bounded
+ * splitting it is genuinely better at.
  */
 @Injectable()
 export class DocumentChunkerService {
-  chunk(pages: ParsedPage[]): Chunk[] {
+  /**
+   * The tokenizer, built once.
+   *
+   * `getEncoding` parses a large BPE table, so constructing it per document
+   * would put that cost on every ingestion job. It is pure and stateless, so
+   * one instance is safe to share.
+   */
+  private readonly encoder: Tiktoken = getEncoding(CHUNK_TOKENIZER);
+
+  private readonly splitter = new RecursiveCharacterTextSplitter({
+    chunkSize: CHUNK_TARGET_TOKENS,
+    chunkOverlap: CHUNK_OVERLAP_TOKENS,
+    separators: RECURSIVE_SEPARATORS,
+    // **Measured in TOKENS, not characters** — the reason for the whole swap.
+    // `chars / 4` under-counts CJK by 3.7x (measured: 6 estimated, 22 real),
+    // so a chunk sized by characters silently overflowed the embedding
+    // model's input on exactly the documents least likely to be spot-checked.
+    lengthFunction: (text: string) => this.countTokens(text),
+  });
+
+  async chunk(pages: ParsedPage[]): Promise<Chunk[]> {
     const chunks: Chunk[] = [];
 
     for (const page of pages) {
       for (const section of this.splitByHeadings(page.markdown)) {
-        for (const text of this.splitByLength(section)) {
+        const pieces = rebalanceSentenceEnds(
+          await this.splitter.splitText(section),
+        );
+
+        for (const text of pieces) {
           const trimmed = text.trim();
-          const tokenCount = approximateTokens(trimmed);
+          const tokenCount = this.countTokens(trimmed);
 
           // Dropped rather than stored. A three-token chunk embeds to
           // something, so it can win a similarity comparison, and it carries
@@ -65,13 +130,25 @@ export class DocumentChunkerService {
     return chunks;
   }
 
+  /** Exact for `cl100k_base`; an estimate for Gemini — see `CHUNK_TOKENIZER`. */
+  private countTokens(text: string): number {
+    return this.encoder.encode(text).length;
+  }
+
   /**
    * Sections, each prefixed with its heading PATH.
    *
-   * The path rather than the immediate heading: "### Travel" alone is nearly as
-   * ambiguous as no heading at all, while "## Expense Policy › ### Travel"
-   * locates the section in the document. Both the reader and the embedding get
-   * the same context, which is the point.
+   * The path rather than the immediate heading: "Travel" alone is nearly as
+   * ambiguous as no heading at all, while "Expense Policy › Travel" locates the
+   * section in the document. Both the reader and the embedding get the same
+   * context, which is the point.
+   *
+   * **Ordered by heading LEVEL, which is trap 4 of 21-doc §3.2.** Building
+   * breadcrumbs with `Object.values(metadata).join(…)` relies on key-insertion
+   * order to happen to produce H1 › H2 › H3. The
+   * `path.filter(entry => entry.level < level)` below gets it right by
+   * construction, and keeping it was a stated goal of the change rather than an
+   * accident of not rewriting it.
    */
   private splitByHeadings(markdown: string): string[] {
     const lines = markdown.split('\n');
@@ -79,6 +156,7 @@ export class DocumentChunkerService {
 
     let path: Array<{ level: number; text: string }> = [];
     let buffer: string[] = [];
+    let inFence = false;
 
     const flush = () => {
       const body = buffer.join('\n').trim();
@@ -93,7 +171,19 @@ export class DocumentChunkerService {
     };
 
     for (const line of lines) {
-      const match = HEADING_PATTERN.exec(line);
+      // **A `#` inside a fenced code block is not a heading** — it is a comment
+      // in shell or Python, or a CSS id. Splitting there tears a code sample in
+      // half and invents a section named after a comment.
+      //
+      // Easy to assume a library handles this. No library does the heading pass
+      // at all (21-doc §3.1), so the tracking lives here.
+      if (isFence(line)) {
+        inFence = !inFence;
+        buffer.push(line);
+        continue;
+      }
+
+      const match = inFence ? null : HEADING_PATTERN.exec(line);
       const level = match ? match[1].length : 0;
 
       if (
@@ -121,101 +211,62 @@ export class DocumentChunkerService {
     // degenerate case to special-case.
     return sections.length > 0 ? sections : [markdown];
   }
+}
 
-  /**
-   * Length splitting, recursive: paragraphs, then lines, then sentences.
-   *
-   * Each level is tried before the next, so a split happens at the largest
-   * natural boundary that fits. A single hard character cut is the last resort,
-   * reached only by text with no paragraph, line or sentence break in 512
-   * tokens — which is real (minified data, some CJK text) and must terminate
-   * rather than loop.
-   */
-  private splitByLength(text: string): string[] {
-    if (approximateTokens(text) <= CHUNK_TARGET_TOKENS) return [text];
+/**
+ * Moves a stranded sentence terminator back onto the chunk it belongs to —
+ * 21-doc §3.5 F2.
+ *
+ * **The one behaviour the library swap lost.** `RecursiveCharacterTextSplitter`
+ * splits with a LOOKAHEAD, so a separator lands at the start of the *following*
+ * chunk:
+ *
+ * ```txt
+ * 'The policy is clear. There is no exception.'
+ * → ['The policy is clear', '. There is no exception.']
+ * ```
+ *
+ * The preceding sentence loses its terminator and the next chunk opens with
+ * orphan punctuation — visible in citation previews, and mild noise in the
+ * embedding. The replaced code split on `(?<=[.!?。！？])\s+`, a LOOKBEHIND,
+ * which kept the punctuation with the sentence it belonged to.
+ *
+ * `keepSeparator: false` is not the fix: it deletes the period outright.
+ *
+ * All 12 pre-existing chunker tests passed through this regression because none
+ * of them asserted it — which is why §3.5's test 3 exists.
+ */
+export function rebalanceSentenceEnds(pieces: string[]): string[] {
+  const out = [...pieces];
 
-    const pieces = this.recursiveSplit(text, [
-      /\n\n+/,
-      /\n/,
-      /(?<=[.!?。！？])\s+/,
-    ]);
+  for (let index = 1; index < out.length; index++) {
+    const match = LEADING_TERMINATOR.exec(out[index]);
+    if (!match) continue;
 
-    return this.mergeWithOverlap(pieces);
+    // Only ever moves a terminator ONTO a chunk that has text to attach it to.
+    // A chunk that is nothing but punctuation is left alone rather than
+    // emptied, which would shift every later index.
+    const previous = out[index - 1].trimEnd();
+    if (!previous) continue;
+
+    out[index - 1] = `${previous}${match[1]}`;
+    out[index] = out[index].slice(match[0].length).trimStart();
   }
 
-  private recursiveSplit(text: string, separators: RegExp[]): string[] {
-    if (approximateTokens(text) <= CHUNK_TARGET_TOKENS) return [text];
+  return out.filter((piece) => piece.trim().length > 0);
+}
 
-    const [separator, ...rest] = separators;
-    if (!separator) return this.hardSplit(text);
+/**
+ * A terminator orphaned at the start of a chunk, plus the whitespace after it.
+ *
+ * Anchored, with a single-character class and a bounded whitespace run — no
+ * ambiguity for a backtracking engine to explore.
+ */
+const LEADING_TERMINATOR = /^([.!?。！？])[^\S\n]*/;
 
-    const parts = text.split(separator).filter((part) => part.trim());
-    if (parts.length <= 1) return this.recursiveSplit(text, rest);
+/** ``` or ~~~ opening or closing a fenced block. */
+function isFence(line: string): boolean {
+  const trimmed = line.trimStart();
 
-    return parts.flatMap((part) => this.recursiveSplit(part, rest));
-  }
-
-  /** The terminating case: fixed-width cuts on text with no boundary at all. */
-  private hardSplit(text: string): string[] {
-    const size = CHUNK_TARGET_TOKENS * CHARS_PER_TOKEN;
-    const parts: string[] = [];
-
-    for (let start = 0; start < text.length; start += size) {
-      parts.push(text.slice(start, start + size));
-    }
-
-    return parts;
-  }
-
-  /**
-   * Re-assembles the pieces up to the target size, carrying an overlap.
-   *
-   * The overlap is what stops a sentence straddling a boundary from being
-   * unusable in both chunks — the retriever finds half an answer and the
-   * generator reports the rest missing. The cost is duplicated storage, which
-   * is much the cheaper of the two problems.
-   */
-  private mergeWithOverlap(pieces: string[]): string[] {
-    const merged: string[] = [];
-    let current: string[] = [];
-    let tokens = 0;
-
-    for (const piece of pieces) {
-      const pieceTokens = approximateTokens(piece);
-
-      if (tokens + pieceTokens > CHUNK_TARGET_TOKENS && current.length > 0) {
-        merged.push(current.join('\n'));
-
-        const overlap = this.tailWithin(current, CHUNK_OVERLAP_TOKENS);
-        current = [...overlap];
-        tokens = overlap.reduce(
-          (total, entry) => total + approximateTokens(entry),
-          0,
-        );
-      }
-
-      current.push(piece);
-      tokens += pieceTokens;
-    }
-
-    if (current.length > 0) merged.push(current.join('\n'));
-
-    return merged;
-  }
-
-  /** The last pieces fitting in `budget` tokens, in order. */
-  private tailWithin(pieces: string[], budget: number): string[] {
-    const tail: string[] = [];
-    let tokens = 0;
-
-    for (let index = pieces.length - 1; index >= 0; index -= 1) {
-      const pieceTokens = approximateTokens(pieces[index]);
-      if (tokens + pieceTokens > budget) break;
-
-      tail.unshift(pieces[index]);
-      tokens += pieceTokens;
-    }
-
-    return tail;
-  }
+  return trimmed.startsWith('```') || trimmed.startsWith('~~~');
 }

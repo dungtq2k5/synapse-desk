@@ -9,7 +9,10 @@ import type { Config } from 'jest';
  * resolves `@synapsedesk/common` to `apps/auth-service/libs/common`, i.e. nothing.
  */
 const baseConfig: Config = {
-  moduleFileExtensions: ['js', 'json', 'ts'],
+  // `mjs` is here for `pdfjs-dist`, which ships ESM-only and names its files
+  // `.mjs` — without it, jest resolves the module and then refuses to transform
+  // it, reporting `Unexpected token 'export'` from library internals.
+  moduleFileExtensions: ['js', 'mjs', 'json', 'ts'],
   testEnvironment: 'node',
 
   /**
@@ -35,7 +38,7 @@ const baseConfig: Config = {
    * it matched EVERY `.ts` file in the project and jest would have tried to run
    * each source module as a test suite.
    */
-  testRegex: '\\.(spec|test)\\.[jt]s$',
+  testRegex: String.raw`\.(spec|test)\.[jt]s$`,
 
   /**
    * `testRegex` above matches `*.e2e-spec.ts` too — it ends in `.spec.ts`.
@@ -47,10 +50,13 @@ const baseConfig: Config = {
    * Each service's e2e project re-includes itself by overriding this in its own
    * `jest.e2e.config.ts`.
    */
-  testPathIgnorePatterns: ['/node_modules/', '\\.e2e-spec\\.ts$'],
+  testPathIgnorePatterns: ['/node_modules/', String.raw`\.e2e-spec\.ts$`],
 
   transform: {
-    '^.+\\.(t|j)s$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.json' }],
+    // `.mjs` included for the same reason as `moduleFileExtensions` above: the
+    // previous pattern matched `.ts` and `.js` only, so an ESM-only dependency
+    // was resolved and then handed to jest untransformed.
+    '^.+\\.(t|j|mj)s$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.json' }],
   },
 
   // Mirrors the `paths` in the root tsconfig. Pointed at the entry FILE rather
@@ -70,6 +76,16 @@ const baseConfig: Config = {
    * `default` export condition pointing at ESM. Node 22 resolves that from CJS
    * on its own (which is why the service runs); jest does not, and fails with
    * `Unexpected token 'export'` from a file three dependencies deep.
+   *
+   * The parsing stack (21-doc §3) needs nothing here. `mammoth`, `turndown` and
+   * `turndown-plugin-gfm` are real CommonJS; `js-tiktoken` and
+   * `@langchain/textsplitters` declare `type: module` but ship a `.cjs` entry
+   * that jest resolves through the `require` condition above.
+   *
+   * `pdfjs-dist` is the one exception and is deliberately NOT listed. It is
+   * ESM-only AND uses `import.meta.url`, which cannot survive a transform to
+   * CommonJS at all — so `document-parser.service.ts` loads it through Node's
+   * real `require`, bypassing jest's registry entirely. See `loadPdfjs` there.
    */
   transformIgnorePatterns: [
     'node_modules/(?!.*(@scure|otplib|@otplib|@noble|@faker-js|jose))',

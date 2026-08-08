@@ -38,6 +38,28 @@ export type IngestionJobData = {
 class BudgetExhausted extends Error {}
 
 /**
+ * Raised when a document parses to no text at all — 21-doc §3.5 F4.
+ *
+ * **A named failure rather than a silent success.** It reaches `fail()` like
+ * any other error, so the reason lands in `ingestion_jobs.error_log`, which is
+ * where a Knowledge Manager looking at a stuck document will actually find it.
+ *
+ * The wording names the likely cause rather than describing the symptom: for a
+ * PDF, no extractable text almost always means the pages are images. Saying so
+ * is the cheap half of the scanned-PDF detection that OCR would complete.
+ */
+class NoExtractableText extends Error {
+  constructor(fileType: string) {
+    super(
+      fileType === 'pdf'
+        ? 'No extractable text — this document appears to be scanned. ' +
+            'Upload a text-based PDF, or run OCR on it first.'
+        : `No extractable text was found in this ${fileType} document.`,
+    );
+  }
+}
+
+/**
  * `QUEUED → PARSING → CHUNKING → EMBEDDING → COMPLETED | FAILED`.
  *
  * Three orderings here are load-bearing and each has a failure behind it:
@@ -91,16 +113,23 @@ export class IngestionProcessor {
       const parsed = await this.parser.parse(bytes, data.fileType);
 
       await this.setJobStatus(ingestionJobId, IngestionJobStatus.CHUNKING);
-      const chunks = this.chunker.chunk(parsed.pages);
+      const chunks = await this.chunker.chunk(parsed.pages);
 
       if (chunks.length === 0) {
-        // Not an error. A cover sheet, a scanned image with no text layer, or
-        // a near-empty file all land here, and `INDEXED` with zero chunks is
-        // the truthful state — the document is processed and retrieves
-        // nothing. FAILED would send someone hunting for a bug.
-        this.logger.warn(`Document ${documentId} produced no chunks`);
-        await this.complete(data, 0);
-        return 'INDEXED';
+        // **FAILED, with a reason a human can act on** — 21-doc §3.5 F4.
+        //
+        // This used to report INDEXED, reasoning that FAILED "would send
+        // someone hunting for a bug". That holds for a GENERIC failure and not
+        // for a named one, and the tenant-visible consequence was the problem:
+        // a Knowledge Manager uploads a scanned handbook, the system reports it
+        // indexed, and it returns nothing in search forever. A log line is not
+        // a feedback channel to the person who caused it.
+        //
+        // Naming "scanned" is the cheap half of the scanned-PDF detection that
+        // §5 argues for before OCR exists: a document that parses to no text at
+        // all is almost certainly an image, and saying so converts a silent
+        // wrong answer into an actionable one.
+        throw new NoExtractableText(data.fileType);
       }
 
       // Written BEFORE the budget gate on purpose: parsing and chunking cost

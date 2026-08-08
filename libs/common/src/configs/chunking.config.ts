@@ -40,21 +40,36 @@ export const CHUNK_OVERLAP_TOKENS = 64;
 export const MIN_CHUNK_TOKENS = 16;
 
 /**
- * The rough characters-per-token ratio used to size chunks without running a
- * real tokenizer.
+ * **The chunker counts with `js-tiktoken` (`cl100k_base`), and that is an
+ * ESTIMATE of the tokenizer that actually bills us** — 21-doc §3.2.
  *
- * **An approximation, and honest about it.** The exact count matters for
- * BILLING, where it comes from the embedding API's own response and is never
- * estimated. Here it decides where to split text, where being 10% off changes
- * nothing a reader would notice. Shipping a tokenizer to gain that 10% would
- * add a large dependency to the hot path of ingestion for no observable gain.
+ * **Trap 1 of §3.2: treating a `cl100k_base` count as exact.** It is
+ * **OpenAI's** tokenizer. We embed with Gemini `text-embedding-004` and
+ * generate with Gemini, whose tokenizer is a different one with no JS
+ * implementation. So this is a far better estimate than `chars / 4` — measured
+ * on CJK, `chars / 4` says 6 tokens where the real count is 22, a 3.7x
+ * under-count that silently overflows a chunk — but it remains an estimate.
+ *
+ * Two consequences, both deliberate:
+ *
+ *   - `CHUNK_TARGET_TOKENS` keeps a **safety margin** below the embedding
+ *     model's input limit rather than being treated as exact. Treating 512 as
+ *     a guarantee is how a document ingests fine for a year and then fails on
+ *     one page of dense CJK.
+ *   - Billing is unaffected. The exact count for spend comes from the
+ *     embedding API's own response and is never estimated here (RDM §1.14).
  */
-export const CHARS_PER_TOKEN = 4;
+export const CHUNK_TOKENIZER = 'cl100k_base';
 
-/** Tokens, approximately, for splitting decisions only — never for billing. */
-export function approximateTokens(text: string): number {
-  return Math.ceil(text.length / CHARS_PER_TOKEN);
-}
+/**
+ * How far below the embedding model's real input limit the target sits.
+ *
+ * `text-embedding-004` accepts 2048 tokens, so 512 is comfortable already —
+ * this constant exists to make the margin a STATED decision rather than an
+ * accident of the number above, so that raising the target is a conversation
+ * about how wrong the estimate can be rather than a one-character edit.
+ */
+export const EMBEDDING_INPUT_TOKEN_LIMIT = 2048;
 
 /**
  * How many chunks are embedded in one API call.

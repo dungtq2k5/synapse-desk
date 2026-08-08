@@ -91,5 +91,3 @@ export class SchedulerProcessor extends WorkerHost {
     }
   }
 }
-
-export { formatErrorMsg } from '@synapsedesk/common';

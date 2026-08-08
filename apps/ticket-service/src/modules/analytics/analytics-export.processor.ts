@@ -6,7 +6,6 @@ import {
   ANALYTICS_EXPORT_QUEUE,
   AnalyticsExportKind,
   formatErrorMsg,
-  StoragePurpose,
 } from '@synapsedesk/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageReferenceService } from '../storage-client/storage-reference.service';
@@ -293,5 +292,3 @@ function newest(dates: Date[]): Date | null {
     dates[0],
   );
 }
-
-export { StoragePurpose };
