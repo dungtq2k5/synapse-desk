@@ -289,3 +289,77 @@ class TestChunking:
         chunks = harness.chunk_markdown(" ".join(["word"] * 200))
 
         assert len(chunks) == 3
+
+
+class TestTheMarkdownContract:
+    """21-doc §1 — the output format, scored rather than assumed.
+
+    Markdown came out of the generation prompt before it was ever asked for,
+    because the training data is full of it. That is a property of the MODEL:
+    a version change, a tier change or an edit to the grounding rules can
+    silently replace structure with a wall of plain text, and nothing fails.
+
+    These metrics are what turn that into a number that moves.
+    """
+
+    def test_a_whole_answer_in_ONE_FENCE_fails(self):
+        # The failure that makes an entire reply unreadable — a grey block
+        # where the answer should be. Models asked for markdown do this
+        # surprisingly often.
+        assert (
+            outcome(answer="```\nYou can carry over 5 days [1].\n```").renders_as_markdown
+            is False
+        )
+
+    def test_a_HEADING_fails(self):
+        # The answer renders inside a chat bubble that already sits under a
+        # page heading, so an `<h1>` breaks the document outline and is
+        # enormous in most themes.
+        assert (
+            outcome(answer="# Leave policy\n\nYou carry over 5 days [1].").renders_as_markdown
+            is False
+        )
+
+    def test_a_fenced_SNIPPET_inside_a_normal_answer_is_fine(self):
+        # The distinction that matters: code in an answer is wanted. Only
+        # wrapping the WHOLE answer is the failure, so a check that merely
+        # looked for a fence anywhere would reject the good case.
+        answer = "Run this [1]:\n\n```bash\nleave --carry-over\n```\n\nThen confirm."
+
+        assert outcome(answer=answer).renders_as_markdown is True
+
+    def test_prose_with_bold_and_backticks_passes(self):
+        answer = "The limit is **5 days**, tracked as `LEAVE-CARRY` [1]."
+
+        assert outcome(answer=answer).renders_as_markdown is True
+
+    def test_a_REFUSAL_is_not_scored(self):
+        # Its text is a fixed canned string. Measuring markdown there scores a
+        # constant, exactly as `language_match` already skips it.
+        assert outcome(status="DOC_MISSING").renders_as_markdown is None
+        assert outcome(status="DOC_MISSING").markdown_structured is None
+
+    def test_STRUCTURE_is_only_demanded_where_there_is_something_to_LIST(self):
+        # A one-line "5 days" answer is correctly unstructured, and demanding a
+        # bullet there would measure verbosity rather than formatting.
+        assert outcome().markdown_structured is None
+
+    def test_a_multi_option_answer_WITHOUT_a_list_fails(self):
+        listless = outcome(
+            question={"category": "ambiguous"},
+            answer="You can carry over 5 days, or request a payout, or forfeit them [1].",
+        )
+
+        assert listless.markdown_structured is False
+
+    def test_bullets_and_numbered_items_both_count_as_structure(self):
+        for body in ("- carry over\n- payout\n", "1. carry over\n2. payout\n"):
+            structured = outcome(question={"category": "ambiguous"}, answer=body)
+
+            assert structured.markdown_structured is True
+
+    def test_an_EMPTY_answer_is_not_scored_as_a_format_failure(self):
+        # An empty answer is a generation failure, and the other metrics
+        # already say so. Reporting it here too would double-count one fault
+        # and make the markdown number move for a reason unrelated to format.
+        assert outcome(answer="   ").renders_as_markdown is None

@@ -99,6 +99,48 @@ class TestAnswering:
         assert len(tokens(frames)) > 1
         assert frames[-1].WhichOneof("payload") == "completion"
 
+    async def test_CONCATENATED_TOKENS_reproduce_the_final_content(
+        self, servicer, seed, tenant_a
+    ):
+        # 21-doc §1, test 7. The client renders the token stream and persists
+        # `completion.content`, so any divergence between them is a message
+        # that changes after it finished arriving.
+        #
+        # Worth having regardless; markdown makes it URGENT. A dropped or
+        # duplicated chunk in plain prose is a typo, and in markdown it is a
+        # lost backtick or fence — which does not corrupt one word, it changes
+        # how everything after it renders.
+        await seed(tenant_a.organization_id, text=SHARED_TEXT)
+
+        frames = await chat(servicer, SHARED_TEXT, tenant_a.outsider())
+
+        assert "".join(tokens(frames)) == completion(frames).content
+
+    async def test_the_answer_is_forwarded_VERBATIM_including_raw_html(
+        self, servicer, seed, tenant_a, generator
+    ):
+        # 21-doc §1.3 — the XSS path, which now runs through the answer.
+        #
+        # Markdown is generated from TENANT-UPLOADED documents, so a document
+        # containing `<img src=x onerror=...>` can reach the renderer through
+        # the answer. The defence is in the RENDERER — markdown-to-text with
+        # HTML disabled, never markdown-to-raw-HTML — and this test pins the
+        # backend's half of that contract: it does not escape, strip or
+        # otherwise "helpfully" alter the model's output.
+        #
+        # That is deliberate rather than lazy. Escaping here would corrupt
+        # every legitimate `<` in a code sample while still leaving the
+        # renderer free to interpret HTML — protection that costs correctness
+        # and buys nothing. ONE layer decides, and it is the one that knows
+        # whether it is producing text or markup.
+        hostile = 'Use <img src=x onerror=alert(1)> carefully [1].'
+        generator.answer = hostile
+        await seed(tenant_a.organization_id, text=SHARED_TEXT)
+
+        frames = await chat(servicer, SHARED_TEXT, tenant_a.outsider())
+
+        assert completion(frames).content == hostile
+
     async def test_an_empty_corpus_yields_DOC_MISSING_rather_than_a_guess(
         self, servicer, tenant_a, generator
     ):

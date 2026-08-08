@@ -35,6 +35,7 @@ import argparse
 import asyncio
 import json
 import os
+import re
 import sys
 import uuid
 from dataclasses import dataclass, field
@@ -139,6 +140,57 @@ class Outcome:
             return None
 
         return detect_language(self.answer) == self.question.language
+
+    @property
+    def markdown_structured(self) -> bool | None:
+        """Did the answer come back with markdown STRUCTURE — 21-doc §1, test 1.
+
+        **Structure, never an exact string.** The wording of every answer here
+        changes with the model version; asserting on it produces a test that
+        fails for no reason and gets deleted rather than fixed. A bullet or a
+        numbered item at line start is durable.
+
+        Only meaningful for questions whose answer has steps or options to
+        list — a one-line "5 days" answer is correctly unstructured, and
+        demanding a bullet there would measure verbosity.
+        """
+        if self.status == "DOC_MISSING" or not self.answer.strip():
+            return None
+        if self.question.category != "ambiguous":
+            return None
+
+        return any(
+            line.lstrip().startswith(("- ", "* ", "+ "))
+            or re.match(r"^\s*\d+[.)]\s", line)
+            for line in self.answer.splitlines()
+        )
+
+    @property
+    def renders_as_markdown(self) -> bool | None:
+        """The two failures that make an answer UNREADABLE — 21-doc §1, tests 2-3.
+
+        Both are things models do unprompted when asked for markdown, and both
+        are total rather than cosmetic:
+
+          - wrapping the WHOLE answer in one fence turns the entire reply into
+            an unrendered grey block
+          - a heading inside a chat bubble that already sits under a page
+            heading breaks the document outline and is enormous in most themes
+
+        Checked on every answered question, because neither depends on what was
+        asked.
+        """
+        if self.status == "DOC_MISSING" or not self.answer.strip():
+            return None
+
+        answer = self.answer.strip()
+
+        wrapped_in_a_fence = answer.startswith("```") and answer.endswith("```")
+        has_heading = any(
+            line.lstrip().startswith("#") for line in answer.splitlines()
+        )
+
+        return not wrapped_in_a_fence and not has_heading
 
     @property
     def contains_expected(self) -> bool | None:
@@ -430,6 +482,11 @@ def report(outcomes: list[Outcome]) -> dict:
         "refusal_accuracy": rate([o.refusal_correct for o in outcomes]),
         "language_match": rate([o.language_match for o in outcomes]),
         "contains_expected": rate([o.contains_expected for o in outcomes]),
+        # 21-doc §1. `renders_as_markdown` is the one that matters day to day:
+        # a single-fenced answer or a heading in a chat bubble is unreadable
+        # rather than merely untidy, and neither fails anything else.
+        "renders_as_markdown": rate([o.renders_as_markdown for o in outcomes]),
+        "markdown_structured": rate([o.markdown_structured for o in outcomes]),
     }
 
     print()
@@ -445,6 +502,7 @@ def report(outcomes: list[Outcome]) -> dict:
         or o.retrieval_hit is False
         or o.language_match is False
         or o.contains_expected is False
+        or o.renders_as_markdown is False
     ]
 
     if failures:
@@ -462,6 +520,8 @@ def report(outcomes: list[Outcome]) -> dict:
                 reasons.append(f"language (wanted {outcome.question.language})")
             if outcome.contains_expected is False:
                 reasons.append(f"content (wanted {outcome.question.must_contain})")
+            if outcome.renders_as_markdown is False:
+                reasons.append("markdown (fenced whole answer, or used a heading)")
 
             print(f"  {outcome.question.id:32} {'; '.join(reasons)}")
 

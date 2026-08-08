@@ -168,10 +168,158 @@ def build_prompt(query: str, chunks: list[HydratedChunk]) -> str:
         "Cite the sources you use as [1], [2] and so on, inline.\n"
         "If the sources do not answer the question, say so plainly and do not "
         "answer from general knowledge — a wrong policy is worse than no "
-        "answer.\n\n"
+        "answer.\n"
+        # 21-doc §1.2 — the output CONTRACT.
+        #
+        # Markdown already came out of this prompt without being asked for,
+        # because the training data is full of it. That is a property of the
+        # MODEL, not of the system: a model version change, a tier change
+        # (FAST -> QUALITY) or an edit to the lines above can silently produce a
+        # wall of plain text into a renderer expecting structure, and nothing
+        # fails. Stating it makes it a contract that can be tested.
+        #
+        # Kept short on purpose — every instruction here competes with the
+        # grounding rules above for attention, and those matter more.
+        #
+        # Three of these clauses are DEFENSIVE rather than stylistic:
+        #
+        #   - No headings: the answer renders inside a chat bubble that already
+        #     sits under a page heading, so an <h1> breaks the document outline
+        #     and is enormous in most themes.
+        #   - Never fence the whole answer: models asked for markdown do this
+        #     surprisingly often, and it turns the entire reply into an
+        #     unrendered grey block.
+        #   - Backticks for exact values is the one that improves USEFULNESS
+        #     rather than appearance. A policy number or error code in prose
+        #     gets reformatted by the model; inside backticks it survives
+        #     verbatim, which is what a user copies.
+        "Format the answer as GitHub-flavoured Markdown. Use bullet lists for "
+        "steps or options, `code` for exact values, commands and error "
+        "strings, and **bold** for the single most important fact. Do not use "
+        "headings — the answer is rendered inside an existing page. Never wrap "
+        "the whole answer in a code fence.\n\n"
         f"SOURCES:\n{context}\n\n"
         f"QUESTION: {query}\n\nANSWER:"
     )
+
+
+def strip_code_spans(markdown: str) -> str:
+    """Blanks fenced blocks and inline code, preserving everything else.
+
+    **The collision the markdown contract creates** — 21-doc §1.3. Asking for
+    markdown means more code in answers, and a code sample containing
+    ``array[0]`` or ``items[2]`` parses as a citation of source 2 under the
+    ``\\[(\\d+)\\]`` pattern below. It is bounds-checked so it cannot crash — it
+    can only attribute an answer to a document the model never used, which is
+    worse than an uncited answer: an operator reading the trail sees a source
+    that was never consulted, and `UNCITED` stops meaning what it says.
+
+    Replaced with spaces rather than removed, so the result has the same length
+    as the input. Nothing depends on that today, and it makes this safe to use
+    for offset-based work later without a second pass.
+
+    Fences are handled before inline spans because an unmatched backtick inside
+    a fenced block would otherwise open a spurious inline span and swallow the
+    prose after it.
+
+    **Written as a linear scan rather than a regex, deliberately.** The natural
+    expressions for both halves — ``^```.*?^```$`` for fences and
+    ``(`+)(?:(?!\\1).)*\\1`` for inline spans — are super-linear on
+    backtracking, and this input is a MODEL's output: untrusted, occasionally
+    pathological, and reachable by anyone who can upload a document. This
+    codebase has already paid for that lesson twice (`stripHtmlTags`'s measured
+    quadratic blowup, `HEADING_PATTERN`'s standing FIXME); a third is not worth
+    the four lines it would save.
+    """
+    lines = markdown.split("\n")
+    in_fence = False
+    fence_marker = ""
+
+    for index, line in enumerate(lines):
+        stripped = line.lstrip()
+
+        if not in_fence:
+            marker = _fence_marker(stripped)
+            if marker:
+                in_fence, fence_marker = True, marker
+                lines[index] = " " * len(line)
+                continue
+        else:
+            # A closing fence is the same marker with nothing after it. An
+            # answer that ends mid-fence simply never closes, and everything
+            # after it stays blanked — which is correct: a truncated code block
+            # is still a code block, and its contents are still not prose.
+            lines[index] = " " * len(line)
+            if stripped.rstrip() == fence_marker:
+                in_fence, fence_marker = False, ""
+            continue
+
+        lines[index] = _blank_inline_spans(line)
+
+    return "\n".join(lines)
+
+
+def _fence_marker(stripped_line: str) -> str:
+    """The ``` or ~~~ opening a fence, or empty when the line opens none."""
+    for char in ("`", "~"):
+        run = len(stripped_line) - len(stripped_line.lstrip(char))
+        if run >= 3:
+            return char * run
+
+    return ""
+
+
+def _backtick_runs(line: str) -> list[tuple[int, int]]:
+    """Every maximal run of backticks, as `(start, length)`. One pass."""
+    runs: list[tuple[int, int]] = []
+    index = 0
+
+    while index < len(line):
+        if line[index] != "`":
+            index += 1
+            continue
+
+        start = index
+        while index < len(line) and line[index] == "`":
+            index += 1
+        runs.append((start, index - start))
+
+    return runs
+
+
+def _blank_inline_spans(line: str) -> str:
+    """Replaces `code` runs with spaces, leaving an unterminated one alone.
+
+    A span opens at a run of N backticks and closes at the next run of exactly
+    N — CommonMark's rule, and the reason ``` ``a`b`` ``` is one span rather
+    than two.
+
+    **An unmatched opener stays as prose**, which is both what CommonMark does
+    and what a mid-stream answer needs: a half-written span is the normal case
+    while tokens are still arriving, not an error.
+    """
+    runs = _backtick_runs(line)
+    out = list(line)
+    index = 0
+
+    while index < len(runs):
+        start, run = runs[index]
+        closer = next(
+            (other for other in range(index + 1, len(runs)) if runs[other][1] == run),
+            None,
+        )
+
+        if closer is None:
+            index += 1
+            continue
+
+        close_start, close_run = runs[closer]
+        for position in range(start, close_start + close_run):
+            out[position] = " "
+
+        index = closer + 1
+
+    return "".join(out)
 
 
 def extract_citations(answer: str, chunks: list[HydratedChunk]) -> list[Citation]:
@@ -181,12 +329,19 @@ def extract_citations(answer: str, chunks: list[HydratedChunk]) -> list[Citation
     mean anything (RDM Table 27). A citation list built from everything
     retrieved would say the model used all five sources when it used one, and
     the flag that finds context-polluting documents would never fire.
+
+    **Extracted from the PROSE only** (21-doc §1.3): code spans are blanked
+    first, so `items[2]` in a code sample is not read as a citation. The
+    original answer is what gets rendered and stored — only the citation scan
+    sees the stripped copy.
     """
     import re
 
+    prose = strip_code_spans(answer)
+
     referenced = {
         int(marker)
-        for marker in re.findall(r"\[(\d+)\]", answer)
+        for marker in re.findall(r"\[(\d+)\]", prose)
         # Bounds-checked: a model that invents `[9]` over five sources must not
         # produce an IndexError, and must not silently cite the wrong document.
         if marker.isdigit() and 1 <= int(marker) <= len(chunks)

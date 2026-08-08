@@ -21,6 +21,7 @@ from rag_service.generation.corag import (
     GenerationDelta,
     build_prompt,
     extract_citations,
+    strip_code_spans,
 )
 from rag_service.retrieval.service import BudgetState, HydratedChunk
 from rag_service.settings import resolve_ai_settings
@@ -187,6 +188,38 @@ class TestGrounding:
 
         assert "same language as the question" in prompt
 
+    def test_the_prompt_STATES_THE_OUTPUT_FORMAT(self):
+        # 21-doc §1.2. Markdown already came out of this prompt without being
+        # asked for, because the training data is full of it — which is a
+        # property of the MODEL, not of the system. A model version change, a
+        # tier change or an edit to the grounding rules can silently produce a
+        # wall of plain text into a renderer expecting structure, and nothing
+        # fails. Stating it is what makes it testable at all.
+        prompt = build_prompt("q", [chunk(1)])
+
+        assert "GitHub-flavoured Markdown" in prompt
+
+    def test_the_prompt_forbids_the_two_formats_that_BREAK_THE_RENDERER(self):
+        # Both are defensive rather than stylistic, and both are things models
+        # do unprompted when asked for markdown:
+        #
+        #   - a heading inside a chat bubble that already sits under a page
+        #     heading breaks the document outline and is enormous in most themes
+        #   - fencing the WHOLE answer turns the entire reply into an unrendered
+        #     grey block
+        prompt = build_prompt("q", [chunk(1)])
+
+        assert "Do not use headings" in prompt
+        assert "Never wrap the whole answer in a code fence" in prompt
+
+    def test_the_prompt_asks_for_BACKTICKS_around_exact_values(self):
+        # The one clause that improves usefulness rather than appearance. A
+        # policy number or an error code in prose gets reformatted by the model;
+        # inside backticks it survives verbatim — which is what a user copies.
+        prompt = build_prompt("q", [chunk(1)])
+
+        assert "`code` for exact values" in prompt
+
     def test_the_prompt_carries_the_title_and_page_a_citation_needs(self):
         prompt = build_prompt("q", [chunk(1, title="Expense Policy", page=7)])
 
@@ -222,9 +255,119 @@ class TestCitations:
 
         assert len(citations) == 1
 
+    def test_a_marker_inside_an_INLINE_CODE_SPAN_is_not_a_citation(self):
+        # 21-doc §1.3 — the collision the markdown contract creates. Asking for
+        # markdown means more code in answers, and `items[2]` parses as a
+        # citation of source 2 under the `[n]` pattern.
+        #
+        # It is bounds-checked, so it cannot crash. It can only attribute the
+        # answer to a document the model never used — which is WORSE than an
+        # uncited answer: an operator reading the trail sees a source that was
+        # never consulted, and `UNCITED` stops meaning what it says.
+        chunks = [chunk(1), chunk(2), chunk(3)]
+
+        citations = extract_citations(
+            "Read the first entry with `items[2]`, as described in [1].",
+            chunks,
+        )
+
+        assert [citation.chunk_id for citation in citations] == ["chunk-1"]
+
+    def test_a_marker_inside_a_FENCED_BLOCK_is_not_a_citation(self):
+        chunks = [chunk(1), chunk(2), chunk(3)]
+
+        answer = (
+            "Use the second element, per [1]:\n"
+            "```python\n"
+            "value = items[2]\n"
+            "other = rows[3]\n"
+            "```\n"
+        )
+
+        citations = extract_citations(answer, chunks)
+
+        assert [citation.chunk_id for citation in citations] == ["chunk-1"]
+
+    def test_REAL_citations_still_resolve_after_stripping(self):
+        # The guard that the fix did not eat what it was protecting. A stripper
+        # that blanked too much would silently produce uncited answers, which
+        # looks like a model problem and is not one.
+        chunks = [chunk(1), chunk(2), chunk(3)]
+
+        answer = (
+            "Per [1] the limit is 500, and [3] covers the exception.\n"
+            "```\n"
+            "example = rows[2]\n"
+            "```\n"
+            "See also [3]."
+        )
+
+        citations = extract_citations(answer, chunks)
+
+        assert [citation.chunk_id for citation in citations] == [
+            "chunk-1",
+            "chunk-3",
+        ]
+
+    def test_an_UNTERMINATED_fence_does_not_swallow_earlier_citations(self):
+        # What a truncated or mid-stream answer looks like. Everything after the
+        # opening fence is correctly treated as code — a truncated code block is
+        # still a code block — but the prose BEFORE it must survive, or a
+        # cut-off answer would lose every citation it had already made.
+        chunks = [chunk(1), chunk(2)]
+
+        answer = "Per [1], run:\n```bash\nrun --flag items[2]"
+
+        citations = extract_citations(answer, chunks)
+
+        assert [citation.chunk_id for citation in citations] == ["chunk-1"]
+
+
+class TestCodeSpanStripping:
+    """21-doc §1.3 — the stripper itself, including its cost.
+
+    Its input is a MODEL's output: untrusted, occasionally pathological, and
+    reachable by anyone who can upload a document. The obvious regexes for both
+    halves are super-linear on backtracking, and this codebase has already paid
+    for that twice — `stripHtmlTags`'s measured quadratic blowup and
+    `HEADING_PATTERN`'s standing FIXME.
+    """
+
+    def test_the_result_is_the_SAME_LENGTH_as_the_input(self):
+        # Blanked rather than removed, so citation offsets in the stripped copy
+        # line up with the original. Nothing depends on that yet; it is what
+        # makes this safe to reuse for offset work later without a second pass.
+        for text in ("a `b` c", "```\nx\n```", "``a`b`` c", "plain"):
+            assert len(strip_code_spans(text)) == len(text)
+
+    def test_PROSE_IS_UNTOUCHED(self):
+        assert strip_code_spans("Per [1], the limit is 500.") == (
+            "Per [1], the limit is 500."
+        )
+
+    def test_a_PATHOLOGICAL_input_is_stripped_in_bounded_time(self):
+        # The regression guard for the class of bug, not for one expression.
+        # Measured linear across 10k-80k on every shape below; the ceiling is
+        # deliberately loose so this fails on a super-linear rewrite rather than
+        # on a slow CI box.
+        import time
+
+        for text in (
+            "`" * 200_000,
+            "```\n" + ("x[2] " * 40_000),
+            "`a` " * 50_000,
+            "``a`b" * 40_000,
+        ):
+            started = time.perf_counter()
+            strip_code_spans(text)
+
+            assert time.perf_counter() - started < 2.0
+
 
 class TestMetering:
-    async def test_charges_before_recording(self, generator, settings, budget, quota, ledger):
+    async def test_charges_before_recording(
+        self, generator, settings, budget, quota, ledger
+    ):
         await run(generator, [chunk(1)], settings, budget)
 
         assert quota.charges
@@ -358,9 +501,7 @@ class TestTruncationIsDiagnosable:
         return generator
 
     async def _drain(self, generator):
-        return [
-            delta async for delta in generator.stream("prompt", "some-model", 32)
-        ]
+        return [delta async for delta in generator.stream("prompt", "some-model", 32)]
 
     async def test_a_MAX_TOKENS_finish_is_logged_at_WARNING(self, caplog):
         generator = self._generator(
@@ -373,8 +514,7 @@ class TestTruncationIsDiagnosable:
         # `getMessage()` rather than `.message`: the log call uses %-style
         # lazy formatting, so the raw template is what is stored.
         assert any(
-            "max_output_tokens" in record.getMessage()
-            and record.levelname == "WARNING"
+            "max_output_tokens" in record.getMessage() and record.levelname == "WARNING"
             for record in caplog.records
         )
 
@@ -392,9 +532,7 @@ class TestTruncationIsDiagnosable:
         # The return shape is unchanged on purpose: the empty/short result is
         # still the right outcome, and this is only about being able to find
         # out why.
-        generator = self._generator(
-            [self.FakeResponse("partial", reason="MAX_TOKENS")]
-        )
+        generator = self._generator([self.FakeResponse("partial", reason="MAX_TOKENS")])
 
         deltas = await self._drain(generator)
 
