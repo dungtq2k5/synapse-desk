@@ -22,6 +22,12 @@ import {
   SessionResponseDto,
 } from './dto/rest/session.dto';
 import { OrgAccessKind } from '../../common/decorators/org-access.decorator';
+import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { AUTH_SCHEMES } from '../../common/config/swagger.config';
+import {
+  ApiFilterErrors,
+  ApiWrappedResponse,
+} from '../../common/decorators/api-response.decorator';
 
 /**
  * The caller's own device sessions (api-endpoints-plan).
@@ -34,6 +40,8 @@ import { OrgAccessKind } from '../../common/decorators/org-access.decorator';
  * from `JwtAuthGuard`, so a caller whose refresh cookie has been cleared still
  * sees their list, just with nothing marked current.
  */
+@ApiTags('Sessions')
+@ApiCookieAuth(AUTH_SCHEMES.access)
 @OrgAccessKind(OrgAccess.AUTH)
 @Controller('auth/sessions')
 @UseGuards(JwtAuthGuard)
@@ -43,6 +51,12 @@ export class SessionsController {
     private readonly jwtCookieService: JwtCookieService,
   ) {}
 
+  @ApiOperation({ summary: 'List own sessions' })
+  @ApiWrappedResponse(SessionResponseDto, { isArray: true })
+  @ApiFilterErrors(['401'])
+  @ApiOperation({ summary: 'List own sessions' })
+  @ApiWrappedResponse(SessionResponseDto, { isArray: true })
+  @ApiFilterErrors(['401'])
   @Get()
   list(
     @CurrentUser() context: RequestContext,
@@ -63,6 +77,12 @@ export class SessionsController {
    * would be swallowed as an id — and `ParseUUIDPipe` would turn that into a
    * confusing 400 on a perfectly valid request.
    */
+  @ApiOperation({ summary: 'Un-trust every device → forces 2FA everywhere' })
+  @ApiWrappedResponse(RevokeTrustResponseDto)
+  @ApiFilterErrors(['401'])
+  @ApiOperation({ summary: 'Un-trust every device → forces 2FA everywhere' })
+  @ApiWrappedResponse(RevokeTrustResponseDto)
+  @ApiFilterErrors(['401'])
   @Delete('trusted')
   @HttpCode(HttpStatus.OK)
   @ResponseMessage('Trusted devices cleared')
@@ -79,6 +99,18 @@ export class SessionsController {
    * Clears cookies when the target was the caller's own session, so "sign out
    * this device" pressed on that device behaves like a logout.
    */
+  @ApiOperation({
+    summary:
+      'Revoke one session — expires the whole family_id, so a rotation already in flight cannot outlive the revocation',
+  })
+  @ApiWrappedResponse()
+  @ApiFilterErrors(['400', '401', '404'])
+  @ApiOperation({
+    summary:
+      'Revoke one session — expires the whole family_id, so a rotation already in flight cannot outlive the revocation',
+  })
+  @ApiWrappedResponse()
+  @ApiFilterErrors(['400', '401', '404'])
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   @ResponseMessage('Session revoked')
@@ -106,6 +138,18 @@ export class SessionsController {
    * Drops "remember this device" while leaving the session signed in. The next
    * login from that device gets a 2FA prompt again.
    */
+  @ApiOperation({
+    summary:
+      'Drop device trust for one session (clear device_token_hash / trusted_until, is_trusted = false) while leaving it logged in',
+  })
+  @ApiWrappedResponse(RevokeTrustResponseDto)
+  @ApiFilterErrors(['400', '401', '404'])
+  @ApiOperation({
+    summary:
+      'Drop device trust for one session (clear device_token_hash / trusted_until, is_trusted = false) while leaving it logged in',
+  })
+  @ApiWrappedResponse(RevokeTrustResponseDto)
+  @ApiFilterErrors(['400', '401', '404'])
   @Delete(':id/trust')
   @HttpCode(HttpStatus.OK)
   @ResponseMessage('Device trust removed')

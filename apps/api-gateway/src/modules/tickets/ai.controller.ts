@@ -22,6 +22,12 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ResponseMessage } from '../../common/decorators/response-message.decorator';
 import { AiGrpcClient } from './ai-grpc.client';
 import { GenerateDraftDto } from './dto/rest/ai.dto';
+import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { AUTH_SCHEMES } from '../../common/config/swagger.config';
+import {
+  ApiFilterErrors,
+  ApiWrappedResponse,
+} from '../../common/decorators/api-response.decorator';
 import {
   AiClassificationDto,
   AiDraftResponseDto,
@@ -41,6 +47,8 @@ import {
  * access, GENERATING anything is `ticket.ai.use`, which is metered and costs
  * money. Those two must not be the same grant.
  */
+@ApiTags('Ai')
+@ApiCookieAuth(AUTH_SCHEMES.access)
 @Controller('tickets/:ticketId/ai')
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class AiController {
@@ -50,6 +58,12 @@ export class AiController {
    * Reading a STORED summary costs nothing and needs no model — so it is gated
    * on queue access rather than on the generation permission.
    */
+  @ApiOperation({ summary: 'Get summary' })
+  @ApiWrappedResponse(AiSummaryResponseDto)
+  @ApiFilterErrors(['400', '401', '403', '404'])
+  @ApiOperation({ summary: 'Get summary' })
+  @ApiWrappedResponse(AiSummaryResponseDto)
+  @ApiFilterErrors(['400', '401', '403', '404'])
   @Get('summary')
   @RequirePermission('ticket.read.all')
   getSummary(
@@ -71,6 +85,12 @@ export class AiController {
   // quota is a month budget checked per request and does nothing to stop one
   // user spending the whole month in ten minutes.
   @Throttle({ [AI_THROTTLER_TIER]: ROUTE_THROTTLE.aiSummary })
+  @ApiOperation({ summary: 'Generate summary' })
+  @ApiWrappedResponse(AiSummaryResponseDto)
+  @ApiFilterErrors(['400', '401', '403', '404'])
+  @ApiOperation({ summary: 'Generate summary' })
+  @ApiWrappedResponse(AiSummaryResponseDto)
+  @ApiFilterErrors(['400', '401', '403', '404'])
   @Post('summary')
   @RequirePermission('ticket.ai.use')
   @HttpCode(HttpStatus.OK)
@@ -93,6 +113,12 @@ export class AiController {
   // quota is a month budget checked per request and does nothing to stop one
   // user spending the whole month in ten minutes.
   @Throttle({ [AI_THROTTLER_TIER]: ROUTE_THROTTLE.aiDraft })
+  @ApiOperation({ summary: 'Generate draft' })
+  @ApiWrappedResponse(AiDraftResponseDto)
+  @ApiFilterErrors(['400', '401', '403', '404'])
+  @ApiOperation({ summary: 'Generate draft' })
+  @ApiWrappedResponse(AiDraftResponseDto)
+  @ApiFilterErrors(['400', '401', '403', '404'])
   @Post('draft')
   @RequirePermission('ticket.ai.use')
   @HttpCode(HttpStatus.OK)
@@ -108,6 +134,12 @@ export class AiController {
   // quota is a month budget checked per request and does nothing to stop one
   // user spending the whole month in ten minutes.
   @Throttle({ [AI_THROTTLER_TIER]: ROUTE_THROTTLE.aiSuggestions })
+  @ApiOperation({ summary: 'Get suggestions' })
+  @ApiWrappedResponse(AiSuggestionDto, { isArray: true })
+  @ApiFilterErrors(['400', '401', '403', '404'])
+  @ApiOperation({ summary: 'Get suggestions' })
+  @ApiWrappedResponse(AiSuggestionDto, { isArray: true })
+  @ApiFilterErrors(['400', '401', '403', '404'])
   @Post('suggestions')
   @RequirePermission('ticket.ai.use')
   @HttpCode(HttpStatus.OK)
@@ -122,6 +154,12 @@ export class AiController {
   // quota is a month budget checked per request and does nothing to stop one
   // user spending the whole month in ten minutes.
   @Throttle({ [AI_THROTTLER_TIER]: ROUTE_THROTTLE.aiClassify })
+  @ApiOperation({ summary: 'Classify' })
+  @ApiWrappedResponse(AiClassificationDto)
+  @ApiFilterErrors(['400', '401', '403', '404'])
+  @ApiOperation({ summary: 'Classify' })
+  @ApiWrappedResponse(AiClassificationDto)
+  @ApiFilterErrors(['400', '401', '403', '404'])
   @Post('classify')
   @RequirePermission('ticket.ai.use')
   @HttpCode(HttpStatus.OK)

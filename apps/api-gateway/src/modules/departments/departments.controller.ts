@@ -21,6 +21,13 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ResponseMessage } from '../../common/decorators/response-message.decorator';
 import { PaginationResponseBase } from '../../common/dto/base/pagination-response-base.dto';
 import { DepartmentsGrpcClient } from './departments-grpc.client';
+import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { AUTH_SCHEMES } from '../../common/config/swagger.config';
+import {
+  ApiFilterErrors,
+  ApiWrappedResponse,
+  Paginated,
+} from '../../common/decorators/api-response.decorator';
 import {
   AddDepartmentMembersDto,
   AddDepartmentMembersResponseDto,
@@ -47,11 +54,23 @@ import {
  * mail on the tenant's behalf, and an admin whose verification mail bounced
  * should still be able to see their own org chart.
  */
+@ApiTags('Departments')
+@ApiCookieAuth(AUTH_SCHEMES.access)
 @Controller('departments')
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class DepartmentsController {
   constructor(private readonly departmentsGrpcClient: DepartmentsGrpcClient) {}
 
+  @ApiOperation({
+    summary: 'List departments in tenant (+ member counts, open-ticket counts)',
+  })
+  @ApiWrappedResponse(Paginated(DepartmentResponseDto))
+  @ApiFilterErrors(['401', '403'])
+  @ApiOperation({
+    summary: 'List departments in tenant (+ member counts, open-ticket counts)',
+  })
+  @ApiWrappedResponse(Paginated(DepartmentResponseDto))
+  @ApiFilterErrors(['401', '403'])
   @Get()
   @RequirePermission('department.read')
   list(
@@ -67,6 +86,12 @@ export class DepartmentsController {
     return this.departmentsGrpcClient.list(query, context);
   }
 
+  @ApiOperation({ summary: 'Detail' })
+  @ApiWrappedResponse(DepartmentResponseDto)
+  @ApiFilterErrors(['400', '401', '403', '404'])
+  @ApiOperation({ summary: 'Detail' })
+  @ApiWrappedResponse(DepartmentResponseDto)
+  @ApiFilterErrors(['400', '401', '403', '404'])
   @Get(':id')
   @RequirePermission('department.read')
   get(
@@ -76,6 +101,12 @@ export class DepartmentsController {
     return this.departmentsGrpcClient.get(id, context);
   }
 
+  @ApiOperation({ summary: 'Create' })
+  @ApiWrappedResponse(DepartmentResponseDto, { status: HttpStatus.CREATED })
+  @ApiFilterErrors(['400', '401', '403'])
+  @ApiOperation({ summary: 'Create' })
+  @ApiWrappedResponse(DepartmentResponseDto, { status: HttpStatus.CREATED })
+  @ApiFilterErrors(['400', '401', '403'])
   @Post()
   @RequirePermission('department.create')
   create(
@@ -85,6 +116,12 @@ export class DepartmentsController {
     return this.departmentsGrpcClient.create(createDepartmentDto, context);
   }
 
+  @ApiOperation({ summary: 'Update' })
+  @ApiWrappedResponse(DepartmentResponseDto)
+  @ApiFilterErrors(['400', '401', '403', '404'])
+  @ApiOperation({ summary: 'Update' })
+  @ApiWrappedResponse(DepartmentResponseDto)
+  @ApiFilterErrors(['400', '401', '403', '404'])
   @Patch(':id')
   @RequirePermission('department.update')
   update(
@@ -96,6 +133,12 @@ export class DepartmentsController {
   }
 
   /** Soft delete. 409 while the department still has members. */
+  @ApiOperation({ summary: 'Remove' })
+  @ApiWrappedResponse()
+  @ApiFilterErrors(['400', '401', '403', '404'])
+  @ApiOperation({ summary: 'Remove' })
+  @ApiWrappedResponse()
+  @ApiFilterErrors(['400', '401', '403', '404'])
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   @RequirePermission('department.delete')
@@ -108,6 +151,12 @@ export class DepartmentsController {
   }
 
   /** 409 if the name was re-used while this one was deleted. */
+  @ApiOperation({ summary: 'Restore' })
+  @ApiWrappedResponse(DepartmentResponseDto)
+  @ApiFilterErrors(['400', '401', '403', '404'])
+  @ApiOperation({ summary: 'Restore' })
+  @ApiWrappedResponse(DepartmentResponseDto)
+  @ApiFilterErrors(['400', '401', '403', '404'])
   @Post(':id/restore')
   @HttpCode(HttpStatus.OK)
   @RequirePermission('department.delete')
@@ -123,6 +172,16 @@ export class DepartmentsController {
   // Membership
   // -------------------------------------------------------------------------
 
+  @ApiOperation({
+    summary: 'Members (via user_departments), flagging is_primary',
+  })
+  @ApiWrappedResponse(Paginated(DepartmentMemberResponseDto))
+  @ApiFilterErrors(['400', '401', '403', '404'])
+  @ApiOperation({
+    summary: 'Members (via user_departments), flagging is_primary',
+  })
+  @ApiWrappedResponse(Paginated(DepartmentMemberResponseDto))
+  @ApiFilterErrors(['400', '401', '403', '404'])
   @Get(':id/members')
   @RequirePermission('department.read')
   listMembers(
@@ -133,6 +192,12 @@ export class DepartmentsController {
     return this.departmentsGrpcClient.listMembers(id, query, context);
   }
 
+  @ApiOperation({ summary: 'Add members' })
+  @ApiWrappedResponse(AddDepartmentMembersResponseDto)
+  @ApiFilterErrors(['400', '401', '403', '404'])
+  @ApiOperation({ summary: 'Add members' })
+  @ApiWrappedResponse(AddDepartmentMembersResponseDto)
+  @ApiFilterErrors(['400', '401', '403', '404'])
   @Post(':id/members')
   @HttpCode(HttpStatus.OK)
   @RequirePermission('department.member.assign')
@@ -154,6 +219,12 @@ export class DepartmentsController {
    * the caller must choose the replacement rather than have one picked for
    * them, because primary department drives ticket routing and document scope.
    */
+  @ApiOperation({ summary: 'Remove member' })
+  @ApiWrappedResponse()
+  @ApiFilterErrors(['400', '401', '403', '404'])
+  @ApiOperation({ summary: 'Remove member' })
+  @ApiWrappedResponse()
+  @ApiFilterErrors(['400', '401', '403', '404'])
   @Delete(':id/members/:userId')
   @HttpCode(HttpStatus.OK)
   @RequirePermission('department.member.assign')

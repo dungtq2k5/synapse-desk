@@ -16,6 +16,12 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ResponseMessage } from '../../common/decorators/response-message.decorator';
 import { SessionsGrpcClient } from './sessions-grpc.client';
 import { SessionResponseDto } from './dto/rest/session.dto';
+import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { AUTH_SCHEMES } from '../../common/config/swagger.config';
+import {
+  ApiFilterErrors,
+  ApiWrappedResponse,
+} from '../../common/decorators/api-response.decorator';
 
 /**
  * Administrative views of ANOTHER user's sessions.
@@ -28,11 +34,19 @@ import { SessionResponseDto } from './dto/rest/session.dto';
  * `@Controller('users/invitations')` while living in `invitations/`. Ownership
  * follows the resource (and its gRPC client), not the URL prefix.
  */
+@ApiTags('User Sessions')
+@ApiCookieAuth(AUTH_SCHEMES.access)
 @Controller('users/:userId/sessions')
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class UserSessionsController {
   constructor(private readonly sessionsGrpcClient: SessionsGrpcClient) {}
 
+  @ApiOperation({ summary: 'List invitations' })
+  @ApiWrappedResponse(SessionResponseDto, { isArray: true })
+  @ApiFilterErrors(['400', '401', '403', '404'])
+  @ApiOperation({ summary: 'List invitations' })
+  @ApiWrappedResponse(SessionResponseDto, { isArray: true })
+  @ApiFilterErrors(['400', '401', '403', '404'])
   @Get()
   @RequirePermission('user.session.read')
   list(
@@ -47,6 +61,12 @@ export class UserSessionsController {
    * the target — being signed out by an administrator is something they should
    * hear from us rather than infer.
    */
+  @ApiOperation({ summary: 'Revoke' })
+  @ApiWrappedResponse()
+  @ApiFilterErrors(['400', '401', '403', '404'])
+  @ApiOperation({ summary: 'Revoke' })
+  @ApiWrappedResponse()
+  @ApiFilterErrors(['400', '401', '403', '404'])
   @Delete()
   @HttpCode(HttpStatus.OK)
   @RequirePermission('user.session.revoke')

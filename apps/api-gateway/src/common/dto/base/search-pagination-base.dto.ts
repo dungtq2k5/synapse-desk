@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
   DEFAULT_SEARCH,
   SORT_ORDER_OPTIONS,
@@ -12,6 +13,16 @@ export class SearchPaginationBase {
   @Min(1)
   @Type(() => Number)
   // Guaranteed that this query will always be provided even if the client does not provide it
+  /**
+   * Optional in the API and, without this, REQUIRED in the docs — 24-doc §1.
+   *
+   * The plugin derives `required` from TYPESCRIPT optionality, not from
+   * `@IsOptional()`. A field declared `page: number = 1` is non-optional to the
+   * compiler even though the validator lets a caller omit it, so the generated
+   * spec demanded it — and a generated client would refuse to send a request
+   * without one.
+   */
+  @ApiPropertyOptional()
   page: number = DEFAULT_SEARCH.PAGE;
 
   @IsOptional()
@@ -19,6 +30,7 @@ export class SearchPaginationBase {
   @Min(DEFAULT_SEARCH.MIN_LIMIT)
   @Max(DEFAULT_SEARCH.MAX_LIMIT)
   @Type(() => Number)
+  @ApiPropertyOptional()
   limit: number = DEFAULT_SEARCH.LIMIT;
 
   @IsOptional()
@@ -37,10 +49,12 @@ export class SearchPaginationBase {
    */
   @IsOptional()
   @IsString()
+  @ApiPropertyOptional()
   sortBy: string = DEFAULT_SEARCH.SORT_BY;
 
   @IsOptional()
   @IsString()
   @IsIn(SORT_ORDER_OPTIONS)
+  @ApiPropertyOptional()
   sortOrder: SortOrder = DEFAULT_SEARCH.SORT_ORDER;
 }

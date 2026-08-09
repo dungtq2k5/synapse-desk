@@ -11,7 +11,7 @@ import {
   MaxLength,
   MinLength,
 } from 'class-validator';
-import { OmitType } from '@nestjs/swagger';
+import { OmitType, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   DEFAULT_SEARCH,
   DEPARTMENT_MEMBER_SORTABLE_FIELDS,
@@ -34,6 +34,16 @@ export class ListDepartmentsQueryDto extends OmitType(SearchPaginationBase, [
   @IsOptional()
   @IsString()
   @IsIn(DEPARTMENT_SORTABLE_FIELDS)
+  /**
+   * Optional in the API and, without this, REQUIRED in the docs — 24-doc §1.
+   *
+   * The plugin derives `required` from TYPESCRIPT optionality, not from
+   * `@IsOptional()`. A field declared `page: number = 1` is non-optional to the
+   * compiler even though the validator lets a caller omit it, so the generated
+   * spec demanded it — and a generated client would refuse to send a request
+   * without one.
+   */
+  @ApiPropertyOptional()
   readonly sortBy: DepartmentSortableField = DEFAULT_SEARCH.SORT_BY;
 
   /**
@@ -44,6 +54,7 @@ export class ListDepartmentsQueryDto extends OmitType(SearchPaginationBase, [
   @IsOptional()
   @IsBoolean()
   @ToBoolean()
+  @ApiPropertyOptional()
   readonly includeDeleted: boolean = false;
 }
 
@@ -63,6 +74,7 @@ export class ListDepartmentMembersQueryDto extends OmitType(
   @IsOptional()
   @IsString()
   @IsIn(DEPARTMENT_MEMBER_SORTABLE_FIELDS)
+  @ApiPropertyOptional()
   readonly sortBy: DepartmentMemberSortableField = 'assignedAt';
 }
 
@@ -113,6 +125,7 @@ export class AddDepartmentMembersDto {
   @IsOptional()
   @IsBoolean()
   @Type(() => Boolean)
+  @ApiPropertyOptional()
   readonly isPrimary: boolean = false;
 }
 

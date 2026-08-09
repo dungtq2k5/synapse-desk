@@ -21,6 +21,13 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ResponseMessage } from '../../common/decorators/response-message.decorator';
 import { PaginationResponseBase } from '../../common/dto/base/pagination-response-base.dto';
 import { RolesGrpcClient } from './roles-grpc.client';
+import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { AUTH_SCHEMES } from '../../common/config/swagger.config';
+import {
+  ApiFilterErrors,
+  ApiWrappedResponse,
+  Paginated,
+} from '../../common/decorators/api-response.decorator';
 import {
   CreateRoleDto,
   ListRolesQueryDto,
@@ -36,11 +43,25 @@ import {
  * none of the latter — enforced in auth-service, not just greyed out here. A
  * UI-only guard would be bypassed by anyone with curl.
  */
+@ApiTags('Roles')
+@ApiCookieAuth(AUTH_SCHEMES.access)
 @Controller('roles')
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class RolesController {
   constructor(private readonly rolesGrpcClient: RolesGrpcClient) {}
 
+  @ApiOperation({
+    summary:
+      'Tenant custom roles + global system roles (organization_id IS NULL)',
+  })
+  @ApiWrappedResponse(Paginated(RoleResponseDto))
+  @ApiFilterErrors(['401', '403'])
+  @ApiOperation({
+    summary:
+      'Tenant custom roles + global system roles (organization_id IS NULL)',
+  })
+  @ApiWrappedResponse(Paginated(RoleResponseDto))
+  @ApiFilterErrors(['401', '403'])
   @Get()
   @RequirePermission('role.read')
   list(
@@ -50,6 +71,12 @@ export class RolesController {
     return this.rolesGrpcClient.list(query, context);
   }
 
+  @ApiOperation({ summary: 'Detail + attached permissions + user_assigned' })
+  @ApiWrappedResponse(RoleResponseDto)
+  @ApiFilterErrors(['400', '401', '403', '404'])
+  @ApiOperation({ summary: 'Detail + attached permissions + user_assigned' })
+  @ApiWrappedResponse(RoleResponseDto)
+  @ApiFilterErrors(['400', '401', '403', '404'])
   @Get(':id')
   @RequirePermission('role.read')
   get(
@@ -69,6 +96,12 @@ export class RolesController {
    * service instead, by the rule that an actor cannot grant what they do not
    * hold; that check does not care which permission opened the route.
    */
+  @ApiOperation({ summary: 'Create' })
+  @ApiWrappedResponse(RoleResponseDto, { status: HttpStatus.CREATED })
+  @ApiFilterErrors(['400', '401', '403'])
+  @ApiOperation({ summary: 'Create' })
+  @ApiWrappedResponse(RoleResponseDto, { status: HttpStatus.CREATED })
+  @ApiFilterErrors(['400', '401', '403'])
   @Post()
   @RequirePermission('role.create')
   create(
@@ -79,6 +112,12 @@ export class RolesController {
   }
 
   /** 403 on a system role. */
+  @ApiOperation({ summary: 'Update' })
+  @ApiWrappedResponse(RoleResponseDto)
+  @ApiFilterErrors(['400', '401', '403', '404'])
+  @ApiOperation({ summary: 'Update' })
+  @ApiWrappedResponse(RoleResponseDto)
+  @ApiFilterErrors(['400', '401', '403', '404'])
   @Patch(':id')
   @RequirePermission('role.update')
   update(
@@ -90,6 +129,12 @@ export class RolesController {
   }
 
   /** 409 while any user still holds it — roles are hard-deleted and cascade. */
+  @ApiOperation({ summary: 'Remove' })
+  @ApiWrappedResponse()
+  @ApiFilterErrors(['400', '401', '403', '404'])
+  @ApiOperation({ summary: 'Remove' })
+  @ApiWrappedResponse()
+  @ApiFilterErrors(['400', '401', '403', '404'])
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   @RequirePermission('role.delete')
@@ -105,6 +150,12 @@ export class RolesController {
    * PUT, not PATCH: replace semantics, so retrying is safe and a code left out
    * of the body is genuinely revoked.
    */
+  @ApiOperation({ summary: 'Set permissions' })
+  @ApiWrappedResponse(RoleResponseDto)
+  @ApiFilterErrors(['400', '401', '403', '404'])
+  @ApiOperation({ summary: 'Set permissions' })
+  @ApiWrappedResponse(RoleResponseDto)
+  @ApiFilterErrors(['400', '401', '403', '404'])
   @Put(':id/permissions')
   @HttpCode(HttpStatus.OK)
   @RequirePermission('role.permission.assign')

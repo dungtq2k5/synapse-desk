@@ -6,6 +6,12 @@ import { RequirePermission } from '../../common/decorators/require-permission.de
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RolesGrpcClient } from './roles-grpc.client';
 import { PermissionResponseDto } from './dto/rest/role.dto';
+import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { AUTH_SCHEMES } from '../../common/config/swagger.config';
+import {
+  ApiFilterErrors,
+  ApiWrappedResponse,
+} from '../../common/decorators/api-response.decorator';
 
 /**
  * The seeded permission catalogue (api-endpoints-plan).
@@ -22,11 +28,25 @@ import { PermissionResponseDto } from './dto/rest/role.dto';
  * and it lists every capability the product has — not something to hand to
  * every authenticated user.
  */
+@ApiTags('Permissions')
+@ApiCookieAuth(AUTH_SCHEMES.access)
 @Controller('permissions')
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class PermissionsController {
   constructor(private readonly rolesGrpcClient: RolesGrpcClient) {}
 
+  @ApiOperation({
+    summary:
+      'Full permission catalogue, grouped by target prefix — drives the role editor UI',
+  })
+  @ApiWrappedResponse(PermissionResponseDto, { isArray: true })
+  @ApiFilterErrors(['401', '403'])
+  @ApiOperation({
+    summary:
+      'Full permission catalogue, grouped by target prefix — drives the role editor UI',
+  })
+  @ApiWrappedResponse(PermissionResponseDto, { isArray: true })
+  @ApiFilterErrors(['401', '403'])
   @Get()
   @RequirePermission('role.read')
   list(

@@ -17,6 +17,7 @@ import {
 } from '@synapsedesk/grpc-proto';
 import { AppModule } from '../../src/app.module';
 import { OPS_ROUTES } from '../../src/modules/health/ops-routes';
+import { setupSwagger } from '../../src/common/config/swagger.config';
 import { AllHttpExceptionFilter } from '../../src/common/filters/all-http-exception.filter';
 import { LoggingInterceptor } from '../../src/common/interceptors/logging.interceptor';
 import { TransformInterceptor } from '../../src/common/interceptors/transform.interceptor';
@@ -112,6 +113,17 @@ export async function bootstrapE2eTest(
       transform: true,
     }),
   );
+
+  // `/docs` and `/docs-json`, exactly as `main.ts` mounts them — 24-doc §4.
+  // **Before `init()`**, which is the whole reason it lives here rather than in
+  // the one suite that reads it: `SwaggerModule.setup` registers routes on the
+  // Express instance, and registering them after the app has initialised
+  // silently does nothing — the endpoint 404s while every static assertion
+  // about the configuration passes.
+  //
+  // `.env.test` sets `SWAGGER_ENABLED=true`, so this also means the gate itself
+  // is exercised rather than bypassed.
+  setupSwagger(app, configService);
 
   await app.init();
 

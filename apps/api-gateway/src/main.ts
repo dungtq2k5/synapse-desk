@@ -2,6 +2,7 @@ import { NestFactory, Reflector } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { OPS_ROUTES } from './modules/health/ops-routes';
 import { MetricsServer } from './modules/metrics/metrics.server';
+import { setupSwagger } from './common/config/swagger.config';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestExpressApplication } from '@nestjs/platform-express';
@@ -126,6 +127,10 @@ async function bootstrap() {
     createNatsTransport(configService),
   );
   await app.startAllMicroservices();
+
+  // `/docs` and `/docs-json`, when config allows — 24-doc §4. Before `listen`
+  // so the routes exist the moment the port opens.
+  setupSwagger(app, configService, logger);
 
   // The metrics listener, BEFORE the public one — 23-doc §4. A scraper that
   // finds the app serving traffic and the metrics port refused would report a

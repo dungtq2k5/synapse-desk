@@ -16,6 +16,12 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ResponseMessage } from '../../common/decorators/response-message.decorator';
 import { OrgAccessKind } from '../../common/decorators/org-access.decorator';
 import { BillingGrpcClient } from './billing-grpc.client';
+import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { AUTH_SCHEMES } from '../../common/config/swagger.config';
+import {
+  ApiFilterErrors,
+  ApiWrappedResponse,
+} from '../../common/decorators/api-response.decorator';
 import {
   CreateCheckoutSessionDto,
   CreatePortalSessionDto,
@@ -35,6 +41,8 @@ import {
  * reach billing and nothing else. A tenant locked out of the page where they
  * would pay their overdue invoice is a lockout with no exit.
  */
+@ApiTags('Billing')
+@ApiCookieAuth(AUTH_SCHEMES.access)
 @Controller('billing')
 @UseGuards(JwtAuthGuard, PermissionGuard)
 @OrgAccessKind(OrgAccess.BILLING)
@@ -47,6 +55,16 @@ export class BillingController {
    * A dashboard that fans out to a third party on every load fails when they
    * do — and this is the page a customer opens when something is already wrong.
    */
+  @ApiOperation({
+    summary: 'Current plan, status, period, and the entitlements it granted',
+  })
+  @ApiWrappedResponse(SubscriptionResponseDto)
+  @ApiFilterErrors(['401', '403'])
+  @ApiOperation({
+    summary: 'Current plan, status, period, and the entitlements it granted',
+  })
+  @ApiWrappedResponse(SubscriptionResponseDto)
+  @ApiFilterErrors(['401', '403'])
   @Get('subscription')
   @RequirePermission('organization.read')
   getSubscription(
@@ -62,6 +80,12 @@ export class BillingController {
    * mid-checkout must not end up upgraded, and a user who pays must not depend
    * on their browser making it back to a redirect.
    */
+  @ApiOperation({ summary: 'Create checkout session' })
+  @ApiWrappedResponse(CheckoutSessionResponseDto)
+  @ApiFilterErrors(['400', '401', '403'])
+  @ApiOperation({ summary: 'Create checkout session' })
+  @ApiWrappedResponse(CheckoutSessionResponseDto)
+  @ApiFilterErrors(['400', '401', '403'])
   @Post('checkout-session')
   @HttpCode(HttpStatus.OK)
   @RequirePermission('organization.update')
@@ -80,6 +104,12 @@ export class BillingController {
    * against Stripe's behaviour, which is most of the reason to use Stripe
    * rather than a payment processor.
    */
+  @ApiOperation({ summary: 'Create portal session' })
+  @ApiWrappedResponse(PortalSessionResponseDto)
+  @ApiFilterErrors(['400', '401', '403'])
+  @ApiOperation({ summary: 'Create portal session' })
+  @ApiWrappedResponse(PortalSessionResponseDto)
+  @ApiFilterErrors(['400', '401', '403'])
   @Post('portal-session')
   @HttpCode(HttpStatus.OK)
   @RequirePermission('organization.update')
@@ -92,6 +122,12 @@ export class BillingController {
   }
 
   /** The one place a live Stripe read is correct — invoices are not mirrored. */
+  @ApiOperation({ summary: 'Invoice history, proxied from Stripe and cached' })
+  @ApiWrappedResponse(InvoiceResponseDto, { isArray: true })
+  @ApiFilterErrors(['401', '403'])
+  @ApiOperation({ summary: 'Invoice history, proxied from Stripe and cached' })
+  @ApiWrappedResponse(InvoiceResponseDto, { isArray: true })
+  @ApiFilterErrors(['401', '403'])
   @Get('invoices')
   @RequirePermission('organization.update')
   listInvoices(

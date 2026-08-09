@@ -1,4 +1,9 @@
 import { Controller, Get } from '@nestjs/common';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiFilterErrors,
+  ApiWrappedResponse,
+} from '../../common/decorators/api-response.decorator';
 import {
   ServiceRegistry,
   type ServiceHealth,
@@ -14,6 +19,7 @@ import {
  * orchestrator has no credentials, and a probe behind auth cannot restart a
  * process whose auth is broken.
  */
+@ApiTags('Ops')
 @Controller('health')
 export class HealthController {
   constructor(
@@ -31,6 +37,19 @@ export class HealthController {
    * failure a restart repairs is a wedged process, and that is what an
    * unanswered request already signals.
    */
+  @ApiOperation({
+    summary: 'Liveness — is this process alive?',
+    description:
+      'Checks NOTHING external, deliberately. A liveness probe that failed on a ' +
+      'dependency outage would get every container restarted, which repairs none ' +
+      'of it. Served outside the `/api/v1` prefix: an orchestrator is not an API ' +
+      'client and cannot follow a version migration.',
+    // PUBLIC, and it must be: an orchestrator holds no credentials, and a probe
+    // behind auth cannot restart a process whose auth is broken.
+    security: [],
+  })
+  @ApiWrappedResponse(LivenessResponseDto)
+  @ApiFilterErrors()
   @Get()
   liveness(): LivenessResponseDto {
     return { status: 'UP', timestamp: new Date() };
@@ -64,6 +83,17 @@ export class HealthController {
    * brief auth-service outage leaves existing sessions working and pulling the
    * gateway would be the thing that ends them.
    */
+  @ApiOperation({
+    summary: 'Readiness — should traffic reach THIS instance?',
+    description:
+      '`ready` gates on Redis alone. Peer gRPC health is REPORTED under `peers` ' +
+      'and deliberately does not gate: every instance sees the same peer down, so ' +
+      'gating would remove all of them and turn one service outage into a total ' +
+      'one. A partial outage should look partial.',
+    security: [],
+  })
+  @ApiWrappedResponse(ReadinessResponseDto)
+  @ApiFilterErrors()
   @Get('ready')
   async readiness(): Promise<ReadinessResponseDto> {
     // Started before the peer read so the two overlap rather than queue. Both

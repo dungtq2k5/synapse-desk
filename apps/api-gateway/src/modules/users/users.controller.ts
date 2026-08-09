@@ -26,6 +26,12 @@ import {
   PresignAvatarResponseDto,
 } from './dto/rest/avatar.dto';
 import { OrgAccessKind } from '../../common/decorators/org-access.decorator';
+import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { AUTH_SCHEMES } from '../../common/config/swagger.config';
+import {
+  ApiFilterErrors,
+  ApiWrappedResponse,
+} from '../../common/decorators/api-response.decorator';
 
 /**
  * The caller's OWN profile.
@@ -38,6 +44,8 @@ import { OrgAccessKind } from '../../common/decorators/org-access.decorator';
  * ahead of `/users/:id` — otherwise `me` is swallowed as an id and
  * `ParseUUIDPipe` turns a valid request into a confusing 400.
  */
+@ApiTags('Users')
+@ApiCookieAuth(AUTH_SCHEMES.access)
 @Controller('users')
 @UseGuards(JwtAuthGuard)
 export class UsersController {
@@ -52,6 +60,16 @@ export class UsersController {
    * caller is authenticated.
    */
   @OrgAccessKind(OrgAccess.AUTH)
+  @ApiOperation({
+    summary: 'Own profile + org + departments + effective permission codes',
+  })
+  @ApiWrappedResponse(CurrentUserResponseDto)
+  @ApiFilterErrors(['401'])
+  @ApiOperation({
+    summary: 'Own profile + org + departments + effective permission codes',
+  })
+  @ApiWrappedResponse(CurrentUserResponseDto)
+  @ApiFilterErrors(['401'])
   @Get('me')
   getCurrentUser(
     @CurrentUser() context: RequestContext,
@@ -71,6 +89,16 @@ export class UsersController {
    * is the enforcement: `forbidNonWhitelisted` rejects any other key with a
    * 400, so keeping it narrow is a security control rather than a convention.
    */
+  @ApiOperation({
+    summary: 'Update own profile fields (fullName, dob, gender)',
+  })
+  @ApiWrappedResponse(UserResponseDto)
+  @ApiFilterErrors(['400', '401'])
+  @ApiOperation({
+    summary: 'Update own profile fields (fullName, dob, gender)',
+  })
+  @ApiWrappedResponse(UserResponseDto)
+  @ApiFilterErrors(['400', '401'])
   @Patch('me')
   @ResponseMessage('Profile updated')
   updateOwnProfile(
@@ -92,6 +120,18 @@ export class UsersController {
    *
    * No permission — this is the caller's own face.
    */
+  @ApiOperation({
+    summary:
+      'Presign a direct-to-Firebase-Storage upload: { contentType, sizeBytes } → { uploadUrl, objectPath, expiresAt }',
+  })
+  @ApiWrappedResponse(PresignAvatarResponseDto)
+  @ApiFilterErrors(['400', '401'])
+  @ApiOperation({
+    summary:
+      'Presign a direct-to-Firebase-Storage upload: { contentType, sizeBytes } → { uploadUrl, objectPath, expiresAt }',
+  })
+  @ApiWrappedResponse(PresignAvatarResponseDto)
+  @ApiFilterErrors(['400', '401'])
   @Post('me/avatar/upload-url')
   @HttpCode(HttpStatus.OK)
   presignAvatar(
@@ -106,6 +146,18 @@ export class UsersController {
    * storage-service, commits the path, audits, and emits the supersede for the
    * OLD object.
    */
+  @ApiOperation({
+    summary:
+      '{ objectPath } — confirms the upload landed, writes users.avatar_url (an object path, not a URL — RDM Table 3), audits, and emits the async delete of the previous avatar if one existed',
+  })
+  @ApiWrappedResponse(UserResponseDto)
+  @ApiFilterErrors(['400', '401'])
+  @ApiOperation({
+    summary:
+      '{ objectPath } — confirms the upload landed, writes users.avatar_url (an object path, not a URL — RDM Table 3), audits, and emits the async delete of the previous avatar if one existed',
+  })
+  @ApiWrappedResponse(UserResponseDto)
+  @ApiFilterErrors(['400', '401'])
   @Post('me/avatar/confirm')
   @HttpCode(HttpStatus.OK)
   @ResponseMessage('Avatar updated')
@@ -122,6 +174,18 @@ export class UsersController {
    * The client needs the row back to re-render the profile with `avatarUrl`
    * null — a 204 would leave it guessing whether the change landed.
    */
+  @ApiOperation({
+    summary:
+      'Clear avatar_url to null; emits the async delete of the object that was there',
+  })
+  @ApiWrappedResponse(UserResponseDto)
+  @ApiFilterErrors(['401'])
+  @ApiOperation({
+    summary:
+      'Clear avatar_url to null; emits the async delete of the object that was there',
+  })
+  @ApiWrappedResponse(UserResponseDto)
+  @ApiFilterErrors(['401'])
   @Delete('me/avatar')
   @HttpCode(HttpStatus.OK)
   @ResponseMessage('Avatar removed')

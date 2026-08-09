@@ -31,6 +31,13 @@ import {
 } from '../tickets/dto/rest/message.dto';
 import { ListTicketsQueryDto } from '../tickets/dto/rest/ticket.dto';
 import { StartConversationDto } from './dto/rest/chat.dto';
+import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { AUTH_SCHEMES } from '../../common/config/swagger.config';
+import {
+  ApiFilterErrors,
+  ApiWrappedResponse,
+  Paginated,
+} from '../../common/decorators/api-response.decorator';
 
 /**
  * Self-service chat — a THIN WRAPPER, and nothing else.
@@ -47,6 +54,8 @@ import { StartConversationDto } from './dto/rest/chat.dto';
  * filter, would be a security hole reachable only through the chat URL — and
  * nobody would think to look for it there.
  */
+@ApiTags('Chat')
+@ApiCookieAuth(AUTH_SCHEMES.access)
 @Controller('chat')
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class ChatController {
@@ -64,6 +73,16 @@ export class ChatController {
    * permission because it can raise a ticket ON BEHALF of somebody else —
    * which this one cannot: the author is always the caller.
    */
+  @ApiOperation({
+    summary: 'Start a Tier 1 conversation → creates a NEW ticket',
+  })
+  @ApiWrappedResponse(TicketResponseDto, { status: HttpStatus.CREATED })
+  @ApiFilterErrors(['400', '401'])
+  @ApiOperation({
+    summary: 'Start a Tier 1 conversation → creates a NEW ticket',
+  })
+  @ApiWrappedResponse(TicketResponseDto, { status: HttpStatus.CREATED })
+  @ApiFilterErrors(['400', '401'])
   @Post('conversations')
   @ResponseMessage('Conversation started')
   start(
@@ -94,6 +113,12 @@ export class ChatController {
    * correct for the queue view at `/tickets`, wrong for "my conversations",
    * which is what this path means.
    */
+  @ApiOperation({ summary: 'List own conversations' })
+  @ApiWrappedResponse(Paginated(TicketResponseDto))
+  @ApiFilterErrors(['401'])
+  @ApiOperation({ summary: 'List own conversations' })
+  @ApiWrappedResponse(Paginated(TicketResponseDto))
+  @ApiFilterErrors(['401'])
   @Get('conversations')
   list(
     @CurrentUser() context: RequestContext,
@@ -110,6 +135,12 @@ export class ChatController {
     );
   }
 
+  @ApiOperation({ summary: 'Thread + citations per AI message' })
+  @ApiWrappedResponse(TicketResponseDto)
+  @ApiFilterErrors(['400', '401', '404'])
+  @ApiOperation({ summary: 'Thread + citations per AI message' })
+  @ApiWrappedResponse(TicketResponseDto)
+  @ApiFilterErrors(['400', '401', '404'])
   @Get('conversations/:id')
   get(
     @CurrentUser() context: RequestContext,
@@ -118,6 +149,12 @@ export class ChatController {
     return this.ticketsGrpcClient.get(id, context);
   }
 
+  @ApiOperation({ summary: 'List messages' })
+  @ApiWrappedResponse(Paginated(MessageResponseDto))
+  @ApiFilterErrors(['400', '401', '404'])
+  @ApiOperation({ summary: 'List messages' })
+  @ApiWrappedResponse(Paginated(MessageResponseDto))
+  @ApiFilterErrors(['400', '401', '404'])
   @Get('conversations/:id/messages')
   listMessages(
     @CurrentUser() context: RequestContext,
@@ -139,6 +176,12 @@ export class ChatController {
   // quota is a month budget checked per request and does nothing to stop one
   // user spending the whole month in ten minutes.
   @Throttle({ [AI_THROTTLER_TIER]: ROUTE_THROTTLE.chatMessage })
+  @ApiOperation({ summary: 'Ask a question' })
+  @ApiWrappedResponse(MessageResponseDto, { status: HttpStatus.CREATED })
+  @ApiFilterErrors(['400', '401', '404'])
+  @ApiOperation({ summary: 'Ask a question' })
+  @ApiWrappedResponse(MessageResponseDto, { status: HttpStatus.CREATED })
+  @ApiFilterErrors(['400', '401', '404'])
   @Post('conversations/:id/messages')
   @ResponseMessage('Message sent')
   sendMessage(
@@ -161,6 +204,18 @@ export class ChatController {
    * chat its own escalation semantics, and the first divergence would be a
    * ticket that escalated without an `escalated_at`.
    */
+  @ApiOperation({
+    summary:
+      'One-click hand-off to a human — alias of POST /tickets/:id/escalate',
+  })
+  @ApiWrappedResponse(TicketResponseDto)
+  @ApiFilterErrors(['400', '401', '404'])
+  @ApiOperation({
+    summary:
+      'One-click hand-off to a human — alias of POST /tickets/:id/escalate',
+  })
+  @ApiWrappedResponse(TicketResponseDto)
+  @ApiFilterErrors(['400', '401', '404'])
   @Post('conversations/:id/escalate')
   @HttpCode(HttpStatus.OK)
   @ResponseMessage('Handed off to an agent')

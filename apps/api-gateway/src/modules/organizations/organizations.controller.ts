@@ -29,6 +29,12 @@ import {
   UpdateOrganizationSettingsDto,
 } from './dto/rest/organization.dto';
 import { OrgAccessKind } from '../../common/decorators/org-access.decorator';
+import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { AUTH_SCHEMES } from '../../common/config/swagger.config';
+import {
+  ApiFilterErrors,
+  ApiWrappedResponse,
+} from '../../common/decorators/api-response.decorator';
 
 /**
  * The caller's OWN tenant (api-endpoints-plan).
@@ -40,6 +46,8 @@ import { OrgAccessKind } from '../../common/decorators/org-access.decorator';
  * A Super Admin has NO current organization, so these return 412 for them
  * rather than a confusing 404; the service raises it.
  */
+@ApiTags('Organizations')
+@ApiCookieAuth(AUTH_SCHEMES.access)
 @Controller('organizations/current')
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class OrganizationsController {
@@ -57,6 +65,12 @@ export class OrganizationsController {
    * response is the caller's own workspace and contains no per-member data.
    */
   @OrgAccessKind(OrgAccess.BILLING)
+  @ApiOperation({ summary: 'Tenant profile + status + quotas' })
+  @ApiWrappedResponse(OrganizationResponseDto)
+  @ApiFilterErrors(['401'])
+  @ApiOperation({ summary: 'Tenant profile + status + quotas' })
+  @ApiWrappedResponse(OrganizationResponseDto)
+  @ApiFilterErrors(['401'])
   @Get()
   get(
     @CurrentUser() context: RequestContext,
@@ -65,6 +79,12 @@ export class OrganizationsController {
   }
 
   /** `slug` changes break existing links; `domain` is security-relevant. */
+  @ApiOperation({ summary: 'Update' })
+  @ApiWrappedResponse(OrganizationResponseDto)
+  @ApiFilterErrors(['400', '401', '403'])
+  @ApiOperation({ summary: 'Update' })
+  @ApiWrappedResponse(OrganizationResponseDto)
+  @ApiFilterErrors(['400', '401', '403'])
   @Patch()
   @RequirePermission('organization.update')
   update(
@@ -74,6 +94,16 @@ export class OrganizationsController {
     return this.organizationsGrpcClient.update(updateOrganizationDto, context);
   }
 
+  @ApiOperation({
+    summary: 'Security governance: enforce_two_factor, allowed_email_domains',
+  })
+  @ApiWrappedResponse(OrganizationSettingsResponseDto)
+  @ApiFilterErrors(['401', '403'])
+  @ApiOperation({
+    summary: 'Security governance: enforce_two_factor, allowed_email_domains',
+  })
+  @ApiWrappedResponse(OrganizationSettingsResponseDto)
+  @ApiFilterErrors(['401', '403'])
   @Get('settings')
   @RequirePermission('organization.read')
   getSettings(
@@ -91,6 +121,12 @@ export class OrganizationsController {
    * surfaced as a response warning: letting `gmail.com` auto-join a tenant is
    * usually a mistake, but not one we can safely refuse on the admin's behalf.
    */
+  @ApiOperation({ summary: 'Update settings' })
+  @ApiWrappedResponse(OrganizationSettingsResponseDto)
+  @ApiFilterErrors(['400', '401', '403'])
+  @ApiOperation({ summary: 'Update settings' })
+  @ApiWrappedResponse(OrganizationSettingsResponseDto)
+  @ApiFilterErrors(['400', '401', '403'])
   @Patch('settings')
   @RequirePermission('organization.update')
   @ResponseMessage('Settings updated')
@@ -115,6 +151,18 @@ export class OrganizationsController {
 
   /** Storage and AI meters report `available: false` until those domains exist. */
   @OrgAccessKind(OrgAccess.BILLING)
+  @ApiOperation({
+    summary:
+      'Live meters: seats used/max, storage used/max, AI tokens used/budget, billing_cycle_start',
+  })
+  @ApiWrappedResponse(OrganizationUsageResponseDto)
+  @ApiFilterErrors(['401', '403'])
+  @ApiOperation({
+    summary:
+      'Live meters: seats used/max, storage used/max, AI tokens used/budget, billing_cycle_start',
+  })
+  @ApiWrappedResponse(OrganizationUsageResponseDto)
+  @ApiFilterErrors(['401', '403'])
   @Get('usage')
   @RequirePermission('organization.read')
   getUsage(
@@ -125,6 +173,18 @@ export class OrganizationsController {
 
   /** Derived live from the data — never a stored checklist. */
   @OrgAccessKind(OrgAccess.ONBOARDING)
+  @ApiOperation({
+    summary:
+      'Onboarding checklist state (departments created, first doc indexed, agents invited)',
+  })
+  @ApiWrappedResponse(OnboardingResponseDto)
+  @ApiFilterErrors(['401', '403'])
+  @ApiOperation({
+    summary:
+      'Onboarding checklist state (departments created, first doc indexed, agents invited)',
+  })
+  @ApiWrappedResponse(OnboardingResponseDto)
+  @ApiFilterErrors(['401', '403'])
   @Get('onboarding')
   @RequirePermission('organization.read')
   getOnboarding(
@@ -135,6 +195,12 @@ export class OrganizationsController {
 
   /** PENDING_ONBOARDING -> ACTIVE only. 409 from any other status. */
   @OrgAccessKind(OrgAccess.ONBOARDING)
+  @ApiOperation({ summary: 'Complete onboarding' })
+  @ApiWrappedResponse(OrganizationResponseDto)
+  @ApiFilterErrors(['401', '403'])
+  @ApiOperation({ summary: 'Complete onboarding' })
+  @ApiWrappedResponse(OrganizationResponseDto)
+  @ApiFilterErrors(['401', '403'])
   @Post('onboarding/complete')
   @HttpCode(HttpStatus.OK)
   @RequirePermission('organization.update')
@@ -155,6 +221,12 @@ export class OrganizationsController {
    * The caller is signed out too, so their cookies are cleared: they have just
    * revoked their own access along with everyone else's.
    */
+  @ApiOperation({ summary: 'Request offboard' })
+  @ApiWrappedResponse(OffboardResponseDto)
+  @ApiFilterErrors(['400', '401', '403'])
+  @ApiOperation({ summary: 'Request offboard' })
+  @ApiWrappedResponse(OffboardResponseDto)
+  @ApiFilterErrors(['400', '401', '403'])
   @Delete()
   @HttpCode(HttpStatus.OK)
   @RequirePermission('organization.delete')

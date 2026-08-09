@@ -14,8 +14,27 @@ import baseConfig from '../../jest.config.base.ts';
  */
 const config: Config = {
   ...baseConfig,
+  /**
+   * ts-jest, PLUS the swagger plugin — 24-doc §1.
+   *
+   * The base config's transform is redeclared here rather than spread-and-patched
+   * because it is a nested object: `...baseConfig` copies the reference, so
+   * mutating it would silently add the transformer to every other workspace's
+   * runs too.
+   */
+  transform: {
+    '^.+\\.(t|j|mj)s$': [
+      'ts-jest',
+      {
+        tsconfig: '<rootDir>/tsconfig.json',
+        astTransformers: {
+          before: ['<rootDir>/jest.swagger-transform.cjs'],
+        },
+      },
+    ],
+  },
   displayName: 'api-gateway:e2e',
-  testRegex: '\\.e2e-spec\\.ts$',
+  testRegex: String.raw`\.e2e-spec\.ts$`,
   testPathIgnorePatterns: ['/node_modules/'],
   testTimeout: 30_000,
 };

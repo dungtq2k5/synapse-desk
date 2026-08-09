@@ -13,6 +13,12 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionGuard } from '../../common/guards/permission.guard';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { AUTH_SCHEMES } from '../../common/config/swagger.config';
+import {
+  ApiFilterErrors,
+  ApiWrappedResponse,
+} from '../../common/decorators/api-response.decorator';
 import {
   DownloadAttachmentDto,
   MessagesGrpcClient,
@@ -32,6 +38,8 @@ import {
  * there, BEFORE any signing call. That check is the only thing standing between
  * a guessed id and another tenant's file.
  */
+@ApiTags('Attachments')
+@ApiCookieAuth(AUTH_SCHEMES.access)
 @Controller('attachments')
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class AttachmentsController {
@@ -45,6 +53,18 @@ export class AttachmentsController {
    * the response envelope identical to every other endpoint.
    *
    */
+  @ApiOperation({
+    summary:
+      'Short-lived pre-signed Firebase Storage URL (302 or { url, expiresAt })',
+  })
+  @ApiWrappedResponse()
+  @ApiFilterErrors(['400', '401', '404'])
+  @ApiOperation({
+    summary:
+      'Short-lived pre-signed Firebase Storage URL (302 or { url, expiresAt })',
+  })
+  @ApiWrappedResponse()
+  @ApiFilterErrors(['400', '401', '404'])
   @Get(':id/download')
   download(
     @CurrentUser() context: RequestContext,
@@ -61,6 +81,18 @@ export class AttachmentsController {
    * filter waiting to be forgotten. The FILE goes through the same
    * at-most-once supersede event everything else uses.
    */
+  @ApiOperation({
+    summary:
+      'Remove an attachment (hard delete — no independent soft-delete story for attachments) and emit the async delete of its object',
+  })
+  @ApiWrappedResponse(undefined, { status: HttpStatus.NO_CONTENT })
+  @ApiFilterErrors(['400', '401', '403', '404'])
+  @ApiOperation({
+    summary:
+      'Remove an attachment (hard delete — no independent soft-delete story for attachments) and emit the async delete of its object',
+  })
+  @ApiWrappedResponse(undefined, { status: HttpStatus.NO_CONTENT })
+  @ApiFilterErrors(['400', '401', '403', '404'])
   @Delete(':id')
   @RequirePermission('ticket.message.moderate')
   @HttpCode(HttpStatus.NO_CONTENT)

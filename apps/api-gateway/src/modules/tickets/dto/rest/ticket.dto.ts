@@ -1,4 +1,4 @@
-import { OmitType } from '@nestjs/swagger';
+import { OmitType, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
   ArrayMaxSize,
@@ -127,6 +127,16 @@ export class ListTicketsQueryDto extends OmitType(SearchPaginationBase, [
   @IsOptional()
   @IsString()
   @IsIn(TICKET_SORTABLE_FIELDS)
+  /**
+   * Optional in the API and, without this, REQUIRED in the docs — 24-doc §1.
+   *
+   * The plugin derives `required` from TYPESCRIPT optionality, not from
+   * `@IsOptional()`. A field declared `page: number = 1` is non-optional to the
+   * compiler even though the validator lets a caller omit it, so the generated
+   * spec demanded it — and a generated client would refuse to send a request
+   * without one.
+   */
+  @ApiPropertyOptional()
   readonly sortBy: TicketSortableField = DEFAULT_SEARCH.SORT_BY;
 
   @IsOptional()
@@ -162,5 +172,6 @@ export class ListTicketsQueryDto extends OmitType(SearchPaginationBase, [
   @IsOptional()
   @IsBoolean()
   @ToBoolean()
+  @ApiPropertyOptional()
   readonly includeDeleted: boolean = false;
 }

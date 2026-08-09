@@ -19,6 +19,12 @@ import { ResponseMessage } from '../../common/decorators/response-message.decora
 import { KnowledgeGrpcClient } from './knowledge-grpc.client';
 import { KnowledgeSearchDto } from './dto/rest/knowledge.dto';
 import { KnowledgeSearchResponseDto } from './dto/rest/knowledge-response.dto';
+import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { AUTH_SCHEMES } from '../../common/config/swagger.config';
+import {
+  ApiFilterErrors,
+  ApiWrappedResponse,
+} from '../../common/decorators/api-response.decorator';
 
 /**
  * `/knowledge` — retrieval, and for now nothing else.
@@ -36,6 +42,8 @@ import { KnowledgeSearchResponseDto } from './dto/rest/knowledge-response.dto';
  * referrer header. A support question is frequently the most sensitive thing a
  * user types.
  */
+@ApiTags('Knowledge')
+@ApiCookieAuth(AUTH_SCHEMES.access)
 @Controller('knowledge')
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class KnowledgeController {
@@ -45,6 +53,18 @@ export class KnowledgeController {
   // quota is a month budget checked per request and does nothing to stop one
   // user spending the whole month in ten minutes.
   @Throttle({ [AI_THROTTLER_TIER]: ROUTE_THROTTLE.knowledgeSearch })
+  @ApiOperation({
+    summary:
+      "Hybrid semantic + keyword retrieval, filtered by tenant and the caller's departments (RDM §1.2)",
+  })
+  @ApiWrappedResponse(KnowledgeSearchResponseDto)
+  @ApiFilterErrors(['400', '401'])
+  @ApiOperation({
+    summary:
+      "Hybrid semantic + keyword retrieval, filtered by tenant and the caller's departments (RDM §1.2)",
+  })
+  @ApiWrappedResponse(KnowledgeSearchResponseDto)
+  @ApiFilterErrors(['400', '401'])
   @Post('search')
   @HttpCode(HttpStatus.OK)
   @ResponseMessage('Search completed')

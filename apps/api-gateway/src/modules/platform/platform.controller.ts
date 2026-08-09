@@ -20,6 +20,13 @@ import { ResponseMessage } from '../../common/decorators/response-message.decora
 import { PaginationResponseBase } from '../../common/dto/base/pagination-response-base.dto';
 import { OrganizationStatusService } from '../../common/services/organization-status.service';
 import { PlatformGrpcClient } from './platform-grpc.client';
+import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { AUTH_SCHEMES } from '../../common/config/swagger.config';
+import {
+  ApiFilterErrors,
+  ApiWrappedResponse,
+  Paginated,
+} from '../../common/decorators/api-response.decorator';
 import {
   CreateGlobalRoleDto,
   CreatePlatformOrganizationDto,
@@ -48,6 +55,8 @@ import {
  * The tenant lifecycle interceptor lets these through automatically: a Super
  * Admin has no organization, and acting on frozen tenants is the entire job.
  */
+@ApiTags('Platform')
+@ApiCookieAuth(AUTH_SCHEMES.access)
 @Controller('platform')
 @UseGuards(JwtAuthGuard, SuperAdminGuard)
 export class PlatformController {
@@ -60,6 +69,12 @@ export class PlatformController {
   // Tenants
   // -------------------------------------------------------------------------
 
+  @ApiOperation({ summary: 'All tenants, filter by status' })
+  @ApiWrappedResponse(Paginated(PlatformOrganizationResponseDto))
+  @ApiFilterErrors(['401'])
+  @ApiOperation({ summary: 'All tenants, filter by status' })
+  @ApiWrappedResponse(Paginated(PlatformOrganizationResponseDto))
+  @ApiFilterErrors(['401'])
   @Get('organizations')
   listOrganizations(
     @CurrentUser() context: RequestContext,
@@ -69,6 +84,16 @@ export class PlatformController {
   }
 
   /** Tenant + its first Org Admin, in one transaction. Half of it is useless. */
+  @ApiOperation({ summary: 'Create organization' })
+  @ApiWrappedResponse(CreatePlatformOrganizationResponseDto, {
+    status: HttpStatus.CREATED,
+  })
+  @ApiFilterErrors(['400', '401'])
+  @ApiOperation({ summary: 'Create organization' })
+  @ApiWrappedResponse(CreatePlatformOrganizationResponseDto, {
+    status: HttpStatus.CREATED,
+  })
+  @ApiFilterErrors(['400', '401'])
   @Post('organizations')
   createOrganization(
     @CurrentUser() context: RequestContext,
@@ -80,6 +105,12 @@ export class PlatformController {
     );
   }
 
+  @ApiOperation({ summary: 'Tenant detail + usage rollups' })
+  @ApiWrappedResponse(PlatformOrganizationResponseDto)
+  @ApiFilterErrors(['400', '401', '404'])
+  @ApiOperation({ summary: 'Tenant detail + usage rollups' })
+  @ApiWrappedResponse(PlatformOrganizationResponseDto)
+  @ApiFilterErrors(['400', '401', '404'])
   @Get('organizations/:id')
   getOrganization(
     @CurrentUser() context: RequestContext,
@@ -89,6 +120,12 @@ export class PlatformController {
   }
 
   /** Unlike the tenant-facing PATCH, this may change quotas. */
+  @ApiOperation({ summary: 'Update organization' })
+  @ApiWrappedResponse(PlatformOrganizationResponseDto)
+  @ApiFilterErrors(['400', '401', '404'])
+  @ApiOperation({ summary: 'Update organization' })
+  @ApiWrappedResponse(PlatformOrganizationResponseDto)
+  @ApiFilterErrors(['400', '401', '404'])
   @Patch('organizations/:id')
   async updateOrganization(
     @CurrentUser() context: RequestContext,
@@ -113,6 +150,12 @@ export class PlatformController {
    * direction for the one action an operator takes when something is going
    * wrong right now.
    */
+  @ApiOperation({ summary: 'Set status' })
+  @ApiWrappedResponse(PlatformOrganizationResponseDto)
+  @ApiFilterErrors(['400', '401', '404'])
+  @ApiOperation({ summary: 'Set status' })
+  @ApiWrappedResponse(PlatformOrganizationResponseDto)
+  @ApiFilterErrors(['400', '401', '404'])
   @Post('organizations/:id/status')
   @HttpCode(HttpStatus.OK)
   @ResponseMessage('Status updated')
@@ -144,6 +187,12 @@ export class PlatformController {
    * incident. The mandatory reason and the audit row are what separate that
    * from someone using it as a way to sell an upgrade.
    */
+  @ApiOperation({ summary: 'Reset billing cycle' })
+  @ApiWrappedResponse(PlatformOrganizationResponseDto)
+  @ApiFilterErrors(['400', '401', '404'])
+  @ApiOperation({ summary: 'Reset billing cycle' })
+  @ApiWrappedResponse(PlatformOrganizationResponseDto)
+  @ApiFilterErrors(['400', '401', '404'])
   @Post('organizations/:id/billing-cycle/reset')
   @HttpCode(HttpStatus.OK)
   @ResponseMessage(
@@ -158,6 +207,12 @@ export class PlatformController {
   }
 
   /** The irreversible half that `DELETE /organizations/current` only requests. */
+  @ApiOperation({ summary: 'Offboard' })
+  @ApiWrappedResponse(OffboardResponseDto)
+  @ApiFilterErrors(['400', '401', '404'])
+  @ApiOperation({ summary: 'Offboard' })
+  @ApiWrappedResponse(OffboardResponseDto)
+  @ApiFilterErrors(['400', '401', '404'])
   @Delete('organizations/:id')
   @HttpCode(HttpStatus.OK)
   @ResponseMessage('Workspace offboarded')
@@ -176,6 +231,12 @@ export class PlatformController {
     return result;
   }
 
+  @ApiOperation({ summary: 'Restore' })
+  @ApiWrappedResponse(PlatformOrganizationResponseDto)
+  @ApiFilterErrors(['400', '401', '404'])
+  @ApiOperation({ summary: 'Restore' })
+  @ApiWrappedResponse(PlatformOrganizationResponseDto)
+  @ApiFilterErrors(['400', '401', '404'])
   @Post('organizations/:id/restore')
   @HttpCode(HttpStatus.OK)
   @ResponseMessage('Workspace restored')
@@ -195,6 +256,12 @@ export class PlatformController {
 
   /** Every row carries its tenant — a bare address list is how support acts on
    * the wrong account, since one address may legitimately exist in several. */
+  @ApiOperation({ summary: 'Cross-tenant user search (support escalations)' })
+  @ApiWrappedResponse(Paginated(PlatformUserResponseDto))
+  @ApiFilterErrors(['401'])
+  @ApiOperation({ summary: 'Cross-tenant user search (support escalations)' })
+  @ApiWrappedResponse(Paginated(PlatformUserResponseDto))
+  @ApiFilterErrors(['401'])
   @Get('users')
   listUsers(
     @CurrentUser() context: RequestContext,
@@ -203,6 +270,12 @@ export class PlatformController {
     return this.platformGrpcClient.listUsers(query, context);
   }
 
+  @ApiOperation({ summary: 'Manage global system roles' })
+  @ApiWrappedResponse(Paginated(RoleResponseDto))
+  @ApiFilterErrors(['401'])
+  @ApiOperation({ summary: 'Manage global system roles' })
+  @ApiWrappedResponse(Paginated(RoleResponseDto))
+  @ApiFilterErrors(['401'])
   @Get('roles')
   listGlobalRoles(
     @CurrentUser() context: RequestContext,
@@ -212,6 +285,12 @@ export class PlatformController {
   }
 
   /** A role visible in EVERY tenant, which is why only the platform mints one. */
+  @ApiOperation({ summary: 'Create global role' })
+  @ApiWrappedResponse(RoleResponseDto, { status: HttpStatus.CREATED })
+  @ApiFilterErrors(['400', '401'])
+  @ApiOperation({ summary: 'Create global role' })
+  @ApiWrappedResponse(RoleResponseDto, { status: HttpStatus.CREATED })
+  @ApiFilterErrors(['400', '401'])
   @Post('roles')
   createGlobalRole(
     @CurrentUser() context: RequestContext,
@@ -224,6 +303,16 @@ export class PlatformController {
   }
 
   /** Full-table counts — cached by the client, never joined into a hot path. */
+  @ApiOperation({
+    summary: 'Platform-wide health: tenant count, MRR-ish usage, AI spend',
+  })
+  @ApiWrappedResponse(PlatformMetricsResponseDto)
+  @ApiFilterErrors(['401'])
+  @ApiOperation({
+    summary: 'Platform-wide health: tenant count, MRR-ish usage, AI spend',
+  })
+  @ApiWrappedResponse(PlatformMetricsResponseDto)
+  @ApiFilterErrors(['401'])
   @Get('metrics')
   getMetrics(
     @CurrentUser() context: RequestContext,

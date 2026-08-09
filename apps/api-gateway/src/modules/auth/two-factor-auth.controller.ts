@@ -46,6 +46,12 @@ import {
   ROUTE_THROTTLE,
 } from '../../common/config/throttler.config';
 import { OrgAccessKind } from '../../common/decorators/org-access.decorator';
+import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { AUTH_SCHEMES } from '../../common/config/swagger.config';
+import {
+  ApiFilterErrors,
+  ApiWrappedResponse,
+} from '../../common/decorators/api-response.decorator';
 
 /**
  * `/auth/2fa` — enrolment and recovery (api-endpoints-plan).
@@ -55,6 +61,8 @@ import { OrgAccessKind } from '../../common/decorators/org-access.decorator';
  * exception because it is the second half of a login that has not completed
  * yet, and is authorized by the short-lived 2FA cookie instead.
  */
+@ApiTags('Two Factor Auth')
+@ApiCookieAuth(AUTH_SCHEMES.access)
 @AuthThrottle()
 @OrgAccessKind(OrgAccess.AUTH)
 @Controller('auth/2fa')
@@ -75,6 +83,18 @@ export class TwoFactorAuthController {
    * whose 2FA is already enabled, so the challenge token cannot be used to
    * replace a live secret.
    */
+  @ApiOperation({
+    summary:
+      'Generate + encrypt two_factor_secret, return otpauth:// URI and QR data URL',
+  })
+  @ApiWrappedResponse(GenerateTwoFactorResponseDto)
+  @ApiFilterErrors(['401'])
+  @ApiOperation({
+    summary:
+      'Generate + encrypt two_factor_secret, return otpauth:// URI and QR data URL',
+  })
+  @ApiWrappedResponse(GenerateTwoFactorResponseDto)
+  @ApiFilterErrors(['401'])
   @Post('setup')
   @HttpCode(HttpStatus.OK)
   @UseGuards(TwoFactorEnrolmentGuard)
@@ -93,6 +113,18 @@ export class TwoFactorAuthController {
    * mints a session. Issuing tokens here instead would give enrolment a second
    * session-minting door to keep correct.
    */
+  @ApiOperation({
+    summary:
+      'Confirm a TOTP code → is_two_factor_enabled = true; returns the one-time plaintext backup codes',
+  })
+  @ApiWrappedResponse(BackupCodesResponseDto)
+  @ApiFilterErrors(['400', '401'])
+  @ApiOperation({
+    summary:
+      'Confirm a TOTP code → is_two_factor_enabled = true; returns the one-time plaintext backup codes',
+  })
+  @ApiWrappedResponse(BackupCodesResponseDto)
+  @ApiFilterErrors(['400', '401'])
   @Post('enable')
   @HttpCode(HttpStatus.OK)
   @UseGuards(TwoFactorEnrolmentGuard)
@@ -123,6 +155,25 @@ export class TwoFactorAuthController {
    * forwarded because auth-service re-verifies it — it is the authority on
    * whether the challenge is live, and the gateway only pre-screens.
    */
+  @ApiOperation({
+    summary: 'Second leg of login',
+    description:
+      'Authenticated by the 2FA CHALLENGE cookie, not the access one — 24-doc ' +
+      '§3. That token proves a password and nothing else; it is signed by a ' +
+      'different keypair so it cannot verify where an access token is expected.',
+    // **Set here rather than with `@ApiCookieAuth`**: that decorator APPENDS to
+    // the controller-level requirement, and two entries in `security` mean OR —
+    // documenting this route as accepting an access token, which it does not.
+    security: [{ [AUTH_SCHEMES.mfa]: [] }],
+  })
+  @ApiWrappedResponse(TwoFactorAuthenticatedResponseDto)
+  @ApiFilterErrors(['400', '401'])
+  @ApiOperation({
+    summary: 'Second leg of login',
+    security: [],
+  })
+  @ApiWrappedResponse(TwoFactorAuthenticatedResponseDto)
+  @ApiFilterErrors(['400', '401'])
   @Post('authenticate')
   @Throttle({ [AUTH_THROTTLER_TIER]: ROUTE_THROTTLE.twoFactorAuthenticate })
   @HttpCode(HttpStatus.OK)
@@ -174,6 +225,12 @@ export class TwoFactorAuthController {
     return { user: result.user, warning: result.warning };
   }
 
+  @ApiOperation({ summary: 'Disable 2FA (requires TOTP + password)' })
+  @ApiWrappedResponse()
+  @ApiFilterErrors(['400', '401'])
+  @ApiOperation({ summary: 'Disable 2FA (requires TOTP + password)' })
+  @ApiWrappedResponse()
+  @ApiFilterErrors(['400', '401'])
   @Delete()
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard)
@@ -193,6 +250,12 @@ export class TwoFactorAuthController {
     this.jwtCookieService.clearDeviceTokenCookie(response);
   }
 
+  @ApiOperation({ summary: 'Regenerate two_factor_backup_codes (30d expiry)' })
+  @ApiWrappedResponse(BackupCodesResponseDto)
+  @ApiFilterErrors(['400', '401'])
+  @ApiOperation({ summary: 'Regenerate two_factor_backup_codes (30d expiry)' })
+  @ApiWrappedResponse(BackupCodesResponseDto)
+  @ApiFilterErrors(['400', '401'])
   @Post('backup-codes')
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard)
@@ -210,6 +273,16 @@ export class TwoFactorAuthController {
   }
 
   /** Counts only — never hashes, never plaintext. */
+  @ApiOperation({
+    summary: 'Metadata only — count remaining, is_used, expires_at',
+  })
+  @ApiWrappedResponse(BackupCodesStatusResponseDto)
+  @ApiFilterErrors(['401'])
+  @ApiOperation({
+    summary: 'Metadata only — count remaining, is_used, expires_at',
+  })
+  @ApiWrappedResponse(BackupCodesStatusResponseDto)
+  @ApiFilterErrors(['401'])
   @Get('backup-codes')
   @UseGuards(JwtAuthGuard)
   getBackupCodesStatus(

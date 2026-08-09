@@ -43,6 +43,13 @@ import {
 } from '../../common/config/throttler.config';
 import { AuthThrottle } from '../../common/decorators/auth-throttle.decorator';
 import { OrgAccessKind } from '../../common/decorators/org-access.decorator';
+import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { AUTH_SCHEMES } from '../../common/config/swagger.config';
+import {
+  ApiFilterErrors,
+  ApiWrappedResponse,
+  Paginated,
+} from '../../common/decorators/api-response.decorator';
 
 /**
  * Invitations (api-endpoints-plan).
@@ -52,6 +59,8 @@ import { OrgAccessKind } from '../../common/decorators/org-access.decorator';
  * The two public routes are the exception and carry no tenant at all: the token
  * itself names it.
  */
+@ApiTags('Invitations')
+@ApiCookieAuth(AUTH_SCHEMES.access)
 @Controller('users/invitations')
 export class InvitationsController {
   constructor(
@@ -66,6 +75,16 @@ export class InvitationsController {
    * `EmailVerifiedGuard` because this sends mail on the tenant's behalf — an
    * unverified inviter would let an unproven address spray invitations.
    */
+  @ApiOperation({ summary: 'Create' })
+  @ApiWrappedResponse(CreateInvitationsResponseDto, {
+    status: HttpStatus.CREATED,
+  })
+  @ApiFilterErrors(['400', '401', '403'])
+  @ApiOperation({ summary: 'Create' })
+  @ApiWrappedResponse(CreateInvitationsResponseDto, {
+    status: HttpStatus.CREATED,
+  })
+  @ApiFilterErrors(['400', '401', '403'])
   @Post()
   @UseGuards(JwtAuthGuard, EmailVerifiedGuard, PermissionGuard)
   @RequirePermission('user.invite')
@@ -91,6 +110,12 @@ export class InvitationsController {
     return result;
   }
 
+  @ApiOperation({ summary: 'List invitations' })
+  @ApiWrappedResponse(Paginated(InvitationResponseDto))
+  @ApiFilterErrors(['401', '403'])
+  @ApiOperation({ summary: 'List invitations' })
+  @ApiWrappedResponse(Paginated(InvitationResponseDto))
+  @ApiFilterErrors(['401', '403'])
   @Get()
   @UseGuards(JwtAuthGuard, PermissionGuard)
   @RequirePermission('user.read')
@@ -111,6 +136,12 @@ export class InvitationsController {
   /** Rotates the token — the previous link stops working immediately. */
   @AuthThrottle()
   @Throttle({ [AUTH_THROTTLER_TIER]: ROUTE_THROTTLE.invitationResend })
+  @ApiOperation({ summary: 'Resend' })
+  @ApiWrappedResponse(InvitationResponseDto)
+  @ApiFilterErrors(['400', '401', '403', '404'])
+  @ApiOperation({ summary: 'Resend' })
+  @ApiWrappedResponse(InvitationResponseDto)
+  @ApiFilterErrors(['400', '401', '403', '404'])
   @Post(':id/resend')
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard, EmailVerifiedGuard, PermissionGuard)
@@ -128,6 +159,12 @@ export class InvitationsController {
     );
   }
 
+  @ApiOperation({ summary: 'Revoke' })
+  @ApiWrappedResponse()
+  @ApiFilterErrors(['400', '401', '403', '404'])
+  @ApiOperation({ summary: 'Revoke' })
+  @ApiWrappedResponse()
+  @ApiFilterErrors(['400', '401', '403', '404'])
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard, PermissionGuard)
@@ -162,6 +199,18 @@ export class InvitationsController {
   @AuthThrottle()
   @Throttle({ [AUTH_THROTTLER_TIER]: ROUTE_THROTTLE.invitationPreview })
   @OrgAccessKind(OrgAccess.AUTH)
+  @ApiOperation({
+    summary: 'Public preview',
+    security: [],
+  })
+  @ApiWrappedResponse(PreviewInvitationResponseDto)
+  @ApiFilterErrors(['401', '404'])
+  @ApiOperation({
+    summary: 'Public preview',
+    security: [],
+  })
+  @ApiWrappedResponse(PreviewInvitationResponseDto)
+  @ApiFilterErrors(['401', '404'])
   @Get('token/:token')
   previewByToken(
     @Param('token') token: string,
@@ -179,6 +228,18 @@ export class InvitationsController {
    * already signed in would silently replace the current session.
    */
   @OrgAccessKind(OrgAccess.AUTH)
+  @ApiOperation({
+    summary: 'Redeem',
+    security: [],
+  })
+  @ApiWrappedResponse(LoginResponseDto)
+  @ApiFilterErrors(['400', '401'])
+  @ApiOperation({
+    summary: 'Redeem',
+    security: [],
+  })
+  @ApiWrappedResponse(LoginResponseDto)
+  @ApiFilterErrors(['400', '401'])
   @Post('accept')
   @HttpCode(HttpStatus.OK)
   @UseGuards(GuestGuard)
@@ -210,6 +271,18 @@ export class InvitationsController {
    * — nothing is sent, so the reason that gate exists (an unproven address
    * spraying invitations) does not apply to a validation call.
    */
+  @ApiOperation({
+    summary:
+      'Dry-run a list before sending: flags addresses already in this tenant, malformed addresses, unknown role/department ids, and projected seat overrun',
+  })
+  @ApiWrappedResponse(PreviewInvitationsResponseDto)
+  @ApiFilterErrors(['400', '401', '403'])
+  @ApiOperation({
+    summary:
+      'Dry-run a list before sending: flags addresses already in this tenant, malformed addresses, unknown role/department ids, and projected seat overrun',
+  })
+  @ApiWrappedResponse(PreviewInvitationsResponseDto)
+  @ApiFilterErrors(['400', '401', '403'])
   @Post('preview')
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard, PermissionGuard)
@@ -231,6 +304,12 @@ export class InvitationsController {
    *
    * Declared AFTER `token/:token` and `preview`, so those literals win.
    */
+  @ApiOperation({ summary: 'Single invitation detail incl' })
+  @ApiWrappedResponse(InvitationResponseDto)
+  @ApiFilterErrors(['400', '401', '403', '404'])
+  @ApiOperation({ summary: 'Single invitation detail incl' })
+  @ApiWrappedResponse(InvitationResponseDto)
+  @ApiFilterErrors(['400', '401', '403', '404'])
   @Get(':id')
   @UseGuards(JwtAuthGuard, PermissionGuard)
   @RequirePermission('user.read')

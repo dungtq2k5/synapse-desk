@@ -14,7 +14,7 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
-import { OmitType } from '@nestjs/swagger';
+import { OmitType, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   DEFAULT_SEARCH,
   ORGANIZATION_SORTABLE_FIELDS,
@@ -39,6 +39,16 @@ export class ListPlatformOrganizationsQueryDto extends OmitType(
   @IsOptional()
   @IsString()
   @IsIn(ORGANIZATION_SORTABLE_FIELDS)
+  /**
+   * Optional in the API and, without this, REQUIRED in the docs — 24-doc §1.
+   *
+   * The plugin derives `required` from TYPESCRIPT optionality, not from
+   * `@IsOptional()`. A field declared `page: number = 1` is non-optional to the
+   * compiler even though the validator lets a caller omit it, so the generated
+   * spec demanded it — and a generated client would refuse to send a request
+   * without one.
+   */
+  @ApiPropertyOptional()
   readonly sortBy: OrganizationSortableField = DEFAULT_SEARCH.SORT_BY;
 
   @IsOptional()
@@ -48,6 +58,7 @@ export class ListPlatformOrganizationsQueryDto extends OmitType(
   @IsOptional()
   @IsBoolean()
   @ToBoolean()
+  @ApiPropertyOptional()
   readonly includeDeleted: boolean = false;
 }
 
@@ -57,6 +68,7 @@ export class ListPlatformUsersQueryDto extends OmitType(SearchPaginationBase, [
   @IsOptional()
   @IsString()
   @IsIn(USER_SORTABLE_FIELDS)
+  @ApiPropertyOptional()
   readonly sortBy: UserSortableField = DEFAULT_SEARCH.SORT_BY;
 
   @IsOptional()
@@ -66,6 +78,7 @@ export class ListPlatformUsersQueryDto extends OmitType(SearchPaginationBase, [
   @IsOptional()
   @IsBoolean()
   @ToBoolean()
+  @ApiPropertyOptional()
   readonly includeDeleted: boolean = false;
 }
 
@@ -255,4 +268,8 @@ export class PlatformMetricsResponseDto {
   readonly generatedAt!: Date;
 }
 
-export type { RoleResponseDto };
+// **`export`, not `export type`** — 24-doc §2. Re-exported as a VALUE because
+// `@ApiWrappedResponse(RoleResponseDto)` needs its runtime identity to build a
+// `$ref`; a type-only re-export erases the class and the reference cannot be
+// built at all.
+export { RoleResponseDto };

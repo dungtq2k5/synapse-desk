@@ -16,6 +16,12 @@ import { PermissionGuard } from '../../common/guards/permission.guard';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AnalyticsService } from './analytics.service';
+import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { AUTH_SCHEMES } from '../../common/config/swagger.config';
+import {
+  ApiFilterErrors,
+  ApiWrappedResponse,
+} from '../../common/decorators/api-response.decorator';
 import {
   AnalyticsRangeQueryDto,
   AnalyticsTopNQueryDto,
@@ -48,12 +54,20 @@ import {
  * gRPC metadata. No route here accepts an organization id, so reading another
  * tenant's dashboard is unexpressible rather than merely refused.
  */
+@ApiTags('Analytics')
+@ApiCookieAuth(AUTH_SCHEMES.access)
 @Controller('analytics')
 @UseGuards(JwtAuthGuard, PermissionGuard)
 @RequirePermission('analytics.read')
 export class AnalyticsController {
   constructor(private readonly analytics: AnalyticsService) {}
 
+  @ApiOperation({ summary: 'Overview' })
+  @ApiWrappedResponse(OverviewDto)
+  @ApiFilterErrors(['401', '403'])
+  @ApiOperation({ summary: 'Overview' })
+  @ApiWrappedResponse(OverviewDto)
+  @ApiFilterErrors(['401', '403'])
   @Get('overview')
   overview(
     @CurrentUser() context: RequestContext,
@@ -63,6 +77,12 @@ export class AnalyticsController {
   }
 
   /** The product's headline claim (product-overview §7), defined once in §3.1. */
+  @ApiOperation({ summary: 'Deflection' })
+  @ApiWrappedResponse(DeflectionDto)
+  @ApiFilterErrors(['401', '403'])
+  @ApiOperation({ summary: 'Deflection' })
+  @ApiWrappedResponse(DeflectionDto)
+  @ApiFilterErrors(['401', '403'])
   @Get('deflection')
   deflection(
     @CurrentUser() context: RequestContext,
@@ -72,6 +92,12 @@ export class AnalyticsController {
   }
 
   /** Human and AI first-response reported SEPARATELY, never blended. */
+  @ApiOperation({ summary: 'Response times' })
+  @ApiWrappedResponse(ResponseTimesDto)
+  @ApiFilterErrors(['401', '403'])
+  @ApiOperation({ summary: 'Response times' })
+  @ApiWrappedResponse(ResponseTimesDto)
+  @ApiFilterErrors(['401', '403'])
   @Get('response-times')
   responseTimes(
     @CurrentUser() context: RequestContext,
@@ -80,6 +106,12 @@ export class AnalyticsController {
     return this.analytics.responseTimes(query, context);
   }
 
+  @ApiOperation({ summary: 'Volume' })
+  @ApiWrappedResponse(VolumeDto)
+  @ApiFilterErrors(['401', '403'])
+  @ApiOperation({ summary: 'Volume' })
+  @ApiWrappedResponse(VolumeDto)
+  @ApiFilterErrors(['401', '403'])
   @Get('volume')
   volume(
     @CurrentUser() context: RequestContext,
@@ -88,6 +120,12 @@ export class AnalyticsController {
     return this.analytics.volume(query, context);
   }
 
+  @ApiOperation({ summary: 'Satisfaction' })
+  @ApiWrappedResponse(SatisfactionDto)
+  @ApiFilterErrors(['401', '403'])
+  @ApiOperation({ summary: 'Satisfaction' })
+  @ApiWrappedResponse(SatisfactionDto)
+  @ApiFilterErrors(['401', '403'])
   @Get('satisfaction')
   satisfaction(
     @CurrentUser() context: RequestContext,
@@ -96,6 +134,12 @@ export class AnalyticsController {
     return this.analytics.satisfaction(query, context);
   }
 
+  @ApiOperation({ summary: 'Ai usage' })
+  @ApiWrappedResponse(AiUsageDto)
+  @ApiFilterErrors(['401', '403'])
+  @ApiOperation({ summary: 'Ai usage' })
+  @ApiWrappedResponse(AiUsageDto)
+  @ApiFilterErrors(['401', '403'])
   @Get('ai-usage')
   aiUsage(
     @CurrentUser() context: RequestContext,
@@ -105,6 +149,12 @@ export class AnalyticsController {
   }
 
   /** Cross-service: ticket stats ∪ ledger acceptance ∪ name hydration. */
+  @ApiOperation({ summary: 'Agents' })
+  @ApiWrappedResponse(AgentAnalyticsDto)
+  @ApiFilterErrors(['401', '403'])
+  @ApiOperation({ summary: 'Agents' })
+  @ApiWrappedResponse(AgentAnalyticsDto)
+  @ApiFilterErrors(['401', '403'])
   @Get('agents')
   agents(
     @CurrentUser() context: RequestContext,
@@ -113,6 +163,12 @@ export class AnalyticsController {
     return this.analytics.agents(query, context);
   }
 
+  @ApiOperation({ summary: 'Knowledge gaps' })
+  @ApiWrappedResponse(KnowledgeGapsDto)
+  @ApiFilterErrors(['401', '403'])
+  @ApiOperation({ summary: 'Knowledge gaps' })
+  @ApiWrappedResponse(KnowledgeGapsDto)
+  @ApiFilterErrors(['401', '403'])
   @Get('knowledge-gaps')
   knowledgeGaps(
     @CurrentUser() context: RequestContext,
@@ -121,6 +177,12 @@ export class AnalyticsController {
     return this.analytics.knowledgeGaps(query, context);
   }
 
+  @ApiOperation({ summary: 'Documents' })
+  @ApiWrappedResponse(DocumentAnalyticsDto)
+  @ApiFilterErrors(['401', '403'])
+  @ApiOperation({ summary: 'Documents' })
+  @ApiWrappedResponse(DocumentAnalyticsDto)
+  @ApiFilterErrors(['401', '403'])
   @Get('documents')
   documents(
     @CurrentUser() context: RequestContext,
@@ -141,6 +203,12 @@ export class AnalyticsController {
    *
    * 202, because the work has been accepted and has not happened.
    */
+  @ApiOperation({ summary: 'Create export' })
+  @ApiWrappedResponse(AnalyticsExportDto, { status: HttpStatus.ACCEPTED })
+  @ApiFilterErrors(['400', '401', '403'])
+  @ApiOperation({ summary: 'Create export' })
+  @ApiWrappedResponse(AnalyticsExportDto, { status: HttpStatus.ACCEPTED })
+  @ApiFilterErrors(['400', '401', '403'])
   @Post('export')
   @HttpCode(HttpStatus.ACCEPTED)
   createExport(
@@ -151,6 +219,12 @@ export class AnalyticsController {
   }
 
   /** Poll for the file. Another tenant's id answers 404, never 403. */
+  @ApiOperation({ summary: 'Get export' })
+  @ApiWrappedResponse(AnalyticsExportDto)
+  @ApiFilterErrors(['400', '401', '403', '404'])
+  @ApiOperation({ summary: 'Get export' })
+  @ApiWrappedResponse(AnalyticsExportDto)
+  @ApiFilterErrors(['400', '401', '403', '404'])
   @Get('export/:id')
   getExport(
     @CurrentUser() context: RequestContext,

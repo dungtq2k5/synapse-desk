@@ -20,6 +20,13 @@ import { ResponseMessage } from '../../common/decorators/response-message.decora
 import { PaginationResponseBase } from '../../common/dto/base/pagination-response-base.dto';
 import { FeedbackGrpcClient } from './feedback-grpc.client';
 import { FeedbackResponseDto } from './dto/rest/feedback-response.dto';
+import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { AUTH_SCHEMES } from '../../common/config/swagger.config';
+import {
+  ApiFilterErrors,
+  ApiWrappedResponse,
+  Paginated,
+} from '../../common/decorators/api-response.decorator';
 import {
   ListFeedbackQueryDto,
   SubmitFeedbackDto,
@@ -34,6 +41,8 @@ import {
  * serves ordinary users. ticket-service scopes each write through the message's
  * ticket, so "can read" is enforced there rather than by a route permission.
  */
+@ApiTags('Feedback')
+@ApiCookieAuth(AUTH_SCHEMES.access)
 @Controller('messages/:messageId/feedback')
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class MessageFeedbackController {
@@ -45,6 +54,18 @@ export class MessageFeedbackController {
    * A user changing 👍 to 👎 is the normal case, not an error, and "created"
    * would be a lie every time after the first.
    */
+  @ApiOperation({
+    summary:
+      'Thumbs up/down on an AI answer → ai_response_feedbacks (rating ∈ {1,-1}, feedback_text?, citation_accurate?)',
+  })
+  @ApiWrappedResponse(FeedbackResponseDto)
+  @ApiFilterErrors(['400', '401', '404'])
+  @ApiOperation({
+    summary:
+      'Thumbs up/down on an AI answer → ai_response_feedbacks (rating ∈ {1,-1}, feedback_text?, citation_accurate?)',
+  })
+  @ApiWrappedResponse(FeedbackResponseDto)
+  @ApiFilterErrors(['400', '401', '404'])
   @Post()
   @HttpCode(HttpStatus.OK)
   @ResponseMessage('Feedback recorded')
@@ -61,6 +82,12 @@ export class MessageFeedbackController {
    * `(messageId, callerId)`, so there is no parameter through which one user
    * could withdraw another's opinion.
    */
+  @ApiOperation({ summary: 'Withdraw feedback' })
+  @ApiWrappedResponse(undefined, { status: HttpStatus.NO_CONTENT })
+  @ApiFilterErrors(['400', '401', '404'])
+  @ApiOperation({ summary: 'Withdraw feedback' })
+  @ApiWrappedResponse(undefined, { status: HttpStatus.NO_CONTENT })
+  @ApiFilterErrors(['400', '401', '404'])
   @Delete()
   @HttpCode(HttpStatus.NO_CONTENT)
   withdraw(
@@ -84,6 +111,12 @@ export class MessageFeedbackController {
 export class FeedbackController {
   constructor(private readonly feedbackGrpcClient: FeedbackGrpcClient) {}
 
+  @ApiOperation({ summary: 'Own feedback on that message' })
+  @ApiWrappedResponse(Paginated(FeedbackResponseDto))
+  @ApiFilterErrors(['401', '403'])
+  @ApiOperation({ summary: 'Own feedback on that message' })
+  @ApiWrappedResponse(Paginated(FeedbackResponseDto))
+  @ApiFilterErrors(['401', '403'])
   @Get()
   @RequirePermission('analytics.read')
   list(

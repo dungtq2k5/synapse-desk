@@ -28,6 +28,15 @@ export const envValidationSchema = Joi.object({
   // that cannot identify itself fails to BOOT, loudly and immediately, instead
   // of starting happily and lying to the person trying to end an outage. The
   // Dockerfile's `test -n "$GIT_SHA"` guard is the same rule one stage earlier.
+  // `/docs` and `/docs-json` — 24-doc §4. **Config, not an inline
+  // `NODE_ENV !== 'production'`**: that check is the one that gets inverted
+  // during a refactor and nobody notices, because the failure direction is MORE
+  // exposure and more exposure looks like everything working.
+  //
+  // Defaults to FALSE, so an environment that never considered the question is
+  // closed rather than open.
+  SWAGGER_ENABLED: Joi.boolean().default(false),
+
   // `/metrics`, on its OWN listener — 23-doc §4. A distinct port is what makes
   // "not reachable from the internet" structural rather than a rule Nginx has
   // to keep enforcing correctly forever.

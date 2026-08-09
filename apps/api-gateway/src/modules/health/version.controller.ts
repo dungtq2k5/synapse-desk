@@ -1,4 +1,9 @@
 import { Controller, Get } from '@nestjs/common';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiFilterErrors,
+  ApiWrappedResponse,
+} from '../../common/decorators/api-response.decorator';
 import { ConfigService } from '@nestjs/config';
 import { readBuildInfo } from '@synapsedesk/common';
 import { VersionResponseDto } from './dto/health-response.dto';
@@ -25,6 +30,7 @@ import { VersionResponseDto } from './dto/health-response.dto';
  * runs — they were baked into the image — so re-reading them per request would
  * only create the possibility of them differing between two calls.
  */
+@ApiTags('Ops')
 @Controller('version')
 export class VersionController {
   private readonly buildInfo: VersionResponseDto;
@@ -33,6 +39,17 @@ export class VersionController {
     this.buildInfo = readBuildInfo(configService);
   }
 
+  @ApiOperation({
+    summary: 'Which build is this?',
+    description:
+      'Three fields and no more — version, commit SHA, build time. Node version, ' +
+      'dependency lists and environment names are deliberately absent: they turn ' +
+      'a support aid into a reconnaissance endpoint on a public route, and none ' +
+      'of them answer the question this exists for.',
+    security: [],
+  })
+  @ApiWrappedResponse(VersionResponseDto)
+  @ApiFilterErrors()
   @Get()
   version(): VersionResponseDto {
     return this.buildInfo;

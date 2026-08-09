@@ -21,6 +21,13 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ResponseMessage } from '../../common/decorators/response-message.decorator';
 import { PaginationResponseBase } from '../../common/dto/base/pagination-response-base.dto';
 import { DocumentsGrpcClient } from './documents-grpc.client';
+import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { AUTH_SCHEMES } from '../../common/config/swagger.config';
+import {
+  ApiFilterErrors,
+  ApiWrappedResponse,
+  Paginated,
+} from '../../common/decorators/api-response.decorator';
 import {
   ConfirmDocumentDto,
   ListDocumentFlagsQueryDto,
@@ -48,11 +55,25 @@ import {
  * departments — the SAME predicate `rag-service` will enforce in retrieval, so
  * a document invisible here cannot be retrievable there.
  */
+@ApiTags('Documents')
+@ApiCookieAuth(AUTH_SCHEMES.access)
 @Controller('documents')
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class DocumentsController {
   constructor(private readonly documentsGrpcClient: DocumentsGrpcClient) {}
 
+  @ApiOperation({
+    summary:
+      "List documents visible to the caller (org-wide ∪ their departments' via department_documents)",
+  })
+  @ApiWrappedResponse(Paginated(DocumentResponseDto))
+  @ApiFilterErrors(['401'])
+  @ApiOperation({
+    summary:
+      "List documents visible to the caller (org-wide ∪ their departments' via department_documents)",
+  })
+  @ApiWrappedResponse(Paginated(DocumentResponseDto))
+  @ApiFilterErrors(['401'])
   @Get()
   list(
     @CurrentUser() context: RequestContext,
@@ -69,6 +90,12 @@ export class DocumentsController {
    * client bug rather than a routing mistake. The same hazard `bulk/status` hit
    * in Domain B and `by-number` before it.
    */
+  @ApiOperation({ summary: 'Storage usage breakdown vs max_storage_bytes' })
+  @ApiWrappedResponse(StorageUsageResponseDto)
+  @ApiFilterErrors(['401', '403'])
+  @ApiOperation({ summary: 'Storage usage breakdown vs max_storage_bytes' })
+  @ApiWrappedResponse(StorageUsageResponseDto)
+  @ApiFilterErrors(['401', '403'])
   @Get('storage')
   @RequirePermission('document.read')
   storageUsage(
@@ -85,6 +112,12 @@ export class DocumentsController {
    * as stale, unread or redundant, which is a judgement about somebody's work
    * and belongs with the people who curate the knowledge base.
    */
+  @ApiOperation({ summary: 'List quality flags' })
+  @ApiWrappedResponse(Paginated(DocumentFlagResponseDto))
+  @ApiFilterErrors(['401', '403'])
+  @ApiOperation({ summary: 'List quality flags' })
+  @ApiWrappedResponse(Paginated(DocumentFlagResponseDto))
+  @ApiFilterErrors(['401', '403'])
   @Get('flags')
   @RequirePermission('document.read')
   listFlags(
@@ -101,6 +134,18 @@ export class DocumentsController {
    * signed, so a tenant over `max_storage_bytes` never receives a usable URL
    * rather than discovering it after uploading 25 MB.
    */
+  @ApiOperation({
+    summary:
+      '{ contentType, sizeBytes, fileName } → storage-service.PresignUpload(purpose: DOCUMENT) → { uploadUrl, objectPath, expiresAt }',
+  })
+  @ApiWrappedResponse(PresignDocumentResponseDto)
+  @ApiFilterErrors(['400', '401', '403'])
+  @ApiOperation({
+    summary:
+      '{ contentType, sizeBytes, fileName } → storage-service.PresignUpload(purpose: DOCUMENT) → { uploadUrl, objectPath, expiresAt }',
+  })
+  @ApiWrappedResponse(PresignDocumentResponseDto)
+  @ApiFilterErrors(['400', '401', '403'])
   @Post('presign')
   @RequirePermission('document.create')
   @HttpCode(HttpStatus.OK)
@@ -117,6 +162,12 @@ export class DocumentsController {
    * Not at presign: an upload the client abandons must not leave a row pointing
    * at an object that never arrived.
    */
+  @ApiOperation({ summary: 'Confirm' })
+  @ApiWrappedResponse(DocumentResponseDto, { status: HttpStatus.CREATED })
+  @ApiFilterErrors(['400', '401', '403'])
+  @ApiOperation({ summary: 'Confirm' })
+  @ApiWrappedResponse(DocumentResponseDto, { status: HttpStatus.CREATED })
+  @ApiFilterErrors(['400', '401', '403'])
   @Post('confirm')
   @RequirePermission('document.create')
   @ResponseMessage('Document uploaded')
@@ -127,6 +178,16 @@ export class DocumentsController {
     return this.documentsGrpcClient.confirm(dto, context);
   }
 
+  @ApiOperation({
+    summary: 'Metadata + ingestion status + linked departments + chunk count',
+  })
+  @ApiWrappedResponse(DocumentResponseDto)
+  @ApiFilterErrors(['400', '401', '404'])
+  @ApiOperation({
+    summary: 'Metadata + ingestion status + linked departments + chunk count',
+  })
+  @ApiWrappedResponse(DocumentResponseDto)
+  @ApiFilterErrors(['400', '401', '404'])
   @Get(':id')
   get(
     @CurrentUser() context: RequestContext,
@@ -135,6 +196,12 @@ export class DocumentsController {
     return this.documentsGrpcClient.get(id, context);
   }
 
+  @ApiOperation({ summary: 'Update' })
+  @ApiWrappedResponse(DocumentResponseDto)
+  @ApiFilterErrors(['400', '401', '403', '404'])
+  @ApiOperation({ summary: 'Update' })
+  @ApiWrappedResponse(DocumentResponseDto)
+  @ApiFilterErrors(['400', '401', '403', '404'])
   @Patch(':id')
   @RequirePermission('document.update')
   @ResponseMessage('Document updated')
@@ -146,6 +213,12 @@ export class DocumentsController {
     return this.documentsGrpcClient.update(id, dto, context);
   }
 
+  @ApiOperation({ summary: 'Remove' })
+  @ApiWrappedResponse(undefined, { status: HttpStatus.NO_CONTENT })
+  @ApiFilterErrors(['400', '401', '403', '404'])
+  @ApiOperation({ summary: 'Remove' })
+  @ApiWrappedResponse(undefined, { status: HttpStatus.NO_CONTENT })
+  @ApiFilterErrors(['400', '401', '403', '404'])
   @Delete(':id')
   @RequirePermission('document.delete')
   @HttpCode(HttpStatus.NO_CONTENT)
@@ -156,6 +229,12 @@ export class DocumentsController {
     return this.documentsGrpcClient.remove(id, context);
   }
 
+  @ApiOperation({ summary: 'Restore' })
+  @ApiWrappedResponse(DocumentResponseDto)
+  @ApiFilterErrors(['400', '401', '403', '404'])
+  @ApiOperation({ summary: 'Restore' })
+  @ApiWrappedResponse(DocumentResponseDto)
+  @ApiFilterErrors(['400', '401', '403', '404'])
   @Post(':id/restore')
   @RequirePermission('document.delete')
   @HttpCode(HttpStatus.OK)
@@ -174,6 +253,12 @@ export class DocumentsController {
    * boundary than the one that matters here — it knows nothing about this
    * document's department scoping and never will.
    */
+  @ApiOperation({ summary: 'Short-lived signed URL via GetSignedReadUrls' })
+  @ApiWrappedResponse(DownloadDocumentResponseDto)
+  @ApiFilterErrors(['400', '401', '404'])
+  @ApiOperation({ summary: 'Short-lived signed URL via GetSignedReadUrls' })
+  @ApiWrappedResponse(DownloadDocumentResponseDto)
+  @ApiFilterErrors(['400', '401', '404'])
   @Get(':id/download')
   download(
     @CurrentUser() context: RequestContext,
@@ -182,6 +267,12 @@ export class DocumentsController {
     return this.documentsGrpcClient.download(id, context);
   }
 
+  @ApiOperation({ summary: 'Departments scoped to this document' })
+  @ApiWrappedResponse()
+  @ApiFilterErrors(['400', '401', '403', '404'])
+  @ApiOperation({ summary: 'Departments scoped to this document' })
+  @ApiWrappedResponse()
+  @ApiFilterErrors(['400', '401', '403', '404'])
   @Get(':id/departments')
   @RequirePermission('document.read')
   listDepartments(
@@ -200,6 +291,12 @@ export class DocumentsController {
    * "succeeded" while leaving it visible to everyone is the worst answer
    * available.
    */
+  @ApiOperation({ summary: 'Set departments' })
+  @ApiWrappedResponse(DocumentResponseDto)
+  @ApiFilterErrors(['400', '401', '403', '404'])
+  @ApiOperation({ summary: 'Set departments' })
+  @ApiWrappedResponse(DocumentResponseDto)
+  @ApiFilterErrors(['400', '401', '403', '404'])
   @Put(':id/departments')
   @RequirePermission('document.share')
   @ResponseMessage('Document scoping updated')
@@ -211,6 +308,18 @@ export class DocumentsController {
     return this.documentsGrpcClient.setDepartments(id, dto, context);
   }
 
+  @ApiOperation({
+    summary:
+      'Paginated document_chunks: chunk_index, content_text, page_number, token_count',
+  })
+  @ApiWrappedResponse(Paginated(DocumentChunkResponseDto))
+  @ApiFilterErrors(['400', '401', '403', '404'])
+  @ApiOperation({
+    summary:
+      'Paginated document_chunks: chunk_index, content_text, page_number, token_count',
+  })
+  @ApiWrappedResponse(Paginated(DocumentChunkResponseDto))
+  @ApiFilterErrors(['400', '401', '403', '404'])
   @Get(':id/chunks')
   @RequirePermission('document.read')
   listChunks(
@@ -226,6 +335,12 @@ export class DocumentsController {
    * document, because a citation in an AI answer is useless if following it
    * needs a permission the reader does not have.
    */
+  @ApiOperation({ summary: 'Single chunk (citation deep-link target)' })
+  @ApiWrappedResponse(DocumentChunkResponseDto)
+  @ApiFilterErrors(['400', '401', '404'])
+  @ApiOperation({ summary: 'Single chunk (citation deep-link target)' })
+  @ApiWrappedResponse(DocumentChunkResponseDto)
+  @ApiFilterErrors(['400', '401', '404'])
   @Get(':id/chunks/:chunkId')
   getChunk(
     @CurrentUser() context: RequestContext,

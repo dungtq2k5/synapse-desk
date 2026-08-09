@@ -14,6 +14,11 @@ import type { Request } from 'express';
 import { CurrentOrigin } from '../../common/decorators/current-origin.decorator';
 import { RequestOrigin } from '@synapsedesk/common';
 import { BillingGrpcClient } from './billing-grpc.client';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiFilterErrors,
+  ApiWrappedResponse,
+} from '../../common/decorators/api-response.decorator';
 
 /**
  * `POST /webhooks/stripe` — and four global mechanisms it bypasses on purpose
@@ -32,6 +37,7 @@ import { BillingGrpcClient } from './billing-grpc.client';
  * succeed. The only non-2xx is a signature failure, which is Stripe's own
  * signal that something is wrong with the caller rather than with the event.
  */
+@ApiTags('Webhooks')
 @Controller('webhooks')
 @SkipThrottle()
 export class WebhooksController {
@@ -39,6 +45,32 @@ export class WebhooksController {
 
   constructor(private readonly billing: BillingGrpcClient) {}
 
+  /**
+   * **Authenticated by SIGNATURE, not by a scheme OpenAPI can express** —
+   * 24-doc §3.
+   *
+   * There is no security requirement here because Swagger has no way to state
+   * "verified HMAC over the raw body". The `description` says so explicitly:
+   * `security: []` on a route that verifies a signature reads as
+   * "unauthenticated", and somebody will eventually take that at face value and
+   * try to call it.
+   */
+  @ApiOperation({
+    summary: 'Stripe event intake',
+    description:
+      '**Not a public endpoint despite carrying no security scheme.** Every ' +
+      "request is authenticated by Stripe's `stripe-signature` header, computed " +
+      'as an HMAC over the exact raw bytes of the body — a stronger claim than a ' +
+      'bearer token, and one OpenAPI cannot describe. Always answers 200, even ' +
+      'for an event this system could not apply: Stripe retries on any non-2xx, ' +
+      'so a 500 for an unmappable price id would turn one config typo into an ' +
+      'escalating retry storm. The only non-2xx is a signature failure.',
+    security: [],
+  })
+  @ApiWrappedResponse(undefined, {
+    description: 'Event accepted. The body carries an acknowledgement only.',
+  })
+  @ApiFilterErrors(['400'])
   @Post('stripe')
   @HttpCode(HttpStatus.OK)
   async stripe(

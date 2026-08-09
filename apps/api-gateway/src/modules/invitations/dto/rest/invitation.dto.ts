@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { OmitType } from '@nestjs/swagger';
+import { OmitType, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   ArrayMaxSize,
   ArrayMinSize,
@@ -74,6 +74,16 @@ export class ListInvitationsQueryDto extends OmitType(SearchPaginationBase, [
   @IsOptional()
   @IsString()
   @IsIn(INVITATION_SORTABLE_FIELDS)
+  /**
+   * Optional in the API and, without this, REQUIRED in the docs — 24-doc §1.
+   *
+   * The plugin derives `required` from TYPESCRIPT optionality, not from
+   * `@IsOptional()`. A field declared `page: number = 1` is non-optional to the
+   * compiler even though the validator lets a caller omit it, so the generated
+   * spec demanded it — and a generated client would refuse to send a request
+   * without one.
+   */
+  @ApiPropertyOptional()
   readonly sortBy: InvitationSortableField = DEFAULT_SEARCH.SORT_BY;
 }
 

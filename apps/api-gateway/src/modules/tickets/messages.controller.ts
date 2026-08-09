@@ -19,6 +19,13 @@ import { RequirePermission } from '../../common/decorators/require-permission.de
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ResponseMessage } from '../../common/decorators/response-message.decorator';
 import { PaginationResponseBase } from '../../common/dto/base/pagination-response-base.dto';
+import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { AUTH_SCHEMES } from '../../common/config/swagger.config';
+import {
+  ApiFilterErrors,
+  ApiWrappedResponse,
+  Paginated,
+} from '../../common/decorators/api-response.decorator';
 import {
   MessagesGrpcClient,
   PresignAttachmentDto,
@@ -51,11 +58,23 @@ import {
  * Only redaction carries a route permission, because it is the one action that
  * is purely moderation.
  */
+@ApiTags('Messages')
+@ApiCookieAuth(AUTH_SCHEMES.access)
 @Controller('tickets/:ticketId/messages')
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class MessagesController {
   constructor(private readonly messagesGrpcClient: MessagesGrpcClient) {}
 
+  @ApiOperation({
+    summary: 'Chronological thread, cursor-paginated (?before=&limit=)',
+  })
+  @ApiWrappedResponse(Paginated(MessageResponseDto))
+  @ApiFilterErrors(['400', '401', '404'])
+  @ApiOperation({
+    summary: 'Chronological thread, cursor-paginated (?before=&limit=)',
+  })
+  @ApiWrappedResponse(Paginated(MessageResponseDto))
+  @ApiFilterErrors(['400', '401', '404'])
   @Get()
   list(
     @CurrentUser() context: RequestContext,
@@ -72,6 +91,12 @@ export class MessagesController {
    * ordinary replies through it. The note flag is checked in ticket-service
    * instead — one field refused, rather than the whole conversation.
    */
+  @ApiOperation({ summary: 'Create' })
+  @ApiWrappedResponse(MessageResponseDto, { status: HttpStatus.CREATED })
+  @ApiFilterErrors(['400', '401', '404'])
+  @ApiOperation({ summary: 'Create' })
+  @ApiWrappedResponse(MessageResponseDto, { status: HttpStatus.CREATED })
+  @ApiFilterErrors(['400', '401', '404'])
   @Post()
   @ResponseMessage('Message posted')
   create(
@@ -82,6 +107,18 @@ export class MessagesController {
     return this.messagesGrpcClient.create(ticketId, dto, context);
   }
 
+  @ApiOperation({
+    summary:
+      'Edit own message inside a short window; internal notes editable by agents',
+  })
+  @ApiWrappedResponse(MessageResponseDto)
+  @ApiFilterErrors(['400', '401', '404'])
+  @ApiOperation({
+    summary:
+      'Edit own message inside a short window; internal notes editable by agents',
+  })
+  @ApiWrappedResponse(MessageResponseDto)
+  @ApiFilterErrors(['400', '401', '404'])
   @Patch(':messageId')
   @ResponseMessage('Message updated')
   update(
@@ -101,6 +138,18 @@ export class MessagesController {
    * it the message was gone, and a thread that silently loses a turn reads as
    * though the conversation never had it.
    */
+  @ApiOperation({
+    summary:
+      'Redact a message (content replaced, row retained for the audit timeline)',
+  })
+  @ApiWrappedResponse(MessageResponseDto)
+  @ApiFilterErrors(['400', '401', '403', '404'])
+  @ApiOperation({
+    summary:
+      'Redact a message (content replaced, row retained for the audit timeline)',
+  })
+  @ApiWrappedResponse(MessageResponseDto)
+  @ApiFilterErrors(['400', '401', '403', '404'])
   @Delete(':messageId')
   @RequirePermission('ticket.message.moderate')
   @HttpCode(HttpStatus.OK)
@@ -125,6 +174,18 @@ export class MessagesController {
    * 200, not 201: nothing has been created yet. A 201 would tell a client the
    * attachment existed when all it has is permission to make one.
    */
+  @ApiOperation({
+    summary:
+      'Presign a direct-to-Firebase-Storage upload: { contentType, sizeBytes } → { uploadUrl, objectPath, expiresAt }',
+  })
+  @ApiWrappedResponse()
+  @ApiFilterErrors(['400', '401', '404'])
+  @ApiOperation({
+    summary:
+      'Presign a direct-to-Firebase-Storage upload: { contentType, sizeBytes } → { uploadUrl, objectPath, expiresAt }',
+  })
+  @ApiWrappedResponse()
+  @ApiFilterErrors(['400', '401', '404'])
   @Post(':messageId/attachments/upload-url')
   @HttpCode(HttpStatus.OK)
   presignAttachment(
@@ -141,6 +202,16 @@ export class MessagesController {
     );
   }
 
+  @ApiOperation({
+    summary: '{ objectPath } — confirms, writes the message_attachments row',
+  })
+  @ApiWrappedResponse(AttachmentResponseDto, { status: HttpStatus.CREATED })
+  @ApiFilterErrors(['400', '401', '404'])
+  @ApiOperation({
+    summary: '{ objectPath } — confirms, writes the message_attachments row',
+  })
+  @ApiWrappedResponse(AttachmentResponseDto, { status: HttpStatus.CREATED })
+  @ApiFilterErrors(['400', '401', '404'])
   @Post(':messageId/attachments/confirm')
   @ResponseMessage('Attachment added')
   confirmAttachment(
@@ -157,6 +228,12 @@ export class MessagesController {
     );
   }
 
+  @ApiOperation({ summary: 'List attachments' })
+  @ApiWrappedResponse(AttachmentResponseDto, { isArray: true })
+  @ApiFilterErrors(['400', '401', '404'])
+  @ApiOperation({ summary: 'List attachments' })
+  @ApiWrappedResponse(AttachmentResponseDto, { isArray: true })
+  @ApiFilterErrors(['400', '401', '404'])
   @Get(':messageId/attachments')
   listAttachments(
     @CurrentUser() context: RequestContext,

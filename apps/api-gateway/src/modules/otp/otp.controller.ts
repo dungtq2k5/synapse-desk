@@ -27,6 +27,12 @@ import {
   ROUTE_THROTTLE,
 } from '../../common/config/throttler.config';
 import { OrgAccessKind } from '../../common/decorators/org-access.decorator';
+import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { AUTH_SCHEMES } from '../../common/config/swagger.config';
+import {
+  ApiFilterErrors,
+  ApiWrappedResponse,
+} from '../../common/decorators/api-response.decorator';
 
 /**
  * Email and phone ownership challenges (api-endpoints-plan).
@@ -52,6 +58,8 @@ import { OrgAccessKind } from '../../common/decorators/org-access.decorator';
  * session and a real identity — they are simply LIMITED, and that limit is
  * enforced on business routes by `EmailVerifiedGuard`, not here.
  */
+@ApiTags('Otp')
+@ApiCookieAuth(AUTH_SCHEMES.access)
 @AuthThrottle()
 @OrgAccessKind(OrgAccess.AUTH)
 @Controller('auth')
@@ -63,6 +71,18 @@ export class OtpController {
    * Issues (or re-issues) an email verification code. Registration already sends
    * the first one; this is the resend path.
    */
+  @ApiOperation({
+    summary:
+      'Issue an otps row (purpose = email_verification, target = users.email) and mail the 6-digit code',
+  })
+  @ApiWrappedResponse(RequestOtpResponseDto, { status: HttpStatus.ACCEPTED })
+  @ApiFilterErrors(['401'])
+  @ApiOperation({
+    summary:
+      'Issue an otps row (purpose = email_verification, target = users.email) and mail the 6-digit code',
+  })
+  @ApiWrappedResponse(RequestOtpResponseDto, { status: HttpStatus.ACCEPTED })
+  @ApiFilterErrors(['401'])
   @Post('email/verify/request')
   @Throttle({ [AUTH_THROTTLER_TIER]: ROUTE_THROTTLE.otpRequest })
   @HttpCode(HttpStatus.ACCEPTED)
@@ -77,6 +97,12 @@ export class OtpController {
    * `isEmailVerified` claim is baked into the access token, so it stays `false`
    * until the token rotates.
    */
+  @ApiOperation({ summary: 'Submit { code }' })
+  @ApiWrappedResponse(VerifyOtpResponseDto)
+  @ApiFilterErrors(['400', '401'])
+  @ApiOperation({ summary: 'Submit { code }' })
+  @ApiWrappedResponse(VerifyOtpResponseDto)
+  @ApiFilterErrors(['400', '401'])
   @Post('email/verify')
   @Throttle({ [AUTH_THROTTLER_TIER]: ROUTE_THROTTLE.otpVerify })
   @HttpCode(HttpStatus.OK)
@@ -91,6 +117,18 @@ export class OtpController {
     );
   }
 
+  @ApiOperation({
+    summary:
+      'Issue an otps row (purpose = phone_verification) and SMS the code',
+  })
+  @ApiWrappedResponse(RequestOtpResponseDto, { status: HttpStatus.ACCEPTED })
+  @ApiFilterErrors(['400', '401'])
+  @ApiOperation({
+    summary:
+      'Issue an otps row (purpose = phone_verification) and SMS the code',
+  })
+  @ApiWrappedResponse(RequestOtpResponseDto, { status: HttpStatus.ACCEPTED })
+  @ApiFilterErrors(['400', '401'])
   @Post('phone/verify/request')
   @Throttle({ [AUTH_THROTTLER_TIER]: ROUTE_THROTTLE.otpRequest })
   @HttpCode(HttpStatus.ACCEPTED)
@@ -105,6 +143,12 @@ export class OtpController {
     );
   }
 
+  @ApiOperation({ summary: 'Submit { code }' })
+  @ApiWrappedResponse(VerifyOtpResponseDto)
+  @ApiFilterErrors(['400', '401'])
+  @ApiOperation({ summary: 'Submit { code }' })
+  @ApiWrappedResponse(VerifyOtpResponseDto)
+  @ApiFilterErrors(['400', '401'])
   @Post('phone/verify')
   @Throttle({ [AUTH_THROTTLER_TIER]: ROUTE_THROTTLE.otpVerify })
   @HttpCode(HttpStatus.OK)
@@ -120,6 +164,18 @@ export class OtpController {
   }
 
   /** Drives the resend UI. Never exposes the code or its hash. */
+  @ApiOperation({
+    summary:
+      '?purpose= — outstanding-challenge state for the resend UI: { pending, target (masked), expiresAt, attemptsRemaining }',
+  })
+  @ApiWrappedResponse(OtpStatusResponseDto)
+  @ApiFilterErrors(['401'])
+  @ApiOperation({
+    summary:
+      '?purpose= — outstanding-challenge state for the resend UI: { pending, target (masked), expiresAt, attemptsRemaining }',
+  })
+  @ApiWrappedResponse(OtpStatusResponseDto)
+  @ApiFilterErrors(['401'])
   @Get('otp/status')
   getOtpStatus(
     @CurrentUser() context: RequestContext,

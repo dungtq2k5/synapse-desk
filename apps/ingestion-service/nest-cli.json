@@ -6,5 +6,5 @@
     "deleteOutDir": true,
     "tsConfigPath": "tsconfig.build.json"
   },
-  "entryFile": "apps/ticket-service/src/main"
+  "entryFile": "apps/ingestion-service/src/main"
 }
