@@ -12,6 +12,7 @@ import { DeliveriesModule } from './modules/deliveries/deliveries.module';
 import { PreferencesModule } from './modules/preferences/preferences.module';
 import { NotificationRealtimeModule } from './modules/realtime/realtime.module';
 import { FeedModule } from './modules/feed/feed.module';
+import { OpsModule } from './modules/ops/ops.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { FeedModule } from './modules/feed/feed.module';
     // The read half — 18-doc §2. Domain E was NATS-only until this existed:
     // it consumed events and wrote rows nobody could read back.
     FeedModule,
+    OpsModule,
   ],
   controllers: [
     NotificationsController,

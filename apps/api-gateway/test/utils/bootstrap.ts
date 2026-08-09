@@ -16,6 +16,7 @@ import {
   toProtoOrgStatus,
 } from '@synapsedesk/grpc-proto';
 import { AppModule } from '../../src/app.module';
+import { OPS_ROUTES } from '../../src/modules/health/ops-routes';
 import { AllHttpExceptionFilter } from '../../src/common/filters/all-http-exception.filter';
 import { LoggingInterceptor } from '../../src/common/interceptors/logging.interceptor';
 import { TransformInterceptor } from '../../src/common/interceptors/transform.interceptor';
@@ -97,7 +98,9 @@ export async function bootstrapE2eTest(
   // anonymous callers on req.ip, so without it every request in a test that
   // sets X-Forwarded-For lands in the same bucket.
   app.set('trust proxy', 1);
-  app.setGlobalPrefix(configService.getOrThrow<string>('GLOBAL_PREFIX'));
+  app.setGlobalPrefix(configService.getOrThrow<string>('GLOBAL_PREFIX'), {
+    exclude: OPS_ROUTES,
+  });
   app.use(cookieParser());
   app.useGlobalFilters(new AllHttpExceptionFilter(false));
   app.useGlobalInterceptors(new LoggingInterceptor(true));

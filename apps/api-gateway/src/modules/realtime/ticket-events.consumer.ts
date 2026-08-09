@@ -218,6 +218,10 @@ export class TicketEventsConsumer {
   private relay(pattern: string, emit: () => void): void {
     try {
       emit();
+      // Counted here rather than at each call site: every relayed event passes
+      // through this boundary, so a handler added later is measured without
+      // anyone remembering to measure it — 23-doc §4.
+      this.gateway.countEvent(pattern);
     } catch (error) {
       this.logger.error(`Failed to relay ${pattern}: ${formatErrorMsg(error)}`);
     }

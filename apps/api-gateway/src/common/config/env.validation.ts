@@ -18,6 +18,29 @@ const cookieName = Joi.string()
 
 export const envValidationSchema = Joi.object({
   PORT: Joi.number().required(),
+
+  // **Which build is this?** — 23-doc §3. Baked at image build time, never read
+  // from git at runtime: a container has no `.git`, so a runtime lookup returns
+  // nothing and the natural fallback is `"unknown"` — the answer you get at
+  // exactly the moment you need the real one.
+  //
+  // `required()` rather than a default, and that is the enforcement: an image
+  // that cannot identify itself fails to BOOT, loudly and immediately, instead
+  // of starting happily and lying to the person trying to end an outage. The
+  // Dockerfile's `test -n "$GIT_SHA"` guard is the same rule one stage earlier.
+  // `/metrics`, on its OWN listener — 23-doc §4. A distinct port is what makes
+  // "not reachable from the internet" structural rather than a rule Nginx has
+  // to keep enforcing correctly forever.
+  METRICS_PORT: Joi.number().required(),
+  // Loopback by DEFAULT. A Kubernetes pod needs `0.0.0.0` for the scraper to
+  // reach it, so this is a real knob — but the default must be the closed one,
+  // so a deployment that never thought about it is safe rather than exposed.
+  METRICS_HOST: Joi.string().default('127.0.0.1'),
+
+  APP_VERSION: Joi.string().required(),
+  BUILD_SHA: Joi.string().required(),
+  BUILD_TIME: Joi.string().isoDate().required(),
+
   GLOBAL_PREFIX: Joi.string().required(),
   CORS: Joi.string().required(),
 

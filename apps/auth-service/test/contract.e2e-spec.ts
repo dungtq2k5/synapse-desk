@@ -18,6 +18,11 @@ import {
   AUTH_PROTO_PATHS,
   GRPC_CHANNEL_OPTIONS,
   GRPC_LOADER_OPTIONS,
+  HEALTH_PACKAGE_NAME,
+  OPS_PACKAGE_NAME,
+  OPS_PACKAGE_NAMES,
+  OPS_PROTO_PATHS,
+  READINESS_SERVICE,
 } from '@synapsedesk/grpc-proto';
 import { compareAlphabetically } from '@synapsedesk/common';
 import { AppModule } from '../src/app.module';
@@ -130,8 +135,12 @@ describe('gRPC wire contract (e2e)', () => {
     app = moduleRef.createNestMicroservice<MicroserviceOptions>({
       transport: Transport.GRPC,
       options: {
-        package: AUTH_PACKAGE_NAME,
-        protoPath: AUTH_PROTO_PATHS,
+        // The ops packages ride along exactly as `main.ts` registers them —
+        // 23-doc §2. Restating them here rather than importing the same
+        // constants would let this suite pass while production served a
+        // different set.
+        package: [AUTH_PACKAGE_NAME, ...OPS_PACKAGE_NAMES],
+        protoPath: [...AUTH_PROTO_PATHS, ...OPS_PROTO_PATHS],
         url,
         ...GRPC_CHANNEL_OPTIONS,
         loader: GRPC_LOADER_OPTIONS,
@@ -354,4 +363,167 @@ describe('gRPC wire contract (e2e)', () => {
     expect(result.code).toBeDefined();
     expect(result.code).not.toBe(GrpcStatus.UNIMPLEMENTED);
   });
+});
+
+/**
+ * The ops surface, over the REAL wire — 23-doc §2, §3.
+ *
+ * Separate from the contract sweep above because it asserts different things:
+ * that sweep proves every domain RPC round-trips, this one proves the standard
+ * health service is actually registered on the same port and answers the two
+ * questions Kubernetes asks it.
+ *
+ * **Kubernetes could not tell whether this process was alive.** It is
+ * `createMicroservice`-only, so there was no HTTP endpoint to probe — and the
+ * fix is only real if `grpc.health.v1.Health` is genuinely reachable, which is
+ * a wire-level fact and not something a controller unit test can establish. A
+ * misregistered package produces `UNIMPLEMENTED` from a server that is running
+ * and healthy, which is exactly what a probe reads as "restart this".
+ */
+describe('ops surface over gRPC (e2e)', () => {
+  let app: INestMicroservice;
+  let health: Record<string, unknown>;
+  let ops: Record<string, unknown>;
+
+  const url = '127.0.0.1:50252';
+
+  const invoke = <T>(
+    client: Record<string, unknown>,
+    method: string,
+    request: unknown,
+  ): Promise<{ ok: boolean; code?: number; value?: T }> => {
+    const fn = client[method] as (
+      request: unknown,
+      options: CallOptions,
+      callback: (error: (Error & { code?: number }) | null, value?: T) => void,
+    ) => void;
+
+    return new Promise((resolve) => {
+      fn.call(
+        client,
+        request,
+        { deadline: new Date(Date.now() + 10_000) },
+        (error, value) =>
+          resolve(
+            error ? { ok: false, code: error.code } : { ok: true, value },
+          ),
+      );
+    });
+  };
+
+  beforeAll(async () => {
+    const moduleRef = await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile();
+
+    app = moduleRef.createNestMicroservice<MicroserviceOptions>({
+      transport: Transport.GRPC,
+      options: {
+        package: [AUTH_PACKAGE_NAME, ...OPS_PACKAGE_NAMES],
+        protoPath: [...AUTH_PROTO_PATHS, ...OPS_PROTO_PATHS],
+        url,
+        ...GRPC_CHANNEL_OPTIONS,
+        loader: GRPC_LOADER_OPTIONS,
+      },
+    });
+    await app.listen();
+
+    const pkg = loadPackageDefinition(
+      loadSync(OPS_PROTO_PATHS, GRPC_LOADER_OPTIONS),
+    );
+    const resolve = (path: string) =>
+      path
+        .split('.')
+        .reduce<GrpcObject>(
+          (node, segment) => node[segment] as GrpcObject,
+          pkg,
+        );
+
+    const HealthCtor = resolve(HEALTH_PACKAGE_NAME)
+      .Health as ServiceClientConstructor;
+    const OpsCtor = resolve(OPS_PACKAGE_NAME)
+      .OpsService as ServiceClientConstructor;
+
+    health = new HealthCtor(url, credentials.createInsecure());
+    ops = new OpsCtor(url, credentials.createInsecure());
+  }, 60_000);
+
+  afterAll(async () => {
+    (health as { close?: () => void }).close?.();
+    (ops as { close?: () => void }).close?.();
+    await app.close();
+  });
+
+  it('1. **answers `Check` as SERVING when its own dependencies are up**', async () => {
+    // Readiness, with a live Postgres. `""` and `"readiness"` are two different
+    // questions over one port, and this is the one that gates traffic.
+    const response = await invoke<{ status: number }>(health, 'check', {
+      service: READINESS_SERVICE,
+    });
+
+    expect(response.ok).toBe(true);
+    expect(response.value?.status).toBe(1); // SERVING
+  }, 30_000);
+
+  it('2. liveness is SERVING and checks NOTHING external', async () => {
+    // `""` is the standard's "the server as a whole". It must never consult a
+    // dependency: a failing liveness probe gets the container KILLED, which
+    // repairs nothing when the cause is a database — and does it on every
+    // replica simultaneously.
+    const response = await invoke<{ status: number }>(health, 'check', {
+      service: '',
+    });
+
+    expect(response.ok).toBe(true);
+    expect(response.value?.status).toBe(1);
+  }, 30_000);
+
+  it('3. an UNKNOWN service name is NOT_FOUND, not a cheerful SERVING', async () => {
+    // A probe misconfigured with a typo'd service name must fail loudly.
+    // Defaulting to liveness would make it pass forever — the failure that
+    // looks exactly like health.
+    const response = await invoke(health, 'check', { service: 'nonsense' });
+
+    expect(response.ok).toBe(false);
+    expect(response.code).toBe(GrpcStatus.NOT_FOUND);
+  }, 30_000);
+
+  it('4. **`GetVersion` answers on the port this service already has**', async () => {
+    // Served from EVERY service, not just the gateway — 23-doc §3. A rolling
+    // deploy where one service lagged is precisely the state this diagnoses,
+    // and a gateway-only version endpoint would report the new SHA while the
+    // peer running the old code is the one causing the incident.
+    const response = await invoke<{
+      version: string;
+      sha: string;
+      builtAt: string;
+    }>(ops, 'getVersion', {});
+
+    expect(response.ok).toBe(true);
+    expect(response.value).toEqual({
+      version: process.env.APP_VERSION,
+      sha: process.env.BUILD_SHA,
+      builtAt: process.env.BUILD_TIME,
+    });
+  }, 30_000);
+
+  it('5. `Watch` is refused EXPLICITLY rather than left dangling', async () => {
+    // Kubernetes uses Check, not Watch, so a streaming health feed would be a
+    // subscription with no subscriber. UNIMPLEMENTED is the standard's own
+    // answer for a server that does not support it.
+    const stream = (
+      health as {
+        watch: (request: unknown) => {
+          on: (event: string, handler: (payload?: unknown) => void) => void;
+        };
+      }
+    ).watch({ service: '' });
+
+    const code = await new Promise<number | undefined>((resolve) => {
+      stream.on('error', (error) => resolve((error as { code?: number }).code));
+      stream.on('end', () => resolve(undefined));
+    });
+
+    expect(code).toBe(GrpcStatus.UNIMPLEMENTED);
+  }, 30_000);
 });

@@ -79,6 +79,9 @@ export class NotificationEventsConsumer {
   private relay(pattern: string, emit: () => void): void {
     try {
       emit();
+      // See `TicketEventsConsumer.relay` — counted at the one boundary every
+      // relayed event crosses.
+      this.gateway.countEvent(pattern);
     } catch (error) {
       this.logger.error(`Could not relay ${pattern}: ${formatErrorMsg(error)}`);
     }

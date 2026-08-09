@@ -12,9 +12,23 @@ import {
   PLATFORM_SERVICE_NAME,
   PlatformServiceClient,
 } from '@synapsedesk/grpc-proto';
-import { formatErrorMsg, RequestContext } from '@synapsedesk/common';
+import {
+  formatErrorMsg,
+  RequestContext,
+  RequestOrigin,
+} from '@synapsedesk/common';
 import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
 import { JobRunStatusDto } from './dto/platform-jobs.dto';
+
+/**
+ * Who is asking for a heartbeat read.
+ *
+ * Widened from `RequestContext` to include a bare origin — 23-doc §4. A
+ * Prometheus scrape has no user, and `BaseGrpcClient.call` already takes the
+ * union for exactly this reason: an unauthenticated caller is a real caller with
+ * no identity, not a caller to fabricate one for.
+ */
+type HeartbeatCaller = RequestContext | RequestOrigin;
 
 /** A heartbeat row plus which service it came from. */
 export type ServiceHeartbeats = {
@@ -62,7 +76,7 @@ export class PlatformJobsClient extends BaseGrpcClient implements OnModuleInit {
     );
   }
 
-  async authHeartbeats(context: RequestContext): Promise<ServiceHeartbeats> {
+  async authHeartbeats(context: HeartbeatCaller): Promise<ServiceHeartbeats> {
     const response = await this.call(
       (metadata) => this.platformService.getAuthJobHealth({}, metadata),
       context,
@@ -83,7 +97,7 @@ export class PlatformJobsClient extends BaseGrpcClient implements OnModuleInit {
     };
   }
 
-  async ticketHeartbeats(context: RequestContext): Promise<ServiceHeartbeats> {
+  async ticketHeartbeats(context: HeartbeatCaller): Promise<ServiceHeartbeats> {
     const response = await this.call(
       (metadata) => this.analyticsService.getJobHealth({}, metadata),
       context,
@@ -105,7 +119,7 @@ export class PlatformJobsClient extends BaseGrpcClient implements OnModuleInit {
   }
 
   async ingestionHeartbeats(
-    context: RequestContext,
+    context: HeartbeatCaller,
   ): Promise<ServiceHeartbeats> {
     const response = await this.call(
       (metadata) => this.ledgerService.getAiJobHealth({}, metadata),

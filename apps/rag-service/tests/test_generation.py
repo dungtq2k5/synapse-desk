@@ -558,7 +558,7 @@ class TestTruncationIsDiagnosable:
 
 
 class TestJsonExtraction:
-    """17-doc §1.2 Gap 1 — the greedy regex, and what it silently cost.
+    r"""17-doc §1.2 Gap 1 — the greedy regex, and what it silently cost.
 
     `re.search(r"\{.*\}", text, re.DOTALL)` spans from the FIRST opening brace
     to the LAST one in the response. One object: correct. Anything else — prose

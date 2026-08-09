@@ -12,6 +12,7 @@ import { AssignmentsModule } from './modules/assignments/assignments.module';
 import { MessagesModule } from './modules/messages/messages.module';
 import { AiModule } from './modules/ai/ai.module';
 import { FeedbackModule } from './modules/feedback/feedback.module';
+import { OpsModule } from './modules/ops/ops.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { FeedbackModule } from './modules/feedback/feedback.module';
     MessagesModule,
     AiModule,
     FeedbackModule,
+    OpsModule,
   ],
 })
 export class AppModule {}

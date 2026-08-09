@@ -8,6 +8,8 @@ import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import {
   GRPC_CHANNEL_OPTIONS,
   GRPC_LOADER_OPTIONS,
+  OPS_PACKAGE_NAMES,
+  OPS_PROTO_PATHS,
   STORAGE_PACKAGE_NAME,
   STORAGE_PROTO_PATHS,
 } from '@synapsedesk/grpc-proto';
@@ -33,8 +35,12 @@ async function bootstrap() {
   app.connectMicroservice<MicroserviceOptions>({
     transport: Transport.GRPC,
     options: {
-      package: STORAGE_PACKAGE_NAME,
-      protoPath: STORAGE_PROTO_PATHS,
+      // Domain package PLUS the ops packages — 23-doc §2. Probes and
+      // `/version` ride the port this service already listens on: no HTTP
+      // listener, no second port, and the kubelet speaks `grpc.health.v1`
+      // natively.
+      package: [STORAGE_PACKAGE_NAME, ...OPS_PACKAGE_NAMES],
+      protoPath: [...STORAGE_PROTO_PATHS, ...OPS_PROTO_PATHS],
       url,
       ...GRPC_CHANNEL_OPTIONS,
       loader: GRPC_LOADER_OPTIONS,

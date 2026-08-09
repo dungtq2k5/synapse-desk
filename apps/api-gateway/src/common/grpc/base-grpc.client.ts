@@ -29,6 +29,25 @@ export abstract class BaseGrpcClient {
   protected abstract readonly serviceName: string;
 
   /**
+   * Where outbound gRPC latency is recorded — 23-doc §4.
+   *
+   * **A static, set once by `MetricsRegistry`'s constructor**, and this is the
+   * one place in the gateway that uses one. Every gRPC client extends this
+   * class, so the alternative is threading a registry through twenty
+   * constructors for a measurement none of them care about — and the one client
+   * somebody forgets to update is invisible in exactly the way the metric
+   * exists to prevent.
+   *
+   * Optional, so a test that boots a client without the metrics module gets a
+   * no-op rather than a crash.
+   */
+  private static durations?: GrpcDurationMetric;
+
+  static useMetrics(metric: GrpcDurationMetric): void {
+    BaseGrpcClient.durations = metric;
+  }
+
+  /**
    * Runs a unary call with the shared deadline, packing the caller's context
    * into metadata first.
    *
@@ -41,24 +60,63 @@ export abstract class BaseGrpcClient {
    * origin, and the service sees a caller with no identity — which is exactly
    * what it is.
    */
-  protected call<T>(
+  protected async call<T>(
     invoke: (metadata: Metadata) => Observable<T>,
     origin: RequestOrigin | RequestContext,
     deadlineMs: number = GRPC_DEADLINE_MS,
   ): Promise<T> {
-    return firstValueFrom(
-      invoke(packRequestContext(origin)).pipe(
-        timeout(deadlineMs),
-        catchError((error: unknown) =>
-          throwError(() =>
-            error instanceof TimeoutError
-              ? new GatewayTimeoutException(
-                  `${this.serviceName} did not respond in time`,
-                )
-              : error,
+    const started = process.hrtime.bigint();
+    let code = 'OK';
+
+    try {
+      return await firstValueFrom(
+        invoke(packRequestContext(origin)).pipe(
+          timeout(deadlineMs),
+          catchError((error: unknown) =>
+            throwError(() =>
+              error instanceof TimeoutError
+                ? new GatewayTimeoutException(
+                    `${this.serviceName} did not respond in time`,
+                  )
+                : error,
+            ),
           ),
         ),
-      ),
-    );
+      );
+    } catch (error) {
+      code = grpcCodeOf(error);
+      throw error;
+    } finally {
+      BaseGrpcClient.durations?.observe(
+        { peer: this.serviceName, code },
+        Number(process.hrtime.bigint() - started) / 1e9,
+      );
+    }
   }
+}
+
+/**
+ * `{peer, code}` — and deliberately NOT `{method}`, which 23-doc §4's table
+ * lists.
+ *
+ * The method name is not available here: `invoke` is an opaque closure, and
+ * capturing it would mean an extra argument at every one of the ~20 clients'
+ * call sites. A metric that reported `method="unknown"` for most calls would be
+ * worse than one that does not claim to know — so the label is omitted rather
+ * than faked, and adding it later is a purely additive change.
+ *
+ * `{peer, code}` still answers the questions that matter first: which peer is
+ * slow, and which peer is erroring.
+ */
+type GrpcDurationMetric = {
+  observe: (labels: { peer: string; code: string }, value: number) => void;
+};
+
+/** The gRPC status name, or the shape of whatever else came back. */
+function grpcCodeOf(error: unknown): string {
+  if (error instanceof GatewayTimeoutException) return 'DEADLINE_EXCEEDED';
+
+  const code = (error as { code?: unknown })?.code;
+
+  return typeof code === 'number' ? String(code) : 'UNKNOWN';
 }

@@ -31,6 +31,7 @@ import { TicketAccessService } from './ticket-access.service';
 import { MessagesGrpcClient } from '../tickets/messages-grpc.client';
 import { AiStreamService } from './ai-stream.service';
 import { PresenceService } from './presence.service';
+import { MetricsRegistry } from '../metrics/metrics.registry';
 import { PresenceUpdateDto } from './dto/presence-update.dto';
 import { MessageSendDto } from './dto/message-send.dto';
 import {
@@ -87,6 +88,7 @@ export class RealtimeGateway
     private readonly messages: MessagesGrpcClient,
     private readonly aiStreams: AiStreamService,
     private readonly presence: PresenceService,
+    private readonly metrics: MetricsRegistry,
   ) {
     this.ACCESS_COOKIE_NAME =
       this.configService.getOrThrow<string>('JWT_ACCESS_NAME');
@@ -151,6 +153,12 @@ export class RealtimeGateway
       // frame that tells this client it may start talking.
       void this.announceConnected(payload);
 
+      // 23-doc §4: WebSocket traffic was entirely invisible to monitoring —
+      // this process could hold ten thousand sockets and no dashboard would
+      // show it. Counted AFTER authentication, so a flood of refused
+      // handshakes does not read as legitimate load.
+      this.metrics.websocketConnections.inc();
+
       this.logger.log(
         `Socket ${client.id} authenticated as ${payload.sub} (tenant ${payload.organizationId ?? 'platform'})`,
       );
@@ -180,6 +188,13 @@ export class RealtimeGateway
    */
   handleDisconnect(client: Socket): void {
     this.aiStreams.cancelAll(client);
+
+    // Only for sockets that were counted. `handleConnection` increments after
+    // authentication, so decrementing unconditionally would drift the gauge
+    // negative under a handshake flood — and a gauge that goes negative is one
+    // nobody trusts again.
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    if (client.data.user) this.metrics.websocketConnections.dec();
   }
 
   /**
@@ -851,6 +866,17 @@ export class RealtimeGateway
    */
   toRoom(room: RealtimeRoom) {
     return this.server.to(room);
+  }
+
+  /**
+   * Counts one outbound event — 23-doc §4.
+   *
+   * Labelled by EVENT NAME only. The names come from `REALTIME_EVENTS`, a fixed
+   * object, so the cardinality is its size; adding the ticket or the recipient
+   * would make it unbounded, which is the trap §4 is entirely about.
+   */
+  countEvent(event: string): void {
+    this.metrics.websocketEvents.inc({ event });
   }
 
   /**

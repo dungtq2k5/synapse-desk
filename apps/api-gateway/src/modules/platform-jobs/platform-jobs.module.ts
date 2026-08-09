@@ -18,5 +18,10 @@ import { PlatformJobsService } from './platform-jobs.service';
   imports: [AuthModule],
   controllers: [PlatformJobsController],
   providers: [PlatformJobsClient, PlatformJobsService],
+  // Exported for the metrics collector — 23-doc §4. The Prometheus gauge reads
+  // the SAME heartbeats this endpoint reports, deliberately: a second reader
+  // with its own staleness rule would eventually disagree with the page an
+  // operator is looking at.
+  exports: [PlatformJobsService],
 })
 export class PlatformJobsModule {}

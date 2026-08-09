@@ -32,6 +32,8 @@ import { TicketGrpcModule } from './common/grpc/ticket-grpc.module';
 import { IngestionGrpcModule } from './common/grpc/ingestion-grpc.module';
 import { RagGrpcModule } from './common/grpc/rag-grpc.module';
 import { NotificationGrpcModule } from './common/grpc/notification-grpc.module';
+import { MetricsModule } from './modules/metrics/metrics.module';
+import { HttpMetricsInterceptor } from './modules/metrics/http-metrics.interceptor';
 
 @Module({
   imports: [
@@ -107,6 +109,7 @@ import { NotificationGrpcModule } from './common/grpc/notification-grpc.module';
     BillingModule,
     RealtimeModule,
     HealthModule,
+    MetricsModule,
   ],
   providers: [
     // Global, so a route added later is rate-limited by DEFAULT. Registering it
@@ -117,6 +120,10 @@ import { NotificationGrpcModule } from './common/grpc/notification-grpc.module';
     // so this would execute before JwtAuthGuard had resolved the caller and
     // would have no tenant to gate on. Interceptors run after every guard.
     { provide: APP_INTERCEPTOR, useClass: OrganizationStatusInterceptor },
+    // RED metrics for every route — 23-doc §4. Global, so a route added later
+    // is measured by DEFAULT: a per-controller registration means the endpoint
+    // somebody forgets is invisible, and that is reliably the interesting one.
+    { provide: APP_INTERCEPTOR, useClass: HttpMetricsInterceptor },
   ],
 })
 export class AppModule {}

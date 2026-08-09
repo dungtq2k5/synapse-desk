@@ -17,7 +17,8 @@ export type ServiceEndpoint = {
 };
 
 /**
- * Tracks whether this gateway's gRPC peers are reachable, for `/health/ready`.
+ * Tracks whether this gateway's gRPC peers are reachable — reported BY
+ * `/health/ready`, and deliberately not gating it (23-doc §1).
  *
  * **Lives in api-gateway, not `libs/common`.** Two reasons, and the second is
  * the binding one:
@@ -55,11 +56,27 @@ export class ServiceRegistry implements OnModuleInit, OnApplicationShutdown {
 
   constructor(private readonly configService: ConfigService) {}
 
+  /**
+   * EVERY gRPC peer, not just auth-service — 23-doc §1.
+   *
+   * Registering one peer was defensible while peer state gated readiness: the
+   * fewer peers listed, the smaller the cascade. Now that it gates nothing, the
+   * list is a diagnostic, and a diagnostic that shows one of five peers is worse
+   * than none — it invites "auth is up, so the peers are fine" during an
+   * incident caused by one of the four it never looked at.
+   */
   onModuleInit(): void {
-    this.register(
-      'auth-service',
-      this.configService.getOrThrow<string>('AUTH_SERVICE_URL'),
-    );
+    const peers = {
+      auth: 'AUTH_SERVICE_URL',
+      ticket: 'TICKET_SERVICE_URL',
+      ingestion: 'INGESTION_SERVICE_URL',
+      notification: 'NOTIFICATION_SERVICE_URL',
+      rag: 'RAG_SERVICE_URL',
+    } as const;
+
+    for (const [name, variable] of Object.entries(peers)) {
+      this.register(name, this.configService.getOrThrow<string>(variable));
+    }
   }
 
   /**
@@ -100,6 +117,12 @@ export class ServiceRegistry implements OnModuleInit, OnApplicationShutdown {
    * a value refreshed "every 10s" by a method nothing ever called, so
    * `/health/ready` reported UNKNOWN forever. A readiness probe must answer for
    * *now* — and the probe is a cheap local state read, not a network round trip.
+   *
+   * **Synchronous, which is what bounds it** — 23-doc §1 test 4.
+   * `getConnectivityState` reads a value the channel already maintains, so an
+   * unreachable peer costs nothing and cannot hang the probe. A version that
+   * sent a real `Check` RPC per peer would be more accurate and would put five
+   * network round trips inside a call Kubernetes gives a few seconds.
    */
   checkAll(): Record<string, ServiceEndpoint> {
     const status: Record<string, ServiceEndpoint> = {};

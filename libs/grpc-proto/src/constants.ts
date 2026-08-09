@@ -181,3 +181,42 @@ export const GRPC_CHANNEL_OPTIONS = {
   keepaliveTime: 30_000,
   keepaliveTimeout: 10_000,
 } as const;
+
+/**
+ * The ops surface every gRPC service serves ALONGSIDE its domain package —
+ * 23-doc §2, §3.
+ *
+ * NestJS's gRPC transport takes arrays for both `package` and `protoPath`, so a
+ * service registers its own package plus these two and gets probes and a version
+ * endpoint on the port it already listens on. **No extra listener, no extra
+ * port, no extra config surface** — which is the whole reason the health check
+ * is a gRPC service rather than an HTTP route bolted onto a `createMicroservice`
+ * process.
+ *
+ * ```ts
+ * package:   [AUTH_PACKAGE_NAME, ...OPS_PACKAGE_NAMES],
+ * protoPath: [...AUTH_PROTO_PATHS, ...OPS_PROTO_PATHS],
+ * ```
+ */
+export const HEALTH_PACKAGE_NAME = 'grpc.health.v1';
+export const OPS_PACKAGE_NAME = 'synapsedesk.ops';
+
+export const OPS_PACKAGE_NAMES = [
+  HEALTH_PACKAGE_NAME,
+  OPS_PACKAGE_NAME,
+] as const;
+
+export const OPS_PROTO_PATHS = [
+  join(PROTO_ROOT, 'grpc', 'health', 'v1', 'health.proto'),
+  join(PROTO_ROOT, 'synapsedesk', 'ops', 'ops.proto'),
+];
+
+/**
+ * The sub-service name a READINESS probe asks for.
+ *
+ * `""` is the standard's "the server as a whole" and is what a liveness probe
+ * sends. Registering a second name is what lets one port answer two genuinely
+ * different questions — *is this process alive?* and *can it serve?* — without
+ * the second one being able to get the container restarted.
+ */
+export const READINESS_SERVICE = 'readiness';

@@ -17,3 +17,39 @@ asyncpg==0.30.0
 redis==5.2.1
 
 python-dotenv==1.0.1
+
+# The Gemini client — embeddings and generation.
+#
+# **Undeclared until now, and the service imports it directly.** It was present
+# only because it sat in the developer venv: nothing in this file required it,
+# and `pip show` reported `Required-by: []`, so a from-scratch resolve produced
+# 26 packages without it. `docker/rag-service.Dockerfile` installs exactly this
+# file, so the image shipped without the client the service embeds through.
+#
+# That one fails LOUDLY at least — `GeminiEmbeddingClient.__init__` imports it
+# and `build_dependencies` runs at boot, so a missing package is an ImportError
+# on startup rather than a surprise later.
+google-genai==1.44.0
+
+# The reranker — 11-doc §1.5.
+#
+# Undeclared for the same reason, and this is the DANGEROUS half. `rerank()`
+# imports it inside a deliberately broad `except` that logs a warning and falls
+# back to the fused order — correct on its own terms, since a missing model file
+# is a quality regression rather than an outage. But with the package absent
+# entirely the process boots, readiness reports SERVING, and every search runs
+# permanently rerank-less behind one log line per request.
+flashrank==0.2.10
+
+# The STANDARD gRPC health service — 23-doc §2. The Python equivalent of the
+# `grpc.health.v1` implementation the Node services share, and the reason the
+# probe is a gRPC service rather than an HTTP route: Kubernetes speaks it
+# natively, so a `createMicroservice`-shaped process needs no HTTP listener to
+# be probeable.
+#
+# `grpcio` is pinned alongside it. It arrived transitively through
+# `qdrant-client` before, which meant this service's gRPC runtime version was
+# decided by a vector-store client's dependency range — for the library it
+# imports directly on every line of `server.py`.
+grpcio==1.83.0
+grpcio-health-checking==1.83.0

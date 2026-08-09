@@ -1,0 +1,50 @@
+# What must never enter a build context — 23-doc §3.
+#
+# Two jobs. The first is speed: `node_modules` and `dist` are hundreds of
+# megabytes that the build regenerates anyway, and every byte here is uploaded
+# to the daemon before the first instruction runs.
+#
+# The second is the one that matters. **A build context is not a layer, but
+# anything COPYed from it becomes one** — and a layer is extractable by anyone
+# who can pull the image. `secrets/` holds JWT keys and Firebase service
+# accounts; `.env` holds real credentials. Both are gitignored, which protects
+# the repository and does nothing at all for an image build.
+
+node_modules
+**/node_modules
+dist
+**/dist
+coverage
+**/coverage
+.turbo
+**/.turbo
+
+# **Both patterns.** A bare `*.tsbuildinfo` matches only the repo root, so the
+# nested ones (`libs/common/tsconfig.build.tsbuildinfo`) were copied into the
+# build context while `dist/` was excluded — and `tsc --incremental` then reads
+# a buildinfo saying "everything is up to date", emits NOTHING, and the next
+# package fails with "has no exported member" for every symbol in the library
+# that was just built successfully.
+*.tsbuildinfo
+**/*.tsbuildinfo
+
+# Credentials. See above — gitignore does not apply to a build context.
+secrets/
+**/secrets/
+.env
+**/.env
+**/.env.*
+
+# Python local state, so a developer's virtualenv never lands in an image.
+.venv
+**/.venv
+__pycache__
+**/__pycache__
+.pytest_cache
+.ruff_cache
+
+.git
+.github
+docs
+.vscode
+.claude

@@ -1,3 +1,5 @@
+export * from './generated/grpc/health/v1/health';
+export * from './generated/synapsedesk/ops/ops';
 export * from './generated/synapsedesk/auth/common';
 export * from './generated/synapsedesk/auth/auth';
 export * from './generated/synapsedesk/auth/user';
@@ -28,6 +30,7 @@ export * from './generated/synapsedesk/rag/rag';
 export * from './generated/synapsedesk/notification/notification';
 
 export * from './constants';
+export * from './ops-controller';
 export * from './metadata';
 export * from './mappers';
 export * from './pagination';

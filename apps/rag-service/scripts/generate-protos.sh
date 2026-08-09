@@ -25,7 +25,8 @@ mkdir -p "$OUT"
   --grpc_python_out="$OUT" \
   --mypy_grpc_out="$OUT" \
   "$PROTO_ROOT/synapsedesk/rag/rag.proto" \
-  "$PROTO_ROOT/synapsedesk/ingestion/ledger.proto"
+  "$PROTO_ROOT/synapsedesk/ingestion/ledger.proto" \
+  "$PROTO_ROOT/synapsedesk/ops/ops.proto"
 
 # `--mypy_grpc_out` (mypy-protobuf) emits `*_pb2_grpc.pyi`. Without it the
 # servicer base class is UNANNOTATED: its methods end in `raise

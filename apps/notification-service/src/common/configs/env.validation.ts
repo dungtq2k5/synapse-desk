@@ -2,6 +2,19 @@ import * as Joi from 'joi';
 import { LOG_LEVELS, NODE_ENV_OPTIONS } from '@synapsedesk/common';
 
 export const envValidationSchema = Joi.object({
+  // **Which build is this?** — 23-doc §3. Baked at image build time, never read
+  // from git at runtime: a container has no `.git`, so a runtime lookup returns
+  // nothing and the natural fallback is `"unknown"` — the answer you get at
+  // exactly the moment you need the real one.
+  //
+  // `required()` rather than a default, and that IS the enforcement: an image
+  // that cannot identify itself fails to BOOT rather than lying about what it
+  // is. The Dockerfile's `test -n "$GIT_SHA"` guard is the same rule one stage
+  // earlier.
+  APP_VERSION: Joi.string().required(),
+  BUILD_SHA: Joi.string().required(),
+  BUILD_TIME: Joi.string().isoDate().required(),
+
   NATS_URL: Joi.string().required(),
 
   APP_NAME: Joi.string().required(),

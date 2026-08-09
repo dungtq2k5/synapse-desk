@@ -12,6 +12,7 @@ import { SessionsModule } from './modules/sessions/sessions.module';
 import { OrganizationsModule } from './modules/organizations/organizations.module';
 import { PlatformModule } from './modules/platform/platform.module';
 import { BillingModule } from './modules/billing/billing.module';
+import { OpsModule } from './modules/ops/ops.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { BillingModule } from './modules/billing/billing.module';
     OrganizationsModule,
     PlatformModule,
     BillingModule,
+    OpsModule,
   ],
 })
 export class AppModule {}

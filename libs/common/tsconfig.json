@@ -17,6 +17,13 @@
     // source, so the program ts-jest compiles has to know `describe`/`it`. The
     // BUILD uses tsconfig.build.json, which excludes `**/*spec.ts` — nothing
     // test-only reaches dist.
+    //
+    // **Both are declared in this package's own devDependencies**, and that was
+    // not always true. They resolved for months only because another
+    // workspace's devDependencies hoisted them to the repo root — so this
+    // library was never independently buildable, and nothing revealed it until
+    // a pruned Docker image installed this workspace on its own and `tsc` could
+    // not find a type definition file for 'jest'.
     "types": ["node", "jest"]
   },
   // Own source only. A library MUST NOT compile application source — the

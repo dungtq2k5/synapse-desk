@@ -62,6 +62,23 @@ export class QdrantService implements OnApplicationBootstrap {
     await this.ensureCollection();
   }
 
+  /**
+   * Is Qdrant reachable? — 23-doc §2, ingestion-service's readiness.
+   *
+   * **Reuses the client this service already holds**, which is the point: a
+   * probe every five seconds that constructs a client is a connection leak with
+   * a schedule. `collectionExists` is the cheapest call that proves the server
+   * is answering — it touches no vectors and returns a boolean.
+   *
+   * Qdrant is in THIS service's readiness because ingestion genuinely cannot do
+   * its job without it: a document that parses and cannot be upserted is a job
+   * that will fail, and reporting ready would mean accepting work to lose.
+   */
+  async isReachable(): Promise<boolean> {
+    await this.client.collectionExists(QDRANT_COLLECTION);
+    return true;
+  }
+
   async ensureCollection(): Promise<void> {
     const exists = await this.client.collectionExists(QDRANT_COLLECTION);
 

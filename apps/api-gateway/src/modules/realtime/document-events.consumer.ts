@@ -115,6 +115,9 @@ export class DocumentEventsConsumer {
   private relay(pattern: string, emit: () => void): void {
     try {
       emit();
+      // See `TicketEventsConsumer.relay` — counted at the one boundary every
+      // relayed event crosses.
+      this.gateway.countEvent(pattern);
     } catch (error) {
       this.logger.error(`Failed to relay ${pattern}: ${formatErrorMsg(error)}`);
     }

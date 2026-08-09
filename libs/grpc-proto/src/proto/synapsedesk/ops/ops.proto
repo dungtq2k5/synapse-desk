@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package synapsedesk.ops;
+
+// `/version` for a service with no HTTP port — 23-doc §3.
+//
+// **Serve it from EVERY service, not just the gateway.** A rolling deploy where
+// one service lagged is precisely the state this diagnoses, and a gateway-only
+// version endpoint cannot see it — it would report the new SHA while the peer
+// still running the old code is the one causing the incident.
+//
+// A separate package from `grpc.health.v1` because that one is a copied
+// standard: adding a method to it would make the file no longer be the standard
+// while still claiming its package name, and the next person to re-copy the
+// upstream file would silently delete this.
+message VersionRequest {}
+
+message VersionResponse {
+  string version = 1;
+  string sha = 2;
+  string built_at = 3;
+}
+
+service OpsService {
+  rpc GetVersion(VersionRequest) returns (VersionResponse);
+}

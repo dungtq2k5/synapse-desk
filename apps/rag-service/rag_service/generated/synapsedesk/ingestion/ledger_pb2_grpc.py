@@ -44,6 +44,31 @@ class AiLedgerServiceStub:
                 request_serializer=synapsedesk_dot_ingestion_dot_ledger__pb2.RecordGenerationOutcomeRequest.SerializeToString,
                 response_deserializer=synapsedesk_dot_ingestion_dot_ledger__pb2.RecordGenerationOutcomeResponse.FromString,
                 _registered_method=True)
+        self.GetAiUsage = channel.unary_unary(
+                '/synapsedesk.ingestion.AiLedgerService/GetAiUsage',
+                request_serializer=synapsedesk_dot_ingestion_dot_ledger__pb2.AiUsageRequest.SerializeToString,
+                response_deserializer=synapsedesk_dot_ingestion_dot_ledger__pb2.AiUsageResponse.FromString,
+                _registered_method=True)
+        self.GetKnowledgeGaps = channel.unary_unary(
+                '/synapsedesk.ingestion.AiLedgerService/GetKnowledgeGaps',
+                request_serializer=synapsedesk_dot_ingestion_dot_ledger__pb2.KnowledgeGapsRequest.SerializeToString,
+                response_deserializer=synapsedesk_dot_ingestion_dot_ledger__pb2.KnowledgeGapsResponse.FromString,
+                _registered_method=True)
+        self.GetDocumentAnalytics = channel.unary_unary(
+                '/synapsedesk.ingestion.AiLedgerService/GetDocumentAnalytics',
+                request_serializer=synapsedesk_dot_ingestion_dot_ledger__pb2.DocumentAnalyticsRequest.SerializeToString,
+                response_deserializer=synapsedesk_dot_ingestion_dot_ledger__pb2.DocumentAnalyticsResponse.FromString,
+                _registered_method=True)
+        self.RunAiRollup = channel.unary_unary(
+                '/synapsedesk.ingestion.AiLedgerService/RunAiRollup',
+                request_serializer=synapsedesk_dot_ingestion_dot_ledger__pb2.RunAiRollupRequest.SerializeToString,
+                response_deserializer=synapsedesk_dot_ingestion_dot_ledger__pb2.RunAiRollupResponse.FromString,
+                _registered_method=True)
+        self.GetAiJobHealth = channel.unary_unary(
+                '/synapsedesk.ingestion.AiLedgerService/GetAiJobHealth',
+                request_serializer=synapsedesk_dot_ingestion_dot_ledger__pb2.AiJobHealthRequest.SerializeToString,
+                response_deserializer=synapsedesk_dot_ingestion_dot_ledger__pb2.AiJobHealthResponse.FromString,
+                _registered_method=True)
 
 
 class AiLedgerServiceServicer:
@@ -61,6 +86,37 @@ class AiLedgerServiceServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def GetAiUsage(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetKnowledgeGaps(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetDocumentAnalytics(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def RunAiRollup(self, request, context):
+        """Platform-operated, like the ticket rollup.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetAiJobHealth(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_AiLedgerServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -73,6 +129,31 @@ def add_AiLedgerServiceServicer_to_server(servicer, server):
                     servicer.RecordGenerationOutcome,
                     request_deserializer=synapsedesk_dot_ingestion_dot_ledger__pb2.RecordGenerationOutcomeRequest.FromString,
                     response_serializer=synapsedesk_dot_ingestion_dot_ledger__pb2.RecordGenerationOutcomeResponse.SerializeToString,
+            ),
+            'GetAiUsage': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetAiUsage,
+                    request_deserializer=synapsedesk_dot_ingestion_dot_ledger__pb2.AiUsageRequest.FromString,
+                    response_serializer=synapsedesk_dot_ingestion_dot_ledger__pb2.AiUsageResponse.SerializeToString,
+            ),
+            'GetKnowledgeGaps': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetKnowledgeGaps,
+                    request_deserializer=synapsedesk_dot_ingestion_dot_ledger__pb2.KnowledgeGapsRequest.FromString,
+                    response_serializer=synapsedesk_dot_ingestion_dot_ledger__pb2.KnowledgeGapsResponse.SerializeToString,
+            ),
+            'GetDocumentAnalytics': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetDocumentAnalytics,
+                    request_deserializer=synapsedesk_dot_ingestion_dot_ledger__pb2.DocumentAnalyticsRequest.FromString,
+                    response_serializer=synapsedesk_dot_ingestion_dot_ledger__pb2.DocumentAnalyticsResponse.SerializeToString,
+            ),
+            'RunAiRollup': grpc.unary_unary_rpc_method_handler(
+                    servicer.RunAiRollup,
+                    request_deserializer=synapsedesk_dot_ingestion_dot_ledger__pb2.RunAiRollupRequest.FromString,
+                    response_serializer=synapsedesk_dot_ingestion_dot_ledger__pb2.RunAiRollupResponse.SerializeToString,
+            ),
+            'GetAiJobHealth': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetAiJobHealth,
+                    request_deserializer=synapsedesk_dot_ingestion_dot_ledger__pb2.AiJobHealthRequest.FromString,
+                    response_serializer=synapsedesk_dot_ingestion_dot_ledger__pb2.AiJobHealthResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -129,6 +210,141 @@ class AiLedgerService:
             '/synapsedesk.ingestion.AiLedgerService/RecordGenerationOutcome',
             synapsedesk_dot_ingestion_dot_ledger__pb2.RecordGenerationOutcomeRequest.SerializeToString,
             synapsedesk_dot_ingestion_dot_ledger__pb2.RecordGenerationOutcomeResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetAiUsage(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/synapsedesk.ingestion.AiLedgerService/GetAiUsage',
+            synapsedesk_dot_ingestion_dot_ledger__pb2.AiUsageRequest.SerializeToString,
+            synapsedesk_dot_ingestion_dot_ledger__pb2.AiUsageResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetKnowledgeGaps(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/synapsedesk.ingestion.AiLedgerService/GetKnowledgeGaps',
+            synapsedesk_dot_ingestion_dot_ledger__pb2.KnowledgeGapsRequest.SerializeToString,
+            synapsedesk_dot_ingestion_dot_ledger__pb2.KnowledgeGapsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetDocumentAnalytics(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/synapsedesk.ingestion.AiLedgerService/GetDocumentAnalytics',
+            synapsedesk_dot_ingestion_dot_ledger__pb2.DocumentAnalyticsRequest.SerializeToString,
+            synapsedesk_dot_ingestion_dot_ledger__pb2.DocumentAnalyticsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def RunAiRollup(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/synapsedesk.ingestion.AiLedgerService/RunAiRollup',
+            synapsedesk_dot_ingestion_dot_ledger__pb2.RunAiRollupRequest.SerializeToString,
+            synapsedesk_dot_ingestion_dot_ledger__pb2.RunAiRollupResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetAiJobHealth(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/synapsedesk.ingestion.AiLedgerService/GetAiJobHealth',
+            synapsedesk_dot_ingestion_dot_ledger__pb2.AiJobHealthRequest.SerializeToString,
+            synapsedesk_dot_ingestion_dot_ledger__pb2.AiJobHealthResponse.FromString,
             options,
             channel_credentials,
             insecure,

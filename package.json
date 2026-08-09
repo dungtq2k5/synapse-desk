@@ -31,7 +31,7 @@
     "lint": "npm run lint:models && turbo run lint",
     "lint:models": "node scripts/check-model-literals.mjs",
     "lint:fix": "turbo run lint -- --fix",
-    "lint:py": "cd apps/rag-service && .venv/bin/ruff check rag_service tests scripts eval",
+    "lint:py": "cd apps/rag-service && .venv/bin/ruff check rag_service tests scripts eval && .venv/bin/python scripts/check-imports.py",
     "lint:py:fix": "cd apps/rag-service && .venv/bin/ruff check rag_service tests scripts eval --fix",
     "format": "prettier --write \"{apps,libs,scripts}/**/*.{ts,mjs,json}\" \"*.{ts,mjs,json,yaml}\"",
     "format:check": "prettier --check \"{apps,libs,scripts}/**/*.{ts,mjs,json}\" \"*.{ts,mjs,json,yaml}\"",

@@ -3,6 +3,7 @@ import {
   checkStaleness,
   JobHeartbeat,
   RequestContext,
+  RequestOrigin,
   SCHEDULED_JOBS,
   ScheduledJobName,
 } from '@synapsedesk/common';
@@ -60,7 +61,12 @@ export class PlatformJobsService {
    * a clean bill of health for a service whose scheduler was never wired, which
    * is precisely what happened for two domains.
    */
-  async health(context: RequestContext): Promise<JobHealthResponseDto> {
+  async health(
+    // `RequestOrigin` too, not just `RequestContext` — 23-doc §4. The Prometheus
+    // scrape reads the same heartbeats and has no user, and inventing one would
+    // put a fake actor in the audit trail of a read that nobody performed.
+    context: RequestContext | RequestOrigin,
+  ): Promise<JobHealthResponseDto> {
     // Three legs, because the heartbeat table lives in each service's own
     // database — auth-service joined them when it moved off `@nestjs/schedule`
     // (20-doc §3.2).

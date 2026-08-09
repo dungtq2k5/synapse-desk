@@ -11,6 +11,7 @@ import { DocumentsModule } from './modules/documents/documents.module';
 import { IngestionModule } from './modules/ingestion/ingestion.module';
 import { ScheduledModule } from './modules/scheduled/scheduled.module';
 import { SchedulerModule } from './modules/scheduler/scheduler.module';
+import { OpsModule } from './modules/ops/ops.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { SchedulerModule } from './modules/scheduler/scheduler.module';
     IngestionModule,
     ScheduledModule,
     SchedulerModule,
+    OpsModule,
   ],
 })
 export class AppModule {}

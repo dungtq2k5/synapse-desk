@@ -19,6 +19,23 @@ from typing import Protocol
 import asyncpg
 import grpc
 import redis.asyncio as redis
+
+# **`_async` is UNTYPED and stays that way**, unlike its siblings below.
+#
+# `types-grpcio-health-checking` stubs `health`, `health_pb2` and
+# `health_pb2_grpc` — it ships no `_async.pyi`, and `grpc_health` has no
+# `py.typed`, so this module is invisible to a checker whatever is installed.
+#
+# **Do not "fix" it by importing the stubbed `health.HealthServicer` instead.**
+# That is the THREADED implementation: its `set()` is synchronous and its
+# `Check` blocks a thread this `grpc.aio` server does not have. The stub would
+# make that swap type-check cleanly while breaking the health service at
+# runtime — a green checker paying for a probe timeout, which reads as the
+# process being unhealthy.
+from grpc_health.v1 import _async as health_aio
+
+# Typed, via `types-grpcio-health-checking` in `requirements-dev.txt`.
+from grpc_health.v1 import health_pb2, health_pb2_grpc
 from qdrant_client import AsyncQdrantClient
 
 from rag_service.common.caller_context import MissingTenantError, require_tenant
@@ -26,6 +43,7 @@ from rag_service.common.metadata import unpack_caller_context
 from rag_service.config import Config, load_config
 from rag_service.embeddings import EmbeddingClient, GeminiEmbeddingClient
 from rag_service.enums import AiGenerationPurpose
+from rag_service.generated.synapsedesk.ops import ops_pb2, ops_pb2_grpc
 from rag_service.generated.synapsedesk.rag import rag_pb2, rag_pb2_grpc
 from rag_service.generation.copilot import CopilotService
 from rag_service.generation.corag import (
@@ -652,6 +670,107 @@ async def build_dependencies(config: Config) -> Dependencies:
     )
 
 
+#: The sub-service name a READINESS probe asks for — matches
+#: `READINESS_SERVICE` in `libs/grpc-proto/src/constants.ts`. `""` is the
+#: standard's "the server as a whole" and is what a liveness probe sends, so one
+#: port answers two genuinely different questions.
+READINESS_SERVICE = "readiness"
+
+#: How long the whole readiness sweep may take. A dependency that has stopped
+#: answering usually accepts the connection and never replies, so an unbounded
+#: check would hold the refresh loop open indefinitely and leave the cached
+#: status stale at whatever it last was — reporting SERVING throughout an outage.
+READINESS_TIMEOUT_SECONDS = 2.0
+
+#: How often the cached status is recomputed. Half the TTL a kubelet would
+#: tolerate, so a genuine failure is visible within one probe interval.
+READINESS_REFRESH_SECONDS = 5.0
+
+
+class OpsServicer(ops_pb2_grpc.OpsServiceServicer):
+    """`/version` for the Python peer — 23-doc §3.
+
+    **Every service serves it, not just the gateway.** A rolling deploy where one
+    service lagged is exactly the state this diagnoses, and a gateway-only
+    version endpoint reports the new SHA while the peer still running the old
+    code is the one causing the incident.
+
+    Read from the environment, never from git: a container has no `.git`, so a
+    runtime lookup returns nothing and the natural fallback is `"unknown"` — the
+    answer you get at exactly the moment you need the real one. The Dockerfile's
+    `test -n "$GIT_SHA"` guard is what makes the environment reliable.
+    """
+
+    async def GetVersion(
+        self,
+        request: ops_pb2.VersionRequest,
+        context: grpc.aio.ServicerContext,
+    ) -> ops_pb2.VersionResponse:
+        return ops_pb2.VersionResponse(
+            version=os.environ.get("APP_VERSION", ""),
+            sha=os.environ.get("BUILD_SHA", ""),
+            built_at=os.environ.get("BUILD_TIME", ""),
+        )
+
+
+async def _readiness_status(deps: Dependencies) -> health_pb2.HealthCheckResponse.ServingStatus:
+    """What this service OWNS: Qdrant, Postgres, Redis — 23-doc §2.
+
+    **No peer is checked**, and that is the rule rather than an omission. This
+    service is called by the gateway and calls ingestion-service's ledger; making
+    either part of readiness would let one service's database failure take this
+    one out of rotation too, which is §1's cascade one level down.
+
+    Every probe is bounded and reuses a connection the process already holds. A
+    probe every five seconds that dials is a connection leak with a schedule.
+    """
+    async def qdrant_ok() -> bool:
+        await deps.qdrant.get_collections()
+        return True
+
+    async def postgres_ok() -> bool:
+        async with deps.pool.acquire() as connection:
+            await connection.execute("SELECT 1")
+        return True
+
+    async def redis_ok() -> bool:
+        return bool(await deps.redis.ping())
+
+    checks = (qdrant_ok(), postgres_ok(), redis_ok())
+    try:
+        results = await asyncio.wait_for(
+            asyncio.gather(*checks, return_exceptions=True),
+            timeout=READINESS_TIMEOUT_SECONDS,
+        )
+    except asyncio.TimeoutError:
+        return health_pb2.HealthCheckResponse.NOT_SERVING
+
+    if all(result is True for result in results):
+        return health_pb2.HealthCheckResponse.SERVING
+
+    for name, result in zip(("qdrant", "postgres", "redis"), results, strict=True):
+        if result is not True:
+            logger.warning("Readiness: %s is not available (%s)", name, result)
+
+    return health_pb2.HealthCheckResponse.NOT_SERVING
+
+
+async def _refresh_readiness(deps: Dependencies, servicer: health_aio.HealthServicer) -> None:
+    """Keeps the health servicer's cached status current.
+
+    **The status is PUSHED on a timer rather than computed inside `Check`.**
+    `grpc_health.v1.health.HealthServicer` answers from a stored value, which is
+    the shape the standard implementation has — and it is the right one here for
+    a second reason: a probe that ran three network checks inline would let a
+    slow dependency turn every readiness call into a timeout, on a path the
+    kubelet calls every few seconds per pod.
+    """
+    while True:
+        status_now = await _readiness_status(deps)
+        await servicer.set(READINESS_SERVICE, status_now)
+        await asyncio.sleep(READINESS_REFRESH_SECONDS)
+
+
 async def serve() -> None:
     logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO"))
 
@@ -665,14 +784,50 @@ async def serve() -> None:
 
     server = grpc.aio.server()
     rag_pb2_grpc.add_RagServiceServicer_to_server(RagServicer(deps), server)
+
+    # The ops surface, on the SAME port — 23-doc §2, §3. No HTTP listener and no
+    # second port: the kubelet probes `grpc.health.v1.Health` natively.
+    #
+    #   livenessProbe:  { grpc: { port: 50054, service: "" } }
+    #   readinessProbe: { grpc: { port: 50054, service: "readiness" } }
+    # The ASYNC servicer, not `grpc_health.v1.health.HealthServicer`. That one
+    # is the threaded implementation: its `set()` is synchronous and its `Check`
+    # blocks a thread this server does not have, because everything here runs on
+    # `grpc.aio`. The mistake is silent in Python and produces a health service
+    # that misbehaves under the async server — which reads as a probe timeout,
+    # i.e. as the process being unhealthy.
+    #
+    # Imported from `_async` rather than through `health.aio`: the alias exists
+    # (`health.py` does `from . import _async as aio`) but it is an
+    # `unused-import` re-export that type checkers do not see through.
+    health_servicer = health_aio.HealthServicer()
+    # `""` is the standard's "the server as a whole" — liveness. Set SERVING
+    # once and never reconsidered: if this process can answer at all it is
+    # alive, and anything else it might check is a reason to route traffic
+    # away, not a reason for the kubelet to kill it.
+    await health_servicer.set("", health_pb2.HealthCheckResponse.SERVING)
+    await health_servicer.set(
+        READINESS_SERVICE, health_pb2.HealthCheckResponse.NOT_SERVING
+    )
+    health_pb2_grpc.add_HealthServicer_to_server(health_servicer, server)
+    ops_pb2_grpc.add_OpsServiceServicer_to_server(OpsServicer(), server)
+
     server.add_insecure_port(f"{config.grpc_host}:{config.grpc_port}")
 
     await server.start()
+    readiness_task = asyncio.create_task(_refresh_readiness(deps, health_servicer))
     logger.info("🧠 [RAG Service] gRPC server listening on %s:%s", config.grpc_host, config.grpc_port)
 
     try:
         await server.wait_for_termination()
     finally:
+        readiness_task.cancel()
+        # Readiness goes red BEFORE the port closes, so the load balancer stops
+        # sending work this process will not finish. Without it every rolling
+        # deploy is a small burst of failed requests.
+        await health_servicer.set(
+            READINESS_SERVICE, health_pb2.HealthCheckResponse.NOT_SERVING
+        )
         # Drains in-flight ledger writes before the process goes. Without it a
         # graceful shutdown drops exactly the rows recording the last requests
         # before it — the ones most likely to be under investigation.

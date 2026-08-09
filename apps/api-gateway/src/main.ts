@@ -1,5 +1,7 @@
 import { NestFactory, Reflector } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { OPS_ROUTES } from './modules/health/ops-routes';
+import { MetricsServer } from './modules/metrics/metrics.server';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestExpressApplication } from '@nestjs/platform-express';
@@ -55,7 +57,7 @@ async function bootstrap() {
 
   // Set global prefix for all routes
   const globalPrefix = configService.getOrThrow<string>('GLOBAL_PREFIX');
-  app.setGlobalPrefix(globalPrefix);
+  app.setGlobalPrefix(globalPrefix, { exclude: OPS_ROUTES });
 
   // Enable cookie parser (cookieParser is a factory — it must be invoked)
   app.use(cookieParser());
@@ -124,6 +126,15 @@ async function bootstrap() {
     createNatsTransport(configService),
   );
   await app.startAllMicroservices();
+
+  // The metrics listener, BEFORE the public one — 23-doc §4. A scraper that
+  // finds the app serving traffic and the metrics port refused would report a
+  // scrape failure for a process that is perfectly healthy.
+  //
+  // A separate listener rather than a route: it is what makes "not reachable
+  // from the internet" a property of this process rather than of an Nginx
+  // config living in another repository.
+  await app.get(MetricsServer).listen();
 
   const port = configService.getOrThrow<number>('PORT');
   await app.listen(port);

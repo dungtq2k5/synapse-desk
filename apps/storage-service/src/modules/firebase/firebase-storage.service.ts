@@ -33,6 +33,7 @@ export class FirebaseStorageService implements OnModuleInit {
 
   private app!: App;
   private bucketHandle!: Bucket;
+  private keyPath = '';
 
   constructor(private readonly configService: ConfigService) {}
 
@@ -43,6 +44,9 @@ export class FirebaseStorageService implements OnModuleInit {
         'FIREBASE_STORAGE_SERVICE_ACCOUNT_PATH',
       ),
     );
+    // Retained for `isConfigured()`, so the readiness probe can notice a
+    // credential that was rotated out from under a running process.
+    this.keyPath = keyPath;
     const bucketName = this.configService.getOrThrow<string>(
       'FIREBASE_STORAGE_BUCKET',
     );
@@ -82,5 +86,24 @@ export class FirebaseStorageService implements OnModuleInit {
 
   get bucket(): Bucket {
     return this.bucketHandle;
+  }
+
+  /**
+   * Readiness, WITHOUT a network call — 23-doc §2.
+   *
+   * The tempting probe is `bucket.exists()`, and it is wrong twice over: it
+   * bills a GCS operation every five seconds per pod, and it makes Google's
+   * availability decide whether this service is in rotation. A storage outage
+   * is something to report on the request that hits it, not a reason to remove
+   * an instance that would serve the next request perfectly well once GCS
+   * returns.
+   *
+   * So this asserts what the SERVICE controls: that `onModuleInit` completed
+   * and the credential is still on disk. The second half is not redundant — a
+   * secret rotated out from under a running pod produces signing failures that
+   * are otherwise invisible until a user reports a broken download.
+   */
+  isConfigured(): boolean {
+    return Boolean(this.bucketHandle) && existsSync(this.keyPath);
   }
 }

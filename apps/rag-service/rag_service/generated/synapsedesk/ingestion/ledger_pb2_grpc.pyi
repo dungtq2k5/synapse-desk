@@ -33,12 +33,24 @@ class AiLedgerServiceStub:
     def __new__(cls, channel: _aio.Channel) -> AiLedgerServiceAsyncStub: ...
     RecordGeneration: _grpc.UnaryUnaryMultiCallable[_ledger_pb2.RecordGenerationRequest, _ledger_pb2.RecordGenerationResponse]
     RecordGenerationOutcome: _grpc.UnaryUnaryMultiCallable[_ledger_pb2.RecordGenerationOutcomeRequest, _ledger_pb2.RecordGenerationOutcomeResponse]
+    GetAiUsage: _grpc.UnaryUnaryMultiCallable[_ledger_pb2.AiUsageRequest, _ledger_pb2.AiUsageResponse]
+    GetKnowledgeGaps: _grpc.UnaryUnaryMultiCallable[_ledger_pb2.KnowledgeGapsRequest, _ledger_pb2.KnowledgeGapsResponse]
+    GetDocumentAnalytics: _grpc.UnaryUnaryMultiCallable[_ledger_pb2.DocumentAnalyticsRequest, _ledger_pb2.DocumentAnalyticsResponse]
+    RunAiRollup: _grpc.UnaryUnaryMultiCallable[_ledger_pb2.RunAiRollupRequest, _ledger_pb2.RunAiRollupResponse]
+    """Platform-operated, like the ticket rollup."""
+    GetAiJobHealth: _grpc.UnaryUnaryMultiCallable[_ledger_pb2.AiJobHealthRequest, _ledger_pb2.AiJobHealthResponse]
 
 @_typing.type_check_only
 class AiLedgerServiceAsyncStub(AiLedgerServiceStub):
     def __init__(self, channel: _aio.Channel) -> None: ...
     RecordGeneration: _aio.UnaryUnaryMultiCallable[_ledger_pb2.RecordGenerationRequest, _ledger_pb2.RecordGenerationResponse]  # type: ignore[assignment]
     RecordGenerationOutcome: _aio.UnaryUnaryMultiCallable[_ledger_pb2.RecordGenerationOutcomeRequest, _ledger_pb2.RecordGenerationOutcomeResponse]  # type: ignore[assignment]
+    GetAiUsage: _aio.UnaryUnaryMultiCallable[_ledger_pb2.AiUsageRequest, _ledger_pb2.AiUsageResponse]  # type: ignore[assignment]
+    GetKnowledgeGaps: _aio.UnaryUnaryMultiCallable[_ledger_pb2.KnowledgeGapsRequest, _ledger_pb2.KnowledgeGapsResponse]  # type: ignore[assignment]
+    GetDocumentAnalytics: _aio.UnaryUnaryMultiCallable[_ledger_pb2.DocumentAnalyticsRequest, _ledger_pb2.DocumentAnalyticsResponse]  # type: ignore[assignment]
+    RunAiRollup: _aio.UnaryUnaryMultiCallable[_ledger_pb2.RunAiRollupRequest, _ledger_pb2.RunAiRollupResponse]  # type: ignore[assignment]
+    """Platform-operated, like the ticket rollup."""
+    GetAiJobHealth: _aio.UnaryUnaryMultiCallable[_ledger_pb2.AiJobHealthRequest, _ledger_pb2.AiJobHealthResponse]  # type: ignore[assignment]
 
 class AiLedgerServiceServicer(metaclass=_abc_1.ABCMeta):
     @_abc_1.abstractmethod
@@ -54,5 +66,41 @@ class AiLedgerServiceServicer(metaclass=_abc_1.ABCMeta):
         request: _ledger_pb2.RecordGenerationOutcomeRequest,
         context: _ServicerContext,
     ) -> _typing.Union[_ledger_pb2.RecordGenerationOutcomeResponse, _abc.Awaitable[_ledger_pb2.RecordGenerationOutcomeResponse]]: ...
+
+    @_abc_1.abstractmethod
+    def GetAiUsage(
+        self,
+        request: _ledger_pb2.AiUsageRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_ledger_pb2.AiUsageResponse, _abc.Awaitable[_ledger_pb2.AiUsageResponse]]: ...
+
+    @_abc_1.abstractmethod
+    def GetKnowledgeGaps(
+        self,
+        request: _ledger_pb2.KnowledgeGapsRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_ledger_pb2.KnowledgeGapsResponse, _abc.Awaitable[_ledger_pb2.KnowledgeGapsResponse]]: ...
+
+    @_abc_1.abstractmethod
+    def GetDocumentAnalytics(
+        self,
+        request: _ledger_pb2.DocumentAnalyticsRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_ledger_pb2.DocumentAnalyticsResponse, _abc.Awaitable[_ledger_pb2.DocumentAnalyticsResponse]]: ...
+
+    @_abc_1.abstractmethod
+    def RunAiRollup(
+        self,
+        request: _ledger_pb2.RunAiRollupRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_ledger_pb2.RunAiRollupResponse, _abc.Awaitable[_ledger_pb2.RunAiRollupResponse]]:
+        """Platform-operated, like the ticket rollup."""
+
+    @_abc_1.abstractmethod
+    def GetAiJobHealth(
+        self,
+        request: _ledger_pb2.AiJobHealthRequest,
+        context: _ServicerContext,
+    ) -> _typing.Union[_ledger_pb2.AiJobHealthResponse, _abc.Awaitable[_ledger_pb2.AiJobHealthResponse]]: ...
 
 def add_AiLedgerServiceServicer_to_server(servicer: AiLedgerServiceServicer, server: _typing.Union[_grpc.Server, _aio.Server]) -> None: ...

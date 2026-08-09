@@ -22,6 +22,7 @@ import {
   TICKET_GRPC_CLIENT,
 } from '@synapsedesk/grpc-proto';
 import { AppModule } from '../../src/app.module';
+import { OPS_ROUTES } from '../../src/modules/health/ops-routes';
 import { RedisIoAdapter } from '../../src/common/adapters/redis-io.adapter';
 import { GrpcStubs, stubGrpcServices } from './grpc-stub';
 import { ACCESS_COOKIE, buildJwtPayload } from './auth';
@@ -97,7 +98,9 @@ export async function bootstrapRealtimeTest(
   const configService = app.get(ConfigService);
 
   app.set('trust proxy', 1);
-  app.setGlobalPrefix(configService.getOrThrow<string>('GLOBAL_PREFIX'));
+  app.setGlobalPrefix(configService.getOrThrow<string>('GLOBAL_PREFIX'), {
+    exclude: OPS_ROUTES,
+  });
   app.use(cookieParser());
 
   // **The SAME global pipe `main.ts` installs**, and it matters more than it
