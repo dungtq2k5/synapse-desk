@@ -23,7 +23,7 @@ import {
   MAX_DOCUMENT_TITLE_LENGTH,
   trimIfString,
 } from '@synapsedesk/common';
-import { SearchPaginationBase } from '../../../../common/dto/base/search-pagination-base.dto';
+import { SearchPaginationDto } from '../../../../common/dto/rest/search-pagination.dto';
 import { ToBoolean } from '../../../../common/decorators/to-boolean.decorator';
 import { MAX_DOCUMENT_DEPARTMENTS } from '../../../../common/config/dto.config';
 
@@ -127,7 +127,7 @@ export class SetDocumentDepartmentsDto {
   readonly departmentIds!: string[];
 }
 
-export class ListDocumentsQueryDto extends SearchPaginationBase {
+export class ListDocumentsQueryDto extends SearchPaginationDto {
   @IsOptional()
   @IsIn(DOCUMENT_STATUSES)
   readonly status?: DocumentStatus;
@@ -155,7 +155,7 @@ export class ListDocumentsQueryDto extends SearchPaginationBase {
  * the first, and a filter that offered only `UNCITED` would quietly re-merge
  * them: the type nobody can select is the type nobody sees.
  */
-export class ListDocumentFlagsQueryDto extends SearchPaginationBase {
+export class ListDocumentFlagsQueryDto extends SearchPaginationDto {
   // `detectedAt`, because the base default is `createdAt` and the service
   // allowlists exactly one sortable column here. Left unoverridden, a request
   // with NO query parameters at all — every default call from the UI — would

@@ -34,7 +34,7 @@ import {
   PreviewInvitationsDto,
   PreviewInvitationsResponseDto,
 } from './dto/rest/invitation.dto';
-import { PaginationResponseBase } from '../../common/dto/base/pagination-response-base.dto';
+import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
 import { LoginResponseDto } from '../auth/dto/rest/login.dto';
 import { Throttle } from '@nestjs/throttler';
 import {
@@ -80,11 +80,6 @@ export class InvitationsController {
     status: HttpStatus.CREATED,
   })
   @ApiFilterErrors(['400', '401', '403'])
-  @ApiOperation({ summary: 'Create' })
-  @ApiWrappedResponse(CreateInvitationsResponseDto, {
-    status: HttpStatus.CREATED,
-  })
-  @ApiFilterErrors(['400', '401', '403'])
   @Post()
   @UseGuards(JwtAuthGuard, EmailVerifiedGuard, PermissionGuard)
   @RequirePermission('user.invite')
@@ -113,16 +108,13 @@ export class InvitationsController {
   @ApiOperation({ summary: 'List invitations' })
   @ApiWrappedResponse(Paginated(InvitationResponseDto))
   @ApiFilterErrors(['401', '403'])
-  @ApiOperation({ summary: 'List invitations' })
-  @ApiWrappedResponse(Paginated(InvitationResponseDto))
-  @ApiFilterErrors(['401', '403'])
   @Get()
   @UseGuards(JwtAuthGuard, PermissionGuard)
   @RequirePermission('user.read')
   async list(
     @CurrentUser() context: RequestContext,
     @Query() query: ListInvitationsQueryDto,
-  ): Promise<PaginationResponseBase<InvitationResponseDto>> {
+  ): Promise<PaginationResponseDto<InvitationResponseDto>> {
     // The envelope is built by the SERVICE now, via the shared PageMeta —
     // this used to recompute it here from `totalItems`, which meant the page
     // maths existed twice and only one copy honoured the service-side clamp.
@@ -136,9 +128,6 @@ export class InvitationsController {
   /** Rotates the token — the previous link stops working immediately. */
   @AuthThrottle()
   @Throttle({ [AUTH_THROTTLER_TIER]: ROUTE_THROTTLE.invitationResend })
-  @ApiOperation({ summary: 'Resend' })
-  @ApiWrappedResponse(InvitationResponseDto)
-  @ApiFilterErrors(['400', '401', '403', '404'])
   @ApiOperation({ summary: 'Resend' })
   @ApiWrappedResponse(InvitationResponseDto)
   @ApiFilterErrors(['400', '401', '403', '404'])
@@ -159,9 +148,6 @@ export class InvitationsController {
     );
   }
 
-  @ApiOperation({ summary: 'Revoke' })
-  @ApiWrappedResponse()
-  @ApiFilterErrors(['400', '401', '403', '404'])
   @ApiOperation({ summary: 'Revoke' })
   @ApiWrappedResponse()
   @ApiFilterErrors(['400', '401', '403', '404'])
@@ -205,12 +191,6 @@ export class InvitationsController {
   })
   @ApiWrappedResponse(PreviewInvitationResponseDto)
   @ApiFilterErrors(['401', '404'])
-  @ApiOperation({
-    summary: 'Public preview',
-    security: [],
-  })
-  @ApiWrappedResponse(PreviewInvitationResponseDto)
-  @ApiFilterErrors(['401', '404'])
   @Get('token/:token')
   previewByToken(
     @Param('token') token: string,
@@ -228,12 +208,6 @@ export class InvitationsController {
    * already signed in would silently replace the current session.
    */
   @OrgAccessKind(OrgAccess.AUTH)
-  @ApiOperation({
-    summary: 'Redeem',
-    security: [],
-  })
-  @ApiWrappedResponse(LoginResponseDto)
-  @ApiFilterErrors(['400', '401'])
   @ApiOperation({
     summary: 'Redeem',
     security: [],
@@ -277,12 +251,6 @@ export class InvitationsController {
   })
   @ApiWrappedResponse(PreviewInvitationsResponseDto)
   @ApiFilterErrors(['400', '401', '403'])
-  @ApiOperation({
-    summary:
-      'Dry-run a list before sending: flags addresses already in this tenant, malformed addresses, unknown role/department ids, and projected seat overrun',
-  })
-  @ApiWrappedResponse(PreviewInvitationsResponseDto)
-  @ApiFilterErrors(['400', '401', '403'])
   @Post('preview')
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard, PermissionGuard)
@@ -304,9 +272,6 @@ export class InvitationsController {
    *
    * Declared AFTER `token/:token` and `preview`, so those literals win.
    */
-  @ApiOperation({ summary: 'Single invitation detail incl' })
-  @ApiWrappedResponse(InvitationResponseDto)
-  @ApiFilterErrors(['400', '401', '403', '404'])
   @ApiOperation({ summary: 'Single invitation detail incl' })
   @ApiWrappedResponse(InvitationResponseDto)
   @ApiFilterErrors(['400', '401', '403', '404'])

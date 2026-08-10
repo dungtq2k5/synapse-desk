@@ -12,9 +12,6 @@ import { TicketRollupJob } from '../../src/modules/analytics/ticket-rollup.job';
 import { AuthReferenceService } from '../../src/modules/auth-client/auth-reference.service';
 import { StorageReferenceService } from '../../src/modules/storage-client/storage-reference.service';
 
-const OBJECT_PATH = 'organizations/o/exports/e/analytics.csv';
-const DOWNLOAD_URL = 'https://storage.example/signed-get';
-
 /**
  * 19-doc §5 — the async export.
  *
@@ -40,10 +37,76 @@ describe('§5 The analytics export (e2e)', () => {
 
   let tenant: TenantFixture;
 
+  const OBJECT_PATH = 'organizations/o/exports/e/analytics.csv';
+  const DOWNLOAD_URL = 'https://storage.example/signed-get';
+
   const caller = (t = tenant) =>
     memberContext({ id: t.agentId, organizationId: t.organizationId }, [
       'analytics.read',
     ]);
+
+  const at = (iso: string) => new Date(iso);
+
+  const request = (overrides = {}) =>
+    facade.create(
+      {
+        kind: AnalyticsExportKind.TICKET_DAILY,
+        from: '2026-03-01',
+        to: '2026-03-31',
+        ...overrides,
+      },
+      caller(),
+    );
+
+  /** Seeds a rollup row so there is something to export. */
+  const seedRollup = async () => {
+    await createTicket(fx.prisma, tenant, {
+      createdAt: at('2026-03-02T09:00:00.000Z'),
+    });
+    await rollup.backfill(
+      at('2026-03-01T00:00:00.000Z'),
+      at('2026-03-05T00:00:00.000Z'),
+    );
+  };
+
+  /**
+   * A `fetch` that records the PUT body and succeeds.
+   *
+   * Re-installed every test rather than once: a test that replaces it to
+   * simulate a rejected upload would otherwise leave the replacement in place
+   * for every test after it — which is precisely how test 13 first failed, on
+   * an error test 12 had injected.
+   */
+  /** The default upload result: a plain 200. */
+  type UploadResult = { ok: boolean; status: number; statusText: string };
+
+  const OK_UPLOAD: UploadResult = { ok: true, status: 200, statusText: 'OK' };
+
+  const stubUpload = (
+    // Named, not an inline literal. A literal default is re-evaluated per call,
+    // so every caller silently gets its OWN object — which reads as a shared
+    // default and is not one. That difference is invisible until something
+    // mutates it, and then the test that mutated it passes while the next one
+    // fails for a reason that points nowhere near the mutation.
+    response: UploadResult = OK_UPLOAD,
+  ) => {
+    global.fetch = jest.fn((_url: unknown, init?: { body?: unknown }) => {
+      if (response.ok) {
+        uploadedBodies.push(
+          Buffer.from(init?.body as Uint8Array).toString('utf8'),
+        );
+      }
+
+      return Promise.resolve(response);
+    }) as unknown as typeof fetch;
+  };
+
+  /** Runs the worker for the one queued export. */
+  const runWorker = (exportId: string) =>
+    processor.process({
+      name: 'generate-export',
+      data: { exportId },
+    } as never);
 
   beforeAll(async () => {
     fx = await bootstrapE2eTest();
@@ -86,59 +149,6 @@ describe('§5 The analytics export (e2e)', () => {
   });
 
   afterAll(() => fx.close());
-
-  const at = (iso: string) => new Date(iso);
-
-  const request = (overrides = {}) =>
-    facade.create(
-      {
-        kind: AnalyticsExportKind.TICKET_DAILY,
-        from: '2026-03-01',
-        to: '2026-03-31',
-        ...overrides,
-      },
-      caller(),
-    );
-
-  /** Seeds a rollup row so there is something to export. */
-  const seedRollup = async () => {
-    await createTicket(fx.prisma, tenant, {
-      createdAt: at('2026-03-02T09:00:00.000Z'),
-    });
-    await rollup.backfill(
-      at('2026-03-01T00:00:00.000Z'),
-      at('2026-03-05T00:00:00.000Z'),
-    );
-  };
-
-  /**
-   * A `fetch` that records the PUT body and succeeds.
-   *
-   * Re-installed every test rather than once: a test that replaces it to
-   * simulate a rejected upload would otherwise leave the replacement in place
-   * for every test after it — which is precisely how test 13 first failed, on
-   * an error test 12 had injected.
-   */
-  const stubUpload = (
-    response = { ok: true, status: 200, statusText: 'OK' },
-  ) => {
-    global.fetch = jest.fn((_url: unknown, init?: { body?: unknown }) => {
-      if (response.ok) {
-        uploadedBodies.push(
-          Buffer.from(init?.body as Uint8Array).toString('utf8'),
-        );
-      }
-
-      return Promise.resolve(response);
-    }) as unknown as typeof fetch;
-  };
-
-  /** Runs the worker for the one queued export. */
-  const runWorker = (exportId: string) =>
-    processor.process({
-      name: 'generate-export',
-      data: { exportId },
-    } as never);
 
   describe('the job', () => {
     it('1. Returns a job id IMMEDIATELY; the file appears later', async () => {

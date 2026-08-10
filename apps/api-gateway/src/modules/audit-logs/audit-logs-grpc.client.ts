@@ -4,15 +4,15 @@ import {
   AUDIT_SERVICE_NAME,
   AuditLogResponse,
   AuditServiceClient,
-  requireTimestamp,
+  requireProtoTimestamp,
   TICKET_GRPC_CLIENT,
   toPageRequest,
-  toTimestamp,
+  toProtoTimestamp,
 } from '@synapsedesk/grpc-proto';
 import { RequestContext } from '@synapsedesk/common';
 import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
-import { PaginationResponseBase } from '../../common/dto/base/pagination-response-base.dto';
-import { toPaginationMeta } from '../../common/mappers/pagination.mapper';
+import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
+import { toPaginationMetaDataResponseDto } from '../../common/mappers/pagination.mapper';
 import { AuditLogResponseDto } from './dto/rest/audit-log-response.dto';
 import { ListAuditLogsQueryDto } from './dto/rest/audit-log.dto';
 
@@ -40,7 +40,7 @@ export class AuditLogsGrpcClient
     query: ListAuditLogsQueryDto,
     context: RequestContext,
     platformScope = false,
-  ): Promise<PaginationResponseBase<AuditLogResponseDto>> {
+  ): Promise<PaginationResponseDto<AuditLogResponseDto>> {
     const response = await this.call(
       (metadata) =>
         this.auditGrpcService.listAuditLogs(
@@ -52,8 +52,8 @@ export class AuditLogsGrpcClient
             userId: query.userId ?? '',
             resourceType: query.resourceType ?? '',
             resourceId: query.resourceId ?? '',
-            from: toTimestamp(query.from ?? null),
-            to: toTimestamp(query.to ?? null),
+            from: toProtoTimestamp(query.from ?? null),
+            to: toProtoTimestamp(query.to ?? null),
             platformScope,
           },
           metadata,
@@ -63,7 +63,7 @@ export class AuditLogsGrpcClient
 
     return {
       items: response.items.map((item) => this.toDto(item)),
-      meta: toPaginationMeta(response.meta),
+      meta: toPaginationMetaDataResponseDto(response.meta),
     };
   }
 
@@ -100,7 +100,7 @@ export class AuditLogsGrpcClient
       ipAddress: log.ipAddress ?? null,
       userAgent: log.userAgent ?? null,
       metadata: this.parseMetadata(log.metadata, log.id),
-      createdAt: requireTimestamp(log.createdAt, 'createdAt'),
+      createdAt: requireProtoTimestamp(log.createdAt, 'createdAt'),
     };
   }
 

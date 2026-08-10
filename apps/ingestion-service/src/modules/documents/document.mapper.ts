@@ -2,12 +2,13 @@ import {
   DocumentChunkResponse,
   DocumentFlagResponse,
   DocumentResponse,
-  toTimestamp,
+  toProtoTimestamp,
 } from '@synapsedesk/grpc-proto';
 import {
   Document,
   DocumentChunk,
   DocumentFlag,
+  Prisma,
 } from '../../generated/prisma/client';
 
 /**
@@ -41,9 +42,9 @@ export function toDocumentResponse(
     status: document.status,
     departmentIds,
     chunkCount,
-    createdAt: toTimestamp(document.createdAt),
-    updatedAt: toTimestamp(document.updatedAt),
-    deletedAt: toTimestamp(document.deletedAt),
+    createdAt: toProtoTimestamp(document.createdAt),
+    updatedAt: toProtoTimestamp(document.updatedAt),
+    deletedAt: toProtoTimestamp(document.deletedAt),
     deletedById: document.deletedById ?? undefined,
   };
 }
@@ -62,7 +63,7 @@ export function toDocumentChunkResponse(
     // meaningful — it means this chunk is not retrievable yet — so it is
     // reported rather than defaulted.
     vectorPointId: chunk.vectorPointId ?? undefined,
-    createdAt: toTimestamp(chunk.createdAt),
+    createdAt: toProtoTimestamp(chunk.createdAt),
   };
 }
 
@@ -84,6 +85,24 @@ export function toDocumentFlagResponse(
     severity: flag.severity,
     detail: flag.detail,
     confidenceScore: flag.confidenceScore ?? undefined,
-    detectedAt: toTimestamp(flag.detectedAt),
+    detectedAt: toProtoTimestamp(flag.detectedAt),
   };
 }
+
+/**
+ * The relations every document read needs, declared ONCE.
+ *
+ * `departmentLinks` is the department half of the visibility answer and
+ * `_count.chunks` is what the UI shows for ingestion progress. Repeating the
+ * shape at each call site is how one query eventually forgets a relation and
+ * returns a document with no departments — which reads as "org-wide" to
+ * anything checking the array.
+ */
+export const DOCUMENT_INCLUDE = {
+  departmentLinks: { select: { departmentId: true } },
+  _count: { select: { chunks: true } },
+} satisfies Prisma.DocumentInclude;
+
+export type DocumentWithScope = Prisma.DocumentGetPayload<{
+  include: typeof DOCUMENT_INCLUDE;
+}>;

@@ -1,7 +1,7 @@
 import {
   AttachmentResponse,
   MessageResponse,
-  toTimestamp,
+  toProtoTimestamp,
 } from '@synapsedesk/grpc-proto';
 import {
   MessageAttachment,
@@ -25,7 +25,7 @@ export function toAttachmentResponse(
     fileUrl: attachment.fileUrl,
     fileSizeBytes: Number(attachment.fileSizeBytes),
     mimeType: attachment.mimeType,
-    createdAt: toTimestamp(attachment.createdAt),
+    createdAt: toProtoTimestamp(attachment.createdAt),
   };
 }
 
@@ -42,9 +42,9 @@ export function toMessageResponse(
     modelName: message.modelName ?? undefined,
     promptTokens: message.promptTokens ?? undefined,
     completionTokens: message.completionTokens ?? undefined,
-    editedAt: toTimestamp(message.editedAt),
-    redactedAt: toTimestamp(message.redactedAt),
-    createdAt: toTimestamp(message.createdAt),
+    editedAt: toProtoTimestamp(message.editedAt),
+    redactedAt: toProtoTimestamp(message.redactedAt),
+    createdAt: toProtoTimestamp(message.createdAt),
     // `?? []` rather than leaving it undefined: proto3 repeated fields are
     // never null, and a caller that fetched without the relation should get an
     // empty list rather than a crash on `.map`.

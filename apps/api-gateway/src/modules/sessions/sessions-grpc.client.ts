@@ -10,16 +10,10 @@ import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
 import {
   RevokeCountResponseDto,
   RevokeTrustResponseDto,
+  RevokeSessionResult,
   SessionResponseDto,
 } from './dto/rest/session.dto';
-import { toSessionDto } from './session.mapper';
-
-/** Whether the revoked family was the caller's own, so the controller knows
- * whether to clear cookies. */
-export type RevokeSessionResult = {
-  wasCurrent: boolean;
-  revokedCount: number;
-};
+import { toSessionResponseDto } from './session.mapper';
 
 @Injectable()
 export class SessionsGrpcClient extends BaseGrpcClient implements OnModuleInit {
@@ -46,7 +40,7 @@ export class SessionsGrpcClient extends BaseGrpcClient implements OnModuleInit {
       context,
     );
 
-    return response.items.map(toSessionDto);
+    return response.items.map(toSessionResponseDto);
   }
 
   revoke(
@@ -92,7 +86,7 @@ export class SessionsGrpcClient extends BaseGrpcClient implements OnModuleInit {
       context,
     );
 
-    return response.items.map(toSessionDto);
+    return response.items.map(toSessionResponseDto);
   }
 
   revokeForUser(

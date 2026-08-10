@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
 import { status } from '@grpc/grpc-js';
 import {
+  ListDepartmentsByIdsRequest,
+  ListDepartmentsByIdsResponse,
   AddDepartmentMembersRequest,
   AddDepartmentMembersResponse,
   CallerContext,
@@ -23,6 +25,8 @@ import {
   toSearchFilter,
 } from '@synapsedesk/grpc-proto';
 import {
+  BATCH_ID_LIMIT,
+  normalizeBatchIds,
   AuditAction,
   AuditResourceType,
   DEPARTMENT_MEMBER_SORTABLE_FIELDS,
@@ -96,6 +100,59 @@ export class DepartmentsService {
       items: items.map(toDepartmentResponse),
       meta: toPageMeta(page, totalItems, items.length),
     };
+  }
+
+  /**
+   * The batch read behind the departments DataLoader — 27-doc §1, §3.
+   *
+   * `Ticket.department`, `Document.departments` and `User.departments` all
+   * traverse to this, which is why it is the second-most-used batch RPC in the
+   * system.
+   *
+   * All six contract properties, and the first is the one that matters most:
+   * **tenant scope comes from the CALLER CONTEXT, never from a request field.**
+   * The id is a loader's cache key and carries no tenant, so this method is the
+   * only thing standing between a uuid and another tenant's department.
+   *
+   * **Soft-deleted departments are returned.** `tenantScope` pins
+   * `deletedAt: null` by default and that is wrong here: a ticket still
+   * referencing a retired department has to render its name, and omitting it
+   * would make the edge null — indistinguishable from a department that never
+   * existed, and shown to the user as a blank.
+   */
+  async listDepartmentsByIds(
+    request: ListDepartmentsByIdsRequest,
+    context: CallerContext,
+  ): Promise<ListDepartmentsByIdsResponse> {
+    const { ids, overLimit } = normalizeBatchIds(request.departmentIds);
+
+    if (overLimit) {
+      // An ERROR rather than a truncation — 27-doc §1, property 5. A truncated
+      // batch is indistinguishable from those rows having been deleted, so the
+      // page renders with silent gaps and nothing reports a problem.
+      throw new RpcException({
+        code: status.INVALID_ARGUMENT,
+        message: `At most ${BATCH_ID_LIMIT} department ids per call`,
+      });
+    }
+
+    if (ids.length === 0) return { items: [] };
+
+    const items = await this.prisma.department.findMany({
+      where: {
+        ...tenantScope(context),
+        // Spread AFTER the scope, or the scope's `deletedAt: null` wins and a
+        // retired department silently disappears from every ticket citing it.
+        deletedAt: undefined,
+        id: { in: ids },
+      },
+      include: DEPARTMENT_INCLUDE,
+    });
+
+    // Returned as a SET, in whatever order the database chose — property 6. The
+    // caller maps it back onto its keys; making this order-preserving would be
+    // a promise every implementation must keep and no test naturally checks.
+    return { items: items.map(toDepartmentResponse) };
   }
 
   async getDepartment(

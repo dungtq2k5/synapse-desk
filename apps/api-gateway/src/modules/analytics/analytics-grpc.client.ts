@@ -1,11 +1,14 @@
 import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ClientGrpc } from '@nestjs/microservices';
 import {
+  UserProjection,
   AI_LEDGER_SERVICE_NAME,
   AiLedgerServiceClient,
   ANALYTICS_SERVICE_NAME,
+  type AnalyticsRangeRequest,
   AnalyticsServiceClient,
-  fromTimestamp,
+  fromProtoTimestamp,
+  type ProtoTimestamp,
   INGESTION_GRPC_CLIENT,
   TICKET_GRPC_CLIENT,
   USER_SERVICE_NAME,
@@ -17,6 +20,7 @@ import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
 import { AnalyticsRangeQueryDto } from './dto/rest/analytics.dto';
 import {
   AiUsageDto,
+  AiUsageSliceDto,
   AnalyticsExportDto,
   DeflectionDto,
   MeanDto,
@@ -86,7 +90,10 @@ export class AnalyticsGrpcClient
   ): Promise<OverviewDto> {
     const response = await this.call(
       (metadata) =>
-        this.analyticsService.getOverview(toRangeRequest(query), metadata),
+        this.analyticsService.getOverview(
+          toAnalyticsRangeRequest(query),
+          metadata,
+        ),
       context,
     );
 
@@ -95,13 +102,13 @@ export class AnalyticsGrpcClient
       ticketsResolved: response.ticketsResolved,
       ticketsEscalated: response.ticketsEscalated,
       openTickets: response.openTickets,
-      deflection: toRate(response.deflection),
-      csat: toRate(response.csat),
-      humanFirstResponseSeconds: toMean(response.humanFirstResponseSeconds),
-      aiFirstResponseSeconds: toMean(response.aiFirstResponseSeconds),
-      resolutionSeconds: toMean(response.resolutionSeconds),
+      deflection: toRateDto(response.deflection),
+      csat: toRateDto(response.csat),
+      humanFirstResponseSeconds: toMeanDto(response.humanFirstResponseSeconds),
+      aiFirstResponseSeconds: toMeanDto(response.aiFirstResponseSeconds),
+      resolutionSeconds: toMeanDto(response.resolutionSeconds),
       openTicketMedianAgeSeconds: response.openTicketMedianAgeSeconds ?? null,
-      computedAt: fromTimestamp(response.computedAt) ?? null,
+      computedAt: fromProtoTimestamp(response.computedAt) ?? null,
       // `?? null` rather than left undefined: the REST contract says the field is
       // always present, and a missing key reads to a client as "this build does
       // not have freshness" rather than "nothing has been rolled up".
@@ -115,18 +122,21 @@ export class AnalyticsGrpcClient
   ): Promise<DeflectionDto> {
     const response = await this.call(
       (metadata) =>
-        this.analyticsService.getDeflection(toRangeRequest(query), metadata),
+        this.analyticsService.getDeflection(
+          toAnalyticsRangeRequest(query),
+          metadata,
+        ),
       context,
     );
 
     return {
       points: response.points.map((point) => ({
         day: point.day,
-        deflection: toRate(point.deflection),
+        deflection: toRateDto(point.deflection),
         chatConversations: point.chatConversations,
         chatResolvedWithoutEscalation: point.chatResolvedWithoutEscalation,
       })),
-      total: toRate(response.total),
+      total: toRateDto(response.total),
       dataThrough: response.dataThrough ?? null,
     };
   }
@@ -137,20 +147,23 @@ export class AnalyticsGrpcClient
   ): Promise<ResponseTimesDto> {
     const response = await this.call(
       (metadata) =>
-        this.analyticsService.getResponseTimes(toRangeRequest(query), metadata),
+        this.analyticsService.getResponseTimes(
+          toAnalyticsRangeRequest(query),
+          metadata,
+        ),
       context,
     );
 
     return {
       points: response.points.map((point) => ({
         day: point.day,
-        humanFirstResponseSeconds: toMean(point.humanFirstResponseSeconds),
-        aiFirstResponseSeconds: toMean(point.aiFirstResponseSeconds),
-        resolutionSeconds: toMean(point.resolutionSeconds),
+        humanFirstResponseSeconds: toMeanDto(point.humanFirstResponseSeconds),
+        aiFirstResponseSeconds: toMeanDto(point.aiFirstResponseSeconds),
+        resolutionSeconds: toMeanDto(point.resolutionSeconds),
       })),
-      humanTotal: toMean(response.humanTotal),
-      aiTotal: toMean(response.aiTotal),
-      resolutionTotal: toMean(response.resolutionTotal),
+      humanTotal: toMeanDto(response.humanTotal),
+      aiTotal: toMeanDto(response.aiTotal),
+      resolutionTotal: toMeanDto(response.resolutionTotal),
       dataThrough: response.dataThrough ?? null,
     };
   }
@@ -161,7 +174,10 @@ export class AnalyticsGrpcClient
   ): Promise<VolumeDto> {
     const response = await this.call(
       (metadata) =>
-        this.analyticsService.getVolume(toRangeRequest(query), metadata),
+        this.analyticsService.getVolume(
+          toAnalyticsRangeRequest(query),
+          metadata,
+        ),
       context,
     );
 
@@ -180,18 +196,21 @@ export class AnalyticsGrpcClient
   ): Promise<SatisfactionDto> {
     const response = await this.call(
       (metadata) =>
-        this.analyticsService.getSatisfaction(toRangeRequest(query), metadata),
+        this.analyticsService.getSatisfaction(
+          toAnalyticsRangeRequest(query),
+          metadata,
+        ),
       context,
     );
 
     return {
       points: response.points.map((point) => ({
         day: point.day,
-        csat: toRate(point.csat),
-        citationAccuracy: toRate(point.citationAccuracy),
+        csat: toRateDto(point.csat),
+        citationAccuracy: toRateDto(point.citationAccuracy),
       })),
-      csatTotal: toRate(response.csatTotal),
-      citationAccuracyTotal: toRate(response.citationAccuracyTotal),
+      csatTotal: toRateDto(response.csatTotal),
+      citationAccuracyTotal: toRateDto(response.citationAccuracyTotal),
       dataThrough: response.dataThrough ?? null,
     };
   }
@@ -219,15 +238,15 @@ export class AnalyticsGrpcClient
         generations: point.generations,
         costMicros: point.costMicros,
       })),
-      byPurpose: response.byPurpose.map(toSlice),
-      byModel: response.byModel.map(toSlice),
+      byPurpose: response.byPurpose.map(toAiUsageSliceDto),
+      byModel: response.byModel.map(toAiUsageSliceDto),
       totalCostMicros: response.totalCostMicros,
       totalGenerations: response.totalGenerations,
       monthlyBudgetMicros: response.monthlyBudgetMicros,
       aiModelTier: response.aiModelTier,
-      draftAcceptance: toRate(response.draftAcceptance),
-      emptyRetrievalRate: toRate(response.emptyRetrievalRate),
-      computedAt: fromTimestamp(response.computedAt) ?? null,
+      draftAcceptance: toRateDto(response.draftAcceptance),
+      emptyRetrievalRate: toRateDto(response.emptyRetrievalRate),
+      computedAt: fromProtoTimestamp(response.computedAt) ?? null,
       dataThrough: response.dataThrough ?? null,
     };
   }
@@ -238,7 +257,7 @@ export class AnalyticsGrpcClient
     dto: { kind: string; from: string; to: string; departmentId?: string },
     context: RequestContext,
   ): Promise<AnalyticsExportDto> {
-    return toExportDto(
+    return toAnalyticsExportDto(
       await this.call(
         (metadata) => this.analyticsService.createExport(dto, metadata),
         context,
@@ -250,7 +269,7 @@ export class AnalyticsGrpcClient
     id: string,
     context: RequestContext,
   ): Promise<AnalyticsExportDto> {
-    return toExportDto(
+    return toAnalyticsExportDto(
       await this.call(
         (metadata) => this.analyticsService.getExport({ id }, metadata),
         context,
@@ -292,7 +311,10 @@ export class AnalyticsGrpcClient
     return this.tryLeg('ticket-service', () =>
       this.call(
         (metadata) =>
-          this.analyticsService.getAgentStats(toRangeRequest(query), metadata),
+          this.analyticsService.getAgentStats(
+            toAnalyticsRangeRequest(query),
+            metadata,
+          ),
         context,
       ),
     );
@@ -351,7 +373,18 @@ export class AnalyticsGrpcClient
       this.call(
         (metadata) =>
           this.userService.listUsersByIds(
-            { organizationId: context.organizationId ?? '', userIds },
+            {
+              organizationId: context.organizationId ?? '',
+              userIds,
+              // **`true` here, unlike the notification caller** — 27-doc §3.
+              // An agent-performance table naming everyone who handled a
+              // ticket last quarter must still name the ones who have since
+              // left; excluding them turns a leaderboard row into a blank.
+              includeInactive: true,
+              // The names only. This path renders a table and has no business
+              // receiving an address it would then have to remember to drop.
+              projection: UserProjection.USER_PROJECTION_SUMMARY,
+            },
             metadata,
           ),
         context,
@@ -360,7 +393,16 @@ export class AnalyticsGrpcClient
   }
 }
 
-function toRangeRequest(query: AnalyticsRangeQueryDto) {
+/**
+ * The REST query -> the proto request every range endpoint takes.
+ *
+ * Annotated rather than inferred: the shape is a CONTRACT with six RPCs, and an
+ * inferred anonymous object silently accepts a renamed or dropped field until
+ * the service reads `undefined` and returns an empty chart.
+ */
+function toAnalyticsRangeRequest(
+  query: AnalyticsRangeQueryDto,
+): AnalyticsRangeRequest {
   return {
     from: query.from,
     to: query.to,
@@ -370,7 +412,7 @@ function toRangeRequest(query: AnalyticsRangeQueryDto) {
 }
 
 /** `undefined` → null, never → 0. A missing rate is not a rate of zero. */
-function toRate(value?: {
+function toRateDto(value?: {
   rate?: number;
   numerator: number;
   denominator: number;
@@ -382,11 +424,11 @@ function toRate(value?: {
   };
 }
 
-function toMean(value?: { mean?: number; count: number }): MeanDto {
+function toMeanDto(value?: { mean?: number; count: number }): MeanDto {
   return { mean: value?.mean ?? null, count: value?.count ?? 0 };
 }
 
-function toSlice(slice: {
+function toAiUsageSliceDto(slice: {
   purpose: string;
   modelName: string;
   generations: number;
@@ -395,7 +437,7 @@ function toSlice(slice: {
   costMicros: number;
   latencyMs?: { mean?: number; count: number };
   failureRate?: { rate?: number; numerator: number; denominator: number };
-}) {
+}): AiUsageSliceDto {
   return {
     purpose: slice.purpose,
     modelName: slice.modelName,
@@ -403,31 +445,40 @@ function toSlice(slice: {
     promptTokens: slice.promptTokens,
     completionTokens: slice.completionTokens,
     costMicros: slice.costMicros,
-    latencyMs: toMean(slice.latencyMs),
-    failureRate: toRate(slice.failureRate),
+    latencyMs: toMeanDto(slice.latencyMs),
+    failureRate: toRateDto(slice.failureRate),
   };
 }
 
-function toExportDto(response: {
+/**
+ * The timestamps are typed, not `unknown`.
+ *
+ * They were declared `unknown` and then handed to `fromProtoTimestamp` through
+ * `as never` — a cast that says "trust me" about the one thing the parameter
+ * type had just refused to state. `ProtoTimestamp` is exported for exactly this,
+ * so naming it costs nothing and makes a wrong wire shape a compile error here
+ * rather than a `new Date(NaN)` in a report.
+ */
+function toAnalyticsExportDto(response: {
   id: string;
   status: string;
   kind: string;
   rowCount?: number;
-  rollupComputedAt?: unknown;
+  rollupComputedAt?: ProtoTimestamp;
   downloadUrl?: string;
   error?: string;
-  createdAt?: unknown;
-  completedAt?: unknown;
+  createdAt?: ProtoTimestamp;
+  completedAt?: ProtoTimestamp;
 }): AnalyticsExportDto {
   return {
     id: response.id,
     status: response.status,
     kind: response.kind,
     rowCount: response.rowCount ?? null,
-    rollupComputedAt: fromTimestamp(response.rollupComputedAt as never) ?? null,
+    rollupComputedAt: fromProtoTimestamp(response.rollupComputedAt) ?? null,
     downloadUrl: response.downloadUrl ?? null,
     error: response.error ?? null,
-    createdAt: fromTimestamp(response.createdAt as never) ?? new Date(0),
-    completedAt: fromTimestamp(response.completedAt as never) ?? null,
+    createdAt: fromProtoTimestamp(response.createdAt) ?? new Date(0),
+    completedAt: fromProtoTimestamp(response.completedAt) ?? null,
   };
 }

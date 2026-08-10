@@ -1,7 +1,7 @@
 import { expectRpc } from '@synapsedesk/common/testing/rpc';
 import { status } from '@grpc/grpc-js';
 import { SCHEDULED_JOBS, SystemRoleName } from '@synapsedesk/common';
-import { toTimestamp } from '@synapsedesk/grpc-proto';
+import { toProtoTimestamp, UserProjection } from '@synapsedesk/grpc-proto';
 import {
   E2eFixture,
   bootstrapE2eTest,
@@ -61,7 +61,7 @@ describe('§2 Temporary locks (e2e)', () => {
       {
         id: member.id,
         reason: 'Suspected compromise',
-        lockedUntil: lockedUntil ? toTimestamp(lockedUntil) : undefined,
+        lockedUntil: lockedUntil ? toProtoTimestamp(lockedUntil) : undefined,
       },
       superuser(tenant),
     );
@@ -179,7 +179,7 @@ describe('§2 Temporary locks (e2e)', () => {
         {
           id: member.id,
           reason: 'x',
-          lockedUntil: toTimestamp(inHours(1)),
+          lockedUntil: toProtoTimestamp(inHours(1)),
         },
         superuser(tenant),
       );
@@ -213,7 +213,7 @@ describe('§2 Temporary locks (e2e)', () => {
         {
           id: stillLocked.id,
           reason: 'x',
-          lockedUntil: toTimestamp(inHours(5)),
+          lockedUntil: toProtoTimestamp(inHours(5)),
         },
         superuser(tenant),
       );
@@ -238,7 +238,7 @@ describe('§2 Temporary locks (e2e)', () => {
         {
           id: member.id,
           reason: 'x',
-          lockedUntil: toTimestamp(inHours(1)),
+          lockedUntil: toProtoTimestamp(inHours(1)),
         },
         superuser(tenant),
       );
@@ -251,6 +251,11 @@ describe('§2 Temporary locks (e2e)', () => {
       const before = await users.listUsersByIds({
         organizationId: tenant.org.id,
         userIds: [member.id],
+        // The NOTIFICATION caller, unchanged — 27-doc §3 test 4. `false` here
+        // is what keeps "a notification to a deactivated account is a row
+        // nobody reads" true after the flag was added for the loader.
+        includeInactive: false,
+        projection: UserProjection.USER_PROJECTION_NOTIFICATION,
       });
       expect(before.items).toEqual([]);
 
@@ -259,6 +264,8 @@ describe('§2 Temporary locks (e2e)', () => {
       const after = await users.listUsersByIds({
         organizationId: tenant.org.id,
         userIds: [member.id],
+        includeInactive: false,
+        projection: UserProjection.USER_PROJECTION_NOTIFICATION,
       });
       expect(after.items.map((item) => item.userId)).toEqual([member.id]);
 
@@ -324,7 +331,7 @@ describe('§2 Temporary locks (e2e)', () => {
           {
             id: member.id,
             reason: 'x',
-            lockedUntil: toTimestamp(hoursAgo(1)),
+            lockedUntil: toProtoTimestamp(hoursAgo(1)),
           },
           superuser(tenant),
         ),
@@ -373,7 +380,7 @@ describe('§2 Temporary locks (e2e)', () => {
         {
           id: member.id,
           reason: 'x',
-          lockedUntil: toTimestamp(inHours(30)),
+          lockedUntil: toProtoTimestamp(inHours(30)),
         },
         superuser(tenant),
       );
@@ -416,7 +423,11 @@ describe('§2 Temporary locks (e2e)', () => {
       });
 
       await users.lockUser(
-        { id: first.id, reason: 'x', lockedUntil: toTimestamp(inHours(1)) },
+        {
+          id: first.id,
+          reason: 'x',
+          lockedUntil: toProtoTimestamp(inHours(1)),
+        },
         superuser(tenant),
       );
 
@@ -536,7 +547,11 @@ describe('§2 Temporary locks (e2e)', () => {
         user: { email: 'window-reads@lock.test' },
       });
       await users.lockUser(
-        { id: member.id, reason: 'x', lockedUntil: toTimestamp(inHours(1)) },
+        {
+          id: member.id,
+          reason: 'x',
+          lockedUntil: toProtoTimestamp(inHours(1)),
+        },
         superuser(tenant),
       );
       await writePair(member.id, true, hoursAgo(1));

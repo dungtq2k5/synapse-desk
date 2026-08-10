@@ -11,7 +11,7 @@ import {
   ListSimilarTicketsResponse,
   ConversationTurn,
   TicketAiRequest,
-  toTimestamp,
+  toProtoTimestamp,
 } from '@synapsedesk/grpc-proto';
 import { formatErrorMsg } from '@synapsedesk/common';
 
@@ -37,8 +37,8 @@ function toAiSummaryResponse(summary: AiSummary): AiSummaryResponse {
     suggestedAction: summary.suggestedAction,
     confidenceScore: summary.confidenceScore,
     modelName: summary.modelName,
-    createdAt: toTimestamp(summary.createdAt),
-    updatedAt: toTimestamp(summary.updatedAt),
+    createdAt: toProtoTimestamp(summary.createdAt),
+    updatedAt: toProtoTimestamp(summary.updatedAt),
   };
 }
 

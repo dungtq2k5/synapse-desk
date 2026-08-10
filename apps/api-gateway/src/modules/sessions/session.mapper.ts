@@ -1,11 +1,13 @@
 import {
-  fromTimestamp,
-  requireTimestamp,
+  fromProtoTimestamp,
+  requireProtoTimestamp,
   SessionResponse,
 } from '@synapsedesk/grpc-proto';
 import { SessionResponseDto } from './dto/rest/session.dto';
 
-export function toSessionDto(session: SessionResponse): SessionResponseDto {
+export function toSessionResponseDto(
+  session: SessionResponse,
+): SessionResponseDto {
   return {
     id: session.id,
     deviceName: session.deviceName ?? null,
@@ -13,8 +15,8 @@ export function toSessionDto(session: SessionResponse): SessionResponseDto {
     userAgent: session.userAgent,
     current: session.current,
     isTrusted: session.isTrusted,
-    trustedUntil: fromTimestamp(session.trustedUntil) ?? null,
-    expiresAt: requireTimestamp(session.expiresAt, 'expiresAt'),
-    createdAt: requireTimestamp(session.createdAt, 'createdAt'),
+    trustedUntil: fromProtoTimestamp(session.trustedUntil) ?? null,
+    expiresAt: requireProtoTimestamp(session.expiresAt, 'expiresAt'),
+    createdAt: requireProtoTimestamp(session.createdAt, 'createdAt'),
   };
 }

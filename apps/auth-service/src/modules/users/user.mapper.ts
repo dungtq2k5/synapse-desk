@@ -1,8 +1,10 @@
 import {
+  NotificationRecipient,
   toIsoDate,
   toProtoGender,
-  toTimestamp,
+  toProtoTimestamp,
   UserResponse,
+  UserSummary,
   UserSummaryResponse,
 } from '@synapsedesk/grpc-proto';
 import type { Prisma, User } from '../../generated/prisma/client';
@@ -66,17 +68,17 @@ export function toUserResponse(
     isPhoneVerified: user.isPhoneVerified,
     dob: toIsoDate(user.dob),
     gender: toProtoGender(user.gender),
-    lastLoginAt: toTimestamp(user.lastLoginAt),
+    lastLoginAt: toProtoTimestamp(user.lastLoginAt),
     isLocked: user.isLocked,
     // Absent means the lock is INDEFINITE — 21-doc §2. Carried so an admin
     // screen can say "locked until Friday" rather than just "locked".
-    lockedUntil: toTimestamp(user.lockedUntil),
+    lockedUntil: toProtoTimestamp(user.lockedUntil),
     isTwoFactorEnabled: user.isTwoFactorEnabled,
     // Non-optional in the proto. ts-proto types every message-valued field as
     // `T | undefined`, which is its convention for message fields -- not
     // permission to omit these.
-    createdAt: toTimestamp(user.createdAt),
-    updatedAt: toTimestamp(user.updatedAt),
+    createdAt: toProtoTimestamp(user.createdAt),
+    updatedAt: toProtoTimestamp(user.updatedAt),
   };
 }
 
@@ -109,7 +111,80 @@ export function toUserSummaryResponse(
     roleNames: user.roles.map((role) => role.name),
     departmentIds: user.userDepartments.map((ud) => ud.departmentId),
     // Only ever set on a soft-deleted row.
-    deletedAt: toTimestamp(user.deletedAt),
+    deletedAt: toProtoTimestamp(user.deletedAt),
     deletedByName: user.deletedBy?.fullName ?? undefined,
+  };
+}
+
+/**
+ * The columns a notification recipient needs, in ONE place.
+ *
+ * Shared by both audience reads so they cannot drift: the quiet-hours fields
+ * were added for `listUsersByIds` and are just as necessary for
+ * `listPermissionHolders`, and a second copy would have gained them later or
+ * never.
+ */
+/**
+ * What a GraphQL edge is allowed to see — 25-doc §4, 27-doc §3.
+ *
+ * **No `email`.** `Ticket.assignee` is reachable with ticket access alone, and
+ * a user with ticket access and no `user.read` must not come away holding an
+ * agent's address. Enforced at the WIRE rather than by a mapper in the gateway:
+ * data the gateway never receives is data it cannot leak.
+ *
+ * `isLocked` and `deletedAt` ride along so the caller can render "Former
+ * employee" rather than infer it from an absence it cannot distinguish from a
+ * missing row.
+ */
+export const USER_SUMMARY_SELECT = {
+  id: true,
+  fullName: true,
+  avatarUrl: true,
+  isLocked: true,
+  deletedAt: true,
+} as const;
+
+export function toUserSummary(user: {
+  id: string;
+  fullName: string;
+  avatarUrl: string | null;
+  isLocked: boolean;
+  deletedAt: Date | null;
+}): UserSummary {
+  return {
+    userId: user.id,
+    fullName: user.fullName,
+    avatarUrl: user.avatarUrl ?? undefined,
+    isLocked: user.isLocked,
+    deletedAt: toProtoTimestamp(user.deletedAt),
+  };
+}
+
+export const NOTIFICATION_RECIPIENT_SELECT = {
+  id: true,
+  email: true,
+  fullName: true,
+  quietHoursStart: true,
+  quietHoursEnd: true,
+  timezone: true,
+} as const;
+
+export function toNotificationRecipient(user: {
+  id: string;
+  email: string;
+  fullName: string;
+  quietHoursStart: string | null;
+  quietHoursEnd: string | null;
+  timezone: string | null;
+}): NotificationRecipient {
+  return {
+    userId: user.id,
+    email: user.email,
+    fullName: user.fullName,
+    // `?? undefined`, not `?? ''`: these are `optional` on the wire, and an
+    // empty string would be indistinguishable from a user who set "00:00".
+    quietHoursStart: user.quietHoursStart ?? undefined,
+    quietHoursEnd: user.quietHoursEnd ?? undefined,
+    timezone: user.timezone ?? undefined,
   };
 }

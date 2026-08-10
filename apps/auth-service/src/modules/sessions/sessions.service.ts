@@ -11,7 +11,7 @@ import {
   RevokeUserSessionsRequest,
   RevokeUserSessionsResponse,
   SessionIdRequest,
-  toTimestamp,
+  toProtoTimestamp,
 } from '@synapsedesk/grpc-proto';
 import {
   AuditAction,
@@ -344,9 +344,9 @@ export class SessionsService {
       // share both, and a mobile client's IP changes between requests.
       current: currentFamilyId !== null && session.familyId === currentFamilyId,
       isTrusted: session.isTrusted,
-      trustedUntil: toTimestamp(session.trustedUntil),
-      expiresAt: toTimestamp(session.expiresAt),
-      createdAt: toTimestamp(session.createdAt),
+      trustedUntil: toProtoTimestamp(session.trustedUntil),
+      expiresAt: toProtoTimestamp(session.expiresAt),
+      createdAt: toProtoTimestamp(session.createdAt),
     };
   }
 }

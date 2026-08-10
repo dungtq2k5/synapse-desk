@@ -1,6 +1,8 @@
 import { Controller } from '@nestjs/common';
 import type { Metadata } from '@grpc/grpc-js';
 import {
+  ListDepartmentsByIdsRequest,
+  ListDepartmentsByIdsResponse,
   AddDepartmentMembersRequest,
   AddDepartmentMembersResponse,
   CreateDepartmentRequest,
@@ -30,6 +32,16 @@ import { DepartmentsService } from './departments.service';
 @DepartmentServiceControllerMethods()
 export class DepartmentsGrpcController implements DepartmentServiceController {
   constructor(private readonly departmentsService: DepartmentsService) {}
+
+  listDepartmentsByIds(
+    request: ListDepartmentsByIdsRequest,
+    metadata?: Metadata,
+  ): Promise<ListDepartmentsByIdsResponse> {
+    return this.departmentsService.listDepartmentsByIds(
+      request,
+      unpackCallerContext(metadata),
+    );
+  }
 
   listDepartments(
     request: ListDepartmentsRequest,

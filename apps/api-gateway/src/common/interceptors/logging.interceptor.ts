@@ -83,7 +83,8 @@ export class LoggingInterceptor implements NestInterceptor {
         fieldName: string;
       }>();
       // The GraphQL context carries the same Express request, so the actor is
-      // resolved identically for both transports.
+      // resolved identically for both transports — see `requestOf`, which this
+      // duplicates only because it also needs `info` from the same context.
       const request = gqlContext.getContext<{ req?: Request }>().req;
 
       return {

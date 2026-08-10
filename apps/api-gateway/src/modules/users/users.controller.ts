@@ -65,11 +65,6 @@ export class UsersController {
   })
   @ApiWrappedResponse(CurrentUserResponseDto)
   @ApiFilterErrors(['401'])
-  @ApiOperation({
-    summary: 'Own profile + org + departments + effective permission codes',
-  })
-  @ApiWrappedResponse(CurrentUserResponseDto)
-  @ApiFilterErrors(['401'])
   @Get('me')
   getCurrentUser(
     @CurrentUser() context: RequestContext,
@@ -89,11 +84,6 @@ export class UsersController {
    * is the enforcement: `forbidNonWhitelisted` rejects any other key with a
    * 400, so keeping it narrow is a security control rather than a convention.
    */
-  @ApiOperation({
-    summary: 'Update own profile fields (fullName, dob, gender)',
-  })
-  @ApiWrappedResponse(UserResponseDto)
-  @ApiFilterErrors(['400', '401'])
   @ApiOperation({
     summary: 'Update own profile fields (fullName, dob, gender)',
   })
@@ -126,12 +116,6 @@ export class UsersController {
   })
   @ApiWrappedResponse(PresignAvatarResponseDto)
   @ApiFilterErrors(['400', '401'])
-  @ApiOperation({
-    summary:
-      'Presign a direct-to-Firebase-Storage upload: { contentType, sizeBytes } → { uploadUrl, objectPath, expiresAt }',
-  })
-  @ApiWrappedResponse(PresignAvatarResponseDto)
-  @ApiFilterErrors(['400', '401'])
   @Post('me/avatar/upload-url')
   @HttpCode(HttpStatus.OK)
   presignAvatar(
@@ -146,12 +130,6 @@ export class UsersController {
    * storage-service, commits the path, audits, and emits the supersede for the
    * OLD object.
    */
-  @ApiOperation({
-    summary:
-      '{ objectPath } — confirms the upload landed, writes users.avatar_url (an object path, not a URL — RDM Table 3), audits, and emits the async delete of the previous avatar if one existed',
-  })
-  @ApiWrappedResponse(UserResponseDto)
-  @ApiFilterErrors(['400', '401'])
   @ApiOperation({
     summary:
       '{ objectPath } — confirms the upload landed, writes users.avatar_url (an object path, not a URL — RDM Table 3), audits, and emits the async delete of the previous avatar if one existed',
@@ -174,12 +152,6 @@ export class UsersController {
    * The client needs the row back to re-render the profile with `avatarUrl`
    * null — a 204 would leave it guessing whether the change landed.
    */
-  @ApiOperation({
-    summary:
-      'Clear avatar_url to null; emits the async delete of the object that was there',
-  })
-  @ApiWrappedResponse(UserResponseDto)
-  @ApiFilterErrors(['401'])
   @ApiOperation({
     summary:
       'Clear avatar_url to null; emits the async delete of the object that was there',

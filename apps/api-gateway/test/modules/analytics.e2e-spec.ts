@@ -384,7 +384,21 @@ describe('§4 Analytics at the HTTP boundary (e2e)', () => {
     const stubNames = () =>
       fx.stubs.user.listUsersByIds.mockReturnValue(
         of({
-          items: [{ userId: agentId, email: 'a@t.test', fullName: 'Ada' }],
+          // **`summaries`, not `items`** — 27-doc §3. This path now asks for the
+          // SUMMARY projection, so the notification-shaped `items` is empty on
+          // the wire. Note what is NOT here any more: `email`. A performance
+          // table renders names, and receiving an address it would have to
+          // remember to discard is one careless mapper from a leak.
+          items: [],
+          summaries: [
+            {
+              userId: agentId,
+              fullName: 'Ada',
+              avatarUrl: undefined,
+              isLocked: false,
+              deletedAt: undefined,
+            },
+          ],
         }),
       );
 

@@ -1,6 +1,6 @@
 import {
   fromProtoInvitationStatus,
-  requireTimestamp,
+  requireProtoTimestamp,
   type InvitationResponse,
 } from '@synapsedesk/grpc-proto';
 import { InvitationStatus } from '@synapsedesk/common';
@@ -16,7 +16,7 @@ import { InvitationResponseDto } from './dto/rest/invitation.dto';
  * WebSocket payload) need it — a private method would force one of them to
  * reimplement it.
  */
-export function toInvitationDto(
+export function toInvitationResponseDto(
   invitation: InvitationResponse,
 ): InvitationResponseDto {
   return {
@@ -32,11 +32,11 @@ export function toInvitationDto(
     primaryDepartmentId: invitation.primaryDepartmentId ?? null,
     invitedByName: invitation.invitedByName ?? null,
     resentCount: invitation.resentCount,
-    // requireTimestamp, not fromTimestamp: these are non-optional in the proto,
+    // requireProtoTimestamp, not fromProtoTimestamp: these are non-optional in the proto,
     // so a missing value is a contract violation rather than something to paper
     // over with a fallback date.
-    lastSentAt: requireTimestamp(invitation.lastSentAt, 'lastSentAt'),
-    expiresAt: requireTimestamp(invitation.expiresAt, 'expiresAt'),
-    createdAt: requireTimestamp(invitation.createdAt, 'createdAt'),
+    lastSentAt: requireProtoTimestamp(invitation.lastSentAt, 'lastSentAt'),
+    expiresAt: requireProtoTimestamp(invitation.expiresAt, 'expiresAt'),
+    createdAt: requireProtoTimestamp(invitation.createdAt, 'createdAt'),
   };
 }

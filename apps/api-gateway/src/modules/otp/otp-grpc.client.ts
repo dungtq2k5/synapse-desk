@@ -2,7 +2,7 @@ import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { ClientGrpc } from '@nestjs/microservices';
 import {
   AUTH_GRPC_CLIENT,
-  fromTimestamp,
+  fromProtoTimestamp,
   OTP_SERVICE_NAME,
   OtpServiceClient,
   toProtoOtpPurpose,
@@ -98,7 +98,7 @@ export class OtpGrpcClient extends BaseGrpcClient implements OnModuleInit {
     return {
       pending: response.pending,
       target: response.target ?? null,
-      expiresAt: fromTimestamp(response.expiresAt) ?? null,
+      expiresAt: fromProtoTimestamp(response.expiresAt) ?? null,
       attemptsRemaining: response.attemptsRemaining,
     };
   }

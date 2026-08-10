@@ -45,7 +45,9 @@ export type ProtoTimestamp = { seconds: number; nanos: number };
  * `google.protobuf.Timestamp` is NOT a `Date` on the wire. proto-loader treats
  * it as an ordinary message, so it travels as `{ seconds, nanos }`.
  */
-export function toTimestamp(date: Date | null): ProtoTimestamp | undefined {
+export function toProtoTimestamp(
+  date: Date | null,
+): ProtoTimestamp | undefined {
   if (!date) return undefined;
 
   const ms = date.getTime();
@@ -55,7 +57,7 @@ export function toTimestamp(date: Date | null): ProtoTimestamp | undefined {
   };
 }
 
-export function fromTimestamp(
+export function fromProtoTimestamp(
   timestamp: ProtoTimestamp | undefined,
 ): Date | undefined {
   if (!timestamp) return undefined;
@@ -69,11 +71,11 @@ export function fromTimestamp(
  * permission to omit them — so a missing value is a contract violation and
  * should say so rather than be papered over with a fallback date.
  */
-export function requireTimestamp(
+export function requireProtoTimestamp(
   timestamp: ProtoTimestamp | undefined,
   field: string,
 ): Date {
-  const date = fromTimestamp(timestamp);
+  const date = fromProtoTimestamp(timestamp);
   if (!date) {
     throw new Error(`Received a message without the required ${field}`);
   }
@@ -119,6 +121,13 @@ export function fromProtoGender(gender: ProtoGender): Gender {
 /**
  * `@db.Date` columns are calendar dates — no time, no zone. Formatted from UTC
  * components so the day cannot drift for a server west of UTC.
+ *
+ * **The one mapper here NOT named for its return type**, and deliberately.
+ * Every other conversion in this file is `to`/`from` plus the PROTO type it
+ * bridges — `toProtoTimestamp`, `fromProtoOrgStatus` — because that names the
+ * side a reader cannot infer. This one returns `string`, and `toString` would
+ * be both meaningless and a collision with the builtin. What is worth stating
+ * is the FORMAT, so that is what the name states.
  */
 export function toIsoDate(date: Date | null): string | undefined {
   if (!date) return undefined;

@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { DepartmentsController } from './departments.controller';
 import { DepartmentsGrpcClient } from './departments-grpc.client';
+import { DepartmentsResolver } from './departments.resolver';
 
 /**
  * Imports AuthModule for `AUTH_GRPC_CLIENT` and the JWT guards, reusing the one
@@ -15,6 +16,11 @@ import { DepartmentsGrpcClient } from './departments-grpc.client';
 @Module({
   imports: [AuthModule],
   controllers: [DepartmentsController],
-  providers: [DepartmentsGrpcClient],
+  providers: [DepartmentsGrpcClient, DepartmentsResolver],
+  // Exported for the GraphQL resolver — 26-doc §4. The resolver calls the SAME
+  // client the controller calls; a second one would be a second path to the
+  // same read, which is the thing a "transport, not an implementation"
+  // resolver must not become.
+  exports: [DepartmentsGrpcClient],
 })
 export class DepartmentsModule {}

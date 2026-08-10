@@ -30,11 +30,18 @@ module.exports = {
   factory(compilerInstance) {
     return swaggerPlugin.before(
       {
-        // See `nest-cli.json`. `.base.ts` is the one that matters: `UserBase`
-        // is the base class of the most-used response in the API and matches
-        // neither of the plugin's defaults, so leaving it out silently strips
-        // the inherited half of every user response with no error anywhere.
-        dtoFileNameSuffix: ['.dto.ts', '.base.ts'],
+        // See `nest-cli.json` — these must stay in step.
+        //
+        // `.base.ts` used to sit beside `.dto.ts`, because `UserBase` held the
+        // fields of the most-used response in the API and matched neither of
+        // the plugin's defaults. There are no `.base.ts` files left: REST and
+        // GraphQL DTOs are independent classes and every REST one is a
+        // `*.dto.ts`, which the default suffix already covers.
+        //
+        // GraphQL types are `*.gql-dto.ts` — deliberately NOT ending in
+        // `.dto.ts`, so the plugin never introspects a type that has no
+        // business in the OpenAPI document.
+        dtoFileNameSuffix: ['.dto.ts'],
         introspectComments: true,
         classValidatorShim: true,
       },

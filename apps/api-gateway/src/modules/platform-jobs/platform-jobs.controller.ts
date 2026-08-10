@@ -50,9 +50,6 @@ export class PlatformJobsController {
   @ApiOperation({ summary: 'Scheduled-job health — 20-doc §4.4' })
   @ApiWrappedResponse(JobHealthResponseDto)
   @ApiFilterErrors(['401'])
-  @ApiOperation({ summary: 'Scheduled-job health — 20-doc §4.4' })
-  @ApiWrappedResponse(JobHealthResponseDto)
-  @ApiFilterErrors(['401'])
   @Get()
   getHealth(
     @CurrentUser() context: RequestContext,
@@ -66,9 +63,6 @@ export class PlatformJobsController {
    * A POST because it does work — and specifically not a GET, which a browser
    * prefetch or an automatic retry can trigger without anyone asking.
    */
-  @ApiOperation({ summary: 'Runs a rollup now — 20-doc §5' })
-  @ApiWrappedResponse(JobRunResultDto)
-  @ApiFilterErrors(['401', '404'])
   @ApiOperation({ summary: 'Runs a rollup now — 20-doc §5' })
   @ApiWrappedResponse(JobRunResultDto)
   @ApiFilterErrors(['401', '404'])
@@ -91,11 +85,6 @@ export class PlatformJobsController {
    * trigger by hand cannot be debugged in staging without waiting for the
    * clock.
    */
-  @ApiOperation({
-    summary: 'Recomputes an explicit from..to range, with a mandatory reason',
-  })
-  @ApiWrappedResponse(JobRunResultDto)
-  @ApiFilterErrors(['400', '401', '404'])
   @ApiOperation({
     summary: 'Recomputes an explicit from..to range, with a mandatory reason',
   })

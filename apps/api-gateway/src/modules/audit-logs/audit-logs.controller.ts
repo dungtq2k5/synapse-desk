@@ -5,7 +5,7 @@ import { PermissionGuard } from '../../common/guards/permission.guard';
 import { SuperAdminGuard } from '../../common/guards/super-admin.guard';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { PaginationResponseBase } from '../../common/dto/base/pagination-response-base.dto';
+import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
 import { AuditLogsGrpcClient } from './audit-logs-grpc.client';
 import { AuditLogResponseDto } from './dto/rest/audit-log-response.dto';
 import { ListAuditLogsQueryDto } from './dto/rest/audit-log.dto';
@@ -41,15 +41,12 @@ export class AuditLogsController {
   @ApiOperation({ summary: 'Tenant-scoped immutable trail' })
   @ApiWrappedResponse(Paginated(AuditLogResponseDto))
   @ApiFilterErrors(['401', '403'])
-  @ApiOperation({ summary: 'Tenant-scoped immutable trail' })
-  @ApiWrappedResponse(Paginated(AuditLogResponseDto))
-  @ApiFilterErrors(['401', '403'])
   @Get()
   @RequirePermission('audit.read')
   list(
     @CurrentUser() context: RequestContext,
     @Query() query: ListAuditLogsQueryDto,
-  ): Promise<PaginationResponseBase<AuditLogResponseDto>> {
+  ): Promise<PaginationResponseDto<AuditLogResponseDto>> {
     return this.auditLogsGrpcClient.list(query, context);
   }
 
@@ -62,9 +59,6 @@ export class AuditLogsController {
    * the full enum would fill a filter dropdown with options that are guaranteed
    * to return nothing, which trains people to distrust the filter.
    */
-  @ApiOperation({ summary: 'Distinct action values, for filter dropdowns' })
-  @ApiWrappedResponse()
-  @ApiFilterErrors(['401', '403'])
   @ApiOperation({ summary: 'Distinct action values, for filter dropdowns' })
   @ApiWrappedResponse()
   @ApiFilterErrors(['401', '403'])
@@ -92,20 +86,14 @@ export class PlatformAuditLogsController {
   @ApiOperation({ summary: 'Tenant-scoped immutable trail' })
   @ApiWrappedResponse(Paginated(AuditLogResponseDto))
   @ApiFilterErrors(['401'])
-  @ApiOperation({ summary: 'Tenant-scoped immutable trail' })
-  @ApiWrappedResponse(Paginated(AuditLogResponseDto))
-  @ApiFilterErrors(['401'])
   @Get()
   list(
     @CurrentUser() context: RequestContext,
     @Query() query: ListAuditLogsQueryDto,
-  ): Promise<PaginationResponseBase<AuditLogResponseDto>> {
+  ): Promise<PaginationResponseDto<AuditLogResponseDto>> {
     return this.auditLogsGrpcClient.list(query, context, true);
   }
 
-  @ApiOperation({ summary: 'Distinct action values, for filter dropdowns' })
-  @ApiWrappedResponse()
-  @ApiFilterErrors(['401'])
   @ApiOperation({ summary: 'Distinct action values, for filter dropdowns' })
   @ApiWrappedResponse()
   @ApiFilterErrors(['401'])

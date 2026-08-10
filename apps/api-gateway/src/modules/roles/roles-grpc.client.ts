@@ -8,9 +8,9 @@ import {
 } from '@synapsedesk/grpc-proto';
 import { RequestContext } from '@synapsedesk/common';
 import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
-import { PaginationResponseBase } from '../../common/dto/base/pagination-response-base.dto';
-import { toPaginationMeta } from '../../common/mappers/pagination.mapper';
-import { toPermissionDto, toRoleDto } from './role.mapper';
+import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
+import { toPaginationMetaDataResponseDto } from '../../common/mappers/pagination.mapper';
+import { toPermissionResponseDto, toRoleResponseDto } from './role.mapper';
 import {
   CreateRoleDto,
   ListRolesQueryDto,
@@ -38,7 +38,7 @@ export class RolesGrpcClient extends BaseGrpcClient implements OnModuleInit {
   async list(
     query: ListRolesQueryDto,
     context: RequestContext,
-  ): Promise<PaginationResponseBase<RoleResponseDto>> {
+  ): Promise<PaginationResponseDto<RoleResponseDto>> {
     const response = await this.call(
       (metadata) =>
         this.roleGrpcService.listRoles(
@@ -49,13 +49,13 @@ export class RolesGrpcClient extends BaseGrpcClient implements OnModuleInit {
     );
 
     return {
-      items: response.items.map(toRoleDto),
-      meta: toPaginationMeta(response.meta),
+      items: response.items.map(toRoleResponseDto),
+      meta: toPaginationMetaDataResponseDto(response.meta),
     };
   }
 
   async get(id: string, context: RequestContext): Promise<RoleResponseDto> {
-    return toRoleDto(
+    return toRoleResponseDto(
       await this.call(
         (metadata) => this.roleGrpcService.getRole({ id }, metadata),
         context,
@@ -67,7 +67,7 @@ export class RolesGrpcClient extends BaseGrpcClient implements OnModuleInit {
     dto: CreateRoleDto,
     context: RequestContext,
   ): Promise<RoleResponseDto> {
-    return toRoleDto(
+    return toRoleResponseDto(
       await this.call(
         (metadata) =>
           this.roleGrpcService.createRole(
@@ -88,7 +88,7 @@ export class RolesGrpcClient extends BaseGrpcClient implements OnModuleInit {
     dto: UpdateRoleDto,
     context: RequestContext,
   ): Promise<RoleResponseDto> {
-    return toRoleDto(
+    return toRoleResponseDto(
       await this.call(
         (metadata) =>
           this.roleGrpcService.updateRole(
@@ -112,7 +112,7 @@ export class RolesGrpcClient extends BaseGrpcClient implements OnModuleInit {
     dto: SetRolePermissionsDto,
     context: RequestContext,
   ): Promise<RoleResponseDto> {
-    return toRoleDto(
+    return toRoleResponseDto(
       await this.call(
         (metadata) =>
           this.roleGrpcService.setRolePermissions(
@@ -132,6 +132,6 @@ export class RolesGrpcClient extends BaseGrpcClient implements OnModuleInit {
       context,
     );
 
-    return response.items.map(toPermissionDto);
+    return response.items.map(toPermissionResponseDto);
   }
 }

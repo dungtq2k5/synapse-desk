@@ -2,17 +2,17 @@ import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { ClientGrpc } from '@nestjs/microservices';
 import {
   AUTH_GRPC_CLIENT,
-  fromTimestamp,
+  fromProtoTimestamp,
   INVITATION_SERVICE_NAME,
   InvitationServiceClient,
   toPageRequest,
   toProtoInvitationStatus,
 } from '@synapsedesk/grpc-proto';
 import { RequestContext, RequestOrigin } from '@synapsedesk/common';
-import { toInvitationDto } from './invitation.mapper';
+import { toInvitationResponseDto } from './invitation.mapper';
 import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
-import { PaginationResponseBase } from '../../common/dto/base/pagination-response-base.dto';
-import { toPaginationMeta } from '../../common/mappers/pagination.mapper';
+import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
+import { toPaginationMetaDataResponseDto } from '../../common/mappers/pagination.mapper';
 import { toUserResponseDto } from '../users/user.mapper';
 import { UserResponseDto } from '../users/dto/rest/user-response.dto';
 import {
@@ -77,7 +77,7 @@ export class InvitationsGrpcClient
     );
 
     return {
-      created: response.created.map(toInvitationDto),
+      created: response.created.map(toInvitationResponseDto),
       failed: response.failed,
       batchId: response.batchId ?? null,
     };
@@ -87,7 +87,7 @@ export class InvitationsGrpcClient
     organizationId: string,
     query: ListInvitationsQueryDto,
     origin: RequestOrigin,
-  ): Promise<PaginationResponseBase<InvitationResponseDto>> {
+  ): Promise<PaginationResponseDto<InvitationResponseDto>> {
     const response = await this.call(
       (metadata) =>
         this.invitationGrpcService.listInvitations(
@@ -104,8 +104,8 @@ export class InvitationsGrpcClient
     );
 
     return {
-      items: response.items.map(toInvitationDto),
-      meta: toPaginationMeta(response.meta),
+      items: response.items.map(toInvitationResponseDto),
+      meta: toPaginationMetaDataResponseDto(response.meta),
     };
   }
 
@@ -124,7 +124,7 @@ export class InvitationsGrpcClient
       origin,
     );
 
-    return toInvitationDto(response);
+    return toInvitationResponseDto(response);
   }
 
   async revoke(
@@ -159,7 +159,7 @@ export class InvitationsGrpcClient
       inviterName: response.inviterName ?? null,
       email: response.email ?? null,
       roleNames: response.roleNames,
-      expiresAt: fromTimestamp(response.expiresAt) ?? null,
+      expiresAt: fromProtoTimestamp(response.expiresAt) ?? null,
     };
   }
 
@@ -229,7 +229,7 @@ export class InvitationsGrpcClient
     invitationId: string,
     context: RequestContext,
   ): Promise<InvitationResponseDto> {
-    return toInvitationDto(
+    return toInvitationResponseDto(
       await this.call(
         (metadata) =>
           this.invitationGrpcService.getInvitation(

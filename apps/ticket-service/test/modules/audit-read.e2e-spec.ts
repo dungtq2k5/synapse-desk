@@ -1,7 +1,7 @@
 import { expectRpc } from '@synapsedesk/common/testing/rpc';
 import { status } from '@grpc/grpc-js';
 import { faker } from '@faker-js/faker';
-import { toTimestamp } from '@synapsedesk/grpc-proto';
+import { toProtoTimestamp } from '@synapsedesk/grpc-proto';
 import { compareAlphabetically } from '@synapsedesk/common';
 import {
   E2eFixture,
@@ -195,8 +195,8 @@ describe('§2.9 Audit logs read API (e2e)', () => {
 
       const { items } = await audit.listAuditLogs(
         listRequest({
-          from: toTimestamp(new Date('2026-06-01T00:00:00.000Z')),
-          to: toTimestamp(new Date('2026-06-15T00:00:00.000Z')),
+          from: toProtoTimestamp(new Date('2026-06-01T00:00:00.000Z')),
+          to: toProtoTimestamp(new Date('2026-06-15T00:00:00.000Z')),
         }),
         auditor(),
       );

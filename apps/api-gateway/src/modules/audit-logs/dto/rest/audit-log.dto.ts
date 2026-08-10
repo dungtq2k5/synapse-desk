@@ -1,8 +1,8 @@
 import { Type } from 'class-transformer';
 import { IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
-import { SearchPaginationBase } from '../../../../common/dto/base/search-pagination-base.dto';
+import { SearchPaginationDto } from '../../../../common/dto/rest/search-pagination.dto';
 
-export class ListAuditLogsQueryDto extends SearchPaginationBase {
+export class ListAuditLogsQueryDto extends SearchPaginationDto {
   /**
    * A free string, not an `@IsIn(AUDIT_ACTIONS)`.
    *

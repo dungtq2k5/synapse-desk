@@ -22,15 +22,26 @@ import { fileURLToPath } from 'node:url';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..');
 
-const { SCHEDULED_JOBS, expectedIntervalMs, SCHEDULE_CRON } = await import(
-  join(ROOT, 'libs/common/dist/main.js')
-);
+const {
+  SCHEDULED_JOBS,
+  expectedIntervalMs,
+  SCHEDULE_CRON,
+  compareAlphabetically,
+} = await import(join(ROOT, 'libs/common/dist/main.js'));
 
 /** Twice the interval, matching `STALENESS_FACTOR` in `job-staleness.ts`. */
 const STALENESS_FACTOR = 2;
 
 const rules = Object.values(SCHEDULED_JOBS)
-  .sort()
+  // Sorted so the generated file is a function of the job list alone: without
+  // it, reordering the `SCHEDULED_JOBS` declaration would rewrite this artifact
+  // and `job-alerts.spec.ts` would fail over a diff that changes no alert.
+  //
+  // `compareAlphabetically` rather than a bare `.sort()`, which compares UTF-16
+  // code units — right for these ASCII job names by luck, and wrong the moment
+  // one is not ASCII. The repo's own comparator is already exported from the
+  // bundle this script imports.
+  .sort(compareAlphabetically)
   .map((job) => {
     const seconds = (expectedIntervalMs(job) / 1000) * STALENESS_FACTOR;
 

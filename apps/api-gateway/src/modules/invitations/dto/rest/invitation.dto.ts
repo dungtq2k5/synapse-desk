@@ -19,7 +19,7 @@ import {
   InvitationStatus,
   type InvitationSortableField,
 } from '@synapsedesk/common';
-import { SearchPaginationBase } from '../../../../common/dto/base/search-pagination-base.dto';
+import { SearchPaginationDto } from '../../../../common/dto/rest/search-pagination.dto';
 import {
   MAX_DEVICE_NAME_LENGTH,
   MAX_INVITATIONS_PER_BATCH,
@@ -64,7 +64,7 @@ export class CreateInvitationsDto {
   readonly invitations!: InviteUserDto[];
 }
 
-export class ListInvitationsQueryDto extends OmitType(SearchPaginationBase, [
+export class ListInvitationsQueryDto extends OmitType(SearchPaginationDto, [
   'sortBy',
 ] as const) {
   @IsOptional()

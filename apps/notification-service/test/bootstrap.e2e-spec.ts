@@ -5,6 +5,7 @@ import {
   NOTIFICATION_TYPES,
   NotificationPriority,
   TICKET_PATTERNS,
+  compareAlphabetically,
 } from '@synapsedesk/common';
 import { bootstrapE2eTest, E2eFixture } from './utils/bootstrap';
 import { NotificationsController } from '../src/modules/notifications.controller';
@@ -126,7 +127,7 @@ describe('§1.1 notification-service foundations (e2e)', () => {
         TICKET_PATTERNS.escalated,
         TICKET_PATTERNS.messageCreated,
         TICKET_PATTERNS.statusChanged,
-      ].sort(),
+      ].sort(compareAlphabetically),
     );
   });
 
@@ -144,8 +145,12 @@ describe('§1.1 notification-service foundations (e2e)', () => {
         (handler): handler is (...args: never[]) => unknown =>
           typeof handler === 'function',
       )
-      .map((handler) => Reflect.getMetadata('microservices:pattern', handler))
-      .flat();
+      // `flatMap`, not `map(…).flat()`: one pass, instead of building an
+      // intermediate array of arrays purely to discard it.
+      .flatMap(
+        (handler) =>
+          Reflect.getMetadata('microservices:pattern', handler) as unknown[],
+      );
 
     expect(patterns).not.toContain(TICKET_PATTERNS.created);
   });

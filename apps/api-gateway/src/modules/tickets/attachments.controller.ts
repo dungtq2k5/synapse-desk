@@ -19,10 +19,8 @@ import {
   ApiFilterErrors,
   ApiWrappedResponse,
 } from '../../common/decorators/api-response.decorator';
-import {
-  DownloadAttachmentDto,
-  MessagesGrpcClient,
-} from './messages-grpc.client';
+import { DownloadAttachmentResponseDto } from './dto/rest/message-response.dto';
+import { MessagesGrpcClient } from './messages-grpc.client';
 
 /**
  * `/attachments/*` — a TOP-LEVEL prefix, not nested under its ticket.
@@ -59,17 +57,11 @@ export class AttachmentsController {
   })
   @ApiWrappedResponse()
   @ApiFilterErrors(['400', '401', '404'])
-  @ApiOperation({
-    summary:
-      'Short-lived pre-signed Firebase Storage URL (302 or { url, expiresAt })',
-  })
-  @ApiWrappedResponse()
-  @ApiFilterErrors(['400', '401', '404'])
   @Get(':id/download')
   download(
     @CurrentUser() context: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
-  ): Promise<DownloadAttachmentDto> {
+  ): Promise<DownloadAttachmentResponseDto> {
     return this.messagesGrpcClient.downloadAttachment(id, context);
   }
 
@@ -81,12 +73,6 @@ export class AttachmentsController {
    * filter waiting to be forgotten. The FILE goes through the same
    * at-most-once supersede event everything else uses.
    */
-  @ApiOperation({
-    summary:
-      'Remove an attachment (hard delete — no independent soft-delete story for attachments) and emit the async delete of its object',
-  })
-  @ApiWrappedResponse(undefined, { status: HttpStatus.NO_CONTENT })
-  @ApiFilterErrors(['400', '401', '403', '404'])
   @ApiOperation({
     summary:
       'Remove an attachment (hard delete — no independent soft-delete story for attachments) and emit the async delete of its object',

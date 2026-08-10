@@ -14,7 +14,7 @@ import {
   MAX_MESSAGE_CONTENT_LENGTH,
   trimIfString,
 } from '@synapsedesk/common';
-import { SearchPaginationBase } from '../../../../common/dto/base/search-pagination-base.dto';
+import { SearchPaginationDto } from '../../../../common/dto/rest/search-pagination.dto';
 import { ToBoolean } from '../../../../common/decorators/to-boolean.decorator';
 
 export class SubmitFeedbackDto {
@@ -51,7 +51,7 @@ export class SubmitFeedbackDto {
   readonly citationAccurate?: boolean;
 }
 
-export class ListFeedbackQueryDto extends SearchPaginationBase {
+export class ListFeedbackQueryDto extends SearchPaginationDto {
   @IsOptional()
   @Type(() => Number)
   @IsInt()

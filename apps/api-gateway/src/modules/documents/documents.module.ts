@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { DocumentsGrpcClient } from './documents-grpc.client';
 import { DocumentsController } from './documents.controller';
+import { DocumentsResolver } from './documents.resolver';
 
 /**
  * `INGESTION_GRPC_CLIENT` needs no import: `IngestionGrpcModule` is `@Global`,
@@ -11,7 +12,7 @@ import { DocumentsController } from './documents.controller';
 @Module({
   imports: [AuthModule],
   controllers: [DocumentsController],
-  providers: [DocumentsGrpcClient],
+  providers: [DocumentsGrpcClient, DocumentsResolver],
   exports: [DocumentsGrpcClient],
 })
 export class DocumentsModule {}

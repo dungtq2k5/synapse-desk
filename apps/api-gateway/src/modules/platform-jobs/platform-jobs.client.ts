@@ -5,7 +5,7 @@ import {
   AiLedgerServiceClient,
   ANALYTICS_SERVICE_NAME,
   AnalyticsServiceClient,
-  fromTimestamp,
+  fromProtoTimestamp,
   INGESTION_GRPC_CLIENT,
   TICKET_GRPC_CLIENT,
   AUTH_GRPC_CLIENT,
@@ -87,9 +87,10 @@ export class PlatformJobsClient extends BaseGrpcClient implements OnModuleInit {
       rows: response.items.map((item) => ({
         service: 'auth-service',
         jobName: item.jobName,
-        lastStartedAt: fromTimestamp(item.lastStartedAt)?.toISOString() ?? null,
+        lastStartedAt:
+          fromProtoTimestamp(item.lastStartedAt)?.toISOString() ?? null,
         lastSucceededAt:
-          fromTimestamp(item.lastSucceededAt)?.toISOString() ?? null,
+          fromProtoTimestamp(item.lastSucceededAt)?.toISOString() ?? null,
         lastDurationMs: item.lastDurationMs ?? null,
         lastError: item.lastError ?? null,
         consecutiveFailures: item.consecutiveFailures,
@@ -108,9 +109,10 @@ export class PlatformJobsClient extends BaseGrpcClient implements OnModuleInit {
       rows: response.items.map((item) => ({
         service: 'ticket-service',
         jobName: item.jobName,
-        lastStartedAt: fromTimestamp(item.lastStartedAt)?.toISOString() ?? null,
+        lastStartedAt:
+          fromProtoTimestamp(item.lastStartedAt)?.toISOString() ?? null,
         lastSucceededAt:
-          fromTimestamp(item.lastSucceededAt)?.toISOString() ?? null,
+          fromProtoTimestamp(item.lastSucceededAt)?.toISOString() ?? null,
         lastDurationMs: item.lastDurationMs ?? null,
         lastError: item.lastError ?? null,
         consecutiveFailures: item.consecutiveFailures,
@@ -131,9 +133,10 @@ export class PlatformJobsClient extends BaseGrpcClient implements OnModuleInit {
       rows: response.items.map((item) => ({
         service: 'ingestion-service',
         jobName: item.jobName,
-        lastStartedAt: fromTimestamp(item.lastStartedAt)?.toISOString() ?? null,
+        lastStartedAt:
+          fromProtoTimestamp(item.lastStartedAt)?.toISOString() ?? null,
         lastSucceededAt:
-          fromTimestamp(item.lastSucceededAt)?.toISOString() ?? null,
+          fromProtoTimestamp(item.lastSucceededAt)?.toISOString() ?? null,
         lastDurationMs: item.lastDurationMs ?? null,
         lastError: item.lastError ?? null,
         consecutiveFailures: item.consecutiveFailures,

@@ -399,13 +399,28 @@ export class AiStreamService implements OnModuleInit {
 
   /** Whether Socket.IO has more queued for this socket than §5.2 allows. */
   private isWedged(client: Socket): boolean {
-    // `writeBuffer` is engine.io internals, typed private. Reached through a
-    // narrow structural cast rather than tracked with a counter of our own,
-    // because it is the ACTUAL backlog — a counter would measure what we
-    // emitted, not what is still unsent, and those differ by exactly the
-    // amount this guard cares about.
-    const conn = client.conn as unknown as { writeBuffer?: unknown[] };
-    const buffered = conn?.writeBuffer?.length ?? 0;
+    // `writeBuffer` is engine.io internals, absent from its public types.
+    // Read structurally rather than tracked with a counter of our own, because
+    // it is the ACTUAL backlog — a counter would measure what we emitted, not
+    // what is still unsent, and those differ by exactly the amount this guard
+    // cares about.
+    //
+    // **`Array.isArray`, not `?? 0`.** This is a library internal, so the field
+    // can vanish in a minor upgrade — and defaulting a missing buffer to zero
+    // would report every socket as healthy and disable the backpressure guard
+    // silently, which is the one failure this method must not have. An absent
+    // buffer is now `null`, and `null` is treated as wedged: refusing to stream
+    // is recoverable, streaming into a socket that cannot drain is not.
+    const buffered = bufferedFrames(client);
+
+    if (buffered === null) {
+      this.logger.warn(
+        'engine.io no longer exposes `writeBuffer`; treating the socket as ' +
+          'wedged. The backpressure guard needs updating for this version.',
+      );
+
+      return true;
+    }
 
     return buffered > MAX_BUFFERED_FRAMES;
   }
@@ -414,4 +429,22 @@ export class AiStreamService implements OnModuleInit {
 /** The proto enum as a name a client can switch on. */
 function statusName(status: AnswerStatus): string {
   return AnswerStatus[status]?.replace('ANSWER_STATUS_', '') ?? 'UNSPECIFIED';
+}
+
+/**
+ * How many frames engine.io still has queued for this socket, or `null` when
+ * the internal is no longer readable.
+ *
+ * The single place that reaches past Socket.IO's public types. Isolated here so
+ * the next person upgrading engine.io has one function to check rather than a
+ * cast buried in a guard, and so the read is validated rather than asserted:
+ * `Array.isArray` is what distinguishes "nothing queued" from "this property is
+ * gone", which `?.length ?? 0` reported identically.
+ */
+function bufferedFrames(client: Socket): number | null {
+  const { writeBuffer } = client.conn as unknown as {
+    writeBuffer?: unknown;
+  };
+
+  return Array.isArray(writeBuffer) ? writeBuffer.length : null;
 }

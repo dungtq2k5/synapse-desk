@@ -1,8 +1,8 @@
 import {
   AssignmentResponse,
-  fromTimestamp,
+  fromProtoTimestamp,
   ReassignmentReason as ProtoReassignmentReason,
-  requireTimestamp,
+  requireProtoTimestamp,
 } from '@synapsedesk/grpc-proto';
 import { ReassignmentReason } from '@synapsedesk/common';
 import { AssignmentResponseDto } from './dto/rest/assignment-response.dto';
@@ -32,7 +32,7 @@ const PROTO_BY_REASON: Record<ReassignmentReason, ProtoReassignmentReason> =
     ]),
   ) as Record<ReassignmentReason, ProtoReassignmentReason>;
 
-export function toProtoReason(
+export function toProtoReassignmentReason(
   value?: ReassignmentReason,
 ): ProtoReassignmentReason {
   return value
@@ -40,7 +40,7 @@ export function toProtoReason(
     : ProtoReassignmentReason.REASSIGNMENT_REASON_UNSPECIFIED;
 }
 
-export function toAssignmentDto(
+export function toAssignmentResponseDto(
   assignment: AssignmentResponse,
 ): AssignmentResponseDto {
   return {
@@ -49,10 +49,10 @@ export function toAssignmentDto(
     assignedToId: assignment.assignedToId,
     assignedById: assignment.assignedById ?? null,
     departmentId: assignment.departmentId,
-    assignedAt: requireTimestamp(assignment.assignedAt, 'assignedAt'),
-    unassignedAt: fromTimestamp(assignment.unassignedAt) ?? null,
+    assignedAt: requireProtoTimestamp(assignment.assignedAt, 'assignedAt'),
+    unassignedAt: fromProtoTimestamp(assignment.unassignedAt) ?? null,
     reason: REASON_BY_PROTO[assignment.reason] ?? null,
     isCurrent: assignment.isCurrent,
-    createdAt: requireTimestamp(assignment.createdAt, 'createdAt'),
+    createdAt: requireProtoTimestamp(assignment.createdAt, 'createdAt'),
   };
 }

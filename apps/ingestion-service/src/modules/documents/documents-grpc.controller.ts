@@ -1,6 +1,10 @@
 import { Controller } from '@nestjs/common';
 import type { Metadata } from '@grpc/grpc-js';
 import {
+  ListDocumentChunksByIdsRequest,
+  ListDocumentChunksByIdsResponse,
+  ListDocumentsByIdsRequest,
+  ListDocumentsByIdsResponse,
   ConfirmDocumentRequest,
   DeleteDocumentResponse,
   DocumentChunkResponse,
@@ -52,6 +56,26 @@ export class DocumentsGrpcController implements DocumentServiceController {
     metadata?: Metadata,
   ): Promise<DocumentResponse> {
     return this.documents.confirmDocument(
+      request,
+      unpackCallerContext(metadata),
+    );
+  }
+
+  listDocumentsByIds(
+    request: ListDocumentsByIdsRequest,
+    metadata?: Metadata,
+  ): Promise<ListDocumentsByIdsResponse> {
+    return this.documents.listDocumentsByIds(
+      request,
+      unpackCallerContext(metadata),
+    );
+  }
+
+  listDocumentChunksByIds(
+    request: ListDocumentChunksByIdsRequest,
+    metadata?: Metadata,
+  ): Promise<ListDocumentChunksByIdsResponse> {
+    return this.documents.listDocumentChunksByIds(
       request,
       unpackCallerContext(metadata),
     );

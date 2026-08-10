@@ -7,6 +7,10 @@
     "apps/*",
     "libs/*"
   ],
+  "//overrides": "`@nestjs/apollo@13` requires `@apollo/server@^5` while depending on `@apollo/server-plugin-landing-page-graphql-playground@4`, which peers on `^4` — an internal conflict in the package, not in this repo. Pinning one Apollo server for the whole tree resolves it. The plugin is only reached when `playground: true`, which 26-doc turns off, so the version it never loads against is the version it never runs on.",
+  "overrides": {
+    "@apollo/server": "^5.5.1"
+  },
   "scripts": {
     "test": "jest --projects apps/*/jest.config.ts libs/*/jest.config.ts --passWithNoTests",
     "test:all": "jest --projects apps/*/jest.config.ts libs/*/jest.config.ts --passWithNoTests",

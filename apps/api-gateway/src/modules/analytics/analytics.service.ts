@@ -96,68 +96,94 @@ export class AnalyticsService {
   async agents(
     query: AnalyticsRangeQueryDto,
     context: RequestContext,
+    /**
+     * **`false` skips the name-hydration leg entirely** — 26-doc §3.1.
+     *
+     * GraphQL passes it, because there the hydration IS the users loader:
+     * `AgentStat.agent` resolves through the same `ListUsersByIds` this leg
+     * calls, batched with every other user on the request, and only when a
+     * client actually asks for it. Hydrating here as well would make the
+     * numbers-only query — which is most of them — pay for a round trip whose
+     * result nothing reads.
+     *
+     * **The cache key changes with it.** An un-hydrated result stored under the
+     * plain `agents` key would be served to the REST route next, which would
+     * then return `fullName: null` for every agent with nothing failing and no
+     * leg marked unavailable.
+     */
+    options: { hydrateNames?: boolean } = {},
   ): Promise<AgentAnalyticsDto> {
-    return this.cached('agents', query, context, async () => {
-      const unavailable: UnavailableBlockDto[] = [];
+    const hydrateNames = options.hydrateNames ?? true;
 
-      const [statsLeg, usageLeg] = await Promise.all([
-        this.client.agentStats(query, context),
-        this.client.ledgerUsage(query, context),
-      ]);
+    return this.cached(
+      hydrateNames ? 'agents' : 'agents:no-names',
+      query,
+      context,
+      async () => {
+        const unavailable: UnavailableBlockDto[] = [];
 
-      const stats = unwrap(statsLeg, unavailable);
-      const usage = unwrap(usageLeg, unavailable);
+        const [statsLeg, usageLeg] = await Promise.all([
+          this.client.agentStats(query, context),
+          this.client.ledgerUsage(query, context),
+        ]);
 
-      const items: AgentStatDto[] = (stats?.items ?? []).map((row) => ({
-        agentId: row.agentId,
-        fullName: null,
-        assigned: row.assigned,
-        resolved: row.resolved,
-        messagesSent: row.messagesSent,
-        resolutionSeconds: {
-          mean: row.resolutionSeconds?.mean ?? null,
-          count: row.resolutionSeconds?.count ?? 0,
-        },
-        draftAcceptance: usage
-          ? {
-              rate: usage.draftAcceptance?.rate ?? null,
-              numerator: usage.draftAcceptance?.numerator ?? 0,
-              denominator: usage.draftAcceptance?.denominator ?? 0,
-            }
-          : null,
-      }));
+        const stats = unwrap(statsLeg, unavailable);
+        const usage = unwrap(usageLeg, unavailable);
 
-      // Hydration LAST and only if there is anything to hydrate: an empty
-      // agent list must not cost a round trip to auth-service, and a name is
-      // decoration — its absence marks the block unavailable without emptying
-      // the numbers, which are the part somebody is actually reading.
-      if (items.length > 0) {
-        const namesLeg = await this.client.hydrateNames(
-          items.map((item) => item.agentId),
-          context,
-        );
-        const names = unwrap(namesLeg, unavailable);
+        const items: AgentStatDto[] = (stats?.items ?? []).map((row) => ({
+          agentId: row.agentId,
+          fullName: null,
+          assigned: row.assigned,
+          resolved: row.resolved,
+          messagesSent: row.messagesSent,
+          resolutionSeconds: {
+            mean: row.resolutionSeconds?.mean ?? null,
+            count: row.resolutionSeconds?.count ?? 0,
+          },
+          draftAcceptance: usage
+            ? {
+                rate: usage.draftAcceptance?.rate ?? null,
+                numerator: usage.draftAcceptance?.numerator ?? 0,
+                denominator: usage.draftAcceptance?.denominator ?? 0,
+              }
+            : null,
+        }));
 
-        if (names) {
-          const byId = new Map(
-            names.items.map((user) => [user.userId, user.fullName]),
+        // Hydration LAST and only if there is anything to hydrate: an empty
+        // agent list must not cost a round trip to auth-service, and a name is
+        // decoration — its absence marks the block unavailable without emptying
+        // the numbers, which are the part somebody is actually reading.
+        if (hydrateNames && items.length > 0) {
+          const namesLeg = await this.client.hydrateNames(
+            items.map((item) => item.agentId),
+            context,
           );
-          for (const item of items) {
-            item.fullName = byId.get(item.agentId) ?? null;
+          const names = unwrap(namesLeg, unavailable);
+
+          if (names) {
+            // `summaries`, not `items` — 27-doc §3. The request now asks for the
+            // SUMMARY projection, so the notification-shaped `items` is empty and
+            // reading it would leave every name null with nothing failing.
+            const byId = new Map(
+              names.summaries.map((user) => [user.userId, user.fullName]),
+            );
+            for (const item of items) {
+              item.fullName = byId.get(item.agentId) ?? null;
+            }
           }
         }
-      }
 
-      return {
-        items,
-        // The STALEST of the two legs. `agent_daily_stats` and
-        // `ai_generation_daily_stats` are written by two schedulers in two
-        // services, so one can be days behind the other — and reporting the
-        // fresher would let the healthy one vouch for the broken one.
-        dataThrough: stalest(stats?.dataThrough, usage?.dataThrough),
-        unavailable,
-      };
-    });
+        return {
+          items,
+          // The STALEST of the two legs. `agent_daily_stats` and
+          // `ai_generation_daily_stats` are written by two schedulers in two
+          // services, so one can be days behind the other — and reporting the
+          // fresher would let the healthy one vouch for the broken one.
+          dataThrough: stalest(stats?.dataThrough, usage?.dataThrough),
+          unavailable,
+        };
+      },
+    );
   }
 
   /**

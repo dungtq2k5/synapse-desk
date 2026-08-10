@@ -1,6 +1,8 @@
 import { Controller } from '@nestjs/common';
 import type { Metadata } from '@grpc/grpc-js';
 import {
+  ListTicketsByIdsRequest,
+  ListTicketsByIdsResponse,
   BulkTicketStatusRequest,
   BulkTicketStatusResponse,
   ChangeTicketStatusRequest,
@@ -55,6 +57,16 @@ export class TicketsGrpcController implements TicketServiceController {
     metadata?: Metadata,
   ): Promise<TicketResponse> {
     return this.ticketsService.getTicketByNumber(
+      request,
+      unpackCallerContext(metadata),
+    );
+  }
+
+  listTicketsByIds(
+    request: ListTicketsByIdsRequest,
+    metadata?: Metadata,
+  ): Promise<ListTicketsByIdsResponse> {
+    return this.ticketsService.listTicketsByIds(
       request,
       unpackCallerContext(metadata),
     );

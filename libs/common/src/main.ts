@@ -1,5 +1,6 @@
 export * from './configs/runtime.config';
 export * from './configs/build-info.config';
+export * from './configs/batch-rpc.config';
 export * from './configs/pagination.config';
 export * from './configs/organization.config';
 export * from './configs/rbac.config';

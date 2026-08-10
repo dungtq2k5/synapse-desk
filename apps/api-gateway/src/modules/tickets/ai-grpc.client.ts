@@ -3,7 +3,7 @@ import { ClientGrpc } from '@nestjs/microservices';
 import {
   AI_SERVICE_NAME,
   AiServiceClient,
-  requireTimestamp,
+  requireProtoTimestamp,
   TICKET_GRPC_CLIENT,
 } from '@synapsedesk/grpc-proto';
 import { RequestContext } from '@synapsedesk/common';
@@ -146,8 +146,8 @@ export class AiGrpcClient extends BaseGrpcClient implements OnModuleInit {
       suggestedAction: summary.suggestedAction,
       confidenceScore: summary.confidenceScore,
       modelName: summary.modelName,
-      createdAt: requireTimestamp(summary.createdAt, 'createdAt'),
-      updatedAt: requireTimestamp(summary.updatedAt, 'updatedAt'),
+      createdAt: requireProtoTimestamp(summary.createdAt, 'createdAt'),
+      updatedAt: requireProtoTimestamp(summary.updatedAt, 'updatedAt'),
     };
   }
 }

@@ -12,7 +12,6 @@ import {
   MarkReadRequest,
   MarkReadResponse,
   NotificationIdRequest,
-  NotificationResponse,
 } from '@synapsedesk/grpc-proto';
 import { Prisma } from '../../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -270,4 +269,4 @@ function clampLimit(limit: number | undefined): number {
   return Math.min(limit, MAX_PAGE_SIZE);
 }
 
-export type { NotificationResponse };
+export { type NotificationResponse } from '@synapsedesk/grpc-proto';

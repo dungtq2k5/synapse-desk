@@ -1,15 +1,15 @@
 import {
   AttachmentResponse,
-  fromTimestamp,
+  fromProtoTimestamp,
   MessageResponse,
-  requireTimestamp,
+  requireProtoTimestamp,
 } from '@synapsedesk/grpc-proto';
 import {
   AttachmentResponseDto,
   MessageResponseDto,
 } from './dto/rest/message-response.dto';
 
-export function toAttachmentDto(
+export function toAttachmentResponseDto(
   attachment: AttachmentResponse,
 ): AttachmentResponseDto {
   return {
@@ -19,11 +19,13 @@ export function toAttachmentDto(
     fileUrl: attachment.fileUrl,
     fileSizeBytes: attachment.fileSizeBytes,
     mimeType: attachment.mimeType,
-    createdAt: requireTimestamp(attachment.createdAt, 'createdAt'),
+    createdAt: requireProtoTimestamp(attachment.createdAt, 'createdAt'),
   };
 }
 
-export function toMessageDto(message: MessageResponse): MessageResponseDto {
+export function toMessageResponseDto(
+  message: MessageResponse,
+): MessageResponseDto {
   return {
     id: message.id,
     ticketId: message.ticketId,
@@ -36,9 +38,9 @@ export function toMessageDto(message: MessageResponse): MessageResponseDto {
     // reading, and `||` would erase it into "we did not measure".
     promptTokens: message.promptTokens ?? null,
     completionTokens: message.completionTokens ?? null,
-    editedAt: fromTimestamp(message.editedAt) ?? null,
-    redactedAt: fromTimestamp(message.redactedAt) ?? null,
-    createdAt: requireTimestamp(message.createdAt, 'createdAt'),
-    attachments: (message.attachments ?? []).map(toAttachmentDto),
+    editedAt: fromProtoTimestamp(message.editedAt) ?? null,
+    redactedAt: fromProtoTimestamp(message.redactedAt) ?? null,
+    createdAt: requireProtoTimestamp(message.createdAt, 'createdAt'),
+    attachments: (message.attachments ?? []).map(toAttachmentResponseDto),
   };
 }

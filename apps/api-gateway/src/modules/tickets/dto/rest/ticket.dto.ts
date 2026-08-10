@@ -25,7 +25,7 @@ import {
   trimIfString,
   type TicketSortableField,
 } from '@synapsedesk/common';
-import { SearchPaginationBase } from '../../../../common/dto/base/search-pagination-base.dto';
+import { SearchPaginationDto } from '../../../../common/dto/rest/search-pagination.dto';
 import { ToBoolean } from '../../../../common/decorators/to-boolean.decorator';
 
 export class CreateTicketDto {
@@ -121,7 +121,7 @@ export class BulkTicketStatusDto {
   readonly reason?: string;
 }
 
-export class ListTicketsQueryDto extends OmitType(SearchPaginationBase, [
+export class ListTicketsQueryDto extends OmitType(SearchPaginationDto, [
   'sortBy',
 ] as const) {
   @IsOptional()

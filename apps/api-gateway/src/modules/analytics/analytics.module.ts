@@ -4,6 +4,12 @@ import { AnalyticsController } from './analytics.controller';
 import { AnalyticsService } from './analytics.service';
 import { AnalyticsGrpcClient } from './analytics-grpc.client';
 import { AnalyticsCacheService } from './analytics-cache.service';
+import {
+  AgentStatResolver,
+  AnalyticsResolver,
+  DocumentUsageResolver,
+  KnowledgeGapFlagResolver,
+} from './analytics.resolver';
 
 /**
  * The composition layer — and the whole of "analytics" as a deploy unit.
@@ -21,7 +27,17 @@ import { AnalyticsCacheService } from './analytics-cache.service';
 @Module({
   imports: [AuthModule],
   controllers: [AnalyticsController],
-  providers: [AnalyticsService, AnalyticsGrpcClient, AnalyticsCacheService],
+  providers: [
+    AnalyticsService,
+    AnalyticsGrpcClient,
+    AnalyticsCacheService,
+    AnalyticsResolver,
+    // The edge resolvers. Separate classes because `@Resolver(() => T)` binds
+    // one parent type, and these three hang off three different rows.
+    AgentStatResolver,
+    DocumentUsageResolver,
+    KnowledgeGapFlagResolver,
+  ],
   exports: [AnalyticsService, AnalyticsCacheService],
 })
 export class AnalyticsModule {}

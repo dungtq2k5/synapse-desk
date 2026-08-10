@@ -15,6 +15,8 @@ import {
   seedTenantWithUser,
 } from '../factories';
 import { DepartmentsService } from '../../src/modules/departments/departments.service';
+import { randomUUID } from 'node:crypto';
+import { BATCH_ID_LIMIT } from '@synapsedesk/common';
 
 describe('Departments (e2e)', () => {
   let fx: E2eFixture;
@@ -427,6 +429,87 @@ describe('Departments (e2e)', () => {
         ),
         status.INVALID_ARGUMENT,
       );
+    });
+  });
+
+  /**
+   * The batch contract — 27-doc §1. Same six properties as `ListUsersByIds`,
+   * asserted per RPC because "it is just a `WHERE id IN (…)`" is exactly the
+   * framing under which the tenant check gets skipped.
+   */
+  describe('§1 ListDepartmentsByIds — the batch contract', () => {
+    const make = async (
+      t: Awaited<ReturnType<typeof seedTenantWithUser>>,
+      name: string,
+    ) => departments.createDepartment({ name, description: '' }, ctx(t));
+
+    it("1. **returns only the CALLER's tenant**", async () => {
+      const mine = await seedTenantWithUser(fx.prisma);
+      const theirs = await seedTenantWithUser(fx.prisma);
+      const ours = await make(mine, 'Support');
+      const other = await make(theirs, 'Support');
+
+      const { items } = await departments.listDepartmentsByIds(
+        { departmentIds: [ours.id, other.id] },
+        ctx(mine),
+      );
+
+      expect(items.map((item) => item.id)).toEqual([ours.id]);
+    });
+
+    it('2. unknown ids are omitted, not an error', async () => {
+      const t = await seedTenantWithUser(fx.prisma);
+      const department = await make(t, 'Support');
+
+      const { items } = await departments.listDepartmentsByIds(
+        { departmentIds: [department.id, randomUUID()] },
+        ctx(t),
+      );
+
+      expect(items.map((item) => item.id)).toEqual([department.id]);
+    });
+
+    it('3. an empty request is an empty response', async () => {
+      const t = await seedTenantWithUser(fx.prisma);
+
+      const { items } = await departments.listDepartmentsByIds(
+        { departmentIds: [] },
+        ctx(t),
+      );
+
+      expect(items).toEqual([]);
+    });
+
+    it('4. an over-cap batch is INVALID_ARGUMENT', async () => {
+      const t = await seedTenantWithUser(fx.prisma);
+
+      await expectRpc(
+        departments.listDepartmentsByIds(
+          {
+            departmentIds: Array.from({ length: BATCH_ID_LIMIT + 1 }, () =>
+              randomUUID(),
+            ),
+          },
+          ctx(t),
+        ),
+        status.INVALID_ARGUMENT,
+      );
+    });
+
+    it('5. **a soft-deleted department is still returned by id**', async () => {
+      // 27-doc §1. A ticket still citing a retired department has to render its
+      // name; omitting it makes the edge null, which the UI cannot distinguish
+      // from a department that never existed — so it shows a blank.
+      const t = await seedTenantWithUser(fx.prisma);
+      const department = await make(t, 'Support');
+      await departments.deleteDepartment({ id: department.id }, ctx(t));
+
+      const { items } = await departments.listDepartmentsByIds(
+        { departmentIds: [department.id] },
+        ctx(t),
+      );
+
+      expect(items.map((item) => item.id)).toEqual([department.id]);
     });
   });
 });

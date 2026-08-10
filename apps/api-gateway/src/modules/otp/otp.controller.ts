@@ -77,12 +77,6 @@ export class OtpController {
   })
   @ApiWrappedResponse(RequestOtpResponseDto, { status: HttpStatus.ACCEPTED })
   @ApiFilterErrors(['401'])
-  @ApiOperation({
-    summary:
-      'Issue an otps row (purpose = email_verification, target = users.email) and mail the 6-digit code',
-  })
-  @ApiWrappedResponse(RequestOtpResponseDto, { status: HttpStatus.ACCEPTED })
-  @ApiFilterErrors(['401'])
   @Post('email/verify/request')
   @Throttle({ [AUTH_THROTTLER_TIER]: ROUTE_THROTTLE.otpRequest })
   @HttpCode(HttpStatus.ACCEPTED)
@@ -97,9 +91,6 @@ export class OtpController {
    * `isEmailVerified` claim is baked into the access token, so it stays `false`
    * until the token rotates.
    */
-  @ApiOperation({ summary: 'Submit { code }' })
-  @ApiWrappedResponse(VerifyOtpResponseDto)
-  @ApiFilterErrors(['400', '401'])
   @ApiOperation({ summary: 'Submit { code }' })
   @ApiWrappedResponse(VerifyOtpResponseDto)
   @ApiFilterErrors(['400', '401'])
@@ -123,12 +114,6 @@ export class OtpController {
   })
   @ApiWrappedResponse(RequestOtpResponseDto, { status: HttpStatus.ACCEPTED })
   @ApiFilterErrors(['400', '401'])
-  @ApiOperation({
-    summary:
-      'Issue an otps row (purpose = phone_verification) and SMS the code',
-  })
-  @ApiWrappedResponse(RequestOtpResponseDto, { status: HttpStatus.ACCEPTED })
-  @ApiFilterErrors(['400', '401'])
   @Post('phone/verify/request')
   @Throttle({ [AUTH_THROTTLER_TIER]: ROUTE_THROTTLE.otpRequest })
   @HttpCode(HttpStatus.ACCEPTED)
@@ -143,9 +128,6 @@ export class OtpController {
     );
   }
 
-  @ApiOperation({ summary: 'Submit { code }' })
-  @ApiWrappedResponse(VerifyOtpResponseDto)
-  @ApiFilterErrors(['400', '401'])
   @ApiOperation({ summary: 'Submit { code }' })
   @ApiWrappedResponse(VerifyOtpResponseDto)
   @ApiFilterErrors(['400', '401'])
@@ -164,12 +146,6 @@ export class OtpController {
   }
 
   /** Drives the resend UI. Never exposes the code or its hash. */
-  @ApiOperation({
-    summary:
-      '?purpose= — outstanding-challenge state for the resend UI: { pending, target (masked), expiresAt, attemptsRemaining }',
-  })
-  @ApiWrappedResponse(OtpStatusResponseDto)
-  @ApiFilterErrors(['401'])
   @ApiOperation({
     summary:
       '?purpose= — outstanding-challenge state for the resend UI: { pending, target (masked), expiresAt, attemptsRemaining }',

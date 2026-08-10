@@ -89,12 +89,6 @@ export class TwoFactorAuthController {
   })
   @ApiWrappedResponse(GenerateTwoFactorResponseDto)
   @ApiFilterErrors(['401'])
-  @ApiOperation({
-    summary:
-      'Generate + encrypt two_factor_secret, return otpauth:// URI and QR data URL',
-  })
-  @ApiWrappedResponse(GenerateTwoFactorResponseDto)
-  @ApiFilterErrors(['401'])
   @Post('setup')
   @HttpCode(HttpStatus.OK)
   @UseGuards(TwoFactorEnrolmentGuard)
@@ -113,12 +107,6 @@ export class TwoFactorAuthController {
    * mints a session. Issuing tokens here instead would give enrolment a second
    * session-minting door to keep correct.
    */
-  @ApiOperation({
-    summary:
-      'Confirm a TOTP code → is_two_factor_enabled = true; returns the one-time plaintext backup codes',
-  })
-  @ApiWrappedResponse(BackupCodesResponseDto)
-  @ApiFilterErrors(['400', '401'])
   @ApiOperation({
     summary:
       'Confirm a TOTP code → is_two_factor_enabled = true; returns the one-time plaintext backup codes',
@@ -165,12 +153,6 @@ export class TwoFactorAuthController {
     // the controller-level requirement, and two entries in `security` mean OR —
     // documenting this route as accepting an access token, which it does not.
     security: [{ [AUTH_SCHEMES.mfa]: [] }],
-  })
-  @ApiWrappedResponse(TwoFactorAuthenticatedResponseDto)
-  @ApiFilterErrors(['400', '401'])
-  @ApiOperation({
-    summary: 'Second leg of login',
-    security: [],
   })
   @ApiWrappedResponse(TwoFactorAuthenticatedResponseDto)
   @ApiFilterErrors(['400', '401'])
@@ -228,9 +210,6 @@ export class TwoFactorAuthController {
   @ApiOperation({ summary: 'Disable 2FA (requires TOTP + password)' })
   @ApiWrappedResponse()
   @ApiFilterErrors(['400', '401'])
-  @ApiOperation({ summary: 'Disable 2FA (requires TOTP + password)' })
-  @ApiWrappedResponse()
-  @ApiFilterErrors(['400', '401'])
   @Delete()
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard)
@@ -253,9 +232,6 @@ export class TwoFactorAuthController {
   @ApiOperation({ summary: 'Regenerate two_factor_backup_codes (30d expiry)' })
   @ApiWrappedResponse(BackupCodesResponseDto)
   @ApiFilterErrors(['400', '401'])
-  @ApiOperation({ summary: 'Regenerate two_factor_backup_codes (30d expiry)' })
-  @ApiWrappedResponse(BackupCodesResponseDto)
-  @ApiFilterErrors(['400', '401'])
   @Post('backup-codes')
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard)
@@ -273,11 +249,6 @@ export class TwoFactorAuthController {
   }
 
   /** Counts only — never hashes, never plaintext. */
-  @ApiOperation({
-    summary: 'Metadata only — count remaining, is_used, expires_at',
-  })
-  @ApiWrappedResponse(BackupCodesStatusResponseDto)
-  @ApiFilterErrors(['401'])
   @ApiOperation({
     summary: 'Metadata only — count remaining, is_used, expires_at',
   })

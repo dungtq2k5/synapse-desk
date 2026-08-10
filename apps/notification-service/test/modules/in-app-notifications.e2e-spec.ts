@@ -7,6 +7,7 @@ import {
   NotificationChannel,
   NotificationPriority,
   NotificationResourceType,
+  compareAlphabetically,
   quotaThresholdEventId,
 } from '@synapsedesk/common';
 import { bootstrapE2eTest, E2eFixture } from '../utils/bootstrap';
@@ -58,6 +59,28 @@ describe('§1 In-app notification delivery (e2e)', () => {
     },
   ];
 
+  /** The command `quota-alert.service.ts` actually emits. */
+  const quotaAlert = (threshold: number, overrides = {}) => {
+    return {
+      organizationId: ORG,
+      // The ORIGINATING event, never the transport subject (18-doc §1.3).
+      type: NOTIFICATION_TYPES.quotaThreshold,
+      audience: { kind: 'permission' as const, permission: AUDIENCE },
+      // DERIVED, never generated — the property the UNIQUE index relies on.
+      eventId: quotaThresholdEventId(ORG, CYCLE_START, threshold),
+      title: `AI budget ${threshold}% used`,
+      body: 'At 100%, all self-service questions will route to your agents.',
+      priority:
+        threshold >= 100
+          ? NotificationPriority.CRITICAL
+          : NotificationPriority.NORMAL,
+      occurredAt: new Date().toISOString(),
+      resourceType: NotificationResourceType.ORGANIZATION,
+      resourceId: ORG,
+      ...overrides,
+    };
+  };
+
   beforeAll(async () => {
     fx = await bootstrapE2eTest();
     inApp = fx.moduleRef.get(InAppNotificationService);
@@ -86,28 +109,6 @@ describe('§1 In-app notification delivery (e2e)', () => {
     await fx.close();
   });
 
-  /** The command `quota-alert.service.ts` actually emits. */
-  function quotaAlert(threshold: number, overrides = {}) {
-    return {
-      organizationId: ORG,
-      // The ORIGINATING event, never the transport subject (18-doc §1.3).
-      type: NOTIFICATION_TYPES.quotaThreshold,
-      audience: { kind: 'permission' as const, permission: AUDIENCE },
-      // DERIVED, never generated — the property the UNIQUE index relies on.
-      eventId: quotaThresholdEventId(ORG, CYCLE_START, threshold),
-      title: `AI budget ${threshold}% used`,
-      body: 'At 100%, all self-service questions will route to your agents.',
-      priority:
-        threshold >= 100
-          ? NotificationPriority.CRITICAL
-          : NotificationPriority.NORMAL,
-      occurredAt: new Date().toISOString(),
-      resourceType: NotificationResourceType.ORGANIZATION,
-      resourceId: ORG,
-      ...overrides,
-    };
-  }
-
   describe('a threshold crossing reaches a person', () => {
     it('1. Writes a row EVERY holder of the audience permission can see', async () => {
       // The assertion the finding asks for. Not "was it emitted" — emitting was
@@ -118,8 +119,10 @@ describe('§1 In-app notification delivery (e2e)', () => {
         orderBy: { recipientId: 'asc' },
       });
 
-      expect(rows.map((row) => row.recipientId).sort()).toEqual(
-        ADMINS.map((admin) => admin.userId).sort(),
+      expect(
+        rows.map((row) => row.recipientId).sort(compareAlphabetically),
+      ).toEqual(
+        ADMINS.map((admin) => admin.userId).sort(compareAlphabetically),
       );
       expect(rows[0].title).toBe('AI budget 80% used');
       expect(rows[0].organizationId).toBe(ORG);

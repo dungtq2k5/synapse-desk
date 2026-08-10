@@ -1,0 +1,439 @@
+# ------------------------------------------------------
+# THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+# ------------------------------------------------------
+
+type AgentAnalytics {
+  dataThrough: String
+  items: [AgentStat!]!
+  unavailable: [UnavailableBlock!]!
+}
+
+type AgentStat {
+  """
+  The agent behind these numbers. Null when the account no longer exists — a rollup row outlives the user it counts.
+  """
+  agent: UserSummary
+  agentId: ID!
+  assigned: Int!
+  draftAcceptance: Rate
+  messagesSent: Int!
+  resolutionSeconds: Mean!
+  resolved: Int!
+}
+
+type AnalyticsOverview {
+  aiFirstResponseSeconds: Mean!
+  computedAt: DateTime
+  csat: Rate!
+  dataThrough: String
+  deflection: Rate!
+  humanFirstResponseSeconds: Mean!
+  openTicketMedianAgeSeconds: Float
+  openTickets: Int!
+  resolutionSeconds: Mean!
+  ticketsCreated: Int!
+  ticketsEscalated: Int!
+  ticketsResolved: Int!
+}
+
+type ApiInfo {
+  builtAt: String!
+  sha: String!
+  version: String!
+}
+
+"""
+A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date-time format.
+"""
+scalar DateTime
+
+type Department {
+  description: String
+  id: ID!
+  name: String!
+}
+
+type DepartmentPage {
+  items: [Department!]!
+  meta: PageMeta!
+}
+
+type Document {
+  chunkCount: Int!
+  createdAt: DateTime!
+
+  """Who uploaded this document."""
+  createdBy: UserSummary
+  createdById: ID!
+  deletedAt: DateTime
+
+  """
+  How many departments this document is scoped to. The `departments` edge is capped at 50; this is the true total.
+  """
+  departmentCount: Int!
+  departmentIds: [ID!]!
+
+  """
+  The departments this document is scoped to. Empty when it is organization-wide.
+  """
+  departments: [Department!]!
+  fileSizeBytes: Int!
+  fileType: String!
+  id: ID!
+  isOrganizationWide: Boolean!
+  organizationId: ID!
+  status: DocumentStatus
+  title: String!
+  updatedAt: DateTime!
+}
+
+type DocumentAnalytics {
+  citationAccuracy: Rate
+  dataThrough: String
+  mostCited: [DocumentUsage!]!
+  neverRetrieved: [DocumentUsage!]!
+  retrievedNeverCited: [DocumentUsage!]!
+  unavailable: [UnavailableBlock!]!
+}
+
+type DocumentPage {
+  items: [Document!]!
+  meta: PageMeta!
+}
+
+"""Where a document sits in the ingestion pipeline."""
+enum DocumentStatus {
+  FAILED
+  INDEXED
+  PENDING
+  PROCESSING
+}
+
+type DocumentUsage {
+  chunkCount: Int!
+  citationCount: Int!
+
+  """
+  The document as it stands now. Null when it has been deleted since the rollup counted it — `title` above is what the rollup recorded.
+  """
+  document: Document
+  documentId: ID!
+  retrievalCount: Int!
+  title: String!
+}
+
+enum Gender {
+  FEMALE
+  MALE
+  OTHER
+  UNSPECIFIED
+}
+
+type KnowledgeGapFlag {
+  detail: String!
+
+  """
+  The flagged document as it stands now. Null when it has been deleted since the flag was raised.
+  """
+  document: Document
+  documentId: ID!
+  documentTitle: String!
+  flagType: String!
+}
+
+type KnowledgeGaps {
+  answeringGenerations: Int!
+  dataThrough: String
+  emptyRetrievalRate: Rate!
+  emptyRetrievals: Int!
+  flags: [KnowledgeGapFlag!]!
+  unavailable: [UnavailableBlock!]!
+}
+
+type MarkNotificationReadPayload {
+  id: ID!
+  unreadCount: Int!
+}
+
+type Mean {
+  count: Int!
+  mean: Float
+}
+
+type Mutation {
+  """Assigns the ticket to an agent."""
+  assignTicket(assigneeId: ID!, departmentId: ID!, id: ID!): TicketMutationPayload!
+
+  """
+  Hands the ticket to a human agent. Runs the same transition table, side effects and summary as `POST /tickets/:id/escalate`.
+  """
+  escalateTicket(id: ID!): TicketMutationPayload!
+
+  """
+  Marks one notification read. Idempotent — re-reading an already-read row succeeds and changes nothing.
+  """
+  markNotificationRead(id: ID!): MarkNotificationReadPayload!
+
+  """
+  Moves the ticket to a new status. The transition table is ticket-service's; an illegal move is an error, not a silent no-op.
+  """
+  transitionTicketStatus(id: ID!, reason: String, status: TicketStatus!): TicketMutationPayload!
+}
+
+type Notification {
+  actionUrl: String
+
+  """Who caused this notification. Null for a system event."""
+  actor: UserSummary
+  actorId: ID
+  archivedAt: DateTime
+  body: String
+  createdAt: DateTime!
+  id: ID!
+  organizationId: ID!
+  priority: String!
+  readAt: DateTime
+  resourceId: ID
+  resourceType: String
+  title: String!
+  type: String!
+}
+
+type NotificationFeed {
+  hasMore: Boolean!
+  items: [Notification!]!
+  nextCursor: String
+}
+
+type PageMeta {
+  currentPage: Int!
+  itemCount: Int!
+  itemsPerPage: Int!
+  totalItems: Int!
+  totalPages: Int!
+}
+
+type Query {
+  """
+  Per-agent throughput. Ask for `agent { … }` to resolve names through the users loader; a query that only wants the numbers costs no call to auth-service at all.
+  """
+  analyticsAgents(from: String!, to: String!): AgentAnalytics!
+
+  """
+  Which documents the AI retrieves and cites. `mostCited`, `neverRetrieved` and `retrievedNeverCited` are three different findings and are never merged.
+  """
+  analyticsDocuments(limit: Int = 20): DocumentAnalytics!
+
+  """
+  Where the knowledge base fails to answer — the empty-retrieval rate, and the documents flagged behind it.
+  """
+  analyticsKnowledgeGaps(from: String!, limit: Int = 20, to: String!): KnowledgeGaps!
+
+  """
+  Headline figures for a date range. `computedAt` says when the rollups ran and `dataThrough` says what they cover — the gap between them is how a stale scheduler is diagnosed.
+  """
+  analyticsOverview(from: String!, to: String!): AnalyticsOverview!
+
+  """
+  Which build is answering this request. The GraphQL twin of GET /version.
+  """
+  apiInfo: ApiInfo!
+
+  """Departments in the caller’s tenant."""
+  departments(first: Int! = 10, page: Int! = 1, searchTerm: String): DepartmentPage!
+
+  """
+  One document. Null when it does not exist, or is scoped to a department the caller is not in — deliberately indistinguishable.
+  """
+  document(id: ID!): Document
+
+  """Documents visible to the caller."""
+  documents(first: Int! = 10, page: Int! = 1, searchTerm: String): DocumentPage!
+
+  """The authenticated caller. Requires no permission."""
+  me: User
+
+  """The caller's own notification feed, newest first."""
+  notifications(cursor: String, first: Int! = 20): NotificationFeed!
+
+  """
+  A single ticket by id. Null when it does not exist, or belongs to another tenant, or is not visible to this caller — the three are deliberately indistinguishable.
+  """
+  ticket(id: ID!): Ticket
+
+  """
+  A page of tickets visible to the caller. `first` is clamped to 100; asking for more returns that many rather than an error.
+  """
+  tickets(assigneeId: String, authorId: String, departmentId: String, first: Int! = 10, page: Int! = 1, priority: TicketPriority, sortBy: String, source: TicketSource, status: TicketStatus): TicketPage!
+
+  """
+  How many unread notifications the caller has. A number, not a list — counting by fetching is the thing this exists to avoid.
+  """
+  unreadNotificationCount: Int!
+
+  """
+  One user in full, including contact details. Requires `user.read` — the same check `GET /users/:id` applies. Edges expose `UserSummary`.
+  """
+  user(id: ID!): User
+
+  """
+  Users in the tenant. Requires `user.read`, like `GET /users`. The rows are summaries, not full profiles — the same narrowing the REST list applies.
+  """
+  users(first: Int! = 10, page: Int! = 1, searchTerm: String): UserPage!
+}
+
+type Rate {
+  denominator: Int!
+  numerator: Int!
+  rate: Float
+}
+
+"""
+A support ticket. Reads are narrowed by ticket-service to what the caller authored or is assigned, unless they hold `ticket.read.all`.
+"""
+type Ticket {
+  """
+  The agent this ticket is assigned to. Null when unassigned, or when the user could not be resolved — one unreachable peer costs this field, not the response.
+  """
+  assignee: UserSummary
+
+  """Who raised the ticket."""
+  author: UserSummary
+  authorId: ID!
+  createdAt: DateTime!
+  currentAssigneeId: ID
+  currentDepartmentId: ID
+  deletedAt: DateTime
+  deletedById: ID
+
+  """The department currently handling this ticket."""
+  department: Department
+  description: String!
+  escalatedAt: DateTime
+  id: ID!
+
+  """
+  The ticket thread, oldest first. Internal notes are filtered by ticket-service for callers without agent access — the same rule the REST list and the WebSocket fan-out apply.
+  """
+  messages(first: Int! = 50): [TicketMessage!]!
+  organizationId: ID!
+  priority: TicketPriority
+  resolvedAt: DateTime
+  source: TicketSource
+  status: TicketStatus
+  ticketNumber: Int!
+  title: String!
+  updatedAt: DateTime!
+}
+
+type TicketMessage {
+  completionTokens: Int
+  content: String!
+  createdAt: DateTime!
+  editedAt: DateTime
+  id: ID!
+  isAiGenerated: Boolean!
+  isInternalNote: Boolean!
+  modelName: String
+  promptTokens: Int
+  redactedAt: DateTime
+
+  """
+  Who wrote the message. Null for an AI-generated one — no user did, and naming one would put words in their mouth in a permanent record.
+  """
+  sender: UserSummary
+  senderId: ID
+  ticketId: ID!
+}
+
+type TicketMutationPayload {
+  message: String
+  ticket: Ticket!
+}
+
+type TicketPage {
+  items: [Ticket!]!
+  meta: PageMeta!
+}
+
+"""How urgent the requester or an agent considers this ticket."""
+enum TicketPriority {
+  HIGH
+  LOW
+  MEDIUM
+  URGENT
+}
+
+"""
+How the ticket arrived. `CHAT` is a self-service conversation; the others are raised through their named channel.
+"""
+enum TicketSource {
+  API
+  CHAT
+  EMAIL
+  WEB
+}
+
+"""
+Where a ticket sits in its lifecycle. Transitions are enforced by ticket-service, not by the client.
+"""
+enum TicketStatus {
+  CLOSED
+  ESCALATED
+  NEW
+  OPEN
+  PENDING_AGENT
+  RESOLVED
+}
+
+type UnavailableBlock {
+  reason: String!
+  source: String!
+}
+
+"""
+A user in full, including contact details. Reachable only from `Query.user` / `Query.me`, both behind the same permission the REST routes apply — edges expose `UserSummary` instead.
+"""
+type User {
+  avatarUrl: String
+  createdAt: DateTime!
+
+  """
+  How many departments this user belongs to. The `departments` edge is capped at 50; this is the true total.
+  """
+  departmentCount: Int!
+  departmentIds: [ID!]!
+
+  """Departments this user belongs to."""
+  departments: [Department!]!
+  dob: String
+  email: String!
+  fullName: String!
+  gender: Gender!
+  id: ID!
+  isEmailVerified: Boolean!
+  isLocked: Boolean!
+  isPhoneVerified: Boolean!
+  isTwoFactorEnabled: Boolean!
+  lastLoginAt: DateTime
+  lockedUntil: DateTime
+  organizationId: ID
+  phoneNumber: String
+  updatedAt: DateTime!
+}
+
+type UserPage {
+  items: [User!]!
+  meta: PageMeta!
+}
+
+"""
+A user as seen through an edge — name and avatar only. Reachable with whatever permission the edge itself required; `User` and its contact details are behind `Query.user` and `user.read`.
+"""
+type UserSummary {
+  avatarUrl: String
+  deletedAt: DateTime
+  fullName: String!
+  id: ID!
+  isLocked: Boolean!
+}

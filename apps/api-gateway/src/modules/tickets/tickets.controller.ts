@@ -20,7 +20,7 @@ import { PermissionGuard } from '../../common/guards/permission.guard';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ResponseMessage } from '../../common/decorators/response-message.decorator';
-import { PaginationResponseBase } from '../../common/dto/base/pagination-response-base.dto';
+import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
 import { TicketsGrpcClient } from './tickets-grpc.client';
 import { AssignmentsGrpcClient } from './assignments-grpc.client';
 import { AiGrpcClient } from './ai-grpc.client';
@@ -78,14 +78,11 @@ export class TicketsController {
   @ApiOperation({ summary: 'Queue view' })
   @ApiWrappedResponse(Paginated(TicketResponseDto))
   @ApiFilterErrors(['401'])
-  @ApiOperation({ summary: 'Queue view' })
-  @ApiWrappedResponse(Paginated(TicketResponseDto))
-  @ApiFilterErrors(['401'])
   @Get()
   list(
     @CurrentUser() context: RequestContext,
     @Query() query: ListTicketsQueryDto,
-  ): Promise<PaginationResponseBase<TicketResponseDto>> {
+  ): Promise<PaginationResponseDto<TicketResponseDto>> {
     // `includeDeleted` needs the module's MANAGE permission, not its read one.
     // Checked here rather than with a second `@RequirePermission` because that
     // decorator gates the whole ROUTE, and gating this route would deny every
@@ -108,11 +105,6 @@ export class TicketsController {
   })
   @ApiWrappedResponse(TicketResponseDto)
   @ApiFilterErrors(['400', '401', '404'])
-  @ApiOperation({
-    summary: 'Lookup by human-friendly ticket_number (e.g. #1042)',
-  })
-  @ApiWrappedResponse(TicketResponseDto)
-  @ApiFilterErrors(['400', '401', '404'])
   @Get('by-number/:ticketNumber')
   getByNumber(
     @CurrentUser() context: RequestContext,
@@ -121,12 +113,6 @@ export class TicketsController {
     return this.ticketsGrpcClient.getByNumber(ticketNumber, context);
   }
 
-  @ApiOperation({
-    summary:
-      'Full detail: ticket + author + current_assignee + current_department + status + ai_summaries + attachment counts',
-  })
-  @ApiWrappedResponse(TicketResponseDto)
-  @ApiFilterErrors(['400', '401', '404'])
   @ApiOperation({
     summary:
       'Full detail: ticket + author + current_assignee + current_department + status + ai_summaries + attachment counts',
@@ -144,9 +130,6 @@ export class TicketsController {
   @ApiOperation({ summary: 'Create' })
   @ApiWrappedResponse(TicketResponseDto, { status: HttpStatus.CREATED })
   @ApiFilterErrors(['400', '401', '403'])
-  @ApiOperation({ summary: 'Create' })
-  @ApiWrappedResponse(TicketResponseDto, { status: HttpStatus.CREATED })
-  @ApiFilterErrors(['400', '401', '403'])
   @Post()
   @RequirePermission('ticket.create')
   @ResponseMessage('Ticket created')
@@ -157,9 +140,6 @@ export class TicketsController {
     return this.ticketsGrpcClient.create(dto, context);
   }
 
-  @ApiOperation({ summary: 'Update' })
-  @ApiWrappedResponse(TicketResponseDto)
-  @ApiFilterErrors(['400', '401', '403', '404'])
   @ApiOperation({ summary: 'Update' })
   @ApiWrappedResponse(TicketResponseDto)
   @ApiFilterErrors(['400', '401', '403', '404'])
@@ -196,9 +176,6 @@ export class TicketsController {
   @ApiOperation({ summary: 'Bulk change status' })
   @ApiWrappedResponse(BulkTicketStatusResponseDto)
   @ApiFilterErrors(['400', '401', '403'])
-  @ApiOperation({ summary: 'Bulk change status' })
-  @ApiWrappedResponse(BulkTicketStatusResponseDto)
-  @ApiFilterErrors(['400', '401', '403'])
   @Post('bulk/status')
   @RequirePermission('ticket.update')
   @HttpCode(HttpStatus.OK)
@@ -210,9 +187,6 @@ export class TicketsController {
     return this.ticketsGrpcClient.bulkChangeStatus(dto, context);
   }
 
-  @ApiOperation({ summary: 'Change status' })
-  @ApiWrappedResponse(TicketResponseDto)
-  @ApiFilterErrors(['400', '401', '403', '404'])
   @ApiOperation({ summary: 'Change status' })
   @ApiWrappedResponse(TicketResponseDto)
   @ApiFilterErrors(['400', '401', '403', '404'])
@@ -250,9 +224,6 @@ export class TicketsController {
   @ApiOperation({ summary: 'Escalate' })
   @ApiWrappedResponse(TicketResponseDto)
   @ApiFilterErrors(['400', '401', '404'])
-  @ApiOperation({ summary: 'Escalate' })
-  @ApiWrappedResponse(TicketResponseDto)
-  @ApiFilterErrors(['400', '401', '404'])
   @Post(':id/escalate')
   @HttpCode(HttpStatus.OK)
   @ResponseMessage('Ticket escalated')
@@ -263,9 +234,6 @@ export class TicketsController {
     return this.ticketsGrpcClient.escalate(id, context);
   }
 
-  @ApiOperation({ summary: 'Resolve' })
-  @ApiWrappedResponse(TicketResponseDto)
-  @ApiFilterErrors(['400', '401', '403', '404'])
   @ApiOperation({ summary: 'Resolve' })
   @ApiWrappedResponse(TicketResponseDto)
   @ApiFilterErrors(['400', '401', '403', '404'])
@@ -283,9 +251,6 @@ export class TicketsController {
   @ApiOperation({ summary: 'Reopen' })
   @ApiWrappedResponse(TicketResponseDto)
   @ApiFilterErrors(['400', '401', '403', '404'])
-  @ApiOperation({ summary: 'Reopen' })
-  @ApiWrappedResponse(TicketResponseDto)
-  @ApiFilterErrors(['400', '401', '403', '404'])
   @Post(':id/reopen')
   @RequirePermission('ticket.update')
   @HttpCode(HttpStatus.OK)
@@ -297,9 +262,6 @@ export class TicketsController {
     return this.ticketsGrpcClient.reopen(id, context);
   }
 
-  @ApiOperation({ summary: 'Close' })
-  @ApiWrappedResponse(TicketResponseDto)
-  @ApiFilterErrors(['400', '401', '403', '404'])
   @ApiOperation({ summary: 'Close' })
   @ApiWrappedResponse(TicketResponseDto)
   @ApiFilterErrors(['400', '401', '403', '404'])
@@ -331,12 +293,6 @@ export class TicketsController {
   })
   @ApiWrappedResponse(SimilarTicketDto, { isArray: true })
   @ApiFilterErrors(['400', '401', '403', '404'])
-  @ApiOperation({
-    summary:
-      'Past resolved tickets with similar content — agent co-pilot (product §6.3)',
-  })
-  @ApiWrappedResponse(SimilarTicketDto, { isArray: true })
-  @ApiFilterErrors(['400', '401', '403', '404'])
   @Get(':id/similar')
   @RequirePermission('ticket.read.all')
   listSimilar(
@@ -358,9 +314,6 @@ export class TicketsController {
    * client to know it would mean a client that guessed wrong got an error for
    * something it had no way to check without a prior read.
    */
-  @ApiOperation({ summary: 'Assign' })
-  @ApiWrappedResponse(AssignmentResponseDto)
-  @ApiFilterErrors(['400', '401', '403', '404'])
   @ApiOperation({ summary: 'Assign' })
   @ApiWrappedResponse(AssignmentResponseDto)
   @ApiFilterErrors(['400', '401', '403', '404'])
@@ -388,9 +341,6 @@ export class TicketsController {
   @ApiOperation({ summary: 'Reassign' })
   @ApiWrappedResponse(AssignmentResponseDto)
   @ApiFilterErrors(['400', '401', '403', '404'])
-  @ApiOperation({ summary: 'Reassign' })
-  @ApiWrappedResponse(AssignmentResponseDto)
-  @ApiFilterErrors(['400', '401', '403', '404'])
   @Post(':id/reassign')
   @RequirePermission('ticket.reassign')
   @HttpCode(HttpStatus.OK)
@@ -412,9 +362,6 @@ export class TicketsController {
   @ApiOperation({ summary: 'Assign to self' })
   @ApiWrappedResponse(AssignmentResponseDto)
   @ApiFilterErrors(['400', '401', '403', '404'])
-  @ApiOperation({ summary: 'Assign to self' })
-  @ApiWrappedResponse(AssignmentResponseDto)
-  @ApiFilterErrors(['400', '401', '403', '404'])
   @Post(':id/assign/self')
   @RequirePermission('ticket.assign.self')
   @HttpCode(HttpStatus.OK)
@@ -427,9 +374,6 @@ export class TicketsController {
     return this.assignmentsGrpcClient.assignToSelf(id, dto, context);
   }
 
-  @ApiOperation({ summary: 'Unassign' })
-  @ApiWrappedResponse(undefined, { status: HttpStatus.NO_CONTENT })
-  @ApiFilterErrors(['400', '401', '403', '404'])
   @ApiOperation({ summary: 'Unassign' })
   @ApiWrappedResponse(undefined, { status: HttpStatus.NO_CONTENT })
   @ApiFilterErrors(['400', '401', '403', '404'])
@@ -457,12 +401,6 @@ export class TicketsController {
   })
   @ApiWrappedResponse(AssignmentResponseDto, { isArray: true })
   @ApiFilterErrors(['400', '401', '404'])
-  @ApiOperation({
-    summary:
-      'Assignment history: full lifecycle of who held ticket, when, which department, why',
-  })
-  @ApiWrappedResponse(AssignmentResponseDto, { isArray: true })
-  @ApiFilterErrors(['400', '401', '404'])
   @Get(':id/assignments')
   listAssignments(
     @CurrentUser() context: RequestContext,
@@ -476,9 +414,6 @@ export class TicketsController {
   @ApiOperation({ summary: 'Remove' })
   @ApiWrappedResponse(undefined, { status: HttpStatus.NO_CONTENT })
   @ApiFilterErrors(['400', '401', '403', '404'])
-  @ApiOperation({ summary: 'Remove' })
-  @ApiWrappedResponse(undefined, { status: HttpStatus.NO_CONTENT })
-  @ApiFilterErrors(['400', '401', '403', '404'])
   @Delete(':id')
   @RequirePermission('ticket.delete')
   @HttpCode(HttpStatus.NO_CONTENT)
@@ -489,9 +424,6 @@ export class TicketsController {
     return this.ticketsGrpcClient.remove(id, context);
   }
 
-  @ApiOperation({ summary: 'Restore' })
-  @ApiWrappedResponse(TicketResponseDto)
-  @ApiFilterErrors(['400', '401', '403', '404'])
   @ApiOperation({ summary: 'Restore' })
   @ApiWrappedResponse(TicketResponseDto)
   @ApiFilterErrors(['400', '401', '403', '404'])

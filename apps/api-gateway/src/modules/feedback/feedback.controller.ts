@@ -17,7 +17,7 @@ import { PermissionGuard } from '../../common/guards/permission.guard';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ResponseMessage } from '../../common/decorators/response-message.decorator';
-import { PaginationResponseBase } from '../../common/dto/base/pagination-response-base.dto';
+import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
 import { FeedbackGrpcClient } from './feedback-grpc.client';
 import { FeedbackResponseDto } from './dto/rest/feedback-response.dto';
 import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -60,12 +60,6 @@ export class MessageFeedbackController {
   })
   @ApiWrappedResponse(FeedbackResponseDto)
   @ApiFilterErrors(['400', '401', '404'])
-  @ApiOperation({
-    summary:
-      'Thumbs up/down on an AI answer → ai_response_feedbacks (rating ∈ {1,-1}, feedback_text?, citation_accurate?)',
-  })
-  @ApiWrappedResponse(FeedbackResponseDto)
-  @ApiFilterErrors(['400', '401', '404'])
   @Post()
   @HttpCode(HttpStatus.OK)
   @ResponseMessage('Feedback recorded')
@@ -82,9 +76,6 @@ export class MessageFeedbackController {
    * `(messageId, callerId)`, so there is no parameter through which one user
    * could withdraw another's opinion.
    */
-  @ApiOperation({ summary: 'Withdraw feedback' })
-  @ApiWrappedResponse(undefined, { status: HttpStatus.NO_CONTENT })
-  @ApiFilterErrors(['400', '401', '404'])
   @ApiOperation({ summary: 'Withdraw feedback' })
   @ApiWrappedResponse(undefined, { status: HttpStatus.NO_CONTENT })
   @ApiFilterErrors(['400', '401', '404'])
@@ -114,15 +105,12 @@ export class FeedbackController {
   @ApiOperation({ summary: 'Own feedback on that message' })
   @ApiWrappedResponse(Paginated(FeedbackResponseDto))
   @ApiFilterErrors(['401', '403'])
-  @ApiOperation({ summary: 'Own feedback on that message' })
-  @ApiWrappedResponse(Paginated(FeedbackResponseDto))
-  @ApiFilterErrors(['401', '403'])
   @Get()
   @RequirePermission('analytics.read')
   list(
     @CurrentUser() context: RequestContext,
     @Query() query: ListFeedbackQueryDto,
-  ): Promise<PaginationResponseBase<FeedbackResponseDto>> {
+  ): Promise<PaginationResponseDto<FeedbackResponseDto>> {
     return this.feedbackGrpcClient.list(query, context);
   }
 }

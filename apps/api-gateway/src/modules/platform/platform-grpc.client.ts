@@ -2,21 +2,19 @@ import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { ClientGrpc } from '@nestjs/microservices';
 import {
   AUTH_GRPC_CLIENT,
-  fromTimestamp,
+  fromProtoTimestamp,
   PLATFORM_SERVICE_NAME,
-  PlatformOrganizationResponse,
   PlatformServiceClient,
-  requireTimestamp,
+  requireProtoTimestamp,
   toPageRequest,
   toProtoOrgStatus,
 } from '@synapsedesk/grpc-proto';
 import { RequestContext } from '@synapsedesk/common';
 import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
-import { PaginationResponseBase } from '../../common/dto/base/pagination-response-base.dto';
-import { toPaginationMeta } from '../../common/mappers/pagination.mapper';
+import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
+import { toPaginationMetaDataResponseDto } from '../../common/mappers/pagination.mapper';
 import { toUserResponseDto } from '../users/user.mapper';
-import { toRoleDto } from '../roles/role.mapper';
-import { toOrganizationDto } from '../organizations/organization.mapper';
+import { toRoleResponseDto } from '../roles/role.mapper';
 import {
   CreateGlobalRoleDto,
   CreatePlatformOrganizationDto,
@@ -32,6 +30,7 @@ import {
   SetOrganizationStatusDto,
   UpdatePlatformOrganizationDto,
 } from './dto/rest/platform.dto';
+import { toPlatformOrganizationResponseDto } from './platform.mapper';
 
 @Injectable()
 export class PlatformGrpcClient extends BaseGrpcClient implements OnModuleInit {
@@ -52,7 +51,7 @@ export class PlatformGrpcClient extends BaseGrpcClient implements OnModuleInit {
   async listOrganizations(
     query: ListPlatformOrganizationsQueryDto,
     context: RequestContext,
-  ): Promise<PaginationResponseBase<PlatformOrganizationResponseDto>> {
+  ): Promise<PaginationResponseDto<PlatformOrganizationResponseDto>> {
     const response = await this.call(
       (metadata) =>
         this.platformGrpcService.listOrganizations(
@@ -70,8 +69,8 @@ export class PlatformGrpcClient extends BaseGrpcClient implements OnModuleInit {
     );
 
     return {
-      items: response.items.map(toPlatformOrganizationDto),
-      meta: toPaginationMeta(response.meta),
+      items: response.items.map(toPlatformOrganizationResponseDto),
+      meta: toPaginationMetaDataResponseDto(response.meta),
     };
   }
 
@@ -79,7 +78,7 @@ export class PlatformGrpcClient extends BaseGrpcClient implements OnModuleInit {
     organizationId: string,
     context: RequestContext,
   ): Promise<PlatformOrganizationResponseDto> {
-    return toPlatformOrganizationDto(
+    return toPlatformOrganizationResponseDto(
       await this.call(
         (metadata) =>
           this.platformGrpcService.getOrganization(
@@ -115,7 +114,7 @@ export class PlatformGrpcClient extends BaseGrpcClient implements OnModuleInit {
     );
 
     return {
-      organization: toPlatformOrganizationDto(response.organization!),
+      organization: toPlatformOrganizationResponseDto(response.organization!),
       admin: toUserResponseDto(response.admin!),
     };
   }
@@ -125,7 +124,7 @@ export class PlatformGrpcClient extends BaseGrpcClient implements OnModuleInit {
     dto: UpdatePlatformOrganizationDto,
     context: RequestContext,
   ): Promise<PlatformOrganizationResponseDto> {
-    return toPlatformOrganizationDto(
+    return toPlatformOrganizationResponseDto(
       await this.call(
         (metadata) =>
           this.platformGrpcService.updateOrganization(
@@ -142,7 +141,7 @@ export class PlatformGrpcClient extends BaseGrpcClient implements OnModuleInit {
     dto: SetOrganizationStatusDto,
     context: RequestContext,
   ): Promise<PlatformOrganizationResponseDto> {
-    return toPlatformOrganizationDto(
+    return toPlatformOrganizationResponseDto(
       await this.call(
         (metadata) =>
           this.platformGrpcService.setOrganizationStatus(
@@ -163,7 +162,7 @@ export class PlatformGrpcClient extends BaseGrpcClient implements OnModuleInit {
     reason: string,
     context: RequestContext,
   ): Promise<PlatformOrganizationResponseDto> {
-    return toPlatformOrganizationDto(
+    return toPlatformOrganizationResponseDto(
       await this.call(
         (metadata) =>
           this.platformGrpcService.resetBillingCycle(
@@ -194,7 +193,7 @@ export class PlatformGrpcClient extends BaseGrpcClient implements OnModuleInit {
     organizationId: string,
     context: RequestContext,
   ): Promise<PlatformOrganizationResponseDto> {
-    return toPlatformOrganizationDto(
+    return toPlatformOrganizationResponseDto(
       await this.call(
         (metadata) =>
           this.platformGrpcService.restoreOrganization(
@@ -209,7 +208,7 @@ export class PlatformGrpcClient extends BaseGrpcClient implements OnModuleInit {
   async listUsers(
     query: ListPlatformUsersQueryDto,
     context: RequestContext,
-  ): Promise<PaginationResponseBase<PlatformUserResponseDto>> {
+  ): Promise<PaginationResponseDto<PlatformUserResponseDto>> {
     const response = await this.call(
       (metadata) =>
         this.platformGrpcService.listUsers(
@@ -229,16 +228,16 @@ export class PlatformGrpcClient extends BaseGrpcClient implements OnModuleInit {
         organizationId: row.organizationId ?? null,
         organizationName: row.organizationName ?? null,
         roleNames: row.roleNames,
-        deletedAt: fromTimestamp(row.deletedAt) ?? null,
+        deletedAt: fromProtoTimestamp(row.deletedAt) ?? null,
       })),
-      meta: toPaginationMeta(response.meta),
+      meta: toPaginationMetaDataResponseDto(response.meta),
     };
   }
 
   async listGlobalRoles(
     query: ListPlatformUsersQueryDto,
     context: RequestContext,
-  ): Promise<PaginationResponseBase<RoleResponseDto>> {
+  ): Promise<PaginationResponseDto<RoleResponseDto>> {
     const response = await this.call(
       (metadata) =>
         this.platformGrpcService.listGlobalRoles(
@@ -249,8 +248,8 @@ export class PlatformGrpcClient extends BaseGrpcClient implements OnModuleInit {
     );
 
     return {
-      items: response.items.map(toRoleDto),
-      meta: toPaginationMeta(response.meta),
+      items: response.items.map(toRoleResponseDto),
+      meta: toPaginationMetaDataResponseDto(response.meta),
     };
   }
 
@@ -258,7 +257,7 @@ export class PlatformGrpcClient extends BaseGrpcClient implements OnModuleInit {
     dto: CreateGlobalRoleDto,
     context: RequestContext,
   ): Promise<RoleResponseDto> {
-    return toRoleDto(
+    return toRoleResponseDto(
       await this.call(
         (metadata) =>
           this.platformGrpcService.createGlobalRole(
@@ -291,19 +290,7 @@ export class PlatformGrpcClient extends BaseGrpcClient implements OnModuleInit {
       liveSessions: response.liveSessions,
       seatsAllocated: response.seatsAllocated,
       seatsInUse: response.seatsInUse,
-      generatedAt: requireTimestamp(response.generatedAt, 'generatedAt'),
+      generatedAt: requireProtoTimestamp(response.generatedAt, 'generatedAt'),
     };
   }
-}
-
-function toPlatformOrganizationDto(
-  row: PlatformOrganizationResponse,
-): PlatformOrganizationResponseDto {
-  return {
-    organization: toOrganizationDto(row.organization!),
-    userCount: row.userCount,
-    pendingInvitationCount: row.pendingInvitationCount,
-    departmentCount: row.departmentCount,
-    deletedAt: fromTimestamp(row.deletedAt) ?? null,
-  };
 }

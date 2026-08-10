@@ -5,14 +5,14 @@ import {
   AuditLogResponse,
   CallerContext,
   emptyPage,
-  fromTimestamp,
+  fromProtoTimestamp,
   ListAuditActionsRequest,
   ListAuditActionsResponse,
   ListAuditLogsRequest,
   ListAuditLogsResponse,
   toPageMeta,
   toPrismaPage,
-  toTimestamp,
+  toProtoTimestamp,
 } from '@synapsedesk/grpc-proto';
 import {
   AUDIT_LOG_SORTABLE_FIELDS,
@@ -36,7 +36,7 @@ function toAuditLogResponse(log: AuditLog): AuditLogResponse {
     // only be a `map<string, string>` — which would flatten every nested value
     // in the before/after diff into uselessness.
     metadata: JSON.stringify(log.metadata ?? {}),
-    createdAt: toTimestamp(log.createdAt),
+    createdAt: toProtoTimestamp(log.createdAt),
   };
 }
 
@@ -69,8 +69,8 @@ export class AuditReadService {
       AUDIT_LOG_SORTABLE_FIELDS,
     );
 
-    const from = fromTimestamp(request.from);
-    const to = fromTimestamp(request.to);
+    const from = fromProtoTimestamp(request.from);
+    const to = fromProtoTimestamp(request.to);
 
     const where: Prisma.AuditLogWhereInput = {
       ...this.scope(request.platformScope, context),

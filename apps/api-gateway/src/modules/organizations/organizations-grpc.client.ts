@@ -5,13 +5,15 @@ import {
   ORGANIZATION_SERVICE_NAME,
   OrganizationServiceClient,
   fromProtoAiModelTier,
-  requireTimestamp,
-  UsageMeter,
+  requireProtoTimestamp,
   fromProtoOrgStatus,
 } from '@synapsedesk/grpc-proto';
 import { RequestContext } from '@synapsedesk/common';
 import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
-import { toOrganizationDto } from './organization.mapper';
+import {
+  toOrganizationResponseDto,
+  toUsageMeterDto,
+} from './organization.mapper';
 import {
   DeleteOrganizationDto,
   OffboardResponseDto,
@@ -21,7 +23,6 @@ import {
   OrganizationUsageResponseDto,
   UpdateOrganizationDto,
   UpdateOrganizationSettingsDto,
-  UsageMeterDto,
 } from './dto/rest/organization.dto';
 
 @Injectable()
@@ -45,7 +46,7 @@ export class OrganizationsGrpcClient
   }
 
   async getCurrent(context: RequestContext): Promise<OrganizationResponseDto> {
-    return toOrganizationDto(
+    return toOrganizationResponseDto(
       await this.call(
         (metadata) =>
           this.organizationGrpcService.getCurrentOrganization({}, metadata),
@@ -58,7 +59,7 @@ export class OrganizationsGrpcClient
     dto: UpdateOrganizationDto,
     context: RequestContext,
   ): Promise<OrganizationResponseDto> {
-    return toOrganizationDto(
+    return toOrganizationResponseDto(
       await this.call(
         (metadata) =>
           this.organizationGrpcService.updateOrganization(
@@ -112,18 +113,18 @@ export class OrganizationsGrpcClient
     );
 
     return {
-      seats: toMeterDto(response.seats),
-      storage: toMeterDto(response.storage),
-      aiTokens: toMeterDto(response.aiTokens),
+      seats: toUsageMeterDto(response.seats),
+      storage: toUsageMeterDto(response.storage),
+      aiTokens: toUsageMeterDto(response.aiTokens),
       // Mapped back to the DOMAIN string rather than passed through as a proto
       // enum number: `aiModelTier: 1` in a JSON body is meaningless to the
       // client that has to render it.
       aiModelTier: fromProtoAiModelTier(response.aiModelTier),
       planName: response.planName,
       currentPeriodEnd: response.currentPeriodEnd
-        ? requireTimestamp(response.currentPeriodEnd, 'currentPeriodEnd')
+        ? requireProtoTimestamp(response.currentPeriodEnd, 'currentPeriodEnd')
         : null,
-      billingCycleStart: requireTimestamp(
+      billingCycleStart: requireProtoTimestamp(
         response.billingCycleStart,
         'billingCycleStart',
       ),
@@ -145,7 +146,7 @@ export class OrganizationsGrpcClient
   async completeOnboarding(
     context: RequestContext,
   ): Promise<OrganizationResponseDto> {
-    return toOrganizationDto(
+    return toOrganizationResponseDto(
       await this.call(
         (metadata) =>
           this.organizationGrpcService.completeOnboarding({}, metadata),
@@ -167,24 +168,4 @@ export class OrganizationsGrpcClient
       context,
     );
   }
-}
-
-/**
- * Unset numbers become `null`, never 0.
- *
- * A meter reporting `used: 0` claims the tenant has consumed nothing; a meter
- * whose domain does not exist yet cannot make that claim, and the difference
- * matters to anyone reading a usage page before deciding to upgrade.
- */
-function toMeterDto(meter: UsageMeter | undefined): UsageMeterDto {
-  if (!meter) {
-    throw new Error('Received a usage response without a meter');
-  }
-
-  return {
-    available: meter.available,
-    used: meter.available ? (meter.used ?? null) : null,
-    limit: meter.available ? (meter.limit ?? null) : null,
-    unavailableReason: meter.unavailableReason ?? null,
-  };
 }

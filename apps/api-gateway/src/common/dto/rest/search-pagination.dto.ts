@@ -7,7 +7,7 @@ import {
   type SortOrder,
 } from '@synapsedesk/common';
 
-export class SearchPaginationBase {
+export class SearchPaginationDto {
   @IsOptional()
   @IsInt()
   @Min(1)

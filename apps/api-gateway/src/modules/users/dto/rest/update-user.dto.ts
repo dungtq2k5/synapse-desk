@@ -1,5 +1,5 @@
 import { PartialType, PickType } from '@nestjs/swagger';
-import { UserBase } from '../base/user.base';
+import { UserResponseDto } from './user-response.dto';
 
 /**
  * `avatarUrl` is absent here and on UpdateOwnProfileDto, and that absence is
@@ -9,7 +9,7 @@ import { UserBase } from '../base/user.base';
  * replaces. Accepting a raw string here would skip both.
  */
 export class UpdateUserDto extends PartialType(
-  PickType(UserBase, ['fullName', 'phoneNumber', 'gender', 'dob']),
+  PickType(UserResponseDto, ['fullName', 'phoneNumber', 'gender', 'dob']),
 ) {}
 
 /**
@@ -25,5 +25,5 @@ export class UpdateUserDto extends PartialType(
  * keeping it narrow is the enforcement, not documentation of it.
  */
 export class UpdateOwnProfileDto extends PartialType(
-  PickType(UserBase, ['fullName', 'gender', 'dob']),
+  PickType(UserResponseDto, ['fullName', 'gender', 'dob']),
 ) {}

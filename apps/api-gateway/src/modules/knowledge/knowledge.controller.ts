@@ -59,12 +59,6 @@ export class KnowledgeController {
   })
   @ApiWrappedResponse(KnowledgeSearchResponseDto)
   @ApiFilterErrors(['400', '401'])
-  @ApiOperation({
-    summary:
-      "Hybrid semantic + keyword retrieval, filtered by tenant and the caller's departments (RDM §1.2)",
-  })
-  @ApiWrappedResponse(KnowledgeSearchResponseDto)
-  @ApiFilterErrors(['400', '401'])
   @Post('search')
   @HttpCode(HttpStatus.OK)
   @ResponseMessage('Search completed')

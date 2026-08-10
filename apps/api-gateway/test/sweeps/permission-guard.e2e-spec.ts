@@ -66,6 +66,13 @@ describe('PermissionGuard ANY semantics (unit)', () => {
     };
 
     return {
+      // **`getType` is required now**, and its absence is what this fixture
+      // taught: `PermissionGuard` reads the request through `requestOf`, which
+      // asks the context which transport it is before unwrapping it (26-doc
+      // §1.1). A mock without it returns `undefined`, takes the HTTP branch by
+      // accident, and would keep passing while the real guard had already
+      // moved on.
+      getType: () => 'http',
       switchToHttp: () => ({ getRequest: () => request }),
       getHandler: () => () => undefined,
       // A named stand-in for the controller class. The guard only ever passes
@@ -186,7 +193,7 @@ describe('PermissionGuard on real routes (e2e)', () => {
             seats: { available: true, used: 1, limit: 10 },
             storage: { available: false, unavailableReason: 'n/a' },
             aiTokens: { available: false, unavailableReason: 'n/a' },
-            // Non-optional on the wire: `requireTimestamp` throws on a missing
+            // Non-optional on the wire: `requireProtoTimestamp` throws on a missing
             // value rather than substituting a date, so omitting it here
             // produces a 500 and the route never reports on its guard.
             billingCycleStart: timestamp(),

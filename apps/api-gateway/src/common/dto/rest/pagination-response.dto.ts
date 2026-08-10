@@ -1,7 +1,7 @@
 /**
  * Pagination envelope for list endpoints.
  */
-export class PaginationMetaDataResponseBase {
+export class PaginationMetaDataResponseDto {
   /** Total matching records, across every page. */
   totalItems!: number;
 
@@ -16,8 +16,8 @@ export class PaginationMetaDataResponseBase {
   currentPage!: number;
 }
 
-export class PaginationResponseBase<T> {
+export class PaginationResponseDto<T> {
   items!: T[];
 
-  meta!: PaginationMetaDataResponseBase;
+  meta!: PaginationMetaDataResponseDto;
 }

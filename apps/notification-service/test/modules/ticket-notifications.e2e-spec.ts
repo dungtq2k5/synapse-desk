@@ -3,6 +3,7 @@ import {
   TICKET_PATTERNS,
   TicketEventOf,
   TicketStatus,
+  compareAlphabetically,
   ticketMessageGroupKey,
 } from '@synapsedesk/common';
 import { bootstrapE2eTest, E2eFixture } from '../utils/bootstrap';
@@ -252,7 +253,7 @@ describe('§3 Ticket notifications (e2e)', () => {
         DEPARTMENT,
       );
       await expect(recipientsOf()).resolves.toEqual(
-        [AGENT, OTHER_AGENT].sort(),
+        [AGENT, OTHER_AGENT].sort(compareAlphabetically),
       );
     });
 
@@ -284,7 +285,7 @@ describe('§3 Ticket notifications (e2e)', () => {
       });
 
       await expect(recipientsOf()).resolves.toEqual(
-        [AGENT, OTHER_AGENT].sort(),
+        [AGENT, OTHER_AGENT].sort(compareAlphabetically),
       );
     });
   });

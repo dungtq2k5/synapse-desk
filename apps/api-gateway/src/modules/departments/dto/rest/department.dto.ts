@@ -19,7 +19,7 @@ import {
   type DepartmentMemberSortableField,
   type DepartmentSortableField,
 } from '@synapsedesk/common';
-import { SearchPaginationBase } from '../../../../common/dto/base/search-pagination-base.dto';
+import { SearchPaginationDto } from '../../../../common/dto/rest/search-pagination.dto';
 import { ToBoolean } from '../../../../common/decorators/to-boolean.decorator';
 import {
   MAX_DEPARTMENT_MEMBERS_PER_BATCH,
@@ -28,7 +28,7 @@ import {
 } from '../../../../common/config/dto.config';
 import { trimIfString } from '@synapsedesk/common';
 
-export class ListDepartmentsQueryDto extends OmitType(SearchPaginationBase, [
+export class ListDepartmentsQueryDto extends OmitType(SearchPaginationDto, [
   'sortBy',
 ] as const) {
   @IsOptional()
@@ -68,7 +68,7 @@ export class ListDepartmentsQueryDto extends OmitType(SearchPaginationBase, [
  * and `forbidNonWhitelisted` should reject it rather than silently ignore it.
  */
 export class ListDepartmentMembersQueryDto extends OmitType(
-  SearchPaginationBase,
+  SearchPaginationDto,
   ['sortBy'] as const,
 ) {
   @IsOptional()

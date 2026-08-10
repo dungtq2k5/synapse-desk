@@ -26,14 +26,13 @@ import {
   type OrganizationSortableField,
   type UserSortableField,
 } from '@synapsedesk/common';
-import { SearchPaginationBase } from '../../../../common/dto/base/search-pagination-base.dto';
+import { SearchPaginationDto } from '../../../../common/dto/rest/search-pagination.dto';
 import { ToBoolean } from '../../../../common/decorators/to-boolean.decorator';
 import { UserResponseDto } from '../../../users/dto/rest/user-response.dto';
 import { OrganizationResponseDto } from '../../../organizations/dto/rest/organization.dto';
-import { RoleResponseDto } from '../../../roles/dto/rest/role.dto';
 
 export class ListPlatformOrganizationsQueryDto extends OmitType(
-  SearchPaginationBase,
+  SearchPaginationDto,
   ['sortBy'] as const,
 ) {
   @IsOptional()
@@ -62,7 +61,7 @@ export class ListPlatformOrganizationsQueryDto extends OmitType(
   readonly includeDeleted: boolean = false;
 }
 
-export class ListPlatformUsersQueryDto extends OmitType(SearchPaginationBase, [
+export class ListPlatformUsersQueryDto extends OmitType(SearchPaginationDto, [
   'sortBy',
 ] as const) {
   @IsOptional()
@@ -272,4 +271,12 @@ export class PlatformMetricsResponseDto {
 // `@ApiWrappedResponse(RoleResponseDto)` needs its runtime identity to build a
 // `$ref`; a type-only re-export erases the class and the reference cannot be
 // built at all.
-export { RoleResponseDto };
+//
+// **Live, and it reads as dead because nothing here mentions it again.** Both
+// `platform.controller.ts` and `platform-grpc.client.ts` import
+// `RoleResponseDto` from THIS module rather than from `roles/`, and the
+// controller passes it to four `@ApiWrappedResponse(…)` calls. Deleting the line
+// fails the build in both files — which is the check worth running before
+// deleting any re-export, because a barrel that is only ever read through is
+// indistinguishable from an unused one at the point of declaration.
+export { RoleResponseDto } from '../../../roles/dto/rest/role.dto';

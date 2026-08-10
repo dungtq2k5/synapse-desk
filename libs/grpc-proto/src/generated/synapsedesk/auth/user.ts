@@ -11,6 +11,13 @@ import { Observable } from "rxjs";
 import { Timestamp } from "../../google/protobuf/timestamp";
 import { Gender, PageMeta, PageRequest, UserResponse } from "./common";
 
+export enum UserProjection {
+  /** USER_PROJECTION_NOTIFICATION - The default keeps 18-doc's caller working with no change at its call site. */
+  USER_PROJECTION_NOTIFICATION = 0,
+  USER_PROJECTION_SUMMARY = 1,
+  UNRECOGNIZED = -1,
+}
+
 export interface GetCurrentUserRequest {
   userId: string;
 }
@@ -119,10 +126,63 @@ export interface ListPermissionHoldersResponse {
 export interface ListUsersByIdsRequest {
   organizationId: string;
   userIds: string[];
+  /**
+   * *Include locked and soft-deleted users** — 27-doc §3.
+   *
+   * Two callers, two different questions:
+   *
+   *   - notification audience: *"who can act on this?"* — exclude them
+   *   - GraphQL loader:        *"who IS this?"* — include them, with state
+   *
+   * A ticket assigned to someone who was locked this morning must still render
+   * their name; omitting them makes the assignee silently null and the UI shows
+   * a blank where "Former employee" belongs.
+   *
+   * A FLAG rather than a second RPC: one query, one tenant check, one place to
+   * get scoping wrong. Defaults false, so the existing caller is unchanged.
+   */
+  includeInactive: boolean;
+  /**
+   * Which shape to return — 27-doc §3.
+   *
+   * The notification projection carries `email`, `quiet_hours_*` and `timezone`.
+   * Quiet hours are meaningless to a loader, and **`email` is precisely what
+   * `UserSummary` must not expose** (25-doc §4). Sending it anyway would make
+   * the gateway hold, on every batch, forever, a field it is obliged to discard
+   * — and "we fetch it and drop it" is one careless mapper away from a leak.
+   */
+  projection: UserProjection;
 }
 
+/**
+ * What a GraphQL edge is allowed to see — 25-doc §4.
+ *
+ * A type reached by TRAVERSAL exposes only what the traversal's own permission
+ * justifies. `Ticket.assignee` is reachable with ticket access alone, so it
+ * carries a name and an avatar and nothing that would need `user.read`.
+ */
+export interface UserSummary {
+  userId: string;
+  fullName: string;
+  avatarUrl?:
+    | string
+    | undefined;
+  /**
+   * State, so the caller can render "Former employee" rather than infer it from
+   * an absence it cannot distinguish from a missing row.
+   */
+  isLocked: boolean;
+  deletedAt?: Timestamp | undefined;
+}
+
+/**
+ * *Exactly one of these is populated**, per the request's `projection`. Two
+ * fields rather than a `oneof` because a `oneof` of two repeated fields needs a
+ * wrapper message on each side for nothing.
+ */
 export interface ListUsersByIdsResponse {
   items: NotificationRecipient[];
+  summaries: UserSummary[];
 }
 
 export interface ListUsersRequest {

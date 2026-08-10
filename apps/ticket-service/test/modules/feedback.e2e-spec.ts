@@ -1,7 +1,7 @@
 import { expectRpc } from '@synapsedesk/common/testing/rpc';
 import { status } from '@grpc/grpc-js';
 import { faker } from '@faker-js/faker';
-import { toTimestamp } from '@synapsedesk/grpc-proto';
+import { toProtoTimestamp } from '@synapsedesk/grpc-proto';
 import {
   E2eFixture,
   bootstrapE2eTest,
@@ -482,8 +482,8 @@ describe('§2.8 AI feedback (e2e)', () => {
 
       const { items } = await feedback.listFeedback(
         listRequest({
-          from: toTimestamp(new Date('2026-05-01T00:00:00.000Z')),
-          to: toTimestamp(boundary),
+          from: toProtoTimestamp(new Date('2026-05-01T00:00:00.000Z')),
+          to: toProtoTimestamp(boundary),
         }),
         analyst(),
       );

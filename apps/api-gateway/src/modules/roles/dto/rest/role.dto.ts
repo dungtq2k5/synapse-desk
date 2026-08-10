@@ -18,7 +18,7 @@ import {
   type RoleSortableField,
   trimIfString,
 } from '@synapsedesk/common';
-import { SearchPaginationBase } from '../../../../common/dto/base/search-pagination-base.dto';
+import { SearchPaginationDto } from '../../../../common/dto/rest/search-pagination.dto';
 import { ToBoolean } from '../../../../common/decorators/to-boolean.decorator';
 import {
   MAX_ROLE_NAME_LENGTH,
@@ -31,7 +31,7 @@ import {
  * `sortBy: string` would accept any column name here and only fail two hops
  * away, in auth-service.
  */
-export class ListRolesQueryDto extends OmitType(SearchPaginationBase, [
+export class ListRolesQueryDto extends OmitType(SearchPaginationDto, [
   'sortBy',
 ] as const) {
   @IsOptional()

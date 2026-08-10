@@ -1139,11 +1139,21 @@ describe('the real-time relay (e2e)', () => {
         departmentIds: [departmentId],
       });
 
-      const [live] = (
+      // `find`, not a destructured `filter`: it stops at the first match, and
+      // it states that one socket is expected rather than leaving a reader to
+      // infer that from `[live]`.
+      const live = (
         await fx.app.get(RealtimeGateway).server.fetchSockets()
-      ).filter((candidate) => candidate.id === socket.id);
+      ).find((candidate) => candidate.id === socket.id);
 
-      expect([...live.rooms]).toContain(`dept:${departmentId}`);
+      // Asserted, not assumed — and this is what `find` bought beyond style.
+      // `const [live] = …filter(…)` is typed `T`, not `T | undefined`, so a
+      // socket that had not joined failed on the NEXT line with a TypeError
+      // about reading `rooms` of undefined: a passing-looking test crashing for
+      // a reason that named nothing. `find` types the absence, so the compiler
+      // demanded this line.
+      expect(live).toBeDefined();
+      expect([...live!.rooms]).toContain(`dept:${departmentId}`);
     });
 
     it('5. the uploader is told ONCE, not once per room they are in', async () => {

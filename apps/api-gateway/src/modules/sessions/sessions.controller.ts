@@ -54,9 +54,6 @@ export class SessionsController {
   @ApiOperation({ summary: 'List own sessions' })
   @ApiWrappedResponse(SessionResponseDto, { isArray: true })
   @ApiFilterErrors(['401'])
-  @ApiOperation({ summary: 'List own sessions' })
-  @ApiWrappedResponse(SessionResponseDto, { isArray: true })
-  @ApiFilterErrors(['401'])
   @Get()
   list(
     @CurrentUser() context: RequestContext,
@@ -80,9 +77,6 @@ export class SessionsController {
   @ApiOperation({ summary: 'Un-trust every device → forces 2FA everywhere' })
   @ApiWrappedResponse(RevokeTrustResponseDto)
   @ApiFilterErrors(['401'])
-  @ApiOperation({ summary: 'Un-trust every device → forces 2FA everywhere' })
-  @ApiWrappedResponse(RevokeTrustResponseDto)
-  @ApiFilterErrors(['401'])
   @Delete('trusted')
   @HttpCode(HttpStatus.OK)
   @ResponseMessage('Trusted devices cleared')
@@ -99,12 +93,6 @@ export class SessionsController {
    * Clears cookies when the target was the caller's own session, so "sign out
    * this device" pressed on that device behaves like a logout.
    */
-  @ApiOperation({
-    summary:
-      'Revoke one session — expires the whole family_id, so a rotation already in flight cannot outlive the revocation',
-  })
-  @ApiWrappedResponse()
-  @ApiFilterErrors(['400', '401', '404'])
   @ApiOperation({
     summary:
       'Revoke one session — expires the whole family_id, so a rotation already in flight cannot outlive the revocation',
@@ -138,12 +126,6 @@ export class SessionsController {
    * Drops "remember this device" while leaving the session signed in. The next
    * login from that device gets a 2FA prompt again.
    */
-  @ApiOperation({
-    summary:
-      'Drop device trust for one session (clear device_token_hash / trusted_until, is_trusted = false) while leaving it logged in',
-  })
-  @ApiWrappedResponse(RevokeTrustResponseDto)
-  @ApiFilterErrors(['400', '401', '404'])
   @ApiOperation({
     summary:
       'Drop device trust for one session (clear device_token_hash / trusted_until, is_trusted = false) while leaving it logged in',

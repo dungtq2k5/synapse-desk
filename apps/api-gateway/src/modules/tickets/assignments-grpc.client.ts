@@ -7,7 +7,10 @@ import {
 } from '@synapsedesk/grpc-proto';
 import { RequestContext } from '@synapsedesk/common';
 import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
-import { toAssignmentDto, toProtoReason } from './assignment.mapper';
+import {
+  toAssignmentResponseDto,
+  toProtoReassignmentReason,
+} from './assignment.mapper';
 import { AssignmentResponseDto } from './dto/rest/assignment-response.dto';
 import {
   AssignTicketDto,
@@ -41,7 +44,7 @@ export class AssignmentsGrpcClient
     dto: AssignTicketDto,
     context: RequestContext,
   ): Promise<AssignmentResponseDto> {
-    return toAssignmentDto(
+    return toAssignmentResponseDto(
       await this.call(
         (metadata) =>
           this.assignmentGrpcService.assignTicket(
@@ -49,7 +52,7 @@ export class AssignmentsGrpcClient
               ticketId,
               assigneeId: dto.assigneeId,
               departmentId: dto.departmentId,
-              reason: toProtoReason(dto.reason),
+              reason: toProtoReassignmentReason(dto.reason),
             },
             metadata,
           ),
@@ -68,7 +71,7 @@ export class AssignmentsGrpcClient
     dto: AssignTicketDto,
     context: RequestContext,
   ): Promise<AssignmentResponseDto> {
-    return toAssignmentDto(
+    return toAssignmentResponseDto(
       await this.call(
         (metadata) =>
           this.assignmentGrpcService.reassignTicket(
@@ -76,7 +79,7 @@ export class AssignmentsGrpcClient
               ticketId,
               assigneeId: dto.assigneeId,
               departmentId: dto.departmentId,
-              reason: toProtoReason(dto.reason),
+              reason: toProtoReassignmentReason(dto.reason),
             },
             metadata,
           ),
@@ -90,7 +93,7 @@ export class AssignmentsGrpcClient
     dto: AssignTicketToSelfDto,
     context: RequestContext,
   ): Promise<AssignmentResponseDto> {
-    return toAssignmentDto(
+    return toAssignmentResponseDto(
       await this.call(
         (metadata) =>
           this.assignmentGrpcService.assignTicketToSelf(
@@ -120,6 +123,6 @@ export class AssignmentsGrpcClient
       context,
     );
 
-    return response.items.map(toAssignmentDto);
+    return response.items.map(toAssignmentResponseDto);
   }
 }

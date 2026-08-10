@@ -426,12 +426,15 @@ describe('§2 The notification feed (e2e)', () => {
 
       await feed.markRead({ id: row.id }, me());
 
-      const [event] = fx.emitted.filter(
+      // `find`, not a destructured `filter`: it stops at the first match and
+      // TYPES the absence, so the `toBeDefined()` below is a real check
+      // rather than one the element type already guaranteed.
+      const event = fx.emitted.find(
         (entry) => entry.pattern === NOTIFICATION_REALTIME_PATTERNS.read,
       );
 
       expect(event).toBeDefined();
-      const payload = event.payload as {
+      const payload = event!.payload as {
         recipientId: string;
         unreadCount: number;
         change: string;

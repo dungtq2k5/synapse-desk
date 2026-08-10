@@ -1,4 +1,4 @@
-import { RoleResponse, toTimestamp } from '@synapsedesk/grpc-proto';
+import { RoleResponse, toProtoTimestamp } from '@synapsedesk/grpc-proto';
 import type { Prisma } from '../../generated/prisma/client';
 
 /** The joins every RoleResponse needs. */
@@ -23,7 +23,7 @@ export function toRoleResponse(role: RoleRow): RoleResponse {
     isSystemRole: role.organizationId === null && role.isSystemRole,
     userAssigned: role.userAssigned,
     permissionCodes: role.permissions.map((permission) => permission.code),
-    createdAt: toTimestamp(role.createdAt),
-    updatedAt: toTimestamp(role.updatedAt),
+    createdAt: toProtoTimestamp(role.createdAt),
+    updatedAt: toProtoTimestamp(role.updatedAt),
   };
 }

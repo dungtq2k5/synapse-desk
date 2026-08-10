@@ -8,9 +8,12 @@ import {
 } from '@synapsedesk/grpc-proto';
 import { RequestContext } from '@synapsedesk/common';
 import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
-import { PaginationResponseBase } from '../../common/dto/base/pagination-response-base.dto';
-import { toPaginationMeta } from '../../common/mappers/pagination.mapper';
-import { toDepartmentDto, toDepartmentMemberDto } from './department.mapper';
+import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
+import { toPaginationMetaDataResponseDto } from '../../common/mappers/pagination.mapper';
+import {
+  toDepartmentResponseDto,
+  toDepartmentMemberResponseDto,
+} from './department.mapper';
 import {
   AddDepartmentMembersDto,
   AddDepartmentMembersResponseDto,
@@ -51,7 +54,7 @@ export class DepartmentsGrpcClient
   async list(
     query: ListDepartmentsQueryDto,
     context: RequestContext,
-  ): Promise<PaginationResponseBase<DepartmentResponseDto>> {
+  ): Promise<PaginationResponseDto<DepartmentResponseDto>> {
     const response = await this.call(
       (metadata) =>
         this.departmentGrpcService.listDepartments(
@@ -65,8 +68,8 @@ export class DepartmentsGrpcClient
     );
 
     return {
-      items: response.items.map(toDepartmentDto),
-      meta: toPaginationMeta(response.meta),
+      items: response.items.map(toDepartmentResponseDto),
+      meta: toPaginationMetaDataResponseDto(response.meta),
     };
   }
 
@@ -74,7 +77,7 @@ export class DepartmentsGrpcClient
     id: string,
     context: RequestContext,
   ): Promise<DepartmentResponseDto> {
-    return toDepartmentDto(
+    return toDepartmentResponseDto(
       await this.call(
         (metadata) =>
           this.departmentGrpcService.getDepartment({ id }, metadata),
@@ -87,7 +90,7 @@ export class DepartmentsGrpcClient
     dto: CreateDepartmentDto,
     context: RequestContext,
   ): Promise<DepartmentResponseDto> {
-    return toDepartmentDto(
+    return toDepartmentResponseDto(
       await this.call(
         (metadata) =>
           this.departmentGrpcService.createDepartment(
@@ -104,7 +107,7 @@ export class DepartmentsGrpcClient
     dto: UpdateDepartmentDto,
     context: RequestContext,
   ): Promise<DepartmentResponseDto> {
-    return toDepartmentDto(
+    return toDepartmentResponseDto(
       await this.call(
         (metadata) =>
           this.departmentGrpcService.updateDepartment(
@@ -130,7 +133,7 @@ export class DepartmentsGrpcClient
     id: string,
     context: RequestContext,
   ): Promise<DepartmentResponseDto> {
-    return toDepartmentDto(
+    return toDepartmentResponseDto(
       await this.call(
         (metadata) =>
           this.departmentGrpcService.restoreDepartment({ id }, metadata),
@@ -143,7 +146,7 @@ export class DepartmentsGrpcClient
     departmentId: string,
     query: ListDepartmentMembersQueryDto,
     context: RequestContext,
-  ): Promise<PaginationResponseBase<DepartmentMemberResponseDto>> {
+  ): Promise<PaginationResponseDto<DepartmentMemberResponseDto>> {
     const response = await this.call(
       (metadata) =>
         this.departmentGrpcService.listDepartmentMembers(
@@ -154,8 +157,8 @@ export class DepartmentsGrpcClient
     );
 
     return {
-      items: response.items.map(toDepartmentMemberDto),
-      meta: toPaginationMeta(response.meta),
+      items: response.items.map(toDepartmentMemberResponseDto),
+      meta: toPaginationMetaDataResponseDto(response.meta),
     };
   }
 

@@ -27,7 +27,7 @@ const MAX_BULK_IDS = 200;
 /**
  * The feed query — CURSOR-paginated, so no `page`.
  *
- * Deliberately not extending `SearchPaginationBase`: that carries `page` and
+ * Deliberately not extending `SearchPaginationDto`: that carries `page` and
  * `sortBy`, and offering either here would be an API that cannot keep its word.
  * The feed is always newest-first, and a page number over a list that grows at
  * the head shifts rows under the reader.

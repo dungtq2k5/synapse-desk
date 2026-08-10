@@ -4,7 +4,7 @@ import {
   AUTH_GRPC_CLIENT,
   BILLING_SERVICE_NAME,
   BillingServiceClient,
-  requireTimestamp,
+  requireProtoTimestamp,
   fromProtoAiModelTier,
   fromProtoOrgStatus,
 } from '@synapsedesk/grpc-proto';
@@ -85,7 +85,7 @@ export class BillingGrpcClient extends BaseGrpcClient implements OnModuleInit {
       maxStorageBytes: response.maxStorageBytes,
       monthlyAiTokenBudget: response.monthlyAiTokenBudget,
       aiModelTier: fromProtoAiModelTier(response.aiModelTier) ?? '',
-      billingCycleStart: requireTimestamp(
+      billingCycleStart: requireProtoTimestamp(
         response.billingCycleStart,
         'billingCycleStart',
       ),
@@ -133,7 +133,7 @@ export class BillingGrpcClient extends BaseGrpcClient implements OnModuleInit {
       amountDue: invoice.amountDue,
       currency: invoice.currency,
       status: invoice.status,
-      created: requireTimestamp(invoice.created, 'created'),
+      created: requireProtoTimestamp(invoice.created, 'created'),
       hostedInvoiceUrl: invoice.hostedInvoiceUrl,
     }));
   }

@@ -7,7 +7,7 @@ import {
 import {
   CreateExportRequest,
   ExportResponse,
-  toTimestamp,
+  toProtoTimestamp,
 } from '@synapsedesk/grpc-proto';
 import { AnalyticsExportService } from './analytics-export.service';
 import { StorageReferenceService } from '../storage-client/storage-reference.service';
@@ -63,12 +63,14 @@ export class AnalyticsExportFacade {
       kind: row.kind,
       rowCount: row.rowCount ?? undefined,
       rollupComputedAt: row.rollupComputedAt
-        ? toTimestamp(row.rollupComputedAt)
+        ? toProtoTimestamp(row.rollupComputedAt)
         : undefined,
       downloadUrl: downloadUrl ?? undefined,
       error: row.errorLog ?? undefined,
-      createdAt: toTimestamp(row.createdAt),
-      completedAt: row.completedAt ? toTimestamp(row.completedAt) : undefined,
+      createdAt: toProtoTimestamp(row.createdAt),
+      completedAt: row.completedAt
+        ? toProtoTimestamp(row.completedAt)
+        : undefined,
     };
   }
 }

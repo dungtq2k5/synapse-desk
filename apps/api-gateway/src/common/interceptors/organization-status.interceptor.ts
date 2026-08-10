@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
+import { requestOf } from '../utils/execution-request.util';
 import { Observable } from 'rxjs';
 import {
   ORG_STATUS_ACCESS,
@@ -48,7 +49,16 @@ export class OrganizationStatusInterceptor implements NestInterceptor {
     context: ExecutionContext,
     next: CallHandler,
   ): Promise<Observable<unknown>> {
-    const request = context.switchToHttp().getRequest<Request>();
+    // `requestOf`, not `switchToHttp()` — 25-doc. This is a GLOBAL interceptor,
+    // so it runs on GraphQL operations too, where `switchToHttp()` returns an
+    // empty object and `.user` throws. The lifecycle gate is exactly the kind of
+    // thing that must not be transport-specific: a frozen tenant that can still
+    // read through GraphQL is a suspension with a hole in it.
+    const request = requestOf(context);
+    // No request at all means no transport this gate understands, and therefore
+    // no identity to gate on — the same answer as an unauthenticated call.
+    if (!request) return next.handle();
+
     const user = request.user;
 
     // No identity yet (login, register, public invitation preview) — there is

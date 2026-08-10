@@ -1,5 +1,12 @@
 import { DocumentStatus } from '@synapsedesk/common';
 
+/**
+ * A document as the REST API returns it.
+ *
+ * **REST only.** The schema's `type Document` is `DocumentResponseGqlDto` in
+ * `../graphql/`; `document-response.contract.spec.ts` checks the two agree and
+ * records `fileUrl` and `deletedById` as deliberate REST-only fields.
+ */
 export class DocumentResponseDto {
   id!: string;
   organizationId!: string;

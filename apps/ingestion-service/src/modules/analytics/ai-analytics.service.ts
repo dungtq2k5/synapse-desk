@@ -27,7 +27,7 @@ import {
   KnowledgeGapsResponse,
   AiMeanValue,
   AiRateValue,
-  toTimestamp,
+  toProtoTimestamp,
 } from '@synapsedesk/grpc-proto';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthReferenceService } from '../auth-client/auth-reference.service';
@@ -442,7 +442,7 @@ function clampLimit(limit: number | undefined): number {
 function latestComputedAt(rows: AiDailyRow[]) {
   if (rows.length === 0) return undefined;
 
-  return toTimestamp(
+  return toProtoTimestamp(
     rows.reduce(
       (latest, row) => (row.computedAt > latest ? row.computedAt : latest),
       rows[0].computedAt,

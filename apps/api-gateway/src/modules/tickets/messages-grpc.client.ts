@@ -3,18 +3,23 @@ import { ClientGrpc } from '@nestjs/microservices';
 import {
   MESSAGE_SERVICE_NAME,
   MessageServiceClient,
-  requireTimestamp,
+  requireProtoTimestamp,
   TICKET_GRPC_CLIENT,
   toPageRequest,
 } from '@synapsedesk/grpc-proto';
 import { RequestContext } from '@synapsedesk/common';
 import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
-import { PaginationResponseBase } from '../../common/dto/base/pagination-response-base.dto';
-import { toPaginationMeta } from '../../common/mappers/pagination.mapper';
-import { toAttachmentDto, toMessageDto } from './message.mapper';
+import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
+import { toPaginationMetaDataResponseDto } from '../../common/mappers/pagination.mapper';
+import {
+  toAttachmentResponseDto,
+  toMessageResponseDto,
+} from './message.mapper';
 import {
   AttachmentResponseDto,
+  DownloadAttachmentResponseDto,
   MessageResponseDto,
+  PresignAttachmentResponseDto,
 } from './dto/rest/message-response.dto';
 import {
   ConfirmAttachmentDto,
@@ -23,17 +28,6 @@ import {
   UpdateMessageDto,
   UploadAttachmentDto,
 } from './dto/rest/message.dto';
-
-export type PresignAttachmentDto = {
-  uploadUrl: string;
-  objectPath: string;
-  expiresAt: Date;
-};
-
-export type DownloadAttachmentDto = {
-  downloadUrl: string;
-  expiresAt: Date;
-};
 
 @Injectable()
 export class MessagesGrpcClient extends BaseGrpcClient implements OnModuleInit {
@@ -54,7 +48,7 @@ export class MessagesGrpcClient extends BaseGrpcClient implements OnModuleInit {
     ticketId: string,
     query: ListMessagesQueryDto,
     context: RequestContext,
-  ): Promise<PaginationResponseBase<MessageResponseDto>> {
+  ): Promise<PaginationResponseDto<MessageResponseDto>> {
     const response = await this.call(
       (metadata) =>
         this.messageGrpcService.listMessages(
@@ -65,8 +59,8 @@ export class MessagesGrpcClient extends BaseGrpcClient implements OnModuleInit {
     );
 
     return {
-      items: response.items.map(toMessageDto),
-      meta: toPaginationMeta(response.meta),
+      items: response.items.map(toMessageResponseDto),
+      meta: toPaginationMetaDataResponseDto(response.meta),
     };
   }
 
@@ -84,7 +78,7 @@ export class MessagesGrpcClient extends BaseGrpcClient implements OnModuleInit {
      */
     clientMessageId?: string,
   ): Promise<MessageResponseDto> {
-    return toMessageDto(
+    return toMessageResponseDto(
       await this.call(
         (metadata) =>
           this.messageGrpcService.createMessage(
@@ -120,7 +114,7 @@ export class MessagesGrpcClient extends BaseGrpcClient implements OnModuleInit {
     generationId: string | undefined,
     context: RequestContext,
   ): Promise<MessageResponseDto> {
-    return toMessageDto(
+    return toMessageResponseDto(
       await this.call(
         (metadata) =>
           this.messageGrpcService.appendAiMessage(
@@ -138,7 +132,7 @@ export class MessagesGrpcClient extends BaseGrpcClient implements OnModuleInit {
     dto: UpdateMessageDto,
     context: RequestContext,
   ): Promise<MessageResponseDto> {
-    return toMessageDto(
+    return toMessageResponseDto(
       await this.call(
         (metadata) =>
           this.messageGrpcService.updateMessage(
@@ -169,7 +163,7 @@ export class MessagesGrpcClient extends BaseGrpcClient implements OnModuleInit {
       context,
     );
 
-    return toMessageDto(response.message!);
+    return toMessageResponseDto(response.message!);
   }
 
   /**
@@ -183,7 +177,7 @@ export class MessagesGrpcClient extends BaseGrpcClient implements OnModuleInit {
     messageId: string,
     dto: UploadAttachmentDto,
     context: RequestContext,
-  ): Promise<PresignAttachmentDto> {
+  ): Promise<PresignAttachmentResponseDto> {
     const response = await this.call(
       (metadata) =>
         this.messageGrpcService.uploadAttachment(
@@ -202,7 +196,7 @@ export class MessagesGrpcClient extends BaseGrpcClient implements OnModuleInit {
     return {
       uploadUrl: response.uploadUrl,
       objectPath: response.objectPath,
-      expiresAt: requireTimestamp(response.expiresAt, 'expiresAt'),
+      expiresAt: requireProtoTimestamp(response.expiresAt, 'expiresAt'),
     };
   }
 
@@ -212,7 +206,7 @@ export class MessagesGrpcClient extends BaseGrpcClient implements OnModuleInit {
     dto: ConfirmAttachmentDto,
     context: RequestContext,
   ): Promise<AttachmentResponseDto> {
-    return toAttachmentDto(
+    return toAttachmentResponseDto(
       await this.call(
         (metadata) =>
           this.messageGrpcService.confirmAttachment(
@@ -243,7 +237,7 @@ export class MessagesGrpcClient extends BaseGrpcClient implements OnModuleInit {
       context,
     );
 
-    return response.items.map(toAttachmentDto);
+    return response.items.map(toAttachmentResponseDto);
   }
 
   async deleteAttachment(
@@ -260,7 +254,7 @@ export class MessagesGrpcClient extends BaseGrpcClient implements OnModuleInit {
   async downloadAttachment(
     attachmentId: string,
     context: RequestContext,
-  ): Promise<DownloadAttachmentDto> {
+  ): Promise<DownloadAttachmentResponseDto> {
     const response = await this.call(
       (metadata) =>
         this.messageGrpcService.downloadAttachment({ attachmentId }, metadata),
@@ -269,10 +263,10 @@ export class MessagesGrpcClient extends BaseGrpcClient implements OnModuleInit {
 
     return {
       downloadUrl: response.downloadUrl,
-      // `requireTimestamp`, not a hand-rolled epoch conversion: a signed URL
+      // `requireProtoTimestamp`, not a hand-rolled epoch conversion: a signed URL
       // with no expiry is a contract violation, and defaulting it to 1970 would
       // hand the client a URL it believes is already dead.
-      expiresAt: requireTimestamp(response.expiresAt, 'expiresAt'),
+      expiresAt: requireProtoTimestamp(response.expiresAt, 'expiresAt'),
     };
   }
 }

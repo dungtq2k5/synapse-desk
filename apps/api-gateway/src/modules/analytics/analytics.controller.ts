@@ -65,9 +65,6 @@ export class AnalyticsController {
   @ApiOperation({ summary: 'Overview' })
   @ApiWrappedResponse(OverviewDto)
   @ApiFilterErrors(['401', '403'])
-  @ApiOperation({ summary: 'Overview' })
-  @ApiWrappedResponse(OverviewDto)
-  @ApiFilterErrors(['401', '403'])
   @Get('overview')
   overview(
     @CurrentUser() context: RequestContext,
@@ -77,9 +74,6 @@ export class AnalyticsController {
   }
 
   /** The product's headline claim (product-overview §7), defined once in §3.1. */
-  @ApiOperation({ summary: 'Deflection' })
-  @ApiWrappedResponse(DeflectionDto)
-  @ApiFilterErrors(['401', '403'])
   @ApiOperation({ summary: 'Deflection' })
   @ApiWrappedResponse(DeflectionDto)
   @ApiFilterErrors(['401', '403'])
@@ -95,9 +89,6 @@ export class AnalyticsController {
   @ApiOperation({ summary: 'Response times' })
   @ApiWrappedResponse(ResponseTimesDto)
   @ApiFilterErrors(['401', '403'])
-  @ApiOperation({ summary: 'Response times' })
-  @ApiWrappedResponse(ResponseTimesDto)
-  @ApiFilterErrors(['401', '403'])
   @Get('response-times')
   responseTimes(
     @CurrentUser() context: RequestContext,
@@ -106,9 +97,6 @@ export class AnalyticsController {
     return this.analytics.responseTimes(query, context);
   }
 
-  @ApiOperation({ summary: 'Volume' })
-  @ApiWrappedResponse(VolumeDto)
-  @ApiFilterErrors(['401', '403'])
   @ApiOperation({ summary: 'Volume' })
   @ApiWrappedResponse(VolumeDto)
   @ApiFilterErrors(['401', '403'])
@@ -123,9 +111,6 @@ export class AnalyticsController {
   @ApiOperation({ summary: 'Satisfaction' })
   @ApiWrappedResponse(SatisfactionDto)
   @ApiFilterErrors(['401', '403'])
-  @ApiOperation({ summary: 'Satisfaction' })
-  @ApiWrappedResponse(SatisfactionDto)
-  @ApiFilterErrors(['401', '403'])
   @Get('satisfaction')
   satisfaction(
     @CurrentUser() context: RequestContext,
@@ -134,9 +119,6 @@ export class AnalyticsController {
     return this.analytics.satisfaction(query, context);
   }
 
-  @ApiOperation({ summary: 'Ai usage' })
-  @ApiWrappedResponse(AiUsageDto)
-  @ApiFilterErrors(['401', '403'])
   @ApiOperation({ summary: 'Ai usage' })
   @ApiWrappedResponse(AiUsageDto)
   @ApiFilterErrors(['401', '403'])
@@ -152,9 +134,6 @@ export class AnalyticsController {
   @ApiOperation({ summary: 'Agents' })
   @ApiWrappedResponse(AgentAnalyticsDto)
   @ApiFilterErrors(['401', '403'])
-  @ApiOperation({ summary: 'Agents' })
-  @ApiWrappedResponse(AgentAnalyticsDto)
-  @ApiFilterErrors(['401', '403'])
   @Get('agents')
   agents(
     @CurrentUser() context: RequestContext,
@@ -166,9 +145,6 @@ export class AnalyticsController {
   @ApiOperation({ summary: 'Knowledge gaps' })
   @ApiWrappedResponse(KnowledgeGapsDto)
   @ApiFilterErrors(['401', '403'])
-  @ApiOperation({ summary: 'Knowledge gaps' })
-  @ApiWrappedResponse(KnowledgeGapsDto)
-  @ApiFilterErrors(['401', '403'])
   @Get('knowledge-gaps')
   knowledgeGaps(
     @CurrentUser() context: RequestContext,
@@ -177,9 +153,6 @@ export class AnalyticsController {
     return this.analytics.knowledgeGaps(query, context);
   }
 
-  @ApiOperation({ summary: 'Documents' })
-  @ApiWrappedResponse(DocumentAnalyticsDto)
-  @ApiFilterErrors(['401', '403'])
   @ApiOperation({ summary: 'Documents' })
   @ApiWrappedResponse(DocumentAnalyticsDto)
   @ApiFilterErrors(['401', '403'])
@@ -206,9 +179,6 @@ export class AnalyticsController {
   @ApiOperation({ summary: 'Create export' })
   @ApiWrappedResponse(AnalyticsExportDto, { status: HttpStatus.ACCEPTED })
   @ApiFilterErrors(['400', '401', '403'])
-  @ApiOperation({ summary: 'Create export' })
-  @ApiWrappedResponse(AnalyticsExportDto, { status: HttpStatus.ACCEPTED })
-  @ApiFilterErrors(['400', '401', '403'])
   @Post('export')
   @HttpCode(HttpStatus.ACCEPTED)
   createExport(
@@ -219,9 +189,6 @@ export class AnalyticsController {
   }
 
   /** Poll for the file. Another tenant's id answers 404, never 403. */
-  @ApiOperation({ summary: 'Get export' })
-  @ApiWrappedResponse(AnalyticsExportDto)
-  @ApiFilterErrors(['400', '401', '403', '404'])
   @ApiOperation({ summary: 'Get export' })
   @ApiWrappedResponse(AnalyticsExportDto)
   @ApiFilterErrors(['400', '401', '403', '404'])

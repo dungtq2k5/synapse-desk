@@ -1,12 +1,12 @@
 import {
   PermissionResponse,
-  requireTimestamp,
+  requireProtoTimestamp,
   RoleResponse,
 } from '@synapsedesk/grpc-proto';
 import { PermissionResponseDto, RoleResponseDto } from './dto/rest/role.dto';
 
 /** Wire -> REST: proto's `undefined` becomes JSON's `null`. */
-export function toRoleDto(role: RoleResponse): RoleResponseDto {
+export function toRoleResponseDto(role: RoleResponse): RoleResponseDto {
   return {
     id: role.id,
     name: role.name,
@@ -14,12 +14,12 @@ export function toRoleDto(role: RoleResponse): RoleResponseDto {
     isSystemRole: role.isSystemRole,
     userAssigned: role.userAssigned,
     permissionCodes: role.permissionCodes,
-    createdAt: requireTimestamp(role.createdAt, 'createdAt'),
-    updatedAt: requireTimestamp(role.updatedAt, 'updatedAt'),
+    createdAt: requireProtoTimestamp(role.createdAt, 'createdAt'),
+    updatedAt: requireProtoTimestamp(role.updatedAt, 'updatedAt'),
   };
 }
 
-export function toPermissionDto(
+export function toPermissionResponseDto(
   permission: PermissionResponse,
 ): PermissionResponseDto {
   return {

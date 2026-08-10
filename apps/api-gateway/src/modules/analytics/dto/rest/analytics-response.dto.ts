@@ -1,5 +1,11 @@
 /**
- * The analytics response shapes — 19-doc §3.
+ * The analytics response shapes — 19-doc §3. **REST only.**
+ *
+ * Three of these — `RateDto`, `MeanDto` and `OverviewDto` — have GraphQL
+ * counterparts in `../graphql/`, checked against them by
+ * `analytics-response.contract.spec.ts`. Everything below `OverviewDto` is the
+ * chart series, which the schema does not serve at all: 26-doc §7 keeps
+ * analytics a whole-shape read rather than a resolvable graph.
  *
  * **Every rate carries its denominator, at every level.** A percentage with a
  * hidden denominator is how *"our CSAT is 100%"* reaches a board deck on two

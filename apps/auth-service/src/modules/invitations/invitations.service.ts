@@ -24,7 +24,7 @@ import {
   RevokeInvitationResponse,
   toPageMeta,
   toProtoInvitationStatus,
-  toTimestamp,
+  toProtoTimestamp,
   emptyPage,
   toPrismaPage,
   toSearchFilter,
@@ -529,7 +529,7 @@ export class InvitationsService {
       // must not learn one.
       email: maskEmail(invitation.email),
       roleNames: await this.resolveRoleNames(invitation.roleIds),
-      expiresAt: toTimestamp(invitation.expiresAt),
+      expiresAt: toProtoTimestamp(invitation.expiresAt),
     };
   }
 
@@ -788,9 +788,9 @@ export class InvitationsService {
       primaryDepartmentId: invitation.primaryDepartmentId ?? undefined,
       invitedByName: invitedByName ?? undefined,
       resentCount: invitation.resentCount,
-      lastSentAt: toTimestamp(invitation.lastSentAt),
-      expiresAt: toTimestamp(invitation.expiresAt),
-      createdAt: toTimestamp(invitation.createdAt),
+      lastSentAt: toProtoTimestamp(invitation.lastSentAt),
+      expiresAt: toProtoTimestamp(invitation.expiresAt),
+      createdAt: toProtoTimestamp(invitation.createdAt),
     };
   }
 

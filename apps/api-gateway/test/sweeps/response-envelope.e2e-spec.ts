@@ -394,7 +394,13 @@ describe('response envelope sweep (e2e)', () => {
     PROBES[0].fail(fx);
     const res = await agentFor(PROBES[0]).get(`${API}${PROBES[0].path}`);
 
-    expect(new Date(res.body.timestamp).toString()).not.toBe('Invalid Date');
+    // Narrowed off supertest's `any` before it reaches `new Date`, which
+    // accepts anything and answers `Invalid Date` — so an unnarrowed value
+    // would make this assert that a wrong TYPE parses, not that the timestamp
+    // does.
+    const { timestamp } = res.body as { timestamp: string };
+
+    expect(new Date(timestamp).toString()).not.toBe('Invalid Date');
   });
 
   it('a 401 from the GUARD is enveloped identically to one from the peer', async () => {

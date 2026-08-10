@@ -1,3 +1,4 @@
+import { GqlExecutionContext, type GqlContextType } from '@nestjs/graphql';
 import { ExecutionContext, Injectable, Logger } from '@nestjs/common';
 import {
   ThrottlerException,
@@ -206,10 +207,13 @@ export class SmartThrottlerGuard extends ThrottlerGuard {
   ): Promise<void> {
     const retryAfterSeconds = Math.ceil(throttlerLimitDetail.timeToBlockExpire);
 
-    context
-      .switchToHttp()
-      .getResponse<Response>()
-      .setHeader('Retry-After', String(retryAfterSeconds));
+    // `getRequestResponse` rather than `switchToHttp()` — see that method. On a
+    // GraphQL operation the latter yields nothing, and setting a header on
+    // `undefined` would turn a clean 429 into a 500.
+    this.getRequestResponse(context).res?.setHeader(
+      'Retry-After',
+      String(retryAfterSeconds),
+    );
 
     // Rejected rather than thrown: the base signature returns Promise<void>,
     // and there is nothing to await here.
@@ -221,17 +225,36 @@ export class SmartThrottlerGuard extends ThrottlerGuard {
   }
 
   /**
-   * The request the tracker sees.
+   * The request and response the tracker sees, on EITHER transport.
    *
-   * Overridden only to type it — this gateway is HTTP-only, so unlike the
-   * reference implementation there is no GraphQL or WebSocket context to
-   * unwrap. Adding those branches now would be dead code referencing packages
-   * this app does not depend on.
+   * **This used to be HTTP-only, and the comment saying so was true until
+   * GraphQL landed** (25-doc). `switchToHttp()` returns an empty object under
+   * GraphQL, so `getTracker` read `.user` off `undefined`, threw, and the
+   * guard's own catch reported "rate-limit storage unavailable" and **allowed
+   * the request unthrottled** — meaning the entire GraphQL surface was
+   * unmetered, while logging a message blaming Redis.
+   *
+   * That is the worst shape this bug could take: it fails OPEN, and it points
+   * at the wrong subsystem. Nothing would have caught it except calling
+   * `/graphql` once.
    */
   protected override getRequestResponse(context: ExecutionContext): {
     req: Request;
     res: Response;
   } {
+    if (context.getType<GqlContextType>() === 'graphql') {
+      const gqlContext = GqlExecutionContext.create(context).getContext<{
+        req: Request;
+        res: Response;
+      }>();
+
+      // Apollo puts both on the context — the same Express pair the POST
+      // arrived on, which is what lets one throttle budget cover both surfaces
+      // rather than giving a client a second, free allowance by switching
+      // transport.
+      return { req: gqlContext.req, res: gqlContext.res };
+    }
+
     const http = context.switchToHttp();
 
     return {

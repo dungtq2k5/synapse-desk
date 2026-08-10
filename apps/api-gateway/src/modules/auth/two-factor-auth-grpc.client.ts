@@ -2,7 +2,7 @@ import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { ClientGrpc } from '@nestjs/microservices';
 import {
   AUTH_GRPC_CLIENT,
-  fromTimestamp,
+  fromProtoTimestamp,
   TWO_FACTOR_AUTH_SERVICE_NAME,
   TwoFactorAuthServiceClient,
 } from '@synapsedesk/grpc-proto';
@@ -145,7 +145,7 @@ export class TwoFactorAuthGrpcClient
     return {
       remaining: response.remaining,
       used: response.used,
-      expiresAt: fromTimestamp(response.expiresAt) ?? null,
+      expiresAt: fromProtoTimestamp(response.expiresAt) ?? null,
     };
   }
 }

@@ -155,7 +155,69 @@ export interface StorageUsageResponse {
   documentCount: number;
 }
 
+/**
+ * ---------------------------------------------------------------------------
+ * `ListXByIds` — the contract behind every DataLoader (27-doc §1).
+ *
+ * Six properties, and five of them are things DataLoader depends on:
+ *
+ *   1. TENANT-SCOPED from the caller context, never from a request field. The
+ *      id is a loader's cache key and carries no tenant, so this RPC is the
+ *      only thing standing between a uuid and another tenant's row.
+ *   2. MISSING IDS ARE OMITTED, never an error. A batch of 50 where one row was
+ *      deleted returns 49; erroring fails 50 fields for one absent row.
+ *   3. DUPLICATE IDS COLLAPSE. `IN (…)` handles it; the response must not
+ *      double-count.
+ *   4. EMPTY REQUEST -> EMPTY RESPONSE, not an error. A page where nothing has
+ *      an assignee is a valid page.
+ *   5. BATCH SIZE CAPPED, and the cap is an ERROR rather than a truncation —
+ *      truncation is indistinguishable from missing data.
+ *   6. ORDER IS NOT GUARANTEED. The response is a SET; the caller maps it back
+ *      onto its keys (27-doc §2), because a database returns `WHERE id IN
+ *      ('c','a','b')` as a, b, c and handing that straight to DataLoader
+ *      renders the wrong entity against every key.
+ *
+ * SOFT DELETES ARE VISIBLE BY ID. A ticket citing a deleted user still needs to
+ * render someone; omitting it makes property 2 fire for a row that exists.
+ * ---------------------------------------------------------------------------
+ */
+export interface ListDocumentsByIdsRequest {
+  documentIds: string[];
+}
+
+export interface ListDocumentsByIdsResponse {
+  items: DocumentResponse[];
+}
+
+/**
+ * Citation previews. **The largest payloads in the system** — a chunk carries
+ * its whole text — so this one is capped hardest (27-doc §3).
+ */
+export interface ListDocumentChunksByIdsRequest {
+  chunkIds: string[];
+}
+
+export interface DocumentChunkSummary {
+  chunkId: string;
+  documentId: string;
+  documentTitle: string;
+  pageNumber?: number | undefined;
+  chunkIndex: number;
+  contentText: string;
+}
+
+export interface ListDocumentChunksByIdsResponse {
+  items: DocumentChunkSummary[];
+}
+
 export interface DocumentServiceClient {
+  listDocumentsByIds(request: ListDocumentsByIdsRequest, metadata?: Metadata): Observable<ListDocumentsByIdsResponse>;
+
+  listDocumentChunksByIds(
+    request: ListDocumentChunksByIdsRequest,
+    metadata?: Metadata,
+  ): Observable<ListDocumentChunksByIdsResponse>;
+
   presignDocument(request: PresignDocumentRequest, metadata?: Metadata): Observable<PresignDocumentResponse>;
 
   confirmDocument(request: ConfirmDocumentRequest, metadata?: Metadata): Observable<DocumentResponse>;
@@ -186,6 +248,19 @@ export interface DocumentServiceClient {
 }
 
 export interface DocumentServiceController {
+  listDocumentsByIds(
+    request: ListDocumentsByIdsRequest,
+    metadata?: Metadata,
+  ): Promise<ListDocumentsByIdsResponse> | Observable<ListDocumentsByIdsResponse> | ListDocumentsByIdsResponse;
+
+  listDocumentChunksByIds(
+    request: ListDocumentChunksByIdsRequest,
+    metadata?: Metadata,
+  ):
+    | Promise<ListDocumentChunksByIdsResponse>
+    | Observable<ListDocumentChunksByIdsResponse>
+    | ListDocumentChunksByIdsResponse;
+
   presignDocument(
     request: PresignDocumentRequest,
     metadata?: Metadata,
@@ -263,6 +338,8 @@ export interface DocumentServiceController {
 export function DocumentServiceControllerMethods() {
   return function (constructor: Function) {
     const grpcMethods: string[] = [
+      "listDocumentsByIds",
+      "listDocumentChunksByIds",
       "presignDocument",
       "confirmDocument",
       "listDocuments",

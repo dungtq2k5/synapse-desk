@@ -66,8 +66,8 @@ const ERROR_DESCRIPTIONS: Record<ApiErrorStatus | '429' | '500', string> = {
 /**
  * Marks a model as the ITEM type of a paginated list.
  *
- * `PaginationResponseBase<T>` is generic, and a generic class has no runtime
- * identity — `getSchemaPath(PaginationResponseBase)` would document `items` as
+ * `PaginationResponseDto<T>` is generic, and a generic class has no runtime
+ * identity — `getSchemaPath(PaginationResponseDto)` would document `items` as
  * an array of nothing for every list route in the API. So the item type is
  * passed separately and the envelope is built around it here.
  */
@@ -80,7 +80,7 @@ type PaginatedModel<T> = { paginatedItem: Type<T> };
 const isPaginated = (value: unknown): value is PaginatedModel<unknown> =>
   typeof value === 'object' && value !== null && 'paginatedItem' in value;
 
-/** The `meta` block every list route returns, from `PaginationResponseBase`. */
+/** The `meta` block every list route returns, from `PaginationResponseDto`. */
 const PAGINATION_META: SchemaObject = {
   type: 'object',
   required: [

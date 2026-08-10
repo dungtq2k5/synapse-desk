@@ -3,7 +3,7 @@ import { Controller } from '@nestjs/common';
 import type { Metadata } from '@grpc/grpc-js';
 import {
   AuthJobHealthResponse,
-  toTimestamp,
+  toProtoTimestamp,
   CreateGlobalRoleRequest,
   CreatePlatformOrganizationRequest,
   CreatePlatformOrganizationResponse,
@@ -153,10 +153,10 @@ export class PlatformGrpcController implements PlatformServiceController {
       items: rows.map((row) => ({
         jobName: row.jobName,
         lastStartedAt: row.lastStartedAt
-          ? toTimestamp(row.lastStartedAt)
+          ? toProtoTimestamp(row.lastStartedAt)
           : undefined,
         lastSucceededAt: row.lastSucceededAt
-          ? toTimestamp(row.lastSucceededAt)
+          ? toProtoTimestamp(row.lastSucceededAt)
           : undefined,
         lastDurationMs: row.lastDurationMs ?? undefined,
         lastError: row.lastError ?? undefined,

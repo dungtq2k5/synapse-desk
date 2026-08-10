@@ -15,7 +15,7 @@ import {
   PresignUploadRequest,
   PresignUploadResponse,
   StoragePurpose as ProtoStoragePurpose,
-  toTimestamp,
+  toProtoTimestamp,
 } from '@synapsedesk/grpc-proto';
 import {
   formatErrorMsg,
@@ -153,7 +153,7 @@ export class StorageService {
         contentType: request.contentType,
       });
 
-    return { uploadUrl, objectPath, expiresAt: toTimestamp(expiresAt) };
+    return { uploadUrl, objectPath, expiresAt: toProtoTimestamp(expiresAt) };
   }
 
   /**
@@ -294,6 +294,7 @@ export class StorageService {
     );
 
     return {
+      // FIXME No overload matches this call.
       urlsByPath: Object.fromEntries(entries.filter((entry) => entry !== null)),
     };
   }

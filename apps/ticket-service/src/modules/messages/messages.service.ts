@@ -23,7 +23,7 @@ import {
   RedactMessageResponse,
   toPageMeta,
   toPrismaPage,
-  toTimestamp,
+  toProtoTimestamp,
   UpdateMessageRequest,
   UploadAttachmentRequest,
 } from '@synapsedesk/grpc-proto';
@@ -483,7 +483,7 @@ export class MessagesService {
       return {
         uploadUrl: presigned.uploadUrl,
         objectPath: presigned.objectPath,
-        expiresAt: toTimestamp(presigned.expiresAt),
+        expiresAt: toProtoTimestamp(presigned.expiresAt),
       };
     } catch (error) {
       throw StorageReferenceService.asClientError(error);
@@ -582,7 +582,7 @@ export class MessagesService {
 
     return {
       downloadUrl,
-      expiresAt: toTimestamp(new Date(Date.now() + READ_URL_GRACE_MS)),
+      expiresAt: toProtoTimestamp(new Date(Date.now() + READ_URL_GRACE_MS)),
     };
   }
 

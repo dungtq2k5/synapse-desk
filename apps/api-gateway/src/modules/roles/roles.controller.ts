@@ -19,7 +19,7 @@ import { PermissionGuard } from '../../common/guards/permission.guard';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ResponseMessage } from '../../common/decorators/response-message.decorator';
-import { PaginationResponseBase } from '../../common/dto/base/pagination-response-base.dto';
+import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
 import { RolesGrpcClient } from './roles-grpc.client';
 import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AUTH_SCHEMES } from '../../common/config/swagger.config';
@@ -56,24 +56,15 @@ export class RolesController {
   })
   @ApiWrappedResponse(Paginated(RoleResponseDto))
   @ApiFilterErrors(['401', '403'])
-  @ApiOperation({
-    summary:
-      'Tenant custom roles + global system roles (organization_id IS NULL)',
-  })
-  @ApiWrappedResponse(Paginated(RoleResponseDto))
-  @ApiFilterErrors(['401', '403'])
   @Get()
   @RequirePermission('role.read')
   list(
     @CurrentUser() context: RequestContext,
     @Query() query: ListRolesQueryDto,
-  ): Promise<PaginationResponseBase<RoleResponseDto>> {
+  ): Promise<PaginationResponseDto<RoleResponseDto>> {
     return this.rolesGrpcClient.list(query, context);
   }
 
-  @ApiOperation({ summary: 'Detail + attached permissions + user_assigned' })
-  @ApiWrappedResponse(RoleResponseDto)
-  @ApiFilterErrors(['400', '401', '403', '404'])
   @ApiOperation({ summary: 'Detail + attached permissions + user_assigned' })
   @ApiWrappedResponse(RoleResponseDto)
   @ApiFilterErrors(['400', '401', '403', '404'])
@@ -99,9 +90,6 @@ export class RolesController {
   @ApiOperation({ summary: 'Create' })
   @ApiWrappedResponse(RoleResponseDto, { status: HttpStatus.CREATED })
   @ApiFilterErrors(['400', '401', '403'])
-  @ApiOperation({ summary: 'Create' })
-  @ApiWrappedResponse(RoleResponseDto, { status: HttpStatus.CREATED })
-  @ApiFilterErrors(['400', '401', '403'])
   @Post()
   @RequirePermission('role.create')
   create(
@@ -112,9 +100,6 @@ export class RolesController {
   }
 
   /** 403 on a system role. */
-  @ApiOperation({ summary: 'Update' })
-  @ApiWrappedResponse(RoleResponseDto)
-  @ApiFilterErrors(['400', '401', '403', '404'])
   @ApiOperation({ summary: 'Update' })
   @ApiWrappedResponse(RoleResponseDto)
   @ApiFilterErrors(['400', '401', '403', '404'])
@@ -129,9 +114,6 @@ export class RolesController {
   }
 
   /** 409 while any user still holds it — roles are hard-deleted and cascade. */
-  @ApiOperation({ summary: 'Remove' })
-  @ApiWrappedResponse()
-  @ApiFilterErrors(['400', '401', '403', '404'])
   @ApiOperation({ summary: 'Remove' })
   @ApiWrappedResponse()
   @ApiFilterErrors(['400', '401', '403', '404'])
@@ -150,9 +132,6 @@ export class RolesController {
    * PUT, not PATCH: replace semantics, so retrying is safe and a code left out
    * of the body is genuinely revoked.
    */
-  @ApiOperation({ summary: 'Set permissions' })
-  @ApiWrappedResponse(RoleResponseDto)
-  @ApiFilterErrors(['400', '401', '403', '404'])
   @ApiOperation({ summary: 'Set permissions' })
   @ApiWrappedResponse(RoleResponseDto)
   @ApiFilterErrors(['400', '401', '403', '404'])

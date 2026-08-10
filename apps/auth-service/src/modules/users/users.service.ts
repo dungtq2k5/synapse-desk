@@ -9,13 +9,12 @@ import {
   CurrentUserResponse,
   DeleteUserResponse,
   fromProtoGender,
-  fromTimestamp,
+  fromProtoTimestamp,
   GetUserPermissionsResponse,
   ListPermissionHoldersRequest,
   ListPermissionHoldersResponse,
   ListUsersByIdsRequest,
   ListUsersByIdsResponse,
-  NotificationRecipient,
   ListUsersRequest,
   ListUsersResponse,
   LockUserRequest,
@@ -27,7 +26,8 @@ import {
   SetUserRolesRequest,
   toPageMeta,
   ProtoTimestamp,
-  toTimestamp,
+  toProtoTimestamp,
+  UserProjection,
   UnlockUserResponse,
   UpdateOwnProfileRequest,
   UpdateUserRequest,
@@ -39,6 +39,8 @@ import {
   toSearchFilter,
 } from '@synapsedesk/grpc-proto';
 import {
+  BATCH_ID_LIMIT,
+  normalizeBatchIds,
   AuditAction,
   AuditResourceType,
   EmailTemplateName,
@@ -61,9 +63,13 @@ import { SessionsService } from '../sessions/sessions.service';
 import { OrganizationsService } from '../organizations/organizations.service';
 import { StorageReferenceService } from '../storage-client/storage-reference.service';
 import {
+  NOTIFICATION_RECIPIENT_SELECT,
+  toNotificationRecipient,
   toUserResponse,
+  toUserSummary,
   toUserSummaryResponse,
   USER_SUMMARY_INCLUDE,
+  USER_SUMMARY_SELECT,
   UserSummaryRow,
 } from './user.mapper';
 import { flattenPermissionCodes } from '../../common/utils';
@@ -332,23 +338,60 @@ export class UsersService {
       });
     }
 
-    const userIds = request.userIds ?? [];
+    // Deduped and capped — 27-doc §1, properties 3 and 5. The cap judges what
+    // was ASKED for rather than what was distinct, or repeating one id 400
+    // times bypasses it.
+    const { ids: userIds, overLimit } = normalizeBatchIds(request.userIds);
+
+    if (overLimit) {
+      throw new RpcException({
+        code: status.INVALID_ARGUMENT,
+        message: `At most ${BATCH_ID_LIMIT} user ids per call`,
+      });
+    }
+
     // An empty request is a valid question with an empty answer, not an error:
     // a producer whose audience filtered down to nobody (everyone was the
-    // actor) should not have to special-case the call.
-    if (userIds.length === 0) return { items: [] };
+    // actor) should not have to special-case the call — property 4.
+    if (userIds.length === 0) return { items: [], summaries: [] };
+
+    const summary =
+      request.projection === UserProjection.USER_PROJECTION_SUMMARY;
+
+    const where = {
+      id: { in: userIds },
+      organizationId: request.organizationId,
+      // **`includeInactive` decides this, and the two callers want opposite
+      // answers** — 27-doc §3. A notification to a deactivated account is a row
+      // nobody reads; a ticket whose assignee was locked this morning still has
+      // to render their name, and omitting them shows a blank where "Former
+      // employee" belongs.
+      ...(request.includeInactive ? {} : { deletedAt: null, isLocked: false }),
+    };
+
+    // **Only the requested shape is fetched, and only it is populated.** The
+    // notification projection carries `email`, and `email` is precisely what a
+    // GraphQL edge must not expose (25-doc §4) — sending it and trusting the
+    // gateway to drop it is one careless mapper away from being a leak.
+    //
+    // Two queries rather than one with a computed `select`: Prisma types the
+    // result FROM the select, so a ternary there collapses both shapes to their
+    // intersection and neither mapper type-checks.
+    if (summary) {
+      const users = await this.prisma.user.findMany({
+        where,
+        select: USER_SUMMARY_SELECT,
+      });
+
+      return { items: [], summaries: users.map(toUserSummary) };
+    }
 
     const users = await this.prisma.user.findMany({
-      where: {
-        id: { in: userIds },
-        organizationId: request.organizationId,
-        deletedAt: null,
-        isLocked: false,
-      },
+      where,
       select: NOTIFICATION_RECIPIENT_SELECT,
     });
 
-    return { items: users.map(toNotificationRecipient) };
+    return { items: users.map(toNotificationRecipient), summaries: [] };
   }
 
   // -------------------------------------------------------------------------
@@ -689,7 +732,7 @@ export class UsersService {
   ): Date | null {
     if (!lockedUntil) return null;
 
-    const expiry = fromTimestamp(lockedUntil);
+    const expiry = fromProtoTimestamp(lockedUntil);
     if (!expiry) return null;
 
     if (expiry.getTime() <= Date.now()) {
@@ -1033,7 +1076,7 @@ export class UsersService {
       return {
         uploadUrl: presigned.uploadUrl,
         objectPath: presigned.objectPath,
-        expiresAt: toTimestamp(presigned.expiresAt),
+        expiresAt: toProtoTimestamp(presigned.expiresAt),
       };
     } catch (error) {
       throw StorageReferenceService.asClientError(error);
@@ -1175,43 +1218,6 @@ export class UsersService {
 }
 
 /**
- * The columns a notification recipient needs, in ONE place.
- *
- * Shared by both audience reads so they cannot drift: the quiet-hours fields
- * were added for `listUsersByIds` and are just as necessary for
- * `listPermissionHolders`, and a second copy would have gained them later or
- * never.
- */
-const NOTIFICATION_RECIPIENT_SELECT = {
-  id: true,
-  email: true,
-  fullName: true,
-  quietHoursStart: true,
-  quietHoursEnd: true,
-  timezone: true,
-} as const;
-
-function toNotificationRecipient(user: {
-  id: string;
-  email: string;
-  fullName: string;
-  quietHoursStart: string | null;
-  quietHoursEnd: string | null;
-  timezone: string | null;
-}): NotificationRecipient {
-  return {
-    userId: user.id,
-    email: user.email,
-    fullName: user.fullName,
-    // `?? undefined`, not `?? ''`: these are `optional` on the wire, and an
-    // empty string would be indistinguishable from a user who set "00:00".
-    quietHoursStart: user.quietHoursStart ?? undefined,
-    quietHoursEnd: user.quietHoursEnd ?? undefined,
-    timezone: user.timezone ?? undefined,
-  };
-}
-
-/**
  * The lock email's body — 21-doc §2.4.
  *
  * **Formatted in the RECIPIENT's timezone**, not the server's or the admin's.
@@ -1223,7 +1229,7 @@ function toNotificationRecipient(user: {
  * string — an unlabelled time is the thing that generates the support ticket
  * this sentence exists to prevent.
  */
-function lockUntilSentence(
+export function lockUntilSentence(
   reason: string,
   lockedUntil: Date | null,
   timezone: string | null,
@@ -1239,7 +1245,7 @@ function lockUntilSentence(
 }
 
 /** A human-readable instant, always carrying the zone it is expressed in. */
-function formatInZone(instant: Date, zone: string = 'UTC'): string {
+export function formatInZone(instant: Date, zone: string = 'UTC'): string {
   try {
     return new Intl.DateTimeFormat('en-GB', {
       dateStyle: 'full',

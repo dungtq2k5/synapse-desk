@@ -20,7 +20,7 @@ import { PermissionGuard } from '../../common/guards/permission.guard';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ResponseMessage } from '../../common/decorators/response-message.decorator';
-import { PaginationResponseBase } from '../../common/dto/base/pagination-response-base.dto';
+import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
 import { UserServiceGrpcClient } from './users-service-grpc.client';
 import { UpdateUserDto } from './dto/rest/update-user.dto';
 import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -61,15 +61,12 @@ export class UserAdminController {
   @ApiOperation({ summary: 'List tenant users' })
   @ApiWrappedResponse(Paginated(UserSummaryResponseDto))
   @ApiFilterErrors(['401', '403'])
-  @ApiOperation({ summary: 'List tenant users' })
-  @ApiWrappedResponse(Paginated(UserSummaryResponseDto))
-  @ApiFilterErrors(['401', '403'])
   @Get()
   @RequirePermission('user.read')
   list(
     @CurrentUser() context: RequestContext,
     @Query() query: ListUsersQueryDto,
-  ): Promise<PaginationResponseBase<UserSummaryResponseDto>> {
+  ): Promise<PaginationResponseDto<UserSummaryResponseDto>> {
     // Deactivated accounts need the module's MANAGE permission, not its read
     // one. Checked here rather than with a second @RequirePermission because
     // that decorator is ANY, so adding a code would WIDEN the route instead of
@@ -89,9 +86,6 @@ export class UserAdminController {
   @ApiOperation({ summary: 'Detail + roles + departments' })
   @ApiWrappedResponse(UserSummaryResponseDto)
   @ApiFilterErrors(['400', '401', '403', '404'])
-  @ApiOperation({ summary: 'Detail + roles + departments' })
-  @ApiWrappedResponse(UserSummaryResponseDto)
-  @ApiFilterErrors(['400', '401', '403', '404'])
   @Get(':id')
   @RequirePermission('user.read')
   get(
@@ -105,11 +99,6 @@ export class UserAdminController {
    * The flattened union across the user's roles — computed by the same function
    * that builds the JWT claim, so this and the token cannot disagree.
    */
-  @ApiOperation({
-    summary: 'Flattened effective permission codes (role union)',
-  })
-  @ApiWrappedResponse(UserPermissionsResponseDto)
-  @ApiFilterErrors(['400', '401', '403', '404'])
   @ApiOperation({
     summary: 'Flattened effective permission codes (role union)',
   })
@@ -134,9 +123,6 @@ export class UserAdminController {
   @ApiOperation({ summary: 'Create' })
   @ApiWrappedResponse(UserSummaryResponseDto, { status: HttpStatus.CREATED })
   @ApiFilterErrors(['400', '401', '403'])
-  @ApiOperation({ summary: 'Create' })
-  @ApiWrappedResponse(UserSummaryResponseDto, { status: HttpStatus.CREATED })
-  @ApiFilterErrors(['400', '401', '403'])
   @Post()
   @RequirePermission('user.create')
   create(
@@ -146,9 +132,6 @@ export class UserAdminController {
     return this.usersGrpcClient.create(createUserDto, context);
   }
 
-  @ApiOperation({ summary: 'Update' })
-  @ApiWrappedResponse(UserSummaryResponseDto)
-  @ApiFilterErrors(['400', '401', '403', '404'])
   @ApiOperation({ summary: 'Update' })
   @ApiWrappedResponse(UserSummaryResponseDto)
   @ApiFilterErrors(['400', '401', '403', '404'])
@@ -171,9 +154,6 @@ export class UserAdminController {
   @ApiOperation({ summary: 'Remove' })
   @ApiWrappedResponse(RevokedSessionCountDto)
   @ApiFilterErrors(['400', '401', '403', '404'])
-  @ApiOperation({ summary: 'Remove' })
-  @ApiWrappedResponse(RevokedSessionCountDto)
-  @ApiFilterErrors(['400', '401', '403', '404'])
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   @RequirePermission('user.delete')
@@ -186,9 +166,6 @@ export class UserAdminController {
   }
 
   /** 409 if the address was taken while the account was deactivated. */
-  @ApiOperation({ summary: 'Restore' })
-  @ApiWrappedResponse(UserSummaryResponseDto)
-  @ApiFilterErrors(['400', '401', '403', '404'])
   @ApiOperation({ summary: 'Restore' })
   @ApiWrappedResponse(UserSummaryResponseDto)
   @ApiFilterErrors(['400', '401', '403', '404'])
@@ -207,9 +184,6 @@ export class UserAdminController {
   @ApiOperation({ summary: 'Lock' })
   @ApiWrappedResponse(RevokedSessionCountDto)
   @ApiFilterErrors(['400', '401', '403', '404'])
-  @ApiOperation({ summary: 'Lock' })
-  @ApiWrappedResponse(RevokedSessionCountDto)
-  @ApiFilterErrors(['400', '401', '403', '404'])
   @Post(':id/lock')
   @HttpCode(HttpStatus.OK)
   @RequirePermission('user.lock')
@@ -223,9 +197,6 @@ export class UserAdminController {
   }
 
   /** No sessions restored: unlocking permits signing in, it does not sign in. */
-  @ApiOperation({ summary: 'Unlock' })
-  @ApiWrappedResponse()
-  @ApiFilterErrors(['400', '401', '403', '404'])
   @ApiOperation({ summary: 'Unlock' })
   @ApiWrappedResponse()
   @ApiFilterErrors(['400', '401', '403', '404'])
@@ -249,9 +220,6 @@ export class UserAdminController {
   @ApiOperation({ summary: 'Reset two factor' })
   @ApiWrappedResponse(UntrustedDeviceCountDto)
   @ApiFilterErrors(['400', '401', '403', '404'])
-  @ApiOperation({ summary: 'Reset two factor' })
-  @ApiWrappedResponse(UntrustedDeviceCountDto)
-  @ApiFilterErrors(['400', '401', '403', '404'])
   @Post(':id/2fa/reset')
   @HttpCode(HttpStatus.OK)
   @RequirePermission('user.2fa.reset')
@@ -272,9 +240,6 @@ export class UserAdminController {
   @ApiOperation({ summary: 'Set roles' })
   @ApiWrappedResponse(UserSummaryResponseDto)
   @ApiFilterErrors(['400', '401', '403', '404'])
-  @ApiOperation({ summary: 'Set roles' })
-  @ApiWrappedResponse(UserSummaryResponseDto)
-  @ApiFilterErrors(['400', '401', '403', '404'])
   @Put(':id/roles')
   @HttpCode(HttpStatus.OK)
   @RequirePermission('user.role.assign')
@@ -288,9 +253,6 @@ export class UserAdminController {
   }
 
   /** Exactly one entry must be primary when the list is non-empty. */
-  @ApiOperation({ summary: 'Set departments' })
-  @ApiWrappedResponse(UserSummaryResponseDto)
-  @ApiFilterErrors(['400', '401', '403', '404'])
   @ApiOperation({ summary: 'Set departments' })
   @ApiWrappedResponse(UserSummaryResponseDto)
   @ApiFilterErrors(['400', '401', '403', '404'])

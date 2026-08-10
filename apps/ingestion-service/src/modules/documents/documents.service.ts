@@ -4,6 +4,10 @@ import { RpcException } from '@nestjs/microservices';
 import { status } from '@grpc/grpc-js';
 import { createHash, randomUUID } from 'node:crypto';
 import {
+  ListDocumentChunksByIdsRequest,
+  ListDocumentChunksByIdsResponse,
+  ListDocumentsByIdsRequest,
+  ListDocumentsByIdsResponse,
   CallerContext,
   ConfirmDocumentRequest,
   DeleteDocumentResponse,
@@ -26,10 +30,13 @@ import {
   toPageMeta,
   toPrismaPage,
   toSearchFilter,
-  toTimestamp,
+  toProtoTimestamp,
   UpdateDocumentRequest,
 } from '@synapsedesk/grpc-proto';
 import {
+  BATCH_CHUNK_LIMIT,
+  BATCH_ID_LIMIT,
+  normalizeBatchIds,
   ALLOWED_DOCUMENT_MIME_TYPES,
   DOCUMENT_CHUNK_SORTABLE_FIELDS,
   DOCUMENT_FLAG_SORTABLE_FIELDS,
@@ -56,6 +63,8 @@ import { ScopeWriterService } from '../ingestion/scope-writer.service';
 import { ScopeFanoutQueueService } from '../ingestion/scope-fanout-queue.service';
 import { Prisma } from '../../generated/prisma/client';
 import {
+  DOCUMENT_INCLUDE,
+  DocumentWithScope,
   toDocumentChunkResponse,
   toDocumentFlagResponse,
   toDocumentResponse,
@@ -63,24 +72,6 @@ import {
 
 /** The partial unique index the seeder applies: one live hash per tenant. */
 const DOCUMENT_HASH_INDEX = 'documents_org_hash_key';
-
-/**
- * The relations every document read needs, declared ONCE.
- *
- * `departmentLinks` is the department half of the visibility answer and
- * `_count.chunks` is what the UI shows for ingestion progress. Repeating the
- * shape at each call site is how one query eventually forgets a relation and
- * returns a document with no departments — which reads as "org-wide" to
- * anything checking the array.
- */
-const DOCUMENT_INCLUDE = {
-  departmentLinks: { select: { departmentId: true } },
-  _count: { select: { chunks: true } },
-} satisfies Prisma.DocumentInclude;
-
-type DocumentWithScope = Prisma.DocumentGetPayload<{
-  include: typeof DOCUMENT_INCLUDE;
-}>;
 
 /**
  * The knowledge base's document surface.
@@ -177,7 +168,7 @@ export class DocumentsService {
     return {
       uploadUrl: presigned.uploadUrl,
       objectPath: presigned.objectPath,
-      expiresAt: toTimestamp(presigned.expiresAt),
+      expiresAt: toProtoTimestamp(presigned.expiresAt),
     };
   }
 
@@ -402,7 +393,7 @@ export class DocumentsService {
 
     return {
       downloadUrl,
-      expiresAt: toTimestamp(new Date(Date.now() + this.downloadUrlTtlMs)),
+      expiresAt: toProtoTimestamp(new Date(Date.now() + this.downloadUrlTtlMs)),
     };
   }
 
@@ -759,6 +750,115 @@ export class DocumentsService {
     });
 
     return toDocumentResponse(document, departmentIds, document._count.chunks);
+  }
+
+  /**
+   * The batch read behind the documents DataLoader — 27-doc §1, §3.
+   *
+   * Citations resolve chunk -> document through this.
+   *
+   * **`visibilityScope` applies, exactly as it does to the list.** Documents
+   * carry a department boundary (11-doc §1.4): a document scoped to a
+   * department is invisible to users outside it, and a batch read that skipped
+   * the filter would be a way to fetch any document in the tenant one id at a
+   * time — including its TITLE, which is usually the sensitive part.
+   */
+  async listDocumentsByIds(
+    request: ListDocumentsByIdsRequest,
+    context: CallerContext,
+  ): Promise<ListDocumentsByIdsResponse> {
+    const { ids, overLimit } = normalizeBatchIds(request.documentIds);
+
+    if (overLimit) {
+      throw new RpcException({
+        code: status.INVALID_ARGUMENT,
+        message: `At most ${BATCH_ID_LIMIT} document ids per call`,
+      });
+    }
+
+    if (ids.length === 0) return { items: [] };
+
+    const items = await this.prisma.document.findMany({
+      where: {
+        organizationId: requireTenant(context),
+        ...this.visibilityScope(context),
+        // Soft-deleted documents ARE returned by id — 27-doc §1. A citation
+        // pointing at a retired document still has to render its title.
+        id: { in: ids },
+      },
+      include: DOCUMENT_INCLUDE,
+    });
+
+    return {
+      items: items.map((document) =>
+        toDocumentResponse(
+          document,
+          document.departmentLinks.map((link) => link.departmentId),
+          document._count.chunks,
+        ),
+      ),
+    };
+  }
+
+  /**
+   * Chunks by id — the citation preview loader.
+   *
+   * **Capped hardest of all the batch RPCs** (`BATCH_CHUNK_LIMIT`), because a
+   * chunk carries its whole text: fifty of these is already megabytes where
+   * fifty users is kilobytes. The cap is about BYTES, and one number shared with
+   * the other batches would be wrong for one of them.
+   *
+   * Scoped through the parent DOCUMENT rather than on the chunk row: the
+   * department boundary lives on the document, and a chunk inherits it. Filtering
+   * on the chunk alone would return text from a document the caller cannot open.
+   */
+  async listDocumentChunksByIds(
+    request: ListDocumentChunksByIdsRequest,
+    context: CallerContext,
+  ): Promise<ListDocumentChunksByIdsResponse> {
+    const { ids, overLimit } = normalizeBatchIds(
+      request.chunkIds,
+      BATCH_CHUNK_LIMIT,
+    );
+
+    if (overLimit) {
+      throw new RpcException({
+        code: status.INVALID_ARGUMENT,
+        message: `At most ${BATCH_CHUNK_LIMIT} chunk ids per call`,
+      });
+    }
+
+    if (ids.length === 0) return { items: [] };
+
+    const chunks = await this.prisma.documentChunk.findMany({
+      where: {
+        id: { in: ids },
+        // The boundary, applied through the parent.
+        document: {
+          organizationId: requireTenant(context),
+          ...this.visibilityScope(context),
+        },
+      },
+      select: {
+        id: true,
+        documentId: true,
+        pageNumber: true,
+        chunkIndex: true,
+        contentText: true,
+        document: { select: { title: true } },
+      },
+    });
+
+    return {
+      items: chunks.map((chunk) => ({
+        chunkId: chunk.id,
+        documentId: chunk.documentId,
+        documentTitle: chunk.document.title,
+        pageNumber: chunk.pageNumber ?? undefined,
+        chunkIndex: chunk.chunkIndex,
+        contentText: chunk.contentText,
+      })),
+    };
   }
 
   // -------------------------------------------------------------------------

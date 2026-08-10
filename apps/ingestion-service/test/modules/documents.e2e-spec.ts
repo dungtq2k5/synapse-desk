@@ -1,14 +1,17 @@
 import { RpcException } from '@nestjs/microservices';
-import { expectRpc } from '@synapsedesk/common/testing/rpc';
-import { status } from '@grpc/grpc-js';
-import { faker } from '@faker-js/faker';
+import { randomUUID } from 'node:crypto';
 import {
+  BATCH_CHUNK_LIMIT,
+  BATCH_ID_LIMIT,
   DOCUMENT_PATTERNS,
   DocumentFlagSeverity,
   DocumentFlagType,
   DocumentStatus,
   IngestionJobStatus,
 } from '@synapsedesk/common';
+import { expectRpc } from '@synapsedesk/common/testing/rpc';
+import { status } from '@grpc/grpc-js';
+import { faker } from '@faker-js/faker';
 import {
   E2eFixture,
   bootstrapE2eTest,
@@ -1030,6 +1033,136 @@ describe('§2 Documents (e2e)', () => {
       );
 
       expect(items).toHaveLength(0);
+    });
+  });
+
+  /**
+   * The batch contract — 27-doc §1, §3.
+   *
+   * The property specific to THIS service is the department boundary: a
+   * document scoped to a department is invisible outside it (11-doc §1.4), and
+   * a batch read that skipped `visibilityScope` would be a way to fetch any
+   * document in the tenant one id at a time — including its TITLE, which is
+   * usually the sensitive part.
+   */
+  describe('§1 ListDocumentsByIds / ListDocumentChunksByIds', () => {
+    it('1. **the department boundary applies to a batch read**', async () => {
+      const scoped = await createScopedDocument(fx.prisma, tenant, [
+        tenant.departmentId,
+      ]);
+
+      const { items } = await documents.listDocumentsByIds(
+        { documentIds: [scoped.id] },
+        outsider(),
+      );
+
+      expect(items).toEqual([]);
+    });
+
+    it('2. and an insider does get it', async () => {
+      // The other half — otherwise test 1 passes against an RPC that returns
+      // nothing to anyone.
+      const scoped = await createScopedDocument(fx.prisma, tenant, [
+        tenant.departmentId,
+      ]);
+
+      const { items } = await documents.listDocumentsByIds(
+        { documentIds: [scoped.id] },
+        manager(),
+      );
+
+      expect(items.map((item) => item.id)).toEqual([scoped.id]);
+    });
+
+    it('3. unknown ids are omitted; an empty request is empty', async () => {
+      const document = await createDocument(fx.prisma, tenant, {
+        isOrganizationWide: true,
+      });
+
+      const found = await documents.listDocumentsByIds(
+        { documentIds: [document.id, randomUUID()] },
+        manager(),
+      );
+      const empty = await documents.listDocumentsByIds(
+        { documentIds: [] },
+        manager(),
+      );
+
+      expect(found.items.map((item) => item.id)).toEqual([document.id]);
+      expect(empty.items).toEqual([]);
+    });
+
+    it('4. an over-cap document batch is INVALID_ARGUMENT', async () => {
+      await expectRpc(
+        documents.listDocumentsByIds(
+          {
+            documentIds: Array.from({ length: BATCH_ID_LIMIT + 1 }, () =>
+              randomUUID(),
+            ),
+          },
+          manager(),
+        ),
+        status.INVALID_ARGUMENT,
+      );
+    });
+
+    it('5. **chunks are capped HARDER than everything else**', async () => {
+      // 27-doc §3. A chunk carries its whole text, so these are the largest
+      // payloads in the system: 50 of them is megabytes where 200 users is
+      // kilobytes. The cap is about BYTES, and one number shared with the other
+      // batches would be wrong for one of them.
+      expect(BATCH_CHUNK_LIMIT).toBeLessThan(BATCH_ID_LIMIT);
+
+      await expectRpc(
+        documents.listDocumentChunksByIds(
+          {
+            chunkIds: Array.from({ length: BATCH_CHUNK_LIMIT + 1 }, () =>
+              randomUUID(),
+            ),
+          },
+          manager(),
+        ),
+        status.INVALID_ARGUMENT,
+      );
+    });
+
+    it("6. **a chunk inherits its document's boundary**", async () => {
+      // Scoped through the parent rather than on the chunk row: the department
+      // boundary lives on the document, and filtering on the chunk alone would
+      // return TEXT from a document the caller cannot open — a worse leak than
+      // the title.
+      const scoped = await createScopedDocument(fx.prisma, tenant, [
+        tenant.departmentId,
+      ]);
+      // Created directly: the document fixture stops at the row, and a test
+      // that looked for a chunk the fixture never makes would find none and
+      // pass while asserting nothing about the boundary.
+      const chunk = await fx.prisma.documentChunk.create({
+        data: {
+          documentId: scoped.id,
+          // Denormalised onto the chunk for retrieval, and deliberately NOT
+          // what this RPC scopes on — the department boundary lives on the
+          // document, so filtering here would return text from a document the
+          // caller cannot open.
+          organizationId: tenant.organizationId,
+          chunkIndex: 0,
+          contentText: 'The redundancy list is attached.',
+          tokenCount: 8,
+        },
+        select: { id: true },
+      });
+
+      const outside = await documents.listDocumentChunksByIds(
+        { chunkIds: [chunk.id] },
+        outsider(),
+      );
+      const inside = await documents.listDocumentChunksByIds(
+        { chunkIds: [chunk.id] },
+        manager(),
+      );
+
+      expect(outside.items).toEqual([]);
+      expect(inside.items.map((item) => item.chunkId)).toEqual([chunk.id]);
     });
   });
 });

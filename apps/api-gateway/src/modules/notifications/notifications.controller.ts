@@ -65,12 +65,6 @@ export class NotificationsController {
   })
   @ApiWrappedResponse(NotificationFeedResponseDto)
   @ApiFilterErrors(['401'])
-  @ApiOperation({
-    summary:
-      'Cursor-paginated feed (?type=&unreadOnly=false&cursor=), 20/page, newest first',
-  })
-  @ApiWrappedResponse(NotificationFeedResponseDto)
-  @ApiFilterErrors(['401'])
   @Get()
   list(
     @CurrentUser() context: RequestContext,
@@ -90,9 +84,6 @@ export class NotificationsController {
   @ApiOperation({ summary: 'Integer count of unread + non-archived' })
   @ApiWrappedResponse(UnreadCountResponseDto)
   @ApiFilterErrors(['401'])
-  @ApiOperation({ summary: 'Integer count of unread + non-archived' })
-  @ApiWrappedResponse(UnreadCountResponseDto)
-  @ApiFilterErrors(['401'])
   @Get('unread-count')
   unreadCount(
     @CurrentUser() context: RequestContext,
@@ -100,12 +91,6 @@ export class NotificationsController {
     return this.notificationsGrpcClient.unreadCount(context);
   }
 
-  @ApiOperation({
-    summary:
-      "Full resolved catalogue per (type, channel) — exact match, else ('*', channel), else the hard-coded default",
-  })
-  @ApiWrappedResponse(PreferenceResponseDto, { isArray: true })
-  @ApiFilterErrors(['401'])
   @ApiOperation({
     summary:
       "Full resolved catalogue per (type, channel) — exact match, else ('*', channel), else the hard-coded default",
@@ -123,9 +108,6 @@ export class NotificationsController {
   @ApiOperation({ summary: 'Update preference' })
   @ApiWrappedResponse(PreferenceResponseDto)
   @ApiFilterErrors(['400', '401'])
-  @ApiOperation({ summary: 'Update preference' })
-  @ApiWrappedResponse(PreferenceResponseDto)
-  @ApiFilterErrors(['400', '401'])
   @Patch('preferences')
   updatePreference(
     @CurrentUser() context: RequestContext,
@@ -140,9 +122,6 @@ export class NotificationsController {
    * `{ resourceType, resourceId }` is the form that makes the feature usable:
    * opening ticket #1042 clears all twelve of its notifications in one call.
    */
-  @ApiOperation({ summary: 'Mark many read' })
-  @ApiWrappedResponse(MarkReadResponseDto)
-  @ApiFilterErrors(['400', '401'])
   @ApiOperation({ summary: 'Mark many read' })
   @ApiWrappedResponse(MarkReadResponseDto)
   @ApiFilterErrors(['400', '401'])
@@ -164,9 +143,6 @@ export class NotificationsController {
   @ApiOperation({ summary: 'Mark read' })
   @ApiWrappedResponse(MarkReadResponseDto)
   @ApiFilterErrors(['400', '401', '404'])
-  @ApiOperation({ summary: 'Mark read' })
-  @ApiWrappedResponse(MarkReadResponseDto)
-  @ApiFilterErrors(['400', '401', '404'])
   @Post(':id/read')
   @HttpCode(HttpStatus.OK)
   markRead(
@@ -182,9 +158,6 @@ export class NotificationsController {
    * `expires_at` and the pruning job own deletion. A user who archives
    * something must still be able to find it with `includeArchived`.
    */
-  @ApiOperation({ summary: 'Archive' })
-  @ApiWrappedResponse(MarkReadResponseDto)
-  @ApiFilterErrors(['400', '401', '404'])
   @ApiOperation({ summary: 'Archive' })
   @ApiWrappedResponse(MarkReadResponseDto)
   @ApiFilterErrors(['400', '401', '404'])

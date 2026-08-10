@@ -2,7 +2,7 @@ import {
   OrganizationResponse,
   toProtoAiModelTier,
   toProtoOrgStatus,
-  toTimestamp,
+  toProtoTimestamp,
 } from '@synapsedesk/grpc-proto';
 import { Organization } from '../../generated/prisma/client';
 
@@ -28,8 +28,8 @@ export function toOrganizationResponse(
     maxStorageBytes: Number(organization.maxStorageBytes),
     monthlyAiTokenBudget: Number(organization.monthlyAiTokenBudget),
     aiModelTier: toProtoAiModelTier(organization.aiModelTier),
-    billingCycleStart: toTimestamp(organization.billingCycleStart),
-    createdAt: toTimestamp(organization.createdAt),
-    updatedAt: toTimestamp(organization.updatedAt),
+    billingCycleStart: toProtoTimestamp(organization.billingCycleStart),
+    createdAt: toProtoTimestamp(organization.createdAt),
+    updatedAt: toProtoTimestamp(organization.updatedAt),
   };
 }

@@ -1,8 +1,7 @@
 import { RpcException } from '@nestjs/microservices';
-import { expectRpc, rpcCode } from '@synapsedesk/common/testing/rpc';
-import { status } from '@grpc/grpc-js';
-import { faker } from '@faker-js/faker';
+import { randomUUID } from 'node:crypto';
 import {
+  BATCH_ID_LIMIT,
   canTransition,
   compareAlphabetically,
   TICKET_PATTERNS,
@@ -10,6 +9,9 @@ import {
   TicketSource,
   TicketStatus,
 } from '@synapsedesk/common';
+import { expectRpc, rpcCode } from '@synapsedesk/common/testing/rpc';
+import { status } from '@grpc/grpc-js';
+import { faker } from '@faker-js/faker';
 import {
   TicketPriority as ProtoTicketPriority,
   TicketSource as ProtoTicketSource,
@@ -26,7 +28,7 @@ import { buildTenant, createTicket, TenantFixture } from '../factories';
 import { TicketsService } from '../../src/modules/tickets/tickets.service';
 import { AuthReferenceService } from '../../src/modules/auth-client/auth-reference.service';
 import { TicketEventPublisher } from '../../src/modules/events/ticket-event.publisher';
-import { toProtoStatus } from '../../src/modules/tickets/ticket.mapper';
+import { toProtoTicketStatus } from '../../src/modules/tickets/ticket.mapper';
 
 describe('Tickets (e2e)', () => {
   let fx: E2eFixture;
@@ -383,7 +385,7 @@ describe('Tickets (e2e)', () => {
 
           const result = await tickets
             .changeTicketStatus(
-              { id: ticket.id, status: toProtoStatus(to) },
+              { id: ticket.id, status: toProtoTicketStatus(to) },
               agent(),
             )
             .then(
@@ -422,7 +424,7 @@ describe('Tickets (e2e)', () => {
 
       await expectRpc(
         tickets.changeTicketStatus(
-          { id: ticket.id, status: toProtoStatus(TicketStatus.OPEN) },
+          { id: ticket.id, status: toProtoTicketStatus(TicketStatus.OPEN) },
           agent(),
         ),
         status.ABORTED,
@@ -437,7 +439,7 @@ describe('Tickets (e2e)', () => {
 
       const error = await tickets
         .changeTicketStatus(
-          { id: ticket.id, status: toProtoStatus(TicketStatus.RESOLVED) },
+          { id: ticket.id, status: toProtoTicketStatus(TicketStatus.RESOLVED) },
           agent(),
         )
         .catch((e: unknown) => e);
@@ -453,7 +455,7 @@ describe('Tickets (e2e)', () => {
       });
 
       await tickets.changeTicketStatus(
-        { id: ticket.id, status: toProtoStatus(TicketStatus.RESOLVED) },
+        { id: ticket.id, status: toProtoTicketStatus(TicketStatus.RESOLVED) },
         agent(),
       );
 
@@ -479,7 +481,7 @@ describe('Tickets (e2e)', () => {
 
       await expectRpc(
         tickets.changeTicketStatus(
-          { id: ticket.id, status: toProtoStatus(TicketStatus.CLOSED) },
+          { id: ticket.id, status: toProtoTicketStatus(TicketStatus.CLOSED) },
           agent(),
         ),
         status.INVALID_ARGUMENT,
@@ -501,7 +503,10 @@ describe('Tickets (e2e)', () => {
 
       const a = await tickets.resolveTicket({ id: viaAlias.id }, agent());
       const b = await tickets.changeTicketStatus(
-        { id: viaGeneric.id, status: toProtoStatus(TicketStatus.RESOLVED) },
+        {
+          id: viaGeneric.id,
+          status: toProtoTicketStatus(TicketStatus.RESOLVED),
+        },
         agent(),
       );
 
@@ -607,7 +612,7 @@ describe('Tickets (e2e)', () => {
       const result = await tickets.bulkChangeTicketStatus(
         {
           ticketIds: [...ok.map((t) => t.id), illegal.id],
-          status: toProtoStatus(TicketStatus.RESOLVED),
+          status: toProtoTicketStatus(TicketStatus.RESOLVED),
         },
         agent(),
       );
@@ -643,7 +648,7 @@ describe('Tickets (e2e)', () => {
       const result = await tickets.bulkChangeTicketStatus(
         {
           ticketIds: [mine.id, theirs.id],
-          status: toProtoStatus(TicketStatus.RESOLVED),
+          status: toProtoTicketStatus(TicketStatus.RESOLVED),
         },
         agent(),
       );
@@ -661,7 +666,7 @@ describe('Tickets (e2e)', () => {
 
       await expectRpc(
         tickets.bulkChangeTicketStatus(
-          { ticketIds: ids, status: toProtoStatus(TicketStatus.CLOSED) },
+          { ticketIds: ids, status: toProtoTicketStatus(TicketStatus.CLOSED) },
           agent(),
         ),
         status.INVALID_ARGUMENT,
@@ -676,7 +681,7 @@ describe('Tickets (e2e)', () => {
       const result = await tickets.bulkChangeTicketStatus(
         {
           ticketIds: [ticket.id, ticket.id, ticket.id],
-          status: toProtoStatus(TicketStatus.RESOLVED),
+          status: toProtoTicketStatus(TicketStatus.RESOLVED),
         },
         agent(),
       );
@@ -828,6 +833,86 @@ describe('Tickets (e2e)', () => {
       );
 
       expect(list.items).toHaveLength(2);
+    });
+  });
+
+  /**
+   * The batch contract — 27-doc §1.
+   *
+   * The property specific to THIS service: `visibilityScope` applies to a batch
+   * read exactly as it does to the list. A batch RPC that skipped it would be a
+   * way to fetch any ticket in the tenant one id at a time — which is precisely
+   * what "it is just a simple `WHERE id IN (…)`" makes easy to miss.
+   */
+  describe('§1 ListTicketsByIds — the batch contract', () => {
+    it("1. **returns only the caller's tenant**", async () => {
+      const mine = await tickets.createTicket(createRequest(), member());
+      // A second tenant is just a second set of ids — this service holds no
+      // organizations table, and the tenant is whatever the caller context says.
+      const otherTenant = buildTenant();
+      const theirs = await tickets.createTicket(
+        createRequest(),
+        member(otherTenant),
+      );
+
+      const { items } = await tickets.listTicketsByIds(
+        { ticketIds: [mine.id, theirs.id] },
+        agent(),
+      );
+
+      expect(items.map((item) => item.id)).toEqual([mine.id]);
+    });
+
+    it("2. **`visibilityScope` applies — a member cannot fetch a stranger's ticket by id**", async () => {
+      // The one that matters most here. Without it, a caller with no
+      // `ticket.read.all` could enumerate the whole queue an id at a time,
+      // which is exactly the narrowing the list route exists to apply.
+      const strangers = await tickets.createTicket(createRequest(), agent());
+
+      const { items } = await tickets.listTicketsByIds(
+        { ticketIds: [strangers.id] },
+        member(),
+      );
+
+      expect(items).toEqual([]);
+    });
+
+    it('3. unknown ids are omitted, not an error', async () => {
+      const mine = await tickets.createTicket(createRequest(), member());
+
+      const { items } = await tickets.listTicketsByIds(
+        { ticketIds: [mine.id, randomUUID()] },
+        member(),
+      );
+
+      expect(items.map((item) => item.id)).toEqual([mine.id]);
+    });
+
+    it('4. duplicates collapse, and an empty request is empty', async () => {
+      const mine = await tickets.createTicket(createRequest(), member());
+
+      const duplicated = await tickets.listTicketsByIds(
+        { ticketIds: [mine.id, mine.id] },
+        member(),
+      );
+      const empty = await tickets.listTicketsByIds({ ticketIds: [] }, member());
+
+      expect(duplicated.items).toHaveLength(1);
+      expect(empty.items).toEqual([]);
+    });
+
+    it('5. an over-cap batch is INVALID_ARGUMENT', async () => {
+      await expectRpc(
+        tickets.listTicketsByIds(
+          {
+            ticketIds: Array.from({ length: BATCH_ID_LIMIT + 1 }, () =>
+              randomUUID(),
+            ),
+          },
+          agent(),
+        ),
+        status.INVALID_ARGUMENT,
+      );
     });
   });
 });

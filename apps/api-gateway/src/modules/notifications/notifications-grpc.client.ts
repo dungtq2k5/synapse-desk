@@ -5,13 +5,13 @@ import {
   fromProtoNotificationChannel,
   fromProtoNotificationPriority,
   fromProtoPreferenceSource,
-  fromTimestamp,
+  fromProtoTimestamp,
   NOTIFICATION_GRPC_CLIENT,
   NOTIFICATION_SERVICE_NAME,
   NotificationResponse,
   NotificationServiceClient,
   PreferenceResponse,
-  requireTimestamp,
+  requireProtoTimestamp,
   toProtoDigestMode,
   toProtoNotificationChannel,
 } from '@synapsedesk/grpc-proto';
@@ -72,7 +72,7 @@ export class NotificationsGrpcClient
     );
 
     return {
-      items: response.items.map(toNotificationDto),
+      items: response.items.map(toNotificationResponseDto),
       // `?? null`: proto3 `optional` arrives as undefined, and a client
       // checking `nextCursor !== null` would loop forever on undefined.
       nextCursor: response.nextCursor ?? null,
@@ -142,7 +142,7 @@ export class NotificationsGrpcClient
       context,
     );
 
-    return response.items.map((item) => toPreferenceDto(item));
+    return response.items.map((item) => toPreferenceResponseDto(item));
   }
 
   async updatePreference(
@@ -168,7 +168,7 @@ export class NotificationsGrpcClient
       context,
     );
 
-    return toPreferenceDto(updated);
+    return toPreferenceResponseDto(updated);
   }
 }
 
@@ -180,7 +180,7 @@ export class NotificationsGrpcClient
  * guarded because the alternative — a malformed payload failing the whole feed
  * — would take out every notification for one bad row.
  */
-function toNotificationDto(
+function toNotificationResponseDto(
   notification: NotificationResponse,
 ): NotificationResponseDto {
   return {
@@ -199,9 +199,9 @@ function toNotificationDto(
     resourceId: notification.resourceId ?? null,
     groupKey: notification.groupKey ?? null,
     groupCount: notification.groupCount,
-    readAt: fromTimestamp(notification.readAt) ?? null,
-    archivedAt: fromTimestamp(notification.archivedAt) ?? null,
-    createdAt: requireTimestamp(notification.createdAt, 'createdAt'),
+    readAt: fromProtoTimestamp(notification.readAt) ?? null,
+    archivedAt: fromProtoTimestamp(notification.archivedAt) ?? null,
+    createdAt: requireProtoTimestamp(notification.createdAt, 'createdAt'),
   };
 }
 
@@ -213,12 +213,12 @@ function toNotificationDto(
  * detail, and publishing it would make every HTTP consumer depend on the proto
  * file to interpret a settings screen.
  *
- * `?? ''` on each, matching `toOrganizationDto`: `UNSPECIFIED` means the field
+ * `?? ''` on each, matching `toOrganizationResponseDto`: `UNSPECIFIED` means the field
  * was not set, and there is no member to honestly read that as. It should not
  * arise — the service maps from validated rows — so degrading to empty beats
  * failing a read the user is entitled to.
  */
-function toPreferenceDto(
+function toPreferenceResponseDto(
   preference: PreferenceResponse,
 ): PreferenceResponseDto {
   return {

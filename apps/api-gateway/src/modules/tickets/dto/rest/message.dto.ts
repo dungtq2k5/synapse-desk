@@ -16,10 +16,10 @@ import {
   MAX_MESSAGE_CONTENT_LENGTH,
   trimIfString,
 } from '@synapsedesk/common';
-import { SearchPaginationBase } from '../../../../common/dto/base/search-pagination-base.dto';
+import { SearchPaginationDto } from '../../../../common/dto/rest/search-pagination.dto';
 import { ToBoolean } from '../../../../common/decorators/to-boolean.decorator';
 
-export class ListMessagesQueryDto extends SearchPaginationBase {}
+export class ListMessagesQueryDto extends SearchPaginationDto {}
 
 export class CreateMessageDto {
   @IsString()

@@ -15,7 +15,7 @@ import {
   RequestEmailVerificationRequest,
   RequestOtpResponse,
   RequestPhoneVerificationRequest,
-  toTimestamp,
+  toProtoTimestamp,
   VerifyOtpRequest,
   VerifyOtpResponse,
 } from '@synapsedesk/grpc-proto';
@@ -192,7 +192,7 @@ export class OtpService {
         purpose === OtpPurpose.PHONE_VERIFICATION
           ? maskPhoneNumber(otp.target)
           : maskEmail(otp.target),
-      expiresAt: toTimestamp(otp.expiresAt),
+      expiresAt: toProtoTimestamp(otp.expiresAt),
       attemptsRemaining: Math.max(0, otp.maxAttempts - otp.attemptsCount),
     };
   }

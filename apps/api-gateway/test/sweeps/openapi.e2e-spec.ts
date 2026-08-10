@@ -105,18 +105,41 @@ describe('§1/§5 the OpenAPI document', () => {
       expect(empty).toEqual([]);
     });
 
-    it('2. **`UserBase`s inherited fields appear on a derived response**', () => {
-      // The `.base.ts` trap specifically — 24-doc §1. The plugin's default
-      // `dtoFileNameSuffix` is `['.dto.ts', '.entity.ts']`, and
-      // `users/dto/base/user.base.ts` matches neither. `UserBase` is the base
-      // class of the most-used response in the API, so leaving it out strips the
-      // inherited half of every user response — silently, and only partially,
-      // which is what makes it survive review.
-      const derived = schema('UserResponseDto');
+    it('2. **fields reached through `PickType` appear on the derived DTO**', () => {
+      // 24-doc §1, restated for the layout that exists now.
+      //
+      // This used to guard the `.base.ts` trap: the plugin's default
+      // `dtoFileNameSuffix` is `['.dto.ts', '.entity.ts']`, `user.base.ts`
+      // matched neither, and leaving it out stripped the inherited half of every
+      // user response — silently and only partially, which is what let it
+      // survive review. That trap is gone: there are no `.base.ts` files left,
+      // and `dtoFileNameSuffix` no longer names the suffix.
+      //
+      // The mechanism it really tested — the plugin resolving properties through
+      // a class the DTO does not declare itself — survives in `PickType`, which
+      // is how the write DTOs derive from `UserResponseDto`. A plugin that stops
+      // following it produces a request body with no properties, so a generated
+      // client sends `{}` and every create fails validation.
+      // `UpdateUserDto`, not `CreateUserDto`: there are TWO classes named
+      // `CreateUserDto` — one in `create-user.dto.ts`, one in
+      // `user-admin.dto.ts` — and a schema name is global, so whichever the
+      // plugin visits last wins. Asserting on a colliding name tests whichever
+      // class happened to be registered rather than the one named.
+      // `UpdateUserDto` is declared once and is the DTO the admin route
+      // actually binds.
+      const picked = schema('UpdateUserDto');
 
-      expect(derived).toBeDefined();
-      // Declared on `UserBase`, not on the derived class.
-      expect(Object.keys(derived?.properties ?? {})).toEqual(
+      expect(picked).toBeDefined();
+      // Declared on `UserResponseDto`, reached through `PickType`.
+      expect(Object.keys(picked?.properties ?? {})).toEqual(
+        expect.arrayContaining(['fullName', 'phoneNumber', 'gender']),
+      );
+
+      // And the response DTO still carries its own, which is the half that
+      // would break if the plugin stopped reading this file at all.
+      const response = schema('UserResponseDto');
+
+      expect(Object.keys(response?.properties ?? {})).toEqual(
         expect.arrayContaining(['id', 'organizationId', 'fullName', 'email']),
       );
     });
@@ -521,10 +544,13 @@ describe('§1/§5 the OpenAPI document', () => {
         join(__dirname, '../../src/common/config/swagger.config.ts'),
         'utf8',
       )
-        .replace(/\/\*[\s\S]*?\*\//g, '')
+        // `.` with the `s` flag rather than `[\s\S]`: the class was only ever a
+        // way to say "any character INCLUDING newlines", which dotAll says
+        // directly and without escapes.
+        .replace(/\/\*.*?\*\//gs, '')
         // Measured linear: `m` makes `$` a line end, so `.*` cannot scan
-        // across lines and there is nothing to backtrack through. NOSONAR
-        .replace(/\/\/.*$/gm, '');
+        // across lines and there is nothing to backtrack through.
+        .replace(/\/\/.*$/gm, ''); // NOSONAR
 
       expect(code).toContain("configService.get<boolean>('SWAGGER_ENABLED')");
       expect(code).not.toMatch(/NODE_ENV\s*[!=]==?\s*['"]production/);

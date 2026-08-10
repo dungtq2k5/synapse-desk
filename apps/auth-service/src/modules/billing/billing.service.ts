@@ -10,7 +10,7 @@ import {
   ListInvoicesResponse,
   PortalSessionResponse,
   SubscriptionResponse,
-  toTimestamp,
+  toProtoTimestamp,
   toProtoAiModelTier,
   toProtoOrgStatus,
 } from '@synapsedesk/grpc-proto';
@@ -76,7 +76,7 @@ export class BillingService {
       maxStorageBytes: Number(organization.maxStorageBytes),
       monthlyAiTokenBudget: Number(organization.monthlyAiTokenBudget),
       aiModelTier: toProtoAiModelTier(organization.aiModelTier),
-      billingCycleStart: toTimestamp(organization.billingCycleStart),
+      billingCycleStart: toProtoTimestamp(organization.billingCycleStart),
       status: toProtoOrgStatus(organization.status),
     };
   }
@@ -205,7 +205,7 @@ export class BillingService {
           amountDue: invoice.amount_due,
           currency: invoice.currency,
           status: invoice.status ?? 'unknown',
-          created: toTimestamp(new Date(invoice.created * 1000)),
+          created: toProtoTimestamp(new Date(invoice.created * 1000)),
           hostedInvoiceUrl: invoice.hosted_invoice_url ?? '',
         })),
       };

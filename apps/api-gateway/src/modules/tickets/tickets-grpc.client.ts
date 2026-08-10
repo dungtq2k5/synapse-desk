@@ -8,13 +8,13 @@ import {
 } from '@synapsedesk/grpc-proto';
 import { RequestContext } from '@synapsedesk/common';
 import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
-import { PaginationResponseBase } from '../../common/dto/base/pagination-response-base.dto';
-import { toPaginationMeta } from '../../common/mappers/pagination.mapper';
+import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
+import { toPaginationMetaDataResponseDto } from '../../common/mappers/pagination.mapper';
 import {
-  toProtoPriority,
-  toProtoSource,
-  toProtoStatus,
-  toTicketDto,
+  toProtoTicketPriority,
+  toProtoTicketSource,
+  toProtoTicketStatus,
+  toTicketResponseDto,
 } from './ticket.mapper';
 import {
   BulkTicketStatusDto,
@@ -56,15 +56,15 @@ export class TicketsGrpcClient extends BaseGrpcClient implements OnModuleInit {
   async list(
     query: ListTicketsQueryDto,
     context: RequestContext,
-  ): Promise<PaginationResponseBase<TicketResponseDto>> {
+  ): Promise<PaginationResponseDto<TicketResponseDto>> {
     const response = await this.call(
       (metadata) =>
         this.ticketGrpcService.listTickets(
           {
             page: toPageRequest(query),
-            status: toProtoStatus(query.status),
-            priority: toProtoPriority(query.priority),
-            source: toProtoSource(query.source),
+            status: toProtoTicketStatus(query.status),
+            priority: toProtoTicketPriority(query.priority),
+            source: toProtoTicketSource(query.source),
             // '' rather than undefined: proto3 scalars have no null, and the
             // service reads the empty string as "no filter".
             assigneeId: query.assigneeId ?? '',
@@ -78,13 +78,13 @@ export class TicketsGrpcClient extends BaseGrpcClient implements OnModuleInit {
     );
 
     return {
-      items: response.items.map(toTicketDto),
-      meta: toPaginationMeta(response.meta),
+      items: response.items.map(toTicketResponseDto),
+      meta: toPaginationMetaDataResponseDto(response.meta),
     };
   }
 
   async get(id: string, context: RequestContext): Promise<TicketResponseDto> {
-    return toTicketDto(
+    return toTicketResponseDto(
       await this.call(
         (metadata) => this.ticketGrpcService.getTicket({ id }, metadata),
         context,
@@ -96,7 +96,7 @@ export class TicketsGrpcClient extends BaseGrpcClient implements OnModuleInit {
     ticketNumber: number,
     context: RequestContext,
   ): Promise<TicketResponseDto> {
-    return toTicketDto(
+    return toTicketResponseDto(
       await this.call(
         (metadata) =>
           this.ticketGrpcService.getTicketByNumber({ ticketNumber }, metadata),
@@ -109,15 +109,15 @@ export class TicketsGrpcClient extends BaseGrpcClient implements OnModuleInit {
     dto: CreateTicketDto,
     context: RequestContext,
   ): Promise<TicketResponseDto> {
-    return toTicketDto(
+    return toTicketResponseDto(
       await this.call(
         (metadata) =>
           this.ticketGrpcService.createTicket(
             {
               title: dto.title,
               description: dto.description,
-              priority: toProtoPriority(dto.priority),
-              source: toProtoSource(dto.source),
+              priority: toProtoTicketPriority(dto.priority),
+              source: toProtoTicketSource(dto.source),
               authorId: dto.authorId,
             },
             metadata,
@@ -132,7 +132,7 @@ export class TicketsGrpcClient extends BaseGrpcClient implements OnModuleInit {
     dto: UpdateTicketDto,
     context: RequestContext,
   ): Promise<TicketResponseDto> {
-    return toTicketDto(
+    return toTicketResponseDto(
       await this.call(
         (metadata) =>
           this.ticketGrpcService.updateTicket(
@@ -140,7 +140,7 @@ export class TicketsGrpcClient extends BaseGrpcClient implements OnModuleInit {
               id,
               title: dto.title,
               description: dto.description,
-              priority: toProtoPriority(dto.priority),
+              priority: toProtoTicketPriority(dto.priority),
             },
             metadata,
           ),
@@ -154,11 +154,11 @@ export class TicketsGrpcClient extends BaseGrpcClient implements OnModuleInit {
     dto: ChangeTicketStatusDto,
     context: RequestContext,
   ): Promise<TicketResponseDto> {
-    return toTicketDto(
+    return toTicketResponseDto(
       await this.call(
         (metadata) =>
           this.ticketGrpcService.changeTicketStatus(
-            { id, status: toProtoStatus(dto.status), reason: dto.reason },
+            { id, status: toProtoTicketStatus(dto.status), reason: dto.reason },
             metadata,
           ),
         context,
@@ -177,7 +177,7 @@ export class TicketsGrpcClient extends BaseGrpcClient implements OnModuleInit {
     id: string,
     context: RequestContext,
   ): Promise<TicketResponseDto> {
-    return toTicketDto(
+    return toTicketResponseDto(
       await this.call(
         (metadata) => this.ticketGrpcService.escalateTicket({ id }, metadata),
         context,
@@ -189,7 +189,7 @@ export class TicketsGrpcClient extends BaseGrpcClient implements OnModuleInit {
     id: string,
     context: RequestContext,
   ): Promise<TicketResponseDto> {
-    return toTicketDto(
+    return toTicketResponseDto(
       await this.call(
         (metadata) => this.ticketGrpcService.resolveTicket({ id }, metadata),
         context,
@@ -201,7 +201,7 @@ export class TicketsGrpcClient extends BaseGrpcClient implements OnModuleInit {
     id: string,
     context: RequestContext,
   ): Promise<TicketResponseDto> {
-    return toTicketDto(
+    return toTicketResponseDto(
       await this.call(
         (metadata) => this.ticketGrpcService.reopenTicket({ id }, metadata),
         context,
@@ -210,7 +210,7 @@ export class TicketsGrpcClient extends BaseGrpcClient implements OnModuleInit {
   }
 
   async close(id: string, context: RequestContext): Promise<TicketResponseDto> {
-    return toTicketDto(
+    return toTicketResponseDto(
       await this.call(
         (metadata) => this.ticketGrpcService.closeTicket({ id }, metadata),
         context,
@@ -227,7 +227,7 @@ export class TicketsGrpcClient extends BaseGrpcClient implements OnModuleInit {
         this.ticketGrpcService.bulkChangeTicketStatus(
           {
             ticketIds: dto.ticketIds,
-            status: toProtoStatus(dto.status),
+            status: toProtoTicketStatus(dto.status),
             reason: dto.reason,
           },
           metadata,
@@ -249,7 +249,7 @@ export class TicketsGrpcClient extends BaseGrpcClient implements OnModuleInit {
     id: string,
     context: RequestContext,
   ): Promise<TicketResponseDto> {
-    return toTicketDto(
+    return toTicketResponseDto(
       await this.call(
         (metadata) => this.ticketGrpcService.restoreTicket({ id }, metadata),
         context,

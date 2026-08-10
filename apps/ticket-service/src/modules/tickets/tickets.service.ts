@@ -2,6 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
 import { status } from '@grpc/grpc-js';
 import {
+  ListTicketsByIdsRequest,
+  ListTicketsByIdsResponse,
   BulkTicketFailure,
   BulkTicketStatusRequest,
   BulkTicketStatusResponse,
@@ -22,6 +24,8 @@ import {
   UpdateTicketRequest,
 } from '@synapsedesk/grpc-proto';
 import {
+  BATCH_ID_LIMIT,
+  normalizeBatchIds,
   formatErrorMsg,
   MAX_BULK_TICKET_IDS,
   requireActor,
@@ -47,9 +51,9 @@ import {
   transitionSideEffects,
 } from '../../common/utils/ticket-state';
 import {
-  fromProtoPriority,
-  fromProtoSource,
-  fromProtoStatus,
+  fromProtoTicketPriority,
+  fromProtoTicketSource,
+  fromProtoTicketStatus,
   toTicketResponse,
 } from './ticket.mapper';
 
@@ -113,9 +117,9 @@ export class TicketsService {
     const { skip, take, orderBy } = toPrismaPage(page, TICKET_SORTABLE_FIELDS);
 
     const search = toSearchFilter(page.searchTerm);
-    const statusFilter = fromProtoStatus(request.status);
-    const priorityFilter = fromProtoPriority(request.priority);
-    const sourceFilter = fromProtoSource(request.source);
+    const statusFilter = fromProtoTicketStatus(request.status);
+    const priorityFilter = fromProtoTicketPriority(request.priority);
+    const sourceFilter = fromProtoTicketSource(request.source);
 
     const where: Prisma.TicketWhereInput = {
       ...tenantScope(context),
@@ -146,6 +150,50 @@ export class TicketsService {
     };
   }
 
+  /**
+   * The batch read behind the tickets DataLoader — 27-doc §1, §3.
+   *
+   * Reached from `Notification.data.ticketId` and from analytics drill-downs.
+   *
+   * **`visibilityScope` applies here exactly as it does to the list.** That is
+   * the property worth stating: a batch read is still a read, and a caller with
+   * no `ticket.read.all` must not be able to resolve a ticket by id that they
+   * could not have listed. A batch RPC that skipped it would be a way to fetch
+   * any ticket in the tenant one id at a time — which is precisely what makes
+   * "it is just a simple `WHERE id IN (…)`" the dangerous framing.
+   */
+  async listTicketsByIds(
+    request: ListTicketsByIdsRequest,
+    context: CallerContext,
+  ): Promise<ListTicketsByIdsResponse> {
+    const { ids, overLimit } = normalizeBatchIds(request.ticketIds);
+
+    if (overLimit) {
+      throw new RpcException({
+        code: status.INVALID_ARGUMENT,
+        message: `At most ${BATCH_ID_LIMIT} ticket ids per call`,
+      });
+    }
+
+    if (ids.length === 0) return { items: [] };
+
+    const items = await this.prisma.ticket.findMany({
+      where: {
+        ...tenantScope(context),
+        ...this.visibilityScope(context),
+        // Soft-deleted tickets ARE returned by id — 27-doc §1. A notification
+        // citing a deleted ticket still has to render something, and omitting
+        // it makes the edge null, which the UI cannot distinguish from a ticket
+        // that never existed.
+        deletedAt: undefined,
+        id: { in: ids },
+      },
+    });
+
+    // A SET, in the database's order. The caller aligns it to its keys.
+    return { items: items.map(toTicketResponse) };
+  }
+
   // -------------------------------------------------------------------------
   // Write
   // -------------------------------------------------------------------------
@@ -172,8 +220,9 @@ export class TicketsService {
         authorId,
         title: request.title.trim(),
         description: request.description.trim(),
-        source: fromProtoSource(request.source) ?? TicketSource.WEB,
-        priority: fromProtoPriority(request.priority) ?? TicketPriority.MEDIUM,
+        source: fromProtoTicketSource(request.source) ?? TicketSource.WEB,
+        priority:
+          fromProtoTicketPriority(request.priority) ?? TicketPriority.MEDIUM,
         // NEW, always. A created ticket is one nobody has looked at yet, and
         // letting a client choose the initial status would let it skip triage.
         status: TicketStatus.NEW,
@@ -211,7 +260,7 @@ export class TicketsService {
     if (request.description !== undefined) {
       data.description = request.description.trim();
     }
-    const priority = fromProtoPriority(request.priority);
+    const priority = fromProtoTicketPriority(request.priority);
     if (priority) data.priority = priority;
 
     // Deliberately NO status here. Status moves through the state machine and
@@ -233,7 +282,7 @@ export class TicketsService {
     request: ChangeTicketStatusRequest,
     context: CallerContext,
   ): Promise<TicketResponse> {
-    const to = fromProtoStatus(request.status);
+    const to = fromProtoTicketStatus(request.status);
     if (!to) {
       throw new RpcException({
         code: status.INVALID_ARGUMENT,
@@ -339,7 +388,7 @@ export class TicketsService {
       });
     }
 
-    const to = fromProtoStatus(request.status);
+    const to = fromProtoTicketStatus(request.status);
     if (!to) {
       throw new RpcException({
         code: status.INVALID_ARGUMENT,

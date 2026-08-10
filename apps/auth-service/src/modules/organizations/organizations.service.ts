@@ -17,7 +17,7 @@ import {
   ListOrganizationTimezonesResponse,
   OrganizationEntitlementsResponse,
   OrganizationUsageResponse,
-  toTimestamp,
+  toProtoTimestamp,
   UpdateOrganizationRequest,
   UpdateOrganizationSettingsRequest,
   toProtoAiModelTier,
@@ -280,7 +280,7 @@ export class OrganizationsService {
         unavailableReason:
           'AI usage metering is not enabled for this workspace yet',
       },
-      billingCycleStart: toTimestamp(organization.billingCycleStart),
+      billingCycleStart: toProtoTimestamp(organization.billingCycleStart),
     };
   }
 
@@ -312,7 +312,7 @@ export class OrganizationsService {
       // The quota window, and its EPOCH is inside the Redis counter key — so a
       // caller reading a different value from this one would meter into a key
       // nothing else reads, and the tenant would appear to have spent nothing.
-      billingCycleStart: toTimestamp(organization.billingCycleStart),
+      billingCycleStart: toProtoTimestamp(organization.billingCycleStart),
       status: toProtoOrgStatus(organization.status),
     };
   }
@@ -389,7 +389,7 @@ export class OrganizationsService {
         // caller that silently substituted the epoch would reconcile against
         // "spend since 1970", which sums every cycle the tenant has ever had.
         billingCycleStart: organization.billingCycleStart
-          ? toTimestamp(organization.billingCycleStart)
+          ? toProtoTimestamp(organization.billingCycleStart)
           : undefined,
       })),
     };

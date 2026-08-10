@@ -1,6 +1,11 @@
+import { randomUUID } from 'node:crypto';
+import {
+  BATCH_ID_LIMIT,
+  compareAlphabetically,
+  SystemRoleName,
+} from '@synapsedesk/common';
 import { expectRpc } from '@synapsedesk/common/testing/rpc';
 import { status } from '@grpc/grpc-js';
-import { compareAlphabetically, SystemRoleName } from '@synapsedesk/common';
 import {
   E2eFixture,
   bootstrapE2eTest,
@@ -19,6 +24,7 @@ import {
 } from '../factories';
 import { UsersService } from '../../src/modules/users/users.service';
 import { flattenPermissionCodes } from '../../src/common/utils';
+import { UserProjection } from '@synapsedesk/grpc-proto';
 
 describe('Users (e2e)', () => {
   let fx: E2eFixture;
@@ -835,9 +841,9 @@ describe('Users (e2e)', () => {
         organizationId: t.org.id,
         permissionCode: 'ticket.read.all',
       });
-      expect(tenantWide.items.map((i) => i.userId).sort()).toEqual(
-        [t.user.id, elsewhere.id].sort(),
-      );
+      expect(
+        tenantWide.items.map((i) => i.userId).sort(compareAlphabetically),
+      ).toEqual([t.user.id, elsewhere.id].sort(compareAlphabetically));
     });
 
     it('**a missing field is INVALID_ARGUMENT, not a 500**', async () => {
@@ -880,6 +886,8 @@ describe('Users (e2e)', () => {
       const { items } = await users.listUsersByIds({
         organizationId: t.org.id,
         userIds: [t.user.id],
+        includeInactive: false,
+        projection: UserProjection.USER_PROJECTION_NOTIFICATION,
       });
 
       expect(items).toEqual([
@@ -905,6 +913,8 @@ describe('Users (e2e)', () => {
       const { items } = await users.listUsersByIds({
         organizationId: mine.org.id,
         userIds: [mine.user.id, theirs.user.id],
+        includeInactive: false,
+        projection: UserProjection.USER_PROJECTION_NOTIFICATION,
       });
 
       expect(items.map((i) => i.userId)).toEqual([mine.user.id]);
@@ -927,6 +937,8 @@ describe('Users (e2e)', () => {
       const { items } = await users.listUsersByIds({
         organizationId: t.org.id,
         userIds: [t.user.id, gone.id, locked.id],
+        includeInactive: false,
+        projection: UserProjection.USER_PROJECTION_NOTIFICATION,
       });
 
       expect(items.map((i) => i.userId)).toEqual([t.user.id]);
@@ -941,6 +953,8 @@ describe('Users (e2e)', () => {
       const { items } = await users.listUsersByIds({
         organizationId: t.org.id,
         userIds: [t.user.id],
+        includeInactive: false,
+        projection: UserProjection.USER_PROJECTION_NOTIFICATION,
       });
 
       expect(items[0].quietHoursStart).toBeUndefined();
@@ -949,9 +963,146 @@ describe('Users (e2e)', () => {
 
     it('a missing organizationId is INVALID_ARGUMENT', async () => {
       await expectRpc(
-        users.listUsersByIds({ organizationId: '', userIds: [] }),
+        users.listUsersByIds({
+          organizationId: '',
+          userIds: [],
+          includeInactive: false,
+          projection: UserProjection.USER_PROJECTION_NOTIFICATION,
+        }),
         status.INVALID_ARGUMENT,
       );
+    });
+  });
+
+  /**
+   * The batch contract — 27-doc §1, §3.
+   *
+   * Six properties, five of which DataLoader depends on. They are not style:
+   * a naive `WHERE id IN (…)` gets two of them wrong, both silently, and one of
+   * those serves one tenant's data under another tenant's key.
+   */
+  describe('§1 ListUsersByIds — the batch contract', () => {
+    const ask = (
+      organizationId: string,
+      userIds: string[],
+      overrides: Partial<{
+        includeInactive: boolean;
+        projection: UserProjection;
+      }> = {},
+    ) =>
+      users.listUsersByIds({
+        organizationId,
+        userIds,
+        includeInactive: false,
+        projection: UserProjection.USER_PROJECTION_NOTIFICATION,
+        ...overrides,
+      });
+
+    it("1. **returns only the CALLER's tenant**", async () => {
+      // Property 1, and the one that must never be skipped for a "simple" batch
+      // read. The id is a loader's cache key and carries no tenant, so this RPC
+      // is the only thing standing between a uuid and another tenant's row.
+      const mine = await seedTenantWithUser(fx.prisma);
+      const theirs = await seedTenantWithUser(fx.prisma);
+
+      const { items } = await ask(mine.org.id, [mine.user.id, theirs.user.id]);
+
+      expect(items.map((item) => item.userId)).toEqual([mine.user.id]);
+    });
+
+    it('2. unknown ids are OMITTED, not an error', async () => {
+      // Property 2. A batch of 50 where one row was deleted must return 49;
+      // erroring fails 50 fields for one absent row, and a deleted assignee is
+      // normal rather than exceptional.
+      const t = await seedTenantWithUser(fx.prisma);
+
+      const { items } = await ask(t.org.id, [t.user.id, randomUUID()]);
+
+      expect(items.map((item) => item.userId)).toEqual([t.user.id]);
+    });
+
+    it('3. duplicate ids collapse', async () => {
+      // Property 3. DataLoader dedups its own keys, but a caller may not.
+      const t = await seedTenantWithUser(fx.prisma);
+
+      const { items } = await ask(t.org.id, [t.user.id, t.user.id, t.user.id]);
+
+      expect(items).toHaveLength(1);
+    });
+
+    it('4. an empty request is an empty response, not an error', async () => {
+      // Property 4. A page where nothing has an assignee is a valid page.
+      const t = await seedTenantWithUser(fx.prisma);
+
+      const { items, summaries } = await ask(t.org.id, []);
+
+      expect(items).toEqual([]);
+      expect(summaries).toEqual([]);
+    });
+
+    it('5. **an over-cap batch is INVALID_ARGUMENT, not a truncation**', async () => {
+      // Property 5. Without a cap, `first: 100` nested twice is one RPC asking
+      // for ten thousand rows. And it must be an ERROR: a truncated batch
+      // returns fewer rows than were asked for, which is indistinguishable from
+      // those rows having been deleted — so the page renders with silent gaps.
+      const t = await seedTenantWithUser(fx.prisma);
+      const tooMany = Array.from({ length: BATCH_ID_LIMIT + 1 }, () =>
+        randomUUID(),
+      );
+
+      await expectRpc(ask(t.org.id, tooMany), status.INVALID_ARGUMENT);
+    });
+
+    it('6. `includeInactive: false` still excludes locked users', async () => {
+      // 27-doc §3 test 4. The existing notification caller, unchanged: a
+      // message to a deactivated account is a row nobody reads.
+      const t = await seedTenantWithUser(fx.prisma);
+      await fx.prisma.user.update({
+        where: { id: t.user.id },
+        data: { isLocked: true },
+      });
+
+      const { items } = await ask(t.org.id, [t.user.id]);
+
+      expect(items).toEqual([]);
+    });
+
+    it('7. **`includeInactive: true` returns them, with state attached**', async () => {
+      // The loader's question is different: "who IS this?". A ticket assigned
+      // to somebody locked this morning must still render their name, and the
+      // state rides along so the client can say "Former employee" rather than
+      // infer it from an absence it cannot distinguish from a missing row.
+      const t = await seedTenantWithUser(fx.prisma);
+      await fx.prisma.user.update({
+        where: { id: t.user.id },
+        data: { isLocked: true },
+      });
+
+      const { summaries } = await ask(t.org.id, [t.user.id], {
+        includeInactive: true,
+        projection: UserProjection.USER_PROJECTION_SUMMARY,
+      });
+
+      expect(summaries).toHaveLength(1);
+      expect(summaries[0].isLocked).toBe(true);
+    });
+
+    it('8. **the loader projection carries NO email**', async () => {
+      // 25-doc §4, enforced at the WIRE rather than in a gateway mapper.
+      // `Ticket.assignee` is reachable with ticket access alone, so a caller
+      // with no `user.read` must not come away holding an agent's address —
+      // and data the gateway never receives is data it cannot leak.
+      const t = await seedTenantWithUser(fx.prisma);
+
+      const { items, summaries } = await ask(t.org.id, [t.user.id], {
+        projection: UserProjection.USER_PROJECTION_SUMMARY,
+      });
+
+      expect(summaries).toHaveLength(1);
+      expect(JSON.stringify(summaries)).not.toContain('@');
+      // And the notification-shaped field is empty, so nothing arrives by the
+      // other door either.
+      expect(items).toEqual([]);
     });
   });
 });

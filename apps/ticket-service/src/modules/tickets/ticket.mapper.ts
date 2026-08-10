@@ -3,7 +3,7 @@ import {
   TicketResponse,
   TicketSource as ProtoTicketSource,
   TicketStatus as ProtoTicketStatus,
-  toTimestamp,
+  toProtoTimestamp,
 } from '@synapsedesk/grpc-proto';
 import {
   TicketPriority,
@@ -57,7 +57,7 @@ const DOMAIN_SOURCE: Record<number, TicketSource> = Object.fromEntries(
   Object.entries(PROTO_SOURCE).map(([domain, proto]) => [proto, domain]),
 ) as Record<number, TicketSource>;
 
-export function toProtoStatus(value: string): ProtoTicketStatus {
+export function toProtoTicketStatus(value: string): ProtoTicketStatus {
   return (
     PROTO_STATUS[value as TicketStatus] ??
     ProtoTicketStatus.TICKET_STATUS_UNSPECIFIED
@@ -72,31 +72,35 @@ export function toProtoStatus(value: string): ProtoTicketStatus {
  * CHANGE it means the request is incomplete. Only the caller knows which, so
  * the decision is left to it rather than guessed here.
  */
-export function fromProtoStatus(value: ProtoTicketStatus): TicketStatus | null {
+export function fromProtoTicketStatus(
+  value: ProtoTicketStatus,
+): TicketStatus | null {
   return DOMAIN_STATUS[value] ?? null;
 }
 
-export function toProtoPriority(value: string): ProtoTicketPriority {
+export function toProtoTicketPriority(value: string): ProtoTicketPriority {
   return (
     PROTO_PRIORITY[value as TicketPriority] ??
     ProtoTicketPriority.TICKET_PRIORITY_UNSPECIFIED
   );
 }
 
-export function fromProtoPriority(
+export function fromProtoTicketPriority(
   value: ProtoTicketPriority,
 ): TicketPriority | null {
   return DOMAIN_PRIORITY[value] ?? null;
 }
 
-export function toProtoSource(value: string): ProtoTicketSource {
+export function toProtoTicketSource(value: string): ProtoTicketSource {
   return (
     PROTO_SOURCE[value as TicketSource] ??
     ProtoTicketSource.TICKET_SOURCE_UNSPECIFIED
   );
 }
 
-export function fromProtoSource(value: ProtoTicketSource): TicketSource | null {
+export function fromProtoTicketSource(
+  value: ProtoTicketSource,
+): TicketSource | null {
   return DOMAIN_SOURCE[value] ?? null;
 }
 
@@ -109,18 +113,18 @@ export function toTicketResponse(ticket: Ticket): TicketResponse {
     ticketNumber: Number(ticket.ticketNumber),
     organizationId: ticket.organizationId,
     authorId: ticket.authorId,
-    source: toProtoSource(ticket.source),
-    status: toProtoStatus(ticket.status),
-    priority: toProtoPriority(ticket.priority),
+    source: toProtoTicketSource(ticket.source),
+    status: toProtoTicketStatus(ticket.status),
+    priority: toProtoTicketPriority(ticket.priority),
     title: ticket.title,
     description: ticket.description,
     currentAssigneeId: ticket.currentAssigneeId ?? undefined,
     currentDepartmentId: ticket.currentDepartmentId ?? undefined,
-    escalatedAt: toTimestamp(ticket.escalatedAt),
-    resolvedAt: toTimestamp(ticket.resolvedAt),
-    createdAt: toTimestamp(ticket.createdAt),
-    updatedAt: toTimestamp(ticket.updatedAt),
-    deletedAt: toTimestamp(ticket.deletedAt),
+    escalatedAt: toProtoTimestamp(ticket.escalatedAt),
+    resolvedAt: toProtoTimestamp(ticket.resolvedAt),
+    createdAt: toProtoTimestamp(ticket.createdAt),
+    updatedAt: toProtoTimestamp(ticket.updatedAt),
+    deletedAt: toProtoTimestamp(ticket.deletedAt),
     deletedById: ticket.deletedById ?? undefined,
   };
 }

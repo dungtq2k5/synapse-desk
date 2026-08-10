@@ -2,28 +2,17 @@ import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ClientGrpc } from '@nestjs/microservices';
 import { firstValueFrom, timeout } from 'rxjs';
 import {
+  UserProjection,
   AUTH_GRPC_CLIENT,
   GRPC_DEADLINE_MS,
   USER_SERVICE_NAME,
   UserServiceClient,
 } from '@synapsedesk/grpc-proto';
 import { formatErrorMsg } from '@synapsedesk/common';
-
-/**
- * A recipient, with everything needed to DECIDE about them.
- *
- * The quiet-hours fields ride along on this read rather than needing a second
- * one (18-doc §4): an extra round trip per notification to learn whether it is
- * 3am for the recipient would put a cross-service read on the fan-out path.
- */
-export type NotificationRecipient = {
-  userId: string;
-  email: string;
-  fullName: string;
-  quietHoursStart: string | null;
-  quietHoursEnd: string | null;
-  timezone: string | null;
-};
+import {
+  NotificationRecipient,
+  toNotificationRecipient,
+} from './auth-reference.mapper';
 
 /**
  * Resolves an AUDIENCE from a permission code.
@@ -76,7 +65,7 @@ export class AuthReferenceService implements OnModuleInit {
           .pipe(timeout(GRPC_DEADLINE_MS)),
       );
 
-      return response.items.map(toRecipient);
+      return response.items.map(toNotificationRecipient);
     } catch (error) {
       this.logger.error(
         `Could not resolve '${permissionCode}' holders for ${organizationId}: ${formatErrorMsg(error)}`,
@@ -103,11 +92,20 @@ export class AuthReferenceService implements OnModuleInit {
     try {
       const response = await firstValueFrom(
         this.userService
-          .listUsersByIds({ organizationId, userIds })
+          .listUsersByIds({
+            organizationId,
+            userIds,
+            // **The notification audience, unchanged** — 27-doc §3. `false`
+            // keeps "a notification to a deactivated account is a row nobody
+            // reads" true now that the flag exists for the GraphQL loader,
+            // which wants the opposite answer.
+            includeInactive: false,
+            projection: UserProjection.USER_PROJECTION_NOTIFICATION,
+          })
           .pipe(timeout(GRPC_DEADLINE_MS)),
       );
 
-      return response.items.map(toRecipient);
+      return response.items.map(toNotificationRecipient);
     } catch (error) {
       this.logger.error(
         `Could not resolve ${userIds.length} recipient(s) for ${organizationId}: ${formatErrorMsg(error)}`,
@@ -116,29 +114,4 @@ export class AuthReferenceService implements OnModuleInit {
       return [];
     }
   }
-}
-
-/**
- * Wire → domain, with `undefined` normalised to `null`.
- *
- * proto3 `optional` arrives as `undefined` when unset, and the rest of this
- * service uses `null` for "not configured". One shape, decided here, so a
- * quiet-hours check never has to handle both.
- */
-function toRecipient(holder: {
-  userId: string;
-  email: string;
-  fullName: string;
-  quietHoursStart?: string;
-  quietHoursEnd?: string;
-  timezone?: string;
-}): NotificationRecipient {
-  return {
-    userId: holder.userId,
-    email: holder.email,
-    fullName: holder.fullName,
-    quietHoursStart: holder.quietHoursStart ?? null,
-    quietHoursEnd: holder.quietHoursEnd ?? null,
-    timezone: holder.timezone ?? null,
-  };
 }

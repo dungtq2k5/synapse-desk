@@ -8,6 +8,8 @@ import { MessagesController } from './messages.controller';
 import { AttachmentsController } from './attachments.controller';
 import { AiGrpcClient } from './ai-grpc.client';
 import { AiController } from './ai.controller';
+import { TicketsResolver } from './tickets.resolver';
+import { TicketMessagesResolver } from './ticket-messages.resolver';
 
 /**
  * Imports AuthModule for `JwtAuthGuard` and the `JwtModule` it needs — a guard
@@ -31,6 +33,8 @@ import { AiController } from './ai.controller';
     AssignmentsGrpcClient,
     MessagesGrpcClient,
     AiGrpcClient,
+    TicketsResolver,
+    TicketMessagesResolver,
   ],
   exports: [
     TicketsGrpcClient,

@@ -37,9 +37,9 @@ import {
   fromProtoPreferenceSource,
   fromProtoSortOrder,
   fromProtoOrgStatus,
-  fromTimestamp,
+  fromProtoTimestamp,
   normalizePage,
-  requireTimestamp,
+  requireProtoTimestamp,
   toIsoDate,
   toPageMeta,
   toPageRequest,
@@ -53,7 +53,7 @@ import {
   toProtoOtpPurpose,
   toProtoPreferenceSource,
   toProtoSortOrder,
-  toTimestamp,
+  toProtoTimestamp,
 } from './mappers';
 
 /**
@@ -398,37 +398,41 @@ describe('mapper round-trip sweep (unit)', () => {
       // treats it as an ordinary message, so it travels as { seconds, nanos }.
       const date = new Date('2026-08-02T12:34:56.789Z');
 
-      expect(fromTimestamp(toTimestamp(date))!.getTime()).toBe(date.getTime());
+      expect(fromProtoTimestamp(toProtoTimestamp(date))!.getTime()).toBe(
+        date.getTime(),
+      );
     });
 
     it('round-trips an instant before the epoch', () => {
       // Negative seconds are where a naive `Math.floor`/modulo pair goes wrong.
       const date = new Date('1969-07-20T20:17:40.000Z');
 
-      expect(fromTimestamp(toTimestamp(date))!.getTime()).toBe(date.getTime());
+      expect(fromProtoTimestamp(toProtoTimestamp(date))!.getTime()).toBe(
+        date.getTime(),
+      );
     });
 
     it('maps NULL to undefined in both directions', () => {
-      expect(toTimestamp(null)).toBeUndefined();
-      expect(fromTimestamp(undefined)).toBeUndefined();
+      expect(toProtoTimestamp(null)).toBeUndefined();
+      expect(fromProtoTimestamp(undefined)).toBeUndefined();
     });
 
-    it('requireTimestamp THROWS on a missing value rather than substituting a date', () => {
+    it('requireProtoTimestamp THROWS on a missing value rather than substituting a date', () => {
       // ts-proto types every message field as `T | undefined` as a convention,
       // not as permission to omit it — so a missing value is a contract
       // violation, and a fallback `new Date()` would write today's date into a
       // record that has no created-at.
-      expect(() => requireTimestamp(undefined, 'createdAt')).toThrow(
+      expect(() => requireProtoTimestamp(undefined, 'createdAt')).toThrow(
         /createdAt/,
       );
     });
 
-    it('requireTimestamp passes a present value through unchanged', () => {
+    it('requireProtoTimestamp passes a present value through unchanged', () => {
       const date = new Date('2026-01-15T00:00:00.000Z');
 
-      expect(requireTimestamp(toTimestamp(date), 'createdAt').getTime()).toBe(
-        date.getTime(),
-      );
+      expect(
+        requireProtoTimestamp(toProtoTimestamp(date), 'createdAt').getTime(),
+      ).toBe(date.getTime());
     });
   });
 

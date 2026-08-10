@@ -44,9 +44,6 @@ export class UserSessionsController {
   @ApiOperation({ summary: 'List invitations' })
   @ApiWrappedResponse(SessionResponseDto, { isArray: true })
   @ApiFilterErrors(['400', '401', '403', '404'])
-  @ApiOperation({ summary: 'List invitations' })
-  @ApiWrappedResponse(SessionResponseDto, { isArray: true })
-  @ApiFilterErrors(['400', '401', '403', '404'])
   @Get()
   @RequirePermission('user.session.read')
   list(
@@ -61,9 +58,6 @@ export class UserSessionsController {
    * the target — being signed out by an administrator is something they should
    * hear from us rather than infer.
    */
-  @ApiOperation({ summary: 'Revoke' })
-  @ApiWrappedResponse()
-  @ApiFilterErrors(['400', '401', '403', '404'])
   @ApiOperation({ summary: 'Revoke' })
   @ApiWrappedResponse()
   @ApiFilterErrors(['400', '401', '403', '404'])

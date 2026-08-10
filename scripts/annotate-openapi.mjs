@@ -200,9 +200,9 @@ function parseController(file) {
       // linear. The analyser flags the SHAPE; the shape here has no nested
       // quantifier over an overlapping character class, so there is nothing to
       // backtrack through. The one regex in this file that WAS quadratic (15.5x)
-      // is the markdown-link one above, and it is bounded. NOSONAR
+      // is the markdown-link one above, and it is bounded.
       handler:
-        /^\s+(?:async\s+)?(\w+)\(/m.exec(
+        /^\s+(?:async\s+)?(\w+)\(/m.exec( // NOSONAR
           block.split('\n').slice(1).join('\n'),
         )?.[1] ?? '',
       returnType: returnTypeOf(block),
@@ -239,8 +239,8 @@ function returnTypeOf(block) {
   // linear. The analyser flags the SHAPE; the shape here has no nested
   // quantifier over an overlapping character class, so there is nothing to
   // backtrack through. The one regex in this file that WAS quadratic (15.5x)
-  // is the markdown-link one above, and it is bounded. NOSONAR
-  const m = /\)\s*:\s*([^{]+?)\s*\{/s.exec(block);
+  // is the markdown-link one above, and it is bounded.
+  const m = /\)\s*:\s*([^{]+?)\s*\{/s.exec(block); // NOSONAR
   if (!m) return { model: null, isArray: false, paginated: false };
 
   const raw = m[1].replace(/\s+/g, '');
@@ -488,9 +488,9 @@ function ensureImports(source, _files) {
         // linear. The analyser flags the SHAPE; the shape here has no nested
         // quantifier over an overlapping character class, so there is nothing to
         // backtrack through. The one regex in this file that WAS quadratic (15.5x)
-        // is the markdown-link one above, and it is bounded. NOSONAR
+        // is the markdown-link one above, and it is bounded.
         (m, inner) =>
-          `import {${inner.replace(/\s*$/, '')}\n  HttpStatus,\n} from '@nestjs/common';`,
+          `import {${inner.replace(/\s*$/, '')}\n  HttpStatus,\n} from '@nestjs/common';`, // NOSONAR
       );
     }
   }

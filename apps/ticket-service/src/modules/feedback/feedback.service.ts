@@ -5,13 +5,13 @@ import {
   CallerContext,
   emptyPage,
   FeedbackResponse,
-  fromTimestamp,
+  fromProtoTimestamp,
   ListFeedbackRequest,
   ListFeedbackResponse,
   SubmitFeedbackRequest,
   toPageMeta,
   toPrismaPage,
-  toTimestamp,
+  toProtoTimestamp,
   WithdrawFeedbackRequest,
   WithdrawFeedbackResponse,
 } from '@synapsedesk/grpc-proto';
@@ -36,8 +36,8 @@ function toFeedbackResponse(feedback: AiResponseFeedback): FeedbackResponse {
     rating: feedback.rating,
     feedbackText: feedback.feedbackText ?? undefined,
     citationAccurate: feedback.citationAccurate ?? undefined,
-    createdAt: toTimestamp(feedback.createdAt),
-    updatedAt: toTimestamp(feedback.updatedAt),
+    createdAt: toProtoTimestamp(feedback.createdAt),
+    updatedAt: toProtoTimestamp(feedback.updatedAt),
   };
 }
 
@@ -129,7 +129,7 @@ export class FeedbackService {
     });
 
     // NOT_FOUND both when nothing exists and when it belongs to another tenant.
-    if (!existing || existing.organizationId !== requireTenant(context)) {
+    if (existing?.organizationId !== requireTenant(context)) {
       throw new RpcException({
         code: status.NOT_FOUND,
         message: 'You have not left feedback on that message',
@@ -164,8 +164,8 @@ export class FeedbackService {
       FEEDBACK_SORTABLE_FIELDS,
     );
 
-    const from = fromTimestamp(request.from);
-    const to = fromTimestamp(request.to);
+    const from = fromProtoTimestamp(request.from);
+    const to = fromProtoTimestamp(request.to);
 
     const where: Prisma.AiResponseFeedbackWhereInput = {
       organizationId: requireTenant(context),

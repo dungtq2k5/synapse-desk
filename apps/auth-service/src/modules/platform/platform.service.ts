@@ -21,7 +21,7 @@ import {
   RoleResponse,
   SetOrganizationStatusRequest,
   toPageMeta,
-  toTimestamp,
+  toProtoTimestamp,
   UpdatePlatformOrganizationRequest,
   emptyPage,
   toPrismaPage,
@@ -538,7 +538,7 @@ export class PlatformService {
         organizationId: user.organizationId ?? undefined,
         organizationName: user.organization?.name ?? undefined,
         roleNames: user.roles.map((role) => role.name),
-        deletedAt: toTimestamp(user.deletedAt),
+        deletedAt: toProtoTimestamp(user.deletedAt),
       })),
       meta: toPageMeta(page, totalItems, items.length),
     };
@@ -684,7 +684,7 @@ export class PlatformService {
       seatsAllocated: seatAllocation._sum.maxAgentSeats ?? 0,
       // The same definition the tenant usage page and the invitation gate use.
       seatsInUse: activeUsers + pendingInvitations,
-      generatedAt: toTimestamp(now),
+      generatedAt: toProtoTimestamp(now),
     };
   }
 
@@ -759,6 +759,6 @@ function toPlatformOrganizationResponse(
     userCount: row._count.users,
     pendingInvitationCount: row._count.invitations,
     departmentCount: row._count.departments,
-    deletedAt: toTimestamp(row.deletedAt),
+    deletedAt: toProtoTimestamp(row.deletedAt),
   };
 }

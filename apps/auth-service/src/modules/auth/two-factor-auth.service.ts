@@ -21,7 +21,7 @@ import {
   GenerateTwoFactorResponse,
   RegenerateBackupCodesRequest,
   RegenerateBackupCodesResponse,
-  toTimestamp,
+  toProtoTimestamp,
 } from '@synapsedesk/grpc-proto';
 import {
   EmailTemplateName,
@@ -422,7 +422,7 @@ export class TwoFactorAuthService {
     return {
       remaining: live.length,
       used: codes.filter((c) => c.isUsed).length,
-      expiresAt: toTimestamp(live[0]?.expiresAt ?? null),
+      expiresAt: toProtoTimestamp(live[0]?.expiresAt ?? null),
     };
   }
 

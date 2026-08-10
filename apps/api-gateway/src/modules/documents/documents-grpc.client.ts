@@ -4,13 +4,13 @@ import {
   DOCUMENT_SERVICE_NAME,
   DocumentServiceClient,
   INGESTION_GRPC_CLIENT,
-  requireTimestamp,
+  requireProtoTimestamp,
   toPageRequest,
 } from '@synapsedesk/grpc-proto';
 import { RequestContext } from '@synapsedesk/common';
 import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
-import { PaginationResponseBase } from '../../common/dto/base/pagination-response-base.dto';
-import { toPaginationMeta } from '../../common/mappers/pagination.mapper';
+import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
+import { toPaginationMetaDataResponseDto } from '../../common/mappers/pagination.mapper';
 import {
   ConfirmDocumentDto,
   ListDocumentFlagsQueryDto,
@@ -27,7 +27,11 @@ import {
   PresignDocumentResponseDto,
   StorageUsageResponseDto,
 } from './dto/rest/document-response.dto';
-import { toChunkDto, toDocumentDto, toFlagDto } from './document.mapper';
+import {
+  toDocumentChunkResponseDto,
+  toDocumentResponseDto,
+  toDocumentFlagResponseDto,
+} from './document.mapper';
 
 @Injectable()
 export class DocumentsGrpcClient
@@ -70,7 +74,7 @@ export class DocumentsGrpcClient
     return {
       uploadUrl: response.uploadUrl,
       objectPath: response.objectPath,
-      expiresAt: requireTimestamp(response.expiresAt, 'expiresAt'),
+      expiresAt: requireProtoTimestamp(response.expiresAt, 'expiresAt'),
     };
   }
 
@@ -78,7 +82,7 @@ export class DocumentsGrpcClient
     dto: ConfirmDocumentDto,
     context: RequestContext,
   ): Promise<DocumentResponseDto> {
-    return toDocumentDto(
+    return toDocumentResponseDto(
       await this.call(
         (metadata) =>
           this.documentGrpcService.confirmDocument(
@@ -101,7 +105,7 @@ export class DocumentsGrpcClient
   async list(
     query: ListDocumentsQueryDto,
     context: RequestContext,
-  ): Promise<PaginationResponseBase<DocumentResponseDto>> {
+  ): Promise<PaginationResponseDto<DocumentResponseDto>> {
     const response = await this.call(
       (metadata) =>
         this.documentGrpcService.listDocuments(
@@ -120,13 +124,13 @@ export class DocumentsGrpcClient
     );
 
     return {
-      items: response.items.map(toDocumentDto),
-      meta: toPaginationMeta(response.meta),
+      items: response.items.map(toDocumentResponseDto),
+      meta: toPaginationMetaDataResponseDto(response.meta),
     };
   }
 
   async get(id: string, context: RequestContext): Promise<DocumentResponseDto> {
-    return toDocumentDto(
+    return toDocumentResponseDto(
       await this.call(
         (metadata) => this.documentGrpcService.getDocument({ id }, metadata),
         context,
@@ -139,7 +143,7 @@ export class DocumentsGrpcClient
     dto: UpdateDocumentDto,
     context: RequestContext,
   ): Promise<DocumentResponseDto> {
-    return toDocumentDto(
+    return toDocumentResponseDto(
       await this.call(
         (metadata) =>
           this.documentGrpcService.updateDocument(
@@ -166,7 +170,7 @@ export class DocumentsGrpcClient
     id: string,
     context: RequestContext,
   ): Promise<DocumentResponseDto> {
-    return toDocumentDto(
+    return toDocumentResponseDto(
       await this.call(
         (metadata) =>
           this.documentGrpcService.restoreDocument({ id }, metadata),
@@ -186,7 +190,7 @@ export class DocumentsGrpcClient
 
     return {
       downloadUrl: response.downloadUrl,
-      expiresAt: requireTimestamp(response.expiresAt, 'expiresAt'),
+      expiresAt: requireProtoTimestamp(response.expiresAt, 'expiresAt'),
     };
   }
 
@@ -208,7 +212,7 @@ export class DocumentsGrpcClient
     dto: SetDocumentDepartmentsDto,
     context: RequestContext,
   ): Promise<DocumentResponseDto> {
-    return toDocumentDto(
+    return toDocumentResponseDto(
       await this.call(
         (metadata) =>
           this.documentGrpcService.setDocumentDepartments(
@@ -224,7 +228,7 @@ export class DocumentsGrpcClient
     documentId: string,
     query: ListDocumentsQueryDto,
     context: RequestContext,
-  ): Promise<PaginationResponseBase<DocumentChunkResponseDto>> {
+  ): Promise<PaginationResponseDto<DocumentChunkResponseDto>> {
     const response = await this.call(
       (metadata) =>
         this.documentGrpcService.listDocumentChunks(
@@ -235,8 +239,8 @@ export class DocumentsGrpcClient
     );
 
     return {
-      items: response.items.map(toChunkDto),
-      meta: toPaginationMeta(response.meta),
+      items: response.items.map(toDocumentChunkResponseDto),
+      meta: toPaginationMetaDataResponseDto(response.meta),
     };
   }
 
@@ -245,7 +249,7 @@ export class DocumentsGrpcClient
     chunkId: string,
     context: RequestContext,
   ): Promise<DocumentChunkResponseDto> {
-    return toChunkDto(
+    return toDocumentChunkResponseDto(
       await this.call(
         (metadata) =>
           this.documentGrpcService.getDocumentChunk(
@@ -267,7 +271,7 @@ export class DocumentsGrpcClient
   async listFlags(
     query: ListDocumentFlagsQueryDto,
     context: RequestContext,
-  ): Promise<PaginationResponseBase<DocumentFlagResponseDto>> {
+  ): Promise<PaginationResponseDto<DocumentFlagResponseDto>> {
     const response = await this.call(
       (metadata) =>
         this.documentGrpcService.listDocumentFlags(
@@ -282,8 +286,8 @@ export class DocumentsGrpcClient
     );
 
     return {
-      items: response.items.map(toFlagDto),
-      meta: toPaginationMeta(response.meta),
+      items: response.items.map(toDocumentFlagResponseDto),
+      meta: toPaginationMetaDataResponseDto(response.meta),
     };
   }
 

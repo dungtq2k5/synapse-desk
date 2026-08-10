@@ -81,12 +81,6 @@ export class AuthController {
   })
   @ApiWrappedResponse(RegisterResponseDto, { status: HttpStatus.CREATED })
   @ApiFilterErrors(['400', '401'])
-  @ApiOperation({
-    summary: 'Sign up',
-    security: [],
-  })
-  @ApiWrappedResponse(RegisterResponseDto, { status: HttpStatus.CREATED })
-  @ApiFilterErrors(['400', '401'])
   @Post('register')
   @Throttle({ [AUTH_THROTTLER_TIER]: ROUTE_THROTTLE.register })
   @UseGuards(GuestGuard)
@@ -102,16 +96,6 @@ export class AuthController {
    * disables Nest's serialization along with the global ValidationPipe's
    * transform.
    */
-  @ApiOperation({
-    summary: 'Email + password',
-    security: [],
-  })
-  @ApiWrappedResponse([
-    LoginResponseDto,
-    TwoFactorRequiredResponseDto,
-    TenantSelectionResponseDto,
-  ])
-  @ApiFilterErrors(['400', '401'])
   @ApiOperation({
     summary: 'Email + password',
     security: [],
@@ -148,16 +132,6 @@ export class AuthController {
    * issued yet. Authority comes from the tenant-selection cookie, which is
    * cleared on success exactly as the 2FA challenge is.
    */
-  @ApiOperation({
-    summary: 'Exchange tenantSelectionToken + { organizationId } for tokens',
-    security: [],
-  })
-  @ApiWrappedResponse([
-    LoginResponseDto,
-    TwoFactorRequiredResponseDto,
-    TenantSelectionResponseDto,
-  ])
-  @ApiFilterErrors(['400', '401'])
   @ApiOperation({
     summary: 'Exchange tenantSelectionToken + { organizationId } for tokens',
     security: [],
@@ -256,17 +230,6 @@ export class AuthController {
     TenantSelectionResponseDto,
   ])
   @ApiFilterErrors(['400', '401'])
-  @ApiOperation({
-    summary:
-      'Verify a Firebase-issued Google ID token, upsert the user with password_hash = NULL, resolve the tenant, issue tokens',
-    security: [],
-  })
-  @ApiWrappedResponse([
-    LoginResponseDto,
-    TwoFactorRequiredResponseDto,
-    TenantSelectionResponseDto,
-  ])
-  @ApiFilterErrors(['400', '401'])
   @Post('google')
   @HttpCode(HttpStatus.OK)
   @UseGuards(GuestGuard)
@@ -293,12 +256,6 @@ export class AuthController {
    * refusing to log them out for that reason is exactly backwards. Authority
    * comes from possession of the refresh cookie, which auth-service looks up.
    */
-  @ApiOperation({
-    summary:
-      'Revoke the current session — expires every row in its family_id, not just the current token',
-  })
-  @ApiWrappedResponse(LogoutResponseDto)
-  @ApiFilterErrors(['400', '401'])
   @ApiOperation({
     summary:
       'Revoke the current session — expires every row in its family_id, not just the current token',
@@ -348,12 +305,6 @@ export class AuthController {
   })
   @ApiWrappedResponse(LogoutAllResponseDto)
   @ApiFilterErrors(['401'])
-  @ApiOperation({
-    summary:
-      'Revoke every session for the user across all families ("log out of all devices", RDM §1.5)',
-  })
-  @ApiWrappedResponse(LogoutAllResponseDto)
-  @ApiFilterErrors(['401'])
   @Post('logout/all')
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard)
@@ -380,9 +331,6 @@ export class AuthController {
    * online password oracle for an attacker who already holds a session.
    * `@nestjs/throttler` is not installed yet (see the remaining-work plan).
    */
-  @ApiOperation({ summary: 'Change password (requires current password)' })
-  @ApiWrappedResponse(ChangePasswordResponseDto)
-  @ApiFilterErrors(['400', '401'])
   @ApiOperation({ summary: 'Change password (requires current password)' })
   @ApiWrappedResponse(ChangePasswordResponseDto)
   @ApiFilterErrors(['400', '401'])
@@ -427,12 +375,6 @@ export class AuthController {
   })
   @ApiWrappedResponse(LoginResponseDto)
   @ApiFilterErrors(['401'])
-  @ApiOperation({
-    summary: 'Rotate the refresh token',
-    security: [],
-  })
-  @ApiWrappedResponse(LoginResponseDto)
-  @ApiFilterErrors(['401'])
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   async refresh(
@@ -464,13 +406,6 @@ export class AuthController {
   })
   @ApiWrappedResponse(undefined, { status: HttpStatus.ACCEPTED })
   @ApiFilterErrors(['400', '401'])
-  @ApiOperation({
-    summary:
-      'Create a password_reset_tokens row (hashed token, ip_address, user_agent, 1h expires_at) and email the reset link',
-    security: [],
-  })
-  @ApiWrappedResponse(undefined, { status: HttpStatus.ACCEPTED })
-  @ApiFilterErrors(['400', '401'])
   @Post('password/forgot')
   @Throttle({ [AUTH_THROTTLER_TIER]: ROUTE_THROTTLE.forgotPassword })
   @HttpCode(HttpStatus.ACCEPTED)
@@ -489,13 +424,6 @@ export class AuthController {
   })
   @ApiWrappedResponse(ValidatePasswordResetTokenResponseDto)
   @ApiFilterErrors(['401', '404'])
-  @ApiOperation({
-    summary:
-      'Validate a reset token before rendering the form (is_used = false AND expires_at > NOW())',
-    security: [],
-  })
-  @ApiWrappedResponse(ValidatePasswordResetTokenResponseDto)
-  @ApiFilterErrors(['401', '404'])
   @Get('password/reset/:token')
   validatePasswordResetToken(
     @Param('token') token: string,
@@ -504,13 +432,6 @@ export class AuthController {
     return this.authService.validatePasswordResetToken(token, origin);
   }
 
-  @ApiOperation({
-    summary:
-      "Consume the token: set is_used = true, write the new password_hash, invalidate the user's other outstanding tokens, and revoke every device_sessions row",
-    security: [],
-  })
-  @ApiWrappedResponse(ResetPasswordResponseDto)
-  @ApiFilterErrors(['400', '401'])
   @ApiOperation({
     summary:
       "Consume the token: set is_used = true, write the new password_hash, invalidate the user's other outstanding tokens, and revoke every device_sessions row",

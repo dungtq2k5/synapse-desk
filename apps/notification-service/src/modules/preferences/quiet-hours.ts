@@ -46,11 +46,9 @@ export function parseTimeOfDay(value: string | null): number | null {
  * to a settings error.
  */
 export function minutesInZone(instant: Date, timeZone: string | null): number {
-  const zone = timeZone ?? 'UTC';
-
   try {
     const parts = new Intl.DateTimeFormat('en-GB', {
-      timeZone: zone,
+      timeZone: timeZone ?? 'UTC',
       hour: '2-digit',
       minute: '2-digit',
       hour12: false,

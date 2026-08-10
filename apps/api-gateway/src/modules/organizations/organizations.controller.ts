@@ -68,9 +68,6 @@ export class OrganizationsController {
   @ApiOperation({ summary: 'Tenant profile + status + quotas' })
   @ApiWrappedResponse(OrganizationResponseDto)
   @ApiFilterErrors(['401'])
-  @ApiOperation({ summary: 'Tenant profile + status + quotas' })
-  @ApiWrappedResponse(OrganizationResponseDto)
-  @ApiFilterErrors(['401'])
   @Get()
   get(
     @CurrentUser() context: RequestContext,
@@ -79,9 +76,6 @@ export class OrganizationsController {
   }
 
   /** `slug` changes break existing links; `domain` is security-relevant. */
-  @ApiOperation({ summary: 'Update' })
-  @ApiWrappedResponse(OrganizationResponseDto)
-  @ApiFilterErrors(['400', '401', '403'])
   @ApiOperation({ summary: 'Update' })
   @ApiWrappedResponse(OrganizationResponseDto)
   @ApiFilterErrors(['400', '401', '403'])
@@ -94,11 +88,6 @@ export class OrganizationsController {
     return this.organizationsGrpcClient.update(updateOrganizationDto, context);
   }
 
-  @ApiOperation({
-    summary: 'Security governance: enforce_two_factor, allowed_email_domains',
-  })
-  @ApiWrappedResponse(OrganizationSettingsResponseDto)
-  @ApiFilterErrors(['401', '403'])
   @ApiOperation({
     summary: 'Security governance: enforce_two_factor, allowed_email_domains',
   })
@@ -121,9 +110,6 @@ export class OrganizationsController {
    * surfaced as a response warning: letting `gmail.com` auto-join a tenant is
    * usually a mistake, but not one we can safely refuse on the admin's behalf.
    */
-  @ApiOperation({ summary: 'Update settings' })
-  @ApiWrappedResponse(OrganizationSettingsResponseDto)
-  @ApiFilterErrors(['400', '401', '403'])
   @ApiOperation({ summary: 'Update settings' })
   @ApiWrappedResponse(OrganizationSettingsResponseDto)
   @ApiFilterErrors(['400', '401', '403'])
@@ -157,12 +143,6 @@ export class OrganizationsController {
   })
   @ApiWrappedResponse(OrganizationUsageResponseDto)
   @ApiFilterErrors(['401', '403'])
-  @ApiOperation({
-    summary:
-      'Live meters: seats used/max, storage used/max, AI tokens used/budget, billing_cycle_start',
-  })
-  @ApiWrappedResponse(OrganizationUsageResponseDto)
-  @ApiFilterErrors(['401', '403'])
   @Get('usage')
   @RequirePermission('organization.read')
   getUsage(
@@ -179,12 +159,6 @@ export class OrganizationsController {
   })
   @ApiWrappedResponse(OnboardingResponseDto)
   @ApiFilterErrors(['401', '403'])
-  @ApiOperation({
-    summary:
-      'Onboarding checklist state (departments created, first doc indexed, agents invited)',
-  })
-  @ApiWrappedResponse(OnboardingResponseDto)
-  @ApiFilterErrors(['401', '403'])
   @Get('onboarding')
   @RequirePermission('organization.read')
   getOnboarding(
@@ -195,9 +169,6 @@ export class OrganizationsController {
 
   /** PENDING_ONBOARDING -> ACTIVE only. 409 from any other status. */
   @OrgAccessKind(OrgAccess.ONBOARDING)
-  @ApiOperation({ summary: 'Complete onboarding' })
-  @ApiWrappedResponse(OrganizationResponseDto)
-  @ApiFilterErrors(['401', '403'])
   @ApiOperation({ summary: 'Complete onboarding' })
   @ApiWrappedResponse(OrganizationResponseDto)
   @ApiFilterErrors(['401', '403'])
@@ -221,9 +192,6 @@ export class OrganizationsController {
    * The caller is signed out too, so their cookies are cleared: they have just
    * revoked their own access along with everyone else's.
    */
-  @ApiOperation({ summary: 'Request offboard' })
-  @ApiWrappedResponse(OffboardResponseDto)
-  @ApiFilterErrors(['400', '401', '403'])
   @ApiOperation({ summary: 'Request offboard' })
   @ApiWrappedResponse(OffboardResponseDto)
   @ApiFilterErrors(['400', '401', '403'])

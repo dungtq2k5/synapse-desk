@@ -1,7 +1,7 @@
 import {
   DepartmentMemberResponse,
   DepartmentResponse,
-  toTimestamp,
+  toProtoTimestamp,
 } from '@synapsedesk/grpc-proto';
 import type { Department, User } from '../../generated/prisma/client';
 import { toUserResponse } from '../users/user.mapper';
@@ -29,10 +29,10 @@ export function toDepartmentResponse(row: DepartmentRow): DepartmentResponse {
     memberCount: row._count.userDepartments,
     // Only ever set on a soft-deleted row, so a list that includes them can be
     // rendered differently instead of showing a deleted department as live.
-    deletedAt: toTimestamp(row.deletedAt),
+    deletedAt: toProtoTimestamp(row.deletedAt),
     deletedByName: row.deletedBy?.fullName ?? undefined,
-    createdAt: toTimestamp(row.createdAt),
-    updatedAt: toTimestamp(row.updatedAt),
+    createdAt: toProtoTimestamp(row.createdAt),
+    updatedAt: toProtoTimestamp(row.updatedAt),
   };
 }
 
@@ -51,6 +51,6 @@ export function toDepartmentMemberResponse(
     user: toUserResponse(row.user, avatarUrls),
     isPrimary: row.isPrimary,
     assignedByName: row.assignedBy?.fullName ?? undefined,
-    assignedAt: toTimestamp(row.assignedAt),
+    assignedAt: toProtoTimestamp(row.assignedAt),
   };
 }

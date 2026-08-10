@@ -1,6 +1,11 @@
 /**
  * The feed's response shapes — api-endpoints-plan §4b.
  *
+ * **REST only.** The schema's `type Notification` is
+ * `NotificationResponseGqlDto` in `../graphql/`;
+ * `notification-response.contract.spec.ts` checks the two agree and records
+ * `data`, `groupKey` and `groupCount` as deliberate REST-only fields.
+ *
  * `data` arrives from gRPC as a JSON STRING (proto3 has no `map<string, any>`)
  * and is parsed back here, at the one boundary that already speaks JSON. A
  * client should never see the encoding the transport needed.
@@ -27,7 +32,7 @@ export class NotificationResponseDto {
 }
 
 /**
- * CURSOR pagination, so the envelope is deliberately NOT `PaginationResponseBase`.
+ * CURSOR pagination, so the envelope is deliberately NOT `PaginationResponseDto`.
  *
  * That base carries `page`, `totalPages` and `totalItems`, none of which a
  * cursor feed can answer honestly: there is no page number, and a total that

@@ -4,7 +4,7 @@ import { status } from '@grpc/grpc-js';
 import type { Metadata } from '@grpc/grpc-js';
 import {
   AiJobHealthResponse,
-  toTimestamp,
+  toProtoTimestamp,
   AiLedgerServiceController,
   AiLedgerServiceControllerMethods,
   AiUsageRequest,
@@ -179,10 +179,10 @@ export class AiLedgerGrpcController implements AiLedgerServiceController {
       items: rows.map((row) => ({
         jobName: row.jobName,
         lastStartedAt: row.lastStartedAt
-          ? toTimestamp(row.lastStartedAt)
+          ? toProtoTimestamp(row.lastStartedAt)
           : undefined,
         lastSucceededAt: row.lastSucceededAt
-          ? toTimestamp(row.lastSucceededAt)
+          ? toProtoTimestamp(row.lastSucceededAt)
           : undefined,
         lastDurationMs: row.lastDurationMs ?? undefined,
         lastError: row.lastError ?? undefined,

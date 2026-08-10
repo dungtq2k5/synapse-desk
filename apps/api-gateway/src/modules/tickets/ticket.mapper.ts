@@ -1,6 +1,6 @@
 import {
-  fromTimestamp,
-  requireTimestamp,
+  fromProtoTimestamp,
+  requireProtoTimestamp,
   TicketPriority as ProtoTicketPriority,
   TicketResponse,
   TicketSource as ProtoTicketSource,
@@ -73,25 +73,27 @@ const PROTO_BY_SOURCE: Record<TicketSource, ProtoTicketSource> =
  * REST -> wire. `undefined` becomes the proto zero value, which every list RPC
  * reads as "no filter" and every write RPC reads as "use the default".
  */
-export function toProtoStatus(value?: TicketStatus): ProtoTicketStatus {
+export function toProtoTicketStatus(value?: TicketStatus): ProtoTicketStatus {
   return value
     ? PROTO_BY_STATUS[value]
     : ProtoTicketStatus.TICKET_STATUS_UNSPECIFIED;
 }
 
-export function toProtoPriority(value?: TicketPriority): ProtoTicketPriority {
+export function toProtoTicketPriority(
+  value?: TicketPriority,
+): ProtoTicketPriority {
   return value
     ? PROTO_BY_PRIORITY[value]
     : ProtoTicketPriority.TICKET_PRIORITY_UNSPECIFIED;
 }
 
-export function toProtoSource(value?: TicketSource): ProtoTicketSource {
+export function toProtoTicketSource(value?: TicketSource): ProtoTicketSource {
   return value
     ? PROTO_BY_SOURCE[value]
     : ProtoTicketSource.TICKET_SOURCE_UNSPECIFIED;
 }
 
-export function toTicketDto(ticket: TicketResponse): TicketResponseDto {
+export function toTicketResponseDto(ticket: TicketResponse): TicketResponseDto {
   return {
     id: ticket.id,
     ticketNumber: ticket.ticketNumber,
@@ -104,13 +106,13 @@ export function toTicketDto(ticket: TicketResponse): TicketResponseDto {
     description: ticket.description,
     currentAssigneeId: ticket.currentAssigneeId ?? null,
     currentDepartmentId: ticket.currentDepartmentId ?? null,
-    escalatedAt: fromTimestamp(ticket.escalatedAt) ?? null,
-    resolvedAt: fromTimestamp(ticket.resolvedAt) ?? null,
+    escalatedAt: fromProtoTimestamp(ticket.escalatedAt) ?? null,
+    resolvedAt: fromProtoTimestamp(ticket.resolvedAt) ?? null,
     // Non-optional in the proto, so a missing value is a contract violation
     // rather than something to paper over with a fallback date.
-    createdAt: requireTimestamp(ticket.createdAt, 'createdAt'),
-    updatedAt: requireTimestamp(ticket.updatedAt, 'updatedAt'),
-    deletedAt: fromTimestamp(ticket.deletedAt) ?? null,
+    createdAt: requireProtoTimestamp(ticket.createdAt, 'createdAt'),
+    updatedAt: requireProtoTimestamp(ticket.updatedAt, 'updatedAt'),
+    deletedAt: fromProtoTimestamp(ticket.deletedAt) ?? null,
     deletedById: ticket.deletedById ?? null,
   };
 }

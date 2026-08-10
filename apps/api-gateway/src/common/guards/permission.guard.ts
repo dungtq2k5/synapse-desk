@@ -11,6 +11,7 @@ import { RequestContextService } from '../contexts/request.context';
 import { PERMISSION_KEY } from '../decorators/require-permission.decorator';
 import { NodeEnv, PermissionCode } from '@synapsedesk/common';
 import { ConfigService } from '@nestjs/config';
+import { requestOf } from '../utils/execution-request.util';
 
 @Injectable()
 export class PermissionGuard implements CanActivate {
@@ -25,7 +26,12 @@ export class PermissionGuard implements CanActivate {
   }
 
   canActivate(context: ExecutionContext): boolean {
-    const request = context.switchToHttp().getRequest<Request>();
+    // `requestOf`, not `switchToHttp()` — 26-doc §1.1. This guard runs on
+    // GraphQL too, where `switchToHttp()` returns an empty object and the read
+    // below throws. The property that matters is that both transports are
+    // guarded by the SAME code: a rule enforced on one and skipped on the other
+    // is a rule with a hole in it that no test of either transport can see.
+    const request = requestOf(context) as Request;
     const requestContext = RequestContextService.fromRequest(request);
     if (!requestContext) {
       throw new UnauthorizedException('Authentication required');

@@ -22,7 +22,10 @@ import { AuthReferenceService } from '../auth-client/auth-reference.service';
 import { TicketEventPublisher } from '../events/ticket-event.publisher';
 import { TicketsService } from '../tickets/tickets.service';
 import { Prisma, TicketAssignment } from '../../generated/prisma/client';
-import { fromProtoReason, toAssignmentResponse } from './assignment.mapper';
+import {
+  fromProtoReassignmentReason,
+  toAssignmentResponse,
+} from './assignment.mapper';
 
 /** The partial unique index the seeder applies: one live assignment per ticket. */
 const CURRENT_ASSIGNMENT_INDEX = 'ticket_assignments_current_key';
@@ -67,7 +70,7 @@ export class AssignmentsService {
       request.ticketId,
       request.assigneeId,
       request.departmentId,
-      fromProtoReason(request.reason),
+      fromProtoReassignmentReason(request.reason),
       context,
     );
   }

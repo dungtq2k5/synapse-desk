@@ -4,10 +4,10 @@ import {
   AUTH_GRPC_CLIENT,
   USER_SERVICE_NAME,
   UserServiceClient,
-  requireTimestamp,
+  requireProtoTimestamp,
   toPageRequest,
   toProtoGender,
-  toTimestamp,
+  toProtoTimestamp,
 } from '@synapsedesk/grpc-proto';
 import {
   PermissionCode,
@@ -20,9 +20,9 @@ import {
   PresignAvatarResponseDto,
 } from './dto/rest/avatar.dto';
 import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
-import { PaginationResponseBase } from '../../common/dto/base/pagination-response-base.dto';
-import { toPaginationMeta } from '../../common/mappers/pagination.mapper';
-import { toUserResponseDto, toUserSummaryDto } from './user.mapper';
+import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
+import { toPaginationMetaDataResponseDto } from '../../common/mappers/pagination.mapper';
+import { toUserResponseDto, toUserSummaryResponseDto } from './user.mapper';
 import {
   CurrentUserResponseDto,
   UserResponseDto,
@@ -73,7 +73,8 @@ export class UserServiceGrpcClient
       departmentIds: response.departmentIds,
     };
   }
-  updateOwnProfile(
+
+  async updateOwnProfile(
     dto: UpdateOwnProfileDto,
     context: RequestContext,
   ): Promise<UserResponseDto> {
@@ -86,7 +87,7 @@ export class UserServiceGrpcClient
 
   // ------------------------------------------------------------- avatars
 
-  presignAvatar(
+  async presignAvatar(
     dto: PresignAvatarDto,
     context: RequestContext,
   ): Promise<PresignAvatarResponseDto> {
@@ -104,11 +105,11 @@ export class UserServiceGrpcClient
     ).then((response) => ({
       uploadUrl: response.uploadUrl,
       objectPath: response.objectPath,
-      expiresAt: requireTimestamp(response.expiresAt, 'expiresAt'),
+      expiresAt: requireProtoTimestamp(response.expiresAt, 'expiresAt'),
     }));
   }
 
-  confirmAvatar(
+  async confirmAvatar(
     dto: ConfirmAvatarDto,
     context: RequestContext,
   ): Promise<UserResponseDto> {
@@ -122,7 +123,7 @@ export class UserServiceGrpcClient
     ).then(toUserResponseDto);
   }
 
-  deleteAvatar(context: RequestContext): Promise<UserResponseDto> {
+  async deleteAvatar(context: RequestContext): Promise<UserResponseDto> {
     return this.call(
       (metadata) => this.userGrpcService.deleteAvatar({}, metadata),
       context,
@@ -132,7 +133,7 @@ export class UserServiceGrpcClient
   async list(
     query: ListUsersQueryDto,
     context: RequestContext,
-  ): Promise<PaginationResponseBase<UserSummaryResponseDto>> {
+  ): Promise<PaginationResponseDto<UserSummaryResponseDto>> {
     const response = await this.call(
       (metadata) =>
         this.userGrpcService.listUsers(
@@ -149,16 +150,19 @@ export class UserServiceGrpcClient
     );
 
     return {
-      items: response.items.map(toUserSummaryDto),
-      meta: toPaginationMeta(response.meta),
+      items: response.items.map(toUserSummaryResponseDto),
+      meta: toPaginationMetaDataResponseDto(response.meta),
     };
   }
 
-  get(id: string, context: RequestContext): Promise<UserSummaryResponseDto> {
+  async get(
+    id: string,
+    context: RequestContext,
+  ): Promise<UserSummaryResponseDto> {
     return this.call(
       (metadata) => this.userGrpcService.getUser({ id }, metadata),
       context,
-    ).then(toUserSummaryDto);
+    ).then(toUserSummaryResponseDto);
   }
 
   async getPermissions(id: string, context: RequestContext): Promise<string[]> {
@@ -189,10 +193,10 @@ export class UserServiceGrpcClient
       context,
     );
 
-    return toUserSummaryDto(response.user!);
+    return toUserSummaryResponseDto(response.user!);
   }
 
-  update(
+  async update(
     id: string,
     dto: UpdateUserDto,
     context: RequestContext,
@@ -208,7 +212,7 @@ export class UserServiceGrpcClient
           metadata,
         ),
       context,
-    ).then(toUserSummaryDto);
+    ).then(toUserSummaryResponseDto);
   }
 
   async remove(
@@ -228,7 +232,7 @@ export class UserServiceGrpcClient
     return this.call(
       (metadata) => this.userGrpcService.restoreUser({ id }, metadata),
       context,
-    ).then(toUserSummaryDto);
+    ).then(toUserSummaryResponseDto);
   }
 
   lock(
@@ -245,7 +249,7 @@ export class UserServiceGrpcClient
             // Absent stays absent — an INDEFINITE lock, which is the existing
             // behaviour and what an admin gets by not choosing (21-doc §2).
             lockedUntil: dto.lockedUntil
-              ? toTimestamp(new Date(dto.lockedUntil))
+              ? toProtoTimestamp(new Date(dto.lockedUntil))
               : undefined,
           },
           metadata,
@@ -271,7 +275,7 @@ export class UserServiceGrpcClient
     );
   }
 
-  setRoles(
+  async setRoles(
     id: string,
     dto: SetUserRolesDto,
     context: RequestContext,
@@ -283,10 +287,10 @@ export class UserServiceGrpcClient
           metadata,
         ),
       context,
-    ).then(toUserSummaryDto);
+    ).then(toUserSummaryResponseDto);
   }
 
-  setDepartments(
+  async setDepartments(
     id: string,
     dto: SetUserDepartmentsDto,
     context: RequestContext,
@@ -298,7 +302,7 @@ export class UserServiceGrpcClient
           metadata,
         ),
       context,
-    ).then(toUserSummaryDto);
+    ).then(toUserSummaryResponseDto);
   }
 }
 

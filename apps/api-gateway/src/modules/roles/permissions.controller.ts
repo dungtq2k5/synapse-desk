@@ -41,12 +41,6 @@ export class PermissionsController {
   })
   @ApiWrappedResponse(PermissionResponseDto, { isArray: true })
   @ApiFilterErrors(['401', '403'])
-  @ApiOperation({
-    summary:
-      'Full permission catalogue, grouped by target prefix — drives the role editor UI',
-  })
-  @ApiWrappedResponse(PermissionResponseDto, { isArray: true })
-  @ApiFilterErrors(['401', '403'])
   @Get()
   @RequirePermission('role.read')
   list(

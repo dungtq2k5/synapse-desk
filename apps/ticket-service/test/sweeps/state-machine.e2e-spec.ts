@@ -10,7 +10,7 @@ import { E2eFixture, bootstrapE2eTest, memberContext } from '../utils';
 import { buildTenant, createTicket, TenantFixture } from '../factories';
 import { TicketsService } from '../../src/modules/tickets/tickets.service';
 import { TicketEventPublisher } from '../../src/modules/events/ticket-event.publisher';
-import { toProtoStatus } from '../../src/modules/tickets/ticket.mapper';
+import { toProtoTicketStatus } from '../../src/modules/tickets/ticket.mapper';
 
 /**
  * §3.3 The state-machine sweep — the full 6×6 grid, against a real database.
@@ -66,7 +66,7 @@ describe('§3.3 state machine sweep (e2e)', () => {
 
       const result = await tickets
         .changeTicketStatus(
-          { id: ticket.id, status: toProtoStatus(to), reason: '' },
+          { id: ticket.id, status: toProtoTicketStatus(to), reason: '' },
           agent(),
         )
         .then(() => 'accepted' as const)
@@ -140,7 +140,7 @@ describe('§3.3 state machine sweep (e2e)', () => {
 
         const genericResult = await attempt(
           tickets.changeTicketStatus(
-            { id: viaGeneric.id, status: toProtoStatus(to), reason: '' },
+            { id: viaGeneric.id, status: toProtoTicketStatus(to), reason: '' },
             agent(),
           ),
         );
@@ -211,7 +211,7 @@ describe('§3.3 state machine sweep (e2e)', () => {
 
       expect([terminal, reopened.status]).toEqual([
         terminal,
-        toProtoStatus(TicketStatus.OPEN),
+        toProtoTicketStatus(TicketStatus.OPEN),
       ]);
     }
   });

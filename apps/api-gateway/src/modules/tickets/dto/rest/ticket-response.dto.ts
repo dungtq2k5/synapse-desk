@@ -7,6 +7,10 @@ import {
 /**
  * A ticket as the REST API returns it.
  *
+ * **REST only.** The schema's `type Ticket` is `TicketResponseGqlDto` in
+ * `../graphql/`, an independent class — `ticket-response.contract.spec.ts`
+ * asserts the two field sets agree so the duplication cannot drift.
+ *
  * Every optional field is `| null`, never absent: protobuf has no null so the
  * wire type uses `undefined`, and passing that through would give a client a
  * key set that changes per row. A stable shape is what an OpenAPI schema and a

@@ -28,7 +28,7 @@ import {
   RateValue,
   ResponseTimesResponse,
   SatisfactionResponse,
-  toTimestamp,
+  toProtoTimestamp,
   VolumeResponse,
 } from '@synapsedesk/grpc-proto';
 import { PrismaService } from '../prisma/prisma.service';
@@ -559,7 +559,7 @@ function latestComputedAt(rows: DailyRow[]) {
     rows[0].computedAt,
   );
 
-  return toTimestamp(newest);
+  return toProtoTimestamp(newest);
 }
 
 /** Domain → wire. `null` becomes an absent field, never a zero. */

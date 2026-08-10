@@ -20,7 +20,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionGuard } from '../../common/guards/permission.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ResponseMessage } from '../../common/decorators/response-message.decorator';
-import { PaginationResponseBase } from '../../common/dto/base/pagination-response-base.dto';
+import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
 import { TicketsGrpcClient } from '../tickets/tickets-grpc.client';
 import { MessagesGrpcClient } from '../tickets/messages-grpc.client';
 import { TicketResponseDto } from '../tickets/dto/rest/ticket-response.dto';
@@ -78,11 +78,6 @@ export class ChatController {
   })
   @ApiWrappedResponse(TicketResponseDto, { status: HttpStatus.CREATED })
   @ApiFilterErrors(['400', '401'])
-  @ApiOperation({
-    summary: 'Start a Tier 1 conversation → creates a NEW ticket',
-  })
-  @ApiWrappedResponse(TicketResponseDto, { status: HttpStatus.CREATED })
-  @ApiFilterErrors(['400', '401'])
   @Post('conversations')
   @ResponseMessage('Conversation started')
   start(
@@ -116,14 +111,11 @@ export class ChatController {
   @ApiOperation({ summary: 'List own conversations' })
   @ApiWrappedResponse(Paginated(TicketResponseDto))
   @ApiFilterErrors(['401'])
-  @ApiOperation({ summary: 'List own conversations' })
-  @ApiWrappedResponse(Paginated(TicketResponseDto))
-  @ApiFilterErrors(['401'])
   @Get('conversations')
   list(
     @CurrentUser() context: RequestContext,
     @Query() query: ListTicketsQueryDto,
-  ): Promise<PaginationResponseBase<TicketResponseDto>> {
+  ): Promise<PaginationResponseDto<TicketResponseDto>> {
     return this.ticketsGrpcClient.list(
       {
         ...query,
@@ -138,9 +130,6 @@ export class ChatController {
   @ApiOperation({ summary: 'Thread + citations per AI message' })
   @ApiWrappedResponse(TicketResponseDto)
   @ApiFilterErrors(['400', '401', '404'])
-  @ApiOperation({ summary: 'Thread + citations per AI message' })
-  @ApiWrappedResponse(TicketResponseDto)
-  @ApiFilterErrors(['400', '401', '404'])
   @Get('conversations/:id')
   get(
     @CurrentUser() context: RequestContext,
@@ -152,15 +141,12 @@ export class ChatController {
   @ApiOperation({ summary: 'List messages' })
   @ApiWrappedResponse(Paginated(MessageResponseDto))
   @ApiFilterErrors(['400', '401', '404'])
-  @ApiOperation({ summary: 'List messages' })
-  @ApiWrappedResponse(Paginated(MessageResponseDto))
-  @ApiFilterErrors(['400', '401', '404'])
   @Get('conversations/:id/messages')
   listMessages(
     @CurrentUser() context: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
     @Query() query: ListMessagesQueryDto,
-  ): Promise<PaginationResponseBase<MessageResponseDto>> {
+  ): Promise<PaginationResponseDto<MessageResponseDto>> {
     return this.messagesGrpcClient.list(id, query, context);
   }
 
@@ -176,9 +162,6 @@ export class ChatController {
   // quota is a month budget checked per request and does nothing to stop one
   // user spending the whole month in ten minutes.
   @Throttle({ [AI_THROTTLER_TIER]: ROUTE_THROTTLE.chatMessage })
-  @ApiOperation({ summary: 'Ask a question' })
-  @ApiWrappedResponse(MessageResponseDto, { status: HttpStatus.CREATED })
-  @ApiFilterErrors(['400', '401', '404'])
   @ApiOperation({ summary: 'Ask a question' })
   @ApiWrappedResponse(MessageResponseDto, { status: HttpStatus.CREATED })
   @ApiFilterErrors(['400', '401', '404'])
@@ -204,12 +187,6 @@ export class ChatController {
    * chat its own escalation semantics, and the first divergence would be a
    * ticket that escalated without an `escalated_at`.
    */
-  @ApiOperation({
-    summary:
-      'One-click hand-off to a human — alias of POST /tickets/:id/escalate',
-  })
-  @ApiWrappedResponse(TicketResponseDto)
-  @ApiFilterErrors(['400', '401', '404'])
   @ApiOperation({
     summary:
       'One-click hand-off to a human — alias of POST /tickets/:id/escalate',

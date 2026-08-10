@@ -12,6 +12,7 @@ import {
   PageMeta,
   ProtoTimestamp,
   UserResponse,
+  UserSummary,
   UserSummaryResponse,
 } from '@synapsedesk/grpc-proto';
 
@@ -20,7 +21,7 @@ import {
  * connection, not what the REST response looks like.
  *
  * These exist because the gateway's mappers are strict on purpose:
- * `requireTimestamp` throws on a missing `createdAt` rather than substituting a
+ * `requireProtoTimestamp` throws on a missing `createdAt` rather than substituting a
  * date, so a hand-written stub like `{ id, email, fullName }` produces a 500
  * instead of the 200 the test expects — and the failure points at the mapper,
  * not at the fixture that caused it. Building the shapes once, correctly, is
@@ -68,6 +69,33 @@ export function wireUserSummary(
     departmentIds: [],
     deletedAt: undefined,
     deletedByName: undefined,
+    ...overrides,
+  };
+}
+
+/**
+ * The NARROW projection `ListUsersByIds` puts in `summaries` — not the envelope
+ * {@link wireUserSummary} builds.
+ *
+ * The two are one letter apart in the proto and completely different on the
+ * wire: `UserSummaryResponse` wraps a whole user beside its roles, while
+ * `UserSummary` is the five fields an EDGE is allowed to see (25-doc §4). This
+ * one is what the loaders batch, so it is what every field-resolver test needs.
+ *
+ * Here rather than redeclared per describe-block: two `graphql.e2e-spec.ts`
+ * blocks had byte-identical private copies, which is one definition of the wire
+ * more than there can be — and the copy that drifts is whichever the next reader
+ * does not open.
+ */
+export function wireUserProjection(
+  overrides: Partial<UserSummary> = {},
+): UserSummary {
+  return {
+    userId: faker.string.uuid(),
+    fullName: faker.person.fullName(),
+    avatarUrl: undefined,
+    isLocked: false,
+    deletedAt: undefined,
     ...overrides,
   };
 }

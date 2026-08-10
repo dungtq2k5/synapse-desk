@@ -1,7 +1,7 @@
 import { ExecutionContext, Injectable } from '@nestjs/common';
-import { GqlExecutionContext } from '@nestjs/graphql';
 import { AuthGuard } from '@nestjs/passport';
 import type { Request } from 'express';
+import { requestOf } from '../utils/execution-request.util';
 
 /**
  * Authorizes the second leg of login using the `two_factor_token` cookie.
@@ -13,11 +13,9 @@ import type { Request } from 'express';
 @Injectable()
 export class Jwt2faGuard extends AuthGuard('jwt-2fa') {
   override getRequest(context: ExecutionContext): Request {
-    if (context.getType<string>() === 'graphql') {
-      return GqlExecutionContext.create(context).getContext<{ req: Request }>()
-        .req;
-    }
-
-    return context.switchToHttp().getRequest<Request>();
+    // Was the only guard with a GraphQL branch, hand-written. Pointed at the
+    // shared helper so the five places that now need it cannot drift — which is
+    // how `@CurrentUser` and four other guards came to be missing theirs.
+    return requestOf(context) as Request;
   }
 }

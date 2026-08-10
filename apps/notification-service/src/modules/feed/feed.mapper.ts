@@ -1,7 +1,7 @@
 import {
   NotificationResponse,
   toProtoNotificationPriority,
-  toTimestamp,
+  toProtoTimestamp,
 } from '@synapsedesk/grpc-proto';
 import { Notification } from '../../generated/prisma/client';
 
@@ -34,10 +34,12 @@ export function toNotificationResponse(
     resourceId: notification.resourceId ?? undefined,
     groupKey: notification.groupKey ?? undefined,
     groupCount: notification.groupCount,
-    readAt: notification.readAt ? toTimestamp(notification.readAt) : undefined,
-    archivedAt: notification.archivedAt
-      ? toTimestamp(notification.archivedAt)
+    readAt: notification.readAt
+      ? toProtoTimestamp(notification.readAt)
       : undefined,
-    createdAt: toTimestamp(notification.createdAt),
+    archivedAt: notification.archivedAt
+      ? toProtoTimestamp(notification.archivedAt)
+      : undefined,
+    createdAt: toProtoTimestamp(notification.createdAt),
   };
 }

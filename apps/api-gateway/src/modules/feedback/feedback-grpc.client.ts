@@ -2,38 +2,21 @@ import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { ClientGrpc } from '@nestjs/microservices';
 import {
   FEEDBACK_SERVICE_NAME,
-  FeedbackResponse,
   FeedbackServiceClient,
-  requireTimestamp,
   TICKET_GRPC_CLIENT,
   toPageRequest,
-  toTimestamp,
+  toProtoTimestamp,
 } from '@synapsedesk/grpc-proto';
-import { FeedbackRating, RequestContext } from '@synapsedesk/common';
+import { RequestContext } from '@synapsedesk/common';
 import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
-import { PaginationResponseBase } from '../../common/dto/base/pagination-response-base.dto';
-import { toPaginationMeta } from '../../common/mappers/pagination.mapper';
+import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
+import { toPaginationMetaDataResponseDto } from '../../common/mappers/pagination.mapper';
 import { FeedbackResponseDto } from './dto/rest/feedback-response.dto';
 import {
   ListFeedbackQueryDto,
   SubmitFeedbackDto,
 } from './dto/rest/feedback.dto';
-
-function toFeedbackDto(feedback: FeedbackResponse): FeedbackResponseDto {
-  return {
-    id: feedback.id,
-    ticketMessageId: feedback.ticketMessageId,
-    userId: feedback.userId,
-    organizationId: feedback.organizationId,
-    rating: feedback.rating as FeedbackRating,
-    feedbackText: feedback.feedbackText ?? null,
-    // `?? null`, never `|| null`: `false` is a real assessment — "the citations
-    // were wrong" — and `||` would erase it into "not assessed".
-    citationAccurate: feedback.citationAccurate ?? null,
-    createdAt: requireTimestamp(feedback.createdAt, 'createdAt'),
-    updatedAt: requireTimestamp(feedback.updatedAt, 'updatedAt'),
-  };
-}
+import { toFeedbackResponseDto } from './feedback.mapper';
 
 @Injectable()
 export class FeedbackGrpcClient extends BaseGrpcClient implements OnModuleInit {
@@ -56,7 +39,7 @@ export class FeedbackGrpcClient extends BaseGrpcClient implements OnModuleInit {
     dto: SubmitFeedbackDto,
     context: RequestContext,
   ): Promise<FeedbackResponseDto> {
-    return toFeedbackDto(
+    return toFeedbackResponseDto(
       await this.call(
         (metadata) =>
           this.feedbackGrpcService.submitFeedback(
@@ -90,7 +73,7 @@ export class FeedbackGrpcClient extends BaseGrpcClient implements OnModuleInit {
   async list(
     query: ListFeedbackQueryDto,
     context: RequestContext,
-  ): Promise<PaginationResponseBase<FeedbackResponseDto>> {
+  ): Promise<PaginationResponseDto<FeedbackResponseDto>> {
     const response = await this.call(
       (metadata) =>
         this.feedbackGrpcService.listFeedback(
@@ -101,8 +84,8 @@ export class FeedbackGrpcClient extends BaseGrpcClient implements OnModuleInit {
             // a real one.
             rating: query.rating ?? 0,
             citationAccurate: query.citationAccurate,
-            from: toTimestamp(query.from ?? null),
-            to: toTimestamp(query.to ?? null),
+            from: toProtoTimestamp(query.from ?? null),
+            to: toProtoTimestamp(query.to ?? null),
           },
           metadata,
         ),
@@ -110,8 +93,8 @@ export class FeedbackGrpcClient extends BaseGrpcClient implements OnModuleInit {
     );
 
     return {
-      items: response.items.map(toFeedbackDto),
-      meta: toPaginationMeta(response.meta),
+      items: response.items.map(toFeedbackResponseDto),
+      meta: toPaginationMetaDataResponseDto(response.meta),
     };
   }
 }

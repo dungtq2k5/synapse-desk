@@ -60,11 +60,6 @@ export class BillingController {
   })
   @ApiWrappedResponse(SubscriptionResponseDto)
   @ApiFilterErrors(['401', '403'])
-  @ApiOperation({
-    summary: 'Current plan, status, period, and the entitlements it granted',
-  })
-  @ApiWrappedResponse(SubscriptionResponseDto)
-  @ApiFilterErrors(['401', '403'])
   @Get('subscription')
   @RequirePermission('organization.read')
   getSubscription(
@@ -80,9 +75,6 @@ export class BillingController {
    * mid-checkout must not end up upgraded, and a user who pays must not depend
    * on their browser making it back to a redirect.
    */
-  @ApiOperation({ summary: 'Create checkout session' })
-  @ApiWrappedResponse(CheckoutSessionResponseDto)
-  @ApiFilterErrors(['400', '401', '403'])
   @ApiOperation({ summary: 'Create checkout session' })
   @ApiWrappedResponse(CheckoutSessionResponseDto)
   @ApiFilterErrors(['400', '401', '403'])
@@ -107,9 +99,6 @@ export class BillingController {
   @ApiOperation({ summary: 'Create portal session' })
   @ApiWrappedResponse(PortalSessionResponseDto)
   @ApiFilterErrors(['400', '401', '403'])
-  @ApiOperation({ summary: 'Create portal session' })
-  @ApiWrappedResponse(PortalSessionResponseDto)
-  @ApiFilterErrors(['400', '401', '403'])
   @Post('portal-session')
   @HttpCode(HttpStatus.OK)
   @RequirePermission('organization.update')
@@ -122,9 +111,6 @@ export class BillingController {
   }
 
   /** The one place a live Stripe read is correct — invoices are not mirrored. */
-  @ApiOperation({ summary: 'Invoice history, proxied from Stripe and cached' })
-  @ApiWrappedResponse(InvoiceResponseDto, { isArray: true })
-  @ApiFilterErrors(['401', '403'])
   @ApiOperation({ summary: 'Invoice history, proxied from Stripe and cached' })
   @ApiWrappedResponse(InvoiceResponseDto, { isArray: true })
   @ApiFilterErrors(['401', '403'])

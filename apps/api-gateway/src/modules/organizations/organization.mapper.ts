@@ -1,9 +1,13 @@
 import {
   fromProtoOrgStatus,
   OrganizationResponse,
-  requireTimestamp,
+  requireProtoTimestamp,
+  UsageMeter,
 } from '@synapsedesk/grpc-proto';
-import { OrganizationResponseDto } from './dto/rest/organization.dto';
+import {
+  OrganizationResponseDto,
+  UsageMeterDto,
+} from './dto/rest/organization.dto';
 
 /**
  * Wire -> REST for an organization.
@@ -12,7 +16,7 @@ import { OrganizationResponseDto } from './dto/rest/organization.dto';
  * identical conversion — a second copy would drift the first time a field was
  * added, and the two surfaces would disagree about the same row.
  */
-export function toOrganizationDto(
+export function toOrganizationResponseDto(
   organization: OrganizationResponse,
 ): OrganizationResponseDto {
   return {
@@ -26,11 +30,31 @@ export function toOrganizationDto(
     maxAgentSeats: organization.maxAgentSeats,
     maxStorageBytes: organization.maxStorageBytes,
     monthlyAiTokenBudget: organization.monthlyAiTokenBudget,
-    billingCycleStart: requireTimestamp(
+    billingCycleStart: requireProtoTimestamp(
       organization.billingCycleStart,
       'billingCycleStart',
     ),
-    createdAt: requireTimestamp(organization.createdAt, 'createdAt'),
-    updatedAt: requireTimestamp(organization.updatedAt, 'updatedAt'),
+    createdAt: requireProtoTimestamp(organization.createdAt, 'createdAt'),
+    updatedAt: requireProtoTimestamp(organization.updatedAt, 'updatedAt'),
+  };
+}
+
+/**
+ * Unset numbers become `null`, never 0.
+ *
+ * A meter reporting `used: 0` claims the tenant has consumed nothing; a meter
+ * whose domain does not exist yet cannot make that claim, and the difference
+ * matters to anyone reading a usage page before deciding to upgrade.
+ */
+export function toUsageMeterDto(meter: UsageMeter | undefined): UsageMeterDto {
+  if (!meter) {
+    throw new Error('Received a usage response without a meter');
+  }
+
+  return {
+    available: meter.available,
+    used: meter.available ? (meter.used ?? null) : null,
+    limit: meter.available ? (meter.limit ?? null) : null,
+    unavailableReason: meter.unavailableReason ?? null,
   };
 }
