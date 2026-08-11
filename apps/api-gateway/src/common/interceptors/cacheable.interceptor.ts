@@ -108,7 +108,7 @@ export class CacheableInterceptor implements NestInterceptor {
  * ---
  *
  * **This must mirror `DocumentsService.visibilityScope` in ingestion-service**,
- * which is the only other place caller visibility is computed — 31-doc C4.
+ * which is the only other place caller visibility is computed.
  * The two are a pair and only one of them looks like it is about security: this
  * one decides who SHARES an answer, that one decides what the answer CONTAINS.
  * They drift by someone widening the filter and not the digest, and the symptom

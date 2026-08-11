@@ -660,7 +660,7 @@ describe('§1/§5 the OpenAPI document', () => {
       const paths = (response.body as { paths: Record<string, unknown> }).paths;
       expect(Object.keys(paths).length).toBeGreaterThan(100);
 
-      // **The staleness contract reaches the client** — 31-doc C9. A contract
+      // **The staleness contract reaches the client.** A contract
       // nobody can read is not published, and the assertions elsewhere in this
       // file read a document this test builds itself; this one reads what the
       // server actually returns.

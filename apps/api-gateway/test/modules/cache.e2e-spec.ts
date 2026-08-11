@@ -154,7 +154,7 @@ describe('§29 the shared cache (e2e)', () => {
       expect(second.body.data[0].name).toBe('Read roles');
     });
 
-    it('**the entry is physically in Redis, with a TTL** — 31-doc C9', async () => {
+    it('**the entry is physically in Redis, with a TTL**', async () => {
       // Closes the gap between "the code is right" and "it is wired in". The
       // call-count assertions above would also pass if `wrap` were a no-op that
       // memoised in process — this reads the shared store the way another pod
@@ -335,7 +335,7 @@ describe('§29 the shared cache (e2e)', () => {
     });
 
     it('**and a digest that always collided would fail this**', async () => {
-      // 31-doc C4. The reversed-array test proves equal sets MERGE; on its own
+      // The reversed-array test proves equal sets MERGE; on its own
       // that also passes for a digest returning a constant, which would merge
       // every caller in the tenant into one entry — the leak, with a green
       // test beside it. This is the separating half.
@@ -376,7 +376,7 @@ describe('§29 the shared cache (e2e)', () => {
     });
   });
 
-  describe('§31 C4 — a cache must not bypass authorization', () => {
+  describe('a cache must not bypass authorization', () => {
     const wireDeleted = () => ({
       items: [
         {
@@ -487,7 +487,7 @@ describe('§29 the shared cache (e2e)', () => {
     });
 
     it('**and `invalidateTenant` spares every NON-analytics scope**', async () => {
-      // 31-doc C7. Its name says tenant and its docblock says analytics, and
+      // Its name says tenant and its docblock says analytics, and
       // under the now-shared `cache:` prefix a genuinely tenant-wide wipe would
       // also drop roles, departments, organizations and every cached entity —
       // turning an operator's backfill tool into a cold-start for the tenant.

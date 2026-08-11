@@ -22,8 +22,8 @@ import { formatErrorMsg } from '@synapsedesk/common';
  *
  * ---
  *
- * **What happens when Redis fills up** — 31-doc C1, and this is the question an
- * outage asks first.
+ * **What happens when Redis fills up**, which is the question an outage asks
+ * first.
  *
  * The instance runs `maxmemory` with `maxmemory-policy noeviction` (set in
  * `docker-compose.yml`, with the full reasoning beside it). **Writes fail when

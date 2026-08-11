@@ -243,7 +243,7 @@ export function alignToKeys<K, V>(
  * all; the RPC behind it resolves nothing anyway, and a shared bucket is not
  * worth the sentence explaining why it is safe.
  *
- * **What a dangling id costs, bounded** — 31-doc C6. A purged user still
+ * **What a dangling id costs, bounded.** A purged user still
  * referenced by an old ticket is a miss on every request, forever. That is one
  * extra batch RPC per request, not per row: DataLoader dedups within the query,
  * so a page of fifty tickets all naming the same dead assignee is a single

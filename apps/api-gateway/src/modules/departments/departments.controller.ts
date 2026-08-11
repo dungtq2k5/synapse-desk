@@ -84,7 +84,7 @@ export class DepartmentsController {
   // and a second `@RequirePermission` cannot express that, because it gates the
   // whole route and its semantics are ANY.
   //
-  // **In a GUARD rather than in the handler, and that is a fix** — 31-doc C4.
+  // **In a GUARD rather than in the handler, and that is a fix.**
   // As a handler check it was bypassed entirely by `@Cacheable`: a caller
   // holding `department.delete` warmed `?includeDeleted=true`, and the next
   // caller without it was served that entry with a 200 and never reached the

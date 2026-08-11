@@ -1199,8 +1199,8 @@ export class UsersService {
     dob?: string;
     gender?: number;
   }): Prisma.UserUpdateInput {
-    // **`fullName` and `avatarUrl` are CACHED by the gateway** — 28-doc §3.1,
-    // 31-doc C5. The entity cache behind the GraphQL user edges is invalidated
+    // **`fullName` and `avatarUrl` are CACHED by the gateway** — 28-doc §3.1.
+    // The entity cache behind the GraphQL user edges is invalidated
     // by the gateway MUTATIONS that reach this service, because today every
     // writer of those two columns is one: `updateOwnProfile`, `updateUser`,
     // `confirmAvatarUpload`, `deleteAvatar`.

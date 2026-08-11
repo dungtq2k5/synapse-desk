@@ -34,8 +34,8 @@ export type QueryPermissionRule = {
  * there would either deny plain reads to everyone without it, or grant the
  * widened view to anyone holding either code.
  *
- * **And why it is a GUARD rather than a check in the handler** — 31-doc C4, and
- * this is the load-bearing part. It was a handler check, and `@Cacheable`
+ * **And why it is a GUARD rather than a check in the handler**, and this is
+ * the load-bearing part. It was a handler check, and `@Cacheable`
  * short-circuits the handler on a hit:
  *
  * ```txt

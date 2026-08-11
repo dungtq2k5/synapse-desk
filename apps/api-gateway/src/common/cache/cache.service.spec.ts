@@ -355,7 +355,7 @@ describe('CacheService', () => {
     });
   });
 
-  describe('§31 C7 the scope pattern against names that do not exist yet', () => {
+  describe('the scope pattern against names that do not exist yet', () => {
     it('**`entity:user` drops `entity:user:{id}` but NOT `entity:user-preferences`**', async () => {
       // The hyphen is what saves it, and nothing about the code says so — the
       // pattern is `scope[|:]*`, and `-` is neither. A future

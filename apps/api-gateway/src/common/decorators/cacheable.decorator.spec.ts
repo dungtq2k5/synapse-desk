@@ -145,7 +145,7 @@ describe('§3 what is cached', () => {
   });
 
   it('**no cached handler authorizes in its own body**', () => {
-    // 31-doc C4, and the systemic version of a bug that was live: a response
+    // The systemic version of a bug that was live: a response
     // cache serves a hit WITHOUT running the handler, so any authorization
     // inside the handler is skipped for every caller after the first. It cost
     // `?includeDeleted=true` — one caller with `department.delete` warmed the

@@ -952,7 +952,7 @@ export class DocumentsService {
    * reporting that search is broken.
    *
    * **The gateway caches `GET /documents` keyed on a digest of exactly these two
-   * inputs** — `visibilityDigest` in `cacheable.interceptor.ts`, 31-doc C4.
+   * inputs** — `visibilityDigest` in `cacheable.interceptor.ts`.
    * Widening this filter without widening that digest serves one audience's rows
    * to another, because two callers the new filter separates would still share a
    * cache entry. The pair is easy to miss: only one of the two files looks like

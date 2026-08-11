@@ -89,7 +89,7 @@ services:
   redis:
     image: redis:8.8.0-alpine
     container_name: synapsedesk-redis
-    # **The eviction policy is stated, not inherited** — 31-doc C1.
+    # **The eviction policy is stated, not inherited.**
     #
     # **`noeviction`, and `volatile-ttl` was tried and is wrong.** The reasoning
     # that produced it was sound about the quota counter and wrong about BullMQ:
@@ -119,7 +119,7 @@ services:
     # silently corrupt something — when memory fills, writes FAIL, loudly, and a
     # failed write is a visible error rather than a job running twice.
     #
-    # The cost is 31-doc C1's original worry: a full instance fails every writer,
+    # The cost is the original worry: a full instance fails every writer,
     # not just the cache. That is accepted deliberately here, because the cache
     # is the component that bounds itself (every entry has a TTL) and a loud
     # failure is recoverable in a way a duplicated side effect is not.

@@ -133,8 +133,8 @@ export class CacheService {
    *
    * ---
    *
-   * **The read-repopulate race, which is accepted rather than fixed** — 31-doc
-   * C2. Written down because the symptom is indistinguishable from a real bug,
+   * **The read-repopulate race, which is accepted rather than fixed.**
+   * Written down because the symptom is indistinguishable from a real bug,
    * and somebody will otherwise spend a day on it.
    *
    * ```txt
@@ -344,7 +344,7 @@ const DATE_TAG = '__cache_date__';
  * ticket whose title is a timestamp, a `dataThrough` that is deliberately a
  * `YYYY-MM-DD` string and must stay one.
  *
- * **`BigInt` is not handled, and in the gateway it cannot arrive** — 31-doc C3.
+ * **`BigInt` is not handled, and in the gateway it cannot arrive.**
  * `maxStorageBytes` and `monthlyAiTokenBudget` are `int64` on the wire, and
  * `GRPC_LOADER_OPTIONS` sets `longs: Number`, so the generated types are
  * `number`; the gateway never holds a Prisma row.

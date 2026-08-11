@@ -1,11 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-describe('§31 C5 the entity cache rests on who writes these fields', () => {
+describe('the entity cache rests on who writes these fields', () => {
   const users = () => readFileSync(USERS_SERVICE, 'utf8');
 
   /**
-   * Who writes a cached entity's fields — 31-doc C5.
+   * Who writes a cached entity's fields.
    *
    * **28-doc §3.1 rests on a claim that is true today and time-sensitive:** every
    * writer of `fullName` or `avatarUrl` is a gateway mutation, so
