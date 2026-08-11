@@ -13,6 +13,7 @@ import { AnalyticsCacheService } from '../../src/modules/analytics/analytics-cac
 import { CacheService } from '../../src/common/cache/cache.service';
 import { entityScope } from '../../src/common/config/cache.config';
 import { RedisService } from '../../src/common/redis/redis.service';
+import { compareAlphabetically } from '@synapsedesk/common';
 
 /**
  * The shared cache, against a REAL Redis — 29-doc §1.
@@ -514,10 +515,12 @@ describe('§29 the shared cache (e2e)', () => {
         .get(RedisService)
         .client.keys('cache:org-a|*');
 
-      expect(survivors.sort()).toEqual([
-        'cache:org-a|entity:user:abc|',
-        'cache:org-a|roles|',
-      ]);
+      survivors.sort(compareAlphabetically);
+      expect(survivors).toEqual(
+        ['cache:org-a|entity:user:abc|', 'cache:org-a|roles|'].sort(
+          compareAlphabetically,
+        ),
+      );
     });
   });
 });

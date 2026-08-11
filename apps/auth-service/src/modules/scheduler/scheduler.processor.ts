@@ -24,7 +24,7 @@ import { ExpiredRecordsPruner } from '../sessions/expired-records.job';
  * whichever they find first, and after 20-doc there were two schedulers in this
  * codebase built on BullMQ and one built on decorators. Now there is one way.
  */
-@Processor(SCHEDULER_QUEUE, { concurrency: 1 })
+@Processor(SCHEDULER_QUEUE.auth, { concurrency: 1 })
 export class SchedulerProcessor extends WorkerHost {
   private readonly logger = new Logger(SchedulerProcessor.name);
 
@@ -44,10 +44,24 @@ export class SchedulerProcessor extends WorkerHost {
       case SCHEDULED_JOBS.AUTH_DAILY:
         return this.runs.track(job.name, () => this.daily());
       default:
-        // A repeat entry left by an older deploy under a name this build no
-        // longer knows. Logged rather than thrown: retrying forever would bury
-        // the jobs that do exist.
-        this.logger.warn(`Ignoring unknown scheduled job '${job.name}'`);
+        // **A defect, not routine cross-talk** — and the difference is what
+        // makes throwing correct now.
+        //
+        // This branch used to `return`, which reported SUCCESS to BullMQ for
+        // work nobody did — and it fired constantly, because all three services
+        // shared one queue and each one received the other two's jobs. Every
+        // stolen run was marked complete and its schedule advanced.
+        //
+        // With one queue per service a job can only arrive at its owner, so a
+        // name this build does not know is what the old comment always claimed
+        // it was: a repeat entry left by an older deploy. It belongs in
+        // `failed`, where it is visible and queryable, and where it stops
+        // pretending the schedule ran.
+        //
+        // Retrying cannot bury the real jobs: the repeat entry carries
+        // `attempts: 3` with exponential backoff, so this exhausts and stops
+        // rather than looping.
+        throw new Error(`Unknown scheduled job '${job.name}'`);
     }
   }
 

@@ -23,7 +23,7 @@ import { TicketRollupJob } from '../analytics/ticket-rollup.job';
  * copied from whatever is already present, and two shapes for one concern is
  * how a third appears.
  */
-@Processor(SCHEDULER_QUEUE, { concurrency: 1 })
+@Processor(SCHEDULER_QUEUE.ticket, { concurrency: 1 })
 export class SchedulerProcessor extends WorkerHost {
   private readonly logger = new Logger(SchedulerProcessor.name);
 
@@ -36,12 +36,23 @@ export class SchedulerProcessor extends WorkerHost {
 
   async process(job: Job): Promise<void> {
     if (job.name !== SCHEDULED_JOBS.ANALYTICS_DAILY) {
-      // A repeat entry from an older deploy under a name this build no longer
-      // knows. Logged rather than thrown, so it cannot bury the real jobs by
-      // retrying forever.
-      this.logger.warn(`Ignoring unknown scheduled job '${job.name}'`);
-
-      return;
+      // **A defect, not routine cross-talk** — and the difference is what makes
+      // throwing correct now.
+      //
+      // This branch used to `return`, which reported SUCCESS to BullMQ for work
+      // nobody did. It is where the shared-queue bug was OBSERVED: all three
+      // services ran a worker on one queue, so `ledger-hourly` and `auth-hourly`
+      // arrived here, were logged as ignored, and were recorded as complete —
+      // and their schedules advanced as though they had run.
+      //
+      // With one queue per service a job can only arrive at its owner, so a name
+      // this build does not know is what the old comment always claimed it was:
+      // a repeat entry left by an older deploy. It belongs in `failed`, where it
+      // is visible and stops pretending the schedule ran.
+      //
+      // Retrying cannot bury the real jobs: the repeat entry carries
+      // `attempts: 3` with exponential backoff, so this exhausts and stops.
+      throw new Error(`Unknown scheduled job '${job.name}'`);
     }
 
     const startedAt = Date.now();

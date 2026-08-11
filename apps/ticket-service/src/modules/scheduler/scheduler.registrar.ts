@@ -28,7 +28,9 @@ import {
 export class SchedulerRegistrar implements OnApplicationBootstrap {
   private readonly logger = new Logger(SchedulerRegistrar.name);
 
-  constructor(@InjectQueue(SCHEDULER_QUEUE) private readonly queue: Queue) {}
+  constructor(
+    @InjectQueue(SCHEDULER_QUEUE.ticket) private readonly queue: Queue,
+  ) {}
 
   async onApplicationBootstrap(): Promise<void> {
     await this.register(SCHEDULED_JOBS.ANALYTICS_DAILY);

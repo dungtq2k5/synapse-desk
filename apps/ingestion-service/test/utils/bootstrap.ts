@@ -101,9 +101,11 @@ export async function bootstrapE2eTest(): Promise<E2eFixture> {
     await worker.worker.close();
   }
 
-  const queues = [INGESTION_QUEUE, SCOPE_FANOUT_QUEUE, SCHEDULER_QUEUE].map(
-    (name) => moduleRef.get<Queue>(getQueueToken(name)),
-  );
+  const queues = [
+    INGESTION_QUEUE,
+    SCOPE_FANOUT_QUEUE,
+    SCHEDULER_QUEUE.ingestion,
+  ].map((name) => moduleRef.get<Queue>(getQueueToken(name)));
 
   const reset = async (): Promise<void> => {
     // BEFORE the truncate, and `obliterate` rather than `drain`: `drain` leaves

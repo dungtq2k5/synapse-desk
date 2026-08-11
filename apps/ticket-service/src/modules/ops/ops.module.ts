@@ -37,7 +37,7 @@ import { AnalyticsModule } from '../analytics/analytics.module';
     // owns `BullModule.forRoot` in this service, so importing it is what makes
     // the root config available here without registering a second one.
     AnalyticsModule,
-    BullModule.registerQueue({ name: SCHEDULER_QUEUE }),
+    BullModule.registerQueue({ name: SCHEDULER_QUEUE.ticket }),
   ],
   controllers: [OpsGrpcController],
   providers: [
@@ -61,7 +61,11 @@ import { AnalyticsModule } from '../analytics/analytics.module';
             },
           },
         ]),
-      inject: [PrismaService, NATS_CLIENT, getQueueToken(SCHEDULER_QUEUE)],
+      inject: [
+        PrismaService,
+        NATS_CLIENT,
+        getQueueToken(SCHEDULER_QUEUE.ticket),
+      ],
     },
     {
       provide: BUILD_INFO,

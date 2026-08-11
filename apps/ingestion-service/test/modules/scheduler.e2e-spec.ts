@@ -44,7 +44,7 @@ describe('§1 The scheduler (e2e)', () => {
     fx = await bootstrapE2eTest();
     processor = fx.moduleRef.get(SchedulerProcessor);
     registrar = fx.moduleRef.get(SchedulerRegistrar);
-    queue = fx.moduleRef.get<Queue>(getQueueToken(SCHEDULER_QUEUE));
+    queue = fx.moduleRef.get<Queue>(getQueueToken(SCHEDULER_QUEUE.ingestion));
   });
 
   beforeEach(async () => {
@@ -267,16 +267,22 @@ describe('§1 The scheduler (e2e)', () => {
   });
 
   describe('unknown job names', () => {
-    it('11. an entry from an older deploy is ignored, not retried forever', async () => {
-      // A repeat entry outlives the build that created it. Throwing here would
-      // make BullMQ retry it with backoff indefinitely, burying the jobs that
-      // do exist under a name nothing handles.
+    it('11. **an unknown job FAILS rather than reporting success**', async () => {
+      // This asserted `resolves.toBeUndefined()`, on the reasoning that
+      // throwing would retry forever and bury the real jobs. The retry fear is
+      // handled by the repeat entry's `attempts: 3`; what returning actually
+      // bought was BullMQ recording SUCCESS for work nobody did.
+      //
+      // That is how the shared queue lost runs silently: every service received
+      // its neighbours' jobs, ignored them, and completed them.
       const projection = jest.spyOn(
         fx.moduleRef.get(ChunkUsageProjection),
         'project',
       );
 
-      await expect(runJob('ledger-weekly-from-2024')).resolves.toBeUndefined();
+      await expect(runJob('ledger-weekly-from-2024')).rejects.toThrow(
+        "Unknown scheduled job 'ledger-weekly-from-2024'",
+      );
       expect(projection).not.toHaveBeenCalled();
     });
   });

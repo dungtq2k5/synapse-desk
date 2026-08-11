@@ -33,7 +33,7 @@ describe('§1 The scheduler (e2e)', () => {
     fx = await bootstrapE2eTest();
     processor = fx.moduleRef.get(SchedulerProcessor);
     registrar = fx.moduleRef.get(SchedulerRegistrar);
-    queue = fx.moduleRef.get<Queue>(getQueueToken(SCHEDULER_QUEUE));
+    queue = fx.moduleRef.get<Queue>(getQueueToken(SCHEDULER_QUEUE.ticket));
   });
 
   beforeEach(async () => {
@@ -115,10 +115,21 @@ describe('§1 The scheduler (e2e)', () => {
     );
   });
 
-  it('6. an entry from an older deploy is ignored, not retried forever', async () => {
+  it('6. **an unknown job FAILS rather than reporting success**', async () => {
+    // This asserted `resolves.toBeUndefined()`, and this processor is where the
+    // shared-queue bug was OBSERVED: `ledger-hourly` and `auth-hourly` arrived
+    // here, took this branch, and were recorded as COMPLETE — so their
+    // schedules advanced and those runs were lost.
+    //
+    // With one queue per service the name can only be a repeat entry from an
+    // older deploy, which belongs in `failed` where somebody can see it. The
+    // repeat entry's `attempts: 3` is what bounds the retries the old comment
+    // was afraid of.
     const run = jest.spyOn(fx.moduleRef.get(TicketRollupJob), 'run');
 
-    await expect(runJob('analytics-weekly-from-2024')).resolves.toBeUndefined();
+    await expect(runJob('analytics-weekly-from-2024')).rejects.toThrow(
+      "Unknown scheduled job 'analytics-weekly-from-2024'",
+    );
     expect(run).not.toHaveBeenCalled();
   });
 

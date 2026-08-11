@@ -28,7 +28,7 @@ import { SchedulerRegistrar } from './scheduler.registrar';
  */
 @Module({
   imports: [
-    BullModule.registerQueue({ name: SCHEDULER_QUEUE }),
+    BullModule.registerQueue({ name: SCHEDULER_QUEUE.ingestion }),
     PrismaModule,
     JobRunsModule,
     // Where the jobs live. This module supplies only the clock.

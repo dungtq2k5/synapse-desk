@@ -43,7 +43,7 @@ describe('§3.2 The scheduler (e2e)', () => {
     fx = await bootstrapE2eTest();
     processor = fx.moduleRef.get(SchedulerProcessor);
     registrar = fx.moduleRef.get(SchedulerRegistrar);
-    queue = fx.moduleRef.get<Queue>(getQueueToken(SCHEDULER_QUEUE));
+    queue = fx.moduleRef.get<Queue>(getQueueToken(SCHEDULER_QUEUE.auth));
   });
 
   beforeEach(async () => {
@@ -172,9 +172,20 @@ describe('§3.2 The scheduler (e2e)', () => {
       expect(row.consecutiveFailures).toBe(0);
     });
 
-    it('8. an entry from an older deploy is ignored, not retried forever', async () => {
-      await expect(runJob('auth-weekly-from-2024')).resolves.toBeUndefined();
+    it('8. **an unknown job FAILS rather than reporting success**', async () => {
+      // This asserted `resolves.toBeUndefined()` — the old branch returned, so
+      // BullMQ recorded success for work nobody did and advanced the schedule.
+      // That was the mechanism by which the shared queue silently deleted runs:
+      // every service received its neighbours' jobs and marked them complete.
+      //
+      // With one queue per service an unrecognised name can only be a repeat
+      // entry from an older deploy, which is a defect worth seeing in `failed`.
+      await expect(runJob('auth-weekly-from-2024')).rejects.toThrow(
+        "Unknown scheduled job 'auth-weekly-from-2024'",
+      );
 
+      // And it still records no run, so `last_succeeded_at` cannot be refreshed
+      // by a job that did nothing — 20-doc §4.1's staleness alert depends on it.
       expect(
         await fx.prisma.jobRun.findUnique({
           where: { jobName: 'auth-weekly-from-2024' },

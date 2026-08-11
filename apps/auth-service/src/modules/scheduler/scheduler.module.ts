@@ -33,7 +33,7 @@ import { SchedulerRegistrar } from './scheduler.registrar';
         },
       }),
     }),
-    BullModule.registerQueue({ name: SCHEDULER_QUEUE }),
+    BullModule.registerQueue({ name: SCHEDULER_QUEUE.auth }),
     PrismaModule,
     JobRunsModule,
     InvitationsModule,

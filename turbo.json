@@ -18,6 +18,25 @@
       "inputs": ["src/**", "tsconfig*.json", "eslint.config.mjs"]
     },
     "dev": {
+      // **`^build` — dev must compile its workspace dependencies first.**
+      //
+      // Without it, `turbo run dev` starts every service against whatever
+      // `libs/common/dist` happened to contain, and a change to a shared
+      // constant is invisible until somebody runs `npm run build` by hand. That
+      // is not a theoretical staleness: `SCHEDULER_QUEUE` went from a string to
+      // an object, the services loaded the old string, `SCHEDULER_QUEUE.auth`
+      // evaluated to `undefined`, and all three died at boot with BullMQ's
+      // `Queue name must be provided` — an error naming neither the library nor
+      // the staleness.
+      //
+      // Jest hides this class of bug completely, because it maps
+      // `@synapsedesk/common` to SOURCE. So the whole suite can be green while
+      // `npm run dev` cannot start.
+      //
+      // This fixes STARTUP only. `nest start --watch` watches a service's own
+      // `src/`, so a libs edit made DURING a dev session still needs a rebuild
+      // to propagate — run `npm run build` in the lib, or restart dev.
+      "dependsOn": ["^build"],
       "cache": false,
       "persistent": true
     },

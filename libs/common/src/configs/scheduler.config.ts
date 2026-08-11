@@ -15,10 +15,69 @@
  * is exactly why it would never have been noticed. A repeat entry lives in
  * Redis and is consumed by ONE worker, with retry and queryable state, and
  * costs no infrastructure that is not already running.
+ *
+ * **"Consumed by ONE worker" is correct for REPLICAS of a service and
+ * catastrophic ACROSS services** — which is why {@link SCHEDULER_QUEUE} carries
+ * the service name. Three ticket-service pods on one queue is the mechanism
+ * working as designed. Three different services on one queue is the same
+ * mechanism deleting work, because the winner of the race is whoever claims the
+ * job, not whoever owns it.
  */
 
-/** The queue every scheduled job in a service shares. */
-export const SCHEDULER_QUEUE = 'scheduler';
+/**
+ * One queue PER SERVICE — never one queue shared by all of them.
+ *
+ * **This was a bare `'scheduler'`, and it silently lost scheduled work.** Each
+ * service registered only its own repeat entries and ran a worker on
+ * *everyone's* queue. BullMQ hands a job to whichever worker claims it first,
+ * and a worker cannot decline one it does not recognise — so `ledger-hourly`
+ * arrived at ticket-service, hit its unknown-job branch, and that branch
+ * RETURNED. BullMQ recorded success and advanced the schedule. With three
+ * services up, roughly two thirds of every service's runs evaporated: no error,
+ * no failed job, and the missing runs were the ones that correct drift.
+ *
+ * The design note above is the other half of why it survived review — it
+ * reasons about replicas, where one-worker-per-queue is exactly right, and read
+ * as a justification for sharing the name.
+ *
+ * A job can now only reach the service that owns it, by construction rather
+ * than by every processor agreeing to be careful.
+ *
+ * **A HYPHEN, not a colon, and BullMQ enforces that** — `new Queue('scheduler:auth')`
+ * throws `Queue name cannot contain :`, because `:` is its own Redis key
+ * delimiter. It is the same constraint {@link SCHEDULED_JOBS} records for job
+ * ids, and it applies to queue names too; the difference is that this one fails
+ * at construction, so the service does not boot rather than misbehaving.
+ *
+ * The hyphen also makes the one-time cleanup below safe: `bull:scheduler:*`
+ * matches the OLD shared queue's keys and not `bull:scheduler-auth:*`, so the
+ * sweep cannot take the new queues with it.
+ *
+ * ---
+ *
+ * **Deploying this needs the old queue drained, in this order.** The repeat
+ * entries under the old `scheduler` name survive the rename and keep producing
+ * jobs into a queue no worker consumes, where they accumulate as waiting jobs
+ * rather than being discarded:
+ *
+ *   1. Stop the old workers (the deploy does this).
+ *   2. Remove the old repeat entries.
+ *   3. New queues register on boot.
+ *
+ * Reverse 1 and 2 and the window between them is a growing backlog.
+ *
+ * `DEL bull:scheduler:*` is the sweep, and it is safe only because the new
+ * names use a hyphen — see above. `queue.obliterate()` on the old name works
+ * too and enumerates its own keys rather than globbing.
+ */
+export const SCHEDULER_QUEUE = {
+  auth: 'scheduler-auth',
+  ticket: 'scheduler-ticket',
+  ingestion: 'scheduler-ingestion',
+} as const;
+
+export type SchedulerQueueName =
+  (typeof SCHEDULER_QUEUE)[keyof typeof SCHEDULER_QUEUE];
 
 /**
  * Job names — the string a repeat entry is registered under and the worker

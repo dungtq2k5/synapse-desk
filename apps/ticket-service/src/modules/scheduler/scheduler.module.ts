@@ -19,7 +19,7 @@ import { SchedulerRegistrar } from './scheduler.registrar';
  */
 @Module({
   imports: [
-    BullModule.registerQueue({ name: SCHEDULER_QUEUE }),
+    BullModule.registerQueue({ name: SCHEDULER_QUEUE.ticket }),
     // Where the job lives. This module supplies only the clock.
     AnalyticsModule,
     PrismaModule,
