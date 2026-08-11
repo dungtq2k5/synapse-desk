@@ -25,24 +25,35 @@ import { formatErrorMsg } from '@synapsedesk/common';
  * **What happens when Redis fills up** — 31-doc C1, and this is the question an
  * outage asks first.
  *
- * The instance runs `maxmemory` with `maxmemory-policy volatile-ttl` (set in
- * `docker-compose.yml`, with the reasoning beside it). Every key this gateway
- * writes carries an expiry — cache entries at 60s–1h, presence at 60s,
- * organization status at its own TTL — so under pressure Redis drops the
- * nearest-to-expiry first, which is the cache, which is the thing designed to
- * be dropped.
+ * The instance runs `maxmemory` with `maxmemory-policy noeviction` (set in
+ * `docker-compose.yml`, with the full reasoning beside it). **Writes fail when
+ * it fills — all of them, not just the cache's — and that is the deliberate
+ * choice rather than the default.**
  *
- * What that protects, and why the obvious alternatives do not: the AI spend
- * counter `quota:{org}:{cycle}` carries a 70-day expiry, so it is evicted LAST
- * among volatile keys — where `allkeys-lru` and `volatile-lru` would evict it
- * early, because it is written once per generation and read once per gate check
- * and is therefore cold. Losing it resets a tenant's metered spend mid-cycle.
- * BullMQ's job keys carry no expiry and are outside the volatile set entirely.
+ * `volatile-ttl` was tried first and is wrong. It orders eviction by nearest
+ * expiry, which sounds ideal: cache entries at 60s–1h go before the AI spend
+ * counter `quota:{org}:{cycle}` at 70 days, and that ordering is exactly what
+ * `allkeys-lru` and `volatile-lru` get dangerously wrong (the counter is cold —
+ * written once per generation, read once per gate check — so recency policies
+ * discard it and reset a tenant's metered spend mid-cycle).
  *
- * **This does not bound the cache's share of memory**, only the order things
- * are dropped in. A second Redis instance for cache keys is the thorough fix
- * and stays deferred (28-doc §7); `maxmemory` is not per-database, so a
- * separate logical DB would be a blast-radius boundary and not a limit.
+ * What it missed is that **BullMQ's job locks carry an expiry too, and it is the
+ * shortest in the instance**: `SET <job>:lock <token> PX <lockDuration>`, 30s by
+ * default. Nearest-expiry-first therefore evicts the LOCKS before any cache
+ * entry — and an evicted lock is not a cache miss, it is a job the
+ * stalled-checker returns to the queue and a worker runs a second time. Every
+ * worker says so at boot: *"IMPORTANT! Eviction policy is volatile-ttl. It
+ * should be noeviction"*.
+ *
+ * **On one shared instance no policy spares both**: cache keys sit between the
+ * locks and the counter on every available ordering. `noeviction` is the only
+ * setting that cannot silently corrupt something — a failed write is a visible
+ * error, a duplicated job is not.
+ *
+ * **This bounds nothing; it only makes the failure loud.** A second Redis
+ * instance for cache keys is the thorough fix and stays deferred (28-doc §7);
+ * `maxmemory` is not per-database, so a separate logical DB would be a
+ * blast-radius boundary and not a limit.
  *
  * ---
  *
