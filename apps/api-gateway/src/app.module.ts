@@ -5,9 +5,9 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { getThrottlerConfig } from './common/config/throttler.config';
 import { SmartThrottlerGuard } from './common/guards/smart-throttler.guard';
 import { OrganizationStatusInterceptor } from './common/interceptors/organization-status.interceptor';
-import { OrganizationStatusModule } from './common/services/organization-status.module';
+import { OrganizationStatusModule } from './common/organization-status/organization-status.module';
 import { CacheModule } from './common/cache/cache.module';
-import { CacheService } from './common/cache/cache.service';
+import { GraphqlApiModule } from './common/graphql/graphql.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { envValidationSchema } from './common/config/env.validation';
 import { UsersModule } from './modules/users/users.module';
@@ -36,13 +36,6 @@ import { RagGrpcModule } from './common/grpc/rag-grpc.module';
 import { NotificationGrpcModule } from './common/grpc/notification-grpc.module';
 import { MetricsModule } from './modules/metrics/metrics.module';
 import { HttpMetricsInterceptor } from './modules/metrics/http-metrics.interceptor';
-import { GraphQLModule } from '@nestjs/graphql';
-import { ApolloDriver, type ApolloDriverConfig } from '@nestjs/apollo';
-import {
-  AUTH_GRPC_CLIENT,
-  INGESTION_GRPC_CLIENT,
-} from '@synapsedesk/grpc-proto';
-import { getGraphqlConfig } from './common/config/graphql.config';
 import { ApiInfoModule } from './modules/api-info/api-info.module';
 
 @Module({
@@ -128,45 +121,9 @@ import { ApiInfoModule } from './modules/api-info/api-info.module';
     MetricsModule,
     ApiInfoModule,
 
-    // The read surface for the SPA — 25-doc. **REST is not deprecated by it;
-    // both are permanent, with different jobs** (25-doc §7): REST stays the
-    // surface for commands, files and machine callers, GraphQL is the read
-    // surface for the SPA. Saying so at the registration prevents the slow
-    // drift where half the mutations live in one place and half in the other
-    // with no rule.
-    //
-    // Registered HERE rather than behind a `GraphqlApiModule` wrapper, exactly
-    // as `ThrottlerModule` is above. That wrapper's entire body was this one
-    // call: a module that imports a root module and provides nothing is a name
-    // to look up on the way to the thing you wanted, and it made the surface
-    // look like a feature the gateway owns rather than a transport it exposes.
-    //
-    // Resolvers are unaffected — they are providers of the feature modules
-    // whose controllers they mirror, and `GraphQLModule` discovers them from
-    // the container rather than from an import list.
-    GraphQLModule.forRootAsync<ApolloDriverConfig>({
-      driver: ApolloDriver,
-      // **`AuthModule` is named HERE even though `AppModule` already imports
-      // it**, and it has to be: `forRootAsync`'s factory resolves in the
-      // GraphQLModule's OWN injector, which sees only what this `imports` array
-      // names. The symptom otherwise is "Nest can't resolve dependencies of the
-      // GqlModuleOptions", pointing at an argument index rather than at the
-      // import that is missing.
-      //
-      // No new connection: `AuthModule` registers the channel once and this is
-      // the same instance every controller's client already holds.
-      //
-      // `IngestionGrpcModule` is named for the same reason, even though it is
-      // `@Global`: the documents loader dials through it (26-doc §3.1).
-      imports: [ConfigModule, AuthModule, IngestionGrpcModule, CacheModule],
-      inject: [
-        ConfigService,
-        AUTH_GRPC_CLIENT,
-        INGESTION_GRPC_CLIENT,
-        CacheService,
-      ],
-      useFactory: getGraphqlConfig,
-    }),
+    // The read surface for the SPA — 25-doc §7. REST is not deprecated by it;
+    // both are permanent, with different jobs. See the module for the rest.
+    GraphqlApiModule,
   ],
   providers: [
     // Global, so a route added later is rate-limited by DEFAULT. Registering it

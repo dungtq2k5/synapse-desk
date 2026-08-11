@@ -9,7 +9,7 @@ import { DocumentEventsConsumer } from './document-events.consumer';
 import { TicketAccessService } from './ticket-access.service';
 import { AiStreamService } from './ai-stream.service';
 import { PresenceService } from './presence.service';
-import { WsThrottlerService } from '../../common/services/ws-throttler.service';
+import { WsThrottlerService } from './ws-throttler.service';
 
 /**
  * Imports AuthModule for `JwtService` — the handshake verifies the SAME

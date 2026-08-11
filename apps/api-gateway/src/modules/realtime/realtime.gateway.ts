@@ -21,7 +21,7 @@ import {
   formatErrorMsg,
 } from '@synapsedesk/common';
 import { SecureGateway } from '../../common/decorators/secure-gateway.decorator';
-import { WsThrottlerService } from '../../common/services/ws-throttler.service';
+import { WsThrottlerService } from './ws-throttler.service';
 import {
   WsAck,
   WsResponse,

@@ -16,7 +16,7 @@ import {
   isFullJwtPayload,
 } from '@synapsedesk/common';
 import { ORG_ACCESS_KEY } from '../decorators/org-access.decorator';
-import { OrganizationStatusService } from '../services/organization-status.service';
+import { OrganizationStatusService } from '../organization-status/organization-status.service';
 
 /**
  * Enforces the tenant lifecycle (api-endpoints-plan).

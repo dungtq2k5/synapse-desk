@@ -18,7 +18,7 @@ import { SuperAdminGuard } from '../../common/guards/super-admin.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ResponseMessage } from '../../common/decorators/response-message.decorator';
 import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
-import { OrganizationStatusService } from '../../common/services/organization-status.service';
+import { OrganizationStatusService } from '../../common/organization-status/organization-status.service';
 import { PlatformGrpcClient } from './platform-grpc.client';
 import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AUTH_SCHEMES } from '../../common/config/swagger.config';
