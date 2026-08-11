@@ -11,6 +11,7 @@ import {
   createLoaders,
   type GqlContext,
 } from '../graphql/loaders/loaders.factory';
+import { CacheService } from '../cache/cache.service';
 
 /**
  * Where the generated SDL is written — and it is COMMITTED.
@@ -66,6 +67,7 @@ export const getGraphqlConfig = (
   configService: ConfigService,
   authClient: ClientGrpc,
   ingestionClient: ClientGrpc,
+  cache: CacheService,
 ): Omit<ApolloDriverConfig, 'driver'> => {
   const isProduction =
     configService.getOrThrow<NodeEnv>('NODE_ENV') === 'production';
@@ -90,9 +92,16 @@ export const getGraphqlConfig = (
     context: ({ req, res }: { req: Request; res: Response }): GqlContext => ({
       req,
       res,
+      // **A plain property, and the laziness is INSIDE the loaders** — see
+      // `createLoaders`. Apollo clones the context with `Object.assign`, which
+      // fires any getter at request start, so deferral cannot live here.
       loaders: createLoaders(req, {
         auth: authClient,
         ingestion: ingestionClient,
+        // The entity cache the loaders read through — 30-doc §2. Passed in
+        // rather than injected into each loader, because a loader is built per
+        // request by this factory and nothing here is in the DI graph.
+        cache,
       }),
     }),
 

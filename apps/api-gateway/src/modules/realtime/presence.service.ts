@@ -1,7 +1,7 @@
-import { Injectable, Logger, OnApplicationShutdown } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import Redis from 'ioredis';
+import { Injectable, Logger } from '@nestjs/common';
+import type Redis from 'ioredis';
 import { formatErrorMsg } from '@synapsedesk/common';
+import { RedisService } from '../../common/redis/redis.service';
 import { PRESENCE_STATES, PresenceState } from './realtime.config';
 
 /**
@@ -47,17 +47,15 @@ type PresenceRecord = {
  * key that vanishes after sixty seconds.
  */
 @Injectable()
-export class PresenceService implements OnApplicationShutdown {
+export class PresenceService {
   private readonly logger = new Logger(PresenceService.name);
   private readonly redis: Redis;
 
-  constructor(configService: ConfigService) {
-    this.redis = new Redis(configService.getOrThrow<string>('REDIS_URL'), {
-      maxRetriesPerRequest: 3,
-    });
-    this.redis.on('error', (error) =>
-      this.logger.error(`Presence store error: ${formatErrorMsg(error)}`),
-    );
+  constructor(redis: RedisService) {
+    // The SHARED connection — 29-doc §2. The error listener moved with it:
+    // `RedisService` logs and never throws, which is what this one did, and an
+    // unhandled `error` event is an unhandled rejection either way.
+    this.redis = redis.client;
   }
 
   /**
@@ -173,10 +171,6 @@ export class PresenceService implements OnApplicationShutdown {
     } catch (error) {
       this.logger.error(`Presence heartbeat failed: ${formatErrorMsg(error)}`);
     }
-  }
-
-  async onApplicationShutdown(): Promise<void> {
-    await this.redis.quit().catch(() => undefined);
   }
 
   /**

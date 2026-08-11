@@ -1,3 +1,4 @@
+import { RedisModule } from '../../common/redis/redis.module';
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { TicketsModule } from '../tickets/tickets.module';
@@ -24,7 +25,7 @@ import { WsThrottlerService } from '../../common/services/ws-throttler.service';
   // `TicketsModule` for `MessagesGrpcClient` — `message:send` calls the SAME
   // RPC the HTTP controller calls (22-doc §2.1), so it reuses that client
   // rather than opening a second path to the same write.
-  imports: [AuthModule, TicketsModule],
+  imports: [AuthModule, TicketsModule, RedisModule],
   controllers: [
     TicketEventsConsumer,
     NotificationEventsConsumer,

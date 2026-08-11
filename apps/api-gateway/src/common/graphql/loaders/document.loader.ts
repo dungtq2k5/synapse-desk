@@ -27,7 +27,7 @@ import { alignToKeys, createLoader } from './loaders.factory';
  */
 export function createDocumentLoader(
   client: ClientGrpc,
-  context: RequestContext,
+  context: () => RequestContext,
 ) {
   const documents = client.getService<DocumentServiceClient>(
     DOCUMENT_SERVICE_NAME,
@@ -38,7 +38,7 @@ export function createDocumentLoader(
       const response = await firstValueFrom(
         documents.listDocumentsByIds(
           { documentIds: [...ids] },
-          packRequestContext(context),
+          packRequestContext(context()),
         ),
       );
 

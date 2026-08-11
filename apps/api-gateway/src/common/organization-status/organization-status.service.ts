@@ -1,13 +1,7 @@
-import {
-  Inject,
-  Injectable,
-  Logger,
-  OnApplicationShutdown,
-  OnModuleInit,
-} from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ClientGrpc } from '@nestjs/microservices';
-import Redis from 'ioredis';
+import type Redis from 'ioredis';
+import { RedisService } from '../redis/redis.service';
 import {
   AUTH_GRPC_CLIENT,
   ORGANIZATION_SERVICE_NAME,
@@ -50,20 +44,19 @@ const CACHE_PREFIX = 'org-status:';
  * happened to serve the status change.
  */
 @Injectable()
-export class OrganizationStatusService
-  implements OnModuleInit, OnApplicationShutdown
-{
+export class OrganizationStatusService implements OnModuleInit {
   private readonly logger = new Logger(OrganizationStatusService.name);
   private readonly redis: Redis;
   private organizationGrpcService!: OrganizationServiceClient;
 
   constructor(
     @Inject(AUTH_GRPC_CLIENT) private readonly client: ClientGrpc,
-    configService: ConfigService,
+    redis: RedisService,
   ) {
-    this.redis = new Redis(configService.getOrThrow<string>('REDIS_URL'), {
-      maxRetriesPerRequest: 3,
-    });
+    // The SHARED connection — 29-doc §2. This service opened its own, with its
+    // own shutdown hook, to run two commands; that is a connection and a
+    // lifecycle written a fourth time for no property the shared one lacks.
+    this.redis = redis.client;
   }
 
   onModuleInit(): void {
@@ -71,10 +64,6 @@ export class OrganizationStatusService
       this.client.getService<OrganizationServiceClient>(
         ORGANIZATION_SERVICE_NAME,
       );
-  }
-
-  async onApplicationShutdown(): Promise<void> {
-    await this.redis.quit();
   }
 
   async get(organizationId: string): Promise<OrganizationState> {

@@ -942,14 +942,21 @@ export class DocumentsService {
   }
 
   /**
-   * Org-wide ∪ the caller's departments — RDM §1.2.
+   * What this caller may see: org-wide ∪ their departments — RDM §1.2 —
+   * and everything for a super admin, which returns `{}` so callers can spread
+   * it unconditionally.
    *
-   * The SAME predicate `rag-service` enforces in retrieval, and the two must
-   * agree: a document invisible in this list but retrievable by the RAG
-   * pipeline is a disclosure, and one visible here but not retrievable is a
-   * user reporting that search is broken.
+   * **The SAME predicate `rag-service` enforces in retrieval**, and the two must
+   * agree: a document invisible in this list but retrievable by the RAG pipeline
+   * is a disclosure, and one visible here but not retrievable is a user
+   * reporting that search is broken.
    *
-   * Returns `{}` for a super admin so callers can spread it unconditionally.
+   * **The gateway caches `GET /documents` keyed on a digest of exactly these two
+   * inputs** — `visibilityDigest` in `cacheable.interceptor.ts`, 31-doc C4.
+   * Widening this filter without widening that digest serves one audience's rows
+   * to another, because two callers the new filter separates would still share a
+   * cache entry. The pair is easy to miss: only one of the two files looks like
+   * it is about security.
    */
   private visibilityScope(context: CallerContext): Prisma.DocumentWhereInput {
     if (context.isSuperAdmin) return {};

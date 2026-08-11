@@ -395,6 +395,82 @@ describe('§1/§5 the OpenAPI document', () => {
    * code that is not what the route returns, a DTO that gained a field the
    * schema did not.
    */
+  describe('§30 §4 the caching contract is PUBLISHED', () => {
+    it('**the description carries the staleness contract**', () => {
+      // 30-doc §5 step 3, and the order is the point: written before any
+      // response cache exists, so it is a stated limit rather than one a client
+      // discovers. Rendered at `/docs`, where the people it affects will read
+      // it — not in a design document only this team opens.
+      const description = doc.info.description ?? '';
+
+      expect(description).toContain('## Caching and staleness');
+      expect(description).toContain('varyBy');
+      // The GraphQL half: the reason there is no response cache there.
+      expect(description).toContain('no response cache');
+      // And the client's half of the contract, which the server cannot enforce.
+      expect(description).toContain('refetch or update your own store');
+    });
+
+    it('**every cached route declares `x-cache`, and no other route does**', () => {
+      // The decorator publishes the SAME object the interceptor reads, so the
+      // document cannot drift from the behaviour. A hand-maintained list of
+      // cached routes is a list that is wrong the first time a TTL changes.
+      const declared = operations()
+        .filter(({ operation }) => 'x-cache' in operation)
+        .map(({ method, path }) => `${method.toUpperCase()} ${path}`)
+        .sort(compareAlphabetically);
+
+      expect(declared).toEqual([
+        'GET /api/v1/departments',
+        'GET /api/v1/documents',
+        'GET /api/v1/organizations/current',
+        'GET /api/v1/permissions',
+        'GET /api/v1/roles',
+      ]);
+    });
+
+    it('and each one publishes a scope, a TTL and its visibility', () => {
+      const cached = operations().filter(
+        ({ operation }) => 'x-cache' in operation,
+      );
+
+      expect(cached.length).toBeGreaterThan(0);
+
+      for (const { method, path, operation } of cached) {
+        const extension = (operation as unknown as Record<string, unknown>)[
+          'x-cache'
+        ];
+
+        // Named in the assertion so a failure says WHICH route is malformed.
+        expect([`${method.toUpperCase()} ${path}`, extension]).toEqual([
+          `${method.toUpperCase()} ${path}`,
+          {
+            scope: expect.any(String),
+            ttlSeconds: expect.any(Number),
+            varyBy: expect.stringMatching(/^(tenant|caller)$/),
+          },
+        ]);
+      }
+    });
+
+    it('**and `GET /documents` publishes `caller`, not `tenant`**', () => {
+      // The one that would be a cross-department leak if it were wrong, and
+      // the one a client most needs to know is not shared tenant-wide.
+      const documents = operations().find(
+        ({ method, path }) => method === 'get' && path === '/api/v1/documents',
+      );
+
+      const extension = (
+        documents?.operation as unknown as Record<
+          string,
+          { varyBy?: string } | undefined
+        >
+      )['x-cache'];
+
+      expect(extension?.varyBy).toBe('caller');
+    });
+  });
+
   describe('§5 a real response validates against its documented schema', () => {
     let validate: (
       path: string,
@@ -583,6 +659,22 @@ describe('§1/§5 the OpenAPI document', () => {
       // and returns something meaningless instead of failing.
       const paths = (response.body as { paths: Record<string, unknown> }).paths;
       expect(Object.keys(paths).length).toBeGreaterThan(100);
+
+      // **The staleness contract reaches the client** — 31-doc C9. A contract
+      // nobody can read is not published, and the assertions elsewhere in this
+      // file read a document this test builds itself; this one reads what the
+      // server actually returns.
+      const served = response.body as {
+        info: { description?: string };
+        paths: Record<string, Record<string, Record<string, unknown>>>;
+      };
+
+      expect(served.info.description).toContain('## Caching and staleness');
+      expect(served.paths['/api/v1/documents'].get['x-cache']).toEqual({
+        scope: 'documents',
+        ttlSeconds: 60,
+        varyBy: 'caller',
+      });
     });
 
     it('mounts `/docs` and `/docs-json` under the SAME prefix', () => {

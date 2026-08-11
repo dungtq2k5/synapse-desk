@@ -1,8 +1,13 @@
+import { Cacheable } from '../../common/decorators/cacheable.decorator';
+import {
+  InvalidateCache,
+  entityFromParam,
+} from '../../common/decorators/invalidate-cache.decorator';
+import { CACHE_SCOPES } from '../../common/config/cache.config';
 import {
   Body,
   Controller,
   Delete,
-  ForbiddenException,
   Get,
   HttpCode,
   HttpStatus,
@@ -16,6 +21,8 @@ import {
 import { RequestContext } from '@synapsedesk/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionGuard } from '../../common/guards/permission.guard';
+import { QueryPermissionGuard } from '../../common/guards/query-permission.guard';
+import { RequirePermissionForQuery } from '../../common/decorators/require-permission-for-query.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ResponseMessage } from '../../common/decorators/response-message.decorator';
@@ -57,7 +64,7 @@ import {
 @ApiTags('Departments')
 @ApiCookieAuth(AUTH_SCHEMES.access)
 @Controller('departments')
-@UseGuards(JwtAuthGuard, PermissionGuard)
+@UseGuards(JwtAuthGuard, PermissionGuard, QueryPermissionGuard)
 export class DepartmentsController {
   constructor(private readonly departmentsGrpcClient: DepartmentsGrpcClient) {}
 
@@ -66,18 +73,30 @@ export class DepartmentsController {
   })
   @ApiWrappedResponse(Paginated(DepartmentResponseDto))
   @ApiFilterErrors(['401', '403'])
+  @Cacheable({
+    scope: CACHE_SCOPES.departments,
+    ttlSeconds: 5 * 60,
+    varyBy: 'tenant',
+  })
   @Get()
   @RequirePermission('department.read')
+  // `includeDeleted` needs the module's MANAGE permission, not its read one —
+  // and a second `@RequirePermission` cannot express that, because it gates the
+  // whole route and its semantics are ANY.
+  //
+  // **In a GUARD rather than in the handler, and that is a fix** — 31-doc C4.
+  // As a handler check it was bypassed entirely by `@Cacheable`: a caller
+  // holding `department.delete` warmed `?includeDeleted=true`, and the next
+  // caller without it was served that entry with a 200 and never reached the
+  // 403. Guards run before interceptors; handlers do not.
+  @RequirePermissionForQuery({
+    query: 'includeDeleted',
+    permission: 'department.delete',
+  })
   list(
     @CurrentUser() context: RequestContext,
     @Query() query: ListDepartmentsQueryDto,
   ): Promise<PaginationResponseDto<DepartmentResponseDto>> {
-    // `includeDeleted` needs the module's MANAGE permission, not its read one.
-    // Checked here rather than with a second @RequirePermission because that
-    // decorator gates the whole route, and gating the route would deny plain
-    // reads to everyone without department.delete.
-    this.assertMayIncludeDeleted(context, query);
-
     return this.departmentsGrpcClient.list(query, context);
   }
 
@@ -96,6 +115,7 @@ export class DepartmentsController {
   @ApiOperation({ summary: 'Create' })
   @ApiWrappedResponse(DepartmentResponseDto, { status: HttpStatus.CREATED })
   @ApiFilterErrors(['400', '401', '403'])
+  @InvalidateCache(CACHE_SCOPES.departments)
   @Post()
   @RequirePermission('department.create')
   create(
@@ -108,6 +128,7 @@ export class DepartmentsController {
   @ApiOperation({ summary: 'Update' })
   @ApiWrappedResponse(DepartmentResponseDto)
   @ApiFilterErrors(['400', '401', '403', '404'])
+  @InvalidateCache(CACHE_SCOPES.departments, entityFromParam('department'))
   @Patch(':id')
   @RequirePermission('department.update')
   update(
@@ -122,6 +143,7 @@ export class DepartmentsController {
   @ApiOperation({ summary: 'Remove' })
   @ApiWrappedResponse()
   @ApiFilterErrors(['400', '401', '403', '404'])
+  @InvalidateCache(CACHE_SCOPES.departments, entityFromParam('department'))
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   @RequirePermission('department.delete')
@@ -137,6 +159,7 @@ export class DepartmentsController {
   @ApiOperation({ summary: 'Restore' })
   @ApiWrappedResponse(DepartmentResponseDto)
   @ApiFilterErrors(['400', '401', '403', '404'])
+  @InvalidateCache(CACHE_SCOPES.departments, entityFromParam('department'))
   @Post(':id/restore')
   @HttpCode(HttpStatus.OK)
   @RequirePermission('department.delete')
@@ -170,6 +193,7 @@ export class DepartmentsController {
   @ApiOperation({ summary: 'Add members' })
   @ApiWrappedResponse(AddDepartmentMembersResponseDto)
   @ApiFilterErrors(['400', '401', '403', '404'])
+  @InvalidateCache(CACHE_SCOPES.departments, entityFromParam('department'))
   @Post(':id/members')
   @HttpCode(HttpStatus.OK)
   @RequirePermission('department.member.assign')
@@ -194,6 +218,7 @@ export class DepartmentsController {
   @ApiOperation({ summary: 'Remove member' })
   @ApiWrappedResponse()
   @ApiFilterErrors(['400', '401', '403', '404'])
+  @InvalidateCache(CACHE_SCOPES.departments, entityFromParam('department'))
   @Delete(':id/members/:userId')
   @HttpCode(HttpStatus.OK)
   @RequirePermission('department.member.assign')
@@ -204,18 +229,5 @@ export class DepartmentsController {
     @Param('userId', ParseUUIDPipe) userId: string,
   ): Promise<void> {
     return this.departmentsGrpcClient.removeMember(id, userId, context);
-  }
-
-  private assertMayIncludeDeleted(
-    context: RequestContext,
-    query: ListDepartmentsQueryDto,
-  ): void {
-    if (!query.includeDeleted) return;
-
-    if (!context.permissionCodes.includes('department.delete')) {
-      throw new ForbiddenException(
-        'Viewing deleted departments requires the department.delete permission',
-      );
-    }
   }
 }

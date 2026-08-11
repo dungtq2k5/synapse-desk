@@ -1,3 +1,5 @@
+import { Cacheable } from '../../common/decorators/cacheable.decorator';
+import { CACHE_SCOPES } from '../../common/config/cache.config';
 import {
   Body,
   Controller,
@@ -68,6 +70,11 @@ export class DocumentsController {
   })
   @ApiWrappedResponse(Paginated(DocumentResponseDto))
   @ApiFilterErrors(['401'])
+  @Cacheable({
+    scope: CACHE_SCOPES.documents,
+    ttlSeconds: 60,
+    varyBy: 'caller',
+  })
   @Get()
   list(
     @CurrentUser() context: RequestContext,

@@ -1,3 +1,6 @@
+import { Cacheable } from '../../common/decorators/cacheable.decorator';
+import { InvalidateCache } from '../../common/decorators/invalidate-cache.decorator';
+import { CACHE_SCOPES } from '../../common/config/cache.config';
 import {
   Body,
   Controller,
@@ -68,6 +71,11 @@ export class OrganizationsController {
   @ApiOperation({ summary: 'Tenant profile + status + quotas' })
   @ApiWrappedResponse(OrganizationResponseDto)
   @ApiFilterErrors(['401'])
+  @Cacheable({
+    scope: CACHE_SCOPES.organizations,
+    ttlSeconds: 60,
+    varyBy: 'tenant',
+  })
   @Get()
   get(
     @CurrentUser() context: RequestContext,
@@ -79,6 +87,7 @@ export class OrganizationsController {
   @ApiOperation({ summary: 'Update' })
   @ApiWrappedResponse(OrganizationResponseDto)
   @ApiFilterErrors(['400', '401', '403'])
+  @InvalidateCache(CACHE_SCOPES.organizations)
   @Patch()
   @RequirePermission('organization.update')
   update(
@@ -113,6 +122,7 @@ export class OrganizationsController {
   @ApiOperation({ summary: 'Update settings' })
   @ApiWrappedResponse(OrganizationSettingsResponseDto)
   @ApiFilterErrors(['400', '401', '403'])
+  @InvalidateCache(CACHE_SCOPES.organizations)
   @Patch('settings')
   @RequirePermission('organization.update')
   @ResponseMessage('Settings updated')
@@ -172,6 +182,7 @@ export class OrganizationsController {
   @ApiOperation({ summary: 'Complete onboarding' })
   @ApiWrappedResponse(OrganizationResponseDto)
   @ApiFilterErrors(['401', '403'])
+  @InvalidateCache(CACHE_SCOPES.organizations)
   @Post('onboarding/complete')
   @HttpCode(HttpStatus.OK)
   @RequirePermission('organization.update')
@@ -195,6 +206,7 @@ export class OrganizationsController {
   @ApiOperation({ summary: 'Request offboard' })
   @ApiWrappedResponse(OffboardResponseDto)
   @ApiFilterErrors(['400', '401', '403'])
+  @InvalidateCache(CACHE_SCOPES.organizations)
   @Delete()
   @HttpCode(HttpStatus.OK)
   @RequirePermission('organization.delete')

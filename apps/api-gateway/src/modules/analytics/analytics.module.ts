@@ -1,3 +1,4 @@
+import { CacheModule } from '../../common/cache/cache.module';
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { AnalyticsController } from './analytics.controller';
@@ -25,7 +26,7 @@ import {
  * connections rather than opening a fourth.
  */
 @Module({
-  imports: [AuthModule],
+  imports: [AuthModule, CacheModule],
   controllers: [AnalyticsController],
   providers: [
     AnalyticsService,

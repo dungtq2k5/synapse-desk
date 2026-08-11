@@ -1,3 +1,6 @@
+import { Cacheable } from '../../common/decorators/cacheable.decorator';
+import { InvalidateCache } from '../../common/decorators/invalidate-cache.decorator';
+import { CACHE_SCOPES } from '../../common/config/cache.config';
 import {
   Body,
   Controller,
@@ -56,6 +59,11 @@ export class RolesController {
   })
   @ApiWrappedResponse(Paginated(RoleResponseDto))
   @ApiFilterErrors(['401', '403'])
+  @Cacheable({
+    scope: CACHE_SCOPES.roles,
+    ttlSeconds: 5 * 60,
+    varyBy: 'tenant',
+  })
   @Get()
   @RequirePermission('role.read')
   list(
@@ -90,6 +98,7 @@ export class RolesController {
   @ApiOperation({ summary: 'Create' })
   @ApiWrappedResponse(RoleResponseDto, { status: HttpStatus.CREATED })
   @ApiFilterErrors(['400', '401', '403'])
+  @InvalidateCache(CACHE_SCOPES.roles)
   @Post()
   @RequirePermission('role.create')
   create(
@@ -103,6 +112,7 @@ export class RolesController {
   @ApiOperation({ summary: 'Update' })
   @ApiWrappedResponse(RoleResponseDto)
   @ApiFilterErrors(['400', '401', '403', '404'])
+  @InvalidateCache(CACHE_SCOPES.roles)
   @Patch(':id')
   @RequirePermission('role.update')
   update(
@@ -117,6 +127,7 @@ export class RolesController {
   @ApiOperation({ summary: 'Remove' })
   @ApiWrappedResponse()
   @ApiFilterErrors(['400', '401', '403', '404'])
+  @InvalidateCache(CACHE_SCOPES.roles)
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   @RequirePermission('role.delete')
@@ -135,6 +146,7 @@ export class RolesController {
   @ApiOperation({ summary: 'Set permissions' })
   @ApiWrappedResponse(RoleResponseDto)
   @ApiFilterErrors(['400', '401', '403', '404'])
+  @InvalidateCache(CACHE_SCOPES.roles)
   @Put(':id/permissions')
   @HttpCode(HttpStatus.OK)
   @RequirePermission('role.permission.assign')

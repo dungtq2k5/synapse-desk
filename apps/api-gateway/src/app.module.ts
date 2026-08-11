@@ -6,6 +6,8 @@ import { getThrottlerConfig } from './common/config/throttler.config';
 import { SmartThrottlerGuard } from './common/guards/smart-throttler.guard';
 import { OrganizationStatusInterceptor } from './common/interceptors/organization-status.interceptor';
 import { OrganizationStatusModule } from './common/services/organization-status.module';
+import { CacheModule } from './common/cache/cache.module';
+import { CacheService } from './common/cache/cache.service';
 import { AuthModule } from './modules/auth/auth.module';
 import { envValidationSchema } from './common/config/env.validation';
 import { UsersModule } from './modules/users/users.module';
@@ -58,6 +60,12 @@ import { ApiInfoModule } from './modules/api-info/api-info.module';
     }),
 
     OrganizationStatusModule,
+    // The shared cache, its `@InvalidateCache` interceptor and the NATS
+    // eviction consumer — 29-doc §4. Registered here rather than left to the
+    // feature modules that cache reads, because the interceptor is global and
+    // the consumer is a subscription the app must hold whether or not any
+    // particular feature module was imported.
+    CacheModule,
     // The single channel to ticket-service, global because Domain B's surface
     // will span several gateway modules and all of them must share one.
     //
@@ -150,8 +158,13 @@ import { ApiInfoModule } from './modules/api-info/api-info.module';
       //
       // `IngestionGrpcModule` is named for the same reason, even though it is
       // `@Global`: the documents loader dials through it (26-doc §3.1).
-      imports: [ConfigModule, AuthModule, IngestionGrpcModule],
-      inject: [ConfigService, AUTH_GRPC_CLIENT, INGESTION_GRPC_CLIENT],
+      imports: [ConfigModule, AuthModule, IngestionGrpcModule, CacheModule],
+      inject: [
+        ConfigService,
+        AUTH_GRPC_CLIENT,
+        INGESTION_GRPC_CLIENT,
+        CacheService,
+      ],
       useFactory: getGraphqlConfig,
     }),
   ],

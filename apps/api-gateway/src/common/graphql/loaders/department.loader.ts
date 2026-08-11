@@ -7,7 +7,9 @@ import {
 } from '@synapsedesk/grpc-proto';
 import { BATCH_ID_LIMIT, type RequestContext } from '@synapsedesk/common';
 import { firstValueFrom } from 'rxjs';
-import { alignToKeys, createLoader } from './loaders.factory';
+import { createCachedLoader } from './loaders.factory';
+import type { CacheService } from '../../cache/cache.service';
+import { ENTITY_TTL_SECONDS, entityScope } from '../../config/cache.config';
 
 /**
  * The departments loader — 27-doc §3.
@@ -18,26 +20,38 @@ import { alignToKeys, createLoader } from './loaders.factory';
  * Tenant scope comes from the caller CONTEXT inside the RPC, not from anything
  * passed here — 27-doc §1, property 1. That is what makes an id-keyed cache
  * safe: the key carries no tenant, so the RPC has to be the boundary.
+ *
+ * **Cached in Redis as well** — 30-doc §2. A department is three fields that
+ * change when somebody renames one, which is roughly never, and it is read on
+ * every ticket, document and user edge in the schema. The Redis key DOES carry
+ * the tenant, so the two boundaries are independent: the key stops a
+ * cross-tenant hit, and the RPC stops a cross-tenant fetch.
  */
 export function createDepartmentLoader(
   client: ClientGrpc,
-  context: RequestContext,
+  context: () => RequestContext,
+  cache: CacheService,
 ) {
   const departments = client.getService<DepartmentServiceClient>(
     DEPARTMENT_SERVICE_NAME,
   );
 
-  return createLoader<string, DepartmentResponse>(
-    async (ids) => {
+  return createCachedLoader<DepartmentResponse>({
+    cache,
+    organizationId: () => context().organizationId,
+    scopeOf: (id) => entityScope('department', id),
+    ttlSeconds: ENTITY_TTL_SECONDS,
+    keyOf: (department) => department.id,
+    maxBatchSize: BATCH_ID_LIMIT,
+    fetch: async (ids) => {
       const response = await firstValueFrom(
         departments.listDepartmentsByIds(
-          { departmentIds: [...ids] },
-          packRequestContext(context),
+          { departmentIds: ids },
+          packRequestContext(context()),
         ),
       );
 
-      return alignToKeys(ids, response.items, (department) => department.id);
+      return response.items;
     },
-    { maxBatchSize: BATCH_ID_LIMIT },
-  );
+  });
 }

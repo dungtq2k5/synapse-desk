@@ -1199,6 +1199,20 @@ export class UsersService {
     dob?: string;
     gender?: number;
   }): Prisma.UserUpdateInput {
+    // **`fullName` and `avatarUrl` are CACHED by the gateway** — 28-doc §3.1,
+    // 31-doc C5. The entity cache behind the GraphQL user edges is invalidated
+    // by the gateway MUTATIONS that reach this service, because today every
+    // writer of those two columns is one: `updateOwnProfile`, `updateUser`,
+    // `confirmAvatarUpload`, `deleteAvatar`.
+    //
+    // **A writer that is not a gateway mutation breaks that** — an SCIM sync, a
+    // directory import, an admin tool calling this service directly. It would
+    // leave a stale name on every ticket, message and notification for up to
+    // `ENTITY_TTL_SECONDS`, with nothing failing. That is the point at which
+    // the `user.*` NATS contract 29-doc §4.2 assumed has to exist.
+    //
+    // `entity-writers.spec.ts` in the gateway pins the write sites, so a fifth
+    // one fails a test rather than shipping quietly.
     const data: Prisma.UserUpdateInput = {};
 
     if (request.fullName !== undefined) data.fullName = request.fullName.trim();

@@ -1,4 +1,9 @@
 import {
+  InvalidateCache,
+  entityFromParam,
+} from '../../common/decorators/invalidate-cache.decorator';
+import { CACHE_SCOPES } from '../../common/config/cache.config';
+import {
   Body,
   Controller,
   Delete,
@@ -135,6 +140,7 @@ export class UserAdminController {
   @ApiOperation({ summary: 'Update' })
   @ApiWrappedResponse(UserSummaryResponseDto)
   @ApiFilterErrors(['400', '401', '403', '404'])
+  @InvalidateCache(CACHE_SCOPES.users, entityFromParam('user'))
   @Patch(':id')
   @RequirePermission('user.update')
   update(

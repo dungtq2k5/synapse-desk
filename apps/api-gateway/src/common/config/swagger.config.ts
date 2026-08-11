@@ -25,6 +25,75 @@ export const AUTH_SCHEMES = {
 } as const;
 
 /**
+ * The staleness contract, published — 30-doc §4, §5 step 3.
+ *
+ * **Written before any response cache exists, deliberately.** A limit stated up
+ * front is a contract; the same limit discovered by a client is a bug report.
+ * And writing it down is what has kept the cached list short: every entry below
+ * had to survive being described to the people who will be surprised by it.
+ *
+ * Rendered at `/docs`, so it reaches the people the caching actually affects
+ * rather than living in a design document only this team reads.
+ */
+// **Here, not `cache.config.ts`.** This is not a cache setting — it is the
+// PROSE rendered into the OpenAPI description, and its only consumer is the
+// builder below. `cache.config.ts` holds what the cache mechanism reads at
+// runtime (`CACHE_SCOPES`, `ENTITY_TTL_SECONDS`); moving a documentation string
+// there would make the cache module the owner of Swagger copy and give this
+// file an import it needs for one paragraph.
+//
+// It sits beside `AUTH_SCHEMES` for the same reason: both are document
+// presentation, and both are read exactly once, twenty lines below.
+const CACHING_CONTRACT = [
+  '## Caching and staleness',
+  '',
+  'Some reads are served from a shared cache. An operation that is cached ' +
+    'says so in its `x-cache` extension: `{ scope, ttlSeconds, varyBy }`. ' +
+    'Everything else is computed per request.',
+  '',
+  '**A cached read can be stale for at most its TTL, and usually far less.** ' +
+    'Cache entries are keyed by `(tenant, scope, parameters)` rather than by ' +
+    'URL, so a write CAN find and evict them — a mutation drops its whole ' +
+    'scope for that tenant before it answers, and changes that originate ' +
+    'elsewhere in the system (a WebSocket message, a background job, another ' +
+    'service) evict through domain events. The TTL is the backstop for a ' +
+    'writer nobody has enumerated, not the mechanism.',
+  '',
+  '`varyBy` says what the entry depends on. `tenant` means every member of ' +
+    'your organization shares one answer. `caller` means the answer is ' +
+    'filtered by what you can see — `GET /documents` is scoped to your ' +
+    'departments — so it is shared only with people whose visibility matches ' +
+    'yours.',
+  '',
+  '**The one entry with no eviction is `GET /permissions`.** The permission ' +
+    'catalogue is seeded and changes on deploy, so there is no request that ' +
+    'could invalidate it; its one-hour TTL is the whole story.',
+  '',
+  '**Tickets, messages and notifications are never cached**, and neither is ' +
+    '`GET /notifications/unread-count` — the WebSocket pushes that ' +
+    'authoritatively, so polling it is the thing to remove rather than the ' +
+    'thing to speed up.',
+  '',
+  '### GraphQL',
+  '',
+  'There is **no response cache** on `/graphql`. A GraphQL response key would ' +
+    'be a hash of the query document, and nothing in such a key says which ' +
+    'entities the answer contains — so no write could ever find it, and a ' +
+    'cached response would be stale for its full TTL no matter what changed. ' +
+    'What is cached instead are the individual entities behind edges ' +
+    '(`assignee`, `author`, `sender`, `actor`, `department`), keyed one per ' +
+    'entity and evicted precisely when that entity changes.',
+  '',
+  '### Your half',
+  '',
+  'After a mutation, refetch or update your own store rather than trusting ' +
+    'the next query to be fresh. A mutation returns fresh data to its own ' +
+    "caller; another tab holding a rendered list is the server's problem only " +
+    'up to the eviction it just performed. Apollo Client does this by default ' +
+    'with normalized cache updates.',
+].join('\n');
+
+/**
  * Builds the OpenAPI document — 24-doc §3.
  *
  * Exported and called from BOTH `main.ts` and the spec tests, deliberately. A
@@ -46,7 +115,8 @@ export function buildOpenApiDocument(
         'in the standard envelope — `{ success, statusCode, message, warning, ' +
         'data }` on success and `{ success, statusCode, path, timestamp, error }` ' +
         'on failure — so the schema shown for a route describes the whole body, ' +
-        'not just its payload.',
+        'not just its payload.\n\n' +
+        CACHING_CONTRACT,
     )
     .setVersion(configService.get<string>('APP_VERSION') ?? '0.0.0')
     // Cookies, not a bearer token. `withCredentials` below is what makes "Try

@@ -219,6 +219,7 @@ describe('§25 the GraphQL surface (e2e)', () => {
       const clients = {
         auth: { getService: () => ({}) } as never,
         ingestion: { getService: () => ({}) } as never,
+        cache: { mget: () => [], msetEx: () => undefined } as never,
       };
 
       seen.push(

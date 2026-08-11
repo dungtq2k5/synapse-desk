@@ -1,4 +1,9 @@
 import {
+  InvalidateCache,
+  entityFromCaller,
+} from '../../common/decorators/invalidate-cache.decorator';
+import { CACHE_SCOPES } from '../../common/config/cache.config';
+import {
   Body,
   Controller,
   Delete,
@@ -89,6 +94,7 @@ export class UsersController {
   })
   @ApiWrappedResponse(UserResponseDto)
   @ApiFilterErrors(['400', '401'])
+  @InvalidateCache(CACHE_SCOPES.users, entityFromCaller('user'))
   @Patch('me')
   @ResponseMessage('Profile updated')
   updateOwnProfile(
@@ -136,6 +142,7 @@ export class UsersController {
   })
   @ApiWrappedResponse(UserResponseDto)
   @ApiFilterErrors(['400', '401'])
+  @InvalidateCache(CACHE_SCOPES.users, entityFromCaller('user'))
   @Post('me/avatar/confirm')
   @HttpCode(HttpStatus.OK)
   @ResponseMessage('Avatar updated')
@@ -158,6 +165,7 @@ export class UsersController {
   })
   @ApiWrappedResponse(UserResponseDto)
   @ApiFilterErrors(['401'])
+  @InvalidateCache(CACHE_SCOPES.users, entityFromCaller('user'))
   @Delete('me/avatar')
   @HttpCode(HttpStatus.OK)
   @ResponseMessage('Avatar removed')

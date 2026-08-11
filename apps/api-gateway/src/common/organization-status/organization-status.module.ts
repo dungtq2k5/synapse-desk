@@ -1,5 +1,6 @@
 import { Global, Module } from '@nestjs/common';
 import { AuthModule } from '../../modules/auth/auth.module';
+import { RedisModule } from '../redis/redis.module';
 import { OrganizationStatusService } from './organization-status.service';
 
 /**
@@ -12,7 +13,7 @@ import { OrganizationStatusService } from './organization-status.service';
  */
 @Global()
 @Module({
-  imports: [AuthModule],
+  imports: [AuthModule, RedisModule],
   providers: [OrganizationStatusService],
   exports: [OrganizationStatusService],
 })

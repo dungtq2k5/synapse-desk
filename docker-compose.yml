@@ -89,6 +89,41 @@ services:
   redis:
     image: redis:8.8.0-alpine
     container_name: synapsedesk-redis
+    # **The eviction policy is stated, not inherited** — 31-doc C1.
+    #
+    # Redis defaults to `noeviction`, which was fine while this instance held a
+    # bounded set of keys. The cache is the first component that writes a large
+    # number of them, and this instance also holds things that must not fail:
+    # the AI spend counter (`quota:{org}:{cycle}`), throttler state, BullMQ
+    # queues and the Socket.IO adapter. Under `noeviction` a full instance
+    # fails every WRITE — the cache degrades gracefully by design and nothing
+    # else here does.
+    #
+    # `volatile-ttl` evicts keys that have an expiry, nearest-expiry first, and
+    # that ordering is what makes it the right choice rather than a compromise:
+    #
+    #   - Cache entries expire in 60s–1h, so they go first — which is exactly
+    #     what a cache is for.
+    #   - `quota:{org}:{cycle}` carries a 70-DAY expiry, so it is last among
+    #     volatile keys. This is the case `allkeys-lru` gets badly wrong: the
+    #     counter is written once per generation and read once per gate check,
+    #     so it is COLD, and LRU would evict it and reset a tenant's metered
+    #     spend to zero mid-cycle.
+    #   - `volatile-lru` fails the same way for the same reason. Ordering by
+    #     remaining TTL rather than by recency is the whole difference.
+    #   - BullMQ job keys carry no expiry at all, so they are outside the
+    #     volatile set and cannot be evicted.
+    #
+    # `maxmemory` has to be set or the policy never applies. 512mb is a dev
+    # figure; production sizes this against the real key count. A second Redis
+    # for cache keys is the thorough fix and stays deferred (28-doc §7) — this
+    # is what makes the shared instance safe until then.
+    command:
+      - redis-server
+      - --maxmemory
+      - 512mb
+      - --maxmemory-policy
+      - volatile-ttl
     ports:
       - '${REDIS_PORT}:6379'
     volumes:

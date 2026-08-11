@@ -294,8 +294,17 @@ export class StorageService {
     );
 
     return {
-      // FIXME No overload matches this call.
-      urlsByPath: Object.fromEntries(entries.filter((entry) => entry !== null)),
+      // A type PREDICATE, not a bare `!== null`. Narrowing a
+      // `(readonly [string, string] | null)[]` through `.filter` only works
+      // implicitly on TS 5.5+; below that the `null` survives in the type and
+      // `Object.fromEntries` has no overload for it. Spelling the predicate out
+      // makes the narrowing explicit rather than a property of the compiler
+      // version this happens to build with.
+      urlsByPath: Object.fromEntries(
+        entries.filter(
+          (entry): entry is readonly [string, string] => entry !== null,
+        ),
+      ),
     };
   }
 

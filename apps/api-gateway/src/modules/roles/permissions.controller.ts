@@ -1,3 +1,5 @@
+import { CACHE_SCOPES } from '../../common/config/cache.config';
+import { Cacheable } from '../../common/decorators/cacheable.decorator';
 import { Controller, Get, UseGuards } from '@nestjs/common';
 import { RequestContext } from '@synapsedesk/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -41,6 +43,11 @@ export class PermissionsController {
   })
   @ApiWrappedResponse(PermissionResponseDto, { isArray: true })
   @ApiFilterErrors(['401', '403'])
+  @Cacheable({
+    scope: CACHE_SCOPES.permissions,
+    ttlSeconds: 60 * 60,
+    varyBy: 'tenant',
+  })
   @Get()
   @RequirePermission('role.read')
   list(

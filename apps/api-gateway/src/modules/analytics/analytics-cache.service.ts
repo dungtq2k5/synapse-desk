@@ -1,7 +1,5 @@
-import { Injectable, Logger, OnApplicationShutdown } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import Redis from 'ioredis';
-import { compareAlphabetically, formatErrorMsg } from '@synapsedesk/common';
+import { Injectable } from '@nestjs/common';
+import { CacheService } from '../../common/cache/cache.service';
 
 /**
  * A range including TODAY changes constantly — today's rollup is provisional
@@ -15,7 +13,14 @@ const OPEN_RANGE_TTL_SECONDS = 60;
  */
 const CLOSED_RANGE_TTL_SECONDS = 24 * 60 * 60;
 
-const CACHE_PREFIX = 'analytics:';
+/**
+ * The scope every analytics entry nests under.
+ *
+ * `analytics:overview`, `analytics:agents`, … so `invalidateTenant` can drop
+ * all of them with one scope and reach nothing else — see
+ * `CacheService.invalidateScope`.
+ */
+const CACHE_SCOPE = 'analytics';
 
 /** What the key is built from. */
 export type CacheKeyInput = {
@@ -51,52 +56,31 @@ export type CacheKeyInput = {
  * would add cache churn to every ticket create and buy nothing a TTL does not.
  */
 @Injectable()
-export class AnalyticsCacheService implements OnApplicationShutdown {
-  private readonly logger = new Logger(AnalyticsCacheService.name);
-  private readonly redis: Redis;
-
-  constructor(configService: ConfigService) {
-    this.redis = new Redis(configService.getOrThrow<string>('REDIS_URL'), {
-      maxRetriesPerRequest: 3,
-    });
-  }
+export class AnalyticsCacheService {
+  constructor(private readonly cache: CacheService) {}
 
   /**
-   * The cache key.
+   * The key, delegated — 29-doc §1.
    *
-   * **The tenant id is the FIRST segment**, so a cross-tenant hit is not merely
-   * unlikely but unreachable: two tenants asking the identical question produce
-   * different keys before any parameter is considered. The worst possible cache
-   * bug in a multi-tenant system, and the cheapest to prevent.
-   *
-   * Parameters are SORTED, so ordering cannot produce two entries for one
-   * question. `undefined` and `null` are dropped rather than serialised, so an
-   * absent optional filter and one explicitly set to nothing agree.
+   * **What stayed here is what is genuinely analytics**: the endpoint-to-scope
+   * mapping and the `computedAt` freshness segment. The tenant-first ordering,
+   * the sorted parameters and the absent/empty collapse are properties every
+   * cached read in the gateway needs, and they now live in one place instead of
+   * being re-derived by the second caller who needs them.
    */
   buildKey(input: CacheKeyInput): string {
-    const params = Object.entries(input.params)
-      .filter(
-        ([, value]) => value !== undefined && value !== null && value !== '',
-      )
-      .map(([key, value]) => `${key}=${String(value)}`)
-      .sort(compareAlphabetically);
-
-    // The freshness segment. Present only for closed ranges — for an open
-    // range the short TTL is the freshness mechanism, and including a
-    // constantly-moving timestamp would make every request a miss.
-    const freshness = input.computedAt ? `|@${input.computedAt.getTime()}` : '';
-
-    return `${CACHE_PREFIX}${input.organizationId}|${input.endpoint}|${params.join('&')}${freshness}`;
+    return this.cache.buildKey(this.toCacheKey(input));
   }
 
   /**
    * How long to keep an answer, from whether the range is CLOSED.
    *
-   * A range is closed when its end is strictly before today: nothing can change
-   * it except a backfill, which the `computedAt` segment catches. Comparison is
-   * on the date string rather than on instants, because the range is expressed
-   * in the tenant's local days and an instant comparison would flip an hour
-   * early or late depending on the server's zone.
+   * **This is the analytics-specific half and it stays.** A range is closed when
+   * its end is strictly before today: nothing can change it except a backfill,
+   * which the `computedAt` segment catches. Comparison is on the date string
+   * rather than on instants, because the range is expressed in the tenant's
+   * local days and an instant comparison would flip an hour early or late
+   * depending on the server's zone.
    */
   ttlSecondsFor(to: string, today: string = todayIso()): number {
     return to < today ? CLOSED_RANGE_TTL_SECONDS : OPEN_RANGE_TTL_SECONDS;
@@ -105,81 +89,46 @@ export class AnalyticsCacheService implements OnApplicationShutdown {
   /**
    * Read-through.
    *
-   * **A Redis failure serves the answer, uncached.** The alternative — failing
-   * the request — would mean a cache outage takes down every dashboard in the
-   * product, which is a worse day than a slow one. Logged so a persistent
-   * failure is visible rather than merely expensive.
+   * A Redis failure serves the answer uncached — `CacheService` fails open, and
+   * the alternative would mean a cache outage takes down every dashboard in the
+   * product rather than merely slowing them.
    */
-  async wrap<T>(
+  wrap<T>(
     input: CacheKeyInput,
     ttlSeconds: number,
     produce: () => Promise<T>,
   ): Promise<T> {
-    const key = this.buildKey(input);
-
-    try {
-      const cached = await this.redis.get(key);
-      if (cached) return JSON.parse(cached) as T;
-    } catch (error) {
-      this.logger.warn(`Analytics cache read failed: ${formatErrorMsg(error)}`);
-    }
-
-    const value = await produce();
-
-    try {
-      await this.redis.set(key, JSON.stringify(value), 'EX', ttlSeconds);
-    } catch (error) {
-      this.logger.warn(
-        `Analytics cache write failed: ${formatErrorMsg(error)}`,
-      );
-    }
-
-    return value;
+    return this.cache.wrap(this.toCacheKey(input), ttlSeconds, produce);
   }
 
   /**
-   * Drops every entry for a tenant.
+   * Drops every analytics entry for a tenant.
    *
    * The blunt instrument, for a backfill that changed numbers a cached closed
    * range would otherwise keep serving. `computedAt` in the key already handles
    * that automatically — this exists for the case where an operator knows
-   * something the key cannot express, and it is deliberately tenant-scoped
-   * rather than global.
+   * something the key cannot express.
+   *
+   * **Scoped to `analytics`, not to the tenant's whole cache.** Under the shared
+   * prefix a tenant-wide wipe would now also drop the roles, departments and
+   * organization entries, which this operation never meant and whose reads
+   * would then all miss at once.
    */
-  async invalidateTenant(organizationId: string): Promise<number> {
-    const pattern = `${CACHE_PREFIX}${organizationId}|*`;
-    let removed = 0;
-
-    try {
-      // SCAN rather than KEYS: `KEYS` blocks the server for the length of the
-      // keyspace, and this runs against a Redis that is also serving the
-      // throttler and the socket adapter.
-      let cursor = '0';
-      do {
-        const [next, keys] = await this.redis.scan(
-          cursor,
-          'MATCH',
-          pattern,
-          'COUNT',
-          200,
-        );
-        cursor = next;
-
-        if (keys.length > 0) {
-          removed += await this.redis.del(...keys);
-        }
-      } while (cursor !== '0');
-    } catch (error) {
-      this.logger.error(
-        `Could not invalidate analytics cache for ${organizationId}: ${formatErrorMsg(error)}`,
-      );
-    }
-
-    return removed;
+  invalidateTenant(organizationId: string): Promise<number> {
+    return this.cache.invalidateScope(organizationId, CACHE_SCOPE);
   }
 
-  async onApplicationShutdown(): Promise<void> {
-    await this.redis.quit();
+  /** `{ endpoint, computedAt }` in analytics terms → a generic cache key. */
+  private toCacheKey(input: CacheKeyInput) {
+    return {
+      organizationId: input.organizationId,
+      scope: `${CACHE_SCOPE}:${input.endpoint}`,
+      params: input.params,
+      // Present only for closed ranges — for an open range the short TTL is the
+      // freshness mechanism, and including a constantly-moving timestamp would
+      // make every request a miss.
+      version: input.computedAt ? input.computedAt.getTime() : undefined,
+    };
   }
 }
 
