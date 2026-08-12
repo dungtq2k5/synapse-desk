@@ -1,4 +1,26 @@
 {
   "extends": "./tsconfig.json",
+  "compilerOptions": {
+    // **Emptied for SWC, and it is load-bearing rather than tidying.**
+    //
+    // The root config maps `@synapsedesk/common` and `@synapsedesk/grpc-proto`
+    // to `libs/*/src`, so editors and `tsc --noEmit` resolve them to SOURCE and
+    // nothing has to be built first. `tsc` never acts on that at emit time — it
+    // leaves the import specifier alone and Node resolves it through the
+    // workspace symlink in `node_modules/@synapsedesk`.
+    //
+    // **SWC does the opposite: it REWRITES an aliased specifier to a relative
+    // path.** `@nestjs/cli` hands it `jsc.paths` verbatim from this file, so
+    // `import ... from '@synapsedesk/grpc-proto'` was emitted as
+    // `require("../../../libs/grpc-proto/src")` — a path outside `dist`, since
+    // SWC only compiles `sourceRoot`. The service built cleanly and died at
+    // startup with `Cannot find module '../../../libs/grpc-proto/src'`.
+    //
+    // Empty here and untouched in `tsconfig.json`, so the alias keeps working
+    // for the IDE, jest and `npm run typecheck` while the emitted `require`
+    // stays a bare specifier that the symlink resolves. This file feeds nothing
+    // else - `typeCheck` is false, so no type resolution happens through it.
+    "paths": {}
+  },
   "exclude": ["node_modules", "dist", "test", "**/*spec.ts"]
 }

@@ -4,7 +4,14 @@
   "sourceRoot": "src",
   "compilerOptions": {
     "deleteOutDir": true,
-    "tsConfigPath": "tsconfig.build.json"
+    "tsConfigPath": "tsconfig.build.json",
+    "builder": {
+      "type": "swc",
+      "options": {
+        "ignore": ["**/*.spec.ts", "**/*.e2e-spec.ts"]
+      }
+    },
+    "typeCheck": false
   },
-  "entryFile": "apps/auth-service/src/main"
+  "entryFile": "src/main"
 }

@@ -9,15 +9,17 @@
     "dev": "nest start --watch",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
+    "db:test:push": "dotenv -e .env.test -- prisma db push",
     "db:studio": "prisma studio",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\"",
-    "clean": "rimraf dist *.tsbuildinfo",
-    "postinstall": "prisma generate"
+    "clean": "rimraf dist *.tsbuildinfo"
   },
+  "//@langchain/core": "A required PEER of @langchain/textsplitters, declared here even though NOTHING in src/ imports it — so a dependency-pruning pass reads it as unused and removing it is a one-line change that looks free. It is not: `text_splitter.cjs` requires `@langchain/core/documents` at LOAD time, so the service builds cleanly and then dies at boot with MODULE_NOT_FOUND, and its whole test suite fails to collect. It was missing from the lockfile for exactly that reason before anyone noticed.",
   "dependencies": {
     "@google/genai": "^2.15.0",
     "@grpc/grpc-js": "^1.14.4",
     "@grpc/proto-loader": "^0.8.1",
+    "@langchain/core": "^1.2.5",
     "@langchain/textsplitters": "^1.0.1",
     "@nestjs/bullmq": "^11.0.4",
     "@nestjs/common": "^11.1.28",

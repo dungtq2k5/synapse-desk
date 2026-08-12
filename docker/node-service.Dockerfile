@@ -70,16 +70,15 @@ WORKDIR /app
 # re-resolving the dependency tree — which is most of the build's wall clock.
 COPY --from=prune /app/out/json/ ./
 
-# The schemas are needed at INSTALL time: several services run `prisma generate`
-# from `postinstall`, and it reads `prisma/schema.prisma`. `turbo prune` does
-# not carry them into `out/json`, so without this the install fails inside npm
-# rather than in a stage whose error points anywhere useful.
-COPY --from=prune /app/out/full/apps/ ./apps/
-# And the ROOT tsconfig, which `prisma.config.ts` extends. Prisma 7 loads that
-# config through the TypeScript compiler, so a missing base config fails the
-# install with `File '../../tsconfig.json' not found` — from inside a
-# `postinstall`, several layers below anything that names Prisma.
-COPY --from=prune /app/tsconfig.json ./
+# **Nothing but manifests here, and that is the point.** This layer used to also
+# copy every service's source (for `prisma/schema.prisma`) and the root tsconfig,
+# because `prisma generate` ran from an npm `postinstall` and needed both at
+# INSTALL time. That made the layer source-keyed: editing one line of TypeScript
+# invalidated it and paid for a full `npm ci` on every build.
+#
+# Generation is now a turbo task that `build` depends on, so it happens in the
+# stage that already has the source, and this layer is keyed on the pruned
+# lockfile alone.
 RUN --mount=type=cache,target=/root/.npm npm ci
 
 # ==================================================================== build
@@ -92,9 +91,20 @@ COPY --from=prune /app/out/full/ ./
 # `grpc-proto`'s build shells out to `scripts/copy-protos.mjs`, without which
 # the image has compiled types and no .proto files to load at boot.
 COPY --from=prune /app/scripts ./scripts
+# The ROOT tsconfig, which `prisma.config.ts` extends. Prisma 7 loads that config
+# through the TypeScript compiler, so without it `db:generate` fails with
+# `File '../../tsconfig.json' not found`. Copied from the prune stage's own
+# checkout rather than `out/`, which does not carry root config files.
+#
+# It lives HERE rather than in `deps` because generation moved into this stage
+# with the rest of the build — see the note above `npm ci`.
+COPY --from=prune /app/tsconfig.json ./
 
 # `...` builds this service AND the workspaces it depends on. Prune already
 # narrowed the graph; the filter keeps the intent readable.
+#
+# This also runs `db:generate` first: `build` depends on it in `turbo.json`, so
+# the Prisma client is produced here rather than as a side effect of `npm ci`.
 RUN npx turbo run build --filter="@synapsedesk/${SERVICE}..."
 
 # ============================================================ deps (runtime)
@@ -144,6 +154,27 @@ COPY --from=build /app/libs/grpc-proto/dist ./libs/grpc-proto/dist
 COPY --from=build /app/apps/${SERVICE}/package.json ./apps/${SERVICE}/
 COPY --from=build /app/apps/${SERVICE}/dist ./apps/${SERVICE}/dist
 
+# **One entrypoint name for two compiler layouts**, resolved at BUILD time.
+#
+# Every service compiles with SWC and emits `dist/src/main.js`. api-gateway
+# cannot: the Swagger CLI plugin is a TypeScript AST transformer, and SWC does
+# not run it — so the gateway stays on `tsc`, whose path aliases pull
+# `libs/*/src` into the program, move the common source root, and emit
+# `dist/apps/api-gateway/src/main.js` instead.
+#
+# A single hardcoded ENTRY served one of those and silently broke the other. A
+# second build-arg would work and is a footgun: the wrong default builds a
+# pushed image that only fails at `docker run`. Probing here instead means a
+# layout matching NEITHER fails the build, which is the one place a mistake is
+# still cheap.
+RUN set -eu; \
+    cd "/app/apps/${SERVICE}"; \
+    if   [ -f dist/src/main.js ];                    then target=dist/src/main.js; \
+    elif [ -f "dist/apps/${SERVICE}/src/main.js" ];  then target="dist/apps/${SERVICE}/src/main.js"; \
+    else echo "No compiled entrypoint for ${SERVICE} — was it built?" >&2; exit 1; fi; \
+    ln -s "$target" entry.js; \
+    echo "Entrypoint for ${SERVICE}: $target"
+
 # Non-root. `node` exists in the base image already; creating a user here would
 # only add a layer and a uid nothing else knows about.
 USER node
@@ -159,6 +190,8 @@ WORKDIR /app/apps/${SERVICE}
 # every deploy. Exec'ing node directly makes it PID 1 and gives it the signal.
 #
 # `${SERVICE}` cannot be interpolated in exec form, so it is baked into an env
-# var at build time and exec'd through it.
-ENV ENTRY=/app/apps/${SERVICE}/dist/apps/${SERVICE}/src/main.js
+# var at build time and exec'd through it. `entry.js` is the symlink resolved
+# above; Node follows it and resolves the module's own `require`s from the real
+# path, so relative imports inside `dist` are unaffected.
+ENV ENTRY=/app/apps/${SERVICE}/entry.js
 CMD ["sh", "-c", "exec node \"$ENTRY\""]

@@ -6,10 +6,10 @@
     "dev": "nest start --watch",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
+    "db:test:push": "dotenv -e .env.test -- prisma db push",
     "db:studio": "prisma studio",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\"",
-    "clean": "rimraf dist *.tsbuildinfo",
-    "postinstall": "prisma generate"
+    "clean": "rimraf dist *.tsbuildinfo"
   },
   "dependencies": {
     "@grpc/grpc-js": "^1.14.4",

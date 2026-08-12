@@ -4,11 +4,11 @@
   "scripts": {
     "build": "nest build",
     "dev": "nest start --watch",
-    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\"",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
+    "db:test:push": "dotenv -e .env.test -- prisma db push",
     "db:studio": "prisma studio",
-    "postinstall": "prisma generate",
+    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\"",
     "clean": "rimraf dist *.tsbuildinfo"
   },
   "dependencies": {

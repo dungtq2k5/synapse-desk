@@ -49,8 +49,23 @@ const baseConfig: Config = {
    *
    * Each service's e2e project re-includes itself by overriding this in its own
    * `jest.e2e.config.ts`.
+   *
+   * **`/dist/` is here because `testRegex` matches `.spec.js`, not just
+   * `.spec.ts`.** Under `tsc` that could not bite — `tsconfig.build.json`
+   * excludes `**\/*spec.ts` so nothing compiled ever looked like a test. SWC
+   * does not read that exclude, and the day the services moved to it, jest
+   * collected `dist/src/**\/*.spec.js` alongside the real suites and five
+   * "suites" failed to run. The build now ignores specs (see each
+   * `nest-cli.json`), so this is the second line rather than the fix: a `dist`
+   * left over from before that change, or from a branch that predates it, must
+   * not be able to turn `npm test` red for a reason that has nothing to do with
+   * the code under test.
    */
-  testPathIgnorePatterns: ['/node_modules/', String.raw`\.e2e-spec\.ts$`],
+  testPathIgnorePatterns: [
+    '/node_modules/',
+    '/dist/',
+    String.raw`\.e2e-spec\.ts$`,
+  ],
 
   transform: {
     // `.mjs` included for the same reason as `moduleFileExtensions` above: the

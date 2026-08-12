@@ -22,7 +22,8 @@ venv/
 .ruff_cache/
 .mypy_cache/
 
-# Prisma client output — rebuilt by `prisma generate` (wired to postinstall).
+# Prisma client output — rebuilt by the `db:generate` turbo task, which `build`
+# and `dev` depend on, so a fresh clone regenerates it without being told to.
 # Deliberately narrow: libs/grpc-proto/src/generated IS committed.
 **/src/generated/prisma/
 

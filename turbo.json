@@ -1,8 +1,28 @@
 {
   "$schema": "https://turborepo.com/schema.json",
   "tasks": {
+    // The Prisma client, generated into `src/generated/prisma` — which is
+    // gitignored, so on a fresh clone it does not exist and every service that
+    // imports it fails.
+    //
+    // **This used to be an npm `postinstall` hook, and moving it here fixes two
+    // things that were wrong with that.** A hook keyed on INSTALL runs on every
+    // `npm install` whether or not a schema changed, and — worse — does NOT run
+    // when a schema changes without one, so an edited `schema.prisma` left a
+    // stale client until somebody remembered `db:generate`. Keyed on the schema
+    // instead, it runs exactly when the schema moves and is a cache hit
+    // otherwise.
+    //
+    // Every task that consumes the client depends on it below, so nothing has
+    // to be remembered at all.
+    "db:generate": {
+      "inputs": ["prisma/schema.prisma", "prisma.config.ts"],
+      "outputs": ["src/generated/**"]
+    },
     "build": {
-      "dependsOn": ["^build"],
+      // `db:generate` is this package's OWN (no `^`): a service compiles against
+      // the client it generates, not its dependencies'.
+      "dependsOn": ["^build", "db:generate"],
       "inputs": [
         "src/**",
         "prisma/schema.prisma",
@@ -36,7 +56,12 @@
       // This fixes STARTUP only. `nest start --watch` watches a service's own
       // `src/`, so a libs edit made DURING a dev session still needs a rebuild
       // to propagate — run `npm run build` in the lib, or restart dev.
-      "dependsOn": ["^build"],
+      //
+      // **`db:generate` too, and `^build` does not cover it.** `^build` builds
+      // DEPENDENCIES, and a service's Prisma client is its own — so without this
+      // a fresh clone runs `npm run dev` and every database-backed service dies
+      // importing `src/generated/prisma`, which nothing has created.
+      "dependsOn": ["^build", "db:generate"],
       "cache": false,
       "persistent": true
     },

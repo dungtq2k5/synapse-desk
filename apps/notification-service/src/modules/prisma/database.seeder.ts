@@ -46,12 +46,46 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
   }
 
   async seed(): Promise<void> {
+    await this.assertSchemaExists();
+
     try {
       await this.applyIndexes();
       this.logger.log('notification-service schema seed complete');
     } catch (error) {
       this.logger.error(`Schema seed failed: ${formatErrorMsg(error)}`);
       throw error;
+    }
+  }
+
+  /**
+   * Fail with an ACTIONABLE message when the database has no schema at all.
+   *
+   * Without this the first statement of the seed is a raw `CREATE INDEX ... ON
+   * notifications`, so an unpushed database reports `relation "notifications" does not
+   * exist` from inside a helper — a symptom that reads like a seeder bug and
+   * takes a stack trace to trace back to the real cause, which is simply that
+   * nothing ever pushed the schema here.
+   *
+   * The e2e suites cannot hit it and neither can a long-running environment, so
+   * the only people who ever see it are on a fresh clone or a fresh Docker
+   * volume — exactly the audience least able to interpret it. Ported from
+   * auth-service, which already had this guard and was therefore the ONE
+   * service that said what to do when a `docker compose down -v` wiped the
+   * volumes.
+   */
+  private async assertSchemaExists(): Promise<void> {
+    const [{ present }] = await this.prisma.$queryRaw<[{ present: boolean }]>`
+      SELECT EXISTS (
+        SELECT 1 FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = 'notifications'
+      ) AS present
+    `;
+
+    if (!present) {
+      throw new Error(
+        'The database has no schema — nothing has been pushed to it yet. ' +
+          'Run `npm run db:push` (dev) or `npm run db:test:push` (test) and start again.',
+      );
     }
   }
 
