@@ -71,7 +71,16 @@ export interface CreateMessageRequest {
    * returns the ORIGINAL message rather than an error: the client's intent was
    * satisfied, and an error would make it retry again.
    */
-  clientMessageId?: string | undefined;
+  clientMessageId?:
+    | string
+    | undefined;
+  /**
+   * The inbound email's `Message-ID`, when this write came from mail — 31-doc
+   * §6.2. Written as an `inbound_emails` row in the SAME transaction, so a
+   * provider redelivery is a duplicate-key violation rather than a second
+   * reply. Absent for every other transport, and absent is not an error.
+   */
+  inboundMessageId?: string | undefined;
 }
 
 /**

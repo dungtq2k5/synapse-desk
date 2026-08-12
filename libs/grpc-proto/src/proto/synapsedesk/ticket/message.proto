@@ -62,6 +62,12 @@ message CreateMessageRequest {
   // returns the ORIGINAL message rather than an error: the client's intent was
   // satisfied, and an error would make it retry again.
   optional string client_message_id = 6;
+
+  // The inbound email's `Message-ID`, when this write came from mail — 31-doc
+  // §6.2. Written as an `inbound_emails` row in the SAME transaction, so a
+  // provider redelivery is a duplicate-key violation rather than a second
+  // reply. Absent for every other transport, and absent is not an error.
+  optional string inbound_message_id = 7;
 }
 
 // Persists a STREAMED AI answer — 22-doc §5.1, write #2.

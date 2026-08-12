@@ -13,6 +13,7 @@ import { PreferencesModule } from './modules/preferences/preferences.module';
 import { NotificationRealtimeModule } from './modules/realtime/realtime.module';
 import { FeedModule } from './modules/feed/feed.module';
 import { OpsModule } from './modules/ops/ops.module';
+import { InboundRejectionConsumer } from './modules/inbound-email/inbound-rejection.consumer';
 
 @Module({
   imports: [
@@ -45,6 +46,11 @@ import { OpsModule } from './modules/ops/ops.module';
     // producers: one is Domain E's own command subject, this one subscribes to
     // another domain's events and translates them.
     TicketNotificationConsumer,
+    // `email.inbound_rejected` → one courtesy reply (32-doc §5). Registered
+    // here beside the other consumer rather than in its own module, because
+    // `EmailService` is an AppModule provider and a module of its own would be
+    // a wrapper around one class with nothing else in it.
+    InboundRejectionConsumer,
   ],
   providers: [EmailService, SmsService, InAppNotificationService],
 })

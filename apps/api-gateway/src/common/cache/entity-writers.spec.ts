@@ -63,11 +63,11 @@ describe('the entity cache rests on who writes these fields', () => {
    *      inside it. `mailer.send({ data: … })` is excluded by the verb;
    *      `select:` and `where:` by not being `data:`.
    */
-  const prismaWrites = (code: string): string[] => {
+  const prismaWrites = (code: string, verbs: string): string[] => {
     const out: string[] = [];
 
     for (const call of code.matchAll(
-      /\.(?:create|update|updateMany|upsert)\(\s*\{/g,
+      new RegExp(String.raw`\.(?:${verbs})\(\s*\{`, 'g'),
     )) {
       // `matchAll` types `index` as optional even though a non-sticky regex
       // always sets it. SKIPPED rather than asserted: a missing index makes
@@ -97,7 +97,11 @@ describe('the entity cache rests on who writes these fields', () => {
    * literal, and a `Prisma.UserUpdateInput` built up field by field before the
    * call.
    */
-  const writesTo = (source: string, field: string): number => {
+  const writesTo = (
+    source: string,
+    field: string,
+    verbs = 'create|update|updateMany|upsert',
+  ): number => {
     const code = source
       .replace(/\/\*[\s\S]*?\*\//g, '')
       .replace(/^\s*\/\/.*$/gm, '')
@@ -107,9 +111,14 @@ describe('the entity cache rests on who writes these fields', () => {
     const named = new RegExp(String.raw`\b${field}\b`);
 
     return (
-      prismaWrites(code).filter((literal) => named.test(literal)).length +
-      [...code.matchAll(new RegExp(String.raw`\bdata\.${field}\s*=`, 'g'))]
-        .length
+      prismaWrites(code, verbs).filter((literal) => named.test(literal))
+        .length +
+      // A `data.field =` builder is update-shaped by construction, so it counts
+      // only when updates are being counted.
+      (verbs.includes('update')
+        ? [...code.matchAll(new RegExp(String.raw`\bdata\.${field}\s*=`, 'g'))]
+            .length
+        : 0)
     );
   };
 
@@ -120,20 +129,41 @@ describe('the entity cache rests on who writes these fields', () => {
     expect(readFileSync(DEPARTMENTS_SERVICE, 'utf8')).toContain('tenantScope');
   });
 
-  it('**`fullName` is written in exactly the two places behind gateway mutations**', () => {
-    // `createUser` (a CREATE — nothing is cached yet) and `updateUser` /
-    // `updateOwnProfile`'s shared `data.fullName` assignment. Both are reached
-    // only through routes carrying `@InvalidateCache(users, entity:user:…)`.
-    expect(writesTo(users(), 'fullName')).toBe(2);
+  it('**`fullName` is UPDATED in exactly one place, behind a gateway mutation**', () => {
+    // The half the entity cache depends on. `updateUser` and `updateOwnProfile`
+    // share one `data.fullName` assignment, and both routes carry
+    // `@InvalidateCache(users, entity:user:…)`.
+    //
+    // **Updates are counted separately from creates, and that split is the
+    // point.** A create cannot stale a cached entity — the id is new, so no
+    // entry can exist for it — while an update to a cached column with no
+    // eviction leaves a wrong name on every ticket for the whole TTL. Counting
+    // them together meant this test failed the day `resolveInboundSender` added
+    // a create, which is a change that cannot affect the cache at all.
+    expect(writesTo(users(), 'fullName', 'update|updateMany|upsert')).toBe(1);
   });
 
-  it('**and `avatarUrl` in exactly the two avatar handlers**', () => {
-    // `confirmAvatarUpload` sets the path; `deleteAvatar` nulls it.
-    expect(writesTo(users(), 'avatarUrl')).toBe(2);
+  it('and CREATED in two — self-signup and inbound email, neither cache-affecting', () => {
+    // `createUser` (the admin path) and `resolveInboundSender` (31-doc §3).
+    // Pinned so a third create is still a decision somebody makes deliberately:
+    // a create that later becomes an upsert WOULD affect the cache.
+    expect(writesTo(users(), 'fullName', 'create')).toBe(2);
   });
 
-  it('**a department name is written only by create and update**', () => {
-    expect(writesTo(readFileSync(DEPARTMENTS_SERVICE, 'utf8'), 'name')).toBe(2);
+  it('**and `avatarUrl` is updated in exactly the two avatar handlers**', () => {
+    // `confirmAvatarUpload` sets the path; `deleteAvatar` nulls it. Both carry
+    // `@InvalidateCache(users, entity:user:…)`.
+    expect(writesTo(users(), 'avatarUrl', 'update|updateMany|upsert')).toBe(2);
+  });
+
+  it('**a department name is updated only by the update handler**', () => {
+    expect(
+      writesTo(
+        readFileSync(DEPARTMENTS_SERVICE, 'utf8'),
+        'name',
+        'update|updateMany|upsert',
+      ),
+    ).toBe(1);
   });
 
   it('and the counter can actually see a write, and only a write', () => {

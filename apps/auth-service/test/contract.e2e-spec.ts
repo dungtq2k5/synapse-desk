@@ -328,6 +328,11 @@ describe('gRPC wire contract (e2e)', () => {
 
       // A ceiling, not an equality: fixing one is welcome and must not fail the
       // suite, while adding a twenty-third is a regression that should.
+      // Named, so a new entry has to be justified rather than absorbed by the
+      // number. This one is deliberate: `ResolveInboundSender` takes its tenant
+      // as an ARGUMENT and has no caller context by design (31-doc §3) — an
+      // identity-less call is its normal mode, and it reaches Prisma with an
+      // empty `organization_id` exactly as the other twenty-two do.
       expect(unknown.length).toBeLessThanOrEqual(22);
     },
     CONTRACT_TIMEOUT_MS,

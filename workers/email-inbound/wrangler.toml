@@ -1,0 +1,13 @@
+name = "synapsedesk-email-inbound"
+main = "src/index.ts"
+compatibility_date = "2026-01-01"
+
+# `WEBHOOK_URL` is not a secret and belongs in version control; the signing key
+# is, and does not. Set it with:
+#
+#   wrangler secret put INBOUND_SECRET
+#
+# It must match the gateway's `INBOUND_EMAIL_SECRET` byte for byte — a mismatch
+# is a 401 on every message, which the Worker reports rather than retries.
+[vars]
+WEBHOOK_URL = "https://api.example.test/api/v1/webhooks/email/inbound"

@@ -4,6 +4,7 @@ import eslintPluginPrettierRecommended from 'eslint-plugin-prettier/recommended'
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
+// FIXME @deprecated - ESLint core now provides this functionality via defineConfig(), which we now recommend instead. See https://typescript-eslint.io/packages/typescript-eslint/#config-deprecated.
 export default tseslint.config(
   {
     ignores: [
@@ -12,6 +13,14 @@ export default tseslint.config(
       '**/node_modules/**',
       // Prisma client output — regenerated from schema.prisma, never hand-edited.
       '**/generated/**',
+      // The Cloudflare Worker — 32-doc §2. It is deliberately outside the
+      // `apps/*` / `libs/*` workspace globs: it is a Workers runtime, not a
+      // Nest app, and no tsconfig in `parserOptions.project` covers it. Linting
+      // it here would fail with "none of those tsconfigs include this file",
+      // which is the same breakage a stray config file caused once already.
+      // It carries its own tsconfig and is checked by `npm run typecheck`
+      // inside its directory.
+      'workers/**',
     ],
   },
   eslint.configs.recommended,

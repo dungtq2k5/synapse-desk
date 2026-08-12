@@ -33,6 +33,13 @@ export const envValidationSchema = Joi.object({
   EMAIL_PASS: Joi.string().required(),
   EMAIL_SENDER: Joi.string().required(),
 
+  // Building the `Reply-To` that makes an emailed notification answerable —
+  // 31-doc §4. The secret must MATCH the gateway's: it verifies what this
+  // signs, and a mismatch makes every reply open a duplicate ticket rather
+  // than failing visibly.
+  INBOUND_EMAIL_SECRET: Joi.string().required(),
+  INBOUND_EMAIL_DOMAIN: Joi.string().required(),
+
   // Twilio. Optional as a group: SMS is only needed once phone verification is
   // switched on, and requiring credentials would block every other notification
   // from working in development.

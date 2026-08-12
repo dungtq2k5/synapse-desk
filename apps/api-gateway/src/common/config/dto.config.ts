@@ -48,3 +48,32 @@ export const MAX_DOCUMENT_DEPARTMENTS = 50;
 // auth-service clamps `limit` a second time (it is reachable over gRPC, where no
 // ValidationPipe ever ran), and two copies of MAX_LIMIT is how the edge and the
 // service end up disagreeing about what "too many" means.
+
+// ------------------------------------------------------- inbound email
+//
+// The webhook's caller is authenticated by signature, which proves the Worker
+// sent the body and nothing about what a stranger put in the mail. Every one of
+// these bounds an attacker-controlled header.
+
+/** RFC 5321's maximum path: 64-octet local part, 255-octet domain, `@`. */
+export const MAX_EMAIL_ADDRESS_LENGTH = 320;
+
+/** RFC 5322's maximum line — the ceiling on any single unfolded header. */
+export const MAX_HEADER_LINE_LENGTH = 998;
+
+/**
+ * How long a `Message-ID` may be, in characters AND bytes.
+ *
+ * Matches `inbound_emails.message_id`'s `VarChar(255)`, and the two agree only
+ * because the DTO also constrains the field to printable ASCII — a validator
+ * counts characters while Postgres counts bytes. The column is half of a unique
+ * index, and Postgres refuses index tuples past roughly 2704 bytes, so an
+ * unbounded multibyte header would pass validation and then fail the insert
+ * with an error that is not a duplicate-key error: a 5xx the provider retries
+ * forever. Real Message-IDs are far under this.
+ */
+export const MAX_MESSAGE_ID_LENGTH = 255;
+
+/** RFC 5322 `msg-id` is printable ASCII, and that is what makes bytes and
+ * characters the same number for {@link MAX_MESSAGE_ID_LENGTH}. */
+export const PRINTABLE_ASCII = /^[\x21-\x7E]+$/;

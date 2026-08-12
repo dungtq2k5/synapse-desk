@@ -71,6 +71,10 @@ export async function bootstrapE2eTest(): Promise<E2eFixture> {
     // is a row nothing can join back.
     await prisma.$executeRawUnsafe(`
       TRUNCATE TABLE "notification_deliveries", "notification_preferences",
+        -- The one-auto-reply-per-day guard (32-doc §5). A row surviving into
+        -- the next test suppresses that test's first reply, which reads as the
+        -- consumer being broken rather than as a dirty fixture.
+        "inbound_auto_replies",
         "notifications" RESTART IDENTITY CASCADE;
     `);
     emitted.length = 0;

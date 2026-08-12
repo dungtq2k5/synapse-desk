@@ -22,6 +22,13 @@ import {
   UpdateOrganizationSettingsRequest,
   toProtoAiModelTier,
   toProtoOrgStatus,
+  OrgStatus as ProtoOrgStatus,
+  type GetInboundTokenRequest,
+  type IssueInboundTokenResponse,
+  type RevokeInboundTokenResponse,
+  type GetInboundTokenResponse,
+  type ResolveOrgByInboundTokenRequest,
+  type ResolveOrgByInboundTokenResponse,
 } from '@synapsedesk/grpc-proto';
 import {
   AuditAction,
@@ -32,6 +39,7 @@ import {
   OrgStatus,
   isUniqueConstraintViolation,
   requireTenant,
+  generateInboundToken,
 } from '@synapsedesk/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditPublisher } from '../audit/audit-publisher.service';
@@ -58,6 +66,153 @@ export class OrganizationsService {
     context: CallerContext,
   ): Promise<OrganizationResponse> {
     return toOrganizationResponse(await this.load(context));
+  }
+
+  /**
+   * The tenant behind an inbound support address — 31-doc §2.
+   *
+   * **Absent rather than an exception for an unroutable token**, and the
+   * distinction is load-bearing: the caller must drop unroutable mail with a
+   * 200 (so the provider stops) while letting an infrastructure failure
+   * propagate (so the provider retries). A thrown NOT_FOUND is
+   * indistinguishable from auth-service being unreachable, and the two need
+   * opposite answers.
+   *
+   * **No caller context, deliberately.** The webhook has no user — it holds a
+   * verified Worker signature. The token is the lookup key and grants nothing
+   * beyond naming a tenant, which is why it can be a public mail address.
+   *
+   * A soft-deleted tenant does not resolve. Mail addressed to a deleted
+   * workspace is as unroutable as mail to a token nobody was issued.
+   */
+  async resolveOrgByInboundToken(
+    request: ResolveOrgByInboundTokenRequest,
+  ): Promise<ResolveOrgByInboundTokenResponse> {
+    const token = request.inboundToken?.trim().toLowerCase();
+
+    // An empty token would otherwise match a row whose column is empty rather
+    // than null, which is a routing accident waiting for a bad migration.
+    if (!token) {
+      return {
+        organizationId: undefined,
+        status: ProtoOrgStatus.ORG_STATUS_UNSPECIFIED,
+      };
+    }
+
+    const organization = await this.prisma.organization.findFirst({
+      where: { inboundToken: token, deletedAt: null },
+      select: { id: true, status: true },
+    });
+
+    if (!organization) {
+      return {
+        organizationId: undefined,
+        status: ProtoOrgStatus.ORG_STATUS_UNSPECIFIED,
+      };
+    }
+
+    // The status travels back so the caller can tell "no such tenant" from
+    // "suspended" in its logs. Whether a suspended tenant may receive mail is
+    // the caller's decision, not this lookup's.
+    return {
+      organizationId: organization.id,
+      status: toProtoOrgStatus(organization.status),
+    };
+  }
+
+  /**
+   * The tenant's inbound token — 31-doc §4, for building `Reply-To`.
+   *
+   * The reverse of `resolveOrgByInboundToken`, and it needs no caller context
+   * for the same reason: the token is a public mail address, not a credential.
+   */
+  async getInboundToken(
+    request: GetInboundTokenRequest,
+  ): Promise<GetInboundTokenResponse> {
+    // Guarded before Prisma, like its two siblings. Without this an empty id
+    // reaches the query as `undefined`, Prisma raises a validation error, and
+    // Nest wraps it as UNKNOWN — which `GRPC_TO_HTTP` has no entry for, so the
+    // gateway answers 500 where it should answer 401. `contract.e2e-spec.ts`
+    // bounds that class of handler, and this one does not need to join them.
+    if (!request.organizationId) return { inboundToken: undefined };
+
+    const organization = await this.prisma.organization.findFirst({
+      where: { id: request.organizationId, deletedAt: null },
+      select: { inboundToken: true },
+    });
+
+    return { inboundToken: organization?.inboundToken ?? undefined };
+  }
+
+  /**
+   * Issues the tenant's inbound-mail token, or ROTATES an existing one — 31-doc §2.
+   *
+   * **One method for both, because they differ only in whether a row already
+   * had a value.** Rotation is one of the three properties §2 chose an opaque
+   * token over a slug for — *an abused address can be rotated without touching
+   * anything else* — and it is the property nothing could exercise until this
+   * existed: the column was writable by hand-editing a row and by nothing else,
+   * so every tenant was permanently unable to receive mail.
+   *
+   * **The old address stops routing immediately**, which is the point of a
+   * rotation and also its cost: mail already in flight to it is dropped as
+   * unroutable. That is the correct trade for an address being abused, and it
+   * is why this is a deliberate action rather than something a rename does as a
+   * side effect.
+   */
+  async issueInboundToken(
+    context: CallerContext,
+  ): Promise<IssueInboundTokenResponse> {
+    const existing = await this.load(context);
+    const inboundToken = generateInboundToken();
+
+    await this.prisma.organization.update({
+      where: { id: existing.id },
+      data: { inboundToken },
+    });
+
+    this.audit.record(context, {
+      action: AuditAction.ORGANIZATION_UPDATED,
+      resourceType: AuditResourceType.ORGANIZATION,
+      resourceId: existing.id,
+      // **The token itself is not recorded, and neither is the old one.** It is
+      // not a secret (customers email it), but an audit log is the wrong place
+      // to keep a copy of an address somebody rotated precisely to stop using.
+      metadata: {
+        after: { inboundEmail: existing.inboundToken ? 'rotated' : 'enabled' },
+      },
+    });
+
+    return { inboundToken };
+  }
+
+  /**
+   * Switches inbound mail off — 31-doc §2.
+   *
+   * Sets NULL rather than deleting anything, which returns the tenant to the
+   * state one that never enabled email is already in. Idempotent: revoking
+   * twice is not an error, because the caller's intent is satisfied either way.
+   */
+  async revokeInboundToken(
+    context: CallerContext,
+  ): Promise<RevokeInboundTokenResponse> {
+    const existing = await this.load(context);
+
+    if (existing.inboundToken) {
+      await this.prisma.organization.update({
+        where: { id: existing.id },
+        data: { inboundToken: null },
+      });
+
+      this.audit.record(context, {
+        action: AuditAction.ORGANIZATION_UPDATED,
+        resourceType: AuditResourceType.ORGANIZATION,
+        resourceId: existing.id,
+        metadata: { after: { inboundEmail: 'disabled' } },
+      });
+    }
+
+    return {};
   }
 
   /**

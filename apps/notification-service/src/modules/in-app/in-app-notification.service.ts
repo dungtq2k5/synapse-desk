@@ -7,10 +7,12 @@ import {
   NotificationAudience,
   NotificationChannel,
   NotificationPriority,
+  NotificationResourceType,
 } from '@synapsedesk/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthReferenceService } from '../auth-client/auth-reference.service';
 import { EmailService } from '../email/email.service';
+import { ReplyAddressService } from '../email/reply-address.service';
 import { DeliveryRecorder } from '../deliveries/delivery-recorder.service';
 import { PreferenceResolver } from '../preferences/preference-resolver.service';
 import { NotificationRealtimePublisher } from '../realtime/notification-realtime.publisher';
@@ -56,6 +58,7 @@ export class InAppNotificationService {
     private readonly deliveries: DeliveryRecorder,
     private readonly preferences: PreferenceResolver,
     private readonly realtime: NotificationRealtimePublisher,
+    private readonly replyAddress: ReplyAddressService,
   ) {}
 
   async deliver(
@@ -360,18 +363,26 @@ export class InAppNotificationService {
       }
 
       try {
-        const result = await this.email.send({
-          template: EmailTemplateName.QUOTA_ALERT,
-          to: recipient.email,
-          data: {
-            fullName: recipient.fullName,
-            headline: command.title,
-            // The BODY, not a rewrite of it. The producer wrote the sentence
-            // that says what happens next; paraphrasing here would mean two
-            // places deciding what the warning means.
-            detail: command.body,
+        const result = await this.email.send(
+          {
+            template: EmailTemplateName.QUOTA_ALERT,
+            to: recipient.email,
+            data: {
+              fullName: recipient.fullName,
+              headline: command.title,
+              // The BODY, not a rewrite of it. The producer wrote the sentence
+              // that says what happens next; paraphrasing here would mean two
+              // places deciding what the warning means.
+              detail: command.body,
+            },
           },
-        });
+          // **A ticket notification is answerable; everything else is not** —
+          // 31-doc §4. The address carries a per-ticket token, so replying to
+          // this email appends to the thread it is about rather than opening a
+          // duplicate. A notification about anything else offers none, because
+          // there is nothing for a reply to attach to.
+          { replyTo: await this.replyAddressFor(command) },
+        );
 
         await this.deliveries.recordSent(
           await this.notificationIdFor(command, recipient.userId),
@@ -400,6 +411,32 @@ export class InAppNotificationService {
     }
 
     return sent;
+  }
+
+  /**
+   * The `Reply-To` for a ticket notification, or `undefined`.
+   *
+   * `resourceType`/`resourceId` are how a notification says what it is about,
+   * and only a TICKET has a thread to reply into. The ticket NUMBER is what the
+   * reply token encodes — the id is a uuid and would not fit an address.
+   */
+  private async replyAddressFor(
+    command: CreateInAppNotificationCommand,
+  ): Promise<string | undefined> {
+    if (command.resourceType !== NotificationResourceType.TICKET) {
+      return undefined;
+    }
+
+    // **The number comes from `data`, which is where `ticketTarget` puts it.**
+    // The command carries `resourceId` — a uuid — and the reply token encodes
+    // the NUMBER, because a uuid does not fit inside a 64-octet local part
+    // beside the tenant token.
+    const ticketNumber = (command.data as { ticketNumber?: number } | undefined)
+      ?.ticketNumber;
+
+    if (typeof ticketNumber !== 'number') return undefined;
+
+    return this.replyAddress.forTicket(command.organizationId, ticketNumber);
   }
 
   private async skipEmail(

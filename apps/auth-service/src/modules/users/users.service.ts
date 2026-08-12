@@ -14,6 +14,8 @@ import {
   ListPermissionHoldersRequest,
   ListPermissionHoldersResponse,
   ListUsersByIdsRequest,
+  type ResolveInboundSenderRequest,
+  type ResolveInboundSenderResponse,
   ListUsersByIdsResponse,
   ListUsersRequest,
   ListUsersResponse,
@@ -828,6 +830,105 @@ export class UsersService {
     });
 
     return { untrustedDeviceCount };
+  }
+
+  /**
+   * The sender of an inbound email, resolved WITHIN a known tenant — 31-doc §3.
+   *
+   * **The `organizationId` argument is the security design, not a convenience.**
+   * Self-signup answers the same policy question — *may this address join
+   * automatically?* — and its implementation has a second branch:
+   *
+   * ```ts
+   * const org = existingOrg ?? (await tx.organization.create({ … })); // a TENANT
+   * const isFounder = existingOrg === null;                           // an ORG ADMIN
+   * ```
+   *
+   * A human deliberately registering can afford that branch — it is the only
+   * way a tenant gets its first admin. An inbound email is a stranger arriving
+   * unannounced, and the same code would turn mail from an unrecognised domain
+   * — the case the policy calls a DROP — into a new organization owned by the
+   * sender.
+   *
+   * Receiving the tenant is what makes that unreachable rather than merely
+   * avoided: there is no branch here in which an organization can be created,
+   * and `inbound-sender.spec.ts` asserts it statically.
+   *
+   * **The domain check is scoped to THIS tenant**, never the global
+   * `findFirst({ allowedEmailDomains: { has: domain } })` self-signup uses.
+   * Unscoped, a sender whose domain matches some other tenant is provisioned
+   * into that tenant while their mail was addressed to yours — a cross-tenant
+   * misroute produced by a correct-looking domain check.
+   *
+   * **Absent `userId` means "may not author here"**, which the caller answers
+   * with a drop and one auto-reply. It is not an error: a public address
+   * receives mail from strangers constantly, and an exception per message would
+   * make the normal case look like a fault.
+   */
+  async resolveInboundSender(
+    request: ResolveInboundSenderRequest,
+  ): Promise<ResolveInboundSenderResponse> {
+    const email = request.email?.trim().toLowerCase();
+    const organizationId = request.organizationId;
+
+    if (!email || !organizationId) return { created: false };
+
+    // FIXME I remember we have a until function for this in `libs/common/.../utils.ts`, reuse it instead
+    const domain = email.split('@')[1];
+    if (!domain) return { created: false };
+
+    // Soft-deleted rows are excluded because the unique index is PARTIAL
+    // (`WHERE deleted_at IS NULL`) — so a former member emailing in is a
+    // re-provision rather than a conflict, which is the same re-hire case that
+    // index was made partial for.
+    const existing = await this.prisma.user.findFirst({
+      where: { organizationId, email, deletedAt: null },
+      select: { id: true },
+    });
+
+    if (existing) return { userId: existing.id, created: false };
+
+    const organization = await this.prisma.organization.findFirst({
+      where: { id: organizationId, deletedAt: null },
+      select: { allowedEmailDomains: true },
+    });
+
+    // Scoped: "does THIS tenant allow this domain?" — never "who claims it?".
+    if (!organization?.allowedEmailDomains.includes(domain)) {
+      return { created: false };
+    }
+
+    const created = await this.prisma.$transaction(async (tx) => {
+      // **End User, always.** The role is not a parameter and cannot be one:
+      // the caller is an unauthenticated webhook, and a request-supplied role
+      // is how a stranger's email becomes tenant control.
+      const endUserRoleId = await this.rolesService.getEndUserRoleId(tx);
+
+      return tx.user.create({
+        data: {
+          organizationId,
+          email,
+          // `full_name` is NOT NULL; the local part is the same stand-in the
+          // Google sign-in path uses when the provider withholds a name.
+          // FIXME We don't have a util function for it but consider create one
+          fullName: request.displayName?.trim() || email.split('@')[0],
+          // No password: this account has no way to sign in until its owner
+          // sets one through the ordinary reset flow. An email sender has not
+          // proven they can authenticate, only that they can send mail.
+          passwordHash: null,
+          // Unverified — sending from an address is not proof of controlling
+          // it, and the portal's own verification is what establishes that.
+          isEmailVerified: false,
+          // `gender` is nullable and unstated — an email sender did not answer
+          // that question, and inventing a default would put a fact in the
+          // record that nobody supplied.
+          roles: { connect: { id: endUserRoleId } },
+        },
+        select: { id: true },
+      });
+    });
+
+    return { userId: created.id, created: true };
   }
 
   // -------------------------------------------------------------------------

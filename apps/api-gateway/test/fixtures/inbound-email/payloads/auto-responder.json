@@ -1,0 +1,13 @@
+{
+  "messageId": "<ooo@mail.acme.test>",
+  "to": "support+a1b2c3d4e5f60718293a4b5c6d7e8f90@inbound.test",
+  "from": "stranger@nowhere.test",
+  "subject": "Automatic reply: The printer is on fire",
+  "text": "I am out of the office until Monday.",
+  "html": null,
+  "headers": {
+    "auto-submitted": "auto-replied",
+    "precedence": "bulk"
+  },
+  "receivedAt": "2026-08-12T09:14:00.000Z"
+}

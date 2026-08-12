@@ -1,0 +1,9 @@
+{
+  "messageId": "<quoted-outlook@mail.outlook.test>",
+  "to": "support+a1b2c3d4e5f60718293a4b5c6d7e8f90@inbound.test",
+  "from": "customer@acme.test",
+  "subject": "RE: Printer",
+  "text": "Still broken I am afraid.\n\n-----Original Message-----\nFrom: Support <support@app.test>\nSent: Tuesday, 11 August 2026 09:14\n\nCould you send a photo?",
+  "html": null,
+  "receivedAt": "2026-08-12T09:14:00.000Z"
+}

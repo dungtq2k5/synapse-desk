@@ -43,6 +43,8 @@ export function renderEmail(
       return invitation(command.data, branding);
     case EmailTemplateName.SECURITY_ALERT:
       return securityAlert(command.data, branding);
+    case EmailTemplateName.INBOUND_REJECTED:
+      return inboundRejected(command.data, branding);
     case EmailTemplateName.QUOTA_ALERT:
       return quotaAlert(command.data, branding);
   }
@@ -273,6 +275,36 @@ function securityAlert(
     ),
     text:
       `Hi ${data.fullName}, ${data.detail}` + textOrigin(data.origin, 'action'),
+  };
+}
+
+/**
+ * The one-time reply to mail this system refused — 31-doc §3.
+ *
+ * **Says what to do, and does not say why in detail.** "Your address is not
+ * permitted in this workspace" tells an outsider which tenants exist and who
+ * belongs to them; "we could not accept this message, please use the portal"
+ * tells the actual sender everything they can act on. The difference is an
+ * enumeration oracle at a public address.
+ */
+function inboundRejected(
+  data: Data<EmailTemplateName.INBOUND_REJECTED>,
+  branding: TemplateBranding,
+): RenderedEmail {
+  const headline = 'We could not accept your email';
+  const body =
+    'Your message did not reach our support team. Please open a request ' +
+    'through the portal instead, and we will pick it up from there.';
+
+  return {
+    subject: `${branding.appName}: ${headline}`,
+    html: layout(
+      branding,
+      headline,
+      `<p style="margin:0 0 12px;">${esc(body)}</p>
+       <p style="margin:0;"><a href="${esc(data.portalUrl)}">${esc(data.portalUrl)}</a></p>`,
+    ),
+    text: `${headline}\n\n${body}\n\n${data.portalUrl}`,
   };
 }
 

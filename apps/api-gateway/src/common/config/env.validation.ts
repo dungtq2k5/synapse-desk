@@ -129,4 +129,28 @@ export const envValidationSchema = Joi.object({
   WS_HANDSHAKE_LIMIT: Joi.number().required(),
   WS_HANDSHAKE_TTL: Joi.number().required(),
   WS_HANDSHAKE_BLOCK_DURATION: Joi.number().required(),
+
+  // ------------------------------------------------------- inbound email
+  //
+  // 31-doc §6. The gateway is the email adapter: it verifies the Worker's
+  // signature, parses the address, and runs the loop guards. All three need
+  // configuration that previously lived only in notification-service.
+
+  /** Shared with the Cloudflare Worker — the HMAC key over the raw body. */
+  INBOUND_EMAIL_SECRET: Joi.string().required(),
+
+  /** The mail domain the catch-all route serves, for building `Reply-To`. */
+  INBOUND_EMAIL_DOMAIN: Joi.string().required(),
+
+  /**
+   * **The self-loop guard's whole basis** — 31-doc §7, 32-doc §5.
+   *
+   * Our own sending address. Mail from it is ignored unconditionally, which is
+   * what stops a notification bouncing off an auto-responder forever.
+   *
+   * `required()` rather than optional, and that is the point: a guard reading
+   * an undefined variable always passes, and it fails OPEN into precisely the
+   * unbounded loop it exists to stop. Better to refuse to boot.
+   */
+  EMAIL_SENDER: Joi.string().required(),
 });

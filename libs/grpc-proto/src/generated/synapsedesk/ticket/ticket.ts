@@ -20,7 +20,16 @@ export interface CreateTicketRequest {
    * Defaults to the caller. Present so an agent can raise a ticket on behalf of
    * an end user — validated against auth-service before the insert.
    */
-  authorId?: string | undefined;
+  authorId?:
+    | string
+    | undefined;
+  /**
+   * The inbound email's `Message-ID`, when this write came from mail — 31-doc
+   * §6.2. Written as an `inbound_emails` row in the SAME transaction, so a
+   * provider redelivery is a duplicate-key violation rather than a second
+   * ticket. Absent for every other transport, and absent is not an error.
+   */
+  inboundMessageId?: string | undefined;
 }
 
 export interface GetTicketRequest {

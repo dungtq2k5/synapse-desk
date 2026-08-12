@@ -26,10 +26,30 @@ model Organization {
   enforceTwoFactor    Boolean  @default(false) @map("enforce_two_factor")
   allowedEmailDomains String[] @map("allowed_email_domains") @db.VarChar(255)
 
+  /// The tenant's inbound-mail address token — 31-doc §2.
+  ///
+  /// The support address is `support+{inbound_token}@<domain>`, delivered by
+  /// one catch-all route. NOT the slug: a slug is guessable, which makes every
+  /// tenant's inbound address derivable from any other and the tenant list
+  /// enumerable. This is not a secret — customers email it — but it is
+  /// unguessable and rotatable, which a slug is neither.
+  ///
+  /// **NULLABLE, so email is opt-in per tenant.** A tenant with no token
+  /// receives no mail, which is the right default for a feature nobody enabled
+  /// — and it makes "unroutable" a state the lookup returns rather than one it
+  /// has to infer.
+  ///
+  /// **32 hex characters, not `generateSecureToken()`** — 32-doc §1. That
+  /// helper is `base64url`, which is 43 characters (too long for this column)
+  /// and CASE-SENSITIVE. Mail systems normalise local-part case in practice, so
+  /// one hop lowercasing the address would silently unroute the tenant, and
+  /// nothing here could tell that apart from nobody having written in.
+  inboundToken String? @unique @map("inbound_token") @db.VarChar(32)
+
   // Quotas & metering
-  maxAgentSeats        Int      @default(10) @map("max_agent_seats")
-  maxStorageBytes      BigInt   @default(5368709120) @map("max_storage_bytes")
-  monthlyAiTokenBudget BigInt   @default(1000000) @map("monthly_ai_token_budget")
+  maxAgentSeats        Int    @default(10) @map("max_agent_seats")
+  maxStorageBytes      BigInt @default(5368709120) @map("max_storage_bytes")
+  monthlyAiTokenBudget BigInt @default(1000000) @map("monthly_ai_token_budget")
 
   /// Follows Stripe's `current_period_start` once billing is live (§1.15).
   ///
@@ -84,10 +104,10 @@ model Organization {
   deletedById String?   @map("deleted_by_id") @db.Uuid
 
   // Relations
-  deletedBy   User?            @relation("OrganizationDeletedBy", fields: [deletedById], references: [id], onDelete: Restrict)
-  departments Department[]
-  users       User[]           @relation("UserOrganization")
-  roles       Role[]           @relation("RoleOrganization")
+  deletedBy     User?            @relation("OrganizationDeletedBy", fields: [deletedById], references: [id], onDelete: Restrict)
+  departments   Department[]
+  users         User[]           @relation("UserOrganization")
+  roles         Role[]           @relation("RoleOrganization")
   invitations   UserInvitation[]
   billingEvents BillingEvent[]
 
@@ -154,11 +174,11 @@ model User {
   gender             String?   @db.VarChar(20)
   isTwoFactorEnabled Boolean   @default(false) @map("is_two_factor_enabled")
   twoFactorSecret    String?   @map("two_factor_secret") @db.VarChar(255)
-  
+
   /// **The one authoritative boolean.** Every read in the system asks this and
   /// only this — login, 2FA, forgot-password, both notification audiences, the
   /// last-Org-Admin count, list filters and the mappers. 21-doc §2.2.
-  isLocked           Boolean   @default(false) @map("is_locked")
+  isLocked Boolean @default(false) @map("is_locked")
 
   /// When a temporary lock lapses. NULL means the lock is INDEFINITE — the
   /// existing behaviour, unchanged.
@@ -176,8 +196,8 @@ model User {
   /// learning about time). Neither alone is enough — see `ExpiredLockSweep`.
   ///
   /// No index: the sweep scans `is_locked = true`, which is a tiny set.
-  lockedUntil        DateTime? @map("locked_until") @db.Timestamptz
-  lastLoginAt        DateTime? @map("last_login_at") @db.Timestamptz
+  lockedUntil DateTime? @map("locked_until") @db.Timestamptz
+  lastLoginAt DateTime? @map("last_login_at") @db.Timestamptz
 
   /// Quiet hours — GLOBAL user settings, not per notification type.
   ///
@@ -201,11 +221,11 @@ model User {
   /// An IANA name — "Asia/Ho_Chi_Minh". NULL is treated as UTC, which is wrong
   /// for the user and at least deterministic; the alternative, the server's
   /// zone, is wrong in a way that changes when the service is redeployed.
-  timezone String? @db.VarChar(64)
-  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt          DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
-  deletedAt          DateTime? @map("deleted_at") @db.Timestamptz
-  deletedById        String?   @map("deleted_by_id") @db.Uuid
+  timezone    String?   @db.VarChar(64)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+  deletedById String?   @map("deleted_by_id") @db.Uuid
 
   // Relations
   organization Organization? @relation("UserOrganization", fields: [organizationId], references: [id])

@@ -69,9 +69,10 @@ model Ticket {
   deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
   deletedById String?   @map("deleted_by_id") @db.Uuid
 
-  assignments TicketAssignment[]
-  messages    TicketMessage[]
-  aiSummary   AiSummary?
+  assignments   TicketAssignment[]
+  messages      TicketMessage[]
+  aiSummary     AiSummary?
+  inboundEmails InboundEmail[]
 
   /// The queue view: "this tenant's tickets in status X".
   @@index([organizationId, status])
@@ -87,6 +88,65 @@ model Ticket {
 // ==========================================
 // 2. TICKET ASSIGNMENTS (full history, one current)
 // ==========================================
+/// Inbound email idempotency — 31-doc §6.2, 32-doc §4.3.
+///
+/// **One row per accepted message, written in the SAME transaction as the
+/// ticket or message it produced.** Providers retry, and Cloudflare re-runs a
+/// Worker that errored, so a redelivery must be a duplicate-key violation
+/// rather than a second ticket.
+///
+/// The atomicity is the argument. Dedup recorded outside that transaction can
+/// be written by a request that then fails — and the mail is then silently lost
+/// on the retry that was supposed to recover it.
+///
+/// **Not `ticket_messages.client_message_id`**, which looks made for this and
+/// cannot be: it is `@db.Uuid` where a `Message-ID` is an arbitrary string, and
+/// it is unique per `(ticket_id, …)` when inbound dedup has to work BEFORE a
+/// ticket exists — a redelivery of a new conversation's first mail has no
+/// ticket to be scoped to.
+///
+/// **A Redis `SET NX` in front of this is an optimisation, never the
+/// guarantee.** It saves two RPCs on a redelivery; the unique constraint below
+/// is what makes the property true, and it is not removable on the grounds that
+/// Redis is there.
+model InboundEmail {
+  id             String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+
+  /// The message's `Message-ID` header, or a synthesized digest when it had
+  /// none — 31-doc §7.
+  ///
+  /// **255, not 998, and the unit is why.** This column is half of the unique
+  /// index below, and Postgres refuses a btree tuple over roughly 2704 BYTES —
+  /// while a length validator counts CHARACTERS. At 998 a multibyte header
+  /// passes validation and then fails the insert with `index row size exceeds
+  /// maximum`, which is not a duplicate-key error, so it surfaces as a 5xx and
+  /// the provider retries it forever.
+  ///
+  /// The endpoint constrains the field to printable ASCII (RFC 5322 `msg-id`),
+  /// which is what makes characters and bytes the same number.
+  messageId String @map("message_id") @db.VarChar(255)
+
+  /// What the message became. Null only for a row written before its ticket in
+  /// some future path — today both are written together.
+  ticketId String? @map("ticket_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  /// **Tenant-scoped, not global.** Two tenants can legitimately receive the
+  /// same `Message-ID` — a customer CCs both, or a mailing list fans out — and
+  /// a global constraint would drop the second one silently.
+  /// **`SetNull`, never `Cascade`.** This row is the idempotency record for a
+  /// delivery, and it has to outlive what it produced: cascade it away with the
+  /// ticket and the provider's next retry of that same message is no longer a
+  /// duplicate, so the deleted ticket comes straight back.
+  ticket Ticket? @relation(fields: [ticketId], references: [id], onDelete: SetNull)
+
+  @@unique([organizationId, messageId])
+  @@index([ticketId])
+  @@map("inbound_emails")
+}
+
 /// Every assignment a ticket has ever had, not just the live one.
 ///
 /// The history is the point: "who was working this when it went wrong?" is not
@@ -94,8 +154,10 @@ model Ticket {
 /// and a partial unique index applied by the seeder guarantees there is at most
 /// one of them per ticket:
 ///
+/// ```sql
 ///   CREATE UNIQUE INDEX ticket_assignments_current_key
 ///     ON ticket_assignments (ticket_id) WHERE is_current = true;
+/// ```
 ///
 /// Partial, so it cannot be expressed as `@@unique` here — the same discipline
 /// as Domain A's `users_org_email_key` and `user_departments_primary_key`, and
@@ -434,7 +496,7 @@ model TicketDailyStat {
 model AgentDailyStat {
   id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
 
-  organizationId String @map("organization_id") @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
   day            DateTime @db.Date
 
   /// No FK — `users` lives in postgres_auth (RDM §1.13). The display name is

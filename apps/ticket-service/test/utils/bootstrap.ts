@@ -62,6 +62,11 @@ export async function bootstrapE2eTest(): Promise<E2eFixture> {
         "ai_response_feedbacks",
         "audit_logs",
         "analytics_exports",
+        -- Inbound-email idempotency (31-doc §6.2). A row surviving into the
+        -- next test makes the FIRST delivery of a message look like a
+        -- redelivery, which fails as ALREADY_EXISTS — a failure that reads as
+        -- a dedup bug rather than as a dirty fixture.
+        "inbound_emails",
         "ticket_daily_stats",
         "agent_daily_stats",
         -- The heartbeat. Not tenant data, but a row surviving into the next

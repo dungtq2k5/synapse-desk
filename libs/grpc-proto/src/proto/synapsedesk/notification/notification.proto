@@ -201,7 +201,32 @@ message UpdatePreferenceRequest {
   DigestMode digest = 4;
 }
 
+// The ticket an outbound notification was about, found by its `Message-ID`.
+// 31-doc §4 — the `In-Reply-To` fallback.
+//
+// **A two-hop join, and both hops are here**: `notification_deliveries`
+// carries the provider's `Message-ID`, and the `notifications` row it belongs
+// to carries the ticket in `resource_type`/`resource_id`. Neither table exists
+// in ticket-service, which is why this is one RPC rather than one column.
+message ResolveTicketByMessageIdRequest {
+  // The `In-Reply-To` (or a `References` entry) the sender's client echoed back.
+  string provider_message_id = 1;
+  // **Scoped, and not in the doc's sketch.** Without it, a `Message-ID` lifted
+  // from one tenant's notification would resolve to that tenant's ticket while
+  // the mail was addressed to another — the same cross-tenant misroute the
+  // reply token's MAC is bound to the tenant to prevent.
+  string organization_id = 2;
+}
+
+message ResolveTicketByMessageIdResponse {
+  // Absent when nothing matches, which is the common case: most inbound mail
+  // is not a reply to anything this system sent.
+  optional string ticket_id = 1;
+}
+
 service NotificationService {
+  rpc ResolveTicketByMessageId(ResolveTicketByMessageIdRequest) returns (ResolveTicketByMessageIdResponse);
+
   rpc ListNotifications(ListNotificationsRequest) returns (ListNotificationsResponse);
   rpc GetUnreadCount(ListNotificationsRequest) returns (UnreadCountResponse);
 

@@ -2,12 +2,7 @@
  * Token generation, hashing and constant-time comparison.
  */
 
-import {
-  createHash,
-  randomBytes,
-  randomInt,
-  timingSafeEqual,
-} from 'node:crypto';
+import { createHash, randomBytes, randomInt } from 'node:crypto';
 
 /**
  * A cryptographically random, URL-safe secret.
@@ -39,16 +34,13 @@ export function hashToken(token: string): string {
 /**
  * Constant-time comparison of two hex digests.
  *
- * A plain `===` leaks how many leading characters matched via its exit time.
- * That is a weak channel, but free to close.
+ * **Moved to `libs/common`** — 31-doc §6.1. The inbound-email webhook verifies
+ * its signature at the GATEWAY, which cannot import a service's private
+ * utility, and a second constant-time compare is reliably a non-constant-time
+ * one. Re-exported here so the twenty call sites in this service keep their
+ * import.
  */
-export function safeCompareHex(a: string, b: string): boolean {
-  const left = Buffer.from(a, 'hex');
-  const right = Buffer.from(b, 'hex');
-  if (left.length !== right.length || left.length === 0) return false;
-
-  return timingSafeEqual(left, right);
-}
+export { safeCompareHex } from '@synapsedesk/common';
 
 /**
  * A zero-padded numeric OTP.

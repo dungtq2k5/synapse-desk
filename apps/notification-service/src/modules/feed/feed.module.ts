@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { FeedService } from './feed.service';
+import { InboundThreadService } from './inbound-thread.service';
 import { NotificationsGrpcController } from './notifications-grpc.controller';
 
 /**
@@ -12,7 +13,7 @@ import { NotificationsGrpcController } from './notifications-grpc.controller';
  */
 @Module({
   controllers: [NotificationsGrpcController],
-  providers: [FeedService],
+  providers: [FeedService, InboundThreadService],
   exports: [FeedService],
 })
 export class FeedModule {}

@@ -315,7 +315,66 @@ export interface ConfirmAvatarUploadRequest {
 export interface DeleteAvatarRequest {
 }
 
+/**
+ * Resolve the SENDER of an inbound email, within an already-known tenant.
+ * 31-doc §3.
+ *
+ * **The `organization_id` is what makes this safe, and it is the whole design.**
+ * Self-signup answers the same policy question — "may this address join
+ * automatically?" — but its implementation has a second branch: no domain match
+ * CREATES an organization and makes the registrant its Org Admin. Reached from
+ * inbound mail, that turns an email from an unrecognised domain into a new
+ * tenant owned by a stranger.
+ *
+ * This RPC receives the tenant, so there is no branch in which it can mint one.
+ * It implements the domain-match half ONLY.
+ */
+export interface ResolveInboundSenderRequest {
+  /**
+   * From the recipient address's token — NEVER from the sender's domain.
+   *
+   * The global `findFirst(allowedEmailDomains has domain)` self-signup uses
+   * answers a different question — "which tenant claims this domain?" — and
+   * would provision a sender into whichever tenant matched, while their mail
+   * was addressed to yours.
+   */
+  organizationId: string;
+  email: string;
+  /**
+   * From the `From` header. `users.full_name` is NOT NULL, so the local part is
+   * the fallback — the same stand-in the Google sign-in path uses.
+   */
+  displayName?: string | undefined;
+}
+
+export interface ResolveInboundSenderResponse {
+  /**
+   * ABSENT means the sender may not author in this tenant: not a member, and
+   * their domain is not in this tenant's `allowed_email_domains`. The caller
+   * drops the mail and sends one auto-reply.
+   */
+  userId?:
+    | string
+    | undefined;
+  /**
+   * True when this call provisioned the account, so the caller can log a
+   * provisioning event rather than inferring one from a first-seen author.
+   */
+  created: boolean;
+}
+
 export interface UserServiceClient {
+  /**
+   * Unauthenticated by design — the caller is the inbound-email webhook, which
+   * holds a verified Worker signature and no user context. It cannot name a
+   * role, and it cannot reach the founder branch: see the request message.
+   */
+
+  resolveInboundSender(
+    request: ResolveInboundSenderRequest,
+    metadata?: Metadata,
+  ): Observable<ResolveInboundSenderResponse>;
+
   getCurrentUser(request: GetCurrentUserRequest, metadata?: Metadata): Observable<CurrentUserResponse>;
 
   updateOwnProfile(request: UpdateOwnProfileRequest, metadata?: Metadata): Observable<UserResponse>;
@@ -374,6 +433,17 @@ export interface UserServiceClient {
 }
 
 export interface UserServiceController {
+  /**
+   * Unauthenticated by design — the caller is the inbound-email webhook, which
+   * holds a verified Worker signature and no user context. It cannot name a
+   * role, and it cannot reach the founder branch: see the request message.
+   */
+
+  resolveInboundSender(
+    request: ResolveInboundSenderRequest,
+    metadata?: Metadata,
+  ): Promise<ResolveInboundSenderResponse> | Observable<ResolveInboundSenderResponse> | ResolveInboundSenderResponse;
+
   getCurrentUser(
     request: GetCurrentUserRequest,
     metadata?: Metadata,
@@ -485,6 +555,7 @@ export interface UserServiceController {
 export function UserServiceControllerMethods() {
   return function (constructor: Function) {
     const grpcMethods: string[] = [
+      "resolveInboundSender",
       "getCurrentUser",
       "updateOwnProfile",
       "listUsers",

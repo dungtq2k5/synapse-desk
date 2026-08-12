@@ -20,6 +20,7 @@ import { timestamp } from '../fixtures/wire';
 import { envValidationSchema } from '../../src/common/config/env.validation';
 import { buildOpenApiDocument } from '../../src/common/config/swagger.config';
 import { compareAlphabetically } from '@synapsedesk/common';
+import { INBOUND_SIGNATURE_HEADER } from '../../src/common/guards/inbound-signature.guard';
 
 describe('§1/§5 the OpenAPI document', () => {
   let fx: E2eFixture;
@@ -468,6 +469,62 @@ describe('§1/§5 the OpenAPI document', () => {
       )['x-cache'];
 
       expect(extension?.varyBy).toBe('caller');
+    });
+  });
+
+  describe('§32 §3.1 the inbound-email webhook documents itself', () => {
+    const inbound = () =>
+      operations().find(
+        ({ method, path }) =>
+          method === 'post' && path === '/api/v1/webhooks/email/inbound',
+      );
+
+    it('1. **appears in the document with a summary and a 200**', () => {
+      // Named here because the tempting way to satisfy 24-doc §5's structural
+      // sweep is `@ApiExcludeEndpoint()`, which would delete the route from the
+      // spec — and the spec is the one document describing how the Worker must
+      // call it.
+      const operation = inbound()?.operation;
+
+      expect(operation?.summary).toBe('Inbound email intake');
+      expect(operation?.responses?.['200']).toBeDefined();
+    });
+
+    it('2. **carries NO security requirement, and says why**', () => {
+      // The pairing is the point. `security: []` alone reads as "public", and
+      // somebody eventually takes that at face value; the description alone is
+      // prose nothing enforces.
+      const operation = inbound()?.operation;
+
+      expect(operation?.security).toEqual([]);
+      expect(operation?.description).toContain('Not a public endpoint');
+      expect(operation?.description).toContain('x-inbound-signature');
+    });
+
+    it('and documents 401 rather than Stripe’s 400', () => {
+      const responses = inbound()?.operation.responses ?? {};
+
+      expect(responses['401']).toBeDefined();
+      expect(responses['400']).toBeUndefined();
+    });
+
+    it('3. **`x-webhook` names the header the code actually reads**', () => {
+      // A documented header the handler ignores is worse than none: it is a
+      // contract the Worker would be written against and the endpoint would
+      // reject. The constant is imported from the guard, so the two cannot
+      // drift.
+      const extension = (
+        inbound()?.operation as unknown as Record<
+          string,
+          Record<string, string> | undefined
+        >
+      )['x-webhook'];
+
+      expect(extension).toEqual({
+        signatureHeader: INBOUND_SIGNATURE_HEADER,
+        idempotencyKey: 'messageId',
+        caller: 'cloudflare-email-worker',
+      });
     });
   });
 

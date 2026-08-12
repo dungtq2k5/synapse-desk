@@ -40,6 +40,7 @@ import {
   tenantScope,
 } from '@synapsedesk/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { recordInboundEmail, withInboundDedup } from './inbound-dedup';
 import { TicketAccessService } from '../ticket-access/ticket-access.service';
 import { AiService } from '../ai/ai.service';
 import { AuthReferenceService } from '../auth-client/auth-reference.service';
@@ -214,20 +215,34 @@ export class TicketsService {
       await this.authReference.assertUserExists(authorId, context);
     }
 
-    const ticket = await this.prisma.ticket.create({
-      data: {
-        organizationId,
-        authorId,
-        title: request.title.trim(),
-        description: request.description.trim(),
-        source: fromProtoTicketSource(request.source) ?? TicketSource.WEB,
-        priority:
-          fromProtoTicketPriority(request.priority) ?? TicketPriority.MEDIUM,
-        // NEW, always. A created ticket is one nobody has looked at yet, and
-        // letting a client choose the initial status would let it skip triage.
-        status: TicketStatus.NEW,
-      },
-    });
+    // **The dedup row and the ticket share one transaction** — 31-doc §6.2.
+    // Recorded separately, a request that inserted the row and then failed
+    // would make the provider's retry a no-op, losing the mail on the one
+    // delivery that could still have saved it.
+    //
+    // No `inbound_message_id` means no transaction is needed: every other
+    // transport has its own idempotency, and wrapping a single insert would be
+    // ceremony.
+    const ticket = request.inboundMessageId
+      ? await withInboundDedup(() =>
+          this.prisma.$transaction(async (tx) => {
+            const created = await tx.ticket.create({
+              data: this.newTicketData(organizationId, authorId, request),
+            });
+
+            await recordInboundEmail(
+              tx,
+              organizationId,
+              request.inboundMessageId!,
+              created.id,
+            );
+
+            return created;
+          }),
+        )
+      : await this.prisma.ticket.create({
+          data: this.newTicketData(organizationId, authorId, request),
+        });
 
     // AFTER the commit, never inside it. An event announcing a ticket a later
     // rollback erases is an event no consumer can un-handle — the same rule
@@ -524,5 +539,27 @@ export class TicketsService {
 
   load(ticketId: string, context: CallerContext): Promise<Ticket> {
     return this.access.load(ticketId, context);
+  }
+
+  /** The row a new ticket is, in one place — both branches above build it. */
+  private newTicketData(
+    organizationId: string,
+    authorId: string,
+    request: CreateTicketRequest,
+  ) {
+    return {
+      organizationId,
+      authorId,
+      // ASK Why should we need to trim since input is normalized in the API Gateway via DTO classes - `ticket.dto.ts`"?
+      title: request.title.trim(),
+      // ASK Why should we need to trim since input is normalized in the API Gateway via DTO classes - `ticket.dto.ts`"?
+      description: request.description.trim(),
+      source: fromProtoTicketSource(request.source) ?? TicketSource.WEB,
+      priority:
+        fromProtoTicketPriority(request.priority) ?? TicketPriority.MEDIUM,
+      // NEW, always. A created ticket is one nobody has looked at yet, and
+      // letting a client choose the initial status would let it skip triage.
+      status: TicketStatus.NEW,
+    };
   }
 }

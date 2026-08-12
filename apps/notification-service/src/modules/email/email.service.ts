@@ -68,7 +68,10 @@ export class EmailService implements OnModuleInit {
    * (18-doc §8), which is exactly why the id has to be captured now — it cannot
    * be recovered later for mail that has already gone out.
    */
-  async send(command: SendEmailCommand): Promise<SendEmailResult> {
+  async send(
+    command: SendEmailCommand,
+    options: { replyTo?: string } = {},
+  ): Promise<SendEmailResult> {
     const { subject, html, text } = renderEmail(command, this.branding);
 
     // nodemailer types `sendMail`'s result loosely, and only `messageId` is
@@ -77,6 +80,16 @@ export class EmailService implements OnModuleInit {
     const info = (await this.transporter.sendMail({
       from: this.sender,
       to: command.to,
+      // **Without this the whole reply-token design is dead** — 31-doc §10.
+      // The address in 31-doc §4 is only authoritative because the client
+      // replies to the one it was GIVEN; offering none means every reply goes
+      // to the bare sender address, carries no ticket token, and opens a
+      // duplicate ticket.
+      //
+      // Optional, because most mail here is transactional and has nothing to
+      // reply to — a password reset with a support Reply-To invites a
+      // conversation nobody is listening for.
+      ...(options.replyTo ? { replyTo: options.replyTo } : {}),
       subject,
       html,
       text,

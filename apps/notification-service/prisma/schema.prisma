@@ -132,17 +132,41 @@ model Notification {
   @@map("notifications")
 }
 
-/// RDM Table 24 — one row per (notification, channel).
+/// One auto-reply per address per TENANT per day — 31-doc §7.
 ///
-/// **Telemetry, not a feature.** No HTTP endpoint: a user seeing `BOUNCED` on
-/// their own address cannot act on it, and `provider_message_id` leaks the ESP
-/// relationship.
+/// **A table rather than Redis, and the reason is not convenience.** This
+/// service has no Redis client, and adding one for a counter would put the loop
+/// guard in a store a flush empties. A flushed limit re-opens the exchange it
+/// exists to close — and a mail loop is the one failure whose blast radius is
+/// somebody else's inbox.
 ///
-/// The valuable status is `SKIPPED`. `SENT` and `FAILED` are obvious; a
-/// `SKIPPED` row carrying `skip_reason = 'quiet_hours'` is the difference
-/// between answering *"why didn't I get an email?"* in ten seconds and not
-/// being able to answer it at all — which is the single most common support
-/// question this feature will generate.
+/// **Owned by the SENDER, not the publisher.** A limit enforced where the event
+/// is emitted counts intentions; enforced here it counts messages, and the loop
+/// is made of messages.
+///
+/// **Keyed `(organization_id, email)`, not on the address alone.** The table
+/// serves two purposes and they want different keys: loop prevention is a
+/// property of a mailbox, while a rejection notice is per-tenant. Keyed
+/// globally, a person who emails two of your tenants gets one courtesy reply
+/// and silence from the second — and concludes that tenant's support address is
+/// dead. This is the same reasoning `InboundEmail` records for `Message-ID`:
+/// one correspondent may legitimately be talking to several tenants.
+///
+/// A loop then costs at most one reply per tenant per day, which is still
+/// bounded — and bounded by the number of tenants that address is actually
+/// writing to, not by the number that exist.
+model InboundAutoReply {
+  organizationId String   @map("organization_id") @db.Uuid
+  email          String   @db.VarChar(320)
+  lastSentAt     DateTime @map("last_sent_at") @db.Timestamptz
+
+  @@id([organizationId, email])
+  /// For the daily prune — rows older than the window are dead weight, and
+  /// without a sweep this grows by one row per distinct stranger, forever.
+  @@index([lastSentAt])
+  @@map("inbound_auto_replies")
+}
+
 model NotificationDelivery {
   id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
 

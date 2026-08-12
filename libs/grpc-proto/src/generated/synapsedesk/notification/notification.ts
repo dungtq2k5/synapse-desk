@@ -213,7 +213,41 @@ export interface UpdatePreferenceRequest {
   digest: DigestMode;
 }
 
+/**
+ * The ticket an outbound notification was about, found by its `Message-ID`.
+ * 31-doc §4 — the `In-Reply-To` fallback.
+ *
+ * **A two-hop join, and both hops are here**: `notification_deliveries`
+ * carries the provider's `Message-ID`, and the `notifications` row it belongs
+ * to carries the ticket in `resource_type`/`resource_id`. Neither table exists
+ * in ticket-service, which is why this is one RPC rather than one column.
+ */
+export interface ResolveTicketByMessageIdRequest {
+  /** The `In-Reply-To` (or a `References` entry) the sender's client echoed back. */
+  providerMessageId: string;
+  /**
+   * *Scoped, and not in the doc's sketch.** Without it, a `Message-ID` lifted
+   * from one tenant's notification would resolve to that tenant's ticket while
+   * the mail was addressed to another — the same cross-tenant misroute the
+   * reply token's MAC is bound to the tenant to prevent.
+   */
+  organizationId: string;
+}
+
+export interface ResolveTicketByMessageIdResponse {
+  /**
+   * Absent when nothing matches, which is the common case: most inbound mail
+   * is not a reply to anything this system sent.
+   */
+  ticketId?: string | undefined;
+}
+
 export interface NotificationServiceClient {
+  resolveTicketByMessageId(
+    request: ResolveTicketByMessageIdRequest,
+    metadata?: Metadata,
+  ): Observable<ResolveTicketByMessageIdResponse>;
+
   listNotifications(request: ListNotificationsRequest, metadata?: Metadata): Observable<ListNotificationsResponse>;
 
   getUnreadCount(request: ListNotificationsRequest, metadata?: Metadata): Observable<UnreadCountResponse>;
@@ -230,6 +264,14 @@ export interface NotificationServiceClient {
 }
 
 export interface NotificationServiceController {
+  resolveTicketByMessageId(
+    request: ResolveTicketByMessageIdRequest,
+    metadata?: Metadata,
+  ):
+    | Promise<ResolveTicketByMessageIdResponse>
+    | Observable<ResolveTicketByMessageIdResponse>
+    | ResolveTicketByMessageIdResponse;
+
   listNotifications(
     request: ListNotificationsRequest,
     metadata?: Metadata,
@@ -269,6 +311,7 @@ export interface NotificationServiceController {
 export function NotificationServiceControllerMethods() {
   return function (constructor: Function) {
     const grpcMethods: string[] = [
+      "resolveTicketByMessageId",
       "listNotifications",
       "getUnreadCount",
       "markRead",

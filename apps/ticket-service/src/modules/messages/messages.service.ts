@@ -40,6 +40,7 @@ import {
   ticketMessageGroupKey,
 } from '@synapsedesk/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { recordInboundEmail, withInboundDedup } from '../tickets/inbound-dedup';
 import { TicketEventPublisher } from '../events/ticket-event.publisher';
 import { TicketsService } from '../tickets/tickets.service';
 import { RagClientService } from '../ai-client/rag-client.service';
@@ -194,18 +195,46 @@ export class MessagesService {
       if (existing) return toMessageResponse(existing);
     }
 
+    const data = {
+      ticketId: ticket.id,
+      senderId,
+      content,
+      isInternalNote: request.isInternalNote,
+      clientMessageId: request.clientMessageId ?? null,
+    };
+
     let message: MessageWithAttachments;
     try {
-      message = await this.prisma.ticketMessage.create({
-        data: {
-          ticketId: ticket.id,
-          senderId,
-          content,
-          isInternalNote: request.isInternalNote,
-          clientMessageId: request.clientMessageId ?? null,
-        },
-        include: { attachments: true },
-      });
+      // **An inbound email's dedup row shares this insert's transaction** —
+      // 31-doc §6.2. `client_message_id` above cannot serve: it is a UUID
+      // column, and it is scoped to a ticket, while inbound dedup must also
+      // work for the mail that CREATES one.
+      //
+      // The two idempotency keys coexist rather than compete — a WebSocket
+      // re-emit and a provider redelivery are different events, and a message
+      // that is both is deduped by whichever arrives second.
+      message = request.inboundMessageId
+        ? await withInboundDedup(() =>
+            this.prisma.$transaction(async (tx) => {
+              const created = await tx.ticketMessage.create({
+                data,
+                include: { attachments: true },
+              });
+
+              await recordInboundEmail(
+                tx,
+                ticket.organizationId,
+                request.inboundMessageId!,
+                ticket.id,
+              );
+
+              return created;
+            }),
+          )
+        : await this.prisma.ticketMessage.create({
+            data,
+            include: { attachments: true },
+          });
     } catch (error) {
       // The race the index exists for. The winner's row is the answer.
       if (isUniqueConstraintViolation(error) && request.clientMessageId) {

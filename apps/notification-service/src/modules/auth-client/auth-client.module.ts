@@ -9,6 +9,7 @@ import {
   GRPC_LOADER_OPTIONS,
 } from '@synapsedesk/grpc-proto';
 import { AuthReferenceService } from './auth-reference.service';
+import { ReplyAddressService } from '../email/reply-address.service';
 
 /**
  * notification-service's first gRPC dependency.
@@ -36,7 +37,11 @@ import { AuthReferenceService } from './auth-reference.service';
       },
     ]),
   ],
-  providers: [AuthReferenceService],
-  exports: [AuthReferenceService],
+  // `ReplyAddressService` lives here rather than beside `EmailService` because
+  // it is a READER of auth-service — the tenant's inbound token — and this is
+  // the module that owns that channel. Registering the client twice would open
+  // a second connection to one peer for a single lookup.
+  providers: [AuthReferenceService, ReplyAddressService],
+  exports: [AuthReferenceService, ReplyAddressService],
 })
 export class AuthClientModule {}

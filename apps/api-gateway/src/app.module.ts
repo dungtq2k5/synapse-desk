@@ -7,6 +7,7 @@ import { SmartThrottlerGuard } from './common/guards/smart-throttler.guard';
 import { OrganizationStatusInterceptor } from './common/interceptors/organization-status.interceptor';
 import { OrganizationStatusModule } from './common/organization-status/organization-status.module';
 import { CacheModule } from './common/cache/cache.module';
+import { InboundEmailModule } from './modules/inbound-email/inbound-email.module';
 import { GraphqlApiModule } from './common/graphql/graphql.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { envValidationSchema } from './common/config/env.validation';
@@ -59,6 +60,9 @@ import { ApiInfoModule } from './modules/api-info/api-info.module';
     // the consumer is a subscription the app must hold whether or not any
     // particular feature module was imported.
     CacheModule,
+    // The mail Worker's entry point — 31-doc §6. The gateway is the email
+    // adapter; no other service knows what an email is.
+    InboundEmailModule,
     // The single channel to ticket-service, global because Domain B's surface
     // will span several gateway modules and all of them must share one.
     //

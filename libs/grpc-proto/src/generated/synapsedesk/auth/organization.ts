@@ -271,7 +271,94 @@ export interface DeleteOrganizationResponse {
   revokedSessionCount: number;
 }
 
+/** Resolve the tenant from the token in an inbound support address — 31-doc §2. */
+export interface ResolveOrgByInboundTokenRequest {
+  inboundToken: string;
+}
+
+export interface ResolveOrgByInboundTokenResponse {
+  /**
+   * ABSENT means the address is definitively unroutable: no such token, or a
+   * deleted tenant. The caller drops the mail and answers 200.
+   *
+   * Optional rather than a NOT_FOUND error on purpose. An exception cannot be
+   * told apart from auth-service being unreachable, and the two need opposite
+   * answers: an unroutable address must be dropped (200, no retry), while an
+   * infrastructure failure must NOT be, or the mail is lost on the one retry
+   * that would have recovered it.
+   */
+  organizationId?:
+    | string
+    | undefined;
+  /**
+   * The tenant's lifecycle state, so the caller can distinguish "no such
+   * tenant" from "suspended" in its logs rather than reporting both as a drop.
+   */
+  status: OrgStatus;
+}
+
+/**
+ * The tenant's inbound token, BY tenant — the reverse of the lookup above.
+ *
+ * notification-service needs it to build the `Reply-To` that makes an emailed
+ * notification answerable (31-doc §4). Absent means the tenant has inbound
+ * email switched off, which is the default.
+ */
+export interface GetInboundTokenRequest {
+  organizationId: string;
+}
+
+export interface GetInboundTokenResponse {
+  inboundToken?: string | undefined;
+}
+
+/**
+ * Issue or ROTATE the tenant's inbound-mail token — 31-doc §2.
+ *
+ * One message for both, because "enable" and "rotate" differ only in whether
+ * the row already had a value — and rotation is one of the three properties
+ * §2 chose an opaque token for: an abused address can be replaced without
+ * touching anything else.
+ *
+ * No `organization_id`: like every other method on this service, the tenant
+ * comes from the verified caller context, so there is no request shape in
+ * which an admin could re-key someone else's workspace.
+ */
+export interface IssueInboundTokenRequest {
+}
+
+export interface IssueInboundTokenResponse {
+  inboundToken: string;
+}
+
+/**
+ * Switch inbound mail off without deleting the tenant — 31-doc §2. Sets NULL,
+ * which is the state a tenant that never enabled email is already in.
+ */
+export interface RevokeInboundTokenRequest {
+}
+
+export interface RevokeInboundTokenResponse {
+}
+
 export interface OrganizationServiceClient {
+  getInboundToken(request: GetInboundTokenRequest, metadata?: Metadata): Observable<GetInboundTokenResponse>;
+
+  issueInboundToken(request: IssueInboundTokenRequest, metadata?: Metadata): Observable<IssueInboundTokenResponse>;
+
+  revokeInboundToken(request: RevokeInboundTokenRequest, metadata?: Metadata): Observable<RevokeInboundTokenResponse>;
+
+  /**
+   * Unauthenticated by design: the caller is the inbound-email webhook, which
+   * has no user context — it holds a verified Worker signature instead. The
+   * token IS the lookup key, and it grants nothing beyond naming a tenant.
+   */
+
+  resolveOrgByInboundToken(
+    request: ResolveOrgByInboundTokenRequest,
+    metadata?: Metadata,
+  ): Observable<ResolveOrgByInboundTokenResponse>;
+
   getCurrentOrganization(request: GetCurrentOrganizationRequest, metadata?: Metadata): Observable<OrganizationResponse>;
 
   getOrganizationStatus(
@@ -325,6 +412,35 @@ export interface OrganizationServiceClient {
 }
 
 export interface OrganizationServiceController {
+  getInboundToken(
+    request: GetInboundTokenRequest,
+    metadata?: Metadata,
+  ): Promise<GetInboundTokenResponse> | Observable<GetInboundTokenResponse> | GetInboundTokenResponse;
+
+  issueInboundToken(
+    request: IssueInboundTokenRequest,
+    metadata?: Metadata,
+  ): Promise<IssueInboundTokenResponse> | Observable<IssueInboundTokenResponse> | IssueInboundTokenResponse;
+
+  revokeInboundToken(
+    request: RevokeInboundTokenRequest,
+    metadata?: Metadata,
+  ): Promise<RevokeInboundTokenResponse> | Observable<RevokeInboundTokenResponse> | RevokeInboundTokenResponse;
+
+  /**
+   * Unauthenticated by design: the caller is the inbound-email webhook, which
+   * has no user context — it holds a verified Worker signature instead. The
+   * token IS the lookup key, and it grants nothing beyond naming a tenant.
+   */
+
+  resolveOrgByInboundToken(
+    request: ResolveOrgByInboundTokenRequest,
+    metadata?: Metadata,
+  ):
+    | Promise<ResolveOrgByInboundTokenResponse>
+    | Observable<ResolveOrgByInboundTokenResponse>
+    | ResolveOrgByInboundTokenResponse;
+
   getCurrentOrganization(
     request: GetCurrentOrganizationRequest,
     metadata?: Metadata,
@@ -404,6 +520,10 @@ export interface OrganizationServiceController {
 export function OrganizationServiceControllerMethods() {
   return function (constructor: Function) {
     const grpcMethods: string[] = [
+      "getInboundToken",
+      "issueInboundToken",
+      "revokeInboundToken",
+      "resolveOrgByInboundToken",
       "getCurrentOrganization",
       "getOrganizationStatus",
       "updateOrganization",

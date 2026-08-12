@@ -1,0 +1,19 @@
+{
+  "name": "@synapsedesk/email-inbound-worker",
+  "version": "0.0.0",
+  "private": true,
+  "//": "Deliberately OUTSIDE the npm workspaces (`apps/*`, `libs/*`). This is a Cloudflare Workers runtime, not a Nest app: different globals, no Nest build, and no tsconfig in the root eslint project list covers it. Install and deploy from inside this directory.",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "postal-mime": "^2.4.4"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250109.0",
+    "typescript": "^5.9.3",
+    "wrangler": "^3.99.0"
+  }
+}

@@ -38,6 +38,7 @@ import {
   ApiFilterErrors,
   ApiWrappedResponse,
 } from '../../common/decorators/api-response.decorator';
+import { InboundAddressResponseDto } from './dto/rest/inbound-address.dto';
 
 /**
  * The caller's OWN tenant (api-endpoints-plan).
@@ -81,6 +82,62 @@ export class OrganizationsController {
     @CurrentUser() context: RequestContext,
   ): Promise<OrganizationResponseDto> {
     return this.organizationsGrpcClient.getCurrent(context);
+  }
+
+  /**
+   * Issues the tenant's inbound support address, or ROTATES it — 31-doc §2.
+   *
+   * **The same route for both**, because "enable" and "rotate" differ only in
+   * whether the tenant already had a token. A separate rotate endpoint would
+   * make a client decide which to call, and getting that wrong either fails or
+   * silently re-keys a working address.
+   *
+   * **`organization.update`, not a self-service action.** The token is a
+   * ROUTING KEY: rotating it stops the old address delivering immediately, so
+   * an end user able to call this could take down their own tenant's support
+   * address.
+   *
+   * **No id in the path**, matching every other route on this controller: the
+   * tenant comes from the verified caller, so there is no request shape in
+   * which an admin re-keys somebody else's workspace.
+   */
+  @ApiOperation({ summary: 'Enable or rotate the inbound email address' })
+  @ApiWrappedResponse(InboundAddressResponseDto, {
+    status: HttpStatus.CREATED,
+    description:
+      'The new address. Any previous one stops routing immediately — mail ' +
+      'already in flight to it is dropped as unroutable, which is the point ' +
+      'of a rotation and also its cost.',
+  })
+  @ApiFilterErrors(['401', '403'])
+  @InvalidateCache(CACHE_SCOPES.organizations)
+  @Post('inbound-token')
+  @RequirePermission('organization.update')
+  @HttpCode(HttpStatus.CREATED)
+  issueInboundToken(
+    @CurrentUser() context: RequestContext,
+  ): Promise<InboundAddressResponseDto> {
+    return this.organizationsGrpcClient.issueInboundToken(context);
+  }
+
+  /**
+   * Switches inbound email off — 31-doc §2.
+   *
+   * Returns the tenant to the state one that never enabled email is already in.
+   * Idempotent, because the caller's intent is satisfied either way.
+   */
+  @ApiOperation({ summary: 'Disable the inbound email address' })
+  @ApiWrappedResponse(undefined, {
+    status: HttpStatus.NO_CONTENT,
+    description: 'Inbound mail is off. The address stops routing immediately.',
+  })
+  @ApiFilterErrors(['401', '403'])
+  @InvalidateCache(CACHE_SCOPES.organizations)
+  @Delete('inbound-token')
+  @RequirePermission('organization.update')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  revokeInboundToken(@CurrentUser() context: RequestContext): Promise<void> {
+    return this.organizationsGrpcClient.revokeInboundToken(context);
   }
 
   /** `slug` changes break existing links; `domain` is security-relevant. */

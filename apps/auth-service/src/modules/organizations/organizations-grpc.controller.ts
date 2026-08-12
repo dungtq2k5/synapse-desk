@@ -4,7 +4,15 @@ import {
   CompleteOnboardingRequest,
   DeleteOrganizationRequest,
   DeleteOrganizationResponse,
+  GetInboundTokenRequest,
+  IssueInboundTokenRequest,
+  IssueInboundTokenResponse,
+  RevokeInboundTokenRequest,
+  RevokeInboundTokenResponse,
+  GetInboundTokenResponse,
   GetOrganizationStatusRequest,
+  ResolveOrgByInboundTokenRequest,
+  ResolveOrgByInboundTokenResponse,
   OrganizationStatusResponse,
   OnboardingResponse,
   OrganizationResponse,
@@ -39,6 +47,40 @@ export class OrganizationsGrpcController implements OrganizationServiceControlle
     metadata?: Metadata,
   ): Promise<OrganizationResponse> {
     return this.organizationsService.getCurrentOrganization(
+      unpackCallerContext(metadata),
+    );
+  }
+
+  /** 31-doc §2. No caller context: the token is the key — see the service. */
+  resolveOrgByInboundToken(
+    request: ResolveOrgByInboundTokenRequest,
+  ): Promise<ResolveOrgByInboundTokenResponse> {
+    return this.organizationsService.resolveOrgByInboundToken(request);
+  }
+
+  /** 31-doc §4. Public address, not a credential — see the service. */
+  getInboundToken(
+    request: GetInboundTokenRequest,
+  ): Promise<GetInboundTokenResponse> {
+    return this.organizationsService.getInboundToken(request);
+  }
+
+  /** 31-doc §2 — issue or rotate. Tenant from the caller, like every method here. */
+  issueInboundToken(
+    _request: IssueInboundTokenRequest,
+    metadata?: Metadata,
+  ): Promise<IssueInboundTokenResponse> {
+    return this.organizationsService.issueInboundToken(
+      unpackCallerContext(metadata),
+    );
+  }
+
+  /** 31-doc §2 — switch inbound mail off. */
+  revokeInboundToken(
+    _request: RevokeInboundTokenRequest,
+    metadata?: Metadata,
+  ): Promise<RevokeInboundTokenResponse> {
+    return this.organizationsService.revokeInboundToken(
       unpackCallerContext(metadata),
     );
   }

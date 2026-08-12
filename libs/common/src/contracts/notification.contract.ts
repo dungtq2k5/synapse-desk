@@ -13,6 +13,8 @@
  * fail a registration.
  */
 
+import type { InboundRejectionReason } from './inbound-email.contract';
+
 /**
  * Subjects. `emit` (fire-and-forget) rather than `send` (request/response) —
  * see EMAIL/SMS commands below; nothing awaits a reply.
@@ -25,6 +27,16 @@ export const NOTIFICATION_PATTERNS = {
 /** Which template to render. The value doubles as the discriminant. */
 export enum EmailTemplateName {
   WELCOME = 'WELCOME',
+  /**
+   * The one-time reply to mail this system refused — 31-doc §3, §7.
+   *
+   * **A drop has to be visible to the SENDER, not only in a log.** Someone
+   * emailed a support address and heard nothing; without this they conclude the
+   * product is broken, and the silence is indistinguishable from mail being
+   * lost. Rate-limited to one per address per day, because the thing most
+   * likely to be on the other end of a refused address is an auto-responder.
+   */
+  INBOUND_REJECTED = 'INBOUND_REJECTED',
   EMAIL_VERIFICATION = 'EMAIL_VERIFICATION',
   PASSWORD_RESET = 'PASSWORD_RESET',
   PASSWORD_CHANGED = 'PASSWORD_CHANGED',
@@ -63,6 +75,17 @@ export type NotificationOrigin = {
  * the email arrived with a dead link.
  */
 export type SendEmailCommand =
+  | {
+      template: EmailTemplateName.INBOUND_REJECTED;
+      to: string;
+      data: {
+        /** Why it was refused, in words a sender can act on. */
+        reason: InboundRejectionReason;
+        /** Where they should go instead. */
+        portalUrl: string;
+        organizationName: string | null;
+      };
+    }
   | {
       template: EmailTemplateName.WELCOME;
       to: string;
