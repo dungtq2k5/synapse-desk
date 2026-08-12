@@ -46,7 +46,7 @@ export const ERROR_ENVELOPE_PROPERTIES = {
   error: { type: 'string' },
 } as const satisfies Record<string, SchemaObject>;
 
-/** What a route may declare. `429` and `500` are added unconditionally. */
+/** What a route may declare. `500` is always added; `429` unless opted out. */
 export type ApiErrorStatus = '400' | '401' | '403' | '404' | '409' | '422';
 
 const ERROR_DESCRIPTIONS: Record<ApiErrorStatus | '429' | '500', string> = {
@@ -59,7 +59,9 @@ const ERROR_DESCRIPTIONS: Record<ApiErrorStatus | '429' | '500', string> = {
     'existence oracle across tenants.',
   '409': 'The request conflicts with the current state of the resource.',
   '422': 'Well-formed, but semantically rejected by a business rule.',
-  '429': 'Rate limited. Every route is throttled — see the tier on the route.',
+  '429':
+    'Rate limited. Nearly every route is throttled — see the tier on the ' +
+    'route. The exceptions are the webhook intakes, which carry no 429 at all.',
   '500': 'Unexpected server error. The response body carries no internals.',
 };
 
@@ -195,9 +197,31 @@ export function ApiWrappedResponse(
 /**
  * Documents the ERROR responses a route can produce — 24-doc §2, fix 1.
  *
- * **`429` and `500` are added unconditionally**, because the global throttler
- * and the global exception filter apply to every route in the gateway. A
- * document that omits them describes a different API than the one running.
+ * **`500` is added unconditionally and `429` is added by default**, because the
+ * global exception filter and the global throttler apply to every route in the
+ * gateway. A document that omits them describes a different API than the one
+ * running.
+ *
+ * **The two are not the same kind of automatic, which is why only one of them
+ * can be turned off.** `500` comes from the global exception filter, and
+ * nothing opts out of that — the webhook routes least of all, since an
+ * infrastructure failure is exactly the case where they must answer 5xx so the
+ * provider retries. `429` comes from the throttler, and `@SkipThrottle()` genuinely
+ * removes it: `/webhooks/stripe` and `/webhooks/email/inbound` cannot produce a
+ * 429 under any input, so documenting one is a claim about the API that is
+ * simply false. A single flag that dropped BOTH would trade a wrong 429 for a
+ * wrong absence of 500.
+ *
+ * ```ts
+ * ＠ApiFilterErrors(['404'])                       // 404, 429, 500
+ * ＠ApiFilterErrors(['401'], { throttled: false })  // 401, 500 — see @SkipThrottle
+ * ```
+ *
+ * **`throttled: false` must mirror `@SkipThrottle()` on the same route**, and
+ * nothing about the type system makes it. `openapi.e2e-spec.ts` asserts the
+ * pairing in both directions against the controllers' actual decorators, so
+ * removing one without the other fails there rather than shipping a document
+ * that quietly disagrees with the guard.
  *
  * **`403` is handled**, which the reference implementation this is ported from
  * did not do: its union accepted `'403'` and its body ignored it, so
@@ -211,8 +235,17 @@ export function ApiWrappedResponse(
  */
 export function ApiFilterErrors(
   statuses: ApiErrorStatus[] = [],
+  options: {
+    /**
+     * Whether the global throttler reaches this route. `false` ONLY for a route
+     * carrying `@SkipThrottle()` — it removes the documented `429`.
+     */
+    throttled?: boolean;
+  } = {},
 ): MethodDecorator & ClassDecorator {
-  const all = [...new Set([...statuses, '429', '500'])] as Array<
+  const automatic = options.throttled === false ? ['500'] : ['429', '500'];
+
+  const all = [...new Set([...statuses, ...automatic])] as Array<
     ApiErrorStatus | '429' | '500'
   >;
 

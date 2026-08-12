@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import request from 'supertest';
 import { of } from 'rxjs';
@@ -68,6 +68,25 @@ describe('§1/§5 the OpenAPI document', () => {
 
   const schema = (name: string) =>
     doc.components?.schemas?.[name] as SchemaObject | undefined;
+
+  /**
+   * Every controller source file, found rather than listed.
+   *
+   * A hardcoded list is the version that rots: a controller added later is
+   * simply absent, and a sweep that silently stops covering a file reports a
+   * clean pass for routes it never looked at.
+   */
+  const controllerFiles = (): string[] => {
+    const walk = (dir: string): string[] =>
+      readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+        const path = join(dir, entry.name);
+        if (entry.isDirectory()) return walk(path);
+
+        return entry.name.endsWith('.controller.ts') ? [path] : [];
+      });
+
+    return walk(join(__dirname, '../../src'));
+  };
 
   beforeAll(async () => {
     fx = await bootstrapE2eTest();
@@ -264,18 +283,125 @@ describe('§1/§5 the OpenAPI document', () => {
       expect(schemaOf(responses, '403')?.properties).toHaveProperty('error');
     });
 
-    it('4. **every route documents 429 and 500**', () => {
-      // The global throttler and the global exception filter apply to every
-      // route in the gateway, so a document that omits them describes a
-      // different API than the one running.
+    it('4. **every route documents 500**', () => {
+      // The global exception filter applies to every route in the gateway with
+      // no way to opt out, so a document that omits it describes a different
+      // API than the one running. 429 is the paired-with-@SkipThrottle case
+      // below — it used to be asserted here, unconditionally, which is how the
+      // two webhook routes came to document a status they cannot produce.
       const missing = operations()
-        .filter(
-          ({ operation }) =>
-            !operation.responses?.['429'] || !operation.responses?.['500'],
-        )
+        .filter(({ operation }) => !operation.responses?.['500'])
         .map(({ method, path }) => `${method.toUpperCase()} ${path}`);
 
       expect(missing).toEqual([]);
+    });
+
+    /**
+     * **429 is documented exactly where the throttler actually runs.**
+     *
+     * `@ApiFilterErrors(['401'], { throttled: false })` and `@SkipThrottle()`
+     * are two statements of one fact, and nothing in the type system ties them
+     * together — so this asserts the pairing in BOTH directions against the
+     * controllers' real decorators.
+     *
+     * The truth comes from the source text rather than from a list here,
+     * because a list would be a third copy of the same fact and would go stale
+     * in the same silent way. It reads the decorator, which is the thing the
+     * guard reads.
+     */
+    describe('4b. 429 tracks @SkipThrottle', () => {
+      /**
+       * A real `@SkipThrottle()` decorator: at the start of a line.
+       *
+       * **Anchored because the unanchored version counts prose.** Both webhook
+       * controllers explain the pairing in a comment that names the decorator,
+       * and a bare `/@SkipThrottle\(/` scored those as two uses each — a scan
+       * that reads documentation ABOUT the code as the code.
+       */
+      const DECORATOR = /^[ \t]*@SkipThrottle\(\)/gm;
+      const ON_A_CLASS =
+        /^[ \t]*@SkipThrottle\(\)[\s\S]{0,400}?export class (\w+)/m;
+
+      /** Controller class names carrying a class-level `@SkipThrottle()`. */
+      const skipThrottled = (): Set<string> => {
+        const names = new Set<string>();
+
+        for (const file of controllerFiles()) {
+          // Class-level only: the decorator above `export class`, allowing the
+          // other class decorators that sit between them.
+          const match = ON_A_CLASS.exec(readFileSync(file, 'utf8'));
+          if (match) names.add(match[1]);
+        }
+
+        return names;
+      };
+
+      it('the scan finds the decorator at all', () => {
+        // Guards the guard. A moved directory or a renamed decorator would make
+        // every assertion below vacuously true of an empty set — and the
+        // failure it is looking for is precisely an over-broad 429.
+        expect([...skipThrottled()].sort(compareAlphabetically)).toEqual([
+          'InboundEmailController',
+          'WebhooksController',
+        ]);
+      });
+
+      it('**and every @SkipThrottle occurrence is class-level**', () => {
+        // A method-level `@SkipThrottle()` would be invisible to the scan
+        // above, so its route would be expected to carry a 429 it cannot
+        // produce — the original bug, one level down. Fail loudly and ask for
+        // the scan to be extended rather than reporting a false pass.
+        const perFile = controllerFiles().map((file) => {
+          const source = readFileSync(file, 'utf8');
+
+          return [
+            file.split('/').pop(),
+            (source.match(DECORATOR) ?? []).length,
+            ON_A_CLASS.test(source) ? 1 : 0,
+          ];
+        });
+
+        expect(
+          perFile.filter(([, total, classLevel]) => total !== classLevel),
+        ).toEqual([]);
+      });
+
+      it('**429 is documented iff the route is throttled**', () => {
+        const skipped = skipThrottled();
+
+        // `operationId` defaults to `ControllerName_methodName`, which is the
+        // only link the document keeps back to the class that produced it.
+        const wrong = operations()
+          .map(({ method, path, operation }) => {
+            const controller = operation.operationId?.split('_')[0] ?? '';
+            const documents429 = Boolean(operation.responses?.['429']);
+
+            return {
+              route: `${method.toUpperCase()} ${path}`,
+              controller,
+              documents429,
+              shouldDocument429: !skipped.has(controller),
+            };
+          })
+          .filter((row) => row.documents429 !== row.shouldDocument429)
+          .map((row) => row.route);
+
+        expect(wrong).toEqual([]);
+      });
+
+      it('and the webhook routes are the ones without it', () => {
+        // The positive statement of the same thing, so a reader sees WHICH
+        // routes this is about without reconstructing it from the sweep.
+        const without = operations()
+          .filter(({ operation }) => !operation.responses?.['429'])
+          .map(({ path }) => path)
+          .sort(compareAlphabetically);
+
+        expect(without).toEqual([
+          '/api/v1/webhooks/email/inbound',
+          '/api/v1/webhooks/stripe',
+        ]);
+      });
     });
   });
 

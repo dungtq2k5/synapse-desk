@@ -70,7 +70,10 @@ export class WebhooksController {
   @ApiWrappedResponse(undefined, {
     description: 'Event accepted. The body carries an acknowledgement only.',
   })
-  @ApiFilterErrors(['400'])
+  // `throttled: false` mirrors the class's `@SkipThrottle()` — Stripe's retry
+  // storm is never rate-limited, so a documented 429 describes a response this
+  // route cannot produce. 500 stays: it is the one non-2xx Stripe should retry.
+  @ApiFilterErrors(['400'], { throttled: false })
   @Post('stripe')
   @HttpCode(HttpStatus.OK)
   async stripe(

@@ -82,7 +82,13 @@ export class InboundEmailController {
   // **401, not Stripe's 400** — 32-doc §3. The credential was presented and
   // rejected, and 401 is the answer that tells the provider to stop rather
   // than retry.
-  @ApiFilterErrors(['401'])
+  //
+  // `throttled: false` mirrors the class's `@SkipThrottle()`: this route cannot
+  // produce a 429 under any input, and a documented one would tell the Worker's
+  // author to write a backoff for a status that never arrives. 500 stays — an
+  // infrastructure failure here is real, and the retry it triggers is the
+  // recovery.
+  @ApiFilterErrors(['401'], { throttled: false })
   // Published so the Worker's contract and the code that enforces it cannot
   // drift — the same reason `@Cacheable` composes `x-cache`.
   @ApiExtension('x-webhook', {
