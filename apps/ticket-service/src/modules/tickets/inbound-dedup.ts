@@ -1,19 +1,24 @@
 import { status } from '@grpc/grpc-js';
 import { RpcException } from '@nestjs/microservices';
+import { isUniqueConstraintViolation } from '@synapsedesk/common';
 import { Prisma } from '../../generated/prisma/client';
-
-/** Postgres unique-violation, as Prisma reports it. */
-const UNIQUE_VIOLATION = 'P2002';
 
 /**
  * A write that has already been performed for this `Message-ID`.
  *
- * Thrown so the caller can answer with the EXISTING row rather than a failure:
- * a provider redelivery means the first attempt succeeded, so the correct
- * response is the thing it produced.
+ * Thrown so the caller can answer a redelivery with success rather than a
+ * failure: the provider retries by design, and the first attempt already
+ * produced the ticket.
+ *
+ * **It carries nothing, and cannot.** An earlier version took the original
+ * `ticketId` so the caller could answer with the existing row; that value is
+ * unobtainable from where this is raised, for the reason `recordInboundEmail`
+ * explains — the transaction is already aborted, so the read that would fetch
+ * it throws first. The parameter survived as permanently `null` and nothing
+ * ever read it.
  */
 export class InboundEmailAlreadyProcessed extends Error {
-  constructor(readonly ticketId: string | null = null) {
+  constructor() {
     super('This inbound email has already been processed');
   }
 }
@@ -42,11 +47,10 @@ export async function recordInboundEmail(
       data: { organizationId, messageId, ticketId },
     });
   } catch (error) {
-    // ASK Can we use `isUniqueConstraintViolation` in `/libs/common/.../prisma-errors.ts`?
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === UNIQUE_VIOLATION
-    ) {
+    // Unnarrowed, deliberately: this insert touches one table with one unique
+    // constraint, so `(organization_id, message_id)` is the only P2002 it can
+    // raise. The `index` argument exists for rows guarded by several.
+    if (isUniqueConstraintViolation(error)) {
       // **Nothing is read here, and that is not laziness.** Postgres puts a
       // transaction into a failed state as soon as a statement inside it
       // errors, so a `findUnique` for the original row would itself throw
@@ -57,30 +61,20 @@ export async function recordInboundEmail(
       // The caller does not need the original id anyway: a redelivery means the
       // first attempt already succeeded, and the only useful answer is
       // ALREADY_EXISTS.
-      throw new InboundEmailAlreadyProcessed(null);
+      throw new InboundEmailAlreadyProcessed();
     }
 
     throw error;
   }
 }
 
-/**
- * The idempotency key for a message that carried no `Message-ID` — 31-doc §7.
- *
- * **Weaker than the header, and far better than nothing.** Without a key, a
- * retry storm creates one ticket per attempt; with this, two deliveries of the
- * same mail collide as they should. It can theoretically collide across two
- * genuinely different messages sent by the same person, with the same subject,
- * in the same second — at which point the second is dropped, which is the
- * failure this trades for.
- */
-export function synthesizeMessageId(
-  from: string,
-  subject: string,
-  receivedAt: string,
-): string {
-  return `synthesized:${from}:${subject}:${receivedAt}`;
-}
+// The key for a message with no `Message-ID` is SYNTHESIZED IN THE GATEWAY —
+// 31-doc §7, `idempotencyKeyFor`. A second implementation lived here, unused,
+// and keyed on `receivedAt`: the Worker stamps that fresh on every delivery
+// attempt, so a redelivery would have produced a new key, a new ticket, and
+// exactly the retry storm the fallback exists to prevent. Removed rather than
+// fixed — ticket-service receives a key and stays ignorant of email (31-doc
+// §6), so it has no business minting one.
 
 /**
  * Runs a write, turning a redelivery into `ALREADY_EXISTS`.

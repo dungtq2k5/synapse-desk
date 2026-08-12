@@ -77,3 +77,14 @@ export const MAX_MESSAGE_ID_LENGTH = 255;
 /** RFC 5322 `msg-id` is printable ASCII, and that is what makes bytes and
  * characters the same number for {@link MAX_MESSAGE_ID_LENGTH}. */
 export const PRINTABLE_ASCII = /^[\x21-\x7E]+$/;
+
+/**
+ * How long a `Date` header may be.
+ *
+ * RFC 5322 `date-time` is under 40 characters even with a comment and an
+ * obsolete zone name, so this is slack rather than a limit anyone reaches. It
+ * is bounded at all because the value is hashed into the idempotency key for a
+ * message with no `Message-ID`, and an unbounded header would let one field
+ * decide how much a digest costs.
+ */
+export const MAX_DATE_HEADER_LENGTH = 255;

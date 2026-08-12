@@ -9,6 +9,7 @@ import {
   MaxLength,
 } from 'class-validator';
 import {
+  MAX_DATE_HEADER_LENGTH,
   MAX_EMAIL_ADDRESS_LENGTH,
   MAX_FULL_NAME_LENGTH,
   MAX_HEADER_LINE_LENGTH,
@@ -133,7 +134,7 @@ export class InboundEmailDto {
    */
   @IsOptional()
   @IsString()
-  @MaxLength(255)
+  @MaxLength(MAX_DATE_HEADER_LENGTH)
   readonly date?: string;
 
   /**

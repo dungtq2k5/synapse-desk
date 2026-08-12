@@ -1,11 +1,15 @@
 // @ts-check
 import eslint from '@eslint/js';
+import { defineConfig } from 'eslint/config';
 import eslintPluginPrettierRecommended from 'eslint-plugin-prettier/recommended';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
-// FIXME @deprecated - ESLint core now provides this functionality via defineConfig(), which we now recommend instead. See https://typescript-eslint.io/packages/typescript-eslint/#config-deprecated.
-export default tseslint.config(
+// `defineConfig` from ESLint core, not `tseslint.config()` — the latter is
+// deprecated now that core provides the same thing, and typescript-eslint's
+// own docs point here. `tseslint` is still imported: it owns the shared rule
+// sets below, and only the wrapper moved.
+export default defineConfig(
   {
     ignores: [
       'eslint.config.mjs',

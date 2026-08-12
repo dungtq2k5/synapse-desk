@@ -5,6 +5,7 @@ import {
   EMAIL_INBOUND_PATTERNS,
   EmailTemplateName,
   formatErrorMsg,
+  isUniqueConstraintViolation,
   type InboundEmailRejectedEvent,
 } from '@synapsedesk/common';
 import { PrismaService } from '../prisma/prisma.service';
@@ -12,17 +13,6 @@ import { EmailService } from '../email/email.service';
 
 /** How long one address waits before it can be told again. */
 const AUTO_REPLY_WINDOW_MS = 24 * 60 * 60 * 1000;
-
-/** Postgres unique violation, as Prisma reports it. */
-const UNIQUE_VIOLATION = 'P2002';
-
-function isUniqueViolation(error: unknown): boolean {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    (error as { code?: string }).code === UNIQUE_VIOLATION
-  );
-}
 
 /**
  * Tells a sender their mail was refused — once a day, at most.
@@ -153,7 +143,7 @@ export class InboundRejectionConsumer {
       // any failure, so a database outage was reported as "this sender was
       // already told today" — the right direction to fail in for a loop guard,
       // and a log line that actively described the wrong thing.
-      if (isUniqueViolation(error)) return false;
+      if (isUniqueConstraintViolation(error)) return false;
 
       throw error;
     }

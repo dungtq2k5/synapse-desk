@@ -49,6 +49,8 @@ import {
   SystemRoleName,
   USER_SORTABLE_FIELDS,
   isUniqueConstraintViolation,
+  extractEmailDomain,
+  extractEmailLocalPart,
   normalizeEmail,
   requireActor,
   requireTenant,
@@ -873,8 +875,7 @@ export class UsersService {
 
     if (!email || !organizationId) return { created: false };
 
-    // FIXME I remember we have a until function for this in `libs/common/.../utils.ts`, reuse it instead
-    const domain = email.split('@')[1];
+    const domain = extractEmailDomain(email);
     if (!domain) return { created: false };
 
     // Soft-deleted rows are excluded because the unique index is PARTIAL
@@ -909,9 +910,12 @@ export class UsersService {
           organizationId,
           email,
           // `full_name` is NOT NULL; the local part is the same stand-in the
-          // Google sign-in path uses when the provider withholds a name.
-          // FIXME We don't have a util function for it but consider create one
-          fullName: request.displayName?.trim() || email.split('@')[0],
+          // Google sign-in path uses when the provider withholds a name, and
+          // now through the same helper rather than a second inline `split`.
+          fullName:
+            request.displayName?.trim() ||
+            extractEmailLocalPart(email) ||
+            email,
           // No password: this account has no way to sign in until its owner
           // sets one through the ordinary reset flow. An email sender has not
           // proven they can authenticate, only that they can send mail.

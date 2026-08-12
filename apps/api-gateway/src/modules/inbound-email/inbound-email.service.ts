@@ -60,21 +60,6 @@ export enum InboundOutcome {
   SELF_LOOP = 'self_addressed',
 }
 
-// ASK Which class owns this comment? `InboundPeer` or `InboundEmailService`?
-/**
- * The email adapter — 31-doc §6, 32-doc §4.
- *
- * **The gateway is the only component that knows what an email is.** Address
- * parsing, the reply-token HMAC, quoted history and the loop headers are all
- * transport; the tenant, the sender and the ticket are RPCs to the services
- * that own them. ticket-service never learns that mail exists — it receives a
- * ticket with `source = EMAIL` and an idempotency key.
- *
- * Order is fixed and each step gates the next (32-doc §4.2): **tenant, then
- * sender, then thread.** Resolving the tenant later would mean running the
- * sender query unscoped, which is the cross-tenant misroute 31-doc §3 exists
- * to prevent.
- */
 /**
  * One peer, so `BaseGrpcClient` can be used by a class that talks to several.
  *
@@ -102,6 +87,20 @@ class InboundPeer extends BaseGrpcClient {
   }
 }
 
+/**
+ * The email adapter — 31-doc §6, 32-doc §4.
+ *
+ * **The gateway is the only component that knows what an email is.** Address
+ * parsing, the reply-token HMAC, quoted history and the loop headers are all
+ * transport; the tenant, the sender and the ticket are RPCs to the services
+ * that own them. ticket-service never learns that mail exists — it receives a
+ * ticket with `source = EMAIL` and an idempotency key.
+ *
+ * Order is fixed and each step gates the next (32-doc §4.2): **tenant, then
+ * sender, then thread.** Resolving the tenant later would mean running the
+ * sender query unscoped, which is the cross-tenant misroute 31-doc §3 exists
+ * to prevent.
+ */
 @Injectable()
 export class InboundEmailService implements OnModuleInit {
   private readonly logger = new Logger(InboundEmailService.name);
@@ -660,8 +659,15 @@ function isAlreadyExists(error: unknown): boolean {
  * Unanchored deliberately: a `From` may carry a comment or an encoded word
  * before the angle brackets, and the first bracketed run is the address in
  * every form of the header that reaches us.
+ *
+ * **Exported for the env cross-check** in `env.validation.spec.ts`, which
+ * asserts that this gateway and notification-service name the same sending
+ * address. That test has to compare them the way the GUARD does — the two
+ * `.env` files carry different display names around one address, which is
+ * decoration rather than disagreement — and a second spelling of this in the
+ * test would be a test that agrees with itself.
  */
-function extractAddress(value: string): string {
+export function extractAddress(value: string): string {
   const angled = /<([^>]+)>/.exec(value); // NOSONAR
 
   return (angled?.[1] ?? value).trim().toLowerCase();

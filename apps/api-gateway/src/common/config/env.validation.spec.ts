@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { envValidationSchema } from './env.validation';
+import { extractAddress } from '../../modules/inbound-email/inbound-email.service';
 
 /**
  * 32-doc §5 test 3 — the self-loop guard is only as real as its variable.
@@ -25,9 +26,9 @@ describe('the gateway’s inbound-email configuration', () => {
    * inbound email. Reading the file the suite actually boots with proves two
    * things at once: the schema accepts it, and it defines these three.
    */
-  const baseline = (): Record<string, string> =>
+  const envFile = (path: string): Record<string, string> =>
     Object.fromEntries(
-      readFileSync(join(__dirname, '../../../.env.test'), 'utf8')
+      readFileSync(join(__dirname, path), 'utf8')
         .split('\n')
         .map((line) => line.trim())
         .filter((line) => line && !line.startsWith('#') && line.includes('='))
@@ -37,6 +38,8 @@ describe('the gateway’s inbound-email configuration', () => {
           return [line.slice(0, at).trim(), line.slice(at + 1).trim()];
         }),
     );
+
+  const baseline = (): Record<string, string> => envFile('../../../.env.test');
 
   const validate = (env: Record<string, string>) =>
     envValidationSchema.validate(env, {
@@ -61,4 +64,32 @@ describe('the gateway’s inbound-email configuration', () => {
       expect(validate(env).error?.message).toContain(key);
     },
   );
+
+  /**
+   * **Defined is only half of it — it has to be the RIGHT address.**
+   *
+   * The test above proves the gateway refuses to boot without `EMAIL_SENDER`,
+   * and that is exactly as far as it goes. notification-service is what
+   * actually sends, so if the two name different mailboxes the guard compares
+   * every inbound `From` against an address nothing ever sends from: it fails
+   * OPEN, nothing logs, and 31-doc §7's unbounded loop is reachable again. The
+   * previous state of these files was precisely that — `support@synapsedesk.test`
+   * here against `noreply@synapsedesk.com` there — and every existing test
+   * passed, because each one only ever read its own side.
+   *
+   * Compared through the guard's own {@link extractAddress}, not a second
+   * spelling of it: `.env` wraps this address in a display name and the two
+   * services word theirs differently, which is decoration rather than
+   * disagreement. A local re-implementation here would be a test that agrees
+   * with itself.
+   */
+  it('**and names the same sending address notification-service does**', () => {
+    const gateway = baseline().EMAIL_SENDER;
+    const notification = envFile(
+      '../../../../notification-service/.env.test',
+    ).EMAIL_SENDER;
+
+    expect(notification).toBeDefined();
+    expect(extractAddress(gateway)).toBe(extractAddress(notification));
+  });
 });

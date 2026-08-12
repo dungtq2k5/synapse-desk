@@ -27,6 +27,28 @@ export function extractEmailDomain(email: string): string | null {
 }
 
 /**
+ * The part before the `@` — the stand-in for a display name nobody supplied.
+ *
+ * `users.full_name` is NOT NULL, and two paths reach it with no name to write:
+ * Google sign-in when the provider withholds one, and inbound email from a
+ * sender whose `From` carried no display name. Both had spelled this
+ * `email.split('@')[0]` inline, which is the shape that quietly returns the
+ * WHOLE string for a malformed address — so a value that is not an address at
+ * all becomes somebody's name rather than being caught.
+ *
+ * Returns `null` for anything without a usable local part, mirroring
+ * {@link extractEmailDomain}'s shape — the two are siblings and a caller that
+ * has both in view should not have to remember which one can surprise it. Both
+ * call sites end in `?? email`, because the column still has to be filled.
+ */
+export function extractEmailLocalPart(email: string): string | null {
+  if (!email.includes('@')) return null;
+
+  const local = email.split('@')[0];
+  return local || null;
+}
+
+/**
  * The comparator for sorting strings alphabetically.
  *
  * `Array.prototype.sort()` with no argument compares by UTF-16 code unit, not

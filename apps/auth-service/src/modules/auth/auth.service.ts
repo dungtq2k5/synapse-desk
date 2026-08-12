@@ -36,6 +36,7 @@ import {
   TwoFactorJwtPayload,
   WEB_ROUTES,
   extractEmailDomain,
+  extractEmailLocalPart,
   isUniqueConstraintViolation,
   normalizeEmail,
   requireActor,
@@ -1394,8 +1395,12 @@ export class AuthService {
           organizationId: org.id,
           email: identity.email,
           // Google may withhold the name; the local part is a usable stand-in
-          // and fullName is NOT NULL.
-          fullName: identity.fullName ?? identity.email.split('@')[0],
+          // and fullName is NOT NULL. Same helper the inbound-email path uses,
+          // because it is the same question with a different provider.
+          fullName:
+            identity.fullName ??
+            extractEmailLocalPart(identity.email) ??
+            identity.email,
           // No `avatarUrl` — see linkGoogleIdentity. Google's CDN URL is not a
           // storage object path, and this column holds only the latter.
           passwordHash: null,

@@ -550,9 +550,7 @@ export class TicketsService {
     return {
       organizationId,
       authorId,
-      // ASK Why should we need to trim since input is normalized in the API Gateway via DTO classes - `ticket.dto.ts`"?
       title: request.title.trim(),
-      // ASK Why should we need to trim since input is normalized in the API Gateway via DTO classes - `ticket.dto.ts`"?
       description: request.description.trim(),
       source: fromProtoTicketSource(request.source) ?? TicketSource.WEB,
       priority:
