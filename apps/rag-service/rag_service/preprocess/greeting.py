@@ -27,6 +27,10 @@ from enum import StrEnum
 class Intent(StrEnum):
     GREETING = "GREETING"
     FACTUAL = "FACTUAL"
+    #: Refused by prompt-injection detection — 33-doc §5. Carries a `reply` like
+    #: a greeting does, so it travels the same free short-circuit; the proto
+    #: status is what keeps the two distinguishable downstream.
+    REFUSED = "REFUSED"
 
 
 @dataclass(frozen=True)
@@ -132,3 +136,64 @@ def detect_greeting_layer_one(text: str) -> GreetingMatch | None:
 def canned_reply(language: str | None) -> str:
     """The reply, by language. Falls back to English rather than to silence."""
     return CANNED_REPLIES.get(language or "en", CANNED_REPLIES["en"])
+
+
+#: What a refused question is told — 33-doc §5.3.
+#:
+#: **It names no pattern and no rule.** A message that explains what tripped the
+#: detector is a free oracle for tuning an attack against it, and the tuning
+#: costs the attacker nothing. The rephrasing hint is the half that matters for
+#: everyone else: it is what makes a false positive recoverable by the user
+#: rather than a dead end they cannot argue with.
+#:
+#: Keyed by language like `CANNED_REPLIES`, and populated for the same languages
+#: — everything around this is multilingual by design, and a refusal is the
+#: worst place to answer somebody in a language they did not write in.
+REFUSAL_REPLIES: dict[str, str] = {
+    "en": (
+        "I can't help with that request. If this was a genuine question, try "
+        "rephrasing it."
+    ),
+    "es": (
+        "No puedo ayudarte con esa solicitud. Si era una pregunta legítima, "
+        "prueba a reformularla."
+    ),
+    "fr": (
+        "Je ne peux pas répondre à cette demande. S'il s'agissait d'une vraie "
+        "question, essayez de la reformuler."
+    ),
+    "de": (
+        "Bei dieser Anfrage kann ich nicht helfen. Wenn es eine echte Frage "
+        "war, formulieren Sie sie bitte um."
+    ),
+    "pt": (
+        "Não posso ajudar com esse pedido. Se era uma pergunta genuína, tente "
+        "reformulá-la."
+    ),
+    "vi": (
+        "Mình không thể hỗ trợ yêu cầu này. Nếu đây là một câu hỏi thật, bạn "
+        "thử diễn đạt lại nhé."
+    ),
+    "ja": (
+        "そのご依頼にはお答えできません。本来のご質問であれば、"
+        "表現を変えてお試しください。"
+    ),
+    "zh": "我无法处理该请求。如果这是一个真实的问题，请尝试换一种说法。",
+}
+
+
+def refusal_reply(language: str | None) -> str:
+    """The refusal, by language. English when neither layer could name one.
+
+    **Both layers can name it** — 33-doc §5.2. Layer A knows the language of the
+    pattern that fired; Layer B asks for it in the same eight-token answer, so
+    `INJECTION es` costs exactly what `INJECTION` would have. That second half
+    is what the cheap-tier classification bought: a classifier head returns a
+    score and no language, which would have forced every Layer B refusal to
+    English — the multilingual defect this system has already paid for once.
+
+    English remains the fallback, not the default. This service has no language
+    detector, so a message neither layer could place is answered in English
+    rather than not answered.
+    """
+    return REFUSAL_REPLIES.get(language or "en", REFUSAL_REPLIES["en"])

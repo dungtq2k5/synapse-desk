@@ -19,6 +19,7 @@ class AnswerStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     ANSWER_STATUS_DOC_MISSING: _ClassVar[AnswerStatus]
     ANSWER_STATUS_GREETING: _ClassVar[AnswerStatus]
     ANSWER_STATUS_AT_CAP: _ClassVar[AnswerStatus]
+    ANSWER_STATUS_REFUSED: _ClassVar[AnswerStatus]
 SEARCH_DEGRADATION_UNSPECIFIED: SearchDegradation
 SEARCH_DEGRADATION_LEXICAL_ONLY: SearchDegradation
 ANSWER_STATUS_UNSPECIFIED: AnswerStatus
@@ -26,6 +27,7 @@ ANSWER_STATUS_DOC_ANSWER: AnswerStatus
 ANSWER_STATUS_DOC_MISSING: AnswerStatus
 ANSWER_STATUS_GREETING: AnswerStatus
 ANSWER_STATUS_AT_CAP: AnswerStatus
+ANSWER_STATUS_REFUSED: AnswerStatus
 
 class SearchRequest(_message.Message):
     __slots__ = ("query", "limit", "skip_rerank")

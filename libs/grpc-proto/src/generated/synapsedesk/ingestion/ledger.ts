@@ -39,6 +39,15 @@ export enum AiGenerationPurpose {
    * folding them under DRAFT would make the per-draft cost look like one call.
    */
   AI_GENERATION_PURPOSE_REVIEW = 9,
+  /**
+   * AI_GENERATION_PURPOSE_INJECTION_CLASSIFY - Layer B of prompt-injection detection on `Ask` and `Draft` — 33-doc §3.3.
+   *
+   * **Not booked by `Chat`**, whose detection is fused into the greeting
+   * classification it was already making and stays under GREETING_CLASSIFY,
+   * because it is the same call it always was. Two purposes for one job would
+   * make the fused call look like a new cost that it is not.
+   */
+  AI_GENERATION_PURPOSE_INJECTION_CLASSIFY = 10,
   UNRECOGNIZED = -1,
 }
 

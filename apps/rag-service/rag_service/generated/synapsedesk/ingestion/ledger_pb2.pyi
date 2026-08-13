@@ -22,6 +22,7 @@ class AiGenerationPurpose(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     AI_GENERATION_PURPOSE_REFORMULATION: _ClassVar[AiGenerationPurpose]
     AI_GENERATION_PURPOSE_EMBEDDING: _ClassVar[AiGenerationPurpose]
     AI_GENERATION_PURPOSE_REVIEW: _ClassVar[AiGenerationPurpose]
+    AI_GENERATION_PURPOSE_INJECTION_CLASSIFY: _ClassVar[AiGenerationPurpose]
 
 class AiGenerationStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -39,6 +40,7 @@ AI_GENERATION_PURPOSE_GREETING_CLASSIFY: AiGenerationPurpose
 AI_GENERATION_PURPOSE_REFORMULATION: AiGenerationPurpose
 AI_GENERATION_PURPOSE_EMBEDDING: AiGenerationPurpose
 AI_GENERATION_PURPOSE_REVIEW: AiGenerationPurpose
+AI_GENERATION_PURPOSE_INJECTION_CLASSIFY: AiGenerationPurpose
 AI_GENERATION_STATUS_UNSPECIFIED: AiGenerationStatus
 AI_GENERATION_STATUS_SUCCESS: AiGenerationStatus
 AI_GENERATION_STATUS_FAILED: AiGenerationStatus

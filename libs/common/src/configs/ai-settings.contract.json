@@ -31,10 +31,10 @@
       "chunkId": "chunk_id"
     }
   },
-  "cheapModel": "gemini-2.0-flash-lite",
-  "embeddingModel": "text-embedding-004",
+  "cheapModel": "gemini-3.5-flash-lite",
+  "embeddingModel": "gemini-embedding-2",
   "generationModelByTier": {
-    "FAST": "gemini-2.0-flash",
+    "FAST": "gemini-3.5-flash-lite",
     "QUALITY": "gemini-2.5-pro"
   },
   "defaultTier": "FAST",

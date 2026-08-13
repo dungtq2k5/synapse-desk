@@ -44,7 +44,7 @@ export const MIN_CHUNK_TOKENS = 16;
  * ESTIMATE of the tokenizer that actually bills us** — 21-doc §3.2.
  *
  * **Trap 1 of §3.2: treating a `cl100k_base` count as exact.** It is
- * **OpenAI's** tokenizer. We embed with Gemini `text-embedding-004` and
+ * **OpenAI's** tokenizer. We embed with Gemini `gemini-embedding-2` and
  * generate with Gemini, whose tokenizer is a different one with no JS
  * implementation. So this is a far better estimate than `chars / 4` — measured
  * on CJK, `chars / 4` says 6 tokens where the real count is 22, a 3.7x
@@ -64,7 +64,7 @@ export const CHUNK_TOKENIZER = 'cl100k_base';
 /**
  * How far below the embedding model's real input limit the target sits.
  *
- * `text-embedding-004` accepts 2048 tokens, so 512 is comfortable already —
+ * `gemini-embedding-2` accepts 2048 tokens, so 512 is comfortable already —
  * this constant exists to make the margin a STATED decision rather than an
  * accident of the number above, so that raising the target is a conversation
  * about how wrong the estimate can be rather than a one-character edit.

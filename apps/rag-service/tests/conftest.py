@@ -426,6 +426,14 @@ class ScriptedGenerator:
     def __init__(self, answer: str = "The limit is 500 [1].") -> None:
         self.answer = answer
         self.calls: list[tuple[str, str]] = []
+        #: Scripted one-shot answers for `generate`, consumed in order.
+        #:
+        #: Added when Layer 2 stopped having one possible answer: the fused
+        #: classification (33-doc §3.3) can reply GREETING, FACTUAL or
+        #: INJECTION, and a fake that always says FACTUAL cannot exercise the
+        #: other two. Empty means the old behaviour.
+        self.answers: list[str] = []
+        self.fail_next: Exception | None = None
 
     async def stream(self, prompt: str, model: str, max_output_tokens: int):
         from rag_service.generation.corag import GenerationDelta
@@ -443,7 +451,14 @@ class ScriptedGenerator:
 
         self.calls.append((prompt, model))
 
-        return GenerationOutput(text="FACTUAL", prompt_tokens=20, completion_tokens=2)
+        if self.fail_next is not None:
+            error, self.fail_next = self.fail_next, None
+
+            raise error
+
+        text = self.answers.pop(0) if self.answers else "FACTUAL"
+
+        return GenerationOutput(text=text, prompt_tokens=20, completion_tokens=2)
 
 
 @pytest_asyncio.fixture

@@ -867,6 +867,45 @@ describe('the real-time relay (e2e)', () => {
       await noError;
     });
 
+    it('**a refused question is appended and NOT escalated**', async () => {
+      // 33-doc §5.1. A refusal takes the greeting path, not the at-cap one:
+      // the user gets a visible reply, the thread keeps its record, and
+      // nothing hands the ticket to a human — the question was rejected on its
+      // content, and the workspace's budget is untouched.
+      //
+      // The status is what makes this legible afterwards. Reusing
+      // `ANSWER_STATUS_GREETING` — which is what the short-circuit reported
+      // before the enum gained a value — would file a refusal in the thread
+      // labelled as a hello.
+      const author = await fx.connectClient({ sub: authorId, organizationId });
+      const { subject } = controllable();
+
+      const noError = expectNoEvent(author, REALTIME_EVENTS.aiStreamError);
+      const done = waitForEvent<DoneFrame>(
+        author,
+        REALTIME_EVENTS.aiStreamDone,
+      );
+
+      await askFrom(author);
+      subject.next(token("I can't help with that request."));
+      subject.next(
+        completion({
+          status: 5, // ANSWER_STATUS_REFUSED
+          content: "I can't help with that request.",
+          generationId: '',
+        }),
+      );
+      subject.complete();
+
+      expect((await done).data).toMatchObject({
+        escalated: false,
+        status: 'REFUSED',
+      });
+      expect(fx.stubs.ticket.escalateTicket).not.toHaveBeenCalled();
+      expect(fx.stubs.message.appendAiMessage).toHaveBeenCalledTimes(1);
+      await noError;
+    });
+
     it('7. **an error mid-stream persists NOTHING** — never a partial row', async () => {
       // A truncated answer written as though it were complete is worse than no
       // answer: it enters the permanent thread, is indistinguishable from a

@@ -26,6 +26,13 @@ import re
 from dataclasses import dataclass
 from enum import StrEnum
 
+from rag_service.generation.boundary import (
+    boundary_instruction,
+    new_nonce,
+    strip_nonce,
+    wrap_question,
+    wrap_sources,
+)
 from rag_service.retrieval.service import HydratedChunk
 
 # Deliberately imports NOTHING from `corag`. This module is prompts, a verdict
@@ -82,17 +89,24 @@ def build_review_prompt(
         f"[{index + 1}] {chunk.content_text}" for index, chunk in enumerate(chunks)
     )
 
+    nonce = new_nonce()
+
     return (
         "You are reviewing a support reply drafted from the numbered sources.\n"
-        "Answer on two lines.\n"
+        # 33-doc §4.2 — the SAME boundary as the answer prompt. CoRAG runs this
+        # on the Draft path, whose question can be a stranger's email, so
+        # hardening only `build_prompt` would leave the forgeable delimiter one
+        # call away.
+        + boundary_instruction(nonce)
+        + "Answer on two lines.\n"
         "Line 1: exactly one of COMPLETE, PARTIAL, UNGROUNDED.\n"
         "  COMPLETE  — answers the question and every claim is supported.\n"
         "  PARTIAL   — supported, but incomplete or unclear.\n"
         "  UNGROUNDED — contains a claim the sources do not support.\n"
         "Line 2: one sentence saying what to fix. Empty if COMPLETE.\n\n"
-        f"SOURCES:\n{sources}\n\n"
-        f"QUESTION: {question}\n\n"
-        f"DRAFT:\n{draft}\n\nREVIEW:"
+        f"{wrap_sources(sources, nonce)}\n\n"
+        f"{wrap_question(question, nonce)}\n\n"
+        f"DRAFT:\n{strip_nonce(draft, nonce)}\n\nREVIEW:"
     )
 
 
@@ -110,15 +124,18 @@ def build_refine_prompt(
         f"[{index + 1}] {chunk.content_text}" for index, chunk in enumerate(chunks)
     )
 
+    nonce = new_nonce()
+
     return (
         "Rewrite the support reply to address the reviewer's critique.\n"
-        "Use ONLY the numbered sources. Cite them inline as [1], [2].\n"
+        + boundary_instruction(nonce)
+        + "Use ONLY the numbered sources. Cite them inline as [1], [2].\n"
         "If the sources do not support a claim, remove it rather than softening "
         "it — a hedged invention is still an invention.\n\n"
-        f"SOURCES:\n{sources}\n\n"
-        f"QUESTION: {question}\n\n"
-        f"CURRENT DRAFT:\n{draft}\n\n"
-        f"REVIEWER: {critique}\n\nIMPROVED REPLY:"
+        f"{wrap_sources(sources, nonce)}\n\n"
+        f"{wrap_question(question, nonce)}\n\n"
+        f"CURRENT DRAFT:\n{strip_nonce(draft, nonce)}\n\n"
+        f"REVIEWER: {strip_nonce(critique, nonce)}\n\nIMPROVED REPLY:"
     )
 
 

@@ -265,13 +265,27 @@ class TestNoCallSiteResolvesItsOwnModel:
         # that never appears in the source because it arrives from a variable.
         # It would work in every environment where the variable happens to be
         # set correctly, and silently downgrade a tenant everywhere else.
-        pattern = re.compile(r"environ(?:\.get)?\s*[\[(]\s*['\"][^'\"]*MODEL")
+        # **`*_MODEL_PATH` is exempt, and the distinction is the whole rule.**
+        # What this forbids is resolving a MODEL NAME — which tenant is on
+        # which tier — outside `settings_for()`. A path to a local ONNX file on
+        # disk is not that: it names no tier, varies per deployment rather than
+        # per tenant, and 33-doc §7 puts it in `Config` deliberately, because a
+        # tenant-resolved kill switch is one a tenant can switch off.
+        pattern = re.compile(
+            r"environ(?:\.get)?\s*[\[(]\s*['\"]([^'\"]*MODEL[^'\"]*)['\"]"
+        )
 
         for path in SOURCE_ROOT.rglob("*.py"):
             if "generated" in path.parts:
                 continue
 
-            assert not pattern.search(path.read_text()), (
-                f"{path.name} reads a model from the environment; "
+            offenders = [
+                name
+                for name in pattern.findall(path.read_text())
+                if not name.endswith("_PATH")
+            ]
+
+            assert not offenders, (
+                f"{path.name} reads {offenders} from the environment; "
                 "resolve it through settings_for() instead"
             )

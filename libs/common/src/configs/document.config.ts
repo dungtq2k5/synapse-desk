@@ -117,6 +117,15 @@ export enum AiGenerationPurpose {
    * by the exact factor that makes it worth having.
    */
   REVIEW = 'REVIEW',
+  /**
+   * Prompt-injection detection on `Ask` and `Draft` — 33-doc §3.3.
+   *
+   * **`Chat` does not book this.** Its detection is fused into the greeting
+   * classification it already made, so that call keeps `GREETING_CLASSIFY` —
+   * the same call, one label wider. Booking it twice would report a cost that
+   * did not change as though it had.
+   */
+  INJECTION_CLASSIFY = 'INJECTION_CLASSIFY',
 }
 
 export const AI_GENERATION_PURPOSES = Object.values(AiGenerationPurpose);

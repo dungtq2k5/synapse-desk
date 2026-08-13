@@ -20,7 +20,13 @@ import time
 from dataclasses import dataclass
 
 from rag_service.enums import AiGenerationPurpose
-from rag_service.ledger.client import GenerationEntry, LedgerClient
+from rag_service.generation.boundary import (
+    history_instruction,
+    new_nonce,
+    wrap_history,
+)
+from rag_service.ledger.client import GenerationEntry
+from rag_service.ledger.metered import LedgerRecorder, QuotaCharger
 from rag_service.retrieval.service import BudgetState
 from rag_service.settings import AiSettings
 
@@ -65,7 +71,9 @@ VALID_PRIORITIES = ("LOW", "MEDIUM", "HIGH", "URGENT")
 
 
 class CopilotService:
-    def __init__(self, generator, ledger: LedgerClient, quota) -> None:
+    def __init__(
+        self, generator, ledger: LedgerRecorder, quota: QuotaCharger
+    ) -> None:
         self._generator = generator
         self._ledger = ledger
         self._quota = quota
@@ -86,12 +94,28 @@ class CopilotService:
         them nothing — the value is in "here is what happened, do this next",
         and the second half is what makes the first worth generating.
         """
+        # **Wrapped, not guarded** — 33-doc §4.2, §8.
+        #
+        # These two prompts read a ticket transcript, and `ticket_messages` now
+        # carries inbound email from senders who never authenticated. The
+        # boundary is what stops a message body forging a turn or a new
+        # instruction; a REFUSAL here would be the wrong remedy, because it
+        # would withhold an agent's summary because a customer wrote oddly —
+        # and the customer would never know.
+        #
+        # The transcript arrives already joined from ticket-service, so only the
+        # block can be delimited. `wrap_turns` is the stronger form and is used
+        # where the turns are still structured.
+        nonce = new_nonce()
         prompt = (
             "Summarise this support conversation for an agent picking it up "
             "cold.\n"
             "Reply as JSON with keys: summary (2-3 sentences), action (one "
-            "sentence naming the single next step), confidence (0-1).\n\n"
-            f"{transcript}\n\nJSON:"
+            "sentence naming the single next step), confidence (0-1).\n"
+            + history_instruction(nonce)
+            + "\n"
+            + wrap_history(transcript, nonce)
+            + "\n\nJSON:"
         )
 
         text, generation_id = await self._spend(
@@ -184,12 +208,16 @@ class CopilotService:
         user_id: str | None = None,
     ) -> tuple[list[Suggestion], str]:
         """Next-step suggestions for an agent, as a short list."""
+        nonce = new_nonce()
         prompt = (
             "Suggest up to three next steps for the agent handling this "
             "conversation.\n"
             "Reply as a JSON array; each item has keys: title, body, "
-            "confidence (0-1).\n\n"
-            f"{transcript}\n\nJSON:"
+            "confidence (0-1).\n"
+            + history_instruction(nonce)
+            + "\n"
+            + wrap_history(transcript, nonce)
+            + "\n\nJSON:"
         )
 
         text, generation_id = await self._spend(

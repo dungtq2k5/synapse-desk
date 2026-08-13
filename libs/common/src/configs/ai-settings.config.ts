@@ -4,7 +4,7 @@
  * Doc 15 §1.2 states the rule and this file is the exception it carves out:
  * no model name in a service, a prompt builder, a test fixture, or a config
  * read at a call site. The failure mode is quiet and expensive — a single
- * `'gemini-2.0-flash'` typed into a summarizer is a tenant on the premium tier
+ * `'gemini-3.5-flash-lite'` typed into a summarizer is a tenant on the premium tier
  * silently receiving the cheap model. Nothing errors; the answer is merely
  * worse, for the customer paying more.
  *
@@ -70,7 +70,7 @@ export type AiSettings = {
  * resolver now.
  */
 export const GENERATION_MODEL_BY_TIER: Record<AiModelTier, string> = {
-  FAST: 'gemini-2.0-flash',
+  FAST: 'gemini-3.5-flash-lite',
   QUALITY: 'gemini-2.5-pro',
 };
 
@@ -87,8 +87,8 @@ export const GENERATION_MODEL_BY_TIER: Record<AiModelTier, string> = {
  * change a full re-embed migration (11-doc §1.3). It is stated here as a
  * constant rather than a setting anyone could vary.
  */
-export const CHEAP_MODEL = 'gemini-2.0-flash-lite';
-export const EMBEDDING_MODEL = 'text-embedding-004';
+export const CHEAP_MODEL = 'gemini-3.5-flash-lite';
+export const EMBEDDING_MODEL = 'gemini-embedding-2';
 
 /** Every model the system can be configured to use — for the boot-time price check. */
 export const ALL_CONFIGURED_MODELS: string[] = [

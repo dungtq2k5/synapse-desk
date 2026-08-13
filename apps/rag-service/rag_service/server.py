@@ -12,7 +12,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Protocol
 
@@ -53,7 +53,10 @@ from rag_service.generation.corag import (
 )
 from rag_service.generation.gemini import GeminiGenerator
 from rag_service.ledger.client import LedgerClient
+from rag_service.ledger.metered import MeteredGenerator
 from rag_service.ledger.quota import QuotaCounter
+from rag_service.preprocess.greeting import Intent, refusal_reply
+from rag_service.preprocess.injection import InjectionGuard, LlmInjectionClassifier
 from rag_service.preprocess.pipeline import (
     PreprocessPipeline,
     TextGenerator,
@@ -87,6 +90,7 @@ class ProviderClient(TextGenerator, StreamingGenerator, Protocol):
     the requirement they were already meeting.
     """
 
+
 #: Clamped server-side no matter what the caller asks for. An unclamped limit
 #: is a direct path to enormous prompts and a blown budget (doc 15 §1.4), and
 #: the value that gets there does not have to arrive from a tenant.
@@ -114,6 +118,23 @@ def with_http_status(status_code: int, message: str) -> str:
     """
     return f"[http:{status_code}] {message}"
 
+
+#: The injection refusal `Draft` aborts with — 33-doc §5.1.
+#:
+#: **`Draft` refuses by NOT returning a draft**, which is why this is an abort
+#: rather than an empty `DraftResponse`. `ticket-service.generateDraft` maps
+#: `content` and drops `status`, so a refused draft returned as a field would
+#: reach the agent as an empty box that reads "the assistant had nothing to
+#: say" — and the agent would then write the reply the injected text was
+#: steering them toward, having been told nothing.
+#:
+#: 422 rather than 402: the request was understood and rejected on its content.
+#: The marker survives both hops because `rag-client.service.ts` passes a gRPC
+#: code and its details through unchanged, which is the same route the at-cap
+#: 402 already takes.
+DRAFT_REFUSAL = with_http_status(
+    422, "This message was refused and no draft was produced"
+)
 
 #: The at-cap refusal, formed once.
 #:
@@ -147,6 +168,19 @@ class Dependencies:
     ledger: LedgerClient
     settings: AiSettingsResolver
 
+    #: Prompt-injection detection — 33-doc §1.
+    #:
+    #: **Defaulted, and the default is the point.** A guard that every test and
+    #: the eval harness had to remember to pass is a guard that is absent
+    #: wherever somebody forgot, so the default is a working Layer A. The boot
+    #: wiring below overrides it with one that also has Layer B.
+    #:
+    #: Nothing here can fail at boot: Layer B is a call to a provider whose
+    #: credential the embedding client already validates at startup (33-doc
+    #: §3.4). An earlier design loaded a local model and needed a boot-time
+    #: check; §3.1 records why that was measured and rejected.
+    injection: InjectionGuard = field(default_factory=InjectionGuard)
+
     def retrieval(self) -> RetrievalService:
         return RetrievalService(
             qdrant=self.qdrant,
@@ -165,6 +199,10 @@ class RagServicer(rag_pb2_grpc.RagServiceServicer):
         self._preprocess = PreprocessPipeline(
             deps.generator, deps.ledger, QuotaCounter(deps.redis)
         )
+        # **One guard, three surfaces** — 33-doc §1. Constructed here rather
+        # than inside the pipeline because the pipeline serves `Chat` alone,
+        # and `Ask` and `Draft` are two thirds of what needs defending.
+        self._injection = deps.injection
         self._corag = CoRagGenerator(
             deps.generator, deps.ledger, QuotaCounter(deps.redis)
         )
@@ -284,12 +322,22 @@ class RagServicer(rag_pb2_grpc.RagServiceServicer):
         )
 
         if preprocessed.reply is not None:
-            # A canned reply. No LLM call, no ledger row, no citations — and it
-            # works at the cap, which is the point of detecting it for free.
+            # A canned reply — a greeting or a refusal. No LLM call, no ledger
+            # row, no citations, and it works at the cap.
+            #
+            # **The status distinguishes the two, and it has to** — 33-doc §5.1.
+            # The gateway persists any completion that is not AT_CAP as an AI
+            # message and passes the label onward, so a refusal reported as
+            # GREETING is wrong in the ticket thread and wrong in the frame the
+            # client renders.
             yield rag_pb2.ChatChunk(token=preprocessed.reply)
             yield rag_pb2.ChatChunk(
                 completion=rag_pb2.ChatCompletion(
-                    status=rag_pb2.ANSWER_STATUS_GREETING,
+                    status=(
+                        rag_pb2.ANSWER_STATUS_REFUSED
+                        if preprocessed.intent is Intent.REFUSED
+                        else rag_pb2.ANSWER_STATUS_GREETING
+                    ),
                     content=preprocessed.reply,
                 )
             )
@@ -352,6 +400,19 @@ class RagServicer(rag_pb2_grpc.RagServiceServicer):
                 AT_CAP_REFUSAL,
             )
 
+        # **The guard, called here because `Ask` never touches the preprocess
+        # pipeline** — 33-doc §1. Both layers at once: there is no greeting
+        # check on this surface to split them around, and greetings do not
+        # arrive at a programmatic one.
+        verdict = await self._injection.scan(
+            request.message, settings=settings, budget=budget, user_id=ctx.sub
+        )
+        if verdict.refused:
+            return rag_pb2.ChatResponse(
+                content=refusal_reply(verdict.language),
+                status=rag_pb2.ANSWER_STATUS_REFUSED,
+            )
+
         result = await self._retrieval.retrieve(
             request.message, ctx, settings, budget=budget
         )
@@ -400,6 +461,18 @@ class RagServicer(rag_pb2_grpc.RagServiceServicer):
             )
 
         question = _last_user_message(request.history)
+
+        # **The guard, on the surface that most needs it** — 33-doc §1. This
+        # "question" is the last message on a ticket, and after 31-doc/32-doc
+        # that can be an email from outside the organisation: an agent clicks
+        # *suggest a reply* and a stranger's text becomes the question in a
+        # prompt whose output the agent is about to send back to them.
+        refusal = await self._injection.scan(
+            question, settings=settings, budget=budget, user_id=ctx.sub
+        )
+        if refusal.refused:
+            await context.abort(grpc.StatusCode.FAILED_PRECONDITION, DRAFT_REFUSAL)
+
         result = await self._retrieval.retrieve(question, ctx, settings, budget=budget)
 
         answer = await self._corag.generate_reviewed(
@@ -630,6 +703,40 @@ def _clamped_limit(requested: int, default: int) -> int:
     return min(requested, MAX_SEARCH_LIMIT)
 
 
+def build_injection_guard(config: Config, metered) -> InjectionGuard:
+    """Layer A from patterns, Layer B from the cheap tier — 33-doc §3.3, §7.
+
+    **No model to load and nothing to fail at boot**, which is the difference
+    from the design this replaced: the classifier is a call to a provider whose
+    credential the embedding client already validates at startup, so there is no
+    boot-closed check left to make. What can still fail is the call itself, and
+    §3.4's answer to that is run-open with a distinct log event.
+
+    Both switches are explicit rather than implied by whether a collaborator was
+    passed, because "no patterns" and "patterns that match nothing" are
+    different states and only one of them is a decision.
+    """
+    if not config.injection_regex_enabled:
+        logger.warning(
+            "Injection pattern matching is DISABLED by configuration — "
+            "Layer A is not running"
+        )
+
+    if not config.injection_llm_enabled:
+        logger.warning(
+            "Injection classification is DISABLED by configuration — "
+            "Layer B is not running"
+        )
+
+    return InjectionGuard(
+        classifier=(
+            LlmInjectionClassifier(metered) if config.injection_llm_enabled else None
+        ),
+        patterns_enabled=config.injection_regex_enabled,
+        classifier_enabled=config.injection_llm_enabled,
+    )
+
+
 async def build_dependencies(config: Config) -> Dependencies:
     """Constructs the real collaborators. Tests build their own.
 
@@ -658,14 +765,23 @@ async def build_dependencies(config: Config) -> Dependencies:
 
     channel = grpc.aio.insecure_channel(config.ingestion_service_url)
 
+    # One provider client, shared. Layer B's classification is the same cheap
+    # tier the preprocessing steps already use, so giving it its own client
+    # would mean a second connection pool for the same model.
+    generator = GeminiGenerator(config.gemini_api_key)
+    ledger = LedgerClient(channel)
+
     return Dependencies(
         qdrant=qdrant,
         pool=pool,
         redis=client,
         embeddings=GeminiEmbeddingClient(config.gemini_api_key),
         reranker=FlashRankReranker(),
-        generator=GeminiGenerator(config.gemini_api_key),
-        ledger=LedgerClient(channel),
+        injection=build_injection_guard(
+            config, MeteredGenerator(generator, ledger, QuotaCounter(client))
+        ),
+        generator=generator,
+        ledger=ledger,
         settings=AiSettingsResolver(),
     )
 
@@ -724,6 +840,7 @@ async def _readiness_status(deps: Dependencies) -> health_pb2.HealthCheckRespons
     Every probe is bounded and reuses a connection the process already holds. A
     probe every five seconds that dials is a connection leak with a schedule.
     """
+
     async def qdrant_ok() -> bool:
         await deps.qdrant.get_collections()
         return True

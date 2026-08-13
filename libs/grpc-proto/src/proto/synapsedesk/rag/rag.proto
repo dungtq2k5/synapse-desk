@@ -90,6 +90,15 @@ enum AnswerStatus {
   ANSWER_STATUS_GREETING = 3;
   // The tenant is at the AI cap. The caller escalates rather than erroring.
   ANSWER_STATUS_AT_CAP = 4;
+  // The question was refused by prompt-injection detection — 33-doc §5.1.
+  //
+  // **Not GREETING, which is what reusing that short-circuit would have
+  // reported.** The gateway persists any completion that is not AT_CAP as an
+  // AI message and passes the label onward, so a refusal filed as a greeting
+  // is wrong in the ticket thread, in the WebSocket frame and in anything
+  // reading the trail afterwards. Handled like a greeting — the message is
+  // appended, nothing escalates — and labelled honestly.
+  ANSWER_STATUS_REFUSED = 5;
 }
 
 message Citation {

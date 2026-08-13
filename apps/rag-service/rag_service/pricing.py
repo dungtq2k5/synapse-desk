@@ -32,11 +32,15 @@ class ModelPricing:
 #: Micros — millionths of a currency unit — rather than floats. Money in
 #: floating point accumulates error over millions of rows, and a metering ledger
 #: is exactly where that compounds.
+#: Published paid-tier rates, read off ai.google.dev/gemini-api/docs/pricing.
+#: Micros per million equals USD per million exactly — $1.25/M is 1_250_000.
 MODEL_PRICING: dict[str, ModelPricing] = {
-    "gemini-2.0-flash": ModelPricing(100_000, 400_000),
     "gemini-2.5-pro": ModelPricing(1_250_000, 10_000_000),
-    "text-embedding-004": ModelPricing(25_000, 0),
-    "gemini-2.0-flash-lite": ModelPricing(37_500, 150_000),
+    #: Text input only. The other modalities this model prices (image, audio,
+    #: video) are unreachable here — this service embeds question and chunk
+    #: TEXT and nothing else.
+    "gemini-embedding-2": ModelPricing(200_000, 0),
+    "gemini-3.5-flash-lite": ModelPricing(300_000, 2_500_000),
 }
 
 

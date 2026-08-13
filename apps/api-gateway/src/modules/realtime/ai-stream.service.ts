@@ -262,6 +262,13 @@ export class AiStreamService implements OnModuleInit {
       // has run out of AI budget, the conversation auto-escalates, and a human
       // now has it. A 402-shaped error frame would tell the user the product is
       // broken at the moment it did the most useful thing it can do.
+      // **`REFUSED` deliberately does NOT branch here** — 33-doc §5.1. A
+      // question refused by injection detection takes the same path as a
+      // greeting: the reply is appended, the thread keeps its record, and
+      // nothing escalates, because the workspace's budget is untouched and
+      // there is nothing for a human to pick up. `statusName` carries the
+      // distinction to the client, which is the entire reason the proto gained
+      // a value rather than reusing `GREETING`.
       if (completion.status === AnswerStatus.ANSWER_STATUS_AT_CAP) {
         const ticket = await this.tickets.escalate(ticketId, context);
 

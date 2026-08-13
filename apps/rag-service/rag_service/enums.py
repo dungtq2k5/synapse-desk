@@ -52,6 +52,7 @@ class AiGenerationPurpose(StrEnum):
     REFORMULATION = "REFORMULATION"
     EMBEDDING = "EMBEDDING"
     REVIEW = "REVIEW"
+    INJECTION_CLASSIFY = "INJECTION_CLASSIFY"
 
 
 class AiGenerationStatus(StrEnum):

@@ -83,9 +83,16 @@ describe('the model pricing table (unit)', () => {
   });
 
   it('charges DIFFERENT money for the same tokens on different models', () => {
-    // The reason the budget is denominated in money rather than tokens. Cost
-    // per token varies by an order of magnitude across tiers, so a token budget
-    // stops meaning anything the moment model choice becomes sellable.
+    // The reason the budget is denominated in money rather than tokens: cost
+    // per token varies MATERIALLY across tiers, so a token budget stops meaning
+    // anything the moment model choice becomes sellable.
+    //
+    // **The multiple is a floor, not a measurement.** It was 5x when FAST was
+    // `gemini-2.0-flash`; it is ~4x now that FAST is `gemini-3.5-flash-lite`
+    // against `gemini-2.5-pro`, and it will move again with every repin. What
+    // must not change is the ORDER — a FAST tenant burning a money-denominated
+    // cap faster than a premium one would make the tier unsellable, and
+    // `ai-settings.config.spec.ts` asserts that direction separately.
     const fast = estimateCostMicros(
       GENERATION_MODEL_BY_TIER.FAST,
       1_000_000,
@@ -97,7 +104,7 @@ describe('the model pricing table (unit)', () => {
       1_000_000,
     );
 
-    expect(quality).toBeGreaterThan(fast * 5n);
+    expect(quality).toBeGreaterThan(fast * 3n);
   });
 
   it('rounds UP, never down', () => {

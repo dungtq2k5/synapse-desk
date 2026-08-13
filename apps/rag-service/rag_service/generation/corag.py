@@ -23,6 +23,13 @@ from dataclasses import dataclass, field
 from typing import Protocol
 
 from rag_service.enums import AiGenerationPurpose, AiGenerationStatus
+from rag_service.generation.boundary import (
+    boundary_instruction,
+    new_nonce,
+    scrub_boundary,
+    wrap_question,
+    wrap_sources,
+)
 from rag_service.generation.review import (
     REFINE_MAX_TOKENS,
     REVIEW_MAX_TOKENS,
@@ -145,9 +152,14 @@ def build_prompt(query: str, chunks: list[HydratedChunk]) -> str:
         for index, chunk in enumerate(chunks)
     )
 
+    nonce = new_nonce()
+
     return (
         "You are a support assistant. Answer the user's question using ONLY the "
-        "numbered sources below.\n"
+        "numbered sources below.\n" + boundary_instruction(nonce) +
+        # 33-doc §4.3 — the boundary, stated where the grounding rules are,
+        # because it is the rule that says which text the grounding rules apply
+        # to. Without this line the delimiters below are decoration.
         # 17-doc §2.1 — the one confirmed prompt defect, and the highest-value
         # line available.
         #
@@ -198,8 +210,8 @@ def build_prompt(query: str, chunks: list[HydratedChunk]) -> str:
         "strings, and **bold** for the single most important fact. Do not use "
         "headings — the answer is rendered inside an existing page. Never wrap "
         "the whole answer in a code fence.\n\n"
-        f"SOURCES:\n{context}\n\n"
-        f"QUESTION: {query}\n\nANSWER:"
+        f"{wrap_sources(context, nonce)}\n\n"
+        f"{wrap_question(query, nonce)}\n\nANSWER:"
     )
 
 
@@ -477,7 +489,7 @@ class CoRagGenerator:
             )
             raise
 
-        content = "".join(parts)
+        content = scrub_boundary("".join(parts))
         answer = GeneratedAnswer(
             content=content,
             status=status,
@@ -670,7 +682,7 @@ class CoRagGenerator:
             return answer
 
         return GeneratedAnswer(
-            content=text,
+            content=scrub_boundary(text),
             status=answer.status,
             citations=extract_citations(text, chunks),
             # The LATEST generation's id, so the acceptance loop compares
@@ -713,7 +725,7 @@ class CoRagGenerator:
             logger.warning("%s pass failed: %s", purpose, error)
             return None
 
-        content = "".join(parts)
+        content = scrub_boundary("".join(parts))
 
         await self._quota.charge(
             budget.organization_id,

@@ -33,11 +33,6 @@ export type ModelPricing = {
 };
 
 export const MODEL_PRICING: Record<string, ModelPricing> = {
-  // Generation — the FAST tier's default.
-  'gemini-2.0-flash': {
-    promptMicrosPerMillion: 100_000,
-    completionMicrosPerMillion: 400_000,
-  },
   // Generation — the QUALITY tier, sellable once billing lands (doc 15).
   'gemini-2.5-pro': {
     promptMicrosPerMillion: 1_250_000,
@@ -46,15 +41,17 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
   // Embedding. No completion side at all, which is why the column is 0 rather
   // than absent: `completionTokens` is always 0 for EMBEDDING, so any non-zero
   // rate here would be unreachable and misleading.
-  'text-embedding-004': {
-    promptMicrosPerMillion: 25_000,
+  'gemini-embedding-2': {
+    promptMicrosPerMillion: 200_000,
     completionMicrosPerMillion: 0,
   },
-  // The cheap tier used for greeting classification and reformulation, where
-  // volume is high and each individual call is worthless.
-  'gemini-2.0-flash-lite': {
-    promptMicrosPerMillion: 37_500,
-    completionMicrosPerMillion: 150_000,
+  // The FAST tier's generation model AND the cheap tier used for greeting
+  // classification, reformulation and injection detection. One model, two
+  // roles, one price — see `GENERATION_MODEL_BY_TIER` for why that is a
+  // pricing decision rather than a merge.
+  'gemini-3.5-flash-lite': {
+    promptMicrosPerMillion: 300_000,
+    completionMicrosPerMillion: 2_500_000,
   },
 };
 

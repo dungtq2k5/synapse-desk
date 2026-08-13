@@ -2,7 +2,7 @@
 
 Doc 15 §1.2 states the rule and this module is the single exception: no model
 name in a retrieval module, a prompt builder, a test fixture or a config read
-at a call site. The failure mode is quiet — a `"gemini-2.0-flash"` typed into a
+at a call site. The failure mode is quiet — a `"gemini-3.5-flash-lite"` typed into a
 generator is a tenant on the premium tier silently receiving the cheap model,
 and nothing errors; the answer is merely worse, for the customer paying more.
 `scripts/check-model-literals.mjs` makes that mechanical for both languages.
@@ -30,26 +30,47 @@ AI_MODEL_TIERS: tuple[AiModelTier, ...] = ("FAST", "QUALITY")
 
 DEFAULT_AI_MODEL_TIER: AiModelTier = "FAST"
 
+#: **A model name lives in FIVE files and they must move together.**
+#:
+#: `settings.py` (here), `libs/common/src/configs/ai-settings.config.ts`,
+#: `ai-settings.contract.json`, `pricing.py` and
+#: `libs/common/src/configs/ai-pricing.config.ts`. The contract fixture and
+#: `assert_pricing_table_covers` catch four of the five at boot or in CI; the
+#: TypeScript pricing table is the one with no equivalent guard on this path,
+#: so a model added everywhere except there meters as free on the Node side.
+#:
 #: Tier -> generation model. **This mapping is the entire tier feature**
 #: (doc 15 §2.1): once the Stripe webhook writes `organizations.ai_model_tier`,
 #: shipping tiers is this table being read with a real value instead of the
 #: default, and nothing else moves.
 GENERATION_MODEL_BY_TIER: dict[AiModelTier, str] = {
-    "FAST": "gemini-2.0-flash",
+    "FAST": "gemini-3.5-flash-lite",
     "QUALITY": "gemini-2.5-pro",
 }
 
+#: **FAST and `CHEAP_MODEL` are the same model today, and that is deliberate.**
+#:
+#: They are separate CONSTANTS because they answer different questions — one is
+#: a tier the tenant buys, the other is an internal volume call — and doc 15
+#: §2.2 is explicit that the cheap call must not scale with the tier. Pointing
+#: both at one model is a pricing decision, not a merge: the moment a cheaper
+#: generation model exists, only this line moves.
+#:
+#: The alternative was a flash model priced ABOVE the QUALITY tier's input rate,
+#: which would have made a FAST tenant exhaust a money-denominated cap faster
+#: than a premium one — the invariant `ai-pricing` asserts, inverted.
+#:
 #: Greeting classification and reformulation. Deliberately NOT tier-varying
 #: (doc 15 §2.2): these are volume calls whose quality barely moves with model
 #: tier, so scaling them multiplies a premium tenant's bill for no perceptible
 #: gain.
-CHEAP_MODEL = "gemini-2.0-flash-lite"
+CHEAP_MODEL = "gemini-3.5-flash-lite"
 
 #: Never tenant-varying and never tier-varying. A Qdrant collection fixes vector
 #: dimension at creation, so a per-tenant embedding model forces per-tenant
 #: collections and makes every tier change a full re-embed migration
 #: (11-doc §1.3).
-EMBEDDING_MODEL = "text-embedding-004"
+EMBEDDING_MODEL = "gemini-embedding-2"
 
 ALL_CONFIGURED_MODELS: list[str] = [
     *GENERATION_MODEL_BY_TIER.values(),
