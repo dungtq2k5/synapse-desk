@@ -1,16 +1,42 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { MIN_PAGE_CHARACTERS } from '@synapsedesk/common';
+import { MAX_OCR_PAGES, OcrService } from './ocr.service';
 
 /** One page of extracted text. PDFs have many; everything else has one. */
 export type ParsedPage = {
   /** 1-based, and NULL for formats with no pages. */
   pageNumber: number | null;
   markdown: string;
+  /**
+   * How the text was obtained — 34-doc §5.
+   *
+   * `ocr` text is FLAT: tesseract emits no headings, so an OCR'd page falls
+   * through to the chunker's length-based split exactly as a `.txt` file does,
+   * and its citations are less precise than a born-digital page's. That is
+   * enormously better than the page being absent, and recording it is what
+   * lets somebody reading a vague citation know why.
+   */
+  source?: 'text' | 'ocr';
 };
 
 export type ParsedDocument = {
   pages: ParsedPage[];
   /** sha256 of the actual BYTES — see the note in `parse`. */
   contentHash: string;
+  /**
+   * How many pages the document HAS, which is not `pages.length` — 34-doc §1.1.
+   *
+   * Pages with no usable text are absent from `pages`, so this is the only way
+   * downstream can tell that page 7 existed at all. §6's check compares the
+   * page numbers that survived chunking against this number, which is the one
+   * comparison that catches BOTH silent drops: the parser's filter and the
+   * chunker's `MIN_CHUNK_TOKENS`.
+   *
+   * Zero for formats with no pages.
+   */
+  pageCount: number;
+  /** Page numbers OCR was tried on and did not produce usable text for. */
+  failedPages: number[];
 };
 
 /**
@@ -37,16 +63,33 @@ const LINE_TOLERANCE_Y = 2;
  * nothing — it is confidently wrong, and a user who clicks through learns not
  * to trust citations.
  *
- * **Both parsers are 100% in-process and offline.** No system binary, no
- * network, no third-party API. That is a hard requirement rather than a
- * preference: a vision-based parser would send tenant documents to a third
- * party and bill per page, and its failure mode is *better output*, so nothing
- * would look wrong. `document-parser.service.spec.ts` asserts it with the
- * network stubbed to throw.
+ * **A tenant's document never leaves the deployment, and never touches the
+ * disk** — 34-doc §2. That is the requirement; "100% in-process", which this
+ * docblock used to claim, was the shape the requirement happened to take before
+ * OCR existed.
+ *
+ * The claim changed because scanned pages now run `pdftoppm` and `tesseract`,
+ * which are system binaries. **All three reasons behind the original rule
+ * survive that**: the binaries are in our own image, so no document reaches a
+ * third party; they bill nothing per page; and their failure mode is garbled
+ * text rather than *better output*, which is what made a vision-API parser
+ * dangerous — nothing would have looked wrong.
+ *
+ * **What "never touches the disk" is buying**, and why it is stated rather than
+ * assumed: both tools accept stdin and write stdout, so the PDF is piped in and
+ * the rendered image never lands (§3.1). "Documents never leave the deployment"
+ * reads as an empty promise if the same document is sitting in `/tmp` while it
+ * is read, and the temp-file alternative was rejected for exactly that reason.
+ *
+ * `document-parser.service.spec.ts` asserts all three halves: the network
+ * stubbed to throw, the subprocess table, and an empty `TMPDIR` after a scanned
+ * page.
  */
 @Injectable()
 export class DocumentParserService {
   private readonly logger = new Logger(DocumentParserService.name);
+
+  constructor(private readonly ocr: OcrService) {}
 
   /**
    * `fileType` decides the parser, and an unknown one is refused rather than
@@ -57,7 +100,18 @@ export class DocumentParserService {
    * client's claim — so by here it is trustworthy, and anything unrecognised is
    * a gap in the allowlist rather than a hostile upload.
    */
-  async parse(bytes: Buffer, fileType: string): Promise<ParsedDocument> {
+  async parse(
+    bytes: Buffer,
+    fileType: string,
+    /**
+     * ISO 639-1 codes for OCR — 34-doc §4.1.
+     *
+     * Arrives on `DocumentUploadedEvent` rather than being read from the
+     * document row, so the worker still needs no lookup to start. Empty is
+     * "not specified", which is almost every document.
+     */
+    ocrLanguages: string[] = [],
+  ): Promise<ParsedDocument> {
     // The hash is of the BYTES, which is the honest fingerprint and could not
     // be computed at confirm time: the bytes never pass through this service on
     // the upload path — that is the point of presign — so `documents.file_hash`
@@ -66,9 +120,21 @@ export class DocumentParserService {
     const { createHash } = await import('node:crypto');
     const contentHash = createHash('sha256').update(bytes).digest('hex');
 
+    if (fileType === 'pdf') {
+      const { pages, pageCount, failedPages } = await this.parsePdf(
+        bytes,
+        ocrLanguages,
+      );
+
+      return { pages, contentHash, pageCount, failedPages };
+    }
+
     const pages = await this.extract(bytes, fileType);
 
-    return { pages, contentHash };
+    // One "page" that is not a page — DOCX, TXT and MD have no pagination, so
+    // there is nothing for §6 to count and nothing that could go missing
+    // page-wise.
+    return { pages, contentHash, pageCount: 0, failedPages: [] };
   }
 
   private async extract(
@@ -77,7 +143,7 @@ export class DocumentParserService {
   ): Promise<ParsedPage[]> {
     switch (fileType) {
       case 'pdf':
-        return this.parsePdf(bytes);
+        return (await this.parsePdf(bytes, [])).pages;
       case 'docx':
       case 'doc':
         return this.parseDocx(bytes);
@@ -113,7 +179,14 @@ export class DocumentParserService {
    * misread a Node `Buffer` — resolving offsets against the wrong bytes and
    * failing intermittently as though the customer's file were corrupt.
    */
-  private async parsePdf(bytes: Buffer): Promise<ParsedPage[]> {
+  private async parsePdf(
+    bytes: Buffer,
+    ocrLanguages: string[],
+  ): Promise<{
+    pages: ParsedPage[];
+    pageCount: number;
+    failedPages: number[];
+  }> {
     const pdfjs = loadPdfjs();
 
     const task = pdfjs.getDocument({
@@ -145,13 +218,26 @@ export class DocumentParserService {
 
     const document = await task.promise;
     const pages: ParsedPage[] = [];
+    const thin: number[] = [];
+    // Read before the loop, because `task.destroy()` in the `finally` makes the
+    // document unusable and this number outlives it — §6 compares against it.
+    const pageCount = document.numPages;
 
     try {
       for (let number = 1; number <= document.numPages; number++) {
         const page = await document.getPage(number);
         const content = await page.getTextContent();
+        const markdown = toLines(content.items);
 
-        pages.push({ pageNumber: number, markdown: toLines(content.items) });
+        // **"Too little", not "empty"** — 34-doc §3.2. `trim().length > 0` was
+        // the wrong test: a page carrying a scanner stamp or a partial OCR
+        // layer has a handful of characters and is still an image.
+        if (markdown.trim().length >= MIN_PAGE_CHARACTERS) {
+          pages.push({ pageNumber: number, markdown, source: 'text' });
+        } else {
+          thin.push(number);
+        }
+
         page.cleanup();
       }
     } finally {
@@ -160,7 +246,72 @@ export class DocumentParserService {
       await task.destroy();
     }
 
-    return pages.filter((page) => page.markdown.trim().length > 0);
+    const failedPages = await this.ocrThinPages(
+      bytes,
+      thin,
+      ocrLanguages,
+      pages,
+    );
+
+    // Sorted, because OCR'd pages are appended as they complete and a citation
+    // that resolves to "page 4" must come from a list where 4 follows 3.
+    pages.sort((a, b) => (a.pageNumber ?? 0) - (b.pageNumber ?? 0));
+
+    return { pages, pageCount, failedPages };
+  }
+
+  /**
+   * OCR for the pages pdf.js could not read — 34-doc §1, §3.
+   *
+   * **Only the thin ones.** A 200-page PDF with two scanned pages pays for two,
+   * and the text pages keep pdf.js's extraction, which is better than OCR of a
+   * render of the same page. That is the entire argument for doing this per
+   * page rather than per document.
+   *
+   * Sequential rather than parallel: each page already runs `pdftoppm` over the
+   * whole file (§3.1), and N of those at once multiplies peak memory by N on a
+   * worker that is also embedding.
+   */
+  private async ocrThinPages(
+    bytes: Buffer,
+    thin: number[],
+    ocrLanguages: string[],
+    into: ParsedPage[],
+  ): Promise<number[]> {
+    if (thin.length === 0) return [];
+
+    const failed: number[] = [];
+    // Past the cap, pages are RECORDED as failures rather than dropped — "we
+    // stopped after fifty" and "page fifty-one could not be read" are the same
+    // fact to whoever reads the flag: part of this document is not searchable.
+    const attempt = thin.slice(0, MAX_OCR_PAGES);
+    failed.push(...thin.slice(MAX_OCR_PAGES));
+
+    if (failed.length > 0) {
+      this.logger.warn(
+        `Document has ${thin.length} pages needing OCR; capped at ${MAX_OCR_PAGES}`,
+      );
+    }
+
+    for (const pageNumber of attempt) {
+      const result = await this.ocr.recognisePage(
+        bytes,
+        pageNumber,
+        ocrLanguages,
+      );
+
+      if (result.ok) {
+        into.push({
+          pageNumber,
+          markdown: result.text,
+          source: 'ocr',
+        });
+      } else {
+        failed.push(pageNumber);
+      }
+    }
+
+    return failed.sort((a, b) => a - b);
   }
 
   /**
@@ -248,7 +399,7 @@ export class DocumentParserService {
  */
 function loadPdfjs(): typeof import('pdfjs-dist/legacy/build/pdf.mjs') {
   const nodeRequire = process
-    .getBuiltinModule('module')
+    .getBuiltinModule('node:module')
     .createRequire(__filename);
 
   return nodeRequire(

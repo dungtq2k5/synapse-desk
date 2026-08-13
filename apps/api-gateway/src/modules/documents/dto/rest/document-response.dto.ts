@@ -15,6 +15,16 @@ export class DocumentResponseDto {
   /** An internal object path today; a signed URL only via `/download`. */
   fileUrl!: string;
   fileType!: string;
+  /**
+   * ISO 639-1 codes the uploader declared for OCR — 34-doc §4.
+   *
+   * `[]` means "not specified", never null: Prisma scalar lists cannot be null,
+   * so there is one value for absent and empty all the way to the client.
+   *
+   * No `@ApiProperty` — this class carries no decorators and the Swagger CLI
+   * plugin generates the schema from the type.
+   */
+  ocrLanguages!: string[];
   fileSizeBytes!: number;
   isOrganizationWide!: boolean;
   status!: DocumentStatus | null;

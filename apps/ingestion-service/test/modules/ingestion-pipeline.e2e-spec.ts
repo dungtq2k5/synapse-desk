@@ -5,6 +5,8 @@ import {
   EMBEDDING_MODEL,
   IngestionJobStatus,
   QDRANT_PAYLOAD_FIELDS,
+  DocumentFlagSeverity,
+  DocumentFlagType,
 } from '@synapsedesk/common';
 import Redis from 'ioredis';
 import { waitFor } from '@synapsedesk/common/testing/wait';
@@ -282,20 +284,200 @@ describe('§3 The ingestion pipeline (e2e)', () => {
       expect(document.status).toBe(DocumentStatus.FAILED);
     });
 
-    it('6a. a scanned PDF names SCANNING as the likely cause', async () => {
-      // The cheap half of the scanned-PDF detection §5 argues for before OCR
-      // exists. A PDF that parses to no text at all is almost certainly an
-      // image, and saying so is the difference between an actionable message
-      // and "it did not work".
+    it('6a. **a PDF OCR could not read names LANGUAGE as the cause**', async () => {
+      // 34-doc §6, and the message changed because the system did. It used to
+      // end "run OCR on it first", which stops making sense once we run OCR
+      // ourselves: by the time a PDF reaches this error every image page has
+      // been rasterized and read and still produced nothing.
+      //
+      // Language is what remains actionable — it is the one input the uploader
+      // controls, and tesseract given the wrong one does not fail, it returns
+      // confident nonsense that falls below the chunker's minimum.
       downloadObject.mockResolvedValue(await buildPdf([' ']));
       const data = await queueDocument({ fileType: 'pdf' });
 
-      await expect(processor.process(data)).rejects.toThrow(/scanned/i);
+      await expect(processor.process(data)).rejects.toThrow(/language/i);
 
       const job = await fx.prisma.ingestionJob.findUniqueOrThrow({
         where: { id: data.ingestionJobId },
       });
-      expect(job.errorLog).toMatch(/scanned/i);
+      expect(job.errorLog).toMatch(/language/i);
+      // The advice that no longer applies is gone, not merely supplemented.
+      expect(job.errorLog).not.toMatch(/run OCR on it first/i);
+    });
+
+    it('and the error log never contains document TEXT', async () => {
+      // §6 test 4. `error_log` is operator-facing and the document is tenant
+      // content — the same rule 33-doc §6 applies to detection logs.
+      const secret = 'CONFIDENTIAL-ACQUISITION-PROJECT-CODENAME';
+      downloadObject.mockResolvedValue(
+        await buildPdf([`  ${secret}  `], { repeat: 1 }),
+      );
+      const data = await queueDocument({ fileType: 'pdf' });
+
+      await expect(processor.process(data)).rejects.toThrow();
+
+      const job = await fx.prisma.ingestionJob.findUniqueOrThrow({
+        where: { id: data.ingestionJobId },
+      });
+      expect(job.errorLog ?? '').not.toContain(secret);
+    });
+  });
+
+  /**
+   * **Every page is either in the corpus or recorded as missing** — 34-doc §6.
+   *
+   * The invariant that closes BOTH silent drops. They fail identically from
+   * outside — the document reports INDEXED and part of it is simply not
+   * searchable — so the check compares page numbers in the chunk rows against
+   * the page count the parser saw, which catches either.
+   */
+  describe('§6 pages that did not reach the corpus', () => {
+    const flagsFor = (documentId: string) =>
+      fx.prisma.documentFlag.findMany({ where: { documentId } });
+
+    //: A page that lands in the GAP between the two thresholds — 34-doc §1.1.
+    //:
+    //: 61 characters, so it clears the parser's `MIN_PAGE_CHARACTERS` of 32 and
+    //: is never sent to OCR; 13 tokens, so it falls under the chunker's
+    //: `MIN_CHUNK_TOKENS` of 16 and is discarded there. That gap is precisely
+    //: where a page used to disappear having been counted a success, and a
+    //: fixture landing anywhere else would test a different drop.
+    const THIN_PAGE =
+      'Appendix C — Signature page, retained for the records office.';
+
+    //: Long enough to survive both, with `repeat: 1` so the thin page above is
+    //: not padded alongside it.
+    const FULL_PAGE =
+      'The annual leave policy grants twelve paid days each year and permits ' +
+      'five of them to carry over into the following year, provided they are ' +
+      'used before the thirty-first of March.';
+
+    it('**a page dropped by the CHUNKER is flagged, not silently lost**', async () => {
+      // §1.1's second drop point, and the one closing the parser alone would
+      // have missed: this page has text, so the parser keeps it — and then it
+      // falls under `MIN_CHUNK_TOKENS` and vanishes at chunking having been
+      // counted a success.
+      //
+      // `repeat: 1` is what makes it thin; the fixture defaults to 40 for
+      // exactly this reason.
+      downloadObject.mockResolvedValue(
+        await buildPdf([FULL_PAGE, THIN_PAGE], { repeat: 1 }),
+      );
+      const data = await queueDocument({ fileType: 'pdf' });
+
+      await processor.process(data);
+
+      const flags = await flagsFor(data.documentId);
+
+      expect(flags).toHaveLength(1);
+      expect(flags[0].flagType).toBe(DocumentFlagType.PAGES_NOT_INDEXED);
+      // **WARNING, not the INFO default** — a one-word omission is what would
+      // bury this under the `UNRETRIEVED` noise in the worklist.
+      expect(flags[0].severity).toBe(DocumentFlagSeverity.WARNING);
+      expect(flags[0].detail).toMatch(/page/i);
+    });
+
+    it('and the document still INDEXES — 197 good pages beat discarding 200', async () => {
+      downloadObject.mockResolvedValue(
+        await buildPdf([FULL_PAGE, THIN_PAGE], { repeat: 1 }),
+      );
+      const data = await queueDocument({ fileType: 'pdf' });
+
+      await expect(processor.process(data)).resolves.toBe('INDEXED');
+
+      const document = await fx.prisma.document.findUniqueOrThrow({
+        where: { id: data.documentId },
+      });
+      expect(document.status).toBe(DocumentStatus.INDEXED);
+    });
+
+    it('**the flag names page numbers and never document text**', async () => {
+      // §6 test 4. `DocumentFlag.detail` is `@db.Text` and operator-facing,
+      // which puts it under the same rule as `error_log` — and it is the field
+      // most likely to grow a helpful excerpt later.
+      // 50 characters and 12 tokens — in the same gap as `THIN_PAGE`, so the
+      // page is kept by the parser and dropped by the chunker. The original
+      // wording measured 16 tokens exactly and survived, which is a reminder
+      // that the boundary here is TOKENS and the eye counts characters.
+      const secret = 'Signature page for codename BLUEHARVEST, retained.';
+      downloadObject.mockResolvedValue(
+        await buildPdf([FULL_PAGE, secret], { repeat: 1 }),
+      );
+      const data = await queueDocument({ fileType: 'pdf' });
+
+      await processor.process(data);
+
+      const [flag] = await flagsFor(data.documentId);
+
+      expect(flag.detail).not.toContain('BLUEHARVEST');
+      expect(flag.detail).toMatch(/1 of 2 page/);
+    });
+
+    it('**processing the same document twice raises ONE flag**', async () => {
+      // Reachable today: BullMQ retries a failed job, and the flag is written
+      // before the steps that can still fail — so a job that flags three
+      // missing pages and then dies at the Qdrant upsert comes back and writes
+      // the finding a second time. The worklist would show one document twice.
+      downloadObject.mockResolvedValue(
+        await buildPdf([FULL_PAGE, THIN_PAGE], { repeat: 1 }),
+      );
+      const data = await queueDocument({ fileType: 'pdf' });
+
+      await processor.process(data);
+      await processor.process(data);
+
+      expect(await flagsFor(data.documentId)).toHaveLength(1);
+    });
+
+    it('**and a DISMISSED flag is never re-raised**', async () => {
+      // The rule `DocumentFlagService` spends a paragraph on: a human
+      // dismissing a flag is a decision, and re-raising it is arguing with
+      // them until they stop reading the worklist. A Knowledge Manager who
+      // confirms the appendix really is a photograph must not be overruled by
+      // the next re-ingestion.
+      downloadObject.mockResolvedValue(
+        await buildPdf([FULL_PAGE, THIN_PAGE], { repeat: 1 }),
+      );
+      const data = await queueDocument({ fileType: 'pdf' });
+
+      await processor.process(data);
+      await fx.prisma.documentFlag.updateMany({
+        where: { documentId: data.documentId },
+        data: { resolvedAt: new Date() },
+      });
+
+      await processor.process(data);
+
+      const flags = await flagsFor(data.documentId);
+      expect(flags).toHaveLength(1);
+      expect(flags[0].resolvedAt).not.toBeNull();
+    });
+
+    it('a fully indexed document raises NO flag', async () => {
+      // The over-reporting direction. A worklist that flags every document is
+      // a worklist nobody opens.
+      downloadObject.mockResolvedValue(
+        await buildPdf([
+          'Page one of the handbook',
+          'Page two of the handbook',
+        ]),
+      );
+      const data = await queueDocument({ fileType: 'pdf' });
+
+      await processor.process(data);
+
+      expect(await flagsFor(data.documentId)).toEqual([]);
+    });
+
+    it('and a format with no pages is never checked', async () => {
+      // A DOCX has no pages until something paginates it, so there is nothing
+      // that could have gone missing and nothing to compare against.
+      const data = await queueDocument({ fileType: 'md' });
+
+      await processor.process(data);
+
+      expect(await flagsFor(data.documentId)).toEqual([]);
     });
   });
 

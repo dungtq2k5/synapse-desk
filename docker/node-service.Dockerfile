@@ -195,3 +195,85 @@ WORKDIR /app/apps/${SERVICE}
 # path, so relative imports inside `dist` are unaffected.
 ENV ENTRY=/app/apps/${SERVICE}/entry.js
 CMD ["sh", "-c", "exec node \"$ENTRY\""]
+
+# ============================================================== runtime-ocr
+#
+# ingestion-service only — 34-doc §7.
+#
+#     docker build -f docker/node-service.Dockerfile \
+#       --target runtime-ocr \
+#       --build-arg SERVICE=ingestion-service \
+#       --build-arg GIT_SHA="$(git rev-parse HEAD)" \
+#       --build-arg BUILD_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+#       -t synapsedesk/ingestion-service .
+#
+# **A second target rather than a bigger base.** Installing these in `runtime`
+# would put a rasteriser and an OCR engine into api-gateway, auth-service,
+# ticket-service, notification-service and storage-service, none of which will
+# ever spawn them — the cost of one service's feature, paid by six images.
+#
+# **`apk`, not `apt-get`.** The base is `node:24-alpine`; the Debian spelling in
+# the design would fail on the first line. The package names differ too:
+# tesseract's language data is `tesseract-ocr-data-<code>`, and the code is
+# tesseract's own — `chi_sim` with an underscore, the same string that goes to
+# `-l`, not the Debian `chi-sim`. `TESSERACT_CODE_BY_LANGUAGE` in
+# `@synapsedesk/common` is the mapping from the ISO 639-1 code the API speaks;
+# these package names are packaging and stay here.
+#
+# **Language data is per package, and only English is installed.** The CJK sets
+# are the large ones, and a demo that reads English scans should not carry
+# Japanese and Chinese models to do it. Adding a language is one word here plus
+# nothing else — the code already accepts all eight.
+FROM runtime AS runtime-ocr
+
+# **Back to root to install, and back to `node` before the CMD.** The `runtime`
+# stage ends on `USER node` deliberately; an image that installs packages and
+# forgets to drop back is a non-root design undone by a convenience — and this
+# is the one stage that runs C++ parsers over untrusted input, which is exactly
+# where the uid matters most.
+USER root
+
+# `--no-cache` rather than `apk add` followed by `rm -rf /var/cache/apk`: it
+# never writes the index in the first place, so there is no layer holding it.
+#
+# **One package per `OCR_LANGUAGES` entry, and the list must stay complete.**
+# The DTO accepts eight ISO 639-1 codes and `TESSERACT_CODE_BY_LANGUAGE` maps
+# each to the `-l` code below; the apk package is that code with a fixed prefix.
+# Shipping only `eng` — which this stage did first — meant seven of the eight
+# were accepted by the API and unservable by the image: tesseract exits 1 with
+# `Error opening data file …/vie.traineddata`, the page is recorded as failed,
+# and the resulting `PAGES_NOT_INDEXED` flag advises the tenant to "re-upload it
+# specifying its language" — which is exactly what they had just done.
+#
+# `check-ocr-image.sh` asserts every one of these is present in the built image,
+# so a language added to `OCR_LANGUAGES` without a package here fails the check
+# rather than one tenant's document.
+RUN apk add --no-cache \
+      poppler-utils \
+      tesseract-ocr \
+      tesseract-ocr-data-eng \
+      tesseract-ocr-data-spa \
+      tesseract-ocr-data-fra \
+      tesseract-ocr-data-deu \
+      tesseract-ocr-data-por \
+      tesseract-ocr-data-vie \
+      tesseract-ocr-data-jpn \
+      tesseract-ocr-data-chi_sim
+
+USER node
+
+# ================================================================== default
+#
+# **This stage exists to restore the default target, and must stay last.**
+#
+# `docker build` with no `--target` builds the FINAL stage. Without this, that
+# would be `runtime-ocr` — so every service built with the documented command
+# above would carry a rasteriser and an OCR engine, silently undoing the one
+# reason `runtime-ocr` is a separate target. The first build of it proved
+# exactly that: `runtime` and `runtime-ocr` came out byte-identical, both with
+# `/usr/bin/tesseract`.
+#
+# It adds no layer — a `FROM` with no instructions is an alias — and it is the
+# cheapest way to make "the default is the small one" true rather than a
+# property of where somebody appended a stage.
+FROM runtime AS default

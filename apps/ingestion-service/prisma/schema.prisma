@@ -49,6 +49,22 @@ model Document {
   /// DocumentStatus.
   status String @default("PENDING") @db.VarChar(20)
 
+  /// ISO 639-1 codes the uploader declared for OCR — 34-doc §4.
+  ///
+  /// **`[]` means "not specified", NOT null**, and the difference matters
+  /// because every other optional column here is nullable: Prisma scalar lists
+  /// cannot be null, so absent and empty are the same value and the parser
+  /// falls back to `eng`.
+  ///
+  /// Stored in ISO 639-1 (`vi`, `ja`) rather than tesseract's own codes
+  /// (`vie`, `jpn`) — §4.2.1. The mapping lives in `@synapsedesk/common`, so a
+  /// different OCR engine changes one table rather than every stored row.
+  ///
+  /// Almost always empty, and that is inherent: an uploader cannot know a PDF
+  /// is scanned until it is parsed. It is an escape hatch for the tenant who
+  /// knows they are uploading scanned Vietnamese forms.
+  ocrLanguages String[] @map("ocr_languages")
+
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz

@@ -93,6 +93,10 @@ export class DocumentsGrpcClient
               // means the RDM default rather than "unspecified".
               isOrganizationWide: dto.isOrganizationWide ?? true,
               departmentIds: dto.departmentIds ?? [],
+              // `?? []` for the same reason: proto3 repeated fields are
+              // absent-by-default, and empty is exactly "not specified" —
+              // there is no third state to preserve.
+              ocrLanguages: dto.ocrLanguages ?? [],
               fileName: dto.fileName ?? '',
             },
             metadata,

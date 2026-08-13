@@ -6,6 +6,7 @@
  * `undefined` and logs nothing. One pattern map, one discriminated union, and
  * consumers `switch` on `pattern` rather than on a raw subject string.
  */
+
 export const DOCUMENT_PATTERNS = {
   /** A confirmed upload is ready to be parsed. The worker's trigger. */
   uploaded: 'document.uploaded',
@@ -39,6 +40,22 @@ export type DocumentUploadedEvent = DocumentEventBase & {
   /** The storage object path, so the worker needs no lookup to start. */
   objectPath: string;
   fileType: string;
+  /**
+   * ISO 639-1 codes for OCR, empty when unspecified — 34-doc §4.1.
+   *
+   * **Here for the same reason `fileType` is**: it is document configuration
+   * the PARSE needs, and the alternative is a database read before parsing —
+   * which is precisely the lookup the line above exists to avoid. The
+   * processor's only `findUniqueOrThrow` happens after the parse, inside
+   * `writeChunkRows`, so hoisting it would move a query to the front of the
+   * hottest path in this service to serve a minority of documents.
+   *
+   * **The cost is acknowledged rather than hidden:** this is a field on a
+   * broadcast contract that one consumer reads, for a case most documents
+   * never hit. `fileType` already paid that price once, and the no-lookup rule
+   * is what both are buying.
+   */
+  ocrLanguages: string[];
 };
 
 export type DocumentIndexedEvent = DocumentEventBase & {

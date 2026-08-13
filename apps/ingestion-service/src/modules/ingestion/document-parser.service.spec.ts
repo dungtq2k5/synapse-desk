@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { getEncoding } from 'js-tiktoken';
 import { DocumentParserService } from './document-parser.service';
+import { OcrService } from './ocr.service';
 import { DocumentChunkerService } from './document-chunker.service';
 import { buildPdf } from '../../../test/utils/pdf-fixture';
 import { buildDocx } from '../../../test/utils/docx-fixture';
@@ -16,7 +17,7 @@ import { buildDocx } from '../../../test/utils/docx-fixture';
  * keep.
  */
 describe('§3 DocumentParserService (unit)', () => {
-  const parser = new DocumentParserService();
+  const parser = new DocumentParserService(new OcrService());
   const chunker = new DocumentChunkerService();
 
   const parse = async (bytes: Buffer, type: string) =>

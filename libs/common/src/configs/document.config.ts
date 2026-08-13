@@ -70,6 +70,26 @@ export enum DocumentFlagType {
   LOW_CONFIDENCE = 'LOW_CONFIDENCE',
   NEGATIVE_FEEDBACK = 'NEGATIVE_FEEDBACK',
   CONFLICTING = 'CONFLICTING',
+  /**
+   * Part of the document is not in the corpus — 34-doc §6.
+   *
+   * **Its provenance differs from every value above it, and that is worth a
+   * sentence rather than a silent addition.** The others are derived from
+   * RETRIEVAL behaviour: `UNRETRIEVED` means nobody's question came near it,
+   * `UNCITED` means it kept winning a context slot without earning one. Those
+   * are observations made weeks after ingestion by a scheduled job.
+   *
+   * This one comes from ingestion itself, at index time, and is a fact about
+   * the document rather than about how it has been used. The mechanism fits —
+   * a Knowledge Manager reviewing a worklist is exactly who should see "three
+   * pages of this could not be read" — but the provenance does not, and a
+   * reader comparing them deserves to know which kind they are looking at.
+   *
+   * Raised when pages the parser saw are absent from the chunk rows, which
+   * covers BOTH ways a page can vanish: OCR failed to read it, or it produced
+   * too little text to survive `MIN_CHUNK_TOKENS`.
+   */
+  PAGES_NOT_INDEXED = 'PAGES_NOT_INDEXED',
 }
 
 export const DOCUMENT_FLAG_TYPES = Object.values(DocumentFlagType);
@@ -171,6 +191,117 @@ export const ALLOWED_DOCUMENT_MIME_TYPES = [
 ] as const;
 export type AllowedDocumentMimeType =
   (typeof ALLOWED_DOCUMENT_MIME_TYPES)[number];
+
+/**
+ * The languages OCR can be asked for — 34-doc §4.
+ *
+ * **Here rather than in `ocr.config` because this is API contract, not engine
+ * tuning.** The gateway validates uploads against this set, it appears in a
+ * DTO, and a change to it is a change to what callers may send.
+ * `ocr.config` holds the worker's own knobs — the character floor, the DPI and
+ * the two ceilings — which no caller can see.
+ *
+ * **The same eight the rest of the product speaks**, matching the greeting and
+ * refusal tables in rag-service: a ninth language is a decision made in one
+ * place rather than a code someone adds here because tesseract happens to ship
+ * a model for it.
+ *
+ * **ISO 639-1, because the API speaks ISO 639-1** (§4.2.1). Tesseract's own
+ * codes are 639-2 (`vie`, `jpn`) and its apt packages are a third spelling
+ * again (`tesseract-ocr-chi-sim`, hyphen where the language code has an
+ * underscore). Storing the engine's alphabet would make the column unportable
+ * and put `chi_sim` in a DTO.
+ */
+export const OCR_LANGUAGES = [
+  'en',
+  'es',
+  'fr',
+  'de',
+  'pt',
+  'vi',
+  'ja',
+  'zh',
+] as const;
+export type OcrLanguage = (typeof OCR_LANGUAGES)[number];
+
+/**
+ * ISO 639-1 -> tesseract's `-l` code — 34-doc §4.2.1.
+ *
+ * **Exported once so the parser never spells a code itself.** Three alphabets
+ * for the same language is the kind of mistake that type-checks: `zh` is
+ * `chi_sim` to the engine and `chi-sim` to apt, and a hand-written `-l zh`
+ * fails at runtime with "Failed loading language" rather than at compile time.
+ *
+ * The apt names are deliberately absent. They are packaging, not domain, and
+ * they live in `docker/node-service.Dockerfile` — a third mapping in code would
+ * be a third place to get `chi-sim` wrong.
+ */
+export const TESSERACT_CODE_BY_LANGUAGE: Record<OcrLanguage, string> = {
+  en: 'eng',
+  es: 'spa',
+  fr: 'fra',
+  de: 'deu',
+  pt: 'por',
+  vi: 'vie',
+  ja: 'jpn',
+  zh: 'chi_sim',
+};
+
+/**
+ * How many languages one document may declare — 34-doc §4.3, MEASURED.
+ *
+ * **The measurement reversed the reasoning, so it is recorded here rather than
+ * in the document that guessed.** The design expected accuracy to degrade as
+ * languages were added, and hypothesised a cap of 2. It does not. Rendered at
+ * 300 dpi and OCR'd with tesseract 5.3.4:
+ *
+ * | `-l`                    | char error rate | time  |
+ * | :---------------------- | :-------------- | :---- |
+ * | `vie`                   | 0.00%           |  651ms |
+ * | `vie+eng`               | 0.00%           |  699ms |
+ * | `vie+eng+jpn`           | 0.00%           |  739ms |
+ * | `vie+eng+jpn+chi_sim`   | 0.00%           |  893ms |
+ * | `eng+vie` (order swapped) | **2.41%**     |  776ms |
+ * | `eng` alone             | **24.41%**      |  642ms |
+ *
+ * **Three findings, and only the third sets this number.**
+ *
+ * 1. Extra languages cost NO accuracy. Four was as exact as one.
+ * 2. **Order is what costs accuracy** — naming English first on a Vietnamese
+ *    document was worse than every four-language combination. Which is why the
+ *    list is stored and passed in the order given, never sorted.
+ * 3. Extra languages cost TIME, roughly linearly, and CJK models cost most:
+ *    `jpn` 578ms against `jpn+eng+chi_sim` 1359ms.
+ *
+ * So the cap is a CPU bound, not an accuracy one. Four permits every realistic
+ * document — one language, English technical terms, and a CJK script — while
+ * holding the worst case near +40% on a path that already has a per-page
+ * timeout.
+ *
+ * **The caveat that keeps this honest:** these were clean synthetic renders of
+ * digital fonts, which is the easy case. Real scans are noisy and skewed, and
+ * language confusion grows with noise. The numbers bound the BEST case, so they
+ * are a reason not to tighten the cap rather than a licence to loosen it.
+ */
+export const MAX_OCR_LANGUAGES = 4;
+
+/**
+ * At most one of these may be named — 34-doc §4.2 rule 3.
+ *
+ * **The rule survives; its stated reason did not.** The design said `jpn+zho`
+ * was "close to worthless — two models competing over the same Han
+ * characters". Measured, it is not: `jpn+chi_sim` scored 0.00% on Japanese,
+ * identical to `jpn` alone.
+ *
+ * What it costs is TIME — `jpn` 578ms against `jpn+chi_sim` 965ms, and
+ * `jpn+eng+chi_sim` 1359ms, well over double. Since the accuracy gain is
+ * exactly zero, that is spend with nothing bought, and refusing it is still
+ * right. The reason is now the one the numbers support.
+ */
+export const NON_LATIN_OCR_LANGUAGES: readonly OcrLanguage[] = ['ja', 'zh'];
+
+/** Used when the uploader specified nothing, which is almost every upload. */
+export const DEFAULT_OCR_LANGUAGE: OcrLanguage = 'en';
 
 export const MAX_DOCUMENT_BYTES = 25 * 1024 * 1024;
 

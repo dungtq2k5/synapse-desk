@@ -34,6 +34,12 @@ message DocumentResponse {
   google.protobuf.Timestamp updated_at = 13;
   optional google.protobuf.Timestamp deleted_at = 14;
   optional string deleted_by_id = 15;
+  // ISO 639-1 codes the uploader declared for OCR — 34-doc §4.
+  //
+  // Empty means "not specified", which is almost every document: an uploader
+  // cannot know a PDF is scanned until it is parsed. `repeated` needs no
+  // `optional` — proto3 repeated fields are already absent-by-default.
+  repeated string ocr_languages = 16;
 }
 
 message PresignDocumentRequest {
@@ -54,6 +60,11 @@ message ConfirmDocumentRequest {
   bool is_organization_wide = 3;
   repeated string department_ids = 4;
   string file_name = 5;
+  // ISO 639-1, validated at the gateway against `OCR_LANGUAGES` — 34-doc §4.2.
+  //
+  // NOT tesseract's own codes: the engine wants `vie`/`chi_sim`, and storing
+  // those would put the engine's alphabet in the API contract and in every row.
+  repeated string ocr_languages = 6;
 }
 
 message ListDocumentsRequest {

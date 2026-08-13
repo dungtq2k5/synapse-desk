@@ -23,6 +23,7 @@ export function toDocumentResponseDto(
     title: document.title,
     fileUrl: document.fileUrl,
     fileType: document.fileType,
+    ocrLanguages: document.ocrLanguages,
     fileSizeBytes: document.fileSizeBytes,
     isOrganizationWide: document.isOrganizationWide,
     // A free string on the wire, narrowed here. An unrecognised value becomes

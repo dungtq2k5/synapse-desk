@@ -5,6 +5,8 @@ import {
   AiGenerationStatus,
   AiSurface,
   DOCUMENT_PATTERNS,
+  DocumentFlagSeverity,
+  DocumentFlagType,
   DocumentStatus,
   EMBEDDING_BATCH_SIZE,
   estimateCostMicros,
@@ -23,8 +25,12 @@ import {
   EMBEDDING_CLIENT,
   EmbeddingClient,
 } from '../embeddings/embedding.contract';
-import { DocumentParserService } from './document-parser.service';
-import { DocumentChunkerService } from './document-chunker.service';
+import {
+  DocumentParserService,
+  ParsedDocument,
+} from './document-parser.service';
+import { Chunk, DocumentChunkerService } from './document-chunker.service';
+import { DocumentFlagService } from '../scheduled/document-flag.service';
 
 export type IngestionJobData = {
   organizationId: string;
@@ -32,6 +38,14 @@ export type IngestionJobData = {
   ingestionJobId: string;
   objectPath: string;
   fileType: string;
+  /**
+   * ISO 639-1 codes for OCR — 34-doc §4.1.
+   *
+   * Optional because jobs enqueued before this field existed are still in
+   * Redis, and a worker that crashed on them would stall every document behind
+   * them. Absent reads as "not specified", which is what it was.
+   */
+  ocrLanguages?: string[];
 };
 
 /** Raised when the tenant is out of AI budget. Not a failure — a deferral. */
@@ -52,8 +66,18 @@ class NoExtractableText extends Error {
   constructor(fileType: string) {
     super(
       fileType === 'pdf'
-        ? 'No extractable text — this document appears to be scanned. ' +
-            'Upload a text-based PDF, or run OCR on it first.'
+        ? // **The advice changed because the system changed** — 34-doc §6.
+          // It used to end "run OCR on it first", which stops making sense
+          // once we run OCR ourselves: by the time a PDF reaches this error,
+          // every image page has been rasterised and read and still produced
+          // nothing.
+          //
+          // So the actionable input is LANGUAGE, because it is the one thing
+          // the uploader controls and the most likely cause — tesseract given
+          // the wrong language does not fail, it returns confident nonsense
+          // that then falls below the chunker's minimum.
+          'OCR found no readable text in this document. If it is not in ' +
+            'English, re-upload it specifying its language.'
         : `No extractable text was found in this ${fileType} document.`,
     );
   }
@@ -85,6 +109,7 @@ export class IngestionProcessor {
     private readonly storage: StorageReferenceService,
     private readonly parser: DocumentParserService,
     private readonly chunker: DocumentChunkerService,
+    private readonly flags: DocumentFlagService,
     private readonly qdrant: QdrantService,
     private readonly ledger: AiLedgerService,
     private readonly aiSettings: AiSettingsService,
@@ -110,7 +135,15 @@ export class IngestionProcessor {
         data.objectPath,
         organizationId,
       );
-      const parsed = await this.parser.parse(bytes, data.fileType);
+      const parsed = await this.parser.parse(
+        bytes,
+        data.fileType,
+        // From the EVENT, not a database read — 34-doc §4.1. `objectPath` and
+        // `fileType` are there for the same reason: the worker needs no lookup
+        // to start, and this service's only document read happens later,
+        // inside `writeChunkRows`.
+        data.ocrLanguages ?? [],
+      );
 
       await this.setJobStatus(ingestionJobId, IngestionJobStatus.CHUNKING);
       const chunks = await this.chunker.chunk(parsed.pages);
@@ -131,6 +164,13 @@ export class IngestionProcessor {
         // wrong answer into an actionable one.
         throw new NoExtractableText(data.fileType);
       }
+
+      // **After chunking, because that is where the SECOND drop happens** —
+      // 34-doc §1.1, §6. `document-chunker.service.ts` discards any chunk under
+      // `MIN_CHUNK_TOKENS`, so a page that OCR'd to eight tokens survived the
+      // parser, counted as a success, and vanished anyway. Checking the parser's
+      // output alone would have reported that document as complete.
+      await this.reportMissingPages(data, parsed, chunks);
 
       // Written BEFORE the budget gate on purpose: parsing and chunking cost
       // nothing but CPU, and a tenant at the cap who later gets more budget
@@ -161,6 +201,84 @@ export class IngestionProcessor {
   }
 
   // -------------------------------------------------------------------------
+
+  /**
+   * **Every page is either in the corpus or recorded as missing** — 34-doc §6.
+   *
+   * The invariant, checked in the one place that holds both halves. Two silent
+   * drops sit between a PDF and the index and they fail identically from
+   * outside — the document reports INDEXED and three of its pages are simply
+   * not searchable, forever:
+   *
+   *   1. the parser drops a page OCR could not read (or that it never tried,
+   *      past `MAX_OCR_PAGES_PER_DOCUMENT`);
+   *   2. the chunker drops a chunk under `MIN_CHUNK_TOKENS`, so a page that
+   *      OCR'd to eight tokens vanishes having been counted a success.
+   *
+   * Comparing page numbers in the CHUNK ROWS against the page count the parser
+   * saw catches both at once, which is why the check lives here rather than
+   * being instrumented at each drop.
+   *
+   * **A flag, never a failure.** A 200-page handbook where three pages could
+   * not be read is 197 pages of value, and discarding it to signal three is a
+   * bad trade — while silently indexing 197 is the bug this whole document
+   * exists to fix. So: index what worked, and put the rest on a worklist a
+   * human already reviews.
+   */
+  private async reportMissingPages(
+    data: IngestionJobData,
+    parsed: ParsedDocument,
+    chunks: Chunk[],
+  ): Promise<void> {
+    // Formats without pagination have nothing to check — a DOCX has no pages
+    // until something paginates it, so `pageCount` is 0 and there is no page
+    // that could have gone missing.
+    if (parsed.pageCount === 0) return;
+
+    const indexed = new Set(
+      chunks
+        .map((chunk) => chunk.pageNumber)
+        .filter((page): page is number => page !== null),
+    );
+
+    const missing = Array.from(
+      { length: parsed.pageCount },
+      (_, index) => index + 1,
+    ).filter((page) => !indexed.has(page));
+
+    if (missing.length === 0) return;
+
+    // **Through the shared policy, not a bare `create`** — `DocumentFlagService`
+    // excludes documents that already have this flag open AND those where a
+    // human resolved one. Both matter here and neither is hypothetical: BullMQ
+    // retries this job, and the flag is written before the steps that can still
+    // fail, so a bare insert puts the same finding on the worklist twice for
+    // one document. And a Knowledge Manager who confirmed the appendix really
+    // is a photograph would have that dismissal overturned by the next
+    // re-ingestion — which is precisely what that service's docblock argues
+    // destroys trust in the worklist.
+    await this.flags.raise(
+      data.organizationId,
+      [data.documentId],
+      DocumentFlagType.PAGES_NOT_INDEXED,
+      // **WARNING, not the INFO default.** A Knowledge Manager scanning the
+      // worklist should see "part of this document is not searchable" above the
+      // `UNRETRIEVED` noise, and a one-word omission is what would bury it.
+      DocumentFlagSeverity.WARNING,
+      // **Page numbers and counts, never document text.** `detail` is
+      // `@db.Text` and operator-facing, which puts it under the same rule as
+      // `error_log` — and it is the field most likely to grow a helpful excerpt
+      // later. "page 7 read as: …" is exactly the improvement somebody ships
+      // without noticing they have put tenant content on an operator's screen.
+      `${missing.length} of ${parsed.pageCount} page(s) could not be indexed: ` +
+        `${summarizePages(missing)}. Scanned pages are read with OCR; if this ` +
+        'document is not in English, re-upload it specifying its language.',
+    );
+
+    this.logger.warn(
+      `Document ${data.documentId}: ${missing.length}/${parsed.pageCount} pages not indexed`,
+    );
+  }
 
   /**
    * The chunk rows, carrying the four scope columns copied from the parent.
@@ -440,4 +558,33 @@ export class IngestionProcessor {
       data: { status },
     });
   }
+}
+
+/**
+ * `[1, 2, 3, 7, 9, 10]` -> `"1-3, 7, 9-10"`.
+ *
+ * Ranges rather than a list because the common shape is contiguous — a
+ * scanned appendix, a fax inserted mid-document — and "pages 40-83 could not be
+ * indexed" is a sentence a Knowledge Manager can act on, while forty-four
+ * comma-separated numbers is one they will scroll past.
+ */
+function summarizePages(pages: number[]): string {
+  const ranges: string[] = [];
+  let start = pages[0];
+  let previous = pages[0];
+
+  for (const page of pages.slice(1)) {
+    if (page === previous + 1) {
+      previous = page;
+      continue;
+    }
+
+    ranges.push(start === previous ? `${start}` : `${start}-${previous}`);
+    start = page;
+    previous = page;
+  }
+
+  ranges.push(start === previous ? `${start}` : `${start}-${previous}`);
+
+  return ranges.join(', ');
 }

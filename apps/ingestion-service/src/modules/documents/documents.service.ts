@@ -238,6 +238,10 @@ export class DocumentsService {
             fileHash,
             isOrganizationWide: request.isOrganizationWide,
             status: DocumentStatus.PENDING,
+            // Validated at the gateway against `OCR_LANGUAGES` — 34-doc §4.2.
+            // Stored as given: `[]` is "not specified", which is almost every
+            // upload, and the parser is what turns that into the `eng` default.
+            ocrLanguages: request.ocrLanguages ?? [],
             departmentLinks: {
               create: departmentIds.map((departmentId) => ({ departmentId })),
             },
@@ -273,6 +277,11 @@ export class DocumentsService {
         ingestionJobId: document.job.id,
         objectPath: request.objectPath,
         fileType: document.created.fileType,
+        // On the EVENT rather than read from the row by the worker — 34-doc
+        // §4.1. The processor's only document read happens after the parse, so
+        // carrying this here is what keeps the "no lookup to start" property
+        // that `objectPath` and `fileType` are already there for.
+        ocrLanguages: document.created.ocrLanguages,
       });
 
       return toDocumentResponse(document.created, departmentIds, 0);

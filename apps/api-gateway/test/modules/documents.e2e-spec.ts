@@ -45,6 +45,7 @@ describe('§3.1 Documents at the HTTP boundary (e2e)', () => {
     status: DocumentStatus.PENDING,
     departmentIds: [],
     chunkCount: 0,
+    ocrLanguages: [],
     createdAt: timestamp(),
     updatedAt: timestamp(),
     deletedAt: undefined,
@@ -273,6 +274,96 @@ describe('§3.1 Documents at the HTTP boundary (e2e)', () => {
       const [request] = fx.stubs.document.confirmDocument.mock.calls[0];
       expect(request.isOrganizationWide).toBe(true);
       expect(request.departmentIds).toEqual([]);
+    });
+
+    it('**an unsupported OCR language is a 400**', async () => {
+      // 34-doc §4.2 rule 1. The set lives in `@synapsedesk/common` beside the
+      // mime allowlist, because the gateway validates it and ingestion-service
+      // consumes it.
+      const res = await authenticatedAgent(fx.app, {
+        permissionCodes: ['document.create'],
+      })
+        .post(`${API}/documents/confirm`)
+        .send({ ...confirm, ocrLanguages: ['klingon'] });
+
+      expect(res.status).toBe(400);
+    });
+
+    it('**TWO non-Latin scripts are rejected** — the rule nobody guesses', async () => {
+      // 34-doc §4.2 rule 3, and the one that carries real information: accuracy
+      // degrades with script MIXING, not with count. `jpn+chi_sim` is two
+      // models competing over the same Han characters and is close to
+      // worthless, while `eng+fra` costs almost nothing — so a size cap alone
+      // would permit exactly the combination that does the most damage.
+      const res = await authenticatedAgent(fx.app, {
+        permissionCodes: ['document.create'],
+      })
+        .post(`${API}/documents/confirm`)
+        .send({ ...confirm, ocrLanguages: ['ja', 'zh'] });
+
+      expect(res.status).toBe(400);
+    });
+
+    it('**more than four languages is a 400** — the measured cap', async () => {
+      // 34-doc §4.3, and the number came from a measurement rather than the
+      // document: extra languages cost no ACCURACY (four scored identically to
+      // one) but roughly 40% more time, and CJK models cost most. So the cap
+      // is a CPU bound, and four permits every realistic document — one
+      // language, English terms, and a CJK script.
+      const res = await authenticatedAgent(fx.app, {
+        permissionCodes: ['document.create'],
+      })
+        .post(`${API}/documents/confirm`)
+        .send({ ...confirm, ocrLanguages: ['vi', 'en', 'fr', 'de', 'pt'] });
+
+      expect(res.status).toBe(400);
+    });
+
+    it('and exactly four is allowed', async () => {
+      // The boundary in the permitted direction. Asserted because a cap tested
+      // only from above passes just as well when it is off by one.
+      fx.stubs.document.confirmDocument.mockReturnValue(of(wireDocument()));
+
+      const res = await authenticatedAgent(fx.app, {
+        permissionCodes: ['document.create'],
+      })
+        .post(`${API}/documents/confirm`)
+        .send({ ...confirm, ocrLanguages: ['vi', 'en', 'fr', 'de'] });
+
+      expect(res.status).toBe(201);
+    });
+
+    it('but one non-Latin plus Latin languages is allowed', async () => {
+      // The over-refusal direction. A Japanese policy with English technical
+      // terms is an ordinary document, and this is the case rule 3 must not
+      // catch.
+      fx.stubs.document.confirmDocument.mockReturnValue(of(wireDocument()));
+
+      const res = await authenticatedAgent(fx.app, {
+        permissionCodes: ['document.create'],
+      })
+        .post(`${API}/documents/confirm`)
+        .send({ ...confirm, ocrLanguages: ['ja', 'en'] });
+
+      expect(res.status).toBe(201);
+
+      const [request] = fx.stubs.document.confirmDocument.mock.calls[0];
+      // **Order preserved.** Tesseract may weight the first language, so the
+      // list is passed as given rather than sorted or de-duplicated into a set.
+      expect(request.ocrLanguages).toEqual(['ja', 'en']);
+    });
+
+    it('and an absent field reaches the service as `[]`, never undefined', async () => {
+      // `[]` and absent are the same value all the way down — Prisma scalar
+      // lists cannot be null, so there is no third state to preserve.
+      fx.stubs.document.confirmDocument.mockReturnValue(of(wireDocument()));
+
+      await authenticatedAgent(fx.app, { permissionCodes: ['document.create'] })
+        .post(`${API}/documents/confirm`)
+        .send(confirm);
+
+      const [request] = fx.stubs.document.confirmDocument.mock.calls[0];
+      expect(request.ocrLanguages).toEqual([]);
     });
 
     it('3. REJECTS a non-UUID department id', async () => {

@@ -1344,6 +1344,7 @@ describe('§25 the GraphQL surface (e2e)', () => {
               status: 'READY',
               departmentIds: [],
               chunkCount: 4,
+              ocrLanguages: [],
               createdAt: timestamp(),
               updatedAt: timestamp(),
             },

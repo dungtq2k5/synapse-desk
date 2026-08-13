@@ -135,8 +135,18 @@ export class DocumentFlagService {
    * next run would be arguing with them once a day until they stopped reading
    * flags entirely. `resolvedAt IS NULL` in the exclusion set is what makes
    * dismissal stick.
+   *
+   * **Public because ingestion writes a flag too** — `PAGES_NOT_INDEXED`,
+   * 34-doc §6 — and that one is not a sweep: it is raised at index time, and
+   * BullMQ retries the job that raises it. Both consequences of writing flags
+   * without this policy are the ones the paragraph above describes: a retry
+   * duplicates the row, and a dismissed flag comes back.
+   *
+   * One implementation rather than a second copy, because the policy is an
+   * argued decision about human behaviour and a copy is where the argument
+   * gets lost — the next writer would follow whichever version they read first.
    */
-  private async raise(
+  async raise(
     organizationId: string,
     documentIds: string[],
     flagType: DocumentFlagType,

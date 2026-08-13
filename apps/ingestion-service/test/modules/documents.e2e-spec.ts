@@ -8,6 +8,7 @@ import {
   DocumentFlagType,
   DocumentStatus,
   IngestionJobStatus,
+  compareAlphabetically,
 } from '@synapsedesk/common';
 import { expectRpc } from '@synapsedesk/common/testing/rpc';
 import { status } from '@grpc/grpc-js';
@@ -79,6 +80,7 @@ describe('§2 Documents (e2e)', () => {
     contentType: 'application/pdf',
     sizeBytes: 2048,
     fileName: 'handbook.pdf',
+    ocrLanguages: [],
     ...overrides,
   });
 
@@ -88,6 +90,7 @@ describe('§2 Documents (e2e)', () => {
     isOrganizationWide: true,
     departmentIds: [] as string[],
     fileName: 'handbook.pdf',
+    ocrLanguages: [],
     ...overrides,
   });
 
@@ -880,7 +883,7 @@ describe('§2 Documents (e2e)', () => {
      * would have answered. A filter offering only `UNCITED` re-merges them in
      * practice — the type nobody can select is the type nobody sees.
      */
-    async function seedFlags() {
+    const seedFlags = async () => {
       const unretrieved = await createDocument(fx.prisma, tenant, {
         title: 'Never found',
       });
@@ -897,7 +900,7 @@ describe('§2 Documents (e2e)', () => {
       });
 
       return { unretrieved, uncited };
-    }
+    };
 
     const flagsRequest = (
       overrides: Partial<{
@@ -919,10 +922,13 @@ describe('§2 Documents (e2e)', () => {
         manager(),
       );
 
-      expect(items.map((flag) => flag.flagType).sort()).toEqual([
-        DocumentFlagType.UNCITED,
-        DocumentFlagType.UNRETRIEVED,
-      ]);
+      expect(
+        items.map((flag) => flag.flagType).sort(compareAlphabetically),
+      ).toEqual(
+        [DocumentFlagType.UNCITED, DocumentFlagType.UNRETRIEVED].sort(
+          compareAlphabetically,
+        ),
+      );
     });
 
     it('2. filters to UNRETRIEVED alone', async () => {

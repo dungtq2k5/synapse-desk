@@ -34,6 +34,9 @@ export function toDocumentResponse(
     // read rather than whenever a stored URL happened to expire.
     fileUrl: document.fileUrl,
     fileType: document.fileType,
+    // `[]` when unspecified, never null — Prisma scalar lists cannot be null,
+    // so absent and empty are one value all the way to the wire.
+    ocrLanguages: document.ocrLanguages,
     // BigInt -> number. `longs: Number` makes int64 a plain JS number on both
     // ends, exact to 2^53 — nine petabytes is not a limit worth engineering
     // around for a 25 MB-per-file corpus.

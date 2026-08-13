@@ -278,6 +278,7 @@ describe('§29 the shared cache (e2e)', () => {
           status: 'READY',
           departmentIds: [],
           chunkCount: 1,
+          ocrLanguages: [],
           createdAt: timestamp(),
           updatedAt: timestamp(),
         },

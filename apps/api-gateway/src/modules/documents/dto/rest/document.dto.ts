@@ -15,14 +15,18 @@ import {
 } from 'class-validator';
 import {
   ALLOWED_DOCUMENT_MIME_TYPES,
+  OCR_LANGUAGES,
   DOCUMENT_FLAG_TYPES,
   DocumentFlagType,
   DOCUMENT_STATUSES,
   DocumentStatus,
   MAX_DOCUMENT_BYTES,
+  MAX_OCR_LANGUAGES,
+  normalizeStringArray,
   MAX_DOCUMENT_TITLE_LENGTH,
   trimIfString,
 } from '@synapsedesk/common';
+import { AtMostOneNonLatinScript } from '../../../../common/decorators/at-most-one-non-latin-script.decorator';
 import { SearchPaginationDto } from '../../../../common/dto/rest/search-pagination.dto';
 import { ToBoolean } from '../../../../common/decorators/to-boolean.decorator';
 import { MAX_DOCUMENT_DEPARTMENTS } from '../../../../common/config/dto.config';
@@ -97,6 +101,44 @@ export class ConfirmDocumentDto {
   @MaxLength(255)
   @Transform(trimIfString)
   readonly fileName?: string;
+
+  /**
+   * ISO 639-1 codes for OCR, if the uploader knows — 34-doc §4.
+   *
+   * **Empty on almost every upload, and that is inherent**: nobody knows their
+   * PDF is scanned until it is parsed, which is the premise of the whole
+   * feature. So this is an escape hatch for the tenant who knows they are
+   * uploading scanned Vietnamese forms — an advanced field in the UI, never a
+   * question asked of every upload.
+   *
+   * Unspecified falls back to `eng` at the parser. `[]` and absent are the same
+   * thing all the way down, because Prisma scalar lists cannot be null.
+   */
+  @IsOptional()
+  // **Lower-cased and de-duplicated before validation**, order preserved.
+  //
+  // Case: BCP 47 defines language tags as case-insensitive and merely
+  // conventionally lower-case, so `VI` is not a mistake a caller can see —
+  // without this it is a 400. The worse half is anything that reaches the parser
+  // without passing through here: `TESSERACT_CODE_BY_LANGUAGE['VI']` is
+  // `undefined`, gets filtered out, and the document is silently OCR'd in
+  // English.
+  //
+  // Duplicates: `tesseract -l eng+eng` exits 0, so nothing downstream would ever
+  // complain — but `['vi','vi','vi','vi']` spends the whole `MAX_OCR_LANGUAGES`
+  // budget on one language, and that cap is a CPU bound. `@ArrayUnique` would
+  // instead 400 a request whose intent is unambiguous.
+  //
+  // Order is preserved because this list is an ordered PREFERENCE: English first
+  // on a Vietnamese document measured 2.41% character error against 0.00%.
+  @Transform(normalizeStringArray)
+  @IsArray()
+  // Four, from the measurement recorded at `MAX_OCR_LANGUAGES` — extra
+  // languages cost time rather than accuracy, so the cap is a CPU bound.
+  @ArrayMaxSize(MAX_OCR_LANGUAGES)
+  @IsIn(OCR_LANGUAGES, { each: true })
+  @AtMostOneNonLatinScript()
+  readonly ocrLanguages?: string[] = [];
 }
 
 export class UpdateDocumentDto {

@@ -64,7 +64,13 @@ describe('§2 REST and GraphQL DTOs are independent but not divergent', () => {
       gqlClass: 'DocumentResponseGqlDto',
       // `fileUrl` is an internal path, not a URL; `deletedById` is an audit field
       // with no edge behind it.
-      restOnly: ['fileUrl', 'deletedById'],
+      //
+      // `ocrLanguages` is REST-only BY DECISION — 34-doc §4.1. `@Field()` is
+      // not inherited (conventions §12.2), so a GraphQL DTO would need its own
+      // line; the field is an advanced upload option that no screen reads yet,
+      // and adding it to the public schema before anything queries it is how a
+      // schema accumulates fields nobody can remove.
+      restOnly: ['fileUrl', 'deletedById', 'ocrLanguages'],
     },
     {
       name: 'Notification',

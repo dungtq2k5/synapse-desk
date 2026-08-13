@@ -25,6 +25,7 @@ export * from './configs/ai-settings.config';
 export * from './contracts/billing.contract';
 export * from './configs/qdrant.config';
 export * from './configs/chunking.config';
+export * from './configs/ocr.config';
 export * from './utils/text-normalize';
 export * from './configs/billing.config';
 export * from './configs/analytics.config';

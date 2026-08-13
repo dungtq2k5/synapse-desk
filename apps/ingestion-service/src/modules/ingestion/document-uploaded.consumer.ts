@@ -42,6 +42,10 @@ export class DocumentUploadedConsumer {
         ingestionJobId: event.ingestionJobId,
         objectPath: event.objectPath,
         fileType: event.fileType,
+        // Carried one more hop: event -> job payload -> parser. The worker
+        // reads no document row before parsing, so this is the only route the
+        // language has (34-doc §4.1).
+        ocrLanguages: event.ocrLanguages,
       });
     } catch (error) {
       // The job ROW already exists and still reads QUEUED, so the document is

@@ -27,7 +27,17 @@ export interface DocumentResponse {
   createdAt: Timestamp | undefined;
   updatedAt: Timestamp | undefined;
   deletedAt?: Timestamp | undefined;
-  deletedById?: string | undefined;
+  deletedById?:
+    | string
+    | undefined;
+  /**
+   * ISO 639-1 codes the uploader declared for OCR — 34-doc §4.
+   *
+   * Empty means "not specified", which is almost every document: an uploader
+   * cannot know a PDF is scanned until it is parsed. `repeated` needs no
+   * `optional` — proto3 repeated fields are already absent-by-default.
+   */
+  ocrLanguages: string[];
 }
 
 export interface PresignDocumentRequest {
@@ -48,6 +58,13 @@ export interface ConfirmDocumentRequest {
   isOrganizationWide: boolean;
   departmentIds: string[];
   fileName: string;
+  /**
+   * ISO 639-1, validated at the gateway against `OCR_LANGUAGES` — 34-doc §4.2.
+   *
+   * NOT tesseract's own codes: the engine wants `vie`/`chi_sim`, and storing
+   * those would put the engine's alphabet in the API contract and in every row.
+   */
+  ocrLanguages: string[];
 }
 
 export interface ListDocumentsRequest {

@@ -4,10 +4,12 @@ import { ConfigService } from '@nestjs/config';
 import { INGESTION_QUEUE, SCOPE_FANOUT_QUEUE } from '@synapsedesk/common';
 import { PrismaModule } from '../prisma/prisma.module';
 import { StorageClientModule } from '../storage-client/storage-client.module';
+import { ScheduledModule } from '../scheduled/scheduled.module';
 import { AiLedgerModule } from '../ai-ledger/ai-ledger.module';
 import { QdrantModule } from '../qdrant/qdrant.module';
 import { EmbeddingsModule } from '../embeddings/embeddings.module';
 import { DocumentParserService } from './document-parser.service';
+import { OcrService } from './ocr.service';
 import { DocumentChunkerService } from './document-chunker.service';
 import { IngestionProcessor } from './ingestion.processor';
 import { IngestionQueueService } from './ingestion-queue.service';
@@ -50,6 +52,12 @@ import { ScopeChangedConsumer } from './scope-changed.consumer';
     ),
     PrismaModule,
     StorageClientModule,
+    // For `DocumentFlagService.raise` — 34-doc §6. Ingestion raises
+    // `PAGES_NOT_INDEXED` at index time and must follow the same
+    // never-re-raise-a-dismissed-flag policy the sweeps do; importing the
+    // module that owns flag writing is what keeps that one implementation
+    // rather than two.
+    ScheduledModule,
     AiLedgerModule,
     QdrantModule,
     EmbeddingsModule,
@@ -57,6 +65,7 @@ import { ScopeChangedConsumer } from './scope-changed.consumer';
   controllers: [DocumentUploadedConsumer, ScopeChangedConsumer],
   providers: [
     DocumentParserService,
+    OcrService,
     DocumentChunkerService,
     IngestionProcessor,
     IngestionQueueService,

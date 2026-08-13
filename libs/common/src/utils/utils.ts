@@ -150,6 +150,40 @@ export function maskPhoneNumber(phoneNumber: string): string {
 }
 
 /**
+ * Trims, LOWER-CASES and de-duplicates a string array, preserving order.
+ *
+ * A `@Transform`, so it runs BEFORE the validators — the same placement and the
+ * same reason as {@link trimIfString}: `@IsIn(...)` and `@ArrayMaxSize(...)`
+ * should judge the value that will actually be stored, not the one that was
+ * typed.
+ *
+ * **The lower-casing is in the contract, not an implementation detail**, and it
+ * is why this is not for every array. It suits case-INSENSITIVE identifier
+ * lists — language codes, email addresses, tags. It would quietly break an array
+ * of enum members: `DOCUMENT_FLAG_TYPES` are upper-case, and running them
+ * through here turns every one into a value `@IsIn` rejects. Reach for it when
+ * case carries no meaning, and not otherwise.
+ *
+ * **De-duplication makes a size cap mean what it says.** `@ArrayMaxSize(4)` over
+ * `['vi','vi','vi','vi']` otherwise passes while expressing one choice, which
+ * matters wherever the cap is a resource bound rather than a formatting one.
+ *
+ * **Order survives, and for some callers that is load-bearing** — `Set` iterates
+ * in insertion order, so the first occurrence of each entry wins. `ocrLanguages`
+ * is an ordered preference: naming English first on a Vietnamese document scored
+ * 2.41% character error against 0.00% the other way round.
+ *
+ * Anything that is not an array of strings passes through untouched, so the
+ * validators report the real problem rather than this quietly reshaping it.
+ */
+export function normalizeStringArray({ value }: { value: unknown }): unknown {
+  if (!Array.isArray(value)) return value;
+  if (!value.every((entry) => typeof entry === 'string')) return value;
+
+  return [...new Set(value.map((entry) => entry.trim().toLowerCase()))];
+}
+
+/**
  * Trims a string value, leaving anything else alone for the validators to
  * reject.
  *
