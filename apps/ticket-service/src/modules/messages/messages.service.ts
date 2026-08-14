@@ -8,6 +8,9 @@ import {
   CallerContext,
   ConfirmAttachmentRequest,
   CreateMessageRequest,
+  CreateMessageResponse,
+  ExcludeFromAiContextRequest,
+  NewAttachment,
   DeleteAttachmentRequest,
   DeleteAttachmentResponse,
   DownloadAttachmentRequest,
@@ -40,6 +43,8 @@ import {
   ticketMessageGroupKey,
 } from '@synapsedesk/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { AiAttachmentService } from '../ai-attachments/ai-attachment.service';
+import { isDraftRefusal } from '../ai-client/refusal';
 import { recordInboundEmail, withInboundDedup } from '../tickets/inbound-dedup';
 import { TicketEventPublisher } from '../events/ticket-event.publisher';
 import { TicketsService } from '../tickets/tickets.service';
@@ -67,6 +72,15 @@ import {
 const READ_URL_GRACE_MS = 14 * 60 * 1000;
 
 /**
+ * How many messages the `invokeAi` reply path sends as context.
+ *
+ * The same bound the co-pilot uses and for the same reason: a long thread is
+ * prompt tokens charged on every generation, and the tail is what the reply is
+ * actually answering.
+ */
+const AI_REPLY_TRANSCRIPT_TURNS = 40;
+
+/**
  * The ticket thread.
  *
  * Two rules carry most of the weight here, and both are about what a reader
@@ -78,15 +92,6 @@ const READ_URL_GRACE_MS = 14 * 60 * 1000;
  * The first is a security property, the second an audit one, and both are
  * easier to get subtly wrong than to get right — see the comments at each.
  */
-/**
- * How many messages the `invokeAi` reply path sends as context.
- *
- * The same bound the co-pilot uses and for the same reason: a long thread is
- * prompt tokens charged on every generation, and the tail is what the reply is
- * actually answering.
- */
-const AI_REPLY_TRANSCRIPT_TURNS = 40;
-
 @Injectable()
 export class MessagesService {
   private readonly logger = new Logger(MessagesService.name);
@@ -98,11 +103,12 @@ export class MessagesService {
     private readonly events: TicketEventPublisher,
     private readonly tickets: TicketsService,
     private readonly rag: RagClientService,
+    private readonly aiAttachments: AiAttachmentService,
     private readonly ledger: LedgerClientService,
     private readonly storage: StorageReferenceService,
-    configService: ConfigService,
+    private readonly configService: ConfigService,
   ) {
-    this.editWindowMinutes = configService.getOrThrow<number>(
+    this.editWindowMinutes = this.configService.getOrThrow<number>(
       'MESSAGE_EDIT_WINDOW_MINUTES',
     );
   }
@@ -158,11 +164,24 @@ export class MessagesService {
    * draft can legitimately fail — `rag-service` does not exist yet, and will
    * still be able to be down once it does — and rolling back would throw away
    * what the human actually typed because a machine could not answer them.
+   *
+   * **Attachments are bound HERE, in the same call** — 36-doc §1.3. Presign and
+   * confirm both took a `messageId`, so an attachment row could only be written
+   * after its message existed, while `invokeAi` fires during this very call:
+   * a first-turn screenshot was stored a moment after the answer that needed
+   * it. Binding at create leaves no ordering for a client to get wrong.
+   *
+   * **A failed confirm skips that file and keeps the message** — §1.3.1. The
+   * presign record lives 600 seconds, and a user writing a careful ticket
+   * around a screenshot takes longer than that often enough. `confirmUpload`
+   * deliberately cannot tell an expired record from a forged path, so the only
+   * outcome that serves both is a named skip — and failing the create would
+   * contradict the rule the `invokeAi` split above already set.
    */
   async createMessage(
     request: CreateMessageRequest,
     context: CallerContext,
-  ): Promise<MessageResponse> {
+  ): Promise<CreateMessageResponse> {
     const ticket = await this.tickets.load(request.ticketId, context);
     const senderId = requireActor(context);
     const content = this.requireContent(request.content);
@@ -192,15 +211,49 @@ export class MessagesService {
         ticket.id,
         request.clientMessageId,
       );
-      if (existing) return toMessageResponse(existing);
+      // No skipped list on a duplicate: the original write already reported
+      // its own, and re-confirming here would fail every path a second time —
+      // `confirmUpload` collapses "already confirmed once" into the same
+      // NOT_FOUND as an expiry, so a re-emit would report every attachment as
+      // skipped for a message that has them.
+      if (existing)
+        return { message: toMessageResponse(existing), skippedAttachments: [] };
     }
 
+    if (request.attachments.length > MAX_ATTACHMENTS_PER_MESSAGE) {
+      // The per-message cap, enforced where the count is now known. Presign
+      // used to carry it, and cannot any more: without a message there is
+      // nothing to count against.
+      throw new RpcException({
+        code: status.FAILED_PRECONDITION,
+        message: `A message can carry at most ${MAX_ATTACHMENTS_PER_MESSAGE} attachments`,
+      });
+    }
+
+    // **Outside the transaction, and before it opens.** Each confirm is a
+    // network call to storage-service; holding a Prisma transaction open across
+    // N of them is the shape that looks fine in a test and exhausts the
+    // connection pool under load.
+    const { confirmed, skippedAttachments } = await this.confirmNewAttachments(
+      request.attachments,
+      context,
+    );
+
+    // Outside the `try` because the `catch` below is narrow on purpose: it
+    // exists to turn ONE error — the unique-constraint violation on
+    // `client_message_id` — into the original message. Building this object
+    // cannot throw, and widening the block to cover statements that cannot fail
+    // makes the handler look like it is catching more than it is.
     const data = {
       ticketId: ticket.id,
       senderId,
       content,
       isInternalNote: request.isInternalNote,
       clientMessageId: request.clientMessageId ?? null,
+      // Written WITH the message rather than after it, so there is no instant
+      // at which the message exists without the files it was sent with — which
+      // is the instant `invokeAi` used to run in.
+      attachments: { create: confirmed },
     };
 
     let message: MessageWithAttachments;
@@ -242,7 +295,8 @@ export class MessagesService {
           ticket.id,
           request.clientMessageId,
         );
-        if (winner) return toMessageResponse(winner);
+        if (winner)
+          return { message: toMessageResponse(winner), skippedAttachments };
       }
       throw error;
     }
@@ -273,7 +327,66 @@ export class MessagesService {
       await this.tryAppendAiReply(ticket, context);
     }
 
-    return toMessageResponse(message);
+    return { message: toMessageResponse(message), skippedAttachments };
+  }
+
+  /**
+   * Confirms every uploaded path, and reports the ones that did not — §1.3.1.
+   *
+   * Sequential rather than `Promise.all`: these are writes against a peer, the
+   * count is capped at {@link MAX_ATTACHMENTS_PER_MESSAGE}, and a burst of
+   * parallel confirms buys milliseconds while making the failure modes harder
+   * to reason about.
+   */
+  private async confirmNewAttachments(
+    attachments: NewAttachment[],
+    context: CallerContext,
+  ): Promise<{
+    confirmed: Prisma.MessageAttachmentCreateWithoutMessageInput[];
+    skippedAttachments: string[];
+  }> {
+    const confirmed: Prisma.MessageAttachmentCreateWithoutMessageInput[] = [];
+    const skippedAttachments: string[] = [];
+
+    for (const attachment of attachments) {
+      const fileName = this.requireFileName(attachment.fileName);
+
+      try {
+        const object = await this.storage.confirmUpload(
+          attachment.objectPath,
+          context,
+        );
+
+        confirmed.push({
+          fileName,
+          // An object PATH, never a URL — the same rule `confirmAttachment`
+          // follows, so a read resolves a fresh signed URL rather than trusting
+          // one stored months ago.
+          //
+          // **`object.objectPath`, not `attachment.objectPath`** — 36-doc
+          // §1.3.2. The caller presigned into `pending/` and the object has
+          // just moved out of it; storing what the client sent would record the
+          // one path a lifecycle sweep is entitled to delete.
+          fileUrl: object.objectPath,
+          // Read back from the OBJECT, never from what the client declared.
+          // Moving the confirm did not move that: a row built from the caller's
+          // claims would record whatever they felt like claiming.
+          fileSizeBytes: BigInt(object.sizeBytes),
+          mimeType: object.contentType,
+        });
+      } catch (error) {
+        // **Named, not thrown.** An expired presign, a forged path and an
+        // already-confirmed one are indistinguishable by design, so there is no
+        // message this could produce that is both honest and useful — and the
+        // typed message must survive either way.
+        this.logger.warn(
+          `Attachment could not be confirmed: ${formatErrorMsg(error)}`,
+        );
+        skippedAttachments.push(fileName);
+      }
+    }
+
+    return { confirmed, skippedAttachments };
   }
 
   /**
@@ -313,6 +426,10 @@ export class MessagesService {
         senderId: null,
         content,
         isAiGenerated: true,
+        // **Persisted, where it used to be dropped** — 36-doc §7. The gateway
+        // held this in the completion frame and threw it away on write, so once
+        // the socket closed a thread could not tell a refusal from an answer.
+        answerStatus: request.answerStatus ?? null,
       },
       include: { attachments: true },
     });
@@ -336,6 +453,40 @@ export class MessagesService {
     }
 
     return toMessageResponse(message);
+  }
+
+  /**
+   * Marks a message as unusable for AI context — 36-doc §7.
+   *
+   * **The row survives and stays visible.** A refused message is the record of
+   * what somebody attempted, and its position in the timeline is real — the
+   * same reason `redactedAt` keeps its row. What changes is that no transcript
+   * builder will hand it to a model again.
+   *
+   * **Not `isInternalNote`-shaped, and the difference is the whole design.** An
+   * internal note must never reach the caller, so it is stripped in a `where`
+   * clause. This one may reach the caller; it must not reach a prompt.
+   *
+   * Idempotent: setting the flag twice is the same as setting it once, which
+   * matters because the caller is a failure path that may be retried.
+   */
+  async excludeFromAiContext(
+    request: ExcludeFromAiContextRequest,
+    context: CallerContext,
+  ): Promise<MessageResponse> {
+    const message = await this.loadMessage(
+      request.ticketId,
+      request.messageId,
+      context,
+    );
+
+    const updated = await this.prisma.ticketMessage.update({
+      where: { id: message.id },
+      data: { excludedFromAiContext: true },
+      include: { attachments: true },
+    });
+
+    return toMessageResponse(updated);
   }
 
   /**
@@ -472,36 +623,52 @@ export class MessagesService {
   /**
    * Presign an attachment upload.
    *
-   * The per-message CAP is enforced HERE, before storage-service is called at
-   * all — §3.2 test 1 asks for exactly that. Checking it downstream instead
-   * would hand a caller who is already at the cap a perfectly usable upload
-   * URL, and they would only discover the refusal after uploading the bytes.
+   * **`messageId` is optional** — 36-doc §1.3. With one, this attaches to a
+   * message that already exists and nothing changes. Without one, the client is
+   * uploading files it will hand to `CreateMessage`, which is the only ordering
+   * in which a first-turn attachment can be read by that turn's answer.
+   *
+   * The per-message CAP is enforced HERE **when there is a message**, before
+   * storage-service is called at all — §3.2 test 1 asks for exactly that.
+   * Checking it downstream instead would hand a caller who is already at the
+   * cap a perfectly usable upload URL, and they would only discover the refusal
+   * after uploading the bytes. With no message there is nothing to count, so
+   * `CreateMessage` enforces the same cap over the list it is given — a
+   * presigned URL that is never bound costs an orphaned object, which is a
+   * class that already exists.
    */
   async uploadAttachment(
     request: UploadAttachmentRequest,
     context: CallerContext,
   ): Promise<PresignAttachmentResponse> {
-    const message = await this.loadMessage(
-      request.ticketId,
-      request.messageId,
-      context,
-    );
+    // The ticket is loaded either way. It is what authorizes the write, and
+    // `loadMessage` was carrying that check as a side effect — dropping it for
+    // the message-less path would let anyone presign into any ticket's prefix.
+    const ticket = await this.tickets.load(request.ticketId, context);
 
-    const existing = await this.prisma.messageAttachment.count({
-      where: { messageId: message.id },
-    });
-    if (existing >= MAX_ATTACHMENTS_PER_MESSAGE) {
-      throw new RpcException({
-        code: status.FAILED_PRECONDITION,
-        message: `A message can carry at most ${MAX_ATTACHMENTS_PER_MESSAGE} attachments`,
+    const message = request.messageId
+      ? await this.loadMessage(request.ticketId, request.messageId, context)
+      : null;
+
+    if (message) {
+      const existing = await this.prisma.messageAttachment.count({
+        where: { messageId: message.id },
       });
+      if (existing >= MAX_ATTACHMENTS_PER_MESSAGE) {
+        throw new RpcException({
+          code: status.FAILED_PRECONDITION,
+          message: `A message can carry at most ${MAX_ATTACHMENTS_PER_MESSAGE} attachments`,
+        });
+      }
     }
 
     try {
       const presigned = await this.storage.presignAttachment(
         {
-          ticketId: message.ticketId,
-          messageId: message.id,
+          ticketId: ticket.id,
+          // Absent when there is no message yet: storage-service omits the
+          // segment rather than filling it with a placeholder.
+          messageId: message?.id,
           contentType: request.mimeType,
           sizeBytes: request.fileSizeBytes,
           fileName: request.fileName,
@@ -537,7 +704,9 @@ export class MessagesService {
       context,
     );
 
-    let confirmed: { sizeBytes: number; contentType: string };
+    let confirmed: Awaited<
+      ReturnType<StorageReferenceService['confirmUpload']>
+    >;
     try {
       confirmed = await this.storage.confirmUpload(request.objectPath, context);
     } catch (error) {
@@ -551,7 +720,11 @@ export class MessagesService {
         // An object PATH, never a URL. Reads resolve it to a fresh signed URL
         // per request, so revoking access takes effect on the NEXT read rather
         // than whenever a stored URL happens to expire.
-        fileUrl: request.objectPath,
+        //
+        // The CONFIRMED path — the object moved out of `pending/` on the way
+        // through (36-doc §1.3.2), so `request.objectPath` is where it no
+        // longer is.
+        fileUrl: confirmed.objectPath,
         fileSizeBytes: BigInt(confirmed.sizeBytes),
         mimeType: confirmed.contentType,
       },
@@ -720,11 +893,22 @@ export class MessagesService {
       // the last line of it. rag-service owns no conversation rows — a second
       // copy in a second database is a consistency problem nobody asked for.
       const history = await this.prisma.ticketMessage.findMany({
-        where: { ticketId },
+        // The same exclusion as the co-pilot's transcript — 36-doc §7. Two
+        // Prisma readers, one clause each, and a refusal that reached only one
+        // of them would be a defence on one surface and a delay on the other.
+        where: { ticketId, excludedFromAiContext: false },
         orderBy: { createdAt: 'asc' },
         select: { content: true, senderId: true, isAiGenerated: true },
         take: AI_REPLY_TRANSCRIPT_TURNS,
       });
+
+      // Same two decisions as the co-pilot path, made by the same service —
+      // 36-doc §2. This one replies to a customer directly, so a screenshot it
+      // could not see produces an answer about the text alone.
+      const attachments = await this.aiAttachments.forLastUserMessage(
+        ticketId,
+        context,
+      );
 
       const draft = await this.rag.generateReplyDraft(
         ticketId,
@@ -740,6 +924,7 @@ export class MessagesService {
         // watches — and 13-doc §4.2's review loop is for the surface where a
         // human reads before sending.
         0,
+        attachments.parts,
       );
 
       const reply = await this.prisma.ticketMessage.create({
@@ -760,6 +945,45 @@ export class MessagesService {
     } catch (error) {
       this.logger.error(
         `AI reply failed for ticket ${ticketId}: ${formatErrorMsg(error)}`,
+      );
+
+      // **The same write-back as the co-pilot path** — 36-doc §7, and the
+      // reason it is here too: this surface auto-replies on every customer
+      // message, so a refused question left in the transcript is re-sent to the
+      // model on the customer's very next line.
+      //
+      // Swallowed like everything else in this handler. The caller's own
+      // message is already committed and is what the RPC promises to return; a
+      // failed bookkeeping write must not turn that into an error.
+      await this.excludeRefused(ticketId, error);
+    }
+  }
+
+  /**
+   * Marks a refused message so it cannot reach a later prompt — 36-doc §7.
+   *
+   * **Only on an actual refusal.** A timeout, an outage or a cap are different
+   * failures whose message is perfectly usable next time, and excluding on
+   * those would shrink a thread's context whenever the provider had a bad
+   * minute.
+   */
+  private async excludeRefused(
+    ticketId: string,
+    error: unknown,
+  ): Promise<void> {
+    if (!isDraftRefusal(error)) return;
+
+    try {
+      const messageId = await this.aiAttachments.lastUserMessageId(ticketId);
+      if (!messageId) return;
+
+      await this.prisma.ticketMessage.update({
+        where: { id: messageId },
+        data: { excludedFromAiContext: true },
+      });
+    } catch (writeError) {
+      this.logger.error(
+        `Could not exclude a refused message from AI context: ${formatErrorMsg(writeError)}`,
       );
     }
   }

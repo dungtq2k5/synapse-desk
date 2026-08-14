@@ -19,6 +19,42 @@ from typing import Any
 
 from rag_service.common.caller_context import CallerContext
 
+#: Mirrors `GRPC_CHANNEL_OPTIONS` in `libs/grpc-proto/src/constants.ts` — 35-doc §7.1.
+#:
+#: **The one place in this service where a MISSING value is the bug.** Every
+#: TypeScript client and every TypeScript server applies those options, so both
+#: ends of a Node-to-Node call agree at 10 MB. `grpc.aio.server()` takes no
+#: options, which left this server at gRPC's 4 MB default — an asymmetry that is
+#: worse than a low limit shared by everyone: a caller configured for 10 MB
+#: sends a request it has every reason to believe is fine and gets
+#: RESOURCE_EXHAUSTED from the far end.
+#:
+#: Nothing hit it before attachments because no request came close. `ChatRequest`
+#: now carries file bytes, so the ceiling is load-bearing and its two halves have
+#: to be read together.
+#:
+#: Duplicated across the language boundary for the same reason the quota key and
+#: the metadata names above are, and guarded the same way — by a test that pins
+#: the numbers against the TypeScript source.
+GRPC_MAX_MESSAGE_BYTES = 10 * 1024 * 1024
+
+#: The keepalive halves of the same object, in Python's millisecond spelling.
+GRPC_KEEPALIVE_TIME_MS = 30_000
+GRPC_KEEPALIVE_TIMEOUT_MS = 10_000
+
+#: The `options` list `grpc.aio.server()` and any Python channel take.
+#:
+#: Python spells these as dotted strings rather than camelCase keys, which is
+#: precisely why the mirror is worth a named constant: `maxReceiveMessageLength`
+#: silently does nothing here, and a typo in a string key is accepted and
+#: ignored rather than raising.
+GRPC_SERVER_OPTIONS: list[tuple[str, int]] = [
+    ("grpc.max_receive_message_length", GRPC_MAX_MESSAGE_BYTES),
+    ("grpc.max_send_message_length", GRPC_MAX_MESSAGE_BYTES),
+    ("grpc.keepalive_time_ms", GRPC_KEEPALIVE_TIME_MS),
+    ("grpc.keepalive_timeout_ms", GRPC_KEEPALIVE_TIMEOUT_MS),
+]
+
 #: Mirrors `GRPC_CONTEXT_METADATA` in `libs/common/src/configs/app.config.ts`.
 #: Duplicated across the language boundary for the same reason the quota key is,
 #: and guarded the same way — by a test that pins the exact strings.

@@ -25,6 +25,7 @@ from rag_service.generation.boundary import (
     new_nonce,
     wrap_history,
 )
+from rag_service.generation.parts import Prompt
 from rag_service.ledger.client import GenerationEntry
 from rag_service.ledger.metered import LedgerRecorder, QuotaCharger
 from rag_service.retrieval.service import BudgetState
@@ -245,7 +246,7 @@ class CopilotService:
 
     async def _spend(
         self,
-        prompt: str,
+        prompt: Prompt,
         model: str,
         max_output_tokens: int,
         *,

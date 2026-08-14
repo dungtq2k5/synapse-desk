@@ -5,6 +5,8 @@ import {
   AttachmentResponse,
   ConfirmAttachmentRequest,
   CreateMessageRequest,
+  CreateMessageResponse,
+  ExcludeFromAiContextRequest,
   DeleteAttachmentRequest,
   DeleteAttachmentResponse,
   ListAttachmentsRequest,
@@ -22,18 +24,24 @@ import {
   unpackCallerContext,
   UpdateMessageRequest,
   UploadAttachmentRequest,
+  GetAiAttachmentsRequest,
+  GetAiAttachmentsResponse,
 } from '@synapsedesk/grpc-proto';
 import { MessagesService } from './messages.service';
+import { AiAttachmentService } from '../ai-attachments/ai-attachment.service';
 
 @Controller()
 @MessageServiceControllerMethods()
 export class MessagesGrpcController implements MessageServiceController {
-  constructor(private readonly messages: MessagesService) {}
+  constructor(
+    private readonly messages: MessagesService,
+    private readonly aiAttachments: AiAttachmentService,
+  ) {}
 
   createMessage(
     request: CreateMessageRequest,
     metadata?: Metadata,
-  ): Promise<MessageResponse> {
+  ): Promise<CreateMessageResponse> {
     return this.messages.createMessage(request, unpackCallerContext(metadata));
   }
 
@@ -59,6 +67,16 @@ export class MessagesGrpcController implements MessageServiceController {
     metadata?: Metadata,
   ): Promise<MessageResponse> {
     return this.messages.updateMessage(request, unpackCallerContext(metadata));
+  }
+
+  excludeFromAiContext(
+    request: ExcludeFromAiContextRequest,
+    metadata?: Metadata,
+  ): Promise<MessageResponse> {
+    return this.messages.excludeFromAiContext(
+      request,
+      unpackCallerContext(metadata),
+    );
   }
 
   redactMessage(
@@ -118,6 +136,23 @@ export class MessagesGrpcController implements MessageServiceController {
   ): Promise<DownloadAttachmentResponse> {
     return this.messages.downloadAttachment(
       request,
+      unpackCallerContext(metadata),
+    );
+  }
+
+  /**
+   * The gateway's route to attachment bytes — 36-doc §2.
+   *
+   * It has no storage client of its own, and this service already does the
+   * identical filter-and-fetch for its two `Draft` call sites. One
+   * implementation of the eligibility rule beats three.
+   */
+  getAiAttachments(
+    request: GetAiAttachmentsRequest,
+    metadata?: Metadata,
+  ): Promise<GetAiAttachmentsResponse> {
+    return this.aiAttachments.forMessage(
+      request.messageId,
       unpackCallerContext(metadata),
     );
   }

@@ -36,6 +36,7 @@ import {
 } from './dto/rest/message.dto';
 import {
   AttachmentResponseDto,
+  CreateMessageResponseDto,
   MessageResponseDto,
   PresignAttachmentResponseDto,
 } from './dto/rest/message-response.dto';
@@ -83,9 +84,22 @@ export class MessagesController {
    * A route-level permission would close this endpoint to end users, who post
    * ordinary replies through it. The note flag is checked in ticket-service
    * instead — one field refused, rather than the whole conversation.
+   *
+   * **The response shape CHANGED, unversioned, and that was a choice** —
+   * 36-doc §1.3.1. This returned a bare message; it now returns
+   * `{ message, skippedAttachments }`, because a create can partially succeed
+   * and a caller has to be told which files did not confirm.
+   *
+   * `enableVersioning` is not switched on anywhere in this gateway, so there is
+   * no `@Version` to hang an old shape from — adding the mechanism for one
+   * endpoint would mean versioning every route to keep the surface coherent.
+   * With no client shipped, breaking it now costs nothing and carrying two
+   * shapes forever costs something. **Recorded here rather than left to be
+   * discovered by the first client**, which is the whole point of writing it
+   * down: the next breaking change does not get to make this call by default.
    */
   @ApiOperation({ summary: 'Create' })
-  @ApiWrappedResponse(MessageResponseDto, { status: HttpStatus.CREATED })
+  @ApiWrappedResponse(CreateMessageResponseDto, { status: HttpStatus.CREATED })
   @ApiFilterErrors(['400', '401', '404'])
   @Post()
   @ResponseMessage('Message posted')
@@ -93,7 +107,7 @@ export class MessagesController {
     @CurrentUser() context: RequestContext,
     @Param('ticketId', ParseUUIDPipe) ticketId: string,
     @Body() dto: CreateMessageDto,
-  ): Promise<MessageResponseDto> {
+  ): Promise<CreateMessageResponseDto> {
     return this.messagesGrpcClient.create(ticketId, dto, context);
   }
 
@@ -141,6 +155,42 @@ export class MessagesController {
   }
 
   // -------------------------------------------------------------- attachments
+
+  /**
+   * The same presign, for a message that does NOT exist yet — 36-doc §1.3.
+   *
+   * **This route is what makes a first-turn attachment readable.** Its sibling
+   * below is nested under `:messageId`, so a client could only upload after
+   * posting — while `invokeAi` runs during the post. The screenshot was stored
+   * a moment after the answer that needed it.
+   *
+   * The object paths this returns are handed to `POST /tickets/:id/messages` in
+   * `attachments`, which confirms each one and binds it as the message is
+   * written. No cap is checked here because there is no message to count
+   * against; create enforces it over the list it is given, and a presigned URL
+   * that is never bound costs an orphaned object — a class that already exists,
+   * since presign-then-never-confirm has always produced them.
+   */
+  @ApiOperation({
+    summary:
+      'Presign an upload for a message not yet created: { fileName, fileSizeBytes, mimeType } → { uploadUrl, objectPath, expiresAt }',
+  })
+  @ApiWrappedResponse()
+  @ApiFilterErrors(['400', '401', '404'])
+  @Post('attachments/upload-url')
+  @HttpCode(HttpStatus.OK)
+  presignNewAttachment(
+    @CurrentUser() context: RequestContext,
+    @Param('ticketId', ParseUUIDPipe) ticketId: string,
+    @Body() dto: UploadAttachmentDto,
+  ): Promise<PresignAttachmentResponseDto> {
+    return this.messagesGrpcClient.presignAttachment(
+      ticketId,
+      undefined,
+      dto,
+      context,
+    );
+  }
 
   /**
    * Presign — 10-storage-service.md §3.2.

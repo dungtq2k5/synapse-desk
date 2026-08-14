@@ -24,17 +24,17 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x19synapsedesk/rag/rag.proto\x12\x0fsynapsedesk.rag\"B\n\rSearchRequest\x12\r\n\x05query\x18\x01 \x01(\t\x12\r\n\x05limit\x18\x02 \x01(\x05\x12\x13\n\x0bskip_rerank\x18\x03 \x01(\x08\"\xcc\x01\n\x0eRetrievedChunk\x12\x10\n\x08\x63hunk_id\x18\x01 \x01(\t\x12\x13\n\x0b\x64ocument_id\x18\x02 \x01(\t\x12\x16\n\x0e\x64ocument_title\x18\x03 \x01(\t\x12\x18\n\x0bpage_number\x18\x04 \x01(\x05H\x00\x88\x01\x01\x12\x13\n\x0b\x63hunk_index\x18\x05 \x01(\x05\x12\x14\n\x0c\x63ontent_text\x18\x06 \x01(\t\x12\r\n\x05score\x18\x07 \x01(\x01\x12\x17\n\x0fvector_point_id\x18\x08 \x01(\tB\x0e\n\x0c_page_number\"w\n\x0eSearchResponse\x12/\n\x06\x63hunks\x18\x01 \x03(\x0b\x32\x1f.synapsedesk.rag.RetrievedChunk\x12\x34\n\x08\x64\x65graded\x18\x02 \x01(\x0e\x32\".synapsedesk.rag.SearchDegradation\"1\n\x10\x43onversationTurn\x12\x0c\n\x04role\x18\x01 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x02 \x01(\t\"x\n\x0b\x43hatRequest\x12\x0f\n\x07message\x18\x01 \x01(\t\x12\x32\n\x07history\x18\x02 \x03(\x0b\x32!.synapsedesk.rag.ConversationTurn\x12\x16\n\tticket_id\x18\x03 \x01(\tH\x00\x88\x01\x01\x42\x0c\n\n_ticket_id\"\x8c\x01\n\x08\x43itation\x12\x10\n\x08\x63hunk_id\x18\x01 \x01(\t\x12\x13\n\x0b\x64ocument_id\x18\x02 \x01(\t\x12\x16\n\x0e\x64ocument_title\x18\x03 \x01(\t\x12\x18\n\x0bpage_number\x18\x04 \x01(\x05H\x00\x88\x01\x01\x12\x17\n\x0fvector_point_id\x18\x05 \x01(\tB\x0e\n\x0c_page_number\"^\n\tChatChunk\x12\x0f\n\x05token\x18\x01 \x01(\tH\x00\x12\x35\n\ncompletion\x18\x02 \x01(\x0b\x32\x1f.synapsedesk.rag.ChatCompletionH\x00\x42\t\n\x07payload\"\x95\x01\n\x0e\x43hatCompletion\x12-\n\x06status\x18\x01 \x01(\x0e\x32\x1d.synapsedesk.rag.AnswerStatus\x12,\n\tcitations\x18\x02 \x03(\x0b\x32\x19.synapsedesk.rag.Citation\x12\x15\n\rgeneration_id\x18\x03 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x04 \x01(\t\"j\n\x0c\x44raftRequest\x12\x11\n\tticket_id\x18\x01 \x01(\t\x12\x32\n\x07history\x18\x02 \x03(\x0b\x32!.synapsedesk.rag.ConversationTurn\x12\x13\n\x0bmax_retries\x18\x03 \x01(\x05\"\x92\x01\n\rDraftResponse\x12\r\n\x05\x64raft\x18\x01 \x01(\t\x12,\n\tcitations\x18\x02 \x03(\x0b\x32\x19.synapsedesk.rag.Citation\x12\x15\n\rgeneration_id\x18\x03 \x01(\t\x12-\n\x06status\x18\x04 \x01(\x0e\x32\x1d.synapsedesk.rag.AnswerStatus\"x\n\x0eSummaryRequest\x12\x11\n\tticket_id\x18\x01 \x01(\t\x12\x32\n\x07history\x18\x02 \x03(\x0b\x32!.synapsedesk.rag.ConversationTurn\x12\x1f\n\x17triggered_by_escalation\x18\x03 \x01(\x08\"\x86\x01\n\x0fSummaryResponse\x12\x14\n\x0csummary_text\x18\x01 \x01(\t\x12\x18\n\x10suggested_action\x18\x02 \x01(\t\x12\x18\n\x10\x63onfidence_score\x18\x03 \x01(\x01\x12\x12\n\nmodel_name\x18\x04 \x01(\t\x12\x15\n\rgeneration_id\x18\x05 \x01(\t\"y\n\x0f\x43lassifyRequest\x12\x11\n\tticket_id\x18\x01 \x01(\t\x12\r\n\x05title\x18\x02 \x01(\t\x12\x0c\n\x04\x62ody\x18\x03 \x01(\t\x12\x36\n\x0b\x64\x65partments\x18\x04 \x03(\x0b\x32!.synapsedesk.rag.DepartmentOption\",\n\x10\x44\x65partmentOption\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0c\n\x04name\x18\x02 \x01(\t\"\x80\x01\n\x10\x43lassifyResponse\x12\x1f\n\x17suggested_department_id\x18\x01 \x01(\t\x12\x1a\n\x12suggested_priority\x18\x02 \x01(\t\x12\x18\n\x10\x63onfidence_score\x18\x03 \x01(\x01\x12\x15\n\rgeneration_id\x18\x04 \x01(\t\"[\n\x12SuggestionsRequest\x12\x11\n\tticket_id\x18\x01 \x01(\t\x12\x32\n\x07history\x18\x02 \x03(\x0b\x32!.synapsedesk.rag.ConversationTurn\"q\n\nSuggestion\x12\r\n\x05title\x18\x01 \x01(\t\x12\x0c\n\x04\x62ody\x18\x02 \x01(\t\x12\x18\n\x10\x63onfidence_score\x18\x03 \x01(\x01\x12,\n\tcitations\x18\x04 \x03(\x0b\x32\x19.synapsedesk.rag.Citation\"^\n\x13SuggestionsResponse\x12\x30\n\x0bsuggestions\x18\x01 \x03(\x0b\x32\x1b.synapsedesk.rag.Suggestion\x12\x15\n\rgeneration_id\x18\x02 \x01(\t\"\x93\x01\n\x0c\x43hatResponse\x12\x0f\n\x07\x63ontent\x18\x01 \x01(\t\x12-\n\x06status\x18\x02 \x01(\x0e\x32\x1d.synapsedesk.rag.AnswerStatus\x12,\n\tcitations\x18\x03 \x03(\x0b\x32\x19.synapsedesk.rag.Citation\x12\x15\n\rgeneration_id\x18\x04 \x01(\t*\\\n\x11SearchDegradation\x12\"\n\x1eSEARCH_DEGRADATION_UNSPECIFIED\x10\x00\x12#\n\x1fSEARCH_DEGRADATION_LEXICAL_ONLY\x10\x01*\xbb\x01\n\x0c\x41nswerStatus\x12\x1d\n\x19\x41NSWER_STATUS_UNSPECIFIED\x10\x00\x12\x1c\n\x18\x41NSWER_STATUS_DOC_ANSWER\x10\x01\x12\x1d\n\x19\x41NSWER_STATUS_DOC_MISSING\x10\x02\x12\x1a\n\x16\x41NSWER_STATUS_GREETING\x10\x03\x12\x18\n\x14\x41NSWER_STATUS_AT_CAP\x10\x04\x12\x19\n\x15\x41NSWER_STATUS_REFUSED\x10\x05\x32\x9e\x04\n\nRagService\x12I\n\x06Search\x12\x1e.synapsedesk.rag.SearchRequest\x1a\x1f.synapsedesk.rag.SearchResponse\x12\x42\n\x04\x43hat\x12\x1c.synapsedesk.rag.ChatRequest\x1a\x1a.synapsedesk.rag.ChatChunk0\x01\x12\x42\n\x03\x41sk\x12\x1c.synapsedesk.rag.ChatRequest\x1a\x1d.synapsedesk.rag.ChatResponse\x12\x46\n\x05\x44raft\x12\x1d.synapsedesk.rag.DraftRequest\x1a\x1e.synapsedesk.rag.DraftResponse\x12N\n\tSummarize\x12\x1f.synapsedesk.rag.SummaryRequest\x1a .synapsedesk.rag.SummaryResponse\x12O\n\x08\x43lassify\x12 .synapsedesk.rag.ClassifyRequest\x1a!.synapsedesk.rag.ClassifyResponse\x12T\n\x07Suggest\x12#.synapsedesk.rag.SuggestionsRequest\x1a$.synapsedesk.rag.SuggestionsResponseb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x19synapsedesk/rag/rag.proto\x12\x0fsynapsedesk.rag\"B\n\rSearchRequest\x12\r\n\x05query\x18\x01 \x01(\t\x12\r\n\x05limit\x18\x02 \x01(\x05\x12\x13\n\x0bskip_rerank\x18\x03 \x01(\x08\"\xcc\x01\n\x0eRetrievedChunk\x12\x10\n\x08\x63hunk_id\x18\x01 \x01(\t\x12\x13\n\x0b\x64ocument_id\x18\x02 \x01(\t\x12\x16\n\x0e\x64ocument_title\x18\x03 \x01(\t\x12\x18\n\x0bpage_number\x18\x04 \x01(\x05H\x00\x88\x01\x01\x12\x13\n\x0b\x63hunk_index\x18\x05 \x01(\x05\x12\x14\n\x0c\x63ontent_text\x18\x06 \x01(\t\x12\r\n\x05score\x18\x07 \x01(\x01\x12\x17\n\x0fvector_point_id\x18\x08 \x01(\tB\x0e\n\x0c_page_number\"w\n\x0eSearchResponse\x12/\n\x06\x63hunks\x18\x01 \x03(\x0b\x32\x1f.synapsedesk.rag.RetrievedChunk\x12\x34\n\x08\x64\x65graded\x18\x02 \x01(\x0e\x32\".synapsedesk.rag.SearchDegradation\"1\n\x10\x43onversationTurn\x12\x0c\n\x04role\x18\x01 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x02 \x01(\t\"D\n\x0e\x41ttachmentPart\x12\x11\n\tmime_type\x18\x01 \x01(\t\x12\x0c\n\x04\x64\x61ta\x18\x02 \x01(\x0c\x12\x11\n\tfile_name\x18\x03 \x01(\t\"\xae\x01\n\x0b\x43hatRequest\x12\x0f\n\x07message\x18\x01 \x01(\t\x12\x32\n\x07history\x18\x02 \x03(\x0b\x32!.synapsedesk.rag.ConversationTurn\x12\x16\n\tticket_id\x18\x03 \x01(\tH\x00\x88\x01\x01\x12\x34\n\x0b\x61ttachments\x18\x04 \x03(\x0b\x32\x1f.synapsedesk.rag.AttachmentPartB\x0c\n\n_ticket_id\"\x8c\x01\n\x08\x43itation\x12\x10\n\x08\x63hunk_id\x18\x01 \x01(\t\x12\x13\n\x0b\x64ocument_id\x18\x02 \x01(\t\x12\x16\n\x0e\x64ocument_title\x18\x03 \x01(\t\x12\x18\n\x0bpage_number\x18\x04 \x01(\x05H\x00\x88\x01\x01\x12\x17\n\x0fvector_point_id\x18\x05 \x01(\tB\x0e\n\x0c_page_number\"^\n\tChatChunk\x12\x0f\n\x05token\x18\x01 \x01(\tH\x00\x12\x35\n\ncompletion\x18\x02 \x01(\x0b\x32\x1f.synapsedesk.rag.ChatCompletionH\x00\x42\t\n\x07payload\"\x95\x01\n\x0e\x43hatCompletion\x12-\n\x06status\x18\x01 \x01(\x0e\x32\x1d.synapsedesk.rag.AnswerStatus\x12,\n\tcitations\x18\x02 \x03(\x0b\x32\x19.synapsedesk.rag.Citation\x12\x15\n\rgeneration_id\x18\x03 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x04 \x01(\t\"\xa0\x01\n\x0c\x44raftRequest\x12\x11\n\tticket_id\x18\x01 \x01(\t\x12\x32\n\x07history\x18\x02 \x03(\x0b\x32!.synapsedesk.rag.ConversationTurn\x12\x13\n\x0bmax_retries\x18\x03 \x01(\x05\x12\x34\n\x0b\x61ttachments\x18\x04 \x03(\x0b\x32\x1f.synapsedesk.rag.AttachmentPart\"\x92\x01\n\rDraftResponse\x12\r\n\x05\x64raft\x18\x01 \x01(\t\x12,\n\tcitations\x18\x02 \x03(\x0b\x32\x19.synapsedesk.rag.Citation\x12\x15\n\rgeneration_id\x18\x03 \x01(\t\x12-\n\x06status\x18\x04 \x01(\x0e\x32\x1d.synapsedesk.rag.AnswerStatus\"x\n\x0eSummaryRequest\x12\x11\n\tticket_id\x18\x01 \x01(\t\x12\x32\n\x07history\x18\x02 \x03(\x0b\x32!.synapsedesk.rag.ConversationTurn\x12\x1f\n\x17triggered_by_escalation\x18\x03 \x01(\x08\"\x86\x01\n\x0fSummaryResponse\x12\x14\n\x0csummary_text\x18\x01 \x01(\t\x12\x18\n\x10suggested_action\x18\x02 \x01(\t\x12\x18\n\x10\x63onfidence_score\x18\x03 \x01(\x01\x12\x12\n\nmodel_name\x18\x04 \x01(\t\x12\x15\n\rgeneration_id\x18\x05 \x01(\t\"y\n\x0f\x43lassifyRequest\x12\x11\n\tticket_id\x18\x01 \x01(\t\x12\r\n\x05title\x18\x02 \x01(\t\x12\x0c\n\x04\x62ody\x18\x03 \x01(\t\x12\x36\n\x0b\x64\x65partments\x18\x04 \x03(\x0b\x32!.synapsedesk.rag.DepartmentOption\",\n\x10\x44\x65partmentOption\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0c\n\x04name\x18\x02 \x01(\t\"\x80\x01\n\x10\x43lassifyResponse\x12\x1f\n\x17suggested_department_id\x18\x01 \x01(\t\x12\x1a\n\x12suggested_priority\x18\x02 \x01(\t\x12\x18\n\x10\x63onfidence_score\x18\x03 \x01(\x01\x12\x15\n\rgeneration_id\x18\x04 \x01(\t\"[\n\x12SuggestionsRequest\x12\x11\n\tticket_id\x18\x01 \x01(\t\x12\x32\n\x07history\x18\x02 \x03(\x0b\x32!.synapsedesk.rag.ConversationTurn\"q\n\nSuggestion\x12\r\n\x05title\x18\x01 \x01(\t\x12\x0c\n\x04\x62ody\x18\x02 \x01(\t\x12\x18\n\x10\x63onfidence_score\x18\x03 \x01(\x01\x12,\n\tcitations\x18\x04 \x03(\x0b\x32\x19.synapsedesk.rag.Citation\"^\n\x13SuggestionsResponse\x12\x30\n\x0bsuggestions\x18\x01 \x03(\x0b\x32\x1b.synapsedesk.rag.Suggestion\x12\x15\n\rgeneration_id\x18\x02 \x01(\t\"\x93\x01\n\x0c\x43hatResponse\x12\x0f\n\x07\x63ontent\x18\x01 \x01(\t\x12-\n\x06status\x18\x02 \x01(\x0e\x32\x1d.synapsedesk.rag.AnswerStatus\x12,\n\tcitations\x18\x03 \x03(\x0b\x32\x19.synapsedesk.rag.Citation\x12\x15\n\rgeneration_id\x18\x04 \x01(\t*\\\n\x11SearchDegradation\x12\"\n\x1eSEARCH_DEGRADATION_UNSPECIFIED\x10\x00\x12#\n\x1fSEARCH_DEGRADATION_LEXICAL_ONLY\x10\x01*\xbb\x01\n\x0c\x41nswerStatus\x12\x1d\n\x19\x41NSWER_STATUS_UNSPECIFIED\x10\x00\x12\x1c\n\x18\x41NSWER_STATUS_DOC_ANSWER\x10\x01\x12\x1d\n\x19\x41NSWER_STATUS_DOC_MISSING\x10\x02\x12\x1a\n\x16\x41NSWER_STATUS_GREETING\x10\x03\x12\x18\n\x14\x41NSWER_STATUS_AT_CAP\x10\x04\x12\x19\n\x15\x41NSWER_STATUS_REFUSED\x10\x05\x32\x9e\x04\n\nRagService\x12I\n\x06Search\x12\x1e.synapsedesk.rag.SearchRequest\x1a\x1f.synapsedesk.rag.SearchResponse\x12\x42\n\x04\x43hat\x12\x1c.synapsedesk.rag.ChatRequest\x1a\x1a.synapsedesk.rag.ChatChunk0\x01\x12\x42\n\x03\x41sk\x12\x1c.synapsedesk.rag.ChatRequest\x1a\x1d.synapsedesk.rag.ChatResponse\x12\x46\n\x05\x44raft\x12\x1d.synapsedesk.rag.DraftRequest\x1a\x1e.synapsedesk.rag.DraftResponse\x12N\n\tSummarize\x12\x1f.synapsedesk.rag.SummaryRequest\x1a .synapsedesk.rag.SummaryResponse\x12O\n\x08\x43lassify\x12 .synapsedesk.rag.ClassifyRequest\x1a!.synapsedesk.rag.ClassifyResponse\x12T\n\x07Suggest\x12#.synapsedesk.rag.SuggestionsRequest\x1a$.synapsedesk.rag.SuggestionsResponseb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'synapsedesk.rag.rag_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
-  _globals['_SEARCHDEGRADATION']._serialized_start=2276
-  _globals['_SEARCHDEGRADATION']._serialized_end=2368
-  _globals['_ANSWERSTATUS']._serialized_start=2371
-  _globals['_ANSWERSTATUS']._serialized_end=2558
+  _globals['_SEARCHDEGRADATION']._serialized_start=2456
+  _globals['_SEARCHDEGRADATION']._serialized_end=2548
+  _globals['_ANSWERSTATUS']._serialized_start=2551
+  _globals['_ANSWERSTATUS']._serialized_end=2738
   _globals['_SEARCHREQUEST']._serialized_start=46
   _globals['_SEARCHREQUEST']._serialized_end=112
   _globals['_RETRIEVEDCHUNK']._serialized_start=115
@@ -43,36 +43,38 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_SEARCHRESPONSE']._serialized_end=440
   _globals['_CONVERSATIONTURN']._serialized_start=442
   _globals['_CONVERSATIONTURN']._serialized_end=491
-  _globals['_CHATREQUEST']._serialized_start=493
-  _globals['_CHATREQUEST']._serialized_end=613
-  _globals['_CITATION']._serialized_start=616
-  _globals['_CITATION']._serialized_end=756
-  _globals['_CHATCHUNK']._serialized_start=758
-  _globals['_CHATCHUNK']._serialized_end=852
-  _globals['_CHATCOMPLETION']._serialized_start=855
-  _globals['_CHATCOMPLETION']._serialized_end=1004
-  _globals['_DRAFTREQUEST']._serialized_start=1006
-  _globals['_DRAFTREQUEST']._serialized_end=1112
-  _globals['_DRAFTRESPONSE']._serialized_start=1115
-  _globals['_DRAFTRESPONSE']._serialized_end=1261
-  _globals['_SUMMARYREQUEST']._serialized_start=1263
-  _globals['_SUMMARYREQUEST']._serialized_end=1383
-  _globals['_SUMMARYRESPONSE']._serialized_start=1386
-  _globals['_SUMMARYRESPONSE']._serialized_end=1520
-  _globals['_CLASSIFYREQUEST']._serialized_start=1522
-  _globals['_CLASSIFYREQUEST']._serialized_end=1643
-  _globals['_DEPARTMENTOPTION']._serialized_start=1645
-  _globals['_DEPARTMENTOPTION']._serialized_end=1689
-  _globals['_CLASSIFYRESPONSE']._serialized_start=1692
-  _globals['_CLASSIFYRESPONSE']._serialized_end=1820
-  _globals['_SUGGESTIONSREQUEST']._serialized_start=1822
-  _globals['_SUGGESTIONSREQUEST']._serialized_end=1913
-  _globals['_SUGGESTION']._serialized_start=1915
-  _globals['_SUGGESTION']._serialized_end=2028
-  _globals['_SUGGESTIONSRESPONSE']._serialized_start=2030
-  _globals['_SUGGESTIONSRESPONSE']._serialized_end=2124
-  _globals['_CHATRESPONSE']._serialized_start=2127
-  _globals['_CHATRESPONSE']._serialized_end=2274
-  _globals['_RAGSERVICE']._serialized_start=2561
-  _globals['_RAGSERVICE']._serialized_end=3103
+  _globals['_ATTACHMENTPART']._serialized_start=493
+  _globals['_ATTACHMENTPART']._serialized_end=561
+  _globals['_CHATREQUEST']._serialized_start=564
+  _globals['_CHATREQUEST']._serialized_end=738
+  _globals['_CITATION']._serialized_start=741
+  _globals['_CITATION']._serialized_end=881
+  _globals['_CHATCHUNK']._serialized_start=883
+  _globals['_CHATCHUNK']._serialized_end=977
+  _globals['_CHATCOMPLETION']._serialized_start=980
+  _globals['_CHATCOMPLETION']._serialized_end=1129
+  _globals['_DRAFTREQUEST']._serialized_start=1132
+  _globals['_DRAFTREQUEST']._serialized_end=1292
+  _globals['_DRAFTRESPONSE']._serialized_start=1295
+  _globals['_DRAFTRESPONSE']._serialized_end=1441
+  _globals['_SUMMARYREQUEST']._serialized_start=1443
+  _globals['_SUMMARYREQUEST']._serialized_end=1563
+  _globals['_SUMMARYRESPONSE']._serialized_start=1566
+  _globals['_SUMMARYRESPONSE']._serialized_end=1700
+  _globals['_CLASSIFYREQUEST']._serialized_start=1702
+  _globals['_CLASSIFYREQUEST']._serialized_end=1823
+  _globals['_DEPARTMENTOPTION']._serialized_start=1825
+  _globals['_DEPARTMENTOPTION']._serialized_end=1869
+  _globals['_CLASSIFYRESPONSE']._serialized_start=1872
+  _globals['_CLASSIFYRESPONSE']._serialized_end=2000
+  _globals['_SUGGESTIONSREQUEST']._serialized_start=2002
+  _globals['_SUGGESTIONSREQUEST']._serialized_end=2093
+  _globals['_SUGGESTION']._serialized_start=2095
+  _globals['_SUGGESTION']._serialized_end=2208
+  _globals['_SUGGESTIONSRESPONSE']._serialized_start=2210
+  _globals['_SUGGESTIONSRESPONSE']._serialized_end=2304
+  _globals['_CHATRESPONSE']._serialized_start=2307
+  _globals['_CHATRESPONSE']._serialized_end=2454
+  _globals['_RAGSERVICE']._serialized_start=2741
+  _globals['_RAGSERVICE']._serialized_end=3283
 # @@protoc_insertion_point(module_scope)

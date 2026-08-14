@@ -21,6 +21,7 @@ import pytest
 
 from rag_service.enums import AiGenerationPurpose
 from rag_service.generation.corag import CoRagGenerator, GenerationDelta
+from rag_service.generation.parts import Prompt, prompt_text
 from rag_service.preprocess.pipeline import PreprocessPipeline, Turn
 from rag_service.pricing import estimate_cost_micros
 from rag_service.retrieval.service import BudgetState, HydratedChunk
@@ -62,16 +63,16 @@ class FixedGenerator:
     def __init__(self) -> None:
         self.calls: list[tuple[str, str]] = []
 
-    async def stream(self, prompt: str, model: str, max_output_tokens: int):
-        self.calls.append((prompt, model))
+    async def stream(self, prompt: Prompt, model: str, max_output_tokens: int):
+        self.calls.append((prompt_text(prompt), model))
 
         yield GenerationDelta(text="It carries over once [1].")
         yield GenerationDelta(done=True, prompt_tokens=1_000, completion_tokens=200)
 
-    async def generate(self, prompt: str, model: str, max_output_tokens: int):
+    async def generate(self, prompt: Prompt, model: str, max_output_tokens: int):
         from rag_service.preprocess.pipeline import GenerationOutput
 
-        self.calls.append((prompt, model))
+        self.calls.append((prompt_text(prompt), model))
 
         return GenerationOutput(text="FACTUAL", prompt_tokens=50, completion_tokens=1)
 

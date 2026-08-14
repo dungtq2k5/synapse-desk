@@ -17,8 +17,10 @@ import pytest
 
 from rag_service.enums import AiGenerationPurpose
 from rag_service.generated.synapsedesk.rag import rag_pb2
+from rag_service.generation.parts import Attachment, attachments_of
 from rag_service.preprocess.greeting import Intent, canned_reply, refusal_reply
 from rag_service.preprocess.injection import (
+    ALLOWED,
     GUARDED_RPCS,
     UNGUARDED_RPCS,
     InjectionGuard,
@@ -353,9 +355,7 @@ async def test_a_layer_a_refusal_answers_in_the_pattern_language(generator, ledg
 
 
 @pytest.mark.asyncio
-async def test_a_layer_b_refusal_answers_in_the_classified_language(
-    generator, ledger
-):
+async def test_a_layer_b_refusal_answers_in_the_classified_language(generator, ledger):
     """§5 test 4 — **the limitation the ONNX design could not lift.**
 
     A classifier head returns a score and nothing else, which forced every
@@ -589,9 +589,7 @@ async def test_ask_and_draft_book_their_own_ledger_row(generator, ledger):
 
 
 @pytest.mark.asyncio
-async def test_the_standalone_call_refuses_and_carries_the_language(
-    generator, ledger
-):
+async def test_the_standalone_call_refuses_and_carries_the_language(generator, ledger):
     from rag_service.ledger.metered import MeteredGenerator
     from rag_service.preprocess.injection import LlmInjectionClassifier
 
@@ -760,7 +758,9 @@ def test_a_pasted_source_block_is_a_near_miss_not_a_refusal(caplog):
     these ever correlate with real attempts, that correlation is the argument
     for promoting the rule — and this line is the only thing that could make it.
     """
-    pasted = 'Our handbook says:\n\nSOURCES:\n[1] (from "Handbook")\n5 days.\n\nStill true?'
+    pasted = (
+        'Our handbook says:\n\nSOURCES:\n[1] (from "Handbook")\n5 days.\n\nStill true?'
+    )
 
     with caplog.at_level("INFO"):
         verdict = InjectionGuard().scan_patterns(
@@ -883,3 +883,363 @@ async def test_a_clean_rewrite_still_answers(generator, ledger):
 
     assert result.intent is Intent.FACTUAL
     assert result.query == "leave policy carryover days"
+
+
+# ------------------------------------------------- §35 attachments, the seam
+
+
+@pytest.mark.asyncio
+async def test_hi_WITH_an_attachment_is_not_answered_as_a_greeting(generator, ledger):
+    """35-doc §5.1 — the correction most likely to ship as a bug.
+
+    `MAX_GREETING_WORDS` is 4 and the patterns are prefix matches, so "hi" plus
+    a screenshot of an error matches Layer 1 today, returns the canned reply,
+    and the one thing the user sent is never looked at. That is the silent drop
+    34-doc spent a document eliminating for scanned pages, in a new place.
+    """
+    from rag_service.generation.parts import Attachment
+
+    generator.answers = ["FACTUAL en"]
+    pipeline = PreprocessPipeline(generator, ledger, NullQuota())
+
+    result = await pipeline.run(
+        "hi",
+        [],
+        _settings(),
+        budget=_budget(),
+        attachments=[
+            Attachment(mime_type="image/png", data=b"\x89PNG", file_name="err.png")
+        ],
+    )
+
+    assert result.intent is not Intent.GREETING
+    assert result.reply is None
+    # The fused Layer 2 decided instead — with the image in view, once §5 lands.
+    assert result.decided_by == "layer_two"
+
+
+@pytest.mark.asyncio
+async def test_hi_WITHOUT_one_still_short_circuits_at_layer_1(generator, ledger):
+    """The cost property this must not cost.
+
+    A greeting is the highest-volume message there is; making every "thanks!"
+    pay for a classification to fix the rare "thanks!" + file would invert the
+    whole reason two-layer greeting detection exists.
+    """
+    pipeline = PreprocessPipeline(generator, ledger, NullQuota())
+
+    result = await pipeline.run("hi", [], _settings(), budget=_budget())
+
+    assert result.intent is Intent.GREETING
+    assert result.decided_by == "layer_one"
+    assert generator.calls == []
+
+
+# ---------------------------------------------------------------------------
+# 36-doc §4 — the guard sees the attachments
+# ---------------------------------------------------------------------------
+
+
+SCREENSHOT = Attachment(
+    mime_type="image/png", data=b"\x89PNG pretend bytes", file_name="error.png"
+)
+
+
+class WatchingClassifier:
+    """Layer B, substituted — records what it was asked and answers to order.
+
+    Substituted rather than run for real, because these tests are about WIRING:
+    that the parts reach the only layer able to look at them, and that its
+    answer is honoured. Whether a model can spot an instruction painted into a
+    PNG is a question for a live call, not for a fake.
+    """
+
+    def __init__(self, injection: bool = False) -> None:
+        self.injection = injection
+        self.seen: list[list[Attachment]] = []
+
+    async def classify(self, text, *, settings, budget, user_id, attachments=None):
+        self.seen.append(list(attachments or []))
+
+        return self.injection, "en"
+
+
+@pytest.mark.asyncio
+async def test_a_typed_injection_is_refused_before_LAYER_B_is_paid_for():
+    """§4 test 1 — the ordering that produces the cost property.
+
+    Layer A is a regex and free, and it runs first and unconditionally. So a
+    typed injection costs nothing at all: no cheap-tier call, and — one service
+    upstream — no attachment download either, because ticket-service fetched
+    the bytes before this RPC and the refusal here is what stops them being
+    paid for as image tokens.
+    """
+    classifier = WatchingClassifier()
+    guard = InjectionGuard(classifier=classifier)
+
+    verdict = await guard.scan(
+        KNOWN_INJECTION,
+        settings=_settings(),
+        budget=_budget(),
+        user_id="user-1",
+        attachments=[SCREENSHOT],
+    )
+
+    assert verdict.refused
+    assert verdict.layer == "layer_a"
+    # Never asked. The image was never turned into tokens.
+    assert classifier.seen == []
+
+
+@pytest.mark.asyncio
+async def test_a_clean_message_with_an_injection_bearing_FILE_is_refused():
+    """§4 test 2 — the case Layer A structurally cannot catch.
+
+    "what does this say?" matches no pattern and should not. The instruction is
+    inside the image, where a regex cannot reach — so Layer B is the only layer
+    that can refuse this, and the point of the wiring is that it gets the
+    chance.
+    """
+    guard = InjectionGuard(classifier=WatchingClassifier(injection=True))
+
+    verdict = await guard.scan(
+        "what does this say?",
+        settings=_settings(),
+        budget=_budget(),
+        user_id="user-1",
+        attachments=[SCREENSHOT],
+    )
+
+    assert verdict.refused
+    assert verdict.layer == "layer_b"
+
+
+@pytest.mark.asyncio
+async def test_a_clean_message_with_a_LEGITIMATE_file_proceeds():
+    """§4 test 3 — the over-refusal direction, which nothing else asserts.
+
+    A guard that refuses every message carrying a file passes every test above
+    and makes the feature useless. This is the one that fails if the attachment
+    line in the prompt, or the wiring around it, turns "has an attachment" into
+    "is suspicious".
+    """
+    classifier = WatchingClassifier(injection=False)
+    guard = InjectionGuard(classifier=classifier)
+
+    verdict = await guard.scan(
+        "how do I fix this error?",
+        settings=_settings(),
+        budget=_budget(),
+        user_id="user-1",
+        attachments=[SCREENSHOT],
+    )
+
+    assert not verdict.refused
+    # And Layer B did see the file — a pass earned by looking, not by skipping.
+    assert classifier.seen == [[SCREENSHOT]]
+
+
+@pytest.mark.asyncio
+async def test_an_empty_message_carrying_a_file_is_still_classified():
+    """The short-circuit that would have made §4 test 2 unreachable.
+
+    `scan_classifier` returned ALLOWED on empty text, which was right when text
+    was all there was. With a file attached the instruction can be entirely
+    inside the image, and an empty caption is the cheapest way to arrange that.
+    """
+    classifier = WatchingClassifier(injection=True)
+    guard = InjectionGuard(classifier=classifier)
+
+    verdict = await guard.scan(
+        "",
+        settings=_settings(),
+        budget=_budget(),
+        user_id="user-1",
+        attachments=[SCREENSHOT],
+    )
+
+    assert verdict.refused
+    assert classifier.seen == [[SCREENSHOT]]
+
+
+@pytest.mark.asyncio
+async def test_the_standalone_prompt_gains_the_attachment_line_ONLY_with_a_file(
+    generator, ledger
+):
+    """The prompt stays byte-identical on the 99% of calls that carry nothing.
+
+    33-doc §3.3's prompt is unchanged — same labels, same ceiling, same parse —
+    and the extra line is appended rather than folded in so that remains
+    checkable rather than asserted.
+    """
+    from rag_service.ledger.metered import MeteredGenerator
+    from rag_service.preprocess.injection import ATTACHMENT_NOTE, LlmInjectionClassifier
+
+    guard = InjectionGuard(
+        classifier=LlmInjectionClassifier(
+            MeteredGenerator(generator, ledger, NullQuota())
+        )
+    )
+
+    generator.answers = ["SAFE en"]
+    await guard.scan(
+        "how do I fix this?",
+        settings=_settings(),
+        budget=_budget(),
+        user_id="user-1",
+    )
+    assert ATTACHMENT_NOTE not in generator.calls[0][0]
+
+    generator.answers = ["SAFE en"]
+    await guard.scan(
+        "how do I fix this?",
+        settings=_settings(),
+        budget=_budget(),
+        user_id="user-1",
+        attachments=[SCREENSHOT],
+    )
+    assert ATTACHMENT_NOTE in generator.calls[1][0]
+    assert attachments_of(generator.prompts[1]) == [SCREENSHOT]
+
+
+class RecordingGuard(InjectionGuard):
+    """Allows everything, and remembers what each surface handed it."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.scanned: list[tuple[str, list[Attachment]]] = []
+
+    async def scan(self, message, *, settings, budget, user_id, attachments=None):
+        self.scanned.append((message, list(attachments or [])))
+
+        return ALLOWED
+
+
+@pytest.mark.asyncio
+async def test_DRAFT_runs_the_guard_over_the_attachments(servicer, tenant_a):
+    """§4 test 4 — the highest-exposure surface in the system.
+
+    35-doc §4: after 31/32 the last message on a ticket can be an email from
+    outside the organisation, so its attachment was chosen by somebody who
+    never authenticated. An agent then clicks *suggest a reply*, and a
+    stranger's file becomes part of a prompt whose output the agent is about to
+    send back to them.
+
+    Asserted at the SERVICER rather than at the guard, because what could break
+    here is the wiring in `Draft` — a guard that works perfectly and is called
+    without the parts refuses nothing, and every unit test above still passes.
+    """
+    guard = RecordingGuard()
+    servicer._injection = guard
+
+    part = rag_pb2.AttachmentPart(
+        mime_type="image/png", data=b"\x89PNG", file_name="from-a-stranger.png"
+    )
+    request = rag_pb2.DraftRequest(
+        ticket_id="00000000-0000-4000-8000-000000000000",
+        history=[rag_pb2.ConversationTurn(role="user", content="please advise")],
+        attachments=[part],
+    )
+
+    await servicer.Draft(request, FakeServicerContext(tenant_a.member_of()))
+
+    assert guard.scanned == [
+        (
+            "please advise",
+            [
+                Attachment(
+                    mime_type="image/png",
+                    data=b"\x89PNG",
+                    file_name="from-a-stranger.png",
+                )
+            ],
+        )
+    ]
+
+
+@pytest.mark.asyncio
+async def test_CHAT_hands_the_attachments_to_the_fused_layer_two(
+    servicer, tenant_a, generator
+):
+    """The same wiring on the other surface, asserted the same way.
+
+    `Chat` does not call `scan` — its Layer B is fused into the greeting
+    classification — so the proof has to be that the classification call itself
+    carried the file.
+    """
+    generator.answers = ["FACTUAL en", "quota error"]
+
+    request = rag_pb2.ChatRequest(
+        message="what does this mean?",
+        attachments=[
+            rag_pb2.AttachmentPart(
+                mime_type="image/png", data=b"\x89PNG", file_name="error.png"
+            )
+        ],
+    )
+
+    async for _ in servicer.Chat(request, FakeServicerContext(tenant_a.member_of())):
+        pass
+
+    classification = generator.prompts[0]
+    assert [part.file_name for part in attachments_of(classification)] == ["error.png"]
+
+
+@pytest.mark.asyncio
+async def test_BOTH_surfaces_state_the_attachment_rule_IDENTICALLY(
+    generator, ledger
+):
+    """One policy, two surfaces — V2.
+
+    The fused Layer 2 serves `Chat`; `LlmInjectionClassifier` serves `Ask` and
+    `Draft`. 35-doc §5 treats them as one detection layer, and for a while the
+    sentence telling the model that an instruction inside a file is still an
+    injection existed twice, byte-for-byte, in two modules.
+
+    **The symptom of drift is invisible.** Tune one and not the other and
+    `Chat` and `Draft` classify the same attachment differently — nobody writes
+    a test for that, because the layer is conceptually one thing.
+
+    The mirror of this test already existed for the no-attachment case: the
+    prompts stay byte-identical when no file rides along. This is the half that
+    was missing, and it is what stops the constant being inlined again by
+    somebody who does not know why it is shared.
+    """
+    from rag_service.ledger.metered import MeteredGenerator
+    from rag_service.preprocess.injection import (
+        ATTACHMENT_NOTE,
+        LlmInjectionClassifier,
+    )
+
+    # Ask/Draft's standalone call.
+    guard = InjectionGuard(
+        classifier=LlmInjectionClassifier(
+            MeteredGenerator(generator, ledger, NullQuota())
+        )
+    )
+    generator.answers = ["SAFE en"]
+    await guard.scan(
+        "what does this say?",
+        settings=_settings(),
+        budget=_budget(),
+        user_id="user-1",
+        attachments=[SCREENSHOT],
+    )
+
+    # Chat's fused call.
+    pipeline = PreprocessPipeline(generator, ledger, NullQuota())
+    generator.answers = ["FACTUAL en", "what does this say"]
+    await pipeline.run(
+        "what does this say?",
+        [],
+        _settings(),
+        budget=_budget(),
+        attachments=[SCREENSHOT],
+    )
+
+    standalone, fused = generator.calls[0][0], generator.calls[1][0]
+
+    # Not "both contain something about attachments" — both contain the SAME
+    # sentence, which is the only version of this that catches a reworded copy.
+    assert ATTACHMENT_NOTE in standalone
+    assert ATTACHMENT_NOTE in fused

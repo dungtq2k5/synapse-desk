@@ -3,9 +3,11 @@ import { ClientGrpc } from '@nestjs/microservices';
 import {
   MESSAGE_SERVICE_NAME,
   MessageServiceClient,
+  requireField,
   requireProtoTimestamp,
   TICKET_GRPC_CLIENT,
   toPageRequest,
+  GetAiAttachmentsResponse,
 } from '@synapsedesk/grpc-proto';
 import { RequestContext } from '@synapsedesk/common';
 import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
@@ -18,6 +20,7 @@ import {
 import {
   AttachmentResponseDto,
   DownloadAttachmentResponseDto,
+  CreateMessageResponseDto,
   MessageResponseDto,
   PresignAttachmentResponseDto,
 } from './dto/rest/message-response.dto';
@@ -77,25 +80,34 @@ export class MessagesGrpcClient extends BaseGrpcClient implements OnModuleInit {
      * no meaning — HTTP clients do not re-emit unacked requests on reconnect.
      */
     clientMessageId?: string,
-  ): Promise<MessageResponseDto> {
-    return toMessageResponseDto(
-      await this.call(
-        (metadata) =>
-          this.messageGrpcService.createMessage(
-            {
-              ticketId,
-              content: dto.content,
-              // `?? false`: proto3 booleans have no null, and an absent flag
-              // means "an ordinary reply" rather than "unspecified".
-              isInternalNote: dto.isInternalNote ?? false,
-              invokeAi: dto.invokeAi ?? false,
-              clientMessageId,
-            },
-            metadata,
-          ),
-        context,
-      ),
+  ): Promise<CreateMessageResponseDto> {
+    const response = await this.call(
+      (metadata) =>
+        this.messageGrpcService.createMessage(
+          {
+            ticketId,
+            content: dto.content,
+            // `?? false`: proto3 booleans have no null, and an absent flag
+            // means "an ordinary reply" rather than "unspecified".
+            isInternalNote: dto.isInternalNote ?? false,
+            invokeAi: dto.invokeAi ?? false,
+            clientMessageId,
+            // Already-uploaded objects, bound as the message is written —
+            // 36-doc §1.3. `?? []` because proto3 has no absent repeated field.
+            attachments: dto.attachments ?? [],
+          },
+          metadata,
+        ),
+      context,
     );
+
+    return {
+      message: toMessageResponseDto(requireField(response.message, 'message')),
+      // Names of files that did not confirm. Routinely non-empty for an honest
+      // caller — a presign record lives ten minutes — so this is a normal
+      // outcome to render, not an error path.
+      skippedAttachments: response.skippedAttachments,
+    };
   }
 
   /**
@@ -113,12 +125,43 @@ export class MessagesGrpcClient extends BaseGrpcClient implements OnModuleInit {
     content: string,
     generationId: string | undefined,
     context: RequestContext,
+    /**
+     * The `AnswerStatus` name, persisted on the row — 36-doc §7.
+     *
+     * The gateway held this in the completion frame and dropped it on write, so
+     * once the socket closed a thread could not tell a refusal from an answer.
+     */
+    answerStatus?: string,
   ): Promise<MessageResponseDto> {
     return toMessageResponseDto(
       await this.call(
         (metadata) =>
           this.messageGrpcService.appendAiMessage(
-            { ticketId, content, generationId },
+            { ticketId, content, generationId, answerStatus },
+            metadata,
+          ),
+        context,
+      ),
+    );
+  }
+
+  /**
+   * Marks a message as unusable for AI context — 36-doc §7.
+   *
+   * Called on the refusal path only, by the service that holds the id of the
+   * message that was just refused. The row stays visible in the thread; what
+   * changes is that no transcript builder hands it to a model again.
+   */
+  async excludeFromAiContext(
+    ticketId: string,
+    messageId: string,
+    context: RequestContext,
+  ): Promise<MessageResponseDto> {
+    return toMessageResponseDto(
+      await this.call(
+        (metadata) =>
+          this.messageGrpcService.excludeFromAiContext(
+            { ticketId, messageId },
             metadata,
           ),
         context,
@@ -174,7 +217,8 @@ export class MessagesGrpcClient extends BaseGrpcClient implements OnModuleInit {
    */
   async presignAttachment(
     ticketId: string,
-    messageId: string,
+    /** Absent when the message does not exist yet — 36-doc §1.3. */
+    messageId: string | undefined,
     dto: UploadAttachmentDto,
     context: RequestContext,
   ): Promise<PresignAttachmentResponseDto> {
@@ -247,6 +291,29 @@ export class MessagesGrpcClient extends BaseGrpcClient implements OnModuleInit {
     await this.call(
       (metadata) =>
         this.messageGrpcService.deleteAttachment({ attachmentId }, metadata),
+      context,
+    );
+  }
+
+  /**
+   * The AI-eligible attachments of one message, as bytes — 36-doc §2.
+   *
+   * **Asked for rather than fetched here.** This gateway has no storage client,
+   * and ticket-service already runs the identical filter-and-fetch for its two
+   * `Draft` call sites — one implementation of the eligibility rule, in the
+   * service that owns `message_attachments`.
+   *
+   * `parts` is returned raw rather than through a DTO mapper: it carries file
+   * BYTES straight into a `ChatRequest`, and a response DTO would exist only to
+   * copy them.
+   */
+  async aiAttachments(
+    messageId: string,
+    context: RequestContext,
+  ): Promise<GetAiAttachmentsResponse> {
+    return this.call(
+      (metadata) =>
+        this.messageGrpcService.getAiAttachments({ messageId }, metadata),
       context,
     );
   }

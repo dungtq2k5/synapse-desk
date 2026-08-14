@@ -1,7 +1,13 @@
 import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ClientGrpc, ClientProxy, RpcException } from '@nestjs/microservices';
 import { status } from '@grpc/grpc-js';
-import { firstValueFrom, timeout } from 'rxjs';
+import {
+  defaultIfEmpty,
+  firstValueFrom,
+  lastValueFrom,
+  tap,
+  timeout,
+} from 'rxjs';
 import {
   CallerContext,
   GRPC_DEADLINE_MS,
@@ -26,6 +32,12 @@ export type PresignedUpload = {
   objectPath: string;
   expiresAt: Date;
 };
+
+/**
+ * Longer than a normal RPC because this one moves bytes — the same figure
+ * ingestion-service uses for the same reason.
+ */
+const DOWNLOAD_DEADLINE_MS = 120_000;
 
 /**
  * ticket-service's view of storage — presign, confirm, resolve, and the
@@ -59,7 +71,8 @@ export class StorageReferenceService implements OnModuleInit {
   async presignAttachment(
     input: {
       ticketId: string;
-      messageId: string;
+      /** Absent before the message exists — 36-doc §1.3. */
+      messageId?: string;
       contentType: string;
       sizeBytes: number;
       fileName: string;
@@ -72,7 +85,10 @@ export class StorageReferenceService implements OnModuleInit {
           {
             purpose: ProtoStoragePurpose.STORAGE_PURPOSE_TICKET_ATTACHMENT,
             ownerId: input.ticketId,
-            secondaryOwnerId: input.messageId,
+            // Empty, not omitted: the field is a plain `string` on the wire, so
+            // an absent message and an empty one are the same bytes either way.
+            // storage-service reads empty as "no segment".
+            secondaryOwnerId: input.messageId ?? '',
             contentType: input.contentType,
             sizeBytes: input.sizeBytes,
             originalFileName: input.fileName,
@@ -167,7 +183,7 @@ export class StorageReferenceService implements OnModuleInit {
   async confirmUpload(
     objectPath: string,
     context: CallerContext,
-  ): Promise<{ sizeBytes: number; contentType: string }> {
+  ): Promise<{ objectPath: string; sizeBytes: number; contentType: string }> {
     const response = await firstValueFrom(
       this.storageService
         .confirmUpload({ objectPath }, packRequestContext(context))
@@ -175,9 +191,68 @@ export class StorageReferenceService implements OnModuleInit {
     );
 
     return {
+      // **The path storage-service RETURNED, not the one we sent** — 36-doc
+      // §1.3.2. A confirmed attachment moves out of `pending/`, so the presign
+      // path is where the object no longer is — and a row built from it would
+      // point at exactly what the lifecycle rule is about to delete.
+      objectPath: response.objectPath,
       sizeBytes: response.sizeBytes,
       contentType: response.contentType,
     };
+  }
+
+  /**
+   * The bytes of one object — 36-doc §2.
+   *
+   * **New here, and it is the first byte path this service has had.** Everything
+   * above hands out signed URLs: presign to upload, `resolveReadUrls` so a
+   * browser can download. Attachments in the AI path need the bytes in-process,
+   * because they travel inline in `ChatRequest`/`DraftRequest` — rag-service
+   * has no storage client and giving it one would add a peer, a credential and
+   * a failure mode to the query path (35-doc §7).
+   *
+   * Reassembled rather than passed through as a stream, for the same reason
+   * ingestion-service reassembles: the consumer needs the whole buffer to put
+   * it in a protobuf field, so streaming past this point would buy nothing and
+   * cost the caller a shape it cannot use.
+   *
+   * **Throws rather than returning empty.** One unreadable attachment must not
+   * silently become an answer about the other four — the caller decides whether
+   * to skip it, and it can only decide if it is told.
+   */
+  async downloadObject(
+    objectPath: string,
+    context: CallerContext,
+  ): Promise<Buffer> {
+    const chunks: Buffer[] = [];
+
+    await lastValueFrom(
+      this.storageService
+        .downloadObject({ objectPath }, packRequestContext(context))
+        .pipe(
+          // Longer than `GRPC_DEADLINE_MS`: this is megabytes over a stream
+          // rather than a lookup, and the standard deadline would kill every
+          // large attachment at the same size boundary.
+          timeout(DOWNLOAD_DEADLINE_MS),
+          tap((chunk) => {
+            if (chunk.data?.length) chunks.push(Buffer.from(chunk.data));
+          }),
+          defaultIfEmpty({ data: new Uint8Array() }),
+        ),
+    );
+
+    const bytes = Buffer.concat(chunks);
+    if (bytes.length === 0) {
+      // An empty read is a MISSING object, not an empty file — confirm rejects
+      // zero-byte uploads. Treating it as "read nothing successfully" would put
+      // an empty part in the prompt and spend a call on it.
+      throw new RpcException({
+        code: status.NOT_FOUND,
+        message: 'That file is no longer available',
+      });
+    }
+
+    return bytes;
   }
 
   /**

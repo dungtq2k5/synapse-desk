@@ -3,6 +3,7 @@ import { TicketAccessModule } from '../ticket-access/ticket-access.module';
 import { AuthClientModule } from '../auth-client/auth-client.module';
 import { AiClientModule } from '../ai-client/ai-client.module';
 import { AiService } from './ai.service';
+import { AiAttachmentsModule } from '../ai-attachments/ai-attachments.module';
 import { AiGrpcController } from './ai-grpc.controller';
 
 /**
@@ -15,7 +16,15 @@ import { AiGrpcController } from './ai-grpc.controller';
 @Module({
   // `AuthClientModule` for the classification candidates: rag-service cannot
   // see postgres_auth, so the department list travels WITH the request.
-  imports: [TicketAccessModule, AiClientModule, AuthClientModule],
+  // `AiAttachmentsModule`, NOT `MessagesModule` — same reasoning as the line
+  // above, one module further out. Importing `MessagesModule` would reach
+  // `TicketsModule` and close the cycle this module was extracted to avoid.
+  imports: [
+    TicketAccessModule,
+    AiClientModule,
+    AuthClientModule,
+    AiAttachmentsModule,
+  ],
   controllers: [AiGrpcController],
   providers: [AiService],
   exports: [AiService],

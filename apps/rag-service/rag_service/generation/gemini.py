@@ -10,6 +10,7 @@ import logging
 from collections.abc import AsyncIterator
 
 from rag_service.generation.corag import GenerationDelta
+from rag_service.generation.parts import Prompt
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +22,7 @@ class GeminiGenerator:
         self._client = genai.Client(api_key=api_key)
 
     async def stream(
-        self, prompt: str, model: str, max_output_tokens: int
+        self, prompt: Prompt, model: str, max_output_tokens: int
     ) -> AsyncIterator[GenerationDelta]:
         """Yields text deltas, then one final frame carrying the USAGE.
 
@@ -37,7 +38,7 @@ class GeminiGenerator:
 
         stream = await self._client.aio.models.generate_content_stream(
             model=model,
-            contents=prompt,
+            contents=_to_contents(prompt),
             config=types.GenerateContentConfig(max_output_tokens=max_output_tokens),
         )
 
@@ -86,7 +87,7 @@ class GeminiGenerator:
         )
 
     async def generate(
-        self, prompt: str, model: str, max_output_tokens: int
+        self, prompt: Prompt, model: str, max_output_tokens: int
     ):
         """The unary form, for the preprocessing steps.
 
@@ -112,6 +113,35 @@ class GeminiGenerator:
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
         )
+
+
+def _to_contents(prompt: Prompt) -> str | list[object]:
+    """`Prompt` -> whatever `google-genai` wants — 36-doc §5.1.
+
+    **The only function in this service that knows what an attachment becomes.**
+    Everything above passes `str | list[str | Attachment]`; a second provider
+    would be a second adapter rather than a second prompt type.
+
+    A bare `str` is passed through untouched rather than wrapped in a one-element
+    list. The SDK accepts both, and passing it through means the overwhelmingly
+    common call — every text prompt in the service — produces exactly the
+    request it produced before this change, which is what makes the widening
+    invisible to the paths that did not ask for it.
+    """
+    if isinstance(prompt, str):
+        return prompt
+
+    # Imported here rather than at module scope, like every other `google.genai`
+    # use in this file: the SDK is heavy and the import cost belongs to the
+    # calls that need it.
+    from google.genai import types
+
+    return [
+        part
+        if isinstance(part, str)
+        else types.Part.from_bytes(data=part.data, mime_type=part.mime_type)
+        for part in prompt
+    ]
 
 
 def _finish_reason(response: object) -> str | None:

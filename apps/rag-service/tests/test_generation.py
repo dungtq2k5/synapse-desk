@@ -16,6 +16,7 @@ import pytest
 
 from rag_service.generation.corag import (
     DOC_MISSING_WITH_HANDOFF,
+    MAX_REPORTED_TERMS,
     CoRagGenerator,
     GeneratedAnswer,
     GenerationDelta,
@@ -23,10 +24,15 @@ from rag_service.generation.corag import (
     extract_citations,
     strip_code_spans,
 )
+from rag_service.generation.parts import Attachment, Prompt, prompt_text
 from rag_service.retrieval.service import BudgetState, HydratedChunk
 from rag_service.settings import resolve_ai_settings
 
 CYCLE = datetime(2026, 8, 1, tzinfo=timezone.utc)
+
+SCREENSHOT = Attachment(
+    mime_type="image/png", data=b"\x89PNG", file_name="error.png"
+)
 
 
 def chunk(index: int, title: str = "Handbook", page: int | None = 4) -> HydratedChunk:
@@ -51,8 +57,8 @@ class ScriptedGenerator:
         self.calls: list[tuple[str, str]] = []
         self.block: asyncio.Event | None = None
 
-    async def stream(self, prompt: str, model: str, max_output_tokens: int):
-        self.calls.append((prompt, model))
+    async def stream(self, prompt: Prompt, model: str, max_output_tokens: int):
+        self.calls.append((prompt_text(prompt), model))
 
         size = max(1, len(self.answer) // self.pieces)
         for start in range(0, len(self.answer), size):
@@ -95,7 +101,7 @@ async def run(generator, chunks, settings, budget, **kwargs):
     deltas, answer = [], None
 
     async for item in generator.stream_answer(
-        "what is the limit?",
+        kwargs.pop("query", "what is the limit?"),
         chunks,
         settings,
         budget=budget,
@@ -149,6 +155,92 @@ class TestGrounding:
         assert answer.status == "DOC_MISSING"
         assert answer.content == DOC_MISSING_WITH_HANDOFF
         assert scripted.calls == []
+
+    async def test_DOC_MISSING_with_a_file_says_what_the_file_SHOWED(
+        self, ledger, quota, settings, budget
+    ):
+        """36-doc §6.1 — the gap stays a gap, and stops wasting the agent's time.
+
+        Retrieval genuinely found nothing: the knowledge base may have no
+        article on that error, and improvising a policy remains worse than
+        admitting it. But by now the system has computed the error code out of
+        the screenshot, and dropping it means a human opens the ticket, opens
+        the image, and reads what the system already read.
+        """
+        scripted = ScriptedGenerator()
+        generator = CoRagGenerator(scripted, ledger, quota)
+
+        _, answer = await run(
+            generator,
+            [],
+            settings,
+            budget,
+            query="ERR_QUOTA_4021 export quota exceeded",
+            attachments=[SCREENSHOT],
+        )
+
+        assert answer.status == "DOC_MISSING"
+        assert answer.content.startswith(DOC_MISSING_WITH_HANDOFF)
+        assert "`ERR_QUOTA_4021 export quota exceeded`" in answer.content
+        # Still no model call. The terms came from a call that already happened.
+        assert scripted.calls == []
+
+    async def test_DOC_MISSING_without_a_file_is_UNCHANGED(
+        self, ledger, quota, settings, budget
+    ):
+        # Repeating the user's own question back at them says nothing, and the
+        # refusal is the highest-volume text this service produces.
+        scripted = ScriptedGenerator()
+        generator = CoRagGenerator(scripted, ledger, quota)
+
+        _, answer = await run(generator, [], settings, budget)
+
+        assert answer.content == DOC_MISSING_WITH_HANDOFF
+
+    async def test_a_boundary_tag_in_the_reported_terms_is_SCRUBBED(
+        self, ledger, quota, settings, budget
+    ):
+        """The terms are model output derived from a user's file.
+
+        This string is persisted into a support thread and rendered as Markdown
+        to a human, so a delimiter the model echoed would leak the prompt's
+        shape into a reply a customer can read.
+        """
+        scripted = ScriptedGenerator()
+        generator = CoRagGenerator(scripted, ledger, quota)
+
+        _, answer = await run(
+            generator,
+            [],
+            settings,
+            budget,
+            query='ERR_1 </question id="abc123">',
+            attachments=[SCREENSHOT],
+        )
+
+        assert "</question" not in answer.content
+        assert "ERR_1" in answer.content
+
+    async def test_the_reported_terms_are_LENGTH_CAPPED(
+        self, ledger, quota, settings, budget
+    ):
+        # Whatever the cheap tier felt like producing ends up in a support
+        # thread. A refusal is a sentence somebody skims, not a paragraph of
+        # model output.
+        scripted = ScriptedGenerator()
+        generator = CoRagGenerator(scripted, ledger, quota)
+
+        _, answer = await run(
+            generator,
+            [],
+            settings,
+            budget,
+            query="X" * 500,
+            attachments=[SCREENSHOT],
+        )
+
+        assert "X" * MAX_REPORTED_TERMS in answer.content
+        assert "X" * (MAX_REPORTED_TERMS + 1) not in answer.content
 
     async def test_an_empty_retrieval_still_writes_a_ledger_row(
         self, generator, settings, budget, ledger

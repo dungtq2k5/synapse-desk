@@ -17,6 +17,7 @@ import pytest
 
 from rag_service.enums import AiGenerationPurpose
 from rag_service.generation.corag import CoRagGenerator, GenerationDelta
+from rag_service.generation.parts import Prompt, prompt_text
 from rag_service.generation.review import (
     ReviewVerdict,
     build_refine_prompt,
@@ -54,12 +55,12 @@ class ScriptedPasses:
         self.refinements = list(refinements or [])
         self.calls: list[tuple[str, str]] = []
 
-    async def stream(self, prompt: str, model: str, max_output_tokens: int):
-        self.calls.append((_kind(prompt), model))
+    async def stream(self, prompt: Prompt, model: str, max_output_tokens: int):
+        self.calls.append((_kind(prompt_text(prompt)), model))
 
-        if _kind(prompt) == "review":
+        if _kind(prompt_text(prompt)) == "review":
             text = self.reviews.pop(0) if self.reviews else "COMPLETE\n"
-        elif _kind(prompt) == "refine":
+        elif _kind(prompt_text(prompt)) == "refine":
             text = self.refinements.pop(0) if self.refinements else "Refined [1]."
         else:
             text = "The limit is 500 [1]."

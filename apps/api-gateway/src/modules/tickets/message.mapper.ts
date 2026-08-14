@@ -42,5 +42,7 @@ export function toMessageResponseDto(
     redactedAt: fromProtoTimestamp(message.redactedAt) ?? null,
     createdAt: requireProtoTimestamp(message.createdAt, 'createdAt'),
     attachments: (message.attachments ?? []).map(toAttachmentResponseDto),
+    excludedFromAiContext: message.excludedFromAiContext,
+    answerStatus: message.answerStatus ?? null,
   };
 }

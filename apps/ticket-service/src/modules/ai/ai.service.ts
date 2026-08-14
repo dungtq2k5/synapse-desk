@@ -14,6 +14,7 @@ import {
   toProtoTimestamp,
 } from '@synapsedesk/grpc-proto';
 import { formatErrorMsg } from '@synapsedesk/common';
+import { isDraftRefusal } from '../ai-client/refusal';
 
 /**
  * How many messages a generation prompt carries.
@@ -24,6 +25,7 @@ import { formatErrorMsg } from '@synapsedesk/common';
  */
 const TRANSCRIPT_TURNS = 40;
 import { PrismaService } from '../prisma/prisma.service';
+import { AiAttachmentService } from '../ai-attachments/ai-attachment.service';
 import { TicketAccessService } from '../ticket-access/ticket-access.service';
 import { RagClientService } from '../ai-client/rag-client.service';
 import { AuthReferenceService } from '../auth-client/auth-reference.service';
@@ -65,6 +67,7 @@ export class AiService {
     private readonly access: TicketAccessService,
     private readonly rag: RagClientService,
     private readonly authReference: AuthReferenceService,
+    private readonly aiAttachments: AiAttachmentService,
   ) {}
 
   /**
@@ -186,11 +189,34 @@ export class AiService {
   ): Promise<GenerateDraftResponse> {
     const ticket = await this.access.load(request.ticketId, context);
 
-    const draft = await this.rag.generateReplyDraft(
+    // The customer's last message may carry a screenshot, and this is the
+    // surface replying to it — 36-doc §2. Filtered from the row before anything
+    // is downloaded, so an attached zip costs nothing.
+    const attachments = await this.aiAttachments.forLastUserMessage(
       ticket.id,
-      await this.transcript(ticket.id),
       context,
     );
+
+    let draft: Awaited<ReturnType<RagClientService['generateReplyDraft']>>;
+    try {
+      draft = await this.rag.generateReplyDraft(
+        ticket.id,
+        await this.transcript(ticket.id),
+        context,
+        undefined,
+        attachments.parts,
+      );
+    } catch (error) {
+      // **The write-back, on the refusal path only** — 36-doc §7. The message
+      // that was just refused must not reach the NEXT draft's transcript;
+      // without this the guard refuses the same question every time an agent
+      // presses the button, which makes the refusal a delay rather than a
+      // defence.
+      //
+      // Rethrown either way: the agent still gets the refusal. This records it.
+      await this.excludeRefused(ticket.id, error);
+      throw error;
+    }
 
     return {
       content: draft.content,
@@ -303,7 +329,18 @@ export class AiService {
    */
   private async transcript(ticketId: string): Promise<ConversationTurn[]> {
     const messages = await this.prisma.ticketMessage.findMany({
-      where: { ticketId },
+      // **Refused messages never reach a prompt** — 36-doc §7.
+      //
+      // Filtered in the WHERE because this query is a dedicated transcript
+      // read serving nothing else: there is no reason to fetch a row only to
+      // drop it. The gateway's builder does the opposite for a reason its own
+      // call site explains — the rows it drops are ones its caller is entitled
+      // to see.
+      //
+      // Without this clause a question refused as injection is still in the
+      // thread, and the next draft's transcript hands it straight back to the
+      // model — which makes the refusal a delay rather than a defence.
+      where: { ticketId, excludedFromAiContext: false },
       orderBy: { createdAt: 'asc' },
       select: { content: true, senderId: true, isAiGenerated: true },
       // Bounded. A 300-message thread is prompt tokens charged on every draft,
@@ -315,6 +352,40 @@ export class AiService {
       role: message.isAiGenerated || !message.senderId ? 'assistant' : 'user',
       content: message.content,
     }));
+  }
+
+  /**
+   * Marks the refused message so it cannot reach a later prompt.
+   *
+   * **Only on an actual refusal.** rag-service refuses a draft with
+   * `FAILED_PRECONDITION` and the `[http:422]` marker; a timeout, an outage or
+   * a cap are different failures whose message is perfectly usable next time,
+   * and excluding on those would quietly shrink a thread's context every time
+   * the provider had a bad minute.
+   *
+   * **Never allowed to replace the original error.** The agent's answer is the
+   * refusal; a bookkeeping write that failed must not turn that into something
+   * else.
+   */
+  private async excludeRefused(
+    ticketId: string,
+    error: unknown,
+  ): Promise<void> {
+    if (!isDraftRefusal(error)) return;
+
+    try {
+      const messageId = await this.aiAttachments.lastUserMessageId(ticketId);
+      if (!messageId) return;
+
+      await this.prisma.ticketMessage.update({
+        where: { id: messageId },
+        data: { excludedFromAiContext: true },
+      });
+    } catch (writeError) {
+      this.logger.error(
+        `Could not exclude a refused message from AI context: ${formatErrorMsg(writeError)}`,
+      );
+    }
   }
 
   /** The tenant's departments, as classification candidates. */

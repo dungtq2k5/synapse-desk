@@ -22,6 +22,7 @@ from collections.abc import Awaitable
 from dataclasses import dataclass
 from typing import Protocol
 
+from rag_service.generation.parts import Prompt
 from rag_service.ledger.client import GenerationEntry
 from rag_service.retrieval.service import BudgetState
 
@@ -39,7 +40,7 @@ class TextGenerator(Protocol):
     """The minimal generation capability a metered call needs."""
 
     async def generate(
-        self, prompt: str, model: str, max_output_tokens: int
+        self, prompt: Prompt, model: str, max_output_tokens: int
     ) -> GenerationOutput: ...
 
 
@@ -109,7 +110,7 @@ class MeteredGenerator:
 
     async def generate(
         self,
-        prompt: str,
+        prompt: Prompt,
         model: str,
         max_output_tokens: int,
         *,

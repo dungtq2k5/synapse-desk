@@ -6,6 +6,7 @@ import {
   bootstrapE2eTest,
   memberContext,
   pageRequest,
+  createTestMessage,
 } from '../utils';
 import {
   buildTenant,
@@ -37,6 +38,7 @@ describe('§3.2 soft-delete sweep (e2e)', () => {
   let fx: E2eFixture;
   let tickets: TicketsService;
   let messages: MessagesService;
+
   let assignments: AssignmentsService;
 
   let tenant: TenantFixture;
@@ -188,7 +190,8 @@ describe('§3.2 soft-delete sweep (e2e)', () => {
         [
           'post message',
           () =>
-            messages.createMessage(
+            createTestMessage(
+              messages,
               {
                 ticketId: deleted.id,
                 content: 'hello',

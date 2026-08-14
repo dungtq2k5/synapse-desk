@@ -95,10 +95,14 @@ export class StorageService {
         message: 'An owner id is required',
       });
     }
-    if (policy.requiresSecondaryOwner && !request.secondaryOwnerId) {
+    if (request.secondaryOwnerId && !policy.allowsSecondaryOwner) {
+      // The check inverted in 36-doc §1.3. It used to REQUIRE the segment for a
+      // ticket attachment, which is what made presign-before-the-message
+      // impossible; now the only error is a secondary owner on a purpose that
+      // has nowhere to put one, which would otherwise be silently discarded.
       throw new RpcException({
         code: status.INVALID_ARGUMENT,
-        message: `${purpose} uploads require a secondary owner id`,
+        message: `${purpose} uploads take no secondary owner id`,
       });
     }
     if (!policy.mimeAllowlist.includes(request.contentType)) {
@@ -116,7 +120,7 @@ export class StorageService {
       });
     }
 
-    const objectPath = this.buildObjectPath(
+    const { objectPath, committedPath } = this.buildObjectPath(
       purpose,
       organizationId,
       request.ownerId,
@@ -132,6 +136,7 @@ export class StorageService {
     await this.pending.put(
       {
         objectPath,
+        committedPath,
         organizationId,
         actorId,
         contentType: request.contentType,
@@ -182,16 +187,38 @@ export class StorageService {
       });
     }
 
-    const file = this.firebase.bucket.file(request.objectPath);
-    const [exists] = await file.exists();
-    if (!exists) {
-      // The client skipped step 4 of the flow. FAILED_PRECONDITION rather than
-      // NOT_FOUND: the authorization passed, and telling them their upload
-      // never landed is actionable in a way a 404 would not be.
-      throw new RpcException({
-        code: status.FAILED_PRECONDITION,
-        message: 'No object was uploaded to that path',
-      });
+    const segregated = pending.committedPath !== request.objectPath;
+
+    let file = this.firebase.bucket.file(request.objectPath);
+    let alreadyMoved = false;
+
+    if (!(await file.exists())[0]) {
+      // **The crash window between `move()` and `consume()`** — and the reason
+      // this is a resumption rather than a refusal.
+      //
+      // A process that dies in that window leaves the object at the COMMITTED
+      // path with the record still keyed to the pending one. Refusing here
+      // would then report the opposite of what happened — "no object was
+      // uploaded" for an upload that landed AND was committed — and the
+      // residue sits outside `pending/`, where the lifecycle rule §1.3.2 exists
+      // for will never touch it.
+      //
+      // Nothing can close the window: there is no transaction spanning a bucket
+      // and Redis. Making the retry idempotent is strictly better than
+      // narrowing it, and costs one `exists()` on a path already in hand.
+      const committed = this.firebase.bucket.file(pending.committedPath);
+      if (segregated && (await committed.exists())[0]) {
+        file = committed;
+        alreadyMoved = true;
+      } else {
+        // The client skipped step 4 of the flow. FAILED_PRECONDITION rather
+        // than NOT_FOUND: the authorization passed, and telling them their
+        // upload never landed is actionable in a way a 404 would not be.
+        throw new RpcException({
+          code: status.FAILED_PRECONDITION,
+          message: 'No object was uploaded to that path',
+        });
+      }
     }
 
     const [metadata] = await file.getMetadata();
@@ -224,13 +251,37 @@ export class StorageService {
       });
     }
 
+    // **The move out of `pending/`** — 36-doc §1.3.2, and the whole reason that
+    // prefix exists. Everything still under it after this point is unreferenced
+    // by construction, which is what makes a lifecycle rule over it safe.
+    //
+    // **Before the record is consumed**, so a failure HERE leaves the object
+    // exactly where a sweep expects it and the caller free to retry.
+    //
+    // That ordering narrows the crash window; it does not close it. A death
+    // between this line and `consume()` below leaves a committed object with a
+    // live record — which the resumption above turns into a successful retry
+    // rather than a lie plus an unsweepable orphan. Both halves are needed:
+    // this order for the common failure, that check for the remaining one.
+    //
+    // Skipped when a previous attempt already moved it, and a no-op for every
+    // purpose that does not segregate — `committedPath` equals `objectPath`
+    // there, and moving a file onto itself is not worth a round trip.
+    if (segregated && !alreadyMoved) {
+      await file.move(pending.committedPath);
+    }
+
     // Consumed only after everything succeeded. Consuming first would burn the
     // record on a transient metadata failure and leave the caller unable to
     // retry a confirm that would otherwise have worked.
     await this.pending.consume(request.objectPath);
 
     return {
-      objectPath: request.objectPath,
+      // **The COMMITTED path, not the one the caller sent.** The object is no
+      // longer at the path they presigned to, and a caller that stored their
+      // own copy would write a `file_url` pointing at something a sweep is
+      // about to delete.
+      objectPath: pending.committedPath,
       // The REAL values from the object, not the ones the client declared at
       // presign. Those were a hint for the policy check; these are what is
       // actually stored, and the caller writes them into its own row.
@@ -384,14 +435,47 @@ export class StorageService {
     ownerId: string,
     secondaryOwnerId: string,
     contentType: string,
-  ): string {
+  ): { objectPath: string; committedPath: string } {
     const policy = PURPOSE_POLICY[purpose];
     const fileName = `${randomUUID()}.${extensionFor(contentType)}`;
     const base = `organizations/${organizationId}/${policy.prefix}`;
 
-    return purpose === StoragePurpose.TICKET_ATTACHMENT
-      ? `${base}/${ownerId}/attachments/${secondaryOwnerId}/${fileName}`
-      : `${base}/${ownerId}/${fileName}`;
+    if (purpose !== StoragePurpose.TICKET_ATTACHMENT) {
+      // **No segregation for the other purposes**, and it would buy nothing.
+      // An avatar, a document and an export are each referenced by a row
+      // written in the same call that confirms them, so there is no window in
+      // which one exists unreferenced by a user changing their mind.
+      const path = `${base}/${ownerId}/${fileName}`;
+
+      return { objectPath: path, committedPath: path };
+    }
+
+    // **The message segment is omitted rather than filled with a placeholder**
+    // when the message does not exist yet — 36-doc §1.3. A literal `pending`
+    // would read as a real message id to anyone browsing the bucket, and would
+    // be the one path segment that means something different from all the
+    // others.
+    const attachments = `${base}/${ownerId}/attachments`;
+    const suffix = secondaryOwnerId
+      ? `${secondaryOwnerId}/${fileName}`
+      : fileName;
+
+    return {
+      // **Uploaded under `pending/`, committed out of it** — 36-doc §1.3.2.
+      //
+      // Nothing else makes the prefix sweepable. `confirmUpload` never moved
+      // the object, so a live attachment on a real ticket had the same path
+      // shape as one somebody uploaded and abandoned — and a lifecycle rule
+      // over `**/attachments/**` would have deleted both. Under `pending/`
+      // everything is unreferenced BY CONSTRUCTION, which is what makes the
+      // rule safe to enable.
+      //
+      // Inserted after `attachments`, not before `organizations`: the tenant
+      // check in `organizationIdFromObjectPath` reads segment 2, and this
+      // leaves it exactly where it was.
+      objectPath: `${attachments}/pending/${suffix}`,
+      committedPath: `${attachments}/${suffix}`,
+    };
   }
 
   private requirePurpose(purpose: ProtoStoragePurpose): StoragePurpose {

@@ -39,6 +39,24 @@ export interface MessageResponse {
   redactedAt?: Timestamp | undefined;
   createdAt: Timestamp | undefined;
   attachments: AttachmentResponse[];
+  /**
+   * Whether this message is kept OUT of AI prompts — 36-doc §7.
+   *
+   * On the read shape because the gateway's transcript builder filters AFTER
+   * the fetch, and cannot filter on what it cannot see. Deliberately not a
+   * `where` clause on `ListMessages`: that route serves the UI, where a refused
+   * message must stay visible.
+   */
+  excludedFromAiContext: boolean;
+  /**
+   * `AnswerStatus` for an AI message, as a name — REFUSED, DOC_ANSWER,
+   * DOC_MISSING. Absent for a human one.
+   *
+   * For reading a thread: an agent scrolling a conversation should be able to
+   * tell a refusal from an escalation from a real answer, which was impossible
+   * while the status lived only in a WebSocket frame nobody persisted.
+   */
+  answerStatus?: string | undefined;
 }
 
 export interface CreateMessageRequest {
@@ -80,7 +98,59 @@ export interface CreateMessageRequest {
    * provider redelivery is a duplicate-key violation rather than a second
    * reply. Absent for every other transport, and absent is not an error.
    */
-  inboundMessageId?: string | undefined;
+  inboundMessageId?:
+    | string
+    | undefined;
+  /**
+   * Objects the client already uploaded, bound to the message as it is created
+   * — 36-doc §1.3.
+   *
+   * **This is what makes a first-turn attachment readable.** Presign and
+   * confirm both took a `message_id`, so the row could only exist after the
+   * message did, while `invoke_ai` runs during the create: the screenshot was
+   * stored a moment after the answer that needed it. Binding here is
+   * STRUCTURAL — there is no ordering left for a client to get wrong — where
+   * "ask for the answer once the confirms land" would have been a client
+   * contract that a slow upload or a retry quietly breaks.
+   *
+   * Each path is confirmed against storage-service before the write. A path
+   * that fails comes back in `skipped_attachments` and the message is still
+   * created; see §1.3.1 for why that is the only safe outcome.
+   */
+  attachments: NewAttachment[];
+}
+
+/**
+ * One already-uploaded object, waiting to be bound to a message.
+ *
+ * No size or MIME type: both are read back from the OBJECT at confirm, never
+ * taken from the client — the rule `confirmAttachment` already follows, and the
+ * reason a row cannot record whatever the caller felt like claiming.
+ */
+export interface NewAttachment {
+  objectPath: string;
+  fileName: string;
+}
+
+/**
+ * What `CreateMessage` answers with — 36-doc §1.3.1.
+ *
+ * A wrapper rather than a bare `MessageResponse`, because a create now has a
+ * second outcome to report: an attachment whose confirm failed is SKIPPED and
+ * named, and the message is created regardless. Folding the names into
+ * `MessageResponse` would put a field on every read that only a create can ever
+ * populate.
+ */
+export interface CreateMessageResponse {
+  message:
+    | MessageResponse
+    | undefined;
+  /**
+   * File names, never object paths and never contents. The same rule the AI's
+   * skipped list follows, and for the same reason: this is the text a user
+   * reads.
+   */
+  skippedAttachments: string[];
 }
 
 /**
@@ -104,7 +174,31 @@ export interface AppendAiMessageRequest {
    * The `ai_generations` row the answer came from, when there is one. Absent
    * for a canned greeting, which never reaches an LLM and never gets a row.
    */
-  generationId?: string | undefined;
+  generationId?:
+    | string
+    | undefined;
+  /**
+   * The status this answer was produced with, persisted on the row — 36-doc §7.
+   *
+   * Absent for a canned greeting. The gateway held this in the completion frame
+   * and threw it away on write, so a thread could not distinguish a refusal
+   * from an answer once the socket closed.
+   */
+  answerStatus?: string | undefined;
+}
+
+/**
+ * Marks a message as unusable for AI context — 36-doc §7.
+ *
+ * **A separate RPC rather than a flag on `UpdateMessage`**, because that route
+ * edits CONTENT on behalf of a human and carries authorship rules with it. This
+ * is the system recording something about a message it just processed, and
+ * giving it its own name keeps "an agent edited their reply" and "the guard
+ * refused this question" from sharing a permission check.
+ */
+export interface ExcludeFromAiContextRequest {
+  ticketId: string;
+  messageId: string;
 }
 
 export interface ListMessagesRequest {
@@ -143,7 +237,12 @@ export interface RedactMessageResponse {
  */
 export interface UploadAttachmentRequest {
   ticketId: string;
-  messageId: string;
+  /**
+   * *Absent when the message does not exist yet** — 36-doc §1.3. Optional
+   * rather than removed, so the `:messageId`-nested routes keep serving
+   * "attach to a message that already exists".
+   */
+  messageId?: string | undefined;
   fileName: string;
   fileSizeBytes: number;
   mimeType: string;
@@ -178,6 +277,41 @@ export interface ListAttachmentsResponse {
   items: AttachmentResponse[];
 }
 
+export interface GetAiAttachmentsRequest {
+  messageId: string;
+}
+
+/**
+ * Field-for-field identical to `synapsedesk.rag.AttachmentPart`, and declared
+ * here rather than imported — 36-doc §2.
+ *
+ * A proto import would point this package at rag's, which is backwards: rag is
+ * downstream of ticket, not the other way round. Declaring it twice costs
+ * nothing at the call site because ts-proto emits structural interfaces, so the
+ * object ticket-service builds satisfies rag's type without a mapping function
+ * — the two are kept aligned by that fact rather than by a converter somebody
+ * has to remember to update.
+ */
+export interface AiAttachmentPart {
+  mimeType: string;
+  data: Uint8Array;
+  /** For the boundary label and for logs. NEVER the file's contents. */
+  fileName: string;
+}
+
+export interface GetAiAttachmentsResponse {
+  /**
+   * Already filtered by mime type and capped by total size. Empty is the common
+   * case and is not an error.
+   */
+  parts: AiAttachmentPart[];
+  /**
+   * File NAMES that did not qualify, so the caller can tell the user — 36-doc
+   * §2.2. Never their contents.
+   */
+  skipped: string[];
+}
+
 export interface DownloadAttachmentRequest {
   attachmentId: string;
 }
@@ -188,7 +322,7 @@ export interface DownloadAttachmentResponse {
 }
 
 export interface MessageServiceClient {
-  createMessage(request: CreateMessageRequest, metadata?: Metadata): Observable<MessageResponse>;
+  createMessage(request: CreateMessageRequest, metadata?: Metadata): Observable<CreateMessageResponse>;
 
   appendAiMessage(request: AppendAiMessageRequest, metadata?: Metadata): Observable<MessageResponse>;
 
@@ -197,6 +331,14 @@ export interface MessageServiceClient {
   updateMessage(request: UpdateMessageRequest, metadata?: Metadata): Observable<MessageResponse>;
 
   redactMessage(request: RedactMessageRequest, metadata?: Metadata): Observable<RedactMessageResponse>;
+
+  /**
+   * The write-back on the refusal path — 36-doc §7. Called by whoever holds the
+   * id of the message that was just refused: the gateway for `Chat`,
+   * ticket-service internally for the two `Draft` paths.
+   */
+
+  excludeFromAiContext(request: ExcludeFromAiContextRequest, metadata?: Metadata): Observable<MessageResponse>;
 
   /**
    * UploadAttachment is now the PRESIGN step — it returns a URL rather than a
@@ -209,6 +351,17 @@ export interface MessageServiceClient {
 
   downloadAttachment(request: DownloadAttachmentRequest, metadata?: Metadata): Observable<DownloadAttachmentResponse>;
 
+  /**
+   * The AI-eligible attachments of one message, as bytes — 36-doc §2.
+   *
+   * **The gateway asks rather than fetching.** It has no storage client, and
+   * giving it one would add a peer and a credential to the chat path for work
+   * ticket-service already does for its own two Draft call sites. One
+   * implementation of the eligibility rule, in the service that owns the rows.
+   */
+
+  getAiAttachments(request: GetAiAttachmentsRequest, metadata?: Metadata): Observable<GetAiAttachmentsResponse>;
+
   deleteAttachment(request: DeleteAttachmentRequest, metadata?: Metadata): Observable<DeleteAttachmentResponse>;
 
   listAttachments(request: ListAttachmentsRequest, metadata?: Metadata): Observable<ListAttachmentsResponse>;
@@ -218,7 +371,7 @@ export interface MessageServiceController {
   createMessage(
     request: CreateMessageRequest,
     metadata?: Metadata,
-  ): Promise<MessageResponse> | Observable<MessageResponse> | MessageResponse;
+  ): Promise<CreateMessageResponse> | Observable<CreateMessageResponse> | CreateMessageResponse;
 
   appendAiMessage(
     request: AppendAiMessageRequest,
@@ -241,6 +394,17 @@ export interface MessageServiceController {
   ): Promise<RedactMessageResponse> | Observable<RedactMessageResponse> | RedactMessageResponse;
 
   /**
+   * The write-back on the refusal path — 36-doc §7. Called by whoever holds the
+   * id of the message that was just refused: the gateway for `Chat`,
+   * ticket-service internally for the two `Draft` paths.
+   */
+
+  excludeFromAiContext(
+    request: ExcludeFromAiContextRequest,
+    metadata?: Metadata,
+  ): Promise<MessageResponse> | Observable<MessageResponse> | MessageResponse;
+
+  /**
    * UploadAttachment is now the PRESIGN step — it returns a URL rather than a
    * stored row, because no row exists until the bytes have actually landed.
    */
@@ -259,6 +423,20 @@ export interface MessageServiceController {
     request: DownloadAttachmentRequest,
     metadata?: Metadata,
   ): Promise<DownloadAttachmentResponse> | Observable<DownloadAttachmentResponse> | DownloadAttachmentResponse;
+
+  /**
+   * The AI-eligible attachments of one message, as bytes — 36-doc §2.
+   *
+   * **The gateway asks rather than fetching.** It has no storage client, and
+   * giving it one would add a peer and a credential to the chat path for work
+   * ticket-service already does for its own two Draft call sites. One
+   * implementation of the eligibility rule, in the service that owns the rows.
+   */
+
+  getAiAttachments(
+    request: GetAiAttachmentsRequest,
+    metadata?: Metadata,
+  ): Promise<GetAiAttachmentsResponse> | Observable<GetAiAttachmentsResponse> | GetAiAttachmentsResponse;
 
   deleteAttachment(
     request: DeleteAttachmentRequest,
@@ -279,9 +457,11 @@ export function MessageServiceControllerMethods() {
       "listMessages",
       "updateMessage",
       "redactMessage",
+      "excludeFromAiContext",
       "uploadAttachment",
       "confirmAttachment",
       "downloadAttachment",
+      "getAiAttachments",
       "deleteAttachment",
       "listAttachments",
     ];

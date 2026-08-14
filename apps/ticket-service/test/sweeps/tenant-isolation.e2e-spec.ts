@@ -8,6 +8,7 @@ import {
   bootstrapE2eTest,
   memberContext,
   pageRequest,
+  createTestMessage,
 } from '../utils';
 import {
   buildTenant,
@@ -51,6 +52,7 @@ describe('§3.1 tenant isolation sweep (e2e)', () => {
   let tickets: TicketsService;
   let assignments: AssignmentsService;
   let messages: MessagesService;
+
   let ai: AiService;
   let feedback: FeedbackService;
   let auditRead: AuditReadService;
@@ -221,7 +223,8 @@ describe('§3.1 tenant isolation sweep (e2e)', () => {
       operation: 'createMessage',
       seed: async () => ({ id: (await createTicket(fx.prisma, owner)).id }),
       run: (ids) =>
-        messages.createMessage(
+        createTestMessage(
+          messages,
           {
             ticketId: ids.id,
             content: 'Injected',

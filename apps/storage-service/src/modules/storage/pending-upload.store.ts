@@ -15,6 +15,20 @@ export const STORAGE_REDIS = Symbol('STORAGE_REDIS');
  */
 export type PendingUpload = {
   objectPath: string;
+  /**
+   * Where this object moves to on a successful confirm — 36-doc §1.3.2.
+   *
+   * **Decided at presign, not derived at confirm.** Both paths come out of
+   * `buildObjectPath`, so the two shapes are chosen in one place; computing the
+   * committed path at confirm would mean string surgery on a path built
+   * somewhere else, and the two would drift the first time either shape
+   * changed.
+   *
+   * Equal to `objectPath` for every purpose that does not segregate — only
+   * ticket attachments do, because they are the only ones a user can abandon
+   * before anything references them.
+   */
+  committedPath: string;
   organizationId: string;
   /** The caller who was authorized to write here. */
   actorId: string;

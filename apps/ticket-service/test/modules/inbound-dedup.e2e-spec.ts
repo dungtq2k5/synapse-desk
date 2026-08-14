@@ -1,7 +1,12 @@
+import { TicketPriority, TicketSource } from '@synapsedesk/grpc-proto';
 import { status as GrpcStatus } from '@grpc/grpc-js';
 import { expectRpc } from '@synapsedesk/common/testing/rpc';
-import { TicketPriority, TicketSource } from '@synapsedesk/grpc-proto';
-import { E2eFixture, bootstrapE2eTest, memberContext } from '../utils';
+import {
+  E2eFixture,
+  bootstrapE2eTest,
+  memberContext,
+  createTestMessage,
+} from '../utils';
 import { buildTenant, createTicket, TenantFixture } from '../factories';
 import { TicketsService } from '../../src/modules/tickets/tickets.service';
 import { MessagesService } from '../../src/modules/messages/messages.service';
@@ -165,7 +170,8 @@ describe('§31 §6.2 inbound email dedup (e2e)', () => {
   it('6. **a redelivered REPLY appends nothing twice**', async () => {
     const ticket = await createTicket(fx.prisma, tenant);
 
-    await messages.createMessage(
+    await createTestMessage(
+      messages,
       {
         ticketId: ticket.id,
         content: 'A reply by email',
@@ -177,7 +183,8 @@ describe('§31 §6.2 inbound email dedup (e2e)', () => {
     );
 
     await expectRpc(
-      messages.createMessage(
+      createTestMessage(
+        messages,
         {
           ticketId: ticket.id,
           content: 'A reply by email',

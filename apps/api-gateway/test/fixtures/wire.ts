@@ -2,6 +2,7 @@ import { faker } from '@faker-js/faker';
 import {
   AssignmentResponse,
   AttachmentResponse,
+  CreateMessageResponse,
   MessageResponse,
   ReassignmentReason as ProtoReassignmentReason,
   Gender as ProtoGender,
@@ -275,8 +276,25 @@ export function wireMessage(
     redactedAt: undefined,
     createdAt: timestamp(),
     attachments: [],
+    excludedFromAiContext: false,
+    answerStatus: undefined,
     ...overrides,
   };
+}
+
+/**
+ * What `CreateMessage` puts on the wire — 36-doc §1.3.1.
+ *
+ * A wrapper because a create has a second outcome: an attachment whose confirm
+ * failed is named and the message is written anyway. `skippedAttachments`
+ * defaults to empty, which is the ordinary case and keeps every test that
+ * predates the field reading as it did.
+ */
+export function wireCreatedMessage(
+  overrides: Partial<MessageResponse> = {},
+  skippedAttachments: string[] = [],
+): CreateMessageResponse {
+  return { message: wireMessage(overrides), skippedAttachments };
 }
 
 export function wireAttachment(

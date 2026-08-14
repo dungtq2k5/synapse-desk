@@ -61,4 +61,17 @@ export class TicketMessageResponseGqlDto {
 
   @Field(() => Date)
   createdAt!: Date;
+
+  /**
+   * How this AI message was produced — `REFUSED`, `DOC_ANSWER`, `DOC_MISSING`.
+   * Null for a human message.
+   *
+   * **Exposed here as well as on REST** — 36-doc §7. An agent scrolling a
+   * conversation should be able to tell a refusal from an escalation from a
+   * real answer, and that is true whichever transport they read it through.
+   * Before this it lived only in a WebSocket frame nobody persisted, so the
+   * distinction vanished the moment the socket closed.
+   */
+  @Field(() => String, { nullable: true })
+  answerStatus!: string | null;
 }

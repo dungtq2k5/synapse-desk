@@ -327,6 +327,7 @@ type Ticket {
 }
 
 type TicketMessage {
+  answerStatus: String
   completionTokens: Int
   content: String!
   createdAt: DateTime!

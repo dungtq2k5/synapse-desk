@@ -39,6 +39,37 @@ export class MessageResponseDto {
   redactedAt!: Date | null;
   createdAt!: Date;
   attachments!: AttachmentResponseDto[];
+  /**
+   * Kept OUT of AI prompts — 36-doc §7.
+   *
+   * Exposed rather than stripped: the transcript builder in `AiStreamService`
+   * filters on it AFTER fetching, because the same route serves the UI, where a
+   * refused message stays visible.
+   */
+  excludedFromAiContext!: boolean;
+  /** `REFUSED`, `DOC_ANSWER`, `DOC_MISSING` — null for a human message. */
+  answerStatus!: string | null;
+}
+
+/**
+ * What a create answers with — 36-doc §1.3.1.
+ *
+ * A wrapper because a create now has a second outcome: an attachment whose
+ * confirm failed is **skipped and named**, and the message is created anyway.
+ * The presign record lives ten minutes and a user writing a careful ticket
+ * around a screenshot takes longer than that often enough — so this list is
+ * routinely non-empty for an honest caller, not only for a forged path.
+ *
+ * Never merged into {@link MessageResponseDto}: every read would then carry a
+ * field only a create can populate.
+ */
+export class CreateMessageResponseDto {
+  message!: MessageResponseDto;
+  /**
+   * File NAMES, never object paths and never contents — the same rule the AI's
+   * own skipped list follows, and for the same reason: a user reads this.
+   */
+  skippedAttachments!: string[];
 }
 
 /**

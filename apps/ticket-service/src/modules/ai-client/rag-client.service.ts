@@ -4,6 +4,7 @@ import { ClientGrpc, RpcException } from '@nestjs/microservices';
 import { status } from '@grpc/grpc-js';
 import { firstValueFrom, timeout } from 'rxjs';
 import {
+  AttachmentPart,
   CallerContext,
   ConversationTurn,
   packRequestContext,
@@ -121,13 +122,25 @@ export class RagClientService implements OnModuleInit {
     history: ConversationTurn[],
     context: CallerContext,
     maxRetries = 1,
+    /**
+     * The last user message's attachments — 36-doc §2.
+     *
+     * Defaulted empty so a caller that has none says nothing, and so this
+     * signature reads the same on both `Draft` paths. Filtered and fetched by
+     * `AiAttachmentService`; by here they are already eligible and within
+     * budget.
+     */
+    attachments: AttachmentPart[] = [],
   ): Promise<AiReplyDraft> {
     const rag = this.require('AI reply drafting');
 
     const response = await this.call(() =>
       firstValueFrom(
         rag
-          .draft({ ticketId, history, maxRetries }, packRequestContext(context))
+          .draft(
+            { ticketId, history, maxRetries, attachments },
+            packRequestContext(context),
+          )
           .pipe(timeout(GENERATION_DEADLINE_MS)),
       ),
     );

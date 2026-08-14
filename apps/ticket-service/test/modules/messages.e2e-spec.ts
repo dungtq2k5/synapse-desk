@@ -13,6 +13,7 @@ import {
   bootstrapE2eTest,
   memberContext,
   pageRequest,
+  createTestMessage,
 } from '../utils';
 import {
   buildTenant,
@@ -168,7 +169,8 @@ describe('§2.5 Ticket messages & attachments (e2e)', () => {
       const ticket = await createTicket(fx.prisma, tenant);
 
       await expectRpc(
-        messages.createMessage(
+        createTestMessage(
+          messages,
           {
             ticketId: ticket.id,
             content: 'sneaky',
@@ -188,7 +190,8 @@ describe('§2.5 Ticket messages & attachments (e2e)', () => {
     it('1. posts and publishes ticket.message_created', async () => {
       const ticket = await createTicket(fx.prisma, tenant);
 
-      const message = await messages.createMessage(
+      const message = await createTestMessage(
+        messages,
         {
           ticketId: ticket.id,
           content: '  My printer is still on fire  ',
@@ -216,7 +219,8 @@ describe('§2.5 Ticket messages & attachments (e2e)', () => {
       // group nobody notices until a user reports duplicates.
       const ticket = await createTicket(fx.prisma, tenant);
 
-      await messages.createMessage(
+      await createTestMessage(
+        messages,
         {
           ticketId: ticket.id,
           content: 'hello',
@@ -237,7 +241,8 @@ describe('§2.5 Ticket messages & attachments (e2e)', () => {
       const ticket = await createTicket(fx.prisma, tenant);
 
       await expectRpc(
-        messages.createMessage(
+        createTestMessage(
+          messages,
           {
             ticketId: ticket.id,
             content: '   ',
@@ -254,7 +259,8 @@ describe('§2.5 Ticket messages & attachments (e2e)', () => {
       const ticket = await createTicket(fx.prisma, tenant);
 
       await expectRpc(
-        messages.createMessage(
+        createTestMessage(
+          messages,
           {
             ticketId: ticket.id,
             content: 'hi',
@@ -275,7 +281,8 @@ describe('§2.5 Ticket messages & attachments (e2e)', () => {
       });
 
       await expectRpc(
-        messages.createMessage(
+        createTestMessage(
+          messages,
           {
             ticketId: ticket.id,
             content: 'hi',
@@ -306,7 +313,8 @@ describe('§2.5 Ticket messages & attachments (e2e)', () => {
       const ticket = await createTicket(fx.prisma, tenant);
       const clientMessageId = faker.string.uuid();
 
-      const first = await messages.createMessage(
+      const first = await createTestMessage(
+        messages,
         {
           ticketId: ticket.id,
           content: 'Sent once, emitted twice',
@@ -316,7 +324,8 @@ describe('§2.5 Ticket messages & attachments (e2e)', () => {
         },
         author(),
       );
-      const second = await messages.createMessage(
+      const second = await createTestMessage(
+        messages,
         {
           ticketId: ticket.id,
           content: 'Sent once, emitted twice',
@@ -339,7 +348,8 @@ describe('§2.5 Ticket messages & attachments (e2e)', () => {
       const ticket = await createTicket(fx.prisma, tenant);
       const clientMessageId = faker.string.uuid();
       const send = () =>
-        messages.createMessage(
+        createTestMessage(
+          messages,
           {
             ticketId: ticket.id,
             content: 'Once',
@@ -365,7 +375,8 @@ describe('§2.5 Ticket messages & attachments (e2e)', () => {
       const ticket = await createTicket(fx.prisma, tenant);
       const clientMessageId = faker.string.uuid();
       const send = () =>
-        messages.createMessage(
+        createTestMessage(
+          messages,
           {
             ticketId: ticket.id,
             content: 'Racing',
@@ -396,11 +407,13 @@ describe('§2.5 Ticket messages & attachments (e2e)', () => {
         isInternalNote: false,
         invokeAi: false,
       };
-      const a = await messages.createMessage(
+      const a = await createTestMessage(
+        messages,
         { ...body, ticketId: first.id, clientMessageId },
         author(),
       );
-      const b = await messages.createMessage(
+      const b = await createTestMessage(
+        messages,
         { ...body, ticketId: second.id, clientMessageId },
         author(),
       );
@@ -419,8 +432,8 @@ describe('§2.5 Ticket messages & attachments (e2e)', () => {
         invokeAi: false,
       };
 
-      await messages.createMessage(body, author());
-      await messages.createMessage(body, author());
+      await createTestMessage(messages, body, author());
+      await createTestMessage(messages, body, author());
 
       await expect(
         fx.prisma.ticketMessage.count({ where: { ticketId: ticket.id } }),
@@ -438,7 +451,8 @@ describe('§2.5 Ticket messages & attachments (e2e)', () => {
 
       const ticket = await createTicket(fx.prisma, tenant);
 
-      const message = await messages.createMessage(
+      const message = await createTestMessage(
+        messages,
         {
           ticketId: ticket.id,
           content: 'Please help',
@@ -463,7 +477,8 @@ describe('§2.5 Ticket messages & attachments (e2e)', () => {
       const ticket = await createTicket(fx.prisma, tenant);
 
       await expect(
-        messages.createMessage(
+        createTestMessage(
+          messages,
           {
             ticketId: ticket.id,
             content: 'Please help',
@@ -485,7 +500,8 @@ describe('§2.5 Ticket messages & attachments (e2e)', () => {
       });
 
       const ticket = await createTicket(fx.prisma, tenant);
-      await messages.createMessage(
+      await createTestMessage(
+        messages,
         {
           ticketId: ticket.id,
           content: 'Please help',
@@ -519,7 +535,8 @@ describe('§2.5 Ticket messages & attachments (e2e)', () => {
       });
 
       const ticket = await createTicket(fx.prisma, tenant);
-      await messages.createMessage(
+      await createTestMessage(
+        messages,
         {
           ticketId: ticket.id,
           content: 'Please help',
@@ -541,7 +558,8 @@ describe('§2.5 Ticket messages & attachments (e2e)', () => {
       // would be noise that trains people to ignore it.
       const ticket = await createTicket(fx.prisma, tenant);
 
-      await messages.createMessage(
+      await createTestMessage(
+        messages,
         {
           ticketId: ticket.id,
           content: 'Please help',
@@ -771,12 +789,18 @@ describe('§2.5 Ticket messages & attachments (e2e)', () => {
         .spyOn(storage, 'presignAttachment')
         .mockResolvedValue({
           uploadUrl: 'https://storage.example/put',
-          objectPath: 'organizations/o/tickets/t/attachments/m/abc.png',
+          // Presign hands back a `pending/` path — 36-doc §1.3.2.
+          objectPath: 'organizations/o/tickets/t/attachments/pending/m/abc.png',
           expiresAt: new Date(Date.now() + 600_000),
         });
-      confirmUpload = jest
-        .spyOn(storage, 'confirmUpload')
-        .mockResolvedValue({ sizeBytes: 2048, contentType: 'image/png' });
+      confirmUpload = jest.spyOn(storage, 'confirmUpload').mockResolvedValue({
+        // And confirm hands back the COMMITTED one, which is what the row
+        // records. Stubbed with the move already applied, because that is what
+        // storage-service actually returns.
+        objectPath: 'organizations/o/tickets/t/attachments/m/abc.png',
+        sizeBytes: 2048,
+        contentType: 'image/png',
+      });
       resolveReadUrls = jest
         .spyOn(storage, 'resolveReadUrls')
         .mockImplementation((paths) =>
@@ -878,6 +902,8 @@ describe('§2.5 Ticket messages & attachments (e2e)', () => {
       const ticket = await createTicket(fx.prisma, tenant);
       const message = await createMessage(fx.prisma, ticket.id);
       confirmUpload.mockResolvedValue({
+        // The committed path, which is what the row records — 36-doc §1.3.2.
+        objectPath: 'organizations/o/t/a/real.pdf',
         sizeBytes: 9999,
         contentType: 'application/pdf',
       });
@@ -1091,7 +1117,8 @@ describe('§2.5 Ticket messages & attachments (e2e)', () => {
       const ticket = await createTicket(fx.prisma, tenant);
       const generationId = faker.string.uuid();
 
-      const message = await messages.createMessage(
+      const message = await createTestMessage(
+        messages,
         {
           ticketId: ticket.id,
           content: 'Have you tried restarting it?',
@@ -1118,7 +1145,8 @@ describe('§2.5 Ticket messages & attachments (e2e)', () => {
       // required field here would break the ordinary path.
       const ticket = await createTicket(fx.prisma, tenant);
 
-      const message = await messages.createMessage(
+      const message = await createTestMessage(
+        messages,
         {
           ticketId: ticket.id,
           content: 'Typed from scratch',
@@ -1140,7 +1168,8 @@ describe('§2.5 Ticket messages & attachments (e2e)', () => {
       recordOutcome.mockResolvedValue(null);
       const ticket = await createTicket(fx.prisma, tenant);
 
-      const message = await messages.createMessage(
+      const message = await createTestMessage(
+        messages,
         {
           ticketId: ticket.id,
           content: 'Sent anyway',

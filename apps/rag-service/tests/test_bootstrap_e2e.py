@@ -94,3 +94,79 @@ class TestServicerWiring:
 
         missing = {name for name in declared if not hasattr(servicer, name)}
         assert missing == set(), f"servicer is missing: {sorted(missing)}"
+
+
+class TestTheGrpcCeilingMatchesTheTypeScriptHalf:
+    """35-doc §7.1 — the one constant where a MISSING value was the bug.
+
+    Every TypeScript client and server applies `GRPC_CHANNEL_OPTIONS`, so both
+    ends of a Node-to-Node call agree. `grpc.aio.server()` takes no options,
+    which left this server at gRPC's 4 MB default — worse than a low limit
+    everyone shares, because a caller configured for 10 MB sends a request it
+    has every reason to believe is fine and gets RESOURCE_EXHAUSTED back.
+
+    Read out of the TypeScript source rather than restated, for the same reason
+    the OCR image check reads its language list from the mapping: a test that
+    hard-codes 10 MB agrees with a drifted constant instead of catching it.
+    """
+
+    def _typescript_options(self) -> dict[str, int]:
+        import re
+        from pathlib import Path
+
+        source = (
+            Path(__file__).resolve().parents[3]
+            / "libs"
+            / "grpc-proto"
+            / "src"
+            / "constants.ts"
+        ).read_text()
+
+        block = re.search(
+            r"GRPC_CHANNEL_OPTIONS\s*=\s*\{(.*?)\}", source, re.DOTALL
+        )
+        assert block, "GRPC_CHANNEL_OPTIONS not found — has it moved?"
+
+        found: dict[str, int] = {}
+        for name, expression in re.findall(
+            r"(\w+):\s*([0-9_ */]+),", block.group(1)
+        ):
+            # `10 * 1024 * 1024` and `30_000` both appear; both are arithmetic
+            # over integer literals and nothing else.
+            found[name] = int(eval(expression.replace("_", "")))
+
+        return found
+
+    def test_the_message_ceiling_matches(self):
+        from rag_service.common.metadata import GRPC_MAX_MESSAGE_BYTES
+
+        options = self._typescript_options()
+
+        assert options["maxReceiveMessageLength"] == GRPC_MAX_MESSAGE_BYTES
+        assert options["maxSendMessageLength"] == GRPC_MAX_MESSAGE_BYTES
+
+    def test_the_keepalive_values_match(self):
+        from rag_service.common.metadata import (
+            GRPC_KEEPALIVE_TIME_MS,
+            GRPC_KEEPALIVE_TIMEOUT_MS,
+        )
+
+        options = self._typescript_options()
+
+        assert options["keepaliveTime"] == GRPC_KEEPALIVE_TIME_MS
+        assert options["keepaliveTimeout"] == GRPC_KEEPALIVE_TIMEOUT_MS
+
+    def test_the_server_is_actually_constructed_with_them(self):
+        """The mirror being right is worth nothing if nothing passes it.
+
+        Python spells these as dotted strings, so a camelCase key would be
+        accepted and silently ignored — which is the failure this whole section
+        exists to prevent, reintroduced one layer down.
+        """
+        from rag_service.common.metadata import GRPC_SERVER_OPTIONS
+
+        keys = dict(GRPC_SERVER_OPTIONS)
+
+        assert keys["grpc.max_receive_message_length"] == 10 * 1024 * 1024
+        assert keys["grpc.max_send_message_length"] == 10 * 1024 * 1024
+        assert all(key.startswith("grpc.") for key in keys)

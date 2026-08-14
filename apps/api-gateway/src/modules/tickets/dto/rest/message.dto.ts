@@ -1,5 +1,7 @@
 import { Transform, Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
+  IsArray,
   IsBoolean,
   IsIn,
   IsInt,
@@ -9,11 +11,15 @@ import {
   MaxLength,
   Min,
   MinLength,
+  ValidateNested,
 } from 'class-validator';
 import {
   ALLOWED_ATTACHMENT_MIME_TYPES,
   MAX_ATTACHMENT_BYTES,
+  MAX_ATTACHMENT_FILE_NAME_LENGTH,
+  MAX_ATTACHMENTS_PER_MESSAGE,
   MAX_MESSAGE_CONTENT_LENGTH,
+  MAX_OBJECT_PATH_LENGTH,
   trimIfString,
 } from '@synapsedesk/common';
 import { SearchPaginationDto } from '../../../../common/dto/rest/search-pagination.dto';
@@ -50,6 +56,47 @@ export class CreateMessageDto {
   @IsBoolean()
   @ToBoolean()
   readonly invokeAi?: boolean = false;
+
+  /**
+   * Objects already uploaded, bound to this message as it is created — 36-doc
+   * §1.3.
+   *
+   * **This is the ordering that makes a first-turn attachment readable.**
+   * Presign then confirm-against-a-message meant the row could only exist after
+   * the message did, while `invokeAi` runs during the create — so the very
+   * screenshot the question was about arrived a moment too late to be seen.
+   *
+   * A path that fails its confirm comes back in `skippedAttachments` and the
+   * message is still created; §1.3.1 is why that is the only safe outcome.
+   */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(MAX_ATTACHMENTS_PER_MESSAGE)
+  @ValidateNested({ each: true })
+  @Type(() => NewAttachmentDto)
+  readonly attachments?: NewAttachmentDto[];
+}
+
+/**
+ * One uploaded object, waiting to be bound.
+ *
+ * **No size and no MIME type**, deliberately: both are read back from the
+ * object at confirm rather than taken from the client. Accepting them here
+ * would invite a row that records whatever the caller felt like claiming — the
+ * rule `confirmAttachment` already states and this must not quietly undo.
+ */
+export class NewAttachmentDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(MAX_OBJECT_PATH_LENGTH)
+  @Transform(trimIfString)
+  readonly objectPath!: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(MAX_ATTACHMENT_FILE_NAME_LENGTH)
+  @Transform(trimIfString)
+  readonly fileName!: string;
 }
 
 export class UpdateMessageDto {
@@ -82,12 +129,12 @@ export class ConfirmAttachmentDto {
    */
   @IsString()
   @MinLength(1)
-  @MaxLength(1024)
+  @MaxLength(MAX_OBJECT_PATH_LENGTH)
   readonly objectPath!: string;
 
   @IsString()
   @MinLength(1)
-  @MaxLength(255)
+  @MaxLength(MAX_ATTACHMENT_FILE_NAME_LENGTH)
   @Transform(trimIfString)
   readonly fileName!: string;
 }
@@ -95,7 +142,7 @@ export class ConfirmAttachmentDto {
 export class UploadAttachmentDto {
   @IsString()
   @MinLength(1)
-  @MaxLength(255)
+  @MaxLength(MAX_ATTACHMENT_FILE_NAME_LENGTH)
   @Transform(trimIfString)
   readonly fileName!: string;
 

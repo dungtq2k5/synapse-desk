@@ -41,7 +41,17 @@ describe('§2 REST and GraphQL DTOs are independent but not divergent', () => {
       gqlClass: 'TicketMessageResponseGqlDto',
       // Internal object paths resolved per request — publishing them would
       // advertise the storage layout and hand clients a value that does not work.
-      restOnly: ['attachments'],
+      //
+      // `excludedFromAiContext` is REST-only BY DECISION — 36-doc §7. It is on
+      // the REST shape for ONE consumer: `AiStreamService.transcript()`, which
+      // filters on it after fetching because the same route serves the UI where
+      // the row must stay visible. No client has a use for it, and publishing it
+      // would advertise an internal detail of the AI pipeline as product API.
+      //
+      // `answerStatus` is deliberately NOT here — it reached the schema, because
+      // telling a refusal from an answer is something any client reading a
+      // thread needs.
+      restOnly: ['attachments', 'excludedFromAiContext'],
     },
     {
       name: 'User',
@@ -218,7 +228,7 @@ describe('§2 REST and GraphQL DTOs are independent but not divergent', () => {
 
     it('and every `@Field()` names its GraphQL type explicitly', () => {
       // `number` cannot distinguish `Int` from `Float`, nor `string` an `ID`
-      // from a `String`. Both serialise identically, so a wrong inference is
+      // from a `String`. Both serialize identically, so a wrong inference is
       // invisible until a client generates types from the schema.
       expect(result.inferredFields).toEqual([]);
     });

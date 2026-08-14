@@ -14,6 +14,7 @@ they enforce the same rule.
 from __future__ import annotations
 
 import asyncio
+import os
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -29,6 +30,7 @@ from qdrant_client.http import models as qm
 
 from rag_service.common.caller_context import CallerContext
 from rag_service.config import load_config
+from rag_service.generation.parts import Prompt, prompt_text
 from rag_service.qdrant.collection import (
     COLLECTION_NAME,
     EMBEDDING_DIMENSION,
@@ -41,7 +43,45 @@ from tests.fakes import FakeAbort
 #: incremented.
 _CYCLE_START = datetime(2026, 8, 1, tzinfo=timezone.utc)
 
-load_dotenv(Path(__file__).resolve().parents[1] / ".env.test")
+_SERVICE_ROOT = Path(__file__).resolve().parents[1]
+
+load_dotenv(_SERVICE_ROOT / ".env.test")
+
+
+def _borrow_api_key_from_dev_env() -> None:
+    """Fills in `GEMINI_API_KEY` from `.env` when `.env.test` has none.
+
+    **One named key, not the whole file.** `load_dotenv(".env")` as a fallback
+    would also fill in every OTHER value `.env.test` happens to omit — the dev
+    Qdrant URL, the dev database — and a test suite silently pointed at a
+    developer's own Postgres is a worse problem than the one being solved.
+
+    **Why this exists at all:** the acceptance test for attachments
+    (`test_multimodal_e2e.py`) needs a real cheap-tier call, and 36-doc's build
+    order says the feature is finished when it passes. It skipped in every
+    normal run because the credential lived one file over. Borrowing it here
+    means the gate runs where the claim is made, without copying a secret into
+    a second file.
+
+    A real environment variable always wins — `load_dotenv` does not override
+    one, and neither does this — so CI supplies its own and nothing here
+    interferes.
+    """
+    if os.environ.get("GEMINI_API_KEY"):
+        return
+
+    dev_env = _SERVICE_ROOT / ".env"
+    if not dev_env.exists():
+        return
+
+    for line in dev_env.read_text().splitlines():
+        name, separator, value = line.partition("=")
+        if separator and name.strip() == "GEMINI_API_KEY":
+            os.environ["GEMINI_API_KEY"] = value.strip().strip("\"'")
+            return
+
+
+_borrow_api_key_from_dev_env()
 
 
 @dataclass
@@ -433,12 +473,16 @@ class ScriptedGenerator:
         #: INJECTION, and a fake that always says FACTUAL cannot exercise the
         #: other two. Empty means the old behaviour.
         self.answers: list[str] = []
+        #: Every prompt as given, parts included. `calls` keeps only the text,
+        #: which cannot answer "did the file go?" — 36-doc §4.
+        self.prompts: list[Prompt] = []
         self.fail_next: Exception | None = None
 
-    async def stream(self, prompt: str, model: str, max_output_tokens: int):
+    async def stream(self, prompt: Prompt, model: str, max_output_tokens: int):
         from rag_service.generation.corag import GenerationDelta
 
-        self.calls.append((prompt, model))
+        self.calls.append((prompt_text(prompt), model))
+        self.prompts.append(prompt)
 
         size = max(1, len(self.answer) // 4)
         for start in range(0, len(self.answer), size):
@@ -446,10 +490,11 @@ class ScriptedGenerator:
 
         yield GenerationDelta(done=True, prompt_tokens=800, completion_tokens=40)
 
-    async def generate(self, prompt: str, model: str, max_output_tokens: int):
+    async def generate(self, prompt: Prompt, model: str, max_output_tokens: int):
         from rag_service.preprocess.pipeline import GenerationOutput
 
-        self.calls.append((prompt, model))
+        self.calls.append((prompt_text(prompt), model))
+        self.prompts.append(prompt)
 
         if self.fail_next is not None:
             error, self.fail_next = self.fail_next, None

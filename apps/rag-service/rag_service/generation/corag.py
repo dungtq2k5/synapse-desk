@@ -24,12 +24,15 @@ from typing import Protocol
 
 from rag_service.enums import AiGenerationPurpose, AiGenerationStatus
 from rag_service.generation.boundary import (
+    attachment_instruction,
     boundary_instruction,
     new_nonce,
     scrub_boundary,
+    wrap_attachments,
     wrap_question,
     wrap_sources,
 )
+from rag_service.generation.parts import Attachment, Prompt
 from rag_service.generation.review import (
     REFINE_MAX_TOKENS,
     REVIEW_MAX_TOKENS,
@@ -77,7 +80,7 @@ class StreamingGenerator(Protocol):
 
     def stream(
         self,
-        prompt: str,
+        prompt: Prompt,
         model: str,
         max_output_tokens: int,
         # Unquoted despite GenerationDelta being defined below: the
@@ -125,17 +128,64 @@ DOC_MISSING_NO_HANDOFF = (
 HANDOFF_CAPABLE_PURPOSES = frozenset({"CHAT_ANSWER_TICKET", "DRAFT"})
 
 
-def doc_missing_answer(purpose: str, *, can_escalate: bool) -> str:
-    """The refusal text for a surface. Never invents, never over-promises."""
+#: The longest run of reformulated text that may appear in a refusal.
+#:
+#: The terms are a MODEL's output derived from a user's file, so the length is
+#: whatever the cheap tier felt like producing. A refusal is a short sentence a
+#: human skims; a paragraph of model output pasted into a support thread is
+#: neither useful nor obviously bounded.
+MAX_REPORTED_TERMS = 120
+
+
+def doc_missing_answer(
+    purpose: str,
+    *,
+    can_escalate: bool,
+    search_terms: str | None = None,
+) -> str:
+    """The refusal text for a surface. Never invents, never over-promises.
+
+    **With an attachment it also says what the file appeared to show** — 36-doc
+    §6.1. Retrieval can genuinely find nothing: the knowledge base may have no
+    article on that error, and improvising a policy stays worse than admitting
+    the gap. But by this point the system has computed something an agent wants
+    — the error code lifted out of the screenshot — and dropping it means a
+    human opens the ticket, opens the image, and reads the code the system
+    already read.
+
+    **In the answer, not in the escalation RPC.** `EscalateTicket` takes a
+    ticket id and nothing else; adding a text field would be a proto change for
+    a string with a better home. This text is already persisted by `appendAi`,
+    so putting it here puts it in the thread, where the agent is already
+    looking.
+    """
     _ = purpose
 
-    return DOC_MISSING_WITH_HANDOFF if can_escalate else DOC_MISSING_NO_HANDOFF
+    base = DOC_MISSING_WITH_HANDOFF if can_escalate else DOC_MISSING_NO_HANDOFF
+    if not search_terms:
+        return base
+
+    # **Scrubbed and fenced, because this is untrusted text going to a human.**
+    # It came out of a model that read a user's file, and it lands in a support
+    # thread rendered as Markdown. `scrub_boundary` removes any delimiter the
+    # model echoed — a `</question id="…">` surfacing in a support reply is a
+    # leak of the prompt's shape — and the backticks stop the rest being read as
+    # formatting.
+    terms = scrub_boundary(search_terms).strip()[:MAX_REPORTED_TERMS].strip()
+    if not terms:
+        return base
+
+    return f"{base} The file appears to show `{terms}`."
 
 
 MAX_ANSWER_TOKENS = 1_024
 
 
-def build_prompt(query: str, chunks: list[HydratedChunk]) -> str:
+def build_prompt(
+    query: str,
+    chunks: list[HydratedChunk],
+    attachments: list[Attachment] | None = None,
+) -> Prompt:
     """The grounding prompt.
 
     Each chunk is numbered so the model can cite by index, and the instruction
@@ -144,6 +194,15 @@ def build_prompt(query: str, chunks: list[HydratedChunk]) -> str:
     catches an empty retrieval, and this catches the case where chunks were
     retrieved but none of them actually answer the question — which no amount
     of retrieval logic can detect.
+
+    **Attachments arrive as PARTS, listed inside the boundary** — 36-doc §6.
+    The user asked about the screenshot, so the answering call has to see it;
+    what the block and its instruction add is that it is material to read rather
+    than an instruction to follow, and — the half that matters — **never a
+    source to cite**.
+
+    Returns a `Prompt`: a bare `str` when there are no attachments, so every
+    existing caller and every existing test is unchanged.
     """
     context = "\n\n".join(
         f'[{index + 1}] (from "{chunk.document_title}"'
@@ -152,9 +211,10 @@ def build_prompt(query: str, chunks: list[HydratedChunk]) -> str:
         for index, chunk in enumerate(chunks)
     )
 
+    parts = attachments or []
     nonce = new_nonce()
 
-    return (
+    text = (
         "You are a support assistant. Answer the user's question using ONLY the "
         "numbered sources below.\n" + boundary_instruction(nonce) +
         # 33-doc §4.3 — the boundary, stated where the grounding rules are,
@@ -210,9 +270,20 @@ def build_prompt(query: str, chunks: list[HydratedChunk]) -> str:
         "strings, and **bold** for the single most important fact. Do not use "
         "headings — the answer is rendered inside an existing page. Never wrap "
         "the whole answer in a code fence.\n\n"
-        f"{wrap_sources(context, nonce)}\n\n"
-        f"{wrap_question(query, nonce)}\n\nANSWER:"
+        + (attachment_instruction(nonce) if parts else "")
+        + f"{wrap_sources(context, nonce)}\n\n"
+        + (
+            f"{wrap_attachments([part.file_name for part in parts], nonce)}\n\n"
+            if parts
+            else ""
+        )
+        + f"{wrap_question(query, nonce)}\n\nANSWER:"
     )
+
+    # The parts follow the text, so the boundary and its instruction are already
+    # in view when the file arrives — the same ordering `_reformulate` and the
+    # fused Layer 2 use.
+    return [text, *parts] if parts else text
 
 
 def strip_code_spans(markdown: str) -> str:
@@ -396,6 +467,7 @@ class CoRagGenerator:
         user_id: str | None = None,
         ticket_id: str | None = None,
         can_escalate: bool = True,
+        attachments: list[Attachment] | None = None,
     ) -> AsyncIterator[GenerationDelta | GeneratedAnswer]:
         """Yields token deltas, then ONE `GeneratedAnswer` as the last item.
 
@@ -415,7 +487,14 @@ class CoRagGenerator:
         """
         if not chunks:
             answer = GeneratedAnswer(
-                content=doc_missing_answer(purpose, can_escalate=can_escalate),
+                content=doc_missing_answer(
+                    purpose,
+                    can_escalate=can_escalate,
+                    # The reformulated query, and ONLY when a file was sent —
+                    # 36-doc §6.1. Without an attachment the query is the user's
+                    # own question, and repeating it back to them says nothing.
+                    search_terms=query if attachments else None,
+                ),
                 status="DOC_MISSING",
                 citations=[],
             )
@@ -435,7 +514,7 @@ class CoRagGenerator:
             yield answer
             return
 
-        prompt = build_prompt(query, chunks)
+        prompt = build_prompt(query, chunks, attachments)
         parts: list[str] = []
         prompt_tokens = 0
         completion_tokens = 0
@@ -538,6 +617,7 @@ class CoRagGenerator:
         max_retries: int,
         user_id: str | None = None,
         ticket_id: str | None = None,
+        attachments: list[Attachment] | None = None,
     ) -> GeneratedAnswer:
         """Draft, review, refine — 13-doc §4.2, the co-pilot's differentiator.
 
@@ -563,7 +643,15 @@ class CoRagGenerator:
             retrieved_chunk_ids=retrieved_chunk_ids,
             user_id=user_id,
             ticket_id=ticket_id,
+            attachments=attachments,
         )
+
+        # **The review and refine passes get NO attachments**, deliberately.
+        # They judge an answer against the SOURCES — that is the yardstick — and
+        # re-sending an image on every retry would multiply the cost of the one
+        # surface that retries at all, to re-examine material the drafting call
+        # already read. What a review catches is an answer unsupported by the
+        # sources, which is a text question.
 
         # An empty retrieval never gets reviewed. There is nothing to review
         # against — the sources are the yardstick — and paying a model to
@@ -694,7 +782,7 @@ class CoRagGenerator:
 
     async def _one_pass(
         self,
-        prompt: str,
+        prompt: Prompt,
         model: str,
         max_output_tokens: int,
         *,

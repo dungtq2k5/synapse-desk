@@ -14,6 +14,7 @@ import { status as GrpcStatus } from '@grpc/grpc-js';
 import {
   grpcError,
   timestamp,
+  wireMessage,
   wirePage,
   wireUser,
   wireUserProjection,
@@ -34,40 +35,40 @@ import { compareAlphabetically } from '@synapsedesk/common';
  * run before execution, and that the REST envelope stays off. The entity graph
  * is 26-doc's.
  */
-/**
- * A `ConfigService` that answers `production` for `NODE_ENV` and defers
- * everything else to the real one.
- *
- * A wrapper rather than `process.env.NODE_ENV = 'production'`: the env variable
- * is read by Joi at module init, by the throttler, by the logger and by Swagger,
- * and setting it globally would boot a differently-configured app whose failure
- * could be any of them.
- */
-/** The committed SDL, which the drift test above keeps current. */
-const schemaSdl = () => readFileSync(SCHEMA_PATH, 'utf8');
-
-/**
- * `git`, by absolute path, run with a PATH containing only system directories.
- *
- * `execFileSync` takes no shell, so the ARGUMENTS below cannot be injected —
- * but a bare `'git'` is still resolved through the inherited `PATH`, and any
- * writable directory earlier in it would supply the binary instead. Naming the
- * absolute path settles which program runs; pinning the environment settles it
- * for anything that program then shells out to itself.
- */
-const GIT = '/usr/bin/git';
-const FIXED_PATH_ENV = { ...process.env, PATH: '/usr/bin:/bin' };
-
-const productionConfig = (real: ConfigService): ConfigService =>
-  ({
-    get: <T>(key: string, fallback?: T) =>
-      key === 'NODE_ENV' ? ('production' as T) : real.get<T>(key, fallback!),
-    getOrThrow: <T>(key: string) =>
-      key === 'NODE_ENV' ? ('production' as T) : real.getOrThrow<T>(key),
-  }) as unknown as ConfigService;
-
 describe('§25 the GraphQL surface (e2e)', () => {
   let fx: E2eFixture;
+
+  /** The committed SDL, which the drift test above keeps current. */
+  const schemaSdl = () => readFileSync(SCHEMA_PATH, 'utf8');
+
+  /**
+   * `git`, by absolute path, run with a PATH containing only system directories.
+   *
+   * `execFileSync` takes no shell, so the ARGUMENTS below cannot be injected —
+   * but a bare `'git'` is still resolved through the inherited `PATH`, and any
+   * writable directory earlier in it would supply the binary instead. Naming the
+   * absolute path settles which program runs; pinning the environment settles it
+   * for anything that program then shells out to itself.
+   */
+  const GIT = '/usr/bin/git';
+  const FIXED_PATH_ENV = { ...process.env, PATH: '/usr/bin:/bin' };
+
+  /**
+   * A `ConfigService` that answers `production` for `NODE_ENV` and defers
+   * everything else to the real one.
+   *
+   * A wrapper rather than `process.env.NODE_ENV = 'production'`: the env variable
+   * is read by Joi at module init, by the throttler, by the logger and by Swagger,
+   * and setting it globally would boot a differently-configured app whose failure
+   * could be any of them.
+   */
+  const productionConfig = (real: ConfigService): ConfigService =>
+    ({
+      get: <T>(key: string, fallback?: T) =>
+        key === 'NODE_ENV' ? ('production' as T) : real.get<T>(key, fallback!),
+      getOrThrow: <T>(key: string) =>
+        key === 'NODE_ENV' ? ('production' as T) : real.getOrThrow<T>(key),
+    }) as unknown as ConfigService;
 
   const gql = (query: string, variables?: Record<string, unknown>) =>
     request(fx.app.getHttpServer()).post('/graphql').send({ query, variables });
@@ -865,16 +866,13 @@ describe('§25 the GraphQL surface (e2e)', () => {
       fx.stubs.message.listMessages.mockReturnValue(
         of(
           wirePage(
-            Array.from({ length: 5 }, () => ({
-              id: faker.string.uuid(),
-              ticketId,
-              senderId: agentId,
-              content: 'Still smoking.',
-              isAiGenerated: false,
-              isInternalNote: false,
-              attachments: [],
-              createdAt: timestamp(),
-            })),
+            Array.from({ length: 5 }, () =>
+              wireMessage({
+                ticketId,
+                senderId: agentId,
+                content: 'Still smoking.',
+              }),
+            ),
           ),
         ),
       );

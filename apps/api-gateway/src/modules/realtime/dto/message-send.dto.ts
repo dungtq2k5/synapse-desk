@@ -1,12 +1,20 @@
+import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
+  IsArray,
   IsBoolean,
   IsOptional,
   IsString,
   IsUUID,
   MaxLength,
   MinLength,
+  ValidateNested,
 } from 'class-validator';
-import { MAX_MESSAGE_CONTENT_LENGTH } from '@synapsedesk/common';
+import {
+  MAX_ATTACHMENTS_PER_MESSAGE,
+  MAX_MESSAGE_CONTENT_LENGTH,
+} from '@synapsedesk/common';
+import { NewAttachmentDto } from '../../tickets/dto/rest/message.dto';
 
 /**
  * The `message:send` payload — 22-doc §2.
@@ -50,4 +58,23 @@ export class MessageSendDto {
   @IsOptional()
   @IsBoolean()
   readonly invokeAi?: boolean;
+
+  /**
+   * Objects already uploaded, bound as this message is created — 36-doc §1.3.
+   *
+   * **The socket needs this as much as HTTP does**, and more: this is the
+   * surface where a customer attaches a screenshot and asks about it in the
+   * same breath, and where `invokeAi` streams an answer moments later. Without
+   * it the answer is generated before the file it is about is bound.
+   *
+   * Nested validation is explicit here for the reason the class docblock gives
+   * — a socket frame reaches no ValidationPipe unless the handler wires one, so
+   * an unvalidated array would reach an RPC as whatever the client sent.
+   */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(MAX_ATTACHMENTS_PER_MESSAGE)
+  @ValidateNested({ each: true })
+  @Type(() => NewAttachmentDto)
+  readonly attachments?: NewAttachmentDto[];
 }

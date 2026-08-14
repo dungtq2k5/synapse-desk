@@ -689,7 +689,13 @@ export class RealtimeGateway
   private async sendMessage(
     client: Socket,
     body: unknown,
-  ): Promise<WsResponse<{ messageId: string; streamId?: string }>> {
+  ): Promise<
+    WsResponse<{
+      messageId: string;
+      streamId?: string;
+      skippedAttachments: string[];
+    }>
+  > {
     const payload = this.requireUser(client);
     await this.requireEventBudget(client, CLIENT_EVENTS.messageSend);
 
@@ -705,7 +711,7 @@ export class RealtimeGateway
       throw new WsException('No ticket with that id');
     }
 
-    const message = await this.messages.create(
+    const { message, skippedAttachments } = await this.messages.create(
       dto.ticketId,
       {
         content: dto.content,
@@ -716,6 +722,10 @@ export class RealtimeGateway
         // so one question would produce two answers: one streamed here, one
         // not. This path takes the AI over; it does not add to it.
         invokeAi: false,
+        // Bound as the message is written, so the stream opened below sees them
+        // — 36-doc §1.3. This handler is the one place where the write and the
+        // answer are close enough together for the ordering to matter.
+        attachments: dto.attachments,
       },
       this.requestContext(client, payload),
       dto.clientMessageId,
@@ -731,7 +741,17 @@ export class RealtimeGateway
     // is already true. Waiting for the generation would put the whole answer
     // latency back into the ack — the exact latency streaming exists to hide.
     const streamId = dto.invokeAi
-      ? await this.startAnswerStream(client, dto.ticketId, dto.content, payload)
+      ? await this.startAnswerStream(
+          client,
+          dto.ticketId,
+          dto.content,
+          payload,
+          // The message just written, so its attachments can reach the model —
+          // 36-doc §2. Passed rather than looked up: this handler already holds
+          // the id, and re-reading the ticket's newest row would race with a
+          // second message arriving between the write and the stream.
+          message.id,
+        )
       : undefined;
 
     // The ack, and nothing more besides the stream handle. A duplicate
@@ -741,7 +761,12 @@ export class RealtimeGateway
     return {
       success: true,
       message: 'Message sent',
-      data: { messageId: message.id, streamId },
+      // **On the ack, not as a separate frame.** A file that did not confirm is
+      // an outcome of THIS send, and the client is already awaiting this
+      // response — 36-doc §1.3.1. `ai:stream:attachments-skipped` answers a
+      // different question (the model could not read it) and would be the wrong
+      // channel for "it was never attached".
+      data: { messageId: message.id, streamId, skippedAttachments },
     };
   }
 
@@ -758,6 +783,7 @@ export class RealtimeGateway
     ticketId: string,
     content: string,
     payload: JwtPayload,
+    messageId: string,
   ): Promise<string | undefined> {
     try {
       return await this.aiStreams.start(
@@ -765,6 +791,7 @@ export class RealtimeGateway
         ticketId,
         content,
         this.requestContext(client, payload),
+        messageId,
       );
     } catch (error) {
       this.logger.error(

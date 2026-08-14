@@ -20,6 +20,7 @@ import { TicketsGrpcClient } from '../tickets/tickets-grpc.client';
 import { ListMessagesQueryDto } from '../tickets/dto/rest/message.dto';
 import { REALTIME_EVENTS } from './realtime.config';
 import {
+  AiStreamAttachmentsSkippedPayloadDto,
   AiStreamChunkPayloadDto,
   AiStreamDonePayloadDto,
   AiStreamErrorPayloadDto,
@@ -102,6 +103,15 @@ export class AiStreamService implements OnModuleInit {
     ticketId: string,
     question: string,
     context: RequestContext,
+    /**
+     * The message this question was stored as — 36-doc §2.
+     *
+     * Optional so the one existing caller that has no message (a retry, a test)
+     * still compiles, and because a question with no attachments is the common
+     * case: an absent id and a message with no files produce the same empty
+     * list and the same zero downloads.
+     */
+    messageId?: string,
   ): Promise<string> {
     // The thread so far, so the answer replies to the conversation rather than
     // to its last line. Read through the same client the REST list route uses,
@@ -110,13 +120,36 @@ export class AiStreamService implements OnModuleInit {
     // generated from.
     const history = await this.transcript(ticketId, context);
 
+    // **Asked for, not fetched.** This service has no storage client, and
+    // ticket-service already does the identical filter-and-fetch for its two
+    // `Draft` call sites — 36-doc §2. Eligibility is decided from the row
+    // there, so an attached zip never costs a download.
+    const attachments = messageId
+      ? await this.messages.aiAttachments(messageId, context)
+      : { parts: [], skipped: [] };
+
+    if (attachments.skipped.length > 0) {
+      // **Told, not silently dropped** — 36-doc §2.2, the same rule 31-doc §5
+      // applies to email attachments the worker could not carry. "It ignored my
+      // file" is something a user discovers before you do.
+      this.notifySkipped(client, ticketId, attachments.skipped);
+    }
+
     const streamId = randomUUID();
     const tokens: string[] = [];
     let completed = false;
 
     const subscription = this.ragService
       .chat(
-        { message: question, history, ticketId },
+        // The bytes came from ticket-service above rather than from storage
+        // here — this service still has no storage client, and its own
+        // attachment route hands the client a signed URL rather than bytes.
+        {
+          message: question,
+          history,
+          ticketId,
+          attachments: attachments.parts,
+        },
         packRequestContext(context),
       )
       .subscribe({
@@ -133,21 +166,28 @@ export class AiStreamService implements OnModuleInit {
             // rejected promise here would surface as an unhandled rejection
             // rather than as an `ai:stream:error`. `settle` owns its own
             // failure path.
-            void this.settle(client, streamId, ticketId, context, {
-              status: chunk.completion.status,
-              // The whole answer as the service assembled it. Authoritative,
-              // and NOT the tokens re-joined here — reassembling client-side
-              // would make a dropped frame silently shorten the stored message.
-              //
-              // The join is the fallback for one real case: a completion frame
-              // that carries a status but no content, where the tokens are all
-              // that was ever produced. Persisting `''` there would fail the
-              // content check and lose an answer the user already watched
-              // arrive.
-              content: chunk.completion.content || tokens.join(''),
-              citations: chunk.completion.citations,
-              generationId: chunk.completion.generationId || undefined,
-            });
+            void this.settle(
+              client,
+              streamId,
+              ticketId,
+              context,
+              {
+                status: chunk.completion.status,
+                // The whole answer as the service assembled it. Authoritative,
+                // and NOT the tokens re-joined here — reassembling client-side
+                // would make a dropped frame silently shorten the stored message.
+                //
+                // The join is the fallback for one real case: a completion frame
+                // that carries a status but no content, where the tokens are all
+                // that was ever produced. Persisting `''` there would fail the
+                // content check and lose an answer the user already watched
+                // arrive.
+                content: chunk.completion.content || tokens.join(''),
+                citations: chunk.completion.citations,
+                generationId: chunk.completion.generationId || undefined,
+              },
+              messageId,
+            );
           }
         },
         error: (error: unknown) => {
@@ -254,6 +294,8 @@ export class AiStreamService implements OnModuleInit {
       citations: Citation[];
       generationId?: string;
     },
+    /** The message that was asked — needed only on the refusal path, §7. */
+    messageId?: string,
   ): Promise<void> {
     this.forget(client, streamId);
 
@@ -285,11 +327,28 @@ export class AiStreamService implements OnModuleInit {
         return;
       }
 
+      // **The write-back, on the refusal path only** — 36-doc §7. The gateway
+      // is the one that holds this id, so the gateway is the one that sets the
+      // flag: without it the refused question stays in the transcript and every
+      // later turn in this conversation re-sends it to the model.
+      //
+      // Before the append, so a failure here surfaces through the same catch
+      // rather than after a message the client has already been told about.
+      if (
+        completion.status === AnswerStatus.ANSWER_STATUS_REFUSED &&
+        messageId
+      ) {
+        await this.messages.excludeFromAiContext(ticketId, messageId, context);
+      }
+
       const message = await this.messages.appendAi(
         ticketId,
         completion.content,
         completion.generationId,
         context,
+        // Persisted, so a thread read after the socket closed can still tell a
+        // refusal from an answer.
+        statusName(completion.status),
       );
 
       // Carries the message id, which is the whole reason `done` and
@@ -354,6 +413,36 @@ export class AiStreamService implements OnModuleInit {
   }
 
   /**
+   * Names what did not reach the model — 36-doc §2.2.
+   *
+   * A zip, a `.docx`, or a file past the byte ceiling is skipped rather than
+   * failing the question: an answer about the screenshot beats no answer
+   * because a spreadsheet came with it. What must not happen is silence —
+   * "it ignored my file" is a thing a user discovers before anybody here does.
+   */
+  private notifySkipped(
+    client: Socket,
+    ticketId: string,
+    fileNames: string[],
+  ): void {
+    client.emit(REALTIME_EVENTS.aiStreamAttachmentsSkipped, {
+      success: true,
+      message: 'Some attachments were not read',
+      data: {
+        ticketId,
+        // Names only. The reason these were skipped is that their contents
+        // could not be used, and echoing contents into a frame would be the one
+        // thing this event must not do.
+        fileNames,
+      },
+      // The envelope, not a bare object. Every other frame this service emits is
+      // a `WsResponse`, and a client reading `frame.data` off a bare one gets
+      // `undefined` — a notice that is delivered and unreadable, which looks
+      // exactly like a notice that was never sent.
+    } satisfies WsResponse<AiStreamAttachmentsSkippedPayloadDto>);
+  }
+
+  /**
    * The transcript, oldest first, in the roles rag-service expects.
    *
    * `senderId === null` means generated: the same rule ticket-service's unary
@@ -376,10 +465,30 @@ export class AiStreamService implements OnModuleInit {
 
     const page = await this.messages.list(ticketId, query, context);
 
-    return page.items.map((item) => ({
-      role: item.isAiGenerated || !item.senderId ? 'assistant' : 'user',
-      content: item.content,
-    }));
+    return (
+      page.items
+        // **Filtered HERE, after the fetch — deliberately, and NOT the same
+        // rule as `isInternalNote`** (36-doc §7.1).
+        //
+        // An internal note is filtered in ticket-service's `where` clause
+        // because those rows must never reach the caller at all; 22-doc §1
+        // found the leak that fetch-then-filter produces there.
+        //
+        // **A refused message is the opposite.** The caller may absolutely see
+        // it — it stays in the thread as the record of what somebody
+        // attempted. What it must not reach is a PROMPT. So the risks differ
+        // and the mechanisms differ with them.
+        //
+        // Moving this into a `where` clause would break the UI list, which is
+        // served by this same route, or force a `forAiContext` flag onto
+        // `ListMessagesRequest` — a proto field whose only job would be to make
+        // one caller's post-processing look like a query.
+        .filter((item) => !item.excludedFromAiContext)
+        .map((item) => ({
+          role: item.isAiGenerated || !item.senderId ? 'assistant' : 'user',
+          content: item.content,
+        }))
+    );
   }
 
   /**

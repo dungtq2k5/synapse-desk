@@ -96,6 +96,10 @@ export class ChangeTicketStatusDto {
 
   @IsOptional()
   @IsString()
+  // A bound on free text a human typed, with no counterpart anywhere: no column
+  // constrains it and no other DTO carries the same field. Left inline
+  // deliberately — a constant would imply an agreement that does not exist, and
+  // the next reader would go looking for the other half.
   @MaxLength(500)
   @Transform(trimIfString)
   readonly reason?: string;

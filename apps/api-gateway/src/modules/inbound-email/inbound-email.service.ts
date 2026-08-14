@@ -396,6 +396,11 @@ export class InboundEmailService implements OnModuleInit {
             isInternalNote: false,
             invokeAi: false,
             inboundMessageId,
+            // Mail carries its own attachments through a different path — the
+            // worker uploads and confirms them against the message it just
+            // created (31-doc §5). This list is for a client that uploaded
+            // BEFORE the message existed, which no inbound email does.
+            attachments: [],
           },
           metadata,
         ),

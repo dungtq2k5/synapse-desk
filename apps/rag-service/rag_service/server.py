@@ -39,7 +39,7 @@ from grpc_health.v1 import health_pb2, health_pb2_grpc
 from qdrant_client import AsyncQdrantClient
 
 from rag_service.common.caller_context import MissingTenantError, require_tenant
-from rag_service.common.metadata import unpack_caller_context
+from rag_service.common.metadata import GRPC_SERVER_OPTIONS, unpack_caller_context
 from rag_service.config import Config, load_config
 from rag_service.embeddings import EmbeddingClient, GeminiEmbeddingClient
 from rag_service.enums import AiGenerationPurpose
@@ -52,6 +52,7 @@ from rag_service.generation.corag import (
     StreamingGenerator,
 )
 from rag_service.generation.gemini import GeminiGenerator
+from rag_service.generation.parts import Attachment
 from rag_service.ledger.client import LedgerClient
 from rag_service.ledger.metered import MeteredGenerator
 from rag_service.ledger.quota import QuotaCounter
@@ -313,12 +314,17 @@ class RagServicer(rag_pb2_grpc.RagServiceServicer):
         ]
         ticket_id = request.ticket_id if request.HasField("ticket_id") else None
 
+        # The files that came with THIS message — 35-doc §3.1. History turns
+        # contribute their text and nothing else.
+        attachments = _attachments_of(request)
+
         preprocessed = await self._preprocess.run(
             request.message,
             history,
             settings,
             budget=budget,
             user_id=ctx.sub,
+            attachments=attachments,
         )
 
         if preprocessed.reply is not None:
@@ -365,6 +371,10 @@ class RagServicer(rag_pb2_grpc.RagServiceServicer):
             retrieved_chunk_ids=result.retrieved_chunk_ids,
             user_id=ctx.sub,
             ticket_id=ticket_id,
+            # The answering call sees the file too — 36-doc §6. Reformulation
+            # turned it into search terms; this is where it becomes something
+            # the answer can describe.
+            attachments=attachments,
         ):
             if isinstance(item, GeneratedAnswer):
                 yield rag_pb2.ChatChunk(completion=_completion(item))
@@ -404,6 +414,11 @@ class RagServicer(rag_pb2_grpc.RagServiceServicer):
         # pipeline** — 33-doc §1. Both layers at once: there is no greeting
         # check on this surface to split them around, and greetings do not
         # arrive at a programmatic one.
+        #
+        # **No attachments here, and none possible** — 35-doc §4.
+        # `/knowledge/ask` has no ticket and no message, so there is nothing to
+        # attach. Adding the parameter would advertise a capability the RPC
+        # cannot carry.
         verdict = await self._injection.scan(
             request.message, settings=settings, budget=budget, user_id=ctx.sub
         )
@@ -467,8 +482,20 @@ class RagServicer(rag_pb2_grpc.RagServiceServicer):
         # that can be an email from outside the organisation: an agent clicks
         # *suggest a reply* and a stranger's text becomes the question in a
         # prompt whose output the agent is about to send back to them.
+        #
+        # **The attachments go to the guard on this surface above all** —
+        # 36-doc §4. The file was chosen by whoever wrote that last message, and
+        # after 31/32 that can be a stranger who never authenticated. An
+        # instruction painted into their screenshot reaches a prompt whose
+        # output an agent is about to send back to them.
+        draft_attachments = _attachments_of(request)
+
         refusal = await self._injection.scan(
-            question, settings=settings, budget=budget, user_id=ctx.sub
+            question,
+            settings=settings,
+            budget=budget,
+            user_id=ctx.sub,
+            attachments=draft_attachments,
         )
         if refusal.refused:
             await context.abort(grpc.StatusCode.FAILED_PRECONDITION, DRAFT_REFUSAL)
@@ -491,6 +518,10 @@ class RagServicer(rag_pb2_grpc.RagServiceServicer):
             ).co_rag_max_retries,
             user_id=ctx.sub,
             ticket_id=request.ticket_id,
+            # The drafting pass only — the review passes judge the answer
+            # against the SOURCES, and re-sending an image on every retry would
+            # multiply the cost of the one surface that retries.
+            attachments=draft_attachments,
         )
 
         return rag_pb2.DraftResponse(
@@ -899,7 +930,11 @@ async def serve() -> None:
 
     deps = await build_dependencies(config)
 
-    server = grpc.aio.server()
+    # **Options, not the default** — 35-doc §7.1. Without these the server sits
+    # at gRPC's 4 MB while every TypeScript client and server is at 10 MB, and
+    # the mismatch only shows up as RESOURCE_EXHAUSTED on a request the caller
+    # had no reason to think was too large.
+    server = grpc.aio.server(options=GRPC_SERVER_OPTIONS)
     rag_pb2_grpc.add_RagServiceServicer_to_server(RagServicer(deps), server)
 
     # The ops surface, on the SAME port — 23-doc §2, §3. No HTTP listener and no
@@ -996,6 +1031,28 @@ def _status_of(answer: GeneratedAnswer) -> rag_pb2.AnswerStatus:
         if answer.status == "DOC_MISSING"
         else rag_pb2.ANSWER_STATUS_DOC_ANSWER
     )
+
+
+def _attachments_of(request) -> list[Attachment]:
+    """The request's attachment parts as domain objects — 36-doc §2.
+
+    **Filtered and capped before they got here.** Ticket-service decided
+    eligibility from the `message_attachments` row and refused anything past
+    `MAX_AI_ATTACHMENT_BYTES`, so this is a shape change and not a policy one —
+    which is why there is no validation to do at this boundary.
+
+    `file_name` is carried for the log and the boundary label. **Never for the
+    contents**: it is attacker-chosen text, exactly like `error_log` and
+    `DocumentFlag.detail`.
+    """
+    return [
+        Attachment(
+            mime_type=part.mime_type,
+            data=part.data,
+            file_name=part.file_name,
+        )
+        for part in request.attachments
+    ]
 
 
 def _last_user_message(history) -> str:

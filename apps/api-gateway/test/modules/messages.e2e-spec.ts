@@ -17,6 +17,7 @@ import {
   grpcError,
   timestamp,
   wireAttachment,
+  wireCreatedMessage,
   wireMessage,
   wirePage,
 } from '../fixtures/wire';
@@ -173,7 +174,7 @@ describe('§2.5 Ticket messages at the HTTP boundary (e2e)', () => {
 
   describe('POST /tickets/:ticketId/messages', () => {
     it('1. is postable by an end user with NO permissions', async () => {
-      fx.stubs.message.createMessage.mockReturnValue(of(wireMessage()));
+      fx.stubs.message.createMessage.mockReturnValue(of(wireCreatedMessage()));
 
       const res = await authenticatedAgent(fx.app, { permissionCodes: [] })
         .post(`${API}/tickets/${ticketId}/messages`)
@@ -186,7 +187,7 @@ describe('§2.5 Ticket messages at the HTTP boundary (e2e)', () => {
       // A route-level gate would close the endpoint to end users, who post
       // ordinary replies through it. One FIELD is refused downstream instead of
       // the whole conversation.
-      fx.stubs.message.createMessage.mockReturnValue(of(wireMessage()));
+      fx.stubs.message.createMessage.mockReturnValue(of(wireCreatedMessage()));
 
       await authenticatedAgent(fx.app, { permissionCodes: [] })
         .post(`${API}/tickets/${ticketId}/messages`)
@@ -198,7 +199,7 @@ describe('§2.5 Ticket messages at the HTTP boundary (e2e)', () => {
 
     it('3. sends the flags as FALSE when absent, never undefined', async () => {
       // proto3 booleans have no null. An absent flag means "an ordinary reply".
-      fx.stubs.message.createMessage.mockReturnValue(of(wireMessage()));
+      fx.stubs.message.createMessage.mockReturnValue(of(wireCreatedMessage()));
 
       await authenticatedAgent(fx.app)
         .post(`${API}/tickets/${ticketId}/messages`)
@@ -231,7 +232,9 @@ describe('§2.5 Ticket messages at the HTTP boundary (e2e)', () => {
       // second row that arrives over the realtime channel, and a client waiting
       // for it in this response body would wait forever.
       fx.stubs.message.createMessage.mockReturnValue(
-        of(wireMessage({ content: 'Please help', isAiGenerated: false })),
+        of(
+          wireCreatedMessage({ content: 'Please help', isAiGenerated: false }),
+        ),
       );
 
       const res = await authenticatedAgent(fx.app)
@@ -239,8 +242,37 @@ describe('§2.5 Ticket messages at the HTTP boundary (e2e)', () => {
         .send({ content: 'Please help', invokeAi: true });
 
       expect(res.status).toBe(201);
-      expect(res.body.data.isAiGenerated).toBe(false);
-      expect(res.body.data.content).toBe('Please help');
+      // **`data.message`, not `data`** — 36-doc §1.3.1 wrapped the create so it
+      // can also report attachments whose confirm failed. A create is the only
+      // RPC with a second outcome to report, so it is the only one wrapped.
+      expect(res.body.data.message.isAiGenerated).toBe(false);
+      expect(res.body.data.message.content).toBe('Please help');
+      expect(res.body.data.skippedAttachments).toEqual([]);
+    });
+
+    it('7. **names the attachments that did not confirm, and still returns 201**', async () => {
+      // The presign record lives ten minutes and this list is routinely
+      // non-empty for an honest caller — so it is a normal response to render,
+      // not an error path. §1.3.1 is why the message survives at all.
+      fx.stubs.message.createMessage.mockReturnValue(
+        of(wireCreatedMessage({ content: 'Here is the error' }, ['stale.png'])),
+      );
+
+      const res = await authenticatedAgent(fx.app)
+        .post(`${API}/tickets/${ticketId}/messages`)
+        .send({
+          content: 'Here is the error',
+          attachments: [
+            {
+              objectPath: `organizations/o/tickets/${ticketId}/attachments/a.png`,
+              fileName: 'stale.png',
+            },
+          ],
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.data.skippedAttachments).toEqual(['stale.png']);
+      expect(res.body.data.message.content).toBe('Here is the error');
     });
   });
 

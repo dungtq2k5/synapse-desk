@@ -13,7 +13,7 @@ import {
   bootstrapE2eTest,
   flushTestRedis,
 } from '../utils';
-import { wireMessage, wirePage, wireTicket } from '../fixtures/wire';
+import { wireCreatedMessage, wirePage, wireTicket } from '../fixtures/wire';
 import { StartConversationDto } from 'apps/api-gateway/src/modules/chat/dto/rest/chat.dto';
 
 /**
@@ -200,7 +200,7 @@ describe('§2.7 Self-service chat at the HTTP boundary (e2e)', () => {
 
   describe('POST /chat/conversations/:id/messages', () => {
     it('1. forwards to the SAME message write as /tickets', async () => {
-      fx.stubs.message.createMessage.mockReturnValue(of(wireMessage()));
+      fx.stubs.message.createMessage.mockReturnValue(of(wireCreatedMessage()));
 
       await authenticatedAgent(fx.app)
         .post(`${API}/chat/conversations/${conversationId}/messages`)
@@ -216,7 +216,7 @@ describe('§2.7 Self-service chat at the HTTP boundary (e2e)', () => {
       // An end-user surface has no notion of an agent-only note. Forwarding the
       // flag would leave a permission check as the only thing stopping a chat
       // client from writing one — refused at the shape instead.
-      fx.stubs.message.createMessage.mockReturnValue(of(wireMessage()));
+      fx.stubs.message.createMessage.mockReturnValue(of(wireCreatedMessage()));
 
       await authenticatedAgent(fx.app, {
         permissionCodes: ['ticket.read.all'],
@@ -229,7 +229,7 @@ describe('§2.7 Self-service chat at the HTTP boundary (e2e)', () => {
     });
 
     it('3. still forwards invokeAi — the point of a chat', async () => {
-      fx.stubs.message.createMessage.mockReturnValue(of(wireMessage()));
+      fx.stubs.message.createMessage.mockReturnValue(of(wireCreatedMessage()));
 
       await authenticatedAgent(fx.app)
         .post(`${API}/chat/conversations/${conversationId}/messages`)

@@ -89,6 +89,23 @@ export class AiStreamDonePayloadDto {
 }
 
 /**
+ * `ai:stream:attachments-skipped` — files the model was not given.
+ *
+ * **Names only, never contents.** These were skipped precisely because their
+ * bytes could not be used, and echoing bytes into a socket frame is the one
+ * thing this event must not do — the same rule `error_log` and
+ * `DocumentFlag.detail` follow.
+ *
+ * Sent before the stream opens rather than folded into `ai:stream:done`, so a
+ * client can show "logs.zip was not read" while the answer is still arriving,
+ * and so the notice survives a stream that later fails.
+ */
+export class AiStreamAttachmentsSkippedPayloadDto {
+  ticketId!: string;
+  fileNames!: string[];
+}
+
+/**
  * The `data` rider on `ai:stream:error`.
  *
  * Sits alongside the `ErrorResponse` envelope rather than inside a `WsResponse`,

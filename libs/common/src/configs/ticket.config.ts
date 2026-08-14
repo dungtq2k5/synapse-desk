@@ -178,8 +178,93 @@ export const ALLOWED_ATTACHMENT_MIME_TYPES = [
 export type AllowedAttachmentMimeType =
   (typeof ALLOWED_ATTACHMENT_MIME_TYPES)[number];
 
+/**
+ * Which attachments may reach the MODEL — 35-doc §8.
+ *
+ * **A different question from `ALLOWED_ATTACHMENT_MIME_TYPES` above, and the
+ * two must not be merged.** That list is a security allowlist answering "may a
+ * user store this?"; this one is a capability allowlist answering "may this
+ * reach the model?". They overlap today and will drift the first time a new
+ * type is added — a `.docx` is perfectly safe to store and Gemini cannot read
+ * it, so widening one is not a reason to widen the other.
+ *
+ * Everything absent from here stays storable, downloadable and human-readable.
+ * It simply never becomes a prompt part: sending a zip spends tokens to produce
+ * nothing, and the user is told what was left out rather than left to discover
+ * it (36-doc §2.2).
+ */
+export const AI_ELIGIBLE_MIME_TYPES = [
+  'image/png',
+  'image/jpeg',
+  'image/gif',
+  'image/webp',
+  'application/pdf',
+  'text/plain',
+  'text/csv',
+] as const;
+export type AiEligibleMimeType = (typeof AI_ELIGIBLE_MIME_TYPES)[number];
+
+/**
+ * How many attachment bytes one message may send to the model — 36-doc §2.1.
+ *
+ * **The TOTAL across a message, not per file.** Five 3 MB screenshots are one
+ * request, and a per-file cap would let them through together.
+ *
+ * **Derived from two ceilings, and the lower one wins.** Written out because a
+ * number with no derivation is one nobody can defend when a user asks why their
+ * 9 MB PDF was skipped:
+ *
+ * | Ceiling | Value |
+ * | :------ | :---- |
+ * | Gemini's inline-data limit — text, system instructions and bytes together | 20 MB |
+ * | **gRPC message limit on `ChatRequest`/`DraftRequest`** | **10 MB** |
+ *
+ * The transport binds, at `GRPC_CHANNEL_OPTIONS` in `libs/grpc-proto` — and it
+ * binds on both ends only because rag-service's Python server now sets matching
+ * options (35-doc §7.1); before that it was 4 MB and the mismatch was invisible
+ * until a request failed.
+ *
+ * The request carries more than the files. Worst case is 40 transcript turns at
+ * `MAX_MESSAGE_CONTENT_LENGTH` — about 800 KB — plus the question and protobuf
+ * framing. **8 MB leaves roughly 2 MB of headroom**, which is deliberate
+ * over-provision: skipping one attachment is a message the user can act on,
+ * while exceeding the transport limit is a `RESOURCE_EXHAUSTED` that fails the
+ * whole question and tells them nothing.
+ */
+export const MAX_AI_ATTACHMENT_BYTES = 8 * 1024 * 1024;
+
 export const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 export const MAX_ATTACHMENTS_PER_MESSAGE = 5;
+
+/**
+ * The longest attachment file name a DTO accepts.
+ *
+ * **A contract, not a sanity bound**, and that is why it is a constant.
+ * `message_attachments.file_name` is `@db.VarChar(255)`; two places have to
+ * agree, and if they drift the DTO accepts what the database rejects — a 500
+ * where a 400 belongs, on a request the caller could have fixed.
+ *
+ * Three DTOs carry it (`NewAttachmentDto`, `ConfirmAttachmentDto`,
+ * `UploadAttachmentDto`), which was three chances for one of them to be edited
+ * alone.
+ */
+export const MAX_ATTACHMENT_FILE_NAME_LENGTH = 255;
+
+/**
+ * The longest object path a DTO accepts.
+ *
+ * **A bound, not a contract** — `message_attachments.file_url` is `@db.Text`,
+ * so nothing downstream holds this number and no column can disagree with it.
+ * A real path is around 190 characters (`organizations/{uuid}/tickets/{uuid}/
+ * attachments/pending/{uuid}/{uuid}.ext`), and the server generates every one
+ * of them; this exists so an absurd string is refused at the edge rather than
+ * carried into a storage call.
+ *
+ * **It is a constant anyway, because the two DTOs that bound it had disagreed**
+ * — 500 in one and 1024 in the other, for the same string. Nothing was broken
+ * by that, which is precisely why it would have stayed.
+ */
+export const MAX_OBJECT_PATH_LENGTH = 1024;
 
 // ---------------------------------------------------------------------------
 // Misc bounds

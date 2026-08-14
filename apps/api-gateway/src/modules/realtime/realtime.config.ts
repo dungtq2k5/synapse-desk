@@ -121,6 +121,17 @@ export const REALTIME_EVENTS = {
   aiStreamDone: 'ai:stream:done',
   /** The stream failed. Never used for the budget cap — see 22-doc §5.2. */
   aiStreamError: 'ai:stream:error',
+  /**
+   * Files that were NOT sent to the model — 36-doc §2.2.
+   *
+   * Its own event rather than a field on `aiStreamDone`, because it fires
+   * BEFORE the answer: a user watching an answer stream in about a screenshot
+   * they attached should learn it was skipped while they are still reading,
+   * not in the frame that closes the stream.
+   *
+   * Carries file NAMES only. The contents are the thing that could not be sent.
+   */
+  aiStreamAttachmentsSkipped: 'ai:stream:attachments-skipped',
 
   /** A document finished indexing. Rooms: uploader, plus `dept:` or `org:`. */
   documentIndexed: 'document:indexed',

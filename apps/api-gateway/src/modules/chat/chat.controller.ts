@@ -24,7 +24,10 @@ import { PaginationResponseDto } from '../../common/dto/rest/pagination-response
 import { TicketsGrpcClient } from '../tickets/tickets-grpc.client';
 import { MessagesGrpcClient } from '../tickets/messages-grpc.client';
 import { TicketResponseDto } from '../tickets/dto/rest/ticket-response.dto';
-import { MessageResponseDto } from '../tickets/dto/rest/message-response.dto';
+import {
+  CreateMessageResponseDto,
+  MessageResponseDto,
+} from '../tickets/dto/rest/message-response.dto';
 import {
   CreateMessageDto,
   ListMessagesQueryDto,
@@ -163,7 +166,7 @@ export class ChatController {
   // user spending the whole month in ten minutes.
   @Throttle({ [AI_THROTTLER_TIER]: ROUTE_THROTTLE.chatMessage })
   @ApiOperation({ summary: 'Ask a question' })
-  @ApiWrappedResponse(MessageResponseDto, { status: HttpStatus.CREATED })
+  @ApiWrappedResponse(CreateMessageResponseDto, { status: HttpStatus.CREATED })
   @ApiFilterErrors(['400', '401', '404'])
   @Post('conversations/:id/messages')
   @ResponseMessage('Message sent')
@@ -171,10 +174,18 @@ export class ChatController {
     @CurrentUser() context: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: CreateMessageDto,
-  ): Promise<MessageResponseDto> {
+  ): Promise<CreateMessageResponseDto> {
     return this.messagesGrpcClient.create(
       id,
-      { content: dto.content, isInternalNote: false, invokeAi: dto.invokeAi },
+      {
+        content: dto.content,
+        isInternalNote: false,
+        invokeAi: dto.invokeAi,
+        // Forwarded rather than dropped — 36-doc §1.3. This is the surface a
+        // customer asks a question from, so it is the surface where the
+        // screenshot and the question arrive together.
+        attachments: dto.attachments,
+      },
       context,
     );
   }

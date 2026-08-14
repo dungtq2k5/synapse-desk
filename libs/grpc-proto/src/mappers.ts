@@ -84,6 +84,25 @@ export function requireProtoTimestamp(
 }
 
 /**
+ * A nested message the sender is contractually required to set.
+ *
+ * proto3 types every nested message as optional, so a response whose whole
+ * payload is one submessage arrives as `T | undefined` and every caller either
+ * asserts it away or silently propagates `undefined` into a mapper. This throws
+ * with the field's name instead — the same trade `requireProtoTimestamp` makes,
+ * and for the same reason: an absent required field is a peer contract
+ * violation, and it should read as one in the log rather than as
+ * `Cannot read properties of undefined`.
+ */
+export function requireField<T>(value: T | undefined, field: string): T {
+  if (value === undefined || value === null) {
+    throw new Error(`Received a message without the required ${field}`);
+  }
+
+  return value;
+}
+
+/**
  * Two different types share the name `Gender` and they are NOT interchangeable:
  * the shared domain enum is a string ('MALE'), the proto one is numeric (1).
  * These two functions are the only sanctioned bridge.

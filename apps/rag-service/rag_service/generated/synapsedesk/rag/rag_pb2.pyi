@@ -75,15 +75,27 @@ class ConversationTurn(_message.Message):
     content: str
     def __init__(self, role: _Optional[str] = ..., content: _Optional[str] = ...) -> None: ...
 
+class AttachmentPart(_message.Message):
+    __slots__ = ("mime_type", "data", "file_name")
+    MIME_TYPE_FIELD_NUMBER: _ClassVar[int]
+    DATA_FIELD_NUMBER: _ClassVar[int]
+    FILE_NAME_FIELD_NUMBER: _ClassVar[int]
+    mime_type: str
+    data: bytes
+    file_name: str
+    def __init__(self, mime_type: _Optional[str] = ..., data: _Optional[bytes] = ..., file_name: _Optional[str] = ...) -> None: ...
+
 class ChatRequest(_message.Message):
-    __slots__ = ("message", "history", "ticket_id")
+    __slots__ = ("message", "history", "ticket_id", "attachments")
     MESSAGE_FIELD_NUMBER: _ClassVar[int]
     HISTORY_FIELD_NUMBER: _ClassVar[int]
     TICKET_ID_FIELD_NUMBER: _ClassVar[int]
+    ATTACHMENTS_FIELD_NUMBER: _ClassVar[int]
     message: str
     history: _containers.RepeatedCompositeFieldContainer[ConversationTurn]
     ticket_id: str
-    def __init__(self, message: _Optional[str] = ..., history: _Optional[_Iterable[_Union[ConversationTurn, _Mapping]]] = ..., ticket_id: _Optional[str] = ...) -> None: ...
+    attachments: _containers.RepeatedCompositeFieldContainer[AttachmentPart]
+    def __init__(self, message: _Optional[str] = ..., history: _Optional[_Iterable[_Union[ConversationTurn, _Mapping]]] = ..., ticket_id: _Optional[str] = ..., attachments: _Optional[_Iterable[_Union[AttachmentPart, _Mapping]]] = ...) -> None: ...
 
 class Citation(_message.Message):
     __slots__ = ("chunk_id", "document_id", "document_title", "page_number", "vector_point_id")
@@ -120,14 +132,16 @@ class ChatCompletion(_message.Message):
     def __init__(self, status: _Optional[_Union[AnswerStatus, str]] = ..., citations: _Optional[_Iterable[_Union[Citation, _Mapping]]] = ..., generation_id: _Optional[str] = ..., content: _Optional[str] = ...) -> None: ...
 
 class DraftRequest(_message.Message):
-    __slots__ = ("ticket_id", "history", "max_retries")
+    __slots__ = ("ticket_id", "history", "max_retries", "attachments")
     TICKET_ID_FIELD_NUMBER: _ClassVar[int]
     HISTORY_FIELD_NUMBER: _ClassVar[int]
     MAX_RETRIES_FIELD_NUMBER: _ClassVar[int]
+    ATTACHMENTS_FIELD_NUMBER: _ClassVar[int]
     ticket_id: str
     history: _containers.RepeatedCompositeFieldContainer[ConversationTurn]
     max_retries: int
-    def __init__(self, ticket_id: _Optional[str] = ..., history: _Optional[_Iterable[_Union[ConversationTurn, _Mapping]]] = ..., max_retries: _Optional[int] = ...) -> None: ...
+    attachments: _containers.RepeatedCompositeFieldContainer[AttachmentPart]
+    def __init__(self, ticket_id: _Optional[str] = ..., history: _Optional[_Iterable[_Union[ConversationTurn, _Mapping]]] = ..., max_retries: _Optional[int] = ..., attachments: _Optional[_Iterable[_Union[AttachmentPart, _Mapping]]] = ...) -> None: ...
 
 class DraftResponse(_message.Message):
     __slots__ = ("draft", "citations", "generation_id", "status")

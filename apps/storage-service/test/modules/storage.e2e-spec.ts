@@ -185,19 +185,49 @@ describe('§2.2–2.4 Storage presign, confirm and read URLs (e2e)', () => {
       );
     });
 
-    it('9. builds the ATTACHMENT path from both owner ids', async () => {
+    it('9. builds the ATTACHMENT path from both owner ids, under `pending/`', async () => {
+      // **`pending/` is new** — 36-doc §1.3.2. A presigned object is
+      // unreferenced until confirm moves it out, and keeping the two apart is
+      // what makes a lifecycle rule over the prefix safe: before this, an
+      // abandoned upload and a live attachment had identical path shapes.
+      //
+      // The owner ids are still both there and still in the same order — the
+      // segment is inserted, not substituted, so the tenant check in
+      // `organizationIdFromObjectPath` reads the same position it always did.
       const request = attachmentRequest();
       const result = await storage.presignUpload(request, caller());
 
       expect(result.objectPath).toContain(
-        `organizations/${organizationId}/tickets/${request.ownerId}/attachments/${request.secondaryOwnerId}/`,
+        `organizations/${organizationId}/tickets/${request.ownerId}/attachments/pending/${request.secondaryOwnerId}/`,
       );
     });
 
-    it('10. REFUSES an attachment with no secondary owner', async () => {
+    it('10. ACCEPTS an attachment with no secondary owner, and omits the segment', async () => {
+      // **This test used to assert the opposite** — 36-doc §1.3. Requiring the
+      // message id here is what made presign-before-the-message impossible, and
+      // that is what left a first-turn screenshot unreadable by the answer to
+      // the very message it was attached to.
+      //
+      // Inverted rather than deleted, because the path shape is the part worth
+      // pinning: the segment is ABSENT, not blank. A placeholder would produce
+      // `attachments//file` and a doubled separator is the kind of thing that
+      // works everywhere until something splits on it.
+      const request = attachmentRequest({ secondaryOwnerId: '' });
+      const result = await storage.presignUpload(request, caller());
+
+      expect(result.objectPath).toContain(
+        `organizations/${organizationId}/tickets/${request.ownerId}/attachments/`,
+      );
+      expect(result.objectPath).not.toContain('//');
+    });
+
+    it('10b. refuses a secondary owner on a purpose with nowhere to put it', async () => {
+      // The half of the old check that still means something. Accepting it
+      // would discard the caller's id silently, which is worse than refusing:
+      // they would believe it landed somewhere.
       await expectRpc(
         storage.presignUpload(
-          attachmentRequest({ secondaryOwnerId: '' }),
+          avatarRequest({ secondaryOwnerId: faker.string.uuid() }),
           caller(),
         ),
         status.INVALID_ARGUMENT,
@@ -536,5 +566,215 @@ describe('§2.2–2.4 Storage presign, confirm and read URLs (e2e)', () => {
       );
       expect(Number(expires)).toBe(900);
     });
+  });
+});
+
+/**
+ * Segregate at presign, move at confirm — 36-doc §1.3.2.
+ *
+ * **The prefix is the point, not the move.** `confirmUpload` never relocated
+ * anything, so a live attachment on a real ticket had the same path shape as
+ * one somebody uploaded and abandoned — and "add a bucket lifecycle rule",
+ * which is the obvious answer to orphaned objects, would have deleted both.
+ *
+ * The rule itself is bucket configuration the emulator does not run, so it
+ * cannot be tested here. **What can be tested is the invariant that makes it
+ * safe to enable**: after a successful confirm, nothing is left under
+ * `pending/`. Same shape as 34-doc §7's image checks — the deployment artifact
+ * is not testable, so test the property it depends on.
+ */
+describe('§1.3.2 ticket attachments are segregated until confirmed (e2e)', () => {
+  let fx: E2eFixture;
+  let storage: StorageService;
+
+  const organizationId = faker.string.uuid();
+  const userId = faker.string.uuid();
+
+  const caller = () => memberContext({ id: userId, organizationId });
+
+  const presign = (overrides: Record<string, unknown> = {}) =>
+    storage.presignUpload(
+      {
+        purpose: ProtoStoragePurpose.STORAGE_PURPOSE_TICKET_ATTACHMENT,
+        ownerId: faker.string.uuid(),
+        contentType: 'application/pdf',
+        sizeBytes: 4096,
+        originalFileName: 'invoice.pdf',
+        secondaryOwnerId: '',
+        ...overrides,
+      },
+      caller(),
+    );
+
+  const exists = async (objectPath: string) =>
+    (await fx.firebase.bucket.file(objectPath).exists())[0];
+
+  beforeAll(async () => {
+    fx = await bootstrapE2eTest();
+    storage = fx.moduleRef.get(StorageService);
+  });
+
+  beforeEach(() => fx.reset());
+  afterAll(() => fx.close());
+
+  it('presigns UNDER `pending/`, for both path shapes', async () => {
+    // Both, because both are abandonable. The `:messageId` route's upload is
+    // just as unreferenced between the PUT and the confirm as the one-shot
+    // flow's is.
+    const messageLess = await presign();
+    const messageBound = await presign({
+      secondaryOwnerId: faker.string.uuid(),
+    });
+
+    expect(messageLess.objectPath).toContain('/attachments/pending/');
+    expect(messageBound.objectPath).toContain('/attachments/pending/');
+  });
+
+  it('1. **after confirm, nothing remains under `pending/`**', async () => {
+    // The invariant the lifecycle rule depends on, and the reason §1.3.2 is a
+    // code change rather than a console change.
+    const presigned = await presign();
+    await fx.firebase.bucket
+      .file(presigned.objectPath)
+      .save(bytesFor('application/pdf'), {
+        contentType: 'application/pdf',
+        resumable: false,
+      });
+
+    const confirmed = await storage.confirmUpload(
+      { objectPath: presigned.objectPath },
+      caller(),
+    );
+
+    expect(confirmed.objectPath).not.toContain('/pending/');
+    expect(confirmed.objectPath).toBe(
+      presigned.objectPath.replace('/attachments/pending/', '/attachments/'),
+    );
+    // The object MOVED — it is not merely also somewhere else.
+    await expect(exists(presigned.objectPath)).resolves.toBe(false);
+    await expect(exists(confirmed.objectPath)).resolves.toBe(true);
+  });
+
+  it('3. **a confirm that FAILS leaves the object under `pending/`**', async () => {
+    // So §1.3.1's named skip and the sweep agree on what "unconfirmed" means.
+    // If a failed confirm moved the object anyway, a skipped attachment would
+    // sit in the committed prefix forever with no row pointing at it — the
+    // exact orphan class this section exists to make sweepable.
+    const presigned = await presign();
+    // Declared a PDF, uploaded as something else: the magic-byte check refuses.
+    await fx.firebase.bucket
+      .file(presigned.objectPath)
+      .save(bytesFor('image/png'), {
+        contentType: 'application/pdf',
+        resumable: false,
+      });
+
+    await expectRpc(
+      storage.confirmUpload({ objectPath: presigned.objectPath }, caller()),
+      status.INVALID_ARGUMENT,
+    );
+
+    const committed = presigned.objectPath.replace(
+      '/attachments/pending/',
+      '/attachments/',
+    );
+    await expect(exists(committed)).resolves.toBe(false);
+  });
+
+  it('a confirm that never happens leaves it under `pending/` too', async () => {
+    // The ordinary abandonment: presign, upload, change your mind, close the
+    // tab. Under this prefix it is sweepable; under the committed one it would
+    // be indistinguishable from a live attachment.
+    const presigned = await presign();
+    await fx.firebase.bucket
+      .file(presigned.objectPath)
+      .save(bytesFor('application/pdf'), {
+        contentType: 'application/pdf',
+        resumable: false,
+      });
+
+    await expect(exists(presigned.objectPath)).resolves.toBe(true);
+    expect(presigned.objectPath).toContain('/attachments/pending/');
+  });
+
+  it('**the other purposes are NOT segregated**, and their paths are unchanged', async () => {
+    // An avatar, a document and an export are each referenced by a row written
+    // in the same call that confirms them, so there is no window in which one
+    // exists unreferenced. Segregating them would be a move per upload for a
+    // problem they do not have.
+    const avatar = await storage.presignUpload(
+      {
+        purpose: ProtoStoragePurpose.STORAGE_PURPOSE_AVATAR,
+        ownerId: userId,
+        contentType: 'image/png',
+        sizeBytes: 1024,
+        originalFileName: 'me.png',
+        secondaryOwnerId: '',
+      },
+      caller(),
+    );
+
+    expect(avatar.objectPath).not.toContain('pending');
+  });
+
+  it('**a crash between the move and the consume RESUMES on retry**', async () => {
+    // V3. The move happens before the record is consumed, which is right for
+    // the common failure — but a death in the gap between them leaves the
+    // object at the COMMITTED path with the record still keyed to the pending
+    // one.
+    //
+    // Refusing there would report the opposite of what happened: "no object was
+    // uploaded" for an upload that landed and was committed. And the residue
+    // sits OUTSIDE `pending/`, where the lifecycle rule can never reach it —
+    // precisely the unsweepable orphan §1.3.2 exists to prevent, arriving
+    // through a narrower door.
+    const presigned = await presign();
+    await fx.firebase.bucket
+      .file(presigned.objectPath)
+      .save(bytesFor('application/pdf'), {
+        contentType: 'application/pdf',
+        resumable: false,
+      });
+
+    // The crash, reproduced exactly: move the object, leave the record.
+    const committed = presigned.objectPath.replace(
+      '/attachments/pending/',
+      '/attachments/',
+    );
+    await fx.firebase.bucket.file(presigned.objectPath).move(committed);
+
+    // The retry the caller would make.
+    const confirmed = await storage.confirmUpload(
+      { objectPath: presigned.objectPath },
+      caller(),
+    );
+
+    expect(confirmed.objectPath).toBe(committed);
+    expect(confirmed.contentType).toBe('application/pdf');
+    await expect(exists(committed)).resolves.toBe(true);
+  });
+
+  it('a MISSING object is still refused, resumption or not', async () => {
+    // The check above must not become "assume it worked". A presign whose
+    // upload never happened has nothing at either path, and that is the case
+    // FAILED_PRECONDITION exists for.
+    const presigned = await presign();
+
+    await expectRpc(
+      storage.confirmUpload({ objectPath: presigned.objectPath }, caller()),
+      status.FAILED_PRECONDITION,
+    );
+  });
+
+  it('2. the TENANT still resolves from a `pending/` path', async () => {
+    // `organizationIdFromObjectPath` gates every read and takes segment 2.
+    // `pending/` is inserted far deeper — but that is exactly the kind of
+    // assumption worth an assertion, because breaking it fails closed and
+    // confusingly.
+    const presigned = await presign();
+
+    expect(organizationIdFromObjectPath(presigned.objectPath)).toBe(
+      organizationId,
+    );
   });
 });

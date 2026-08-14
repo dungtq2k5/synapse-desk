@@ -15,7 +15,7 @@ import {
   generateInboundToken,
 } from '@synapsedesk/common';
 import { E2eFixture, bootstrapE2eTest } from '../utils';
-import { timestamp, wireMessage } from '../fixtures/wire';
+import { timestamp, wireCreatedMessage } from '../fixtures/wire';
 import {
   plainEmail,
   signPayload,
@@ -197,7 +197,7 @@ describe('§32 §4 inbound email routing (e2e)', () => {
     it('6. **a valid reply token appends to that ticket**', async () => {
       resolvable();
       fx.stubs.ticket.getTicketByNumber.mockReturnValue(of(wireTicket()));
-      fx.stubs.message.createMessage.mockReturnValue(of(wireMessage()));
+      fx.stubs.message.createMessage.mockReturnValue(of(wireCreatedMessage()));
 
       const token = buildTicketReplyToken(organizationId, 4211, secret);
 
@@ -263,7 +263,7 @@ describe('§32 §4 inbound email routing (e2e)', () => {
         of(wireTicket({ status: ProtoTicketStatus.TICKET_STATUS_CLOSED })),
       );
       fx.stubs.ticket.reopenTicket.mockReturnValue(of(wireTicket()));
-      fx.stubs.message.createMessage.mockReturnValue(of(wireMessage()));
+      fx.stubs.message.createMessage.mockReturnValue(of(wireCreatedMessage()));
 
       const token = buildTicketReplyToken(organizationId, 4211, secret);
 
@@ -315,7 +315,7 @@ describe('§32 §4 inbound email routing (e2e)', () => {
       fx.stubs.ticket.getTicket.mockReturnValue(
         of(wireTicket({ id: seenTicketId })),
       );
-      fx.stubs.message.createMessage.mockReturnValue(of(wireMessage()));
+      fx.stubs.message.createMessage.mockReturnValue(of(wireCreatedMessage()));
 
       const response = await post(
         plainEmail({
@@ -344,7 +344,7 @@ describe('§32 §4 inbound email routing (e2e)', () => {
       fx.stubs.ticket.getTicket.mockReturnValue(
         of(wireTicket({ id: seenTicketId })),
       );
-      fx.stubs.message.createMessage.mockReturnValue(of(wireMessage()));
+      fx.stubs.message.createMessage.mockReturnValue(of(wireCreatedMessage()));
 
       await post(
         plainEmail({
@@ -552,7 +552,7 @@ describe('§32 §4 inbound email routing (e2e)', () => {
     it('a Gmail-quoted reply threads and keeps only the new text', async () => {
       resolvable();
       fx.stubs.ticket.getTicketByNumber.mockReturnValue(of(wireTicket()));
-      fx.stubs.message.createMessage.mockReturnValue(of(wireMessage()));
+      fx.stubs.message.createMessage.mockReturnValue(of(wireCreatedMessage()));
 
       const token = buildTicketReplyToken(organizationId, 4211, secret);
 

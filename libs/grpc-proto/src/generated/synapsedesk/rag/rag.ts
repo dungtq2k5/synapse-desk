@@ -103,6 +103,25 @@ export interface ConversationTurn {
   content: string;
 }
 
+/**
+ * One attachment, already filtered and capped by the CALLER — 35-doc §7, §8.
+ *
+ * The bytes arrive inline rather than as an object path because rag-service
+ * has no storage client, and giving it one would add a peer, a credential and
+ * a failure mode to the query path. What makes that safe is
+ * `MAX_AI_ATTACHMENT_BYTES`, which exists regardless: Gemini's own inline-data
+ * limit sits well under `5 x 10 MB`.
+ */
+export interface AttachmentPart {
+  mimeType: string;
+  data: Uint8Array;
+  /**
+   * For the boundary label and for logs. NEVER the file's contents — the same
+   * rule `error_log` and `DocumentFlag.detail` follow.
+   */
+  fileName: string;
+}
+
 export interface ChatRequest {
   message: string;
   history: ConversationTurn[];
@@ -110,7 +129,19 @@ export interface ChatRequest {
    * Present for a ticket conversation, absent for `/knowledge/ask`. It decides
    * `ai_generations.ticket_id`, which is how spend is attributed to a ticket.
    */
-  ticketId?: string | undefined;
+  ticketId?:
+    | string
+    | undefined;
+  /**
+   * The CURRENT message's attachments only — 35-doc §3.1.
+   *
+   * History turns contribute TEXT. Re-sending their images would put four turns
+   * times five files on every call to recover information the assistant's own
+   * reply usually carries: if turn 1's answer says "the ERR_QUOTA_4021 error
+   * means...", turn 2's reformulation reads that and resolves "how do I fix
+   * it?" without seeing a pixel.
+   */
+  attachments: AttachmentPart[];
 }
 
 export interface Citation {
@@ -169,6 +200,13 @@ export interface DraftRequest {
    * Clamped server-side regardless.
    */
   maxRetries: number;
+  /**
+   * The LAST USER message's attachments — the ones the agent is about to reply
+   * to. After 31-doc/32-doc those can come from a sender who never
+   * authenticated, which makes this the highest-trust position an untrusted
+   * file reaches in this system.
+   */
+  attachments: AttachmentPart[];
 }
 
 export interface DraftResponse {

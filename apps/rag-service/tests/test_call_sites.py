@@ -27,6 +27,7 @@ import rag_service
 from rag_service.enums import AiGenerationPurpose
 from rag_service.generation.copilot import CopilotService
 from rag_service.generation.corag import CoRagGenerator, GenerationDelta
+from rag_service.generation.parts import Prompt
 from rag_service.preprocess.pipeline import PreprocessPipeline, Turn
 from rag_service.retrieval.service import BudgetState, HydratedChunk
 from rag_service.settings import AiSettings, resolve_ai_settings
@@ -46,13 +47,13 @@ class ModelRecordingGenerator:
     def __init__(self) -> None:
         self.models: list[str] = []
 
-    async def stream(self, prompt: str, model: str, max_output_tokens: int):
+    async def stream(self, prompt: Prompt, model: str, max_output_tokens: int):
         self.models.append(model)
 
         yield GenerationDelta(text='{"summary":"s","action":"a","confidence":1}')
         yield GenerationDelta(done=True, prompt_tokens=10, completion_tokens=2)
 
-    async def generate(self, prompt: str, model: str, max_output_tokens: int):
+    async def generate(self, prompt: Prompt, model: str, max_output_tokens: int):
         from rag_service.preprocess.pipeline import GenerationOutput
 
         self.models.append(model)

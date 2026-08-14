@@ -17,6 +17,7 @@
     "test:py": "cd apps/rag-service && .venv/bin/pytest -q",
     "test:py:watch": "cd apps/rag-service && .venv/bin/pytest -q -x --ff",
     "eval:rag": "cd apps/rag-service && .venv/bin/python eval/run.py",
+    "test:gateway": "jest --config apps/api-gateway/jest.config.ts --passWithNoTests",
     "test:auth": "jest --config apps/auth-service/jest.config.ts --passWithNoTests",
     "test:watch": "jest --projects apps/*/jest.config.ts libs/*/jest.config.ts --watch --passWithNoTests",
     "test:e2e:gateway": "dotenv -e apps/api-gateway/.env.test -- jest --config apps/api-gateway/jest.e2e.config.ts --runInBand",

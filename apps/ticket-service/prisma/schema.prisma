@@ -213,6 +213,37 @@ model TicketMessage {
   /// fetched-then-filtered — see TicketMessagesService.
   isInternalNote Boolean @default(false) @map("is_internal_note")
 
+  /// Set when this message was REFUSED as prompt injection — 35-doc §6.
+  ///
+  /// **A filter, not a label.** The transcript builders exclude these, so a
+  /// refused question cannot reach a later reformulation. Instructing a model
+  /// to ignore an injection sitting in its own context is the reliance Layer A
+  /// exists because you cannot make; excluding the row is a mechanism.
+  ///
+  /// **Not the same shape as `isInternalNote` above, and the difference is the
+  /// point.** An internal note must never reach the caller — so it is stripped
+  /// in the WHERE clause. A refused message MAY reach the caller: it is the
+  /// record of what somebody attempted and stays visible in the thread. What it
+  /// must not reach is a prompt. Two different risks, two different mechanisms.
+  ///
+  /// The row survives for the same reason `redactedAt` keeps its row: its
+  /// position in the timeline is real, and what somebody attempted is worth
+  /// keeping.
+  excludedFromAiContext Boolean @default(false) @map("excluded_from_ai_context")
+
+  /// `AnswerStatus` for an AI message — 35-doc §6. NULL for a human one.
+  ///
+  /// **For reading a thread, not for analytics.** An agent scrolling a
+  /// conversation should be able to tell a refusal from an escalation from a
+  /// real answer, which today is impossible: `appendAi` stores no status and
+  /// the one in the WebSocket frame is never persisted.
+  ///
+  /// **The knowledge-gap question is already a ledger query** — generations
+  /// with empty `retrieved_chunk_ids` (13-doc §4.1). A second report built off
+  /// this column would eventually disagree with that one, and the ledger is the
+  /// half that money is computed from.
+  answerStatus String? @map("answer_status") @db.VarChar(30)
+
   /// A DENORMALIZED CONVENIENCE for per-message display — doc 15 §3.2.
   ///
   /// These were token metering before the ledger existed. They are not any
