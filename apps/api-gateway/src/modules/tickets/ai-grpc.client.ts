@@ -76,6 +76,20 @@ export class AiGrpcClient extends BaseGrpcClient implements OnModuleInit {
       modelName: response.modelName,
       promptTokens: response.promptTokens,
       completionTokens: response.completionTokens,
+      // **Both of these were read off the response and not copied** — 38-doc
+      // §1. Every service satisfied its own contract and this boundary is the
+      // one no test crossed, which is why BOTH halves of the loop were missing
+      // here rather than one.
+      generationId: response.generationId,
+      citations: response.citations.map((citation) => ({
+        chunkId: citation.chunkId,
+        documentId: citation.documentId,
+        documentTitle: citation.documentTitle,
+        // `?? null`, and the DTO is `| null` to match: proto3 hands an absent
+        // `optional int32` back as `undefined`, and publishing that as a
+        // required number would misdescribe the response rather than break it.
+        pageNumber: citation.pageNumber ?? null,
+      })),
     };
   }
 

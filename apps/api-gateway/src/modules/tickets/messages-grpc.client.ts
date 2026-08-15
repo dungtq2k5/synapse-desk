@@ -95,6 +95,10 @@ export class MessagesGrpcClient extends BaseGrpcClient implements OnModuleInit {
             // Already-uploaded objects, bound as the message is written —
             // 36-doc §1.3. `?? []` because proto3 has no absent repeated field.
             attachments: dto.attachments ?? [],
+            // **Closes the acceptance loop** — 38-doc §1. Forwarded rather than
+            // dropped: ticket-service has always read this field, and not
+            // sending it is what made every accepted draft look discarded.
+            generatedFromId: dto.generatedFromId,
           },
           metadata,
         ),

@@ -7,6 +7,7 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  IsUUID,
   Max,
   MaxLength,
   Min,
@@ -75,6 +76,28 @@ export class CreateMessageDto {
   @ValidateNested({ each: true })
   @Type(() => NewAttachmentDto)
   readonly attachments?: NewAttachmentDto[];
+
+  /**
+   * The `ai_generations` row this reply came from — 38-doc §1, the loop's
+   * inbound half.
+   *
+   * **The other end of `AiDraftResponseDto.generationId`.** An agent presses
+   * *suggest a reply*, edits it or not, and posts; sending this back is what
+   * lets ticket-service compare the text against the stored draft and record
+   * ACCEPTED or EDITED instead of letting the sweep mark it DISCARDED.
+   *
+   * **This half was missing too**, which is why the loop was broken in both
+   * directions at exactly one service. The proto has carried the field since
+   * `message.proto:71` and ticket-service has always read it; the gateway
+   * neither returned the id nor accepted it back, so a client could not have
+   * closed the loop even knowing to try.
+   *
+   * Absent for an ordinary reply, and absent is not an error — most replies are
+   * typed by a human from nothing.
+   */
+  @IsOptional()
+  @IsUUID()
+  readonly generatedFromId?: string;
 }
 
 /**

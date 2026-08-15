@@ -9,7 +9,7 @@ import {
   bootstrapE2eTest,
   flushTestRedis,
 } from '../utils';
-import { grpcError, timestamp } from '../fixtures/wire';
+import { grpcError, timestamp, wireCreatedMessage } from '../fixtures/wire';
 
 /**
  * §2.6 The AI co-pilot at the HTTP boundary.
@@ -195,6 +195,141 @@ describe('§2.6 AI Co-Pilot at the HTTP boundary (e2e)', () => {
         .send({});
 
       expect(res.status).toBe(200);
+    });
+
+    it('**4. the loop closes: the id comes back and can be handed back**', async () => {
+      // 38-doc §3 test 1, and the assertion that would have prevented this.
+      //
+      // **Both directions in one test, because the loop is one thing.** The
+      // gateway returned neither half: `generationId` was read off the response
+      // and not copied, and `CreateMessageDto` had no `generatedFromId` to send
+      // it back through. Asserting only that the field is PRESENT would pass
+      // while the loop stayed broken — the id could be returned and have
+      // nowhere to go.
+      // **A real uuid, because the DTO validates one.** `ai_generations.id` is
+      // `@db.Uuid`, so `@IsUUID()` on the way back in is the right check — and
+      // it is what rejected the first version of this test, which used
+      // `'gen-42'`. A loop test that cannot tell "the field is missing" from
+      // "the value is malformed" is not testing the loop.
+      const generationId = faker.string.uuid();
+
+      fx.stubs.ai.generateDraft.mockReturnValue(
+        of({
+          content: 'A suggested reply',
+          modelName: 'm',
+          promptTokens: 1,
+          completionTokens: 2,
+          generationId,
+          citations: [
+            {
+              chunkId: 'chunk-1',
+              documentId: 'doc-1',
+              documentTitle: 'Handbook',
+              pageNumber: 4,
+            },
+          ],
+        }),
+      );
+      fx.stubs.message.createMessage.mockReturnValue(of(wireCreatedMessage()));
+
+      const draft = await authenticatedAgent(fx.app, {
+        permissionCodes: ['ticket.ai.use'],
+      })
+        .post(`${API}/tickets/${ticketId}/ai/draft`)
+        .send({});
+
+      expect(draft.body.data.generationId).toBe(generationId);
+
+      // The other half: post the draft back, naming what it came from.
+      await authenticatedAgent(fx.app, { permissionCodes: ['ticket.ai.use'] })
+        .post(`${API}/tickets/${ticketId}/messages`)
+        .send({
+          content: 'A suggested reply',
+          generatedFromId: draft.body.data.generationId,
+        })
+        .expect(201);
+
+      // Which is what lets ticket-service record ACCEPTED rather than letting
+      // the sweep mark it DISCARDED.
+      const [[sent]] = fx.stubs.message.createMessage.mock.calls;
+      expect((sent as { generatedFromId?: string }).generatedFromId).toBe(
+        generationId,
+      );
+    });
+
+    it('**5. citations reach the client, and `vectorPointId` does not**', async () => {
+      // §2. The narrowing is the decision, so it needs the assertion: a Qdrant
+      // point id is an internal retrieval identifier, and publishing it in a
+      // response DTO would make it part of the product surface by accident.
+      //
+      // ticket-service already drops it on the way through; this pins that the
+      // gateway's DTO cannot reintroduce it.
+      fx.stubs.ai.generateDraft.mockReturnValue(
+        of({
+          content: 'A draft',
+          modelName: 'm',
+          promptTokens: 1,
+          completionTokens: 2,
+          generationId: 'gen-1',
+          citations: [
+            {
+              chunkId: 'chunk-1',
+              documentId: 'doc-1',
+              documentTitle: 'Handbook',
+              pageNumber: 4,
+              // Present on the wire type and must not survive the mapper.
+              vectorPointId: 'point-1',
+            },
+          ],
+        }),
+      );
+
+      const res = await authenticatedAgent(fx.app, {
+        permissionCodes: ['ticket.ai.use'],
+      })
+        .post(`${API}/tickets/${ticketId}/ai/draft`)
+        .send({});
+
+      expect(res.body.data.citations).toEqual([
+        {
+          chunkId: 'chunk-1',
+          documentId: 'doc-1',
+          documentTitle: 'Handbook',
+          pageNumber: 4,
+        },
+      ]);
+      expect(JSON.stringify(res.body)).not.toContain('point-1');
+    });
+
+    it('**6. a source with no pages reports `null`, not a missing field**', async () => {
+      // `page_number` is `optional int32`, so an absent one arrives as
+      // `undefined`. Typing the DTO as a bare `number` would have the Swagger
+      // plugin publish a required field that is sometimes missing — a lie in
+      // the specification rather than in the code.
+      fx.stubs.ai.generateDraft.mockReturnValue(
+        of({
+          content: 'A draft',
+          modelName: 'm',
+          promptTokens: 1,
+          completionTokens: 2,
+          generationId: 'gen-1',
+          citations: [
+            {
+              chunkId: 'chunk-1',
+              documentId: 'doc-1',
+              documentTitle: 'A pasted text file',
+            },
+          ],
+        }),
+      );
+
+      const res = await authenticatedAgent(fx.app, {
+        permissionCodes: ['ticket.ai.use'],
+      })
+        .post(`${API}/tickets/${ticketId}/ai/draft`)
+        .send({});
+
+      expect(res.body.data.citations[0]).toHaveProperty('pageNumber', null);
     });
 
     it('3. REJECTS an over-long instruction', async () => {

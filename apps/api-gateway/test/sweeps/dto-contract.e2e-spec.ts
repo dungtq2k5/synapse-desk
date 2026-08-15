@@ -1,3 +1,4 @@
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { compareContract, type DtoContract } from '../utils/dto-contract';
 
@@ -182,6 +183,61 @@ describe('§2 REST and GraphQL DTOs are independent but not divergent', () => {
     },
   ];
 
+  /**
+   * REST response shapes with **no GraphQL twin, on purpose** — 38-doc §1.
+   *
+   * **The sweep is organised by PAIRS, so a shape with no twin is invisible to
+   * it.** That is not a small hole: `AiDraftResponseDto` sat outside every
+   * assertion in this file while two of its fields were silently dropped by the
+   * mapper, and the one mechanism built to flag a field nobody decided about
+   * never looked at it. The same shape as a hand-written list agreeing with
+   * whatever it was copied from.
+   *
+   * So the check below DISCOVERS response classes and requires each to be
+   * either contracted above or named here with a reason. An entry is a decision
+   * a reviewer can question; absence is now a failure rather than a silence.
+   *
+   * **Scoped to modules that have GraphQL DTOs at all.** In `auth` or `billing`
+   * a twin is not merely absent but meaningless — there is no GraphQL surface
+   * for those — and requiring forty entries saying so would bury the ones that
+   * matter. Within a module the schema already covers, a shape with no twin is
+   * a decision.
+   */
+  const TWINLESS: Readonly<Record<string, string>> = {
+    // tickets — the co-pilot is a REST surface; no client reads drafts,
+    // summaries or suggestions through the schema.
+    AiSummaryResponseDto: 'co-pilot output, REST-only surface',
+    AiDraftResponseDto: 'co-pilot output, REST-only surface — 38-doc §5',
+    // Envelopes and one-shot results rather than entities: nothing would query
+    // them by id, which is what a GraphQL type is for.
+    AttachmentResponseDto: 'nested inside MessageResponse, not queried alone',
+    CreateMessageResponseDto: 'a write RESULT, not an entity',
+    PresignAttachmentResponseDto: 'a short-lived credential, never a query',
+    DownloadAttachmentResponseDto: 'a short-lived credential, never a query',
+    BulkTicketStatusResponseDto: 'a write RESULT, not an entity',
+    AssignmentResponseDto: 'reached through Ticket, not queried alone',
+    // departments
+    DepartmentResponseDto: 'schema exposes departments through User and Ticket',
+    DepartmentMemberResponseDto: 'a membership edge, resolved not queried',
+    AddDepartmentMembersResponseDto: 'a write RESULT, not an entity',
+    // documents
+    DocumentChunkResponseDto: 'an ingestion internal, not a product shape',
+    DocumentFlagResponseDto: 'operator diagnostics, REST-only',
+    PresignDocumentResponseDto: 'a short-lived credential, never a query',
+    DownloadDocumentResponseDto: 'a short-lived credential, never a query',
+    StorageUsageResponseDto: 'a metered total, served beside billing',
+    // notifications
+    NotificationFeedResponseDto: 'an envelope around NotificationResponseDto',
+    UnreadCountResponseDto: 'a scalar in a wrapper',
+    MarkReadResponseDto: 'a write RESULT, not an entity',
+    PreferenceResponseDto: 'settings, not a queried entity',
+    // users
+    PresignAvatarResponseDto: 'a short-lived credential, never a query',
+    CurrentUserResponseDto: 'an envelope around UserResponseDto',
+    UserSummaryResponseDto: 'an envelope around UserResponseDto',
+    UserPermissionsResponseDto: 'a permission list, not an entity',
+  };
+
   it('the contract list covers every paired shape', () => {
     // Guards the guard: an empty or truncated list passes every assertion below
     // while checking nothing.
@@ -202,6 +258,60 @@ describe('§2 REST and GraphQL DTOs are independent but not divergent', () => {
       'KnowledgeGapFlag',
       'KnowledgeGaps',
     ]);
+  });
+
+  it('**every response shape is contracted or declared twinless**', () => {
+    // The assertion that would have asked somebody about `generationId`.
+    //
+    // Discovery is by class NAME (`*ResponseDto`), which is the convention this
+    // codebase follows — a shape named otherwise escapes it, and that is the
+    // known edge rather than a claim of completeness.
+    const contracted = new Set(CONTRACTS.map(({ restClass }) => restClass));
+    const modules = readdirSync(SRC).filter((name) =>
+      existsSync(join(SRC, name, 'dto/graphql')),
+    );
+
+    const undeclared: string[] = [];
+    for (const module of modules) {
+      const restDir = join(SRC, module, 'dto/rest');
+      if (!existsSync(restDir)) continue;
+
+      for (const file of readdirSync(restDir).filter(
+        (name) => name.endsWith('.dto.ts') && !name.endsWith('.spec.ts'),
+      )) {
+        const source = readFileSync(join(restDir, file), 'utf8');
+        for (const [, className] of source.matchAll(
+          /export class (\w*ResponseDto)\b/g,
+        )) {
+          if (!contracted.has(className) && !(className in TWINLESS)) {
+            undeclared.push(`${module}/${file}: ${className}`);
+          }
+        }
+      }
+    }
+
+    expect(undeclared).toEqual([]);
+  });
+
+  it('every twinless entry still exists', () => {
+    // The other direction: a stale entry silently exempts nothing and makes the
+    // list look more considered than it is.
+    const sources = readdirSync(SRC)
+      .filter((name) => existsSync(join(SRC, name, 'dto/rest')))
+      .flatMap((name) =>
+        readdirSync(join(SRC, name, 'dto/rest'))
+          .filter((file) => file.endsWith('.dto.ts'))
+          .map((file) =>
+            readFileSync(join(SRC, name, 'dto/rest', file), 'utf8'),
+          ),
+      )
+      .join('\n');
+
+    const stale = Object.keys(TWINLESS).filter(
+      (className) => !sources.includes(`export class ${className}`),
+    );
+
+    expect(stale).toEqual([]);
   });
 
   describe.each(CONTRACTS)('$name', (contract) => {
