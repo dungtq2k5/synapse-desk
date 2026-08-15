@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { envValidationSchema } from './env.validation';
-import { extractAddress } from '../../modules/inbound-email/inbound-email.service';
+import { extractEmailAddress } from '@synapsedesk/common';
 
 /**
  * 32-doc §5 test 3 — the self-loop guard is only as real as its variable.
@@ -20,7 +20,7 @@ describe('the gateway’s inbound-email configuration', () => {
   /**
    * The REAL `.env.test`, parsed.
    *
-   * Synthesising a valid env by hand was the first attempt and it failed for
+   * Synthesizing a valid env by hand was the first attempt and it failed for
    * unrelated keys — `BUILD_TIME` wants ISO, `COOKIE_SAMESITE` an enum — which
    * would have made the control case red for reasons that say nothing about
    * inbound email. Reading the file the suite actually boots with proves two
@@ -77,7 +77,7 @@ describe('the gateway’s inbound-email configuration', () => {
    * here against `noreply@synapsedesk.com` there — and every existing test
    * passed, because each one only ever read its own side.
    *
-   * Compared through the guard's own {@link extractAddress}, not a second
+   * Compared through the guard's own {@link extractEmailAddress}, not a second
    * spelling of it: `.env` wraps this address in a display name and the two
    * services word theirs differently, which is decoration rather than
    * disagreement. A local re-implementation here would be a test that agrees
@@ -90,6 +90,8 @@ describe('the gateway’s inbound-email configuration', () => {
     ).EMAIL_SENDER;
 
     expect(notification).toBeDefined();
-    expect(extractAddress(gateway)).toBe(extractAddress(notification));
+    expect(extractEmailAddress(gateway)).toBe(
+      extractEmailAddress(notification),
+    );
   });
 });

@@ -49,6 +49,37 @@ export function extractEmailLocalPart(email: string): string | null {
 }
 
 /**
+ * The bare address out of a `From` header — `"Support" <a@b>` becomes `a@b`.
+ *
+ * **Here rather than beside its one caller, and the spec is what decided it.**
+ * The gateway's self-loop guard compares an inbound `From` against
+ * `EMAIL_SENDER`, and `env.validation.spec.ts` asserts that the gateway and
+ * notification-service name the same address — through this function, because a
+ * second spelling in the test would be a test that agrees with itself. That put
+ * a spec under `common/config` importing from `modules/inbound-email`, which is
+ * the dependency running the wrong way: in this repo `common/` is the mechanism
+ * and `modules/` the capability, and mechanisms do not reach into features.
+ *
+ * Named for the family it joins — {@link extractEmailDomain},
+ * {@link extractEmailLocalPart} — all three being "pull one part out of an
+ * address a human typed".
+ *
+ * Comparison is the point, so the result is lower-cased: a display name is
+ * decoration a sender controls, and a guard that compared whole headers would
+ * miss `"SynapseDesk Support" <support@…>` and fail OPEN into the loop it
+ * exists to stop.
+ *
+ * Unanchored deliberately: a `From` may carry a comment or an encoded word
+ * before the angle brackets, and the first bracketed run is the address in
+ * every form of the header that reaches us.
+ */
+export function extractEmailAddress(value: string): string {
+  const angled = /<([^>]+)>/.exec(value); // NOSONAR
+
+  return (angled?.[1] ?? value).trim().toLowerCase();
+}
+
+/**
  * The comparator for sorting strings alphabetically.
  *
  * `Array.prototype.sort()` with no argument compares by UTF-16 code unit, not

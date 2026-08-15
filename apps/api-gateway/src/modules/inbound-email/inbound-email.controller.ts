@@ -17,6 +17,10 @@ import {
   InboundSignatureGuard,
 } from '../../common/guards/inbound-signature.guard';
 import { InboundEmailDto } from './dto/rest/inbound-email.dto';
+import {
+  InboundAttachmentUploadRequestDto,
+  InboundAttachmentUploadResponseDto,
+} from './dto/rest/inbound-attachment.dto';
 import { InboundEmailService } from './inbound-email.service';
 
 /**
@@ -107,5 +111,43 @@ export class InboundEmailController {
     const outcome = await this.inboundEmail.accept(payload);
 
     return { received: true, outcome };
+  }
+
+  /**
+   * Presigned uploads for a mail's attachments — 31-doc §5, the reply half.
+   *
+   * **Called before the webhook, by the same Worker, over the same signature.**
+   * The Worker parses the MIME, asks here which files it may store and where,
+   * PUTs the bytes to storage directly, and then posts the webhook carrying
+   * only object paths. The bytes never reach an application server, which is
+   * the property the presign flow exists to hold — and the one an inbound mail
+   * most threatens, because the Worker is handed the bytes whether anyone
+   * wanted them or not.
+   *
+   * **200, not 201.** Nothing has been created: the caller has permission to
+   * upload, and until the bytes land and the webhook binds them there is no
+   * attachment. The same reason the `:messageId` presign route answers 200.
+   *
+   * **Never fails for an ineligible file.** Files this route will not store come
+   * back in `declined`, by name, so the Worker can list them in
+   * `droppedAttachments` and the ticket can still say what was left out.
+   */
+  @ApiOperation({
+    summary:
+      'Presign uploads for an inbound mail’s attachments, before the webhook',
+  })
+  @ApiWrappedResponse(InboundAttachmentUploadResponseDto)
+  @ApiFilterErrors(['401'], { throttled: false })
+  @ApiExtension('x-webhook', {
+    signatureHeader: INBOUND_SIGNATURE_HEADER,
+    caller: 'cloudflare-email-worker',
+  })
+  @Post('email/attachments')
+  @UseGuards(InboundSignatureGuard)
+  @HttpCode(HttpStatus.OK)
+  presignAttachments(
+    @Body() request: InboundAttachmentUploadRequestDto,
+  ): Promise<InboundAttachmentUploadResponseDto> {
+    return this.inboundEmail.presignAttachments(request);
   }
 }

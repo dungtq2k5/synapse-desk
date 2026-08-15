@@ -46,6 +46,25 @@ GUARDED_RPCS = frozenset({"Chat", "Ask", "Draft"})
 #: department id, a priority and a set of suggested actions, never prose
 #: returned to a user. The blast radius of a successful injection is a misrouted
 #: ticket. Worth revisiting if any of them ever returns free text.
+#:
+#: **Re-read when `Classify` gained attachments, and it still holds** — the
+#: co-pilot plan §3.3. What changed is not the modality but the TRUST of the
+#: input: it was `title` and `body` written by whoever opened the ticket, and it
+#: is now also a file they chose — which after 31/32 can be an unauthenticated
+#: email sender. Three reasons the exemption survives that, stated rather than
+#: assumed:
+#:
+#:   - the blast radius is unchanged — a misrouted ticket, and one an agent
+#:     confirms before anything moves;
+#:   - the output is still a constrained choice — a department id from a list
+#:     the caller supplied, and a priority from a fixed set;
+#:   - **Layer A could not read an image regardless**, so guarding this would
+#:     buy the classifier's cost for a check the regex cannot perform.
+#:
+#: What DID change is the prompt: `classify` interpolated `TITLE:`/`BODY:` as
+#: plain-text delimiters and now uses the nonce boundary like its two siblings,
+#: because an unguarded surface taking an attacker-chosen file should at least
+#: bound it.
 UNGUARDED_RPCS: dict[str, str] = {
     "Summarize": "output is a summary shown to an agent, not shaped by a question",
     "Classify": "output is a department id and a priority — a constrained choice",

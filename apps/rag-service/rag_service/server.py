@@ -601,6 +601,10 @@ class RagServicer(rag_pb2_grpc.RagServiceServicer):
             settings,
             budget=budget,
             user_id=ctx.sub,
+            # The ticket's EARLIEST message's files — the third selection rule.
+            # Empty for a ticket opened by email, which has no message until
+            # somebody replies.
+            attachments=_attachments_of(request),
         )
 
         return rag_pb2.ClassifyResponse(

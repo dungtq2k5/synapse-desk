@@ -250,6 +250,8 @@ export class RagClientService implements OnModuleInit {
     body: string,
     departments: Array<{ id: string; name: string }>,
     context: CallerContext,
+    /** The ticket's earliest message's files — the third selection rule. */
+    attachments: AttachmentPart[] = [],
   ): Promise<AiClassification> {
     const rag = this.require('AI classification');
 
@@ -257,7 +259,7 @@ export class RagClientService implements OnModuleInit {
       firstValueFrom(
         rag
           .classify(
-            { ticketId, title, body, departments },
+            { ticketId, title, body, departments, attachments },
             packRequestContext(context),
           )
           .pipe(timeout(GENERATION_DEADLINE_MS)),

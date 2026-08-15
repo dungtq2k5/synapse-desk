@@ -21,11 +21,15 @@ from dataclasses import dataclass
 
 from rag_service.enums import AiGenerationPurpose
 from rag_service.generation.boundary import (
+    attachment_instruction,
+    classified_text_instruction,
     history_instruction,
     new_nonce,
+    wrap_attachments,
     wrap_history,
+    wrap_question,
 )
-from rag_service.generation.parts import Prompt
+from rag_service.generation.parts import Attachment, Prompt
 from rag_service.ledger.client import GenerationEntry
 from rag_service.ledger.metered import LedgerRecorder, QuotaCharger
 from rag_service.retrieval.service import BudgetState
@@ -155,6 +159,7 @@ class CopilotService:
         *,
         budget: BudgetState,
         user_id: str | None = None,
+        attachments: list[Attachment] | None = None,
     ) -> Classification:
         """Routes a ticket, choosing only from departments that EXIST.
 
@@ -162,16 +167,51 @@ class CopilotService:
         cannot see `postgres_auth`. A suggestion naming a department that does
         not exist is worse than no suggestion: it either fails a write or
         silently routes a ticket nowhere.
-        """
-        options = "\n".join(f"- {name} (id: {did})" for did, name in departments)
 
-        prompt = (
+        **The attachments are the ticket's EARLIEST message's** — the third
+        selection rule, beside `Chat`'s "the current message's" and `Draft`'s
+        "the last user message's". This surface never reads the conversation,
+        so nothing carries terms forward to it: a ticket whose body says *"see
+        attached"* routes on those two words unless the file is here.
+
+        **Empty is the normal case for an emailed ticket**, which has no message
+        at all until somebody replies. Accepted blindness rather than a wait —
+        classify is agent-triggered and re-running it is one click.
+        """
+        parts = attachments or []
+        options = "\n".join(f"- {name} (id: {did})" for did, name in departments)
+        nonce = new_nonce()
+
+        # **The boundary, which this prompt did not have.** `summarize` and
+        # `suggest` both wrap their untrusted text; classify interpolated
+        # `TITLE:` and `BODY:` as plain-text delimiters — the exact pattern
+        # 33-doc §4 exists to remove, and a body containing its own `BODY:` line
+        # could restate the task.
+        #
+        # It mattered less while this surface was unguarded AND text-only: the
+        # blast radius is a misrouted ticket. It matters more now, because the
+        # input is a file chosen by whoever opened the ticket — and after 31/32
+        # that can be an unauthenticated email sender.
+        text_prompt = (
             "Route this support ticket.\n"
             f"Choose ONE department id from this list, and nothing else:\n{options}\n"
             f"Choose ONE priority from: {', '.join(VALID_PRIORITIES)}.\n"
-            "Reply as JSON with keys: department_id, priority, confidence (0-1).\n\n"
-            f"TITLE: {title}\nBODY: {body}\n\nJSON:"
+            "Reply as JSON with keys: department_id, priority, confidence (0-1).\n"
+            + classified_text_instruction(nonce)
+            + (attachment_instruction(nonce) if parts else "")
+            + "\n"
+            + wrap_question(f"TITLE: {title}\nBODY: {body}", nonce)
+            + (
+                f"\n{wrap_attachments([part.file_name for part in parts], nonce)}"
+                if parts
+                else ""
+            )
+            + "\n\nJSON:"
         )
+
+        # Parts last, after the instruction and the boundary — the same ordering
+        # every other multimodal call in this service uses.
+        prompt: Prompt = [text_prompt, *parts] if parts else text_prompt
 
         text, generation_id = await self._spend(
             prompt,

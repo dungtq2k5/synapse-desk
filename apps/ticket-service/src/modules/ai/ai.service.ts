@@ -257,9 +257,24 @@ export class AiService {
     request: TicketAiRequest,
     context: CallerContext,
   ): Promise<ClassifyTicketResponse> {
-    await this.access.load(request.ticketId, context);
-
     const ticket = await this.access.load(request.ticketId, context);
+
+    // **The EARLIEST message's files — the third selection rule.**
+    //
+    // `title` and `description` describe how the ticket opened, and this
+    // surface reads nothing later: it never touches the conversation, so the
+    // free win where the AI's own replies name an error code — the one
+    // summaries inherit — does not reach it. A ticket whose body says "see
+    // attached" routes on those two words unless the file comes too, and a
+    // department chosen from them is not thin but WRONG, arriving with a
+    // confidence score attached.
+    //
+    // Empty for a ticket opened by email, which has no message until somebody
+    // replies. Accepted blindness rather than a wait — see the service.
+    const attachments = await this.aiAttachments.forEarliestMessage(
+      ticket.id,
+      context,
+    );
 
     // A SUGGESTION, never applied here. Auto-routing on a model's guess without
     // an agent confirming it would move tickets between teams on a confidence
@@ -273,6 +288,7 @@ export class AiService {
       // exist is worse than no suggestion.
       await this.departmentOptions(context),
       context,
+      attachments.parts,
     );
   }
 

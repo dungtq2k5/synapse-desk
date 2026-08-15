@@ -208,6 +208,19 @@ message ClassifyRequest {
   // rag-service cannot see postgres_auth, and a suggestion naming a
   // department that does not exist is worse than no suggestion.
   repeated DepartmentOption departments = 4;
+  // The EARLIEST message's attachments — the third selection rule.
+  //
+  // `Chat` sends the current message's and `Draft` the last user message's;
+  // this one sends the first, because `title` and `body` describe how the
+  // ticket opened. **Nothing carries terms forward to this surface**: classify
+  // never reads the conversation, so the free win where the AI's own replies
+  // name an error code — the one summaries inherit — does not reach it.
+  //
+  // Empty when no message exists yet, which for a ticket opened by email is
+  // every classify run until somebody replies. That is accepted blindness
+  // rather than a wait: classify is agent-triggered and re-running it is one
+  // click.
+  repeated AttachmentPart attachments = 5;
 }
 
 message DepartmentOption {

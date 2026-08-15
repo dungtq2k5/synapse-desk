@@ -1,4 +1,6 @@
+import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
   IsArray,
   IsEmail,
   IsISO8601,
@@ -7,7 +9,14 @@ import {
   IsString,
   Matches,
   MaxLength,
+  MinLength,
+  ValidateNested,
 } from 'class-validator';
+import {
+  MAX_ATTACHMENT_FILE_NAME_LENGTH,
+  MAX_ATTACHMENTS_PER_MESSAGE,
+  MAX_OBJECT_PATH_LENGTH,
+} from '@synapsedesk/common';
 import {
   MAX_DATE_HEADER_LENGTH,
   MAX_EMAIL_ADDRESS_LENGTH,
@@ -17,6 +26,27 @@ import {
   PRINTABLE_ASCII,
 } from '../../../../common/config/dto.config';
 import { IsPresentButNullable } from '../../../../common/decorators/is-nullable.decorator';
+
+/**
+ * One object the Worker uploaded, ready to bind to the message.
+ *
+ * Field-for-field the shape `CreateMessageRequest.attachments` takes, because
+ * that is exactly where it goes. **No size and no MIME type**: both are read
+ * back from the object at confirm rather than trusted from the caller — the
+ * rule 36-doc §1.3 states and a signed-but-attacker-influenced payload must not
+ * be allowed to undo.
+ */
+export class InboundUploadedAttachmentDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(MAX_OBJECT_PATH_LENGTH)
+  readonly objectPath!: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(MAX_ATTACHMENT_FILE_NAME_LENGTH)
+  readonly fileName!: string;
+}
 
 /**
  * What the mail Worker POSTs — 32-doc §2, §3.1.
@@ -120,6 +150,30 @@ export class InboundEmailDto {
   @IsArray()
   @IsString({ each: true })
   readonly droppedAttachments?: string[];
+
+  /**
+   * Attachments the Worker ALREADY UPLOADED, as object paths — 31-doc §5.
+   *
+   * **The bytes came nowhere near this server.** The Worker asked
+   * `POST /webhooks/email/attachments` which files it could store, PUT them to
+   * storage directly, and sends only the paths here — so the one route in the
+   * system that takes input from an unauthenticated sender never takes their
+   * file bytes.
+   *
+   * **Only on a reply.** A mail that opens a NEW ticket has nothing to attach
+   * to: `createTicket` writes a ticket row and no message, so there is no
+   * `message_attachments` parent. The presign route declines everything for
+   * that case and those names arrive in `droppedAttachments` instead.
+   *
+   * Each path is confirmed by ticket-service as the message is written
+   * (36-doc §1.3); a path that fails is skipped and named, never fatal.
+   */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(MAX_ATTACHMENTS_PER_MESSAGE)
+  @ValidateNested({ each: true })
+  @Type(() => InboundUploadedAttachmentDto)
+  readonly attachments?: InboundUploadedAttachmentDto[];
 
   /**
    * The message's own `Date` header, verbatim.

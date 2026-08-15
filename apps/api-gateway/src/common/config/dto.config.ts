@@ -32,6 +32,24 @@ export const MIN_DEPARTMENT_NAME_LENGTH = 2;
 export const MAX_DEPARTMENT_NAME_LENGTH = 100;
 
 /**
+ * How many files ONE inbound mail may present for upload.
+ *
+ * **Deliberately larger than `MAX_ATTACHMENTS_PER_MESSAGE`.** A mail with eight
+ * attachments is a real mail; the route accepts the list, decides which five are
+ * eligible, and DECLINES the rest by name. Rejecting the whole request at six
+ * would make the Worker guess the policy, and it would lose the names the
+ * ticket's "attachments were not accepted" note is built from.
+ *
+ * Here rather than beside the DTO because this file is where a bound on an
+ * incoming body belongs — the same shelf as the two batch limits above it. The
+ * other two bounds on this route (`MAX_ATTACHMENT_BYTES`, the file-name length)
+ * are in `@synapsedesk/common` because ticket-service enforces them too; this
+ * one is the gateway's alone, and a local `const` in a DTO made three bounds on
+ * one route live in three places.
+ */
+export const MAX_PRESENTED_ATTACHMENTS = 20;
+
+/**
  * Upper bound on one "add members" call. Guards the REQUEST BODY only; the
  * tenant check on every id is what enforces correctness.
  */

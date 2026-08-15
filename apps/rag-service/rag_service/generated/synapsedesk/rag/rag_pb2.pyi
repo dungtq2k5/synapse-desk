@@ -180,16 +180,18 @@ class SummaryResponse(_message.Message):
     def __init__(self, summary_text: _Optional[str] = ..., suggested_action: _Optional[str] = ..., confidence_score: _Optional[float] = ..., model_name: _Optional[str] = ..., generation_id: _Optional[str] = ...) -> None: ...
 
 class ClassifyRequest(_message.Message):
-    __slots__ = ("ticket_id", "title", "body", "departments")
+    __slots__ = ("ticket_id", "title", "body", "departments", "attachments")
     TICKET_ID_FIELD_NUMBER: _ClassVar[int]
     TITLE_FIELD_NUMBER: _ClassVar[int]
     BODY_FIELD_NUMBER: _ClassVar[int]
     DEPARTMENTS_FIELD_NUMBER: _ClassVar[int]
+    ATTACHMENTS_FIELD_NUMBER: _ClassVar[int]
     ticket_id: str
     title: str
     body: str
     departments: _containers.RepeatedCompositeFieldContainer[DepartmentOption]
-    def __init__(self, ticket_id: _Optional[str] = ..., title: _Optional[str] = ..., body: _Optional[str] = ..., departments: _Optional[_Iterable[_Union[DepartmentOption, _Mapping]]] = ...) -> None: ...
+    attachments: _containers.RepeatedCompositeFieldContainer[AttachmentPart]
+    def __init__(self, ticket_id: _Optional[str] = ..., title: _Optional[str] = ..., body: _Optional[str] = ..., departments: _Optional[_Iterable[_Union[DepartmentOption, _Mapping]]] = ..., attachments: _Optional[_Iterable[_Union[AttachmentPart, _Mapping]]] = ...) -> None: ...
 
 class DepartmentOption(_message.Message):
     __slots__ = ("id", "name")

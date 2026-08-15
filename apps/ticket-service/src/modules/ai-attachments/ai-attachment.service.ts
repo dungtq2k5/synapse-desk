@@ -51,7 +51,21 @@ export class AiAttachmentService {
     context: CallerContext,
   ): Promise<AiAttachments> {
     const rows = await this.prisma.messageAttachment.findMany({
-      where: { messageId },
+      // **The refusal exclusion reaches the FILES, not only the text** —
+      // 35-doc §6.
+      //
+      // The three transcript builders drop a refused message's content; without
+      // this clause its attachments still arrived. A user sends injection text
+      // plus a screenshot, the guard refuses it, the write-back sets the flag —
+      // and the next co-pilot draft excludes the sentence and sends the file.
+      //
+      // **Inverted with respect to risk, which is why it is here rather than
+      // only in the selectors below.** The file is the half Layer A cannot read
+      // at all and Layer B only classifies, so it is the half the exclusion most
+      // needed to cover. Filtered through the relation so a caller that hands
+      // in a message id directly — the gateway's `Chat` path — is covered by the
+      // same clause as the two rules that select their own.
+      where: { messageId, message: { excludedFromAiContext: false } },
       orderBy: { createdAt: 'asc' },
     });
 
@@ -121,10 +135,70 @@ export class AiAttachmentService {
     ticketId: string,
     context: CallerContext,
   ): Promise<AiAttachments> {
-    const messageId = await this.lastUserMessageId(ticketId);
+    // **Excluding refused ones**, which is what makes this differ from
+    // `lastUserMessageId` below. A refused turn is not in the transcript this
+    // draft is built from, so its files must not be either — and falling back
+    // to the previous message means the attachments and the text the model sees
+    // describe the same exchange.
+    const messageId = await this.newestUserMessageId(ticketId, {
+      excludingRefused: true,
+    });
     if (!messageId) return { parts: [], skipped: [] };
 
     return this.forMessage(messageId, context);
+  }
+
+  /**
+   * The parts for the ticket's EARLIEST message — `Classify`.
+   *
+   * **The third selection rule, and the three belong together.** `Chat` sends
+   * the current message's, `Draft` the last user message's, and this one the
+   * first — because `title` and `description` describe how the ticket opened,
+   * and classify never reads anything later.
+   *
+   * **Nothing carries terms forward to this surface.** Summaries inherit error
+   * codes for free once the AI's own replies name them; classify reads neither
+   * the replies nor the conversation, so a ticket whose body says "see
+   * attached" routes on those two words unless the file is here.
+   *
+   * **Empty is the ordinary case for an emailed ticket**, and that is accepted
+   * rather than worked around: `createTicket` writes a ticket row and no
+   * message, so a ticket opened by mail has none until somebody replies.
+   * Classify is agent-triggered, so by the time anyone clicks it a message
+   * usually exists — and when it does not, re-running it is one click. Waiting
+   * or re-running automatically would both cost more than the blindness does.
+   *
+   * User messages only, for the same reason `forLastUserMessage` skips AI ones:
+   * an assistant reply carries no attachments and taking it would return empty
+   * for a customer's screenshot.
+   */
+  async forEarliestMessage(
+    ticketId: string,
+    context: CallerContext,
+  ): Promise<AiAttachments> {
+    const message = await this.prisma.ticketMessage.findFirst({
+      // **No exclusion clause, and it is NOT an oversight** — the refused
+      // opening message is still the opening message.
+      //
+      // `forLastUserMessage` skips refused rows and falls back to the previous
+      // one, because a draft's attachments should describe the same exchange
+      // its transcript shows. This rule cannot borrow that: it selects the
+      // EARLIEST message precisely because `title` and `description` describe
+      // how the ticket opened, and a later message's files are not what they
+      // describe. Falling back would answer a different question.
+      //
+      // So a refused opening message yields NOTHING rather than something
+      // else — `forMessage` drops its files through the relation clause — and
+      // a ticket that opened with an injection routes on its text alone, which
+      // is where it started.
+      where: { ticketId, isAiGenerated: false },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true },
+    });
+
+    if (!message) return { parts: [], skipped: [] };
+
+    return this.forMessage(message.id, context);
   }
 
   /**
@@ -137,8 +211,35 @@ export class AiAttachmentService {
    * disagreement would be a refused question quietly staying in context.
    */
   async lastUserMessageId(ticketId: string): Promise<string | null> {
+    // **Includes refused ones, deliberately** — the opposite of what
+    // `forLastUserMessage` wants, which is why the two ask separately rather
+    // than sharing a call.
+    //
+    // This resolves the message a refusal is about to be written back TO.
+    // Skipping already-excluded rows would be wrong on a retry: the row it
+    // wants is precisely the one a previous attempt already flagged.
+    return this.newestUserMessageId(ticketId, { excludingRefused: false });
+  }
+
+  /**
+   * The newest message a human wrote — with or without the refused ones.
+   *
+   * **One query, two questions, and the flag says which.** *"What is the draft
+   * replying to"* and *"what was just refused"* are different questions about
+   * the same table, and answering both from one unparameterised method is how
+   * the refusal write-back and the attachment selector would silently agree to
+   * be wrong in opposite directions.
+   */
+  private async newestUserMessageId(
+    ticketId: string,
+    { excludingRefused }: { excludingRefused: boolean },
+  ): Promise<string | null> {
     const message = await this.prisma.ticketMessage.findFirst({
-      where: { ticketId, isAiGenerated: false },
+      where: {
+        ticketId,
+        isAiGenerated: false,
+        ...(excludingRefused ? { excludedFromAiContext: false } : {}),
+      },
       orderBy: { createdAt: 'desc' },
       select: { id: true },
     });

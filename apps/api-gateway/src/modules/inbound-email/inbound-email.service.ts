@@ -26,6 +26,10 @@ import {
   fromProtoOrgStatus,
 } from '@synapsedesk/grpc-proto';
 import {
+  extractEmailAddress,
+  formatErrorMsg,
+  MAX_ATTACHMENT_BYTES,
+  MAX_ATTACHMENTS_PER_MESSAGE,
   OrgStatus,
   parseInboundAddress,
   parseTicketReplyToken,
@@ -36,6 +40,13 @@ import {
 } from '@synapsedesk/common';
 import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
 import { InboundEmailDto } from './dto/rest/inbound-email.dto';
+import type { InboundUploadedAttachmentDto } from './dto/rest/inbound-email.dto';
+import {
+  InboundAttachmentDeclinedDto,
+  InboundAttachmentUploadDto,
+  InboundAttachmentUploadRequestDto,
+  InboundAttachmentUploadResponseDto,
+} from './dto/rest/inbound-attachment.dto';
 import { InboundEmailPublisher } from './inbound-email.publisher';
 import { toStoredBody } from './quoted-reply';
 
@@ -86,6 +97,54 @@ class InboundPeer extends BaseGrpcClient {
     return this.call(invoke, origin);
   }
 }
+
+/**
+ * The only fields routing reads.
+ *
+ * **Narrow on purpose.** `InboundEmailDto` satisfies it and so does the
+ * Worker's presign request, which is what lets one resolver serve both — and
+ * the narrowness is the documentation: nothing about the SUBJECT or the BODY
+ * decides which ticket a mail threads onto, and a resolver typed to the whole
+ * payload invites somebody to start reading them.
+ */
+type RoutingFacts = {
+  to: string;
+  from: string;
+  fromName?: string;
+  inReplyTo?: string;
+  references?: string[];
+};
+
+/**
+ * What `resolveRouting` found — 31-doc §5's reply half.
+ *
+ * A discriminated result rather than a nullable one, so the three ways a mail
+ * can be unroutable stay distinguishable: `accept` turns each into its own drop
+ * event, and the Worker's presign route treats all three as "no".
+ */
+type RoutingResolution =
+  | {
+      ok: false;
+      outcome: InboundOutcome;
+      organizationId?: string;
+      /** `null` when the peer reported a status this gateway does not know. */
+      status?: OrgStatus | null;
+    }
+  | {
+      ok: true;
+      organizationId: string;
+      context: RequestContext;
+      /**
+       * Whether the address itself named a ticket.
+       *
+       * Distinguishes "a reply whose ticket vanished" from "a fresh mail" — the
+       * first is a drop, the second creates a ticket, and they arrive here
+       * looking identical once `ticket` is null.
+       */
+      addressedToTicket: boolean;
+      /** `null` when this mail would CREATE a ticket rather than thread onto one. */
+      ticket: TicketResponse | null;
+    };
 
 /**
  * The email adapter — 31-doc §6, 32-doc §4.
@@ -153,127 +212,56 @@ export class InboundEmailService implements OnModuleInit {
       return InboundOutcome.SELF_LOOP;
     }
 
-    // ---------------------------------------------------------- 1. tenant
-    const address = parseInboundAddress(payload.to);
-
-    if (!address) {
-      return this.drop(InboundOutcome.UNROUTABLE, payload, null);
-    }
-
-    const { organizationId, status: tenantStatus } = await this.authPeer.run(
-      (metadata) =>
-        this.organizations.resolveOrgByInboundToken(
-          { inboundToken: address.tenantToken },
-          metadata,
-        ),
-      // No caller identity exists yet — the tenant is what this call resolves.
-      UNKNOWN_ORIGIN,
-    );
-
-    if (!organizationId) {
-      return this.drop(InboundOutcome.UNROUTABLE, payload, null);
-    }
-
-    // **The lifecycle gate, applied HERE because it cannot apply where it
-    // normally does.** The global interceptor reads `organizations.status` off
-    // the caller's identity, and this route has none — the tenant comes from
-    // the payload. 32-doc §3 records that the route "bypasses the tenant
-    // lifecycle gate", and that means bypassing WHERE the check happens, not
-    // whether it happens: a suspended tenant taking mail would grow a queue
-    // nobody may read, and provision End Users into a workspace that is closed
-    // to its own members.
+    // ------------------------------------------- 1-3. tenant, sender, thread
     //
-    // Only ACTIVE accepts. `PENDING_ONBOARDING` is deliberately included in the
-    // refusal: a tenant that has not finished setup has no departments, no
-    // agents and no one to route to, so mail would land in a queue with no
-    // reader — and the sender gets told, which is better than silence.
-    if (fromProtoOrgStatus(tenantStatus) !== OrgStatus.ACTIVE) {
+    // **One resolver, shared with the Worker's presign route** — 31-doc §5's
+    // reply half. The Worker presigns against a ticket BEFORE this webhook
+    // runs; if the two resolutions could disagree, a customer's screenshot
+    // would be uploaded under one ticket's prefix and attached to another's
+    // message.
+    const routing = await this.resolveRouting(payload);
+
+    if (!routing.ok) {
       return this.drop(
-        InboundOutcome.TENANT_INACTIVE,
+        routing.outcome,
         payload,
-        organizationId,
-        fromProtoOrgStatus(tenantStatus),
+        routing.organizationId ?? null,
+        routing.status ?? undefined,
       );
     }
 
-    // ---------------------------------------------------------- 2. sender
-    const sender = await this.authPeer.run(
-      (metadata) =>
-        this.users.resolveInboundSender(
-          {
-            organizationId,
-            email: payload.from,
-            displayName: payload.fromName,
-          },
-          metadata,
-        ),
-      UNKNOWN_ORIGIN,
-    );
+    const { context, ticket, addressedToTicket } = routing;
 
-    // Not a member, and their domain is not permitted here. The auto-reply that
-    // tells them so is step 6 — the drop itself is visible now.
-    if (!sender.userId) {
-      return this.drop(InboundOutcome.SENDER_REFUSED, payload, organizationId);
-    }
-
-    if (sender.created) {
-      this.logger.log(
-        `Provisioned an End User for ${payload.from} in ${organizationId}`,
-      );
-    }
-
-    // ---------------------------------------------------------- 3. thread
+    // **The note is applied ONCE, for both paths** — and until now it was not.
     //
-    // The caller context every RPC below is scoped by. Assembled from the
-    // RESOLVED tenant and sender rather than from anything the message claimed
-    // — the only facts here that survived verification.
-    const context: RequestContext = {
-      ...UNKNOWN_ORIGIN,
-      sub: sender.userId,
-      organizationId,
-      isSuperAdmin: false,
-      departmentIds: [],
-      permissionCodes: [],
-      isEmailVerified: false,
-    };
-
-    const body = toStoredBody(payload.text, payload.html);
+    // `withAttachmentNote` was only ever reached on ticket creation, so an
+    // emailed REPLY carrying attachments dropped them in silence: no file, no
+    // note, nothing in the thread saying anything had been left out. That was
+    // survivable while mail dropped every attachment, because the customer at
+    // least got the note on their first mail. It stops being survivable now
+    // that some attachments land and some do not — a partial delivery with no
+    // record of the missing half is worse than a total one.
+    const body = this.withAttachmentNote(
+      toStoredBody(payload.text, payload.html),
+      payload,
+    );
     const inboundMessageId = this.idempotencyKeyFor(payload);
-    const ticketNumber = this.ticketFromReplyToken(address, organizationId);
 
     try {
-      if (ticketNumber !== null) {
-        const appended = await this.appendByNumber(
-          ticketNumber,
+      if (ticket) {
+        // The thread this mail belongs to, already resolved above.
+        const appended = await this.append(
+          ticket,
           body,
           inboundMessageId,
           context,
+          payload.attachments,
         );
-
         if (appended) return InboundOutcome.APPENDED;
+      } else if (addressedToTicket) {
         // The token verified but the ticket is gone. A new ticket is the safe
         // direction — 31-doc §4 — because the alternative is discarding a
         // customer's message.
-      } else if (!address.ticketToken) {
-        // **The `In-Reply-To` fallback** — 31-doc §4. Someone replying to a
-        // forwarded copy, or writing to the bare support address about an
-        // existing issue, carries no ticket token but does echo back the
-        // `Message-ID` of the mail they are answering.
-        //
-        // **Guarded on the ABSENCE of a token, not on a null ticket number** —
-        // and the difference is the security property. Both cases produce a
-        // null number: an address with no token at all, and one whose token
-        // failed its MAC. Falling through on the second would hand back exactly
-        // the threading the MAC just refused, using a header the same sender
-        // also controls.
-        const ticketId = await this.ticketFromHeaders(payload, organizationId);
-
-        if (
-          ticketId &&
-          (await this.appendToTicket(ticketId, body, inboundMessageId, context))
-        ) {
-          return InboundOutcome.APPENDED;
-        }
       }
 
       await this.ticketPeer.run(
@@ -281,7 +269,7 @@ export class InboundEmailService implements OnModuleInit {
           this.tickets.createTicket(
             {
               title: payload.subject.trim() || '(no subject)',
-              description: this.withAttachmentNote(body, payload),
+              description: body,
               source: ProtoTicketSource.TICKET_SOURCE_EMAIL,
               // **UNSPECIFIED, not a guess.** No mail header states a priority,
               // and inferring one from "URGENT!!" in the subject would let the
@@ -289,7 +277,9 @@ export class InboundEmailService implements OnModuleInit {
               // its own default (MEDIUM), so the rule lives in one place and an
               // emailed ticket is triaged like any other.
               priority: ProtoTicketPriority.TICKET_PRIORITY_UNSPECIFIED,
-              authorId: sender.userId,
+              // The resolved sender, which is what `context.sub` already is —
+              // the only identity here that survived verification.
+              authorId: context.sub,
               inboundMessageId,
             },
             metadata,
@@ -311,60 +301,274 @@ export class InboundEmailService implements OnModuleInit {
     }
   }
 
-  private async appendByNumber(
-    ticketNumber: number,
-    body: string,
-    inboundMessageId: string,
-    context: RequestContext,
-  ): Promise<boolean> {
-    // Typed rather than inferred: `firstValueFrom` in a `try` widens to `any`
-    // when the binding has no annotation, and every read below then silently
-    // stops being checked — including `status`, which is a proto enum this
-    // path has already been caught comparing against the wrong type once.
-    let ticket: TicketResponse;
-    try {
-      ticket = await this.ticketPeer.run(
-        (metadata) =>
-          this.tickets.getTicketByNumber({ ticketNumber }, metadata),
-        context,
-      );
-    } catch {
-      return false;
-    }
-
-    return this.append(ticket, body, inboundMessageId, context);
-  }
-
   /**
-   * Appends to a ticket named by ID — the `In-Reply-To` path.
+   * Presigns uploads for a mail's attachments — 31-doc §5, the reply half.
    *
-   * **The ticket is re-fetched under the CALLER's context rather than trusted.**
-   * The id came from notification-service's join, which is already scoped to
-   * this tenant; fetching it through ticket-service means the answer is scoped
-   * twice, by two services, from two directions. That is the difference between
-   * an isolation guarantee and an isolation convention.
+   * **Called BEFORE the webhook, by the Worker, over the same signed channel.**
+   * The bytes go from the Worker straight to storage and never touch this
+   * server, which is the property 10-doc's presign flow exists to hold and the
+   * one an inbound mail most threatens: the Worker has the bytes whether anyone
+   * wanted them or not, and uploading them through the webhook would make
+   * `/webhooks/email/inbound` the only route in the system that accepts
+   * arbitrary file bytes from an unauthenticated sender.
+   *
+   * **Eligibility is decided here, not in the Worker.** The allowlist, the size
+   * cap and the per-message ceiling are policy, and a second copy of policy in a
+   * Cloudflare Worker is a copy that drifts. The Worker presents what it parsed
+   * and is told which files it may upload; the rest come back NAMED so the
+   * ticket can still say what was left out.
+   *
+   * **A mail that would CREATE a ticket declines everything**, because there is
+   * no ticket for the object path to hang under — the new-ticket half of §0,
+   * which is blocked on a separate decision.
    */
-  private async appendToTicket(
-    ticketId: string,
-    body: string,
-    inboundMessageId: string,
-    context: RequestContext,
-  ): Promise<boolean> {
-    let ticket: TicketResponse;
-    try {
-      ticket = await this.ticketPeer.run(
-        (metadata) => this.tickets.getTicket({ id: ticketId }, metadata),
-        context,
-      );
-    } catch {
-      return false;
+  async presignAttachments(
+    request: InboundAttachmentUploadRequestDto,
+  ): Promise<InboundAttachmentUploadResponseDto> {
+    const uploads: InboundAttachmentUploadDto[] = [];
+    const declined: InboundAttachmentDeclinedDto[] = [];
+
+    const routing = await this.resolveRouting({
+      to: request.to,
+      from: request.from,
+      fromName: request.fromName,
+      inReplyTo: request.inReplyTo,
+      references: request.references,
+    });
+
+    if (!routing.ok || !routing.ticket) {
+      // One reason for every file, and it is the same reason: either the mail
+      // does not route, or it opens a new ticket. Neither has somewhere to put
+      // a file.
+      return {
+        uploads: [],
+        declined: request.files.map((file) => ({
+          fileName: file.fileName,
+          reason: routing.ok ? 'no ticket to attach to' : 'unroutable',
+        })),
+      };
     }
 
-    return this.append(ticket, body, inboundMessageId, context);
+    const { context, ticket } = routing;
+
+    for (const file of request.files) {
+      // **The per-message ceiling, applied HERE.** `createMessage` throws when
+      // the list is over the cap rather than trimming it — so a mail with eight
+      // attachments would lose the MESSAGE, not the extra files. Declining the
+      // sixth here keeps that a partial loss with a name on it.
+      if (uploads.length >= MAX_ATTACHMENTS_PER_MESSAGE) {
+        declined.push({
+          fileName: file.fileName,
+          reason: `only ${MAX_ATTACHMENTS_PER_MESSAGE} attachments per message`,
+        });
+        continue;
+      }
+
+      if (file.sizeBytes > MAX_ATTACHMENT_BYTES) {
+        declined.push({ fileName: file.fileName, reason: 'too large' });
+        continue;
+      }
+
+      try {
+        const presigned = await this.ticketPeer.run(
+          (metadata) =>
+            this.messages.uploadAttachment(
+              {
+                ticketId: ticket.id,
+                // No message yet — it is created by the webhook that follows,
+                // and 36-doc §1.3 is what made presigning without one possible.
+                messageId: undefined,
+                fileName: file.fileName,
+                fileSizeBytes: file.sizeBytes,
+                mimeType: file.mimeType,
+              },
+              metadata,
+            ),
+          context,
+        );
+
+        uploads.push({
+          fileName: file.fileName,
+          uploadUrl: presigned.uploadUrl,
+          objectPath: presigned.objectPath,
+        });
+      } catch (error) {
+        // One refused file must not fail the batch, and must not fail the mail
+        // either — the message still lands, minus this attachment.
+        this.logger.warn(
+          `Could not presign an inbound attachment: ${formatErrorMsg(error)}`,
+        );
+        declined.push({
+          fileName: file.fileName,
+          reason: 'refused by storage',
+        });
+      }
+    }
+
+    return { uploads, declined };
   }
 
   /**
-   * The write both threading paths share.
+   * The tenant, the sender and the ticket a message threads onto — the prefix
+   * `accept` and the Worker's presign route both need.
+   *
+   * **Extracted rather than duplicated**, and the reason is that the two must
+   * not be able to disagree. The Worker presigns against a ticket BEFORE the
+   * webhook runs, and the webhook then binds the objects to whatever ticket it
+   * resolves — so if the two resolutions ever diverged, a customer's screenshot
+   * would be uploaded under one ticket's prefix and attached to another's
+   * message. One implementation makes that unrepresentable.
+   *
+   * **Failures come back as an OUTCOME rather than as `null`**, because
+   * `accept` distinguishes them: unroutable, suspended tenant and refused
+   * sender are three different drop events with three different telemetry
+   * meanings. Collapsing them here would have forced `accept` to keep its own
+   * copy of this sequence to tell them apart — which is the duplication this
+   * method exists to remove.
+   *
+   * A `ticket` of `null` on success means the mail would CREATE a ticket rather
+   * than thread onto one — the case the Worker cannot presign for, because
+   * there is no ticket to own the path.
+   *
+   * **Read-only.** It resolves and may PROVISION a sender (that is
+   * `resolveInboundSender`'s existing behaviour), but it writes no ticket and
+   * no message, so the presign route calling it does not half-process a mail
+   * the webhook has not accepted yet.
+   */
+  private async resolveRouting(
+    payload: RoutingFacts,
+  ): Promise<RoutingResolution> {
+    const address = parseInboundAddress(payload.to);
+    if (!address) {
+      return { ok: false, outcome: InboundOutcome.UNROUTABLE };
+    }
+
+    const { organizationId, status: tenantStatus } = await this.authPeer.run(
+      (metadata) =>
+        this.organizations.resolveOrgByInboundToken(
+          { inboundToken: address.tenantToken },
+          metadata,
+        ),
+      UNKNOWN_ORIGIN,
+    );
+
+    if (!organizationId) {
+      return { ok: false, outcome: InboundOutcome.UNROUTABLE };
+    }
+
+    const status = fromProtoOrgStatus(tenantStatus);
+    if (status !== OrgStatus.ACTIVE) {
+      return {
+        ok: false,
+        outcome: InboundOutcome.TENANT_INACTIVE,
+        organizationId,
+        status,
+      };
+    }
+
+    const sender = await this.authPeer.run(
+      (metadata) =>
+        this.users.resolveInboundSender(
+          {
+            organizationId,
+            email: payload.from,
+            displayName: payload.fromName,
+          },
+          metadata,
+        ),
+      UNKNOWN_ORIGIN,
+    );
+    if (!sender.userId) {
+      return {
+        ok: false,
+        outcome: InboundOutcome.SENDER_REFUSED,
+        organizationId,
+      };
+    }
+
+    if (sender.created) {
+      this.logger.log(
+        `Provisioned an End User for ${payload.from} in ${organizationId}`,
+      );
+    }
+
+    const context: RequestContext = {
+      ...UNKNOWN_ORIGIN,
+      sub: sender.userId,
+      organizationId,
+      isSuperAdmin: false,
+      departmentIds: [],
+      permissionCodes: [],
+      isEmailVerified: false,
+    };
+
+    const ticketNumber = this.ticketFromReplyToken(address, organizationId);
+    if (ticketNumber !== null) {
+      return {
+        ok: true,
+        organizationId,
+        context,
+        // **A reply token naming a ticket that does not resolve stays a
+        // reply.** `accept` drops it as unroutable rather than creating a
+        // second ticket from a reply — the token said which thread this
+        // belongs to, and inventing a new one would split the conversation.
+        addressedToTicket: true,
+        ticket: await this.loadTicket(
+          (metadata) =>
+            this.tickets.getTicketByNumber({ ticketNumber }, metadata),
+          context,
+        ),
+      };
+    }
+
+    if (!address.ticketToken) {
+      const ticketId = await this.ticketFromHeaders(payload, organizationId);
+      if (ticketId) {
+        const ticket = await this.loadTicket(
+          (metadata) => this.tickets.getTicket({ id: ticketId }, metadata),
+          context,
+        );
+        if (ticket) {
+          return {
+            ok: true,
+            organizationId,
+            context,
+            addressedToTicket: false,
+            ticket,
+          };
+        }
+      }
+    }
+
+    // Routable, and it would CREATE a ticket rather than thread onto one.
+    return {
+      ok: true,
+      organizationId,
+      context,
+      addressedToTicket: false,
+      ticket: null,
+    };
+  }
+
+  /** A ticket fetch whose failure is "no such ticket", not an error. */
+  private async loadTicket(
+    fetch: (metadata: Metadata) => Observable<TicketResponse>,
+    context: RequestContext,
+  ): Promise<TicketResponse | null> {
+    try {
+      return await this.ticketPeer.run(fetch, context);
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * The write every threading path shares.
+   *
+   * **The two `appendBy…` wrappers that used to sit here are gone.** They each
+   * fetched a ticket and called this; `resolveRouting` now does the fetching
+   * for both callers, so keeping them would have left two ways to reach this
+   * write and only one of them reachable.
    *
    * **A CLOSED ticket is reopened through the transition, never a status
    * write** — 32-doc §4.2, the same rule `message:send` follows. Reopened
@@ -376,6 +580,7 @@ export class InboundEmailService implements OnModuleInit {
     body: string,
     inboundMessageId: string,
     context: RequestContext,
+    attachments?: InboundUploadedAttachmentDto[],
   ): Promise<boolean> {
     if (ticket.status === ProtoTicketStatus.TICKET_STATUS_CLOSED) {
       await this.ticketPeer.run(
@@ -396,11 +601,18 @@ export class InboundEmailService implements OnModuleInit {
             isInternalNote: false,
             invokeAi: false,
             inboundMessageId,
-            // Mail carries its own attachments through a different path — the
-            // worker uploads and confirms them against the message it just
-            // created (31-doc §5). This list is for a client that uploaded
-            // BEFORE the message existed, which no inbound email does.
-            attachments: [],
+            // **Uploaded by the Worker before this webhook ran** — 31-doc §5.
+            //
+            // This list is for a client that uploaded BEFORE the message
+            // existed, and inbound mail is now exactly that client: the Worker
+            // presigns against the resolved ticket, PUTs the bytes straight to
+            // storage, and sends only object paths. ticket-service confirms
+            // each one as it writes the message.
+            //
+            // Empty for a mail that opens a NEW ticket — there is no message to
+            // attach to, so the presign route declined everything and those
+            // names travel in `droppedAttachments` instead.
+            attachments: attachments ?? [],
           },
           metadata,
         ),
@@ -422,7 +634,7 @@ export class InboundEmailService implements OnModuleInit {
    * would let one long thread cost dozens of RPCs.
    */
   private async ticketFromHeaders(
-    payload: InboundEmailDto,
+    payload: RoutingFacts,
     organizationId: string,
   ): Promise<string | null> {
     const candidates = [
@@ -613,7 +825,7 @@ export class InboundEmailService implements OnModuleInit {
       .getOrThrow<string>('EMAIL_SENDER')
       .toLowerCase();
 
-    return extractAddress(from) === extractAddress(sender);
+    return extractEmailAddress(from) === extractEmailAddress(sender);
   }
 
   /** `Auto-Submitted` / `Precedence` — the headers a machine sets. */
@@ -652,28 +864,4 @@ function isAlreadyExists(error: unknown): boolean {
     error !== null &&
     (error as { code?: number }).code === GrpcStatus.ALREADY_EXISTS
   );
-}
-
-/**
- * The bare address out of a `From` header.
- *
- * `"Support" <support@app.test>` and `support@app.test` are the same sender, and
- * the self-loop guard comparing the whole header would miss the first form —
- * failing OPEN into the loop it exists to stop.
- *
- * Unanchored deliberately: a `From` may carry a comment or an encoded word
- * before the angle brackets, and the first bracketed run is the address in
- * every form of the header that reaches us.
- *
- * **Exported for the env cross-check** in `env.validation.spec.ts`, which
- * asserts that this gateway and notification-service name the same sending
- * address. That test has to compare them the way the GUARD does — the two
- * `.env` files carry different display names around one address, which is
- * decoration rather than disagreement — and a second spelling of this in the
- * test would be a test that agrees with itself.
- */
-export function extractAddress(value: string): string {
-  const angled = /<([^>]+)>/.exec(value); // NOSONAR
-
-  return (angled?.[1] ?? value).trim().toLowerCase();
 }

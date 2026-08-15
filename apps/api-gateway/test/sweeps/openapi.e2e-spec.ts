@@ -398,6 +398,12 @@ describe('§1/§5 the OpenAPI document', () => {
           .sort(compareAlphabetically);
 
         expect(without).toEqual([
+          // Presigns an inbound mail's attachments before the webhook — 31-doc
+          // §5. On the same controller and therefore under the same
+          // `@SkipThrottle()`: a Worker rate-limited mid-delivery would drop a
+          // customer's file, and the signature is what bounds this route's
+          // callers, not a counter.
+          '/api/v1/webhooks/email/attachments',
           '/api/v1/webhooks/email/inbound',
           '/api/v1/webhooks/stripe',
         ]);
