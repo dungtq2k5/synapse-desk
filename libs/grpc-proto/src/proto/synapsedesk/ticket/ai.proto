@@ -66,6 +66,16 @@ message SuggestionResponse {
 
 message GetSuggestionsResponse {
   repeated SuggestionResponse items = 1;
+  // Carried through from rag-service — 39-doc §1. `items` is the next-step
+  // list this endpoint already produced; these are the articles beside it.
+  repeated SuggestedArticleResponse articles = 2;
+}
+
+message SuggestedArticleResponse {
+  string document_id = 1;
+  string document_title = 2;
+  optional int32 page_number = 3;
+  double score = 4;
 }
 
 message ClassifyTicketResponse {

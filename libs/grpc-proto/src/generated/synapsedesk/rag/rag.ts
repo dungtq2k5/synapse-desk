@@ -278,6 +278,22 @@ export interface ClassifyResponse {
 export interface SuggestionsRequest {
   ticketId: string;
   history: ConversationTurn[];
+  /**
+   * What the ticket IS — the retrieval query for the article sidebar,
+   * 39-doc §3.
+   *
+   * **Not the transcript, and the reason is the sidebar rather than the cost.**
+   * A sidebar is a panel an agent glances at; articles that churn every time
+   * the customer sends a message lose the agent the article they were about to
+   * open. Retrieval on the ticket's subject gives a list that holds still while
+   * the conversation moves.
+   *
+   * The same input `Classify` uses, for the same reason: these two fields
+   * describe what the ticket is, and that is what a recommendation should be
+   * about. The `history` above still drives the next-step suggestions.
+   */
+  title: string;
+  body: string;
 }
 
 export interface Suggestion {
@@ -290,6 +306,34 @@ export interface Suggestion {
 export interface SuggestionsResponse {
   suggestions: Suggestion[];
   generationId: string;
+  /**
+   * Knowledge-base articles relevant to the ticket — product §6.3's first
+   * third, 39-doc §1. The other two need a ticket corpus, which is a threat
+   * model change rather than a queue (§4).
+   */
+  articles: SuggestedArticle[];
+}
+
+/**
+ * One article to recommend — 39-doc §2.
+ *
+ * **Deliberately NOT `Citation` reused.** They differ by more than a field: a
+ * citation points at the PASSAGE an answer used, and carries `chunk_id` so the
+ * answer can be traced to it; an article recommendation points at the DOCUMENT
+ * an agent should open, and a chunk id would be an implementation detail of how
+ * it was found.
+ *
+ * `vector_point_id` is absent for 38-doc §2's reason — a Qdrant point id is an
+ * internal retrieval identifier, not part of the product's surface.
+ */
+export interface SuggestedArticle {
+  documentId: string;
+  documentTitle: string;
+  pageNumber?:
+    | number
+    | undefined;
+  /** How well it matched, so a client can show or sort by relevance. */
+  score: number;
 }
 
 /** The unary form of a ChatCompletion, for `Ask`. */

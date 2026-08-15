@@ -62,6 +62,46 @@ export class AiDraftResponseDto {
   citations!: DraftCitationDto[];
 }
 
+/**
+ * One knowledge-base article to recommend — 39-doc §2.
+ *
+ * **Not `DraftCitationDto` reused, and merging them later would be wrong.**
+ * They differ by more than the extra `score`: a draft citation points at the
+ * PASSAGE an answer used and carries `chunkId` so the answer can be traced to
+ * it; this points at the DOCUMENT an agent should open, where a chunk id is an
+ * implementation detail of how it was found.
+ *
+ * No `vectorPointId`, for 38-doc §2's reason — a Qdrant point id is an internal
+ * retrieval identifier and publishing it in a response DTO would make it part
+ * of the product's surface by accident.
+ */
+export class SuggestedArticleDto {
+  documentId!: string;
+  documentTitle!: string;
+  /** `null` for a source with no pages — a pasted text file, an HTML article. */
+  pageNumber!: number | null;
+  /** How well it matched, so a client can show or sort by relevance. */
+  score!: number;
+}
+
+/**
+ * What `POST /tickets/:id/ai/suggestions` answers with — 39-doc §2.
+ *
+ * **A wrapper where there was a bare array, and that is a breaking change.** A
+ * client reading `data[0].title` reads `data.nextSteps[0].title` now. Accepted
+ * on the same grounds as 36-doc §1.3's `CreateMessageResponse` — no client has
+ * shipped and versioning is not enabled — and this is the **second** such
+ * change, which is worth counting rather than repeating silently.
+ *
+ * `nextSteps` is deliberately unchanged in shape and content: it is what this
+ * endpoint already produced, it works, and the articles arrive beside it rather
+ * than instead of it.
+ */
+export class AiSuggestionsResponseDto {
+  nextSteps!: AiSuggestionDto[];
+  articles!: SuggestedArticleDto[];
+}
+
 export class AiSuggestionDto {
   title!: string;
   body!: string;

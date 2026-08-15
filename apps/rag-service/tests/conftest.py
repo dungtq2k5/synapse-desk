@@ -173,6 +173,7 @@ async def seed(qdrant, pool):
         document_id: str | None = None,
         title: str = "fixture",
         page_number: int | None = None,
+        chunk_index: int = 0,
     ) -> SeededChunk:
         chunk_id = str(uuid.uuid4())
         vector_point_id = str(uuid.uuid4())
@@ -240,7 +241,7 @@ async def seed(qdrant, pool):
                     vector_point_id, organization_id, is_organization_wide,
                     department_ids, is_deleted, page_number
                 ) VALUES (
-                    $1::uuid, $2::uuid, 0, $3, 10,
+                    $1::uuid, $2::uuid, $10, $3, 10,
                     $4::uuid, $5::uuid, $6, $7::uuid[], $8, $9
                 )
                 """,
@@ -253,6 +254,11 @@ async def seed(qdrant, pool):
                 department_ids,
                 is_deleted,
                 page_number,
+                # **Parameterised so one DOCUMENT can have several chunks.** It
+                # was hardcoded to 0, and `(document_id, chunk_index)` is
+                # unique — so a fixture could not express the thing retrieval
+                # actually returns, which is chunks rather than documents.
+                chunk_index,
             )
 
         return SeededChunk(

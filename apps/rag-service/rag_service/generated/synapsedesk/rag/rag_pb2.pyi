@@ -214,12 +214,16 @@ class ClassifyResponse(_message.Message):
     def __init__(self, suggested_department_id: _Optional[str] = ..., suggested_priority: _Optional[str] = ..., confidence_score: _Optional[float] = ..., generation_id: _Optional[str] = ...) -> None: ...
 
 class SuggestionsRequest(_message.Message):
-    __slots__ = ("ticket_id", "history")
+    __slots__ = ("ticket_id", "history", "title", "body")
     TICKET_ID_FIELD_NUMBER: _ClassVar[int]
     HISTORY_FIELD_NUMBER: _ClassVar[int]
+    TITLE_FIELD_NUMBER: _ClassVar[int]
+    BODY_FIELD_NUMBER: _ClassVar[int]
     ticket_id: str
     history: _containers.RepeatedCompositeFieldContainer[ConversationTurn]
-    def __init__(self, ticket_id: _Optional[str] = ..., history: _Optional[_Iterable[_Union[ConversationTurn, _Mapping]]] = ...) -> None: ...
+    title: str
+    body: str
+    def __init__(self, ticket_id: _Optional[str] = ..., history: _Optional[_Iterable[_Union[ConversationTurn, _Mapping]]] = ..., title: _Optional[str] = ..., body: _Optional[str] = ...) -> None: ...
 
 class Suggestion(_message.Message):
     __slots__ = ("title", "body", "confidence_score", "citations")
@@ -234,12 +238,26 @@ class Suggestion(_message.Message):
     def __init__(self, title: _Optional[str] = ..., body: _Optional[str] = ..., confidence_score: _Optional[float] = ..., citations: _Optional[_Iterable[_Union[Citation, _Mapping]]] = ...) -> None: ...
 
 class SuggestionsResponse(_message.Message):
-    __slots__ = ("suggestions", "generation_id")
+    __slots__ = ("suggestions", "generation_id", "articles")
     SUGGESTIONS_FIELD_NUMBER: _ClassVar[int]
     GENERATION_ID_FIELD_NUMBER: _ClassVar[int]
+    ARTICLES_FIELD_NUMBER: _ClassVar[int]
     suggestions: _containers.RepeatedCompositeFieldContainer[Suggestion]
     generation_id: str
-    def __init__(self, suggestions: _Optional[_Iterable[_Union[Suggestion, _Mapping]]] = ..., generation_id: _Optional[str] = ...) -> None: ...
+    articles: _containers.RepeatedCompositeFieldContainer[SuggestedArticle]
+    def __init__(self, suggestions: _Optional[_Iterable[_Union[Suggestion, _Mapping]]] = ..., generation_id: _Optional[str] = ..., articles: _Optional[_Iterable[_Union[SuggestedArticle, _Mapping]]] = ...) -> None: ...
+
+class SuggestedArticle(_message.Message):
+    __slots__ = ("document_id", "document_title", "page_number", "score")
+    DOCUMENT_ID_FIELD_NUMBER: _ClassVar[int]
+    DOCUMENT_TITLE_FIELD_NUMBER: _ClassVar[int]
+    PAGE_NUMBER_FIELD_NUMBER: _ClassVar[int]
+    SCORE_FIELD_NUMBER: _ClassVar[int]
+    document_id: str
+    document_title: str
+    page_number: int
+    score: float
+    def __init__(self, document_id: _Optional[str] = ..., document_title: _Optional[str] = ..., page_number: _Optional[int] = ..., score: _Optional[float] = ...) -> None: ...
 
 class ChatResponse(_message.Message):
     __slots__ = ("content", "status", "citations", "generation_id")

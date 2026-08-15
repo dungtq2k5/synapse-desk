@@ -31,7 +31,7 @@ import {
 import {
   AiClassificationDto,
   AiDraftResponseDto,
-  AiSuggestionDto,
+  AiSuggestionsResponseDto,
   AiSummaryResponseDto,
 } from './dto/rest/ai-response.dto';
 
@@ -126,7 +126,7 @@ export class AiController {
   // user spending the whole month in ten minutes.
   @Throttle({ [AI_THROTTLER_TIER]: ROUTE_THROTTLE.aiSuggestions })
   @ApiOperation({ summary: 'Get suggestions' })
-  @ApiWrappedResponse(AiSuggestionDto, { isArray: true })
+  @ApiWrappedResponse(AiSuggestionsResponseDto)
   @ApiFilterErrors(['400', '401', '403', '404'])
   @Post('suggestions')
   @RequirePermission('ticket.ai.use')
@@ -134,7 +134,7 @@ export class AiController {
   getSuggestions(
     @CurrentUser() context: RequestContext,
     @Param('ticketId', ParseUUIDPipe) ticketId: string,
-  ): Promise<AiSuggestionDto[]> {
+  ): Promise<AiSuggestionsResponseDto> {
     return this.aiGrpcClient.getSuggestions(ticketId, context);
   }
 

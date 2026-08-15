@@ -369,6 +369,108 @@ describe('§2.6 AI Co-Pilot at the HTTP boundary (e2e)', () => {
     });
   });
 
+  describe('POST /tickets/:ticketId/ai/suggestions', () => {
+    const wireArticle = () => ({
+      documentId: faker.string.uuid(),
+      documentTitle: 'Expense Handbook',
+      pageNumber: 4,
+      score: 0.82,
+    });
+
+    it('**returns a WRAPPER, not a bare array** — 39-doc §2', async () => {
+      // The breaking change, asserted rather than assumed. A client reading
+      // `data[0].title` reads `data.nextSteps[0].title` now, and this is the
+      // SECOND such change — 36-doc §1.3's `CreateMessageResponse` was the
+      // first, which is worth counting rather than repeating silently.
+      const article = wireArticle();
+      fx.stubs.ai.getSuggestions.mockReturnValue(
+        of({
+          items: [
+            { title: 'Check the toner', body: 'do it', confidenceScore: 0.6 },
+          ],
+          articles: [article],
+        }),
+      );
+
+      const res = await authenticatedAgent(fx.app, {
+        permissionCodes: ['ticket.ai.use'],
+      })
+        .post(`${API}/tickets/${ticketId}/ai/suggestions`)
+        .send({});
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.nextSteps).toEqual([
+        { title: 'Check the toner', body: 'do it', confidenceScore: 0.6 },
+      ]);
+      expect(res.body.data.articles).toEqual([article]);
+    });
+
+    it('an article never carries `vectorPointId`', async () => {
+      // 38-doc §2's rule on a third surface. ticket-service already drops it;
+      // this pins that the gateway's DTO cannot reintroduce it.
+      fx.stubs.ai.getSuggestions.mockReturnValue(
+        of({
+          items: [],
+          articles: [{ ...wireArticle(), vectorPointId: 'point-1' }],
+        }),
+      );
+
+      const res = await authenticatedAgent(fx.app, {
+        permissionCodes: ['ticket.ai.use'],
+      })
+        .post(`${API}/tickets/${ticketId}/ai/suggestions`)
+        .send({});
+
+      expect(JSON.stringify(res.body)).not.toContain('point-1');
+    });
+
+    it('**a document with no pages reports `null`**, not a missing field', async () => {
+      // `page_number` is `optional int32`, so absent arrives as `undefined`.
+      // Publishing that as a required number would misdescribe the response —
+      // 38-doc §2's reasoning, same shape.
+      fx.stubs.ai.getSuggestions.mockReturnValue(
+        of({
+          items: [],
+          articles: [
+            {
+              documentId: faker.string.uuid(),
+              documentTitle: 'A pasted text file',
+              score: 0.5,
+            },
+          ],
+        }),
+      );
+
+      const res = await authenticatedAgent(fx.app, {
+        permissionCodes: ['ticket.ai.use'],
+      })
+        .post(`${API}/tickets/${ticketId}/ai/suggestions`)
+        .send({});
+
+      expect(res.body.data.articles[0]).toHaveProperty('pageNumber', null);
+    });
+
+    it('a tenant with no indexed documents gets `articles: []`', async () => {
+      // The common case for a new tenant, and the one an empty-retrieval path
+      // gets wrong. The next steps still arrive.
+      fx.stubs.ai.getSuggestions.mockReturnValue(
+        of({
+          items: [{ title: 'Step', body: 'do it', confidenceScore: 0.5 }],
+          articles: [],
+        }),
+      );
+
+      const res = await authenticatedAgent(fx.app, {
+        permissionCodes: ['ticket.ai.use'],
+      })
+        .post(`${API}/tickets/${ticketId}/ai/suggestions`)
+        .send({});
+
+      expect(res.body.data.articles).toEqual([]);
+      expect(res.body.data.nextSteps).toHaveLength(1);
+    });
+  });
+
   describe('GET /tickets/:ticketId/similar', () => {
     it('1. is gated on ticket.read.all, not on ticket.ai.use', async () => {
       // The RESULTS are other people's tickets, so the permission that matters

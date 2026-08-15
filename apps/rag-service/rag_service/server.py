@@ -208,7 +208,14 @@ class RagServicer(rag_pb2_grpc.RagServiceServicer):
             deps.generator, deps.ledger, QuotaCounter(deps.redis)
         )
         self._copilot = CopilotService(
-            deps.generator, deps.ledger, QuotaCounter(deps.redis)
+            deps.generator,
+            deps.ledger,
+            QuotaCounter(deps.redis),
+            # **The collaborator this class did not have** — 39-doc §3.1. The
+            # same retriever the answering path uses, so the article sidebar is
+            # scoped by the same `tenant_scope()` and cannot see further than a
+            # `Chat` answer can.
+            self._retrieval,
         )
 
     # -----------------------------------------------------------------
@@ -628,12 +635,20 @@ class RagServicer(rag_pb2_grpc.RagServiceServicer):
                 AT_CAP_REFUSAL,
             )
 
-        suggestions, generation_id = await self._copilot.suggest(
+        suggestions, generation_id, articles = await self._copilot.suggest(
             request.ticket_id,
             _transcript(request.history),
             settings,
             budget=budget,
             user_id=ctx.sub,
+            # The retrieval query — 39-doc §3. What the ticket IS, not where the
+            # conversation got to, so the sidebar holds still while the thread
+            # moves.
+            title=request.title,
+            body=request.body,
+            # Retrieval is tenant- and department-scoped through this, and it is
+            # the only thing that scopes it.
+            ctx=ctx,
         )
 
         return rag_pb2.SuggestionsResponse(
@@ -646,6 +661,15 @@ class RagServicer(rag_pb2_grpc.RagServiceServicer):
                 for suggestion in suggestions
             ],
             generation_id=generation_id,
+            articles=[
+                rag_pb2.SuggestedArticle(
+                    document_id=article.document_id,
+                    document_title=article.document_title,
+                    page_number=article.page_number,
+                    score=article.score,
+                )
+                for article in articles
+            ],
         )
 
     async def _within_grace(

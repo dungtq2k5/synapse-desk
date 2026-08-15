@@ -108,7 +108,9 @@ describe('§2 AI route rate limiting (e2e)', () => {
       limit: ROUTE_THROTTLE.aiSuggestions.limit,
       permissions: ['ticket.ai.use'],
       stub: (fixture: E2eFixture) =>
-        fixture.stubs.ai.getSuggestions.mockReturnValue(of({ items: [] })),
+        fixture.stubs.ai.getSuggestions.mockReturnValue(
+          of({ items: [], articles: [] }),
+        ),
     },
     {
       name: 'POST /tickets/:id/ai/summary',

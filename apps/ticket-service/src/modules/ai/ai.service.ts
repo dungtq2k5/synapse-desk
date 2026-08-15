@@ -242,14 +242,33 @@ export class AiService {
     request: TicketAiRequest,
     context: CallerContext,
   ): Promise<GetSuggestionsResponse> {
-    await this.access.load(request.ticketId, context);
+    // **Bound rather than discarded.** This call was already here as the access
+    // check and threw its result away; the article sidebar needs the ticket's
+    // subject as its retrieval query — 39-doc §3 — so the change is a variable,
+    // not a second fetch.
+    const ticket = await this.access.load(request.ticketId, context);
+
+    const suggestions = await this.rag.getSuggestions(
+      request.ticketId,
+      await this.transcript(request.ticketId),
+      context,
+      // What the ticket IS, which is what a recommendation should be about —
+      // the same input `Classify` uses. The transcript above still drives the
+      // next steps: two outputs, two inputs.
+      { title: ticket.title, body: ticket.description ?? '' },
+    );
 
     return {
-      items: await this.rag.getSuggestions(
-        request.ticketId,
-        await this.transcript(request.ticketId),
-        context,
-      ),
+      items: suggestions.items,
+      articles: suggestions.articles.map((article) => ({
+        ...article,
+        // `null` on this side of the boundary, `undefined` on the wire: proto3
+        // has no null, so an absent `optional int32` is `undefined` and the
+        // gateway's DTO turns it back into `null`. Converting here rather than
+        // widening the domain type keeps "no pages" one concept with one
+        // representation per layer.
+        pageNumber: article.pageNumber ?? undefined,
+      })),
     };
   }
 

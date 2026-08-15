@@ -208,6 +208,7 @@ describe('§2 REST and GraphQL DTOs are independent but not divergent', () => {
     // summaries or suggestions through the schema.
     AiSummaryResponseDto: 'co-pilot output, REST-only surface',
     AiDraftResponseDto: 'co-pilot output, REST-only surface — 38-doc §5',
+    AiSuggestionsResponseDto: 'co-pilot output, REST-only surface — 39-doc §7',
     // Envelopes and one-shot results rather than entities: nothing would query
     // them by id, which is what a GraphQL type is for.
     AttachmentResponseDto: 'nested inside MessageResponse, not queried alone',

@@ -12,7 +12,7 @@ import { GenerateDraftDto } from './dto/rest/ai.dto';
 import {
   AiClassificationDto,
   AiDraftResponseDto,
-  AiSuggestionDto,
+  AiSuggestionsResponseDto,
   AiSummaryResponseDto,
   SimilarTicketDto,
 } from './dto/rest/ai-response.dto';
@@ -96,17 +96,25 @@ export class AiGrpcClient extends BaseGrpcClient implements OnModuleInit {
   async getSuggestions(
     ticketId: string,
     context: RequestContext,
-  ): Promise<AiSuggestionDto[]> {
+  ): Promise<AiSuggestionsResponseDto> {
     const response = await this.call(
       (metadata) => this.aiGrpcService.getSuggestions({ ticketId }, metadata),
       context,
     );
 
-    return response.items.map((item) => ({
-      title: item.title,
-      body: item.body,
-      confidenceScore: item.confidenceScore,
-    }));
+    return {
+      nextSteps: response.items.map((item) => ({
+        title: item.title,
+        body: item.body,
+        confidenceScore: item.confidenceScore,
+      })),
+      articles: response.articles.map((article) => ({
+        documentId: article.documentId,
+        documentTitle: article.documentTitle,
+        pageNumber: article.pageNumber ?? null,
+        score: article.score,
+      })),
+    };
   }
 
   async classifyTicket(

@@ -19,6 +19,7 @@ import logging
 import time
 from dataclasses import dataclass
 
+from rag_service.common.caller_context import CallerContext
 from rag_service.enums import AiGenerationPurpose
 from rag_service.generation.boundary import (
     attachment_instruction,
@@ -32,7 +33,7 @@ from rag_service.generation.boundary import (
 from rag_service.generation.parts import Attachment, Prompt
 from rag_service.ledger.client import GenerationEntry
 from rag_service.ledger.metered import LedgerRecorder, QuotaCharger
-from rag_service.retrieval.service import BudgetState
+from rag_service.retrieval.service import BudgetState, RetrievalService
 from rag_service.settings import AiSettings
 
 logger = logging.getLogger(__name__)
@@ -66,6 +67,31 @@ class Suggestion:
     confidence_score: float
 
 
+@dataclass(frozen=True)
+class SuggestedArticle:
+    """One knowledge-base article to recommend — 39-doc §2.
+
+    **Not a `Citation`.** A citation points at the PASSAGE an answer used and
+    carries a chunk id so the answer can be traced to it; this points at the
+    DOCUMENT an agent should open, where a chunk id would be an implementation
+    detail of how it was found.
+    """
+
+    document_id: str
+    document_title: str
+    page_number: int | None
+    score: float
+
+
+#: How many articles the sidebar asks for.
+#:
+#: **Three, matching the next-step list beside it.** A sidebar is glanced at;
+#: ten articles is a search results page, which is a different product. Retrieval
+#: returns its own default and this narrows it, so the number lives here rather
+#: than being whatever the answering path happens to want.
+SUGGESTED_ARTICLE_LIMIT = 3
+
+
 #: The priorities a classification may return.
 #:
 #: Constrained to the domain's own set rather than left to the model, and
@@ -77,11 +103,26 @@ VALID_PRIORITIES = ("LOW", "MEDIUM", "HIGH", "URGENT")
 
 class CopilotService:
     def __init__(
-        self, generator, ledger: LedgerRecorder, quota: QuotaCharger
+        self,
+        generator,
+        ledger: LedgerRecorder,
+        quota: QuotaCharger,
+        retrieval: RetrievalService | None = None,
     ) -> None:
         self._generator = generator
         self._ledger = ledger
         self._quota = quota
+        #: **A collaborator this class did not have** — 39-doc §3.1.
+        #:
+        #: Its only import from the retrieval module was `BudgetState`, a type.
+        #: "`suggest()` gains the retrieval call" therefore meant a constructor
+        #: dependency and a wiring change one file over, not a line in a method.
+        #:
+        #: Optional so every existing construction site — the eval harness, the
+        #: fakes in five spec files — keeps working without a retriever it has
+        #: no use for. `suggest` returns no articles when it is absent, which is
+        #: the same answer a tenant with no indexed documents gets.
+        self._retrieval = retrieval
 
     async def summarize(
         self,
@@ -247,8 +288,25 @@ class CopilotService:
         *,
         budget: BudgetState,
         user_id: str | None = None,
-    ) -> tuple[list[Suggestion], str]:
-        """Next-step suggestions for an agent, as a short list."""
+        title: str = "",
+        body: str = "",
+        ctx: CallerContext | None = None,
+    ) -> tuple[list[Suggestion], str, list[SuggestedArticle]]:
+        """Next-step suggestions, and the articles beside them — 39-doc §1.
+
+        **Two outputs from two different inputs, deliberately.** The next steps
+        are generated from the TRANSCRIPT, because what to do next depends on
+        where the conversation got to. The articles are retrieved on `title` and
+        `body`, because a sidebar that churns every time the customer sends a
+        message loses the agent the article they were about to open.
+
+        **The articles never enter the next-step prompt.** Adding retrieved
+        chunks there would turn a checklist into an answering surface, and
+        answering surfaces come with the grounding contract — `cited ⊆
+        retrieved` and everything that enforces it. That contract is not absent
+        here and failing to govern; it is not present at all, and adding chunks
+        is what would require it.
+        """
         nonce = new_nonce()
         prompt = (
             "Suggest up to three next steps for the agent handling this "
@@ -260,6 +318,8 @@ class CopilotService:
             + wrap_history(transcript, nonce)
             + "\n\nJSON:"
         )
+
+        articles = await self._articles(title, body, ctx, settings, budget)
 
         text, generation_id = await self._spend(
             prompt,
@@ -282,7 +342,72 @@ class CopilotService:
                 if isinstance(item, dict) and item.get("title")
             ][:3],
             generation_id,
+            articles,
         )
+
+    async def _articles(
+        self,
+        title: str,
+        body: str,
+        ctx: CallerContext | None,
+        settings: AiSettings,
+        budget: BudgetState,
+    ) -> list[SuggestedArticle]:
+        """Knowledge-base articles for the ticket's subject — 39-doc §3.
+
+        **Never fatal.** The next-step list is what this endpoint promised
+        before articles existed, and a retrieval failure must not take it down
+        with it — an agent gets their checklist and an empty sidebar, which is
+        the same thing a tenant with no indexed documents gets.
+
+        **Still useful at the AI cap.** Retrieval degrades rather than failing:
+        the lexical arm needs no embedding, so a capped tenant gets articles
+        from keyword search plus a `lexical_only` marker instead of nothing.
+        That matters here more than on the answering path — the cap arrives when
+        a tenant is busiest, which is exactly when a sidebar is being used.
+
+        Deduplicated by document, because retrieval returns CHUNKS: three
+        passages from one handbook are one article to open, and listing it three
+        times fills a sidebar with a single document.
+        """
+        if self._retrieval is None or ctx is None:
+            return []
+
+        query = f"{title}\n{body}".strip()
+        if not query:
+            return []
+
+        try:
+            result = await self._retrieval.retrieve(
+                query,
+                ctx,
+                settings,
+                budget=budget,
+                # A wider net than the sidebar shows, because the dedup below
+                # collapses chunks into documents and three chunks can be one.
+                limit=SUGGESTED_ARTICLE_LIMIT * 3,
+            )
+        except Exception:
+            logger.exception(
+                "suggested_articles_failed: the next-step list was returned "
+                "without them"
+            )
+            return []
+
+        best: dict[str, SuggestedArticle] = {}
+        for chunk in result.chunks:
+            existing = best.get(chunk.document_id)
+            if existing is None or chunk.score > existing.score:
+                best[chunk.document_id] = SuggestedArticle(
+                    document_id=chunk.document_id,
+                    document_title=chunk.document_title,
+                    page_number=chunk.page_number,
+                    score=chunk.score,
+                )
+
+        return sorted(best.values(), key=lambda a: a.score, reverse=True)[
+            :SUGGESTED_ARTICLE_LIMIT
+        ]
 
     async def _spend(
         self,

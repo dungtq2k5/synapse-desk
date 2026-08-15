@@ -55,6 +55,26 @@ export type AiSummaryDraft = {
   generationId: string;
 };
 
+/**
+ * One article to recommend beside the next steps — 39-doc §2.
+ *
+ * **Not `AiCitation` reused, and they must not be merged.** A citation points
+ * at the PASSAGE an answer used and carries a `chunkId` so the answer can be
+ * traced back to it; this points at the DOCUMENT an agent should open, where a
+ * chunk id would be an implementation detail of how it was found.
+ */
+export type AiSuggestedArticle = {
+  documentId: string;
+  documentTitle: string;
+  pageNumber: number | null;
+  score: number;
+};
+
+export type AiSuggestions = {
+  items: AiSuggestion[];
+  articles: AiSuggestedArticle[];
+};
+
 export type AiSuggestion = {
   title: string;
   body: string;
@@ -219,22 +239,44 @@ export class RagClientService implements OnModuleInit {
     ticketId: string,
     history: ConversationTurn[],
     context: CallerContext,
-  ): Promise<AiSuggestion[]> {
+    /**
+     * What the ticket IS — the article sidebar's retrieval query, 39-doc §3.
+     *
+     * Separate from `history`, which still drives the next-step list. The two
+     * outputs come from two different inputs on purpose: next steps depend on
+     * where the conversation got to, articles on what the ticket is about.
+     */
+    subject: { title: string; body: string },
+  ): Promise<AiSuggestions> {
     const rag = this.require('AI suggestions');
 
     const response = await this.call(() =>
       firstValueFrom(
         rag
-          .suggest({ ticketId, history }, packRequestContext(context))
+          .suggest(
+            { ticketId, history, title: subject.title, body: subject.body },
+            packRequestContext(context),
+          )
           .pipe(timeout(GENERATION_DEADLINE_MS)),
       ),
     );
 
-    return response.suggestions.map((suggestion) => ({
-      title: suggestion.title,
-      body: suggestion.body,
-      confidenceScore: suggestion.confidenceScore,
-    }));
+    return {
+      items: response.suggestions.map((suggestion) => ({
+        title: suggestion.title,
+        body: suggestion.body,
+        confidenceScore: suggestion.confidenceScore,
+      })),
+      articles: response.articles.map((article) => ({
+        documentId: article.documentId,
+        documentTitle: article.documentTitle,
+        // `?? null` and the DTO is `| null` to match — a document with no pages
+        // is a real answer, and proto3 hands an absent `optional int32` back as
+        // `undefined`. 38-doc §2's reasoning, on a second surface.
+        pageNumber: article.pageNumber ?? null,
+        score: article.score,
+      })),
+    };
   }
 
   /**

@@ -238,6 +238,20 @@ message ClassifyResponse {
 message SuggestionsRequest {
   string ticket_id = 1;
   repeated ConversationTurn history = 2;
+  // What the ticket IS — the retrieval query for the article sidebar,
+  // 39-doc §3.
+  //
+  // **Not the transcript, and the reason is the sidebar rather than the cost.**
+  // A sidebar is a panel an agent glances at; articles that churn every time
+  // the customer sends a message lose the agent the article they were about to
+  // open. Retrieval on the ticket's subject gives a list that holds still while
+  // the conversation moves.
+  //
+  // The same input `Classify` uses, for the same reason: these two fields
+  // describe what the ticket is, and that is what a recommendation should be
+  // about. The `history` above still drives the next-step suggestions.
+  string title = 3;
+  string body = 4;
 }
 
 message Suggestion {
@@ -250,6 +264,28 @@ message Suggestion {
 message SuggestionsResponse {
   repeated Suggestion suggestions = 1;
   string generation_id = 2;
+  // Knowledge-base articles relevant to the ticket — product §6.3's first
+  // third, 39-doc §1. The other two need a ticket corpus, which is a threat
+  // model change rather than a queue (§4).
+  repeated SuggestedArticle articles = 3;
+}
+
+// One article to recommend — 39-doc §2.
+//
+// **Deliberately NOT `Citation` reused.** They differ by more than a field: a
+// citation points at the PASSAGE an answer used, and carries `chunk_id` so the
+// answer can be traced to it; an article recommendation points at the DOCUMENT
+// an agent should open, and a chunk id would be an implementation detail of how
+// it was found.
+//
+// `vector_point_id` is absent for 38-doc §2's reason — a Qdrant point id is an
+// internal retrieval identifier, not part of the product's surface.
+message SuggestedArticle {
+  string document_id = 1;
+  string document_title = 2;
+  optional int32 page_number = 3;
+  // How well it matched, so a client can show or sort by relevance.
+  double score = 4;
 }
 
 service RagService {

@@ -10,11 +10,13 @@ from __future__ import annotations
 
 import json
 import re
+import uuid
 
 import pytest
 
 from rag_service.enums import AiGenerationPurpose
 from rag_service.generated.synapsedesk.rag import rag_pb2
+from rag_service.common.caller_context import CallerContext
 from rag_service.generation.parts import attachments_of, prompt_text
 from rag_service.generation.corag import (
     DOC_MISSING_NO_HANDOFF,
@@ -759,3 +761,289 @@ class TestClassifyAttachmentBoundary:
         # what is inside it.
         block_at = text.index(f'<attachments id="{nonce}">\n- error.png')
         assert 0 <= text.index("never sources to cite") < block_at
+
+
+class TestSuggestedArticles:
+    """The article sidebar — 39-doc §1, product §6.3's first third.
+
+    **Two outputs from two different inputs.** The next steps come from the
+    transcript, because what to do next depends on where the conversation got
+    to. The articles are retrieved on `title` and `body`, because a sidebar that
+    churns every time the customer sends a message loses the agent the article
+    they were about to open.
+
+    Real Qdrant and real Postgres through the `seed` fixture, because what is
+    under test is retrieval reaching a new caller with the right scope — and a
+    stubbed retriever would prove none of it.
+    """
+
+    @staticmethod
+    def _recording(servicer):
+        """Wraps the REAL retriever and records what it was asked.
+
+        **Because the end-to-end assertions cannot see the query.** The test
+        embedding client returns a deterministic vector regardless of input, so
+        a seeded document comes back whatever you search for — which means
+        "the article was returned" passes even when the query is the transcript,
+        the ticket id, or an empty string. Three sabotages proved exactly that.
+
+        So the flow is asserted end to end against real stores, and the two
+        DECISIONS — which query, whose scope — are asserted here, where they are
+        visible.
+        """
+        retrieval = servicer._copilot._retrieval
+        calls: list[tuple[str, CallerContext]] = []
+        original = retrieval.retrieve
+
+        async def recording(query, ctx, settings, **kwargs):
+            calls.append((query, ctx))
+
+            return await original(query, ctx, settings, **kwargs)
+
+        retrieval.retrieve = recording  # type: ignore[method-assign]
+
+        return calls
+
+    def _request(self, **overrides) -> rag_pb2.SuggestionsRequest:
+        return rag_pb2.SuggestionsRequest(
+            ticket_id=TICKET_ID,
+            history=turns(("user", "help")),
+            **overrides,
+        )
+
+    async def _suggest(self, servicer, ctx, generator, **overrides):
+        generator.answer = json.dumps(
+            [{"title": "Step", "body": "do it", "confidence": 0.5}]
+        )
+
+        return await servicer.Suggest(
+            self._request(**overrides), FakeServicerContext(ctx)
+        )
+
+    async def test_1_an_indexed_document_matching_the_subject_is_returned(
+        self, servicer, tenant_a, generator, seed
+    ):
+        # The feature. `title` + `body` is the query — what the ticket IS.
+        chunk = await seed(
+            tenant_a.organization_id,
+            text="Expense approval threshold is 500 for travel bookings",
+            title="Expense Handbook",
+        )
+
+        response = await self._suggest(
+            servicer,
+            tenant_a.outsider(),
+            generator,
+            title="Expense approval threshold",
+            body="What is the limit for travel?",
+        )
+
+        assert [article.document_id for article in response.articles] == [
+            chunk.document_id
+        ]
+        assert response.articles[0].document_title == "Expense Handbook"
+
+    async def test_1b_the_QUERY_is_the_ticket_subject_not_the_transcript(
+        self, servicer, tenant_a, generator, seed
+    ):
+        """§3's decision, asserted where it is visible.
+
+        A sidebar that churns every time the customer sends a message loses the
+        agent the article they were about to open. The transcript must not reach
+        the query — and only this assertion can tell, because the fake embedder
+        returns the same vector for every input.
+        """
+        await seed(tenant_a.organization_id, text="the expense handbook")
+        calls = self._recording(servicer)
+
+        await self._suggest(
+            servicer,
+            tenant_a.outsider(),
+            generator,
+            title="Expense approval threshold",
+            body="What is the limit for travel?",
+        )
+
+        assert len(calls) == 1
+        query, _ = calls[0]
+        assert "Expense approval threshold" in query
+        assert "What is the limit for travel?" in query
+        # `turns(("user", "help"))` is what the transcript contains.
+        assert "help" not in query
+
+    async def test_1c_the_CALLER_s_context_is_what_scopes_it(
+        self, servicer, tenant_a, generator, seed
+    ):
+        # A new caller of `retrieve()` is exactly where a scope filter gets
+        # passed wrong — 27-doc §1. Retrieval's own isolation is tested against
+        # real stores elsewhere; what this adds is that the sidebar goes THROUGH
+        # it with the caller's own context rather than around it.
+        await seed(tenant_a.organization_id, text="anything")
+        calls = self._recording(servicer)
+        caller = tenant_a.member_of(tenant_a.department_a)
+
+        await self._suggest(servicer, caller, generator, title="t", body="b")
+
+        _, ctx = calls[0]
+        assert ctx.organization_id == caller.organization_id
+        assert ctx.department_ids == caller.department_ids
+
+    async def test_1d_three_chunks_of_one_document_are_ONE_article(
+        self, servicer, tenant_a, generator, seed
+    ):
+        # Retrieval returns CHUNKS. Three passages from one handbook are one
+        # article to open, and listing it three times fills a sidebar with a
+        # single document.
+        document_id = str(uuid.uuid4())
+        for index, passage in enumerate(
+            ("the first passage", "the second", "the third")
+        ):
+            await seed(
+                tenant_a.organization_id,
+                text=passage,
+                document_id=document_id,
+                title="One Handbook",
+                chunk_index=index,
+            )
+
+        response = await self._suggest(
+            servicer, tenant_a.outsider(), generator, title="handbook", body="passage"
+        )
+
+        assert [article.document_id for article in response.articles] == [
+            document_id
+        ]
+
+    async def test_2_the_next_steps_are_UNCHANGED(
+        self, servicer, tenant_a, generator, seed
+    ):
+        # The half that already worked, and the likely regression: a refactor
+        # that quietly changes the list this endpoint has always produced.
+        await seed(tenant_a.organization_id, text="anything at all")
+
+        response = await self._suggest(
+            servicer, tenant_a.outsider(), generator, title="t", body="b"
+        )
+
+        assert [s.title for s in response.suggestions] == ["Step"]
+        assert response.suggestions[0].confidence_score == 0.5
+        assert response.generation_id
+
+    async def test_3_an_article_never_carries_a_vector_point_id(
+        self, servicer, tenant_a, generator, seed
+    ):
+        # 38-doc §2's rule on a second surface: a Qdrant point id is an internal
+        # retrieval identifier, and a response field would make it product API.
+        chunk = await seed(tenant_a.organization_id, text="the quota policy")
+
+        response = await self._suggest(
+            servicer, tenant_a.outsider(), generator, title="quota", body="policy"
+        )
+
+        assert response.articles
+        assert chunk.vector_point_id not in str(response)
+        assert not any(
+            "vector" in field.name for field, _ in response.articles[0].ListFields()
+        )
+
+    async def test_4_a_tenant_with_NO_documents_gets_an_empty_list(
+        self, servicer, tenant_a, generator
+    ):
+        # The common case for a new tenant, and the one an empty-retrieval path
+        # gets wrong. Empty, not an error — the next steps still arrive.
+        response = await self._suggest(
+            servicer, tenant_a.outsider(), generator, title="anything", body="at all"
+        )
+
+        assert list(response.articles) == []
+        assert len(response.suggestions) == 1
+
+    async def test_5_articles_are_DEPARTMENT_scoped(
+        self, servicer, tenant_a, generator, seed
+    ):
+        """A new caller of `retrieve()` is exactly where a scope filter gets
+        passed wrong — 27-doc §1's reasoning, applied to a new consumer.
+
+        Not ceremony: the isolation is enforced inside retrieval, and this asserts
+        the sidebar goes through it rather than around it.
+        """
+        await seed(
+            tenant_a.organization_id,
+            text="Department A only: the escalation runbook",
+            department_ids=[tenant_a.department_a],
+            is_organization_wide=False,
+        )
+
+        response = await self._suggest(
+            servicer,
+            # A member of department B — the document above is not theirs.
+            tenant_a.member_of(tenant_a.department_b),
+            generator,
+            title="escalation",
+            body="runbook",
+        )
+
+        assert list(response.articles) == []
+
+    async def test_6_ONE_generation_call_plus_the_embedding_it_retrieves_with(
+        self, servicer, tenant_a, generator, seed, ledger
+    ):
+        """§3's "free" claim, stated precisely.
+
+        **Two ledger rows is the CORRECT answer, not one.** `retrieve()` books
+        its own `EMBEDDING` row — it embeds the query — so a test asserting "one
+        ledgered call" would fail against a correct implementation, which is
+        where somebody starts editing the code to match the test.
+
+        What "free" means is no second GENERATION: no reformulation. That is the
+        assertion.
+        """
+        await seed(tenant_a.organization_id, text="the handbook")
+
+        await self._suggest(
+            servicer, tenant_a.outsider(), generator, title="hand", body="book"
+        )
+
+        purposes = [entry.purpose for entry in ledger.entries]
+
+        assert AiGenerationPurpose.SUGGESTIONS in purposes
+        assert AiGenerationPurpose.EMBEDDING in purposes
+        assert AiGenerationPurpose.REFORMULATION not in purposes
+
+    async def test_7_the_whole_call_is_REFUSED_at_the_cap(
+        self, servicer, tenant_a, generator, seed, at_cap
+    ):
+        """**39-doc §3.2 is right about retrieval and wrong about this
+        endpoint.**
+
+        `retrieve()` genuinely degrades at the cap — the lexical arm needs no
+        embedding, so it returns results plus a `lexical_only` marker instead of
+        failing. But `Suggest` never reaches it: the servicer aborts on
+        `allows_embedding` before calling the co-pilot at all, exactly as
+        `Summarize`, `Classify` and `Draft` do.
+
+        So a capped tenant gets no articles AND no next steps, and this test
+        pins that rather than the hoped-for degradation. Changing it would be a
+        product decision — "a sidebar still works at the cap" is defensible, and
+        so is "the cap means the co-pilot stops" — but it is a decision about
+        this endpoint's contract, not a property inherited from retrieval.
+        """
+        _ = at_cap
+        await seed(
+            tenant_a.organization_id,
+            text="Escalation runbook for the on-call rotation",
+            title="Runbook",
+        )
+
+        with pytest.raises(FakeAbort) as raised:
+            await self._suggest(
+                servicer,
+                tenant_a.outsider(),
+                generator,
+                title="escalation runbook",
+                body="on-call",
+            )
+
+        # The same refusal every other co-pilot surface gives, which is the
+        # consistency worth keeping if the decision is revisited.
+        assert "[http:402]" in raised.value.details

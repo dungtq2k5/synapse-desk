@@ -67,6 +67,18 @@ export interface SuggestionResponse {
 
 export interface GetSuggestionsResponse {
   items: SuggestionResponse[];
+  /**
+   * Carried through from rag-service — 39-doc §1. `items` is the next-step
+   * list this endpoint already produced; these are the articles beside it.
+   */
+  articles: SuggestedArticleResponse[];
+}
+
+export interface SuggestedArticleResponse {
+  documentId: string;
+  documentTitle: string;
+  pageNumber?: number | undefined;
+  score: number;
 }
 
 export interface ClassifyTicketResponse {

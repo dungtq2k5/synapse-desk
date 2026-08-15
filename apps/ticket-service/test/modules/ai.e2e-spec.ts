@@ -196,13 +196,18 @@ describe('§2.6 AI Co-Pilot (e2e)', () => {
         generationId: 'gen-draft-1',
         citations: [],
       });
-      jest.spyOn(rag, 'getSuggestions').mockResolvedValue([
-        {
-          title: 'Check the toner sensor',
-          body: 'Step one…',
-          confidenceScore: 0.6,
-        },
-      ]);
+      jest.spyOn(rag, 'getSuggestions').mockResolvedValue({
+        items: [
+          {
+            title: 'Check the toner sensor',
+            body: 'Step one…',
+            confidenceScore: 0.6,
+          },
+        ],
+        // The article sidebar — 39-doc §1. Empty here: this test is about the
+        // next-step list, which arrives beside them rather than instead.
+        articles: [],
+      });
       jest.spyOn(rag, 'classifyTicket').mockResolvedValue({
         suggestedDepartmentId: '',
         suggestedPriority: 'HIGH',
