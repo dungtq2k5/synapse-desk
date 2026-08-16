@@ -1,6 +1,6 @@
 """One metered call: generate, CHARGE, then RECORD — RDM §1.14.
 
-Extracted when Layer B's standalone classification (33-doc §3.3) became the
+Extracted when Layer B's standalone classification became the
 second caller needing exactly this sequence. **The ordering is the design, and
 that is why it is shared rather than copied**: the charge is awaited because it
 is the only thing standing between a burst of concurrent requests and all of

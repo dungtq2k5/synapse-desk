@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 /**
- * **The drift guard** — 20-doc §4.5 test 1.
+ * **The drift guard** test 1.
  *
  * `model JobRun` is declared three times, in `postgres_auth`, `postgres_ticket`
  * and `postgres_ingestion`. That is correct and deliberate: three tables

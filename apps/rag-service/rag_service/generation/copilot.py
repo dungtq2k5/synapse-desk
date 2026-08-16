@@ -1,4 +1,4 @@
-"""The co-pilot's non-drafting surfaces — 13-doc §4.2.
+"""The co-pilot's non-drafting surfaces
 
 Summary, classification and suggestions. None of them stream: an agent absorbs
 the latency, which is the same trade the review loop makes.
@@ -69,7 +69,7 @@ class Suggestion:
 
 @dataclass(frozen=True)
 class SuggestedArticle:
-    """One knowledge-base article to recommend — 39-doc §2.
+    """One knowledge-base article to recommend
 
     **Not a `Citation`.** A citation points at the PASSAGE an answer used and
     carries a chunk id so the answer can be traced to it; this points at the
@@ -112,7 +112,7 @@ class CopilotService:
         self._generator = generator
         self._ledger = ledger
         self._quota = quota
-        #: **A collaborator this class did not have** — 39-doc §3.1.
+        #: **A collaborator this class did not have**
         #:
         #: Its only import from the retrieval module was `BudgetState`, a type.
         #: "`suggest()` gains the retrieval call" therefore meant a constructor
@@ -140,7 +140,7 @@ class CopilotService:
         them nothing — the value is in "here is what happened, do this next",
         and the second half is what makes the first worth generating.
         """
-        # **Wrapped, not guarded** — 33-doc §4.2, §8.
+        # **Wrapped, not guarded**
         #
         # These two prompts read a ticket transcript, and `ticket_messages` now
         # carries inbound email from senders who never authenticated. The
@@ -226,7 +226,7 @@ class CopilotService:
         # **The boundary, which this prompt did not have.** `summarize` and
         # `suggest` both wrap their untrusted text; classify interpolated
         # `TITLE:` and `BODY:` as plain-text delimiters — the exact pattern
-        # 33-doc §4 exists to remove, and a body containing its own `BODY:` line
+        # Exists to remove, and a body containing its own `BODY:` line
         # could restate the task.
         #
         # It mattered less while this surface was unguarded AND text-only: the
@@ -292,7 +292,7 @@ class CopilotService:
         body: str = "",
         ctx: CallerContext | None = None,
     ) -> tuple[list[Suggestion], str, list[SuggestedArticle]]:
-        """Next-step suggestions, and the articles beside them — 39-doc §1.
+        """Next-step suggestions, and the articles beside them
 
         **Two outputs from two different inputs, deliberately.** The next steps
         are generated from the TRANSCRIPT, because what to do next depends on
@@ -353,7 +353,7 @@ class CopilotService:
         settings: AiSettings,
         budget: BudgetState,
     ) -> list[SuggestedArticle]:
-        """Knowledge-base articles for the ticket's subject — 39-doc §3.
+        """Knowledge-base articles for the ticket's subject
 
         **Never fatal.** The next-step list is what this endpoint promised
         before articles existed, and a retrieval failure must not take it down
@@ -498,7 +498,7 @@ def _json_array(text: str) -> list:
 
 
 def _first_parsable(text: str, opening: str, closing: str, kind: type):
-    r"""The first BALANCED span that parses — 17-doc §1.2 Gap 1.
+    r"""The first BALANCED span that parses Gap 1.
 
     The previous implementation was `re.search(r"\{.*\}", text, re.DOTALL)`,
     which with a greedy `.*` spans from the FIRST opening brace to the LAST one

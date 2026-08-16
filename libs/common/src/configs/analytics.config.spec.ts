@@ -15,7 +15,7 @@ import {
 } from './analytics.config';
 
 /**
- * The DEFINITIONS — 19-doc §3.1.
+ * The DEFINITIONS
  *
  * **Step 2 of the build order is not documentation, it is this file's subject.**
  * Every metric here has a plausible alternative reading, and two endpoints
@@ -188,7 +188,7 @@ describe('the analytics definitions', () => {
     });
 
     it('reports ~100% WITHOUT the discarded sweep — the failure it guards', () => {
-      // The denominator needs `DISCARDED`, which comes from the sweep (12-doc
+      // The denominator needs `DISCARDED`, which comes from the sweep (
       // §4.3). Without those rows the denominator only ever contains drafts
       // that were USED, and acceptance cannot go down — the clearest possible
       // sign a metric is measuring nothing.

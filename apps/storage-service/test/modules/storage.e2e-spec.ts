@@ -186,7 +186,7 @@ describe('§2.2–2.4 Storage presign, confirm and read URLs (e2e)', () => {
     });
 
     it('9. builds the ATTACHMENT path from both owner ids, under `pending/`', async () => {
-      // **`pending/` is new** — 36-doc §1.3.2. A presigned object is
+      // **`pending/` is new** A presigned object is
       // unreferenced until confirm moves it out, and keeping the two apart is
       // what makes a lifecycle rule over the prefix safe: before this, an
       // abandoned upload and a live attachment had identical path shapes.
@@ -203,7 +203,7 @@ describe('§2.2–2.4 Storage presign, confirm and read URLs (e2e)', () => {
     });
 
     it('10. ACCEPTS an attachment with no secondary owner, and omits the segment', async () => {
-      // **This test used to assert the opposite** — 36-doc §1.3. Requiring the
+      // **This test used to assert the opposite** Requiring the
       // message id here is what made presign-before-the-message impossible, and
       // that is what left a first-turn screenshot unreadable by the answer to
       // the very message it was attached to.
@@ -570,7 +570,7 @@ describe('§2.2–2.4 Storage presign, confirm and read URLs (e2e)', () => {
 });
 
 /**
- * Segregate at presign, move at confirm — 36-doc §1.3.2.
+ * Segregate at presign, move at confirm
  *
  * **The prefix is the point, not the move.** `confirmUpload` never relocated
  * anything, so a live attachment on a real ticket had the same path shape as
@@ -580,7 +580,7 @@ describe('§2.2–2.4 Storage presign, confirm and read URLs (e2e)', () => {
  * The rule itself is bucket configuration the emulator does not run, so it
  * cannot be tested here. **What can be tested is the invariant that makes it
  * safe to enable**: after a successful confirm, nothing is left under
- * `pending/`. Same shape as 34-doc §7's image checks — the deployment artifact
+ * `pending/`. Same shape as the OCR image checks — the deployment artifact
  * is not testable, so test the property it depends on.
  */
 describe('§1.3.2 ticket attachments are segregated until confirmed (e2e)', () => {

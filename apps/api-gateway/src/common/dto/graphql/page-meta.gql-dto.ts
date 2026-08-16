@@ -3,7 +3,7 @@ import { Field, Int, ObjectType } from '@nestjs/graphql';
 /**
  * The pagination block every list field returns.
  *
- * **Offset pagination, matching REST** — 26-doc §7 defers Relay cursors. Mixing
+ * **Offset pagination, matching REST** defers Relay cursors. Mixing
  * the two is worse than either: a client would have to know which fields take a
  * cursor and which take a page, and the SPA's existing calls are offset-based.
  *
@@ -25,7 +25,7 @@ export class PageMetaGqlDto {
   /**
    * The page size actually used.
    *
-   * Reads back the CLAMPED value, not what was asked for — 25-doc §5. A client
+   * Reads back the CLAMPED value, not what was asked for A client
    * that requested 500 and received 100 can see that here rather than inferring
    * it from a short array, which is indistinguishable from running out of rows.
    */

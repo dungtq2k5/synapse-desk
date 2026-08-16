@@ -1,9 +1,9 @@
-"""Hybrid retrieval, end to end — 13-doc §2.2-2.3.
+"""Hybrid retrieval, end to end-2.3.
 
     tenant_scope(ctx)  ──┬──> Qdrant ANN      ──┐
                          └──> Postgres FTS    ──┴──> RRF ──> rerank ──> chunks
 
-The one function feeding two arms is the security boundary (11-doc §1.4); the
+The one function feeding two arms is the security boundary; the
 rest of this module is the ranking and hydration around it.
 
 **At the AI cap this degrades rather than failing.** The lexical arm needs no
@@ -71,7 +71,7 @@ class RetrievalResult:
     #: True when the semantic arm was skipped because the tenant is at the cap.
     lexical_only: bool
     #: Every chunk the retriever SAW, for the ledger. Empty is the
-    #: knowledge-gap signal (11-doc §1.6), which is why it is recorded
+    #: knowledge-gap signal, which is why it is recorded
     #: separately from what a generator eventually cites.
     retrieved_chunk_ids: list[str]
 
@@ -129,7 +129,7 @@ class RetrievalService:
         else:
             # The DEGRADED path, and it still goes through `tenant_scope()`.
             # The failure to avoid is a fallback that skips the boundary
-            # because it is "just keyword search" (13-doc §2.3 test 4).
+            # because it is "just keyword search".
             arm_results[LEXICAL] = await lexical
 
         fused = reciprocal_rank_fusion(
@@ -165,7 +165,7 @@ class RetrievalService:
             lexical_only=not budget.allows_embedding,
             # Recorded from the FUSED pool rather than the final selection: what
             # the retriever saw is a different question from what survived
-            # rerank, and `UNCITED` needs both to mean anything (12-doc §4.2).
+            # rerank, and `UNCITED` needs both to mean anything.
             retrieved_chunk_ids=[entry.chunk.chunk_id for entry in fused],
         )
 

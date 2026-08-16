@@ -17,7 +17,7 @@ import { ANALYTICS_TOP_N } from '@synapsedesk/common';
 import { grpcError, timestamp } from '../fixtures/wire';
 
 /**
- * The analytics surface at the HTTP boundary — 19-doc §3, §4.
+ * The analytics surface at the HTTP boundary
  *
  * The owning services are stubbed: the rollup arithmetic, the definitions and
  * the timezone bucketing all have their own suites against real databases. What
@@ -389,7 +389,7 @@ describe('§4 Analytics at the HTTP boundary (e2e)', () => {
     const stubNames = () =>
       fx.stubs.user.listUsersByIds.mockReturnValue(
         of({
-          // **`summaries`, not `items`** — 27-doc §3. This path now asks for the
+          // **`summaries`, not `items`** This path now asks for the
           // SUMMARY projection, so the notification-shaped `items` is empty on
           // the wire. Note what is NOT here any more: `email`. A performance
           // table renders names, and receiving an address it would have to

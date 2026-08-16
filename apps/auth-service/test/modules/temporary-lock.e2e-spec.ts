@@ -22,7 +22,7 @@ import { SchedulerProcessor } from '../../src/modules/scheduler/scheduler.proces
 import { DatabaseSeeder } from '../../src/modules/prisma/database.seeder';
 
 /**
- * **Temporary locks** — 21-doc §2.
+ * **Temporary locks**
  *
  * The design under test is the one that kept this feature to three call sites
  * instead of 22: `is_locked` stays the single authoritative boolean that every
@@ -251,7 +251,7 @@ describe('§2 Temporary locks (e2e)', () => {
       const before = await users.listUsersByIds({
         organizationId: tenant.org.id,
         userIds: [member.id],
-        // The NOTIFICATION caller, unchanged — 27-doc §3 test 4. `false` here
+        // The NOTIFICATION caller, unchanged test 4. `false` here
         // is what keeps "a notification to a deactivated account is a row
         // nobody reads" true after the flag was added for the loader.
         includeInactive: false,
@@ -303,7 +303,7 @@ describe('§2 Temporary locks (e2e)', () => {
     });
 
     it('10. runs on the HOURLY scheduled job, not on its own timer', async () => {
-      // 20-doc's rule: a job is not done until something calls it. The sweep
+      // 's rule: a job is not done until something calls it. The sweep
       // being correct is worth nothing if nothing invokes it.
       const member = await lockedMember(inHours(1));
       await fx.prisma.user.update({
@@ -440,7 +440,7 @@ describe('§2 Temporary locks (e2e)', () => {
   });
 
   /**
-   * 21-doc §2.2b — the state matrix.
+   * B — the state matrix.
    *
    * Two columns is four states on paper and only three mean anything. The two
    * invalid ones are **unrepresentable rather than merely unwritten**: both

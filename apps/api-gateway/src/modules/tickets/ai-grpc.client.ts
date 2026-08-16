@@ -77,7 +77,7 @@ export class AiGrpcClient extends BaseGrpcClient implements OnModuleInit {
       modelName: response.modelName,
       promptTokens: response.promptTokens,
       completionTokens: response.completionTokens,
-      // **Both of these were read off the response and not copied** — 38-doc
+      // **Both of these were read off the response and not copied**
       // §1. Every service satisfied its own contract and this boundary is the
       // one no test crossed, which is why BOTH halves of the loop were missing
       // here rather than one.

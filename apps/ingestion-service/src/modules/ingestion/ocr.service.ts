@@ -18,7 +18,7 @@ export type OcrResult =
   { ok: true; text: string } | { ok: false; reason: OcrFailure };
 
 /**
- * `pdftoppm` then `tesseract`, per page — 34-doc §3.
+ * `pdftoppm` then `tesseract`, per page
  *
  * **Nothing touches the disk** (§3.1). Both tools read stdin and write stdout,
  * so the PDF is piped in, the PNG never lands, and the text comes back on a
@@ -46,7 +46,7 @@ export class OcrService implements OnModuleInit {
   private available: boolean | null = null;
 
   /**
-   * Probes at startup so a bad build is a DEPLOY-time diagnostic — 34-doc §6.1.
+   * Probes at startup so a bad build is a DEPLOY-time diagnostic
    *
    * The warning this produces says "build ingestion-service with
    * `--target runtime-ocr`". That is a message for whoever deployed the
@@ -77,13 +77,13 @@ export class OcrService implements OnModuleInit {
   }
 
   /**
-   * Whether both binaries exist — 34-doc §6.1, and it does NOT fail the boot.
+   * Whether both binaries exist, and it does NOT fail the boot.
    *
    * Called at boot by `onModuleInit` and again by every `recognisePage`; the
    * memoisation makes all but the first free, so the lazy call sites cost
    * nothing and the eager one decides when the warning lands.
    *
-   * A missing model made the injection classifier fail its process (33-doc
+   * A missing model made the injection classifier fail its process (
    * §3.2) because that was a SECURITY control: absent, it silently stops
    * defending. This is a CAPABILITY. Absent, PDFs needing OCR fail with a named
    * reason and every other document still ingests — and failing the boot would
@@ -203,7 +203,7 @@ export class OcrService implements OnModuleInit {
   }
 
   /**
-   * Runs a binary with `input` on stdin and returns stdout — 34-doc §3.3.
+   * Runs a binary with `input` on stdin and returns stdout
    *
    * **`spawn`, never `exec`.** No shell means an argument can never become a
    * command; there is no filename in these arguments today, and the guarantee

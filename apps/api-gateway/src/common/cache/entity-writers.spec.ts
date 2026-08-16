@@ -7,7 +7,7 @@ describe('the entity cache rests on who writes these fields', () => {
   /**
    * Who writes a cached entity's fields.
    *
-   * **28-doc §3.1 rests on a claim that is true today and time-sensitive:** every
+   * **This rests on a claim that is true today and time-sensitive:** every
    * writer of `fullName` or `avatarUrl` is a gateway mutation, so
    * `@InvalidateCache` is precise invalidation for the entity cache rather than a
    * fallback, and a `user.*` NATS contract would have no publisher.
@@ -144,7 +144,7 @@ describe('the entity cache rests on who writes these fields', () => {
   });
 
   it('and CREATED in two — self-signup and inbound email, neither cache-affecting', () => {
-    // `createUser` (the admin path) and `resolveInboundSender` (31-doc §3).
+    // `createUser` (the admin path) and `resolveInboundSender`.
     // Pinned so a third create is still a decision somebody makes deliberately:
     // a create that later becomes an upsert WOULD affect the cache.
     expect(writesTo(users(), 'fullName', 'create')).toBe(2);

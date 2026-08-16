@@ -26,10 +26,10 @@ import { toUserResponseGqlDto } from './user.mapper';
 import { MAX_EDGE_LIST } from '../../common/config/graphql-limits.config';
 
 /**
- * `Query.me`, `Query.user` — 26-doc §4.
+ * `Query.me`, `Query.user`
  *
  * **`Query.user` carries `@RequirePermission('user.read')`, and `Ticket.assignee`
- * does not** — 25-doc §4, and that is the entire reason the two return different
+ * does not**, and that is the entire reason the two return different
  * types. The full `User` is reachable only through a query that applies the same
  * check the REST route applies; an edge reaches `UserSummary`, which has no
  * contact details to protect.
@@ -110,7 +110,7 @@ export class UsersResolver {
         // `TicketsArgsGqlDto` and `DepartmentsResolver` state. The REST route
         // accepts the flag and gates it on `user.delete` inside the controller;
         // reproducing that check in a resolver would be a second implementation
-        // of a permission rule (26-doc §4), so it is not offered on this surface
+        // of a permission rule, so it is not offered on this surface
         // and the safe value is passed explicitly.
         //
         // `as never` on the query was previously silencing its absence.
@@ -129,7 +129,7 @@ export class UsersResolver {
   }
 
   /**
-   * **The flat count beside the capped edge** — 26-doc §3.2.
+   * **The flat count beside the capped edge**
    *
    * Without it a capped list is indistinguishable from a complete one: a client
    * showing fifty departments cannot tell whether that is all of them, and the
@@ -162,7 +162,7 @@ export class UsersResolver {
   }
 
   /**
-   * `User.departments` — 26-doc §3.
+   * `User.departments`
    *
    * On `UserResponseGqlDto` rather than `UserSummaryGqlDto`: department membership is
    * organizational information, and an edge that reached it from a ticket would
@@ -186,9 +186,9 @@ export class UsersResolver {
     const ids = user.departmentIds;
     if (ids.length === 0) return [];
 
-    // **Sliced BEFORE the batch, not after** — 26-doc §3.2. A user in 250
+    // **Sliced BEFORE the batch, not after** A user in 250
     // departments produces a 250-key batch, and `ListDepartmentsByIds` caps at
-    // 200 with an ERROR rather than a truncation (27-doc §1, property 5) — so
+    // 200 with an ERROR rather than a truncation — so
     // an uncapped parent does not return fewer departments, it fails the whole
     // field. `departmentCount` beside this edge is what tells a client the list
     // was cut.

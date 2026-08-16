@@ -217,7 +217,7 @@ describe('SmartThrottlerGuard (e2e)', () => {
     });
 
     /**
-     * WAS a `it.failing` known defect; FIXED in 16-doc §2.
+     * WAS a `it.failing` known defect; FIXED during the hardening sweep.
      *
      * The defect: `SmartThrottlerGuard` is registered with `APP_GUARD`, and Nest
      * runs global guards BEFORE controller- and route-level ones — so

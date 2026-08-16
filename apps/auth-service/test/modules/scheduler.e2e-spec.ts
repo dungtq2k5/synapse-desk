@@ -15,7 +15,7 @@ import { SchedulerProcessor } from '../../src/modules/scheduler/scheduler.proces
 import { SchedulerRegistrar } from '../../src/modules/scheduler/scheduler.registrar';
 
 /**
- * 20-doc §3.2 — auth-service off `@nestjs/schedule`.
+ * Auth-service off `@nestjs/schedule`.
  *
  * Both jobs here were `@Cron`, which runs in-process: three pods fired each of
  * them three times, and under a rolling deploy zero or four. Both are
@@ -23,7 +23,7 @@ import { SchedulerRegistrar } from '../../src/modules/scheduler/scheduler.regist
  * genuinely low severity, and not the reason it changed.
  *
  * It changed because **two mechanisms for one concern is how a third appears**.
- * After doc 20 this codebase had two BullMQ schedulers and one built on
+ * This codebase once had two BullMQ schedulers and one built on
  * decorators, and whoever added the next scheduled job would have copied
  * whichever they found first.
  *
@@ -185,7 +185,7 @@ describe('§3.2 The scheduler (e2e)', () => {
       );
 
       // And it still records no run, so `last_succeeded_at` cannot be refreshed
-      // by a job that did nothing — 20-doc §4.1's staleness alert depends on it.
+      // by a job that did nothing's staleness alert depends on it.
       expect(
         await fx.prisma.jobRun.findUnique({
           where: { jobName: 'auth-weekly-from-2024' },
@@ -195,7 +195,7 @@ describe('§3.2 The scheduler (e2e)', () => {
   });
 
   /**
-   * 20-doc §4.5 test 3 — the BINDING.
+   * The BINDING.
    *
    * `JobRunRecorder` now lives in `libs/common` and takes a `JobRunStore`.
    * `JobRunsModule` binds it to THIS service's `prisma.jobRun`, and three thin

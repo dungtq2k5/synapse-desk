@@ -1,5 +1,5 @@
 /**
- * The `@nestjs/swagger` CLI plugin, as a ts-jest AST transformer — 24-doc §1.
+ * The `@nestjs/swagger` CLI plugin, as a ts-jest AST transformer
  *
  * **Without this, every OpenAPI test in this workspace passes vacuously.** The
  * plugin is a TypeScript transformer that reads existing types and
@@ -10,7 +10,7 @@
  * "no schema is missing properties" would be true of a spec with no schemas at
  * all.
  *
- * That is the confusing hour 24-doc §1 warns about: it works in dev, and the
+ * That is the confusing hour this guards against: it works in dev, and the
  * schema is empty in the assertion.
  *
  * **CommonJS on purpose.** ts-jest `require()`s this file directly rather than

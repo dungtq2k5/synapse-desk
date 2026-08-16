@@ -20,7 +20,7 @@ export const NOTIFICATION_PATTERNS = {
 export enum EmailTemplateName {
   WELCOME = 'WELCOME',
   /**
-   * The one-time reply to mail this system refused — 31-doc §3, §7.
+   * The one-time reply to mail this system refused
    *
    * Rate-limited to one per address per day.
    */
@@ -30,7 +30,7 @@ export enum EmailTemplateName {
   PASSWORD_CHANGED = 'PASSWORD_CHANGED',
   INVITATION = 'INVITATION',
   SECURITY_ALERT = 'SECURITY_ALERT',
-  /** A budget threshold crossing — 16-doc §1. */
+  /** A budget threshold crossing */
   QUOTA_ALERT = 'QUOTA_ALERT',
 }
 
@@ -189,7 +189,7 @@ export const PREFERENCE_WILDCARD_TYPE = '*';
 
 export enum NotificationPriority {
   // LOW and HIGH are declared by RDM Table 23 but nothing branches on them yet
-  // — both behave as NORMAL. Known gap, 18-doc §8.
+  // — both behave as NORMAL. Known gap
   LOW = 'LOW',
   NORMAL = 'NORMAL',
   HIGH = 'HIGH',
@@ -202,7 +202,7 @@ export enum NotificationChannel {
   IN_APP = 'IN_APP',
   EMAIL = 'EMAIL',
   SMS = 'SMS',
-  // Declared but unimplemented — 18-doc §8.
+  // Declared but unimplemented
   WEBHOOK = 'WEBHOOK',
 }
 
@@ -237,14 +237,14 @@ export enum DeliverySkipReason {
 /** RDM Table 25 — batching mode. Only `IMMEDIATE` and `OFF` act today. */
 export enum DigestMode {
   IMMEDIATE = 'IMMEDIATE',
-  /** Read by the resolver; the SCHEDULER is deferred (18-doc §8). */
+  /** Read by the resolver; the SCHEDULER is deferred. */
   HOURLY = 'HOURLY',
   DAILY = 'DAILY',
   OFF = 'OFF',
 }
 
 /**
- * Where a resolved preference came from — 18-doc §4.
+ * Where a resolved preference came from
  *
  * The UI renders `DEFAULT` and `WILDCARD` as "inherited" rather than as a
  * choice the user made. Values are lower-case, matching what is stored.
@@ -267,7 +267,7 @@ export enum NotificationResourceType {
 }
 
 /**
- * Who receives a notification — 18-doc §1.3.
+ * Who receives a notification
  *
  * Use `users` whenever the producer knows the recipients; `permission` only
  * when it genuinely cannot, since resolving a permission reaches everyone who
@@ -311,7 +311,7 @@ export type CreateInAppNotificationCommand = {
   priority: NotificationPriority;
   occurredAt: string;
 
-  /** Who caused it. Excluded from the recipients — 18-doc §3.1 rule 1. */
+  /** Who caused it. Excluded from the recipients rule 1. */
   actorId?: string;
 
   /** Deep-link payload for the SPA: `{ ticketId, ticketNumber, actorName }`. */
@@ -327,7 +327,7 @@ export type CreateInAppNotificationCommand = {
    * Collapse key — e.g. `ticket:{ticketId}:message`.
    *
    * An unread notification with the same key for the same recipient is
-   * incremented rather than duplicated — 18-doc §3.2.
+   * incremented rather than duplicated
    */
   groupKey?: string;
 };
@@ -338,7 +338,7 @@ export type CreateInAppNotificationCommand = {
 
 /**
  * Subjects the gateway subscribes to in order to push a notification down a
- * socket — 18-doc §6.
+ * socket
  *
  * The socket is a delivery optimisation, not a channel of record: write the row
  * first and emit fire-and-forget, so a disconnected user still finds the

@@ -18,7 +18,7 @@ import type { VersionResponse } from './generated/synapsedesk/ops/ops';
 export const BUILD_INFO = Symbol('BUILD_INFO');
 
 /**
- * The probe and version surface every gRPC service serves — 23-doc §2, §3.
+ * The probe and version surface every gRPC service serves
  *
  * **In `libs/grpc-proto`, not `libs/common`**, and the split is the same one
  * `ServiceRegistry`'s docblock draws: `libs/common` is domain types, and a
@@ -93,7 +93,7 @@ export class OpsGrpcController {
   }
 
   /**
-   * `/version` for a service with no HTTP port — 23-doc §3.
+   * `/version` for a service with no HTTP port
    *
    * **Every service, not just the gateway.** A rolling deploy where one service
    * lagged is precisely the state this diagnoses, and a gateway-only version

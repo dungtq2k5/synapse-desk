@@ -10,7 +10,7 @@ import {
 import { grpcError, timestamp } from '../fixtures/wire';
 
 /**
- * `/platform/jobs` — 20-doc §4.4, §5.
+ * `/platform/jobs`
  *
  * **The endpoint whose absence cost two domains.** Seven scheduled jobs were
  * written correctly and invoked by nothing; every analytics endpoint answered

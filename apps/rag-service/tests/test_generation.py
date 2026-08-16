@@ -144,7 +144,7 @@ class TestGrounding:
     async def test_an_empty_retrieval_NEVER_reaches_the_model(
         self, ledger, quota, settings, budget
     ):
-        # 11-doc §1.6. An enterprise support bot inventing a policy is worse
+        # An enterprise support bot inventing a policy is worse
         # than one that escalates — and the notebook app this came from did the
         # opposite.
         scripted = ScriptedGenerator()
@@ -268,7 +268,7 @@ class TestGrounding:
         assert "do not answer from general knowledge" in prompt
 
     def test_the_prompt_PINS_THE_RESPONSE_LANGUAGE(self):
-        # 17-doc §2.1. The rest of the pipeline is multilingual by design —
+        # The rest of the pipeline is multilingual by design —
         # the greeting regex, `canned_reply`, and the `'simple'` FTS
         # configuration — and this prompt was the one place that stopped.
         #
@@ -281,7 +281,7 @@ class TestGrounding:
         assert "same language as the question" in prompt
 
     def test_the_prompt_STATES_THE_OUTPUT_FORMAT(self):
-        # 21-doc §1.2. Markdown already came out of this prompt without being
+        # Markdown already came out of this prompt without being
         # asked for, because the training data is full of it — which is a
         # property of the MODEL, not of the system. A model version change, a
         # tier change or an edit to the grounding rules can silently produce a
@@ -348,7 +348,7 @@ class TestCitations:
         assert len(citations) == 1
 
     def test_a_marker_inside_an_INLINE_CODE_SPAN_is_not_a_citation(self):
-        # 21-doc §1.3 — the collision the markdown contract creates. Asking for
+        # The collision the markdown contract creates. Asking for
         # markdown means more code in answers, and `items[2]` parses as a
         # citation of source 2 under the `[n]` pattern.
         #
@@ -496,7 +496,7 @@ class TestCancellation:
     async def test_a_cancelled_stream_STILL_records_and_STILL_charges(
         self, ledger, quota, settings, budget
     ):
-        # 13-doc §4.1 test 5, and the reason it is called out: with
+        # And the reason it is called out: with
         # `asyncio.create_task`, cancelling the request cancels its children —
         # so the ledger write is exactly what dies, and the metering hole hides
         # inside the metering design.
@@ -662,7 +662,7 @@ class TestJsonExtraction:
     "summary not available" with a perfectly good object sitting inside the text
     and nothing in the logs saying so.
 
-    Fixed AFTER the eval harness existed (17-doc build order step 6), so the
+    Fixed AFTER the eval harness existed, so the
     change could be shown not to regress anything.
     """
 

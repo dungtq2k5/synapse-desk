@@ -8,7 +8,7 @@ import { SchedulerProcessor } from './scheduler.processor';
 import { SchedulerRegistrar } from './scheduler.registrar';
 
 /**
- * The clock for `TicketRollupJob` — 20-doc §1.
+ * The clock for `TicketRollupJob`
  *
  * Without it the rollup tables were never written and all six analytics
  * endpoints answered zero, correctly, from empty tables.

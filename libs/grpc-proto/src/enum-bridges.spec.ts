@@ -309,7 +309,7 @@ describe('the two AnswerStatus protos stay aligned', () => {
   });
 
   it('REFUSED is not GREETING, in either proto', () => {
-    // 33-doc §5.1. The two share a short-circuit in the generator and the whole
+    // The two share a short-circuit in the generator and the whole
     // point of the member is that they are labelled differently — a refusal
     // filed as a greeting is wrong in the thread and in the trail.
     expect(AnswerStatus.REFUSED).not.toBe(AnswerStatus.GREETING);

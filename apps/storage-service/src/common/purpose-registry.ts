@@ -20,7 +20,7 @@ export type PurposePolicy = {
   /**
    * Whether the path CAN take a second owner id — a message, for an attachment.
    *
-   * **Permitted, not required** — 36-doc §1.3. It was required until the
+   * **Permitted, not required** It was required until the
    * one-shot case turned up: presign and confirm both took a `message_id`, so
    * the attachment row could only exist after the message did, while
    * `invoke_ai` runs during the create. The screenshot arrived a moment too

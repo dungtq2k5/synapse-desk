@@ -141,7 +141,7 @@ export class MessagesGrpcController implements MessageServiceController {
   }
 
   /**
-   * The gateway's route to attachment bytes — 36-doc §2.
+   * The gateway's route to attachment bytes
    *
    * It has no storage client of its own, and this service already does the
    * identical filter-and-fetch for its two `Draft` call sites. One

@@ -81,7 +81,7 @@ def screenshot() -> Attachment:
 async def test_the_reformulated_query_carries_a_string_only_the_IMAGE_has(
     live_pipeline, screenshot, budget
 ):
-    # 35-doc §1's example, run for real: six words that name no product, no
+    # 's example, run for real: six words that name no product, no
     # error and no policy, plus the screenshot that names all three.
     result = await live_pipeline.run(
         "how can I solve this problem?",

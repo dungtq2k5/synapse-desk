@@ -27,7 +27,7 @@ import {
 } from './dto/platform-jobs.dto';
 
 /**
- * Scheduled-job operations — 20-doc §4.4, §5.
+ * Scheduled-job operations
  *
  * `SuperAdminGuard` at CLASS level, as everywhere else under `/platform`: one
  * forgotten decorator here is a way for a tenant admin to trigger a
@@ -79,7 +79,7 @@ export class PlatformJobsController {
   /**
    * Recomputes an explicit range.
    *
-   * Three reasons this small surface is worth having (20-doc §5): fixing a
+   * Three reasons this small surface is worth having: fixing a
    * rollup bug requires recomputation or the wrong numbers are permanent; the
    * first run after this ships IS a backfill; and a scheduled job you cannot
    * trigger by hand cannot be debugged in staging without waiting for the

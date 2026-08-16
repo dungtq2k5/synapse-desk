@@ -93,13 +93,13 @@ export type GrpcStubs = {
    *  reason: what the gateway can prove alone is its own boundary. */
   rag: MockProxy<RagServiceClient>;
 
-  /** Domain E — the feed. New in 18-doc: this peer had no gRPC server before. */
+  /** Domain E — the feed. New with Domain E: this peer had no gRPC server before. */
   notification: MockProxy<NotificationServiceClient>;
 
-  /** The read projection over Domain B — 19-doc. Served by ticket-service. */
+  /** The read projection over Domain B. Served by ticket-service. */
   analytics: MockProxy<AnalyticsServiceClient>;
 
-  /** Domain C's ledger, which also answers the AI-usage reads (19-doc §3.2). */
+  /** Domain C's ledger, which also answers the AI-usage reads. */
   ledger: MockProxy<AiLedgerServiceClient>;
 };
 

@@ -486,7 +486,7 @@ export class AuthService {
   }
 
   /**
-   * Clears a lock whose `lockedUntil` has passed — 21-doc §2.2, mechanism 1.
+   * Clears a lock whose `lockedUntil` has passed, mechanism 1.
    *
    * **Both columns are cleared together.** Leaving `lockedUntil` set on an
    * unlocked account would let a later indefinite re-lock silently inherit an
@@ -537,7 +537,7 @@ export class AuthService {
     device: RequestOrigin,
     client: { deviceName?: string; deviceToken?: string },
   ): Promise<LoginResponse> {
-    // **Lazy unlock, before the check** — 21-doc §2.2.
+    // **Lazy unlock, before the check**
     //
     // The one place where being locked matters in real time, so the expiry is
     // honoured the moment the user tries to use it, with no dependency on a

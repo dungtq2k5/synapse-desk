@@ -78,7 +78,7 @@ export class AiController {
    * first, and a client keying off 201 would treat a replacement as a new
    * resource.
    */
-  // A per-USER minute limit, on top of the monthly quota — 16-doc §2. The
+  // A per-USER minute limit, on top of the monthly quota The
   // quota is a month budget checked per request and does nothing to stop one
   // user spending the whole month in ten minutes.
   @Throttle({ [AI_THROTTLER_TIER]: ROUTE_THROTTLE.aiSummary })
@@ -103,7 +103,7 @@ export class AiController {
    * `invokeAi` is the path that does persist, and keeping the two separate is
    * what stops an unreviewed generated reply reaching a customer.
    */
-  // A per-USER minute limit, on top of the monthly quota — 16-doc §2. The
+  // A per-USER minute limit, on top of the monthly quota The
   // quota is a month budget checked per request and does nothing to stop one
   // user spending the whole month in ten minutes.
   @Throttle({ [AI_THROTTLER_TIER]: ROUTE_THROTTLE.aiDraft })
@@ -121,7 +121,7 @@ export class AiController {
     return this.aiGrpcClient.generateDraft(ticketId, dto, context);
   }
 
-  // A per-USER minute limit, on top of the monthly quota — 16-doc §2. The
+  // A per-USER minute limit, on top of the monthly quota The
   // quota is a month budget checked per request and does nothing to stop one
   // user spending the whole month in ten minutes.
   @Throttle({ [AI_THROTTLER_TIER]: ROUTE_THROTTLE.aiSuggestions })
@@ -138,7 +138,7 @@ export class AiController {
     return this.aiGrpcClient.getSuggestions(ticketId, context);
   }
 
-  // A per-USER minute limit, on top of the monthly quota — 16-doc §2. The
+  // A per-USER minute limit, on top of the monthly quota The
   // quota is a month budget checked per request and does nothing to stop one
   // user spending the whole month in ten minutes.
   @Throttle({ [AI_THROTTLER_TIER]: ROUTE_THROTTLE.aiClassify })

@@ -8,10 +8,10 @@ import {
 } from '@synapsedesk/common';
 
 /**
- * Tells notification-service that mail was refused — 32-doc §5.
+ * Tells notification-service that mail was refused
  *
  * **The gateway's first NATS PUBLISHER**, which is worth naming: it has
- * consumed events since 22-doc and has never emitted one, so the client is new
+ * consumed events since the realtime work and has never emitted one, so the client is new
  * rather than a channel that happened to exist.
  *
  * **Fire-and-forget, and it must never throw.** The webhook answers 200 for

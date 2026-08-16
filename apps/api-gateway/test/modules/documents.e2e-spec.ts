@@ -288,7 +288,7 @@ describe('§3.1 Documents at the HTTP boundary (e2e)', () => {
     });
 
     it('**an unsupported OCR language is a 400**', async () => {
-      // 34-doc §4.2 rule 1. The set lives in `@synapsedesk/common` beside the
+      // Rule 1. The set lives in `@synapsedesk/common` beside the
       // mime allowlist, because the gateway validates it and ingestion-service
       // consumes it.
       const res = await authenticatedAgent(fx.app, {
@@ -301,7 +301,7 @@ describe('§3.1 Documents at the HTTP boundary (e2e)', () => {
     });
 
     it('**TWO non-Latin scripts are rejected** — the rule nobody guesses', async () => {
-      // 34-doc §4.2 rule 3, and the one that carries real information: accuracy
+      // Rule 3, and the one that carries real information: accuracy
       // degrades with script MIXING, not with count. `jpn+chi_sim` is two
       // models competing over the same Han characters and is close to
       // worthless, while `eng+fra` costs almost nothing — so a size cap alone
@@ -316,7 +316,7 @@ describe('§3.1 Documents at the HTTP boundary (e2e)', () => {
     });
 
     it('**more than four languages is a 400** — the measured cap', async () => {
-      // 34-doc §4.3, and the number came from a measurement rather than the
+      // And the number came from a measurement rather than the
       // document: extra languages cost no ACCURACY (four scored identically to
       // one) but roughly 40% more time, and CJK models cost most. So the cap
       // is a CPU bound, and four permits every realistic document — one
@@ -682,7 +682,7 @@ describe('§3.1 Documents at the HTTP boundary (e2e)', () => {
     });
 
     it('2. accepts UNRETRIEVED as well as UNCITED', async () => {
-      // The point of 16-doc §5. They were one flag under a name that fitted
+      // The point of the hardening sweep. They were one flag under a name that fitted
       // only `UNRETRIEVED`, and a filter that offered only `UNCITED` would
       // re-merge them in practice: the type nobody can select is the type
       // nobody sees.

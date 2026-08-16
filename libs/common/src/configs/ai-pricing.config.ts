@@ -33,7 +33,7 @@ export type ModelPricing = {
 };
 
 export const MODEL_PRICING: Record<string, ModelPricing> = {
-  // Generation — the QUALITY tier, sellable once billing lands (doc 15).
+  // Generation — the QUALITY tier, sellable once billing lands.
   'gemini-2.5-pro': {
     promptMicrosPerMillion: 1_250_000,
     completionMicrosPerMillion: 10_000_000,

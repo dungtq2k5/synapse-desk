@@ -15,7 +15,7 @@ import { AnalyticsExportService } from './analytics-export.service';
 import { StorageReferenceService } from '../storage-client/storage-reference.service';
 
 /**
- * Wire ↔ domain for the export — 19-doc §5.
+ * Wire ↔ domain for the export
  *
  * Separate from `AnalyticsExportService` because that one is also the WORKER's
  * collaborator, and the worker has no wire types and no caller. Keeping the

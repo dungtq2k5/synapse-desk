@@ -1,4 +1,4 @@
-"""The prompt boundary — 33-doc §4.
+"""The prompt boundary
 
 **Parameterised over all three builders**, because the defect was never
 specific to one of them: `corag.build_prompt`, `build_review_prompt` and
@@ -284,7 +284,7 @@ async def _copilot_prompts(recorder, method: str):
     return recorder.prompts
 
 
-#: Every prompt that interpolates conversation history — 33-doc §4.2's argument,
+#: Every prompt that interpolates conversation history's argument,
 #: applied to a delimiter it did not originally count.
 #:
 #: Parameterised rather than asserted one by one, because these four came from a
@@ -449,7 +449,7 @@ def test_scrubbing_covers_every_tag_the_boundary_emits():
 
 
 # ---------------------------------------------------------------------------
-# 36-doc §6 — the attachment as a bounded part
+# The attachment as a bounded part
 # ---------------------------------------------------------------------------
 
 
@@ -551,7 +551,7 @@ def test_the_attachment_block_is_ABSENT_when_no_file_was_sent():
 
 
 def test_the_generation_prompt_carries_NO_conversation_history():
-    """§6 test 4 — 35-doc §9's decision, pinned rather than assumed.
+    """§6 test 4's decision, pinned rather than assumed.
 
     History reaches reformulation and the classification; it does not reach the
     answering prompt. Pinned so the next person adding conversation context here

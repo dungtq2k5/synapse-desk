@@ -66,13 +66,13 @@ export async function buildPdf(
  * blob in git makes it impossible to tell from a diff what page 2 is supposed
  * to say, and page attribution is exactly what these tests assert.
  *
- * The route is 34-doc §8.1, and it adds no dependency: `pdf-lib` draws text but
+ * The route adds no dependency: `pdf-lib` draws text but
  * cannot rasterise it, so the text is drawn into a PDF, `pdftoppm` renders that
  * page to a PNG, and `embedPng` puts the PNG back into a document as a
  * full-bleed image. pdfjs then extracts **zero** text items from it — verified,
  * not assumed — which is precisely the page `parsePdf` silently drops today.
  *
- * **Requires poppler on the host** (34-doc step 0). Callers guard with
+ * **Requires poppler on the host**. Callers guard with
  * `describeWithPoppler`; this throws rather than returning a broken fixture,
  * because a test that silently received a text page would pass for the wrong
  * reason.
@@ -121,7 +121,7 @@ export async function buildScannedPdf(
 }
 
 /**
- * Text and image pages interleaved — the mixed document 34-doc §1 is about.
+ * Text and image pages interleaved — the mixed document this is about.
  *
  * `pages` marks each one: a string is drawn as text, a `{ scanned }` entry is
  * rasterised. Interleaving matters because page NUMBERS are the property under

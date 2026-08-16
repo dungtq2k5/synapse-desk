@@ -48,7 +48,7 @@ import { faultInjector } from '@synapsedesk/common/testing/fault';
 
 describe('§2 Documents (e2e)', () => {
   // Every injected fault in this file is registered here and restored in an
-  // `afterEach` that runs whether the test passed, failed or threw — 16-doc §9.
+  // `afterEach` that runs whether the test passed, failed or threw
   const faults = faultInjector();
 
   let fx: E2eFixture;
@@ -539,7 +539,7 @@ describe('§2 Documents (e2e)', () => {
   describe('re-scoping', () => {
     it('1. replaces the department set and fans out to the CHUNK rows', async () => {
       // The chunk rows are the lexical retrieval arm's half of the boundary
-      // (11-doc §1.4). A re-scope that updated `documents` alone would leave
+      //. A re-scope that updated `documents` alone would leave
       // that arm serving the document to people who just lost access.
       const document = await createScopedDocument(fx.prisma, tenant, [
         tenant.departmentId,
@@ -1085,10 +1085,10 @@ describe('§2 Documents (e2e)', () => {
   });
 
   /**
-   * The batch contract — 27-doc §1, §3.
+   * The batch contract
    *
    * The property specific to THIS service is the department boundary: a
-   * document scoped to a department is invisible outside it (11-doc §1.4), and
+   * document scoped to a department is invisible outside it, and
    * a batch read that skipped `visibilityScope` would be a way to fetch any
    * document in the tenant one id at a time — including its TITLE, which is
    * usually the sensitive part.
@@ -1155,7 +1155,7 @@ describe('§2 Documents (e2e)', () => {
     });
 
     it('5. **chunks are capped HARDER than everything else**', async () => {
-      // 27-doc §3. A chunk carries its whole text, so these are the largest
+      // A chunk carries its whole text, so these are the largest
       // payloads in the system: 50 of them is megabytes where 200 users is
       // kilobytes. The cap is about BYTES, and one number shared with the other
       // batches would be wrong for one of them.

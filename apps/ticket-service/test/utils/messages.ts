@@ -4,7 +4,7 @@ import type { CallerContext } from '@synapsedesk/common';
 import type { MessagesService } from '../../src/modules/messages/messages.service';
 
 /**
- * `createMessage`, with 36-doc §1.3's fields supplied and its wrapper unwrapped.
+ * `createMessage`, with the attachment fields supplied and its wrapper unwrapped.
  *
  * The RPC takes `attachments` and answers with `{ message, skippedAttachments }`
  * because a create can partially succeed: a file whose confirm failed is named

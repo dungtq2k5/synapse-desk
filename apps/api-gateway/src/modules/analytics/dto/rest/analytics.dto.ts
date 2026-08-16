@@ -68,7 +68,7 @@ export class DocumentAnalyticsQueryDto {
 }
 
 /**
- * The export request — 19-doc §5.
+ * The export request
  *
  * A POST rather than the `GET /analytics/export` the endpoint plan names,
  * because it CREATES a job: a GET that writes a row and queues work is one that

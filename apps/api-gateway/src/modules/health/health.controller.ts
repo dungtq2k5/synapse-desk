@@ -56,7 +56,7 @@ export class HealthController {
   }
 
   /**
-   * Readiness: should this instance receive traffic? — 23-doc §1.
+   * Readiness: should this instance receive traffic?
    *
    * **Peer health does NOT gate this, and that is the fix.** The previous
    * version computed `every(s => s.health !== 'DOWN')` over the gRPC peers, so a

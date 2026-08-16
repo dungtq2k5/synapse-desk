@@ -14,7 +14,7 @@ import {
 import { InAppNotificationService } from './in-app-notification.service';
 
 /**
- * `ticket.*` → notifications — 18-doc §3, the largest piece of Domain E.
+ * `ticket.*` → notifications, the largest piece of Domain E.
  *
  * **Three rules decide who gets notified, and every handler applies all
  * three.** Each has a failure mode worse than a missing notification:
@@ -163,7 +163,7 @@ export class TicketNotificationConsumer {
 
   /**
    * The highest-volume event, and the one that decides whether this feature is
-   * usable — 18-doc §3.2.
+   * usable
    *
    * Two things happen here that happen nowhere else:
    *

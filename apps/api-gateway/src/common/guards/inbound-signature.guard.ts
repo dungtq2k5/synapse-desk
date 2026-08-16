@@ -10,20 +10,20 @@ import type { RawBodyRequest } from '@nestjs/common';
 import type { Request } from 'express';
 import { verifyHmacSignature } from '@synapsedesk/common';
 
-/** The header the mail Worker signs with — 32-doc §2. */
+/** The header the mail Worker signs with */
 export const INBOUND_SIGNATURE_HEADER = 'x-inbound-signature';
 
 /**
- * Authenticates the inbound-email webhook — 31-doc §6.1, 32-doc §3.
+ * Authenticates the inbound-email webhook
  *
  * **A GUARD rather than a check inside the handler**, because the property this
  * endpoint is built around is *"a bad signature causes nothing to happen"* — no
  * lookup, no RPC, no job, no log of the body. Guards run before interceptors,
  * pipes and the handler, so expressing it here makes that structural instead of
- * a promise every future edit has to keep. 32-doc §3 test 3b asserts it by
+ * a promise every future edit has to keep. a test asserts it by
  * spying the auth-service client.
  *
- * **Verified HERE, which is deliberately not what Stripe does** — 31-doc §6.1.
+ * **Verified HERE, which is deliberately not what Stripe does**
  * `/webhooks/stripe` forwards raw bytes and auth-service verifies, and copying
  * that would spend a gRPC call before authenticating. The credentials also
  * differ in kind: Stripe's secret is a billing-domain credential held where the
@@ -46,7 +46,7 @@ export class InboundSignatureGuard implements CanActivate {
       .switchToHttp()
       .getRequest<RawBodyRequest<Request>>();
 
-    // **The raw bytes, not the parsed body** — 14-doc §3.2, the trap this
+    // **The raw bytes, not the parsed body**, the trap this
     // codebase has already been caught by once. A JSON parser deserialises and
     // re-serialises: different key order, different whitespace, a different
     // digest, and every signature fails in production while passing every local

@@ -184,7 +184,7 @@ export class MessagesService {
    * still be able to be down once it does — and rolling back would throw away
    * what the human actually typed because a machine could not answer them.
    *
-   * **Attachments are bound HERE, in the same call** — 36-doc §1.3. Presign and
+   * **Attachments are bound HERE, in the same call** Presign and
    * confirm both took a `messageId`, so an attachment row could only be written
    * after its message existed, while `invokeAi` fires during this very call:
    * a first-turn screenshot was stored a moment after the answer that needed
@@ -214,7 +214,7 @@ export class MessagesService {
       });
     }
 
-    // **Idempotency, for the WebSocket path** — 22-doc §2.3.
+    // **Idempotency, for the WebSocket path**
     //
     // A socket that reconnects holding an unacked message re-emits it, which is
     // correct client behaviour and double-posts. Returning the ORIGINAL rather
@@ -278,7 +278,7 @@ export class MessagesService {
     let message: MessageWithAttachments;
     try {
       // **An inbound email's dedup row shares this insert's transaction** —
-      // 31-doc §6.2. `client_message_id` above cannot serve: it is a UUID
+      // `client_message_id` above cannot serve: it is a UUID
       // column, and it is scoped to a ticket, while inbound dedup must also
       // work for the mail that CREATES one.
       //
@@ -382,7 +382,7 @@ export class MessagesService {
           // follows, so a read resolves a fresh signed URL rather than trusting
           // one stored months ago.
           //
-          // **`object.objectPath`, not `attachment.objectPath`** — 36-doc
+          // **`object.objectPath`, not `attachment.objectPath`**
           // §1.3.2. The caller presigned into `pending/` and the object has
           // just moved out of it; storing what the client sent would record the
           // one path a lifecycle sweep is entitled to delete.
@@ -409,7 +409,7 @@ export class MessagesService {
   }
 
   /**
-   * Persists a STREAMED AI answer — 22-doc §5.1, write #2.
+   * Persists a STREAMED AI answer, write #2.
    *
    * **The gateway holds the stream; this still holds the write.** Tokens have
    * to reach a socket and this service has none, so `Chat` is opened at the
@@ -445,7 +445,7 @@ export class MessagesService {
         senderId: null,
         content,
         isAiGenerated: true,
-        // **Persisted, where it used to be dropped** — 36-doc §7. The gateway
+        // **Persisted, where it used to be dropped** The gateway
         // held this in the completion frame and threw it away on write, so once
         // the socket closed a thread could not tell a refusal from an answer.
         answerStatus: fromProtoMessageAnswerStatus(request.answerStatus),
@@ -453,7 +453,7 @@ export class MessagesService {
       include: { attachments: true },
     });
 
-    // This is what puts `message:new` in the ticket room — 22-doc §5.1. The
+    // This is what puts `message:new` in the ticket room The
     // socket that asked for the stream gets `ai:stream:done` as well, and the
     // two are not duplication: one settles a pending request, the other tells
     // a thread something appeared.
@@ -475,7 +475,7 @@ export class MessagesService {
   }
 
   /**
-   * Marks a message as unusable for AI context — 36-doc §7.
+   * Marks a message as unusable for AI context
    *
    * **The row survives and stays visible.** A refused message is the record of
    * what somebody attempted, and its position in the timeline is real — the
@@ -553,7 +553,7 @@ export class MessagesService {
       include: { attachments: true },
     });
 
-    // 22-doc §6.1. Published for the same reason the create is: without it a
+    // Published for the same reason the create is: without it a
     // socket showing the thread keeps the pre-edit text until it refreshes, and
     // an edit nobody sees is indistinguishable from an edit that did not save.
     this.events.publish({
@@ -619,7 +619,7 @@ export class MessagesService {
       include: { attachments: true },
     });
 
-    // **No content on the wire** — 22-doc §6.1. The moderator removed those
+    // **No content on the wire** The moderator removed those
     // words; shipping them in the removal notice would be the most direct way
     // to defeat the redaction.
     this.events.publish({
@@ -642,7 +642,7 @@ export class MessagesService {
   /**
    * Presign an attachment upload.
    *
-   * **`messageId` is optional** — 36-doc §1.3. With one, this attaches to a
+   * **`messageId` is optional** With one, this attaches to a
    * message that already exists and nothing changes. Without one, the client is
    * uploading files it will hand to `CreateMessage`, which is the only ordering
    * in which a first-turn attachment can be read by that turn's answer.
@@ -741,7 +741,7 @@ export class MessagesService {
         // than whenever a stored URL happens to expire.
         //
         // The CONFIRMED path — the object moved out of `pending/` on the way
-        // through (36-doc §1.3.2), so `request.objectPath` is where it no
+        // through, so `request.objectPath` is where it no
         // longer is.
         fileUrl: confirmed.objectPath,
         fileSizeBytes: BigInt(confirmed.sizeBytes),
@@ -912,7 +912,7 @@ export class MessagesService {
       // the last line of it. rag-service owns no conversation rows — a second
       // copy in a second database is a consistency problem nobody asked for.
       const history = await this.prisma.ticketMessage.findMany({
-        // The same exclusion as the co-pilot's transcript — 36-doc §7. Two
+        // The same exclusion as the co-pilot's transcript Two
         // Prisma readers, one clause each, and a refusal that reached only one
         // of them would be a defence on one surface and a delay on the other.
         where: { ticketId, excludedFromAiContext: false },
@@ -922,7 +922,7 @@ export class MessagesService {
       });
 
       // Same two decisions as the co-pilot path, made by the same service —
-      // 36-doc §2. This one replies to a customer directly, so a screenshot it
+      // This one replies to a customer directly, so a screenshot it
       // could not see produces an answer about the text alone.
       const attachments = await this.aiAttachments.forLastUserMessage(
         ticketId,
@@ -940,7 +940,7 @@ export class MessagesService {
         // No review pass on this path. It appends a message to a
         // customer-visible thread rather than handing an agent a draft to
         // check, so the latency an agent would absorb is latency a customer
-        // watches — and 13-doc §4.2's review loop is for the surface where a
+        // watches — and the review loop is for the surface where a
         // human reads before sending.
         0,
         attachments.parts,
@@ -966,7 +966,7 @@ export class MessagesService {
         `AI reply failed for ticket ${ticketId}: ${formatErrorMsg(error)}`,
       );
 
-      // **The same write-back as the co-pilot path** — 36-doc §7, and the
+      // **The same write-back as the co-pilot path**, and the
       // reason it is here too: this surface auto-replies on every customer
       // message, so a refused question left in the transcript is re-sent to the
       // model on the customer's very next line.
@@ -979,7 +979,7 @@ export class MessagesService {
   }
 
   /**
-   * Marks a refused message so it cannot reach a later prompt — 36-doc §7.
+   * Marks a refused message so it cannot reach a later prompt
    *
    * **Only on an actual refusal.** A timeout, an outage or a cap are different
    * failures whose message is perfectly usable next time, and excluding on
@@ -1014,7 +1014,7 @@ export class MessagesService {
    * *the other party* — the requester when an agent wrote it, the assignee when
    * the requester did — which is undecidable from `senderId` alone. Passing the
    * ticket here rather than re-reading it in the consumer is what keeps the
-   * fan-out free of an RPC per message (18-doc §3 test 9), and messages are the
+   * fan-out free of an RPC per message, and messages are the
    * highest-volume event in the system.
    */
   private publishCreated(
@@ -1124,7 +1124,7 @@ export class MessagesService {
   }
 
   /**
-   * An earlier message with this client id, or null — 22-doc §2.3.
+   * An earlier message with this client id, or null
    *
    * Scoped to the TICKET as well as the id, matching the index: uniqueness is
    * per ticket, so a client reusing an id across threads gets two messages

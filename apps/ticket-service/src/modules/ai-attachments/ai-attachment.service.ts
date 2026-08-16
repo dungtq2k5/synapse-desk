@@ -8,7 +8,7 @@ import { AttachmentPart, CallerContext } from '@synapsedesk/grpc-proto';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageReferenceService } from '../storage-client/storage-reference.service';
 
-/** What was sent, and what was not — 36-doc §2.2. */
+/** What was sent, and what was not */
 export type AiAttachments = {
   parts: AttachmentPart[];
   /** File names left out, for telling the user. Never their contents. */
@@ -16,11 +16,11 @@ export type AiAttachments = {
 };
 
 /**
- * Attachments as model input — 36-doc §2.
+ * Attachments as model input
  *
  * **One implementation for three call sites.** `Chat` is the gateway's,
  * co-pilot `Draft` and the `invokeAi` auto-reply are ticket-service's
- * (35-doc §4.1), and all three need the same two decisions made the same way.
+ *, and all three need the same two decisions made the same way.
  * A copy per caller is three places for the eligibility rule to drift, on a
  * path where drift means either spending tokens on a zip or silently dropping
  * a screenshot.
@@ -52,7 +52,7 @@ export class AiAttachmentService {
   ): Promise<AiAttachments> {
     const rows = await this.prisma.messageAttachment.findMany({
       // **The refusal exclusion reaches the FILES, not only the text** —
-      // 35-doc §6.
+      //
       //
       // The three transcript builders drop a refused message's content; without
       // this clause its attachments still arrived. A user sends injection text
@@ -122,10 +122,10 @@ export class AiAttachmentService {
    * The parts for the last USER message on a ticket — both `Draft` paths.
    *
    * An agent asking for a suggested reply is replying to what the customer last
-   * sent, and after 31-doc/32-doc that message can have arrived by email from
+   * sent, and with inbound email that message can have arrived by email from
    * someone who never authenticated. That makes this the highest-trust position
    * an untrusted file reaches in this system, which is why the guard covers it
-   * (36-doc §4).
+   *.
    *
    * AI messages are skipped rather than the newest row taken: the last message
    * on a busy ticket is often the assistant's own reply, which has no
@@ -202,7 +202,7 @@ export class AiAttachmentService {
   }
 
   /**
-   * The id of the message a draft is replying to — 36-doc §7.
+   * The id of the message a draft is replying to
    *
    * Public because the refusal write-back needs the same row this class already
    * resolves: when rag-service refuses a draft, what was refused is this

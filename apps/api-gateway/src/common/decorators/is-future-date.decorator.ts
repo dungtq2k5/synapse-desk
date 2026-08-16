@@ -1,7 +1,7 @@
 import { registerDecorator, ValidationOptions } from 'class-validator';
 
 /**
- * An ISO-8601 instant that has not already passed — 21-doc §2.4.
+ * An ISO-8601 instant that has not already passed
  *
  * Written for `LockUserDto.lockedUntil`, where a past value would lock and
  * unlock an account in the same instant: accepted by the database, rejected by

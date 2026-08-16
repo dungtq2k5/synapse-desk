@@ -8,7 +8,7 @@ export type ParsedPage = {
   pageNumber: number | null;
   markdown: string;
   /**
-   * How the text was obtained — 34-doc §5.
+   * How the text was obtained
    *
    * `ocr` text is FLAT: tesseract emits no headings, so an OCR'd page falls
    * through to the chunker's length-based split exactly as a `.txt` file does,
@@ -24,7 +24,7 @@ export type ParsedDocument = {
   /** sha256 of the actual BYTES — see the note in `parse`. */
   contentHash: string;
   /**
-   * How many pages the document HAS, which is not `pages.length` — 34-doc §1.1.
+   * How many pages the document HAS, which is not `pages.length`
    *
    * Pages with no usable text are absent from `pages`, so this is the only way
    * downstream can tell that page 7 existed at all. §6's check compares the
@@ -50,7 +50,7 @@ export type ParsedDocument = {
 const LINE_TOLERANCE_Y = 2;
 
 /**
- * Bytes -> markdown, per format — 21-doc §3.
+ * Bytes -> markdown, per format
  *
  * **Markdown rather than plain text**, because the headings are what the
  * chunker splits on and what turns a retrieved chunk into "page 4, §2.1"
@@ -64,7 +64,7 @@ const LINE_TOLERANCE_Y = 2;
  * to trust citations.
  *
  * **A tenant's document never leaves the deployment, and never touches the
- * disk** — 34-doc §2. That is the requirement; "100% in-process", which this
+ * disk** That is the requirement; "100% in-process", which this
  * docblock used to claim, was the shape the requirement happened to take before
  * OCR existed.
  *
@@ -104,7 +104,7 @@ export class DocumentParserService {
     bytes: Buffer,
     fileType: string,
     /**
-     * ISO 639-1 codes for OCR — 34-doc §4.1.
+     * ISO 639-1 codes for OCR
      *
      * Arrives on `DocumentUploadedEvent` rather than being read from the
      * document row, so the worker still needs no lookup to start. Empty is
@@ -163,7 +163,7 @@ export class DocumentParserService {
    * PDF -> one `ParsedPage` per page, via **pdfjs-dist**.
    *
    * **Page-by-page is the citation guarantee**, and it is why this does not use
-   * a converter that returns one string — 21-doc §3.1.
+   * a converter that returns one string
    *
    * Trap 2 of §3.2 is the package landscape here, and it is genuinely
    * confusing: `@opendocsg/pdf2md` returns the whole document with
@@ -204,7 +204,7 @@ export class DocumentParserService {
       // the type is what is narrow.
       isEvalSupported: false,
       useSystemFonts: false,
-      // **Pointed at the package's own bundled fonts** — 21-doc §3.5 F5.
+      // **Pointed at the package's own bundled fonts** F5.
       //
       // `undefined` made pdf.js log `UnknownErrorException: Ensure that the
       // standardFontDataUrl API parameter is provided` once per document, on
@@ -229,7 +229,7 @@ export class DocumentParserService {
         const content = await page.getTextContent();
         const markdown = toLines(content.items);
 
-        // **"Too little", not "empty"** — 34-doc §3.2. `trim().length > 0` was
+        // **"Too little", not "empty"** `trim().length > 0` was
         // the wrong test: a page carrying a scanner stamp or a partial OCR
         // layer has a handful of characters and is still an image.
         if (markdown.trim().length >= MIN_PAGE_CHARACTERS) {
@@ -261,7 +261,7 @@ export class DocumentParserService {
   }
 
   /**
-   * OCR for the pages pdf.js could not read — 34-doc §1, §3.
+   * OCR for the pages pdf.js could not read
    *
    * **Only the thin ones.** A 200-page PDF with two scanned pages pays for two,
    * and the text pages keep pdf.js's extraction, which is better than OCR of a
@@ -315,9 +315,9 @@ export class DocumentParserService {
   }
 
   /**
-   * DOCX -> markdown, via **mammoth then turndown** — 21-doc §3.5 F1.
+   * DOCX -> markdown, via **mammoth then turndown** F1.
    *
-   * **It is easy to misdiagnose which half was broken** — 21-doc §3.2.
+   * **It is easy to misdiagnose which half was broken**
    * "Mammoth plus custom regular expressions" reads as one failing unit and is
    * not: mammoth was the working half, and the 80-line hand-written
    * `htmlToMarkdown` after it was the liability. Replacing that one function
@@ -434,7 +434,7 @@ function standardFontsPath(): string {
  * tolerance, then ordered top-to-bottom — PDF Y grows upward, hence the
  * descending sort.
  *
- * **KNOWN LIMITATION: two-column PDFs merge into nonsense** — 21-doc §3.5 F3.
+ * **KNOWN LIMITATION: two-column PDFs merge into nonsense** F3.
  * Grouping by Y alone means two columns at the same vertical position
  * concatenate, so every line of a two-column policy document becomes
  * left-column text followed by right-column text.

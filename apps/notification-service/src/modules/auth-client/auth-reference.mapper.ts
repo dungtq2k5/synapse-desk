@@ -2,7 +2,7 @@
  * A recipient, with everything needed to DECIDE about them.
  *
  * The quiet-hours fields ride along on this read rather than needing a second
- * one (18-doc §4): an extra round trip per notification to learn whether it is
+ * one: an extra round trip per notification to learn whether it is
  * 3am for the recipient would put a cross-service read on the fan-out path.
  */
 export type NotificationRecipient = {

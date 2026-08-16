@@ -2,7 +2,7 @@ import { RequestMethod } from '@nestjs/common';
 import type { RouteInfo } from '@nestjs/common/interfaces';
 
 /**
- * Routes served OUTSIDE the versioned API prefix — 23-doc §1, §3.
+ * Routes served OUTSIDE the versioned API prefix
  *
  * `/api/v1` is a contract offered to API clients, and an orchestrator is not
  * one: it has no credentials, no version negotiation and no ability to follow a

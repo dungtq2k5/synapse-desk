@@ -5,7 +5,7 @@ import { OrganizationsService } from '../../src/modules/organizations/organizati
 import { UsersService } from '../../src/modules/users/users.service';
 
 /**
- * The two RPCs inbound mail resolves through — 31-doc §2, §3.
+ * The two RPCs inbound mail resolves through
  *
  * **The security half of the feature.** Everything downstream is a transport
  * detail; these two decide which tenant a stranger's email lands in and whether
@@ -26,7 +26,7 @@ describe('§31 inbound email resolution (e2e)', () => {
 
   afterAll(() => fx.close());
 
-  // ------------------------------------------------- §2 / 32-doc §1
+  // ------------------------------------------------- inbound token
 
   describe('resolving the tenant from the address token', () => {
     it('1. resolves the tenant that owns the token', async () => {
@@ -115,7 +115,7 @@ describe('§31 inbound email resolution (e2e)', () => {
     });
   });
 
-  // ------------------------------------------------- §3 / 32-doc §4.4
+  // ------------------------------------------------- tenant resolution
 
   describe('resolving the sender within that tenant', () => {
     it('1. a known member authors as themselves', async () => {
@@ -160,7 +160,7 @@ describe('§31 inbound email resolution (e2e)', () => {
     });
 
     it('3. **a domain matching a DIFFERENT tenant is refused**', async () => {
-      // 32-doc §4.4 test 3 — A2's cross-tenant misroute, and the bug passes
+      // A2's cross-tenant misroute, and the bug passes
       // every other test in this file. Self-signup's lookup is global: it asks
       // "which tenant claims this domain?", so a sender whose domain belongs to
       // someone else would be provisioned into THAT tenant while their mail was

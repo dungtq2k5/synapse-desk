@@ -89,7 +89,7 @@ export class FirebaseStorageService implements OnModuleInit {
   }
 
   /**
-   * Readiness, WITHOUT a network call — 23-doc §2.
+   * Readiness, WITHOUT a network call
    *
    * The tempting probe is `bucket.exists()`, and it is wrong twice over: it
    * bills a GCS operation every five seconds per pod, and it makes Google's

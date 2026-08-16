@@ -8,11 +8,11 @@ import {
 import { MAX_QUERY_DEPTH } from '../config/graphql-limits.config';
 
 /**
- * Refuses a query nested deeper than {@link MAX_QUERY_DEPTH} — 25-doc §5.
+ * Refuses a query nested deeper than {@link MAX_QUERY_DEPTH}
  *
  * **A validation rule, not a plugin**, and that is the point: validation runs
  * before execution begins, so a rejected query never reaches a resolver and
- * therefore never makes a gRPC call. 26-doc §1.3 test 1 asserts exactly that —
+ * therefore never makes a gRPC call, which its test asserts exactly —
  * refusing *after* the fan-out is not a limit, it is a log line.
  *
  * Hand-written rather than `graphql-depth-limit`, which is unmaintained

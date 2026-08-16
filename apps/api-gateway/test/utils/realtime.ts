@@ -50,7 +50,7 @@ export type RealtimeFixture = {
   /**
    * A direct Redis handle, for the presence tests.
    *
-   * Used to EXPIRE a key rather than to write one: 22-doc §4 test 3 asks what
+   * Used to EXPIRE a key rather than to write one: the presence test asks what
    * happens to a user whose heartbeat stops with no disconnect, and the honest
    * way to ask that is to remove the key the way a TTL would — not to wait sixty
    * seconds, and not to call a method the production path never calls.
@@ -83,7 +83,7 @@ export async function bootstrapRealtimeTest(
     .useValue(clientGrpc)
     .overrideProvider(TICKET_GRPC_CLIENT)
     .useValue(clientGrpc)
-    // Domain C's Python peer, for the AI streaming relay — 22-doc §5. Stubbed
+    // Domain C's Python peer, for the AI streaming relay Stubbed
     // like the others: what the gateway can prove alone is that it RELAYS a
     // server-stream correctly, which is a property of this process. Whether a
     // cancelled generation writes its ledger row is rag-service's half, and is

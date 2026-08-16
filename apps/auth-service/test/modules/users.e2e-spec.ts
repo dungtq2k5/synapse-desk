@@ -726,7 +726,7 @@ describe('Users (e2e)', () => {
   // ------------------------------------------------- notification audiences
 
   /**
-   * The two AUDIENCE resolvers — 18-doc §1.3.
+   * The two AUDIENCE resolvers
    *
    * **notification-service mocks both, in three suites.** That is correct for
    * those tests, which are about fan-out and quiet hours rather than about
@@ -815,7 +815,7 @@ describe('Users (e2e)', () => {
     });
 
     it('narrows to a DEPARTMENT when asked, and to the tenant when not', async () => {
-      // 18-doc §3.1. Absent means the whole tenant, which is right for a quota
+      // Absent means the whole tenant, which is right for a quota
       // alert — one budget per organization — and wrong for a ticket
       // escalation: every agent in the company hearing about one department's
       // queue is the noise that makes people stop reading them.
@@ -847,7 +847,7 @@ describe('Users (e2e)', () => {
     });
 
     it('**a missing field is INVALID_ARGUMENT, not a 500**', async () => {
-      // The guard added in 16-doc. Without it an empty string reaches a
+      // The guard added during hardening. Without it an empty string reaches a
       // `@db.Uuid` column, the driver raises, Nest wraps it as UNKNOWN and the
       // gateway answers 500 to something that is plainly a bad request.
       await expectRpc(
@@ -975,7 +975,7 @@ describe('Users (e2e)', () => {
   });
 
   /**
-   * The batch contract — 27-doc §1, §3.
+   * The batch contract
    *
    * Six properties, five of which DataLoader depends on. They are not style:
    * a naive `WHERE id IN (…)` gets two of them wrong, both silently, and one of
@@ -1054,7 +1054,7 @@ describe('Users (e2e)', () => {
     });
 
     it('6. `includeInactive: false` still excludes locked users', async () => {
-      // 27-doc §3 test 4. The existing notification caller, unchanged: a
+      // The existing notification caller, unchanged: a
       // message to a deactivated account is a row nobody reads.
       const t = await seedTenantWithUser(fx.prisma);
       await fx.prisma.user.update({
@@ -1088,7 +1088,7 @@ describe('Users (e2e)', () => {
     });
 
     it('8. **the loader projection carries NO email**', async () => {
-      // 25-doc §4, enforced at the WIRE rather than in a gateway mapper.
+      // Enforced at the WIRE rather than in a gateway mapper.
       // `Ticket.assignee` is reachable with ticket access alone, so a caller
       // with no `user.read` must not come away holding an agent's address —
       // and data the gateway never receives is data it cannot leak.

@@ -8,7 +8,7 @@ import {
 } from '@synapsedesk/common';
 
 /**
- * The domain enums, registered with the GraphQL schema — 26-doc §2.
+ * The domain enums, registered with the GraphQL schema
  *
  * **Registered once, here, rather than beside each type.** `registerEnumType`
  * is a side effect: calling it twice for the same enum throws at boot, and

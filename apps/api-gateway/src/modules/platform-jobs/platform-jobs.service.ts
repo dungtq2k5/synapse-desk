@@ -21,7 +21,7 @@ import {
  * **An exhaustive `Record`, deliberately.** Adding a job to `SCHEDULED_JOBS`
  * without deciding where it lives is a compile error rather than a job that
  * silently never appears on this page — which is the same class of omission
- * that started 20-doc. It has already earned its keep once: migrating
+ * that started the scheduler work. It has already earned its keep once: migrating
  * auth-service off `@Cron` failed to build here until its two jobs were given
  * a leg to be read from.
  */
@@ -34,7 +34,7 @@ const JOB_OWNER: Record<ScheduledJobName, string> = {
 };
 
 /**
- * The platform job surface — 20-doc §4.4, §5.
+ * The platform job surface
  *
  * Two jobs, and the second is the one that pays for the first:
  *
@@ -62,14 +62,14 @@ export class PlatformJobsService {
    * is precisely what happened for two domains.
    */
   async health(
-    // `RequestOrigin` too, not just `RequestContext` — 23-doc §4. The Prometheus
+    // `RequestOrigin` too, not just `RequestContext` The Prometheus
     // scrape reads the same heartbeats and has no user, and inventing one would
     // put a fake actor in the audit trail of a read that nobody performed.
     context: RequestContext | RequestOrigin,
   ): Promise<JobHealthResponseDto> {
     // Three legs, because the heartbeat table lives in each service's own
     // database — auth-service joined them when it moved off `@nestjs/schedule`
-    // (20-doc §3.2).
+    //.
     const [ticketLeg, ingestionLeg, authLeg] = await Promise.all([
       this.client.tryLeg('ticket-service', () =>
         this.client.ticketHeartbeats(context),
@@ -146,7 +146,7 @@ export class PlatformJobsService {
   }
 
   /**
-   * Runs one job NOW — 20-doc §5.
+   * Runs one job NOW
    *
    * The first run after this ships is a backfill of everything since the tables
    * were created, and a rollup bug can only be corrected by recomputation.
@@ -159,10 +159,10 @@ export class PlatformJobsService {
   }
 
   /**
-   * Recomputes an explicit range — 20-doc §5.
+   * Recomputes an explicit range
    *
    * **Safe to expose only because the jobs are idempotent and range-bounded**
-   * (19-doc §2.2 test 1). Without that property this endpoint would be a way to
+   * . Without that property this endpoint would be a way to
    * double every counter in a quarter, which is why the range is required
    * rather than optional.
    */

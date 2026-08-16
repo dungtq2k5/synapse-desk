@@ -92,7 +92,7 @@ const baseConfig: Config = {
    * on its own (which is why the service runs); jest does not, and fails with
    * `Unexpected token 'export'` from a file three dependencies deep.
    *
-   * The parsing stack (21-doc §3) needs nothing here. `mammoth`, `turndown` and
+   * The parsing stack needs nothing here. `mammoth`, `turndown` and
    * `turndown-plugin-gfm` are real CommonJS; `js-tiktoken` and
    * `@langchain/textsplitters` declare `type: module` but ship a `.cjs` entry
    * that jest resolves through the `require` condition above.

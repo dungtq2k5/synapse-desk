@@ -122,7 +122,7 @@ export const INGESTION_PROTO_PATHS = [
  * `rag-service` is the one Python peer, and this path is consumed from BOTH
  * sides: TypeScript loads it to build a client, and `grpcio-tools` compiles the
  * same file into Python stubs. One file, two languages, no hand-written mirror
- * — which is the only reason the enum drift that 13-doc §1.1 warns about is
+ * — which is the only reason the enum drift warned about is
  * confined to the few values the proto does not carry.
  */
 export const RAG_PROTO_PATHS = [
@@ -184,7 +184,7 @@ export const GRPC_CHANNEL_OPTIONS = {
 
 /**
  * The ops surface every gRPC service serves ALONGSIDE its domain package —
- * 23-doc §2, §3.
+ * §3.
  *
  * NestJS's gRPC transport takes arrays for both `package` and `protoPath`, so a
  * service registers its own package plus these two and gets probes and a version

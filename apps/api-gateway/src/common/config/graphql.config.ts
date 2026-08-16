@@ -53,13 +53,13 @@ export const SCHEMA_PATH = join(__dirname, '../../schema.gql');
  *
  * Three things it sets up, in the order they matter:
  *
- *   1. **Cost limits before any resolver runs** (25-doc §5). A validation rule
+ * 1. **Cost limits before any resolver runs**. A validation rule
  *      and a complexity plugin, both firing before execution — a limit that
  *      fires after the fan-out is a log line, not a limit.
  *   2. **The context factory**, the only place a DataLoader is ever constructed
- *      (25-doc §6). Loaders are a cache keyed by id and an id carries no tenant,
+ *. Loaders are a cache keyed by id and an id carries no tenant,
  *      so where they are built is a security decision.
- *   3. **No envelope** (25-doc §3). `TransformInterceptor` already bypasses for
+ * 3. **No envelope**. `TransformInterceptor` already bypasses for
  *      GraphQL and `AllHttpExceptionFilter` already re-throws so Apollo formats
  *      the error; this relies on both rather than re-deciding.
  */
@@ -76,7 +76,7 @@ export const getGraphqlConfig = (
     autoSchemaFile: SCHEMA_PATH,
     sortSchema: true,
 
-    // **OFF in production** — 25-doc §5. The schema is a map of the API: every
+    // **OFF in production** The schema is a map of the API: every
     // type, every field, every argument, handed to anyone who asks. Non-prod
     // keeps it, because that is where the tooling lives.
     introspection: !isProduction,
@@ -84,7 +84,7 @@ export const getGraphqlConfig = (
     // documents the REST half and introspection serves any real IDE.
     playground: false,
 
-    // **The one place loaders are constructed** — 25-doc §6.
+    // **The one place loaders are constructed**
     //
     // `res` is passed through as well: the global throttler writes its limit
     // headers to it, and a context without one makes that fail and fail OPEN.
@@ -98,7 +98,7 @@ export const getGraphqlConfig = (
       loaders: createLoaders(req, {
         auth: authClient,
         ingestion: ingestionClient,
-        // The entity cache the loaders read through — 30-doc §2. Passed in
+        // The entity cache the loaders read through Passed in
         // rather than injected into each loader, because a loader is built per
         // request by this factory and nothing here is in the DI graph.
         cache,

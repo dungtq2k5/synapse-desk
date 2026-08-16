@@ -12,7 +12,7 @@ import { ApiInfoGqlDto } from './dto/graphql/api-info.gql-dto';
  * first, and this is the smallest thing that is genuinely useful rather than a
  * placeholder someone has to remember to delete.
  *
- * Deliberately NOT a domain type: 26-doc builds those, and starting the schema
+ * Deliberately NOT a domain type: domain resolvers build those, and starting the schema
  * with a ticket would mean designing the entity graph inside a module-setup
  * change.
  */

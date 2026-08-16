@@ -100,7 +100,7 @@ export class UsersGrpcController implements UserServiceController {
     return this.usersService.listPermissionHolders(request);
   }
 
-  /** 31-doc §3. Takes the tenant, so it cannot create one — see the service. */
+  /** Takes the tenant, so it cannot create one — see the service. */
   resolveInboundSender(
     request: ResolveInboundSenderRequest,
   ): Promise<ResolveInboundSenderResponse> {

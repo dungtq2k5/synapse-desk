@@ -6,13 +6,13 @@ import { E2eFixture, bootstrapE2eTest } from '../utils';
 import { plainEmail, signPayload } from '../fixtures/inbound-email';
 
 /**
- * `POST /webhooks/email/inbound` — the signature boundary, 32-doc §3.
+ * `POST /webhooks/email/inbound` — the signature boundary
  *
  * **Everything here is about what happens BEFORE the message is understood.**
  * Resolution, threading and dedup are step 5 and have their own tests; these
  * pin the property the whole endpoint is built around — *a bad signature causes
  * nothing to happen* — which is the reason verification is local rather than
- * forwarded (31-doc §6.1).
+ * forwarded.
  */
 describe('§32 §3 the inbound email webhook (e2e)', () => {
   let fx: E2eFixture;
@@ -56,7 +56,7 @@ describe('§32 §3 the inbound email webhook (e2e)', () => {
 
       const response = await post(body, signature).expect(200);
 
-      // **200 even though the mail was dropped** — 32-doc §3.1. A 4xx would
+      // **200 even though the mail was dropped** A 4xx would
       // tell the provider to retry an address that will never resolve.
       expect(response.body.data).toEqual({
         received: true,
@@ -65,9 +65,9 @@ describe('§32 §3 the inbound email webhook (e2e)', () => {
     });
 
     it('6. **the handler sees the RAW body, with the global JSON parser registered**', async () => {
-      // The trap that has already caught this codebase once (14-doc §3.2). The
-      // signature is over the exact BYTES; a parser that deserialises and
-      // re-serialises produces a different digest, and every request then fails
+      // The trap that has already caught this codebase once. The
+      // signature is over the exact BYTES; a parser that deserializes and
+      // re-serializes produces a different digest, and every request then fails
       // in production while passing any test that builds its own body.
       //
       // The body below carries whitespace `JSON.stringify` would never emit, so
@@ -141,7 +141,7 @@ describe('§32 §3 the inbound email webhook (e2e)', () => {
     });
 
     it('3b. **a bad signature makes NO gRPC call at all**', async () => {
-      // The property that decided 31-doc §6.1, and the one a refactor to
+      // The property that decided the adapter split, and the one a refactor to
       // forward-then-verify would break while still passing tests 2 and 3.
       //
       // Asserted across every stubbed peer rather than one: "no lookup, no RPC,

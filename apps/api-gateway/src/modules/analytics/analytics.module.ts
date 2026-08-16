@@ -16,7 +16,7 @@ import {
  * The composition layer — and the whole of "analytics" as a deploy unit.
  *
  * **There is no `analytics-service`, and this module is why there does not need
- * to be one** (19-doc §1): the fan-out is three endpoints joining on a user or
+ * to be one**: the fan-out is three endpoints joining on a user or
  * document id at tens-to-hundreds of rows per tenant. A service whose entire
  * job is this would add a hop, a deploy unit and a latency budget while
  * answering no question the gateway could not.

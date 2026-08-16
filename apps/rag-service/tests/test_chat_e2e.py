@@ -102,7 +102,7 @@ class TestAnswering:
     async def test_CONCATENATED_TOKENS_reproduce_the_final_content(
         self, servicer, seed, tenant_a
     ):
-        # 21-doc §1, test 7. The client renders the token stream and persists
+        # Test 7. The client renders the token stream and persists
         # `completion.content`, so any divergence between them is a message
         # that changes after it finished arriving.
         #
@@ -119,7 +119,7 @@ class TestAnswering:
     async def test_the_answer_is_forwarded_VERBATIM_including_raw_html(
         self, servicer, seed, tenant_a, generator
     ):
-        # 21-doc §1.3 — the XSS path, which now runs through the answer.
+        # The XSS path, which now runs through the answer.
         #
         # Markdown is generated from TENANT-UPLOADED documents, so a document
         # containing `<img src=x onerror=...>` can reach the renderer through
@@ -144,7 +144,7 @@ class TestAnswering:
     async def test_an_empty_corpus_yields_DOC_MISSING_rather_than_a_guess(
         self, servicer, tenant_a, generator
     ):
-        # 11-doc §1.6. The behaviour change from the notebook app this came
+        # The behaviour change from the notebook app this came
         # from, which would happily answer from general knowledge.
         frames = await chat(servicer, "what is the carryover policy?", tenant_a.outsider())
 

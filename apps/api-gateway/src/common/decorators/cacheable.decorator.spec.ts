@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { Cacheable, CACHEABLE_KEY } from './cacheable.decorator';
 
 /**
- * Which reads are cached, and whether anything ever evicts them — 29-doc §3.
+ * Which reads are cached, and whether anything ever evicts them
  *
  * Static, because the failure this guards is an ABSENCE: a `@Cacheable` added
  * to a read whose scope nothing invalidates does not fail, does not log, and
@@ -29,7 +29,7 @@ const sources = () =>
   }));
 
 describe('§30 §4 a cached route documents itself', () => {
-  // 30-doc §5 step 3. Read back from the metadata rather than from a built
+  // Read back from the metadata rather than from a built
   // OpenAPI document, so this holds without booting the app — and so the
   // failure names the decorator rather than a missing key in a large object.
   // The key `@nestjs/swagger` writes extensions under. Spelled out rather than
@@ -133,7 +133,7 @@ describe('§3 what is cached', () => {
     // Tickets, messages and notifications. A user watching their own ticket
     // must not watch their own reply disappear for a minute — and
     // `unread-count` is the trap: the most-polled route in the product, whose
-    // polling the WebSocket already made unnecessary (22-doc).
+    // polling the WebSocket already made unnecessary.
     const offenders = sources()
       .filter(({ path }) =>
         /modules\/(tickets|notifications|realtime|chat|feedback)\//.test(path),

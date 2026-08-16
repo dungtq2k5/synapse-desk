@@ -100,7 +100,7 @@ export class SmartThrottlerGuard extends ThrottlerGuard {
     // executed, so every authenticated route was quietly rate-limited per IP.
     // Harmless for the auth routes this guard was written for (they are
     // unauthenticated by definition) and exactly wrong for the AI routes added
-    // in 16-doc §2, where ten agents behind one office NAT would share one
+    // where ten agents behind one office NAT would share one
     // budget.
     //
     // It is kept as the first check because a future refactor that made this
@@ -228,7 +228,7 @@ export class SmartThrottlerGuard extends ThrottlerGuard {
    * The request and response the tracker sees, on EITHER transport.
    *
    * **This used to be HTTP-only, and the comment saying so was true until
-   * GraphQL landed** (25-doc). `switchToHttp()` returns an empty object under
+   * GraphQL landed**. `switchToHttp()` returns an empty object under
    * GraphQL, so `getTracker` read `.user` off `undefined`, threw, and the
    * guard's own catch reported "rate-limit storage unavailable" and **allowed
    * the request unthrottled** — meaning the entire GraphQL surface was

@@ -98,7 +98,7 @@ describe('§2 The AI tier (unit)', () => {
 
     it('7. Takes no model name as an INPUT on any co-pilot call', () => {
       // The subtler version the lint cannot see: a `modelName` PARAMETER would
-      // let a caller pick the premium tier for free (11-doc §1.7). `modelName`
+      // let a caller pick the premium tier for free. `modelName`
       // appears only as an output field, never as something passed in.
       const source = readFileSync(
         join(

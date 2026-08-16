@@ -71,7 +71,7 @@ export class StorageReferenceService implements OnModuleInit {
   async presignAttachment(
     input: {
       ticketId: string;
-      /** Absent before the message exists — 36-doc §1.3. */
+      /** Absent before the message exists */
       messageId?: string;
       contentType: string;
       sizeBytes: number;
@@ -106,7 +106,7 @@ export class StorageReferenceService implements OnModuleInit {
   }
 
   /**
-   * The analytics export's upload slot — 19-doc §5.
+   * The analytics export's upload slot
    *
    * A BACKGROUND job has no caller context: it runs from a queue, on behalf of
    * a request that finished minutes ago. So the tenant is passed explicitly and
@@ -164,7 +164,7 @@ export class StorageReferenceService implements OnModuleInit {
    * A short-lived download URL for a finished export.
    *
    * **A signed URL to a file containing a tenant's full ticket history is a
-   * credential** (19-doc §5), so it is minted per request and expires in
+   * credential**, so it is minted per request and expires in
    * minutes rather than being stored on the row. Storing it would turn a
    * database read into a durable secret.
    */
@@ -191,7 +191,7 @@ export class StorageReferenceService implements OnModuleInit {
     );
 
     return {
-      // **The path storage-service RETURNED, not the one we sent** — 36-doc
+      // **The path storage-service RETURNED, not the one we sent**
       // §1.3.2. A confirmed attachment moves out of `pending/`, so the presign
       // path is where the object no longer is — and a row built from it would
       // point at exactly what the lifecycle rule is about to delete.
@@ -202,14 +202,14 @@ export class StorageReferenceService implements OnModuleInit {
   }
 
   /**
-   * The bytes of one object — 36-doc §2.
+   * The bytes of one object
    *
    * **New here, and it is the first byte path this service has had.** Everything
    * above hands out signed URLs: presign to upload, `resolveReadUrls` so a
    * browser can download. Attachments in the AI path need the bytes in-process,
    * because they travel inline in `ChatRequest`/`DraftRequest` — rag-service
    * has no storage client and giving it one would add a peer, a credential and
-   * a failure mode to the query path (35-doc §7).
+   * a failure mode to the query path.
    *
    * Reassembled rather than passed through as a stream, for the same reason
    * ingestion-service reassembles: the consumer needs the whole buffer to put

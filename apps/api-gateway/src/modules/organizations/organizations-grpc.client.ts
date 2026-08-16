@@ -51,7 +51,7 @@ export class OrganizationsGrpcClient
   }
 
   /**
-   * Issues or rotates the tenant's inbound-mail address — 31-doc §2.
+   * Issues or rotates the tenant's inbound-mail address
    *
    * Returns the ADDRESS rather than the bare token, because the token alone is
    * unusable: the mail domain is deployment configuration, and a client that

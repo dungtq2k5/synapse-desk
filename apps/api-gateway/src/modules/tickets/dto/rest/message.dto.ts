@@ -60,7 +60,7 @@ export class CreateMessageDto {
   readonly invokeAi?: boolean = false;
 
   /**
-   * Objects already uploaded, bound to this message as it is created — 36-doc
+   * Objects already uploaded, bound to this message as it is created
    * §1.3.
    *
    * **This is the ordering that makes a first-turn attachment readable.**
@@ -80,7 +80,7 @@ export class CreateMessageDto {
 
   // ASK This `docblock` seems to be invalid
   /**
-   * The `ai_generations` row this reply came from — 38-doc §1, the loop's
+   * The `ai_generations` row this reply came from, the loop's
    * inbound half.
    *
    * **The other end of `AiDraftResponseDto.generationId`.** An agent presses

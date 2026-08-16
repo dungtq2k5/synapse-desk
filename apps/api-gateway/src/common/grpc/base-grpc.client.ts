@@ -29,7 +29,7 @@ export abstract class BaseGrpcClient {
   protected abstract readonly serviceName: string;
 
   /**
-   * Where outbound gRPC latency is recorded — 23-doc §4.
+   * Where outbound gRPC latency is recorded
    *
    * **A static, set once by `MetricsRegistry`'s constructor**, and this is the
    * one place in the gateway that uses one. Every gRPC client extends this
@@ -96,7 +96,7 @@ export abstract class BaseGrpcClient {
 }
 
 /**
- * `{peer, code}` — and deliberately NOT `{method}`, which 23-doc §4's table
+ * `{peer, code}` — and deliberately NOT `{method}`, which the metrics table
  * lists.
  *
  * The method name is not available here: `invoke` is an opaque closure, and

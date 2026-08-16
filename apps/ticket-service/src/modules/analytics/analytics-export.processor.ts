@@ -15,7 +15,7 @@ import {
 } from './analytics-export.service';
 
 /**
- * Produces the file — 19-doc §5.
+ * Produces the file
  *
  * A BullMQ worker rather than a detached promise, and the difference is one
  * property: an export in flight when a replica restarts is RETRIED rather than
@@ -150,7 +150,7 @@ export class AnalyticsExportProcessor extends WorkerHost {
     return {
       // **Sums and counts, exactly as stored.** No rate is exported: a
       // spreadsheet that recomputed one differently from the dashboard is the
-      // disagreement 19-doc §3.1 exists to prevent, and shipping the inputs
+      // disagreement this exists to prevent, and shipping the inputs
       // lets a reader derive whichever they want from the same numbers.
       header: [
         'day',

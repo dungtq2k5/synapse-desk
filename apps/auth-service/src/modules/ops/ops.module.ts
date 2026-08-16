@@ -10,7 +10,7 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { PrismaService } from '../prisma/prisma.service';
 
 /**
- * `grpc.health.v1.Health` and `synapsedesk.ops.OpsService` — 23-doc §2, §3.
+ * `grpc.health.v1.Health` and `synapsedesk.ops.OpsService`
  *
  * **auth-service checks its Postgres, and nothing else.** It is called by every
  * other service in the system and calls none of them, so there is nothing else

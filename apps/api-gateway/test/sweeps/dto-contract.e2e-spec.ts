@@ -6,7 +6,7 @@ describe('§2 REST and GraphQL DTOs are independent but not divergent', () => {
   const SRC = join(__dirname, '../../src/modules');
 
   /**
-   * REST and GraphQL DTOs agree, without sharing a class — 26-doc §2, revised.
+   * REST and GraphQL DTOs agree, without sharing a class, revised.
    *
    * **The guard that replaced inheritance.** Three shapes were tried:
    *
@@ -43,7 +43,7 @@ describe('§2 REST and GraphQL DTOs are independent but not divergent', () => {
       // Internal object paths resolved per request — publishing them would
       // advertise the storage layout and hand clients a value that does not work.
       //
-      // `excludedFromAiContext` is REST-only BY DECISION — 36-doc §7. It is on
+      // `excludedFromAiContext` is REST-only BY DECISION It is on
       // the REST shape for ONE consumer: `AiStreamService.transcript()`, which
       // filters on it after fetching because the same route serves the UI where
       // the row must stay visible. No client has a use for it, and publishing it
@@ -76,7 +76,7 @@ describe('§2 REST and GraphQL DTOs are independent but not divergent', () => {
       // `fileUrl` is an internal path, not a URL; `deletedById` is an audit field
       // with no edge behind it.
       //
-      // `ocrLanguages` is REST-only BY DECISION — 34-doc §4.1. `@Field()` is
+      // `ocrLanguages` is REST-only BY DECISION `@Field()` is
       // not inherited (conventions §12.2), so a GraphQL DTO would need its own
       // line; the field is an advanced upload option that no screen reads yet,
       // and adding it to the public schema before anything queries it is how a
@@ -184,7 +184,7 @@ describe('§2 REST and GraphQL DTOs are independent but not divergent', () => {
   ];
 
   /**
-   * REST response shapes with **no GraphQL twin, on purpose** — 38-doc §1.
+   * REST response shapes with **no GraphQL twin, on purpose**
    *
    * **The sweep is organised by PAIRS, so a shape with no twin is invisible to
    * it.** That is not a small hole: `AiDraftResponseDto` sat outside every

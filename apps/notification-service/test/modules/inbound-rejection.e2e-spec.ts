@@ -10,7 +10,7 @@ import { EmailService } from '../../src/modules/email/email.service';
 import { InboundRejectionConsumer } from '../../src/modules/inbound-email/inbound-rejection.consumer';
 
 /**
- * The reply to mail the gateway refused — 32-doc §5.
+ * The reply to mail the gateway refused
  *
  * **The rate limit lives here because the sending does.** A limit enforced by
  * the publisher counts intentions; enforced by the sender it counts messages,

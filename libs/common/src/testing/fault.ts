@@ -1,5 +1,5 @@
 /**
- * Fault injection that cleans up after ITSELF — 16-doc §9.
+ * Fault injection that cleans up after ITSELF
  *
  * The bug this exists to make impossible: an injected `qdrant is down` fault
  * escaped `documents.e2e-spec.ts` and failed a later test in the same file,

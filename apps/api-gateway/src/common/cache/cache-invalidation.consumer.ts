@@ -10,15 +10,15 @@ import { CacheService } from './cache.service';
 import { CACHE_SCOPES } from '../config/cache.config';
 
 /**
- * Cache eviction driven by domain events — 29-doc §4.2.
+ * Cache eviction driven by domain events
  *
  * **This is the mechanism; `@InvalidateCache` is the fast path.** A decorator on
  * a gateway route sees writes that went through this gateway, and a ticket
- * changes in at least four ways that did not (28-doc §3): a `message:send` over
+ * changes in at least four ways that did not: a `message:send` over
  * the WebSocket, the escalation side effects inside `ticket-service`, a
  * scheduled job, and another service writing through its own path. Shipping the
  * decorator alone would look complete and be silently partial — which is why
- * 29-doc §5 insists the two land together.
+ * Invalidation and the cached read must land together.
  *
  * > Redis is shared, so cross-INSTANCE invalidation is already free: a `del`
  * > from any gateway pod is global. What this solves is **origin fan-out** — a
@@ -32,7 +32,7 @@ import { CACHE_SCOPES } from '../config/cache.config';
  *
  * ---
  *
- * **On what is NOT here.** 29-doc's table listed `user.*` events, and there are
+ * **On what is NOT here.** An earlier design listed `user.*` events, and there are
  * none — auth-service publishes audit records, billing entitlements,
  * notifications and storage supersessions, and nothing about users. That is not
  * a gap to fill: every writer of a user's name or avatar is a gateway mutation
@@ -85,13 +85,13 @@ export class CacheInvalidationConsumer {
   documentChanged(@Payload() event: unknown): void {
     // `document.uploaded` is deliberately absent: it is the WORKER's trigger
     // and nothing is readable yet. `indexed` and `ingestion_failed` are the two
-    // that change what a `GET /documents` row says — 29-doc §3 gives that list
+    // that change what a `GET /documents` row says gives that list
     // a 60s TTL precisely because status moves asynchronously.
     this.drop(CACHE_SCOPES.documents, event);
   }
 
   /**
-   * A plan change — 15-doc §1.3, and the precedent for all of this.
+   * A plan change, and the precedent for all of this.
    *
    * *"A stale settings cache keeps a downgraded tenant on the premium model"* —
    * this pattern, built once already, for the case where getting it wrong costs

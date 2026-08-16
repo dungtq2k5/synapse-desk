@@ -18,7 +18,7 @@ export type ServiceEndpoint = {
 
 /**
  * Tracks whether this gateway's gRPC peers are reachable — reported BY
- * `/health/ready`, and deliberately not gating it (23-doc §1).
+ * `/health/ready`, and deliberately not gating it.
  *
  * **Lives in api-gateway, not `libs/common`.** Two reasons, and the second is
  * the binding one:
@@ -57,7 +57,7 @@ export class ServiceRegistry implements OnModuleInit, OnApplicationShutdown {
   constructor(private readonly configService: ConfigService) {}
 
   /**
-   * EVERY gRPC peer, not just auth-service — 23-doc §1.
+   * EVERY gRPC peer, not just auth-service
    *
    * Registering one peer was defensible while peer state gated readiness: the
    * fewer peers listed, the smaller the cascade. Now that it gates nothing, the
@@ -118,7 +118,7 @@ export class ServiceRegistry implements OnModuleInit, OnApplicationShutdown {
    * `/health/ready` reported UNKNOWN forever. A readiness probe must answer for
    * *now* — and the probe is a cheap local state read, not a network round trip.
    *
-   * **Synchronous, which is what bounds it** — 23-doc §1 test 4.
+   * **Synchronous, which is what bounds it** test 4.
    * `getConnectivityState` reads a value the channel already maintains, so an
    * unreachable peer costs nothing and cannot hang the probe. A version that
    * sent a real `Check` RPC per peer would be more accurate and would put five

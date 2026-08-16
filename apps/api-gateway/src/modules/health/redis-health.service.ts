@@ -6,7 +6,7 @@ import { formatErrorMsg } from '@synapsedesk/common';
 /**
  * How long a readiness probe will wait on Redis before calling it down.
  *
- * **A probe that hangs is a probe that fails** — 23-doc §1 test 4. Kubernetes
+ * **A probe that hangs is a probe that fails** test 4. Kubernetes
  * gives a readiness check a few seconds and then counts the timeout as a
  * failure, so an unbounded check does not produce "unknown", it produces
  * not-ready *plus* a request holding a worker for the whole timeout. Bounding it
@@ -15,7 +15,7 @@ import { formatErrorMsg } from '@synapsedesk/common';
 const PROBE_TIMEOUT_MS = 1_000;
 
 /**
- * Is Redis reachable from THIS instance? — 23-doc §1.
+ * Is Redis reachable from THIS instance?
  *
  * The one dependency that genuinely gates gateway readiness. Sessions, the
  * throttler store and the Socket.IO adapter all run through it, so an instance

@@ -33,7 +33,7 @@ import { IsPresentButNullable } from '../../../../common/decorators/is-nullable.
  * Field-for-field the shape `CreateMessageRequest.attachments` takes, because
  * that is exactly where it goes. **No size and no MIME type**: both are read
  * back from the object at confirm rather than trusted from the caller — the
- * rule 36-doc §1.3 states and a signed-but-attacker-influenced payload must not
+ * rule states, and a signed-but-attacker-influenced payload must not
  * be allowed to undo.
  */
 export class InboundUploadedAttachmentDto {
@@ -49,7 +49,7 @@ export class InboundUploadedAttachmentDto {
 }
 
 /**
- * What the mail Worker POSTs — 32-doc §2, §3.1.
+ * What the mail Worker POSTs
  *
  * **This is a CONTRACT, not a description.** Stripe's DTO documents somebody
  * else's payload; here both halves are ours — the Worker in `workers/email-inbound/`
@@ -64,7 +64,7 @@ export class InboundUploadedAttachmentDto {
  */
 export class InboundEmailDto {
   /**
-   * The message's own `Message-ID` header — the idempotency key (31-doc §7).
+   * The message's own `Message-ID` header — the idempotency key.
    *
    * Optional because it is a header a sender can omit. When absent, the
    * receiving side synthesizes one from `from + subject + date`: weaker, and
@@ -87,7 +87,7 @@ export class InboundEmailDto {
    * The sender's address.
    *
    * Validated as an email because everything downstream treats it as one: the
-   * domain decides whether an account may be provisioned (31-doc §3), and a
+   * domain decides whether an account may be provisioned, and a
    * malformed value would make that check meaningless rather than merely ugly.
    */
   @IsEmail()
@@ -114,7 +114,7 @@ export class InboundEmailDto {
   @IsString()
   readonly html!: string | null;
 
-  /** `In-Reply-To`, for the threading fallback (31-doc §4). */
+  /** `In-Reply-To`, for the threading fallback. */
   @IsOptional()
   @IsString()
   @MaxLength(MAX_MESSAGE_ID_LENGTH)
@@ -128,7 +128,7 @@ export class InboundEmailDto {
   readonly references?: string[];
 
   /**
-   * The loop-guard headers, and only those — 32-doc §2.
+   * The loop-guard headers, and only those
    *
    * `Auto-Submitted` and `Precedence` are invisible once the body is parsed,
    * and they are what stop an auto-responder and this system replying to each
@@ -141,7 +141,7 @@ export class InboundEmailDto {
   readonly headers?: Record<string, string>;
 
   /**
-   * Filenames of attachments the Worker DROPPED — 31-doc §5.
+   * Filenames of attachments the Worker DROPPED
    *
    * Carried so the ticket can say what was omitted. *"Attachments silently
    * vanish"* is something a customer discovers before you do.
@@ -152,7 +152,7 @@ export class InboundEmailDto {
   readonly droppedAttachments?: string[];
 
   /**
-   * Attachments the Worker ALREADY UPLOADED, as object paths — 31-doc §5.
+   * Attachments the Worker ALREADY UPLOADED, as object paths
    *
    * **The bytes came nowhere near this server.** The Worker asked
    * `POST /webhooks/email/attachments` which files it could store, PUT them to
@@ -166,7 +166,7 @@ export class InboundEmailDto {
    * that case and those names arrive in `droppedAttachments` instead.
    *
    * Each path is confirmed by ticket-service as the message is written
-   * (36-doc §1.3); a path that fails is skipped and named, never fatal.
+   *; a path that fails is skipped and named, never fatal.
    */
   @IsOptional()
   @IsArray()
@@ -179,7 +179,7 @@ export class InboundEmailDto {
    * The message's own `Date` header, verbatim.
    *
    * **A property of the MESSAGE, which is what makes it usable as an
-   * idempotency key** — 31-doc §7. `receivedAt` below is generated fresh on
+   * idempotency key** `receivedAt` below is generated fresh on
    * every delivery attempt, so a key built from it changes on each retry and
    * dedups nothing.
    *

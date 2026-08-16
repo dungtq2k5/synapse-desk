@@ -15,7 +15,7 @@ export type DependencyProbe = {
 };
 
 /**
- * How long the whole readiness answer may take — 23-doc §2 test 4.
+ * How long the whole readiness answer may take test 4.
  *
  * Every probe races this. A dependency that has stopped answering does not
  * usually refuse a connection; it accepts one and never replies, so an
@@ -29,7 +29,7 @@ export const SERVING = 1;
 export const NOT_SERVING = 2;
 
 /**
- * The gRPC health service every backing service registers — 23-doc §2.
+ * The gRPC health service every backing service registers
  *
  * **Kubernetes could not tell whether any of these processes was alive.** They
  * are `createMicroservice`-only, so there was no HTTP endpoint to probe, and
@@ -65,7 +65,7 @@ export class GrpcHealthService {
 
   /**
    * Set on shutdown, so readiness reports NOT_SERVING while in-flight requests
-   * drain — 23-doc §1's "a partial outage should look partial", applied to a
+   * drain's "a partial outage should look partial", applied to a
    * deploy. Without it the pod keeps accepting new work right up to the moment
    * it closes its listener, and those requests fail rather than being routed
    * elsewhere.
@@ -134,7 +134,7 @@ export class GrpcHealthService {
  *
  * `SELECT 1` rather than a real query: it proves the pool has a live connection
  * and touches no table, so it cannot start failing because a migration renamed
- * something. **No new connection is opened** — 23-doc §2 test 4. A probe every
+ * something. **No new connection is opened** test 4. A probe every
  * five seconds that connects is a connection leak with a schedule, and it is
  * the shape a health check most often takes when written in a hurry.
  */

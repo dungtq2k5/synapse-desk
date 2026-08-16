@@ -103,7 +103,7 @@ export class QuotaAlertService {
 
       const command: CreateInAppNotificationCommand = {
         organizationId,
-        // The ORIGINATING event, not the transport subject (18-doc §1.3).
+        // The ORIGINATING event, not the transport subject.
         // Preference resolution keys on this, so a user who wants budget
         // warnings and not ticket noise needs the two to be distinguishable.
         type: NOTIFICATION_TYPES.quotaThreshold,

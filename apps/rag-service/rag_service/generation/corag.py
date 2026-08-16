@@ -1,4 +1,4 @@
-"""Co-RAG generation — 13-doc §4, and the two decisions that shape it.
+"""Co-RAG generation, and the two decisions that shape it.
 
 **Co-RAG, not Self-RAG, and streaming is what decides it.** Self-RAG generates
 N candidates, judges them, then picks a winner — you cannot stream an answer you
@@ -8,7 +8,7 @@ hot path. The co-pilot runs the same generator with 1-2 review passes, because a
 agent absorbs the latency and gets quality in exchange.
 
 **No-documents does not mean improvise.** `DOC_MISSING` offers the human handoff
-and records the gap; it does not fall back to general knowledge (11-doc §1.6).
+and records the gap; it does not fall back to general knowledge.
 An enterprise support bot inventing a policy is worse than one that escalates,
 and the notebook app this pipeline came from did the opposite.
 """
@@ -55,7 +55,7 @@ class Citation:
     document_id: str
     document_title: str
     page_number: int | None
-    #: The id a citation RESOLVES THROUGH — 13-doc §4.1 test 2.
+    #: The id a citation RESOLVES THROUGH test 2.
     #:
     #: Carried even though `chunk_id` would also find the row, because it is
     #: the key the two arms fuse on and the one Qdrant returns natively. A
@@ -105,7 +105,7 @@ class GenerationDelta:
 #: would vary — sometimes hedging into a guess, which is exactly what §1.6
 #: forbids.
 #:
-#: **Two of them, because the surfaces differ in one important way** (13-doc
+#: **Two of them, because the surfaces differ in one important way** (
 #: §2.4). Tier 1 chat sits in a conversation that can be escalated, so it offers
 #: the handoff. `/knowledge/ask` has no conversation and no ticket — there is
 #: nothing to escalate INTO — so offering a handoff there is promising something
@@ -145,7 +145,7 @@ def doc_missing_answer(
 ) -> str:
     """The refusal text for a surface. Never invents, never over-promises.
 
-    **With an attachment it also says what the file appeared to show** — 36-doc
+    **With an attachment it also says what the file appeared to show**
     §6.1. Retrieval can genuinely find nothing: the knowledge base may have no
     article on that error, and improvising a policy stays worse than admitting
     the gap. But by this point the system has computed something an agent wants
@@ -195,7 +195,7 @@ def build_prompt(
     retrieved but none of them actually answer the question — which no amount
     of retrieval logic can detect.
 
-    **Attachments arrive as PARTS, listed inside the boundary** — 36-doc §6.
+    **Attachments arrive as PARTS, listed inside the boundary**
     The user asked about the screenshot, so the answering call has to see it;
     what the block and its instruction add is that it is material to read rather
     than an instruction to follow, and — the half that matters — **never a
@@ -217,10 +217,10 @@ def build_prompt(
     text = (
         "You are a support assistant. Answer the user's question using ONLY the "
         "numbered sources below.\n" + boundary_instruction(nonce) +
-        # 33-doc §4.3 — the boundary, stated where the grounding rules are,
+        # The boundary, stated where the grounding rules are,
         # because it is the rule that says which text the grounding rules apply
         # to. Without this line the delimiters below are decoration.
-        # 17-doc §2.1 — the one confirmed prompt defect, and the highest-value
+        # The one confirmed prompt defect, and the highest-value
         # line available.
         #
         # Everything around this is multilingual BY DESIGN: Layer 1's greeting
@@ -241,7 +241,7 @@ def build_prompt(
         "If the sources do not answer the question, say so plainly and do not "
         "answer from general knowledge — a wrong policy is worse than no "
         "answer.\n"
-        # 21-doc §1.2 — the output CONTRACT.
+        # The output CONTRACT.
         #
         # Markdown already came out of this prompt without being asked for,
         # because the training data is full of it. That is a property of the
@@ -289,7 +289,7 @@ def build_prompt(
 def strip_code_spans(markdown: str) -> str:
     """Blanks fenced blocks and inline code, preserving everything else.
 
-    **The collision the markdown contract creates** — 21-doc §1.3. Asking for
+    **The collision the markdown contract creates** Asking for
     markdown means more code in answers, and a code sample containing
     ``array[0]`` or ``items[2]`` parses as a citation of source 2 under the
     ``\\[(\\d+)\\]`` pattern below. It is bounds-checked so it cannot crash — it
@@ -413,7 +413,7 @@ def extract_citations(answer: str, chunks: list[HydratedChunk]) -> list[Citation
     retrieved would say the model used all five sources when it used one, and
     the flag that finds context-polluting documents would never fire.
 
-    **Extracted from the PROSE only** (21-doc §1.3): code spans are blanked
+    **Extracted from the PROSE only**: code spans are blanked
     first, so `items[2]` in a code sample is not read as a citation. The
     original answer is what gets rendered and stored — only the citation scan
     sees the stripped copy.
@@ -491,7 +491,7 @@ class CoRagGenerator:
                     purpose,
                     can_escalate=can_escalate,
                     # The reformulated query, and ONLY when a file was sent —
-                    # 36-doc §6.1. Without an attachment the query is the user's
+                    # Without an attachment the query is the user's
                     # own question, and repeating it back to them says nothing.
                     search_terms=query if attachments else None,
                 ),
@@ -619,7 +619,7 @@ class CoRagGenerator:
         ticket_id: str | None = None,
         attachments: list[Attachment] | None = None,
     ) -> GeneratedAnswer:
-        """Draft, review, refine — 13-doc §4.2, the co-pilot's differentiator.
+        """Draft, review, refine, the co-pilot's differentiator.
 
         The same generator Tier 1 chat uses, with review passes on top. Chat
         runs this with `max_retries = 0`, which makes it exactly `generate()` —
@@ -655,7 +655,7 @@ class CoRagGenerator:
 
         # An empty retrieval never gets reviewed. There is nothing to review
         # against — the sources are the yardstick — and paying a model to
-        # confirm that a canned refusal is a canned refusal is spend with no
+        # confirm that a canned refusal is spend with no
         # possible finding.
         if answer.status == "DOC_MISSING" or not chunks:
             return answer

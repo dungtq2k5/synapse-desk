@@ -16,7 +16,7 @@ const CACHE_TTL_MS = 5 * 60 * 1000;
 /**
  * `settingsFor(orgId)` — the only source of model names in this service.
  *
- * The rule it exists to enforce is doc 15 §1.2: **no model name anywhere
+ * The rule it exists to enforce: **no model name anywhere
  * except the settings module's defaults table.** Not in a service, not in a
  * prompt builder, not in a test fixture. `scripts/check-model-literals.mjs`
  * makes that mechanical, because the discipline decays exactly when someone is
@@ -25,7 +25,7 @@ const CACHE_TTL_MS = 5 * 60 * 1000;
  * It is built now, before a single LLM call site exists, and that timing is the
  * entire point. Writing it alongside the call sites costs about an hour;
  * retrofitting it means auditing every LLM invocation across two services in
- * two languages (11-doc §1.7). Everything the tier feature needs afterwards is
+ * two languages. Everything the tier feature needs afterwards is
  * additive — one column read where `resolveTier` currently returns a constant.
  */
 @Injectable()
@@ -44,7 +44,7 @@ export class AiSettingsService implements OnApplicationBootstrap {
    *
    * At boot rather than at first use, and that distinction is the whole value:
    * an unpriced model discovered at first use has already been metered as free
-   * at least once (12-doc §1.3). This is also why the check reads
+   * at least once. This is also why the check reads
    * `ALL_CONFIGURED_MODELS` — derived from the mapping itself — rather than a
    * hand-written list that could drift away from what the resolver returns.
    */
@@ -81,7 +81,7 @@ export class AiSettingsService implements OnApplicationBootstrap {
   /**
    * Drops ONE tenant's cached settings. Called by the entitlements consumer.
    *
-   * One tenant, never all of them (doc 15 §1.4 test 4). Stripe webhooks arrive
+   * One tenant, never all of them. Stripe webhooks arrive
    * in bursts — a plan change, an invoice, a subscription update within
    * seconds — and a global flush on each would re-resolve every active tenant
    * at once, at precisely the moment the system is least able to absorb it.
@@ -93,9 +93,9 @@ export class AiSettingsService implements OnApplicationBootstrap {
   }
 
   /**
-   * The tenant's tier, read over gRPC — doc 14 step 6.
+   * The tenant's tier, read over gRPC.
    *
-   * **This method body is the entire tier feature**, and the claim doc 15 §1.1
+   * **This method body is the entire tier feature**, and the claim
    * makes is now visible: nothing else changed to ship it. No caller moved, no
    * endpoint signature moved, and no call site learned a model name — the
    * mapping the settings layer already went through simply started receiving a

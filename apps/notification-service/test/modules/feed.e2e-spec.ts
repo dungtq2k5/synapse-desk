@@ -20,7 +20,7 @@ const OTHER_TENANT_USER = '44444444-4444-4444-8444-444444444444';
 const TICKET_ID = '55555555-5555-4555-8555-555555555555';
 
 /**
- * 18-doc §2 — the personal inbox.
+ * The personal inbox.
  *
  * The two properties worth the most here are the ones a reader cannot check by
  * eye: that **cursor pagination does not shift rows under the reader**, and
@@ -195,7 +195,7 @@ describe('§2 The notification feed (e2e)', () => {
     });
 
     it('8. **A row inserted between page 1 and page 2 does not shift page 2**', async () => {
-      // The reason for cursors, made mechanical — 18-doc §2 test 3.
+      // The reason for cursors, made mechanical test 3.
       //
       // With `OFFSET`, an arrival at the head pushes every row down one, so
       // page 2 re-serves a row the client already has. Nothing in the response

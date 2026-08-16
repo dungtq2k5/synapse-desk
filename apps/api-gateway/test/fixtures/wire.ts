@@ -81,7 +81,7 @@ export function wireUserSummary(
  *
  * The two are one letter apart in the proto and completely different on the
  * wire: `UserSummaryResponse` wraps a whole user beside its roles, while
- * `UserSummary` is the five fields an EDGE is allowed to see (25-doc §4). This
+ * `UserSummary` is the five fields an EDGE is allowed to see. This
  * one is what the loaders batch, so it is what every field-resolver test needs.
  *
  * Here rather than redeclared per describe-block: two `graphql.e2e-spec.ts`
@@ -284,7 +284,7 @@ export function wireMessage(
 }
 
 /**
- * What `CreateMessage` puts on the wire — 36-doc §1.3.1.
+ * What `CreateMessage` puts on the wire
  *
  * A wrapper because a create has a second outcome: an attachment whose confirm
  * failed is named and the message is written anyway. `skippedAttachments`

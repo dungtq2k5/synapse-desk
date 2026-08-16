@@ -19,7 +19,7 @@ import { formatErrorMsg } from '@synapsedesk/common';
  * is a gRPC call rather than a reach into another service's database.
  *
  * **gRPC rather than an event, and that was settled rather than deferred**
- * (12-doc §1.2). Two reasons: the caller needs the classification in its own
+ *. Two reasons: the caller needs the classification in its own
  * response, and this is an UPDATE to an existing row rather than an append of
  * new spend — so at-least-once delivery buys nothing and a queue's ordering
  * ambiguity is a liability. NATS remains correct for spend writes, which are

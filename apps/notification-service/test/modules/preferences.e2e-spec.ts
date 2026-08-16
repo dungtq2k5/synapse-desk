@@ -26,7 +26,7 @@ const ORG = '11111111-1111-4111-8111-111111111111';
 const ME = '22222222-2222-4222-8222-222222222222';
 
 /**
- * 18-doc §4 — preferences and quiet hours.
+ * Preferences and quiet hours.
  *
  * **The section most likely to be deferred and least safe to defer.** §3 turns
  * on the volume; this is the only thing that lets a user survive it, and a user
@@ -308,7 +308,7 @@ describe('§4 Preferences and quiet hours (e2e)', () => {
     });
 
     it('10. REFUSES the WEBHOOK channel, which controls nothing', async () => {
-      // In the enum for completeness and deliberately unimplemented (18-doc
+      // In the enum for completeness and deliberately unimplemented (
       // §8). A preference for it would be a switch wired to nothing.
       await expectRpc(
         preferences.update(

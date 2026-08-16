@@ -1,5 +1,5 @@
 /**
- * The feed cursor — 18-doc §2.
+ * The feed cursor
  *
  * **Cursors, not offsets, and the reason is mechanical rather than stylistic.**
  * The feed grows at the head while it is being read: between the request for

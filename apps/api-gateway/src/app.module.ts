@@ -55,12 +55,12 @@ import { ApiInfoModule } from './modules/api-info/api-info.module';
 
     OrganizationStatusModule,
     // The shared cache, its `@InvalidateCache` interceptor and the NATS
-    // eviction consumer — 29-doc §4. Registered here rather than left to the
+    // eviction consumer Registered here rather than left to the
     // feature modules that cache reads, because the interceptor is global and
     // the consumer is a subscription the app must hold whether or not any
     // particular feature module was imported.
     CacheModule,
-    // The mail Worker's entry point — 31-doc §6. The gateway is the email
+    // The mail Worker's entry point The gateway is the email
     // adapter; no other service knows what an email is.
     InboundEmailModule,
     // The single channel to ticket-service, global because Domain B's surface
@@ -125,7 +125,7 @@ import { ApiInfoModule } from './modules/api-info/api-info.module';
     MetricsModule,
     ApiInfoModule,
 
-    // The read surface for the SPA — 25-doc §7. REST is not deprecated by it;
+    // The read surface for the SPA REST is not deprecated by it;
     // both are permanent, with different jobs. See the module for the rest.
     GraphqlApiModule,
   ],
@@ -138,7 +138,7 @@ import { ApiInfoModule } from './modules/api-info/api-info.module';
     // so this would execute before JwtAuthGuard had resolved the caller and
     // would have no tenant to gate on. Interceptors run after every guard.
     { provide: APP_INTERCEPTOR, useClass: OrganizationStatusInterceptor },
-    // RED metrics for every route — 23-doc §4. Global, so a route added later
+    // RED metrics for every route Global, so a route added later
     // is measured by DEFAULT: a per-controller registration means the endpoint
     // somebody forgets is invisible, and that is reliably the interesting one.
     { provide: APP_INTERCEPTOR, useClass: HttpMetricsInterceptor },

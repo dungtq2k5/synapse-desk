@@ -16,10 +16,10 @@ const SCRAPE_ORIGIN: RequestOrigin = {
 };
 
 /**
- * Exports `job_last_success_timestamp_seconds` — 23-doc §4, and the item the
+ * Exports `job_last_success_timestamp_seconds`, and the item the
  * doc says to build first.
  *
- * 20-doc §4.2 specifies a staleness alert over the `job_runs` heartbeat.
+ * Specifies a staleness alert over the `job_runs` heartbeat.
  * Exporting that table as a gauge turns the alert into a Prometheus rule:
  *
  * ```txt
@@ -53,7 +53,7 @@ export class JobMetricsCollector {
       this.metrics.jobLastSuccess.reset();
 
       for (const item of health.items) {
-        // **ABSENT, not zero** — 23-doc §4 test 4. Zero is 1970, which
+        // **ABSENT, not zero** test 4. Zero is 1970, which
         // satisfies any `time() - x > threshold` rule and reads as
         // catastrophically stale rather than as unknown. A job that has never
         // run must produce NO series, so the alert distinguishes "no data"

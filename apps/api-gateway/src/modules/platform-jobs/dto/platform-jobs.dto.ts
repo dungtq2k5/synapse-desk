@@ -33,10 +33,10 @@ export class JobHealthResponseDto {
 }
 
 /**
- * A BACKFILL — 20-doc §5.
+ * A BACKFILL
  *
  * Ranged and mandatory-reason. The range is what keeps it safe to expose: the
- * underlying jobs are idempotent over an explicit window (19-doc §2.2 test 1),
+ * underlying jobs are idempotent over an explicit window,
  * which is the property that makes re-running a correction possible at all.
  */
 export class BackfillJobDto {

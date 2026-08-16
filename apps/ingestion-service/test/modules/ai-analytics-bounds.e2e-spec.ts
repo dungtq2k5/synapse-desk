@@ -9,7 +9,7 @@ import {
 import { AiAnalyticsService } from '../../src/modules/analytics/ai-analytics.service';
 
 /**
- * The top-N bound on the gRPC side — 19-doc §4.
+ * The top-N bound on the gRPC side
  *
  * **This is the door with no `ValidationPipe` in front of it.** The gateway
  * DTOs reject an out-of-range `limit` before dialling, and that is tested at

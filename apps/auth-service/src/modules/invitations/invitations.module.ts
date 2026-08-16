@@ -22,7 +22,7 @@ import { InvitationsGrpcController } from './invitations-grpc.controller';
   controllers: [InvitationsGrpcController],
   providers: [InvitationsService],
   // Exported for `SchedulerModule`, which drives the hourly expiry sweep —
-  // 20-doc §3.2. It was a `@Cron` inside this module until then.
+  // It was a `@Cron` inside this module until then.
   exports: [InvitationsService],
 })
 export class InvitationsModule {}

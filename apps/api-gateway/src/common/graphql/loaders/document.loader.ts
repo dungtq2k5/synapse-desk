@@ -10,10 +10,10 @@ import { firstValueFrom } from 'rxjs';
 import { alignToKeys, createLoader } from './loaders.factory';
 
 /**
- * The documents loader — 26-doc §3.1, 27-doc §3.
+ * The documents loader
  *
- * **`ListDocumentsByIds` was built and called by nothing.** 27-doc §3 records it
- * among three idle RPCs; the analytics edges — `DocumentUsage.document` and
+ * **`ListDocumentsByIds` was built and called by nothing** — one of three idle
+ * batch RPCs. The analytics edges — `DocumentUsage.document` and
  * `KnowledgeGapFlag.document` — are its first consumer, and they are the reason
  * those two reads earned a GraphQL query at all. A batch RPC with no caller is
  * a maintained promise nobody depends on, which is worse than either having it
@@ -21,7 +21,7 @@ import { alignToKeys, createLoader } from './loaders.factory';
  * it.
  *
  * Tenant scope comes from the caller CONTEXT inside the RPC, not from anything
- * passed here — 27-doc §1, property 1. Analytics rows carry raw document ids
+ * passed here, property 1. Analytics rows carry raw document ids
  * out of a rollup table, so this is the boundary that stops one from resolving
  * across tenants.
  */

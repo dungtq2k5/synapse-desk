@@ -1,5 +1,5 @@
 /**
- * Strips quoted history from a reply — 31-doc §4, 32-doc §4.4.
+ * Strips quoted history from a reply
  *
  * **Not cosmetic.** Every reply carries the entire prior thread, so without
  * this `ticket_messages` grows quadratically, and the RAG corpus fills with
@@ -99,7 +99,7 @@ export function stripQuotedHtml(html: string): string {
 /**
  * The body to store: the text part, or the HTML part reduced to text.
  *
- * **The text part wins whenever there is one.** 31-doc §10 defers faithful
+ * **The text part wins whenever there is one.** Faithful
  * HTML→Markdown; this is the "good enough to read" version it describes, and
  * taking the text part first means most mail never meets the lossy path at all.
  */
@@ -111,7 +111,7 @@ export function toStoredBody(text: string | null, html: string | null): string {
 }
 
 /**
- * The crude HTML→text reduction — 31-doc §10 defers the faithful one.
+ * The crude HTML→text reduction defers the faithful one.
  *
  * Block boundaries become newlines before tags are dropped, or every paragraph
  * runs into the next and the result is one unreadable line. Entities are

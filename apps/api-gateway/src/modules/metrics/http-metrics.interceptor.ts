@@ -9,7 +9,7 @@ import { Observable, tap } from 'rxjs';
 import { MetricsRegistry } from './metrics.registry';
 
 /**
- * RED metrics for every HTTP request — 23-doc §4.
+ * RED metrics for every HTTP request
  *
  * **The `route` label is the PATH TEMPLATE, never the resolved path.** This is
  * §4's test 3 and it is the same cardinality trap wearing different clothes:

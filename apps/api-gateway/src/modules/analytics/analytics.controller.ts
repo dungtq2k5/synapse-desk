@@ -42,7 +42,7 @@ import {
 } from './dto/rest/analytics-response.dto';
 
 /**
- * The executive dashboard — api-endpoints-plan §4, implemented per 19-doc.
+ * The executive dashboard — api-endpoints-plan §4.
  *
  * **`analytics.read` throughout, and every route is a GET.** Analytics is a
  * read projection: there is nothing here to create, and the one write-shaped
@@ -165,7 +165,7 @@ export class AnalyticsController {
   }
 
   /**
-   * Queues an export — 19-doc §5.
+   * Queues an export
    *
    * **POST, not the GET the endpoint plan names.** It creates a job and
    * produces a file: a GET that writes is one a browser prefetch, a link

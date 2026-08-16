@@ -61,7 +61,7 @@ class QuotaCounter:
         None rather than 0, and the distinction is the point: a caller that
         cannot tell "no spend yet" from "cannot tell" will treat an outage as an
         empty counter and let every request through. The gate FAILS CLOSED on
-        None (12-doc §1.3 test 8) — the one place a cache miss must not mean
+        None — the one place a cache miss must not mean
         "allow".
         """
         key = quota_counter_key(organization_id, cycle_start)

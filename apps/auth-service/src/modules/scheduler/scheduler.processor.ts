@@ -11,7 +11,7 @@ import { ExpiredLockSweep } from '../users/expired-lock.sweep';
 import { ExpiredRecordsPruner } from '../sessions/expired-records.job';
 
 /**
- * auth-service's scheduler — 20-doc §3.2.
+ * auth-service's scheduler
  *
  * **Migrated off `@nestjs/schedule`, which had the replica problem.** Both jobs
  * here used `@Cron`, which runs in-process: three pods fired each of them three
@@ -21,7 +21,7 @@ import { ExpiredRecordsPruner } from '../sessions/expired-records.job';
  *
  * It was worth changing for a different reason. **Two mechanisms for one
  * concern is how a third appears**: whoever adds the next scheduled job copies
- * whichever they find first, and after 20-doc there were two schedulers in this
+ * whichever they find first, and at one point there were two schedulers in this
  * codebase built on BullMQ and one built on decorators. Now there is one way.
  */
 @Processor(SCHEDULER_QUEUE.auth, { concurrency: 1 })
@@ -79,7 +79,7 @@ export class SchedulerProcessor extends WorkerHost {
       this.logger.log(`Expired ${expiredCount} stale invitation(s)`);
     }
 
-    // **Expired temporary locks** — 21-doc §2.2, mechanism 2.
+    // **Expired temporary locks**, mechanism 2.
     //
     // The login path already unlocks lazily, so this is not what lets a user
     // back in — that is instant. What it fixes is everything that does NOT go

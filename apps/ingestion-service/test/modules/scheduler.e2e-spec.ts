@@ -19,7 +19,7 @@ import { QuotaReconciliationJob } from '../../src/modules/scheduled/quota-reconc
 import { AiGenerationRollupJob } from '../../src/modules/analytics/ai-generation-rollup.job';
 
 /**
- * 20-doc §1, §2, §6 — the scheduler.
+ * §2, §6 — the scheduler.
  *
  * **The layer whose absence was the entire bug.** Six jobs in this service were
  * written correctly, exported, imported into `AppModule`, and invoked by
@@ -289,7 +289,7 @@ describe('§1 The scheduler (e2e)', () => {
   });
 
   /**
-   * 20-doc §4.5 test 3 — the BINDING.
+   * The BINDING.
    *
    * `JobRunRecorder` now lives in `libs/common` and takes a `JobRunStore`.
    * `JobRunsModule` binds it to THIS service's `prisma.jobRun`, and three thin

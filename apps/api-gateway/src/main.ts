@@ -19,7 +19,7 @@ async function bootstrap() {
 
   // Cast the app to NestExpressApplication to access underlying Express settings
   //
-  // `rawBody: true` is NOT optional — it is the fix for 14-doc §3.2, the single
+  // `rawBody: true` is NOT optional — it is the fix for the Stripe webhook, the single
   // most common way a Stripe integration fails on first deploy. Stripe's
   // signature is computed over the EXACT BYTES of the request; the global JSON
   // parser deserializes and re-serializes them, and verification then fails for
@@ -128,11 +128,11 @@ async function bootstrap() {
   );
   await app.startAllMicroservices();
 
-  // `/docs` and `/docs-json`, when config allows — 24-doc §4. Before `listen`
+  // `/docs` and `/docs-json`, when config allows Before `listen`
   // so the routes exist the moment the port opens.
   setupSwagger(app, configService, logger);
 
-  // The metrics listener, BEFORE the public one — 23-doc §4. A scraper that
+  // The metrics listener, BEFORE the public one A scraper that
   // finds the app serving traffic and the metrics port refused would report a
   // scrape failure for a process that is perfectly healthy.
   //

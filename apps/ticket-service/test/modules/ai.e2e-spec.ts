@@ -87,7 +87,7 @@ describe('§2.6 AI Co-Pilot (e2e)', () => {
   // ------------------------------------------------------- the 503 contract
 
   /**
-   * Renamed in 16-doc §4: this was `describe('the contract-first stub')`, and
+   * Renamed: this was `describe('the contract-first stub')`, and
    * the adapter has not been a stub since Domain C — it calls rag-service for
    * draft, summary, classify and suggest.
    *
@@ -172,7 +172,7 @@ describe('§2.6 AI Co-Pilot (e2e)', () => {
   // ------------------------------------------- configured AND reachable
 
   /**
-   * The case that matters now — 16-doc §4.
+   * The case that matters now
    *
    * The suite above proves the system degrades. Nothing proved it *works*:
    * every RPC could have answered UNAVAILABLE for a second reason — a wrong
@@ -205,7 +205,7 @@ describe('§2.6 AI Co-Pilot (e2e)', () => {
             confidenceScore: 0.6,
           },
         ],
-        // The article sidebar — 39-doc §1. Empty here: this test is about the
+        // The article sidebar Empty here: this test is about the
         // next-step list, which arrives beside them rather than instead.
         articles: [],
       });

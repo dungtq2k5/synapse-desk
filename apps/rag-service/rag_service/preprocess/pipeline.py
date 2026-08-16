@@ -108,7 +108,7 @@ class PreprocessPipeline:
         self._metered = MeteredGenerator(generator, ledger, quota)
         #: **Defaulted rather than required**, so no existing construction site
         #: silently ends up without a guard. `Chat` is the only surface that
-        #: splits the two layers around its greeting check — 33-doc §1.
+        #: splits the two layers around its greeting check
         self._injection = injection or InjectionGuard()
 
     async def run(
@@ -141,11 +141,11 @@ class PreprocessPipeline:
 
         # LAYER 1 — free, and SKIPPED when a file came with the message.
         #
-        # 35-doc §5.1, and it is the correction most likely to ship as a bug.
+        # And it is the correction most likely to ship as a bug.
         # `MAX_GREETING_WORDS` is 4 with prefix matching, so a user who attaches
         # a screenshot of an error and types "hi", "help" or "please help"
         # matches here, gets "Hi! How can I help you today?", and the one thing
-        # they sent is never looked at. That is the same silent drop 34-doc
+        # they sent is never looked at. That is the same silent drop OCR
         # spent a document eliminating for scanned pages.
         #
         # **A message carrying an attachment is not a greeting, whatever its
@@ -155,7 +155,7 @@ class PreprocessPipeline:
         # Otherwise unchanged: a greeting still costs nothing at all, is still
         # answered at the cap, and still short-circuits before the
         # classification — which is what makes Layer B free on this path
-        # (33-doc §1.1).
+        #.
         if not parts:
             match = detect_greeting_layer_one(message)
             if match is not None:
@@ -178,12 +178,12 @@ class PreprocessPipeline:
 
         # THE FUSED LAYER 2 — greeting detection and Layer B in ONE call.
         #
-        # 33-doc §3.3. This call was already being made and was already
+        # This call was already being made and was already
         # multilingual; widening it from two labels to three adds a word to the
         # answer and nothing to the bill. A separate injection call here would
         # double the cheap-tier round trips on the highest-volume path in the
         # system to ask one model two questions about one sentence.
-        # **The parts go to the fused call** — 36-doc §4. This is the only
+        # **The parts go to the fused call** This is the only
         # layer that can see an image at all: Layer A is a regex and stays
         # text-only, so an instruction painted into a screenshot reaches no
         # check before this one.
@@ -192,7 +192,7 @@ class PreprocessPipeline:
         )
 
         if intent is Intent.REFUSED and not self._injection.classifier_enabled:
-            # **The kill switch reaches this path too** — 33-doc §7. The guard
+            # **The kill switch reaches this path too** The guard
             # never runs on the fused call, so without this check turning Layer
             # B off would silence it on `Ask` and `Draft` and leave `Chat`
             # refusing: a switch covering two surfaces of three is one nobody
@@ -229,7 +229,7 @@ class PreprocessPipeline:
         calls = [AiGenerationPurpose.GREETING_CLASSIFY.value]
 
         # **`or parts` is the condition change, and it is the whole feature** —
-        # 35-doc §3. `if history:` alone skips reformulation on the first
+        # `if history:` alone skips reformulation on the first
         # message of a conversation, which is exactly when somebody pastes a
         # screenshot of an error and types "how can I solve this problem?".
         #
@@ -319,7 +319,7 @@ class PreprocessPipeline:
         *,
         attachments: list[Attachment] | None = None,
     ) -> tuple[Intent, str | None]:
-        """Greeting detection and Layer B, in one cheap-tier call — 33-doc §3.3.
+        """Greeting detection and Layer B, in one cheap-tier call
 
         **Three labels where there were two, and a language.** The call already
         existed, already went to the cheap tier and was already multilingual;
@@ -352,7 +352,7 @@ class PreprocessPipeline:
             "language the message is written in. Nothing else.\n"
             "Example: FACTUAL en\n"
             # **The history is delimited here for the same reason the sources
-            # are** — 33-doc §4. `role: content` is a plain-text delimiter, and
+            # are** `role: content` is a plain-text delimiter, and
             # `ticket_messages` now contains inbound email written by senders
             # who never authenticated, so a message body carrying a newline and
             # `assistant: …` forges a turn that never happened. On THIS prompt
@@ -363,20 +363,20 @@ class PreprocessPipeline:
             + (f"{transcript}\n" if recent else "")
             + wrap_question(message, nonce)
             + (
-                # **One line, and only when a file is present** — 36-doc §4.
+                # **One line, and only when a file is present**
                 # An instruction painted into a screenshot is injection exactly
                 # as much as one typed, and without saying so the model reads
                 # the image as content to classify rather than as a place an
                 # instruction can hide.
                 #
                 # Conditional because the prompt is otherwise unchanged from
-                # 33-doc §3.3 — same three labels, same eight-token ceiling,
+                # Same three labels, same eight-token ceiling,
                 # same run-open parse — and a line about attachments on the
                 # 99% of calls that have none is tokens spent on nothing.
                 #
                 # **The same constant `Ask` and `Draft` use, not a copy.** This
                 # call and `LlmInjectionClassifier` are one detection layer on
-                # two surfaces (35-doc §5), so a sentence tuned here and not
+                # two surfaces, so a sentence tuned here and not
                 # there would make `Chat` and `Draft` classify the same
                 # attachment differently — a divergence nobody would look for,
                 # because the layer is conceptually one thing.
@@ -438,7 +438,7 @@ class PreprocessPipeline:
         With history it becomes "tell me more about the expense approval
         threshold", which retrieves.
 
-        **An attachment has the same problem and the same cure** — 35-doc §3.
+        **An attachment has the same problem and the same cure**
         "how can I solve this problem?" has no nouns either; the nouns are in
         the screenshot. This call is where they come out, and it is the only
         place they can: it already runs on the cheap tier, is already ledgered
@@ -451,7 +451,7 @@ class PreprocessPipeline:
         exact visible text for that reason, and the output stays one short
         query either way.
 
-        **Only the current message's attachments** — 35-doc §3.1. Re-feeding
+        **Only the current message's attachments** Re-feeding
         history would be four turns times five files on the highest-volume path
         in the system, and the information usually survives as text anyway: the
         assistant's own earlier reply is in the transcript, and it named the
@@ -493,7 +493,7 @@ class PreprocessPipeline:
         # **The attachment goes AFTER the text**, so the instruction and the
         # boundary are already in context when the file arrives. The file is a
         # part rather than text, so no delimiter can wrap it — what bounds it is
-        # this ordering plus the instruction above, and 36-doc §6 is where the
+        # this ordering plus the instruction above, and the attachment work is where the
         # generation half of that argument lives.
         prompt: Prompt = [text, *parts] if parts else text
 

@@ -124,7 +124,7 @@ export const TERMINAL_TICKET_STATUSES: readonly TicketStatus[] = [
 ];
 
 /**
- * `ticket_messages.answer_status` — what an AI reply concluded (36-doc §7).
+ * `ticket_messages.answer_status` — what an AI reply concluded.
  *
  * Mirrors `synapsedesk.rag.AnswerStatus`; `enum-bridges.spec.ts` asserts the two
  * stay aligned.
@@ -139,7 +139,7 @@ export enum AnswerStatus {
   /** The tenant is at the AI cap. The caller escalates rather than erroring. */
   AT_CAP = 'AT_CAP',
   /**
-   * Refused by prompt-injection detection — 33-doc §5.1.
+   * Refused by prompt-injection detection
    *
    * **Not GREETING**, which is what reusing that short-circuit reported: a
    * refusal filed as a greeting is wrong in the thread, in the WebSocket frame
@@ -234,7 +234,7 @@ export type AllowedAttachmentMimeType =
   (typeof ALLOWED_ATTACHMENT_MIME_TYPES)[number];
 
 /**
- * Which attachments may reach the MODEL — 35-doc §8.
+ * Which attachments may reach the MODEL
  *
  * **A different question from `ALLOWED_ATTACHMENT_MIME_TYPES` above, and the
  * two must not be merged.** That list is a security allowlist answering "may a
@@ -254,7 +254,7 @@ export type AllowedAttachmentMimeType =
  * Everything absent from here stays storable, downloadable and human-readable.
  * It simply never becomes a prompt part: sending a zip spends tokens to produce
  * nothing, and the user is told what was left out through `skippedAttachments`
- * rather than left to discover it (36-doc §2.2).
+ * rather than left to discover it.
  */
 export const AI_ELIGIBLE_MIME_TYPES = [
   'image/png',
@@ -268,7 +268,7 @@ export const AI_ELIGIBLE_MIME_TYPES = [
 export type AiEligibleMimeType = (typeof AI_ELIGIBLE_MIME_TYPES)[number];
 
 /**
- * How many attachment bytes one message may send to the model — 36-doc §2.1.
+ * How many attachment bytes one message may send to the model
  *
  * **The TOTAL across a message, not per file.** Five 3 MB screenshots are one
  * request, and a per-file cap would let them through together.
@@ -284,7 +284,7 @@ export type AiEligibleMimeType = (typeof AI_ELIGIBLE_MIME_TYPES)[number];
  *
  * The transport binds, at `GRPC_CHANNEL_OPTIONS` in `libs/grpc-proto` — and it
  * binds on both ends only because rag-service's Python server now sets matching
- * options (35-doc §7.1); before that it was 4 MB and the mismatch was invisible
+ * options; before that it was 4 MB and the mismatch was invisible
  * until a request failed.
  *
  * The request carries more than the files. Worst case is 40 transcript turns at

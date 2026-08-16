@@ -12,7 +12,7 @@ import { AuthReferenceService } from '../../src/modules/auth-client/auth-referen
 import { EmailService } from '../../src/modules/email/email.service';
 
 /**
- * 18-doc §3 — the `ticket.*` producers.
+ * The `ticket.*` producers.
  *
  * **Three rules decide who gets notified, and each has a failure mode worse
  * than a missing notification**: a self-notification makes the feature feel
@@ -56,7 +56,7 @@ describe('§3 Ticket notifications (e2e)', () => {
   };
 
   // Narrowed by PATTERN rather than by shape. `Extract<…, { messageId: string }>`
-  // used to name exactly one variant and now names three — 22-doc §6.1 added
+  // used to name exactly one variant and now names three added
   // `message_updated` and `message_redacted`, which also carry a `messageId`.
   // Structural narrowing silently widened; the pattern is the discriminant and
   // says what it means.
@@ -421,7 +421,7 @@ describe('§3 Ticket notifications (e2e)', () => {
 
   describe('cost and containment', () => {
     it('21. No handler calls back into ticket-service', () => {
-      // 18-doc §3 test 9. The event union carries every party, which is what
+      // The event union carries every party, which is what
       // keeps the fan-out cheap — an RPC per notification on the highest-volume
       // event in the system is what makes people turn notifications off.
       //
@@ -470,7 +470,7 @@ describe('§3 Ticket notifications (e2e)', () => {
 
     it('24. Sends NO email for a NORMAL ticket notification', async () => {
       // Emailing every reply to every agent is how a channel earns the filter
-      // that then hides the one that mattered — and 18-doc §4 is explicit that
+      // that then hides the one that mattered — and you get one chance, which means
       // you get one chance at a user's notification settings.
       await consumer.messageCreated(messageEvent());
 

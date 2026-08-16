@@ -1,7 +1,7 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 
 /**
- * Inbound email addressing — 31-doc §2, §4.
+ * Inbound email addressing
  *
  * **One definition, three readers.** The Cloudflare Worker builds nothing but
  * forwards the recipient verbatim; the gateway parses it to find the tenant and
@@ -34,7 +34,7 @@ const INBOUND_TOKEN_BYTES = 16;
 /**
  * A tenant's inbound token: 32 lowercase hex characters.
  *
- * **Hex, not `generateSecureToken()`** — 32-doc §1. That helper produces 43
+ * **Hex, not `generateSecureToken()`** That helper produces 43
  * `base64url` characters, which does not fit `organizations.inbound_token` and,
  * far worse, is CASE-SENSITIVE: local-part case is preserved in theory and
  * normalised by plenty of real mail systems in practice, so one hop lowercasing
@@ -55,7 +55,7 @@ export type InboundAddress = {
   /**
    * The per-ticket reply token, when the sender replied to a notification.
    *
-   * An HMAC of the ticket id rather than the id itself — 31-doc §4. A raw id
+   * An HMAC of the ticket id rather than the id itself A raw id
    * would let anyone who can construct the address post into any ticket;
    * holding the HMAC is the authorization, which is what a reply is.
    */
@@ -68,7 +68,7 @@ export type InboundAddress = {
  * **Returns `null` rather than throwing, and the caller drops.** An unroutable
  * address is not an error condition — it is a public address receiving mail
  * nobody could route, which happens constantly and must cost a log line rather
- * than an exception (31-doc §2).
+ * than an exception.
  *
  * Case is normalised before matching, for the reason
  * {@link generateInboundToken} explains: a hop that lowercases the local part
@@ -149,7 +149,7 @@ const REPLY_TOKEN_SEPARATOR = '-';
 export const MAX_ADDRESSABLE_TICKET_NUMBER = 36 ** 8 - 1;
 
 /**
- * The per-ticket half of a reply address — 31-doc §4.
+ * The per-ticket half of a reply address
  *
  * `{base36 ticket number}-{MAC}`, so it is both **readable back** and
  * **unforgeable**:
@@ -182,7 +182,7 @@ export function buildTicketReplyToken(
  *
  * `null` covers every failure — malformed, wrong tenant, altered number,
  * altered MAC — and the caller treats all of them the same way: open a NEW
- * ticket. That is the safe direction (31-doc §4): a duplicate ticket is
+ * ticket. That is the safe direction: a duplicate ticket is
  * annoying and visible, while threading a stranger's mail onto somebody else's
  * conversation is a disclosure.
  */

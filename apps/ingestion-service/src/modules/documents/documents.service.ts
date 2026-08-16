@@ -242,7 +242,7 @@ export class DocumentsService {
             fileHash,
             isOrganizationWide: request.isOrganizationWide,
             status: DocumentStatus.PENDING,
-            // Validated at the gateway against `OCR_LANGUAGES` — 34-doc §4.2.
+            // Validated at the gateway against `OCR_LANGUAGES`
             // Stored as given: `[]` is "not specified", which is almost every
             // upload, and the parser is what turns that into the `eng` default.
             ocrLanguages: request.ocrLanguages ?? [],
@@ -281,7 +281,7 @@ export class DocumentsService {
         ingestionJobId: document.job.id,
         objectPath: request.objectPath,
         fileType: document.created.fileType,
-        // On the EVENT rather than read from the row by the worker — 34-doc
+        // On the EVENT rather than read from the row by the worker
         // §4.1. The processor's only document read happens after the parse, so
         // carrying this here is what keeps the "no lookup to start" property
         // that `objectPath` and `fileType` are already there for.
@@ -441,7 +441,7 @@ export class DocumentsService {
   }
 
   /**
-   * The flag worklist — 16-doc §5.
+   * The flag worklist
    *
    * **Accepts EVERY flag type, and more than one at a time.** `UNRETRIEVED` and
    * `UNCITED` were one flag under a name that fitted only `UNRETRIEVED`, and
@@ -787,12 +787,12 @@ export class DocumentsService {
   }
 
   /**
-   * The batch read behind the documents DataLoader — 27-doc §1, §3.
+   * The batch read behind the documents DataLoader
    *
    * Citations resolve chunk -> document through this.
    *
    * **`visibilityScope` applies, exactly as it does to the list.** Documents
-   * carry a department boundary (11-doc §1.4): a document scoped to a
+   * carry a department boundary: a document scoped to a
    * department is invisible to users outside it, and a batch read that skipped
    * the filter would be a way to fetch any document in the tenant one id at a
    * time — including its TITLE, which is usually the sensitive part.
@@ -816,7 +816,7 @@ export class DocumentsService {
       where: {
         organizationId: requireTenant(context),
         ...this.visibilityScope(context),
-        // Soft-deleted documents ARE returned by id — 27-doc §1. A citation
+        // Soft-deleted documents ARE returned by id A citation
         // pointing at a retired document still has to render its title.
         id: { in: ids },
       },

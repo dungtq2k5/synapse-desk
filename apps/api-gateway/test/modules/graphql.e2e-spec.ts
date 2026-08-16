@@ -34,12 +34,12 @@ import { SCHEMA_PATH } from '../../src/common/config/graphql.config';
 import { compareAlphabetically } from '@synapsedesk/common';
 
 /**
- * The GraphQL surface — 25-doc.
+ * The GraphQL surface.
  *
  * Everything here is about the transport rather than about any domain type:
  * that the caller resolves identically on both surfaces, that the cost limits
  * run before execution, and that the REST envelope stays off. The entity graph
- * is 26-doc's.
+ * is the resolver layer's.
  */
 describe('§25 the GraphQL surface (e2e)', () => {
   let fx: E2eFixture;
@@ -139,7 +139,7 @@ describe('§25 the GraphQL surface (e2e)', () => {
 
   describe('§5 cost limits run BEFORE execution', () => {
     it('1. **a query nested past the depth limit is refused at VALIDATION**', async () => {
-      // 26-doc §1.3 test 1. Validation runs before execution begins, so a
+      // Validation runs before execution begins, so a
       // refused query never reaches a resolver and never makes a gRPC call —
       // refusing *after* the fan-out is a log line, not a limit.
       const deep = `{ ${'a { '.repeat(MAX_QUERY_DEPTH + 2)}b${' }'.repeat(MAX_QUERY_DEPTH + 2)} }`;
@@ -199,7 +199,7 @@ describe('§25 the GraphQL surface (e2e)', () => {
 
       // And the GraphQL branch exists at all — the one line that was missing.
       // Asserted structurally rather than by calling a guarded resolver,
-      // because 26-doc is what adds one; this is the seam being in place.
+      // because the resolver work is what adds one; this is the seam being in place.
       const source = readFileSync(
         join(
           __dirname,
@@ -214,7 +214,7 @@ describe('§25 the GraphQL surface (e2e)', () => {
 
   describe('§6 loaders are per-request', () => {
     it('**two requests never share a loader instance**', async () => {
-      // 25-doc §6. A singleton loader caches one tenant's row under a bare uuid
+      // A singleton loader caches one tenant's row under a bare uuid
       // and serves it to whoever asks for that id next — a cross-tenant leak
       // whose cause is a performance optimisation.
       //
@@ -240,7 +240,7 @@ describe('§25 the GraphQL surface (e2e)', () => {
 
   describe('§1.2 the committed schema', () => {
     it('**matches the generated one**', () => {
-      // 26-doc §1.2 test 2. `schema.gql` is generated, and committing a
+      // `schema.gql` is generated, and committing a
       // generated file looks redundant until the first breaking change: with
       // it, removing a field is a red line in a diff somebody reviews; without
       // it, it is a client failing in staging a week later.
@@ -347,7 +347,7 @@ describe('§25 the GraphQL surface (e2e)', () => {
     });
 
     it('**is OFF when NODE_ENV is production**', async () => {
-      // 25-doc §5. The schema is a map of the API — every type, every field,
+      // The schema is a map of the API — every type, every field,
       // every argument — handed to anyone who asks.
       //
       // A SECOND app on a production config rather than mutating the shared
@@ -374,7 +374,7 @@ describe('§25 the GraphQL surface (e2e)', () => {
   });
 
   /**
-   * Root resolvers — 26-doc §4.
+   * Root resolvers
    *
    * **A resolver is a transport, not an implementation.** Every test here is
    * really one claim: that the query and its REST twin share a call, guards and
@@ -437,7 +437,7 @@ describe('§25 the GraphQL surface (e2e)', () => {
     });
 
     it('2. **a missing ticket nulls its own field, not the whole query**', async () => {
-      // 26-doc §4 test 4. `nullable: true` on a single-entity query is the
+      // `nullable: true` on a single-entity query is the
       // decision being tested: a non-null field that throws takes its parent's
       // entire `data` with it, so one missing ticket would empty a dashboard.
       fx.stubs.ticket.getTicket.mockReturnValue(
@@ -476,7 +476,7 @@ describe('§25 the GraphQL surface (e2e)', () => {
     });
 
     it('4. **an unauthenticated caller is refused on BOTH transports**', async () => {
-      // Same guards, proven rather than assumed — 26-doc §4 test 3. The guard
+      // Same guards, proven rather than assumed test 3. The guard
       // classes are literally the controller's, so this is checking they were
       // actually applied to the resolver.
       const rest = await request(fx.app.getHttpServer()).get(
@@ -494,7 +494,7 @@ describe('§25 the GraphQL surface (e2e)', () => {
     });
 
     it('5. **`first: 500` is CLAMPED to 100, not rejected**', async () => {
-      // 26-doc §1.3 test 3. Clamping keeps a client working with less data than
+      // Clamping keeps a client working with less data than
       // it asked for; rejecting makes the cap a breaking change for a client
       // that worked yesterday.
       fx.stubs.ticket.listTickets.mockReturnValue(
@@ -527,7 +527,7 @@ describe('§25 the GraphQL surface (e2e)', () => {
   });
 
   /**
-   * Field resolvers — 26-doc §5, 27-doc §2.
+   * Field resolvers
    *
    * **Test 1 is the test this whole design exists for**, and test 2 is the one
    * that renders a convincing page with the wrong people on it if it fails.
@@ -559,12 +559,12 @@ describe('§25 the GraphQL surface (e2e)', () => {
     beforeEach(() => jest.clearAllMocks());
 
     it('1. **50 tickets with `assignee` produce EXACTLY ONE batch call**', async () => {
-      // 26-doc §5 test 1. Counted on the STUB, not inferred from the response
+      // Counted on the STUB, not inferred from the response
       // shape: an N+1 returns exactly the same JSON as a batch, so the only
       // observable difference is how many times the peer was called.
       //
       // Unbatched this is fifty concurrent calls into auth-service, which is
-      // also serving every login in the system — 25-doc §2 calls that an
+      // also serving every login in the system calls that an
       // outage rather than a missed optimisation.
       const ids = Array.from({ length: 50 }, () => faker.string.uuid());
       const assignees = ids.map(() => faker.string.uuid());
@@ -604,7 +604,7 @@ describe('§25 the GraphQL surface (e2e)', () => {
     });
 
     it('2. **the right user lands on the right ticket, whatever order the RPC answers in**', async () => {
-      // 27-doc §2 test 1 — the highest-value test in the GraphQL work. Every
+      // The highest-value test in the GraphQL work. Every
       // other failure here is visible; this one produces a page that looks
       // entirely plausible with the wrong names against the wrong tickets.
       //
@@ -662,7 +662,7 @@ describe('§25 the GraphQL surface (e2e)', () => {
     });
 
     it('3. **the same user on twenty tickets is fetched once**', async () => {
-      // Per-request dedup, which is most of the win — 26-doc §5 test 2.
+      // Per-request dedup, which is most of the win test 2.
       const ids = Array.from({ length: 20 }, () => faker.string.uuid());
 
       fx.stubs.ticket.listTickets.mockReturnValue(
@@ -698,7 +698,7 @@ describe('§25 the GraphQL surface (e2e)', () => {
     });
 
     it('4. **a null `currentAssigneeId` yields null with NO loader call**', async () => {
-      // 26-doc §5 test 3. DataLoader batches a key of `undefined` happily and
+      // DataLoader batches a key of `undefined` happily and
       // caches the failure, so one unassigned ticket would poison the batch for
       // every other row on the page.
       fx.stubs.ticket.listTickets.mockReturnValue(
@@ -724,7 +724,7 @@ describe('§25 the GraphQL surface (e2e)', () => {
     });
 
     it('5. **an unreachable peer nulls its field and leaves the rest intact**', async () => {
-      // 27-doc §4 test 1. One unreachable service costs the assignee column,
+      // One unreachable service costs the assignee column,
       // not the dashboard — and that is only safe because every edge is
       // nullable, which is a decision made for availability rather than for
       // modelling.
@@ -762,7 +762,7 @@ describe('§25 the GraphQL surface (e2e)', () => {
     });
 
     it('6. **`assignee` exposes no `email`** — the schema, not the resolver', async () => {
-      // 25-doc §4, 26-doc §3 test 1. Asserted against the SCHEMA rather than a
+      // Asserted against the SCHEMA rather than a
       // response: a field that is not in the schema cannot be reached by any
       // query, which is what makes the narrow type structural rather than
       // procedural.
@@ -781,7 +781,7 @@ describe('§25 the GraphQL surface (e2e)', () => {
   });
 
   /**
-   * The rest of the type graph and the selective mutations — 26-doc §3, §6.
+   * The rest of the type graph and the selective mutations
    */
   describe('§3/§6 the wider graph', () => {
     const agentId = faker.string.uuid();
@@ -800,7 +800,7 @@ describe('§25 the GraphQL surface (e2e)', () => {
     beforeEach(() => jest.clearAllMocks());
 
     it('1. **`Query.user` requires `user.read`; `Ticket.assignee` does not**', async () => {
-      // 26-doc §3 test 2 — the two paths, and the reason they return different
+      // The two paths, and the reason they return different
       // types. A caller with ticket access and no `user.read` can traverse to a
       // name, and cannot ask for the profile behind it.
       fx.stubs.ticket.getTicket.mockReturnValue(
@@ -910,7 +910,7 @@ describe('§25 the GraphQL surface (e2e)', () => {
     });
 
     it('3. **a mutation returns a PAYLOAD, not the bare entity**', async () => {
-      // 25-doc §3. The payload gives a mutation somewhere to put the `message`
+      // The payload gives a mutation somewhere to put the `message`
       // the REST envelope carries — GraphQL has no envelope — and somewhere to
       // add `userErrors` later without a breaking change.
       fx.stubs.ticket.escalateTicket.mockReturnValue(
@@ -961,7 +961,7 @@ describe('§25 the GraphQL surface (e2e)', () => {
     });
 
     it('5. **analytics is ONE whole shape, with no edges to resolve**', () => {
-      // 26-doc §3. `AnalyticsOverview` is a composed read with its own cache
+      // `AnalyticsOverview` is a composed read with its own cache
       // and rollups; decomposing it into resolvable fields would re-run the
       // composition per field.
       // `exec` rather than `String.match`: with no `g` flag the two return
@@ -1094,7 +1094,7 @@ describe('§25 the GraphQL surface (e2e)', () => {
   });
 
   /**
-   * List edges: cap or paginate, never both — 26-doc §3.2.
+   * List edges: cap or paginate, never both
    */
   describe('§3.2 capped edge lists', () => {
     const userId = faker.string.uuid();
@@ -1107,7 +1107,7 @@ describe('§25 the GraphQL surface (e2e)', () => {
     it('3. **250 departments yields a CAPPED list, not a batch-cap error**', async () => {
       // The failure this fix prevents is not truncation — it is a HARD FIELD
       // FAILURE. `ListDepartmentsByIds` caps at 200 ids and answers
-      // INVALID_ARGUMENT rather than truncating (27-doc §1, property 5), so an
+      // INVALID_ARGUMENT rather than truncating, so an
       // uncapped 250-key batch does not return fewer departments: it errors,
       // and the whole `departments` field nulls.
       const departmentIds = Array.from({ length: 250 }, () =>
@@ -1204,7 +1204,7 @@ describe('§25 the GraphQL surface (e2e)', () => {
     });
   });
   /**
-   * The analytics reads that earned a GraphQL query — 26-doc §3.1.
+   * The analytics reads that earned a GraphQL query
    *
    * `agents` is the one that justifies the rule, and these tests pin the reason
    * rather than the wiring: in REST the agent names come from a hydration leg
@@ -1248,7 +1248,7 @@ describe('§25 the GraphQL surface (e2e)', () => {
     };
 
     it('1. **the numbers alone cost NO call to auth-service**', async () => {
-      // 26-doc §3.1 test 2. The REST endpoint hydrates names whenever the list
+      // The REST endpoint hydrates names whenever the list
       // is non-empty; a GraphQL query that asked for the same thing would be
       // parity, not composition. The `hydrateNames: false` on the resolver is
       // what this asserts, and it is invisible in the response body — the
@@ -1309,7 +1309,7 @@ describe('§25 the GraphQL surface (e2e)', () => {
     });
 
     it("3. **`KnowledgeGapFlag.document` is `ListDocumentsByIds`'s first consumer**", async () => {
-      // 27-doc §3 records the RPC as built and called by nothing. This edge is
+      // The RPC was built and called by nothing. This edge is
       // the caller, and a batch RPC with no consumer is a maintained promise
       // that drifts until the day something finally uses it.
       const documentId = faker.string.uuid();

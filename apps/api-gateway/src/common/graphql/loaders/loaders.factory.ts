@@ -16,7 +16,7 @@ import type { CacheService } from '../../cache/cache.service';
 /**
  * Every DataLoader available to a resolver, for ONE request.
  *
- * One entry per cross-service edge — 26-doc §3. A field resolver reaches for
+ * One entry per cross-service edge A field resolver reaches for
  * one of these and never for a gRPC client, which is the rule that makes the
  * whole design work and the one people break, because a direct call is easier
  * to write and passes every test with a single parent row.
@@ -26,7 +26,7 @@ export type RequestLoaders = {
   users: DataLoader<string, UserSummary | null, string>;
   /** `Ticket.department`, `Document.departments`, `User.departments`. */
   departments: DataLoader<string, DepartmentResponse | null, string>;
-  /** `DocumentUsage.document`, `KnowledgeGapFlag.document` — 26-doc §3.1. */
+  /** `DocumentUsage.document`, `KnowledgeGapFlag.document` */
   documents: DataLoader<string, DocumentResponse | null, string>;
 };
 
@@ -47,7 +47,7 @@ export type GqlContext = {
 };
 
 /**
- * Builds a fresh set of loaders for one request — 25-doc §6.
+ * Builds a fresh set of loaders for one request
  *
  * **This is a security boundary, not a performance helper.** A DataLoader is a
  * cache keyed by id, and an id carries no tenant. Three ways to construct them,
@@ -90,7 +90,7 @@ export function createLoaders(
   // with `Object.assign`, which fires a getter immediately. So it lives here,
   // in the batch function, which runs during execution.
   //
-  // Each batch RPC is tenant-scoped from this context — 27-doc §1, property 1
+  // Each batch RPC is tenant-scoped from this context, property 1
   // — which is what makes an id-keyed cache safe at all.
   //
   // A genuinely unauthenticated request still gets loaders, and now they are
@@ -107,7 +107,7 @@ export function createLoaders(
   return {
     users: createUserSummaryLoader(clients.auth, context, clients.cache),
     departments: createDepartmentLoader(clients.auth, context, clients.cache),
-    // **Deliberately NOT cached** — 30-doc §2. The entity cache is for the
+    // **Deliberately NOT cached** The entity cache is for the
     // narrow types an edge traverses constantly; a `Document` is none of the
     // three things that make one worth caching. It is large, it changes
     // asynchronously as ingestion re-indexes it, and its only consumers are the
@@ -155,7 +155,7 @@ export function callerOf(request: Request): RequestContext | undefined {
 }
 
 /**
- * The shape every batch function must have — 27-doc §2.
+ * The shape every batch function must have
  *
  * Exported here rather than in a loader file because it is the CONTRACT, and
  * the contract is what the mapping helper below enforces.
@@ -165,7 +165,7 @@ export type BatchFn<K, V> = (
 ) => Promise<(V | Error | null)[]>;
 
 /**
- * Maps a set-shaped RPC response back onto the loader's keys — 27-doc §2.
+ * Maps a set-shaped RPC response back onto the loader's keys
  *
  * **The single highest-value function in the GraphQL work**, because the bug it
  * prevents renders a completely plausible page with the wrong people on it.
@@ -208,7 +208,7 @@ export function alignToKeys<K, V>(
 }
 
 /**
- * A loader that reads Redis before the RPC — 30-doc §2.
+ * A loader that reads Redis before the RPC
  *
  * **The entity cache, and it goes INSIDE the batch function rather than around
  * the loader.** The positional contract ({@link alignToKeys}) must hold whether
@@ -223,7 +223,7 @@ export function alignToKeys<K, V>(
  *        └─ MISS → ListUsersByIds, for the misses ONLY
  * ```
  *
- * **Why this layer and not a response cache** (30-doc §1): an entity key is
+ * **Why this layer and not a response cache**: an entity key is
  * enumerable, so `user.updated` — or, here, the gateway mutation that wrote the
  * name — evicts exactly one key. A response cache key is a hash of the
  * question, and nothing in it says which entities are in the answer. This buys
@@ -297,7 +297,7 @@ export function createCachedLoader<V>(options: {
       // shifts the array: concatenating hits and fetches gives an array whose
       // length is right and whose ORDER is the cache's, not the caller's —
       // and every field resolver then renders the wrong row against the wrong
-      // parent, with nothing failing. 27-doc §2 is why this line does not move.
+      // parent, with nothing failing. Batch alignment is why this line does not move.
       const found = [
         ...cached.filter((item): item is Awaited<V> => item !== null),
         ...fetched,
@@ -314,7 +314,7 @@ export function createCachedLoader<V>(options: {
  *
  * DataLoader does not call the batch function with no keys, so this is belt and
  * braces for a caller that invokes the batch function directly — and it is
- * 27-doc §2 test 4, which exists because "an empty page still costs an RPC" is
+ * Covered by a test that exists because "an empty page still costs an RPC" is
  * the kind of waste that never shows up in a functional test.
  */
 export function createLoader<K, V>(
@@ -326,7 +326,7 @@ export function createLoader<K, V>(
     {
       // **The cache key is always a string.** DataLoader's default identity
       // function compares object keys by REFERENCE, so a composite key built
-      // fresh per call — `{ tenantId, id }`, which 27-doc contemplates — would
+      // fresh per call — `{ tenantId, id }` — would
       // miss the cache every single time and turn the batch into an N+1 that
       // still passes every test.
       cacheKeyFn: (key) =>

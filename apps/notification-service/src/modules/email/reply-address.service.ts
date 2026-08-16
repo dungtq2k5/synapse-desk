@@ -14,7 +14,7 @@ import {
 } from '@synapsedesk/common';
 
 /**
- * The `Reply-To` that makes an email notification answerable — 31-doc §4.
+ * The `Reply-To` that makes an email notification answerable
  *
  * **This is the half that was missing.** The reply token, the address format
  * and the gateway that verifies them were all built before anything offered a

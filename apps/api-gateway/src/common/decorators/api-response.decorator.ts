@@ -11,7 +11,7 @@ import type {
 } from '@nestjs/swagger/dist/interfaces/open-api-spec.interface';
 
 /**
- * The success envelope's own fields, declared ONCE — 24-doc §2, fix 3.
+ * The success envelope's own fields, declared ONCE, fix 3.
  *
  * Both decorators below reference this rather than inlining the property list.
  * Two copies of an envelope shape drift the first time a field is added, and
@@ -105,7 +105,7 @@ const PAGINATION_META: SchemaObject = {
 };
 
 /**
- * Documents the SUCCESS response, envelope included — 24-doc §2.
+ * Documents the SUCCESS response, envelope included
  *
  * **Without this, every documented response in the API is wrong.** A handler
  * returns `TicketResponseDto`; `TransformInterceptor` wraps it, so the wire
@@ -121,7 +121,7 @@ const PAGINATION_META: SchemaObject = {
  * ＠ApiWrappedResponse(TicketResponseDto, { isArray: true })
  * ```
  *
- * **The status is derived, not hardcoded** — 24-doc §2, fix 2. The obvious
+ * **The status is derived, not hardcoded**, fix 2. The obvious
  * implementation reaches for `ApiOkResponse`, which means every `@Post`
  * documents a 200 while returning 201. A silently-wrong status is worse than an
  * absent one, because a client generator emits it and the resulting client
@@ -195,7 +195,7 @@ export function ApiWrappedResponse(
 }
 
 /**
- * Documents the ERROR responses a route can produce — 24-doc §2, fix 1.
+ * Documents the ERROR responses a route can produce, fix 1.
  *
  * **`500` is added unconditionally and `429` is added by default**, because the
  * global exception filter and the global throttler apply to every route in the

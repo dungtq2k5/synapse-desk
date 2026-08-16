@@ -45,7 +45,7 @@ export type QueryPermissionRule = {
  *
  * The 403 never ran. Guards execute before interceptors, so authorization
  * expressed here cannot be skipped by a cache hit — which is the general rule a
- * response cache imposes on everything behind it, and the reason 30-doc §1
+ * response cache imposes on everything behind it, and the reason
  * refuses response caching on the GraphQL surface for exactly this hazard.
  */
 export const RequirePermissionForQuery = (...rules: QueryPermissionRule[]) =>

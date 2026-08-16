@@ -23,7 +23,7 @@ export type ExportJobData = {
 };
 
 /**
- * `GET /analytics/export` — 19-doc §5.
+ * `GET /analytics/export`
  *
  * **Not a read.** It creates a job, produces a file and returns a download URL,
  * which is why it needs an owner at all: ticket-service owns most of the source
@@ -88,7 +88,7 @@ export class AnalyticsExportService {
         {
           // The row id, so a duplicated enqueue is a no-op rather than two
           // files. No colons: BullMQ uses them as its own Redis key delimiter
-          // and rejects a custom id containing one — the mistake 12-doc found
+          // and rejects a custom id containing one — the mistake found
           // the hard way, where every enqueue failed into a deliberate swallow.
           jobId: `export-${row.id}`,
           attempts: 3,

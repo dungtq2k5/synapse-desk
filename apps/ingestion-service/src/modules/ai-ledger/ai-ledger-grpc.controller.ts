@@ -89,7 +89,7 @@ export class AiLedgerGrpcController implements AiLedgerServiceController {
    * Awaited rather than fire-and-forget, unlike `recordGeneration`: this is an
    * UPDATE to an existing row and the caller needs the classification in its
    * own response. That is precisely why it is a gRPC call rather than an event
-   * (12-doc §1.2).
+   *.
    */
   async recordGenerationOutcome(
     request: RecordGenerationOutcomeRequest,
@@ -109,7 +109,7 @@ export class AiLedgerGrpcController implements AiLedgerServiceController {
 
     return { outcome: toProtoAiGenerationOutcome(outcome) };
   }
-  // ------------------------------------------------- 19-doc §3.2, the reads
+  // ------------------------------------------------- the reads
 
   /**
    * Spend and quality, from the DAILY ROLLUP.
@@ -150,7 +150,7 @@ export class AiLedgerGrpcController implements AiLedgerServiceController {
    * Platform-operated, and the ordering constraint is the whole risk here.
    *
    * This rollup reads rows retention deletes, so it must run BEFORE retention
-   * over the same window (19-doc §2.2). Exposed so the recovery path is
+   * over the same window. Exposed so the recovery path is
    * reachable at all: once retention has eaten the raw rows, a backfill is the
    * only way a mistake in this job can ever be corrected.
    */
@@ -167,7 +167,7 @@ export class AiLedgerGrpcController implements AiLedgerServiceController {
   }
 
   /**
-   * The heartbeat — 20-doc §4.4.
+   * The heartbeat
    *
    * Every row, unjudged. The staleness decision needs the list of jobs this
    * build EXPECTS, because a job that never ran has no row to return — which is

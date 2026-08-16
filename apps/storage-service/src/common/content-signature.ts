@@ -41,7 +41,7 @@ export const VALIDATED_MIME_TYPES = [
   'application/pdf',
   'text/plain',
   'text/markdown',
-  // Analytics exports (19-doc §5). Text with no signature of their own, so
+  // Analytics exports. Text with no signature of their own, so
   // both fall to `looksLikeText` below — which is the honest check: neither
   // format has a magic number, and inventing one ("starts with a comma"?)
   // would reject legitimate files while catching nothing.

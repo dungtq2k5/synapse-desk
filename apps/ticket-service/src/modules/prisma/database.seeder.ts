@@ -119,7 +119,7 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
         WHERE "client_message_id" IS NOT NULL;
     `);
 
-    // The analytics rollup's uniqueness guard — 19-doc §2.2.
+    // The analytics rollup's uniqueness guard
     //
     // A PAIR, because `department_id` is NULLable and Postgres treats NULLs as
     // DISTINCT in a unique index: a plain `@@unique([organizationId, day,

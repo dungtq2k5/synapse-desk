@@ -17,14 +17,14 @@ import {
 } from '../decorators/invalidate-cache.decorator';
 
 /**
- * Runs `@InvalidateCache` — 29-doc §4.1, the FAST path.
+ * Runs `@InvalidateCache`, the FAST path.
  *
  * **The fast path, not the mechanism.** It sees writes that went through this
  * gateway and nothing else: a ticket also changes over the WebSocket, inside
  * `ticket-service`'s escalation side effects, and from a scheduled job. Those
  * are `CacheInvalidationConsumer`'s, and shipping this half alone would teach
  * everyone that invalidation is handled while covering one origin out of four
- * (28-doc §3).
+ *.
  *
  * Where it IS the whole story is a scope whose only writer is a gateway
  * mutation — `departments`, and the four handlers that write a user's name or
@@ -68,7 +68,7 @@ export class CacheInvalidationInterceptor implements NestInterceptor {
     context: ExecutionContext,
     targets: CacheInvalidationTarget[],
   ): Promise<void> {
-    // **The tenant, from the request context and nowhere else** — 29-doc §4.1.
+    // **The tenant, from the request context and nowhere else**
     const request = context.switchToHttp().getRequest<Request>();
     const caller = RequestContextService.fromRequest(request);
 

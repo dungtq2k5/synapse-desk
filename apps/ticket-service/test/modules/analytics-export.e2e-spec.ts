@@ -18,7 +18,7 @@ import { AuthReferenceService } from '../../src/modules/auth-client/auth-referen
 import { StorageReferenceService } from '../../src/modules/storage-client/storage-reference.service';
 
 /**
- * 19-doc §5 — the async export.
+ * The async export.
  *
  * Two properties carry the section, and neither is about CSV:
  *
@@ -259,7 +259,7 @@ describe('§5 The analytics export (e2e)', () => {
 
     it('7. Exports SUMS AND COUNTS, never a computed rate', async () => {
       // A spreadsheet that recomputed a rate differently from the dashboard is
-      // exactly the disagreement 19-doc §3.1 exists to prevent. Shipping the
+      // exactly the disagreement this exists to prevent. Shipping the
       // inputs lets a reader derive whichever they want from the same numbers.
       await seedRollup();
       const created = await request();

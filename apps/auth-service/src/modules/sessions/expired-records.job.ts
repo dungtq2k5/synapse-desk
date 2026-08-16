@@ -25,9 +25,9 @@ export class ExpiredRecordsPruner {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * **A plain method, with no `@Cron`** — 20-doc §1, §3.2.
+   * **A plain method, with no `@Cron`**
    *
-   * It carried `@Cron(EVERY_DAY_AT_3AM)` until doc 20. `@nestjs/schedule` runs
+   * It carried `@Cron(EVERY_DAY_AT_3AM)` once. `@nestjs/schedule` runs
    * in-process, so three pods pruned three times, and under a rolling deploy
    * zero or four. Every statement is idempotent (`expiresAt < now`) so the cost
    * was duplicated write load rather than wrong data — genuinely low severity,

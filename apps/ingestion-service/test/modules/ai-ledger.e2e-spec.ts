@@ -37,7 +37,7 @@ import { faultInjector } from '@synapsedesk/common/testing/fault';
 
 describe('§1.3 The AI ledger and quota gate (e2e)', () => {
   // Every injected fault in this file is registered here and restored in an
-  // `afterEach` that runs whether the test passed, failed or threw — 16-doc §9.
+  // `afterEach` that runs whether the test passed, failed or threw
   const faults = faultInjector();
 
   let fx: E2eFixture;
@@ -289,7 +289,7 @@ describe('§1.3 The AI ledger and quota gate (e2e)', () => {
     });
 
     it('8b. FAILS CLOSED when AUTH-SERVICE is unreachable — 16-doc §4', async () => {
-      // The row 16-doc §4 says to check first, and the one that goes the
+      // The row to check first, and the one that goes the
       // OPPOSITE way from `listDepartments`.
       //
       // `listDepartments` returning empty on an unreachable auth-service is a
@@ -662,7 +662,7 @@ describe('§1.3 The AI ledger and quota gate (e2e)', () => {
       await ledger.charge(tenant.organizationId, 20_000n, context());
       await new Promise((resolve) => setTimeout(resolve, 100));
 
-      // The AUDIENCE UNION (18-doc §1.3), not the old `audiencePermission`
+      // The AUDIENCE UNION, not the old `audiencePermission`
       // field. This producer is the reason the `permission` kind exists: it
       // genuinely does not know who holds `organization.update` in a tenant, so
       // it names the permission and auth-service resolves it. A ticket event

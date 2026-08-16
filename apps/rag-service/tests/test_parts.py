@@ -1,4 +1,4 @@
-"""The widened prompt type — 36-doc §5.1.
+"""The widened prompt type
 
 **One type at the bottom rather than a second method alongside the first.** A
 parallel `generate_multimodal()` would double the surface the ledger and the

@@ -28,7 +28,7 @@ import { OpsModule } from './modules/ops/ops.module';
     AuthClientModule,
     AuditModule,
     TicketsModule,
-    // The read projection over Domain B — 19-doc. No `analytics-service`
+    // The read projection over Domain B. No `analytics-service`
     // exists; analytics lives beside the data it reads and the gateway
     // composes across services.
     AnalyticsModule,

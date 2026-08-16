@@ -19,7 +19,7 @@ describe('§3b AiSettingsService (unit)', () => {
   const ORG_B = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 
   beforeEach(async () => {
-    // The tier now comes from auth-service over gRPC (doc 14 step 6), so the
+    // The tier now comes from auth-service over gRPC, so the
     // collaborator is substituted rather than the whole tier being a constant.
     // Its RETURN VALUE is what these tests vary — which is the point of the
     // indirection: shipping the tier changed one method body and nothing else.
@@ -53,7 +53,7 @@ describe('§3b AiSettingsService (unit)', () => {
     it('2. Resolves a PRICED model on every field that names one', async () => {
       // The boot check restated per-field, because it is the property that
       // actually matters at a call site: a model the resolver can return but
-      // the pricing table does not know meters as free (12-doc §1.3).
+      // the pricing table does not know meters as free.
       const settings = await service.settingsFor(ORG_A);
 
       for (const model of [
@@ -117,7 +117,7 @@ describe('§3b AiSettingsService (unit)', () => {
     });
 
     it('13. Changes the generation model and NOTHING else', async () => {
-      // Doc 15 §2.2. Scaling the embedding model with the tier is a full
+      // Scaling the embedding model with the tier is a full
       // re-embed migration of every tenant; scaling the cheap model multiplies
       // a premium tenant's bill on volume calls nobody can tell apart.
       authReference.getAiModelTier.mockResolvedValue('QUALITY');
@@ -158,7 +158,7 @@ describe('§3b AiSettingsService (unit)', () => {
     });
 
     it('7. Leaves the NEIGHBOURING tenant cached', async () => {
-      // Doc 15 §1.4 test 4. A global flush on every webhook is a thundering
+      // A global flush on every webhook is a thundering
       // herd, and webhooks arrive in bursts — a plan change, an invoice and a
       // subscription update within seconds of each other.
       const resolveTier = authReference.getAiModelTier;

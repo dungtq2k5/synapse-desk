@@ -27,7 +27,7 @@ import { faultInjector } from '@synapsedesk/common/testing/fault';
 
 describe('§3 The ingestion pipeline (e2e)', () => {
   // Every injected fault in this file is registered here and restored in an
-  // `afterEach` that runs whether the test passed, failed or threw — 16-doc §9.
+  // `afterEach` that runs whether the test passed, failed or threw
   const faults = faultInjector();
 
   let fx: E2eFixture;
@@ -205,7 +205,7 @@ describe('§3 The ingestion pipeline (e2e)', () => {
     });
 
     it('4. Gives every Qdrant point the SAME four payload fields', async () => {
-      // 12-doc §3 test 3. The filter is worthless if the payload is missing:
+      // The filter is worthless if the payload is missing:
       // a filter excludes nothing by a field it cannot see, so an omission
       // here is a cross-tenant disclosure with no failing query anywhere.
       const data = await queueDocument({
@@ -239,7 +239,7 @@ describe('§3 The ingestion pipeline (e2e)', () => {
     });
 
     it('5. Embeds through the model the SETTINGS LAYER resolved', async () => {
-      // Not a literal typed at the call site — doc 15 §1.2, asserted rather
+      // Not a literal typed at the call site, asserted rather
       // than assumed, because the whole layer is worthless if one caller
       // bypasses it.
       const data = await queueDocument();
@@ -253,7 +253,7 @@ describe('§3 The ingestion pipeline (e2e)', () => {
     });
 
     it('6. **A document with NO extractable text FAILS, with a reason** — §3.5 F4', async () => {
-      // This asserted the opposite until 21-doc §3.5: zero chunks reported
+      // This asserted the opposite once: zero chunks reported
       // INDEXED, on the reasoning that FAILED "would send someone hunting for
       // a bug". That holds for a generic failure and not for a NAMED one.
       //
@@ -285,7 +285,7 @@ describe('§3 The ingestion pipeline (e2e)', () => {
     });
 
     it('6a. **a PDF OCR could not read names LANGUAGE as the cause**', async () => {
-      // 34-doc §6, and the message changed because the system did. It used to
+      // And the message changed because the system did. It used to
       // end "run OCR on it first", which stops making sense once we run OCR
       // ourselves: by the time a PDF reaches this error every image page has
       // been rasterized and read and still produced nothing.
@@ -308,7 +308,7 @@ describe('§3 The ingestion pipeline (e2e)', () => {
 
     it('and the error log never contains document TEXT', async () => {
       // §6 test 4. `error_log` is operator-facing and the document is tenant
-      // content — the same rule 33-doc §6 applies to detection logs.
+      // content — the same rule that applies to detection logs.
       const secret = 'CONFIDENTIAL-ACQUISITION-PROJECT-CODENAME';
       downloadObject.mockResolvedValue(
         await buildPdf([`  ${secret}  `], { repeat: 1 }),
@@ -325,7 +325,7 @@ describe('§3 The ingestion pipeline (e2e)', () => {
   });
 
   /**
-   * **Every page is either in the corpus or recorded as missing** — 34-doc §6.
+   * **Every page is either in the corpus or recorded as missing**
    *
    * The invariant that closes BOTH silent drops. They fail identically from
    * outside — the document reports INDEXED and part of it is simply not
@@ -336,7 +336,7 @@ describe('§3 The ingestion pipeline (e2e)', () => {
     const flagsFor = (documentId: string) =>
       fx.prisma.documentFlag.findMany({ where: { documentId } });
 
-    //: A page that lands in the GAP between the two thresholds — 34-doc §1.1.
+    //: A page that lands in the GAP between the two thresholds
     //:
     //: 61 characters, so it clears the parser's `MIN_PAGE_CHARACTERS` of 32 and
     //: is never sent to OCR; 13 tokens, so it falls under the chunker's

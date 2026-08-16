@@ -5,7 +5,7 @@ import { AgentStatResolver } from './analytics.resolver';
 import type { AgentStatGqlDto } from './dto/graphql/analytics-response.gql-dto';
 
 /**
- * 26-doc §3.1 test 1 — `AgentStat.agent` resolves through the USERS loader.
+ * `AgentStat.agent` resolves through the USERS loader.
  *
  * **The test is about which machinery the edge uses, not about the answer.** A
  * resolver that called `UserServiceGrpcClient` directly would return the same

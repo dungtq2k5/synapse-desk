@@ -49,7 +49,7 @@ export class OrganizationStatusInterceptor implements NestInterceptor {
     context: ExecutionContext,
     next: CallHandler,
   ): Promise<Observable<unknown>> {
-    // `requestOf`, not `switchToHttp()` — 25-doc. This is a GLOBAL interceptor,
+    // `requestOf`, not `switchToHttp()`. This is a GLOBAL interceptor,
     // so it runs on GraphQL operations too, where `switchToHttp()` returns an
     // empty object and `.user` throws. The lifecycle gate is exactly the kind of
     // thing that must not be transport-specific: a frozen tenant that can still

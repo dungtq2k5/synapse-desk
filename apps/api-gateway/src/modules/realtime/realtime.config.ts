@@ -23,30 +23,20 @@ export const ticketRoom = (ticketId: string): TicketRoom =>
   `ticket:${ticketId}`;
 
 /**
- * The AGENT-ONLY half of a ticket room — 22-doc §1.
+ * The AGENT-ONLY half of a ticket room.
  *
- * **Why a second room rather than a per-socket filter.** `message:new` used to
- * fan every message to `ticket:{id}`, and `TicketAccessService.canRead` admits
- * the ticket's AUTHOR — so the requester sat in that room and received every
- * internal note in real time. The REST read strips internal notes in its
- * `WHERE` clause, so `GET /tickets/:id/messages` was safe and the push was not:
- * a customer with the page open saw the agent-only note appear, and the same
- * customer on refresh did not. **The safe path was the one nobody tested.**
+ * Internal notes fan out here rather than to `ticket:{id}`, whose members
+ * include the ticket's author. Joined only by sockets holding `ticket.read.all`
+ * at join time — so a revoked permission lands on the next join, not
+ * immediately. That is the boundary, stated rather than implied.
  *
- * Filtering per socket at emit time would work and would need a permission read
- * per socket per message. This puts the authorization decision where it already
- * happens — once, at join — and keeps the fan-out a single room emit with no
- * per-message logic.
- *
- * Joined only by sockets holding `ticket.read.all` at join time. That makes
- * revocation land on the next join rather than immediately, which §6.3 states
- * as the boundary rather than leaving it implied.
+ * See `docs/decisions/0023-internal-notes-are-stripped-before-serialization.md`.
  */
 export const ticketInternalRoom = (ticketId: string): TicketInternalRoom =>
   `ticket:${ticketId}:internal`;
 
 /**
- * A department's room — 22-doc §6.2.
+ * A department's room.
  *
  * Exists for `document:indexed`. A department-scoped document is invisible to
  * users outside its departments, so announcing it on `org:{id}` would disclose
@@ -84,10 +74,10 @@ export const REALTIME_EVENTS = {
   /** Emitted to the joining socket alone, confirming a `ticket:join`. */
   ticketJoined: 'ticket:joined',
 
-  /** An edit. Room: `ticket:{id}` or its `:internal` half — 22-doc §6.1. */
+  /** An edit. Room: `ticket:{id}` or its `:internal` half. */
   messageUpdated: 'message:updated',
   /**
-   * A REDACTION, carrying no content — 22-doc §6.1.
+   * A REDACTION, carrying no content.
    *
    * The row survives with `content` replaced; this announces *that* it happened
    * plus the message id. Sending the old content in a "deleted" event is the
@@ -101,11 +91,11 @@ export const REALTIME_EVENTS = {
    * Carries a TTL and the CLIENT expires it — `typing:stop` is a hint that a
    * closed tab, a dead battery or a lost network all skip, and server-side
    * timers per socket per ticket are state a stateless gateway does not want
-   * and would multiply by instance count (22-doc §3).
+   * and would multiply by instance count.
    */
   typing: 'typing',
 
-  /** A user's availability changed. Room: `org:{id}` — 22-doc §4. */
+  /** A user's availability changed. Room: `org:{id}`. */
   presence: 'presence',
 
   /** One token of a streaming AI answer. Emitted to the REQUESTING SOCKET. */
@@ -116,13 +106,13 @@ export const REALTIME_EVENTS = {
    * Emitted alongside `message:new`, and that is not duplication — they answer
    * different questions. "Your stream finished, here is the message id" versus
    * "a message appeared in this thread". A client receiving both reconciles on
-   * the id, which is why this carries it (22-doc §5.1).
+   * the id, which is why this carries it.
    */
   aiStreamDone: 'ai:stream:done',
-  /** The stream failed. Never used for the budget cap — see 22-doc §5.2. */
+  /** The stream failed. Never used for the budget cap. */
   aiStreamError: 'ai:stream:error',
   /**
-   * Files that were NOT sent to the model — 36-doc §2.2.
+   * Files that were NOT sent to the model.
    *
    * Its own event rather than a field on `aiStreamDone`, because it fires
    * BEFORE the answer: a user watching an answer stream in about a screenshot
@@ -211,11 +201,11 @@ export const CLIENT_EVENTS = {
 export type ClientEvent = (typeof CLIENT_EVENTS)[keyof typeof CLIENT_EVENTS];
 
 /**
- * What a user's presence can be — 22-doc §4.
+ * What a user's presence can be.
  *
  * Deliberately small: every state here must mean something a colleague would
  * act on differently. Custom statuses are a product decision with no backend
- * cost and no demand yet (22-doc §8).
+ * cost and no demand yet.
  *
  * **Here rather than in `presence.service.ts`, and not in `dto.config.ts`.**
  * `PresenceUpdateDto` validates against this list, and importing it from the
@@ -230,7 +220,7 @@ export const PRESENCE_STATES = ['online', 'away', 'busy', 'offline'] as const;
 export type PresenceState = (typeof PRESENCE_STATES)[number];
 
 /**
- * How long a `typing` frame is valid for, in ms — 22-doc §3.
+ * How long a `typing` frame is valid for, in ms.
  *
  * **The CLIENT expires it.** `typing:stop` is a hint that a closed tab, a dead
  * battery and a lost network all skip, so a server that waited for one would
@@ -250,7 +240,7 @@ export const TYPING_TTL_MS = 5_000;
 export const TYPING_RELAY_INTERVAL_MS = 2_000;
 
 /**
- * Per-event rate limits — 22-doc §6.3.
+ * Per-event rate limits.
  *
  * **Every C→S handler goes through one of these.** `WsThrottlerService` guarded
  * only the handshake, which left each handler unmetered — and `message:send`
@@ -263,8 +253,8 @@ export const TYPING_RELAY_INTERVAL_MS = 2_000;
  *     never swallowed, or the user's text vanishes.
  *   - `typing` is generous and dropped SILENTLY. A client emitting per keystroke
  *     is normal behaviour; relaying per keystroke is a broadcast storm. The
- *     separate ~1-per-2s relay throttle in §3 is a different limit with a
- *     different job — this one only stops abuse.
+ *     separate {@link TYPING_RELAY_INTERVAL_MS} throttle is a different limit
+ *     with a different job — this one only stops abuse.
  *   - `ticketJoin` costs a gRPC round trip to ticket-service, so it is metered
  *     even though it is not a write.
  */

@@ -17,7 +17,7 @@ import { DepartmentsResolver } from './departments.resolver';
   imports: [AuthModule],
   controllers: [DepartmentsController],
   providers: [DepartmentsGrpcClient, DepartmentsResolver],
-  // Exported for the GraphQL resolver — 26-doc §4. The resolver calls the SAME
+  // Exported for the GraphQL resolver The resolver calls the SAME
   // client the controller calls; a second one would be a second path to the
   // same read, which is the thing a "transport, not an implementation"
   // resolver must not become.

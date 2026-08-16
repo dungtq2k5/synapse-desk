@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 /**
- * Who is allowed to construct a Redis connection — 29-doc §2.
+ * Who is allowed to construct a Redis connection
  *
  * The doc's premise was *"seven `new Redis(...)` sites, replace them with one"*.
  * Read as written that is wrong in three places, and each is wrong for a reason

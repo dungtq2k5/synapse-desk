@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-# The image for EVERY Node service in this monorepo — 23-doc §3.
+# The image for EVERY Node service in this monorepo
 #
 # **One parameterized file rather than six near-identical ones.** The six differ
 # only in which workspace they build, and six copies of the same five-stage
@@ -29,7 +29,7 @@ ARG NODE_VERSION=24-alpine
 # minutes into a build is a guard people learn to work around by passing
 # `GIT_SHA=x`; one that fails immediately is just part of the command.
 #
-# **The build FAILS without GIT_SHA**, deliberately (23-doc §3 test 2). The
+# **The build FAILS without GIT_SHA**, deliberately. The
 # tempting alternative is a default of `"unknown"`, which produces an image that
 # starts happily and cannot say what it is — at exactly the moment, mid
 # incident, when "did the fix actually roll out?" is the only question anyone is
@@ -198,7 +198,7 @@ CMD ["sh", "-c", "exec node \"$ENTRY\""]
 
 # ============================================================== runtime-ocr
 #
-# ingestion-service only — 34-doc §7.
+# ingestion-service only
 #
 #     docker build -f docker/node-service.Dockerfile \
 #       --target runtime-ocr \

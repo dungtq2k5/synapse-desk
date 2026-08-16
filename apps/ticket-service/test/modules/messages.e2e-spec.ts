@@ -299,7 +299,7 @@ describe('§2.5 Ticket messages & attachments (e2e)', () => {
   // ---------------------------------------------------------------- invokeAi
 
   /**
-   * 22-doc §2.3 — idempotency for the WebSocket transport.
+   * Idempotency for the WebSocket transport.
    *
    * **The shape of the transport creates the requirement.** A user clicks Send
    * once; a socket reconnects, and a client holding an unacked message re-emits
@@ -789,7 +789,7 @@ describe('§2.5 Ticket messages & attachments (e2e)', () => {
         .spyOn(storage, 'presignAttachment')
         .mockResolvedValue({
           uploadUrl: 'https://storage.example/put',
-          // Presign hands back a `pending/` path — 36-doc §1.3.2.
+          // Presign hands back a `pending/` path
           objectPath: 'organizations/o/tickets/t/attachments/pending/m/abc.png',
           expiresAt: new Date(Date.now() + 600_000),
         });
@@ -902,7 +902,7 @@ describe('§2.5 Ticket messages & attachments (e2e)', () => {
       const ticket = await createTicket(fx.prisma, tenant);
       const message = await createMessage(fx.prisma, ticket.id);
       confirmUpload.mockResolvedValue({
-        // The committed path, which is what the row records — 36-doc §1.3.2.
+        // The committed path, which is what the row records
         objectPath: 'organizations/o/t/a/real.pdf',
         sizeBytes: 9999,
         contentType: 'application/pdf',

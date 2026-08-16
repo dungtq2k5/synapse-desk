@@ -11,7 +11,7 @@ import {
 } from '@synapsedesk/common';
 
 /**
- * Registers this service's repeat entry on boot — 20-doc §1.
+ * Registers this service's repeat entry on boot
  *
  * **`onApplicationBootstrap`, not `onModuleInit`.** The first scheduled tick
  * can arrive as soon as the entry exists, and it calls into jobs across several

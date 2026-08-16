@@ -35,7 +35,7 @@ import {
   LoginOutcomeDto,
   LoginResponseDto,
   LoginWithTenantDto,
-  // The three members of `LoginOutcomeDto` — 24-doc §2. The union itself is a
+  // The three members of `LoginOutcomeDto` The union itself is a
   // type alias with no runtime identity, so `oneOf` over its members is the only
   // way to describe it; documenting only the happy one would tell a client that
   // the 2FA challenge is a malformed response.

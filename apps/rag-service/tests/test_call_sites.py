@@ -190,7 +190,7 @@ class TestNoCallSiteResolvesItsOwnModel:
     #: Every one is a field of `AiSettings`. A call passing anything else is
     #: either resolving its own model or forwarding one from a request — and the
     #: second is worse, because it lets a caller choose the premium tier for
-    #: free (11-doc §1.7).
+    #: free.
     #: `ClassVar`, because this is shared constant data rather than per-instance
     #: state — the annotation is what stops one test mutating the set every
     #: later test then scans against.
@@ -270,7 +270,7 @@ class TestNoCallSiteResolvesItsOwnModel:
         # What this forbids is resolving a MODEL NAME — which tenant is on
         # which tier — outside `settings_for()`. A path to a local ONNX file on
         # disk is not that: it names no tier, varies per deployment rather than
-        # per tenant, and 33-doc §7 puts it in `Config` deliberately, because a
+        # per tenant, and it sits in `Config` deliberately, because a
         # tenant-resolved kill switch is one a tenant can switch off.
         pattern = re.compile(
             r"environ(?:\.get)?\s*[\[(]\s*['\"]([^'\"]*MODEL[^'\"]*)['\"]"

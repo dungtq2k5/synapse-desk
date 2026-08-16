@@ -31,10 +31,10 @@ import { toUserSummaryGqlDto } from '../users/user.mapper';
 import { toDepartmentResponseGqlDto } from '../departments/department.mapper';
 
 /**
- * `Query.ticket` and `Query.tickets` — 26-doc §4.
+ * `Query.ticket` and `Query.tickets`
  *
  * **A resolver is a transport, not an implementation.** The same rule as
- * `message:send` (22-doc §2.1): it calls the same gRPC client the controller
+ * `message:send`: it calls the same gRPC client the controller
  * calls, with a context built from the request, and does nothing else. A
  * GraphQL-only copy of a rule is a rule with two implementations, and the second
  * one is the one nobody updates.
@@ -65,7 +65,7 @@ export class TicketsResolver {
   /**
    * One ticket, or `null`.
    *
-   * **`nullable: true` is deliberate** — 26-doc §4. REST returns 404; GraphQL's
+   * **`nullable: true` is deliberate** REST returns 404; GraphQL's
    * idiom is `null` plus an error entry where it matters. A non-null field that
    * throws takes its parent's whole `data` with it, so one missing ticket would
    * null an entire dashboard rather than one card on it.
@@ -114,7 +114,7 @@ export class TicketsResolver {
     const page = await this.client.list(
       {
         page: args.page,
-        // **Clamped, not rejected** — 25-doc §5. An unbounded list multiplies
+        // **Clamped, not rejected** An unbounded list multiplies
         // every nested field beneath it; refusing the request instead would
         // make the cap a breaking change for a client that worked yesterday.
         limit: Math.min(args.first, MAX_PAGE_SIZE),
@@ -144,7 +144,7 @@ export class TicketsResolver {
    *   1. **Never a gRPC client, only a loader.** A direct call here is an N+1
    *      that works perfectly in every test with one parent row and becomes 50
    *      concurrent calls into auth-service on a real page.
-   *   2. **The loader comes from the CONTEXT**, never injected — 25-doc §6.
+   * 2. **The loader comes from the CONTEXT**, never injected
    *      Injection means either a cache shared across tenants or request scope
    *      bubbling through the module graph.
    *   3. **Return `null` for an absent edge; do not load `undefined`.**
@@ -166,7 +166,7 @@ export class TicketsResolver {
     @Parent() ticket: TicketResponseGqlDto,
     @Context() { loaders }: GqlContext,
   ): Promise<UserSummaryGqlDto | null> {
-    // Rule 3, and rule 1 of 26-doc §3's flat-field decision: a client asking
+    // Rule 3, and rule 1 of the flat-field decision: a client asking
     // for `assignee { id }` is asking for something already on the parent, but
     // it asked through the edge — so this still loads. `currentAssigneeId` is
     // the field that costs nothing, and it is exposed for exactly that reason.
@@ -212,7 +212,7 @@ export class TicketsResolver {
   /**
    * `Ticket.messages` — the thread.
    *
-   * **No loader, deliberately** — 26-doc §3. The messages live in the SAME
+   * **No loader, deliberately** The messages live in the SAME
    * service as the ticket and are fetched by ticket id, so this is one call per
    * ticket rather than a batch across tickets: there is no `ListMessagesByIds`
    * to batch into, and inventing one would batch a query nobody makes.
@@ -222,7 +222,7 @@ export class TicketsResolver {
    * why `first` is clamped above it.
    *
    * **`isInternalNote` is filtered by ticket-service**, not here. Third
-   * transport, one rule (22-doc §1).
+   * transport, one rule.
    */
   @ResolveField(() => [TicketMessageResponseGqlDto], {
     description:
@@ -252,7 +252,7 @@ export class TicketsResolver {
   // ---------------------------------------------------------- mutations
 
   /**
-   * **Four mutations, chosen rather than transcribed** — 25-doc §7.
+   * **Four mutations, chosen rather than transcribed**
    *
    * A mutation gains nothing from GraphQL except sharing a request with a
    * query, so the rule is: add one when a SCREEN wants it beside its reads.
@@ -261,7 +261,7 @@ export class TicketsResolver {
    * the response rather than re-querying.
    *
    * Everything else stays REST. Auth, uploads and AI streaming are explicitly
-   * out (25-doc §7), and "REST and GraphQL both exist" is a permanent state
+   * out, and "REST and GraphQL both exist" is a permanent state
    * rather than a migration.
    */
   @Mutation(() => TicketMutationPayloadGqlDto, {

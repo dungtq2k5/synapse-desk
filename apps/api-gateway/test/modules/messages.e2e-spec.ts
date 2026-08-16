@@ -242,7 +242,7 @@ describe('§2.5 Ticket messages at the HTTP boundary (e2e)', () => {
         .send({ content: 'Please help', invokeAi: true });
 
       expect(res.status).toBe(201);
-      // **`data.message`, not `data`** — 36-doc §1.3.1 wrapped the create so it
+      // **`data.message`, not `data`** wrapped the create so it
       // can also report attachments whose confirm failed. A create is the only
       // RPC with a second outcome to report, so it is the only one wrapped.
       expect(res.body.data.message.isAiGenerated).toBe(false);

@@ -1,5 +1,5 @@
 /**
- * The metric DEFINITIONS — 19-doc §3.1, and **step 2 of its build order is not
+ * The metric DEFINITIONS, and **step 2 of its build order is not
  * documentation, it is this file.**
  *
  * Every metric below has a plausible alternative reading, and two endpoints
@@ -158,7 +158,7 @@ export type AiStatSums = {
 /**
  * **Draft acceptance** — `accepted / (accepted + edited + discarded)`.
  *
- * The denominator NEEDS `DISCARDED`, which comes from the sweep (12-doc §4.3).
+ * The denominator NEEDS `DISCARDED`, which comes from the sweep.
  * Without it the denominator only ever contains drafts that were used, and
  * acceptance reports ~100% regardless of quality — a number that cannot go
  * down, which is the clearest possible sign it is measuring nothing.
@@ -290,7 +290,7 @@ export const ANALYTICS_GRANULARITIES = Object.values(AnalyticsGranularity);
  * Not a paranoid limit: a five-year range over daily rows is 1,825 buckets per
  * department, which is a response no dashboard renders and a query that holds a
  * connection while it serialises. Multi-year ranges are the warehouse's job
- * (19-doc §7).
+ *.
  */
 export const MAX_ANALYTICS_RANGE_DAYS = 400;
 
@@ -308,7 +308,7 @@ export const ANALYTICS_TOP_N = {
 } as const;
 
 // ---------------------------------------------------------------------------
-// Export — 19-doc §5
+// Export
 // ---------------------------------------------------------------------------
 
 /**

@@ -200,7 +200,7 @@ describe('§3 DocumentChunkerService (unit)', () => {
       // under a heading that does not exist in the document.
       //
       // Easy to assume a library covers this. No library does the heading pass
-      // at all (21-doc §3.1), so it is pinned here where the tracking lives.
+      // at all, so it is pinned here where the tracking lives.
       const chunks = await chunker.chunk(
         page(
           [
@@ -230,7 +230,7 @@ describe('§3 DocumentChunkerService (unit)', () => {
     });
 
     it('14. **breadcrumbs are ordered H1 › H2 › H3, absent levels excluded**', async () => {
-      // Trap 4 of 21-doc §3.2: building these with
+      // Trap 4: building these with
       // `Object.values(metadata).join(' › ')` relies on key-insertion order to
       // happen to come out in heading order.
       const chunks = await chunker.chunk(
@@ -328,7 +328,7 @@ describe('§3 DocumentChunkerService (unit)', () => {
     });
 
     it('19. rebalanceSentenceEnds is exact on the documented example', () => {
-      // The example from 21-doc §3.5 F2, pinned directly so the helper can be
+      // The F2 example, pinned directly so the helper can be
       // reasoned about without running the whole splitter.
       expect(
         rebalanceSentenceEnds([

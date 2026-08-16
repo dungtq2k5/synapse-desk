@@ -1,5 +1,5 @@
 /**
- * Engine tuning for scanned-page OCR — 34-doc §3.
+ * Engine tuning for scanned-page OCR
  *
  * Read by the ingestion worker only; none of it reaches the API. The OCR values
  * that ARE API contract — `OCR_LANGUAGES`, `TESSERACT_CODE_BY_LANGUAGE`,
@@ -8,7 +8,7 @@
 
 /**
  * Below this many extracted characters, a PDF page is treated as an image and
- * sent to OCR — 34-doc §3.2.
+ * sent to OCR
  *
  * Deliberately biased to over-OCR: re-reading a sparse but genuine page costs
  * one page of CPU, while missing an image page loses it from the corpus.

@@ -317,7 +317,7 @@ describe('the real-time relay (e2e)', () => {
   // ------------------------------------------------------------- relaying
 
   /**
-   * 22-doc §1 — the disclosure that was live before this document.
+   * The internal-note disclosure that was live before this work.
    *
    * `message:new` fanned every message to `ticket:{id}`, and `canRead` admits
    * the ticket's AUTHOR — so the requester was in that room and received every
@@ -431,7 +431,7 @@ describe('the real-time relay (e2e)', () => {
   });
 
   /**
-   * 22-doc §2 — `message:send`.
+   * `message:send`.
    *
    * **A transport, not a second write path.** The handler calls the same gRPC
    * RPC the HTTP controller calls, so these tests are about what only the socket
@@ -609,14 +609,14 @@ describe('the real-time relay (e2e)', () => {
   });
 
   /**
-   * 22-doc §3 — typing indicators.
+   * Typing indicators.
    *
    * Ephemeral: no table, no NATS subject, no audit. These four tests are about
    * what the design deliberately does NOT spend — an echo to the sender, a
    * frame per keystroke, and a server-side timer per socket per ticket.
    */
   /**
-   * 22-doc §5 — the AI streaming relay.
+   * The AI streaming relay.
    *
    * The gap this closes: `Chat` has always been a server-stream and has always
    * been tested as one, and nothing carried it to a browser. The tests below
@@ -717,7 +717,7 @@ describe('the real-time relay (e2e)', () => {
       );
       // The transcript read the relay performs before opening the stream.
       fx.stubs.message.listMessages.mockReturnValue(of(wirePage([])));
-      // The attachment read, which ticket-service answers — 36-doc §2. Empty by
+      // The attachment read, which ticket-service answers Empty by
       // default because that is the common question.
       fx.stubs.message.getAiAttachments.mockReturnValue(
         of({ parts: [], skipped: [] }),
@@ -872,7 +872,7 @@ describe('the real-time relay (e2e)', () => {
     });
 
     it('**the screenshot reaches `chat()`** — the third call site, §2', async () => {
-      // Chat is the surface 35-doc §1 is about: a customer attaches an error
+      // Chat is the surface this is about: a customer attaches an error
       // screenshot and asks what it means. Reaching generation without the
       // bytes produces an answer about the sentence alone.
       const author = await fx.connectClient({ sub: authorId, organizationId });
@@ -907,7 +907,7 @@ describe('the real-time relay (e2e)', () => {
     });
 
     it('**a skipped file is named to the user**, and the answer still goes', async () => {
-      // Silence here is the failure 34-doc already hit once: the answer arrives,
+      // Silence here is the failure OCR already hit once: the answer arrives,
       // says nothing about the zip, and reads as though the file was read and
       // found irrelevant. Names only — never contents.
       const author = await fx.connectClient({ sub: authorId, organizationId });
@@ -1022,7 +1022,7 @@ describe('the real-time relay (e2e)', () => {
     });
 
     it('**a refused question is appended and NOT escalated**', async () => {
-      // 33-doc §5.1. A refusal takes the greeting path, not the at-cap one:
+      // A refusal takes the greeting path, not the at-cap one:
       // the user gets a visible reply, the thread keeps its record, and
       // nothing hands the ticket to a human — the question was rejected on its
       // content, and the workspace's budget is untouched.
@@ -1119,7 +1119,7 @@ describe('the real-time relay (e2e)', () => {
   });
 
   /**
-   * 22-doc §6.1–6.2 — edits, redactions, and Domain C's announcements.
+   * Edits, redactions, and Domain C's announcements.
    *
    * Two of these are disclosure tests wearing different clothes. §1 established
    * that a message-shaped frame picks its room from `isInternalNote`; §6.1's job
@@ -1372,7 +1372,7 @@ describe('the real-time relay (e2e)', () => {
   });
 
   /**
-   * 22-doc §4 — presence.
+   * Presence.
    *
    * The most machinery for the least product, and the only feature here needing
    * a second instance to test honestly. Every test below fails against an
@@ -1958,7 +1958,7 @@ describe('the real-time relay (e2e)', () => {
     });
   });
 
-  // ------------------------------------------- 18-doc §6 — Domain E's relay
+  // ------------------------------------------------------ Domain E's relay
 
   describe('6. notifications reach the right socket, and only that one', () => {
     const notificationPayload = (recipientId: string) => ({

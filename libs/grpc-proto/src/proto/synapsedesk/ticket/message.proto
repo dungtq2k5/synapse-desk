@@ -33,13 +33,13 @@ enum MessageAnswerStatus {
   // Answered from the corpus, with citations.
   MESSAGE_ANSWER_STATUS_DOC_ANSWER = 1;
   // Nothing retrieved above threshold — the escalation case, never an
-  // invitation to improvise (11-doc §1.6).
+  // invitation to improvise.
   MESSAGE_ANSWER_STATUS_DOC_MISSING = 2;
   // A greeting, answered from the canned table. No LLM call, no ledger row.
   MESSAGE_ANSWER_STATUS_GREETING = 3;
   // The tenant is at the AI cap. The caller escalates rather than erroring.
   MESSAGE_ANSWER_STATUS_AT_CAP = 4;
-  // Refused by prompt-injection detection — 33-doc §5.1. **Not GREETING**: a
+  // Refused by prompt-injection detection **Not GREETING**: a
   // refusal filed as a greeting is wrong in the thread, in the WebSocket frame
   // and in anything reading the trail afterwards.
   MESSAGE_ANSWER_STATUS_REFUSED = 5;
@@ -71,7 +71,7 @@ message MessageResponse {
   optional google.protobuf.Timestamp redacted_at = 11;
   google.protobuf.Timestamp created_at = 12;
   repeated AttachmentResponse attachments = 13;
-  // Whether this message is kept OUT of AI prompts — 36-doc §7.
+  // Whether this message is kept OUT of AI prompts
   //
   // On the read shape because the gateway's transcript builder filters AFTER
   // the fetch, and cannot filter on what it cannot see. Deliberately not a
@@ -103,7 +103,7 @@ message CreateMessageRequest {
   // Absent for an ordinary reply, and absent is not an error — most replies
   // are typed by a human from nothing.
   optional string generated_from_id = 5;
-  // The SENDER's own id, for idempotency -- 22-doc §2.3.
+  // The SENDER's own id, for idempotency.
   //
   // Absent for an HTTP call and REQUIRED for the WebSocket path, because a
   // socket that reconnects with an unacked message re-emits it. A duplicate
@@ -111,14 +111,14 @@ message CreateMessageRequest {
   // satisfied, and an error would make it retry again.
   optional string client_message_id = 6;
 
-  // The inbound email's `Message-ID`, when this write came from mail — 31-doc
+  // The inbound email's `Message-ID`, when this write came from mail
   // §6.2. Written as an `inbound_emails` row in the SAME transaction, so a
   // provider redelivery is a duplicate-key violation rather than a second
   // reply. Absent for every other transport, and absent is not an error.
   optional string inbound_message_id = 7;
 
   // Objects the client already uploaded, bound to the message as it is created
-  // — 36-doc §1.3.
+  //
   //
   // **This is what makes a first-turn attachment readable.** Presign and
   // confirm both took a `message_id`, so the row could only exist after the
@@ -144,7 +144,7 @@ message NewAttachment {
   string file_name = 2;
 }
 
-// What `CreateMessage` answers with — 36-doc §1.3.1.
+// What `CreateMessage` answers with
 //
 // A wrapper rather than a bare `MessageResponse`, because a create now has a
 // second outcome to report: an attachment whose confirm failed is SKIPPED and
@@ -159,7 +159,7 @@ message CreateMessageResponse {
   repeated string skipped_attachments = 2;
 }
 
-// Persists a STREAMED AI answer — 22-doc §5.1, write #2.
+// Persists a STREAMED AI answer, write #2.
 //
 // The gateway holds the `Chat` stream, because tokens have to reach a socket
 // and ticket-service has none. What it does NOT hold is the shape of an AI
@@ -177,7 +177,7 @@ message AppendAiMessageRequest {
   // The `ai_generations` row the answer came from, when there is one. Absent
   // for a canned greeting, which never reaches an LLM and never gets a row.
   optional string generation_id = 3;
-  // The status this answer was produced with, persisted on the row — 36-doc §7.
+  // The status this answer was produced with, persisted on the row
   //
   // UNSPECIFIED for a canned greeting. The gateway held this in the completion
   // frame and threw it away on write, so a thread could not distinguish a
@@ -185,7 +185,7 @@ message AppendAiMessageRequest {
   MessageAnswerStatus answer_status = 4;
 }
 
-// Marks a message as unusable for AI context — 36-doc §7.
+// Marks a message as unusable for AI context
 //
 // **A separate RPC rather than a flag on `UpdateMessage`**, because that route
 // edits CONTENT on behalf of a human and carries authorship rules with it. This
@@ -229,7 +229,7 @@ message RedactMessageResponse {
 // whether the upload may happen and records it once it has.
 message UploadAttachmentRequest {
   string ticket_id = 1;
-  // **Absent when the message does not exist yet** — 36-doc §1.3. Optional
+  // **Absent when the message does not exist yet** Optional
   // rather than removed, so the `:messageId`-nested routes keep serving
   // "attach to a message that already exists".
   optional string message_id = 2;
@@ -266,7 +266,7 @@ message GetAiAttachmentsRequest {
 }
 
 // Field-for-field identical to `synapsedesk.rag.AttachmentPart`, and declared
-// here rather than imported — 36-doc §2.
+// here rather than imported
 //
 // A proto import would point this package at rag's, which is backwards: rag is
 // downstream of ticket, not the other way round. Declaring it twice costs
@@ -285,7 +285,7 @@ message GetAiAttachmentsResponse {
   // Already filtered by mime type and capped by total size. Empty is the common
   // case and is not an error.
   repeated AiAttachmentPart parts = 1;
-  // File NAMES that did not qualify, so the caller can tell the user — 36-doc
+  // File NAMES that did not qualify, so the caller can tell the user
   // §2.2. Never their contents.
   repeated string skipped = 2;
 }
@@ -305,7 +305,7 @@ service MessageService {
   rpc ListMessages(ListMessagesRequest) returns (ListMessagesResponse);
   rpc UpdateMessage(UpdateMessageRequest) returns (MessageResponse);
   rpc RedactMessage(RedactMessageRequest) returns (RedactMessageResponse);
-  // The write-back on the refusal path — 36-doc §7. Called by whoever holds the
+  // The write-back on the refusal path Called by whoever holds the
   // id of the message that was just refused: the gateway for `Chat`,
   // ticket-service internally for the two `Draft` paths.
   rpc ExcludeFromAiContext(ExcludeFromAiContextRequest) returns (MessageResponse);
@@ -315,7 +315,7 @@ service MessageService {
   rpc UploadAttachment(UploadAttachmentRequest) returns (PresignAttachmentResponse);
   rpc ConfirmAttachment(ConfirmAttachmentRequest) returns (AttachmentResponse);
   rpc DownloadAttachment(DownloadAttachmentRequest) returns (DownloadAttachmentResponse);
-  // The AI-eligible attachments of one message, as bytes — 36-doc §2.
+  // The AI-eligible attachments of one message, as bytes
   //
   // **The gateway asks rather than fetching.** It has no storage client, and
   // giving it one would add a peer and a credential to the chat path for work

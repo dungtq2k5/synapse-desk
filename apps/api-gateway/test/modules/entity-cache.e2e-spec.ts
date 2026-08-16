@@ -18,7 +18,7 @@ import {
 import { createUserSummaryLoader } from '../../src/common/graphql/loaders/user-summary.loader';
 
 /**
- * The GraphQL entity cache — 30-doc §2.
+ * The GraphQL entity cache
  *
  * **The layer that pays and stays correct.** A response cache key is a hash of
  * the question and says nothing about which entities are in the answer; an

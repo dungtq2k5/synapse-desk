@@ -14,7 +14,7 @@ import { SchedulerRegistrar } from '../../src/modules/scheduler/scheduler.regist
 import { TicketRollupJob } from '../../src/modules/analytics/ticket-rollup.job';
 
 /**
- * 20-doc §1 — the clock `TicketRollupJob` never had.
+ * The clock `TicketRollupJob` never had.
  *
  * Without it, `ticket_daily_stats` and `agent_daily_stats` were never written
  * and **all six analytics endpoints returned zeros** — correctly, from empty
@@ -75,7 +75,7 @@ describe('§1 The scheduler (e2e)', () => {
   });
 
   it('3. **the tick actually calls the rollup** — the whole point', async () => {
-    // The one assertion that would have failed before 20-doc: the job existed
+    // The one assertion that would have failed before the scheduler landed: the job existed
     // and nothing invoked it.
     const run = jest
       .spyOn(fx.moduleRef.get(TicketRollupJob), 'run')
@@ -105,7 +105,7 @@ describe('§1 The scheduler (e2e)', () => {
     // Unlike ingestion-service's multi-step sequence, there is nothing after
     // this to protect — so the honest thing is to fail loudly. A swallowed
     // error here would be a job whose state says "completed" having done
-    // nothing, which is the failure mode 20-doc is about.
+    // nothing, which is the failure mode the scheduler exists to prevent.
     jest
       .spyOn(fx.moduleRef.get(TicketRollupJob), 'run')
       .mockRejectedValue(new Error('rollup exploded'));
@@ -134,7 +134,7 @@ describe('§1 The scheduler (e2e)', () => {
   });
 
   /**
-   * 20-doc §4.1 — the heartbeat.
+   * The heartbeat.
    *
    * The jobs not running was not the deepest problem. **Nothing anywhere could
    * tell you they were not running**, and a job that never runs logs nothing at
@@ -160,7 +160,7 @@ describe('§1 The scheduler (e2e)', () => {
     it('8. **a failure records the error and KEEPS the previous success**', async () => {
       // The previous success is what the staleness alert reads. Clearing it
       // here would turn "broken since Tuesday" into "never ran" and lose the
-      // one piece of information worth having — 20-doc §4 test 2.
+      // one piece of information worth having test 2.
       const rollup = jest.spyOn(fx.moduleRef.get(TicketRollupJob), 'run');
 
       rollup.mockResolvedValue({ tenants: 0, ticketRows: 0, agentRows: 0 });
@@ -230,7 +230,7 @@ describe('§1 The scheduler (e2e)', () => {
   });
 
   /**
-   * 20-doc §4.5 test 3 — the BINDING.
+   * The BINDING.
    *
    * `JobRunRecorder` now lives in `libs/common` and takes a `JobRunStore`.
    * `JobRunsModule` binds it to THIS service's `prisma.jobRun`, and three thin

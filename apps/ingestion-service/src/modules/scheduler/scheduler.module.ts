@@ -9,7 +9,7 @@ import { SchedulerProcessor } from './scheduler.processor';
 import { SchedulerRegistrar } from './scheduler.registrar';
 
 /**
- * **The layer whose absence was the whole of 20-doc.**
+ * **The layer whose absence stopped every job running.**
  *
  * Six jobs in this service existed, were exported, were imported into
  * `AppModule` — and were invoked by nothing. A plain method with no caller is

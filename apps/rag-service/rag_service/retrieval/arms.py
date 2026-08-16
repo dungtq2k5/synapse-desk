@@ -25,7 +25,7 @@ from rag_service.retrieval.tenant_scope import TenantScope
 class RetrievedChunk:
     """A candidate from either arm.
 
-    Keyed on `vector_point_id` — the COMMON FUSION KEY (11-doc §1.5). Qdrant
+    Keyed on `vector_point_id` — the COMMON FUSION KEY. Qdrant
     returns it natively as the point id; the FTS query selects it explicitly so
     dedup and fusion are a straight join rather than a second lookup.
     """

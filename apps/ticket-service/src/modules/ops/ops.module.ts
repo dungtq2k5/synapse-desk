@@ -17,7 +17,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AnalyticsModule } from '../analytics/analytics.module';
 
 /**
- * `grpc.health.v1.Health` and `synapsedesk.ops.OpsService` — 23-doc §2, §3.
+ * `grpc.health.v1.Health` and `synapsedesk.ops.OpsService`
  *
  * **ticket-service owns three things and checks exactly those three**: its
  * Postgres, NATS, and the Redis its BullMQ queues run on. It calls auth-service

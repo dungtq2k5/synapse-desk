@@ -20,13 +20,13 @@ import {
 } from '../decorators/cacheable.decorator';
 
 /**
- * Serves `@Cacheable` reads from Redis — 29-doc §3.
+ * Serves `@Cacheable` reads from Redis
  *
  * **Written rather than subclassed from `CacheInterceptor`.** `@nestjs/cache-manager`'s
  * default key is the request URL, which carries no tenant: `GET /roles` would
  * be one entry for every tenant on the platform. Overriding `trackBy` fixes
  * that and leaves `cache-manager` supplying a `get`/`set` wrapper over a Redis
- * client this gateway already has — 29-doc §1's reasoning, and the same
+ * client this gateway already has's reasoning, and the same
  * conclusion from the other direction.
  *
  * **It caches the handler's RETURN VALUE, not the HTTP response.** So the
@@ -50,7 +50,7 @@ export class CacheableInterceptor implements NestInterceptor {
 
     // GraphQL and WebSocket contexts have no `Request` — `switchToHttp()`
     // returns an EMPTY OBJECT under GraphQL rather than throwing, which is how
-    // five guards in this gateway silently stopped working (25-doc). A global
+    // five guards in this gateway silently stopped working. A global
     // interceptor must check, not assume.
     const request: Request | undefined = context.switchToHttp().getRequest();
 

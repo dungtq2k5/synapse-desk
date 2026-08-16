@@ -1,5 +1,5 @@
 /**
- * Every cache scope in the gateway, named once — 29-doc §3, §4.
+ * Every cache scope in the gateway, named once
  *
  * **A scope is written in two places by nature**: at the read that caches it
  * and at the write that evicts it. Two string literals is how a mutation ends
@@ -15,14 +15,14 @@ export const CACHE_SCOPES = {
   documents: 'documents',
   tickets: 'tickets',
   users: 'users',
-  /** The AI settings and tier — 15-doc §1.3. */
+  /** The AI settings and tier */
   settings: 'settings',
 } as const;
 
 export type CacheScope = (typeof CACHE_SCOPES)[keyof typeof CACHE_SCOPES];
 
 /**
- * The scope for ONE cached entity — 30-doc §2.
+ * The scope for ONE cached entity
  *
  * `entity:user:abc` rather than a `entity:user` scope with an `id` parameter,
  * and the difference is what makes eviction work at two granularities with one
@@ -41,7 +41,7 @@ export const entityScope = (kind: 'user' | 'department', id: string): string =>
   `entity:${kind}:${id}`;
 
 /**
- * How long a cached entity lives — 30-doc §2.
+ * How long a cached entity lives
  *
  * **The TTL is the backstop, not the mechanism.** Every writer of a
  * `UserSummary`'s fields is a gateway mutation (`updateOwnProfile`,

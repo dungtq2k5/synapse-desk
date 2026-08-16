@@ -26,7 +26,7 @@ model Organization {
   enforceTwoFactor    Boolean  @default(false) @map("enforce_two_factor")
   allowedEmailDomains String[] @map("allowed_email_domains") @db.VarChar(255)
 
-  /// The tenant's inbound-mail address token — 31-doc §2.
+  /// The tenant's inbound-mail address token
   ///
   /// The support address is `support+{inbound_token}@<domain>`, delivered by
   /// one catch-all route. NOT the slug: a slug is guessable, which makes every
@@ -39,7 +39,7 @@ model Organization {
   /// — and it makes "unroutable" a state the lookup returns rather than one it
   /// has to infer.
   ///
-  /// **32 hex characters, not `generateSecureToken()`** — 32-doc §1. That
+  /// **32 hex characters, not `generateSecureToken()`** That
   /// helper is `base64url`, which is 43 characters (too long for this column)
   /// and CASE-SENSITIVE. Mail systems normalise local-part case in practice, so
   /// one hop lowercasing the address would silently unroute the tenant, and
@@ -60,14 +60,14 @@ model Organization {
   /// `POST /platform/organizations/:id/billing-cycle/reset` is now break-glass.
   billingCycleStart DateTime @default(now()) @map("billing_cycle_start") @db.Timestamptz
 
-  /// `FAST | QUALITY` — the sellable AI entitlement (doc 15).
+  /// `FAST | QUALITY` — the sellable AI entitlement.
   ///
   /// Defaults to FAST, and the default is what makes the migration safe: every
   /// existing row gets a usable tier without a backfill, and a NULL reaching
   /// the settings layer would be an unresolvable model name at request time.
   aiModelTier String @default("FAST") @map("ai_model_tier") @db.VarChar(20)
 
-  /// The tenant's business timezone — 19-doc §2.2.
+  /// The tenant's business timezone
   ///
   /// Distinct from `users.timezone`, which is a person's quiet hours. This one
   /// answers "when does this tenant's Monday start", and every daily analytics
@@ -177,7 +177,7 @@ model User {
 
   /// **The one authoritative boolean.** Every read in the system asks this and
   /// only this — login, 2FA, forgot-password, both notification audiences, the
-  /// last-Org-Admin count, list filters and the mappers. 21-doc §2.2.
+  /// last-Org-Admin count, list filters and the mappers.
   isLocked Boolean @default(false) @map("is_locked")
 
   /// When a temporary lock lapses. NULL means the lock is INDEFINITE — the
@@ -185,7 +185,7 @@ model User {
   ///
   /// **`is_locked` remains authoritative**, which is the entire design: this
   /// column answers only "when should it stop", so adding it touched three call
-  /// sites rather than 22 (21-doc §2.1). The naive alternative —
+  /// sites rather than 22. The naive alternative —
   /// `isLocked || lockedUntil > now` at every read — is 22 chances to get a
   /// boolean wrong in code where wrong means either a locked user can log in or
   /// an unlocked user cannot.
@@ -205,7 +205,7 @@ model User {
   /// deliberately: "do not disturb me between 22:00 and 07:00" is a fact about
   /// the person, and per-type quiet hours would be a setting nobody could
   /// reason about. notification-service reads them on the same gRPC call that
-  /// already resolves recipients (18-doc §4).
+  /// already resolves recipients.
   ///
   /// Stored as "HH:mm" strings rather than as `time` columns: they are compared
   /// against a wall clock in `timezone`, never against a database timestamp,
@@ -587,7 +587,7 @@ model BillingEvent {
   @@map("billing_events")
 }
 
-/// The HEARTBEAT — 20-doc §4.1.
+/// The HEARTBEAT
 ///
 /// **One row per job name, and the deepest fix in that document.** The jobs not
 /// running was not the real problem; the real problem was that nothing anywhere
@@ -595,7 +595,7 @@ model BillingEvent {
 /// never runs logs nothing at all — which is precisely the case that occurred,
 /// and it stayed invisible for two domains.
 ///
-/// **Three copies of this table is CORRECT** (20-doc §4.5), and this note
+/// **Three copies of this table is CORRECT**, and this note
 /// exists so nobody re-opens it. Service-per-database means each service
 /// records its own jobs in its own failure domain: "did ingestion-service's
 /// rollup run?" is a question about ingestion-service's database, and a shared

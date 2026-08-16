@@ -4,7 +4,7 @@ package synapsedesk.rag;
 
 // The retrieval and generation surface — `rag-service`, in Python.
 //
-// **This contract names no model, anywhere.** Doc 15 §1.2: every model choice
+// **This contract names no model, anywhere.** Every model choice
 // is resolved inside rag-service from `settings_for(organization_id)`, so no
 // endpoint takes a model name today and none would once tiers ship. A
 // `model_name` field here would be the one place a caller could route itself to
@@ -22,7 +22,7 @@ package synapsedesk.rag;
 message SearchRequest {
   string query = 1;
   // Clamped server-side regardless of what is asked for. An unclamped limit is
-  // a direct path to enormous prompts downstream (doc 15 §1.4).
+  // a direct path to enormous prompts downstream.
   int32 limit = 2;
   // Skips the cross-encoder. The diagnostic path a Knowledge Manager uses to
   // see what the RETRIEVER found before the reranker had an opinion.
@@ -67,7 +67,7 @@ message ConversationTurn {
   string content = 2;
 }
 
-// One attachment, already filtered and capped by the CALLER — 35-doc §7, §8.
+// One attachment, already filtered and capped by the CALLER
 //
 // The bytes arrive inline rather than as an object path because rag-service
 // has no storage client, and giving it one would add a peer, a credential and
@@ -88,7 +88,7 @@ message ChatRequest {
   // Present for a ticket conversation, absent for `/knowledge/ask`. It decides
   // `ai_generations.ticket_id`, which is how spend is attributed to a ticket.
   optional string ticket_id = 3;
-  // The CURRENT message's attachments only — 35-doc §3.1.
+  // The CURRENT message's attachments only
   //
   // History turns contribute TEXT. Re-sending their images would put four turns
   // times five files on every call to recover information the assistant's own
@@ -99,7 +99,7 @@ message ChatRequest {
 }
 
 // What a generation concluded, kept from Self-RAG's taxonomy even though
-// Self-RAG itself is deferred (11-doc §1.1). It maps onto a PRODUCT decision
+// Self-RAG itself is deferred. It maps onto a PRODUCT decision
 // the notebook app never had: whether to answer or to hand off.
 enum AnswerStatus {
   ANSWER_STATUS_UNSPECIFIED = 0;
@@ -107,13 +107,13 @@ enum AnswerStatus {
   ANSWER_STATUS_DOC_ANSWER = 1;
   // Nothing retrieved above threshold. **Not an invitation to improvise** —
   // an enterprise support bot inventing a policy is worse than one that
-  // escalates (11-doc §1.6).
+  // escalates.
   ANSWER_STATUS_DOC_MISSING = 2;
   // A greeting, answered from the canned table. No LLM call, no ledger row.
   ANSWER_STATUS_GREETING = 3;
   // The tenant is at the AI cap. The caller escalates rather than erroring.
   ANSWER_STATUS_AT_CAP = 4;
-  // The question was refused by prompt-injection detection — 33-doc §5.1.
+  // The question was refused by prompt-injection detection
   //
   // **Not GREETING, which is what reusing that short-circuit would have
   // reported.** The gateway persists any completion that is not AT_CAP as an
@@ -129,7 +129,7 @@ message Citation {
   string document_id = 2;
   string document_title = 3;
   optional int32 page_number = 4;
-  // The id a citation RESOLVES THROUGH — 13-doc §4.1 test 2.
+  // The id a citation RESOLVES THROUGH test 2.
   //
   // Carried alongside `chunk_id` even though either would find the row,
   // because this is the key the two arms fuse on and the one Qdrant returns
@@ -169,7 +169,7 @@ message DraftRequest {
   // Clamped server-side regardless.
   int32 max_retries = 3;
   // The LAST USER message's attachments — the ones the agent is about to reply
-  // to. After 31-doc/32-doc those can come from a sender who never
+  // to. With inbound email those can come from a sender who never
   // authenticated, which makes this the highest-trust position an untrusted
   // file reaches in this system.
   repeated AttachmentPart attachments = 4;
@@ -239,7 +239,7 @@ message SuggestionsRequest {
   string ticket_id = 1;
   repeated ConversationTurn history = 2;
   // What the ticket IS — the retrieval query for the article sidebar,
-  // 39-doc §3.
+  //
   //
   // **Not the transcript, and the reason is the sidebar rather than the cost.**
   // A sidebar is a panel an agent glances at; articles that churn every time
@@ -265,12 +265,12 @@ message SuggestionsResponse {
   repeated Suggestion suggestions = 1;
   string generation_id = 2;
   // Knowledge-base articles relevant to the ticket — product §6.3's first
-  // third, 39-doc §1. The other two need a ticket corpus, which is a threat
+  // third. The other two need a ticket corpus, which is a threat
   // model change rather than a queue (§4).
   repeated SuggestedArticle articles = 3;
 }
 
-// One article to recommend — 39-doc §2.
+// One article to recommend
 //
 // **Deliberately NOT `Citation` reused.** They differ by more than a field: a
 // citation points at the PASSAGE an answer used, and carries `chunk_id` so the
@@ -278,7 +278,7 @@ message SuggestionsResponse {
 // an agent should open, and a chunk id would be an implementation detail of how
 // it was found.
 //
-// `vector_point_id` is absent for 38-doc §2's reason — a Qdrant point id is an
+// `vector_point_id` is absent deliberately — a Qdrant point id is an
 // internal retrieval identifier, not part of the product's surface.
 message SuggestedArticle {
   string document_id = 1;
@@ -289,7 +289,7 @@ message SuggestedArticle {
 }
 
 service RagService {
-  // Retrieval with NO generation — the test seam (13-doc §2.3). It exists
+  // Retrieval with NO generation — the test seam. It exists
   // before anything calls an LLM because it is the only point where isolation
   // and relevance can be proven cheaply and deterministically; once generation
   // is layered on, those tests become slow, non-deterministic and skipped.
@@ -300,7 +300,7 @@ service RagService {
   // Self-RAG cannot stream, structurally: it generates N candidates, judges
   // them, then picks a winner, and you cannot stream an answer you have not
   // chosen. Co-RAG's Mode A draft is a single generation, streamable from the
-  // first token (11-doc §1.1).
+  // first token.
   rpc Chat(ChatRequest) returns (stream ChatChunk);
 
   // One-shot Q&A with no conversation to escalate into. `DOC_MISSING` here

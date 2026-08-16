@@ -15,7 +15,7 @@ import type { InboundEmailPublisher } from './inbound-email.publisher';
 import type { InboundEmailDto } from './dto/rest/inbound-email.dto';
 
 /**
- * Mail-loop guards — 31-doc §7, 32-doc §5.
+ * Mail-loop guards
  *
  * **The failure these prevent reaches somebody else's inbox**, which is why
  * they ship with the routing rather than after it. An auto-responder on the

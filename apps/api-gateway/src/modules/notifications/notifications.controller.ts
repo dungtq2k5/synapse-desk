@@ -34,7 +34,7 @@ import {
 } from './dto/rest/notification-response.dto';
 
 /**
- * The personal inbox — api-endpoints-plan §4b, 18-doc §2.
+ * The personal inbox — api-endpoints-plan §4b
  *
  * **Every route is SELF-scoped, and there is no `PermissionGuard`.** That is
  * not an omission: a permission would imply the existence of a caller who could

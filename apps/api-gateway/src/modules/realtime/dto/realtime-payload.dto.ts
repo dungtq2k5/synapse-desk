@@ -55,7 +55,7 @@ export class PresencePayloadDto {
  *
  * `ttlMs` is on the frame because the CLIENT expires the indicator: `typing:stop`
  * is a hint that a closed tab, a dead battery and a lost network all skip
- * (22-doc §3).
+ *.
  */
 export class TypingPayloadDto {
   ticketId!: string;
@@ -83,7 +83,7 @@ export type FrameAnswerStatus =
  * `ai:stream:done` — the stream finished.
  *
  * Carries `messageId` because a client receiving both this and `message:new`
- * reconciles them on the id (22-doc §5.1). `null` when the answer was never
+ * reconciles them on the id. `null` when the answer was never
  * persisted — the cap path, where the conversation escalated instead.
  */
 export class AiStreamDonePayloadDto {

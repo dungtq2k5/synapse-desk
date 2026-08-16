@@ -50,7 +50,7 @@ export function toMessageResponse(
     // never null, and a caller that fetched without the relation should get an
     // empty list rather than a crash on `.map`.
     attachments: (message.attachments ?? []).map(toAttachmentResponse),
-    // **On the read shape so the gateway can filter after fetching** — 36-doc
+    // **On the read shape so the gateway can filter after fetching**
     // §7. Its transcript builder drops these rows itself rather than asking for
     // a filtered list, because the same route serves the UI where a refused
     // message must stay visible.

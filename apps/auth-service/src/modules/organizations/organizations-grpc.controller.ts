@@ -51,21 +51,21 @@ export class OrganizationsGrpcController implements OrganizationServiceControlle
     );
   }
 
-  /** 31-doc §2. No caller context: the token is the key — see the service. */
+  /** No caller context: the token is the key — see the service. */
   resolveOrgByInboundToken(
     request: ResolveOrgByInboundTokenRequest,
   ): Promise<ResolveOrgByInboundTokenResponse> {
     return this.organizationsService.resolveOrgByInboundToken(request);
   }
 
-  /** 31-doc §4. Public address, not a credential — see the service. */
+  /** Public address, not a credential — see the service. */
   getInboundToken(
     request: GetInboundTokenRequest,
   ): Promise<GetInboundTokenResponse> {
     return this.organizationsService.getInboundToken(request);
   }
 
-  /** 31-doc §2 — issue or rotate. Tenant from the caller, like every method here. */
+  /** Issue or rotate. Tenant from the caller, like every method here. */
   issueInboundToken(
     _request: IssueInboundTokenRequest,
     metadata?: Metadata,
@@ -75,7 +75,7 @@ export class OrganizationsGrpcController implements OrganizationServiceControlle
     );
   }
 
-  /** 31-doc §2 — switch inbound mail off. */
+  /** Switch inbound mail off. */
   revokeInboundToken(
     _request: RevokeInboundTokenRequest,
     metadata?: Metadata,
@@ -131,7 +131,7 @@ export class OrganizationsGrpcController implements OrganizationServiceControlle
 
   /**
    * Read by the two spending services and CACHED there, so this is a cache
-   * fill rather than a per-request call (doc 15 §1.3, §3.1).
+   * fill rather than a per-request call.
    */
   getOrganizationEntitlements(
     _request: GetOrganizationEntitlementsRequest,
@@ -149,7 +149,7 @@ export class OrganizationsGrpcController implements OrganizationServiceControlle
     return this.organizationsService.listOrganizationTimezones(request);
   }
 
-  /** Service-to-service only — see 20-doc §3.1. */
+  /** Service-to-service only. */
   listOrganizationCycles(
     request: ListOrganizationCyclesRequest,
   ): Promise<ListOrganizationCyclesResponse> {

@@ -5,7 +5,7 @@ import {
 } from './quiet-hours';
 
 /**
- * 18-doc §4 — quiet hours.
+ * Quiet hours.
  *
  * Two bugs here reach production and only one of them is visible in review:
  *

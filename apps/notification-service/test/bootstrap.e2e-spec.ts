@@ -15,7 +15,7 @@ import { AuthReferenceService } from '../src/modules/auth-client/auth-reference.
 import { NotificationRealtimePublisher } from '../src/modules/realtime/notification-realtime.publisher';
 
 /**
- * 18-doc §1.1 — the HYBRID conversion.
+ * The HYBRID conversion.
  *
  * This service was NATS-only for its whole life. Adding a gRPC server is the
  * change that risks a specific regression: `NestFactory.create` +
@@ -66,7 +66,7 @@ describe('§1.1 notification-service foundations (e2e)', () => {
   });
 
   it('2. **The existing NATS consumers still fire after the gRPC server was added**', async () => {
-    // The regression the hybrid conversion actually risks — 18-doc §1.1 test 2.
+    // The regression the hybrid conversion actually risks test 2.
     // Asserted by driving the handler and checking for a ROW, because a
     // consumer that was registered and does nothing looks identical to one that
     // was never registered at all.
@@ -92,7 +92,7 @@ describe('§1.1 notification-service foundations (e2e)', () => {
   it('3. Subscribes to every subject Domain E owns AND to `ticket.*`', () => {
     // Reflected from the decorators rather than trusted to a comment: a
     // handler that lost its `@EventPattern` is a subject that silently stops
-    // being consumed, which is precisely the bug 16-doc §1 was about.
+    // being consumed, which is precisely the bug hardening was about.
     const patterns = new Set<string>();
 
     for (const target of [
@@ -156,7 +156,7 @@ describe('§1.1 notification-service foundations (e2e)', () => {
   });
 
   it('5. PUBLISHES as well as consuming — the direction that did not exist', () => {
-    // Before 18-doc this service consumed events and published none, so it had
+    // Before Domain E this service consumed events and published none, so it had
     // no NATS *client* at all. The socket relay needs one, and a publisher
     // resolved from a client that was never registered fails at runtime rather
     // than at boot — which means the first thing to notice would be a toast

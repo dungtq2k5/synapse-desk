@@ -10,7 +10,7 @@ import type {
 import { PrismaService } from '../prisma/prisma.service';
 
 /**
- * The ticket an outbound notification was about — 31-doc §4.
+ * The ticket an outbound notification was about
  *
  * **The `In-Reply-To` fallback, and it lives here because the data does.** A
  * reply that carries no ticket token — someone answering a forwarded copy, or
@@ -21,7 +21,7 @@ import { PrismaService } from '../prisma/prisma.service';
  * this is an RPC rather than a column ticket-service could read.
  *
  * **Without a fallback every such reply opens a duplicate ticket**, which is
- * the visible-but-annoying failure 31-doc §4 prefers to a misthread — this
+ * the visible-but-annoying failure preferred to a misthread — this
  * turns most of those duplicates back into replies.
  */
 @Injectable()

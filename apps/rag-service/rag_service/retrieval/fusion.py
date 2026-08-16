@@ -1,4 +1,4 @@
-"""Reciprocal Rank Fusion — 11-doc §1.5, with both of its corrections.
+"""Reciprocal Rank Fusion, with both of its corrections.
 
 RRF combines two ranked lists without needing their scores to be comparable,
 which matters because they are not: a cosine similarity and a `ts_rank` share no
@@ -20,7 +20,7 @@ from rag_service.retrieval.arms import RetrievedChunk
 #: It damps the difference between the top ranks: without it, rank 1 would be
 #: worth infinitely more than rank 2, and a single arm's top hit would win every
 #: fusion regardless of what the other arm thought. 60 is the published default
-#: and there is no eval set here to justify moving it (11-doc §1.7).
+#: and there is no eval set here to justify moving it.
 RRF_K = 60
 
 
@@ -46,7 +46,7 @@ def reciprocal_rank_fusion(
     straight join rather than a second lookup per candidate — which is the whole
     reason the lexical arm carries a column it never filters on.
 
-    **Weights change ORDERING and never eligibility.** The correction 11-doc
+    **Weights change ORDERING and never eligibility.** The correction the design
     §1.5 makes: scaling `k` per arm (`k = top_n × w_semantic`) truncates an
     arm's contribution unpredictably, so a low-weighted arm can never surface
     its rank-8 result even when that result is the right one. Both arms are

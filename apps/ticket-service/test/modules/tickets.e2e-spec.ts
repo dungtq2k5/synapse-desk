@@ -837,7 +837,7 @@ describe('Tickets (e2e)', () => {
   });
 
   /**
-   * The batch contract — 27-doc §1.
+   * The batch contract
    *
    * The property specific to THIS service: `visibilityScope` applies to a batch
    * read exactly as it does to the list. A batch RPC that skipped it would be a

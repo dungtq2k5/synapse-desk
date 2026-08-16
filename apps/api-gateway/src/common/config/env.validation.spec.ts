@@ -4,7 +4,7 @@ import { envValidationSchema } from './env.validation';
 import { extractEmailAddress } from '@synapsedesk/common';
 
 /**
- * 32-doc §5 test 3 — the self-loop guard is only as real as its variable.
+ * The self-loop guard is only as real as its variable.
  *
  * **This test exists because the failure is silent and total.** The guard is
  * "ignore mail from our own sending address"; read from a variable this process
@@ -13,7 +13,7 @@ import { extractEmailAddress } from '@synapsedesk/common';
  * to stop. Nothing logs, because from the code's point of view no mail was ever
  * from us.
  *
- * `EMAIL_SENDER` was notification-service's alone until 31-doc §6 moved the
+ * `EMAIL_SENDER` was notification-service's alone until inbound email moved the
  * guard to the gateway, which is the whole reason this can be forgotten.
  */
 describe('the gateway’s inbound-email configuration', () => {
@@ -72,7 +72,7 @@ describe('the gateway’s inbound-email configuration', () => {
    * and that is exactly as far as it goes. notification-service is what
    * actually sends, so if the two name different mailboxes the guard compares
    * every inbound `From` against an address nothing ever sends from: it fails
-   * OPEN, nothing logs, and 31-doc §7's unbounded loop is reachable again. The
+   * OPEN, nothing logs, and the unbounded loop is reachable again. The
    * previous state of these files was precisely that — `support@synapsedesk.test`
    * here against `noreply@synapsedesk.com` there — and every existing test
    * passed, because each one only ever read its own side.

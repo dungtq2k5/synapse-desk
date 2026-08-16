@@ -1,4 +1,4 @@
-# What must never enter a build context — 23-doc §3.
+# What must never enter a build context
 #
 # Two jobs. The first is speed: `node_modules` and `dist` are hundreds of
 # megabytes that the build regenerates anyway, and every byte here is uploaded

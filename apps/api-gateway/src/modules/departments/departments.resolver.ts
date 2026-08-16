@@ -11,7 +11,7 @@ import { DepartmentPageGqlDto } from './dto/graphql/department-page.gql-dto';
 import { PageArgsGqlDto } from '../../common/dto/graphql/page-args.gql-dto';
 import { toPageQuery } from '../../common/mappers/pagination.mapper';
 
-/** `Query.departments` — 26-doc §4. */
+/** `Query.departments` */
 @Resolver(() => DepartmentResponseGqlDto)
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class DepartmentsResolver {
@@ -38,7 +38,7 @@ export class DepartmentsResolver {
         // same rule `TicketsArgsGqlDto` states for its own `includeDeleted`. The REST
         // route accepts the flag and gates it on `department.delete` inside the
         // controller; reproducing that check in a resolver would be a second
-        // implementation of a permission rule (26-doc §4), so the flag is not
+        // implementation of a permission rule, so the flag is not
         // offered on this surface and the safe value is passed explicitly.
         //
         // It was previously omitted entirely and the call cast with `as never`,

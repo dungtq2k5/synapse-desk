@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Adds `@ApiOperation` / `@ApiWrappedResponse` / `@ApiFilterErrors` to every
- * gateway route — 24-doc §6.
+ * gateway route
  *
  *     node scripts/annotate-openapi.mjs [--dry]
  *
@@ -12,7 +12,7 @@
  * already there. Deriving them is both faster and more accurate than reading 184
  * handlers by hand, because the derivation cannot get bored.
  *
- * What it does NOT decide is `summary`. That is 24-doc §6's one judgement call,
+ * What it does NOT decide is `summary`. That is the one judgement call,
  * and the answers already exist: `docs/api-endpoints-plan.md` carries a
  * reviewed description for most routes, so those are lifted verbatim. Routes
  * with no plan entry get a summary derived from the handler name and are listed
@@ -46,7 +46,7 @@ function loadPlan() {
     const [, method, path, description, auth] = m;
     // Only the FIRST sentence. The plan's prose explains decisions to
     // developers; `summary` is read by API consumers who need behaviour, not
-    // history — 24-doc §6.
+    // history
     rows.set(`${method} ${path.split(' ')[0]}`, {
       description: firstSentence(description),
       auth: auth.trim(),
@@ -111,7 +111,7 @@ function fromHandlerName(name) {
 }
 
 /**
- * Type ALIASES that are unions of real classes — 24-doc §2's `oneOf` case.
+ * Type ALIASES that are unions of real classes's `oneOf` case.
  *
  * A union has no runtime identity, so it cannot be referenced as a model. Its
  * members can, and `oneOf` is the accurate description: `POST /auth/login`
@@ -292,7 +292,7 @@ function errorsFor(route) {
   return errors;
 }
 
-/** 24-doc §2 fix 2: the status the route ACTUALLY returns. */
+/** The status the route ACTUALLY returns. */
 function statusFor(route) {
   if (route.httpCode) return route.httpCode;
 
@@ -319,7 +319,7 @@ const withoutPlan = [];
 
 for (const file of files) {
   // The ops routes are special cases with their own hand-written annotations —
-  // 24-doc §6, order 5.
+  // Order 5.
   if (
     /health\.controller|version\.controller|webhooks\.controller/.test(file)
   ) {
@@ -337,7 +337,7 @@ for (const file of files) {
     if (!entry) withoutPlan.push(`${route.verb} ${route.path}`);
 
     // **PUBLIC is opted into per route; everything else inherits the
-    // controller's cookie requirement** — 24-doc §3. 184 routes are
+    // controller's cookie requirement** 184 routes are
     // authenticated and roughly ten are not, so annotating the ten is both less
     // work and self-correcting: a route added later and forgotten defaults to
     // documented-as-authenticated, which is the safe direction to be wrong in.

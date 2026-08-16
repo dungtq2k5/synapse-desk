@@ -23,7 +23,7 @@ import { JobRunStatusDto } from './dto/platform-jobs.dto';
 /**
  * Who is asking for a heartbeat read.
  *
- * Widened from `RequestContext` to include a bare origin — 23-doc §4. A
+ * Widened from `RequestContext` to include a bare origin A
  * Prometheus scrape has no user, and `BaseGrpcClient.call` already takes the
  * union for exactly this reason: an unauthenticated caller is a real caller with
  * no identity, not a caller to fabricate one for.
@@ -37,7 +37,7 @@ export type ServiceHeartbeats = {
 };
 
 /**
- * Reads and drives the schedulers in both owning services — 20-doc §4.4, §5.
+ * Reads and drives the schedulers in both owning services
  *
  * The heartbeat tables live in `postgres_ticket` and `postgres_ingestion`, one
  * per service, because that is where the jobs run. So "are the jobs healthy" is

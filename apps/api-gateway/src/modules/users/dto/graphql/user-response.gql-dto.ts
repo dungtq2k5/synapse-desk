@@ -3,7 +3,7 @@ import { Gender } from '@synapsedesk/common';
 import '../../../../common/graphql/enums';
 
 /**
- * The FULL user, as the GraphQL schema serves it — 25-doc §4, 26-doc §3.
+ * The FULL user, as the GraphQL schema serves it
  *
  * **Independent of `UserResponseDto`, deliberately.** The two describe the same
  * domain object and share no class: a DTO is a transport contract, and coupling
@@ -52,7 +52,7 @@ export class UserResponseGqlDto {
   /**
    * The ids, flat. The resolved departments are the `departments` edge.
    *
-   * **Exposed for the reason every other type here exposes its ids** — 26-doc
+   * **Exposed for the reason every other type here exposes its ids**
    * §3, the same rule behind `Ticket.currentAssigneeId`, `Document.departmentIds`
    * and `Notification.actorId`: a client that only wants the ids must not pay a
    * network call for them, and `departments { id }` would.
@@ -109,7 +109,7 @@ export class UserResponseGqlDto {
   readonly isLocked!: boolean;
 
   /**
-   * When a temporary lock lapses; `null` means INDEFINITE — 21-doc §2.
+   * When a temporary lock lapses; `null` means INDEFINITE
    *
    * `isLocked` stays the field a client renders on. This is here so an admin
    * screen can say "locked until Friday" instead of just "locked".

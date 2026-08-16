@@ -13,7 +13,7 @@ export class AiSummaryResponseDto {
 
 // ASK This `docblock` seems to be invalid
 /**
- * One source a draft used — 38-doc §2.
+ * One source a draft used
  *
  * **Four fields, matching what ticket-service sends rather than what
  * rag-service produces.** The proto `Citation` carries a fifth,
@@ -51,7 +51,7 @@ export class AiDraftResponseDto {
   completionTokens!: number;
   // ASK This `docblock` seems to be invalid
   /**
-   * The `ai_generations` row this draft came from — 38-doc §1.
+   * The `ai_generations` row this draft came from
    *
    * **Returned so the acceptance loop can close.** The client hands it back as
    * `generatedFromId` when the agent posts; ticket-service then compares the
@@ -69,7 +69,7 @@ export class AiDraftResponseDto {
 
 // ASK This `docblock` seems to be invalid
 /**
- * One knowledge-base article to recommend — 39-doc §2.
+ * One knowledge-base article to recommend
  *
  * **Not `DraftCitationDto` reused, and merging them later would be wrong.**
  * They differ by more than the extra `score`: a draft citation points at the
@@ -77,7 +77,7 @@ export class AiDraftResponseDto {
  * it; this points at the DOCUMENT an agent should open, where a chunk id is an
  * implementation detail of how it was found.
  *
- * No `vectorPointId`, for 38-doc §2's reason — a Qdrant point id is an internal
+ * No `vectorPointId`, for a deliberate reason — a Qdrant point id is an internal
  * retrieval identifier and publishing it in a response DTO would make it part
  * of the product's surface by accident.
  */
@@ -92,11 +92,11 @@ export class SuggestedArticleDto {
 
 // ASK This `docblock` seems to be invalid
 /**
- * What `POST /tickets/:id/ai/suggestions` answers with — 39-doc §2.
+ * What `POST /tickets/:id/ai/suggestions` answers with
  *
  * **A wrapper where there was a bare array, and that is a breaking change.** A
  * client reading `data[0].title` reads `data.nextSteps[0].title` now. Accepted
- * on the same grounds as 36-doc §1.3's `CreateMessageResponse` — no client has
+ * on the same grounds as `CreateMessageResponse` — no client has
  * shipped and versioning is not enabled — and this is the **second** such
  * change, which is worth counting rather than repeating silently.
  *

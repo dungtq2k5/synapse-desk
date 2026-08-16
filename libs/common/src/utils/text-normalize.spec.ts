@@ -2,7 +2,7 @@ import { isSameText, normalizeForComparison } from './text-normalize';
 
 describe('§3.2 The acceptance comparison (unit)', () => {
   it('1. Treats a TRAILING NEWLINE as the same text', () => {
-    // Doc 15 §3.2 test 4b. A rich-text editor adds one on send, and exact
+    // A rich-text editor adds one on send, and exact
     // equality then reports every untouched draft as EDITED — understating
     // acceptance rate, the single number justifying the co-pilot, by a margin
     // nobody can see.

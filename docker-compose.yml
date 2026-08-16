@@ -60,7 +60,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # Domain E's own database — 16-doc §1.
+  # Domain E's own database
   #
   # Added when the quota alert became the first LOAD-BEARING consumer of the
   # in-app notification subject: the alert was published correctly, idempotently
@@ -124,7 +124,7 @@ services:
     # is the component that bounds itself (every entry has a TTL) and a loud
     # failure is recoverable in a way a duplicated side effect is not.
     #
-    # **The real fix is the second Redis instance** — deferred in 28-doc §7 —
+    # **The real fix is the second Redis instance** — deferred —
     # which lets the cache have an eviction policy of its own without BullMQ or
     # the quota counter sharing the consequences. Until then this is the safe
     # configuration rather than the ideal one.

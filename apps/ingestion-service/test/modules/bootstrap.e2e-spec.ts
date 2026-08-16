@@ -54,7 +54,7 @@ describe('§1.2 ingestion-service foundations (e2e)', () => {
   });
 
   it('3. has the COMPOSITE FTS index, not a bare tsvector GIN', async () => {
-    // Composite so tenant filtering happens BEFORE text matching (11-doc §1.4).
+    // Composite so tenant filtering happens BEFORE text matching.
     // A GIN on the tsvector alone matches text across every tenant's chunks and
     // filters afterwards — correct, but it degrades exactly as the corpus
     // grows, which is the worst time to discover it.

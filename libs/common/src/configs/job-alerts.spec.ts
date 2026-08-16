@@ -4,10 +4,10 @@ import { join } from 'node:path';
 import { SCHEDULED_JOBS } from './scheduler.config';
 
 /**
- * The Prometheus staleness rules — 23-doc §4, closing 20-doc §4.2's gap.
+ * The Prometheus staleness rules, closing the staleness-detection gap.
  *
  * **The alert file is GENERATED, and this test is what keeps that true.**
- * 20-doc's whole subject is seven jobs that existed and were never invoked, and
+ * 's whole subject is seven jobs that existed and were never invoked, and
  * the reason it stayed invisible for two domains is that nothing held the list
  * of what SHOULD be running. A hand-maintained alert file recreates exactly
  * that hole one layer up: a job added to the scheduler and forgotten in the

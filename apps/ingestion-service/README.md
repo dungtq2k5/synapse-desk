@@ -5,7 +5,7 @@ Parses uploaded documents, chunks them, embeds them, and writes the corpus that
 
 ## Running the tests needs two system binaries
 
-**Scanned-PDF OCR shells out to poppler and tesseract** — 34-doc §3 — and jest
+**Scanned-PDF OCR shells out to poppler and tesseract** — and jest
 runs on your machine rather than in the image, so `--target runtime-ocr` puts
 them somewhere the test suite cannot reach. Install them locally:
 

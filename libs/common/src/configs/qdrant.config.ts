@@ -12,7 +12,7 @@
  * `ai-settings.contract.json` like every other cross-language constant.
  */
 
-/** ONE collection, payload-partitioned — 11-doc §1.3. Not one per tenant. */
+/** ONE collection, payload-partitioned Not one per tenant. */
 export const QDRANT_COLLECTION = 'document_chunks';
 
 /**
@@ -26,7 +26,7 @@ export const QDRANT_COLLECTION = 'document_chunks';
 export const EMBEDDING_DIMENSION = 768;
 
 /**
- * The payload keys. Four of them are the retrieval filter (11-doc §1.4); the
+ * The payload keys. Four of them are the retrieval filter; the
  * other two are how a hit becomes a citation.
  *
  * **All four filter fields must be payload-indexed**, which is not an

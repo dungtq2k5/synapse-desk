@@ -62,7 +62,7 @@ export function toPaginationMetaDataResponseDto(
  * Neither surfaced at runtime: ts-jest transpiles without typechecking, so the
  * e2e suite passed over both.
  *
- * The clamp is here rather than a `@Max` on the argument — 25-doc §5. A
+ * The clamp is here rather than a `@Max` on the argument A
  * validator would turn the clamp into the rejection it exists to replace.
  */
 export function toPageQuery<

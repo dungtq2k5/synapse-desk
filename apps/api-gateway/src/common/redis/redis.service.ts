@@ -4,7 +4,7 @@ import Redis from 'ioredis';
 import { formatErrorMsg } from '@synapsedesk/common';
 
 /**
- * The gateway's shared Redis connection — 28-doc §6 step 1, 29-doc §2.
+ * The gateway's shared Redis connection step 1
  *
  * **A class, not a `useFactory` provider**, and that is the whole reason this
  * file exists rather than a one-line provider in a module. Conventions §15 gap
@@ -51,7 +51,7 @@ import { formatErrorMsg } from '@synapsedesk/common';
  * error, a duplicated job is not.
  *
  * **This bounds nothing; it only makes the failure loud.** A second Redis
- * instance for cache keys is the thorough fix and stays deferred (28-doc §7);
+ * instance for cache keys is the thorough fix and stays deferred;
  * `maxmemory` is not per-database, so a separate logical DB would be a
  * blast-radius boundary and not a limit.
  *

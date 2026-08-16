@@ -3,13 +3,13 @@ import { alignToKeys, createLoader } from './loaders.factory';
 type User = { id: string; fullName: string };
 
 /**
- * The loader seam — 25-doc §6, 27-doc §2.
+ * The loader seam
  *
  * **Test 1 is the highest-value test in the GraphQL work.** Every other failure
  * in this area is visible; this one renders a completely convincing page with
  * the wrong people on it.
  *
- * Written against a STUB, before any batch RPC exists — 27-doc §5 step 1. The
+ * Written against a STUB, before any batch RPC exists step 1. The
  * bug lives in the mapping, not in the RPC, and writing the mapping while
  * thinking about the RPC is how it gets written wrong.
  */
@@ -89,7 +89,7 @@ describe('§6/§2 loader key alignment', () => {
   });
 
   it('5. a per-request loader caches WITHIN the request and not beyond it', async () => {
-    // 25-doc §6, in miniature: two loaders are two caches. A singleton would
+    // In miniature: two loaders are two caches. A singleton would
     // serve one tenant's row under a bare uuid to the next request that asked
     // for that id — a cross-tenant leak whose cause is a performance
     // optimisation.

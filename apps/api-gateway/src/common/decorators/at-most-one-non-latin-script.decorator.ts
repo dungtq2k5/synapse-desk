@@ -2,7 +2,7 @@ import { registerDecorator, ValidationOptions } from 'class-validator';
 import { NON_LATIN_OCR_LANGUAGES, OcrLanguage } from '@synapsedesk/common';
 
 /**
- * At most one non-Latin OCR language — 34-doc §4.2 rule 3.
+ * At most one non-Latin OCR language rule 3.
  *
  * **Measured, and the reason is not the one the design gave.** The expectation
  * was that two Han scripts would fight and wreck accuracy. They do not:

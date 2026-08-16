@@ -57,14 +57,14 @@ export const GENERATION_MODEL_BY_TIER: Record<AiModelTier, string> = {
 /**
  * The tier-independent models.
  *
- * `cheapModel` does not scale with the tier on purpose (doc 15 §2.2): greeting
+ * `cheapModel` does not scale with the tier on purpose: greeting
  * classification and reformulation are volume calls whose quality barely moves
  * with model tier, so scaling them multiplies a premium tenant's bill for no
  * perceptible gain.
  *
  * `embeddingModel` is not merely tier-independent but tenant-independent.
  * Per-tenant embedding models force per-tenant collections and make every tier
- * change a full re-embed migration (11-doc §1.3). It is stated here as a
+ * change a full re-embed migration. It is stated here as a
  * constant rather than a setting anyone could vary.
  */
 export const CHEAP_MODEL = 'gemini-3.5-flash-lite';
@@ -81,7 +81,7 @@ export const ALL_CONFIGURED_MODELS: string[] = [
  * The retrieval defaults, from `docs/rag/`.
  *
  * These are guesses in the honest sense — there is no eval set yet, which is
- * exactly why 11-doc §1.7 keeps them out of tenant hands. They live here so
+ * exactly why they are kept out of tenant hands. They live here so
  * that when there IS an eval set, tuning them is editing one table rather than
  * finding every call site that hardcoded a `k`.
  */
@@ -95,7 +95,7 @@ export const AI_RETRIEVAL_DEFAULTS = {
 } as const;
 
 /**
- * Server-side bounds on every numeric setting — doc 15 §1.4.
+ * Server-side bounds on every numeric setting
  *
  * Applied whether or not tenants can currently set anything, because the cost
  * of the clamp is one line now and the cost of its absence is an incident: an
@@ -141,7 +141,7 @@ export function clampAiSetting(
 }
 
 /**
- * Resolution steps 1 and 2 of doc 15 §1.1, and in v1 there are only two.
+ * Resolution steps 1 and 2, and in v1 there are only two.
  *
  * Step 3 — per-tenant overrides from `organization_ai_settings` — is additive
  * by construction: it would clamp a partial override over this result, and no

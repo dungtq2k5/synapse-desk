@@ -27,10 +27,10 @@ const CACHE_PREFIX = 'cache:';
  */
 const NO_TENANT = 'no-tenant';
 
-/** What a key is built from — 29-doc §1. */
+/** What a key is built from */
 export type CacheKeyInput = {
   /**
-   * **The FIRST segment, always** — 28-doc §2.
+   * **The FIRST segment, always**
    *
    * Two tenants asking the identical question produce different keys before any
    * parameter is considered, so a cross-tenant hit is unreachable rather than
@@ -59,7 +59,7 @@ export type CacheKeyInput = {
 };
 
 /**
- * The shared cache — 29-doc §1.
+ * The shared cache
  *
  * Generalized from `AnalyticsCacheService`, which had the design right and only
  * lacked reach: tenant-first keys, sorted parameters, `wrap()` as the single
@@ -199,7 +199,7 @@ export class CacheService {
   }
 
   /**
-   * Reads many entries at once — 30-doc §2, for the loaders.
+   * Reads many entries at once, for the loaders.
    *
    * **One round trip, not N.** A loader batch already collapsed the RPCs; doing
    * the cache lookups serially would put the N back one layer down, which is
@@ -254,7 +254,7 @@ export class CacheService {
     }
   }
 
-  /** Drops one exact entry. The precise half of 28-doc §3. */
+  /** Drops one exact entry. The precise half of the invalidation model. */
   async invalidate(input: CacheKeyInput): Promise<void> {
     const key = this.buildKey(input);
 
@@ -330,7 +330,7 @@ const DATE_TAG = '__cache_date__';
  *
  * That is not a cosmetic difference. `computedAt: null` has a defined meaning
  * in this system — *the rollups have never run for this tenant* — and it is
- * half of the diagnostic pair 19-doc §4.3 defines against `dataThrough`. So the
+ * half of the diagnostic pair defined against `dataThrough`. So the
  * cache made a healthy scheduler report as one that had never started, for the
  * length of a TTL at a time, on a field whose whole purpose is telling an
  * operator whether the scheduler is working.

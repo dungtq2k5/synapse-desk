@@ -49,7 +49,7 @@ model Document {
   /// DocumentStatus.
   status String @default("PENDING") @db.VarChar(20)
 
-  /// ISO 639-1 codes the uploader declared for OCR — 34-doc §4.
+  /// ISO 639-1 codes the uploader declared for OCR
   ///
   /// **`[]` means "not specified", NOT null**, and the difference matters
   /// because every other optional column here is nullable: Prisma scalar lists
@@ -116,13 +116,13 @@ model DocumentChunk {
 
   /// The Postgres <-> Qdrant bridge. NULLABLE despite RDM saying NOT NULL, and
   /// deliberately: the pipeline writes chunk rows BEFORE the Qdrant upsert and
-  /// fills this in after (12-doc §3). A NOT NULL column would force the
+  /// fills this in after. A NOT NULL column would force the
   /// reversed order, which leaves Postgres claiming vectors that were never
   /// stored — the exact failure the write-back ordering exists to prevent.
   vectorPointId String? @unique @map("vector_point_id") @db.Uuid
 
   // ---------------------------------------------------------------------
-  // The four DENORMALISED scope columns — 11-doc §1.4.
+  // The four DENORMALISED scope columns
   //
   // Not a cache: they are the lexical retrieval arm's half of the security
   // boundary. Without them that arm expresses the same rule as a join through
@@ -291,13 +291,13 @@ model AiGeneration {
   @@map("ai_generations")
 }
 
-/// 19-doc §2.2 — the daily AI-generation rollup.
+/// The daily AI-generation rollup.
 ///
 /// **This one is not an optimisation, it is the only durable record.**
 /// `ai_generations` is retention-rolled (RDM Table 29): raw rows aggregate away
 /// after ~90 days. Any analytics query written against raw rows silently loses
 /// history the moment retention ships — the same trap that made `UNCITED` a
-/// projection rather than a query (12-doc §4.1).
+/// projection rather than a query.
 ///
 /// Which makes the ORDERING constraint real: this job must run BEFORE ledger
 /// retention over the same window. Reversed, retention deletes rows this has
@@ -310,10 +310,10 @@ model AiGenerationDailyStat {
 
   organizationId String @map("organization_id") @db.Uuid
 
-  /// A DATE in the TENANT'S timezone, not UTC — 19-doc §2.2 test 4.
+  /// A DATE in the TENANT'S timezone, not UTC test 4.
   day DateTime @db.Date
 
-  /// AiGenerationPurpose. **The per-purpose split is the point** (19-doc §3.2):
+  /// AiGenerationPurpose. **The per-purpose split is the point**:
   /// it shows a tenant where their AI budget actually goes, which is rarely
   /// where they assume.
   purpose String @db.VarChar(30)
@@ -343,14 +343,14 @@ model AiGenerationDailyStat {
 
   /// The acceptance-rate numerator and its denominator's other two terms.
   ///
-  /// `discarded` depends on the sweep (12-doc §4.3): without it the denominator
+  /// `discarded` depends on the sweep: without it the denominator
   /// only ever contains drafts that were USED, and acceptance reports ~100%
   /// regardless of quality.
   draftsAccepted  Int @default(0) @map("drafts_accepted")
   draftsEdited    Int @default(0) @map("drafts_edited")
   draftsDiscarded Int @default(0) @map("drafts_discarded")
 
-  /// In the analytics cache key for closed ranges (19-doc §4), so a backfill
+  /// In the analytics cache key for closed ranges, so a backfill
   /// correction invalidates instead of serving known-wrong numbers for a day.
   computedAt DateTime @default(now()) @map("computed_at") @db.Timestamptz
 
@@ -359,7 +359,7 @@ model AiGenerationDailyStat {
   @@map("ai_generation_daily_stats")
 }
 
-/// The HEARTBEAT — 20-doc §4.1.
+/// The HEARTBEAT
 ///
 /// **One row per job name, and the deepest fix in that document.** The jobs not
 /// running was not the real problem; the real problem was that nothing anywhere
@@ -367,7 +367,7 @@ model AiGenerationDailyStat {
 /// never runs logs nothing at all — which is precisely the case that occurred,
 /// and it stayed invisible for two domains.
 ///
-/// **Three copies of this table is CORRECT** (20-doc §4.5), and this note
+/// **Three copies of this table is CORRECT**, and this note
 /// exists so nobody re-opens it. Service-per-database means each service
 /// records its own jobs in its own failure domain: "did ingestion-service's
 /// rollup run?" is a question about ingestion-service's database, and a shared

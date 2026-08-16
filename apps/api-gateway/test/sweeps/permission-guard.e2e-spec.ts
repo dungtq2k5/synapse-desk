@@ -68,7 +68,7 @@ describe('PermissionGuard ANY semantics (unit)', () => {
     return {
       // **`getType` is required now**, and its absence is what this fixture
       // taught: `PermissionGuard` reads the request through `requestOf`, which
-      // asks the context which transport it is before unwrapping it (26-doc
+      // asks the context which transport it is before unwrapping it (
       // §1.1). A mock without it returns `undefined`, takes the HTTP branch by
       // accident, and would keep passing while the real guard had already
       // moved on.

@@ -79,7 +79,7 @@ export class QuotaReconciliationJob {
   /**
    * Every tenant with recent spend, each reconciled against **its OWN cycle**.
    *
-   * **This took no parameter by design** — 20-doc §3.1. The previous signature
+   * **This took no parameter by design** The previous signature
    * was `reconcileAll(cycleStart: Date)`, which applied one date to every
    * tenant and directly contradicted the warning on `reconcile()` above.
    *

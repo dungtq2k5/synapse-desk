@@ -17,7 +17,7 @@ import { DocumentFlagService } from './document-flag.service';
  * thin layer above; the ORDER it calls them in is the part that matters —
  * projection before retention, always (§4.1).
  *
- * `AiGenerationRollupJob` shares that constraint (19-doc §2.2) and deliberately
+ * `AiGenerationRollupJob` shares that constraint and deliberately
  * does NOT live here: it writes `ai_generation_daily_stats`, and the module
  * that owns a table should own its writer. Putting it beside its siblings
  * instead would have made `AiLedgerModule` and this module import each other.

@@ -54,7 +54,7 @@ export class AuthReferenceService implements OnModuleInit {
       DEPARTMENT_SERVICE_NAME,
     );
 
-    // Added for the rollup jobs (19-doc §2.2), which need the tenant's
+    // Added for the rollup jobs, which need the tenant's
     // timezone. The first thing in this service to talk to OrganizationService
     // — every other reference it resolves is a user or a department.
     this.organizationService =
@@ -106,7 +106,7 @@ export class AuthReferenceService implements OnModuleInit {
   }
 
   /**
-   * The tenant's departments, as classification candidates — doc 15 §3.2.
+   * The tenant's departments, as classification candidates
    *
    * Sent WITH the classify request because rag-service cannot see
    * `postgres_auth`, and a suggestion naming a department that does not exist
@@ -200,7 +200,7 @@ export class AuthReferenceService implements OnModuleInit {
   }
 
   /**
-   * Tenant timezones for a set of ids — 19-doc §2.2.
+   * Tenant timezones for a set of ids
    *
    * Called by the daily rollup jobs, which run across every tenant that had
    * activity rather than on behalf of a caller. Bulk, so one run costs one

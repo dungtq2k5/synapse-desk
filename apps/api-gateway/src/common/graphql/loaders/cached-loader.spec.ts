@@ -5,9 +5,9 @@ import { createCachedLoader } from './loaders.factory';
 type Row = { userId: string; fullName: string };
 
 /**
- * The entity cache's ordering contract — 30-doc §2 test 2, written first.
+ * The entity cache's ordering contract test 2, written first.
  *
- * **27-doc §2's bug, in its new and likelier form.** A DataLoader batch must
+ * **The batch-alignment bug, in its new and likelier form.** A DataLoader batch must
  * return `results[i]` for `keys[i]`. With a cache in front, the natural
  * implementation concatenates the hits and the fetched rows — producing an
  * array of the right LENGTH in the cache's order, so every assertion about
@@ -113,7 +113,7 @@ describe('createCachedLoader', () => {
   });
 
   it('an all-hit batch makes NO rpc call at all', async () => {
-    // The point of the layer — 30-doc §2 test 1, at the unit level.
+    // The point of the layer test 1, at the unit level.
     const fetch = jest.fn(() => Promise.resolve([]));
 
     const { loader } = build(

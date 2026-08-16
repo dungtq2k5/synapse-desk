@@ -37,7 +37,7 @@ export class ListUsersQueryDto extends OmitType(SearchPaginationDto, [
   @IsIn(USER_SORTABLE_FIELDS)
   // ASK This `docblock` seems to be invalid
   /**
-   * Optional in the API and, without this, REQUIRED in the docs — 24-doc §1.
+   * Optional in the API and, without this, REQUIRED in the docs
    *
    * The plugin derives `required` from TYPESCRIPT optionality, not from
    * `@IsOptional()`. A field declared `page: number = 1` is non-optional to the
@@ -116,7 +116,7 @@ export class LockUserDto {
 
   // ASK This `docblock` seems to be invalid
   /**
-   * When the lock should lapse — 21-doc §2.
+   * When the lock should lapse
    *
    * **Absent means INDEFINITE**, which is the existing product and the default
    * an admin gets by not thinking about it.

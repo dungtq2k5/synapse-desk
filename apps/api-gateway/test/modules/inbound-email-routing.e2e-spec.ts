@@ -23,7 +23,7 @@ import {
 } from '../fixtures/inbound-email';
 
 /**
- * Tenant → sender → thread — 32-doc §4.2, §4.4.
+ * Tenant → sender → thread
  *
  * **Test 7 is the one that matters** and it is asserted twice here: a forged
  * reply token must not append to the ticket it names. Everything else in this
@@ -99,7 +99,7 @@ describe('§32 §4 inbound email routing (e2e)', () => {
       ).expect(200);
 
       expect(response.body.data.outcome).toBe('unroutable_address');
-      // **The order is the security property** — 32-doc §4.2. Resolving the
+      // **The order is the security property** Resolving the
       // sender first would mean querying it unscoped.
       expect(fx.stubs.user.resolveInboundSender).not.toHaveBeenCalled();
       expect(fx.stubs.ticket.createTicket).not.toHaveBeenCalled();
@@ -213,7 +213,7 @@ describe('§32 §4 inbound email routing (e2e)', () => {
       const [[sent]] = fx.stubs.message.createMessage.mock.calls;
 
       // A customer's reply is customer-visible by definition. An internal note
-      // reaching one is the leak 22-doc §1 found.
+      // reaching one is the leak found in the realtime fan-out.
       expect(sent.isInternalNote).toBe(false);
     });
 
@@ -477,7 +477,7 @@ describe('§32 §4 inbound email routing (e2e)', () => {
     });
 
     it('**and an infrastructure failure is NOT a 200**', async () => {
-      // The distinction 32-doc §3.1's "always 200" does not cover. A deliberate
+      // The distinction "always 200" does not cover. A deliberate
       // drop must not be retried; a service being down must be, or the mail is
       // lost on the one delivery that could have recovered it.
       resolvable();
@@ -494,7 +494,7 @@ describe('§32 §4 inbound email routing (e2e)', () => {
   });
 
   describe('the recorded Worker payloads', () => {
-    // 32-doc §7. These are the shapes the Worker emits, run through the real
+    // These are the shapes the Worker emits, run through the real
     // endpoint — the closest this suite gets to the mail transport without one.
     const PAYLOADS = join(__dirname, '../fixtures/inbound-email/payloads');
 

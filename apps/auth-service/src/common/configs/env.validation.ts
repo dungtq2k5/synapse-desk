@@ -2,7 +2,7 @@ import * as Joi from 'joi';
 import { LOG_LEVELS, NODE_ENV_OPTIONS } from '@synapsedesk/common';
 
 export const envValidationSchema = Joi.object({
-  // **Which build is this?** — 23-doc §3. Baked at image build time, never read
+  // **Which build is this?** Baked at image build time, never read
   // from git at runtime: a container has no `.git`, so a runtime lookup returns
   // nothing and the natural fallback is `"unknown"` — the answer you get at
   // exactly the moment you need the real one.
@@ -144,7 +144,7 @@ export const envValidationSchema = Joi.object({
     .valid(...LOG_LEVELS),
 
   // ---------------------------------------------------------------------
-  // Billing — OPTIONAL, and deliberately so (14-doc §2.1).
+  // Billing — OPTIONAL, and deliberately so.
   //
   // Every existing tenant is grandfathered: no Stripe objects at all, and on
   // the day this ships that is all of them. A service that refused to boot

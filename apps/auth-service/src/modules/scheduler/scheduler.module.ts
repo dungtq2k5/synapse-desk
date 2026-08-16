@@ -11,7 +11,7 @@ import { SchedulerProcessor } from './scheduler.processor';
 import { SchedulerRegistrar } from './scheduler.registrar';
 
 /**
- * auth-service's scheduler — 20-doc §3.2.
+ * auth-service's scheduler
  *
  * **Replaces `@nestjs/schedule`, which this service was the last user of.** Two
  * `@Cron` jobs fired once per pod; both were idempotent deletes, so the impact

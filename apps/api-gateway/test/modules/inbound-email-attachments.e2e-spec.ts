@@ -19,7 +19,7 @@ import {
 } from '../fixtures/inbound-email';
 
 /**
- * Attachments on an inbound REPLY — 31-doc §5, the reply half of the
+ * Attachments on an inbound REPLY, the reply half of the
  * co-pilot plan's §0.
  *
  * **The bytes never reach this server.** The Worker presigns here, PUTs to
@@ -232,7 +232,7 @@ describe('§0 inbound email attachments — the reply half (e2e)', () => {
       //
       // **`application/x-msdownload`, not `application/zip`.** A zip is
       // perfectly storable — it is on the UPLOAD allowlist and only the
-      // AI-eligible list excludes it (35-doc §8). Picking it here would have
+      // AI-eligible list excludes it. Picking it here would have
       // tested the wrong list, which is exactly what the first draft did.
       resolvable();
 

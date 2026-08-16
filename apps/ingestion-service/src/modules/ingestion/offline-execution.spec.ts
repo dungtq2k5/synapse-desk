@@ -3,7 +3,7 @@ import { buildPdf, buildScannedPdf } from '../../../test/utils/pdf-fixture';
 import { describeWithOcr } from '../../../test/utils/ocr-binaries';
 
 /**
- * **Which binaries this service is allowed to run** — 34-doc §2.
+ * **Which binaries this service is allowed to run**
  *
  * Its own file because of how the observation has to be made. `jest.spyOn`
  * cannot patch `node:child_process` — its exports are non-configurable, and

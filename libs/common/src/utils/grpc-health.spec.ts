@@ -9,7 +9,7 @@ import {
 } from './grpc-health';
 
 /**
- * The shared gRPC health service — 23-doc §2.
+ * The shared gRPC health service
  *
  * Two of these are behavioural and two are the RULE: that no service's
  * readiness references another service. That rule decays first, because "we
@@ -99,7 +99,7 @@ describe('§2 GrpcHealthService', () => {
   });
 
   /**
-   * The static half — 23-doc §2 test 3.
+   * The static half test 3.
    *
    * A grep-style assertion rather than a behavioural one, because the failure it
    * guards against is a line somebody ADDS in good faith. There is no state to

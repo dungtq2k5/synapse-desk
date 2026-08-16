@@ -85,7 +85,7 @@ export class OrganizationsController {
   }
 
   /**
-   * Issues the tenant's inbound support address, or ROTATES it — 31-doc §2.
+   * Issues the tenant's inbound support address, or ROTATES it
    *
    * **The same route for both**, because "enable" and "rotate" differ only in
    * whether the tenant already had a token. A separate rotate endpoint would
@@ -121,7 +121,7 @@ export class OrganizationsController {
   }
 
   /**
-   * Switches inbound email off — 31-doc §2.
+   * Switches inbound email off
    *
    * Returns the tenant to the state one that never enabled email is already in.
    * Idempotent, because the caller's intent is satisfied either way.

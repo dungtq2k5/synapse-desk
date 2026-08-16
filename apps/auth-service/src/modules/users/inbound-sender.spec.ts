@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 /**
- * 32-doc §4.4 test 4 — **no inbound path can create an organization.**
+ * **no inbound path can create an organization.**
  *
  * Static, and deliberately so: the failure it guards is total and one call
  * away. Self-signup's path creates an organization when no domain matches and

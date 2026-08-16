@@ -17,7 +17,7 @@ import {
 import { MetricsServer } from '../../src/modules/metrics/metrics.server';
 
 /**
- * `/metrics` — 23-doc §4.
+ * `/metrics`
  *
  * Three of these four tests are about things NOT happening: the endpoint not
  * being public, the labels not being unbounded, and a never-run job not
@@ -80,7 +80,7 @@ describe('§4 metrics', () => {
   });
 
   it('2. **no exported metric carries a tenant, user or resource id label**', async () => {
-    // **Static, over the registered definitions** — 23-doc §4 test 2. A runtime
+    // **Static, over the registered definitions** test 2. A runtime
     // check would only cover labels something happened to emit during the test,
     // and the metric that kills a Prometheus install is usually the one on a
     // path the test suite never took.
@@ -153,7 +153,7 @@ describe('§4 metrics', () => {
   });
 
   it('4. **`job_last_success_timestamp_seconds` is ABSENT for a job that never ran**', async () => {
-    // **Absent, not zero** — 23-doc §4 test 4. Zero is 1970, which satisfies any
+    // **Absent, not zero** test 4. Zero is 1970, which satisfies any
     // `time() - x > threshold` rule and reads as catastrophically stale rather
     // than as unknown. Those need different responses: "the rollup broke last
     // night" is a page, "the rollup was never wired" is a deploy — and the

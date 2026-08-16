@@ -44,7 +44,7 @@ export class DocumentUploadedConsumer {
         fileType: event.fileType,
         // Carried one more hop: event -> job payload -> parser. The worker
         // reads no document row before parsing, so this is the only route the
-        // language has (34-doc §4.1).
+        // language has.
         ocrLanguages: event.ocrLanguages,
       });
     } catch (error) {

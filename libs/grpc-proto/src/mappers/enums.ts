@@ -219,7 +219,7 @@ export function toProtoOrgStatus(status: OrgStatus | string): ProtoOrgStatus {
 }
 
 /**
- * The AI tier — doc 15 §2.1.
+ * The AI tier
  *
  * Same UNSPECIFIED-is-null rule as above, and it matters more here: the tier
  * selects which MODEL a tenant's questions are answered by, so reading an unset
@@ -257,7 +257,7 @@ export function toProtoAiModelTier(tier: string): ProtoAiModelTier {
 }
 
 // ---------------------------------------------------------------------------
-// Notification preferences — 18-doc §4
+// Notification preferences
 // ---------------------------------------------------------------------------
 
 /**
@@ -269,7 +269,7 @@ export function toProtoAiModelTier(tier: string): ProtoAiModelTier {
  * strings in Postgres (§7.3).
  *
  * The asymmetry is the point. `to*` is the RESPONSE path and must not throw —
- * a row carrying a value nobody recognises should read as "unset" rather than
+ * a row carrying a value nobody recognizes should read as "unset" rather than
  * failing a read the user is entitled to. `from*` returns null so the caller
  * decides how to complain, because it knows its own transport.
  */

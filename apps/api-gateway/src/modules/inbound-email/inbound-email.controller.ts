@@ -27,7 +27,7 @@ import { InboundEmailService } from './inbound-email.service';
  * `POST /webhooks/email/inbound` — the mail Worker's only entry point.
  *
  * **A separate controller from `/webhooks/stripe`, sharing its tag and path.**
- * 32-doc §3.1 says it "joins the existing `@ApiTags('Webhooks')` controller",
+ * Says it "joins the existing `@ApiTags('Webhooks')` controller",
  * and it joins the TAG — the two appear together at `/docs`, which is what that
  * sentence is about. It does not join the billing MODULE: an email intake route
  * owned by billing is organisation-by-layer, and conventions §1.2 is explicit
@@ -83,7 +83,7 @@ export class InboundEmailController {
       'Accepted, or deliberately dropped. The body carries an acknowledgement ' +
       'and the outcome, never the message.',
   })
-  // **401, not Stripe's 400** — 32-doc §3. The credential was presented and
+  // **401, not Stripe's 400** The credential was presented and
   // rejected, and 401 is the answer that tells the provider to stop rather
   // than retry.
   //
@@ -102,7 +102,7 @@ export class InboundEmailController {
   })
   @Post('email/inbound')
   // The guard, not a check in the handler: "a bad signature causes nothing to
-  // happen" is only true if nothing has run yet — 31-doc §6.1.
+  // happen" is only true if nothing has run yet
   @UseGuards(InboundSignatureGuard)
   @HttpCode(HttpStatus.OK)
   async inbound(
@@ -114,7 +114,7 @@ export class InboundEmailController {
   }
 
   /**
-   * Presigned uploads for a mail's attachments — 31-doc §5, the reply half.
+   * Presigned uploads for a mail's attachments, the reply half.
    *
    * **Called before the webhook, by the same Worker, over the same signature.**
    * The Worker parses the MIME, asks here which files it may store and where,

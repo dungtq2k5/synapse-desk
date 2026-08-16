@@ -13,10 +13,10 @@ import { CacheModule } from '../cache/cache.module';
 import { CacheService } from '../cache/cache.service';
 
 /**
- * The GraphQL surface — 25-doc, 26-doc §1.2.
+ * The GraphQL surface
  *
  * **REST is not deprecated by it; both are permanent, with different jobs**
- * (25-doc §7): REST stays the surface for commands, files and machine callers,
+ *: REST stays the surface for commands, files and machine callers,
  * GraphQL is the read surface for the SPA. Saying so at the registration
  * prevents the slow drift where half the mutations live in one place and half in
  * the other with no rule.
@@ -60,7 +60,7 @@ import { CacheService } from '../cache/cache.service';
       // No new connections: each of these registers its channel once, and these
       // are the same instances every controller's client already holds.
       // `IngestionGrpcModule` is named despite being `@Global` for the same
-      // reason — the documents loader dials through it (26-doc §3.1).
+      // reason — the documents loader dials through it.
       imports: [ConfigModule, AuthModule, IngestionGrpcModule, CacheModule],
       inject: [
         ConfigService,

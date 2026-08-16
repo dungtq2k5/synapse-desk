@@ -8,7 +8,7 @@ import { bootstrapE2eTest, E2eFixture } from '../utils/bootstrap';
 import { InboundThreadService } from '../../src/modules/feed/inbound-thread.service';
 
 /**
- * The `In-Reply-To` fallback — 31-doc §4.
+ * The `In-Reply-To` fallback
  *
  * **A two-hop join, and the second hop is the tenant check.** A `Message-ID` is
  * a string a sender's client echoes back; it is not a credential, and anyone

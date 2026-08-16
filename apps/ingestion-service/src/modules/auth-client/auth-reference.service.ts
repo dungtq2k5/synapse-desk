@@ -133,7 +133,7 @@ export class AuthReferenceService implements OnModuleInit {
     context: CallerContext,
   ): Promise<{ budgetMicros: bigint; billingCycleStart: Date }> {
     try {
-      // `GetOrganizationEntitlements`, not `GetCurrentOrganization` — doc 15
+      // `GetOrganizationEntitlements`, not `GetCurrentOrganization`
       // §3.1. The latter ships a tenant's name, slug, allowed email domains
       // and onboarding state on a call that reads two numbers, and it invites
       // a gate to start depending on a field that has nothing to do with
@@ -170,7 +170,7 @@ export class AuthReferenceService implements OnModuleInit {
   }
 
   /**
-   * The tenant's AI TIER — doc 15 §3.1, doc 14 step 6.
+   * The tenant's AI TIER, read over gRPC.
    *
    * Read over gRPC rather than from a column this service does not own, and
    * cached by `AiSettingsService` against `billing.entitlements_changed` — so
@@ -252,7 +252,7 @@ export class AuthReferenceService implements OnModuleInit {
   }
 
   /**
-   * Tenant timezones for a set of ids — 19-doc §2.2.
+   * Tenant timezones for a set of ids
    *
    * Called by the daily rollup jobs, which run across every tenant that had
    * activity rather than on behalf of a caller. Bulk, so one run costs one
@@ -296,7 +296,7 @@ export class AuthReferenceService implements OnModuleInit {
   }
 
   /**
-   * Each tenant's BILLING CYCLE START, in bulk — 20-doc §3.1.
+   * Each tenant's BILLING CYCLE START, in bulk
    *
    * **Reconciling against the wrong cycle is worse than not reconciling.**
    * `QuotaCounterService` keys on `quota:{org}:{cycleStartEpoch}`, so a

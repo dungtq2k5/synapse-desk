@@ -15,7 +15,7 @@ import { PrismaService } from './prisma.service';
  *     block re-uploading a document you had deleted; the partial index releases
  *     the slot, which is the whole reason it is partial.
  *   - `document_chunks_fts_idx` is the lexical retrieval arm's index, and it is
- *     COMPOSITE for a security-adjacent reason (11-doc §1.4): tenant filtering
+ * COMPOSITE for a security-adjacent reason: tenant filtering
  *     must happen BEFORE text matching. A GIN index on the tsvector alone
  *     matches text across every tenant's chunks and filters afterwards — not a
  *     leak, but a query that degrades exactly as the corpus grows.

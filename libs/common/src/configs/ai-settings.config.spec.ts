@@ -49,7 +49,7 @@ describe('§3b AI settings (unit)', () => {
     it('2. Changes generationModel and NOTHING else when the tier is QUALITY', () => {
       // The row that catches the plausible-sounding extension: scaling the
       // embedding model with the tier is a full re-embed migration of every
-      // tenant (doc 15 §2.2), and scaling the cheap model multiplies a premium
+      // tenant, and scaling the cheap model multiplies a premium
       // tenant's bill on volume calls nobody can tell apart.
       const fast = resolveAiSettings('FAST');
       const quality = resolveAiSettings('QUALITY');
@@ -67,7 +67,7 @@ describe('§3b AI settings (unit)', () => {
     });
 
     it('3. Prices the QUALITY model HIGHER, which is what makes the tier safe to sell', () => {
-      // Doc 15 §2.1: a QUALITY tenant consumes the same token count for
+      // A QUALITY tenant consumes the same token count for
       // several times the money. Because the budget is denominated in cost
       // rather than tokens, their spend rises accordingly and the cap keeps
       // meaning what it meant. Equal prices here would silently restore the
@@ -162,7 +162,7 @@ describe('§3b AI settings (unit)', () => {
   });
 
   describe('cross-language contract', () => {
-    // Doc 15 §1.4 test 6. The Python half of this same assertion lives in
+    // The Python half of this same assertion lives in
     // `apps/rag-service/tests/test_settings.py`; between them, a value changed
     // on one side and not the other fails that side's own suite.
     it('11. Matches the SHARED contract fixture the Python resolver also reads', () => {

@@ -18,7 +18,7 @@ import { QUOTA_REDIS } from '../ai-ledger/quota-counter.service';
 import { QdrantService } from '../qdrant/qdrant.service';
 
 /**
- * `grpc.health.v1.Health` and `synapsedesk.ops.OpsService` — 23-doc §2, §3.
+ * `grpc.health.v1.Health` and `synapsedesk.ops.OpsService`
  *
  * **Four dependencies, and Qdrant is the one that distinguishes this service.**
  * A document that parses and cannot be upserted is a job that will fail, so an

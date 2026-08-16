@@ -35,7 +35,7 @@ type Recipient = {
 };
 
 /**
- * `notification.in_app.create` → rows a user can actually see — 18-doc §1, §3.
+ * `notification.in_app.create` → rows a user can actually see
  *
  * **This consumer is the fix for a subject that had no subscriber.** The AI
  * quota alert published into it correctly, idempotently and to the right
@@ -43,7 +43,7 @@ type Recipient = {
  * except the one that reaches a person, and the emit looked exactly like
  * success, which is why it survived a review.
  *
- * 18-doc turns it from one producer's consumer into Domain E's write path:
+ * Turns it from one producer's consumer into Domain E's write path:
  * two audience kinds, group collapse, preference and quiet-hours resolution,
  * and a delivery row for every channel including the ones that were skipped.
  */
@@ -69,7 +69,7 @@ export class InAppNotificationService {
       command.audience,
     );
 
-    // **Never notify the actor** — 18-doc §3.1 rule 1.
+    // **Never notify the actor** rule 1.
     //
     // Applied HERE rather than in each producer, so a new producer gets it for
     // free. An agent who assigns a ticket to themselves being told about it is
@@ -128,7 +128,7 @@ export class InAppNotificationService {
         }
       } catch (error) {
         // **One recipient's failure must not cost the others theirs**
-        // (18-doc §3 test 8). A fan-out that aborts halfway is worse than one
+        // . A fan-out that aborts halfway is worse than one
         // that loses a single row: the recipients it did not reach have no
         // record that anything was attempted.
         this.logger.error(
@@ -157,7 +157,7 @@ export class InAppNotificationService {
   }
 
   /**
-   * The audience, by whichever kind the producer used — 18-doc §1.3.
+   * The audience, by whichever kind the producer used
    *
    * A `users` audience makes **no call to auth-service for resolution**: the
    * producer already knows who, and a permission lookup here is the exact bug
@@ -240,7 +240,7 @@ export class InAppNotificationService {
   /**
    * Collapse onto an existing UNREAD notification with the same group key.
    *
-   * **Scoped to unread deliberately** (18-doc §3.2). Once the user has read
+   * **Scoped to unread deliberately**. Once the user has read
    * *"3 new replies"*, the next reply is new information and starts a fresh
    * row — otherwise a long thread produces one notification the user read on
    * day one and never sees again.
@@ -265,7 +265,7 @@ export class InAppNotificationService {
 
     if (!existing) return null;
 
-    // **The honest limit of this guard** (18-doc §3.2). The INSERT is deduped
+    // **The honest limit of this guard**. The INSERT is deduped
     // by the unique index; an increment has no such protection, so a NATS
     // redelivery could double-count. Comparing against the last triggering
     // event id covers CONSECUTIVE redelivery — which is the case NATS actually
@@ -320,7 +320,7 @@ export class InAppNotificationService {
    *
    * Everything below `CRITICAL` is in-app only. Emailing every reply to every
    * agent is how a channel earns the filter that then hides the one that
-   * mattered — and 18-doc §4 is explicit that you get one chance at a user's
+   * mattered — and you get one chance at a user's
    * notification settings.
    */
   private async fanOutEmail(
@@ -355,7 +355,7 @@ export class InAppNotificationService {
 
       if (!decision.allowed) {
         // **A suppressed notification is a SKIPPED row, never a silent drop**
-        // (18-doc §4). "I never got notified" is unanswerable without it, and
+        //. "I never got notified" is unanswerable without it, and
         // it is the single most common support question this feature will
         // generate.
         await this.skipEmail(command, recipient, decision.reason);
@@ -377,7 +377,7 @@ export class InAppNotificationService {
             },
           },
           // **A ticket notification is answerable; everything else is not** —
-          // 31-doc §4. The address carries a per-ticket token, so replying to
+          // The address carries a per-ticket token, so replying to
           // this email appends to the thread it is about rather than opening a
           // duplicate. A notification about anything else offers none, because
           // there is nothing for a reply to attach to.

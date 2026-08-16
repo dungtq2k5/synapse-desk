@@ -41,7 +41,7 @@ import { stopWorkers } from '../utils';
  */
 describe('AuditConsumer over NATS (e2e)', () => {
   // Every injected fault in this file is registered here and restored in an
-  // `afterEach` that runs whether the test passed, failed or threw — 16-doc §9.
+  // `afterEach` that runs whether the test passed, failed or threw
   const faults = faultInjector();
 
   let app: INestApplication;

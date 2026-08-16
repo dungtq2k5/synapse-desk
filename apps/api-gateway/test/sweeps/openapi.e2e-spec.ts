@@ -27,7 +27,7 @@ describe('§1/§5 the OpenAPI document', () => {
   let doc: OpenAPIObject;
 
   /**
-   * The OpenAPI spec, asserted as a whole — 24-doc §1, §5.
+   * The OpenAPI spec, asserted as a whole
    *
    * **These tests only mean anything because the swagger CLI plugin runs under
    * jest.** It is a TypeScript transformer that emits `@ApiProperty` from existing
@@ -35,7 +35,7 @@ describe('§1/§5 the OpenAPI document', () => {
    * `nest-cli.json` says so, and jest runs it because
    * `jest.swagger-transform.cjs` wires it into ts-jest. Without that file every
    * assertion below is vacuously true of a spec with no schemas in it — which is
-   * exactly the confusing hour 24-doc §1 describes.
+   * exactly the confusing hour described when this was designed.
    *
    * `document.spec.ts` guards that: it asserts the transform is present, so
    * removing it fails loudly rather than turning this suite green and empty.
@@ -126,7 +126,7 @@ describe('§1/§5 the OpenAPI document', () => {
     });
 
     it('2. **fields reached through `PickType` appear on the derived DTO**', () => {
-      // 24-doc §1, restated for the layout that exists now.
+      // Restated for the layout that exists now.
       //
       // This used to guard the `.base.ts` trap: the plugin's default
       // `dtoFileNameSuffix` is `['.dto.ts', '.entity.ts']`, `user.base.ts`
@@ -165,7 +165,7 @@ describe('§1/§5 the OpenAPI document', () => {
     });
 
     it('3. **an optional query parameter is not documented as required**', () => {
-      // 24-doc §1 frames this as "proves `classValidatorShim` is engaged", and
+      // This proves `classValidatorShim` is engaged, and
       // running it revealed that it does not: **the plugin derives `required`
       // from TYPESCRIPT optionality, not from `@IsOptional()`.** A field
       // declared `page: number = 1` is non-optional to the compiler even though
@@ -249,7 +249,7 @@ describe('§1/§5 the OpenAPI document', () => {
     });
 
     it('2. **a `@Post` that returns 201 documents 201, not 200**', () => {
-      // 24-doc §2, fix 2. The obvious implementation hardcodes `ApiOkResponse`,
+      // The obvious implementation hardcodes `ApiOkResponse`,
       // so every create documents a 200 while returning a 201 — and a
       // silently-wrong status is worse than an absent one, because a client
       // generator emits it and the client then treats every successful create
@@ -272,7 +272,7 @@ describe('§1/§5 the OpenAPI document', () => {
     });
 
     it('3. **`ApiFilterErrors([403])` actually produces a 403**', () => {
-      // The silent no-op — 24-doc §2, fix 1. The reference implementation's
+      // The silent no-op, fix 1. The reference implementation's
       // union accepted `'403'` and its body ignored it, so the annotation
       // type-checked, read as documentation, and produced nothing. This system
       // needs 403 more than the reference did: permission-guarded routes are
@@ -398,7 +398,7 @@ describe('§1/§5 the OpenAPI document', () => {
           .sort(compareAlphabetically);
 
         expect(without).toEqual([
-          // Presigns an inbound mail's attachments before the webhook — 31-doc
+          // Presigns an inbound mail's attachments before the webhook
           // §5. On the same controller and therefore under the same
           // `@SkipThrottle()`: a Worker rate-limited mid-delivery would drop a
           // customer's file, and the signature is what bounds this route's
@@ -516,7 +516,7 @@ describe('§1/§5 the OpenAPI document', () => {
   // ---------------------------------------------------- §5 tests 4 and 5
 
   /**
-   * **The test that makes this stay true** — 24-doc §5.
+   * **The test that makes this stay true**
    *
    * Documentation drifts silently: nothing about a wrong schema fails, the page
    * still renders, and the first person to notice is a consumer whose generated
@@ -530,7 +530,7 @@ describe('§1/§5 the OpenAPI document', () => {
    */
   describe('§30 §4 the caching contract is PUBLISHED', () => {
     it('**the description carries the staleness contract**', () => {
-      // 30-doc §5 step 3, and the order is the point: written before any
+      // The order is the point: written before any
       // response cache exists, so it is a stated limit rather than one a client
       // discovers. Rendered at `/docs`, where the people it affects will read
       // it — not in a design document only this team opens.
@@ -612,7 +612,7 @@ describe('§1/§5 the OpenAPI document', () => {
       );
 
     it('1. **appears in the document with a summary and a 200**', () => {
-      // Named here because the tempting way to satisfy 24-doc §5's structural
+      // Named here because the tempting way to satisfy the structural
       // sweep is `@ApiExcludeEndpoint()`, which would delete the route from the
       // spec — and the spec is the one document describing how the Worker must
       // call it.
@@ -798,7 +798,7 @@ describe('§1/§5 the OpenAPI document', () => {
 
   describe('§4 exposure', () => {
     it('**is gated on `SWAGGER_ENABLED`, not on an inline NODE_ENV check**', () => {
-      // 24-doc §4. `NODE_ENV !== 'production'` written at a call site is the
+      // `NODE_ENV !== 'production'` written at a call site is the
       // condition that gets inverted during a refactor with nobody noticing,
       // because the failure direction is MORE exposure — and more exposure
       // looks exactly like everything working.

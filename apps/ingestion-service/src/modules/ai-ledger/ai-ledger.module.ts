@@ -20,7 +20,7 @@ import { QUOTA_REDIS, QuotaCounterService } from './quota-counter.service';
 @Module({
   controllers: [AiLedgerGrpcController],
   // `AiAnalyticsModule` for the three analytics RPCs and the rollup that feeds
-  // them (19-doc §3.2) — they hang off this controller because they read this
+  // them — they hang off this controller because they read this
   // module's projection.
   imports: [JobRunsModule, PrismaModule, AuthClientModule, AiAnalyticsModule],
   providers: [

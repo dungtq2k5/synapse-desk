@@ -1,7 +1,7 @@
 """The real generation provider, streamed.
 
 **Names no model.** The model arrives as an argument, resolved by the caller
-from `settings_for(organization_id)` — doc 15 §1.2.
+from `settings_for(organization_id)`
 """
 
 from __future__ import annotations
@@ -46,7 +46,7 @@ class GeminiGenerator:
             if response.text:
                 yield GenerationDelta(text=response.text)
 
-            # 17-doc §1.2 Gap 2 — the reason generation stopped.
+            # Gap 2 — the reason generation stopped.
             #
             # A truncated response and a badly-answered one are INDISTINGUISHABLE
             # downstream: hitting `max_output_tokens` cuts the JSON off
@@ -116,7 +116,7 @@ class GeminiGenerator:
 
 
 def _to_contents(prompt: Prompt) -> str | list[object]:
-    """`Prompt` -> whatever `google-genai` wants — 36-doc §5.1.
+    """`Prompt` -> whatever `google-genai` wants
 
     **The only function in this service that knows what an attachment becomes.**
     Everything above passes `str | list[str | Attachment]`; a second provider

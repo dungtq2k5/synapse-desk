@@ -152,7 +152,7 @@ export class TicketsService {
   }
 
   /**
-   * The batch read behind the tickets DataLoader — 27-doc §1, §3.
+   * The batch read behind the tickets DataLoader
    *
    * Reached from `Notification.data.ticketId` and from analytics drill-downs.
    *
@@ -182,7 +182,7 @@ export class TicketsService {
       where: {
         ...tenantScope(context),
         ...this.visibilityScope(context),
-        // Soft-deleted tickets ARE returned by id — 27-doc §1. A notification
+        // Soft-deleted tickets ARE returned by id A notification
         // citing a deleted ticket still has to render something, and omitting
         // it makes the edge null, which the UI cannot distinguish from a ticket
         // that never existed.
@@ -215,7 +215,7 @@ export class TicketsService {
       await this.authReference.assertUserExists(authorId, context);
     }
 
-    // **The dedup row and the ticket share one transaction** — 31-doc §6.2.
+    // **The dedup row and the ticket share one transaction**
     // Recorded separately, a request that inserted the row and then failed
     // would make the provider's retry a no-op, losing the mail on the one
     // delivery that could still have saved it.
@@ -335,7 +335,7 @@ export class TicketsService {
       occurredAt: new Date().toISOString(),
       escalatedAt: (ticket.escalatedAt ?? new Date()).toISOString(),
       // The queue that must react. Domain E addresses this one by PERMISSION
-      // inside the department (18-doc §3.1) — the only ticket event that does.
+      // inside the department — the only ticket event that does.
       departmentId: ticket.currentDepartmentId,
     });
 
@@ -516,7 +516,7 @@ export class TicketsService {
       fromStatus: from,
       toStatus: to,
       changedById: context.sub,
-      // Carried so Domain E does not need an RPC per notification (18-doc §3
+      // Carried so Domain E does not need an RPC per notification (
       // test 9). A terminal transition is news for the person who opened the
       // ticket, and `changedById` is whoever closed it.
       requesterId: ticket.authorId,

@@ -22,7 +22,7 @@ const AUDIENCE = 'organization.update';
 const CYCLE_START = new Date('2026-08-01T00:00:00.000Z');
 
 /**
- * 18-doc §1, §3, §5 — Domain E's write path.
+ * §3, §5 — Domain E's write path.
  *
  * **Every assertion here is on something a user could SEE**: a row in their
  * feed, a captured outbound email, or a delivery record that answers *"why
@@ -63,7 +63,7 @@ describe('§1 In-app notification delivery (e2e)', () => {
   const quotaAlert = (threshold: number, overrides = {}) => {
     return {
       organizationId: ORG,
-      // The ORIGINATING event, never the transport subject (18-doc §1.3).
+      // The ORIGINATING event, never the transport subject.
       type: NOTIFICATION_TYPES.quotaThreshold,
       audience: { kind: 'permission' as const, permission: AUDIENCE },
       // DERIVED, never generated — the property the UNIQUE index relies on.
@@ -131,7 +131,7 @@ describe('§1 In-app notification delivery (e2e)', () => {
     });
 
     it('2. Stores the ORIGINATING type, not the transport subject — §1.3', async () => {
-      // The latent bug 18-doc §1.3 names. `type` used to be written as
+      // The latent bug here. `type` used to be written as
       // `IN_APP_NOTIFICATION_PATTERN`, identical on every row — harmless with
       // one producer and a blocker with two, because `?type=` would match
       // everything against everything and preference resolution keys on it, so
@@ -369,7 +369,7 @@ describe('§1 In-app notification delivery (e2e)', () => {
     it('18. Records the provider message id on a sent email', async () => {
       // Captured now because it cannot be recovered later: it is what
       // correlates a bounce webhook back to the row that sent the mail, and
-      // nothing consumes those webhooks yet (18-doc §8).
+      // nothing consumes those webhooks yet.
       await inApp.deliver(quotaAlert(100));
 
       const [delivery] = await fx.prisma.notificationDelivery.findMany({

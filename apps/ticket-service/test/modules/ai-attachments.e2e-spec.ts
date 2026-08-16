@@ -19,7 +19,7 @@ import { RagClientService } from '../../src/modules/ai-client/rag-client.service
 import { StorageReferenceService } from '../../src/modules/storage-client/storage-reference.service';
 
 /**
- * Filter, THEN fetch — 36-doc §2.
+ * Filter, THEN fetch
  *
  * The order is the design rather than a detail: `mimeType` and `fileSizeBytes`
  * are on the row, so an ineligible file is rejected without a download.
@@ -79,7 +79,7 @@ describe('§36 attachments as model input (e2e)', () => {
 
   it('1. **an ineligible type is never downloaded**', async () => {
     // The upload allowlist permits a zip; the model cannot read one. Two lists,
-    // two questions — 35-doc §8.
+    // two questions
     const ticket = await createTicket(fx.prisma, tenant);
     const message = await createMessage(fx.prisma, ticket.id);
     await attach(message.id, 'application/zip', 1024, 'logs.zip');
@@ -172,7 +172,7 @@ describe('§36 attachments as model input (e2e)', () => {
    * §2's fifth test — **both `Draft` call sites**, driven end to end.
    *
    * `generateReplyDraft` has exactly two callers and they are in different
-   * modules, which is how the first draft of 36-doc came to name only the
+   * modules, which is how the first draft came to name only the
    * co-pilot one. Parameterised rather than written twice, so a third caller
    * added tomorrow has an obvious place to land and no place to hide.
    *
@@ -274,7 +274,7 @@ describe('§36 attachments as model input (e2e)', () => {
    * be written after its message existed, while `invokeAi` runs during the
    * create. The pinned version of this test recorded that a same-turn
    * attachment could never reach the same-turn answer — the exact failure
-   * 35-doc §1 opens with, arriving through a different door.
+   * Opens with, arriving through a different door.
    *
    * Inverted rather than deleted. It documented the bug; it is now the
    * assertion that the fix holds, and if the binding ever moves back out of
@@ -284,7 +284,7 @@ describe('§36 attachments as model input (e2e)', () => {
     const ticket = await createTicket(fx.prisma, tenant);
     const objectPath = `organizations/${tenant.organizationId}/tickets/${ticket.id}/attachments/pending/${faker.string.uuid()}.png`;
     confirmUpload.mockResolvedValue({
-      // Out of `pending/` — 36-doc §1.3.2.
+      // Out of `pending/`
       objectPath: objectPath.replace('/pending/', '/'),
       sizeBytes: 2048,
       contentType: 'image/png',
@@ -377,7 +377,7 @@ describe('§36 attachments as model input (e2e)', () => {
   /**
    * **A refused message's ATTACHMENTS do not reach a later prompt.**
    *
-   * 35-doc §6's rule, which was half-applied: all three transcript builders
+   * 's rule, which was half-applied: all three transcript builders
    * dropped a refused message's text, and all three attachment rules sent its
    * files anyway. A user sends injection text plus a screenshot, the guard
    * refuses it, the write-back sets the flag — and the next co-pilot draft

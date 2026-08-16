@@ -69,7 +69,7 @@ export class OrganizationsService {
   }
 
   /**
-   * The tenant behind an inbound support address — 31-doc §2.
+   * The tenant behind an inbound support address
    *
    * **Absent rather than an exception for an unroutable token**, and the
    * distinction is load-bearing: the caller must drop unroutable mail with a
@@ -121,7 +121,7 @@ export class OrganizationsService {
   }
 
   /**
-   * The tenant's inbound token — 31-doc §4, for building `Reply-To`.
+   * The tenant's inbound token, for building `Reply-To`.
    *
    * The reverse of `resolveOrgByInboundToken`, and it needs no caller context
    * for the same reason: the token is a public mail address, not a credential.
@@ -145,7 +145,7 @@ export class OrganizationsService {
   }
 
   /**
-   * Issues the tenant's inbound-mail token, or ROTATES an existing one — 31-doc §2.
+   * Issues the tenant's inbound-mail token, or ROTATES an existing one
    *
    * **One method for both, because they differ only in whether a row already
    * had a value.** Rotation is one of the three properties §2 chose an opaque
@@ -187,7 +187,7 @@ export class OrganizationsService {
   }
 
   /**
-   * Switches inbound mail off — 31-doc §2.
+   * Switches inbound mail off
    *
    * Sets NULL rather than deleting anything, which returns the tenant to the
    * state one that never enabled email is already in. Idempotent: revoking
@@ -412,7 +412,7 @@ export class OrganizationsService {
     const seatsUsed = await this.seatsInUse(this.prisma, organization.id);
 
     return {
-      // The PLAN, alongside the meters — doc 15 §3.1. This is the page a
+      // The PLAN, alongside the meters This is the page a
       // customer opens when they hit a limit, and a limit with no plan beside
       // it is a number they cannot act on: the next question is always "what
       // would I get if I upgraded", and answering it on a different page means
@@ -440,7 +440,7 @@ export class OrganizationsService {
   }
 
   /**
-   * Everything a spending service needs to gate a request — doc 15 §3.1.
+   * Everything a spending service needs to gate a request
    *
    * `ingestion-service` and `rag-service` both need the tier AND the quota
    * columns, and neither may read `postgres_auth` directly (RDM §1.13). This is
@@ -473,7 +473,7 @@ export class OrganizationsService {
   }
 
   /**
-   * Tenant timezones, in BULK — 19-doc §2.2.
+   * Tenant timezones, in BULK
    *
    * **Service-to-service, with no actor.** The daily rollup jobs run across
    * every tenant that had activity, not on behalf of a caller, so the ids are a
@@ -514,7 +514,7 @@ export class OrganizationsService {
   }
 
   /**
-   * Every tenant's BILLING CYCLE START, in bulk — 20-doc §3.1.
+   * Every tenant's BILLING CYCLE START, in bulk
    *
    * **The read that makes per-tenant quota reconciliation possible.** The cycle
    * start differs per tenant, so a sweep that assumed one would reconcile

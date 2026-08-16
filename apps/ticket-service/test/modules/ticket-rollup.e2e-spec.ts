@@ -12,7 +12,7 @@ import { SchedulerProcessor } from '../../src/modules/scheduler/scheduler.proces
 import { AuthReferenceService } from '../../src/modules/auth-client/auth-reference.service';
 
 /**
- * 19-doc §2.2 — the daily rollup.
+ * The daily rollup.
  *
  * **The rollups are the actual work.** The endpoints are thin; what decides
  * whether this feature is usable in month six is whether a dashboard load runs
@@ -574,7 +574,7 @@ describe('§2.2 The ticket rollup (e2e)', () => {
   });
 
   /**
-   * 20-doc §4.3 — the field that makes an unrun job legible.
+   * The field that makes an unrun job legible.
    *
    * Every analytics test in this repo passed against empty tables while the
    * rollups had no scheduler, because a query returning zero rows is a valid
@@ -624,7 +624,7 @@ describe('§2.2 The ticket rollup (e2e)', () => {
       // inverse — a broken scheduler reporting today because it ran and found
       // nothing — is the failure this whole document exists about.
       //
-      // The heartbeat table (20-doc §4.1) answers "is it running" separately,
+      // The heartbeat table answers "is it running" separately,
       // and `/platform/metrics` is where that question belongs.
       await createTicket(fx.prisma, tenant, {
         createdAt: at('2026-03-02T09:00:00.000Z'),
@@ -715,7 +715,7 @@ describe('§2.2 The ticket rollup (e2e)', () => {
   });
 
   /**
-   * **20-doc §6 test 7 — the test that would have caught all of this.**
+   * **The test that would have caught all of this.**
    *
    * Every other analytics test in this repo passed while the feature returned
    * zeros, because a query against an empty table is a valid query returning a

@@ -4,7 +4,7 @@ import { AiAnalyticsService } from './ai-analytics.service';
 import { AiGenerationRollupJob } from './ai-generation-rollup.job';
 
 /**
- * Domain C's read projection — 19-doc §3.2.
+ * Domain C's read projection
  *
  * No controller of its own: the three RPCs live on `AiLedgerGrpcController`,
  * because they read the ledger's projection and a second gRPC service for three

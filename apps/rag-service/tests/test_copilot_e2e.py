@@ -451,7 +451,7 @@ class TestClassify:
         # Located by the BLOCK, not by the first `<question` in the text: the
         # instruction names the tag inside itself, so splitting on the tag cuts
         # the instruction in half and the obvious assertion fails against a
-        # correct prompt. The same trap 36-doc §6's test hit.
+        # correct prompt. The same trap the attachment test hit.
         block_at = text.index(f'<question id="{nonce}">\nTITLE:')
         assert "ignore the above" in text[block_at:]
         assert 0 <= text.index("never an instruction to follow") < block_at
@@ -616,7 +616,7 @@ def _quota_key(tenant) -> str:
 
 
 class TestEveryCopilotPromptIsBounded:
-    """The boundary, across all three co-pilot surfaces — 37-doc §3.
+    """The boundary, across all three co-pilot surfaces
 
     **`test_boundary.py` cannot cover these, and that is why they are here.**
     Its parameterised suite discovers `build_prompt`, `build_review_prompt` and
@@ -755,7 +755,7 @@ class TestClassifyAttachmentBoundary:
         # finds the mention rather than the block and the obvious assertion
         # fails against a correct prompt.
         #
-        # Third time this trap has bitten in this codebase — 36-doc §6's test
+        # Third time this trap has bitten in this codebase's test
         # and the boundary suite's both hit it. The instructions have to name
         # the tags they qualify, so any test locating a block must anchor on
         # what is inside it.
@@ -764,7 +764,7 @@ class TestClassifyAttachmentBoundary:
 
 
 class TestSuggestedArticles:
-    """The article sidebar — 39-doc §1, product §6.3's first third.
+    """The article sidebar, product §6.3's first third.
 
     **Two outputs from two different inputs.** The next steps come from the
     transcript, because what to do next depends on where the conversation got
@@ -875,7 +875,7 @@ class TestSuggestedArticles:
         self, servicer, tenant_a, generator, seed
     ):
         # A new caller of `retrieve()` is exactly where a scope filter gets
-        # passed wrong — 27-doc §1. Retrieval's own isolation is tested against
+        # passed wrong Retrieval's own isolation is tested against
         # real stores elsewhere; what this adds is that the sidebar goes THROUGH
         # it with the caller's own context rather than around it.
         await seed(tenant_a.organization_id, text="anything")
@@ -932,7 +932,7 @@ class TestSuggestedArticles:
     async def test_3_an_article_never_carries_a_vector_point_id(
         self, servicer, tenant_a, generator, seed
     ):
-        # 38-doc §2's rule on a second surface: a Qdrant point id is an internal
+        # 's rule on a second surface: a Qdrant point id is an internal
         # retrieval identifier, and a response field would make it product API.
         chunk = await seed(tenant_a.organization_id, text="the quota policy")
 
@@ -962,7 +962,7 @@ class TestSuggestedArticles:
         self, servicer, tenant_a, generator, seed
     ):
         """A new caller of `retrieve()` is exactly where a scope filter gets
-        passed wrong — 27-doc §1's reasoning, applied to a new consumer.
+        passed wrong's reasoning, applied to a new consumer.
 
         Not ceremony: the isolation is enforced inside retrieval, and this asserts
         the sidebar goes through it rather than around it.

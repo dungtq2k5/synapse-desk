@@ -31,7 +31,7 @@ import type { GqlContext } from '../../common/graphql/loaders/loaders.factory';
 import { ANALYTICS_TOP_N } from '@synapsedesk/common';
 
 /**
- * The analytics queries — 26-doc §3.1, §4.
+ * The analytics queries
  *
  * **Four of the ten REST reads, chosen by composition rather than parity.** A
  * read earns a query here when its rows carry entity ids a loader can resolve
@@ -80,7 +80,7 @@ export class AnalyticsResolver {
     @Args('to', { type: () => String }) to: string,
     @CurrentUser() context: RequestContext,
   ): Promise<AgentAnalyticsGqlDto> {
-    // **`hydrateNames: false` is the whole point of the edge** — 26-doc §3.1.
+    // **`hydrateNames: false` is the whole point of the edge**
     // The service's third leg calls the same `ListUsersByIds` the users loader
     // does; running it here as well would make every numbers-only query pay
     // for a round trip whose result no field reads.
@@ -162,7 +162,7 @@ export class AgentStatResolver {
 }
 
 /**
- * `DocumentUsage.document` — `ListDocumentsByIds`'s first consumer, 27-doc §3.
+ * `DocumentUsage.document` — `ListDocumentsByIds`'s first consumer
  *
  * The rollup row carries the title it was written with, so this edge is what a
  * client asks for when it needs the CURRENT document — the title after a

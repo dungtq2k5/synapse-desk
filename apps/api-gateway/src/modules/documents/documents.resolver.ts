@@ -27,7 +27,7 @@ import { toDepartmentResponseGqlDto } from '../departments/department.mapper';
 import { MAX_EDGE_LIST } from '../../common/config/graphql-limits.config';
 
 /**
- * `Query.document`, `Query.documents` and the document edges — 26-doc §3, §4.
+ * `Query.document`, `Query.documents` and the document edges
  *
  * The department boundary is ingestion-service's, applied inside the same call
  * the REST route makes: a document scoped to a department is invisible outside
@@ -87,7 +87,7 @@ export class DocumentsResolver {
   }
 
   /**
-   * The flat count beside the capped edge — 26-doc §3.2. See
+   * The flat count beside the capped edge See
    * `UsersResolver.departmentCount` for why it is a field rather than a
    * `totalCount` on the connection.
    */
@@ -122,7 +122,7 @@ export class DocumentsResolver {
     const ids = document.departmentIds;
     if (ids.length === 0) return [];
 
-    // Sliced BEFORE the batch — 26-doc §3.2, same reasoning as
+    // Sliced BEFORE the batch, same reasoning as
     // `User.departments`: the batch RPC's cap is an error, not a truncation, so
     // an uncapped parent fails the whole field rather than shortening it.
     const departments = await loaders.departments.loadMany(

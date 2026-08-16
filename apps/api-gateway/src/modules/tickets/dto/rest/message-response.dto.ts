@@ -42,7 +42,7 @@ export class MessageResponseDto {
   createdAt!: Date;
   attachments!: AttachmentResponseDto[];
   /**
-   * Kept OUT of AI prompts — 36-doc §7.
+   * Kept OUT of AI prompts
    *
    * Exposed rather than stripped: the transcript builder in `AiStreamService`
    * filters on it AFTER fetching, because the same route serves the UI, where a
@@ -63,7 +63,7 @@ export class MessageResponseDto {
 }
 
 /**
- * What a create answers with — 36-doc §1.3.1.
+ * What a create answers with
  *
  * A wrapper because a create now has a second outcome: an attachment whose
  * confirm failed is **skipped and named**, and the message is created anyway.

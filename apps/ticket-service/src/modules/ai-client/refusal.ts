@@ -12,7 +12,7 @@ import { readHttpStatusHint } from '@synapsedesk/common';
 const REFUSAL_HTTP_STATUS = 422;
 
 /**
- * Whether a failed draft was REFUSED, as opposed to merely failing — 36-doc §7.
+ * Whether a failed draft was REFUSED, as opposed to merely failing
  *
  * **The distinction decides whether a message is excluded from AI context**, so
  * being wrong in either direction has a cost. Treating an outage as a refusal

@@ -40,7 +40,7 @@ message GenerateDraftResponse {
   int32 prompt_tokens = 3;
   int32 completion_tokens = 4;
 
-  // The `ai_generations` row this draft was recorded as — doc 15 §3.2.
+  // The `ai_generations` row this draft was recorded as
   //
   // The client hands it back as `generatedFromId` when the agent posts, which
   // is what closes the ACCEPTANCE LOOP. Without it the outcome is never
@@ -67,7 +67,7 @@ message SuggestionResponse {
 
 message GetSuggestionsResponse {
   repeated SuggestionResponse items = 1;
-  // Carried through from rag-service — 39-doc §1. `items` is the next-step
+  // Carried through from rag-service `items` is the next-step
   // list this endpoint already produced; these are the articles beside it.
   repeated SuggestedArticleResponse articles = 2;
 }

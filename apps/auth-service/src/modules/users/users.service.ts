@@ -236,7 +236,7 @@ export class UsersService {
 
   /**
    * Everyone in a tenant holding a given permission — the notification
-   * AUDIENCE (16-doc §1).
+   * AUDIENCE.
    *
    * Resolved HERE because auth-service owns roles and permissions. The producer
    * of a quota alert knows it should reach "whoever can act on this" and cannot
@@ -275,7 +275,7 @@ export class UsersService {
         // of addressing it by permission.
         //
         // **`isLocked` is the authoritative boolean, and this filter is
-        // deliberately NOT temporal** — 21-doc §2.2. A `lockedUntil` column
+        // deliberately NOT temporal** A `lockedUntil` column
         // does now exist, but it is only an EXPIRY: two mechanisms act on it
         // (a lazy unlock on the login path and the hourly `ExpiredLockSweep`),
         // and both clear `isLocked` when they fire. Reading the expiry here as
@@ -296,7 +296,7 @@ export class UsersService {
         roles: {
           some: { permissions: { some: { code: request.permissionCode } } },
         },
-        // Narrowed to one DEPARTMENT when the caller asked for it — 18-doc
+        // Narrowed to one DEPARTMENT when the caller asked for it
         // §3.1. Absent means the whole tenant, which is right for a quota
         // alert (one budget per organization) and wrong for a ticket
         // escalation: every agent in the company hearing about one
@@ -316,7 +316,7 @@ export class UsersService {
   }
 
   /**
-   * The OTHER audience kind — 18-doc §1.3.
+   * The OTHER audience kind
    *
    * A ticket event already knows who the assignee is; resolving `ticket.read`
    * holders instead would tell every agent in the tenant that one of them got a
@@ -342,7 +342,7 @@ export class UsersService {
       });
     }
 
-    // Deduped and capped — 27-doc §1, properties 3 and 5. The cap judges what
+    // Deduped and capped, properties 3 and 5. The cap judges what
     // was ASKED for rather than what was distinct, or repeating one id 400
     // times bypasses it.
     const { ids: userIds, overLimit } = normalizeBatchIds(request.userIds);
@@ -366,7 +366,7 @@ export class UsersService {
       id: { in: userIds },
       organizationId: request.organizationId,
       // **`includeInactive` decides this, and the two callers want opposite
-      // answers** — 27-doc §3. A notification to a deactivated account is a row
+      // answers** A notification to a deactivated account is a row
       // nobody reads; a ticket whose assignee was locked this morning still has
       // to render their name, and omitting them shows a blank where "Former
       // employee" belongs.
@@ -375,7 +375,7 @@ export class UsersService {
 
     // **Only the requested shape is fetched, and only it is populated.** The
     // notification projection carries `email`, and `email` is precisely what a
-    // GraphQL edge must not expose (25-doc §4) — sending it and trusting the
+    // GraphQL edge must not expose — sending it and trusting the
     // gateway to drop it is one careless mapper away from being a leak.
     //
     // Two queries rather than one with a computed `select`: Prisma types the
@@ -667,7 +667,7 @@ export class UsersService {
    * Same "otherwise they keep working" reasoning as delete.
    *
    * **`lockedUntil` is optional, and absent means INDEFINITE** — the existing
-   * product, unchanged (21-doc §2.5 test 1). A temporary lock stores an expiry
+   * product, unchanged. A temporary lock stores an expiry
    * that two mechanisms act on; nothing about the lock itself differs.
    */
   async lockUser(
@@ -684,7 +684,7 @@ export class UsersService {
     await this.prisma.user.update({
       where: { id: target.id },
       // `lockedUntil: null` when absent, not left alone: a re-lock must not
-      // inherit an expiry from a previous temporary lock — 21-doc §2.4.
+      // inherit an expiry from a previous temporary lock
       data: { isLocked: true, lockedUntil },
     });
 
@@ -712,7 +712,7 @@ export class UsersService {
       data: {
         fullName: target.fullName,
         headline: 'Your account has been locked',
-        // **Says when it ends** — 21-doc §2.4. For a temporary lock, "until
+        // **Says when it ends** For a temporary lock, "until
         // Friday 09:00" is the difference between a support ticket and no
         // support ticket, and the user has no other way to find out.
         detail: lockUntilSentence(request.reason, lockedUntil, target.timezone),
@@ -724,7 +724,7 @@ export class UsersService {
   }
 
   /**
-   * Validates an optional lock expiry — 21-doc §2.4.
+   * Validates an optional lock expiry
    *
    * **A past date is rejected rather than accepted.** It would lock and
    * instantly unlock: legal in the database, and incomprehensible to the admin
@@ -752,7 +752,7 @@ export class UsersService {
   /**
    * No sessions restored: unlocking permits signing in, it does not sign in.
    *
-   * **Clears `lockedUntil` too** — 21-doc §2.4. An admin unlocking a
+   * **Clears `lockedUntil` too** An admin unlocking a
    * temporarily-locked user must not leave a stale expiry behind for a later
    * indefinite re-lock to inherit.
    */
@@ -835,7 +835,7 @@ export class UsersService {
   }
 
   /**
-   * The sender of an inbound email, resolved WITHIN a known tenant — 31-doc §3.
+   * The sender of an inbound email, resolved WITHIN a known tenant
    *
    * **The `organizationId` argument is the security design, not a convenience.**
    * Self-signup answers the same policy question — *may this address join
@@ -1304,7 +1304,7 @@ export class UsersService {
     dob?: string;
     gender?: number;
   }): Prisma.UserUpdateInput {
-    // **`fullName` and `avatarUrl` are CACHED by the gateway** — 28-doc §3.1.
+    // **`fullName` and `avatarUrl` are CACHED by the gateway**
     // The entity cache behind the GraphQL user edges is invalidated
     // by the gateway MUTATIONS that reach this service, because today every
     // writer of those two columns is one: `updateOwnProfile`, `updateUser`,
@@ -1314,7 +1314,7 @@ export class UsersService {
     // directory import, an admin tool calling this service directly. It would
     // leave a stale name on every ticket, message and notification for up to
     // `ENTITY_TTL_SECONDS`, with nothing failing. That is the point at which
-    // the `user.*` NATS contract 29-doc §4.2 assumed has to exist.
+    // the `user.*` NATS contract the cache design assumed has to exist.
     //
     // `entity-writers.spec.ts` in the gateway pins the write sites, so a fifth
     // one fails a test rather than shipping quietly.
@@ -1337,7 +1337,7 @@ export class UsersService {
 }
 
 /**
- * The lock email's body — 21-doc §2.4.
+ * The lock email's body
  *
  * **Formatted in the RECIPIENT's timezone**, not the server's or the admin's.
  * `users.timezone` is already there for quiet hours, and an unlock time in a

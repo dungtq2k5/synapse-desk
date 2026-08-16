@@ -86,7 +86,7 @@ export class MessagesController {
    * instead — one field refused, rather than the whole conversation.
    *
    * **The response shape CHANGED, unversioned, and that was a choice** —
-   * 36-doc §1.3.1. This returned a bare message; it now returns
+   * This returned a bare message; it now returns
    * `{ message, skippedAttachments }`, because a create can partially succeed
    * and a caller has to be told which files did not confirm.
    *
@@ -157,7 +157,7 @@ export class MessagesController {
   // -------------------------------------------------------------- attachments
 
   /**
-   * The same presign, for a message that does NOT exist yet — 36-doc §1.3.
+   * The same presign, for a message that does NOT exist yet
    *
    * **This route is what makes a first-turn attachment readable.** Its sibling
    * below is nested under `:messageId`, so a client could only upload after

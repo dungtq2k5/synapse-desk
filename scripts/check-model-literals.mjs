@@ -2,7 +2,7 @@
 /**
  * Fails the build when an AI model name appears outside the settings layer.
  *
- * Doc 15 §1.2 states the rule; this makes it mechanical, "because the
+ * The rule is stated in the conventions; this makes it mechanical, "because the
  * discipline decays exactly when someone is debugging at speed". The failure it
  * prevents is silent: a single `'gemini-2.0-flash'` typed into a summarizer is
  * a tenant on the premium tier receiving the cheap model. Nothing throws, no
@@ -57,7 +57,7 @@ const ALLOWED = [
  *
  * An exact list would pass the moment somebody reached for a model that is not
  * yet configured — which is precisely the change worth catching, because it is
- * how an unpriced model enters the system and meters as free (12-doc §1.3).
+ * how an unpriced model enters the system and meters as free.
  */
 const MODEL_PATTERNS = [
   /\bgemini-[\w.]+/i,

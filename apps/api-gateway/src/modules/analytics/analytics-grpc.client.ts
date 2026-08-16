@@ -50,7 +50,7 @@ export type LegFailure = { source: string; reason: string };
 export type LegResult<T> = { value: T } | { failure: LegFailure };
 
 /**
- * The gateway's analytics client — 19-doc §1, §3.2.
+ * The gateway's analytics client
  *
  * **This class IS the argument for having no `analytics-service`.** The fan-out
  * is smaller than the ownership map implies: eight of the eleven endpoints are
@@ -263,7 +263,7 @@ export class AnalyticsGrpcClient
     };
   }
 
-  // ------------------------------------------------------ 19-doc §5, export
+  // ------------------------------------------------------ export
 
   async createExport(
     dto: CreateExportDto,
@@ -296,7 +296,7 @@ export class AnalyticsGrpcClient
   // ------------------------------------------------- the cross-service legs
 
   /**
-   * A leg that may fail WITHOUT failing the request — 19-doc §3.2.
+   * A leg that may fail WITHOUT failing the request
    *
    * Returns a discriminated result rather than throwing, so the composer can
    * render the legs it has and mark the rest `unavailable`. That is what
@@ -404,7 +404,7 @@ export class AnalyticsGrpcClient
             {
               organizationId: context.organizationId ?? '',
               userIds,
-              // **`true` here, unlike the notification caller** — 27-doc §3.
+              // **`true` here, unlike the notification caller**
               // An agent-performance table naming everyone who handled a
               // ticket last quarter must still name the ones who have since
               // left; excluding them turns a leaderboard row into a blank.

@@ -53,7 +53,7 @@ export function toDepartmentMemberResponseDto(
  *
  * **`null` in, `null` out** — a loader answers `null` for an id the batch RPC
  * omitted, and an empty object would render a blank card the client could not
- * tell apart from a real one (27-doc §4).
+ * tell apart from a real one.
  */
 export function toDepartmentResponseGqlDto(
   department: DepartmentResponse | null,

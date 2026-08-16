@@ -1,5 +1,5 @@
 /**
- * The scheduler — 20-doc §1, §2.
+ * The scheduler
  *
  * Background jobs run as BullMQ repeatable jobs rather than `@Cron`, so a
  * service with three replicas fires each schedule once rather than three times.
@@ -79,8 +79,8 @@ export const SCHEDULE_CRON = {
  * which breaks as soon as the first step runs long.
  */
 // **The order is a correctness constraint, and violating it is unrecoverable.**
-// Retention drops the arrays that ChunkUsageProjection (12-doc §4.1) and
-// AiGenerationRollupJob (19-doc §2.1) read, and document flags read the
+// Retention drops the arrays that ChunkUsageProjection and
+// AiGenerationRollupJob read, and document flags read the
 // counters the projection writes.
 export const JOB_SEQUENCES = {
   [SCHEDULED_JOBS.LEDGER_DAILY]: [

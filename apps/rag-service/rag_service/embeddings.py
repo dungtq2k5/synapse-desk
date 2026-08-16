@@ -8,7 +8,7 @@ retrieval, which is the kind of bug that gets attributed to "the model" for
 months.
 
 **Names no model.** The model arrives as an argument, resolved by the caller
-from `settings_for(organization_id)` — doc 15 §1.2.
+from `settings_for(organization_id)`
 """
 
 from __future__ import annotations

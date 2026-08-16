@@ -93,7 +93,7 @@ class ProviderClient(TextGenerator, StreamingGenerator, Protocol):
 
 
 #: Clamped server-side no matter what the caller asks for. An unclamped limit
-#: is a direct path to enormous prompts and a blown budget (doc 15 §1.4), and
+#: is a direct path to enormous prompts and a blown budget, and
 #: the value that gets there does not have to arrive from a tenant.
 MAX_SEARCH_LIMIT = 50
 
@@ -120,7 +120,7 @@ def with_http_status(status_code: int, message: str) -> str:
     return f"[http:{status_code}] {message}"
 
 
-#: The injection refusal `Draft` aborts with — 33-doc §5.1.
+#: The injection refusal `Draft` aborts with
 #:
 #: **`Draft` refuses by NOT returning a draft**, which is why this is an abort
 #: rather than an empty `DraftResponse`. `ticket-service.generateDraft` maps
@@ -169,7 +169,7 @@ class Dependencies:
     ledger: LedgerClient
     settings: AiSettingsResolver
 
-    #: Prompt-injection detection — 33-doc §1.
+    #: Prompt-injection detection
     #:
     #: **Defaulted, and the default is the point.** A guard that every test and
     #: the eval harness had to remember to pass is a guard that is absent
@@ -177,7 +177,7 @@ class Dependencies:
     #: wiring below overrides it with one that also has Layer B.
     #:
     #: Nothing here can fail at boot: Layer B is a call to a provider whose
-    #: credential the embedding client already validates at startup (33-doc
+    #: credential the embedding client already validates at startup (
     #: §3.4). An earlier design loaded a local model and needed a boot-time
     #: check; §3.1 records why that was measured and rejected.
     injection: InjectionGuard = field(default_factory=InjectionGuard)
@@ -200,7 +200,7 @@ class RagServicer(rag_pb2_grpc.RagServiceServicer):
         self._preprocess = PreprocessPipeline(
             deps.generator, deps.ledger, QuotaCounter(deps.redis)
         )
-        # **One guard, three surfaces** — 33-doc §1. Constructed here rather
+        # **One guard, three surfaces** Constructed here rather
         # than inside the pipeline because the pipeline serves `Chat` alone,
         # and `Ask` and `Draft` are two thirds of what needs defending.
         self._injection = deps.injection
@@ -211,7 +211,7 @@ class RagServicer(rag_pb2_grpc.RagServiceServicer):
             deps.generator,
             deps.ledger,
             QuotaCounter(deps.redis),
-            # **The collaborator this class did not have** — 39-doc §3.1. The
+            # **The collaborator this class did not have** The
             # same retriever the answering path uses, so the article sidebar is
             # scoped by the same `tenant_scope()` and cannot see further than a
             # `Chat` answer can.
@@ -227,7 +227,7 @@ class RagServicer(rag_pb2_grpc.RagServiceServicer):
         request: rag_pb2.SearchRequest,
         context: grpc.aio.ServicerContext,
     ) -> rag_pb2.SearchResponse:
-        """Retrieval with NO generation — the test seam (13-doc §2.3).
+        """Retrieval with NO generation — the test seam.
 
         **At the cap this degrades to lexical-only rather than returning 402.**
         The FTS arm needs no embedding and therefore costs nothing, so a
@@ -295,7 +295,7 @@ class RagServicer(rag_pb2_grpc.RagServiceServicer):
         """Tier 1 chat, STREAMED — the hot path.
 
         The order below is load-bearing and each step was wrong in an earlier
-        draft (11-doc §4):
+        draft:
 
           1. **Layer 1 greeting detection runs FIRST**, ahead of the budget
              check, so a greeting costs nothing at all and is answered even at
@@ -321,7 +321,7 @@ class RagServicer(rag_pb2_grpc.RagServiceServicer):
         ]
         ticket_id = request.ticket_id if request.HasField("ticket_id") else None
 
-        # The files that came with THIS message — 35-doc §3.1. History turns
+        # The files that came with THIS message History turns
         # contribute their text and nothing else.
         attachments = _attachments_of(request)
 
@@ -338,7 +338,7 @@ class RagServicer(rag_pb2_grpc.RagServiceServicer):
             # A canned reply — a greeting or a refusal. No LLM call, no ledger
             # row, no citations, and it works at the cap.
             #
-            # **The status distinguishes the two, and it has to** — 33-doc §5.1.
+            # **The status distinguishes the two, and it has to**
             # The gateway persists any completion that is not AT_CAP as an AI
             # message and passes the label onward, so a refusal reported as
             # GREETING is wrong in the ticket thread and wrong in the frame the
@@ -378,7 +378,7 @@ class RagServicer(rag_pb2_grpc.RagServiceServicer):
             retrieved_chunk_ids=result.retrieved_chunk_ids,
             user_id=ctx.sub,
             ticket_id=ticket_id,
-            # The answering call sees the file too — 36-doc §6. Reformulation
+            # The answering call sees the file too Reformulation
             # turned it into search terms; this is where it becomes something
             # the answer can describe.
             attachments=attachments,
@@ -418,11 +418,11 @@ class RagServicer(rag_pb2_grpc.RagServiceServicer):
             )
 
         # **The guard, called here because `Ask` never touches the preprocess
-        # pipeline** — 33-doc §1. Both layers at once: there is no greeting
+        # pipeline** Both layers at once: there is no greeting
         # check on this surface to split them around, and greetings do not
         # arrive at a programmatic one.
         #
-        # **No attachments here, and none possible** — 35-doc §4.
+        # **No attachments here, and none possible**
         # `/knowledge/ask` has no ticket and no message, so there is nothing to
         # attach. Adding the parameter would advertise a capability the RPC
         # cannot carry.
@@ -449,7 +449,7 @@ class RagServicer(rag_pb2_grpc.RagServiceServicer):
             # NULL, deliberately: this surface creates no ticket, so attributing
             # its spend to one would be inventing an association.
             ticket_id=None,
-            # **No handoff offer** — 13-doc §2.4. There is no conversation to
+            # **No handoff offer** There is no conversation to
             # escalate into, so offering one promises something this surface
             # cannot perform, and a user who accepts gets nothing.
             can_escalate=False,
@@ -484,14 +484,14 @@ class RagServicer(rag_pb2_grpc.RagServiceServicer):
 
         question = _last_user_message(request.history)
 
-        # **The guard, on the surface that most needs it** — 33-doc §1. This
-        # "question" is the last message on a ticket, and after 31-doc/32-doc
+        # **The guard, on the surface that most needs it** This
+        # "question" is the last message on a ticket, and with inbound email
         # that can be an email from outside the organisation: an agent clicks
         # *suggest a reply* and a stranger's text becomes the question in a
         # prompt whose output the agent is about to send back to them.
         #
         # **The attachments go to the guard on this surface above all** —
-        # 36-doc §4. The file was chosen by whoever wrote that last message, and
+        # The file was chosen by whoever wrote that last message, and
         # after 31/32 that can be a stranger who never authenticated. An
         # instruction painted into their screenshot reaches a prompt whose
         # output an agent is about to send back to them.
@@ -641,7 +641,7 @@ class RagServicer(rag_pb2_grpc.RagServiceServicer):
             settings,
             budget=budget,
             user_id=ctx.sub,
-            # The retrieval query — 39-doc §3. What the ticket IS, not where the
+            # The retrieval query What the ticket IS, not where the
             # conversation got to, so the sidebar holds still while the thread
             # moves.
             title=request.title,
@@ -719,7 +719,7 @@ class RagServicer(rag_pb2_grpc.RagServiceServicer):
 
         **Fails CLOSED**: an unreadable counter means the embedding is skipped
         and search degrades, never that it proceeds unmetered. That is the one
-        place a cache miss must not mean "allow" (12-doc §1.3 test 8), and here
+        place a cache miss must not mean "allow", and here
         the cost of failing closed is a keyword search rather than an error.
         """
         cycle_start, limit_micros = await self._entitlement(organization_id)
@@ -763,7 +763,7 @@ def _clamped_limit(requested: int, default: int) -> int:
 
 
 def build_injection_guard(config: Config, metered) -> InjectionGuard:
-    """Layer A from patterns, Layer B from the cheap tier — 33-doc §3.3, §7.
+    """Layer A from patterns, Layer B from the cheap tier
 
     **No model to load and nothing to fail at boot**, which is the difference
     from the design this replaced: the classifier is a call to a provider whose
@@ -863,7 +863,7 @@ READINESS_REFRESH_SECONDS = 5.0
 
 
 class OpsServicer(ops_pb2_grpc.OpsServiceServicer):
-    """`/version` for the Python peer — 23-doc §3.
+    """`/version` for the Python peer
 
     **Every service serves it, not just the gateway.** A rolling deploy where one
     service lagged is exactly the state this diagnoses, and a gateway-only
@@ -889,7 +889,7 @@ class OpsServicer(ops_pb2_grpc.OpsServiceServicer):
 
 
 async def _readiness_status(deps: Dependencies) -> health_pb2.HealthCheckResponse.ServingStatus:
-    """What this service OWNS: Qdrant, Postgres, Redis — 23-doc §2.
+    """What this service OWNS: Qdrant, Postgres, Redis
 
     **No peer is checked**, and that is the rule rather than an omission. This
     service is called by the gateway and calls ingestion-service's ledger; making
@@ -958,14 +958,14 @@ async def serve() -> None:
 
     deps = await build_dependencies(config)
 
-    # **Options, not the default** — 35-doc §7.1. Without these the server sits
+    # **Options, not the default** Without these the server sits
     # at gRPC's 4 MB while every TypeScript client and server is at 10 MB, and
     # the mismatch only shows up as RESOURCE_EXHAUSTED on a request the caller
     # had no reason to think was too large.
     server = grpc.aio.server(options=GRPC_SERVER_OPTIONS)
     rag_pb2_grpc.add_RagServiceServicer_to_server(RagServicer(deps), server)
 
-    # The ops surface, on the SAME port — 23-doc §2, §3. No HTTP listener and no
+    # The ops surface, on the SAME port No HTTP listener and no
     # second port: the kubelet probes `grpc.health.v1.Health` natively.
     #
     #   livenessProbe:  { grpc: { port: 50054, service: "" } }
@@ -1062,7 +1062,7 @@ def _status_of(answer: GeneratedAnswer) -> rag_pb2.AnswerStatus:
 
 
 def _attachments_of(request) -> list[Attachment]:
-    """The request's attachment parts as domain objects — 36-doc §2.
+    """The request's attachment parts as domain objects
 
     **Filtered and capped before they got here.** Ticket-service decided
     eligibility from the `message_attachments` row and refused anything past

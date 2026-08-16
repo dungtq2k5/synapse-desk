@@ -70,7 +70,7 @@ export function toUserResponse(
     gender: toProtoGender(user.gender),
     lastLoginAt: toProtoTimestamp(user.lastLoginAt),
     isLocked: user.isLocked,
-    // Absent means the lock is INDEFINITE — 21-doc §2. Carried so an admin
+    // Absent means the lock is INDEFINITE Carried so an admin
     // screen can say "locked until Friday" rather than just "locked".
     lockedUntil: toProtoTimestamp(user.lockedUntil),
     isTwoFactorEnabled: user.isTwoFactorEnabled,
@@ -125,7 +125,7 @@ export function toUserSummaryResponse(
  * never.
  */
 /**
- * What a GraphQL edge is allowed to see — 25-doc §4, 27-doc §3.
+ * What a GraphQL edge is allowed to see
  *
  * **No `email`.** `Ticket.assignee` is reachable with ticket access alone, and
  * a user with ticket access and no `user.read` must not come away holding an

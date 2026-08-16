@@ -1,7 +1,7 @@
 import { Field, ID, ObjectType } from '@nestjs/graphql';
 
 /**
- * What an EDGE is allowed to see of a user — 25-doc §4.
+ * What an EDGE is allowed to see of a user
  *
  * **The narrow type is the security model, not a convenience.** GraphQL
  * authorizes nothing by default, so composition defeats route-level

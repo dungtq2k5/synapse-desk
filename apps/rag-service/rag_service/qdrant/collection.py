@@ -1,6 +1,6 @@
 """The Qdrant collection, its payload indexes, and the pin on the embedding model.
 
-**One collection, payload-partitioned** (11-doc §1.3, §1.4). Not
+**One collection, payload-partitioned**. Not
 collection-per-tenant: Qdrant carries per-collection overhead that degrades past
 a few hundred, and its own multitenancy guidance is payload partitioning. The
 consequence is that the tenant boundary lives inside a *filter* rather than
@@ -36,7 +36,7 @@ COLLECTION_NAME = "document_chunks"
 EMBEDDING_MODEL = SETTINGS_EMBEDDING_MODEL
 EMBEDDING_DIMENSION = 768
 
-#: The four payload fields the retrieval filter compares — 11-doc §1.4.
+#: The four payload fields the retrieval filter compares
 #:
 #: **Payload indexes are mandatory, not an optimisation.** Without them Qdrant
 #: cannot estimate filter cardinality and falls back to scanning, which turns
@@ -115,7 +115,7 @@ async def _ensure_payload_indexes(client: AsyncQdrantClient) -> None:
         (DEPARTMENT_IDS, qm.PayloadSchemaType.KEYWORD),
         (IS_ORGANIZATION_WIDE, qm.PayloadSchemaType.BOOL),
         # Not part of the filter. Indexed because the re-scoping fan-out
-        # (11-doc §1.4b) updates every point of one document, and without this
+        #  updates every point of one document, and without this
         # that update scans the whole collection.
         (DOCUMENT_ID, qm.PayloadSchemaType.KEYWORD),
     ]

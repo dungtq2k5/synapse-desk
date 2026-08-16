@@ -65,7 +65,7 @@ export class EmailService implements OnModuleInit {
    * Returned rather than discarded because `notification_deliveries` stores it
    * (RDM Table 24): an SMTP `Message-ID` is what correlates a provider bounce
    * webhook back to the row that sent it. Nothing consumes those webhooks yet
-   * (18-doc §8), which is exactly why the id has to be captured now — it cannot
+   *, which is exactly why the id has to be captured now — it cannot
    * be recovered later for mail that has already gone out.
    */
   async send(
@@ -80,8 +80,8 @@ export class EmailService implements OnModuleInit {
     const info = (await this.transporter.sendMail({
       from: this.sender,
       to: command.to,
-      // **Without this the whole reply-token design is dead** — 31-doc §10.
-      // The address in 31-doc §4 is only authoritative because the client
+      // **Without this the whole reply-token design is dead**
+      // The reply-to address is only authoritative because the client
       // replies to the one it was GIVEN; offering none means every reply goes
       // to the bare sender address, carries no ticket token, and opens a
       // duplicate ticket.

@@ -60,7 +60,7 @@ const DEFAULT_PREFERENCE = {
 } as const;
 
 /**
- * Preferences and quiet hours — 18-doc §4.
+ * Preferences and quiet hours
  *
  * **Ships WITH the producers, not after them.** §3 turns on the volume and this
  * is the only thing that lets a user survive it: `ticket.message_created` fires

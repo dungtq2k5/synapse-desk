@@ -12,7 +12,7 @@ import { TicketsService } from '../../src/modules/tickets/tickets.service';
 import { MessagesService } from '../../src/modules/messages/messages.service';
 
 /**
- * Inbound-email idempotency — 31-doc §6.2, 32-doc §4.3.
+ * Inbound-email idempotency
  *
  * **The transactional property is the point, not the uniqueness.** A unique
  * index alone makes a redelivery fail. Writing the row in the SAME transaction

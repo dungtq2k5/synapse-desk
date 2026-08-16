@@ -17,7 +17,7 @@ import { QuotaReconciliationJob } from '../scheduled/quota-reconciliation.job';
 import { AiGenerationRollupJob } from '../analytics/ai-generation-rollup.job';
 
 /**
- * The thing that was missing — 20-doc §1, §2.
+ * The thing that was missing
  *
  * Six jobs in this service were written correctly and called by nothing. This
  * class is the caller, and it is deliberately thin: it decides WHEN and in what
@@ -157,7 +157,7 @@ export class SchedulerProcessor extends WorkerHost {
    * Runs one step, logs its outcome, and **does not let a failure stop the
    * sequence**.
    *
-   * A step that throws is logged and the next one still runs — 20-doc §6 test
+   * A step that throws is logged and the next one still runs test
    * 5. The alternative would let one bad tenant's projection cost that night's
    * rollup and flags as well, turning a small fault into a missing day.
    *

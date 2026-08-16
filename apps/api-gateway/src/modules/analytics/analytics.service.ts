@@ -24,7 +24,7 @@ import {
 } from './dto/rest/analytics-response.dto';
 
 /**
- * The composition layer — 19-doc §1, §3.2, §4.
+ * The composition layer
  *
  * Two responsibilities and no third:
  *
@@ -115,14 +115,14 @@ export class AnalyticsService {
    * limitation stated rather than hidden: `ai_generations` records the user who
    * triggered a generation, but the daily rollup groups by (purpose, model)
    * only. Per-agent acceptance would need a fourth dimension on a table that
-   * already multiplies by two — and 19-doc's own §2.2 shape does not include
+   * already multiplies by two — and the rollup shape does not include
    * it. Every row carries the same figure, which is honest about what it is.
    */
   async agents(
     query: AnalyticsRangeQueryDto,
     context: RequestContext,
     /**
-     * **`false` skips the name-hydration leg entirely** — 26-doc §3.1.
+     * **`false` skips the name-hydration leg entirely**
      *
      * GraphQL passes it, because there the hydration IS the users loader:
      * `AgentStat.agent` resolves through the same `ListUsersByIds` this leg
@@ -186,7 +186,7 @@ export class AnalyticsService {
           const names = unwrap(namesLeg, unavailable);
 
           if (names) {
-            // `summaries`, not `items` — 27-doc §3. The request now asks for the
+            // `summaries`, not `items` The request now asks for the
             // SUMMARY projection, so the notification-shaped `items` is empty and
             // reading it would leave every name null with nothing failing.
             const byId = new Map(
@@ -302,7 +302,7 @@ export class AnalyticsService {
     );
   }
 
-  // ------------------------------------------------------ 19-doc §5, export
+  // ------------------------------------------------------ export
 
   /**
    * Deliberately NOT cached.
@@ -321,7 +321,7 @@ export class AnalyticsService {
   }
 
   /**
-   * Read-through, keyed and TTL'd per 19-doc §4.
+   * Read-through, keyed and TTL'd by range.
    *
    * The `computedAt` freshness segment is deliberately NOT read here: it would
    * need the answer to build the key for the answer. Closed ranges instead get
@@ -372,7 +372,7 @@ function unwrap<T>(
 }
 
 /**
- * The OLDEST `dataThrough` among the legs — 20-doc §4.3.
+ * The OLDEST `dataThrough` among the legs
  *
  * A composed answer is only as fresh as its stalest input. Reporting the
  * freshest would let a healthy service vouch for a broken one, which is the

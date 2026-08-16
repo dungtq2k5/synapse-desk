@@ -4,7 +4,7 @@ import type { Request } from 'express';
 import { requestOf } from '../utils/execution-request.util';
 
 /**
- * The access-token guard, on BOTH transports — 26-doc §1.1.
+ * The access-token guard, on BOTH transports
  *
  * **`AuthGuard` is HTTP-only until `getRequest` is overridden.** Passport's Nest
  * adapter calls `context.switchToHttp().getRequest()` and then `req.logIn(…)`;
@@ -13,7 +13,7 @@ import { requestOf } from '../utils/execution-request.util';
  * passport internals and says nothing about transports.
  *
  * Overriding it is what makes the two surfaces share ONE authentication path
- * rather than have two. 26-doc §1.1 test 2 states the property directly: the
+ * rather than have two. The property, stated directly: the
  * guards must populate the request identically on both, because every
  * authorization test elsewhere assumes it.
  */

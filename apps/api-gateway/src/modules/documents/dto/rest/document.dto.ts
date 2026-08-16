@@ -117,7 +117,7 @@ export class ConfirmDocumentDto {
 
   // ASK this `docblock` seem to be invalid
   /**
-   * ISO 639-1 codes for OCR, if the uploader knows — 34-doc §4.
+   * ISO 639-1 codes for OCR, if the uploader knows
    *
    * **Empty on almost every upload, and that is inherent**: nobody knows their
    * PDF is scanned until it is parsed, which is the premise of the whole
@@ -176,7 +176,7 @@ export class SetDocumentDepartmentsDto {
   /**
    * The FULL replacement set, not a delta.
    *
-   * Replacement rather than add/remove because the fan-out ordering (11-doc
+   * Replacement rather than add/remove because the fan-out ordering (
    * §1.4b) turns on whether a change restricts, and that is answerable from a
    * before/after pair but not from a stream of deltas applied in unknown order.
    */
@@ -207,7 +207,7 @@ export class ListDocumentsQueryDto extends SearchPaginationDto {
 }
 
 /**
- * The flag worklist filter — 16-doc §5.
+ * The flag worklist filter
  *
  * `type` accepts EVERY member of `DocumentFlagType` and any number of them.
  * `UNRETRIEVED` and `UNCITED` were once one flag under a name that fitted only

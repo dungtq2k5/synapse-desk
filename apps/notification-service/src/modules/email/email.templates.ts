@@ -279,7 +279,7 @@ function securityAlert(
 }
 
 /**
- * The one-time reply to mail this system refused — 31-doc §3.
+ * The one-time reply to mail this system refused
  *
  * **Says what to do, and does not say why in detail.** "Your address is not
  * permitted in this workspace" tells an outsider which tenants exist and who

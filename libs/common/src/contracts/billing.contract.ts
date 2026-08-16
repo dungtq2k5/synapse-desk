@@ -1,9 +1,10 @@
 /**
  * The one billing event Domain C already has to care about.
  *
- * **The publisher does not exist yet** — it is the Stripe webhook in
- * [14-billing-and-entitlements.md](../../../../docs/14-billing-and-entitlements.md)
- * §3. The consumer exists now because doc 15 §1.3 names the exact failure of
+ * **The publisher is the Stripe webhook** — see
+ * `docs/decisions/0026-stripe-webhook-idempotency.md`.
+ *
+ * The consumer exists because of the exact failure mode of
  * shipping the cache without it: a downgraded tenant keeps receiving the
  * premium model for the length of the cache TTL. That is the system giving away
  * the thing it just stopped being paid for — a failure in the direction that
@@ -35,7 +36,7 @@ export type EntitlementsChangedEvent = {
   /**
    * Whose entitlements changed. **Required, and never a wildcard.**
    *
-   * Doc 15 §1.4 test 4 asserts the neighbouring tenant's cache survives: a
+   * A test asserts the neighbouring tenant's cache survives: a
    * global flush on every webhook is a thundering herd, and webhooks arrive in
    * bursts at exactly the moment the system is least able to absorb one.
    */

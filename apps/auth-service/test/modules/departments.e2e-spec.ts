@@ -433,7 +433,7 @@ describe('Departments (e2e)', () => {
   });
 
   /**
-   * The batch contract — 27-doc §1. Same six properties as `ListUsersByIds`,
+   * The batch contract Same six properties as `ListUsersByIds`,
    * asserted per RPC because "it is just a `WHERE id IN (…)`" is exactly the
    * framing under which the tenant check gets skipped.
    */
@@ -497,7 +497,7 @@ describe('Departments (e2e)', () => {
     });
 
     it('5. **a soft-deleted department is still returned by id**', async () => {
-      // 27-doc §1. A ticket still citing a retired department has to render its
+      // A ticket still citing a retired department has to render its
       // name; omitting it makes the edge null, which the UI cannot distinguish
       // from a department that never existed — so it shows a blank.
       const t = await seedTenantWithUser(fx.prisma);

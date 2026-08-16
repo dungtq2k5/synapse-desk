@@ -6,12 +6,12 @@ import {
 } from '@synapsedesk/common';
 
 /**
- * The analytics response shapes — 19-doc §3. **REST only.**
+ * The analytics response shapes **REST only.**
  *
  * Three of these — `RateDto`, `MeanDto` and `OverviewDto` — have GraphQL
  * counterparts in `../graphql/`, checked against them by
  * `analytics-response.contract.spec.ts`. Everything below `OverviewDto` is the
- * chart series, which the schema does not serve at all: 26-doc §7 keeps
+ * chart series, which the schema does not serve at all: the schema keeps
  * analytics a whole-shape read rather than a resolvable graph.
  *
  * **Every rate carries its denominator, at every level.** A percentage with a
@@ -50,7 +50,7 @@ export class OverviewDto {
   /** When the rollups behind this answer ran. */
   computedAt!: Date | null;
   /**
-   * **The last day the rollups behind this answer cover** — 20-doc §4.3,
+   * **The last day the rollups behind this answer cover**,
    * `YYYY-MM-DD`, or `null` when no rollup has ever run for this tenant.
    *
    * Not the same as `computedAt`, and the gap between them is the diagnosis: a
@@ -173,7 +173,7 @@ export class AiUsageDto {
  *
  * ticket-service stores an agent id and has never known a display name (RDM
  * §1.13). auth-service is a NAME SOURCE here, not an analytics source — the
- * distinction the ownership map blurs and 19-doc §1 corrects.
+ * distinction the ownership map blurs.
  */
 export class AgentStatDto {
   agentId!: string;
@@ -188,7 +188,7 @@ export class AgentStatDto {
 }
 
 /**
- * A block that could not be produced — 19-doc §3.2.
+ * A block that could not be produced
  *
  * **A dashboard where nine tiles render and one says "unavailable" is far more
  * useful than a 500**, and it is what someone diagnosing an incident actually
@@ -205,7 +205,7 @@ export class AgentAnalyticsDto {
 
   /** Empty when everything answered. */
   /**
-   * **The last day the underlying rollups cover** — 20-doc §4.3, `YYYY-MM-DD`,
+   * **The last day the underlying rollups cover**, `YYYY-MM-DD`,
    * or `null` when nothing has ever been rolled up.
    *
    * This endpoint spans more than one service, so it reports the STALEST leg:

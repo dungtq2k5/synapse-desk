@@ -11,7 +11,7 @@ import { requestOf } from '../utils/execution-request.util';
  * `@CurrentUser()` → the entire `RequestContext`; `@CurrentUser('sub')` → one
  * field of it.
  *
- * **Works in a RESOLVER as well as a controller** — 25-doc §8 step 1, closing
+ * **Works in a RESOLVER as well as a controller** step 1, closing
  * docs/reference/known-gaps.md #6. It used to call `switchToHttp()` unconditionally, which
  * returns an empty object under GraphQL: `RequestContextService.fromRequest`
  * then found no user and this threw "no authenticating guard" at a resolver

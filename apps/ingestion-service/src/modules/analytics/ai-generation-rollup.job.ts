@@ -17,13 +17,13 @@ export type AiRollupOutcome = {
 };
 
 /**
- * `ai_generation_daily_stats` — 19-doc §2.2.
+ * `ai_generation_daily_stats`
  *
  * **Not an optimisation. The only durable record.** `ai_generations` is
  * retention-rolled (RDM Table 29): raw rows aggregate away after ~90 days, so
  * an analytics query written against them silently loses history the moment
  * retention ships — the same trap that made `UNCITED` a projection rather than
- * a query (12-doc §4.1).
+ * a query.
  *
  * **Which makes the ordering constraint real: this runs BEFORE retention over
  * the same window**, exactly like `ChunkUsageProjection`. Reversed, retention
@@ -52,7 +52,7 @@ export class AiGenerationRollupJob {
   }
 
   /**
-   * The BACKFILL entry point — 19-doc §2.3.
+   * The BACKFILL entry point
    *
    * Load-bearing here in a way it is not for tickets: a bug in this rollup is
    * uncorrectable once retention has eaten the raw rows, so the backfill is the

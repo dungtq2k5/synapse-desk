@@ -13,7 +13,7 @@ import { AnalyticsExportFacade } from './analytics-export.facade';
 import { AnalyticsExportProcessor } from './analytics-export.processor';
 
 /**
- * The read projection over Domain B — 19-doc.
+ * The read projection over Domain B.
  *
  * **No `analytics-service` exists**, and that is the decision this module
  * records: a service with no tables either reads another service's database

@@ -23,7 +23,7 @@ import { faultInjector } from '@synapsedesk/common/testing/fault';
 
 describe('§2.4 Assignment & reassignment (e2e)', () => {
   // Every injected fault in this file is registered here and restored in an
-  // `afterEach` that runs whether the test passed, failed or threw — 16-doc §9.
+  // `afterEach` that runs whether the test passed, failed or threw
   const faults = faultInjector();
 
   let fx: E2eFixture;

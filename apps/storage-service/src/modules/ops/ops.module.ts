@@ -13,7 +13,7 @@ import { FirebaseStorageModule } from '../firebase/firebase-storage.module';
 import { FirebaseStorageService } from '../firebase/firebase-storage.service';
 
 /**
- * `grpc.health.v1.Health` and `synapsedesk.ops.OpsService` — 23-doc §2, §3.
+ * `grpc.health.v1.Health` and `synapsedesk.ops.OpsService`
  *
  * **No Postgres**: this service has no database at all. Its readiness is NATS —
  * it consumes `storage.object.superseded`, so a broker it cannot reach means

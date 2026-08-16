@@ -39,7 +39,7 @@ export type IngestionJobData = {
   objectPath: string;
   fileType: string;
   /**
-   * ISO 639-1 codes for OCR — 34-doc §4.1.
+   * ISO 639-1 codes for OCR
    *
    * Optional because jobs enqueued before this field existed are still in
    * Redis, and a worker that crashed on them would stall every document behind
@@ -52,7 +52,7 @@ export type IngestionJobData = {
 class BudgetExhausted extends Error {}
 
 /**
- * Raised when a document parses to no text at all — 21-doc §3.5 F4.
+ * Raised when a document parses to no text at all F4.
  *
  * **A named failure rather than a silent success.** It reaches `fail()` like
  * any other error, so the reason lands in `ingestion_jobs.error_log`, which is
@@ -138,7 +138,7 @@ export class IngestionProcessor {
       const parsed = await this.parser.parse(
         bytes,
         data.fileType,
-        // From the EVENT, not a database read — 34-doc §4.1. `objectPath` and
+        // From the EVENT, not a database read `objectPath` and
         // `fileType` are there for the same reason: the worker needs no lookup
         // to start, and this service's only document read happens later,
         // inside `writeChunkRows`.
@@ -149,7 +149,7 @@ export class IngestionProcessor {
       const chunks = await this.chunker.chunk(parsed.pages);
 
       if (chunks.length === 0) {
-        // **FAILED, with a reason a human can act on** — 21-doc §3.5 F4.
+        // **FAILED, with a reason a human can act on** F4.
         //
         // This used to report INDEXED, reasoning that FAILED "would send
         // someone hunting for a bug". That holds for a GENERIC failure and not
@@ -166,7 +166,7 @@ export class IngestionProcessor {
       }
 
       // **After chunking, because that is where the SECOND drop happens** —
-      // 34-doc §1.1, §6. `document-chunker.service.ts` discards any chunk under
+      // `document-chunker.service.ts` discards any chunk under
       // `MIN_CHUNK_TOKENS`, so a page that OCR'd to eight tokens survived the
       // parser, counted as a success, and vanished anyway. Checking the parser's
       // output alone would have reported that document as complete.
@@ -203,7 +203,7 @@ export class IngestionProcessor {
   // -------------------------------------------------------------------------
 
   /**
-   * **Every page is either in the corpus or recorded as missing** — 34-doc §6.
+   * **Every page is either in the corpus or recorded as missing**
    *
    * The invariant, checked in the one place that holds both halves. Two silent
    * drops sit between a PDF and the index and they fail identically from
@@ -285,7 +285,7 @@ export class IngestionProcessor {
    *
    * A chunk with a NULL `organization_id` is a chunk no tenant filter excludes
    * — the lexical arm's half of the boundary is these four columns, so writing
-   * them is not bookkeeping, it is the security precondition (11-doc §1.4).
+   * them is not bookkeeping, it is the security precondition.
    *
    * `deleteMany` first makes a re-run idempotent. A retried job that appended
    * would double every chunk and, worse, leave the first set orphaned in
@@ -450,7 +450,7 @@ export class IngestionProcessor {
       this.prisma.document.update({
         where: { id: data.documentId },
         data: { status: DocumentStatus.INDEXED },
-        // The uploader, the title and the SCOPE — 22-doc §6.2. Taken from the
+        // The uploader, the title and the SCOPE Taken from the
         // row this write already returns rather than fetched afterwards: the
         // relay decides which rooms the announcement reaches, and a
         // department-scoped document announced tenant-wide would disclose its
@@ -532,7 +532,7 @@ export class IngestionProcessor {
       documentId: data.documentId,
       occurredAt: new Date().toISOString(),
       reason: message,
-      // The uploader is the ONLY recipient — 22-doc §6.2. A failure is one
+      // The uploader is the ONLY recipient A failure is one
       // person's document not working, not department news.
       uploaderId: document.createdById,
       title: document.title,

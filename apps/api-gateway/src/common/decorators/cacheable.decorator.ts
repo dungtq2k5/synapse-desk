@@ -11,10 +11,10 @@ export const CACHEABLE_KEY = 'cache:cacheable';
  * VISIBILITY joins the key.
  *
  * **Requiring it is the whole point.** A default of `'tenant'` is right for
- * four of the five reads 29-doc §3 lists and catastrophically wrong for the
+ * four of the five cacheable reads and catastrophically wrong for the
  * fifth: `GET /documents` is filtered by `visibilityScope` — org-wide ∪ the
  * caller's departments — so one tenant-keyed entry would serve a Finance
- * agent's documents to Support. That is the 28-doc §2 failure one level down:
+ * agent's documents to Support. That is the tenant-key failure one level down:
  * the tenant segment is correct and the answer still belongs to somebody else.
  *
  * A field somebody must fill in is a question somebody must answer. A default
@@ -30,7 +30,7 @@ export type CacheableOptions = {
 };
 
 /**
- * Caches this GET, tenant-first — 29-doc §3.
+ * Caches this GET, tenant-first
  *
  * ```ts
  * ＠Get()
@@ -45,10 +45,10 @@ export type CacheableOptions = {
  *
  * `GET /notifications/unread-count` is the one that looks obvious and is not —
  * it is the most-polled route in the product, and the WebSocket already pushes
- * `notification:unread-count` authoritatively (22-doc). The polling a cache
+ * `notification:unread-count` authoritatively. The polling a cache
  * would optimise is polling that should stop.
  *
- * **It documents itself, in the same call** — 30-doc §5 step 3. The OpenAPI
+ * **It documents itself, in the same call** step 3. The OpenAPI
  * operation gains an `x-cache` extension carrying exactly these values, so a
  * client can see which reads are cached and on what terms without anybody
  * maintaining a second list. A hand-written list of cached routes is a list

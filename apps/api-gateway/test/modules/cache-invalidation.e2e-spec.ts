@@ -17,7 +17,7 @@ import { CacheService } from '../../src/common/cache/cache.service';
 import { CACHE_SCOPES } from '../../src/common/config/cache.config';
 
 /**
- * Cache eviction, both halves — 29-doc §4.
+ * Cache eviction, both halves
  *
  * **On the realtime fixture rather than the plain one**, because the half that
  * matters here needs a REAL NATS round trip: the gateway must evict on a change
@@ -91,7 +91,7 @@ describe('§29 §4 cache invalidation (e2e)', () => {
     it('**a ticket write originating in ticket-service evicts the gateway entry**', async () => {
       // **The test worth writing first.** Everything else in this file fails
       // visibly; a decorator-only implementation looks complete and is silently
-      // partial — it covers ONE origin out of four (28-doc §3). A ticket also
+      // partial — it covers ONE origin out of four. A ticket also
       // changes over the WebSocket, inside escalation side effects, and from a
       // scheduled job, and a decorator on a gateway route sees none of them.
       await seed(organizationId, CACHE_SCOPES.tickets);

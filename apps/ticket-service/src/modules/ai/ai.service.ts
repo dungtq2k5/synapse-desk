@@ -178,7 +178,7 @@ export class AiService {
     const ticket = await this.access.load(request.ticketId, context);
 
     // The customer's last message may carry a screenshot, and this is the
-    // surface replying to it — 36-doc §2. Filtered from the row before anything
+    // surface replying to it Filtered from the row before anything
     // is downloaded, so an attached zip costs nothing.
     const attachments = await this.aiAttachments.forLastUserMessage(
       ticket.id,
@@ -195,7 +195,7 @@ export class AiService {
         attachments.parts,
       );
     } catch (error) {
-      // **The write-back, on the refusal path only** — 36-doc §7. The message
+      // **The write-back, on the refusal path only** The message
       // that was just refused must not reach the NEXT draft's transcript;
       // without this the guard refuses the same question every time an agent
       // presses the button, which makes the refusal a delay rather than a
@@ -232,7 +232,7 @@ export class AiService {
   ): Promise<GetSuggestionsResponse> {
     // **Bound rather than discarded.** This call was already here as the access
     // check and threw its result away; the article sidebar needs the ticket's
-    // subject as its retrieval query — 39-doc §3 — so the change is a variable,
+    // subject as its retrieval query — so the change is a variable,
     // not a second fetch.
     const ticket = await this.access.load(request.ticketId, context);
 
@@ -364,7 +364,7 @@ export class AiService {
    */
   private async transcript(ticketId: string): Promise<ConversationTurn[]> {
     const messages = await this.prisma.ticketMessage.findMany({
-      // **Refused messages never reach a prompt** — 36-doc §7.
+      // **Refused messages never reach a prompt**
       //
       // Filtered in the WHERE because this query is a dedicated transcript
       // read serving nothing else: there is no reason to fetch a row only to

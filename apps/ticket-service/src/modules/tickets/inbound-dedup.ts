@@ -24,7 +24,7 @@ export class InboundEmailAlreadyProcessed extends Error {
 }
 
 /**
- * Records that an inbound message produced a write — 31-doc §6.2.
+ * Records that an inbound message produced a write
  *
  * **Called INSIDE the caller's transaction**, which is the whole point. Dedup
  * written outside it can be recorded by a request that then fails, and the mail
@@ -69,11 +69,11 @@ export async function recordInboundEmail(
 }
 
 // The key for a message with no `Message-ID` is SYNTHESIZED IN THE GATEWAY —
-// 31-doc §7, `idempotencyKeyFor`. A second implementation lived here, unused,
+// `idempotencyKeyFor`. A second implementation lived here, unused,
 // and keyed on `receivedAt`: the Worker stamps that fresh on every delivery
 // attempt, so a redelivery would have produced a new key, a new ticket, and
 // exactly the retry storm the fallback exists to prevent. Removed rather than
-// fixed — ticket-service receives a key and stays ignorant of email (31-doc
+// fixed — ticket-service receives a key and stays ignorant of email (
 // §6), so it has no business minting one.
 
 /**

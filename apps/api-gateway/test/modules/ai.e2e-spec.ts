@@ -198,7 +198,7 @@ describe('§2.6 AI Co-Pilot at the HTTP boundary (e2e)', () => {
     });
 
     it('**4. the loop closes: the id comes back and can be handed back**', async () => {
-      // 38-doc §3 test 1, and the assertion that would have prevented this.
+      // And the assertion that would have prevented this.
       //
       // **Both directions in one test, because the loop is one thing.** The
       // gateway returned neither half: `generationId` was read off the response
@@ -380,7 +380,7 @@ describe('§2.6 AI Co-Pilot at the HTTP boundary (e2e)', () => {
     it('**returns a WRAPPER, not a bare array** — 39-doc §2', async () => {
       // The breaking change, asserted rather than assumed. A client reading
       // `data[0].title` reads `data.nextSteps[0].title` now, and this is the
-      // SECOND such change — 36-doc §1.3's `CreateMessageResponse` was the
+      // SECOND such change's `CreateMessageResponse` was the
       // first, which is worth counting rather than repeating silently.
       const article = wireArticle();
       fx.stubs.ai.getSuggestions.mockReturnValue(
@@ -406,7 +406,7 @@ describe('§2.6 AI Co-Pilot at the HTTP boundary (e2e)', () => {
     });
 
     it('an article never carries `vectorPointId`', async () => {
-      // 38-doc §2's rule on a third surface. ticket-service already drops it;
+      // 's rule on a third surface. ticket-service already drops it;
       // this pins that the gateway's DTO cannot reintroduce it.
       fx.stubs.ai.getSuggestions.mockReturnValue(
         of({
@@ -427,7 +427,7 @@ describe('§2.6 AI Co-Pilot at the HTTP boundary (e2e)', () => {
     it('**a document with no pages reports `null`**, not a missing field', async () => {
       // `page_number` is `optional int32`, so absent arrives as `undefined`.
       // Publishing that as a required number would misdescribe the response —
-      // 38-doc §2's reasoning, same shape.
+      // 's reasoning, same shape.
       fx.stubs.ai.getSuggestions.mockReturnValue(
         of({
           items: [],

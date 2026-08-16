@@ -8,7 +8,7 @@ import {
 } from './inbound-email.config';
 
 /**
- * The address format — 31-doc §2, §4.
+ * The address format
  *
  * Every test here is about a way mail gets misrouted or silently dropped, which
  * is why the negative cases outnumber the positive ones: an address that fails
@@ -125,7 +125,7 @@ describe('inbound email addressing', () => {
   });
 
   /**
-   * 32-doc §4.4 test 7 — **a forged ticket token must not thread.**
+   * **a forged ticket token must not thread.**
    *
    * The one to write first. Everything else in this feature fails visibly; a
    * weak reply token lets one customer read and write another's support thread

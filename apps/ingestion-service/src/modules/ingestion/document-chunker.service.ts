@@ -32,7 +32,7 @@ const HEADING_PATTERN = /^(#{1,6})[^\S\n]+(\S.*)$/;
 /** The separators pass 2 splits on, largest natural boundary first. */
 const RECURSIVE_SEPARATORS = [
   // Paragraph, then line, then sentence, then word. Written as real escapes,
-  // which is **trap 3 of 21-doc §3.2**: separators written `['nn', 'n', …]` are
+  // which is **trap 3**: separators written `['nn', 'n', …]` are
   // the literal letters `n` and `s` rather than `\n` and `\s`, and a splitter
   // configured that way splits text on the letter "n".
   '\n\n',
@@ -48,7 +48,7 @@ const RECURSIVE_SEPARATORS = [
 ];
 
 /**
- * Markdown -> chunks, splitting on STRUCTURE first and length second — 21-doc §3.
+ * Markdown -> chunks, splitting on STRUCTURE first and length second
  *
  * The ordering is the whole design. Splitting purely by length cuts through the
  * middle of sections, so a chunk begins mid-sentence under no heading and the
@@ -62,7 +62,7 @@ const RECURSIVE_SEPARATORS = [
  * text, so a heading held in a metadata column is invisible to the one
  * component that most needs it.
  *
- * **Pass 1 is ours; pass 2 is `RecursiveCharacterTextSplitter`** — 21-doc §3.1,
+ * **Pass 1 is ours; pass 2 is `RecursiveCharacterTextSplitter`**,
  * which states that heading extraction stays custom.
  *
  * `MarkdownHeaderTextSplitter` is the obvious candidate for pass 1 and is
@@ -143,7 +143,7 @@ export class DocumentChunkerService {
    * section in the document. Both the reader and the embedding get the same
    * context, which is the point.
    *
-   * **Ordered by heading LEVEL, which is trap 4 of 21-doc §3.2.** Building
+   * **Ordered by heading LEVEL, which is trap 4.** Building
    * breadcrumbs with `Object.values(metadata).join(…)` relies on key-insertion
    * order to happen to produce H1 › H2 › H3. The
    * `path.filter(entry => entry.level < level)` below gets it right by
@@ -176,7 +176,7 @@ export class DocumentChunkerService {
       // half and invents a section named after a comment.
       //
       // Easy to assume a library handles this. No library does the heading pass
-      // at all (21-doc §3.1), so the tracking lives here.
+      // at all, so the tracking lives here.
       if (isFence(line)) {
         inFence = !inFence;
         buffer.push(line);
@@ -215,7 +215,7 @@ export class DocumentChunkerService {
 
 /**
  * Moves a stranded sentence terminator back onto the chunk it belongs to —
- * 21-doc §3.5 F2.
+ * F2.
  *
  * **The one behaviour the library swap lost.** `RecursiveCharacterTextSplitter`
  * splits with a LOOKAHEAD, so a separator lands at the start of the *following*

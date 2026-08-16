@@ -3,7 +3,7 @@ import { GqlExecutionContext, type GqlContextType } from '@nestjs/graphql';
 import type { Request } from 'express';
 
 /**
- * The underlying Express request, whichever transport is executing — 25-doc §8
+ * The underlying Express request, whichever transport is executing
  * step 1.
  *
  * **The same Express request object on both.** Apollo is mounted on the same

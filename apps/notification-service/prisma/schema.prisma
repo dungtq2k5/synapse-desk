@@ -1,12 +1,12 @@
 // Domain E — postgres_notification. RDM Tables 23-25.
 //
-// The first slice of this schema shipped with 16-doc §1, because the AI quota
+// The first slice of this schema shipped during hardening, because the AI quota
 // alert became the first LOAD-BEARING consumer of `notification.in_app.create`:
 // the alert was published correctly, idempotently, to the right audience, into
 // a subject with no subscriber. Everything looked finished except that nobody
 // was ever told.
 //
-// 18-doc completes it, and the seven columns added to `Notification` are what
+// Completes it, and the seven columns added to `Notification` are what
 // made the rest of Domain E UNBUILDABLE rather than merely incomplete:
 // `actor_id` is how self-notifications are suppressed, `resource_*` is what
 // bulk-read-by-ticket matches on, and `group_key`/`group_count` are the
@@ -36,7 +36,7 @@ model Notification {
   /// permission at delivery time by asking auth-service.
   recipientId String @map("recipient_id") @db.Uuid
 
-  /// **The ORIGINATING event, never the transport subject** — 18-doc §1.3.
+  /// **The ORIGINATING event, never the transport subject**
   ///
   /// `ticket.assigned`, `document.indexed`, `quota.exceeded`. This used to be
   /// written as `IN_APP_NOTIFICATION_PATTERN`, which is identical on every row
@@ -63,7 +63,7 @@ model Notification {
   /// No FK — `users` is in postgres_auth. Exists so a consumer can suppress
   /// SELF-notifications: an agent who assigns a ticket to themselves must not
   /// be told about it, and getting that wrong is the first thing anybody
-  /// notices by hand (18-doc §3.1).
+  /// notices by hand.
   actorId String? @map("actor_id") @db.Uuid
 
   /// `ticket | document | user | organization`.
@@ -92,7 +92,7 @@ model Notification {
   /// alert is exactly the producer that retries.
   eventId String? @map("event_id") @db.VarChar(100)
 
-  /// The event id that last INCREMENTED this group — 18-doc §3.2.
+  /// The event id that last INCREMENTED this group
   ///
   /// Grouping and `event_id` idempotency pull in opposite directions: the
   /// INSERT is deduped by the unique index, but an increment has no such
@@ -107,7 +107,7 @@ model Notification {
   readAt     DateTime? @map("read_at") @db.Timestamptz
   archivedAt DateTime? @map("archived_at") @db.Timestamptz
 
-  /// Retention cutoff for the pruning job (18-doc §8 — column now, job later).
+  /// Retention cutoff for the pruning job.
   /// This table grows faster than any other in the system.
   expiresAt DateTime? @map("expires_at") @db.Timestamptz
 
@@ -132,7 +132,7 @@ model Notification {
   @@map("notifications")
 }
 
-/// One auto-reply per address per TENANT per day — 31-doc §7.
+/// One auto-reply per address per TENANT per day
 ///
 /// **A table rather than Redis, and the reason is not convenience.** This
 /// service has no Redis client, and adding one for a counter would put the loop
@@ -189,7 +189,7 @@ model NotificationDelivery {
   target String? @db.VarChar(255)
 
   /// The provider's own id — an SMTP `Message-ID` or a Twilio SID. Stored now
-  /// so provider delivery webhooks are additive later (18-doc §8).
+  /// so provider delivery webhooks are additive later.
   providerMessageId String? @map("provider_message_id") @db.VarChar(255)
 
   attempts Int     @default(0)
@@ -215,7 +215,7 @@ model NotificationDelivery {
 
 /// RDM Table 25 — per (user, type, channel) opt-in and batching.
 ///
-/// **Ships WITH the producers, not after them** (18-doc §4). §3 turns on the
+/// **Ships WITH the producers, not after them**. §3 turns on the
 /// volume and this is the only thing that lets a user survive it — and a user
 /// who disables notifications in week one is not recovered by shipping
 /// preferences in week three.
@@ -244,7 +244,7 @@ model NotificationPreference {
   isEnabled Boolean @default(true) @map("is_enabled")
 
   /// DigestMode. `HOURLY`/`DAILY` are read by the resolver and have no
-  /// scheduler yet (18-doc §8) — the column is what makes the job possible.
+  /// scheduler yet — the column is what makes the job possible.
   digest String @default("IMMEDIATE") @db.VarChar(20)
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz

@@ -53,7 +53,7 @@ class TestCollection:
     """The preconditions the filter is worthless without."""
 
     async def test_every_filter_field_is_payload_indexed(self, qdrant):
-        # Payload indexes are MANDATORY, not an optimisation (11-doc §1.4).
+        # Payload indexes are MANDATORY, not an optimisation.
         # Without them Qdrant cannot estimate filter cardinality and falls back
         # to scanning — which returns correct answers, so nothing fails, and
         # the tenant filter quietly becomes the dominant cost of every query.
@@ -270,7 +270,7 @@ class TestBothRenderingsAgree:
     async def test_both_arms_key_on_the_SAME_fusion_id(
         self, qdrant, pool, seed, query_vector, tenant_a
     ):
-        # 11-doc §1.5: Qdrant returns `vector_point_id` natively and the FTS
+        # Qdrant returns `vector_point_id` natively and the FTS
         # query SELECTs it, so fusion is a straight join rather than a second
         # lookup per candidate. If the two arms keyed differently, RRF would
         # dedup nothing and every chunk would appear twice.
@@ -471,7 +471,7 @@ class TestRescopeTakesEffectPerArm:
     async def test_a_soft_deleted_chunk_is_STILL_RESOLVABLE_by_vector_point_id(
         self, pool, seed, rescope, tenant_a
     ):
-        # 12-doc §2.4 test 2, and the reason delete FLIPS rather than removes:
+        # And the reason delete FLIPS rather than removes:
         # citations in already-sent ticket messages must still resolve to their
         # chunk text (RDM §1.4, §1.6). A user reading last week's reply gets
         # the passage it quoted, not a broken link.

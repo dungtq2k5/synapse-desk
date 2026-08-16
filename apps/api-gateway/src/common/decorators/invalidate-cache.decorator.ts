@@ -8,7 +8,7 @@ export const INVALIDATE_CACHE_KEY = 'cache:invalidate';
 /**
  * A scope to drop, or a function that derives one from the request.
  *
- * **It cannot name a tenant, and that is the type doing the work** — 29-doc
+ * **It cannot name a tenant, and that is the type doing the work**
  * §4.1. A target that builds its own key is a target that can omit the tenant,
  * and an invalidation missing its tenant segment either clears nothing or
  * reaches for a pattern that touches everyone. The tenant comes from the
@@ -18,7 +18,7 @@ export type CacheInvalidationTarget =
   string | ((context: ExecutionContext) => string | string[]);
 
 /**
- * Drops cache scopes after this handler succeeds — 29-doc §4.1.
+ * Drops cache scopes after this handler succeeds
  *
  * ```ts
  * ＠Patch(':id')
@@ -50,10 +50,10 @@ export const InvalidateCache = (...targets: CacheInvalidationTarget[]) =>
   SetMetadata(INVALIDATE_CACHE_KEY, targets);
 
 /**
- * `@InvalidateCache` targets for the entity cache — 30-doc §2, §5 step 2.
+ * `@InvalidateCache` targets for the entity cache step 2.
  *
  * **An entity cache with no eviction is a staleness bug with a hit rate**, and
- * these are the eviction. 29-doc's table expected `user.*` NATS events to do
+ * these are the eviction. An earlier design expected `user.*` NATS events to do
  * this job; there are none, and there should not be — every writer of a
  * `UserSummary`'s fields is a gateway mutation, so a decorator here is PRECISE
  * invalidation rather than a fallback, and a contract with no publisher would

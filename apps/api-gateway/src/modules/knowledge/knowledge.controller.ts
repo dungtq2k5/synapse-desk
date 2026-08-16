@@ -49,7 +49,7 @@ import {
 export class KnowledgeController {
   constructor(private readonly knowledge: KnowledgeGrpcClient) {}
 
-  // A per-USER minute limit, on top of the monthly quota — 16-doc §2. The
+  // A per-USER minute limit, on top of the monthly quota The
   // quota is a month budget checked per request and does nothing to stop one
   // user spending the whole month in ten minutes.
   @Throttle({ [AI_THROTTLER_TIER]: ROUTE_THROTTLE.knowledgeSearch })

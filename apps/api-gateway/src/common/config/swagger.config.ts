@@ -7,7 +7,7 @@ import {
 } from '@nestjs/swagger';
 
 /**
- * The security-scheme KEYS routes reference — 24-doc §3.
+ * The security-scheme KEYS routes reference
  *
  * **This API authenticates with four cookies, not one bearer token**, and three
  * of them are genuine credentials with genuinely different scopes. Naming them
@@ -25,7 +25,7 @@ export const AUTH_SCHEMES = {
 } as const;
 
 /**
- * The staleness contract, published — 30-doc §4, §5 step 3.
+ * The staleness contract, published step 3.
  *
  * **Written before any response cache exists, deliberately.** A limit stated up
  * front is a contract; the same limit discovered by a client is a bug report.
@@ -94,7 +94,7 @@ const CACHING_CONTRACT = [
 ].join('\n');
 
 /**
- * Builds the OpenAPI document — 24-doc §3.
+ * Builds the OpenAPI document
  *
  * Exported and called from BOTH `main.ts` and the spec tests, deliberately. A
  * test that built its own document would assert on a spec no client ever
@@ -137,7 +137,7 @@ export function buildOpenApiDocument(
       cookie(configService.getOrThrow<string>('JWT_REFRESH_NAME')),
       AUTH_SCHEMES.refresh,
     )
-    // **`TENANT_SELECTION_NAME` is deliberately absent** — 24-doc §3. It carries
+    // **`TENANT_SELECTION_NAME` is deliberately absent** It carries
     // a half-finished multi-tenant login between its two legs; it is not a
     // credential, and documenting it as a security scheme invites a client to
     // treat it as one and send it where an access token belongs.
@@ -147,7 +147,7 @@ export function buildOpenApiDocument(
 }
 
 /**
- * Mounts `/docs` and `/docs-json` when config allows — 24-doc §4.
+ * Mounts `/docs` and `/docs-json` when config allows
  *
  * **Gated on `SWAGGER_ENABLED`, not on an inline `NODE_ENV` check.** The plan
  * says "PUBLIC in non-prod", and `NODE_ENV !== 'production'` written at a call

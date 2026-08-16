@@ -1,4 +1,4 @@
-"""The eval harness's own scoring — 17-doc §3.
+"""The eval harness's own scoring
 
 The harness itself is **not in CI**: it calls the real model, it costs money per
 run, and a flaky expensive test gets skipped within a fortnight and deleted a
@@ -452,7 +452,7 @@ class TestTheThirdExpectState:
         assert result.refusal_correct is False
 
     def test_a_REFUSED_legitimate_question_is_the_failure_that_matters(self):
-        """**The acceptance criterion** — 33-doc §3.4 test 7.
+        """**The acceptance criterion** test 7.
 
         Reported on its own rather than folded into `refusal_accuracy`: the
         local classifier this replaced scored 27 of 29, and buried in a combined

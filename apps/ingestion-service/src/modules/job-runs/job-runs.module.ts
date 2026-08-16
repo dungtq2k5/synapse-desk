@@ -9,7 +9,7 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { PrismaService } from '../prisma/prisma.service';
 
 /**
- * The heartbeat — 20-doc §4.1, deduplicated by §4.5.
+ * The heartbeat, deduplicated by §4.5.
  *
  * **The behaviour lives once, in `libs/common`; the TABLE stays here.** Three
  * `job_runs` tables holding different rows is not duplication of facts —

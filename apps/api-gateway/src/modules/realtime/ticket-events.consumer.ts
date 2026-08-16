@@ -138,7 +138,7 @@ export class TicketEventsConsumer {
     @Payload() event: TicketEventOf<typeof TICKET_PATTERNS.messageCreated>,
   ): void {
     this.relay(event.pattern, () => {
-      // **Two rooms, chosen by `isInternalNote`** — 22-doc §1.
+      // **Two rooms, chosen by `isInternalNote`**
       //
       // The previous version sent every message to `ticket:{id}` alone, with
       // the reasoning that membership there is authorized and the org room is
@@ -157,7 +157,7 @@ export class TicketEventsConsumer {
   }
 
   /**
-   * An edit — 22-doc §6.1.
+   * An edit
    *
    * The same room split, by construction: it calls the same helper, so the
    * disclosure §1 closed cannot reopen here. The new content rides on the frame,
@@ -176,7 +176,7 @@ export class TicketEventsConsumer {
   }
 
   /**
-   * A REDACTION — 22-doc §6.1.
+   * A REDACTION
    *
    * **The event carries no content and neither does this frame.** The whole
    * payload is forwarded rather than rebuilt precisely so that stays true: the
@@ -196,7 +196,7 @@ export class TicketEventsConsumer {
   }
 
   /**
-   * Which room a message-shaped event belongs in — 22-doc §1, §6.1.
+   * Which room a message-shaped event belongs in
    *
    * Shared by `message:new`, `message:updated` and `message:deleted` so the
    * three cannot drift: the disclosure was fixed once, and the two later events
@@ -220,7 +220,7 @@ export class TicketEventsConsumer {
       emit();
       // Counted here rather than at each call site: every relayed event passes
       // through this boundary, so a handler added later is measured without
-      // anyone remembering to measure it — 23-doc §4.
+      // anyone remembering to measure it
       this.gateway.countEvent(pattern);
     } catch (error) {
       this.logger.error(`Failed to relay ${pattern}: ${formatErrorMsg(error)}`);

@@ -129,7 +129,7 @@ export class ListTicketsQueryDto extends OmitType(SearchPaginationDto, [
   @IsString()
   @IsIn(TICKET_SORTABLE_FIELDS)
   /**
-   * Optional in the API and, without this, REQUIRED in the docs — 24-doc §1.
+   * Optional in the API and, without this, REQUIRED in the docs
    *
    * The plugin derives `required` from TYPESCRIPT optionality, not from
    * `@IsOptional()`. A field declared `page: number = 1` is non-optional to the

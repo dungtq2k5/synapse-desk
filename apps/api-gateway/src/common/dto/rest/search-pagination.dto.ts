@@ -14,7 +14,7 @@ export class SearchPaginationDto {
   @Type(() => Number)
   // Guaranteed that this query will always be provided even if the client does not provide it
   /**
-   * Optional in the API and, without this, REQUIRED in the docs — 24-doc §1.
+   * Optional in the API and, without this, REQUIRED in the docs
    *
    * The plugin derives `required` from TYPESCRIPT optionality, not from
    * `@IsOptional()`. A field declared `page: number = 1` is non-optional to the

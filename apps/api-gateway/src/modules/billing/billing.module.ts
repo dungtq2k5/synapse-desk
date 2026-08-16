@@ -8,7 +8,7 @@ import { WebhooksController } from './webhooks.controller';
  * Two controllers, one client — and they are deliberately separate classes.
  *
  * `/billing/*` is authenticated and permissioned; `/webhooks/stripe` is neither
- * (14-doc §3.3). Putting them on one controller would mean the webhook
+ *. Putting them on one controller would mean the webhook
  * inheriting a class-level `@UseGuards`, and the bypass that route depends on
  * would become an easy thing to reintroduce by accident.
  */

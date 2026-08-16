@@ -8,7 +8,7 @@ import type { GqlContext } from '../../common/graphql/loaders/loaders.factory';
 import { toUserSummaryGqlDto } from '../users/user.mapper';
 
 /**
- * `TicketMessage.sender` — 26-doc §3.
+ * `TicketMessage.sender`
  *
  * Its own resolver class because `@ResolveField` attaches to the type named by
  * `@Resolver()`, and this field belongs to `TicketMessage` rather than to

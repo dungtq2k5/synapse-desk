@@ -81,7 +81,7 @@ export async function bootstrapE2eTest(
 
   const moduleRef = await builder.compile();
   // `rawBody: true` mirrors main.ts, and this suite is the reason it can be
-  // trusted: 14-doc §3.2 test 5 asserts the webhook receives the RAW body even
+  // trusted: a test asserts the webhook receives the RAW body even
   // with the global JSON parser registered. Without the option here the test
   // would pass against a bootstrap that does not resemble production, which is
   // the failure mode the doc calls "caught by a test rather than by a
@@ -114,7 +114,7 @@ export async function bootstrapE2eTest(
     }),
   );
 
-  // `/docs` and `/docs-json`, exactly as `main.ts` mounts them — 24-doc §4.
+  // `/docs` and `/docs-json`, exactly as `main.ts` mounts them
   // **Before `init()`**, which is the whole reason it lives here rather than in
   // the one suite that reads it: `SwaggerModule.setup` registers routes on the
   // Express instance, and registering them after the app has initialised

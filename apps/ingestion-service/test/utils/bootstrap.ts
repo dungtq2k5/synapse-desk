@@ -72,7 +72,7 @@ export async function bootstrapE2eTest(): Promise<E2eFixture> {
   // `--randomize` and passed in isolation: the delete had enqueued a fan-out
   // carrying `isDeleted: true`, the restore un-flipped the chunks, and then the
   // deferred job re-applied the stale scope. Identical in shape to the mock
-  // leak in 16-doc §9, and it needs the same rule — WORK must not escape its
+  // leak found during hardening, and it needs the same rule — WORK must not escape its
   // test either.
   /**
    * The live WORKERS, stopped — the other half of the fix above.

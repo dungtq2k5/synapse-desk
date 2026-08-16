@@ -13,14 +13,14 @@ import type { CacheService } from '../../cache/cache.service';
 import { ENTITY_TTL_SECONDS, entityScope } from '../../config/cache.config';
 
 /**
- * The users loader — 27-doc §2, §3.
+ * The users loader
  *
  * **50 tickets asking for `assignee { fullName }` becomes ONE gRPC call.**
  * Unbatched it is fifty concurrent calls into auth-service, which is also
- * serving every login in the system — 25-doc §2 calls that an outage rather
+ * serving every login in the system calls that an outage rather
  * than a missed optimisation, and it is triggered by a query string.
  *
- * **And now Redis in front of that** — 30-doc §2. A `UserSummary` is the ideal
+ * **And now Redis in front of that** A `UserSummary` is the ideal
  * thing to cache and that is not a coincidence: it is small, read on nearly
  * every edge in the schema, and changed by four handlers nobody calls often. It
  * is also shared across QUERIES — one cached user serves `Ticket.assignee`,
@@ -40,7 +40,7 @@ export function createUserSummaryLoader(
     scopeOf: (id) => entityScope('user', id),
     ttlSeconds: ENTITY_TTL_SECONDS,
     keyOf: (user) => user.userId,
-    // Never more than the RPC will accept — 27-doc §1, property 5. Without
+    // Never more than the RPC will accept, property 5. Without
     // this, one page of 100 tickets with two user edges is a 200-id batch that
     // the service refuses outright, and the whole column nulls.
     //
@@ -54,14 +54,14 @@ export function createUserSummaryLoader(
           {
             organizationId: context().organizationId ?? '',
             userIds: [...ids],
-            // **`true`** — 27-doc §3. The notification caller wants "who can act
+            // **`true`** The notification caller wants "who can act
             // on this?"; a loader wants "who IS this?". A ticket assigned to
             // somebody locked this morning must still render their name, and
             // excluding them shows a blank where "Former employee" belongs.
             includeInactive: true,
             // No `email`, no quiet hours. Enforced at the WIRE rather than by a
             // mapper here: data the gateway never receives is data it cannot
-            // leak (25-doc §4).
+            // leak.
             projection: UserProjection.USER_PROJECTION_SUMMARY,
           },
           packRequestContext(context()),
@@ -69,7 +69,7 @@ export function createUserSummaryLoader(
       );
 
       // The alignment moved INTO `createCachedLoader`, where it now has to hold
-      // across a partial hit as well — 30-doc §2 test 2. Returning the rows is
+      // across a partial hit as well test 2. Returning the rows is
       // all this function does.
       return response.summaries;
     },

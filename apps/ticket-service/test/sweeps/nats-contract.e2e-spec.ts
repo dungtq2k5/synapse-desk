@@ -206,7 +206,7 @@ describe('§3.4 NATS contract sweep (e2e)', () => {
     {
       // **No `content` field, and the sweep is where that is pinned.** The
       // frame this becomes announces a redaction; carrying the removed words in
-      // it would be the most direct way to defeat the redaction — 22-doc §6.1.
+      // it would be the most direct way to defeat the redaction
       pattern: TICKET_PATTERNS.messageRedacted,
       organizationId,
       ticketId,

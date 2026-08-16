@@ -223,7 +223,7 @@ export class PlatformService {
    * Everything the tenant-facing update allows, PLUS quotas.
    *
    * **The quota fields are an OVERRIDE with a lifetime, not a setting** —
-   * 14-doc §5. Since billing shipped, `max_agent_seats`, `max_storage_bytes`
+   * Since billing shipped, `max_agent_seats`, `max_storage_bytes`
    * and `monthly_ai_token_budget` are written by the Stripe entitlement
    * webhook, so a manual edit here survives exactly until the next
    * `subscription.updated` and is then reverted with no notice.
@@ -355,7 +355,7 @@ export class PlatformService {
   }
 
   /**
-   * Rolls the metering window. **BREAK-GLASS since billing shipped** — 14-doc §5.
+   * Rolls the metering window. **BREAK-GLASS since billing shipped**
    *
    * It was routine tenant administration. Two things changed underneath it:
    *

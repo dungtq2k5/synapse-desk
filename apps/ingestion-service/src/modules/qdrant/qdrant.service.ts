@@ -63,7 +63,7 @@ export class QdrantService implements OnApplicationBootstrap {
   }
 
   /**
-   * Is Qdrant reachable? — 23-doc §2, ingestion-service's readiness.
+   * Is Qdrant reachable?, ingestion-service's readiness.
    *
    * **Reuses the client this service already holds**, which is the point: a
    * probe every five seconds that constructs a client is a connection leak with
@@ -268,7 +268,7 @@ export class QdrantService implements OnApplicationBootstrap {
    * The dimension is the only part Qdrant itself enforces, and it does so at
    * insert time with an error that says nothing about why. This turns it into a
    * boot failure naming the actual problem — a full re-embed migration, not a
-   * config change (11-doc §1.3).
+   * config change.
    */
   private async assertDimensionMatches(): Promise<void> {
     const info = await this.client.getCollection(QDRANT_COLLECTION);

@@ -4,10 +4,10 @@ import { StorageClientModule } from '../storage-client/storage-client.module';
 import { AiAttachmentService } from './ai-attachment.service';
 
 /**
- * Its own module, and the cycle is why — 36-doc §2.
+ * Its own module, and the cycle is why
  *
  * All three AI call sites need the same filter-and-fetch, and two of them live
- * in ticket-service (35-doc §4.1). The obvious home was `MessagesModule`, which
+ * in ticket-service. The obvious home was `MessagesModule`, which
  * owns `message_attachments` — but `AiModule` would then import it, and
  * `MessagesModule` imports `TicketsModule`, which imports `AiModule` so
  * escalation can trigger a summary. That is a cycle, and `ai.module.ts` already

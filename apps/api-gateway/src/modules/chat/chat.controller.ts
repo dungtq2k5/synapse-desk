@@ -161,7 +161,7 @@ export class ChatController {
    * mean the only thing stopping a chat client from writing one is a permission
    * check it could not see. It is refused here, at the shape.
    */
-  // A per-USER minute limit, on top of the monthly quota — 16-doc §2. The
+  // A per-USER minute limit, on top of the monthly quota The
   // quota is a month budget checked per request and does nothing to stop one
   // user spending the whole month in ten minutes.
   @Throttle({ [AI_THROTTLER_TIER]: ROUTE_THROTTLE.chatMessage })
@@ -181,7 +181,7 @@ export class ChatController {
         content: dto.content,
         isInternalNote: false,
         invokeAi: dto.invokeAi,
-        // Forwarded rather than dropped — 36-doc §1.3. This is the surface a
+        // Forwarded rather than dropped This is the surface a
         // customer asks a question from, so it is the surface where the
         // screenshot and the question arrive together.
         attachments: dto.attachments,

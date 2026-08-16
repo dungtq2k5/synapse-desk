@@ -22,7 +22,7 @@ import { InboundRejectionConsumer } from './modules/inbound-email/inbound-reject
       validationSchema: envValidationSchema,
       validationOptions: { allowUnknown: true },
     }),
-    // Domain E gained a database when in-app notifications landed — 16-doc §1.
+    // Domain E gained a database when in-app notifications landed
     // Email and SMS carry their recipient in the command and need no storage;
     // an in-app feed is storage by definition.
     PrismaModule,
@@ -34,19 +34,19 @@ import { InboundRejectionConsumer } from './modules/inbound-email/inbound-reject
     DeliveriesModule,
     PreferencesModule,
     NotificationRealtimeModule,
-    // The read half — 18-doc §2. Domain E was NATS-only until this existed:
+    // The read half Domain E was NATS-only until this existed:
     // it consumed events and wrote rows nobody could read back.
     FeedModule,
     OpsModule,
   ],
   controllers: [
     NotificationsController,
-    // `ticket.*` → notifications (18-doc §3). A separate controller rather than
+    // `ticket.*` → notifications. A separate controller rather than
     // more handlers on the one above, because the two answer to different
     // producers: one is Domain E's own command subject, this one subscribes to
     // another domain's events and translates them.
     TicketNotificationConsumer,
-    // `email.inbound_rejected` → one courtesy reply (32-doc §5). Registered
+    // `email.inbound_rejected` → one courtesy reply. Registered
     // here beside the other consumer rather than in its own module, because
     // `EmailService` is an AppModule provider and a module of its own would be
     // a wrapper around one class with nothing else in it.

@@ -6,7 +6,7 @@ import { RedisHealthService } from '../../src/modules/health/redis-health.servic
 import { compareAlphabetically } from '@synapsedesk/common';
 
 /**
- * `/health` and `/health/ready` — 23-doc §1.
+ * `/health` and `/health/ready`
  *
  * **The bug this suite exists for turned any single outage into a total one.**
  * Readiness computed `every(peer => peer.health !== 'DOWN')`, so one gRPC peer
@@ -133,7 +133,7 @@ describe('§1 health probes (e2e)', () => {
 });
 
 /**
- * `/version` — 23-doc §3.
+ * `/version`
  *
  * Trivial to serve and easy to make useless. The two ways it goes wrong are
  * both tested here: reporting the wrong build (test 1's values come from the

@@ -21,7 +21,7 @@ import {
 /**
  * Generation is slow — a draft with a review pass is three model calls — so the
  * shared 5-second deadline would turn every co-pilot request into a 504. The
- * agent is waiting and knows they are waiting; that is the trade 13-doc §4.2
+ * agent is waiting and knows they are waiting; that is the trade
  * makes when it says the co-pilot is not streamed.
  */
 const GENERATION_DEADLINE_MS = 60_000;
@@ -46,7 +46,7 @@ export type AiReplyDraft = {
 /**
  * A summary, WITHOUT token columns.
  *
- * `ai_summaries` has none in the RDM, and doc 15 §3.2 settles why: summaries
+ * `ai_summaries` has none in the RDM, and the reason is that summaries
  * append to `ai_generations` like every other spend. Adding token columns here
  * would grow a SECOND metering path beside the ledger — and the quota gate sums
  * the ledger, so the second path would be a number nobody gates on that looks
@@ -61,7 +61,7 @@ export type AiSummaryDraft = {
 };
 
 /**
- * One article to recommend beside the next steps — 39-doc §2.
+ * One article to recommend beside the next steps
  *
  * **Not `AiCitation` reused, and they must not be merged.** A citation points
  * at the PASSAGE an answer used and carries a `chunkId` so the answer can be
@@ -149,7 +149,7 @@ export class RagClientService implements OnModuleInit {
     context: CallerContext,
     maxRetries: number = 1,
     /**
-     * The last user message's attachments — 36-doc §2.
+     * The last user message's attachments
      *
      * Defaulted empty so a caller that has none says nothing, and so this
      * signature reads the same on both `Draft` paths. Filtered and fetched by
@@ -174,7 +174,7 @@ export class RagClientService implements OnModuleInit {
     return {
       content: response.draft,
       // **THE RULE: populate model/token fields only where they cannot be read
-      // as the meter.** — 16-doc §8.
+      // as the meter.**
       //
       // Written down because this looks exactly like an inconsistency with
       // `generateSummary` below, which passes `modelName` straight through, and
@@ -189,7 +189,7 @@ export class RagClientService implements OnModuleInit {
       //     display metadata.
       //
       // rag-service has already written the ledger row carrying the real model
-      // and tokens (doc 15 §3.2). `rag-client.service.spec.ts` pins both sides.
+      // and tokens. `rag-client.service.spec.ts` pins both sides.
       modelName: '',
       promptTokens: 0,
       completionTokens: 0,
@@ -246,7 +246,7 @@ export class RagClientService implements OnModuleInit {
     history: ConversationTurn[],
     context: CallerContext,
     /**
-     * What the ticket IS — the article sidebar's retrieval query, 39-doc §3.
+     * What the ticket IS — the article sidebar's retrieval query
      *
      * Separate from `history`, which still drives the next-step list. The two
      * outputs come from two different inputs on purpose: next steps depend on
@@ -278,7 +278,7 @@ export class RagClientService implements OnModuleInit {
         documentTitle: article.documentTitle,
         // `?? null` and the DTO is `| null` to match — a document with no pages
         // is a real answer, and proto3 hands an absent `optional int32` back as
-        // `undefined`. 38-doc §2's reasoning, on a second surface.
+        // `undefined`. The narrow-DTO reasoning, on a second surface.
         pageNumber: article.pageNumber ?? null,
         score: article.score,
       })),
@@ -327,7 +327,7 @@ export class RagClientService implements OnModuleInit {
   }
 
   /**
-   * Still unbuilt — a second corpus with its own pipeline (11-doc §7).
+   * Still unbuilt — a second corpus with its own pipeline.
    *
    * Kept as an explicit UNAVAILABLE rather than removed, so the endpoint that
    * calls it keeps answering "not up" instead of 404ing a route the plan says

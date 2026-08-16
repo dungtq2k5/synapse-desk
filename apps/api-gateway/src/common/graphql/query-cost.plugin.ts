@@ -16,7 +16,7 @@ import {
 } from '../config/graphql-limits.config';
 
 /**
- * Field names resolved by a call to ANOTHER SERVICE — 25-doc §5.
+ * Field names resolved by a call to ANOTHER SERVICE
  *
  * A hand-maintained list, and deliberately so: the alternative is reading a
  * custom directive or an extension off the schema, which means the weighting
@@ -24,8 +24,8 @@ import {
  * reviews the limit. Kept honest by a test that every name here exists in the
  * schema, so a renamed edge fails rather than silently reverting to scalar cost.
  *
- * Empty until the first edge lands (26-doc §5). The scorer is built now because
- * 25-doc §8 puts the limits before the resolvers — a limit added afterwards is a
+ * Empty until the first edge lands. The scorer is built now because
+ * The limits come before the resolvers — a limit added afterwards is a
  * restriction on working clients rather than a constraint on a new surface.
  */
 export const CROSS_SERVICE_FIELDS = new Set<string>([
@@ -44,7 +44,7 @@ export const CROSS_SERVICE_FIELDS = new Set<string>([
  * **`didResolveOperation` is the hook that matters**: it runs after parse and
  * validation and BEFORE execution, so a refusal costs nothing downstream. A
  * check inside a resolver would fire after the fan-out it was meant to prevent —
- * which is 26-doc §1.3 test 1, asserting that no gRPC stub was called.
+ * which its test asserts by checking no gRPC stub was called.
  */
 /**
  * The plugin type, taken from `ApolloDriverConfig` rather than from
@@ -107,7 +107,7 @@ export function queryCostPlugin(
 }
 
 /**
- * The default page size each list field declares, by field name — 26-doc §1.3.
+ * The default page size each list field declares, by field name
  *
  * **Only fields that DECLARE a `first` / `limit` argument appear here**, and
  * that restriction is load-bearing. `TicketPage.items` is also a list, and its
@@ -285,7 +285,7 @@ function listSizeOf(
   );
 
   if (!argument) {
-    // **The blind spot** — 26-doc §1.3. `listSizeOf` reads the QUERY, and a
+    // **The blind spot** `listSizeOf` reads the QUERY, and a
     // client that omits `first` leaves nothing to read — so the field scored as
     // one item while the resolver's own `defaultValue` returned fifty.
     //
@@ -303,11 +303,11 @@ function listSizeOf(
   if (argument.value.kind === Kind.INT) {
     // **Capped at the page size the server will actually honour.**
     //
-    // Resolvers CLAMP `first` rather than rejecting it (25-doc §5), so a query
+    // Resolvers CLAMP `first` rather than rejecting it, so a query
     // asking for 500 receives 100. Pricing it at 500 charges for work that
     // cannot happen — and it refused `first: 500` outright, which defeats the
     // clamp entirely and turns "clamped, not rejected" back into "rejected".
-    // Found by 26-doc §1.3 test 3, which is exactly what that test is for.
+    // Found by the cost-limit test, which is exactly what that test is for.
     return Math.min(
       Math.max(1, Number.parseInt(argument.value.value, 10)),
       MAX_PAGE_SIZE,

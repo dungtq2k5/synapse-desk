@@ -21,7 +21,7 @@ export class DocumentResponseGqlDto {
   organizationId!: string;
 
   /**
-   * The uploader's id, flat beside the `createdBy` edge — 26-doc §3.
+   * The uploader's id, flat beside the `createdBy` edge
    *
    * Same rule as `Ticket.currentAssigneeId`: a client that wants the id must
    * not pay a network call for it.
@@ -59,7 +59,7 @@ export class DocumentResponseGqlDto {
 
   // ASK this `docblock` seem to be invalid
   /**
-   * **A field, not a connection** — 26-doc §3. The service already has this
+   * **A field, not a connection** The service already has this
    * number; `chunks { totalCount }` would fetch chunks in order to count them.
    */
   @Field(() => Int)

@@ -34,14 +34,14 @@ export const CHUNK_OVERLAP_TOKENS = 64;
  * A three-token chunk ("Appendix B") is a retrieval hazard: it embeds to
  * something, so it can win a similarity comparison, and it carries no
  * information a generator can use. It then occupies a context slot a useful
- * chunk would have held — the `UNCITED` failure mode (12-doc §4.2), created
+ * chunk would have held — the `UNCITED` failure mode, created
  * at ingestion rather than discovered later.
  */
 export const MIN_CHUNK_TOKENS = 16;
 
 /**
  * **The chunker counts with `js-tiktoken` (`cl100k_base`), and that is an
- * ESTIMATE of the tokenizer that actually bills us** — 21-doc §3.2.
+ * ESTIMATE of the tokenizer that actually bills us**
  *
  * **Trap 1 of §3.2: treating a `cl100k_base` count as exact.** It is
  * **OpenAI's** tokenizer. We embed with Gemini `gemini-embedding-2` and

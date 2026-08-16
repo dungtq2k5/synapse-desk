@@ -67,7 +67,7 @@ class TestResolution:
         assert settings.embedding_model == EMBEDDING_MODEL
 
     def test_quality_changes_the_generation_model_and_nothing_else(self):
-        # Doc 15 §2.2. Each of the fields held constant here is a
+        # Each of the fields held constant here is a
         # plausible-sounding extension that breaks something: scaling the
         # embedding model with the tier is a full re-embed migration of every
         # tenant, and scaling the cheap model multiplies a premium tenant's
@@ -159,7 +159,7 @@ class TestCache:
         assert calls == ["org-a"]
 
     async def test_invalidation_affects_only_the_named_tenant(self):
-        # Doc 15 §1.4 test 4. A global flush on every webhook is a thundering
+        # A global flush on every webhook is a thundering
         # herd, and webhooks arrive in bursts.
         resolver = AiSettingsResolver()
         calls: list[str] = []

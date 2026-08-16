@@ -12,7 +12,7 @@ const CONTEXT = memberContext({
 });
 
 /**
- * 16-doc §8 — **populate model/token fields only where they cannot be read as
+ * **populate model/token fields only where they cannot be read as
  * the meter.**
  *
  * The rule looks like an inconsistency, which is the dangerous combination:
@@ -39,7 +39,7 @@ describe('RagClientService — the single metering path', () => {
   /**
    * A stand-in, NOT a real model name.
    *
-   * `check-model-literals.mjs` scans test files too (doc 15 §1.2), and it is
+   * `check-model-literals.mjs` scans test files too, and it is
    * right to: a real name here would be one grep away from being copied into a
    * call site. Nothing in this test depends on the value — the point is that the
    * mapper drops whatever the wire carried.

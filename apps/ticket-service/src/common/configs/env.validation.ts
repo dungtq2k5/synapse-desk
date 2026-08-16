@@ -2,7 +2,7 @@ import * as Joi from 'joi';
 import { NODE_ENV_OPTIONS } from '@synapsedesk/common';
 
 export const envValidationSchema = Joi.object({
-  // **Which build is this?** — 23-doc §3. Baked at image build time, never read
+  // **Which build is this?** Baked at image build time, never read
   // from git at runtime: a container has no `.git`, so a runtime lookup returns
   // nothing and the natural fallback is `"unknown"` — the answer you get at
   // exactly the moment you need the real one.
@@ -66,7 +66,7 @@ export const envValidationSchema = Joi.object({
     then: Joi.optional(),
     otherwise: Joi.required(),
   }),
-  // The export queue's Redis — 19-doc §5. ticket-service's FIRST queue: it had
+  // The export queue's Redis ticket-service's FIRST queue: it had
   // no Redis at all before analytics, which is why the whole `BullModule`
   // registration lives in `AnalyticsModule` rather than in `AppModule`.
   REDIS_URL: Joi.string().required(),

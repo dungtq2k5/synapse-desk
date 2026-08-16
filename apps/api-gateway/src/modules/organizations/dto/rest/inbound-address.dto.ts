@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 
 /**
- * The tenant's inbound support address — 31-doc §2.
+ * The tenant's inbound support address
  *
  * **The address, not the token.** The token alone is unusable without the mail
  * domain, which is deployment configuration; returning the two separately would

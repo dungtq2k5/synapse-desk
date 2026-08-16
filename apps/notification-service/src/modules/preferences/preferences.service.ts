@@ -28,7 +28,7 @@ import { PreferenceResolver } from './preference-resolver.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 /**
- * The settings screen — 18-doc §4, api-endpoints-plan §4b.
+ * The settings screen, api-endpoints-plan §4b.
  *
  * **Returns the RESOLVED catalogue, not the stored rows.** A settings screen
  * built from stored rows shows a user who has never touched it an empty page,
@@ -162,7 +162,7 @@ export class PreferencesService {
    *
    * What remains is a POLICY, which no wire type can express: `WEBHOOK` is a
    * real channel that is not a configurable preference. It has no
-   * implementation (18-doc §8), so a preference for it would be a setting that
+   * implementation, so a preference for it would be a setting that
    * controls nothing. `PREFERENCE_CHANNELS` is Table 25; the enum is Table 24.
    *
    * `UNSPECIFIED` lands here too — a caller that omitted the field — and gets

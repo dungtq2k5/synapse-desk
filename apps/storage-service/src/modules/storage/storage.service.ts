@@ -89,7 +89,7 @@ export class StorageService {
       });
     }
     if (request.secondaryOwnerId && !policy.allowsSecondaryOwner) {
-      // The check inverted in 36-doc §1.3. It used to REQUIRE the segment for a
+      // The check, since inverted. It used to REQUIRE the segment for a
       // ticket attachment, which is what made presign-before-the-message
       // impossible; now the only error is a secondary owner on a purpose that
       // has nowhere to put one, which would otherwise be silently discarded.
@@ -251,7 +251,7 @@ export class StorageService {
       });
     }
 
-    // **The move out of `pending/`** — 36-doc §1.3.2, and the whole reason that
+    // **The move out of `pending/`**, and the whole reason that
     // prefix exists. Everything still under it after this point is unreferenced
     // by construction, which is what makes a lifecycle rule over it safe.
     //
@@ -451,7 +451,7 @@ export class StorageService {
     }
 
     // **The message segment is omitted rather than filled with a placeholder**
-    // when the message does not exist yet — 36-doc §1.3. A literal `pending`
+    // when the message does not exist yet A literal `pending`
     // would read as a real message id to anyone browsing the bucket, and would
     // be the one path segment that means something different from all the
     // others.
@@ -461,7 +461,7 @@ export class StorageService {
       : fileName;
 
     return {
-      // **Uploaded under `pending/`, committed out of it** — 36-doc §1.3.2.
+      // **Uploaded under `pending/`, committed out of it**
       //
       // Nothing else makes the prefix sweepable. `confirmUpload` never moved
       // the object, so a live attachment on a real ticket had the same path

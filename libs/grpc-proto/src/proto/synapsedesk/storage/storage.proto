@@ -14,7 +14,7 @@ enum StoragePurpose {
   STORAGE_PURPOSE_TICKET_ATTACHMENT = 2;
   // Reserved — Domain C's ingestion-service. No caller today.
   STORAGE_PURPOSE_DOCUMENT = 3;
-  // An analytics export — 19-doc §5. A new purpose rather than a second file
+  // An analytics export A new purpose rather than a second file
   // path, so the signed-URL discipline and the tenant prefix are reused rather
   // than reinvented.
   STORAGE_PURPOSE_EXPORT = 4;

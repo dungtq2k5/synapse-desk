@@ -51,7 +51,7 @@ HOSTILE = [
     pytest.param("", id="empty"),
     pytest.param("I'm sorry, I can't help with that.", id="refusal-no-json"),
     pytest.param('```json\n{"summary":', id="truncated-mid-object"),
-    # 17-doc §1.2 Gap 1: `re.search(r"\{.*\}", ...)` with DOTALL spans from the
+    # Gap 1: `re.search(r"\{.*\}",...)` with DOTALL spans from the
     # FIRST brace to the LAST, so two objects capture a span that is not valid
     # JSON and the caller gets an empty result with a good object inside the
     # text.

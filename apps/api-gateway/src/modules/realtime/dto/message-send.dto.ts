@@ -17,7 +17,7 @@ import {
 import { NewAttachmentDto } from '../../tickets/dto/rest/message.dto';
 
 /**
- * The `message:send` payload — 22-doc §2.
+ * The `message:send` payload
  *
  * **Validated explicitly, because a socket frame has no ValidationPipe.** There
  * is no global pipe on a WebSocket message unless one is wired per handler, so
@@ -33,7 +33,7 @@ export class MessageSendDto {
   readonly content!: string;
 
   /**
-   * **Required, unlike its HTTP twin** — 22-doc §2.3.
+   * **Required, unlike its HTTP twin**
    *
    * A socket that reconnects holding an unacked message re-emits it. That is
    * correct client behaviour, and without an id to dedup on it double-posts.
@@ -60,7 +60,7 @@ export class MessageSendDto {
   readonly invokeAi?: boolean;
 
   /**
-   * Objects already uploaded, bound as this message is created — 36-doc §1.3.
+   * Objects already uploaded, bound as this message is created
    *
    * **The socket needs this as much as HTTP does**, and more: this is the
    * surface where a customer attaches a screenshot and asks about it in the

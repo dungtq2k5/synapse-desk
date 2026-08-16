@@ -4,7 +4,7 @@ import { formatErrorMsg } from '@synapsedesk/common';
 import { PrismaService } from './prisma.service';
 
 /**
- * Bootstrap DDL for notification-service — 18-doc §1.2.
+ * Bootstrap DDL for notification-service
  *
  * Seeds no ROWS. Domain E has no reference data: a preference row is created
  * when a user changes something, and its absence is a permissive default rather
@@ -124,7 +124,7 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
 
     // Group collapse: "is there already an UNREAD row for this thread?".
     //
-    // Scoped to unread deliberately (18-doc §3.2). Once the user has read
+    // Scoped to unread deliberately. Once the user has read
     // "3 new replies", the next reply is new information and starts a fresh
     // row — an index covering read rows would serve a lookup that must not
     // find anything.

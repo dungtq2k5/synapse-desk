@@ -37,7 +37,7 @@ export class NotificationsController {
       async () => {
         // The message id is discarded on THIS path deliberately: a bare
         // `notification.email.send` has no `notifications` row to attach a
-        // delivery record to. Domain E's own fan-out captures it (18-doc §5);
+        // delivery record to. Domain E's own fan-out captures it;
         // this subject predates the table and is still used for transactional
         // mail — a password reset is not an in-app notification.
         await this.emailService.send(command);
@@ -60,7 +60,7 @@ export class NotificationsController {
   }
 
   /**
-   * The subscriber this subject did not have — 16-doc §1.
+   * The subscriber this subject did not have
    *
    * `IN_APP_NOTIFICATION_PATTERN` was published to from the moment the quota
    * alert existed, on the same reasoning that had `audit.record` emitting
@@ -78,7 +78,7 @@ export class NotificationsController {
     if (!command?.organizationId || !command.audience || !command.type) {
       // Dropped rather than guessed at. An audience of "everyone" is the one
       // interpretation a malformed command must never receive — and a missing
-      // `type` would produce a row no preference can ever silence (18-doc
+      // `type` would produce a row no preference can ever silence (
       // §1.3), which is worse than no row at all.
       this.logger.error(
         `${IN_APP_NOTIFICATION_PATTERN} arrived without a tenant, a type or an audience`,

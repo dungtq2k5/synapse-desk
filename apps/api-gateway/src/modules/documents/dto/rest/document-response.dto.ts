@@ -32,7 +32,7 @@ export class DocumentResponseDto {
   fileType!: DocumentFileType;
   // ASK this `docblock` seem to be invalid
   /**
-   * ISO 639-1 codes the uploader declared for OCR — 34-doc §4.
+   * ISO 639-1 codes the uploader declared for OCR
    *
    * `[]` means "not specified", never null: Prisma scalar lists cannot be null,
    * so there is one value for absent and empty all the way to the client.

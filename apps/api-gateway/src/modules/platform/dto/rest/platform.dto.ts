@@ -39,7 +39,7 @@ export class ListPlatformOrganizationsQueryDto extends OmitType(
   @IsString()
   @IsIn(ORGANIZATION_SORTABLE_FIELDS)
   /**
-   * Optional in the API and, without this, REQUIRED in the docs — 24-doc §1.
+   * Optional in the API and, without this, REQUIRED in the docs
    *
    * The plugin derives `required` from TYPESCRIPT optionality, not from
    * `@IsOptional()`. A field declared `page: number = 1` is non-optional to the
@@ -188,7 +188,7 @@ export class SetOrganizationStatusDto {
 }
 
 /**
- * A reason, required — 14-doc §5.
+ * A reason, required
  *
  * This endpoint used to be routine tenant administration. Since billing
  * shipped it is BREAK-GLASS: `billing_cycle_start` follows Stripe's invoice
@@ -267,7 +267,7 @@ export class PlatformMetricsResponseDto {
   readonly generatedAt!: Date;
 }
 
-// **`export`, not `export type`** — 24-doc §2. Re-exported as a VALUE because
+// **`export`, not `export type`** Re-exported as a VALUE because
 // `@ApiWrappedResponse(RoleResponseDto)` needs its runtime identity to build a
 // `$ref`; a type-only re-export erases the class and the reference cannot be
 // built at all.

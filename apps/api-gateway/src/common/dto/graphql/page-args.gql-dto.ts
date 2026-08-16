@@ -5,7 +5,7 @@ import { DEFAULT_SEARCH } from '@synapsedesk/common';
 /**
  * The pagination arguments every list query takes.
  *
- * **`first` carries no `@Max`, deliberately** — 25-doc §5. It is CLAMPED to
+ * **`first` carries no `@Max`, deliberately** It is CLAMPED to
  * `MAX_PAGE_SIZE` by `toPageQuery` in `common/mappers/pagination.mapper.ts`, and
  * a validator here would turn that clamp into the rejection it exists to
  * replace — making the cap a breaking change for a client that worked

@@ -5,7 +5,7 @@ import { PlatformJobsController } from './platform-jobs.controller';
 import { PlatformJobsService } from './platform-jobs.service';
 
 /**
- * `/platform/jobs` — 20-doc §4.4, §5.
+ * `/platform/jobs`
  *
  * Separate from `PlatformModule` because it talks to ticket-service and
  * ingestion-service rather than to auth-service: the heartbeat tables live
@@ -18,7 +18,7 @@ import { PlatformJobsService } from './platform-jobs.service';
   imports: [AuthModule],
   controllers: [PlatformJobsController],
   providers: [PlatformJobsClient, PlatformJobsService],
-  // Exported for the metrics collector — 23-doc §4. The Prometheus gauge reads
+  // Exported for the metrics collector The Prometheus gauge reads
   // the SAME heartbeats this endpoint reports, deliberately: a second reader
   // with its own staleness rule would eventually disagree with the page an
   // operator is looking at.

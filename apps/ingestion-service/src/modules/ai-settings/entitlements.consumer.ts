@@ -9,8 +9,8 @@ import { AiSettingsService } from './ai-settings.service';
 /**
  * Invalidates one tenant's cached AI settings when their plan changes.
  *
- * **The publisher does not exist yet** (doc 14 §3's Stripe webhook), and this
- * consumer still ships now, because doc 15 §1.3 describes the failure of
+ * **The publisher is the Stripe webhook**, and this
+ * consumer still ships now, because of the failure mode of
  * shipping the cache first: a downgraded tenant keeps receiving the premium
  * model until the TTL expires. Nobody reports that — it fails in the direction
  * that costs money rather than the direction a customer notices — so the fix
@@ -31,7 +31,7 @@ export class EntitlementsConsumer {
   handle(@Payload() event: EntitlementsChangedEvent): void {
     // A missing organizationId cannot be interpreted as "all of them". That
     // reading turns one malformed message into a full cache flush and a
-    // re-resolve for every active tenant at once — the thundering herd doc 15
+    // re-resolve for every active tenant at once — the thundering herd
     // §1.4 test 4 exists to prevent, arriving from the one input nobody
     // validated.
     if (!event?.organizationId) {

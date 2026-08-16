@@ -1,4 +1,4 @@
-"""Co-RAG's review loop — 13-doc §4.2, and the co-pilot's whole differentiator.
+"""Co-RAG's review loop, and the co-pilot's whole differentiator.
 
 Tier 1 chat runs `co_rag_max_retries = 0`: one generation, streamed, because the
 product IS the instant answer. The co-pilot runs the SAME generator with 1-2
@@ -93,7 +93,7 @@ def build_review_prompt(
 
     return (
         "You are reviewing a support reply drafted from the numbered sources.\n"
-        # 33-doc §4.2 — the SAME boundary as the answer prompt. CoRAG runs this
+        # The SAME boundary as the answer prompt. CoRAG runs this
         # on the Draft path, whose question can be a stranger's email, so
         # hardening only `build_prompt` would leave the forgeable delimiter one
         # call away.

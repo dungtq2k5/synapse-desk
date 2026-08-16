@@ -53,7 +53,7 @@ import { toStoredBody } from './quoted-reply';
 /**
  * Why a message did not become a ticket, or what it became.
  *
- * **Every one of these is answered with a 200** — 32-doc §3.1. A 4xx tells the
+ * **Every one of these is answered with a 200** A 4xx tells the
  * provider the request was malformed and worth retrying, so one misconfigured
  * mail rule would become a retry loop against this endpoint. The outcome
  * travels in the body instead, where an operator can see it and a provider
@@ -64,10 +64,10 @@ export enum InboundOutcome {
   APPENDED = 'message_appended',
   DUPLICATE = 'duplicate',
   UNROUTABLE = 'unroutable_address',
-  /** A real tenant, but not one currently accepting anything — 31-doc §2. */
+  /** A real tenant, but not one currently accepting anything */
   TENANT_INACTIVE = 'tenant_inactive',
   SENDER_REFUSED = 'sender_not_permitted',
-  /** Our own notification came back to us — 31-doc §7. */
+  /** Our own notification came back to us */
   SELF_LOOP = 'self_addressed',
 }
 
@@ -116,7 +116,7 @@ type RoutingFacts = {
 };
 
 /**
- * What `resolveRouting` found — 31-doc §5's reply half.
+ * What `resolveRouting` found's reply half.
  *
  * A discriminated result rather than a nullable one, so the three ways a mail
  * can be unroutable stay distinguishable: `accept` turns each into its own drop
@@ -147,7 +147,7 @@ type RoutingResolution =
     };
 
 /**
- * The email adapter — 31-doc §6, 32-doc §4.
+ * The email adapter
  *
  * **The gateway is the only component that knows what an email is.** Address
  * parsing, the reply-token HMAC, quoted history and the loop headers are all
@@ -155,9 +155,9 @@ type RoutingResolution =
  * that own them. ticket-service never learns that mail exists — it receives a
  * ticket with `source = EMAIL` and an idempotency key.
  *
- * Order is fixed and each step gates the next (32-doc §4.2): **tenant, then
+ * Order is fixed and each step gates the next: **tenant, then
  * sender, then thread.** Resolving the tenant later would mean running the
- * sender query unscoped, which is the cross-tenant misroute 31-doc §3 exists
+ * sender query unscoped, which is the cross-tenant misroute the tenant token exists
  * to prevent.
  */
 @Injectable()
@@ -202,7 +202,7 @@ export class InboundEmailService implements OnModuleInit {
   async accept(payload: InboundEmailDto): Promise<InboundOutcome> {
     // ------------------------------------------------------- 0. loop guards
     //
-    // **Before anything else, and unconditionally** — 31-doc §7. A mail loop is
+    // **Before anything else, and unconditionally** A mail loop is
     // the classic way an email integration takes out a mailbox, and its blast
     // radius is somebody else's.
     if (this.isSelfAddressed(payload.from)) {
@@ -214,7 +214,7 @@ export class InboundEmailService implements OnModuleInit {
 
     // ------------------------------------------- 1-3. tenant, sender, thread
     //
-    // **One resolver, shared with the Worker's presign route** — 31-doc §5's
+    // **One resolver, shared with the Worker's presign route**'s
     // reply half. The Worker presigns against a ticket BEFORE this webhook
     // runs; if the two resolutions could disagree, a customer's screenshot
     // would be uploaded under one ticket's prefix and attached to another's
@@ -260,7 +260,7 @@ export class InboundEmailService implements OnModuleInit {
         if (appended) return InboundOutcome.APPENDED;
       } else if (addressedToTicket) {
         // The token verified but the ticket is gone. A new ticket is the safe
-        // direction — 31-doc §4 — because the alternative is discarding a
+        // direction — because the alternative is discarding a
         // customer's message.
       }
 
@@ -302,11 +302,11 @@ export class InboundEmailService implements OnModuleInit {
   }
 
   /**
-   * Presigns uploads for a mail's attachments — 31-doc §5, the reply half.
+   * Presigns uploads for a mail's attachments, the reply half.
    *
    * **Called BEFORE the webhook, by the Worker, over the same signed channel.**
    * The bytes go from the Worker straight to storage and never touch this
-   * server, which is the property 10-doc's presign flow exists to hold and the
+   * server, which is the property the presign flow exists to hold and the
    * one an inbound mail most threatens: the Worker has the bytes whether anyone
    * wanted them or not, and uploading them through the webhook would make
    * `/webhooks/email/inbound` the only route in the system that accepts
@@ -376,7 +376,7 @@ export class InboundEmailService implements OnModuleInit {
               {
                 ticketId: ticket.id,
                 // No message yet — it is created by the webhook that follows,
-                // and 36-doc §1.3 is what made presigning without one possible.
+                // and the message-first upload flow made presigning without one possible.
                 messageId: undefined,
                 fileName: file.fileName,
                 fileSizeBytes: file.sizeBytes,
@@ -571,7 +571,7 @@ export class InboundEmailService implements OnModuleInit {
    * write and only one of them reachable.
    *
    * **A CLOSED ticket is reopened through the transition, never a status
-   * write** — 32-doc §4.2, the same rule `message:send` follows. Reopened
+   * write**, the same rule `message:send` follows. Reopened
    * first, so the reply never lands on a ticket the state machine still
    * considers finished.
    */
@@ -596,12 +596,12 @@ export class InboundEmailService implements OnModuleInit {
             ticketId: ticket.id,
             content: body,
             // **Never an internal note.** A customer's reply is customer-visible
-            // by definition, and the one thing 22-doc §1 found leaking was an
+            // by definition, and the one thing found leaking was an
             // internal note reaching one.
             isInternalNote: false,
             invokeAi: false,
             inboundMessageId,
-            // **Uploaded by the Worker before this webhook ran** — 31-doc §5.
+            // **Uploaded by the Worker before this webhook ran**
             //
             // This list is for a client that uploaded BEFORE the message
             // existed, and inbound mail is now exactly that client: the Worker
@@ -693,7 +693,7 @@ export class InboundEmailService implements OnModuleInit {
   /**
    * The idempotency key — the `Message-ID`, or a digest when it had none.
    *
-   * 31-doc §7: a missing header is not a reason to skip the check. Without a
+   * A missing header is not a reason to skip the check. Without a
    * key, a retry storm creates one ticket per attempt.
    */
   private idempotencyKeyFor(payload: InboundEmailDto): string {
@@ -725,7 +725,7 @@ export class InboundEmailService implements OnModuleInit {
   }
 
   /**
-   * Notes what was dropped, in the body — 31-doc §5.
+   * Notes what was dropped, in the body
    *
    * *"Attachments silently vanish"* is something a customer finds before you
    * do, so the omission is visible to everyone on the thread rather than only
@@ -738,7 +738,7 @@ export class InboundEmailService implements OnModuleInit {
   }
 
   /**
-   * A drop, made visible in the three places 31-doc §3 requires.
+   * A drop, made visible in all three places.
    *
    * A log line here, a metric from it, and ONE auto-reply so the sender is not
    * left with silence — silence is indistinguishable from mail being lost, and
@@ -762,7 +762,7 @@ export class InboundEmailService implements OnModuleInit {
         (tenantStatus ? ` status=${tenantStatus}` : ''),
     );
 
-    // **Never reply to an auto-reply** — 31-doc §7. An auto-responder on the
+    // **Never reply to an auto-reply** An auto-responder on the
     // other end plus a courtesy reply from us is an unbounded exchange, and
     // these two headers are the standard way a machine says it is one. They are
     // invisible once the body is parsed, which is why the Worker forwards

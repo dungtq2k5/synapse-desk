@@ -17,7 +17,7 @@ import { RedisService } from '../../src/common/redis/redis.service';
 import { compareAlphabetically } from '@synapsedesk/common';
 
 /**
- * The shared cache, against a REAL Redis — 29-doc §1.
+ * The shared cache, against a REAL Redis
  *
  * The unit suite beside `cache.service.ts` covers key construction and the
  * fail-open behaviour with a fake. These two need the real thing: one is about
@@ -202,7 +202,7 @@ describe('§29 the shared cache (e2e)', () => {
     });
 
     it('**two tenants never share a cached read**', async () => {
-      // 29-doc §1 test 1, through a real route: the failure the default
+      // Through a real route: the failure the default
       // `CacheInterceptor` ships with, since its key is the request URL.
       fx.stubs.role.listPermissions.mockReturnValueOnce(
         of(wirePermissions("tenant A's catalogue")),
@@ -302,7 +302,7 @@ describe('§29 the shared cache (e2e)', () => {
       // `GET /documents` is filtered by `visibilityScope` in ingestion-service
       // — org-wide ∪ the caller's departments. A tenant-only key would serve
       // Finance's documents to Support: the right tenant, somebody else's
-      // answer. This is 28-doc §2's failure one level down, and it is why
+      // answer. This is the tenant-key failure one level down, and it is why
       // `varyBy` has no default.
       const finance = faker.string.uuid();
       const support = faker.string.uuid();
@@ -464,7 +464,7 @@ describe('§29 the shared cache (e2e)', () => {
   describe('the wiring', () => {
     it('resolves from the container, over the SHARED connection', () => {
       // Not a tautology: `CacheService` taking its own `new Redis(...)` would
-      // still pass every test above while being the eighth connection 29-doc §2
+      // still pass every test above while being the eighth connection the design
       // exists to prevent.
       expect(cache).toBeInstanceOf(CacheService);
       expect(fx.app.get(RedisService).client).toBeDefined();

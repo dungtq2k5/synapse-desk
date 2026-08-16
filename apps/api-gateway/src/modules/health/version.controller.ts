@@ -9,7 +9,7 @@ import { readBuildInfo } from '@synapsedesk/common';
 import { VersionResponseDto } from './dto/health-response.dto';
 
 /**
- * `GET /version` — 23-doc §3.
+ * `GET /version`
  *
  * **Which build is this?** During an incident, "did the fix actually roll out?"
  * is the first question anyone asks, and without this every answer is inference

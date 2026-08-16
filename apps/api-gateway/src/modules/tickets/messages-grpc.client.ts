@@ -73,7 +73,7 @@ export class MessagesGrpcClient extends BaseGrpcClient implements OnModuleInit {
     dto: CreateMessageDto,
     context: RequestContext,
     /**
-     * The sender's own id, for idempotency — 22-doc §2.3.
+     * The sender's own id, for idempotency
      *
      * Passed as an argument rather than added to `CreateMessageDto`, because it
      * belongs to the WEBSOCKET transport and not to the HTTP body. Putting it on
@@ -94,9 +94,9 @@ export class MessagesGrpcClient extends BaseGrpcClient implements OnModuleInit {
             invokeAi: dto.invokeAi ?? false,
             clientMessageId,
             // Already-uploaded objects, bound as the message is written —
-            // 36-doc §1.3. `?? []` because proto3 has no absent repeated field.
+            // `?? []` because proto3 has no absent repeated field.
             attachments: dto.attachments ?? [],
-            // **Closes the acceptance loop** — 38-doc §1. Forwarded rather than
+            // **Closes the acceptance loop** Forwarded rather than
             // dropped: ticket-service has always read this field, and not
             // sending it is what made every accepted draft look discarded.
             generatedFromId: dto.generatedFromId,
@@ -116,7 +116,7 @@ export class MessagesGrpcClient extends BaseGrpcClient implements OnModuleInit {
   }
 
   /**
-   * Persists a STREAMED AI answer — 22-doc §5.1, write #2.
+   * Persists a STREAMED AI answer, write #2.
    *
    * **Not reachable from any route.** There is no DTO and no controller calling
    * this: the only caller is `AiStreamService`, with content that came from
@@ -132,7 +132,7 @@ export class MessagesGrpcClient extends BaseGrpcClient implements OnModuleInit {
     context: RequestContext,
     // ASK This `docblock` seems to be invalid
     /**
-     * What the generation concluded, persisted on the row — 36-doc §7.
+     * What the generation concluded, persisted on the row
      *
      * The gateway held this in the completion frame and dropped it on write, so
      * once the socket closed a thread could not tell a refusal from an answer.
@@ -162,7 +162,7 @@ export class MessagesGrpcClient extends BaseGrpcClient implements OnModuleInit {
   }
 
   /**
-   * Marks a message as unusable for AI context — 36-doc §7.
+   * Marks a message as unusable for AI context
    *
    * Called on the refusal path only, by the service that holds the id of the
    * message that was just refused. The row stays visible in the thread; what
@@ -233,7 +233,7 @@ export class MessagesGrpcClient extends BaseGrpcClient implements OnModuleInit {
    */
   async presignAttachment(
     ticketId: string,
-    /** Absent when the message does not exist yet — 36-doc §1.3. */
+    /** Absent when the message does not exist yet */
     messageId: string | undefined,
     dto: UploadAttachmentDto,
     context: RequestContext,
@@ -312,7 +312,7 @@ export class MessagesGrpcClient extends BaseGrpcClient implements OnModuleInit {
   }
 
   /**
-   * The AI-eligible attachments of one message, as bytes — 36-doc §2.
+   * The AI-eligible attachments of one message, as bytes
    *
    * **Asked for rather than fetched here.** This gateway has no storage client,
    * and ticket-service already runs the identical filter-and-fetch for its two

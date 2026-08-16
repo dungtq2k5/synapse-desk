@@ -4,7 +4,7 @@ package synapsedesk.ticket;
 
 import "google/protobuf/timestamp.proto";
 
-// The read projection over Domain B — 19-doc.
+// The read projection over Domain B.
 //
 // **Served by ticket-service, not by an `analytics-service`.** A service with
 // no tables of its own either reads another service's database — breaking the
@@ -16,7 +16,7 @@ import "google/protobuf/timestamp.proto";
 // aggregating a quarter of tickets competes with ticket creation, and no
 // endpoint design fixes that.
 
-// A rate and the count it was computed over — 19-doc §3.1.
+// A rate and the count it was computed over
 //
 // **Every rate carries its denominator.** A percentage with a hidden
 // denominator is how "our CSAT is 100%" reaches a board deck on two responses.
@@ -62,7 +62,7 @@ message OverviewResponse {
 
   // The counterweight to `resolution_seconds`, which is biased OPTIMISTIC
   // because it can only see tickets that closed — a ticket open for 40 days is
-  // invisible to it (19-doc §3.1).
+  // invisible to it.
   optional int64 open_ticket_median_age_seconds = 10;
 
   // When the rollups behind this answer were computed. Carried so a caller can
@@ -70,7 +70,7 @@ message OverviewResponse {
   // run produced its numbers.
   optional google.protobuf.Timestamp computed_at = 11;
 
-  // **The last DAY the rollups cover for this tenant** (20-doc §4.3), as
+  // **The last DAY the rollups cover for this tenant**, as
   // `YYYY-MM-DD`, or absent when no rollup has ever run.
   //
   // NOT the same fact as `computed_at`, and the difference is the point:
@@ -174,7 +174,7 @@ message AgentStatsResponse {
 
 // The rollup job, exposed so a scheduler and an operator can both reach it.
 // ---------------------------------------------------------------------------
-// Job health -- 20-doc §4.1, §4.4.
+// Job health.
 //
 // **Alerting on staleness rather than on failure.** A failed job logs; a job
 // that never ran logs nothing at all, which is precisely what happened here --
@@ -211,7 +211,7 @@ message RunRollupResponse {
   int32 agent_rows = 3;
 }
 
-// The async export — 19-doc §5.
+// The async export
 
 enum AnalyticsExportKind {
   ANALYTICS_EXPORT_KIND_UNSPECIFIED = 0;

@@ -17,7 +17,7 @@ const AUTO_REPLY_WINDOW_MS = 24 * 60 * 60 * 1000;
 /**
  * Tells a sender their mail was refused — once a day, at most.
  *
- * **The gateway does not send this, and that split is deliberate** — 32-doc §5.
+ * **The gateway does not send this, and that split is deliberate**
  * The webhook must answer 200 whatever happens, so the drop path cannot be
  * allowed to fail because a mailbox was slow; and the rate limit belongs where
  * the sending happens, because a limit enforced by the publisher counts

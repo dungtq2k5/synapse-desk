@@ -15,7 +15,7 @@ import {
 } from '../../../test/utils/ocr-binaries';
 
 /**
- * Scanned-page OCR — 34-doc §1, §3.
+ * Scanned-page OCR
  *
  * **These tests need binaries on the HOST**, and the Docker target does not
  * provide them: jest runs on the developer's machine (§3.4). Install with
@@ -247,7 +247,7 @@ describe('§3 the OCR pipeline', () => {
 /**
  * §6.1 — a missing binary is run-open, not boot-closed.
  *
- * 33-doc §3.2 argued the opposite for the injection classifier and both are
+ * Argued the opposite for the injection classifier and both are
  * right, which is why the difference is asserted rather than assumed. That was
  * a SECURITY control: absent, it silently stops defending, so the process must
  * not start without it. This is a CAPABILITY: absent, PDFs needing OCR fail

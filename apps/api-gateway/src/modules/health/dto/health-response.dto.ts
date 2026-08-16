@@ -15,7 +15,7 @@ export class ReadinessDependenciesDto {
 }
 
 /**
- * `GET /health/ready` — 23-doc §1.
+ * `GET /health/ready`
  *
  * **The split between `ready` and `peers` is the whole design.** `ready` answers
  * one question — should traffic reach THIS instance? — and everything that does
@@ -34,7 +34,7 @@ export class ReadinessResponseDto {
 }
 
 /**
- * `GET /version` — 23-doc §3.
+ * `GET /version`
  *
  * **Three fields, and the test asserts the exact key set.** This is the endpoint
  * that accretes fields: Node version, dependency versions, environment name and

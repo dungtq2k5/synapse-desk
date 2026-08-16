@@ -50,7 +50,7 @@ export const INGESTION_JOB_STATUSES = Object.values(IngestionJobStatus);
  *
  * `QUEUED` is in here on purpose and it is the interesting entry: a job parked
  * because the tenant is over AI budget stays `QUEUED` and resumes at cycle roll
- * (12-doc §3). Marking it `FAILED` would discard parsing work already done and
+ *. Marking it `FAILED` would discard parsing work already done and
  * would punish document onboarding for chat overspend.
  */
 export const RESUMABLE_INGESTION_STATUSES = [
@@ -77,7 +77,7 @@ export enum DocumentFlagType {
   NEGATIVE_FEEDBACK = 'NEGATIVE_FEEDBACK',
   CONFLICTING = 'CONFLICTING',
   /**
-   * Part of the document is not in the corpus — 34-doc §6.
+   * Part of the document is not in the corpus
    *
    * **Its provenance differs from every value above it, and that is worth a
    * sentence rather than a silent addition.** The others are derived from
@@ -121,7 +121,7 @@ export enum DocumentFlagResolution {
  *
  * There is deliberately NO `GREETING_REPLY`. Detecting a greeting for free and
  * then paying a model to produce one of about six canned sentences would be
- * spending money to say "Hi!" — the reply is a lookup table (11-doc §1.2). If
+ * spending money to say "Hi!" — the reply is a lookup table. If
  * canned replies ever prove too rigid, adding the value AND ledgering the call
  * is the change; an unmetered LLM call in the flow is not.
  */
@@ -135,7 +135,7 @@ export enum AiGenerationPurpose {
   REFORMULATION = 'REFORMULATION',
   EMBEDDING = 'EMBEDDING',
   /**
-   * The co-pilot's review pass — 13-doc §4.2.
+   * The co-pilot's review pass
    *
    * A distinct purpose because it is a distinct COST: a draft with two review
    * passes is three generations, and folding them under `DRAFT` would make the
@@ -144,7 +144,7 @@ export enum AiGenerationPurpose {
    */
   REVIEW = 'REVIEW',
   /**
-   * Prompt-injection detection on `Ask` and `Draft` — 33-doc §3.3.
+   * Prompt-injection detection on `Ask` and `Draft`
    *
    * **`Chat` does not book this.** Its detection is fused into the greeting
    * classification it already made, so that call keeps `GREETING_CLASSIFY` —
@@ -199,7 +199,7 @@ export type AllowedDocumentMimeType =
   (typeof ALLOWED_DOCUMENT_MIME_TYPES)[number];
 
 /**
- * The languages OCR can be asked for — 34-doc §4.
+ * The languages OCR can be asked for
  *
  * **Here rather than in `ocr.config` because this is API contract, not engine
  * tuning.** The gateway validates uploads against this set, it appears in a
@@ -231,7 +231,7 @@ export const OCR_LANGUAGES = [
 export type OcrLanguage = (typeof OCR_LANGUAGES)[number];
 
 /**
- * ISO 639-1 -> tesseract's `-l` code — 34-doc §4.2.1.
+ * ISO 639-1 -> tesseract's `-l` code
  *
  * **Exported once so the parser never spells a code itself.** Three alphabets
  * for the same language is the kind of mistake that type-checks: `zh` is
@@ -254,7 +254,7 @@ export const TESSERACT_CODE_BY_LANGUAGE: Record<OcrLanguage, string> = {
 };
 
 /**
- * How many languages one document may declare — 34-doc §4.3, MEASURED.
+ * How many languages one document may declare, MEASURED.
  *
  * **The measurement reversed the reasoning, so it is recorded here rather than
  * in the document that guessed.** The design expected accuracy to degrade as
@@ -292,7 +292,7 @@ export const TESSERACT_CODE_BY_LANGUAGE: Record<OcrLanguage, string> = {
 export const MAX_OCR_LANGUAGES = 4;
 
 /**
- * At most one of these may be named — 34-doc §4.2 rule 3.
+ * At most one of these may be named rule 3.
  *
  * **The rule survives; its stated reason did not.** The design said `jpn+zho`
  * was "close to worthless — two models competing over the same Han

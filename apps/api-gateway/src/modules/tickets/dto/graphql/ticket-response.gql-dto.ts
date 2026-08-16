@@ -7,7 +7,7 @@ import {
 import '../../../../common/graphql/enums';
 
 /**
- * A ticket, as the GraphQL schema serves it — 26-doc §2, §3.
+ * A ticket, as the GraphQL schema serves it
  *
  * **Independent of `TicketResponseDto`.** The two are checked against each other
  * by `ticket-response.contract.spec.ts` rather than coupled by inheritance —
@@ -25,7 +25,7 @@ import '../../../../common/graphql/enums';
  * WHOLE query with a non-null error rather than returning one null field. The
  * contract spec checks the pairing.
  *
- * **`currentAssigneeId` stays flat, beside the `assignee` edge** — 26-doc §3. A
+ * **`currentAssigneeId` stays flat, beside the `assignee` edge** A
  * client that only wants the id must not pay a network call for it, and
  * `assignee { id }` would.
  */

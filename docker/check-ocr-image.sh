@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The two checks 34-doc §7 asks for, as something that runs.
+# The two OCR image checks, as something that runs.
 #
 # Nothing in this repo builds these images — no compose service, no pipeline —
 # so these cannot be jest tests today. Written as a script rather than as a

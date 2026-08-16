@@ -37,7 +37,7 @@ import { PrismaService } from '../prisma/prisma.service';
 type DailyRow = TicketStatSums & { day: Date; computedAt: Date };
 
 /**
- * The six single-service analytics endpoints — 19-doc §3.2.
+ * The six single-service analytics endpoints
  *
  * **Every query reads `ticket_daily_stats`, never `tickets`.** That is the
  * whole point of §2: an aggregation over a quarter of tickets, on the table
@@ -255,7 +255,7 @@ export class AnalyticsService {
   }
 
   /**
-   * **The last day the rollups cover for this tenant** — 20-doc §4.3.
+   * **The last day the rollups cover for this tenant**
    *
    * The cheapest thing in this file and the most valuable: a dashboard showing
    * zeros beside *"data through 12 Aug"* diagnoses itself, where the same
@@ -281,7 +281,7 @@ export class AnalyticsService {
    * Kept because it fails in the SAFE direction. A false "your data looks old"
    * costs somebody a glance at the job status; the inverse — a dead scheduler
    * reporting today because it ran and found nothing — is the exact failure
-   * 20-doc exists about. "Is it running" is answered separately by the
+   * Exists about. "Is it running" is answered separately by the
    * heartbeat table (§4.1), on `/platform/metrics`, where it belongs.
    */
   private async dataThrough(
@@ -501,7 +501,7 @@ function granularityOf(request: AnalyticsRangeRequest): AnalyticsGranularity {
  * not the mean of seven daily rates.
  *
  * **A range spanning a DST boundary has neither a 23- nor a 25-hour day**
- * (19-doc §3.2 test 9), and it comes for free: `day` is a `date`, and a date
+ * , and it comes for free: `day` is a `date`, and a date
  * has no hours to be wrong about. The hour-level arithmetic happened once, in
  * the rollup's `AT TIME ZONE` cast, where Postgres owns the rules.
  */

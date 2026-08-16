@@ -1,4 +1,4 @@
-"""The prompt boundary — 33-doc §4.
+"""The prompt boundary
 
 **The defect this closes is that a question can forge a source block.** The
 prompt's delimiters were plain text, so a question containing
@@ -21,7 +21,7 @@ the entire justification for the shape; the property is that the boundary is
 unpredictable, so neither a question nor a chunk can reproduce it.
 
 **XML is not adopted for output**, and this changes nothing about output.
-21-doc §1.2 made GitHub-flavoured Markdown a contract and `[N]` citations are
+Made GitHub-flavoured Markdown a contract and `[N]` citations are
 parsed by regex and validated `cited ⊆ retrieved`; changing the answer format
 would mean rewriting citation extraction and re-baselining every eval for no
 benefit. The `[N]` labels below are byte-identical to what they were.
@@ -103,7 +103,7 @@ def wrap_turns(turns: list[tuple[str, str]], nonce: str) -> str:
     inside `content` can close the block or open a source. It is not semantic,
     and no delimiter can make it so — a model persuaded by quoted text stays
     persuaded.
-    
+
     That is why this is the third layer and not the first. The same forged turn
     classifies as INJECTION at Layer B, which is the layer that actually refuses
     it; this one bounds what a miss can reach.
@@ -134,7 +134,7 @@ def wrap_history(transcript: str, nonce: str) -> str:
 
 
 def wrap_attachments(file_names: list[str], nonce: str) -> str:
-    """The label block for files that ride alongside as PARTS — 36-doc §6.
+    """The label block for files that ride alongside as PARTS
 
     **A label, not a container.** Everything else in this file wraps text, and
     wrapping is what makes the delimiter meaningful: nothing inside a

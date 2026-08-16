@@ -26,7 +26,7 @@ class Config:
     #: retrieval suite needs no API key, no network and no per-run spend.
     gemini_api_key: str
 
-    # ------------------------------------------------- prompt injection, 33-doc §7
+    # ------------------------------------------------- prompt injection
     #
     # **Here rather than in `AiSettings`, and that is the decision.**
     # `AiSettings` is resolved per tenant from another service's column, so a
@@ -37,7 +37,7 @@ class Config:
     # "without a deploy" would promise something the mechanism does not do.
     #
     # **Two flags, not four.** An earlier design ran a local ONNX classifier and
-    # needed a model path and a score threshold; 33-doc §3.1 records why that
+    # needed a model path and a score threshold; that approach was measured and
     # was measured and rejected. Layer B is now a cheap-tier call whose model
     # comes from `settings.cheap_model` — already resolved per tenant — and
     # whose answer is a label rather than a score, so neither setting has

@@ -1,4 +1,4 @@
-"""The eval harness — 17-doc §3.
+"""The eval harness
 
 **Without this, every prompt change is a guess with a confident-sounding
 rationale.** It does not need to be sophisticated; it needs to exist, and it
@@ -13,7 +13,7 @@ What it does, in order:
   3. Scores four metrics and prints a table.
   4. Deletes the tenant's data.
 
-**Not in CI, deliberately** (17-doc §3.3). It costs money per run and it is
+**Not in CI, deliberately**. It costs money per run and it is
 non-deterministic, and a flaky expensive test gets skipped within a fortnight
 and deleted a month later. Run it on purpose: before and after a prompt change,
 before a model version change, and when someone reports that the answers got
@@ -120,7 +120,7 @@ class Outcome:
     def refusal_correct(self) -> bool | None:
         """Did it answer, escalate or refuse exactly when it should have?
 
-        **Three states, not two** — 33-doc §9. `expect` used to mean "is this a
+        **Three states, not two** `expect` used to mean "is this a
         DOC_MISSING question", which made the metric a boolean about the corpus;
         prompt-injection refusals are a third outcome with its own proto status,
         and folding them into either existing branch would score a refused
@@ -142,7 +142,7 @@ class Outcome:
 
     @property
     def wrongly_refused(self) -> bool | None:
-        """**The acceptance criterion, stated on its own** — 33-doc §3.4 test 7.
+        """**The acceptance criterion, stated on its own** test 7.
 
         Separated from `refusal_accuracy` because it is the number that decides
         whether Layer B ships: the local classifier this replaced scored 27 of
@@ -169,7 +169,7 @@ class Outcome:
 
     @property
     def markdown_structured(self) -> bool | None:
-        """Did the answer come back with markdown STRUCTURE — 21-doc §1, test 1.
+        """Did the answer come back with markdown STRUCTURE, test 1.
 
         **Structure, never an exact string.** The wording of every answer here
         changes with the model version; asserting on it produces a test that
@@ -193,7 +193,7 @@ class Outcome:
 
     @property
     def renders_as_markdown(self) -> bool | None:
-        """The two failures that make an answer UNREADABLE — 21-doc §1, tests 2-3.
+        """The two failures that make an answer UNREADABLE, tests 2-3.
 
         Both are things models do unprompted when asked for markdown, and both
         are total rather than cosmetic:
@@ -506,7 +506,7 @@ def report(outcomes: list[Outcome]) -> dict:
         "retrieval_hit_rate": rate([o.retrieval_hit for o in outcomes]),
         "citation_rate": rate([o.cited_anything for o in outcomes]),
         "refusal_accuracy": rate([o.refusal_correct for o in outcomes]),
-        # 33-doc §3.4 test 7 — the acceptance criterion for Layer B, reported
+        # The acceptance criterion for Layer B, reported
         # on its own because a combined rate hides exactly the failure that
         # rejected the previous design. Inverted so, like every other row here,
         # higher is better.
@@ -516,7 +516,7 @@ def report(outcomes: list[Outcome]) -> dict:
         ),
         "language_match": rate([o.language_match for o in outcomes]),
         "contains_expected": rate([o.contains_expected for o in outcomes]),
-        # 21-doc §1. `renders_as_markdown` is the one that matters day to day:
+        # `renders_as_markdown` is the one that matters day to day:
         # a single-fenced answer or a heading in a chat bubble is unreadable
         # rather than merely untidy, and neither fails anything else.
         "renders_as_markdown": rate([o.renders_as_markdown for o in outcomes]),
@@ -545,9 +545,9 @@ def report(outcomes: list[Outcome]) -> dict:
         for outcome in failures:
             reasons = []
             if outcome.refusal_correct is False:
-                # Named first on purpose: 17-doc calls it the single most
+                # Named first on purpose: it is the single most
                 # damaging failure mode, because an invented policy is worse
-                # than no answer every time — and 33-doc adds the mirror of it,
+                # than no answer every time — and injection defence adds the mirror of it,
                 # a real question refused as an injection.
                 reasons.append(
                     f"refusal (expected {outcome.question.expect or 'an answer'}, "
@@ -645,7 +645,7 @@ async def main() -> int:
     #
     # `Dependencies.injection` defaults to a guard with no classifier, which
     # would leave Layer B silently absent — and this harness is the acceptance
-    # gate for Layer B (33-doc §3.4 test 7). A default that measured nothing
+    # gate for Layer B. A default that measured nothing
     # would report a perfect score for a layer that never ran.
     from rag_service.ledger.metered import MeteredGenerator
     from rag_service.server import build_injection_guard

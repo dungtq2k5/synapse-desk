@@ -252,7 +252,7 @@ export class UserServiceGrpcClient
             id,
             reason: dto.reason,
             // Absent stays absent — an INDEFINITE lock, which is the existing
-            // behaviour and what an admin gets by not choosing (21-doc §2).
+            // behaviour and what an admin gets by not choosing.
             lockedUntil: dto.lockedUntil
               ? toProtoTimestamp(new Date(dto.lockedUntil))
               : undefined,

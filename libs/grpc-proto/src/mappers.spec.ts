@@ -226,7 +226,7 @@ describe('mapper round-trip sweep (unit)', () => {
 
   describe('NotificationPriority', () => {
     it('round-trips EVERY domain member', () => {
-      // Includes LOW and HIGH, which nothing branches on yet (18-doc §8). A
+      // Includes LOW and HIGH, which nothing branches on yet. A
       // level that behaves as NORMAL today still has to SURVIVE the round trip
       // — otherwise the day something starts branching on HIGH, the values were
       // never really stored.

@@ -67,7 +67,7 @@ type AiDailyRow = AiStatSums & {
 };
 
 /**
- * AI spend and corpus health — 19-doc §3.2.
+ * AI spend and corpus health
  *
  * **Reads `ai_generation_daily_stats`, never `ai_generations`.** That table is
  * retention-rolled (RDM Table 29): raw rows aggregate away after ~90 days, so a
@@ -76,7 +76,7 @@ type AiDailyRow = AiStatSums & {
  *
  * The two document endpoints are the exception and read `document_chunks`
  * counters directly — those are a PROJECTION maintained by
- * `ChunkUsageProjection` for exactly this reason (12-doc §4.1), so they survive
+ * `ChunkUsageProjection` for exactly this reason, so they survive
  * retention too.
  */
 @Injectable()
@@ -113,7 +113,7 @@ export class AiAnalyticsService {
           costMicros: stats.costMicros,
         }),
       ),
-      // **The per-purpose split is the point** (19-doc §3.2): it shows a tenant
+      // **The per-purpose split is the point**: it shows a tenant
       // where the budget actually goes, which is rarely where they assume —
       // embeddings and review passes are usually the surprise.
       byPurpose: slice(
@@ -146,7 +146,7 @@ export class AiAnalyticsService {
   }
 
   /**
-   * The content backlog — 19-doc §3.2.
+   * The content backlog
    *
    * Two signals that answer different questions and are useless apart: the
    * empty-retrieval RATE says how often the corpus had nothing, and the
@@ -194,7 +194,7 @@ export class AiAnalyticsService {
   }
 
   /**
-   * Corpus health from the chunk counters — 19-doc §3.2.
+   * Corpus health from the chunk counters
    *
    * **`UNRETRIEVED` and `UNCITED` are DIFFERENT findings** (RDM Table 27) and
    * are returned as separate lists. A document nobody's question came near may
@@ -264,7 +264,7 @@ export class AiAnalyticsService {
   }
 
   /**
-   * **The last day `ai_generation_daily_stats` covers** — 20-doc §4.3.
+   * **The last day `ai_generation_daily_stats` covers**
    *
    * See the note on ticket-service's equivalent: this is what lets a dashboard
    * of zeros say *why* it is zero. Tenant-wide and not clipped to the requested

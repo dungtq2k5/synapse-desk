@@ -11,7 +11,7 @@ import {
 import { TicketRollupJob } from '../analytics/ticket-rollup.job';
 
 /**
- * The caller `TicketRollupJob` never had — 20-doc §1, §2.
+ * The caller `TicketRollupJob` never had
  *
  * Without this, `ticket_daily_stats` and `agent_daily_stats` were never
  * written, and **all six analytics endpoints returned zeros** — correctly, from
@@ -58,7 +58,7 @@ export class SchedulerProcessor extends WorkerHost {
     const startedAt = Date.now();
 
     // Wrapped so a run that never happens is visible as an ageing
-    // `last_succeeded_at` rather than as silence — 20-doc §4.1.
+    // `last_succeeded_at` rather than as silence
     return this.runs.track(job.name, async () => {
       try {
         // **A TRAILING window, not yesterday.** This is what makes one 02:00 UTC

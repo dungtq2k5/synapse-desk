@@ -115,7 +115,7 @@ export class UserResponseDto {
 
   // ASK This `docblock` seems to be invalid
   /**
-   * When a temporary lock lapses; `null` means INDEFINITE — 21-doc §2.
+   * When a temporary lock lapses; `null` means INDEFINITE
    *
    * `isLocked` stays the field a client renders on. This is here so an admin
    * screen can say "locked until Friday" instead of just "locked", and so an

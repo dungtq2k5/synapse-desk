@@ -1,16 +1,16 @@
 /**
- * The analytics shapes the GraphQL schema serves — 19-doc §3, 26-doc §3.
+ * The analytics shapes the GraphQL schema serves
  *
  * **Analytics is a WHOLE SHAPE, not an entity graph.** The overview is one
  * composed read with its own caching and its own daily rollups behind it
- * (19-doc). Decomposing it into resolvable fields would re-run that composition
+ * . Decomposing it into resolvable fields would re-run that composition
  * per field: `deflection` and `csat` come from the same query, so a client
  * asking for both would pay for it twice, while a client asking for one would
- * still pay for the whole rollup join. So there are no edges here, and 26-doc §7
+ * still pay for the whole rollup join. So there are no edges here, and the schema
  * defers `@ResolveField` into analytics permanently rather than "for now".
  *
  * **Four of the ten REST reads appear here, and the rule is composition rather
- * than parity** — 26-doc §3.1. A read earns a GraphQL query when its rows carry
+ * than parity** A read earns a GraphQL query when its rows carry
  * entity ids an existing loader can resolve, or when it is the headline figure
  * a screen opens with. The chart series — `DeflectionDto`, `VolumeDto`,
  * `AiUsageDto` and the rest — are buckets and numbers with no entity id in any
@@ -94,7 +94,7 @@ export class AnalyticsOverviewGqlDto {
   computedAt!: Date | null;
 
   /**
-   * **The last day the rollups behind this answer cover** — 20-doc §4.3,
+   * **The last day the rollups behind this answer cover**,
    * `YYYY-MM-DD`, or `null` when no rollup has ever run for this tenant.
    *
    * Not the same as `computedAt`, and the gap between them is the diagnosis: a
@@ -106,7 +106,7 @@ export class AnalyticsOverviewGqlDto {
 }
 
 /**
- * A leg that did not answer — 19-doc §1.
+ * A leg that did not answer
  *
  * **Present on every composed read, and never merged into the numbers.** A
  * dashboard where nine tiles render and one names the service that is down is
@@ -125,7 +125,7 @@ export class UnavailableBlockGqlDto {
 }
 
 /**
- * One agent's row — 26-doc §3.1, and the read that justifies the whole rule.
+ * One agent's row, and the read that justifies the whole rule.
  *
  * **`agent` is an edge, not a hydration step.** The REST endpoint resolves
  * names in `analytics.service.ts` as a third leg, called last and
@@ -144,7 +144,7 @@ export class UnavailableBlockGqlDto {
 @ObjectType('AgentStat')
 export class AgentStatGqlDto {
   /**
-   * The agent's id, flat beside the `agent` edge — 26-doc §3.
+   * The agent's id, flat beside the `agent` edge
    *
    * Same rule as `Ticket.currentAssigneeId`: a client that only wants the id
    * must not pay a network call for it.
@@ -175,7 +175,7 @@ export class AgentAnalyticsGqlDto {
   items!: AgentStatGqlDto[];
 
   /**
-   * **The STALEST leg's coverage**, not the freshest — 19-doc §3.2.
+   * **The STALEST leg's coverage**, not the freshest
    *
    * This spans two schedulers in two services, so one can be days behind the
    * other, and reporting the fresher would let the healthy one vouch for the
@@ -192,7 +192,7 @@ export class AgentAnalyticsGqlDto {
  * One document's retrieval and citation counts.
  *
  * `document` is the edge that gave `ListDocumentsByIds` its first consumer —
- * 27-doc §3. Nullable, because a rollup row outlives the document it counts:
+ * Nullable, because a rollup row outlives the document it counts:
  * the id stays in `document_daily_stats` after a delete, and a null edge beside
  * a live `title` is the honest rendering of that.
  */

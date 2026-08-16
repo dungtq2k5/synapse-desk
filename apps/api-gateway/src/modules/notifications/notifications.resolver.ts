@@ -26,7 +26,7 @@ import type { GqlContext } from '../../common/graphql/loaders/loaders.factory';
 import { toUserSummaryGqlDto } from '../users/user.mapper';
 
 /**
- * The notification feed — 26-doc §3, §4, and one mutation (25-doc §7).
+ * The notification feed, and one mutation.
  *
  * **No permission gate anywhere here.** A notification belongs to its recipient
  * and the service scopes every read to `context.sub`; a permission would be
@@ -48,7 +48,7 @@ export class NotificationsResolver {
   ): Promise<NotificationFeedGqlDto> {
     return await this.notifications.list(
       {
-        // Clamped, like every other list — 25-doc §5.
+        // Clamped, like every other list
         limit: Math.min(first, MAX_PAGE_SIZE),
         cursor,
       },
@@ -90,7 +90,7 @@ export class NotificationsResolver {
   }
 
   /**
-   * **One of the four mutations 25-doc §7 names**, and it earns its place: a
+   * **One of the four mutations on the schema**, and it earns its place: a
    * screen that renders the feed marks rows read from the same component, so
    * sharing a request with the query it updates is the whole point.
    */

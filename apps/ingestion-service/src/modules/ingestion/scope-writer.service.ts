@@ -15,8 +15,8 @@ export type DocumentScope = {
  * The ONE place a visibility change touches the retrievable stores — §2.3.
  *
  * Both `document_chunks` and the Qdrant payload carry the same four scope
- * fields (11-doc §1.4), so every change has to be written twice, and **the
- * order is a security property that is not symmetric** (11-doc §1.4b):
+ * fields, so every change has to be written twice, and **the
+ * order is a security property that is not symmetric**:
  *
  *   - **Restrictions** — removing departments, `is_organization_wide: true →
  *     false`, delete — write **Qdrant first, then `document_chunks`**, and only

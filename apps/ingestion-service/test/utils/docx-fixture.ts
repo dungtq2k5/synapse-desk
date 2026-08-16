@@ -1,7 +1,7 @@
 import JSZip from 'jszip';
 
 /**
- * A REAL .docx, generated rather than committed — 21-doc §3.4.
+ * A REAL.docx, generated rather than committed
  *
  * Same reasoning as `pdf-fixture.ts`: the properties under test are that a
  * TABLE survives as a table and that OMML math survives as LaTeX, and a

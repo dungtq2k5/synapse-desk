@@ -103,7 +103,7 @@ export class DepartmentsService {
   }
 
   /**
-   * The batch read behind the departments DataLoader — 27-doc §1, §3.
+   * The batch read behind the departments DataLoader
    *
    * `Ticket.department`, `Document.departments` and `User.departments` all
    * traverse to this, which is why it is the second-most-used batch RPC in the
@@ -127,7 +127,7 @@ export class DepartmentsService {
     const { ids, overLimit } = normalizeBatchIds(request.departmentIds);
 
     if (overLimit) {
-      // An ERROR rather than a truncation — 27-doc §1, property 5. A truncated
+      // An ERROR rather than a truncation, property 5. A truncated
       // batch is indistinguishable from those rows having been deleted, so the
       // page renders with silent gaps and nothing reports a problem.
       throw new RpcException({

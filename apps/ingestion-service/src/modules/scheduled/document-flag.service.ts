@@ -137,7 +137,7 @@ export class DocumentFlagService {
    * dismissal stick.
    *
    * **Public because ingestion writes a flag too** — `PAGES_NOT_INDEXED`,
-   * 34-doc §6 — and that one is not a sweep: it is raised at index time, and
+   * And that one is not a sweep: it is raised at index time, and
    * BullMQ retries the job that raises it. Both consequences of writing flags
    * without this policy are the ones the paragraph above describes: a retry
    * duplicates the row, and a dismissed flag comes back.

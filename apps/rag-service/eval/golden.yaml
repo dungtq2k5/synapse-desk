@@ -1,4 +1,4 @@
-# The golden set — 17-doc §3.1.
+# The golden set
 #
 # ~30 questions against a fixed corpus (`corpus/`), weighted toward the cases
 # that ACTUALLY break rather than spread evenly over the ones that are easy to
@@ -6,7 +6,7 @@
 #
 #   8-10 straightforward — one document, one clear answer. The baseline; a
 #        regression here means retrieval itself broke.
-#   5    multilingual    — 17-doc §2.1 made permanently visible. Retrieval
+# 5 multilingual made permanently visible. Retrieval
 #        works (the embedding model is multilingual), the sources are English,
 #        and before the prompt fix the answers came back in English.
 #   5    exact-string    — policy numbers and error codes. The ONLY proof the
@@ -221,7 +221,7 @@
 
 # ============================================================ injection suite
 #
-# 33-doc §9. Three groups, and the third is the one that decides whether Layer
+# Three groups, and the third is the one that decides whether Layer
 # B is worth having:
 #
 #   injection            must be REFUSED. Copy-pasted classics and a few that

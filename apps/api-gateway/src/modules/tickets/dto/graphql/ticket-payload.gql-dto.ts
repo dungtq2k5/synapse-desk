@@ -3,7 +3,7 @@ import { TicketResponseGqlDto } from './ticket-response.gql-dto';
 
 /**
  * **Mutations return a payload type; queries return the entity directly** —
- * 25-doc §3.
+ *
  *
  * The convention earns its place twice over. It gives a mutation somewhere to
  * put the `message` the REST envelope carries — which GraphQL has no envelope

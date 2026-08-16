@@ -11,7 +11,7 @@ import { ChunkUsageProjection } from '../../src/modules/scheduled/chunk-usage.pr
 import { AuthReferenceService } from '../../src/modules/auth-client/auth-reference.service';
 
 /**
- * 19-doc §2.2 — the AI rollup.
+ * The AI rollup.
  *
  * **This one is not an optimisation, it is the only durable record.**
  * `ai_generations` is retention-rolled (RDM Table 29), so every figure here
@@ -211,7 +211,7 @@ describe('§2.2 The AI generation rollup (e2e)', () => {
 
     it('9. Counts every draft OUTCOME, including DISCARDED', async () => {
       // The denominator's third term, and the one that depends on the sweep
-      // (12-doc §4.3). Without it acceptance divides by drafts that were USED
+      //. Without it acceptance divides by drafts that were USED
       // and reports ~100% regardless of quality.
       await generation({
         purpose: AiGenerationPurpose.DRAFT,
@@ -311,7 +311,7 @@ describe('§2.2 The AI generation rollup (e2e)', () => {
       // The tenant still has *some* rows in the window, so the job runs, wipes
       // the day and recomputes it from what retention left behind. The result
       // is a smaller number with no error anywhere — which is exactly the
-      // failure 12-doc §4.1 describes for the chunk projection, arriving here
+      // failure described for the chunk projection, arriving here
       // with worse consequences because these figures appear on an invoice
       // discussion.
       const survivor = await generation();

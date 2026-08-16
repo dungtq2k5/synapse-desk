@@ -31,10 +31,10 @@ export const TICKET_PATTERNS = {
   unassigned: 'ticket.unassigned',
   statusChanged: 'ticket.status_changed',
   messageCreated: 'ticket.message_created',
-  /** An edit — 22-doc §6.1. Same room split as the message itself. */
+  /** An edit Same room split as the message itself. */
   messageUpdated: 'ticket.message_updated',
   /**
-   * A REDACTION — 22-doc §6.1.
+   * A REDACTION
    *
    * Named for what happened rather than for the frame it produces: the row
    * survives with its content replaced, and calling the event `deleted` would
@@ -74,7 +74,7 @@ export type TicketEscalatedEvent = TicketEventBase & {
   pattern: typeof TICKET_PATTERNS.escalated;
   escalatedAt: string;
   /**
-   * The queue that must react — 18-doc §3.1, and the ONE ticket event addressed
+   * The queue that must react, and the ONE ticket event addressed
    * by permission rather than to a person.
    *
    * Everywhere else, notifying a queue produces the noise that trains people to
@@ -122,7 +122,7 @@ export type TicketStatusChangedEvent = TicketEventBase & {
   /**
    * Who opened the ticket — the person a terminal transition is FOR.
    *
-   * Carried on the event rather than fetched by the consumer (18-doc §3 test
+   * Carried on the event rather than fetched by the consumer (
    * 9): an RPC back to ticket-service per notification is what makes fan-out
    * expensive, and it would put a synchronous cross-service read on a path that
    * is deliberately fire-and-forget.
@@ -164,7 +164,7 @@ export type TicketMessageCreatedEvent = TicketEventBase & {
 };
 
 /**
- * An edit — 22-doc §6.1.
+ * An edit
  *
  * Carries `isInternalNote` for the same reason `ticket.message_created` does:
  * the relay routes on it, and a consumer that had to fetch the message to learn
@@ -184,7 +184,7 @@ export type TicketMessageUpdatedEvent = TicketEventBase & {
 };
 
 /**
- * A REDACTION — 22-doc §6.1.
+ * A REDACTION
  *
  * **Carries no content, and that is the whole design.** The row survives with
  * its text replaced; this announces *that* it happened plus which message. An

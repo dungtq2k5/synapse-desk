@@ -141,7 +141,7 @@ export class PlatformGrpcController implements PlatformServiceController {
   }
 
   /**
-   * The heartbeat — 20-doc §4.4.
+   * The heartbeat
    *
    * Every row, unjudged: the staleness decision needs the list of jobs this
    * build EXPECTS, because a job that has never run has no row to return.

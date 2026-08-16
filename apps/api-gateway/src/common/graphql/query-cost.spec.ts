@@ -13,7 +13,7 @@ import {
 } from '../config/graphql-limits.config';
 
 /**
- * The complexity scorer — 25-doc §5, 26-doc §1.3.
+ * The complexity scorer
  *
  * **The point of scoring at all is the WEIGHTING.** A scorer charging the same
  * for `title` (a property read on an object already in memory) and `assignee`
@@ -25,7 +25,7 @@ describe('§5 query complexity', () => {
   const cost = (query: string) => scoreDocument(parse(query));
 
   it('1. **a cross-service field scores higher than a scalar**', () => {
-    // 26-doc §1.3 test 2. The ratio is the design; the absolute numbers are
+    // The ratio is the design; the absolute numbers are
     // arbitrary units.
     const scalar = cost('{ ticket { title } }');
     const crossService = cost('{ ticket { assignee { fullName } } }');
@@ -75,7 +75,7 @@ describe('§5 query complexity', () => {
 
   it('6. a realistic dashboard query stays comfortably under the cap', () => {
     // The guard against a limit tuned so tight the feature is pointless —
-    // 26-doc §1.3 test 4. If this ever fails, the limit is wrong, not the query.
+    // If this ever fails, the limit is wrong, not the query.
     const realistic = cost(`{
       tickets(first: 50) {
         id title status createdAt
@@ -101,7 +101,7 @@ describe('§5 query complexity', () => {
       scoreDocument(parse(query), undefined, defaults);
 
     it('5. **`messages { id }` costs the same as `messages(first: 50) { id }`**', () => {
-      // They return the same thing, so they must cost the same — 26-doc §1.3
+      // They return the same thing, so they must cost the same
       // test 5. `listSizeOf` reads the QUERY, and a client that omits `first`
       // leaves nothing to read: the field scored as ONE item while the
       // resolver's `defaultValue` returned fifty.

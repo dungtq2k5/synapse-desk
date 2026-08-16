@@ -76,7 +76,7 @@ export function toUserSummaryResponseDto(
  *
  * **`null` in, `null` out.** A loader returns `null` for an id the batch RPC
  * omitted — a deleted row, or one in another tenant — and every edge is nullable
- * precisely so that answer can be given (27-doc §4). Mapping it to an empty
+ * precisely so that answer can be given. Mapping it to an empty
  * object instead would render a card with a blank name and no way for the client
  * to tell that anything was missing.
  */

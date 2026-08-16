@@ -46,7 +46,7 @@ export class InboundAttachmentDto {
 }
 
 /**
- * What the Worker asks for BEFORE it posts the webhook — 31-doc §5.
+ * What the Worker asks for BEFORE it posts the webhook
  *
  * **The routing fields are here because the ticket has to be resolved twice.**
  * The Worker cannot presign against a ticket it does not know, and it cannot
@@ -110,7 +110,7 @@ export class InboundAttachmentUploadDto {
  * **Named rather than silently omitted**, so the Worker can put it in
  * `droppedAttachments` and the ticket can still say what was left out. "My
  * attachment vanished" is something a customer discovers before you do — the
- * same rule 31-doc §5 set when attachments were dropped wholesale.
+ * same rule set when attachments were dropped wholesale.
  *
  * A RESPONSE shape, like {@link InboundAttachmentUploadDto} above.
  */

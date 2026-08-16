@@ -8,7 +8,7 @@ import { buildPdf } from '../../../test/utils/pdf-fixture';
 import { buildDocx } from '../../../test/utils/docx-fixture';
 
 /**
- * The parser, on libraries rather than hand-written parsing — 21-doc §3.
+ * The parser, on libraries rather than hand-written parsing
  *
  * Most of these exist because the hand-written version got them WRONG, not
  * because a library upgrade might: a DOCX table became a run-on sentence, OMML
@@ -45,7 +45,7 @@ describe('§3 DocumentParserService (unit)', () => {
 
       const [page] = await parse(bytes, 'docx');
 
-      // **Real GFM, with no repair pass** — 21-doc §3.5 F1. The delimiter row
+      // **Real GFM, with no repair pass** F1. The delimiter row
       // comes from `turndown-plugin-gfm`, which is what that plugin exists for.
       // The wrapper this replaced emitted no delimiter row, and ~50 lines of
       // ours put one back.
@@ -146,7 +146,7 @@ describe('§3 DocumentParserService (unit)', () => {
 
   describe('offline execution', () => {
     it('7. **the parser makes NO network calls**', async () => {
-      // The guard against trap 2 of 21-doc §3.2 — one of the similarly-named
+      // The guard against trap 2 — one of the similarly-named
       // PDF packages calls a vision API per page. That failure is silent
       // because it produces BETTER output: nothing looks wrong, and every page
       // has quietly been sent to a third party and billed for.

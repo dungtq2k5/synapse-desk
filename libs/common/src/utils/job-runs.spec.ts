@@ -8,7 +8,7 @@ import {
 } from './job-runs';
 
 /**
- * An in-memory `JobRunStore` — 20-doc §4.5 test 2.
+ * An in-memory `JobRunStore` test 2.
  *
  * **The point of the interface.** The shared recorder is exercised here with no
  * Prisma client, no database and no Nest module: the three services differ only

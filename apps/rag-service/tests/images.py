@@ -1,4 +1,4 @@
-"""A PNG carrying a known string, built at test time — 36-doc §5 test 2.
+"""A PNG carrying a known string, built at test time test 2.
 
 **Generated rather than committed as a fixture.** The acceptance test asserts
 that a string visible ONLY in an image reaches the reformulated query, so the

@@ -1,6 +1,6 @@
 /**
  * Price id → entitlements. **The whole integration is this table plus one
- * function** (14-doc §3); everything else is plumbing around it.
+ * function**; everything else is plumbing around it.
  *
  * **What is deliberately NOT here: plan names, price points, feature lists.**
  * Mirroring them into Postgres — or into this file — creates a second source of
@@ -22,7 +22,7 @@ export type PlanEntitlements = {
   maxStorageBytes: bigint;
   /** MICROS of currency, not tokens — RDM §1.14. The name is kept for continuity. */
   monthlyAiTokenBudget: bigint;
-  /** `FAST | QUALITY`. The sellable AI entitlement (doc 15). */
+  /** `FAST | QUALITY`. The sellable AI entitlement. */
   aiModelTier: AiModelTier;
   /** For logs and the billing page. NEVER an authorization input. */
   displayName: string;
@@ -51,7 +51,7 @@ export const DEFAULT_PLAN_CATALOG: Record<string, PlanEntitlements> = {
     maxStorageBytes: 50n * GIB,
     monthlyAiTokenBudget: 10_000_000n,
     // The tier is what makes Pro sellable as more than a bigger number —
-    // doc 15 §2.1.
+    // The tier a tenant buys.
     aiModelTier: 'QUALITY',
     displayName: 'Pro',
   },
@@ -111,7 +111,7 @@ export function loadPlanCatalog(
  * — **downgrades a paying customer** on their next `subscription.updated`.
  * Nothing errors; their seat limit simply drops, and they find out days later.
  *
- * The caller records `FAILED`, alerts, and changes nothing (14-doc §3 test 6).
+ * The caller records `FAILED`, alerts, and changes nothing.
  * Failing closed here means a human fixes a config line; failing open means a
  * customer discovers it.
  */

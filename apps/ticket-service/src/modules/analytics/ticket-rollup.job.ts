@@ -22,7 +22,7 @@ export type RollupOutcome = {
 };
 
 /**
- * `ticket_daily_stats` and `agent_daily_stats` — 19-doc §2.2.
+ * `ticket_daily_stats` and `agent_daily_stats`
  *
  * **A plain method taking a window, with no `@Cron` decorator.** The same shape
  * `chunk-usage.projection.ts` and `quota-reconciliation.job.ts` take, and for
@@ -69,7 +69,7 @@ export class TicketRollupJob {
   }
 
   /**
-   * The BACKFILL entry point — 19-doc §2.3.
+   * The BACKFILL entry point
    *
    * Shipped from day one because it is fifteen minutes while the job is fresh
    * and the alternative is discovering a rollup bug with no way to recompute:
@@ -89,7 +89,7 @@ export class TicketRollupJob {
   private async rollup(window: RollupWindow): Promise<RollupOutcome> {
     const organizationIds = await this.activeTenants(window);
     if (organizationIds.length === 0) {
-      // **No rows for a quiet tenant, and that is correct** (19-doc §2.2 test
+      // **No rows for a quiet tenant, and that is correct** (
       // 5). Absent is not broken: the endpoints read a missing row as zero, and
       // writing zero rows for every tenant every day would be the largest table
       // in the system holding nothing.

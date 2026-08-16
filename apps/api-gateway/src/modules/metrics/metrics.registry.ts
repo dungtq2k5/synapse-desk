@@ -9,7 +9,7 @@ import {
 import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
 
 /**
- * Label names that must NEVER appear on a metric — 23-doc §4.
+ * Label names that must NEVER appear on a metric
  *
  * **Prometheus creates one time series per unique label combination**, and in a
  * multi-tenant system the tempting labels are the fatal ones:
@@ -27,7 +27,7 @@ import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
  * reclaim them.
  *
  * **Per-tenant numbers already have a home.** `ai_generations` and the daily
- * rollups (19-doc §2) answer *"what did tenant X spend"*. Prometheus answers
+ * rollups answer *"what did tenant X spend"*. Prometheus answers
  * *"is the system healthy"*. Keeping the question in the store built for it is
  * not a compromise — the rollups are better at it.
  */
@@ -84,7 +84,7 @@ export function assertLabelsAreBounded(
 }
 
 /**
- * The gateway's metrics — 23-doc §4.
+ * The gateway's metrics
  *
  * **Served on a SEPARATE listener** (see `metrics.server.ts`), never as a route
  * on the public app. The spec says "not via Nginx", and a distinct port bound to
@@ -105,14 +105,14 @@ export class MetricsRegistry {
   /** Where cross-service latency actually shows up. */
   readonly grpcDuration: Histogram<'peer' | 'code'>;
 
-  /** Currently invisible without this — 23-doc §4. */
+  /** Currently invisible without this */
   readonly websocketConnections: Gauge<string>;
   readonly websocketEvents: Counter<'event'>;
 
   /**
-   * **The one worth building first** — 23-doc §4.
+   * **The one worth building first**
    *
-   * 20-doc §4.2 specifies a staleness alert over the `job_runs` heartbeat, and
+   * Specifies a staleness alert over the `job_runs` heartbeat, and
    * exporting that table as a gauge turns it into a two-line Prometheus rule:
    *
    * ```txt

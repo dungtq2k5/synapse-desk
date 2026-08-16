@@ -21,7 +21,7 @@ import { InboundThreadService } from './inbound-thread.service';
 import { PreferencesService } from '../preferences/preferences.service';
 
 /**
- * Domain E's gRPC surface — 18-doc §1.1, §2.
+ * Domain E's gRPC surface
  *
  * **Every method unpacks the caller context, and every one of them is
  * SELF-scoped.** The recipient is `ctx.sub`; no request message carries a user
@@ -43,7 +43,7 @@ export class NotificationsGrpcController implements NotificationServiceControlle
   ) {}
 
   /**
-   * 31-doc §4 — the `In-Reply-To` fallback.
+   * The `In-Reply-To` fallback.
    *
    * **No caller context, and it does not need one.** The caller is the inbound
    * webhook, which holds a verified Worker signature and no user; the tenant it

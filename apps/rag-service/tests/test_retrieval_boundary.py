@@ -114,7 +114,7 @@ class TestEveryEntryPointGoesThroughTheBoundary:
 
     def test_no_servicer_rpc_retrieves_without_it(self) -> None:
         # `Search`, `Chat`, the co-pilot RPCs and `Ask` must all reach retrieval
-        # by the same call. 16-doc §3 singles out `Ask` because it has the most
+        # by the same call. Hardening singled out `Ask` because it has the most
         # machinery of its own — reformulation, a status enum, a handoff — and
         # is the likeliest to grow a private retrieval path.
         server = (SOURCE_ROOT / "server.py").read_text(encoding="utf-8")

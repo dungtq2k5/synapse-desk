@@ -21,7 +21,7 @@ export enum StoragePurpose {
   /** Reserved for Domain C's `ingestion-service`. No caller today. */
   DOCUMENT = 'DOCUMENT',
   /**
-   * An analytics export — 19-doc §5.
+   * An analytics export
    *
    * A new purpose rather than a second file path: the signed-URL discipline,
    * the tenant path prefix and the deletion story all already exist here, and

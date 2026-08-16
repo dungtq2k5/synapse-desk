@@ -41,7 +41,7 @@ export function expectedIntervalMs(name: ScheduledJobName): number {
 }
 
 /**
- * **Alerts on STALENESS, not on failure** — 20-doc §4.2.
+ * **Alerts on STALENESS, not on failure**
  *
  * A failed job logs. A job that never ran logs nothing at all, which is exactly
  * the case that occurred here: seven jobs with no scheduler, producing zeros

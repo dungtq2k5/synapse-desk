@@ -25,7 +25,7 @@ import { faultInjector } from '@synapsedesk/common/testing/fault';
 
 describe('§2-§4 Billing and entitlements (e2e)', () => {
   // Every injected fault in this file is registered here and restored in an
-  // `afterEach` that runs whether the test passed, failed or threw — 16-doc §9.
+  // `afterEach` that runs whether the test passed, failed or threw
   const faults = faultInjector();
 
   let fx: E2eFixture;
@@ -50,7 +50,7 @@ describe('§2-§4 Billing and entitlements (e2e)', () => {
    * Builds a signed webhook exactly as Stripe would.
    *
    * **Signed with the real SDK over the real bytes**, not stubbed. Verification
-   * is the piece 14-doc §6 insists is built first — "every other test in this
+   * is the piece built first — "every other test in this
    * document needs a webhook that verifies, and debugging a mapping function
    * through a signature failure is a bad afternoon" — so a suite that mocked it
    * away would be testing the mapping against a door it had propped open.

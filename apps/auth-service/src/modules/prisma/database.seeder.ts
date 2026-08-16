@@ -259,7 +259,7 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
   }
 
   /**
-   * Constraints Prisma cannot express — 21-doc §2.2b.
+   * Constraints Prisma cannot expressb.
    *
    * **`locked_until` without `is_locked` is unrepresentable, not merely
    * unwritten.** Two columns is four states on paper and only three mean
@@ -292,7 +292,7 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
    * `DO $$` rather than `ADD CONSTRAINT IF NOT EXISTS`: Postgres has no
    * `IF NOT EXISTS` for constraints, so a second boot would fail without the
    * catalogue check. Same pattern as ticket-service's `rating` constraint —
-   * which, contrary to 21-doc §2.2b, is the codebase's ONLY existing example.
+   * which is the codebase's ONLY existing example.
    * There is no `(organization_id IS NULL) = is_super_admin` CHECK on `users`
    * today; that invariant is enforced in the service layer and by
    * `users_super_admin_email_key`, not by the database. Worth adding one day,

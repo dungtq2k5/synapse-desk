@@ -1,4 +1,4 @@
-"""The ops surface on the Python peer — 23-doc §2, §3.
+"""The ops surface on the Python peer
 
 `rag-service` is `grpc.aio`-only, so before this there was no way for Kubernetes
 to learn whether it was alive. The fix is the standard `grpc.health.v1.Health`
@@ -138,7 +138,7 @@ async def test_liveness_never_consults_a_dependency(deps):
 
 @pytest.mark.asyncio
 async def test_get_version_reports_the_baked_build(monkeypatch):
-    """5. `/version`'s gRPC twin — 23-doc §3.
+    """5. `/version`'s gRPC twin
 
     Read from the environment, which is where the image bakes it. A container
     has no `.git`, so a runtime lookup returns nothing and the fallback is

@@ -6,7 +6,7 @@ import { MetricsRegistry } from './metrics.registry';
 import { JobMetricsCollector } from './job-metrics.collector';
 
 /**
- * `/metrics`, on its OWN listener — 23-doc §4.
+ * `/metrics`, on its OWN listener
  *
  * **A separate port bound to the internal interface, not a route on the public
  * app.** The spec says "not via Nginx", and a distinct listener makes that

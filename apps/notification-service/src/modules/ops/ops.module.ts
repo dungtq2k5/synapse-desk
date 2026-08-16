@@ -13,7 +13,7 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { PrismaService } from '../prisma/prisma.service';
 
 /**
- * `grpc.health.v1.Health` and `synapsedesk.ops.OpsService` — 23-doc §2, §3.
+ * `grpc.health.v1.Health` and `synapsedesk.ops.OpsService`
  *
  * **Postgres and NATS**, because this service is a NATS consumer with a feed
  * table and nothing else. Notably NOT the SMTP host or the SMS provider: those

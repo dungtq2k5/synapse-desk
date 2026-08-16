@@ -3,9 +3,9 @@ import { Field, ID, Int, ObjectType } from '@nestjs/graphql';
 /**
  * One message in a ticket thread, as the GraphQL schema serves it.
  *
- * **`isInternalNote` is filtered by ticket-service, not here** — 26-doc §3, and
+ * **`isInternalNote` is filtered by ticket-service, not here**, and
  * this is the THIRD transport to face that boundary after the REST `WHERE`
- * clause and the WebSocket fan-out (22-doc §1, where it was leaking). Three
+ * clause and the WebSocket fan-out. Three
  * transports, one rule: it belongs in the service, and a GraphQL-side filter
  * would be a fourth implementation of it.
  *
@@ -66,7 +66,7 @@ export class TicketMessageResponseGqlDto {
    * How this AI message was produced — `REFUSED`, `DOC_ANSWER`, `DOC_MISSING`.
    * Null for a human message.
    *
-   * **Exposed here as well as on REST** — 36-doc §7. An agent scrolling a
+   * **Exposed here as well as on REST** An agent scrolling a
    * conversation should be able to tell a refusal from an escalation from a
    * real answer, and that is true whichever transport they read it through.
    * Before this it lived only in a WebSocket frame nobody persisted, so the

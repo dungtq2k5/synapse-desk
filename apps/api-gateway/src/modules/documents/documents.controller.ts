@@ -103,7 +103,7 @@ export class DocumentsController {
   }
 
   /**
-   * The flag worklist — 16-doc §5. Declared before `@Get(':id')`, like
+   * The flag worklist Declared before `@Get(':id')`, like
    * `storage`.
    *
    * `document.read` rather than open to every member: a flag names a document

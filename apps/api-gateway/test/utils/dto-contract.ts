@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 
 /**
- * The drift guard that replaced inheritance — 26-doc §2, revised.
+ * The drift guard that replaced inheritance, revised.
  *
  * REST and GraphQL DTOs are now independent classes. That buys separation of
  * concerns and costs duplicated field declarations, and the cost is only
@@ -126,7 +126,7 @@ export function compareContract(contract: DtoContract): {
 }
 
 /**
- * Fields whose nullability disagrees — 26-doc §2 test 2, the second half.
+ * Fields whose nullability disagrees test 2, the second half.
  *
  * Compared on both sides from the SOURCE, for the reason the file note gives:
  * `TypeMetadataStorage` is empty until a schema build has run, so a
@@ -175,7 +175,7 @@ function nullabilityOf(
  * spells both the same way — as a nullable field. Read across the declaration's
  * lines rather than the first one, because a union that wraps is still a union.
  *
- * Not `@IsOptional()`: 24-doc §1 records that the Swagger plugin derives
+ * Not `@IsOptional()`: the Swagger plugin derives
  * `required` from TypeScript optionality rather than from the validator, and a
  * check that disagreed with the generated document would be checking a third
  * thing nobody serves.

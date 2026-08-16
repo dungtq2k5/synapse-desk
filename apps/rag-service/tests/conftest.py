@@ -1,6 +1,6 @@
 """Fixtures that seed Qdrant and `document_chunks` DIRECTLY.
 
-**Deliberately not via the ingestion worker** (13-doc §5). Read literally, the
+**Deliberately not via the ingestion worker**. Read literally, the
 two build orders deadlock: isolation tests need populated stores, and the
 pipeline that populates them is built later in the other service. They do not
 deadlock, because `tenant_scope()` is what is under test here — not ingestion —
@@ -475,12 +475,12 @@ class ScriptedGenerator:
         #: Scripted one-shot answers for `generate`, consumed in order.
         #:
         #: Added when Layer 2 stopped having one possible answer: the fused
-        #: classification (33-doc §3.3) can reply GREETING, FACTUAL or
+        #: classification can reply GREETING, FACTUAL or
         #: INJECTION, and a fake that always says FACTUAL cannot exercise the
         #: other two. Empty means the old behaviour.
         self.answers: list[str] = []
         #: Every prompt as given, parts included. `calls` keeps only the text,
-        #: which cannot answer "did the file go?" — 36-doc §4.
+        #: which cannot answer "did the file go?"
         self.prompts: list[Prompt] = []
         self.fail_next: Exception | None = None
 

@@ -32,7 +32,7 @@ const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
 
 /**
- * The personal inbox — 18-doc §2.
+ * The personal inbox
  *
  * **Every method is SELF-scoped**, filtered by `recipientId = ctx.sub` and
  * never by a request field. There is no admin read-someone-else's-inbox path
@@ -134,7 +134,7 @@ export class FeedService {
   }
 
   /**
-   * Bulk read, by ids or by RESOURCE — 18-doc §2.
+   * Bulk read, by ids or by RESOURCE
    *
    * The resource form is what makes this feature usable rather than annoying:
    * opening ticket #1042 clears all twelve of its notifications in one call
@@ -208,7 +208,7 @@ export class FeedService {
     });
 
     if (count === 0) {
-      // **404, not 403** — 18-doc §2 test 7. A 403 confirms the id exists,
+      // **404, not 403** test 7. A 403 confirms the id exists,
       // which turns this endpoint into an oracle for other users' inboxes.
       // Same rule as everywhere else in the system.
       throw new RpcException({

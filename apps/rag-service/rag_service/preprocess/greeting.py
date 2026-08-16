@@ -1,4 +1,4 @@
-"""Two-layer greeting detection — 13-doc §3.1, and the ORDER is the point.
+"""Two-layer greeting detection, and the ORDER is the point.
 
     Layer 1 regex (FREE)
       └─ miss → Layer 2 classify (cheap LLM, ledgered)
@@ -9,7 +9,7 @@
 embedding, a Qdrant query, a rerank and a generation — all metered against the
 tenant. Layer 1 costs a regex match.
 
-**The reply is a canned lookup, not a generation** (11-doc §1.2). Detecting a
+**The reply is a canned lookup, not a generation**. Detecting a
 greeting for free and then paying a model to produce "Hi! How can I help?"
 spends money on one of about six sentences. That is also why
 `AiGenerationPurpose` has no `GREETING_REPLY` value — there is no spend to
@@ -27,7 +27,7 @@ from enum import StrEnum
 class Intent(StrEnum):
     GREETING = "GREETING"
     FACTUAL = "FACTUAL"
-    #: Refused by prompt-injection detection — 33-doc §5. Carries a `reply` like
+    #: Refused by prompt-injection detection Carries a `reply` like
     #: a greeting does, so it travels the same free short-circuit; the proto
     #: status is what keeps the two distinguishable downstream.
     REFUSED = "REFUSED"
@@ -138,7 +138,7 @@ def canned_reply(language: str | None) -> str:
     return CANNED_REPLIES.get(language or "en", CANNED_REPLIES["en"])
 
 
-#: What a refused question is told — 33-doc §5.3.
+#: What a refused question is told
 #:
 #: **It names no pattern and no rule.** A message that explains what tripped the
 #: detector is a free oracle for tuning an attack against it, and the tuning
@@ -185,7 +185,7 @@ REFUSAL_REPLIES: dict[str, str] = {
 def refusal_reply(language: str | None) -> str:
     """The refusal, by language. English when neither layer could name one.
 
-    **Both layers can name it** — 33-doc §5.2. Layer A knows the language of the
+    **Both layers can name it** Layer A knows the language of the
     pattern that fired; Layer B asks for it in the same eight-token answer, so
     `INJECTION es` costs exactly what `INJECTION` would have. That second half
     is what the cheap-tier classification bought: a classifier head returns a

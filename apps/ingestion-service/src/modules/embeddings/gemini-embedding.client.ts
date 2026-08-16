@@ -8,7 +8,7 @@ import { EmbeddingClient, EmbeddingResult } from './embedding.contract';
  * The real embedding provider.
  *
  * **It names no model.** The model arrives as an argument, resolved by the
- * caller from `settingsFor(orgId)` — doc 15 §1.2, and the reason
+ * caller from `settingsFor(orgId)`, and the reason
  * `scripts/check-model-literals.mjs` passes over this file rather than
  * allowlisting it.
  */
@@ -76,7 +76,7 @@ export class GeminiEmbeddingClient implements EmbeddingClient {
    *
    * An estimate is wrong in a way that a ZERO is not merely wrong but
    * dangerous: zero-cost calls meter as free, which is precisely the hole the
-   * pricing table exists to close (12-doc §1.3). An approximate charge that
+   * pricing table exists to close. An approximate charge that
    * errs high is the safe direction.
    */
   private fallbackTokens(texts: string[]): number {

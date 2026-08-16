@@ -8,7 +8,7 @@ import {
 } from '../utils';
 
 /**
- * `POST /users/:id/lock` with an expiry — 21-doc §2, tests 7 and 1.
+ * `POST /users/:id/lock` with an expiry, tests 7 and 1.
  *
  * The service-side behaviour has its own suite against a real database. What is
  * under test here is what only exists at this layer: **the DTO validation**,

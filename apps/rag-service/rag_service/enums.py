@@ -1,4 +1,4 @@
-"""The ledger's enumerated values, DERIVED FROM THE PROTO — 13-doc §1.1.
+"""The ledger's enumerated values, DERIVED FROM THE PROTO
 
 These values exist in TypeScript and in Python, and the doc names the failure
 precisely: *"a hand-copied `GREETING_CLASSIFY` that becomes

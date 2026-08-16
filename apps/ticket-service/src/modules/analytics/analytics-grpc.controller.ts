@@ -25,7 +25,7 @@ import { TicketRollupJob } from './ticket-rollup.job';
 import { AnalyticsExportFacade } from './analytics-export.facade';
 
 /**
- * Domain B's analytics surface — 19-doc §3.2.
+ * Domain B's analytics surface
  *
  * Every read unpacks the caller context, and every one is tenant-scoped by
  * `requireTenant` inside the service. The rollup tables are NEW tables written
@@ -99,7 +99,7 @@ export class AnalyticsGrpcController implements AnalyticsServiceController {
    * decision with an audit trail behind it — not a button on a dashboard.
    *
    * Exposed as an RPC rather than left to a scheduler alone because the
-   * recovery path has to be reachable: 19-doc §2.3 is explicit that the
+   * recovery path has to be reachable: the
    * alternative to a shipped backfill is a metric that stays wrong forever.
    */
   async runRollup(request: RunRollupRequest): Promise<RunRollupResponse> {
@@ -118,7 +118,7 @@ export class AnalyticsGrpcController implements AnalyticsServiceController {
     };
   }
   /**
-   * The heartbeat — 20-doc §4.4.
+   * The heartbeat
    *
    * Platform-operated, like `runRollup` above. Returns every row unjudged: the
    * staleness decision needs the list of jobs this build EXPECTS, and a job
@@ -143,7 +143,7 @@ export class AnalyticsGrpcController implements AnalyticsServiceController {
     };
   }
 
-  // ------------------------------------------------------ 19-doc §5, export
+  // ------------------------------------------------------ export
 
   /**
    * Queues an export and answers IMMEDIATELY with a job id.

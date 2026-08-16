@@ -136,7 +136,7 @@ describe('gRPC wire contract (e2e)', () => {
       transport: Transport.GRPC,
       options: {
         // The ops packages ride along exactly as `main.ts` registers them —
-        // 23-doc §2. Restating them here rather than importing the same
+        // Restating them here rather than importing the same
         // constants would let this suite pass while production served a
         // different set.
         package: [AUTH_PACKAGE_NAME, ...OPS_PACKAGE_NAMES],
@@ -192,7 +192,7 @@ describe('gRPC wire contract (e2e)', () => {
     expect(services).toEqual(
       [
         'AuthService',
-        // Doc 14. Its webhook RPC is reachable like any other — the four
+        // Billing. Its webhook RPC is reachable like any other — the four
         // things it bypasses are gateway-level (auth guard, lifecycle gate,
         // tenant scoping, throttling), and none of them exist at this layer.
         'BillingService',
@@ -330,7 +330,7 @@ describe('gRPC wire contract (e2e)', () => {
       // suite, while adding a twenty-third is a regression that should.
       // Named, so a new entry has to be justified rather than absorbed by the
       // number. This one is deliberate: `ResolveInboundSender` takes its tenant
-      // as an ARGUMENT and has no caller context by design (31-doc §3) — an
+      // as an ARGUMENT and has no caller context by design — an
       // identity-less call is its normal mode, and it reaches Prisma with an
       // empty `organization_id` exactly as the other twenty-two do.
       expect(unknown.length).toBeLessThanOrEqual(22);
@@ -371,7 +371,7 @@ describe('gRPC wire contract (e2e)', () => {
 });
 
 /**
- * The ops surface, over the REAL wire — 23-doc §2, §3.
+ * The ops surface, over the REAL wire
  *
  * Separate from the contract sweep above because it asserts different things:
  * that sweep proves every domain RPC round-trips, this one proves the standard
@@ -494,7 +494,7 @@ describe('ops surface over gRPC (e2e)', () => {
   }, 30_000);
 
   it('4. **`GetVersion` answers on the port this service already has**', async () => {
-    // Served from EVERY service, not just the gateway — 23-doc §3. A rolling
+    // Served from EVERY service, not just the gateway A rolling
     // deploy where one service lagged is precisely the state this diagnoses,
     // and a gateway-only version endpoint would report the new SHA while the
     // peer running the old code is the one causing the incident.

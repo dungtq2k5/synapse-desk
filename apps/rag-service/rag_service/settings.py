@@ -9,7 +9,7 @@ and nothing errors; the answer is merely worse, for the customer paying more.
 
 **This is the Python half of a two-language duplication**, mirroring
 `libs/common/src/configs/ai-settings.config.ts`. That is the same class of drift
-as the quota key and the purpose enums (13-doc §1.1), and it is handled the same
+as the quota key and the purpose enums, and it is handled the same
 way: both halves are asserted against `ai-settings.contract.json`, so a value
 changed on one side and not the other fails that side's own test suite. The
 fixture is deliberately not loaded at runtime — that would make this container's
@@ -40,7 +40,7 @@ DEFAULT_AI_MODEL_TIER: AiModelTier = "FAST"
 #: so a model added everywhere except there meters as free on the Node side.
 #:
 #: Tier -> generation model. **This mapping is the entire tier feature**
-#: (doc 15 §2.1): once the Stripe webhook writes `organizations.ai_model_tier`,
+#:: once the Stripe webhook writes `organizations.ai_model_tier`,
 #: shipping tiers is this table being read with a real value instead of the
 #: default, and nothing else moves.
 GENERATION_MODEL_BY_TIER: dict[AiModelTier, str] = {
@@ -51,7 +51,7 @@ GENERATION_MODEL_BY_TIER: dict[AiModelTier, str] = {
 #: **FAST and `CHEAP_MODEL` are the same model today, and that is deliberate.**
 #:
 #: They are separate CONSTANTS because they answer different questions — one is
-#: a tier the tenant buys, the other is an internal volume call — and doc 15
+#: a tier the tenant buys, the other is an internal volume call — and the tier
 #: §2.2 is explicit that the cheap call must not scale with the tier. Pointing
 #: both at one model is a pricing decision, not a merge: the moment a cheaper
 #: generation model exists, only this line moves.
@@ -61,7 +61,7 @@ GENERATION_MODEL_BY_TIER: dict[AiModelTier, str] = {
 #: than a premium one — the invariant `ai-pricing` asserts, inverted.
 #:
 #: Greeting classification and reformulation. Deliberately NOT tier-varying
-#: (doc 15 §2.2): these are volume calls whose quality barely moves with model
+#:: these are volume calls whose quality barely moves with model
 #: tier, so scaling them multiplies a premium tenant's bill for no perceptible
 #: gain.
 CHEAP_MODEL = "gemini-3.5-flash-lite"
@@ -69,7 +69,7 @@ CHEAP_MODEL = "gemini-3.5-flash-lite"
 #: Never tenant-varying and never tier-varying. A Qdrant collection fixes vector
 #: dimension at creation, so a per-tenant embedding model forces per-tenant
 #: collections and makes every tier change a full re-embed migration
-#: (11-doc §1.3).
+#:.
 EMBEDDING_MODEL = "gemini-embedding-2"
 
 ALL_CONFIGURED_MODELS: list[str] = [
@@ -79,7 +79,7 @@ ALL_CONFIGURED_MODELS: list[str] = [
 ]
 
 #: The retrieval defaults, from `docs/rag/`. Guesses in the honest sense —
-#: there is no eval set yet, which is exactly why 11-doc §1.7 keeps them out of
+#: there is no eval set yet, which is exactly why they are kept out of
 #: tenant hands. They live here so that when there IS one, tuning them is
 #: editing a table rather than finding every call site that hardcoded a `k`.
 RETRIEVAL_DEFAULTS: dict[str, float] = {
@@ -91,7 +91,7 @@ RETRIEVAL_DEFAULTS: dict[str, float] = {
     "co_rag_max_retries": 0,
 }
 
-#: Server-side bounds on every numeric setting — doc 15 §1.4. Applied whether
+#: Server-side bounds on every numeric setting Applied whether
 #: or not tenants can currently set anything: an unclamped `final_context_k` is
 #: a direct path to enormous prompts and a blown budget, and the value that
 #: gets there does not have to arrive from a tenant. A bad default, a migration
@@ -256,8 +256,8 @@ class AiSettingsResolver:
         """Where the tier will come from — and today it comes from nowhere.
 
         `organizations.ai_model_tier` does not exist yet: the Stripe webhook
-        writes it (doc 14 §3) and this reads it over
-        `GetOrganizationEntitlements` (doc 15 §3.1). Until then every tenant
+        writes it and this reads it over
+        `GetOrganizationEntitlements`. Until then every tenant
         resolves to the default.
 
         **The constant is returned from HERE rather than from `settings_for`**,
@@ -275,7 +275,7 @@ def with_co_rag_retries(settings: AiSettings, retries: int) -> AiSettings:
 
     Tier 1 chat runs `co_rag_max_retries = 0` because it streams and cannot
     afford a review pass; the co-pilot runs 1-2 because an agent absorbs the
-    latency (11-doc §1.1). That is a property of the call site rather than of
+    latency. That is a property of the call site rather than of
     the tenant, so it is applied here — still through the clamp, so a surface
     cannot buy itself an unbounded retry loop by passing a large number.
     """

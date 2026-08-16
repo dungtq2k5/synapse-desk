@@ -12,16 +12,16 @@ import type { CacheService } from '../../cache/cache.service';
 import { ENTITY_TTL_SECONDS, entityScope } from '../../config/cache.config';
 
 /**
- * The departments loader — 27-doc §3.
+ * The departments loader
  *
  * The second-most-traversed edge: `Ticket.department`, `Document.departments`
  * and `User.departments` all arrive here.
  *
  * Tenant scope comes from the caller CONTEXT inside the RPC, not from anything
- * passed here — 27-doc §1, property 1. That is what makes an id-keyed cache
+ * passed here, property 1. That is what makes an id-keyed cache
  * safe: the key carries no tenant, so the RPC has to be the boundary.
  *
- * **Cached in Redis as well** — 30-doc §2. A department is three fields that
+ * **Cached in Redis as well** A department is three fields that
  * change when somebody renames one, which is roughly never, and it is read on
  * every ticket, document and user edge in the schema. The Redis key DOES carry
  * the tenant, so the two boundaries are independent: the key stops a

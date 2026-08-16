@@ -5,7 +5,7 @@ import { seedTenantWithUser } from '../factories';
 import { OrganizationsService } from '../../src/modules/organizations/organizations.service';
 
 /**
- * Issuing, rotating and revoking a tenant's inbound address — 31-doc §2.
+ * Issuing, rotating and revoking a tenant's inbound address
  *
  * **Rotation is one of the three properties an opaque token was chosen for**,
  * and until these existed it was the one nothing implemented: the column could

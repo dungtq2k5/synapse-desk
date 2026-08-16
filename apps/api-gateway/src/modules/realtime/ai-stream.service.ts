@@ -39,7 +39,7 @@ const TRANSCRIPT_TURNS = 40;
 
 /**
  * The most frames Socket.IO may have queued for a socket before the stream is
- * abandoned — 22-doc §5.2.
+ * abandoned
  *
  * **Socket.IO applies no backpressure.** `emit` returns immediately whether the
  * peer is reading or not; unsent frames accumulate in the engine's write buffer.
@@ -63,7 +63,7 @@ type LiveStream = {
 
 /**
  * The relay between rag-service's `Chat` server-stream and one socket —
- * 22-doc §5.
+ *
  *
  * Closes the gap the spec names: `Chat` has always been a stream and has always
  * been tested as one, and nothing carried it to a browser. A Tier 1 answer
@@ -111,7 +111,7 @@ export class AiStreamService implements OnModuleInit {
     question: string,
     context: RequestContext,
     /**
-     * The message this question was stored as — 36-doc §2.
+     * The message this question was stored as
      *
      * Optional so the one existing caller that has no message (a retry, a test)
      * still compiles, and because a question with no attachments is the common
@@ -129,14 +129,14 @@ export class AiStreamService implements OnModuleInit {
 
     // **Asked for, not fetched.** This service has no storage client, and
     // ticket-service already does the identical filter-and-fetch for its two
-    // `Draft` call sites — 36-doc §2. Eligibility is decided from the row
+    // `Draft` call sites Eligibility is decided from the row
     // there, so an attached zip never costs a download.
     const attachments = messageId
       ? await this.messages.aiAttachments(messageId, context)
       : { parts: [], skipped: [] };
 
     if (attachments.skipped.length > 0) {
-      // **Told, not silently dropped** — 36-doc §2.2, the same rule 31-doc §5
+      // **Told, not silently dropped**, the same rule
       // applies to email attachments the worker could not carry. "It ignored my
       // file" is something a user discovers before you do.
       this.notifySkipped(client, ticketId, attachments.skipped);
@@ -199,7 +199,7 @@ export class AiStreamService implements OnModuleInit {
         },
         error: (error: unknown) => {
           this.forget(client, streamId);
-          // **Nothing is persisted here** — 22-doc §5 test 7. A partial answer
+          // **Nothing is persisted here** test 7. A partial answer
           // written as though it were complete is worse than no answer: it
           // enters the permanent thread, is indistinguishable from a finished
           // one, and the user reads a policy that stops mid-sentence.
@@ -227,7 +227,7 @@ export class AiStreamService implements OnModuleInit {
   }
 
   /**
-   * `ai:stream:cancel` — 22-doc §5.2.
+   * `ai:stream:cancel`
    *
    * **Only works on the instance holding the call**, and that is a property of
    * the design rather than a limitation to route around. A socket lives on one
@@ -249,7 +249,7 @@ export class AiStreamService implements OnModuleInit {
     // **Unsubscribing IS the gRPC cancellation.** Nest's stream client calls
     // `call.cancel()` in its teardown, so this propagates to rag-service as a
     // real CANCELLED status — which is what triggers the shielded ledger write
-    // there (13-doc §4.1). A socket-side `return` that merely stopped emitting
+    // there. A socket-side `return` that merely stopped emitting
     // would leave the generation running and unbilled, spending money nothing
     // is watching.
     stream.subscription.unsubscribe();
@@ -307,11 +307,11 @@ export class AiStreamService implements OnModuleInit {
     this.forget(client, streamId);
 
     try {
-      // **At the cap this is `done`, never `error`** — 22-doc §5.2. The tenant
+      // **At the cap this is `done`, never `error`** The tenant
       // has run out of AI budget, the conversation auto-escalates, and a human
       // now has it. A 402-shaped error frame would tell the user the product is
       // broken at the moment it did the most useful thing it can do.
-      // **`REFUSED` deliberately does NOT branch here** — 33-doc §5.1. A
+      // **`REFUSED` deliberately does NOT branch here** A
       // question refused by injection detection takes the same path as a
       // greeting: the reply is appended, the thread keeps its record, and
       // nothing escalates, because the workspace's budget is untouched and
@@ -334,7 +334,7 @@ export class AiStreamService implements OnModuleInit {
         return;
       }
 
-      // **The write-back, on the refusal path only** — 36-doc §7. The gateway
+      // **The write-back, on the refusal path only** The gateway
       // is the one that holds this id, so the gateway is the one that sets the
       // flag: without it the refused question stays in the transcript and every
       // later turn in this conversation re-sends it to the model.
@@ -422,7 +422,7 @@ export class AiStreamService implements OnModuleInit {
   }
 
   /**
-   * Names what did not reach the model — 36-doc §2.2.
+   * Names what did not reach the model
    *
    * A zip, a `.docx`, or a file past the byte ceiling is skipped rather than
    * failing the question: an answer about the screenshot beats no answer
@@ -477,10 +477,10 @@ export class AiStreamService implements OnModuleInit {
     return (
       page.items
         // **Filtered HERE, after the fetch — deliberately, and NOT the same
-        // rule as `isInternalNote`** (36-doc §7.1).
+        // rule as `isInternalNote`**.
         //
         // An internal note is filtered in ticket-service's `where` clause
-        // because those rows must never reach the caller at all; 22-doc §1
+        // because those rows must never reach the caller at all; the internal-note leak
         // found the leak that fetch-then-filter produces there.
         //
         // **A refused message is the opposite.** The caller may absolutely see

@@ -158,7 +158,7 @@ export class PlatformController {
   }
 
   /**
-   * Rolls the metering window. **BREAK-GLASS, not routine** — 14-doc §5.
+   * Rolls the metering window. **BREAK-GLASS, not routine**
    *
    * Two things happen that the response cannot show. `billing_cycle_start` now
    * follows Stripe's `current_period_start`, so a manual roll desynchronizes

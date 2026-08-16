@@ -22,7 +22,7 @@ import {
 
 /**
  * `POST /webhooks/stripe` — and four global mechanisms it bypasses on purpose
- * (14-doc §3.3).
+ *.
  *
  * | Mechanism | Why it must not apply |
  * | --- | --- |
@@ -47,7 +47,7 @@ export class WebhooksController {
 
   /**
    * **Authenticated by SIGNATURE, not by a scheme OpenAPI can express** —
-   * 24-doc §3.
+   *
    *
    * There is no security requirement here because Swagger has no way to state
    * "verified HMAC over the raw body". The `description` says so explicitly:
@@ -81,7 +81,7 @@ export class WebhooksController {
     @Headers('stripe-signature') signature: string,
     @CurrentOrigin() origin: RequestOrigin,
   ): Promise<{ received: true; status: string }> {
-    // **THE trap** — 14-doc §3.2. Stripe's signature is computed over the
+    // **THE trap** Stripe's signature is computed over the
     // exact bytes of the request, and a JSON body parser deserializes and
     // re-serializes them: different key order, different whitespace, and
     // verification fails for every event forever.

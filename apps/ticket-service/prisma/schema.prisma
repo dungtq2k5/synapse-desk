@@ -7,7 +7,7 @@
 // NO foreign key — Postgres cannot enforce one across databases, and that is
 // the correct shape for service-per-database rather than a shortcut. The
 // obligation it creates is validation at WRITE time over gRPC; see §1.1 of
-// docs/09-domain-b-support-engine.md and TicketsService.
+// TicketsService.
 
 generator client {
   provider = "prisma-client"
@@ -88,7 +88,7 @@ model Ticket {
 // ==========================================
 // 2. TICKET ASSIGNMENTS (full history, one current)
 // ==========================================
-/// Inbound email idempotency — 31-doc §6.2, 32-doc §4.3.
+/// Inbound email idempotency
 ///
 /// **One row per accepted message, written in the SAME transaction as the
 /// ticket or message it produced.** Providers retry, and Cloudflare re-runs a
@@ -114,7 +114,7 @@ model InboundEmail {
   organizationId String @map("organization_id") @db.Uuid
 
   /// The message's `Message-ID` header, or a synthesized digest when it had
-  /// none — 31-doc §7.
+  /// none
   ///
   /// **255, not 998, and the unit is why.** This column is half of the unique
   /// index below, and Postgres refuses a btree tuple over roughly 2704 BYTES —
@@ -213,7 +213,7 @@ model TicketMessage {
   /// fetched-then-filtered — see TicketMessagesService.
   isInternalNote Boolean @default(false) @map("is_internal_note")
 
-  /// Set when this message was REFUSED as prompt injection — 35-doc §6.
+  /// Set when this message was REFUSED as prompt injection
   ///
   /// **A filter, not a label.** The transcript builders exclude these, so a
   /// refused question cannot reach a later reformulation. Instructing a model
@@ -231,7 +231,7 @@ model TicketMessage {
   /// keeping.
   excludedFromAiContext Boolean @default(false) @map("excluded_from_ai_context")
 
-  /// `AnswerStatus` for an AI message — 35-doc §6. NULL for a human one.
+  /// `AnswerStatus` for an AI message NULL for a human one.
   ///
   /// **For reading a thread, not for analytics.** An agent scrolling a
   /// conversation should be able to tell a refusal from an escalation from a
@@ -239,12 +239,12 @@ model TicketMessage {
   /// the one in the WebSocket frame is never persisted.
   ///
   /// **The knowledge-gap question is already a ledger query** — generations
-  /// with empty `retrieved_chunk_ids` (13-doc §4.1). A second report built off
+  /// with empty `retrieved_chunk_ids`. A second report built off
   /// this column would eventually disagree with that one, and the ledger is the
   /// half that money is computed from.
   answerStatus String? @map("answer_status") @db.VarChar(30)
 
-  /// A DENORMALIZED CONVENIENCE for per-message display — doc 15 §3.2.
+  /// A DENORMALIZED CONVENIENCE for per-message display
   ///
   /// These were token metering before the ledger existed. They are not any
   /// more: **the quota gate sums `ai_generations`, never these**, and
@@ -273,7 +273,7 @@ model TicketMessage {
   redactedAt   DateTime? @map("redacted_at") @db.Timestamptz
   redactedById String?   @map("redacted_by_id") @db.Uuid
 
-  /// The SENDER's own id for this message — 22-doc §2.3.
+  /// The SENDER's own id for this message
   ///
   /// **Exists because WebSocket clients retry in a way HTTP clients do not.** A
   /// user clicks Send once; a socket reconnects, and a client holding an unacked
@@ -427,7 +427,7 @@ model AuditLog {
   @@map("audit_logs")
 }
 
-/// 19-doc §2.2 — the daily ticket rollup.
+/// The daily ticket rollup.
 ///
 /// **Why a table and not a query.** `/analytics/overview` over a quarter is an
 /// aggregation across every ticket in a tenant, ON THE TABLE SERVING TICKET
@@ -450,7 +450,7 @@ model TicketDailyStat {
 
   organizationId String @map("organization_id") @db.Uuid
 
-  /// A DATE in the TENANT'S timezone, not UTC — 19-doc §2.2 test 4.
+  /// A DATE in the TENANT'S timezone, not UTC test 4.
   ///
   /// A tenant at UTC+7 whose Monday starts at 17:00 Sunday UTC would otherwise
   /// see every daily figure split across two rows, and no consumer could
@@ -478,14 +478,14 @@ model TicketDailyStat {
   ///
   /// The cost is that today's figure is PROVISIONAL until its conversations
   /// close — which is why the job is re-runnable and why ranges including today
-  /// cache briefly (19-doc §4).
+  /// cache briefly.
   chatConversations             Int @default(0) @map("chat_conversations")
   chatResolvedWithoutEscalation Int @default(0) @map("chat_resolved_without_escalation")
 
   firstResponseSecondsSum Int @default(0) @map("first_response_seconds_sum")
   firstResponseCount      Int @default(0) @map("first_response_count")
 
-  /// Split from the human figures deliberately — 19-doc §3.1.
+  /// Split from the human figures deliberately
   ///
   /// An AI reply in 2 seconds genuinely IS a first response, and blending it
   /// with human response time produces a headline that improves whenever AI
@@ -504,7 +504,7 @@ model TicketDailyStat {
   /// When the job that wrote this row ran.
   ///
   /// Load-bearing rather than decorative: it goes into the analytics CACHE KEY
-  /// for closed ranges (19-doc §4), so a backfill correction invalidates the
+  /// for closed ranges, so a backfill correction invalidates the
   /// affected entries automatically instead of serving known-wrong numbers for
   /// a day. It is also what an export records so two people exporting "last
   /// quarter" a week apart can tell why their numbers differ.
@@ -518,7 +518,7 @@ model TicketDailyStat {
   @@map("ticket_daily_stats")
 }
 
-/// 19-doc §2.2 — the daily per-agent rollup.
+/// The daily per-agent rollup.
 ///
 /// Separate from `ticket_daily_stats` rather than a wider dimension on it: an
 /// agent is a person and a department is a queue, and one row per (day,
@@ -550,7 +550,7 @@ model AgentDailyStat {
   @@map("agent_daily_stats")
 }
 
-/// 19-doc §5 — an async analytics export.
+/// An async analytics export.
 ///
 /// **`GET /analytics/export` is not a read**: it creates a job, produces a file
 /// and returns a download URL. So it needs an owner, and ticket-service owns
@@ -601,7 +601,7 @@ model AnalyticsExport {
   @@map("analytics_exports")
 }
 
-/// The HEARTBEAT — 20-doc §4.1.
+/// The HEARTBEAT
 ///
 /// **One row per job name, and the deepest fix in that document.** The jobs not
 /// running was not the real problem; the real problem was that nothing anywhere
@@ -609,7 +609,7 @@ model AnalyticsExport {
 /// never runs logs nothing at all — which is precisely the case that occurred,
 /// and it stayed invisible for two domains.
 ///
-/// **Three copies of this table is CORRECT** (20-doc §4.5), and this note
+/// **Three copies of this table is CORRECT**, and this note
 /// exists so nobody re-opens it. Service-per-database means each service
 /// records its own jobs in its own failure domain: "did ingestion-service's
 /// rollup run?" is a question about ingestion-service's database, and a shared

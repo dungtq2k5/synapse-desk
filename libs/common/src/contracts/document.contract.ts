@@ -17,7 +17,7 @@ export const DOCUMENT_PATTERNS = {
   /**
    * Visibility changed and the retrievable stores need re-writing.
    *
-   * The fan-out job's trigger (11-doc §1.4b). A separate event from `uploaded`
+   * The fan-out job's trigger. A separate event from `uploaded`
    * because it is a re-write of existing points rather than a first index, and
    * conflating them would make a re-scope re-embed the whole document.
    */
@@ -41,7 +41,7 @@ export type DocumentUploadedEvent = DocumentEventBase & {
   objectPath: string;
   fileType: string;
   /**
-   * ISO 639-1 codes for OCR, empty when unspecified — 34-doc §4.1.
+   * ISO 639-1 codes for OCR, empty when unspecified
    *
    * **Here for the same reason `fileType` is**: it is document configuration
    * the PARSE needs, and the alternative is a database read before parsing —
@@ -68,7 +68,7 @@ export type DocumentIndexedEvent = DocumentEventBase & {
   /** Rendered by the client without a follow-up fetch. */
   title: string;
   /**
-   * The visibility, CARRIED rather than re-read — 22-doc §6.2.
+   * The visibility, CARRIED rather than re-read
    *
    * The relay decides which rooms this reaches, and a department-scoped
    * document announced tenant-wide would disclose its existence and title to
@@ -86,7 +86,7 @@ export type DocumentIngestionFailedEvent = DocumentEventBase & {
   /** Already redacted for display — never a raw stack trace. */
   reason: string;
   /**
-   * The uploader, and the ONLY recipient — 22-doc §6.2.
+   * The uploader, and the ONLY recipient
    *
    * A failure is not department news: it is one person's document not working.
    * Carried for the same reason as above, and with a sharper edge — the
@@ -103,7 +103,7 @@ export type DocumentIngestionFailedEvent = DocumentEventBase & {
  *
  * A restriction (departments removed, org-wide turned off, a delete) must reach
  * the retrievable stores FIRST; a grant must reach `documents` first. Failing
- * halfway then over-restricts rather than over-exposes — see 11-doc §1.4b. A
+ * halfway then over-restricts rather than over-exposes. A
  * consumer that had to work out which kind of change this was would be
  * re-deriving a security property from a diff.
  */

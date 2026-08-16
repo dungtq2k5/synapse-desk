@@ -10,7 +10,7 @@ import {
 } from '@synapsedesk/grpc-proto';
 
 /**
- * The gateway's single connection to notification-service — 18-doc §1.1.
+ * The gateway's single connection to notification-service
  *
  * New because that service had no gRPC server until Domain E's feed existed: it
  * consumed NATS events and wrote rows nobody could read back. `@Global` like

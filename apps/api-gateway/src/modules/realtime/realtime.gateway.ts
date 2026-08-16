@@ -124,7 +124,7 @@ export class RealtimeGateway
         await client.join(orgRoom(payload.organizationId));
       }
 
-      // **The department rooms, from the token** — 22-doc §6.2.
+      // **The department rooms, from the token**
       //
       // Same reasoning as `user:` and `org:`: the ids come from a verified JWT,
       // so no authorization call is needed and a client cannot ask for a
@@ -153,7 +153,7 @@ export class RealtimeGateway
       // frame that tells this client it may start talking.
       void this.announceConnected(payload);
 
-      // 23-doc §4: WebSocket traffic was entirely invisible to monitoring —
+      // WebSocket traffic was entirely invisible to monitoring —
       // this process could hold ten thousand sockets and no dashboard would
       // show it. Counted AFTER authentication, so a flood of refused
       // handshakes does not read as legitimate load.
@@ -174,7 +174,7 @@ export class RealtimeGateway
   }
 
   /**
-   * Cancels whatever this socket still had running — 22-doc §5.2.
+   * Cancels whatever this socket still had running
    *
    * **This is the cancellation that actually happens.** `ai:stream:cancel`
    * covers a user who pressed stop; closing the tab is the same intent
@@ -198,7 +198,7 @@ export class RealtimeGateway
   }
 
   /**
-   * `presence:update` — 22-doc §4.
+   * `presence:update`
    *
    * **The ONLY writer.** Connecting sets a floor and a heartbeat refreshes a
    * TTL; neither states anything about the user's intent. Keeping one writer is
@@ -283,7 +283,7 @@ export class RealtimeGateway
 
     await client.join(ticketRoom(id));
 
-    // **The agent-only half** — 22-doc §1. Joined only by a socket that holds
+    // **The agent-only half** Joined only by a socket that holds
     // `ticket.read.all` at THIS moment, which is what makes the internal-note
     // fan-out a single room emit rather than a per-socket permission read on
     // every message.
@@ -321,7 +321,7 @@ export class RealtimeGateway
   }
 
   /**
-   * `message:send` — 22-doc §2.
+   * `message:send`
    *
    * **A transport, not a second write path.** The spec says it "mirrors
    * `POST /tickets/:id/messages`", and mirroring is the trap: a second
@@ -347,7 +347,7 @@ export class RealtimeGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() body: unknown,
   ): Promise<WsAck<{ messageId: string; streamId?: string }>> {
-    // **Every refusal returns in the ACK rather than throwing** — 22-doc §2.1.
+    // **Every refusal returns in the ACK rather than throwing**
     //
     // The ack is what lets the client clear its pending state, and a refused
     // send is exactly when clearing matters most. A thrown `WsException` leaves
@@ -361,7 +361,7 @@ export class RealtimeGateway
   }
 
   /**
-   * `ai:stream:cancel` — 22-doc §5.2.
+   * `ai:stream:cancel`
    *
    * Acked, because a client that pressed stop needs to know the stream is
    * actually gone before it re-enables its composer. A cancel for a stream this
@@ -389,7 +389,7 @@ export class RealtimeGateway
   }
 
   /**
-   * `typing:start` / `typing:stop` — 22-doc §3.
+   * `typing:start` / `typing:stop`
    *
    * **Ephemeral, and that word does the work.** No table, no NATS subject, no
    * audit. A typing frame is worth less than the bytes it costs, which is why
@@ -533,7 +533,7 @@ export class RealtimeGateway
   }
 
   /**
-   * Validates a socket frame against a DTO — 22-doc §2.
+   * Validates a socket frame against a DTO
    *
    * **Not because the global `ValidationPipe` cannot see socket frames — it
    * can.** `useGlobalPipes` binds across every execution context, so typing a
@@ -545,7 +545,7 @@ export class RealtimeGateway
    * {@link acknowledge} and never becomes a failure ack. Socket.IO's ack
    * callback is then never invoked: the client's spinner runs forever and its
    * retry never fires, which is the precise failure `WsAck`'s docblock and
-   * 22-doc §2.1 exist to prevent. The `exception` frame the filter emits is not
+   * Exist to prevent. The `exception` frame the filter emits is not
    * a substitute, because the client is awaiting THIS call.
    *
    * Measured rather than argued: registering the pipe in the realtime fixture
@@ -591,7 +591,7 @@ export class RealtimeGateway
   }
 
   /**
-   * Spends one unit of this event's budget, or refuses the frame — 22-doc §6.3.
+   * Spends one unit of this event's budget, or refuses the frame
    *
    * **Throws rather than returning false.** Every caller here wants the client
    * told: a refused join or send that returned silently would leave the UI
@@ -667,7 +667,7 @@ export class RealtimeGateway
   }
 
   /**
-   * Fanned to `org:{organizationId}` — 22-doc §4.
+   * Fanned to `org:{organizationId}`
    *
    * Not a ticket room, which is far too narrow to be useful: presence answers
    * "who is around right now?", and the people asking are colleagues who have
@@ -701,7 +701,7 @@ export class RealtimeGateway
 
     const dto = await this.validateBody(MessageSendDto, body);
 
-    // `canWrite`, NOT `canRead` — 22-doc §2.2. A `ticket.read.all` holder may
+    // `canWrite`, NOT `canRead` A `ticket.read.all` holder may
     // watch any thread in the tenant and post into none of them.
     //
     // Note what this check is FOR: ticket-service re-validates on its own, so
@@ -723,7 +723,7 @@ export class RealtimeGateway
         // not. This path takes the AI over; it does not add to it.
         invokeAi: false,
         // Bound as the message is written, so the stream opened below sees them
-        // — 36-doc §1.3. This handler is the one place where the write and the
+        // This handler is the one place where the write and the
         // answer are close enough together for the ordering to matter.
         attachments: dto.attachments,
       },
@@ -732,7 +732,7 @@ export class RealtimeGateway
     );
 
     // **The AI answer STREAMS from here rather than from ticket-service** —
-    // 22-doc §5.1.
+    //
     //
     // Only for a socket: the HTTP twin still uses ticket-service's unary path,
     // because a request has nowhere to stream to.
@@ -747,7 +747,7 @@ export class RealtimeGateway
           dto.content,
           payload,
           // The message just written, so its attachments can reach the model —
-          // 36-doc §2. Passed rather than looked up: this handler already holds
+          // Passed rather than looked up: this handler already holds
           // the id, and re-reading the ticket's newest row would race with a
           // second message arriving between the write and the stream.
           message.id,
@@ -763,7 +763,7 @@ export class RealtimeGateway
       message: 'Message sent',
       // **On the ack, not as a separate frame.** A file that did not confirm is
       // an outcome of THIS send, and the client is already awaiting this
-      // response — 36-doc §1.3.1. `ai:stream:attachments-skipped` answers a
+      // response `ai:stream:attachments-skipped` answers a
       // different question (the model could not read it) and would be the wrong
       // channel for "it was never attached".
       data: { messageId: message.id, streamId, skippedAttachments },
@@ -896,7 +896,7 @@ export class RealtimeGateway
   }
 
   /**
-   * Counts one outbound event — 23-doc §4.
+   * Counts one outbound event
    *
    * Labelled by EVENT NAME only. The names come from `REALTIME_EVENTS`, a fixed
    * object, so the cardinality is its size; adding the ticket or the recipient
@@ -907,7 +907,7 @@ export class RealtimeGateway
   }
 
   /**
-   * ONE emit addressing several rooms — 22-doc §6.2.
+   * ONE emit addressing several rooms
    *
    * Not a convenience wrapper around a loop, and the difference is the whole
    * reason it exists. Socket.IO deduplicates recipients WITHIN a single emit and

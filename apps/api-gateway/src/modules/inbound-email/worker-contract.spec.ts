@@ -5,7 +5,7 @@ import { validateSync } from 'class-validator';
 import { InboundEmailDto } from './dto/rest/inbound-email.dto';
 
 /**
- * The Worker's payloads satisfy the endpoint's contract — 32-doc §3.1, §7.
+ * The Worker's payloads satisfy the endpoint's contract
  *
  * **Both halves of this contract are ours**, which is the difference from the
  * Stripe route: that DTO documents somebody else's payload, and this one *is*
@@ -14,7 +14,7 @@ import { InboundEmailDto } from './dto/rest/inbound-email.dto';
  * the agreement is checked against recorded payloads instead of assumed.
  *
  * **These are hand-built and that is a known weakness**, stated rather than
- * hidden: 32-doc §7 asks for payloads captured from a real Worker run, because
+ * hidden: this asks for payloads captured from a real Worker run, because
  * a synthetic fixture agrees with whatever the parser does while a recorded one
  * disagrees — and the disagreement is the point. Replace them after the first
  * live run; the shapes here are what `buildPayload` is written to produce.
@@ -71,7 +71,7 @@ describe('the mail Worker’s payload contract', () => {
   });
 
   it('and the auto-responder fixture carries the loop headers', () => {
-    // The one shape the guards in 32-doc §5 need, and the one a Worker that
+    // The one shape the guards need, and the one a Worker that
     // forwarded only the body would silently lose.
     const payload = JSON.parse(
       readFileSync(join(PAYLOADS, 'auto-responder.json'), 'utf8'),

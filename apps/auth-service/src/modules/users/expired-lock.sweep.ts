@@ -9,7 +9,7 @@ import { AuditPublisher } from '../audit/audit-publisher.service';
 import { NotificationPublisher } from '../notifications/notification-publisher.service';
 
 /**
- * Clears locks whose expiry has passed — 21-doc §2.2, mechanism 2.
+ * Clears locks whose expiry has passed, mechanism 2.
  *
  * **Why this exists when the login path already unlocks lazily.** The lazy
  * unlock fires only when the user tries to sign in — which for a locked account
@@ -41,7 +41,7 @@ export class ExpiredLockSweep {
   /**
    * Unlocks everyone whose `lockedUntil` has passed.
    *
-   * **A plain method taking `now`, with no `@Cron`** — 20-doc §1. The scheduler
+   * **A plain method taking `now`, with no `@Cron`** The scheduler
    * calls it; that is what makes it testable without waiting an hour.
    *
    * The scan is on `isLocked: true`, which is why the column carries no index:
@@ -64,7 +64,7 @@ export class ExpiredLockSweep {
       // **Conditional on the row still being locked**, so this and the login
       // path's lazy unlock racing the same user produce ONE unlock and one
       // audit row. At expiry both firing at once is the normal case, not an
-      // edge case — 21-doc §2.5 test 6.
+      // edge case test 6.
       const { count } = await this.prisma.user.updateMany({
         where: { id: user.id, isLocked: true },
         data: { isLocked: false, lockedUntil: null },

@@ -2,7 +2,7 @@ import * as Joi from 'joi';
 import { LOG_LEVELS, NODE_ENV_OPTIONS } from '@synapsedesk/common';
 
 export const envValidationSchema = Joi.object({
-  // **Which build is this?** — 23-doc §3. Baked at image build time, never read
+  // **Which build is this?** Baked at image build time, never read
   // from git at runtime: a container has no `.git`, so a runtime lookup returns
   // nothing and the natural fallback is `"unknown"` — the answer you get at
   // exactly the moment you need the real one.
@@ -34,7 +34,7 @@ export const envValidationSchema = Joi.object({
   EMAIL_SENDER: Joi.string().required(),
 
   // Building the `Reply-To` that makes an emailed notification answerable —
-  // 31-doc §4. The secret must MATCH the gateway's: it verifies what this
+  // The secret must MATCH the gateway's: it verifies what this
   // signs, and a mismatch makes every reply open a duplicate ticket rather
   // than failing visibly.
   INBOUND_EMAIL_SECRET: Joi.string().required(),
@@ -54,18 +54,18 @@ export const envValidationSchema = Joi.object({
     .required()
     .valid(...LOG_LEVELS),
 
-  // Domain E's own database — added with in-app notifications (16-doc §1).
+  // Domain E's own database — added with in-app notifications.
   // Email and SMS carry their recipient in the command and need no storage; a
   // feed is storage by definition.
   DATABASE_URL: Joi.string().required(),
 
-  // The gRPC server added with the feed API (18-doc §1.1). Required rather
+  // The gRPC server added with the feed API. Required rather
   // than defaulted: a service that bound to a wrong port would look healthy
   // and answer nothing, which is worse than failing to boot.
   GRPC_HOST: Joi.string().required(),
   GRPC_PORT: Joi.number().required(),
 
-  // Applies the four partial indexes `schema.prisma` cannot express (18-doc
+  // Applies the four partial indexes `schema.prisma` cannot express (
   // §1.2). False in tests, which seed explicitly from the fixture so there is
   // ONE seeding path rather than one that races module init.
   SEED_ON_BOOTSTRAP: Joi.boolean().required(),

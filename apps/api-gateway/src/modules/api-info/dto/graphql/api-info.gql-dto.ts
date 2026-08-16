@@ -11,7 +11,7 @@ import { Field, ObjectType } from '@nestjs/graphql';
  * which decouples the SDL from what the class happens to be called.
  *
  * The three fields and no more: adding the environment name or the Node version
- * would reintroduce, on a second transport, exactly what 24-doc §3 kept off the
+ * would reintroduce, on a second transport, exactly what the OpenAPI work kept off the
  * REST one.
  */
 @ObjectType('ApiInfo')

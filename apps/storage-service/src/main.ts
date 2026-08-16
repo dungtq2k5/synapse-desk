@@ -35,7 +35,7 @@ async function bootstrap() {
   app.connectMicroservice<MicroserviceOptions>({
     transport: Transport.GRPC,
     options: {
-      // Domain package PLUS the ops packages — 23-doc §2. Probes and
+      // Domain package PLUS the ops packages Probes and
       // `/version` ride the port this service already listens on: no HTTP
       // listener, no second port, and the kubelet speaks `grpc.health.v1`
       // natively.

@@ -3,7 +3,7 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 /**
  * Constant-time comparison and HMAC verification for webhook signatures.
  *
- * **Here rather than in a service, because the gateway now needs it** — 31-doc
+ * **Here rather than in a service, because the gateway now needs it**
  * §6.1. `safeCompareHex` lived only in `apps/auth-service/src/common/utils/crypto.ts`,
  * which is where Stripe's signature is checked; the inbound-email route
  * verifies at the EDGE, and a gateway cannot import a service's private
@@ -37,7 +37,7 @@ export function safeCompareHex(a: string, b: string): boolean {
 /**
  * Verifies an HMAC-SHA256 signature over the EXACT bytes received.
  *
- * **`payload` must be the raw body, never a re-serialised object** — 14-doc
+ * **`payload` must be the raw body, never a re-serialised object**
  * §3.2, and the trap is worth restating at the one place both webhooks reach.
  * A JSON parser deserialises and re-serialises: different key order, different
  * whitespace, a different digest, and verification fails for every request

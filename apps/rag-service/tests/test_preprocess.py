@@ -49,7 +49,7 @@ class RecordingGenerator:
     def __init__(self, answers: list[str] | None = None) -> None:
         self.calls: list[tuple[str, str]] = []
         #: The prompts as given, parts and all. `calls` keeps only the text
-        #: because almost every assertion here is about wording; 36-doc §5 test
+        #: because almost every assertion here is about wording; the attachment test
         #: 3 is about how many FILES went, which text cannot answer.
         self.prompts: list[Prompt] = []
         self.answers = answers or []
@@ -216,7 +216,7 @@ class TestOrdering:
     async def test_only_the_CURRENT_message_attachments_are_ever_sent(
         self, generator, ledger, settings, budget
     ):
-        """36-doc §5 test 3 — 35-doc §3.1, asserted as a property.
+        """36-doc §5 test 3, asserted as a property.
 
         Four turns times five files is twenty images on every call, on the
         highest-volume path in the system. Only the CURRENT message's files go;
@@ -296,7 +296,7 @@ class TestLayerTwo:
     async def test_uses_the_CHEAP_model_from_the_settings_layer(
         self, pipeline, generator, settings, budget
     ):
-        # Doc 15 §2.2: the cheap model does not scale with the tier. These are
+        # The cheap model does not scale with the tier. These are
         # volume calls whose quality barely moves with model tier, so scaling
         # them multiplies a premium tenant's bill for no perceptible gain.
         await pipeline.run("what is the policy?", [], settings, budget=budget)

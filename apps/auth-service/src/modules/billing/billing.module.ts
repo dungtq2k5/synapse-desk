@@ -11,7 +11,7 @@ import { BillingGrpcController } from './billing-grpc.controller';
 
 /**
  * Billing lives in `auth-service` because it owns `organizations`, and
- * entitlements are columns on that row (14-doc, opening note). A separate
+ * entitlements are columns on that row. A separate
  * billing service would need write access to another service's table, which is
  * exactly what service-per-database exists to prevent.
  */

@@ -1,4 +1,4 @@
-"""What a prompt can be made of — 36-doc §5.1.
+"""What a prompt can be made of
 
 **One widened type at the bottom, not a second method alongside the first.**
 Every generation call in this service took a `str`, and making one of them
@@ -26,7 +26,7 @@ class Attachment:
     """One file the user attached, already filtered and capped by the caller.
 
     **The bytes are here rather than an object path** because rag-service has no
-    storage client — 35-doc §7. Giving it one would add a peer, a credential and
+    storage client Giving it one would add a peer, a credential and
     a failure mode to the query path, and what makes inline bytes safe is a cap
     that has to exist anyway.
 

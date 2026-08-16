@@ -26,17 +26,17 @@ const walkFiles = (dir: string, out: string[] = []): string[] => {
 };
 
 /**
- * The rule that decays first — 26-doc §5 test 5.
+ * The rule that decays first test 5.
  *
  * **A FIELD resolver never calls a gRPC client directly; only a loader.** A
  * direct call is an N+1 that works perfectly in every test with one parent row,
  * and only misbehaves at fifty — which is the page size the product actually
  * uses.
  *
- * 26-doc says to write this test early, and the reason is behavioural rather
+ * Says to write this test early, and the reason is behavioural rather
  * than technical: people break rule 1 in the direction that works locally.
  *
- * **Written now, before the first field resolver exists** (those need 27-doc's
+ * **Written now, before the first field resolver exists** (those need the batch RPCs'
  * batch RPCs). A guard added after the thing it guards is a guard written while
  * looking at the code it is supposed to judge.
  */
@@ -77,7 +77,7 @@ describe('§5 field resolvers never inject a gRPC client', () => {
   });
 
   /**
-   * The ONE sanctioned direct call — 26-doc §3.
+   * The ONE sanctioned direct call
    *
    * `Ticket.messages` has no loader because there is nothing to batch INTO:
    * messages live in the same service as the ticket and are fetched by ticket
@@ -132,7 +132,7 @@ describe('§5 field resolvers never inject a gRPC client', () => {
   });
 
   it('3. **loaders come from the CONTEXT, never from injection**', () => {
-    // 25-doc §6. Injection means either a shared cache across tenants — a
+    // Injection means either a shared cache across tenants — a
     // cross-tenant leak whose cause is a performance optimisation — or
     // `Scope.REQUEST` bubbling through the module graph and dragging half the
     // gateway's providers into request scope with it.

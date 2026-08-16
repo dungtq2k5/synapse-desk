@@ -16,7 +16,7 @@ export const STORAGE_REDIS = Symbol('STORAGE_REDIS');
 export type PendingUpload = {
   objectPath: string;
   /**
-   * Where this object moves to on a successful confirm — 36-doc §1.3.2.
+   * Where this object moves to on a successful confirm
    *
    * **Decided at presign, not derived at confirm.** Both paths come out of
    * `buildObjectPath`, so the two shapes are chosen in one place; computing the

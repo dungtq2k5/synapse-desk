@@ -15,7 +15,7 @@ import { MessagesService } from '../../src/modules/messages/messages.service';
 import { StorageReferenceService } from '../../src/modules/storage-client/storage-reference.service';
 
 /**
- * Binding attachments AT CREATE — 36-doc §1.3.
+ * Binding attachments AT CREATE
  *
  * Presign and confirm both took a `messageId`, so a row could only be written
  * after its message existed, while `invokeAi` runs during the create: a
@@ -57,7 +57,7 @@ describe('§1.3 attachments bound at message create (e2e)', () => {
 
     confirmUpload = jest.spyOn(storage, 'confirmUpload').mockResolvedValue({
       // The COMMITTED path — the object left `pending/` on the way through
-      // (36-doc §1.3.2), and this is what the row must record.
+      //, and this is what the row must record.
       objectPath: 'organizations/o/tickets/t/attachments/committed.png',
       sizeBytes: 2048,
       contentType: 'image/png',
@@ -94,7 +94,7 @@ describe('§1.3 attachments bound at message create (e2e)', () => {
   });
 
   it('**the row records the CONFIRMED path, not the presigned one**', async () => {
-    // 36-doc §1.3.2. The client presigned into `pending/` and the object moved
+    // The client presigned into `pending/` and the object moved
     // out of it during confirm — so storing what the client sent would record
     // the one path a lifecycle sweep is entitled to delete, and the attachment
     // would resolve to nothing the first time somebody opened it.

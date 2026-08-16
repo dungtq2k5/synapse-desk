@@ -19,7 +19,7 @@ const cookieName = Joi.string()
 export const envValidationSchema = Joi.object({
   PORT: Joi.number().required(),
 
-  // **Which build is this?** — 23-doc §3. Baked at image build time, never read
+  // **Which build is this?** Baked at image build time, never read
   // from git at runtime: a container has no `.git`, so a runtime lookup returns
   // nothing and the natural fallback is `"unknown"` — the answer you get at
   // exactly the moment you need the real one.
@@ -28,7 +28,7 @@ export const envValidationSchema = Joi.object({
   // that cannot identify itself fails to BOOT, loudly and immediately, instead
   // of starting happily and lying to the person trying to end an outage. The
   // Dockerfile's `test -n "$GIT_SHA"` guard is the same rule one stage earlier.
-  // `/docs` and `/docs-json` — 24-doc §4. **Config, not an inline
+  // `/docs` and `/docs-json` **Config, not an inline
   // `NODE_ENV !== 'production'`**: that check is the one that gets inverted
   // during a refactor and nobody notices, because the failure direction is MORE
   // exposure and more exposure looks like everything working.
@@ -37,7 +37,7 @@ export const envValidationSchema = Joi.object({
   // closed rather than open.
   SWAGGER_ENABLED: Joi.boolean().default(false),
 
-  // `/metrics`, on its OWN listener — 23-doc §4. A distinct port is what makes
+  // `/metrics`, on its OWN listener A distinct port is what makes
   // "not reachable from the internet" structural rather than a rule Nginx has
   // to keep enforcing correctly forever.
   METRICS_PORT: Joi.number().required(),
@@ -91,7 +91,7 @@ export const envValidationSchema = Joi.object({
   // ingestion-service — Domain C's document and knowledge surface.
   INGESTION_SERVICE_URL: Joi.string().required(),
 
-  // Domain E's gRPC server, added with the feed API (18-doc §1.1). Required
+  // Domain E's gRPC server, added with the feed API. Required
   // like every other peer: a gateway that boots without it would answer 500 on
   // the notification bell rather than failing where the misconfiguration is.
   NOTIFICATION_SERVICE_URL: Joi.string().required(),
@@ -132,7 +132,7 @@ export const envValidationSchema = Joi.object({
 
   // ------------------------------------------------------- inbound email
   //
-  // 31-doc §6. The gateway is the email adapter: it verifies the Worker's
+  // The gateway is the email adapter: it verifies the Worker's
   // signature, parses the address, and runs the loop guards. All three need
   // configuration that previously lived only in notification-service.
 
@@ -143,7 +143,7 @@ export const envValidationSchema = Joi.object({
   INBOUND_EMAIL_DOMAIN: Joi.string().required(),
 
   /**
-   * **The self-loop guard's whole basis** — 31-doc §7, 32-doc §5.
+   * **The self-loop guard's whole basis**
    *
    * Our own sending address. Mail from it is ignored unconditionally, which is
    * what stops a notification bouncing off an auto-responder forever.

@@ -1,6 +1,6 @@
 """§1.2 test 2 — the enum drift guard, made mechanical.
 
-13-doc §1.1 names this as *"the one genuinely new drift risk"*: these values now
+Names this as *"the one genuinely new drift risk"*: these values now
 exist in TypeScript and in Python, and a hand-copied `GREETING_CLASSIFY` that
 becomes `GREETING_CLASSIFICATION` on one side meters into a purpose nothing
 queries. Nothing errors — rows are written, the counter increments, and every

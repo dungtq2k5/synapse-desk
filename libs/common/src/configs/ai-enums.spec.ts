@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { AiGenerationPurpose, AiGenerationStatus } from './document.config';
 
 /**
- * The TypeScript half of 13-doc §1.2 test 2. The Python half is
+ * The TypeScript half of the enum-parity check. The Python half is
  * `apps/rag-service/tests/test_enums.py`.
  *
  * The proto is read as TEXT rather than through the generated module: the
@@ -37,7 +37,7 @@ function protoEnumValues(name: string, prefix: string): string[] {
 
 describe('§1.1 The AI ledger enums (unit)', () => {
   it('1. Matches the proto value for value on PURPOSE', () => {
-    // The drift 13-doc §1.1 calls "the one genuinely new drift risk": these
+    // The one genuinely new drift risk: these
     // values exist in two languages, and a `GREETING_CLASSIFY` that becomes
     // `GREETING_CLASSIFICATION` on one side meters into a purpose nothing
     // queries. Nothing errors — rows are written, the counter increments, and

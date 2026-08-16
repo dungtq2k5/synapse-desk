@@ -193,7 +193,7 @@ class TestMetering:
     async def test_embeds_through_the_model_the_settings_layer_resolved(
         self, search, seed, tenant_a, embeddings
     ):
-        # Doc 15 §1.2, asserted rather than assumed — the whole layer is
+        # Asserted rather than assumed — the whole layer is
         # worthless if one caller bypasses it.
         from rag_service.settings import EMBEDDING_MODEL
 

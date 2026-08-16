@@ -122,7 +122,7 @@ export class OrganizationUsageResponseDto {
   readonly billingCycleStart!: Date;
 
   /**
-   * The plan, beside the meters — doc 15 §3.1.
+   * The plan, beside the meters
    *
    * This is the page a customer opens when they hit a limit, and a limit with
    * no plan next to it is a number they cannot act on: the next question is

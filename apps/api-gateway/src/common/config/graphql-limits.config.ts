@@ -1,5 +1,5 @@
 /**
- * The cost limits — 25-doc §5.
+ * The cost limits
  *
  * **REST bounds cost structurally**: one route, one handler, a known fan-out.
  * GraphQL hands the client a query language, and with cross-service field
@@ -91,7 +91,7 @@ export const FIELD_COST = {
 } as const;
 
 /**
- * The most items a LIST EDGE returns — 26-doc §3.2.
+ * The most items a LIST EDGE returns
  *
  * **A cap, not pagination, and the two are mutually exclusive.** A paginated
  * edge's DataLoader key is `(parentId, first, offset, orderBy)`, so the batch
@@ -107,7 +107,7 @@ export const FIELD_COST = {
  * practice, and the cap exists to bound the pathological case rather than to
  * page a normal one.
  *
- * **The ids are capped BEFORE the batch, never the results after** — 27-doc §1
+ * **The ids are capped BEFORE the batch, never the results after**
  * property 5. A user in 250 departments produces a 250-key batch against a
  * ~200-id RPC cap, and that cap is an ERROR rather than a truncation: an
  * uncapped parent does not return fewer departments, it fails the whole field.

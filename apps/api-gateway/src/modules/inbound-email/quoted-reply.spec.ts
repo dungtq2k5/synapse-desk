@@ -5,7 +5,7 @@ import {
 } from './quoted-reply';
 
 /**
- * 32-doc §4.4 test 10 — quoted history is stripped, the new text survives.
+ * Quoted history is stripped, the new text survives.
  *
  * **Fixtures shaped after Gmail, Outlook and Apple Mail, because they quote
  * differently** — and the asymmetry in the assertions is the point: every case

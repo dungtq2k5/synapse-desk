@@ -15,7 +15,7 @@ import { MessagesService } from '../../src/modules/messages/messages.service';
 import { RagClientService } from '../../src/modules/ai-client/rag-client.service';
 
 /**
- * A refused message never reaches a later prompt — 36-doc §7.
+ * A refused message never reaches a later prompt
  *
  * **The failure this prevents makes a refusal a delay rather than a defence.**
  * The guard refuses an injection, the row stays in the thread, and the next

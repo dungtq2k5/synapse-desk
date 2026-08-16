@@ -12,7 +12,7 @@ import { InboundSignatureGuard } from '../../common/guards/inbound-signature.gua
 /**
  * Inbound email — the gateway is the adapter, and this module is all of it.
  *
- * 31-doc §6: everything email-shaped lives here, and everything ticket- or
+ * Everything email-shaped lives here, and everything ticket- or
  * identity-shaped is an RPC to the service that owns it. ticket-service stays
  * ignorant of email.
  */
@@ -21,10 +21,10 @@ import { InboundSignatureGuard } from '../../common/guards/inbound-signature.gua
   // existing connections — email adds no new peer, only new calls.
   imports: [
     AuthModule,
-    // The `In-Reply-To` fallback's owner — 31-doc §4.
+    // The `In-Reply-To` fallback's owner
     NotificationGrpcModule,
     // **The gateway's first NATS publisher.** It has consumed events since
-    // 22-doc and never emitted one, so this is a new client rather than a
+    // And never emitted one, so this is a new client rather than a
     // channel that already existed. The transport comes from the SAME factory
     // `main.ts` uses for the consumer side — both ends must agree on the
     // serializer, and one factory is how that stays true.

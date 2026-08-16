@@ -9,8 +9,7 @@ import { CacheableInterceptor } from '../interceptors/cacheable.interceptor';
 /**
  * The shared cache.
  *
- * **In `common/cache/` rather than `common/services/`**, which is where 29-doc
- * §1 names the file — because §4.2 of the same document puts the NATS
+ * **In `common/cache/` rather than `common/services/`** — because the NATS
  * invalidation consumer in `common/cache/`, and a cache whose service and whose
  * eviction live in different folders is one where somebody adds a cached read
  * without ever seeing the eviction half.

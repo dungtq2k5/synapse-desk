@@ -1,4 +1,4 @@
-"""The four-clause retrieval boundary, rendered for both arms — 11-doc §1.4.
+"""The four-clause retrieval boundary, rendered for both arms
 
 **This is the single most important function in Domain C.** Its failure mode is
 silent cross-tenant disclosure inside an otherwise correct-looking answer:
