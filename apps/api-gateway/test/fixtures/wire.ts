@@ -15,6 +15,7 @@ import {
   UserResponse,
   UserSummary,
   UserSummaryResponse,
+  MessageAnswerStatus,
 } from '@synapsedesk/grpc-proto';
 
 /**
@@ -277,7 +278,7 @@ export function wireMessage(
     createdAt: timestamp(),
     attachments: [],
     excludedFromAiContext: false,
-    answerStatus: undefined,
+    answerStatus: MessageAnswerStatus.MESSAGE_ANSWER_STATUS_UNSPECIFIED,
     ...overrides,
   };
 }

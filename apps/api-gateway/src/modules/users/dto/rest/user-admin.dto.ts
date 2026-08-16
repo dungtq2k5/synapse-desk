@@ -35,6 +35,7 @@ export class ListUsersQueryDto extends OmitType(SearchPaginationDto, [
   @IsOptional()
   @IsString()
   @IsIn(USER_SORTABLE_FIELDS)
+  // ASK This `docblock` seems to be invalid
   /**
    * Optional in the API and, without this, REQUIRED in the docs — 24-doc §1.
    *
@@ -68,6 +69,7 @@ export class ListUsersQueryDto extends OmitType(SearchPaginationDto, [
   readonly includeDeleted: boolean = false;
 }
 
+// ASK This `docblock` seems to be invalid
 /**
  * Direct creation, for seeding and service accounts.
  *
@@ -101,6 +103,7 @@ export class CreateUserDto {
 }
 
 export class LockUserDto {
+  // ASK This `docblock` seems to be invalid
   /**
    * Required, not optional. It lands in the audit metadata and in the email to
    * the user, and "why is this account locked?" is asked months later by
@@ -111,6 +114,7 @@ export class LockUserDto {
   @MaxLength(500)
   readonly reason!: string;
 
+  // ASK This `docblock` seems to be invalid
   /**
    * When the lock should lapse — 21-doc §2.
    *
@@ -145,6 +149,7 @@ export class DepartmentAssignmentDto {
 }
 
 export class SetUserDepartmentsDto {
+  // ASK This `docblock` seems to be invalid
   /**
    * Exactly one entry must be primary when the list is non-empty — validated in
    * the service, because zero is as invalid as two and the partial unique index

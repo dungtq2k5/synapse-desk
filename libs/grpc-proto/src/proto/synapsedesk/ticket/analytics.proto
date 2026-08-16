@@ -212,9 +212,24 @@ message RunRollupResponse {
 }
 
 // The async export — 19-doc §5.
+
+enum AnalyticsExportKind {
+  ANALYTICS_EXPORT_KIND_UNSPECIFIED = 0;
+  // Daily ticket rollups: the numbers behind `overview`, `volume`, `deflection`.
+  ANALYTICS_EXPORT_KIND_TICKET_DAILY = 1;
+  ANALYTICS_EXPORT_KIND_AGENT_DAILY = 2;
+}
+
+enum AnalyticsExportStatus {
+  ANALYTICS_EXPORT_STATUS_UNSPECIFIED = 0;
+  ANALYTICS_EXPORT_STATUS_PENDING = 1;
+  ANALYTICS_EXPORT_STATUS_READY = 2;
+  // **Reported as a failure, never as an empty file.** An empty CSV reads as
+  // "no data", which is a wrong answer rather than an error.
+  ANALYTICS_EXPORT_STATUS_FAILED = 3;
+}
 message CreateExportRequest {
-  // TICKET_DAILY | AGENT_DAILY.
-  string kind = 1;
+  AnalyticsExportKind kind = 1;
   string from = 2;
   string to = 3;
   optional string department_id = 4;
@@ -222,9 +237,8 @@ message CreateExportRequest {
 
 message ExportResponse {
   string id = 1;
-  // PENDING | READY | FAILED.
-  string status = 2;
-  string kind = 3;
+  AnalyticsExportStatus status = 2;
+  AnalyticsExportKind kind = 3;
   optional int32 row_count = 4;
   // The newest rollup run behind the file — the disputed-number guard. Two
   // people exporting "last quarter" a week apart can see whether the data was

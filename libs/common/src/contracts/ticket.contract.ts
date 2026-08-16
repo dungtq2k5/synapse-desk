@@ -1,9 +1,3 @@
-import {
-  ReassignmentReason,
-  TicketSource,
-  TicketStatus,
-} from '../configs/ticket.config';
-
 /**
  * Domain B's NATS contract — the events `ticket-service` publishes and every
  * consumer reads.
@@ -22,6 +16,13 @@ import {
  * out what happened turns one event into an event plus an RPC, and Domain E in
  * particular cannot do that cheaply for every notification it fans out.
  */
+
+import {
+  ReassignmentReason,
+  TicketSource,
+  TicketStatus,
+} from '../configs/ticket.config';
+
 export const TICKET_PATTERNS = {
   created: 'ticket.created',
   escalated: 'ticket.escalated',

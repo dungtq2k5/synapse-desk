@@ -20,7 +20,7 @@ import type { Request } from 'express';
  * `LoggingInterceptor`, `TransformInterceptor`, `Jwt2faGuard`,
  * `AllHttpExceptionFilter` and, as of this document, `@CurrentUser`. The one
  * that was missing it returned `null` in every resolver and surfaced as a
- * misleading 500 about a missing guard (conventions §15 gap 6), which is exactly
+ * misleading 500 about a missing guard (docs/reference/known-gaps.md #6), which is exactly
  * the shape of bug a fifth hand-written copy produces.
  */
 export function requestOf(context: ExecutionContext): Request | undefined {

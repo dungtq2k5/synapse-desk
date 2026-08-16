@@ -92,7 +92,7 @@ export class WsThrottlerService {
   }
 
   /**
-   * Flood control for an authenticated C→S **event** — 22-doc §6.3.
+   * Flood control for an authenticated C→S **event**.
    *
    * `allowHandshake` above guards only the connection. Every client-to-server
    * handler needs this too, and `message:send` needs it most: it reaches the

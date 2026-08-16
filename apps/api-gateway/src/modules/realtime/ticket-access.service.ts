@@ -80,7 +80,7 @@ export class TicketAccessService implements OnModuleInit {
   }
 
   /**
-   * "May this person POST into this ticket?" — 22-doc §2.2.
+   * "May this person POST into this ticket?"
    *
    * **A distinct method, not a flag on `canRead`.** Until `message:send` existed
    * nothing a socket could *do* depended on access: join authorization gated

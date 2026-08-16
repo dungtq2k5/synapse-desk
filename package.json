@@ -14,6 +14,7 @@
   "scripts": {
     "test": "jest --projects apps/*/jest.config.ts libs/*/jest.config.ts --passWithNoTests",
     "test:all": "jest --projects apps/*/jest.config.ts libs/*/jest.config.ts --passWithNoTests",
+    "setup:py": "cd apps/rag-service && python3 -m venv .venv && .venv/bin/pip install -q -r requirements.txt -r requirements-dev.txt",
     "test:py": "cd apps/rag-service && .venv/bin/pytest -q",
     "test:py:watch": "cd apps/rag-service && .venv/bin/pytest -q -x --ff",
     "eval:rag": "cd apps/rag-service && .venv/bin/python eval/run.py",
@@ -59,6 +60,7 @@
     "clean:all": "turbo run clean && rimraf node_modules \"apps/*/node_modules\" \"libs/*/node_modules\" \".turbo\" \"apps/*/.turbo\" \"libs/*/.turbo\"",
     "keys:generate": "node scripts/generate-jwt-keys.mjs",
     "proto:generate": "npm run proto:generate -w @synapsedesk/grpc-proto",
+    "proto:check": "npm run proto:check -w @synapsedesk/grpc-proto",
     "proto:lint": "npm run proto:lint -w @synapsedesk/grpc-proto",
     "proto:breaking": "npm run proto:breaking -w @synapsedesk/grpc-proto"
   },

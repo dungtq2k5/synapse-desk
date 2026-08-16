@@ -17,7 +17,11 @@ import {
   emptyPage,
   GetDocumentChunkRequest,
   ListDocumentChunksRequest,
+  DocumentChunkResponse,
   ListDocumentChunksResponse,
+  fromProtoDocumentFileType,
+  fromProtoDocumentFlagType,
+  fromProtoDocumentStatus,
   ListDocumentFlagsRequest,
   ListDocumentFlagsResponse,
   ListDocumentDepartmentsResponse,
@@ -38,14 +42,14 @@ import {
   BATCH_ID_LIMIT,
   normalizeBatchIds,
   ALLOWED_DOCUMENT_MIME_TYPES,
+  type AllowedDocumentMimeType,
   DOCUMENT_CHUNK_SORTABLE_FIELDS,
   DOCUMENT_FLAG_SORTABLE_FIELDS,
-  DOCUMENT_FLAG_TYPES,
   DocumentFlagType,
   DOCUMENT_PATTERNS,
   DOCUMENT_SORTABLE_FIELDS,
   DocumentStatus,
-  FILE_TYPE_BY_MIME,
+  extensionFor,
   IngestionJobStatus,
   isUniqueConstraintViolation,
   MAX_DOCUMENT_BYTES,
@@ -152,7 +156,7 @@ export class DocumentsService {
 
     // The id the ROW will have. There is no row yet — it is created at confirm
     // — so the path carries the future id, which is what lets confirm tie the
-    // object back to the request that authorised it.
+    // object back to the request that authorized it.
     const documentId = randomUUID();
 
     const presigned = await this.storage.presignDocument(
@@ -233,7 +237,7 @@ export class DocumentsService {
             createdById: actorId,
             title,
             fileUrl: request.objectPath,
-            fileType: FILE_TYPE_BY_MIME[confirmed.contentType] ?? 'bin',
+            fileType: extensionFor(confirmed.contentType),
             fileSizeBytes: BigInt(confirmed.sizeBytes),
             fileHash,
             isOrganizationWide: request.isOrganizationWide,
@@ -315,8 +319,14 @@ export class DocumentsService {
       organizationId: requireTenant(context),
       ...(request.includeDeleted ? {} : { deletedAt: null }),
       ...this.visibilityScope(context),
-      ...(request.status ? { status: request.status } : {}),
-      ...(request.fileType ? { fileType: request.fileType } : {}),
+      // UNSPECIFIED (0) is falsy and means "no filter", so `fromProto*`
+      // returning null and the field being absent are the same thing here.
+      ...(fromProtoDocumentStatus(request.status)
+        ? { status: fromProtoDocumentStatus(request.status)! }
+        : {}),
+      ...(fromProtoDocumentFileType(request.fileType)
+        ? { fileType: fromProtoDocumentFileType(request.fileType)! }
+        : {}),
       ...(request.departmentId
         ? { departmentLinks: { some: { departmentId: request.departmentId } } }
         : {}),
@@ -456,14 +466,24 @@ export class DocumentsService {
       DOCUMENT_FLAG_SORTABLE_FIELDS,
     );
 
-    const requested = request.flagTypes ?? [];
-    const unknown = requested.filter(
-      (type) => !DOCUMENT_FLAG_TYPES.includes(type as DocumentFlagType),
-    );
+    // **The membership check stays, and the enum did not make it redundant.**
+    // protoc refuses an unknown value from a peer that shares this contract, but
+    // ts-proto maps anything it cannot name to `UNRECOGNIZED` (-1) rather than
+    // failing — so a newer build's flag type arrives here as a legal value of
+    // the enum type that this build cannot act on. `fromProto*` answers null for
+    // exactly that case, and null is what this rejects.
+    //
+    // Refused rather than ignored. Silently dropping an unknown filter answers a
+    // DIFFERENT question than the one asked — and a caller reading "no OUTDATED
+    // flags" as "nothing is outdated" is the whole failure.
+    const requested: DocumentFlagType[] = [];
+    const unknown: number[] = [];
+    for (const flagType of request.flagTypes ?? []) {
+      const domain = fromProtoDocumentFlagType(flagType);
+      if (domain) requested.push(domain);
+      else unknown.push(flagType);
+    }
     if (unknown.length > 0) {
-      // Refused rather than ignored. Silently dropping an unknown filter
-      // answers a DIFFERENT question than the one asked — and a caller reading
-      // "no OUTDTAED flags" as "nothing is outdated" is the whole failure.
       throw new RpcException({
         code: status.INVALID_ARGUMENT,
         message: `Unknown flag type(s): ${unknown.join(', ')}`,
@@ -499,7 +519,12 @@ export class DocumentsService {
   async getDocumentChunk(
     request: GetDocumentChunkRequest,
     context: CallerContext,
-  ): Promise<ReturnType<typeof toDocumentChunkResponse>> {
+    // `DocumentChunkResponse`, not `ReturnType<typeof toDocumentChunkResponse>`.
+    // The inferred form named the mapper instead of the contract, so the RPC's
+    // return type was whatever the mapper happened to return — a mapper that
+    // dropped a field would have changed this signature silently rather than
+    // failing to compile against the proto.
+  ): Promise<DocumentChunkResponse> {
     const document = await this.load(request.documentId, context);
 
     const chunk = await this.prisma.documentChunk.findFirst({
@@ -994,8 +1019,11 @@ export class DocumentsService {
 
   private assertUploadable(contentType: string, sizeBytes: number): void {
     if (
+      // `AllowedDocumentMimeType` is the exported name for exactly this
+      // indexed access — spelling it out inline meant the cast did not move
+      // when the list did.
       !ALLOWED_DOCUMENT_MIME_TYPES.includes(
-        contentType as (typeof ALLOWED_DOCUMENT_MIME_TYPES)[number],
+        contentType as AllowedDocumentMimeType,
       )
     ) {
       throw new RpcException({

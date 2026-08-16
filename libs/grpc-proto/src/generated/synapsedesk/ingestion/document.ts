@@ -11,6 +11,77 @@ import { Observable } from "rxjs";
 import { Timestamp } from "../../google/protobuf/timestamp";
 import { PageMeta, PageRequest } from "../auth/common";
 
+/**
+ * Enumerated document columns.
+ *
+ * **These were `string` with the members listed in a comment**, which is the
+ * arrangement that let `documents.file_type` — a `VarChar(20)` — travel onto the
+ * wire unchecked from the Prisma row all the way to the gateway's mapper. The
+ * generated enum makes that hop a compile error on the WRITE side, which is the
+ * side that had no guard at all.
+ *
+ * Values carry the enum-name prefix because protobuf enum values use C++
+ * scoping — they are SIBLINGS of their type, not children — so a bare
+ * `UNSPECIFIED` in two enums of one package is a compile error, not a style
+ * complaint. Same rule `ticket/common.proto` states.
+ */
+export enum DocumentStatus {
+  DOCUMENT_STATUS_UNSPECIFIED = 0,
+  DOCUMENT_STATUS_PENDING = 1,
+  DOCUMENT_STATUS_PROCESSING = 2,
+  DOCUMENT_STATUS_INDEXED = 3,
+  DOCUMENT_STATUS_FAILED = 4,
+  UNRECOGNIZED = -1,
+}
+
+/**
+ * The EXTENSION a document is filed under, not its MIME type — the distinction
+ * the `DocumentFileType` doc comment exists to make. The column holds `pdf`; a
+ * filter naming `application/pdf` matches no row and reports no error.
+ *
+ * `BIN` is a real stored value, not a sentinel: confirm writes it for any
+ * accepted type with no extension mapping. It is distinct from UNSPECIFIED,
+ * which means the field was not set.
+ */
+export enum DocumentFileType {
+  DOCUMENT_FILE_TYPE_UNSPECIFIED = 0,
+  DOCUMENT_FILE_TYPE_PDF = 1,
+  DOCUMENT_FILE_TYPE_TXT = 2,
+  DOCUMENT_FILE_TYPE_MD = 3,
+  DOCUMENT_FILE_TYPE_BIN = 4,
+  UNRECOGNIZED = -1,
+}
+
+export enum DocumentFlagType {
+  DOCUMENT_FLAG_TYPE_UNSPECIFIED = 0,
+  DOCUMENT_FLAG_TYPE_OUTDATED = 1,
+  DOCUMENT_FLAG_TYPE_UNRETRIEVED = 2,
+  /**
+   * DOCUMENT_FLAG_TYPE_UNCITED - A genuinely different finding from UNRETRIEVED — it keeps winning a context
+   * slot without earning one, displacing the sources that would have answered.
+   * 16-doc §5: the two were once one flag, and the filter must keep them apart.
+   */
+  DOCUMENT_FLAG_TYPE_UNCITED = 3,
+  DOCUMENT_FLAG_TYPE_LOW_CONFIDENCE = 4,
+  DOCUMENT_FLAG_TYPE_NEGATIVE_FEEDBACK = 5,
+  DOCUMENT_FLAG_TYPE_CONFLICTING = 6,
+  /**
+   * DOCUMENT_FLAG_TYPE_PAGES_NOT_INDEXED - Raised by ingestion itself at index time — 34-doc §6. Its provenance
+   * differs from every value above: those are observations about how a document
+   * has been USED, this is a fact about the document.
+   */
+  DOCUMENT_FLAG_TYPE_PAGES_NOT_INDEXED = 7,
+  UNRECOGNIZED = -1,
+}
+
+export enum DocumentFlagSeverity {
+  DOCUMENT_FLAG_SEVERITY_UNSPECIFIED = 0,
+  DOCUMENT_FLAG_SEVERITY_INFO = 1,
+  DOCUMENT_FLAG_SEVERITY_WARNING = 2,
+  DOCUMENT_FLAG_SEVERITY_CRITICAL = 3,
+  UNRECOGNIZED = -1,
+}
+
 export interface DocumentResponse {
   id: string;
   organizationId: string;
@@ -18,10 +89,10 @@ export interface DocumentResponse {
   title: string;
   /** An object PATH, not a URL. Reads resolve it per request. */
   fileUrl: string;
-  fileType: string;
+  fileType: DocumentFileType;
   fileSizeBytes: number;
   isOrganizationWide: boolean;
-  status: string;
+  status: DocumentStatus;
   departmentIds: string[];
   chunkCount: number;
   createdAt: Timestamp | undefined;
@@ -68,10 +139,16 @@ export interface ConfirmDocumentRequest {
 }
 
 export interface ListDocumentsRequest {
-  page: PageRequest | undefined;
-  status: string;
+  page:
+    | PageRequest
+    | undefined;
+  /**
+   * UNSPECIFIED means "no filter", which is what proto3's zero value is for —
+   * and why neither of these is `optional`.
+   */
+  status: DocumentStatus;
   departmentId: string;
-  fileType: string;
+  fileType: DocumentFileType;
   includeDeleted: boolean;
 }
 
@@ -137,10 +214,8 @@ export interface DocumentFlagResponse {
   id: string;
   documentId: string;
   documentTitle: string;
-  /** DocumentFlagType — OUTDATED, UNRETRIEVED, UNCITED, DUPLICATE. */
-  flagType: string;
-  /** DocumentFlagSeverity. */
-  severity: string;
+  flagType: DocumentFlagType;
+  severity: DocumentFlagSeverity;
   detail: string;
   confidenceScore?: number | undefined;
   detectedAt: Timestamp | undefined;
@@ -155,7 +230,7 @@ export interface ListDocumentFlagsRequest {
    * quietly re-merge them in the UI, because the type nobody can select is the
    * type nobody sees.
    */
-  flagTypes: string[];
+  flagTypes: DocumentFlagType[];
   /** Unresolved only, by default — a resolved flag is history, not a task. */
   includeResolved: boolean;
   page: PageRequest | undefined;

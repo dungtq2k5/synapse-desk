@@ -11,6 +11,74 @@ import { Observable } from "rxjs";
 import { Timestamp } from "../../google/protobuf/timestamp";
 import { PageMeta, PageRequest } from "../auth/common";
 
+/**
+ * The trail's enumerated columns — mirrors `AuditAction` and
+ * `AuditResourceType` in `libs/common/src/contracts/audit.contract.ts`.
+ *
+ * `resource_type` is the one that earns this most. Its doc comment records that
+ * three services each declared their OWN local `RESOURCE_TYPE` constant and a
+ * fourth wrote the literal `'user'` twice, none of which could disagree at
+ * compile time. The TS enum closed that inside one process; this closes it
+ * across the wire, where the audit CONSUMER previously took whatever string
+ * arrived.
+ */
+export enum AuditAction {
+  AUDIT_ACTION_UNSPECIFIED = 0,
+  /** AUDIT_ACTION_USER_LOGOUT_ALL - Sessions and credentials */
+  AUDIT_ACTION_USER_LOGOUT_ALL = 1,
+  AUDIT_ACTION_PASSWORD_CHANGED = 2,
+  AUDIT_ACTION_USER_SESSIONS_REVOKED = 3,
+  /** AUDIT_ACTION_DEPARTMENT_CREATED - Departments */
+  AUDIT_ACTION_DEPARTMENT_CREATED = 4,
+  AUDIT_ACTION_DEPARTMENT_UPDATED = 5,
+  AUDIT_ACTION_DEPARTMENT_DELETED = 6,
+  AUDIT_ACTION_DEPARTMENT_RESTORED = 7,
+  AUDIT_ACTION_DEPARTMENT_MEMBERS_ADDED = 8,
+  AUDIT_ACTION_DEPARTMENT_MEMBER_REMOVED = 9,
+  /** AUDIT_ACTION_ROLE_CREATED - Roles */
+  AUDIT_ACTION_ROLE_CREATED = 10,
+  AUDIT_ACTION_ROLE_UPDATED = 11,
+  AUDIT_ACTION_ROLE_DELETED = 12,
+  AUDIT_ACTION_ROLE_PERMISSIONS_UPDATED = 13,
+  /** AUDIT_ACTION_USER_CREATED - Users */
+  AUDIT_ACTION_USER_CREATED = 14,
+  AUDIT_ACTION_USER_UPDATED = 15,
+  AUDIT_ACTION_USER_DELETED = 16,
+  AUDIT_ACTION_USER_RESTORED = 17,
+  AUDIT_ACTION_USER_LOCKED = 18,
+  AUDIT_ACTION_USER_UNLOCKED = 19,
+  AUDIT_ACTION_USER_TWO_FACTOR_RESET = 20,
+  AUDIT_ACTION_USER_ROLES_UPDATED = 21,
+  AUDIT_ACTION_USER_DEPARTMENTS_UPDATED = 22,
+  AUDIT_ACTION_USER_AVATAR_UPDATED = 23,
+  /** AUDIT_ACTION_ORGANIZATION_UPDATED - Organization */
+  AUDIT_ACTION_ORGANIZATION_UPDATED = 24,
+  AUDIT_ACTION_ORGANIZATION_SETTINGS_UPDATED = 25,
+  AUDIT_ACTION_ORGANIZATION_ONBOARDING_COMPLETED = 26,
+  AUDIT_ACTION_ORGANIZATION_OFFBOARD_REQUESTED = 27,
+  /**
+   * AUDIT_ACTION_PLATFORM_ORGANIZATION_CREATED - Platform — recorded with organization_id unset, because the event belongs
+   * to the platform rather than to the customer it touched (RDM §1.7).
+   */
+  AUDIT_ACTION_PLATFORM_ORGANIZATION_CREATED = 28,
+  AUDIT_ACTION_PLATFORM_ORGANIZATION_UPDATED = 29,
+  AUDIT_ACTION_PLATFORM_ORGANIZATION_STATUS_CHANGED = 30,
+  AUDIT_ACTION_PLATFORM_BILLING_CYCLE_RESET = 31,
+  AUDIT_ACTION_PLATFORM_ORGANIZATION_OFFBOARDED = 32,
+  AUDIT_ACTION_PLATFORM_ORGANIZATION_RESTORED = 33,
+  AUDIT_ACTION_PLATFORM_GLOBAL_ROLE_CREATED = 34,
+  UNRECOGNIZED = -1,
+}
+
+export enum AuditResourceType {
+  AUDIT_RESOURCE_TYPE_UNSPECIFIED = 0,
+  AUDIT_RESOURCE_TYPE_USER = 1,
+  AUDIT_RESOURCE_TYPE_DEPARTMENT = 2,
+  AUDIT_RESOURCE_TYPE_ROLE = 3,
+  AUDIT_RESOURCE_TYPE_ORGANIZATION = 4,
+  UNRECOGNIZED = -1,
+}
+
 export interface AuditLogResponse {
   id: string;
   /**
@@ -19,8 +87,12 @@ export interface AuditLogResponse {
    */
   organizationId?: string | undefined;
   userId?: string | undefined;
-  action: string;
-  resourceType?: string | undefined;
+  action: AuditAction;
+  /**
+   * No `optional`: UNSPECIFIED already means "not set", and a second way to
+   * say the same thing is a second case every reader has to handle.
+   */
+  resourceType: AuditResourceType;
   resourceId?: string | undefined;
   ipAddress?: string | undefined;
   userAgent?:
@@ -35,10 +107,13 @@ export interface AuditLogResponse {
 }
 
 export interface ListAuditLogsRequest {
-  page: PageRequest | undefined;
-  action: string;
+  page:
+    | PageRequest
+    | undefined;
+  /** UNSPECIFIED means "no filter" on both of these. */
+  action: AuditAction;
   userId: string;
-  resourceType: string;
+  resourceType: AuditResourceType;
   resourceId: string;
   from?: Timestamp | undefined;
   to?:
@@ -67,7 +142,7 @@ export interface ListAuditActionsRequest {
  * can never trigger it is a worse experience than a shorter list.
  */
 export interface ListAuditActionsResponse {
-  actions: string[];
+  actions: AuditAction[];
 }
 
 export interface AuditServiceClient {

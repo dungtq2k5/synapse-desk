@@ -29,6 +29,7 @@ import {
   toProtoTimestamp,
   UpdateMessageRequest,
   UploadAttachmentRequest,
+  fromProtoMessageAnswerStatus,
 } from '@synapsedesk/grpc-proto';
 import {
   formatErrorMsg,
@@ -79,6 +80,24 @@ const READ_URL_GRACE_MS = 14 * 60 * 1000;
  * actually answering.
  */
 const AI_REPLY_TRANSCRIPT_TURNS = 40;
+
+/** A message plus the tenant of the ticket it hangs off. */
+type LoadedMessage = TicketMessage & { organizationId: string };
+
+/**
+ * The ticket fields a `message_created` event needs.
+ *
+ * A structural type rather than the Prisma model, so the AI-reply path can pass
+ * the same object it already loaded without a second read — and so adding a
+ * column to `tickets` does not silently widen what this depends on.
+ */
+type NotifiableTicket = {
+  id: string;
+  organizationId: string;
+  ticketNumber: bigint | number;
+  authorId: string;
+  currentAssigneeId: string | null;
+};
 
 /**
  * The ticket thread.
@@ -429,7 +448,7 @@ export class MessagesService {
         // **Persisted, where it used to be dropped** — 36-doc §7. The gateway
         // held this in the completion frame and threw it away on write, so once
         // the socket closed a thread could not tell a refusal from an answer.
-        answerStatus: request.answerStatus ?? null,
+        answerStatus: fromProtoMessageAnswerStatus(request.answerStatus),
       },
       include: { attachments: true },
     });
@@ -1157,21 +1176,3 @@ export class MessagesService {
     return { ...message, organizationId: ticket.organizationId };
   }
 }
-
-/** A message plus the tenant of the ticket it hangs off. */
-type LoadedMessage = TicketMessage & { organizationId: string };
-
-/**
- * The ticket fields a `message_created` event needs.
- *
- * A structural type rather than the Prisma model, so the AI-reply path can pass
- * the same object it already loaded without a second read — and so adding a
- * column to `tickets` does not silently widen what this depends on.
- */
-type NotifiableTicket = {
-  id: string;
-  organizationId: string;
-  ticketNumber: bigint | number;
-  authorId: string;
-  currentAssigneeId: string | null;
-};

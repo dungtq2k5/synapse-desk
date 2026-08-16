@@ -1,3 +1,4 @@
+import { MessageAnswerStatus } from '@synapsedesk/grpc-proto';
 import { faker } from '@faker-js/faker';
 import { status } from '@grpc/grpc-js';
 import { RpcException } from '@nestjs/microservices';
@@ -244,12 +245,14 @@ describe('§7 refused messages are excluded from AI context (e2e)', () => {
         ticketId: ticket.id,
         content: 'I cannot help with that.',
         generationId: undefined,
-        answerStatus: 'REFUSED',
+        answerStatus: MessageAnswerStatus.MESSAGE_ANSWER_STATUS_REFUSED,
       },
       author(),
     );
 
-    expect(message.answerStatus).toBe('REFUSED');
+    expect(message.answerStatus).toBe(
+      MessageAnswerStatus.MESSAGE_ANSWER_STATUS_REFUSED,
+    );
   });
 
   it('`excludeFromAiContext` is idempotent', async () => {

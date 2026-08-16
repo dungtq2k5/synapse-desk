@@ -1,5 +1,5 @@
 import { Field, ID, Int, ObjectType } from '@nestjs/graphql';
-import { DocumentStatus } from '@synapsedesk/common';
+import { DocumentStatus, type DocumentFileType } from '@synapsedesk/common';
 import '../../../../common/graphql/enums';
 
 /**
@@ -32,8 +32,17 @@ export class DocumentResponseGqlDto {
   @Field(() => String)
   title!: string;
 
+  // ASK this `docblock` seem to be invalid
+  /**
+   * **`@Field(() => String)` with a narrowed TS type, deliberately.**
+   * The decorator decides the SCHEMA and the type decides what the mapper may
+   * assign, so this stays `String` in `schema.gql` while the resolver still
+   * cannot hand it an arbitrary value. Promoting it to a GraphQL enum is a
+   * breaking schema change for clients and belongs with a versioning decision,
+   * not with a typing cleanup.
+   */
   @Field(() => String)
-  fileType!: string;
+  fileType!: DocumentFileType;
 
   @Field(() => Int)
   fileSizeBytes!: number;
@@ -48,6 +57,7 @@ export class DocumentResponseGqlDto {
   @Field(() => [ID])
   departmentIds!: string[];
 
+  // ASK this `docblock` seem to be invalid
   /**
    * **A field, not a connection** — 26-doc §3. The service already has this
    * number; `chunks { totalCount }` would fetch chunks in order to count them.

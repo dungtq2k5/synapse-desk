@@ -6,7 +6,6 @@ import {
   UserServiceClient,
   requireProtoTimestamp,
   toPageRequest,
-  toProtoGender,
   toProtoTimestamp,
 } from '@synapsedesk/grpc-proto';
 import {
@@ -22,7 +21,11 @@ import {
 import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
 import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
 import { toPaginationMetaDataResponseDto } from '../../common/mappers/pagination.mapper';
-import { toUserResponseDto, toUserSummaryResponseDto } from './user.mapper';
+import {
+  toProfileFields,
+  toUserResponseDto,
+  toUserSummaryResponseDto,
+} from './user.mapper';
 import {
   CurrentUserResponseDto,
   UserResponseDto,
@@ -35,6 +38,8 @@ import {
   SetUserDepartmentsDto,
   SetUserRolesDto,
   UserSummaryResponseDto,
+  RevokedSessionCountDto,
+  UntrustedDeviceCountDto,
 } from './dto/rest/user-admin.dto';
 
 @Injectable()
@@ -218,7 +223,7 @@ export class UserServiceGrpcClient
   async remove(
     id: string,
     context: RequestContext,
-  ): Promise<{ revokedSessionCount: number }> {
+  ): Promise<RevokedSessionCountDto> {
     return this.call(
       (metadata) => this.userGrpcService.deleteUser({ id }, metadata),
       context,
@@ -239,7 +244,7 @@ export class UserServiceGrpcClient
     id: string,
     dto: LockUserDto,
     context: RequestContext,
-  ): Promise<{ revokedSessionCount: number }> {
+  ): Promise<RevokedSessionCountDto> {
     return this.call(
       (metadata) =>
         this.userGrpcService.lockUser(
@@ -268,7 +273,7 @@ export class UserServiceGrpcClient
   resetTwoFactor(
     id: string,
     context: RequestContext,
-  ): Promise<{ untrustedDeviceCount: number }> {
+  ): Promise<UntrustedDeviceCountDto> {
     return this.call(
       (metadata) => this.userGrpcService.resetUserTwoFactor({ id }, metadata),
       context,
@@ -304,24 +309,4 @@ export class UserServiceGrpcClient
       context,
     ).then(toUserSummaryResponseDto);
   }
-}
-
-/**
- * The profile fields shared by own-profile and admin updates.
- *
- * `null` from the REST DTO becomes an EMPTY STRING on the wire, not
- * `undefined`: proto3 has no null, so the service distinguishes "leave
- * unchanged" (absent) from "clear it" (empty) — and mapping null to undefined
- * would silently turn every clear into a no-op.
- */
-function toProfileFields(dto: {
-  fullName?: string;
-  gender?: string;
-  dob?: string | null;
-}) {
-  return {
-    fullName: dto.fullName,
-    gender: dto.gender === undefined ? undefined : toProtoGender(dto.gender),
-    dob: dto.dob === null ? '' : dto.dob,
-  };
 }

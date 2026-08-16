@@ -5,17 +5,15 @@ import {
   TICKET_SERVICE_NAME,
   TicketServiceClient,
   toPageRequest,
+  toProtoTicketPriority,
+  toProtoTicketSource,
+  toProtoTicketStatus,
 } from '@synapsedesk/grpc-proto';
 import { RequestContext } from '@synapsedesk/common';
 import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
 import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
 import { toPaginationMetaDataResponseDto } from '../../common/mappers/pagination.mapper';
-import {
-  toProtoTicketPriority,
-  toProtoTicketSource,
-  toProtoTicketStatus,
-  toTicketResponseDto,
-} from './ticket.mapper';
+import { toTicketResponseDto } from './ticket.mapper';
 import {
   BulkTicketStatusDto,
   ChangeTicketStatusDto,

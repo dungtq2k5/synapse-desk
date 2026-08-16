@@ -24,14 +24,23 @@ import {
   MAX_OCR_LANGUAGES,
   normalizeStringArray,
   MAX_DOCUMENT_TITLE_LENGTH,
+  MAX_OBJECT_PATH_LENGTH,
   trimIfString,
+  type AllowedDocumentMimeType,
+  type OcrLanguage,
+  DOCUMENT_FILE_TYPES,
+  type DocumentFileType,
 } from '@synapsedesk/common';
 import { AtMostOneNonLatinScript } from '../../../../common/decorators/at-most-one-non-latin-script.decorator';
 import { SearchPaginationDto } from '../../../../common/dto/rest/search-pagination.dto';
 import { ToBoolean } from '../../../../common/decorators/to-boolean.decorator';
-import { MAX_DOCUMENT_DEPARTMENTS } from '../../../../common/config/dto.config';
+import {
+  MAX_DOCUMENT_DEPARTMENTS,
+  MAX_UPLOAD_FILE_NAME_LENGTH,
+} from '../../../../common/config/dto.config';
 
 export class PresignDocumentDto {
+  // ASK this `docblock` seem to be invalid
   /**
    * The allowlist, mirrored from storage-service's `PURPOSE_POLICY[DOCUMENT]`.
    *
@@ -40,7 +49,7 @@ export class PresignDocumentDto {
    * matter which service is asking. Widen BOTH when the parser handles more.
    */
   @IsIn(ALLOWED_DOCUMENT_MIME_TYPES)
-  readonly contentType!: string;
+  readonly contentType!: AllowedDocumentMimeType;
 
   @Type(() => Number)
   @IsInt()
@@ -50,7 +59,7 @@ export class PresignDocumentDto {
 
   @IsString()
   @MinLength(1)
-  @MaxLength(255)
+  @MaxLength(MAX_UPLOAD_FILE_NAME_LENGTH)
   @Transform(trimIfString)
   readonly fileName!: string;
 }
@@ -67,7 +76,7 @@ export class ConfirmDocumentDto {
    */
   @IsString()
   @MinLength(1)
-  @MaxLength(1024)
+  @MaxLength(MAX_OBJECT_PATH_LENGTH)
   readonly objectPath!: string;
 
   @IsString()
@@ -76,6 +85,7 @@ export class ConfirmDocumentDto {
   @Transform(trimIfString)
   readonly title!: string;
 
+  // ASK this `docblock` seem to be invalid
   /**
    * Defaults TRUE, matching RDM Table 17.
    *
@@ -87,6 +97,9 @@ export class ConfirmDocumentDto {
    */
   @IsOptional()
   @IsBoolean()
+  // `1`/`0` and mixed case are accepted; anything else is a 400 rather than a
+  // silent `false`. The default below is NOT dead — an absent key never reaches
+  // the transform, which `to-boolean.decorator.spec.ts` pins.
   @ToBoolean()
   readonly isOrganizationWide?: boolean = true;
 
@@ -98,10 +111,11 @@ export class ConfirmDocumentDto {
 
   @IsOptional()
   @IsString()
-  @MaxLength(255)
+  @MaxLength(MAX_UPLOAD_FILE_NAME_LENGTH)
   @Transform(trimIfString)
   readonly fileName?: string;
 
+  // ASK this `docblock` seem to be invalid
   /**
    * ISO 639-1 codes for OCR, if the uploader knows — 34-doc §4.
    *
@@ -138,7 +152,10 @@ export class ConfirmDocumentDto {
   @ArrayMaxSize(MAX_OCR_LANGUAGES)
   @IsIn(OCR_LANGUAGES, { each: true })
   @AtMostOneNonLatinScript()
-  readonly ocrLanguages?: string[] = [];
+  // `?` is required even with a default: the Swagger plugin derives `required`
+  // from TypeScript optionality rather than from `@IsOptional()`, so dropping it
+  // would document this as mandatory. See `openapi.e2e-spec.ts` §1 test 3.
+  readonly ocrLanguages?: OcrLanguage[] = [];
 }
 
 export class UpdateDocumentDto {
@@ -179,9 +196,9 @@ export class ListDocumentsQueryDto extends SearchPaginationDto {
   readonly departmentId?: string;
 
   @IsOptional()
-  @IsString()
-  @MaxLength(50)
-  readonly fileType?: string;
+  @IsIn(DOCUMENT_FILE_TYPES)
+  // ASK Why not transform to lowercase?
+  readonly fileType?: DocumentFileType;
 
   @IsOptional()
   @IsBoolean()

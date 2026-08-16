@@ -2,14 +2,16 @@ import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ClientGrpc } from '@nestjs/microservices';
 import {
   AUDIT_SERVICE_NAME,
-  AuditLogResponse,
   AuditServiceClient,
-  requireProtoTimestamp,
   TICKET_GRPC_CLIENT,
   toPageRequest,
   toProtoTimestamp,
+  fromProtoAuditAction,
+  toProtoAuditAction,
+  toProtoAuditResourceType,
 } from '@synapsedesk/grpc-proto';
-import { RequestContext } from '@synapsedesk/common';
+import { AuditAction, RequestContext } from '@synapsedesk/common';
+import { toAuditLogResponseDto } from './audit-log.mapper';
 import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
 import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
 import { toPaginationMetaDataResponseDto } from '../../common/mappers/pagination.mapper';
@@ -46,11 +48,14 @@ export class AuditLogsGrpcClient
         this.auditGrpcService.listAuditLogs(
           {
             page: toPageRequest(query),
-            // '' rather than undefined: proto3 scalars have no null, and the
-            // service reads the empty string as "no filter".
-            action: query.action ?? '',
+            // UNSPECIFIED rather than '' for the two enumerated filters —
+            // proto3's zero value already carries "no filter", so the empty
+            // string that used to stand in for it is gone. The `@IsIn` on the
+            // query DTO means an unknown value never reaches here as a 200.
+            action: toProtoAuditAction(query.action),
             userId: query.userId ?? '',
-            resourceType: query.resourceType ?? '',
+            resourceType: toProtoAuditResourceType(query.resourceType),
+            // Still a plain string: a resource ID is a uuid, not a vocabulary.
             resourceId: query.resourceId ?? '',
             from: toProtoTimestamp(query.from ?? null),
             to: toProtoTimestamp(query.to ?? null),
@@ -62,7 +67,7 @@ export class AuditLogsGrpcClient
     );
 
     return {
-      items: response.items.map((item) => this.toDto(item)),
+      items: response.items.map((item) => toAuditLogResponseDto(item)),
       meta: toPaginationMetaDataResponseDto(response.meta),
     };
   }
@@ -77,44 +82,11 @@ export class AuditLogsGrpcClient
       context,
     );
 
-    return response.actions;
-  }
-
-  /**
-   * Parses `metadata` back into an object.
-   *
-   * A malformed value yields `{}` and a log line rather than a 500. The trail
-   * is what somebody reaches for when something has already gone wrong, and
-   * failing the whole page because one row's diff cannot be parsed would take
-   * the tool away exactly when it is needed. The rest of that row is still
-   * perfectly readable.
-   */
-  private toDto(log: AuditLogResponse): AuditLogResponseDto {
-    return {
-      id: log.id,
-      organizationId: log.organizationId ?? null,
-      userId: log.userId ?? null,
-      action: log.action,
-      resourceType: log.resourceType ?? null,
-      resourceId: log.resourceId ?? null,
-      ipAddress: log.ipAddress ?? null,
-      userAgent: log.userAgent ?? null,
-      metadata: this.parseMetadata(log.metadata, log.id),
-      createdAt: requireProtoTimestamp(log.createdAt, 'createdAt'),
-    };
-  }
-
-  private parseMetadata(raw: string, logId: string): Record<string, unknown> {
-    if (!raw) return {};
-
-    try {
-      const parsed: unknown = JSON.parse(raw);
-      return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-        ? (parsed as Record<string, unknown>)
-        : {};
-    } catch {
-      this.logger.warn(`Audit log ${logId} has unparseable metadata`);
-      return {};
-    }
+    // Filtered rather than defaulted: a value this build cannot name would
+    // otherwise become the literal 'UNSPECIFIED' in a filter dropdown, which is
+    // an option that selects nothing.
+    return response.actions
+      .map((action) => fromProtoAuditAction(action))
+      .filter((action): action is AuditAction => action !== null);
   }
 }

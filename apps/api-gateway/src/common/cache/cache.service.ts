@@ -61,7 +61,7 @@ export type CacheKeyInput = {
 /**
  * The shared cache — 29-doc §1.
  *
- * Generalised from `AnalyticsCacheService`, which had the design right and only
+ * Generalized from `AnalyticsCacheService`, which had the design right and only
  * lacked reach: tenant-first keys, sorted parameters, `wrap()` as the single
  * read path, and `SCAN`-based invalidation. Analytics keeps the parts that are
  * genuinely analytics — its range-derived TTL and its `computedAt` segment —
@@ -413,7 +413,7 @@ function scopePattern(organizationId: string | null, scope: string): string {
  * That is the collision `buildKey`'s own docblock warns about, arriving through
  * the one input nobody controls.
  *
- * **Objects are serialised with SORTED keys**, recursively, for the same reason
+ * **Objects are serialized with SORTED keys**, recursively, for the same reason
  * the top-level params are sorted: `{a,b}` and `{b,a}` are the same question and
  * must not split the cache. Plain `JSON.stringify` preserves insertion order and
  * would.

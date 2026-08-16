@@ -1,3 +1,5 @@
+import { TicketPriority } from '@synapsedesk/common';
+
 export class AiSummaryResponseDto {
   id!: string;
   ticketId!: string;
@@ -9,6 +11,7 @@ export class AiSummaryResponseDto {
   updatedAt!: Date;
 }
 
+// ASK This `docblock` seems to be invalid
 /**
  * One source a draft used — 38-doc §2.
  *
@@ -27,6 +30,7 @@ export class DraftCitationDto {
   chunkId!: string;
   documentId!: string;
   documentTitle!: string;
+  // ASK This `docblock` seems to be invalid
   /**
    * `null` when the source document has no pages — a pasted text file, an
    * HTML article.
@@ -45,6 +49,7 @@ export class AiDraftResponseDto {
   modelName!: string;
   promptTokens!: number;
   completionTokens!: number;
+  // ASK This `docblock` seems to be invalid
   /**
    * The `ai_generations` row this draft came from — 38-doc §1.
    *
@@ -62,6 +67,7 @@ export class AiDraftResponseDto {
   citations!: DraftCitationDto[];
 }
 
+// ASK This `docblock` seems to be invalid
 /**
  * One knowledge-base article to recommend — 39-doc §2.
  *
@@ -84,6 +90,7 @@ export class SuggestedArticleDto {
   score!: number;
 }
 
+// ASK This `docblock` seems to be invalid
 /**
  * What `POST /tickets/:id/ai/suggestions` answers with — 39-doc §2.
  *
@@ -117,7 +124,16 @@ export class AiSuggestionDto {
  */
 export class AiClassificationDto {
   suggestedDepartmentId!: string;
-  suggestedPriority!: string;
+  /**
+   * Null when the model named something that is not a priority.
+   *
+   * The value crosses two hops: rag-service (Python) answers a bare string, and
+   * ticket-service narrows it there — at the one boundary where it is genuinely
+   * foreign — before putting it on `ClassifyTicketResponse` as a real enum. So a
+   * `MEDIUM-HIGH` or a translated label arrives here as null rather than as a
+   * suggestion the UI would render and no agent could apply.
+   */
+  suggestedPriority!: TicketPriority | null;
   confidenceScore!: number;
 }
 

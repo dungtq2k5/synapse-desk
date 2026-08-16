@@ -12,6 +12,8 @@
  * Postgres enum to disagree with, and none to migrate when a member is added.
  */
 
+import type { MimeType } from './mime.config';
+
 /** `tickets.status`. */
 export enum TicketStatus {
   NEW = 'NEW',
@@ -29,6 +31,9 @@ export enum TicketPriority {
   HIGH = 'HIGH',
   URGENT = 'URGENT',
 }
+
+/** {@link TicketPriority}'s members as an array, for `@IsIn` and membership tests. */
+export const TICKET_PRIORITIES = Object.values(TicketPriority);
 
 /** `tickets.source` — how the ticket entered the system. */
 export enum TicketSource {
@@ -118,6 +123,33 @@ export const TERMINAL_TICKET_STATUSES: readonly TicketStatus[] = [
   TicketStatus.CLOSED,
 ];
 
+/**
+ * `ticket_messages.answer_status` — what an AI reply concluded (36-doc §7).
+ *
+ * Mirrors `synapsedesk.rag.AnswerStatus`; `enum-bridges.spec.ts` asserts the two
+ * stay aligned.
+ */
+export enum AnswerStatus {
+  /** Answered from the corpus, with citations. */
+  DOC_ANSWER = 'DOC_ANSWER',
+  /** Nothing retrieved above threshold — escalate rather than improvise. */
+  DOC_MISSING = 'DOC_MISSING',
+  /** Answered from the canned table. No LLM call, no ledger row. */
+  GREETING = 'GREETING',
+  /** The tenant is at the AI cap. The caller escalates rather than erroring. */
+  AT_CAP = 'AT_CAP',
+  /**
+   * Refused by prompt-injection detection — 33-doc §5.1.
+   *
+   * **Not GREETING**, which is what reusing that short-circuit reported: a
+   * refusal filed as a greeting is wrong in the thread, in the WebSocket frame
+   * and in anything reading the trail afterwards.
+   */
+  REFUSED = 'REFUSED',
+}
+
+export const ANSWER_STATUSES = Object.values(AnswerStatus);
+
 // ---------------------------------------------------------------------------
 // Sortable columns — same four-way contract as Domain A's, see app.config.ts
 // ---------------------------------------------------------------------------
@@ -156,25 +188,48 @@ export type FeedbackSortableField = (typeof FEEDBACK_SORTABLE_FIELDS)[number];
 // ---------------------------------------------------------------------------
 
 /**
- * An allowlist, never a denylist.
+ * What may be stored as a user AVATAR — mirrors `PURPOSE_POLICY[AVATAR]`.
  *
- * A denylist is a promise to have thought of every dangerous type, which is not
- * a promise anyone can keep. Anything not named here is refused.
+ * **No SVG**, and it is the one exclusion worth naming: an SVG is a document
+ * that can carry script, so it is the single image type that behaves like an
+ * executable when served.
+ *
+ * Here rather than as a private `const` in `avatar.dto.ts`, where it lived —
+ * the same three literals as storage's policy, in a file storage never reads,
+ * with nothing relating the two. `mime.spec.ts` now fails if they diverge.
+ */
+export const AVATAR_MIME_TYPES = [
+  'image/png',
+  'image/jpeg',
+  'image/webp',
+] as const satisfies readonly MimeType[];
+export type AvatarMimeType = (typeof AVATAR_MIME_TYPES)[number];
+
+/**
+ * What may be STORED as a ticket attachment — a security allowlist.
+ *
+ * An allowlist, never a denylist: a denylist is a promise to have thought of
+ * every dangerous type, which is not a promise anyone can keep.
+ *
+ * **Narrowed from twelve to five, and the twelve were never real.** This list
+ * had drifted from `PURPOSE_POLICY[TICKET_ATTACHMENT]` in storage-service,
+ * which accepts exactly these five and throws `INVALID_ARGUMENT` for anything
+ * else. So `.docx`, `.xlsx`, `.zip`, `gif` and `csv` passed the gateway's
+ * validation and were then refused at presign — a 400 from the second hop for a
+ * type the API contract had just accepted. Narrowing does not remove a
+ * capability; it moves an existing refusal to where the caller can understand
+ * it.
+ *
+ * **Widen BOTH together**, or the drift returns. `mime.spec.ts` fails when they
+ * disagree, which is the half that makes "both" enforceable.
  */
 export const ALLOWED_ATTACHMENT_MIME_TYPES = [
   'image/png',
   'image/jpeg',
-  'image/gif',
   'image/webp',
   'application/pdf',
   'text/plain',
-  'text/csv',
-  'application/zip',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'application/vnd.ms-excel',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-] as const;
+] as const satisfies readonly MimeType[];
 export type AllowedAttachmentMimeType =
   (typeof ALLOWED_ATTACHMENT_MIME_TYPES)[number];
 
@@ -184,14 +239,22 @@ export type AllowedAttachmentMimeType =
  * **A different question from `ALLOWED_ATTACHMENT_MIME_TYPES` above, and the
  * two must not be merged.** That list is a security allowlist answering "may a
  * user store this?"; this one is a capability allowlist answering "may this
- * reach the model?". They overlap today and will drift the first time a new
- * type is added — a `.docx` is perfectly safe to store and Gemini cannot read
- * it, so widening one is not a reason to widen the other.
+ * reach the model?". Storage exists for the AGENT first — a human opens these
+ * through `GET :id/download` — and the model reading them is a bonus on two
+ * surfaces. Tying what a customer may send to what one vendor's model can read
+ * would make a model-capability change a storage-policy change.
+ *
+ * **The invariant is one-directional: every STORABLE type must be AI-eligible.**
+ * Not the reverse. This list may legitimately be wider — `image/gif` and
+ * `text/csv` are here and storable nowhere, which is pre-approval for the day a
+ * storage policy widens. It must never be NARROWER, because that is the state
+ * that produces a file a user uploaded and the model silently ignores.
+ * `mime.spec.ts` pins that direction.
  *
  * Everything absent from here stays storable, downloadable and human-readable.
  * It simply never becomes a prompt part: sending a zip spends tokens to produce
- * nothing, and the user is told what was left out rather than left to discover
- * it (36-doc §2.2).
+ * nothing, and the user is told what was left out through `skippedAttachments`
+ * rather than left to discover it (36-doc §2.2).
  */
 export const AI_ELIGIBLE_MIME_TYPES = [
   'image/png',
@@ -201,7 +264,7 @@ export const AI_ELIGIBLE_MIME_TYPES = [
   'application/pdf',
   'text/plain',
   'text/csv',
-] as const;
+] as const satisfies readonly MimeType[];
 export type AiEligibleMimeType = (typeof AI_ELIGIBLE_MIME_TYPES)[number];
 
 /**

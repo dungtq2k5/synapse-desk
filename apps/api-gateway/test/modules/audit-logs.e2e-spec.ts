@@ -1,3 +1,8 @@
+import { AuditAction } from '@synapsedesk/common';
+import {
+  AuditAction as ProtoAuditAction,
+  AuditResourceType as ProtoAuditResourceType,
+} from '@synapsedesk/grpc-proto';
 import { of } from 'rxjs';
 import { faker } from '@faker-js/faker';
 import {
@@ -36,10 +41,10 @@ describe('§2.9 Audit logs at the HTTP boundary (e2e)', () => {
     id: faker.string.uuid(),
     organizationId: faker.string.uuid(),
     userId: faker.string.uuid(),
-    action: 'USER_CREATED',
-    resourceType: 'User',
+    action: ProtoAuditAction.AUDIT_ACTION_USER_CREATED,
+    resourceType: ProtoAuditResourceType.AUDIT_RESOURCE_TYPE_USER,
     resourceId: faker.string.uuid(),
-    ipAddress: '10.0.0.1',
+    ipAddress: '10.0.0.1', // NOSONAR
     userAgent: 'jest',
     metadata: '{}',
     createdAt: timestamp(),
@@ -160,7 +165,7 @@ describe('§2.9 Audit logs at the HTTP boundary (e2e)', () => {
       expect(res.body.data.items[0]).toHaveProperty('userId', null);
     });
 
-    it('8. forwards ABSENT filters as empty strings', async () => {
+    it('8. forwards ABSENT filters as UNSPECIFIED and empty strings', async () => {
       fx.stubs.audit.listAuditLogs.mockReturnValue(
         of({ items: [], meta: wirePage([]).meta }),
       );
@@ -170,25 +175,30 @@ describe('§2.9 Audit logs at the HTTP boundary (e2e)', () => {
       );
 
       const [request] = fx.stubs.audit.listAuditLogs.mock.calls[0];
-      expect(request.action).toBe('');
+      // The enumerated filter goes as proto3's zero value, which is what the
+      // empty string used to stand in for. `userId` is a uuid, not a
+      // vocabulary, so it stays a string.
+      expect(request.action).toBe(ProtoAuditAction.AUDIT_ACTION_UNSPECIFIED);
       expect(request.userId).toBe('');
     });
 
-    it('9. accepts an UNKNOWN action string rather than rejecting it', async () => {
-      // The catalogue grows in whichever service publishes an action. A gateway
-      // enum would 400 a filter for an event that genuinely happened, the first
-      // time a new service emitted one.
-      fx.stubs.audit.listAuditLogs.mockReturnValue(
-        of({ items: [], meta: wirePage([]).meta }),
-      );
-
+    it('9. **REJECTS an unknown action rather than dropping the filter**', async () => {
+      // **This test used to assert the opposite**, and the reasoning behind it
+      // was sound while `action` was a wire `string`: an unknown value reached
+      // an equality filter and matched nothing, so forwarding it was honest and
+      // a gateway enum would have 400'd a genuine event.
+      //
+      // The field is a proto enum now, so an unrecognized name converts to
+      // UNSPECIFIED — and UNSPECIFIED means NO FILTER. Forwarding it would turn
+      // `?action=SOME_FUTURE_ACTION` into "return everything", and a caller
+      // reading that page as "these are the SOME_FUTURE_ACTION events" is a
+      // wrong answer rather than an empty one.
       const res = await authenticatedAgent(fx.app, {
         permissionCodes: ['audit.read'],
       }).get(`${API}/audit-logs?action=SOME_FUTURE_ACTION`);
 
-      expect(res.status).toBe(200);
-      const [request] = fx.stubs.audit.listAuditLogs.mock.calls[0];
-      expect(request.action).toBe('SOME_FUTURE_ACTION');
+      expect(res.status).toBe(400);
+      expect(fx.stubs.audit.listAuditLogs).not.toHaveBeenCalled();
     });
 
     it('10. REJECTS a non-UUID userId filter', async () => {
@@ -203,7 +213,7 @@ describe('§2.9 Audit logs at the HTTP boundary (e2e)', () => {
   describe('GET /audit-logs/actions', () => {
     it('1. does not collide with a future :id route', async () => {
       fx.stubs.audit.listAuditActions.mockReturnValue(
-        of({ actions: ['USER_CREATED'] }),
+        of({ actions: [ProtoAuditAction.AUDIT_ACTION_USER_CREATED] }),
       );
 
       const res = await authenticatedAgent(fx.app, {
@@ -211,7 +221,9 @@ describe('§2.9 Audit logs at the HTTP boundary (e2e)', () => {
       }).get(`${API}/audit-logs/actions`);
 
       expect(res.status).toBe(200);
-      expect(res.body.data).toEqual(['USER_CREATED']);
+      // The gateway converts back to NAMES for the client — the REST body
+      // must never carry the wire's integers.
+      expect(res.body.data).toEqual([AuditAction.USER_CREATED]);
       expect(fx.stubs.audit.listAuditLogs).not.toHaveBeenCalled();
     });
 
@@ -256,7 +268,13 @@ describe('§2.9 Audit logs at the HTTP boundary (e2e)', () => {
 
     it('3. exposes the actions list under the platform scope too', async () => {
       fx.stubs.audit.listAuditActions.mockReturnValue(
-        of({ actions: ['PLATFORM_ORGANIZATION_SUSPENDED'] }),
+        // `PLATFORM_ORGANIZATION_SUSPENDED` was never a member; the status
+        // change is recorded as PLATFORM_ORGANIZATION_STATUS_CHANGED.
+        of({
+          actions: [
+            ProtoAuditAction.AUDIT_ACTION_PLATFORM_ORGANIZATION_STATUS_CHANGED,
+          ],
+        }),
       );
 
       const res = await authenticatedAgent(fx.app, {

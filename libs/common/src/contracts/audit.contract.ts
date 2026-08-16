@@ -1,5 +1,3 @@
-import type { RequestOrigin } from '../configs/identity.config';
-
 /**
  * The NATS contract between any service and whoever owns `audit_logs`.
  *
@@ -13,6 +11,9 @@ import type { RequestOrigin } from '../configs/identity.config';
  * write must not be able to fail the request it describes, and must not add
  * broker latency to it.
  */
+
+import type { RequestOrigin } from '../configs/identity.config';
+
 export const AUDIT_PATTERNS = {
   record: 'audit.record',
 } as const;

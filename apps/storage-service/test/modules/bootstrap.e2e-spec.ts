@@ -4,7 +4,7 @@ import { bootstrapE2eTest, E2eFixture, uploadTo } from '../utils';
  * §2.1 test 1 — the bootstrap smoke test.
  *
  * Every other suite in this service assumes the emulator and Redis are both up
- * and that the Firebase app initialised with the right bucket. When that
+ * and that the Firebase app initialized with the right bucket. When that
  * assumption is wrong, every suite fails at once with an error from deep inside
  * the SDK. This one fails first, and says which piece is missing.
  */

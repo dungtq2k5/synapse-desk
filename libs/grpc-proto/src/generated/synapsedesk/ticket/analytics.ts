@@ -10,6 +10,26 @@ import { GrpcMethod, GrpcStreamMethod } from "@nestjs/microservices";
 import { Observable } from "rxjs";
 import { Timestamp } from "../../google/protobuf/timestamp";
 
+export enum AnalyticsExportKind {
+  ANALYTICS_EXPORT_KIND_UNSPECIFIED = 0,
+  /** ANALYTICS_EXPORT_KIND_TICKET_DAILY - Daily ticket rollups: the numbers behind `overview`, `volume`, `deflection`. */
+  ANALYTICS_EXPORT_KIND_TICKET_DAILY = 1,
+  ANALYTICS_EXPORT_KIND_AGENT_DAILY = 2,
+  UNRECOGNIZED = -1,
+}
+
+export enum AnalyticsExportStatus {
+  ANALYTICS_EXPORT_STATUS_UNSPECIFIED = 0,
+  ANALYTICS_EXPORT_STATUS_PENDING = 1,
+  ANALYTICS_EXPORT_STATUS_READY = 2,
+  /**
+   * ANALYTICS_EXPORT_STATUS_FAILED - *Reported as a failure, never as an empty file.** An empty CSV reads as
+   * "no data", which is a wrong answer rather than an error.
+   */
+  ANALYTICS_EXPORT_STATUS_FAILED = 3,
+  UNRECOGNIZED = -1,
+}
+
 /**
  * A rate and the count it was computed over — 19-doc §3.1.
  *
@@ -242,10 +262,8 @@ export interface RunRollupResponse {
   agentRows: number;
 }
 
-/** The async export — 19-doc §5. */
 export interface CreateExportRequest {
-  /** TICKET_DAILY | AGENT_DAILY. */
-  kind: string;
+  kind: AnalyticsExportKind;
   from: string;
   to: string;
   departmentId?: string | undefined;
@@ -253,9 +271,8 @@ export interface CreateExportRequest {
 
 export interface ExportResponse {
   id: string;
-  /** PENDING | READY | FAILED. */
-  status: string;
-  kind: string;
+  status: AnalyticsExportStatus;
+  kind: AnalyticsExportKind;
   rowCount?:
     | number
     | undefined;

@@ -59,6 +59,7 @@ export class UsersController {
     private readonly usersGrpcClient: UserServiceGrpcClient,
   ) {}
 
+  // ASK This `docblock` seems to be invalid
   /**
    * Takes the whole RequestContext rather than just `sub`: `ip` and `userAgent`
    * are two of its fields, so the origin needs no separate derivation once a
@@ -77,6 +78,7 @@ export class UsersController {
     return this.usersService.getCurrentUser(context.sub, context);
   }
 
+  // ASK This `docblock` seems to be invalid
   /**
    * `fullName`, `dob`, `gender` — and nothing else.
    *

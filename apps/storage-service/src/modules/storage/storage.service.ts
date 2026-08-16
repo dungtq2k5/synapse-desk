@@ -16,6 +16,7 @@ import {
   PresignUploadResponse,
   StoragePurpose as ProtoStoragePurpose,
   toProtoTimestamp,
+  fromProtoStoragePurpose,
 } from '@synapsedesk/grpc-proto';
 import {
   formatErrorMsg,
@@ -31,14 +32,6 @@ import {
   SIGNATURE_SAMPLE_BYTES,
 } from '../../common/content-signature';
 import { PendingUploadStore } from './pending-upload.store';
-
-const DOMAIN_PURPOSE: Record<number, StoragePurpose> = {
-  [ProtoStoragePurpose.STORAGE_PURPOSE_AVATAR]: StoragePurpose.AVATAR,
-  [ProtoStoragePurpose.STORAGE_PURPOSE_TICKET_ATTACHMENT]:
-    StoragePurpose.TICKET_ATTACHMENT,
-  [ProtoStoragePurpose.STORAGE_PURPOSE_DOCUMENT]: StoragePurpose.DOCUMENT,
-  [ProtoStoragePurpose.STORAGE_PURPOSE_EXPORT]: StoragePurpose.EXPORT,
-};
 
 /**
  * Presign → upload → confirm, one mechanism for every file type (§1.2).
@@ -105,7 +98,14 @@ export class StorageService {
         message: `${purpose} uploads take no secondary owner id`,
       });
     }
-    if (!policy.mimeAllowlist.includes(request.contentType)) {
+    // **Widened to `string` for the CHECK, narrow for the DECLARATION.**
+    // `mimeAllowlist` is `readonly MimeType[]` so a mistyped entry cannot be
+    // written; `contentType` is whatever a caller sent, which is precisely what
+    // this line exists to judge. Typing the input would be claiming the
+    // untrusted value is already valid.
+    if (
+      !(policy.mimeAllowlist as readonly string[]).includes(request.contentType)
+    ) {
       // An allowlist, never a denylist — a denylist is a promise to have
       // thought of every dangerous type, and nobody can keep that promise.
       throw new RpcException({
@@ -479,7 +479,7 @@ export class StorageService {
   }
 
   private requirePurpose(purpose: ProtoStoragePurpose): StoragePurpose {
-    const domain = DOMAIN_PURPOSE[purpose];
+    const domain = fromProtoStoragePurpose(purpose);
     if (!domain) {
       throw new RpcException({
         code: status.INVALID_ARGUMENT,

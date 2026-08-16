@@ -1,31 +1,18 @@
 /**
- * **The only place in the TypeScript codebase where a model name may appear.**
+ * AI model and retrieval settings — the only TypeScript file that may name a model.
  *
- * Doc 15 §1.2 states the rule and this file is the exception it carves out:
- * no model name in a service, a prompt builder, a test fixture, or a config
- * read at a call site. The failure mode is quiet and expensive — a single
- * `'gemini-3.5-flash-lite'` typed into a summarizer is a tenant on the premium tier
- * silently receiving the cheap model. Nothing errors; the answer is merely
- * worse, for the customer paying more.
+ * `scripts/check-model-literals.mjs` enforces that; this file and
+ * `ai-pricing.config.ts` are its allowlist. Values are mirrored in
+ * `rag_service/settings.py`, held honest by `ai-settings.contract.json`.
  *
- * `scripts/check-model-literals.mjs` makes that rule mechanical rather than
- * aspirational, and this file plus `ai-pricing.config.ts` are its allowlist.
- * The pricing table is a second legitimate home for the names because it is
- * keyed BY model rather than choosing one — it answers "what does X cost",
- * never "which model do we use".
- *
- * The values here are mirrored in `rag_service/settings.py`, and the mirror is
- * held honest by `ai-settings.contract.json` — see the note on that file.
+ * See `docs/decisions/0007-settings-layer-owns-model-names.md`.
  */
 
 /**
  * The tier a tenant's generation model is resolved from.
  *
- * Present before anything writes it, which is deliberate: doc 15 §2.1 makes
- * this one column set by the Stripe webhook, and the point of building the
- * resolver first is that landing the tier is then a data change rather than a
- * refactor. Until billing ships every tenant resolves to `FAST` — but through
- * the mapping below, not around it.
+ * Written to `organizations.ai_model_tier` by the Stripe webhook. Resolve
+ * through {@link GENERATION_MODEL_BY_TIER}, never around it.
  */
 export const AI_MODEL_TIERS = ['FAST', 'QUALITY'] as const;
 export type AiModelTier = (typeof AI_MODEL_TIERS)[number];
@@ -35,13 +22,11 @@ export const DEFAULT_AI_MODEL_TIER: AiModelTier = 'FAST';
 /**
  * What a tenant's AI request is allowed to know about models and retrieval.
  *
- * Everything downstream — both services, both languages — reads its values
- * from here and nothing else. Note what is absent: no endpoint takes a model
- * name today, and none would once tiers ship, which is the property that keeps
- * step 3 of the resolution order (per-tenant overrides) additive.
+ * Every downstream caller — both services, both languages — reads its values
+ * from here and nothing else. No endpoint accepts a model name.
  */
 export type AiSettings = {
-  /** Resolved from the tier. The ONLY tier-varying value — doc 15 §2.2. */
+  /** Resolved from the tier. The only tier-varying value. */
   generationModel: string;
   /** Greeting classification and reformulation. Deliberately tier-INdependent. */
   cheapModel: string;
@@ -51,7 +36,7 @@ export type AiSettings = {
   semanticWeight: number;
   /** RRF weight on the lexical arm. */
   lexicalWeight: number;
-  /** Candidates requested from EACH arm — never scaled per arm (11-doc §1.5). */
+  /** Candidates requested from EACH arm — never scaled per arm. */
   topN: number;
   /** How many chunks survive rerank and reach the prompt. */
   finalContextK: number;
@@ -62,12 +47,7 @@ export type AiSettings = {
 };
 
 /**
- * Tier -> generation model. **This mapping is the entire tier feature.**
- *
- * Doc 15 §2.1: once the Stripe webhook writes `organizations.ai_model_tier`,
- * shipping tiers is this table being read with a real value instead of the
- * default. Nothing else moves, which is the whole return on building the
- * resolver now.
+ * Tier -> generation model. This mapping is the entire tier feature.
  */
 export const GENERATION_MODEL_BY_TIER: Record<AiModelTier, string> = {
   FAST: 'gemini-3.5-flash-lite',

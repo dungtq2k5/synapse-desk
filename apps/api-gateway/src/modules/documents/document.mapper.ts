@@ -2,6 +2,10 @@ import {
   DocumentChunkResponse,
   DocumentFlagResponse,
   DocumentResponse,
+  fromProtoDocumentFileType,
+  fromProtoDocumentFlagSeverity,
+  fromProtoDocumentFlagType,
+  fromProtoDocumentStatus,
   fromProtoTimestamp,
   requireProtoTimestamp,
 } from '@synapsedesk/grpc-proto';
@@ -11,7 +15,11 @@ import {
   DocumentResponseDto,
 } from './dto/rest/document-response.dto';
 import { DocumentResponseGqlDto } from './dto/graphql/document-response.gql-dto';
-import { DocumentStatus } from '@synapsedesk/common';
+import {
+  OCR_LANGUAGES,
+  UNKNOWN_EXTENSION,
+  type OcrLanguage,
+} from '@synapsedesk/common';
 
 export function toDocumentResponseDto(
   document: DocumentResponse,
@@ -22,14 +30,19 @@ export function toDocumentResponseDto(
     createdById: document.createdById,
     title: document.title,
     fileUrl: document.fileUrl,
-    fileType: document.fileType,
-    ocrLanguages: document.ocrLanguages,
+    // `bin` rather than null, because it is a DESIGNED unknown: the confirm
+    // path already files an accepted type with no extension mapping under it,
+    // so an unrecognized value here joins rows that legitimately hold it.
+    fileType: fromProtoDocumentFileType(document.fileType) ?? UNKNOWN_EXTENSION,
+    // Valid by construction — the request DTO validates against the same list —
+    // so this filter should never drop anything. It is here so the declared
+    // `OcrLanguage[]` is a fact rather than a hope.
+    ocrLanguages: document.ocrLanguages.filter((code): code is OcrLanguage =>
+      (OCR_LANGUAGES as readonly string[]).includes(code),
+    ),
     fileSizeBytes: document.fileSizeBytes,
     isOrganizationWide: document.isOrganizationWide,
-    // A free string on the wire, narrowed here. An unrecognised value becomes
-    // null rather than being passed through: a client switching on the status
-    // should see "unknown" explicitly, not a string its union does not have.
-    status: (document.status as DocumentStatus) || null,
+    status: fromProtoDocumentStatus(document.status),
     departmentIds: document.departmentIds,
     chunkCount: document.chunkCount,
     createdAt: requireProtoTimestamp(document.createdAt, 'createdAt'),
@@ -50,7 +63,7 @@ export function toDocumentResponseDto(
  *
  *   - `fileUrl` is an internal object path the schema deliberately never
  *     exposes. Building it into an object handed to GraphQL made its absence
- *     from the response a property of the SERIALISER rather than of the data,
+ *     from the response a property of the SERIALIZER rather than of the data,
  *     and "it gets pruned" is a weaker guarantee than "it was never read".
  *   - Every other edge in the gateway maps through a `…GqlDto` mapper. One
  *     borrowing the REST one is the kind of exception that reads as precedent.
@@ -66,10 +79,10 @@ export function toDocumentResponseGqlDto(
     organizationId: document.organizationId,
     createdById: document.createdById,
     title: document.title,
-    fileType: document.fileType,
+    fileType: fromProtoDocumentFileType(document.fileType) ?? UNKNOWN_EXTENSION,
     fileSizeBytes: document.fileSizeBytes,
     isOrganizationWide: document.isOrganizationWide,
-    status: (document.status as DocumentStatus) || null,
+    status: fromProtoDocumentStatus(document.status),
     departmentIds: document.departmentIds,
     chunkCount: document.chunkCount,
     createdAt: requireProtoTimestamp(document.createdAt, 'createdAt'),
@@ -102,8 +115,11 @@ export function toDocumentFlagResponseDto(
     id: flag.id,
     documentId: flag.documentId,
     documentTitle: flag.documentTitle,
-    flagType: flag.flagType,
-    severity: flag.severity,
+    // `| null` rather than a fallback, matching `status` above: there is no
+    // "unknown flag type" a client could sensibly render, so the honest answer
+    // is that this build does not recognise the value.
+    flagType: fromProtoDocumentFlagType(flag.flagType),
+    severity: fromProtoDocumentFlagSeverity(flag.severity),
     detail: flag.detail,
     // `?? null`: a flag raised by a rule rather than a model has no score, and
     // that is different from a score of zero.

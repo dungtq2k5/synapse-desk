@@ -3,11 +3,12 @@ import { ClientGrpc } from '@nestjs/microservices';
 import {
   AI_SERVICE_NAME,
   AiServiceClient,
-  requireProtoTimestamp,
   TICKET_GRPC_CLIENT,
+  fromProtoTicketPriority,
 } from '@synapsedesk/grpc-proto';
 import { RequestContext } from '@synapsedesk/common';
 import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
+import { toAiSummaryResponseDto } from './ai.mapper';
 import { GenerateDraftDto } from './dto/rest/ai.dto';
 import {
   AiClassificationDto,
@@ -36,7 +37,7 @@ export class AiGrpcClient extends BaseGrpcClient implements OnModuleInit {
     ticketId: string,
     context: RequestContext,
   ): Promise<AiSummaryResponseDto> {
-    return this.toSummaryDto(
+    return toAiSummaryResponseDto(
       await this.call(
         (metadata) => this.aiGrpcService.getSummary({ ticketId }, metadata),
         context,
@@ -48,7 +49,7 @@ export class AiGrpcClient extends BaseGrpcClient implements OnModuleInit {
     ticketId: string,
     context: RequestContext,
   ): Promise<AiSummaryResponseDto> {
-    return this.toSummaryDto(
+    return toAiSummaryResponseDto(
       await this.call(
         (metadata) =>
           this.aiGrpcService.generateSummary({ ticketId }, metadata),
@@ -128,7 +129,7 @@ export class AiGrpcClient extends BaseGrpcClient implements OnModuleInit {
 
     return {
       suggestedDepartmentId: response.suggestedDepartmentId,
-      suggestedPriority: response.suggestedPriority,
+      suggestedPriority: fromProtoTicketPriority(response.suggestedPriority),
       confidenceScore: response.confidenceScore,
     };
   }
@@ -149,27 +150,5 @@ export class AiGrpcClient extends BaseGrpcClient implements OnModuleInit {
       title: item.title,
       similarityScore: item.similarityScore,
     }));
-  }
-
-  private toSummaryDto(summary: {
-    id: string;
-    ticketId: string;
-    summaryText: string;
-    suggestedAction: string;
-    confidenceScore: number;
-    modelName: string;
-    createdAt?: { seconds: number; nanos: number };
-    updatedAt?: { seconds: number; nanos: number };
-  }): AiSummaryResponseDto {
-    return {
-      id: summary.id,
-      ticketId: summary.ticketId,
-      summaryText: summary.summaryText,
-      suggestedAction: summary.suggestedAction,
-      confidenceScore: summary.confidenceScore,
-      modelName: summary.modelName,
-      createdAt: requireProtoTimestamp(summary.createdAt, 'createdAt'),
-      updatedAt: requireProtoTimestamp(summary.updatedAt, 'updatedAt'),
-    };
   }
 }

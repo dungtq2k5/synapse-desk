@@ -4,13 +4,11 @@ import {
   ASSIGNMENT_SERVICE_NAME,
   AssignmentServiceClient,
   TICKET_GRPC_CLIENT,
+  toProtoReassignmentReason,
 } from '@synapsedesk/grpc-proto';
 import { RequestContext } from '@synapsedesk/common';
 import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
-import {
-  toAssignmentResponseDto,
-  toProtoReassignmentReason,
-} from './assignment.mapper';
+import { toAssignmentResponseDto } from './assignment.mapper';
 import { AssignmentResponseDto } from './dto/rest/assignment-response.dto';
 import {
   AssignTicketDto,

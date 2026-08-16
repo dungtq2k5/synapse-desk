@@ -5,11 +5,12 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc -p tsconfig.build.json && node ../../scripts/copy-protos.mjs dist/proto",
-    "proto:generate": "buf generate",
+    "proto:generate": "buf generate && node ../../scripts/generate-python-protos.mjs",
     "proto:lint": "buf lint",
     "proto:breaking": "buf breaking --against '../../.git#branch=main,subdir=libs/grpc-proto'",
     "clean": "rimraf dist *.tsbuildinfo",
-    "lint": "eslint \"src/**/*.ts\""
+    "lint": "eslint \"src/**/*.ts\"",
+    "proto:check": "buf generate && node ../../scripts/generate-python-protos.mjs --check && git diff --exit-code -- src/generated"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",

@@ -15,7 +15,7 @@ import {
 } from './realtime.config';
 
 /**
- * Domain C's half of the relay — 22-doc §6.2.
+ * Domain C's half of the relay.
  *
  * There was no document consumer at all before this, which mattered in one
  * direction: a Knowledge Manager uploaded a file and then watched it sit in

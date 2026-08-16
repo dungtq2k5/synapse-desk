@@ -22,6 +22,7 @@ import {
   MAX_MESSAGE_CONTENT_LENGTH,
   MAX_OBJECT_PATH_LENGTH,
   trimIfString,
+  type AllowedAttachmentMimeType,
 } from '@synapsedesk/common';
 import { SearchPaginationDto } from '../../../../common/dto/rest/search-pagination.dto';
 import { ToBoolean } from '../../../../common/decorators/to-boolean.decorator';
@@ -77,6 +78,7 @@ export class CreateMessageDto {
   @Type(() => NewAttachmentDto)
   readonly attachments?: NewAttachmentDto[];
 
+  // ASK This `docblock` seems to be invalid
   /**
    * The `ai_generations` row this reply came from — 38-doc §1, the loop's
    * inbound half.
@@ -174,7 +176,7 @@ export class UploadAttachmentDto {
    * every dangerous type, which is not a promise anyone can keep.
    */
   @IsIn(ALLOWED_ATTACHMENT_MIME_TYPES)
-  readonly mimeType!: string;
+  readonly mimeType!: AllowedAttachmentMimeType;
 
   /**
    * Declared by the client and therefore not trustworthy on its own — the real

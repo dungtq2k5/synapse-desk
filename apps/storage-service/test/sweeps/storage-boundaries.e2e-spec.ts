@@ -277,7 +277,9 @@ describe('§4 storage boundary sweeps (e2e)', () => {
       for (const [purpose, policy] of Object.entries(PURPOSE_POLICY)) {
         expect([
           purpose,
-          policy.mimeAllowlist.includes('image/svg+xml'),
+          // Deliberately outside the vocabulary — that IS the assertion, so
+          // the comparison widens rather than the type admitting an SVG.
+          (policy.mimeAllowlist as readonly string[]).includes('image/svg+xml'),
         ]).toEqual([purpose, false]);
       }
     });

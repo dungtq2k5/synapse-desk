@@ -3,6 +3,7 @@ import { RpcException } from '@nestjs/microservices';
 import { status } from '@grpc/grpc-js';
 import type { Metadata } from '@grpc/grpc-js';
 import {
+  toProtoAiGenerationOutcome,
   AiJobHealthResponse,
   toProtoTimestamp,
   AiLedgerServiceController,
@@ -106,7 +107,7 @@ export class AiLedgerGrpcController implements AiLedgerServiceController {
       request.sentText,
     );
 
-    return { outcome };
+    return { outcome: toProtoAiGenerationOutcome(outcome) };
   }
   // ------------------------------------------------- 19-doc §3.2, the reads
 

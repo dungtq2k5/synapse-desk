@@ -202,9 +202,8 @@ function parseController(file) {
       // backtrack through. The one regex in this file that WAS quadratic (15.5x)
       // is the markdown-link one above, and it is bounded.
       handler:
-        /^\s+(?:async\s+)?(\w+)\(/m.exec( // NOSONAR
-          block.split('\n').slice(1).join('\n'),
-        )?.[1] ?? '',
+        /^\s+(?:async\s+)?(\w+)\(/m // NOSONAR
+          .exec(block.split('\n').slice(1).join('\n'))?.[1] ?? '',
       returnType: returnTypeOf(block),
       httpCode: /@HttpCode\(HttpStatus\.(\w+)\)/.exec(block)?.[1] ?? null,
       hasBody: /@Body\(/.test(block),
@@ -376,7 +375,7 @@ for (const file of files) {
         : `${route.indent}@ApiOperation({ summary: ${quote(summary)} })`,
       `${route.indent}@ApiWrappedResponse(${responseArgs.join(', ')})`,
       errors.length
-        ? `${route.indent}@ApiFilterErrors([${errors.map((e) => `'${e}'`).join(', ')}])`
+        ? `${route.indent}@ApiFilterErrors([${errors.map((e) => `'${e}'`).join(', ')}])` // NOSONAR
         : `${route.indent}@ApiFilterErrors()`,
     ];
 
@@ -432,7 +431,7 @@ function tagFor(file) {
 function quote(text) {
   // `String.raw` so the escapes read as the characters they produce:
   // one backslash becomes two, a quote becomes an escaped quote.
-  return `'${text.replaceAll('\\', String.raw`\\`).replaceAll("'", String.raw`\'`)}'`;
+  return `'${text.replaceAll('\\', String.raw`\\`).replaceAll("'", String.raw`\'`)}'`; // NOSONAR
 }
 
 /** Adds the decorator imports, and `HttpStatus` when a status is referenced. */

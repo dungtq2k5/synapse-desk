@@ -9,7 +9,19 @@ import {
   DocumentStatus,
   IngestionJobStatus,
   compareAlphabetically,
+  type DocumentFileType,
 } from '@synapsedesk/common';
+import {
+  DocumentFlagType as ProtoDocumentFlagType,
+  type ListDocumentFlagsRequest,
+  type ListDocumentsRequest,
+  fromProtoDocumentFileType,
+  fromProtoDocumentFlagType,
+  fromProtoDocumentStatus,
+  toProtoDocumentFileType,
+  toProtoDocumentFlagType,
+  toProtoDocumentStatus,
+} from '@synapsedesk/grpc-proto';
 import { expectRpc } from '@synapsedesk/common/testing/rpc';
 import { status } from '@grpc/grpc-js';
 import { faker } from '@faker-js/faker';
@@ -94,13 +106,28 @@ describe('§2 Documents (e2e)', () => {
     ...overrides,
   });
 
-  const listRequest = (overrides: Record<string, unknown> = {}) => ({
-    page: pageRequest(),
-    status: '',
-    departmentId: '',
-    fileType: '',
-    includeDeleted: false,
-    ...overrides,
+  /**
+   * Takes DOMAIN values and converts, so call sites still read
+   * `{ status: DocumentStatus.INDEXED }` rather than a proto member name.
+   *
+   * The two enumerated filters default to UNSPECIFIED, which is what the empty
+   * strings here used to stand in for — proto3's zero value already means
+   * "no filter".
+   */
+  const listRequest = (
+    overrides: Partial<{
+      status: DocumentStatus;
+      departmentId: string;
+      fileType: DocumentFileType;
+      includeDeleted: boolean;
+      page: ReturnType<typeof pageRequest>;
+    }> = {},
+  ): ListDocumentsRequest => ({
+    page: overrides.page ?? pageRequest(),
+    status: toProtoDocumentStatus(overrides.status),
+    departmentId: overrides.departmentId ?? '',
+    fileType: toProtoDocumentFileType(overrides.fileType),
+    includeDeleted: overrides.includeDeleted ?? false,
   });
 
   beforeAll(async () => {
@@ -243,7 +270,13 @@ describe('§2 Documents (e2e)', () => {
         manager(),
       );
 
-      expect(document.status).toBe(DocumentStatus.PENDING);
+      // Through the bridge: the RESPONSE carries the proto enum's integer,
+      // while the NATS event two tests below carries the domain string. Both
+      // are correct and they are not the same value — asserting the domain name
+      // against the wire is what this test caught.
+      expect(fromProtoDocumentStatus(document.status)).toBe(
+        DocumentStatus.PENDING,
+      );
       expect(document.chunkCount).toBe(0);
 
       const jobs = await fx.prisma.ingestionJob.findMany({
@@ -284,7 +317,7 @@ describe('§2 Documents (e2e)', () => {
       );
 
       expect(document.fileSizeBytes).toBe(9999);
-      expect(document.fileType).toBe('md');
+      expect(fromProtoDocumentFileType(document.fileType)).toBe('md');
     });
 
     it('4. writes the job in the SAME transaction as the document', async () => {
@@ -904,14 +937,13 @@ describe('§2 Documents (e2e)', () => {
 
     const flagsRequest = (
       overrides: Partial<{
-        flagTypes: string[];
+        flagTypes: DocumentFlagType[];
         includeResolved: boolean;
       }> = {},
-    ) => ({
-      flagTypes: [],
-      includeResolved: false,
+    ): ListDocumentFlagsRequest => ({
+      flagTypes: (overrides.flagTypes ?? []).map(toProtoDocumentFlagType),
+      includeResolved: overrides.includeResolved ?? false,
       page: pageRequest({ sortBy: 'detectedAt' }),
-      ...overrides,
     });
 
     it('1. returns EVERY type when no filter is given', async () => {
@@ -923,7 +955,9 @@ describe('§2 Documents (e2e)', () => {
       );
 
       expect(
-        items.map((flag) => flag.flagType).sort(compareAlphabetically),
+        items
+          .map((flag) => fromProtoDocumentFlagType(flag.flagType)!)
+          .sort(compareAlphabetically),
       ).toEqual(
         [DocumentFlagType.UNCITED, DocumentFlagType.UNRETRIEVED].sort(
           compareAlphabetically,
@@ -971,9 +1005,17 @@ describe('§2 Documents (e2e)', () => {
     it('5. REFUSES an unknown type rather than ignoring it', async () => {
       // Silently dropping the filter answers a different question than the one
       // asked, and "no OUTDTAED flags" reads as "nothing is outdated".
+      // **The typo this used to send — `'OUTDTAED'` — is now unexpressible**,
+      // which is the point of the enum. What survives is the case the enum does
+      // NOT close: ts-proto maps a member this build cannot name to
+      // `UNRECOGNIZED` (-1) rather than failing, so a newer peer's flag type
+      // still arrives as a legal value of the type and must still be refused.
       await expectRpc(
         documents.listDocumentFlags(
-          flagsRequest({ flagTypes: ['OUTDTAED'] }),
+          {
+            ...flagsRequest(),
+            flagTypes: [ProtoDocumentFlagType.UNRECOGNIZED],
+          },
           manager(),
         ),
         status.INVALID_ARGUMENT,
@@ -1146,7 +1188,7 @@ describe('§2 Documents (e2e)', () => {
       const chunk = await fx.prisma.documentChunk.create({
         data: {
           documentId: scoped.id,
-          // Denormalised onto the chunk for retrieval, and deliberately NOT
+          // Denormalized onto the chunk for retrieval, and deliberately NOT
           // what this RPC scopes on — the department boundary lives on the
           // document, so filtering here would return text from a document the
           // caller cannot open.

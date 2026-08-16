@@ -1,3 +1,4 @@
+import { AuditAction, AuditResourceType } from '@synapsedesk/grpc-proto';
 import { RpcException } from '@nestjs/microservices';
 import { rpcCode } from '@synapsedesk/common/testing/rpc';
 import { status } from '@grpc/grpc-js';
@@ -461,9 +462,11 @@ describe('§3.1 tenant isolation sweep (e2e)', () => {
       const { items } = await auditRead.listAuditLogs(
         {
           page: pageRequest(),
-          action: '',
+          // UNSPECIFIED on both enumerated filters — "no filter", which is what
+          // the empty strings used to mean.
+          action: AuditAction.AUDIT_ACTION_UNSPECIFIED,
           userId: '',
-          resourceType: '',
+          resourceType: AuditResourceType.AUDIT_RESOURCE_TYPE_UNSPECIFIED,
           resourceId: '',
           from: undefined,
           to: undefined,

@@ -1,3 +1,9 @@
+import {
+  AiModelTier as ProtoAiModelTier,
+  DocumentFileType as ProtoDocumentFileType,
+  DocumentFlagType as ProtoDocumentFlagType,
+  DocumentStatus as ProtoDocumentStatus,
+} from '@synapsedesk/grpc-proto';
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -1233,7 +1239,7 @@ describe('§25 the GraphQL surface (e2e)', () => {
           totalCostMicros: 0,
           totalGenerations: 0,
           monthlyBudgetMicros: 0,
-          aiModelTier: 'standard',
+          aiModelTier: ProtoAiModelTier.AI_MODEL_TIER_FAST,
           draftAcceptance: { rate: 0.5, numerator: 4, denominator: 8 },
           emptyRetrievalRate: { rate: 0, numerator: 0, denominator: 0 },
           dataThrough: '2026-08-09',
@@ -1317,7 +1323,8 @@ describe('§25 the GraphQL surface (e2e)', () => {
             {
               documentId,
               documentTitle: 'Refund policy (as flagged)',
-              flagType: 'STALE',
+              // `'STALE'` was never a DocumentFlagType; OUTDATED is the member.
+              flagType: ProtoDocumentFlagType.DOCUMENT_FLAG_TYPE_OUTDATED,
               detail: 'No citation in 90 days',
             },
           ],
@@ -1336,10 +1343,10 @@ describe('§25 the GraphQL surface (e2e)', () => {
               // reaches the CURRENT one.
               title: 'Refund policy (renamed)',
               fileUrl: 'documents/org/refund.pdf',
-              fileType: 'application/pdf',
+              fileType: ProtoDocumentFileType.DOCUMENT_FILE_TYPE_PDF,
               fileSizeBytes: 1024,
               isOrganizationWide: true,
-              status: 'READY',
+              status: ProtoDocumentStatus.DOCUMENT_STATUS_INDEXED,
               departmentIds: [],
               chunkCount: 4,
               ocrLanguages: [],

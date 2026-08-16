@@ -8,18 +8,13 @@ import {
 } from '@synapsedesk/common';
 
 /**
- * Announces that a tenant's entitlements changed.
+ * Publishes `billing.entitlements_changed` once a tenant's entitlements are written.
  *
- * **The consumer already exists** — `ingestion-service` invalidates its cached
- * AI settings on this subject (doc 15 §1.3). Without the emit, a downgraded
- * tenant keeps receiving the premium model for the length of the cache TTL:
- * the system giving away the exact thing it just stopped being paid for, in the
- * direction that costs money rather than the direction someone complains about.
+ * Fire-and-forget: a failed emit is logged, never thrown, and costs one cache
+ * TTL of stale AI settings. Call it after the entitlement write has committed.
  *
- * Fire-and-forget, like every other publisher here. The entitlement write is
- * already committed, so a failed emit costs one TTL of stale settings — while
- * failing the webhook would tell Stripe to retry an event that was fully
- * applied.
+ * `ingestion-service` consumes this subject to invalidate its cached AI
+ * settings — see `docs/decisions/0007-settings-layer-owns-model-names.md`.
  */
 @Injectable()
 export class BillingEventPublisher {
@@ -37,6 +32,9 @@ export class BillingEventPublisher {
     // `.subscribe()` is mandatory: `emit()` returns a COLD observable and
     // nothing is published until something subscribes. Omitting it is the
     // classic silent failure with this API — no error, no message, no clue.
+    //
+    // Log, never rethrow: this runs inside the Stripe webhook, and a throw
+    // would make Stripe retry an event that was already fully applied.
     this.nats.emit(BILLING_PATTERNS.entitlementsChanged, event).subscribe({
       error: (error: unknown) =>
         this.logger.error(

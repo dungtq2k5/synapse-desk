@@ -1,9 +1,10 @@
+import { TicketPriority, TicketStatus } from '@synapsedesk/common';
+import { fromProtoTicketPriority } from '@synapsedesk/grpc-proto';
 import { RpcException } from '@nestjs/microservices';
 import { waitFor } from '@synapsedesk/common/testing/wait';
 import { expectRpc, rpcCode } from '@synapsedesk/common/testing/rpc';
 import { status } from '@grpc/grpc-js';
 import { faker } from '@faker-js/faker';
-import { TicketStatus } from '@synapsedesk/common';
 import { E2eFixture, bootstrapE2eTest, memberContext } from '../utils';
 import {
   buildTenant,
@@ -210,7 +211,7 @@ describe('§2.6 AI Co-Pilot (e2e)', () => {
       });
       jest.spyOn(rag, 'classifyTicket').mockResolvedValue({
         suggestedDepartmentId: '',
-        suggestedPriority: 'HIGH',
+        suggestedPriority: TicketPriority.HIGH,
         confidenceScore: 0.55,
       });
     });
@@ -245,7 +246,9 @@ describe('§2.6 AI Co-Pilot (e2e)', () => {
         { ticketId: ticket.id },
         context,
       );
-      expect(classification.suggestedPriority).toBe('HIGH');
+      expect(fromProtoTicketPriority(classification.suggestedPriority)).toBe(
+        TicketPriority.HIGH,
+      );
     });
 
     it('2. STILL checks the ACL — availability is not authorization', async () => {
@@ -498,7 +501,7 @@ describe('§2.6 AI Co-Pilot (e2e)', () => {
       const suggestedDepartmentId = faker.string.uuid();
       jest.spyOn(rag, 'classifyTicket').mockResolvedValue({
         suggestedDepartmentId,
-        suggestedPriority: 'URGENT',
+        suggestedPriority: TicketPriority.URGENT,
         confidenceScore: 0.7,
       });
       const ticket = await createTicket(fx.prisma, tenant);

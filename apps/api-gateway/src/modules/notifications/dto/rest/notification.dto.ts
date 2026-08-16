@@ -1,3 +1,8 @@
+import {
+  MAX_BULK_NOTIFICATION_IDS,
+  MAX_FEED_CURSOR_LENGTH,
+  NOTIFICATION_FEED_LIMIT,
+} from '../../../../common/config/dto.config';
 import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
@@ -18,11 +23,9 @@ import {
   NotificationResourceType,
   PREFERENCE_CHANNELS,
   PREFERENCE_WILDCARD_TYPE,
+  type NotificationType,
 } from '@synapsedesk/common';
 import { ToBoolean } from '../../../../common/decorators/to-boolean.decorator';
-
-/** How many ids one bulk-read may carry. Bounded because it arrives from a client. */
-const MAX_BULK_IDS = 200;
 
 /**
  * The feed query — CURSOR-paginated, so no `page`.
@@ -35,7 +38,7 @@ const MAX_BULK_IDS = 200;
 export class ListNotificationsQueryDto {
   @IsOptional()
   @IsIn(NOTIFICATION_TYPE_VALUES)
-  readonly type?: string;
+  readonly type?: NotificationType;
 
   @IsOptional()
   @IsBoolean()
@@ -49,18 +52,15 @@ export class ListNotificationsQueryDto {
 
   @IsOptional()
   @IsString()
-  // Opaque, and length-bounded rather than pattern-matched: it is base64 of a
-  // pair we issued, and validating its structure here would duplicate the
-  // decoder that already returns null for anything it did not produce.
-  @MaxLength(500)
+  @MaxLength(MAX_FEED_CURSOR_LENGTH)
   readonly cursor?: string;
 
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  @Max(100)
-  readonly limit?: number = 20;
+  @Max(NOTIFICATION_FEED_LIMIT.MAX)
+  readonly limit?: number = NOTIFICATION_FEED_LIMIT.DEFAULT;
 }
 
 /**
@@ -73,13 +73,13 @@ export class ListNotificationsQueryDto {
 export class MarkManyReadDto {
   @IsOptional()
   @IsArray()
-  @ArrayMaxSize(MAX_BULK_IDS)
+  @ArrayMaxSize(MAX_BULK_NOTIFICATION_IDS)
   @IsUUID('4', { each: true })
   readonly ids?: string[];
 
   @IsOptional()
   @IsIn(Object.values(NotificationResourceType))
-  readonly resourceType?: string;
+  readonly resourceType?: NotificationResourceType;
 
   @IsOptional()
   @IsUUID('4')
@@ -89,22 +89,26 @@ export class MarkManyReadDto {
 export class UpdatePreferenceDto {
   /** A known type, or `'*'` for the catch-all that turns a channel off wholesale. */
   @IsIn([PREFERENCE_WILDCARD_TYPE, ...NOTIFICATION_TYPE_VALUES])
-  readonly type!: string;
+  readonly type!: NotificationType | typeof PREFERENCE_WILDCARD_TYPE;
 
   // `WEBHOOK` is absent on purpose: it is in the channel enum for completeness
   // and has no implementation, so a preference for it would control nothing.
   @IsIn(PREFERENCE_CHANNELS)
-  readonly channel!: string;
+  readonly channel!: (typeof PREFERENCE_CHANNELS)[number];
 
   // No `@ToBoolean()`: this arrives in a JSON BODY, where `true` is already a
-  // boolean, whereas the query DTOs above parse strings. Coercing here would
-  // turn the string `"false"` into `true` on the one route where a client can
-  // legitimately send a real boolean.
+  // boolean, whereas the query DTOs above parse strings.
+  //
+  // The reason used to be that coercing would turn `"false"` into `true` — that
+  // was a description of `@Type(() => Boolean)`, and `@ToBoolean` never did it.
+  // The decision stands on the narrower ground: a body field that is already
+  // the right type needs no transform, and adding one would quietly accept the
+  // STRING `"true"` on a route whose contract says boolean.
   @IsOptional()
   @IsBoolean()
   readonly isEnabled?: boolean;
 
   @IsOptional()
   @IsIn(Object.values(DigestMode))
-  readonly digest?: string;
+  readonly digest?: DigestMode;
 }

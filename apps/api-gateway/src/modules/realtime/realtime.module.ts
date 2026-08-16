@@ -23,7 +23,7 @@ import { WsThrottlerService } from './ws-throttler.service';
  */
 @Module({
   // `TicketsModule` for `MessagesGrpcClient` — `message:send` calls the SAME
-  // RPC the HTTP controller calls (22-doc §2.1), so it reuses that client
+  // RPC the HTTP controller calls, so it reuses that client
   // rather than opening a second path to the same write.
   imports: [AuthModule, TicketsModule, RedisModule],
   controllers: [
@@ -34,12 +34,12 @@ import { WsThrottlerService } from './ws-throttler.service';
   providers: [
     RealtimeGateway,
     TicketAccessService,
-    // Holds the `Chat` server-stream per socket — 22-doc §5. In this module
+    // Holds the `Chat` server-stream per socket. In this module
     // rather than a `ChatModule` because the thing it owns is a SOCKET's
     // lifetime: a stream is cancelled by disconnect, and disconnect is only
     // observable here.
     AiStreamService,
-    // Redis-backed rather than in-process — 22-doc §4. A pod that crashes never
+    // Redis-backed rather than in-process. A pod that crashes never
     // sends `disconnect`, so anything derived from disconnect events leaks
     // "online forever"; an expiring key needs no cleanup at all.
     PresenceService,

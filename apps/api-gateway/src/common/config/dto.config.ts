@@ -39,13 +39,6 @@ export const MAX_DEPARTMENT_NAME_LENGTH = 100;
  * eligible, and DECLINES the rest by name. Rejecting the whole request at six
  * would make the Worker guess the policy, and it would lose the names the
  * ticket's "attachments were not accepted" note is built from.
- *
- * Here rather than beside the DTO because this file is where a bound on an
- * incoming body belongs — the same shelf as the two batch limits above it. The
- * other two bounds on this route (`MAX_ATTACHMENT_BYTES`, the file-name length)
- * are in `@synapsedesk/common` because ticket-service enforces them too; this
- * one is the gateway's alone, and a local `const` in a DTO made three bounds on
- * one route live in three places.
  */
 export const MAX_PRESENTED_ATTACHMENTS = 20;
 
@@ -62,10 +55,35 @@ export const MAX_ROLE_NAME_LENGTH = 100;
 /** A document belongs to a handful of departments, not hundreds. */
 export const MAX_DOCUMENT_DEPARTMENTS = 50;
 
-// SORT_ORDER_OPTIONS / SortOrder / DEFAULT_SEARCH moved to @synapsedesk/common:
-// auth-service clamps `limit` a second time (it is reachable over gRPC, where no
-// ValidationPipe ever ran), and two copies of MAX_LIMIT is how the edge and the
-// service end up disagreeing about what "too many" means.
+// ------------------------------------------------------------ uploads
+
+/** Longest file name a presign DTO accepts. */
+export const MAX_UPLOAD_FILE_NAME_LENGTH = 255;
+
+/** Largest avatar a presign DTO accepts, in bytes (2 MiB). */
+export const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
+
+// ------------------------------------------------------------- free text
+
+/** Longest reason accepted when changing a ticket's status. */
+export const MAX_STATUS_CHANGE_REASON_LENGTH = 500;
+
+/** Longest instruction accepted when steering an AI draft. */
+export const MAX_DRAFT_INSTRUCTION_LENGTH = 500;
+
+// ---------------------------------------------------- notification feed
+
+/** Most notification ids one bulk-read may carry. */
+export const MAX_BULK_NOTIFICATION_IDS = 200;
+
+/** Longest notification feed cursor accepted. */
+export const MAX_FEED_CURSOR_LENGTH = 500;
+
+/** Page size for the cursor-paginated notification feed. */
+export const NOTIFICATION_FEED_LIMIT = {
+  DEFAULT: 20,
+  MAX: 100,
+} as const;
 
 // ------------------------------------------------------- inbound email
 //

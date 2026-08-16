@@ -1,8 +1,19 @@
 import { expectRpc } from '@synapsedesk/common/testing/rpc';
 import { status } from '@grpc/grpc-js';
 import { faker } from '@faker-js/faker';
-import { toProtoTimestamp } from '@synapsedesk/grpc-proto';
-import { compareAlphabetically } from '@synapsedesk/common';
+import {
+  fromProtoAuditAction,
+  toProtoAuditAction,
+  toProtoAuditResourceType,
+  toProtoTimestamp,
+  type ListAuditLogsRequest,
+  type ProtoTimestamp,
+} from '@synapsedesk/grpc-proto';
+import {
+  AuditAction,
+  AuditResourceType,
+  compareAlphabetically,
+} from '@synapsedesk/common';
 import {
   E2eFixture,
   bootstrapE2eTest,
@@ -24,16 +35,32 @@ describe('§2.9 Audit logs read API (e2e)', () => {
       'audit.read',
     ]);
 
-  const listRequest = (overrides: Record<string, unknown> = {}) => ({
+  /**
+   * Takes DOMAIN values and converts, so call sites still read
+   * `{ action: AuditAction.USER_CREATED }` rather than a proto member name.
+   *
+   * The two enumerated filters default to UNSPECIFIED — which is what the empty
+   * strings here used to stand in for, and what test 5 below is about.
+   */
+  const listRequest = (
+    overrides: Partial<{
+      action: AuditAction;
+      userId: string;
+      resourceType: AuditResourceType;
+      resourceId: string;
+      from: ProtoTimestamp;
+      to: ProtoTimestamp;
+      platformScope: boolean;
+    }> = {},
+  ): ListAuditLogsRequest => ({
     page: pageRequest(),
-    action: '',
-    userId: '',
-    resourceType: '',
-    resourceId: '',
-    from: undefined,
-    to: undefined,
-    platformScope: false,
-    ...overrides,
+    action: toProtoAuditAction(overrides.action),
+    userId: overrides.userId ?? '',
+    resourceType: toProtoAuditResourceType(overrides.resourceType),
+    resourceId: overrides.resourceId ?? '',
+    from: overrides.from,
+    to: overrides.to,
+    platformScope: overrides.platformScope ?? false,
   });
 
   beforeAll(async () => {
@@ -54,11 +81,11 @@ describe('§2.9 Audit logs read API (e2e)', () => {
     it('1. is TENANT-scoped', async () => {
       await createAuditLog(fx.prisma, {
         organizationId: tenant.organizationId,
-        action: 'USER_CREATED',
+        action: AuditAction.USER_CREATED,
       });
       await createAuditLog(fx.prisma, {
         organizationId: faker.string.uuid(),
-        action: 'USER_CREATED',
+        action: AuditAction.USER_CREATED,
       });
 
       const { items } = await audit.listAuditLogs(listRequest(), auditor());
@@ -73,7 +100,7 @@ describe('§2.9 Audit logs read API (e2e)', () => {
       // happened to other customers.
       await createAuditLog(fx.prisma, {
         organizationId: tenant.organizationId,
-        action: 'USER_CREATED',
+        action: AuditAction.USER_CREATED,
       });
       await createAuditLog(fx.prisma, {
         organizationId: null,
@@ -83,7 +110,9 @@ describe('§2.9 Audit logs read API (e2e)', () => {
       const { items } = await audit.listAuditLogs(listRequest(), auditor());
 
       expect(items).toHaveLength(1);
-      expect(items[0].action).toBe('USER_CREATED');
+      expect(fromProtoAuditAction(items[0].action)).toBe(
+        AuditAction.USER_CREATED,
+      );
     });
 
     it('3. shows the platform view ONLY platform rows', async () => {
@@ -91,7 +120,7 @@ describe('§2.9 Audit logs read API (e2e)', () => {
       // platform activity must not have a customer's rows folded in.
       await createAuditLog(fx.prisma, {
         organizationId: tenant.organizationId,
-        action: 'USER_CREATED',
+        action: AuditAction.USER_CREATED,
       });
       await createAuditLog(fx.prisma, {
         organizationId: null,
@@ -141,16 +170,21 @@ describe('§2.9 Audit logs read API (e2e)', () => {
     const seed = async () => {
       await createAuditLog(fx.prisma, {
         organizationId: tenant.organizationId,
-        action: 'USER_CREATED',
+        action: AuditAction.USER_CREATED,
         userId: tenant.userId,
-        resourceType: 'User',
+        resourceType: AuditResourceType.USER,
         createdAt: new Date('2026-01-15T00:00:00.000Z'),
       });
+      // **`TICKET_ASSIGNED` / `Ticket` used to be seeded here, and no producer
+      // anywhere emits either.** Every `audit.record` publisher passes an
+      // `AuditAction` member, and `AuditResourceType` has no TICKET — so these
+      // rows were testing the filter against values the table can never hold.
+      // The behaviour under test is unchanged; only the fixtures are real now.
       await createAuditLog(fx.prisma, {
         organizationId: tenant.organizationId,
-        action: 'TICKET_ASSIGNED',
+        action: AuditAction.ROLE_CREATED,
         userId: tenant.agentId,
-        resourceType: 'Ticket',
+        resourceType: AuditResourceType.ROLE,
         createdAt: new Date('2026-06-15T00:00:00.000Z'),
       });
     };
@@ -159,12 +193,14 @@ describe('§2.9 Audit logs read API (e2e)', () => {
       await seed();
 
       const { items } = await audit.listAuditLogs(
-        listRequest({ action: 'TICKET_ASSIGNED' }),
+        listRequest({ action: AuditAction.ROLE_CREATED }),
         auditor(),
       );
 
       expect(items).toHaveLength(1);
-      expect(items[0].action).toBe('TICKET_ASSIGNED');
+      expect(fromProtoAuditAction(items[0].action)).toBe(
+        AuditAction.ROLE_CREATED,
+      );
     });
 
     it('2. filters by USER', async () => {
@@ -183,7 +219,7 @@ describe('§2.9 Audit logs read API (e2e)', () => {
       await seed();
 
       const { items } = await audit.listAuditLogs(
-        listRequest({ resourceType: 'Ticket' }),
+        listRequest({ resourceType: AuditResourceType.ROLE }),
         auditor(),
       );
 
@@ -202,12 +238,14 @@ describe('§2.9 Audit logs read API (e2e)', () => {
       );
 
       expect(items).toHaveLength(1);
-      expect(items[0].action).toBe('TICKET_ASSIGNED');
+      expect(fromProtoAuditAction(items[0].action)).toBe(
+        AuditAction.ROLE_CREATED,
+      );
     });
 
-    it('5. treats an EMPTY filter string as "no filter"', async () => {
-      // proto3 scalars have no null; '' is what an absent filter arrives as.
-      // Reading it as a literal value would return nothing at all.
+    it('5. treats UNSPECIFIED as "no filter"', async () => {
+      // proto3 scalars have no null, so an omitted enum filter arrives as the
+      // zero value. Reading that as a literal member would return nothing.
       await seed();
 
       const { items } = await audit.listAuditLogs(listRequest(), auditor());
@@ -219,7 +257,7 @@ describe('§2.9 Audit logs read API (e2e)', () => {
       await seed();
 
       const { items, meta } = await audit.listAuditLogs(
-        listRequest({ action: 'USER_CREATED' }),
+        listRequest({ action: AuditAction.USER_CREATED }),
         auditor(),
       );
 
@@ -237,7 +275,7 @@ describe('§2.9 Audit logs read API (e2e)', () => {
       // people to distrust the filter.
       await createAuditLog(fx.prisma, {
         organizationId: tenant.organizationId,
-        action: 'USER_CREATED',
+        action: AuditAction.USER_CREATED,
       });
       await createAuditLog(fx.prisma, {
         organizationId: null,
@@ -249,14 +287,16 @@ describe('§2.9 Audit logs read API (e2e)', () => {
         auditor(),
       );
 
-      expect(actions).toEqual(['USER_CREATED']);
+      expect(actions.map((action) => fromProtoAuditAction(action))).toEqual([
+        AuditAction.USER_CREATED,
+      ]);
     });
 
     it('2. DEDUPLICATES repeated actions', async () => {
       for (let i = 0; i < 3; i++) {
         await createAuditLog(fx.prisma, {
           organizationId: tenant.organizationId,
-          action: 'USER_CREATED',
+          action: AuditAction.USER_CREATED,
         });
       }
 
@@ -265,11 +305,22 @@ describe('§2.9 Audit logs read API (e2e)', () => {
         auditor(),
       );
 
-      expect(actions).toEqual(['USER_CREATED']);
+      expect(actions.map((action) => fromProtoAuditAction(action))).toEqual([
+        AuditAction.USER_CREATED,
+      ]);
     });
 
     it('3. sorts alphabetically, so the dropdown order is stable', async () => {
-      for (const action of ['USER_CREATED', 'AUTH_LOGIN', 'TICKET_ASSIGNED']) {
+      // Three real members, chosen so alphabetical order and ENUM order
+      // disagree — `USER_CREATED` is 14 and `ROLE_CREATED` is 10, so a service
+      // that sorted the numbers instead would put them the other way round.
+      // That is the regression this test exists for now that the wire carries
+      // integers rather than names.
+      for (const action of [
+        AuditAction.USER_CREATED,
+        AuditAction.DEPARTMENT_CREATED,
+        AuditAction.ROLE_CREATED,
+      ]) {
         await createAuditLog(fx.prisma, {
           organizationId: tenant.organizationId,
           action,
@@ -281,10 +332,10 @@ describe('§2.9 Audit logs read API (e2e)', () => {
         auditor(),
       );
 
-      expect(actions).toEqual([
-        'AUTH_LOGIN',
-        'TICKET_ASSIGNED',
-        'USER_CREATED',
+      expect(actions.map((action) => fromProtoAuditAction(action))).toEqual([
+        AuditAction.DEPARTMENT_CREATED,
+        AuditAction.ROLE_CREATED,
+        AuditAction.USER_CREATED,
       ]);
     });
 

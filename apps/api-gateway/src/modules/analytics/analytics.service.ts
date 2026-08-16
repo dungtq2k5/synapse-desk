@@ -1,3 +1,4 @@
+import { fromProtoDocumentFlagType } from '@synapsedesk/grpc-proto';
 import { Injectable } from '@nestjs/common';
 import { RequestContext } from '@synapsedesk/common';
 import { AnalyticsCacheService } from './analytics-cache.service';
@@ -14,6 +15,12 @@ import {
   DocumentAnalyticsDto,
   KnowledgeGapsDto,
   UnavailableBlockDto,
+  AiUsageDto,
+  DeflectionDto,
+  OverviewDto,
+  ResponseTimesDto,
+  SatisfactionDto,
+  VolumeDto,
 } from './dto/rest/analytics-response.dto';
 
 /**
@@ -41,37 +48,55 @@ export class AnalyticsService {
 
   // ------------------------------------------- the six single-service reads
 
-  overview(query: AnalyticsRangeQueryDto, context: RequestContext) {
+  overview(
+    query: AnalyticsRangeQueryDto,
+    context: RequestContext,
+  ): Promise<OverviewDto> {
     return this.cached('overview', query, context, () =>
       this.client.overview(query, context),
     );
   }
 
-  deflection(query: AnalyticsRangeQueryDto, context: RequestContext) {
+  deflection(
+    query: AnalyticsRangeQueryDto,
+    context: RequestContext,
+  ): Promise<DeflectionDto> {
     return this.cached('deflection', query, context, () =>
       this.client.deflection(query, context),
     );
   }
 
-  responseTimes(query: AnalyticsRangeQueryDto, context: RequestContext) {
+  responseTimes(
+    query: AnalyticsRangeQueryDto,
+    context: RequestContext,
+  ): Promise<ResponseTimesDto> {
     return this.cached('response-times', query, context, () =>
       this.client.responseTimes(query, context),
     );
   }
 
-  volume(query: AnalyticsRangeQueryDto, context: RequestContext) {
+  volume(
+    query: AnalyticsRangeQueryDto,
+    context: RequestContext,
+  ): Promise<VolumeDto> {
     return this.cached('volume', query, context, () =>
       this.client.volume(query, context),
     );
   }
 
-  satisfaction(query: AnalyticsRangeQueryDto, context: RequestContext) {
+  satisfaction(
+    query: AnalyticsRangeQueryDto,
+    context: RequestContext,
+  ): Promise<SatisfactionDto> {
     return this.cached('satisfaction', query, context, () =>
       this.client.satisfaction(query, context),
     );
   }
 
-  aiUsage(query: AnalyticsRangeQueryDto, context: RequestContext) {
+  aiUsage(
+    query: AnalyticsRangeQueryDto,
+    context: RequestContext,
+  ): Promise<AiUsageDto> {
     return this.cached('ai-usage', query, context, () =>
       this.client.aiUsage(query, context),
     );
@@ -214,7 +239,13 @@ export class AnalyticsService {
           numerator: gaps?.emptyRetrievalRate?.numerator ?? 0,
           denominator: gaps?.emptyRetrievalRate?.denominator ?? 0,
         },
-        flags: gaps?.flags ?? [],
+        // Mapped rather than passed through: `flags` is the raw wire shape,
+        // and its `flagType` is a numeric proto enum that would otherwise reach
+        // a JSON response as an integer.
+        flags: (gaps?.flags ?? []).map((flag) => ({
+          ...flag,
+          flagType: fromProtoDocumentFlagType(flag.flagType),
+        })),
         dataThrough: gaps?.dataThrough ?? null,
         unavailable,
       };

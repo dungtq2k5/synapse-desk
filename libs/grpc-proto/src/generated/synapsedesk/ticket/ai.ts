@@ -9,6 +9,7 @@ import type { Metadata } from "@grpc/grpc-js";
 import { GrpcMethod, GrpcStreamMethod } from "@nestjs/microservices";
 import { Observable } from "rxjs";
 import { Timestamp } from "../../google/protobuf/timestamp";
+import { TicketPriority } from "./common";
 
 export interface AiSummaryResponse {
   id: string;
@@ -83,7 +84,12 @@ export interface SuggestedArticleResponse {
 
 export interface ClassifyTicketResponse {
   suggestedDepartmentId: string;
-  suggestedPriority: string;
+  /**
+   * The enum this package already declares, rather than its NAME as a string.
+   * A suggestion the agent can apply with one click must name a priority the
+   * ticket surface accepts, and this is what makes the two the same type.
+   */
+  suggestedPriority: TicketPriority;
   confidenceScore: number;
 }
 

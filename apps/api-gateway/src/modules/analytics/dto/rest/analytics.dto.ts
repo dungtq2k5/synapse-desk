@@ -12,6 +12,8 @@ import {
   ANALYTICS_EXPORT_KINDS,
   ANALYTICS_GRANULARITIES,
   ANALYTICS_TOP_N,
+  AnalyticsGranularity,
+  AnalyticsExportKind,
 } from '@synapsedesk/common';
 
 /**
@@ -36,7 +38,7 @@ export class AnalyticsRangeQueryDto {
 
   @IsOptional()
   @IsIn(ANALYTICS_GRANULARITIES)
-  readonly granularity?: string;
+  readonly granularity?: AnalyticsGranularity;
 }
 
 /** Knowledge gaps and document lists take a size rather than a page. */
@@ -76,7 +78,7 @@ export class DocumentAnalyticsQueryDto {
  */
 export class CreateExportDto {
   @IsIn(ANALYTICS_EXPORT_KINDS)
-  readonly kind!: string;
+  readonly kind!: AnalyticsExportKind;
 
   @IsISO8601({ strict: true })
   readonly from!: string;

@@ -1,4 +1,4 @@
-import { StoragePurpose } from '@synapsedesk/common';
+import { StoragePurpose, type MimeType } from '@synapsedesk/common';
 
 /**
  * What each purpose allows — §2.1.
@@ -13,7 +13,7 @@ import { StoragePurpose } from '@synapsedesk/common';
  * anyone is thinking about it.
  */
 export type PurposePolicy = {
-  mimeAllowlist: readonly string[];
+  mimeAllowlist: readonly MimeType[];
   maxSizeBytes: number;
   /** The path segment under `organizations/{orgId}/`. */
   prefix: string;
@@ -81,26 +81,11 @@ export const PURPOSE_POLICY: Record<StoragePurpose, PurposePolicy> = {
 };
 
 /**
- * The extension a stored object gets, derived from its MIME TYPE.
+ * Re-exported so call sites here need one import, not two.
  *
- * Never from the client's filename. `invoice.pdf.php` is a perfectly plausible
- * upload, and taking the extension from the name is how it becomes a `.php`
- * object sitting in a bucket. The name is preserved separately, for the
- * content-disposition on reads.
- *
- * An unknown type yields `bin` rather than throwing: by the time this runs the
- * type has already passed the allowlist, so the only way here is an allowlist
- * entry with no mapping — a naming gap, not a security one.
+ * The table itself lives in `libs/common` beside the vocabulary: storage-service
+ * names an object's extension and ingestion-service writes the same string into
+ * `documents.file_type`, and they had drifted into two tables mapping the same
+ * thing.
  */
-const EXTENSION_BY_MIME: Record<string, string> = {
-  'image/png': 'png',
-  'image/jpeg': 'jpg',
-  'image/webp': 'webp',
-  'application/pdf': 'pdf',
-  'text/plain': 'txt',
-  'text/markdown': 'md',
-};
-
-export function extensionFor(contentType: string): string {
-  return EXTENSION_BY_MIME[contentType] ?? 'bin';
-}
+export { extensionFor } from '@synapsedesk/common';

@@ -12,7 +12,9 @@ import { AuthReferenceService } from '../auth-client/auth-reference.service';
 /** How many trailing days a routine run recomputes. */
 const DEFAULT_TRAILING_DAYS = 2;
 
+// ASK Why we have two `docblock`?
 /** What one run did, for the log and the tests. */
+/** What one rollup run wrote. */
 export type RollupOutcome = {
   tenants: number;
   ticketRows: number;

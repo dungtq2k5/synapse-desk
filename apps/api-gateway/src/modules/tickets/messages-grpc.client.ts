@@ -8,8 +8,9 @@ import {
   TICKET_GRPC_CLIENT,
   toPageRequest,
   GetAiAttachmentsResponse,
+  toProtoMessageAnswerStatus,
 } from '@synapsedesk/grpc-proto';
-import { RequestContext } from '@synapsedesk/common';
+import { AnswerStatus, RequestContext } from '@synapsedesk/common';
 import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
 import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
 import { toPaginationMetaDataResponseDto } from '../../common/mappers/pagination.mapper';
@@ -129,19 +130,30 @@ export class MessagesGrpcClient extends BaseGrpcClient implements OnModuleInit {
     content: string,
     generationId: string | undefined,
     context: RequestContext,
+    // ASK This `docblock` seems to be invalid
     /**
-     * The `AnswerStatus` name, persisted on the row — 36-doc §7.
+     * What the generation concluded, persisted on the row — 36-doc §7.
      *
      * The gateway held this in the completion frame and dropped it on write, so
      * once the socket closed a thread could not tell a refusal from an answer.
+     *
+     * The DOMAIN enum, not the wire one and no longer a bare `string`. The
+     * caller is `ai-stream.service.ts`, which reads rag's numeric enum off the
+     * stream — it now converts once, through `fromProtoRagAnswerStatus`, rather
+     * than rebuilding the name here with a reverse lookup and a `.replace()`.
      */
-    answerStatus?: string,
+    answerStatus: AnswerStatus | null,
   ): Promise<MessageResponseDto> {
     return toMessageResponseDto(
       await this.call(
         (metadata) =>
           this.messageGrpcService.appendAiMessage(
-            { ticketId, content, generationId, answerStatus },
+            {
+              ticketId,
+              content,
+              generationId,
+              answerStatus: toProtoMessageAnswerStatus(answerStatus),
+            },
             metadata,
           ),
         context,

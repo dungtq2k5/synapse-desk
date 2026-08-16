@@ -1,6 +1,7 @@
 import { getQueueToken } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import {
+  compareAlphabetically,
   JobHealthService,
   JobRunRecorder,
   repeatJobId,
@@ -83,11 +84,11 @@ describe('§1 The scheduler (e2e)', () => {
       expect(repeats).toHaveLength(2);
       // Keyed by the id we chose, not by a hash of the options — which is what
       // makes a CHANGED cron an update rather than a second schedule.
-      expect(repeats.map((r) => r.key).sort()).toEqual(
+      expect(repeats.map((r) => r.key).sort(compareAlphabetically)).toEqual(
         [
           repeatJobId(SCHEDULED_JOBS.LEDGER_DAILY),
           repeatJobId(SCHEDULED_JOBS.LEDGER_HOURLY),
-        ].sort(),
+        ].sort(compareAlphabetically),
       );
     });
 

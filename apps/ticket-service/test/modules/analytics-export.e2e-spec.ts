@@ -1,3 +1,8 @@
+import {
+  AnalyticsExportKind as ProtoAnalyticsExportKind,
+  fromProtoAnalyticsExportStatus,
+  toProtoAnalyticsExportKind,
+} from '@synapsedesk/grpc-proto';
 import { status } from '@grpc/grpc-js';
 import { expectRpc } from '@synapsedesk/common/testing/rpc';
 import {
@@ -50,7 +55,7 @@ describe('§5 The analytics export (e2e)', () => {
   const request = (overrides = {}) =>
     facade.create(
       {
-        kind: AnalyticsExportKind.TICKET_DAILY,
+        kind: toProtoAnalyticsExportKind(AnalyticsExportKind.TICKET_DAILY),
         from: '2026-03-01',
         to: '2026-03-31',
         ...overrides,
@@ -161,7 +166,9 @@ describe('§5 The analytics export (e2e)', () => {
       const created = await request();
 
       expect(created.id).toBeTruthy();
-      expect(created.status).toBe(AnalyticsExportStatus.PENDING);
+      expect(fromProtoAnalyticsExportStatus(created.status)).toBe(
+        AnalyticsExportStatus.PENDING,
+      );
       expect(created.downloadUrl).toBeUndefined();
       // Nothing uploaded yet.
       expect(presignExport).not.toHaveBeenCalled();
@@ -174,7 +181,9 @@ describe('§5 The analytics export (e2e)', () => {
       await runWorker(created.id);
       const ready = await facade.get(created.id, caller());
 
-      expect(ready.status).toBe(AnalyticsExportStatus.READY);
+      expect(fromProtoAnalyticsExportStatus(ready.status)).toBe(
+        AnalyticsExportStatus.READY,
+      );
       expect(ready.downloadUrl).toBe(DOWNLOAD_URL);
       expect(ready.rowCount).toBe(1);
       expect(confirmExportUpload).toHaveBeenCalledWith(
@@ -218,7 +227,13 @@ describe('§5 The analytics export (e2e)', () => {
     });
 
     it('5. Refuses an unknown export kind', async () => {
-      await expectRpc(request({ kind: 'EVERYTHING' }), status.INVALID_ARGUMENT);
+      await expectRpc(
+        // `'EVERYTHING'` is unexpressible now; UNRECOGNIZED is the case
+        // that survives — a kind some newer build knows and this one cannot
+        // produce.
+        request({ kind: ProtoAnalyticsExportKind.UNRECOGNIZED }),
+        status.INVALID_ARGUMENT,
+      );
     });
   });
 
@@ -278,7 +293,9 @@ describe('§5 The analytics export (e2e)', () => {
         at('2026-03-05T00:00:00.000Z'),
       );
 
-      const created = await request({ kind: AnalyticsExportKind.AGENT_DAILY });
+      const created = await request({
+        kind: toProtoAnalyticsExportKind(AnalyticsExportKind.AGENT_DAILY),
+      });
       await runWorker(created.id);
 
       const [csv] = uploadedBodies;
@@ -317,7 +334,9 @@ describe('§5 The analytics export (e2e)', () => {
       const ready = await facade.get(created.id, caller());
       const [csv] = uploadedBodies;
 
-      expect(ready.status).toBe(AnalyticsExportStatus.READY);
+      expect(fromProtoAnalyticsExportStatus(ready.status)).toBe(
+        AnalyticsExportStatus.READY,
+      );
       expect(ready.rowCount).toBe(0);
       expect(csv).toContain('# generated_at=');
       expect(csv).toContain('# rollup_computed_at=none');
@@ -336,7 +355,9 @@ describe('§5 The analytics export (e2e)', () => {
       await expect(runWorker(created.id)).rejects.toThrow('storage is down');
 
       const failed = await facade.get(created.id, caller());
-      expect(failed.status).toBe(AnalyticsExportStatus.FAILED);
+      expect(fromProtoAnalyticsExportStatus(failed.status)).toBe(
+        AnalyticsExportStatus.FAILED,
+      );
       expect(failed.error).toContain('storage is down');
       expect(failed.downloadUrl).toBeUndefined();
       expect(uploadedBodies).toHaveLength(0);
@@ -350,7 +371,9 @@ describe('§5 The analytics export (e2e)', () => {
       await expect(runWorker(created.id)).rejects.toThrow();
 
       const failed = await facade.get(created.id, caller());
-      expect(failed.status).toBe(AnalyticsExportStatus.FAILED);
+      expect(fromProtoAnalyticsExportStatus(failed.status)).toBe(
+        AnalyticsExportStatus.FAILED,
+      );
       expect(failed.error).toContain('403');
     });
 
@@ -363,15 +386,19 @@ describe('§5 The analytics export (e2e)', () => {
 
       const created = await request();
       await expect(runWorker(created.id)).rejects.toThrow('transient');
-      expect((await facade.get(created.id, caller())).status).toBe(
-        AnalyticsExportStatus.FAILED,
-      );
+      expect(
+        fromProtoAnalyticsExportStatus(
+          (await facade.get(created.id, caller())).status,
+        ),
+      ).toBe(AnalyticsExportStatus.FAILED);
 
       // The retry BullMQ would perform.
       await runWorker(created.id);
 
       const ready = await facade.get(created.id, caller());
-      expect(ready.status).toBe(AnalyticsExportStatus.READY);
+      expect(fromProtoAnalyticsExportStatus(ready.status)).toBe(
+        AnalyticsExportStatus.READY,
+      );
       expect(ready.error).toBeUndefined();
     });
   });

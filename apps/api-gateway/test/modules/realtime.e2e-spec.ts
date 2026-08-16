@@ -1,3 +1,4 @@
+import { MessageAnswerStatus } from '@synapsedesk/grpc-proto';
 import { Logger } from '@nestjs/common';
 import { Observable, of, Subject, throwError } from 'rxjs';
 import { faker } from '@faker-js/faker';
@@ -851,9 +852,9 @@ describe('the real-time relay (e2e)', () => {
       // And the status is persisted, so a thread read later can still tell a
       // refusal from an answer.
       const [[appended]] = fx.stubs.message.appendAiMessage.mock.calls;
-      expect((appended as { answerStatus?: string }).answerStatus).toBe(
-        'REFUSED',
-      );
+      expect(
+        (appended as { answerStatus?: MessageAnswerStatus }).answerStatus,
+      ).toBe(MessageAnswerStatus.MESSAGE_ANSWER_STATUS_REFUSED);
     });
 
     it('an ordinary answer marks NOTHING', async () => {

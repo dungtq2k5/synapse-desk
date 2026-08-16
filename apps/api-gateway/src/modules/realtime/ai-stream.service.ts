@@ -11,8 +11,13 @@ import {
   RAG_SERVICE_NAME,
   RagServiceClient,
   packRequestContext,
+  fromProtoRagAnswerStatus,
 } from '@synapsedesk/grpc-proto';
-import { formatErrorMsg, RequestContext } from '@synapsedesk/common';
+import {
+  AnswerStatus as DomainAnswerStatus,
+  formatErrorMsg,
+  RequestContext,
+} from '@synapsedesk/common';
 import type { ErrorResponse } from '../../common/interfaces/http-response.interface';
 import { WsResponse } from '../../common/interfaces/ws-response.interface';
 import { MessagesGrpcClient } from '../tickets/messages-grpc.client';
@@ -20,6 +25,8 @@ import { TicketsGrpcClient } from '../tickets/tickets-grpc.client';
 import { ListMessagesQueryDto } from '../tickets/dto/rest/message.dto';
 import { REALTIME_EVENTS } from './realtime.config';
 import {
+  UNSPECIFIED_FRAME_STATUS,
+  type FrameAnswerStatus,
   AiStreamAttachmentsSkippedPayloadDto,
   AiStreamChunkPayloadDto,
   AiStreamDonePayloadDto,
@@ -308,7 +315,7 @@ export class AiStreamService implements OnModuleInit {
       // question refused by injection detection takes the same path as a
       // greeting: the reply is appended, the thread keeps its record, and
       // nothing escalates, because the workspace's budget is untouched and
-      // there is nothing for a human to pick up. `statusName` carries the
+      // there is nothing for a human to pick up. `toFrameAnswerStatus` carries the
       // distinction to the client, which is the entire reason the proto gained
       // a value rather than reusing `GREETING`.
       if (completion.status === AnswerStatus.ANSWER_STATUS_AT_CAP) {
@@ -319,7 +326,7 @@ export class AiStreamService implements OnModuleInit {
           content: '',
           citations: [],
           escalated: true,
-          status: 'AT_CAP',
+          status: DomainAnswerStatus.AT_CAP,
         });
         this.logger.log(
           `Stream ${streamId} hit the AI cap; ticket ${ticket.id} escalated`,
@@ -347,8 +354,10 @@ export class AiStreamService implements OnModuleInit {
         completion.generationId,
         context,
         // Persisted, so a thread read after the socket closed can still tell a
-        // refusal from an answer.
-        statusName(completion.status),
+        // refusal from an answer. Null for a status this build cannot name,
+        // which leaves the column NULL rather than writing `'UNSPECIFIED'` into
+        // it as a value.
+        fromProtoRagAnswerStatus(completion.status),
       );
 
       // Carries the message id, which is the whole reason `done` and
@@ -359,7 +368,7 @@ export class AiStreamService implements OnModuleInit {
         content: completion.content,
         citations: completion.citations,
         escalated: false,
-        status: statusName(completion.status),
+        status: toFrameAnswerStatus(completion.status),
       });
     } catch (error) {
       // The generation succeeded and the write did not. Reported as an error
@@ -379,7 +388,7 @@ export class AiStreamService implements OnModuleInit {
       content: string;
       citations: Citation[];
       escalated: boolean;
-      status: string;
+      status: FrameAnswerStatus;
     },
   ): void {
     client.emit(REALTIME_EVENTS.aiStreamDone, {
@@ -542,11 +551,27 @@ export class AiStreamService implements OnModuleInit {
   }
 }
 
-/** The proto enum as a name a client can switch on. */
-function statusName(status: AnswerStatus): string {
-  return AnswerStatus[status]?.replace('ANSWER_STATUS_', '') ?? 'UNSPECIFIED';
+// ASK This `docblock` seems to be invalid
+/**
+ * The WebSocket frame's status, as a name a client can switch on.
+ *
+ * **This used to BE the conversion**, doing it with a reverse enum lookup and a
+ * string edit: `AnswerStatus[status]?.replace('ANSWER_STATUS_', '') ??
+ * 'UNSPECIFIED'`. That value was both emitted on the socket AND persisted into
+ * `ticket_messages.answer_status`, a `VarChar(30)` — so the column's whole
+ * vocabulary was decided by a `.replace()`, and an enum member this build did
+ * not know wrote the literal `'UNSPECIFIED'` into a row.
+ *
+ * `fromProtoRagAnswerStatus` does the crossing now, against a domain enum that
+ * exists. What is left here is the FRAME's rendering, which keeps `'UNSPECIFIED'`
+ * as its own case deliberately: a socket frame has to carry something, and a
+ * client switching on the value needs a default arm it can name.
+ */
+function toFrameAnswerStatus(status: AnswerStatus): FrameAnswerStatus {
+  return fromProtoRagAnswerStatus(status) ?? UNSPECIFIED_FRAME_STATUS;
 }
 
+// ASK This `docblock` seems to be invalid
 /**
  * How many frames engine.io still has queued for this socket, or `null` when
  * the internal is no longer readable.

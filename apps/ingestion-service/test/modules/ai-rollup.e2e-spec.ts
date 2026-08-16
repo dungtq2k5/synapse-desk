@@ -2,15 +2,13 @@ import {
   AiGenerationPurpose,
   AiGenerationStatus,
   AiGenerationOutcome,
+  compareAlphabetically,
 } from '@synapsedesk/common';
 import { E2eFixture, bootstrapE2eTest } from '../utils';
 import { buildTenant, TenantFixture } from '../factories';
 import { AiGenerationRollupJob } from '../../src/modules/analytics/ai-generation-rollup.job';
 import { ChunkUsageProjection } from '../../src/modules/scheduled/chunk-usage.projection';
 import { AuthReferenceService } from '../../src/modules/auth-client/auth-reference.service';
-
-const SAIGON = 'Asia/Ho_Chi_Minh';
-const MODEL = 'model-under-test';
 
 /**
  * 19-doc §2.2 — the AI rollup.
@@ -27,6 +25,9 @@ describe('§2.2 The AI generation rollup (e2e)', () => {
   let listOrganizationTimezones: jest.SpyInstance;
 
   let tenant: TenantFixture;
+
+  const SAIGON = 'Asia/Ho_Chi_Minh';
+  const MODEL = 'model-under-test';
 
   beforeAll(async () => {
     fx = await bootstrapE2eTest();
@@ -139,12 +140,16 @@ describe('§2.2 The AI generation rollup (e2e)', () => {
       const rows = await statsFor('2026-03-02');
       expect(rows).toHaveLength(3);
       expect(
-        rows.map((row) => `${row.purpose}:${row.modelName}`).sort(),
-      ).toEqual([
-        `${AiGenerationPurpose.CHAT_ANSWER}:another-model`,
-        `${AiGenerationPurpose.CHAT_ANSWER}:${MODEL}`,
-        `${AiGenerationPurpose.EMBEDDING}:${MODEL}`,
-      ]);
+        rows
+          .map((row) => `${row.purpose}:${row.modelName}`)
+          .sort(compareAlphabetically),
+      ).toEqual(
+        [
+          `${AiGenerationPurpose.CHAT_ANSWER}:another-model`,
+          `${AiGenerationPurpose.CHAT_ANSWER}:${MODEL}`,
+          `${AiGenerationPurpose.EMBEDDING}:${MODEL}`,
+        ].sort(compareAlphabetically),
+      );
     });
 
     it('5. Sums tokens, cost and latency — with the latency COUNT beside it', async () => {

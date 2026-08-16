@@ -22,10 +22,17 @@
  * case, which no signature library can answer anyway.
  */
 
+import type { MimeType } from '@synapsedesk/common';
+
+// ASK This `docblock` seems to be invalid
 /**
- * Every type any purpose may declare. Kept as a literal union so the matcher
- * table below is TOTAL: adding a type to a `mimeAllowlist` without teaching it
- * how to be recognised is a compile error, not a silently unchecked upload.
+ * Every content type a storage purpose may declare.
+ *
+ * `as const` keeps the literals so the signature table below is checked for
+ * totality; `satisfies` holds every member to the shared {@link MimeType}
+ * vocabulary, so a misspelling is a compile error rather than an upload nobody
+ * checks. Add a member here and the matcher below stops compiling until it
+ * knows how to recognise it.
  */
 export const VALIDATED_MIME_TYPES = [
   'image/png',
@@ -40,7 +47,7 @@ export const VALIDATED_MIME_TYPES = [
   // would reject legitimate files while catching nothing.
   'text/csv',
   'application/json',
-] as const;
+] as const satisfies readonly MimeType[];
 
 export type ValidatedMimeType = (typeof VALIDATED_MIME_TYPES)[number];
 
@@ -50,6 +57,7 @@ export const SIGNATURE_SAMPLE_BYTES = 4096;
 const startsWith = (head: Buffer, bytes: readonly number[]): boolean =>
   head.length >= bytes.length && bytes.every((b, i) => head[i] === b);
 
+// ASK This `docblock` seems to be invalid
 /**
  * A text file has no signature, so "is this really text?" is answered the only
  * way it can be: it must not be something else, and it must decode.

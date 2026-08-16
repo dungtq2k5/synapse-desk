@@ -1,3 +1,9 @@
+import {
+  EXTENSION_BY_MIME,
+  UNKNOWN_EXTENSION,
+  type MimeType,
+} from './mime.config';
+
 /**
  * Domain C's enumerated columns and bounds.
  *
@@ -188,7 +194,7 @@ export const ALLOWED_DOCUMENT_MIME_TYPES = [
   'application/pdf',
   'text/plain',
   'text/markdown',
-] as const;
+] as const satisfies readonly MimeType[];
 export type AllowedDocumentMimeType =
   (typeof ALLOWED_DOCUMENT_MIME_TYPES)[number];
 
@@ -252,7 +258,7 @@ export const TESSERACT_CODE_BY_LANGUAGE: Record<OcrLanguage, string> = {
  *
  * **The measurement reversed the reasoning, so it is recorded here rather than
  * in the document that guessed.** The design expected accuracy to degrade as
- * languages were added, and hypothesised a cap of 2. It does not. Rendered at
+ * languages were added, and hypothesized a cap of 2. It does not. Rendered at
  * 300 dpi and OCR'd with tesseract 5.3.4:
  *
  * | `-l`                    | char error rate | time  |
@@ -305,12 +311,33 @@ export const DEFAULT_OCR_LANGUAGE: OcrLanguage = 'en';
 
 export const MAX_DOCUMENT_BYTES = 25 * 1024 * 1024;
 
-/** `documents.file_type` — the short extension, derived from the mime type. */
-export const FILE_TYPE_BY_MIME: Record<string, string> = {
-  'application/pdf': 'pdf',
-  'text/plain': 'txt',
-  'text/markdown': 'md',
-};
+/**
+ * Every value `documents.file_type` can hold.
+ *
+ * An EXTENSION (`pdf`), not a MIME type — a filter built from
+ * `AllowedDocumentMimeType` would ask for `application/pdf` and match no row.
+ *
+ * Derived from {@link EXTENSION_BY_MIME} and
+ * {@link ALLOWED_DOCUMENT_MIME_TYPES}, so widening the allowlist widens this.
+ * Includes {@link UNKNOWN_EXTENSION}, which confirm writes for an accepted type
+ * with no extension mapping.
+ */
+export type DocumentFileType =
+  | (typeof EXTENSION_BY_MIME)[AllowedDocumentMimeType &
+      keyof typeof EXTENSION_BY_MIME]
+  | typeof UNKNOWN_EXTENSION;
+
+/**
+ * {@link DocumentFileType}'s members as an array, for `@IsIn` and enum mapping.
+ *
+ * De-duplicated: two accepted MIME types can share one extension.
+ */
+export const DOCUMENT_FILE_TYPES: readonly DocumentFileType[] = [
+  ...new Set(
+    ALLOWED_DOCUMENT_MIME_TYPES.map((mime) => EXTENSION_BY_MIME[mime]),
+  ),
+  UNKNOWN_EXTENSION,
+];
 
 export const DOCUMENT_SORTABLE_FIELDS = [
   'createdAt',

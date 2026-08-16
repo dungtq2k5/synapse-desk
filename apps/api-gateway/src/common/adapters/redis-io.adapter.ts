@@ -48,7 +48,7 @@ export class RedisIoAdapter extends IoAdapter {
 
   /**
    * Must be awaited BEFORE `useWebSocketAdapter`, because `createIOServer` runs
-   * synchronously when the first gateway initialises and cannot wait for a
+   * synchronously when the first gateway initializes and cannot wait for a
    * connection that has not been made.
    *
    * Async by CONTRACT rather than by current implementation — ioredis connects

@@ -6,6 +6,7 @@ export * from './configs/organization.config';
 export * from './configs/rbac.config';
 export * from './configs/identity.config';
 export * from './configs/auth.config';
+export * from './configs/mime.config';
 export * from './configs/ticket.config';
 export * from './configs/nats.config';
 export * from './utils/utils';

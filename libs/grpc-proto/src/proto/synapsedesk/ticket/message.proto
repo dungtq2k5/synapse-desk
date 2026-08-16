@@ -11,6 +11,40 @@ import "synapsedesk/auth/common.proto";
 // fetched-then-filtered: filtering at serialization leaks the note's existence
 // through response timing and through any client that forgets to filter.
 
+// `AnswerStatus`, mirrored from `synapsedesk.rag` rather than imported — the
+// same call `AiAttachmentPart` further down makes, and for the same reason: a
+// proto import would point this package at rag's, which is backwards. rag is
+// downstream of ticket, not the other way round.
+//
+// **PREFIXED, and not for style.** ts-proto flattens every package into one
+// TypeScript barrel, and `export *` silently DROPS any name two modules both
+// export — a bare `AnswerStatus` here would delete rag's from the public API
+// with no error anywhere. `AiRateValue` carries a prefix for exactly this
+// reason. `barrel-collisions.spec.ts` now checks it rather than trusting it.
+//
+// **The NUMBERING is the contract.** Unlike ts-proto's message interfaces,
+// which are structural, generated enums are TypeScript enums and therefore
+// NOMINAL — rag's `DOC_ANSWER` is not assignable to this type even though both
+// are `1`. So the two are bridged by `toMessageAnswerStatus`, whose whole job is
+// to be a numeric identity, and `mappers.spec.ts` asserts member-for-member that
+// it still is.
+enum MessageAnswerStatus {
+  MESSAGE_ANSWER_STATUS_UNSPECIFIED = 0;
+  // Answered from the corpus, with citations.
+  MESSAGE_ANSWER_STATUS_DOC_ANSWER = 1;
+  // Nothing retrieved above threshold — the escalation case, never an
+  // invitation to improvise (11-doc §1.6).
+  MESSAGE_ANSWER_STATUS_DOC_MISSING = 2;
+  // A greeting, answered from the canned table. No LLM call, no ledger row.
+  MESSAGE_ANSWER_STATUS_GREETING = 3;
+  // The tenant is at the AI cap. The caller escalates rather than erroring.
+  MESSAGE_ANSWER_STATUS_AT_CAP = 4;
+  // Refused by prompt-injection detection — 33-doc §5.1. **Not GREETING**: a
+  // refusal filed as a greeting is wrong in the thread, in the WebSocket frame
+  // and in anything reading the trail afterwards.
+  MESSAGE_ANSWER_STATUS_REFUSED = 5;
+}
+
 message AttachmentResponse {
   string id = 1;
   string message_id = 2;
@@ -44,13 +78,13 @@ message MessageResponse {
   // `where` clause on `ListMessages`: that route serves the UI, where a refused
   // message must stay visible.
   bool excluded_from_ai_context = 14;
-  // `AnswerStatus` for an AI message, as a name — REFUSED, DOC_ANSWER,
-  // DOC_MISSING. Absent for a human one.
+  // `AnswerStatus` for an AI message. UNSPECIFIED for a human one — no
+  // `optional`, because the zero value already carries exactly that meaning.
   //
   // For reading a thread: an agent scrolling a conversation should be able to
   // tell a refusal from an escalation from a real answer, which was impossible
   // while the status lived only in a WebSocket frame nobody persisted.
-  optional string answer_status = 15;
+  MessageAnswerStatus answer_status = 15;
 }
 
 message CreateMessageRequest {
@@ -145,10 +179,10 @@ message AppendAiMessageRequest {
   optional string generation_id = 3;
   // The status this answer was produced with, persisted on the row — 36-doc §7.
   //
-  // Absent for a canned greeting. The gateway held this in the completion frame
-  // and threw it away on write, so a thread could not distinguish a refusal
-  // from an answer once the socket closed.
-  optional string answer_status = 4;
+  // UNSPECIFIED for a canned greeting. The gateway held this in the completion
+  // frame and threw it away on write, so a thread could not distinguish a
+  // refusal from an answer once the socket closed.
+  MessageAnswerStatus answer_status = 4;
 }
 
 // Marks a message as unusable for AI context — 36-doc §7.

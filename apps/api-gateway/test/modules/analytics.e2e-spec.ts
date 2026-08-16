@@ -1,3 +1,8 @@
+import {
+  AiModelTier as ProtoAiModelTier,
+  AnalyticsExportKind as ProtoAnalyticsExportKind,
+  AnalyticsExportStatus as ProtoAnalyticsExportStatus,
+} from '@synapsedesk/grpc-proto';
 import { of, throwError } from 'rxjs';
 import { faker } from '@faker-js/faker';
 import { status as GrpcStatus } from '@grpc/grpc-js';
@@ -374,7 +379,7 @@ describe('§4 Analytics at the HTTP boundary (e2e)', () => {
           totalCostMicros: 0,
           totalGenerations: 0,
           monthlyBudgetMicros: 1_000_000,
-          aiModelTier: 'FAST',
+          aiModelTier: ProtoAiModelTier.AI_MODEL_TIER_FAST,
           draftAcceptance: wireRate(6, 10),
           emptyRetrievalRate: wireRate(1, 20),
           computedAt: undefined,
@@ -575,7 +580,12 @@ describe('§4 Analytics at the HTTP boundary (e2e)', () => {
           totalCostMicros: 4_500,
           totalGenerations: 910,
           monthlyBudgetMicros: 1_000_000,
-          aiModelTier: 'BALANCED',
+          // **`'BALANCED'` used to sit here — a tier that has never existed.**
+          // The field was a proto `string`, so the fixture could name anything
+          // and the gateway forwarded it verbatim. It is an enum now, and the
+          // equivalent case is UNRECOGNIZED: a member some newer build knows
+          // and this one does not.
+          aiModelTier: ProtoAiModelTier.UNRECOGNIZED,
           draftAcceptance: wireRate(6, 10),
           emptyRetrievalRate: wireRate(1, 20),
           computedAt: timestamp(),
@@ -588,7 +598,9 @@ describe('§4 Analytics at the HTTP boundary (e2e)', () => {
 
       expect(res.body.data.byPurpose[0].purpose).toBe('EMBEDDING');
       expect(res.body.data.monthlyBudgetMicros).toBe(1_000_000);
-      expect(res.body.data.aiModelTier).toBe('BALANCED');
+      // Null, not the raw value: a client whose union is FAST | QUALITY is
+      // better told "unknown" than handed a third member it cannot switch on.
+      expect(res.body.data.aiModelTier).toBeNull();
       expect(res.body.data.draftAcceptance.denominator).toBe(10);
     });
   });
@@ -598,8 +610,8 @@ describe('§4 Analytics at the HTTP boundary (e2e)', () => {
 
     const wireExport = (overrides: Record<string, unknown> = {}) => ({
       id: exportId,
-      status: 'PENDING',
-      kind: 'TICKET_DAILY',
+      status: ProtoAnalyticsExportStatus.ANALYTICS_EXPORT_STATUS_PENDING,
+      kind: ProtoAnalyticsExportKind.ANALYTICS_EXPORT_KIND_TICKET_DAILY,
       rowCount: undefined,
       rollupComputedAt: undefined,
       downloadUrl: undefined,
@@ -638,7 +650,7 @@ describe('§4 Analytics at the HTTP boundary (e2e)', () => {
       fx.stubs.analytics.getExport.mockReturnValue(
         of(
           wireExport({
-            status: 'READY',
+            status: ProtoAnalyticsExportStatus.ANALYTICS_EXPORT_STATUS_READY,
             rowCount: 90,
             rollupComputedAt: timestamp(),
             downloadUrl: 'https://storage.example/signed-get',
@@ -663,7 +675,7 @@ describe('§4 Analytics at the HTTP boundary (e2e)', () => {
       fx.stubs.analytics.getExport.mockReturnValue(
         of(
           wireExport({
-            status: 'FAILED',
+            status: ProtoAnalyticsExportStatus.ANALYTICS_EXPORT_STATUS_FAILED,
             error: 'storage is down',
             completedAt: timestamp(),
           }),

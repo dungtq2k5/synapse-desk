@@ -13,6 +13,11 @@ import {
   toPageMeta,
   toPrismaPage,
   toProtoTimestamp,
+  AuditAction,
+  fromProtoAuditAction,
+  fromProtoAuditResourceType,
+  toProtoAuditAction,
+  toProtoAuditResourceType,
 } from '@synapsedesk/grpc-proto';
 import {
   AUDIT_LOG_SORTABLE_FIELDS,
@@ -21,24 +26,6 @@ import {
 } from '@synapsedesk/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLog, Prisma } from '../../generated/prisma/client';
-
-function toAuditLogResponse(log: AuditLog): AuditLogResponse {
-  return {
-    id: log.id,
-    organizationId: log.organizationId ?? undefined,
-    userId: log.userId ?? undefined,
-    action: log.action,
-    resourceType: log.resourceType ?? undefined,
-    resourceId: log.resourceId ?? undefined,
-    ipAddress: log.ipAddress ?? undefined,
-    userAgent: log.userAgent ?? undefined,
-    // JSON as a string. The shape differs per action, so a typed message could
-    // only be a `map<string, string>` — which would flatten every nested value
-    // in the before/after diff into uselessness.
-    metadata: JSON.stringify(log.metadata ?? {}),
-    createdAt: toProtoTimestamp(log.createdAt),
-  };
-}
 
 /**
  * The audit trail, READ ONLY.
@@ -74,9 +61,15 @@ export class AuditReadService {
 
     const where: Prisma.AuditLogWhereInput = {
       ...this.scope(request.platformScope, context),
-      ...(request.action ? { action: request.action } : {}),
+      // UNSPECIFIED (0) is falsy and means "no filter", so an absent field and
+      // `fromProto*` answering null are the same thing on both of these.
+      ...(fromProtoAuditAction(request.action)
+        ? { action: fromProtoAuditAction(request.action)! }
+        : {}),
       ...(request.userId ? { userId: request.userId } : {}),
-      ...(request.resourceType ? { resourceType: request.resourceType } : {}),
+      ...(fromProtoAuditResourceType(request.resourceType)
+        ? { resourceType: fromProtoAuditResourceType(request.resourceType)! }
+        : {}),
       ...(request.resourceId ? { resourceId: request.resourceId } : {}),
       ...(from || to
         ? {
@@ -117,10 +110,21 @@ export class AuditReadService {
       distinct: ['action'],
     });
 
+    // Sorted by the STORED NAME rather than by the enum's number, so the
+    // dropdown stays alphabetical. Sorting the numeric values instead would
+    // order the list by when each action was added to the proto, which is not
+    // an order anybody reading a filter can predict.
+    //
+    // A row whose action this build cannot name maps to UNSPECIFIED and is
+    // dropped: offering a filter that selects nothing is worse than a shorter
+    // list, which is the same call the "only actions that ACTUALLY occurred"
+    // rule already makes.
     return {
       actions: rows
         .map((row) => row.action)
-        .sort((a, b) => compareAlphabetically(a, b)),
+        .sort((a, b) => compareAlphabetically(a, b))
+        .map((action) => toProtoAuditAction(action))
+        .filter((action) => action !== AuditAction.AUDIT_ACTION_UNSPECIFIED),
     };
   }
 
@@ -151,4 +155,22 @@ export class AuditReadService {
 
     return { organizationId: null };
   }
+}
+
+function toAuditLogResponse(log: AuditLog): AuditLogResponse {
+  return {
+    id: log.id,
+    organizationId: log.organizationId ?? undefined,
+    userId: log.userId ?? undefined,
+    action: toProtoAuditAction(log.action),
+    resourceType: toProtoAuditResourceType(log.resourceType),
+    resourceId: log.resourceId ?? undefined,
+    ipAddress: log.ipAddress ?? undefined,
+    userAgent: log.userAgent ?? undefined,
+    // JSON as a string. The shape differs per action, so a typed message could
+    // only be a `map<string, string>` — which would flatten every nested value
+    // in the before/after diff into uselessness.
+    metadata: JSON.stringify(log.metadata ?? {}),
+    createdAt: toProtoTimestamp(log.createdAt),
+  };
 }

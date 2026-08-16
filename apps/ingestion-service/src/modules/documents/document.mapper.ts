@@ -2,6 +2,10 @@ import {
   DocumentChunkResponse,
   DocumentFlagResponse,
   DocumentResponse,
+  toProtoDocumentFileType,
+  toProtoDocumentFlagSeverity,
+  toProtoDocumentFlagType,
+  toProtoDocumentStatus,
   toProtoTimestamp,
 } from '@synapsedesk/grpc-proto';
 import {
@@ -33,7 +37,11 @@ export function toDocumentResponse(
     // fresh signed URL per request, so revoking access takes effect on the next
     // read rather than whenever a stored URL happened to expire.
     fileUrl: document.fileUrl,
-    fileType: document.fileType,
+    // Through the bridge, not straight across. The column is a `VarChar(20)`
+    // and this assignment used to be `fileType: document.fileType` — a Prisma
+    // `string` onto a wire `string`, with no check anywhere between the row and
+    // the gateway. That was the one hop in the whole chain with no guard at all.
+    fileType: toProtoDocumentFileType(document.fileType),
     // `[]` when unspecified, never null — Prisma scalar lists cannot be null,
     // so absent and empty are one value all the way to the wire.
     ocrLanguages: document.ocrLanguages,
@@ -42,7 +50,7 @@ export function toDocumentResponse(
     // around for a 25 MB-per-file corpus.
     fileSizeBytes: Number(document.fileSizeBytes),
     isOrganizationWide: document.isOrganizationWide,
-    status: document.status,
+    status: toProtoDocumentStatus(document.status),
     departmentIds,
     chunkCount,
     createdAt: toProtoTimestamp(document.createdAt),
@@ -84,8 +92,8 @@ export function toDocumentFlagResponse(
     id: flag.id,
     documentId: flag.documentId,
     documentTitle: flag.document.title,
-    flagType: flag.flagType,
-    severity: flag.severity,
+    flagType: toProtoDocumentFlagType(flag.flagType),
+    severity: toProtoDocumentFlagSeverity(flag.severity),
     detail: flag.detail,
     confidenceScore: flag.confidenceScore ?? undefined,
     detectedAt: toProtoTimestamp(flag.detectedAt),

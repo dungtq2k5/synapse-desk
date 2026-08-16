@@ -22,6 +22,7 @@
  * exists, and the two would drift.
  */
 
+import { AnswerStatus as DomainAnswerStatus } from '@synapsedesk/common';
 import { Citation } from '@synapsedesk/grpc-proto';
 import { PresenceState } from '../realtime.config';
 
@@ -70,6 +71,14 @@ export class AiStreamChunkPayloadDto {
   token!: string;
 }
 
+/** Frame status for an answer status this build does not recognise. */
+export const UNSPECIFIED_FRAME_STATUS = 'UNSPECIFIED';
+
+/** Every value `ai:stream:done` may carry in `status`. */
+// ASK Is there a reason we declare it at here? Why is shouldn't be in config? What about proto?
+export type FrameAnswerStatus =
+  DomainAnswerStatus | typeof UNSPECIFIED_FRAME_STATUS;
+
 /**
  * `ai:stream:done` — the stream finished.
  *
@@ -85,7 +94,7 @@ export class AiStreamDonePayloadDto {
   citations!: Citation[];
   /** True on the cap path — a human is now handling it, not an error. */
   escalated!: boolean;
-  status!: string;
+  status!: FrameAnswerStatus;
 }
 
 /**

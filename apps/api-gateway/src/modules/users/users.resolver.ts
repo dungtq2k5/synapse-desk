@@ -165,7 +165,7 @@ export class UsersResolver {
    * `User.departments` — 26-doc §3.
    *
    * On `UserResponseGqlDto` rather than `UserSummaryGqlDto`: department membership is
-   * organisational information, and an edge that reached it from a ticket would
+   * organizational information, and an edge that reached it from a ticket would
    * tell a customer which teams an agent belongs to.
    */
   @ResolveField(() => [DepartmentResponseGqlDto], {

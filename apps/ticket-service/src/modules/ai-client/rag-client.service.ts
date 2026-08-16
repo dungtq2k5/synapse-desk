@@ -12,7 +12,11 @@ import {
   RAG_SERVICE_NAME,
   RagServiceClient,
 } from '@synapsedesk/grpc-proto';
-import { formatErrorMsg } from '@synapsedesk/common';
+import {
+  formatErrorMsg,
+  TICKET_PRIORITIES,
+  TicketPriority,
+} from '@synapsedesk/common';
 
 /**
  * Generation is slow — a draft with a review pass is three model calls — so the
@@ -38,6 +42,7 @@ export type AiReplyDraft = {
   }>;
 };
 
+// ASK This `docblock` seems to be invalid
 /**
  * A summary, WITHOUT token columns.
  *
@@ -83,7 +88,8 @@ export type AiSuggestion = {
 
 export type AiClassification = {
   suggestedDepartmentId: string;
-  suggestedPriority: string;
+  /** Null when the model named something that is not a `TicketPriority`. */
+  suggestedPriority: TicketPriority | null;
   confidenceScore: number;
 };
 
@@ -141,7 +147,7 @@ export class RagClientService implements OnModuleInit {
     ticketId: string,
     history: ConversationTurn[],
     context: CallerContext,
-    maxRetries = 1,
+    maxRetries: number = 1,
     /**
      * The last user message's attachments — 36-doc §2.
      *
@@ -211,7 +217,7 @@ export class RagClientService implements OnModuleInit {
     ticketId: string,
     history: ConversationTurn[],
     context: CallerContext,
-    triggeredByEscalation = false,
+    triggeredByEscalation: boolean = false,
   ): Promise<AiSummaryDraft> {
     const rag = this.require('AI summarization');
 
@@ -310,7 +316,12 @@ export class RagClientService implements OnModuleInit {
 
     return {
       suggestedDepartmentId: response.suggestedDepartmentId,
-      suggestedPriority: response.suggestedPriority,
+      // The one hop where the value is a bare string from another language.
+      suggestedPriority: TICKET_PRIORITIES.includes(
+        response.suggestedPriority as TicketPriority,
+      )
+        ? (response.suggestedPriority as TicketPriority)
+        : null,
       confidenceScore: response.confidenceScore,
     };
   }

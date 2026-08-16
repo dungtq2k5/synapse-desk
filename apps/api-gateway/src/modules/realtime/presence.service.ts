@@ -24,7 +24,7 @@ type PresenceRecord = {
 };
 
 /**
- * Presence, in Redis, keyed per USER — 22-doc §4.
+ * Presence, in Redis, keyed per USER.
  *
  * Three properties fight each other here, and every design that holds presence
  * in process memory loses at least one:
@@ -52,7 +52,7 @@ export class PresenceService {
   private readonly redis: Redis;
 
   constructor(redis: RedisService) {
-    // The SHARED connection — 29-doc §2. The error listener moved with it:
+    // The SHARED Redis connection. The error listener moved with it:
     // `RedisService` logs and never throws, which is what this one did, and an
     // unhandled `error` event is an unhandled rejection either way.
     this.redis = redis.client;

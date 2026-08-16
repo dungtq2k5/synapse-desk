@@ -1,5 +1,3 @@
-import { Field, Float, ID, Int, ObjectType } from '@nestjs/graphql';
-
 /**
  * The analytics shapes the GraphQL schema serves — 19-doc §3, 26-doc §3.
  *
@@ -28,6 +26,10 @@ import { Field, Float, ID, Int, ObjectType } from '@nestjs/graphql';
  * responses, and the shape here makes that impossible to do accidentally: there
  * is no bare number to read.
  */
+
+import { DocumentFlagType } from '@synapsedesk/common';
+import { Field, Float, ID, Int, ObjectType } from '@nestjs/graphql';
+
 @ObjectType('Rate')
 export class RateGqlDto {
   /** null when the denominator is zero — NOT zero. The two are different facts. */
@@ -253,8 +255,10 @@ export class KnowledgeGapFlagGqlDto {
   @Field(() => String)
   documentTitle!: string;
 
-  @Field(() => String)
-  flagType!: string;
+  // Nullable, matching the REST DTO: a flag type this build cannot name is
+  // reported as absent rather than as a string the client's union lacks.
+  @Field(() => String, { nullable: true })
+  flagType!: DocumentFlagType | null;
 
   @Field(() => String)
   detail!: string;

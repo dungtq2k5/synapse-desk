@@ -12,9 +12,16 @@ import {
   ConversationTurn,
   TicketAiRequest,
   toProtoTimestamp,
+  toProtoTicketPriority,
 } from '@synapsedesk/grpc-proto';
 import { formatErrorMsg } from '@synapsedesk/common';
 import { isDraftRefusal } from '../ai-client/refusal';
+import { PrismaService } from '../prisma/prisma.service';
+import { AiAttachmentService } from '../ai-attachments/ai-attachment.service';
+import { TicketAccessService } from '../ticket-access/ticket-access.service';
+import { RagClientService } from '../ai-client/rag-client.service';
+import { AuthReferenceService } from '../auth-client/auth-reference.service';
+import { AiSummary } from '../../generated/prisma/client';
 
 /**
  * How many messages a generation prompt carries.
@@ -24,25 +31,6 @@ import { isDraftRefusal } from '../ai-client/refusal';
  * normal support conversation fits whole.
  */
 const TRANSCRIPT_TURNS = 40;
-import { PrismaService } from '../prisma/prisma.service';
-import { AiAttachmentService } from '../ai-attachments/ai-attachment.service';
-import { TicketAccessService } from '../ticket-access/ticket-access.service';
-import { RagClientService } from '../ai-client/rag-client.service';
-import { AuthReferenceService } from '../auth-client/auth-reference.service';
-import { AiSummary } from '../../generated/prisma/client';
-
-function toAiSummaryResponse(summary: AiSummary): AiSummaryResponse {
-  return {
-    id: summary.id,
-    ticketId: summary.ticketId,
-    summaryText: summary.summaryText,
-    suggestedAction: summary.suggestedAction,
-    confidenceScore: summary.confidenceScore,
-    modelName: summary.modelName,
-    createdAt: toProtoTimestamp(summary.createdAt),
-    updatedAt: toProtoTimestamp(summary.updatedAt),
-  };
-}
 
 /**
  * The AI co-pilot — contract-first, per §1.7.
@@ -298,7 +286,7 @@ export class AiService {
     // A SUGGESTION, never applied here. Auto-routing on a model's guess without
     // an agent confirming it would move tickets between teams on a confidence
     // score nobody looked at.
-    return this.rag.classifyTicket(
+    const classification = await this.rag.classifyTicket(
       ticket.id,
       ticket.title,
       ticket.description ?? '',
@@ -309,6 +297,18 @@ export class AiService {
       context,
       attachments.parts,
     );
+
+    return {
+      ...classification,
+      // Already narrowed at the rag boundary, so this is a widening back to the
+      // wire rather than a check. A priority the model invented arrives here as
+      // null and leaves as UNSPECIFIED, which the gateway renders as "no
+      // suggestion" — the agent sees the department suggestion and no priority,
+      // instead of a priority they never chose.
+      suggestedPriority: toProtoTicketPriority(
+        classification.suggestedPriority,
+      ),
+    };
   }
 
   /**
@@ -438,4 +438,17 @@ export class AiService {
 
     return { items: await this.rag.listSimilarTickets() };
   }
+}
+
+function toAiSummaryResponse(summary: AiSummary): AiSummaryResponse {
+  return {
+    id: summary.id,
+    ticketId: summary.ticketId,
+    summaryText: summary.summaryText,
+    suggestedAction: summary.suggestedAction,
+    confidenceScore: summary.confidenceScore,
+    modelName: summary.modelName,
+    createdAt: toProtoTimestamp(summary.createdAt),
+    updatedAt: toProtoTimestamp(summary.updatedAt),
+  };
 }

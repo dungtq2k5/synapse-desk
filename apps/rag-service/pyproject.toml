@@ -14,6 +14,14 @@ src = ["."]
 # any fix applied here is undone by the next generation and shows up as diff
 # noise in between. The same exclusion the TypeScript half makes for
 # `**/generated/` in `.prettierignore` and `eslint.config.mjs`.
+#
+# **That sentence was aspirational until `scripts/generate-python-protos.mjs`
+# landed.** `buf.gen.yaml` drove only the TypeScript half, so a `.proto` edit
+# regenerated `libs/grpc-proto/src/generated` and left this directory untouched
+# — for however long it took someone to notice. The script closes it, and
+# `npm run proto:check` fails if these ever fall behind again. It also owns the
+# import rewrite (`from synapsedesk.` -> `from rag_service.generated.synapsedesk.`)
+# that protoc does not do and that used to be applied by hand.
 extend-exclude = ["rag_service/generated", "**/__pycache__"]
 
 [tool.ruff.lint]

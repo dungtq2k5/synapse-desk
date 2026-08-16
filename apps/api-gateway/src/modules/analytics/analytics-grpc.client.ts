@@ -5,27 +5,39 @@ import {
   AI_LEDGER_SERVICE_NAME,
   AiLedgerServiceClient,
   ANALYTICS_SERVICE_NAME,
-  type AnalyticsRangeRequest,
   AnalyticsServiceClient,
   fromProtoTimestamp,
-  type ProtoTimestamp,
   INGESTION_GRPC_CLIENT,
   TICKET_GRPC_CLIENT,
   USER_SERVICE_NAME,
   UserServiceClient,
   AUTH_GRPC_CLIENT,
+  fromProtoAiModelTier,
+  toProtoAnalyticsExportKind,
+  AgentStatsResponse,
+  AiUsageResponse,
+  DocumentAnalyticsResponse,
+  KnowledgeGapsResponse,
+  ListUsersByIdsResponse,
 } from '@synapsedesk/grpc-proto';
 import { formatErrorMsg, RequestContext } from '@synapsedesk/common';
 import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
-import { AnalyticsRangeQueryDto } from './dto/rest/analytics.dto';
+import {
+  toAiUsageSliceDto,
+  toAnalyticsExportDto,
+  toAnalyticsRangeRequest,
+  toMeanDto,
+  toRateDto,
+} from './analytics.mapper';
+import {
+  AnalyticsRangeQueryDto,
+  CreateExportDto,
+} from './dto/rest/analytics.dto';
 import {
   AiUsageDto,
-  AiUsageSliceDto,
   AnalyticsExportDto,
   DeflectionDto,
-  MeanDto,
   OverviewDto,
-  RateDto,
   ResponseTimesDto,
   SatisfactionDto,
   VolumeDto,
@@ -33,6 +45,9 @@ import {
 
 /** What a failed leg reports back, so the caller can mark it unavailable. */
 export type LegFailure = { source: string; reason: string };
+
+/** What {@link AnalyticsGrpcClient.tryLeg} resolves to: the value, or why not. */
+export type LegResult<T> = { value: T } | { failure: LegFailure };
 
 /**
  * The gateway's analytics client — 19-doc §1, §3.2.
@@ -109,9 +124,6 @@ export class AnalyticsGrpcClient
       resolutionSeconds: toMeanDto(response.resolutionSeconds),
       openTicketMedianAgeSeconds: response.openTicketMedianAgeSeconds ?? null,
       computedAt: fromProtoTimestamp(response.computedAt) ?? null,
-      // `?? null` rather than left undefined: the REST contract says the field is
-      // always present, and a missing key reads to a client as "this build does
-      // not have freshness" rather than "nothing has been rolled up".
       dataThrough: response.dataThrough ?? null,
     };
   }
@@ -243,7 +255,7 @@ export class AnalyticsGrpcClient
       totalCostMicros: response.totalCostMicros,
       totalGenerations: response.totalGenerations,
       monthlyBudgetMicros: response.monthlyBudgetMicros,
-      aiModelTier: response.aiModelTier,
+      aiModelTier: fromProtoAiModelTier(response.aiModelTier),
       draftAcceptance: toRateDto(response.draftAcceptance),
       emptyRetrievalRate: toRateDto(response.emptyRetrievalRate),
       computedAt: fromProtoTimestamp(response.computedAt) ?? null,
@@ -254,12 +266,16 @@ export class AnalyticsGrpcClient
   // ------------------------------------------------------ 19-doc §5, export
 
   async createExport(
-    dto: { kind: string; from: string; to: string; departmentId?: string },
+    dto: CreateExportDto,
     context: RequestContext,
   ): Promise<AnalyticsExportDto> {
     return toAnalyticsExportDto(
       await this.call(
-        (metadata) => this.analyticsService.createExport(dto, metadata),
+        (metadata) =>
+          this.analyticsService.createExport(
+            { ...dto, kind: toProtoAnalyticsExportKind(dto.kind) },
+            metadata,
+          ),
         context,
       ),
     );
@@ -296,7 +312,7 @@ export class AnalyticsGrpcClient
   async tryLeg<T>(
     source: string,
     produce: () => Promise<T>,
-  ): Promise<{ value: T } | { failure: LegFailure }> {
+  ): Promise<LegResult<T>> {
     try {
       return { value: await produce() };
     } catch (error) {
@@ -307,7 +323,10 @@ export class AnalyticsGrpcClient
     }
   }
 
-  agentStats(query: AnalyticsRangeQueryDto, context: RequestContext) {
+  agentStats(
+    query: AnalyticsRangeQueryDto,
+    context: RequestContext,
+  ): Promise<LegResult<AgentStatsResponse>> {
     return this.tryLeg('ticket-service', () =>
       this.call(
         (metadata) =>
@@ -320,7 +339,10 @@ export class AnalyticsGrpcClient
     );
   }
 
-  ledgerUsage(query: AnalyticsRangeQueryDto, context: RequestContext) {
+  ledgerUsage(
+    query: AnalyticsRangeQueryDto,
+    context: RequestContext,
+  ): Promise<LegResult<AiUsageResponse>> {
     return this.tryLeg('ingestion-service', () =>
       this.call(
         (metadata) =>
@@ -337,7 +359,7 @@ export class AnalyticsGrpcClient
     query: AnalyticsRangeQueryDto,
     limit: number,
     context: RequestContext,
-  ) {
+  ): Promise<LegResult<KnowledgeGapsResponse>> {
     return this.tryLeg('ingestion-service', () =>
       this.call(
         (metadata) =>
@@ -350,7 +372,10 @@ export class AnalyticsGrpcClient
     );
   }
 
-  documentAnalytics(limit: number, context: RequestContext) {
+  documentAnalytics(
+    limit: number,
+    context: RequestContext,
+  ): Promise<LegResult<DocumentAnalyticsResponse>> {
     return this.tryLeg('ingestion-service', () =>
       this.call(
         (metadata) =>
@@ -368,7 +393,10 @@ export class AnalyticsGrpcClient
    * would make the endpoint's cost scale with team size for a field that is
    * decoration on every row.
    */
-  hydrateNames(userIds: string[], context: RequestContext) {
+  hydrateNames(
+    userIds: string[],
+    context: RequestContext,
+  ): Promise<LegResult<ListUsersByIdsResponse>> {
     return this.tryLeg('auth-service', () =>
       this.call(
         (metadata) =>
@@ -391,94 +419,4 @@ export class AnalyticsGrpcClient
       ),
     );
   }
-}
-
-/**
- * The REST query -> the proto request every range endpoint takes.
- *
- * Annotated rather than inferred: the shape is a CONTRACT with six RPCs, and an
- * inferred anonymous object silently accepts a renamed or dropped field until
- * the service reads `undefined` and returns an empty chart.
- */
-function toAnalyticsRangeRequest(
-  query: AnalyticsRangeQueryDto,
-): AnalyticsRangeRequest {
-  return {
-    from: query.from,
-    to: query.to,
-    departmentId: query.departmentId,
-    granularity: query.granularity,
-  };
-}
-
-/** `undefined` → null, never → 0. A missing rate is not a rate of zero. */
-function toRateDto(value?: {
-  rate?: number;
-  numerator: number;
-  denominator: number;
-}): RateDto {
-  return {
-    rate: value?.rate ?? null,
-    numerator: value?.numerator ?? 0,
-    denominator: value?.denominator ?? 0,
-  };
-}
-
-function toMeanDto(value?: { mean?: number; count: number }): MeanDto {
-  return { mean: value?.mean ?? null, count: value?.count ?? 0 };
-}
-
-function toAiUsageSliceDto(slice: {
-  purpose: string;
-  modelName: string;
-  generations: number;
-  promptTokens: number;
-  completionTokens: number;
-  costMicros: number;
-  latencyMs?: { mean?: number; count: number };
-  failureRate?: { rate?: number; numerator: number; denominator: number };
-}): AiUsageSliceDto {
-  return {
-    purpose: slice.purpose,
-    modelName: slice.modelName,
-    generations: slice.generations,
-    promptTokens: slice.promptTokens,
-    completionTokens: slice.completionTokens,
-    costMicros: slice.costMicros,
-    latencyMs: toMeanDto(slice.latencyMs),
-    failureRate: toRateDto(slice.failureRate),
-  };
-}
-
-/**
- * The timestamps are typed, not `unknown`.
- *
- * They were declared `unknown` and then handed to `fromProtoTimestamp` through
- * `as never` — a cast that says "trust me" about the one thing the parameter
- * type had just refused to state. `ProtoTimestamp` is exported for exactly this,
- * so naming it costs nothing and makes a wrong wire shape a compile error here
- * rather than a `new Date(NaN)` in a report.
- */
-function toAnalyticsExportDto(response: {
-  id: string;
-  status: string;
-  kind: string;
-  rowCount?: number;
-  rollupComputedAt?: ProtoTimestamp;
-  downloadUrl?: string;
-  error?: string;
-  createdAt?: ProtoTimestamp;
-  completedAt?: ProtoTimestamp;
-}): AnalyticsExportDto {
-  return {
-    id: response.id,
-    status: response.status,
-    kind: response.kind,
-    rowCount: response.rowCount ?? null,
-    rollupComputedAt: fromProtoTimestamp(response.rollupComputedAt) ?? null,
-    downloadUrl: response.downloadUrl ?? null,
-    error: response.error ?? null,
-    createdAt: fromProtoTimestamp(response.createdAt) ?? new Date(0),
-    completedAt: fromProtoTimestamp(response.completedAt) ?? null,
-  };
 }

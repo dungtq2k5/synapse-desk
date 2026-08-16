@@ -12,7 +12,7 @@ import { requestOf } from '../utils/execution-request.util';
  * field of it.
  *
  * **Works in a RESOLVER as well as a controller** — 25-doc §8 step 1, closing
- * conventions §15 gap 6. It used to call `switchToHttp()` unconditionally, which
+ * docs/reference/known-gaps.md #6. It used to call `switchToHttp()` unconditionally, which
  * returns an empty object under GraphQL: `RequestContextService.fromRequest`
  * then found no user and this threw "no authenticating guard" at a resolver
  * whose guard had run perfectly. The message sent you looking at the guard,

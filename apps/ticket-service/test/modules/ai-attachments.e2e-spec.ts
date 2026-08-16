@@ -501,14 +501,21 @@ describe('§36 attachments as model input (e2e)', () => {
     });
   });
 
-  it('every AI-eligible type is a subset of what may be uploaded', async () => {
-    // Two lists that answer different questions, and the capability one must
-    // never permit something the security one refuses.
+  it('every UPLOADABLE type can reach the model', async () => {
+    // **The direction was backwards, and the narrowing exposed it.** This used
+    // to assert `AI_ELIGIBLE ⊆ ALLOWED_ATTACHMENT`, which fails the moment the
+    // capability list is legitimately wider — `image/gif` and `text/csv` are
+    // pre-approved for a storage policy that has not widened yet.
+    //
+    // The invariant that matters runs the other way: a type a user can upload
+    // and the model cannot read is a file that arrives and is silently ignored.
+    // `mime.spec.ts` owns the full set of these relationships; this one stays
+    // because it is the one this service's behaviour depends on.
     const { ALLOWED_ATTACHMENT_MIME_TYPES } =
       await import('@synapsedesk/common');
 
-    for (const mime of AI_ELIGIBLE_MIME_TYPES) {
-      expect(ALLOWED_ATTACHMENT_MIME_TYPES).toContain(mime);
+    for (const mime of ALLOWED_ATTACHMENT_MIME_TYPES) {
+      expect(AI_ELIGIBLE_MIME_TYPES).toContain(mime);
     }
   });
 });

@@ -1,3 +1,4 @@
+import { DocumentFileType, DocumentStatus } from '@synapsedesk/grpc-proto';
 import Redis from 'ioredis';
 import { of } from 'rxjs';
 import { faker } from '@faker-js/faker';
@@ -272,10 +273,15 @@ describe('§29 the shared cache (e2e)', () => {
           createdById: faker.string.uuid(),
           title,
           fileUrl: 'organizations/a/documents/x.pdf',
-          fileType: 'application/pdf',
+          // **`'application/pdf'` used to sit here, and the column holds an
+          // EXTENSION.** Exactly the confusion `DocumentFileType`'s doc comment
+          // warns about: a MIME type in this field matches no row and reports an
+          // empty page rather than an error. Unexpressible now.
+          fileType: DocumentFileType.DOCUMENT_FILE_TYPE_PDF,
           fileSizeBytes: 10,
           isOrganizationWide: false,
-          status: 'READY',
+          // `'READY'` is not a DocumentStatus either — the indexed state is INDEXED.
+          status: DocumentStatus.DOCUMENT_STATUS_INDEXED,
           departmentIds: [],
           chunkCount: 1,
           ocrLanguages: [],

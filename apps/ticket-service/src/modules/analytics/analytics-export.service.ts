@@ -15,7 +15,9 @@ import {
 } from '@synapsedesk/common';
 import { PrismaService } from '../prisma/prisma.service';
 
+// ASK Why we have two `docblock` for `ExportJobData`?
 /** What the worker needs to produce the file. */
+/** The BullMQ payload for one export job. */
 export type ExportJobData = {
   exportId: string;
 };

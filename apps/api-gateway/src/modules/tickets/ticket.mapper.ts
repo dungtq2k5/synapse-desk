@@ -1,107 +1,37 @@
 import {
+  fromProtoTicketPriority,
+  fromProtoTicketSource,
+  fromProtoTicketStatus,
   fromProtoTimestamp,
   requireProtoTimestamp,
-  TicketPriority as ProtoTicketPriority,
   TicketResponse,
-  TicketSource as ProtoTicketSource,
-  TicketStatus as ProtoTicketStatus,
 } from '@synapsedesk/grpc-proto';
-import {
-  TicketPriority,
-  TicketSource,
-  TicketStatus,
-} from '@synapsedesk/common';
 import { TicketResponseDto } from './dto/rest/ticket-response.dto';
 
 /**
- * Wire -> REST, the mirror of ticket-service's own mapper.
+ * Converts a `TicketResponse` off the wire into its REST DTO.
  *
- * protobuf has no null, so an unset field arrives as `undefined`. The REST
- * contract commits to `null` instead — a client (and an OpenAPI schema) sees a
- * stable key set rather than fields that vanish — so every optional field is
- * converted deliberately here rather than passed through.
+ * protobuf has no null, so every optional field arrives as `undefined` and is
+ * converted to `null` here — the REST contract commits to a stable key set.
+ * Enum fields go through the shared `fromProto*` bridges, which answer `null`
+ * for both an unset and an unrecognized value.
+ *
+ * @throws Error if `createdAt` or `updatedAt` is missing, which the proto marks
+ * non-optional.
  */
-
-const STATUS_BY_PROTO: Record<number, TicketStatus> = {
-  [ProtoTicketStatus.TICKET_STATUS_NEW]: TicketStatus.NEW,
-  [ProtoTicketStatus.TICKET_STATUS_OPEN]: TicketStatus.OPEN,
-  [ProtoTicketStatus.TICKET_STATUS_PENDING_AGENT]: TicketStatus.PENDING_AGENT,
-  [ProtoTicketStatus.TICKET_STATUS_ESCALATED]: TicketStatus.ESCALATED,
-  [ProtoTicketStatus.TICKET_STATUS_RESOLVED]: TicketStatus.RESOLVED,
-  [ProtoTicketStatus.TICKET_STATUS_CLOSED]: TicketStatus.CLOSED,
-};
-
-const PROTO_BY_STATUS: Record<TicketStatus, ProtoTicketStatus> =
-  Object.fromEntries(
-    Object.entries(STATUS_BY_PROTO).map(([proto, domain]) => [
-      domain,
-      Number(proto),
-    ]),
-  ) as Record<TicketStatus, ProtoTicketStatus>;
-
-const PRIORITY_BY_PROTO: Record<number, TicketPriority> = {
-  [ProtoTicketPriority.TICKET_PRIORITY_LOW]: TicketPriority.LOW,
-  [ProtoTicketPriority.TICKET_PRIORITY_MEDIUM]: TicketPriority.MEDIUM,
-  [ProtoTicketPriority.TICKET_PRIORITY_HIGH]: TicketPriority.HIGH,
-  [ProtoTicketPriority.TICKET_PRIORITY_URGENT]: TicketPriority.URGENT,
-};
-
-const PROTO_BY_PRIORITY: Record<TicketPriority, ProtoTicketPriority> =
-  Object.fromEntries(
-    Object.entries(PRIORITY_BY_PROTO).map(([proto, domain]) => [
-      domain,
-      Number(proto),
-    ]),
-  ) as Record<TicketPriority, ProtoTicketPriority>;
-
-const SOURCE_BY_PROTO: Record<number, TicketSource> = {
-  [ProtoTicketSource.TICKET_SOURCE_WEB]: TicketSource.WEB,
-  [ProtoTicketSource.TICKET_SOURCE_CHAT]: TicketSource.CHAT,
-  [ProtoTicketSource.TICKET_SOURCE_EMAIL]: TicketSource.EMAIL,
-  [ProtoTicketSource.TICKET_SOURCE_API]: TicketSource.API,
-};
-
-const PROTO_BY_SOURCE: Record<TicketSource, ProtoTicketSource> =
-  Object.fromEntries(
-    Object.entries(SOURCE_BY_PROTO).map(([proto, domain]) => [
-      domain,
-      Number(proto),
-    ]),
-  ) as Record<TicketSource, ProtoTicketSource>;
-
-/**
- * REST -> wire. `undefined` becomes the proto zero value, which every list RPC
- * reads as "no filter" and every write RPC reads as "use the default".
- */
-export function toProtoTicketStatus(value?: TicketStatus): ProtoTicketStatus {
-  return value
-    ? PROTO_BY_STATUS[value]
-    : ProtoTicketStatus.TICKET_STATUS_UNSPECIFIED;
-}
-
-export function toProtoTicketPriority(
-  value?: TicketPriority,
-): ProtoTicketPriority {
-  return value
-    ? PROTO_BY_PRIORITY[value]
-    : ProtoTicketPriority.TICKET_PRIORITY_UNSPECIFIED;
-}
-
-export function toProtoTicketSource(value?: TicketSource): ProtoTicketSource {
-  return value
-    ? PROTO_BY_SOURCE[value]
-    : ProtoTicketSource.TICKET_SOURCE_UNSPECIFIED;
-}
-
 export function toTicketResponseDto(ticket: TicketResponse): TicketResponseDto {
   return {
     id: ticket.id,
     ticketNumber: ticket.ticketNumber,
     organizationId: ticket.organizationId,
     authorId: ticket.authorId,
-    source: SOURCE_BY_PROTO[ticket.source] ?? null,
-    status: STATUS_BY_PROTO[ticket.status] ?? null,
-    priority: PRIORITY_BY_PROTO[ticket.priority] ?? null,
+    // `?? null` is no longer needed: `fromProto*` already answers null for
+    // UNSPECIFIED and for UNRECOGNIZED, which is what the old `?? null` was
+    // catching — except it could only catch the first, because a lookup miss
+    // and a zero value were the same `undefined`.
+    source: fromProtoTicketSource(ticket.source),
+    status: fromProtoTicketStatus(ticket.status),
+    priority: fromProtoTicketPriority(ticket.priority),
     title: ticket.title,
     description: ticket.description,
     currentAssigneeId: ticket.currentAssigneeId ?? null,

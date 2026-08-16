@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
 import { status } from '@grpc/grpc-js';
 import {
+  AiGenerationPurpose,
   addAiStats,
   AiStatSums,
   AnalyticsGranularity,
@@ -28,12 +29,34 @@ import {
   AiMeanValue,
   AiRateValue,
   toProtoTimestamp,
+  toProtoAiModelTier,
+  toProtoDocumentFlagType,
 } from '@synapsedesk/grpc-proto';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthReferenceService } from '../auth-client/auth-reference.service';
 
-/** The purposes that ANSWER a question — the only ones an empty retrieval means anything for. */
-const ANSWERING_PURPOSES = new Set(['CHAT_ANSWER', 'DRAFT']);
+// ASK This `docblock` seems to be invalid
+/**
+ * The purposes that ANSWER a question — the only ones an empty retrieval means
+ * anything for.
+ *
+ * **No new enum**, which was the ASK here: `AiGenerationPurpose` already names
+ * every member, and a second enum listing two of them would be a copy that can
+ * disagree with its source. What this needed was not a new vocabulary but the
+ * existing one — the literals were the problem, not the Set.
+ *
+ * Typed `ReadonlySet<string>` but BUILT from enum members, which is the pair
+ * that matters: `row.purpose` is a Prisma `VarChar`, so `has()` has to take a
+ * string, while a renamed enum member still fails to compile at the two
+ * references below. Typing the Set itself as the enum would force a cast at the
+ * call site and lose the check that the cast was hiding — the literals here
+ * used to match no row at all if a purpose were renamed, reporting an
+ * empty-retrieval rate of zero for a tenant whose rate is not zero.
+ */
+const ANSWERING_PURPOSES: ReadonlySet<string> = new Set([
+  AiGenerationPurpose.CHAT_ANSWER,
+  AiGenerationPurpose.DRAFT,
+]);
 
 /** A rollup row with its dimensions. */
 type AiDailyRow = AiStatSums & {
@@ -112,7 +135,7 @@ export class AiAnalyticsService {
       totalCostMicros: totals.costMicros,
       totalGenerations: totals.generations,
       monthlyBudgetMicros: Number(entitlement.budgetMicros),
-      aiModelTier: tier,
+      aiModelTier: toProtoAiModelTier(tier),
       draftAcceptance: toRate(draftAcceptanceRate(totals)),
       emptyRetrievalRate: toRate(
         emptyRetrievalRate(sumAll(answeringOnly(rows))),
@@ -163,7 +186,7 @@ export class AiAnalyticsService {
       flags: flags.map((flag) => ({
         documentId: flag.documentId,
         documentTitle: flag.document.title,
-        flagType: flag.flagType,
+        flagType: toProtoDocumentFlagType(flag.flagType),
         detail: flag.detail,
       })),
       dataThrough: await this.dataThrough(organizationId),

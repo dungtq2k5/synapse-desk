@@ -1,3 +1,4 @@
+import { AnswerStatus } from '@synapsedesk/common';
 export class AttachmentResponseDto {
   id!: string;
   messageId!: string;
@@ -9,6 +10,7 @@ export class AttachmentResponseDto {
   createdAt!: Date;
 }
 
+// ASK This `docblock` seems to be invalid
 /**
  * A message as the REST API returns it.
  *
@@ -47,8 +49,17 @@ export class MessageResponseDto {
    * refused message stays visible.
    */
   excludedFromAiContext!: boolean;
-  /** `REFUSED`, `DOC_ANSWER`, `DOC_MISSING` — null for a human message. */
-  answerStatus!: string | null;
+  // ASK This `docblock` seems to be invalid
+  /**
+   * What the generation concluded — null for a human message.
+   *
+   * The FIXME here asked for the enum "if it's right", and it was: the
+   * vocabulary existed in two protos and in no TypeScript at all, so there was
+   * nothing to name. `AnswerStatus` in `@synapsedesk/common` is that name now,
+   * and `message.mapper.ts` narrows the wire value through the shared bridge —
+   * null covers both a human message and a status this build cannot name.
+   */
+  answerStatus!: AnswerStatus | null;
 }
 
 /**

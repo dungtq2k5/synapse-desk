@@ -3,6 +3,7 @@ import { E2eFixture, bootstrapE2eTest } from '../utils';
 import { envValidationSchema } from '../../src/common/config/env.validation';
 import { ServiceRegistry } from '../../src/modules/health/service-registry.service';
 import { RedisHealthService } from '../../src/modules/health/redis-health.service';
+import { compareAlphabetically } from '@synapsedesk/common';
 
 /**
  * `/health` and `/health/ready` — 23-doc §1.
@@ -121,13 +122,13 @@ describe('§1 health probes (e2e)', () => {
     const response: { body: { data: { peers: Record<string, unknown> } } } =
       await readiness().expect(200);
 
-    expect(Object.keys(response.body.data.peers).sort()).toEqual([
-      'auth',
-      'ingestion',
-      'notification',
-      'rag',
-      'ticket',
-    ]);
+    expect(
+      Object.keys(response.body.data.peers).sort(compareAlphabetically),
+    ).toEqual(
+      ['auth', 'ingestion', 'notification', 'rag', 'ticket'].sort(
+        compareAlphabetically,
+      ),
+    );
   });
 });
 
@@ -191,11 +192,9 @@ describe('§3 /version (e2e)', () => {
     return version()
       .expect(200)
       .expect((response: { body: { data: Record<string, unknown> } }) => {
-        expect(Object.keys(response.body.data).sort()).toEqual([
-          'builtAt',
-          'sha',
-          'version',
-        ]);
+        expect(
+          Object.keys(response.body.data).sort(compareAlphabetically),
+        ).toEqual(['builtAt', 'sha', 'version'].sort(compareAlphabetically));
       });
   });
 });

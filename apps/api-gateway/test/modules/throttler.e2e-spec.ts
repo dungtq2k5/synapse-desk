@@ -113,10 +113,7 @@ describe('SmartThrottlerGuard (e2e)', () => {
       stubSuccessfulLogin();
 
       const email = 'victim@short-circuit.test';
-      const send = () =>
-        anonymousAgent(fx.app)
-          .post(`${API}/auth/login`)
-          .send({ email, password: 'Passw0rd!' });
+      const send = () => postLogin(email);
 
       // ROUTE_THROTTLE.login allows 5 per 15 minutes per (ip, account).
       for (let i = 0; i < 5; i++) await send();
@@ -135,10 +132,7 @@ describe('SmartThrottlerGuard (e2e)', () => {
       stubSuccessfulLogin();
 
       const email = 'retry@header.test';
-      const send = () =>
-        anonymousAgent(fx.app)
-          .post(`${API}/auth/login`)
-          .send({ email, password: 'Passw0rd!' });
+      const send = () => postLogin(email);
 
       for (let i = 0; i < 5; i++) await send();
       const blocked = await send();
@@ -150,6 +144,12 @@ describe('SmartThrottlerGuard (e2e)', () => {
     });
   });
 
+  /** Posts a login for `email`. The four throttle cases all drive this route. */
+  const postLogin = (email: string) =>
+    anonymousAgent(fx.app)
+      .post(`${API}/auth/login`)
+      .send({ email, password: 'Passw0rd!' });
+
   describe('tracker keying', () => {
     it('3. two accounts from the SAME IP have independent budgets', async () => {
       // The NAT case. Keying anonymous auth routes on IP alone means five bad
@@ -157,10 +157,7 @@ describe('SmartThrottlerGuard (e2e)', () => {
       // a self-inflicted outage dressed up as a security control.
       stubSuccessfulLogin();
 
-      const post = (email: string) =>
-        anonymousAgent(fx.app)
-          .post(`${API}/auth/login`)
-          .send({ email, password: 'Passw0rd!' });
+      const post = postLogin;
 
       for (let i = 0; i < 5; i++) await post('alice@same-nat.test');
       expect((await post('alice@same-nat.test')).status).toBe(429);
@@ -169,15 +166,12 @@ describe('SmartThrottlerGuard (e2e)', () => {
       expect((await post('bob@same-nat.test')).status).not.toBe(429);
     });
 
-    it('3b. capitalisation does not buy a fresh budget', async () => {
+    it('3b. capitalization does not buy a fresh budget', async () => {
       // Otherwise changing the case of one letter is a free reset of the
       // guessing limit.
       stubSuccessfulLogin();
 
-      const post = (email: string) =>
-        anonymousAgent(fx.app)
-          .post(`${API}/auth/login`)
-          .send({ email, password: 'Passw0rd!' });
+      const post = postLogin;
 
       for (let i = 0; i < 5; i++) await post('carol@case.test');
 
@@ -274,14 +268,15 @@ describe('SmartThrottlerGuard (e2e)', () => {
       for (let i = 0; i < TIGHT_GENERAL_LIMIT + 1; i++) {
         await agent
           .get(`${API}/departments`)
-          .set('X-Forwarded-For', '10.0.0.1');
+          .set('X-Forwarded-For', '10.0.0.1'); // NOSONAR
       }
 
       expect(
         (
-          await agent
-            .get(`${API}/departments`)
-            .set('X-Forwarded-For', '10.0.0.2')
+          await agent.get(`${API}/departments`).set(
+            'X-Forwarded-For',
+            '10.0.0.2', // NOSONAR
+          )
         ).status,
       ).toBe(429);
     });
@@ -298,8 +293,10 @@ describe('SmartThrottlerGuard (e2e)', () => {
           .set('X-Forwarded-For', ip)
           .send({ email: 'anon@isolation.test', password: 'Passw0rd!' });
 
-      for (let i = 0; i < 6; i++) await login('10.0.1.1');
-      expect((await login('10.0.1.1')).status).toBe(429);
+      const exhausted = '10.0.1.1'; // NOSONAR
+
+      for (let i = 0; i < 6; i++) await login(exhausted);
+      expect((await login(exhausted)).status).toBe(429);
 
       // A different address is a different bucket — which is exactly why the
       // per-user tracker matters for the routes that DO have an identity.

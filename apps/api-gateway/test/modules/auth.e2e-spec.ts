@@ -253,7 +253,7 @@ describe('auth at the HTTP boundary (e2e)', () => {
 
       const res = await authenticatedAgent(fx.app)
         .patch(`${API}/auth/password`)
-        .send({ currentPassword: 'Wrong1!', newPassword: 'BrandNew1!' });
+        .send({ currentPassword: 'Wrong1!', newPassword: 'BrandNew1!' }); // NOSONAR
 
       expect(res.status).toBe(401);
     });
@@ -274,7 +274,7 @@ describe('auth at the HTTP boundary (e2e)', () => {
 
       const res = await authenticatedAgent(fx.app)
         .patch(`${API}/auth/password`)
-        .send({ currentPassword: 'x', newPassword: 'BrandNew1!' });
+        .send({ currentPassword: 'x', newPassword: 'BrandNew1!' }); // NOSONAR
 
       expect(res.status).toBe(400);
     });

@@ -6,6 +6,9 @@ import {
   INGESTION_GRPC_CLIENT,
   requireProtoTimestamp,
   toPageRequest,
+  toProtoDocumentFileType,
+  toProtoDocumentFlagType,
+  toProtoDocumentStatus,
 } from '@synapsedesk/grpc-proto';
 import { RequestContext } from '@synapsedesk/common';
 import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
@@ -90,7 +93,9 @@ export class DocumentsGrpcClient
               objectPath: dto.objectPath,
               title: dto.title,
               // `?? true`: proto3 booleans have no null, and an absent flag
-              // means the RDM default rather than "unspecified".
+              // means the RDM default rather than "unspecified". The DTO field
+              // stays optional because the OpenAPI schema takes its `required`
+              // list from TypeScript optionality.
               isOrganizationWide: dto.isOrganizationWide ?? true,
               departmentIds: dto.departmentIds ?? [],
               // `?? []` for the same reason: proto3 repeated fields are
@@ -115,11 +120,13 @@ export class DocumentsGrpcClient
         this.documentGrpcService.listDocuments(
           {
             page: toPageRequest(query),
-            // '' rather than undefined: proto3 scalars have no null, and the
-            // service reads the empty string as "no filter".
-            status: query.status ?? '',
+            // UNSPECIFIED for the two enumerated filters — proto3's zero
+            // value already means "no filter", so the empty string that used to
+            // stand in for it is gone. `departmentId` stays a string because a
+            // uuid is not a vocabulary.
+            status: toProtoDocumentStatus(query.status),
             departmentId: query.departmentId ?? '',
-            fileType: query.fileType ?? '',
+            fileType: toProtoDocumentFileType(query.fileType),
             includeDeleted: query.includeDeleted ?? false,
           },
           metadata,
@@ -280,7 +287,7 @@ export class DocumentsGrpcClient
       (metadata) =>
         this.documentGrpcService.listDocumentFlags(
           {
-            flagTypes: query.type ?? [],
+            flagTypes: (query.type ?? []).map(toProtoDocumentFlagType),
             includeResolved: query.includeResolved ?? false,
             page: toPageRequest(query),
           },

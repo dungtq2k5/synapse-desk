@@ -8,6 +8,7 @@ import {
   GRPC_DEADLINE_MS,
   INGESTION_GRPC_CLIENT,
   packRequestContext,
+  fromProtoAiGenerationOutcome,
 } from '@synapsedesk/grpc-proto';
 import { formatErrorMsg } from '@synapsedesk/common';
 
@@ -67,7 +68,7 @@ export class LedgerClientService implements OnModuleInit {
           .pipe(timeout(GRPC_DEADLINE_MS)),
       );
 
-      return response.outcome;
+      return fromProtoAiGenerationOutcome(response.outcome);
     } catch (error) {
       this.logger.error(
         `Could not record the outcome for generation ${generationId}: ${formatErrorMsg(error)}`,

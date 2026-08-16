@@ -27,7 +27,7 @@ import { timestamp, wirePage, wireUser } from '../fixtures/wire';
  * through — the e2e half covers the shape that exists, and the unit half covers
  * the rule itself, which is the part that regressed before.
  */
-class TestController {}
+class TestController {} // NOSONAR
 
 describe('PermissionGuard ANY semantics (unit)', () => {
   const buildGuard = () => {

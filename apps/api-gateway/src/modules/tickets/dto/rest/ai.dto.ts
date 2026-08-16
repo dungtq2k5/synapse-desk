@@ -1,9 +1,7 @@
+import { MAX_DRAFT_INSTRUCTION_LENGTH } from '../../../../common/config/dto.config';
 import { Transform } from 'class-transformer';
 import { IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 import { trimIfString } from '@synapsedesk/common';
-
-/** How long a steer may be. Long enough for a sentence, not a second prompt. */
-const MAX_DRAFT_INSTRUCTION_LENGTH = 500;
 
 export class GenerateDraftDto {
   /**

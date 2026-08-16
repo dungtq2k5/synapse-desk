@@ -3,6 +3,7 @@ import {
   fromProtoTimestamp,
   MessageResponse,
   requireProtoTimestamp,
+  fromProtoMessageAnswerStatus,
 } from '@synapsedesk/grpc-proto';
 import {
   AttachmentResponseDto,
@@ -43,6 +44,6 @@ export function toMessageResponseDto(
     createdAt: requireProtoTimestamp(message.createdAt, 'createdAt'),
     attachments: (message.attachments ?? []).map(toAttachmentResponseDto),
     excludedFromAiContext: message.excludedFromAiContext,
-    answerStatus: message.answerStatus ?? null,
+    answerStatus: fromProtoMessageAnswerStatus(message.answerStatus),
   };
 }

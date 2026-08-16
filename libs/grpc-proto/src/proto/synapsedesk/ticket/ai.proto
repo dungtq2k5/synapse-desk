@@ -3,6 +3,7 @@ syntax = "proto3";
 package synapsedesk.ticket;
 
 import "google/protobuf/timestamp.proto";
+import "synapsedesk/ticket/common.proto";
 
 // The AI co-pilot surface.
 //
@@ -80,7 +81,10 @@ message SuggestedArticleResponse {
 
 message ClassifyTicketResponse {
   string suggested_department_id = 1;
-  string suggested_priority = 2;
+  // The enum this package already declares, rather than its NAME as a string.
+  // A suggestion the agent can apply with one click must name a priority the
+  // ticket surface accepts, and this is what makes the two the same type.
+  TicketPriority suggested_priority = 2;
   double confidence_score = 3;
 }
 

@@ -2,6 +2,7 @@ import {
   AttachmentResponse,
   MessageResponse,
   toProtoTimestamp,
+  toProtoMessageAnswerStatus,
 } from '@synapsedesk/grpc-proto';
 import {
   MessageAttachment,
@@ -54,6 +55,6 @@ export function toMessageResponse(
     // a filtered list, because the same route serves the UI where a refused
     // message must stay visible.
     excludedFromAiContext: message.excludedFromAiContext,
-    answerStatus: message.answerStatus ?? undefined,
+    answerStatus: toProtoMessageAnswerStatus(message.answerStatus),
   };
 }

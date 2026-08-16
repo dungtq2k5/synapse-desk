@@ -1,5 +1,6 @@
 import {
   fromProtoGender,
+  toProtoGender,
   fromProtoTimestamp,
   requireProtoTimestamp,
   UserResponse,
@@ -11,6 +12,7 @@ import { UserSummaryResponseDto } from './dto/rest/user-admin.dto';
 import { UserSummaryGqlDto } from './dto/graphql/user-summary.gql-dto';
 import { UserResponseGqlDto } from './dto/graphql/user-response.gql-dto';
 
+// ASK This `docblock` seems to be invalid
 /**
  * Wire -> REST boundary, the mirror of auth-service's `toUserResponse`.
  *
@@ -57,6 +59,7 @@ export function toUserSummaryResponseDto(
   };
 }
 
+// ASK This `docblock` seems to be invalid
 /**
  * Wire -> GraphQL edge type, for `Ticket.assignee`, `Document.createdBy` and
  * the other resolved-user fields.
@@ -91,6 +94,7 @@ export function toUserSummaryGqlDto(
   };
 }
 
+// ASK This `docblock` seems to be invalid
 /**
  * The user envelope -> the FLAT shape the GraphQL `User` type declares.
  *
@@ -117,7 +121,7 @@ export function toUserSummaryGqlDto(
  *
  * **The return type is exactly `UserResponseGqlDto`**, with nothing riding
  * along. It was briefly an intersection — the schema type PLUS a `departmentIds`
- * the schema did not declare — which worked, because GraphQL serialises only
+ * the schema did not declare — which worked, because GraphQL serializes only
  * declared fields, and was the wrong shape of solution: a function named for a
  * DTO that does not return that DTO, feeding a resolver whose parameter had to
  * be widened to see the extra property. Declaring the field on the type instead
@@ -132,4 +136,23 @@ export function toUserResponseGqlDto(source: {
   departmentIds: string[];
 }): UserResponseGqlDto {
   return { ...source.user, departmentIds: source.departmentIds };
+}
+
+/**
+ * Builds the profile half of an `UpdateUser` request, shared by the own-profile
+ * and admin routes.
+ *
+ * A `null` field becomes the empty string, which the service reads as "clear
+ * it"; an absent field stays absent, which it reads as "leave unchanged".
+ */
+export function toProfileFields(dto: {
+  fullName?: string;
+  gender?: string;
+  dob?: string | null;
+}) {
+  return {
+    fullName: dto.fullName,
+    gender: dto.gender === undefined ? undefined : toProtoGender(dto.gender),
+    dob: dto.dob === null ? '' : dto.dob,
+  };
 }

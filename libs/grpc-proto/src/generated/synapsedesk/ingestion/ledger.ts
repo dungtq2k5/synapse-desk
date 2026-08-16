@@ -9,6 +9,8 @@ import type { Metadata } from "@grpc/grpc-js";
 import { GrpcMethod, GrpcStreamMethod } from "@nestjs/microservices";
 import { Observable } from "rxjs";
 import { Timestamp } from "../../google/protobuf/timestamp";
+import { AiModelTier } from "../auth/common";
+import { DocumentFlagType } from "./document";
 
 /**
  * The ledger's enumerated values, declared HERE so both languages GENERATE
@@ -58,6 +60,22 @@ export enum AiGenerationStatus {
   AI_GENERATION_STATUS_FAILED = 2,
   /** AI_GENERATION_STATUS_CANCELLED - A cancelled stream still spent money on the tokens it produced. */
   AI_GENERATION_STATUS_CANCELLED = 3,
+  UNRECOGNIZED = -1,
+}
+
+/**
+ * Drafts only, written after the fact when the agent acts — or when the hourly
+ * sweep gives up and calls it DISCARDED (12-doc §4.3).
+ *
+ * **DISCARDED is what makes acceptance rate mean anything.** Without the sweep
+ * the denominator is drafts that were USED, and the metric reports ~100%
+ * regardless of quality.
+ */
+export enum AiGenerationOutcome {
+  AI_GENERATION_OUTCOME_UNSPECIFIED = 0,
+  AI_GENERATION_OUTCOME_ACCEPTED = 1,
+  AI_GENERATION_OUTCOME_EDITED = 2,
+  AI_GENERATION_OUTCOME_DISCARDED = 3,
   UNRECOGNIZED = -1,
 }
 
@@ -129,12 +147,16 @@ export interface RecordGenerationOutcomeRequest {
 
 export interface RecordGenerationOutcomeResponse {
   /**
-   * AiGenerationOutcome — ACCEPTED or EDITED. The caller needs this in its own
-   * response, which is why this is a gRPC call rather than an event: it is an
-   * UPDATE to an existing row, not an append of spend, so at-least-once
-   * delivery buys nothing and a queue's ordering ambiguity is a liability.
+   * ACCEPTED or EDITED. The caller needs this in its own response, which is why
+   * this is a gRPC call rather than an event: it is an UPDATE to an existing
+   * row, not an append of spend, so at-least-once delivery buys nothing and a
+   * queue's ordering ambiguity is a liability.
+   *
+   * Unlike `purpose` and `status` above, this one is written and read entirely
+   * in TypeScript — rag-service never calls this RPC — so the enum costs no
+   * cross-language coordination.
    */
-  outcome: string;
+  outcome: AiGenerationOutcome;
 }
 
 /**
@@ -188,7 +210,11 @@ export interface AiUsageResponse {
    * second round trip to auth-service to render a progress bar.
    */
   monthlyBudgetMicros: number;
-  aiModelTier: string;
+  /**
+   * The enum `billing.proto` has used all along. This field spelled the same
+   * fact as a string, which is drift rather than a decision.
+   */
+  aiModelTier: AiModelTier;
   /**
    * Draft quality, and its denominator needs the DISCARDED sweep (12-doc §4.3)
    * — without it, acceptance divides by drafts that were USED and reports
@@ -223,7 +249,7 @@ export interface KnowledgeGapsRequest {
 export interface KnowledgeGapDocumentFlag {
   documentId: string;
   documentTitle: string;
-  flagType: string;
+  flagType: DocumentFlagType;
   detail: string;
 }
 

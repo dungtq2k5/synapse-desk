@@ -1,6 +1,8 @@
 import datetime
 
 from google.protobuf import timestamp_pb2 as _timestamp_pb2
+from rag_service.generated.synapsedesk.auth import common_pb2 as _common_pb2
+from rag_service.generated.synapsedesk.ingestion import document_pb2 as _document_pb2
 from google.protobuf.internal import containers as _containers
 from google.protobuf.internal import enum_type_wrapper as _enum_type_wrapper
 from google.protobuf import descriptor as _descriptor
@@ -30,6 +32,13 @@ class AiGenerationStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     AI_GENERATION_STATUS_SUCCESS: _ClassVar[AiGenerationStatus]
     AI_GENERATION_STATUS_FAILED: _ClassVar[AiGenerationStatus]
     AI_GENERATION_STATUS_CANCELLED: _ClassVar[AiGenerationStatus]
+
+class AiGenerationOutcome(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    AI_GENERATION_OUTCOME_UNSPECIFIED: _ClassVar[AiGenerationOutcome]
+    AI_GENERATION_OUTCOME_ACCEPTED: _ClassVar[AiGenerationOutcome]
+    AI_GENERATION_OUTCOME_EDITED: _ClassVar[AiGenerationOutcome]
+    AI_GENERATION_OUTCOME_DISCARDED: _ClassVar[AiGenerationOutcome]
 AI_GENERATION_PURPOSE_UNSPECIFIED: AiGenerationPurpose
 AI_GENERATION_PURPOSE_CHAT_ANSWER: AiGenerationPurpose
 AI_GENERATION_PURPOSE_DRAFT: AiGenerationPurpose
@@ -45,6 +54,10 @@ AI_GENERATION_STATUS_UNSPECIFIED: AiGenerationStatus
 AI_GENERATION_STATUS_SUCCESS: AiGenerationStatus
 AI_GENERATION_STATUS_FAILED: AiGenerationStatus
 AI_GENERATION_STATUS_CANCELLED: AiGenerationStatus
+AI_GENERATION_OUTCOME_UNSPECIFIED: AiGenerationOutcome
+AI_GENERATION_OUTCOME_ACCEPTED: AiGenerationOutcome
+AI_GENERATION_OUTCOME_EDITED: AiGenerationOutcome
+AI_GENERATION_OUTCOME_DISCARDED: AiGenerationOutcome
 
 class RecordGenerationRequest(_message.Message):
     __slots__ = ("organization_id", "user_id", "ticket_id", "purpose", "model_name", "prompt_tokens", "completion_tokens", "latency_ms", "status", "content", "retrieved_chunk_ids", "cited_chunk_ids")
@@ -93,8 +106,8 @@ class RecordGenerationOutcomeRequest(_message.Message):
 class RecordGenerationOutcomeResponse(_message.Message):
     __slots__ = ("outcome",)
     OUTCOME_FIELD_NUMBER: _ClassVar[int]
-    outcome: str
-    def __init__(self, outcome: _Optional[str] = ...) -> None: ...
+    outcome: AiGenerationOutcome
+    def __init__(self, outcome: _Optional[_Union[AiGenerationOutcome, str]] = ...) -> None: ...
 
 class AiUsageRequest(_message.Message):
     __slots__ = ("to", "granularity")
@@ -154,12 +167,12 @@ class AiUsageResponse(_message.Message):
     total_cost_micros: int
     total_generations: int
     monthly_budget_micros: int
-    ai_model_tier: str
+    ai_model_tier: _common_pb2.AiModelTier
     draft_acceptance: AiRateValue
     empty_retrieval_rate: AiRateValue
     computed_at: _timestamp_pb2.Timestamp
     data_through: str
-    def __init__(self, points: _Optional[_Iterable[_Union[AiUsagePoint, _Mapping]]] = ..., by_purpose: _Optional[_Iterable[_Union[AiUsageSlice, _Mapping]]] = ..., by_model: _Optional[_Iterable[_Union[AiUsageSlice, _Mapping]]] = ..., total_cost_micros: _Optional[int] = ..., total_generations: _Optional[int] = ..., monthly_budget_micros: _Optional[int] = ..., ai_model_tier: _Optional[str] = ..., draft_acceptance: _Optional[_Union[AiRateValue, _Mapping]] = ..., empty_retrieval_rate: _Optional[_Union[AiRateValue, _Mapping]] = ..., computed_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., data_through: _Optional[str] = ...) -> None: ...
+    def __init__(self, points: _Optional[_Iterable[_Union[AiUsagePoint, _Mapping]]] = ..., by_purpose: _Optional[_Iterable[_Union[AiUsageSlice, _Mapping]]] = ..., by_model: _Optional[_Iterable[_Union[AiUsageSlice, _Mapping]]] = ..., total_cost_micros: _Optional[int] = ..., total_generations: _Optional[int] = ..., monthly_budget_micros: _Optional[int] = ..., ai_model_tier: _Optional[_Union[_common_pb2.AiModelTier, str]] = ..., draft_acceptance: _Optional[_Union[AiRateValue, _Mapping]] = ..., empty_retrieval_rate: _Optional[_Union[AiRateValue, _Mapping]] = ..., computed_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., data_through: _Optional[str] = ...) -> None: ...
 
 class KnowledgeGapsRequest(_message.Message):
     __slots__ = ("to", "limit")
@@ -178,9 +191,9 @@ class KnowledgeGapDocumentFlag(_message.Message):
     DETAIL_FIELD_NUMBER: _ClassVar[int]
     document_id: str
     document_title: str
-    flag_type: str
+    flag_type: _document_pb2.DocumentFlagType
     detail: str
-    def __init__(self, document_id: _Optional[str] = ..., document_title: _Optional[str] = ..., flag_type: _Optional[str] = ..., detail: _Optional[str] = ...) -> None: ...
+    def __init__(self, document_id: _Optional[str] = ..., document_title: _Optional[str] = ..., flag_type: _Optional[_Union[_document_pb2.DocumentFlagType, str]] = ..., detail: _Optional[str] = ...) -> None: ...
 
 class KnowledgeGapsResponse(_message.Message):
     __slots__ = ("empty_retrievals", "answering_generations", "empty_retrieval_rate", "flags", "data_through")

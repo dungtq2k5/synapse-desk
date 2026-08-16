@@ -10,7 +10,7 @@ import { RealtimeGateway } from './realtime.gateway';
 import { REALTIME_EVENTS, userRoom } from './realtime.config';
 
 /**
- * Domain E's events → sockets — 18-doc §6.
+ * Domain E's events → sockets.
  *
  * **Reuses the gateway, adds nothing.** The socket server, the Redis adapter
  * and the `user:{id}` rooms already exist; notification-service publishes a

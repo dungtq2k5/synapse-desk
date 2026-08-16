@@ -1,3 +1,9 @@
+import {
+  MAX_EMAIL_ADDRESS_LENGTH,
+  MAX_FULL_NAME_LENGTH,
+  MAX_MESSAGE_ID_LENGTH,
+  MAX_PRESENTED_ATTACHMENTS,
+} from '../../../../common/config/dto.config';
 import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
@@ -14,8 +20,8 @@ import {
 import {
   ALLOWED_ATTACHMENT_MIME_TYPES,
   MAX_ATTACHMENT_FILE_NAME_LENGTH,
+  type AllowedAttachmentMimeType,
 } from '@synapsedesk/common';
-import { MAX_PRESENTED_ATTACHMENTS } from '../../../../common/config/dto.config';
 
 /** One file the Worker has parsed out of a message and would like to upload. */
 export class InboundAttachmentDto {
@@ -32,7 +38,7 @@ export class InboundAttachmentDto {
    * the policy storage-service enforces at presign anyway.
    */
   @IsIn([...ALLOWED_ATTACHMENT_MIME_TYPES])
-  readonly mimeType!: string;
+  readonly mimeType!: AllowedAttachmentMimeType;
 
   @IsInt()
   @Min(1)
@@ -55,27 +61,27 @@ export class InboundAttachmentDto {
  */
 export class InboundAttachmentUploadRequestDto {
   @IsString()
-  @MaxLength(320)
+  @MaxLength(MAX_EMAIL_ADDRESS_LENGTH)
   readonly to!: string;
 
   @IsString()
-  @MaxLength(320)
+  @MaxLength(MAX_EMAIL_ADDRESS_LENGTH)
   readonly from!: string;
 
   @IsOptional()
   @IsString()
-  @MaxLength(255)
+  @MaxLength(MAX_FULL_NAME_LENGTH)
   readonly fromName?: string;
 
   @IsOptional()
   @IsString()
-  @MaxLength(998)
+  @MaxLength(MAX_MESSAGE_ID_LENGTH)
   readonly inReplyTo?: string;
 
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  @MaxLength(998, { each: true })
+  @MaxLength(MAX_MESSAGE_ID_LENGTH, { each: true })
   readonly references?: string[];
 
   @IsArray()
@@ -85,7 +91,12 @@ export class InboundAttachmentUploadRequestDto {
   readonly files!: InboundAttachmentDto[];
 }
 
-/** A file the Worker may now PUT to storage. */
+/**
+ * A file the Worker may now PUT to storage.
+ *
+ * A RESPONSE shape, nested in {@link InboundAttachmentUploadResponseDto} — it is
+ * never bound from a request body, which is why it carries no validators.
+ */
 export class InboundAttachmentUploadDto {
   fileName!: string;
   uploadUrl!: string;
@@ -100,6 +111,8 @@ export class InboundAttachmentUploadDto {
  * `droppedAttachments` and the ticket can still say what was left out. "My
  * attachment vanished" is something a customer discovers before you do — the
  * same rule 31-doc §5 set when attachments were dropped wholesale.
+ *
+ * A RESPONSE shape, like {@link InboundAttachmentUploadDto} above.
  */
 export class InboundAttachmentDeclinedDto {
   fileName!: string;

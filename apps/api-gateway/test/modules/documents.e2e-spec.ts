@@ -1,13 +1,19 @@
-import { of, throwError } from 'rxjs';
-import { faker } from '@faker-js/faker';
-import { status as GrpcStatus } from '@grpc/grpc-js';
 import {
-  DocumentFlagSeverity,
+  DocumentFileType as ProtoDocumentFileType,
+  DocumentStatus as ProtoDocumentStatus,
+  DocumentFlagSeverity as ProtoDocumentFlagSeverity,
+  DocumentFlagType as ProtoDocumentFlagType,
+  toProtoDocumentFlagType,
+} from '@synapsedesk/grpc-proto';
+import {
   DocumentFlagType,
   DocumentStatus,
   MAX_DOCUMENT_BYTES,
   withHttpStatus,
 } from '@synapsedesk/common';
+import { of, throwError } from 'rxjs';
+import { faker } from '@faker-js/faker';
+import { status as GrpcStatus } from '@grpc/grpc-js';
 import {
   API,
   E2eFixture,
@@ -39,10 +45,10 @@ describe('§3.1 Documents at the HTTP boundary (e2e)', () => {
     createdById: faker.string.uuid(),
     title: '2026 Employee Handbook',
     fileUrl: 'organizations/o/documents/d/abc.pdf',
-    fileType: 'pdf',
+    fileType: ProtoDocumentFileType.DOCUMENT_FILE_TYPE_PDF,
     fileSizeBytes: 2048,
     isOrganizationWide: true,
-    status: DocumentStatus.PENDING,
+    status: ProtoDocumentStatus.DOCUMENT_STATUS_PENDING,
     departmentIds: [],
     chunkCount: 0,
     ocrLanguages: [],
@@ -105,7 +111,7 @@ describe('§3.1 Documents at the HTTP boundary (e2e)', () => {
       expect(res.body.data.items[0]).toHaveProperty('deletedById', null);
     });
 
-    it('3. forwards ABSENT filters as empty strings', async () => {
+    it('3. forwards ABSENT filters as UNSPECIFIED and empty strings', async () => {
       fx.stubs.document.listDocuments.mockReturnValue(
         of({ items: [], meta: wirePage([]).meta }),
       );
@@ -113,7 +119,12 @@ describe('§3.1 Documents at the HTTP boundary (e2e)', () => {
       await authenticatedAgent(fx.app).get(`${API}/documents`);
 
       const [request] = fx.stubs.document.listDocuments.mock.calls[0];
-      expect(request.status).toBe('');
+      // `status` is enumerated and goes as proto3's zero value, which is what
+      // the empty string used to stand in for. `departmentId` is a uuid, not a
+      // vocabulary, so it stays a string.
+      expect(request.status).toBe(
+        ProtoDocumentStatus.DOCUMENT_STATUS_UNSPECIFIED,
+      );
       expect(request.departmentId).toBe('');
       expect(request.includeDeleted).toBe(false);
     });
@@ -644,8 +655,8 @@ describe('§3.1 Documents at the HTTP boundary (e2e)', () => {
       id: faker.string.uuid(),
       documentId,
       documentTitle: '2019 Expense Policy',
-      flagType: DocumentFlagType.UNRETRIEVED,
-      severity: DocumentFlagSeverity.INFO,
+      flagType: ProtoDocumentFlagType.DOCUMENT_FLAG_TYPE_UNRETRIEVED,
+      severity: ProtoDocumentFlagSeverity.DOCUMENT_FLAG_SEVERITY_INFO,
       detail: 'Indexed and never retrieved.',
       confidenceScore: undefined,
       detectedAt: timestamp(),
@@ -689,7 +700,11 @@ describe('§3.1 Documents at the HTTP boundary (e2e)', () => {
 
         expect(res.status).toBe(200);
         expect(fx.stubs.document.listDocumentFlags).toHaveBeenLastCalledWith(
-          expect.objectContaining({ flagTypes: [type] }),
+          // Converted on the way out: the QUERY carries the domain name and the
+          // WIRE carries the enum's number.
+          expect.objectContaining({
+            flagTypes: [toProtoDocumentFlagType(type)],
+          }),
           expect.anything(),
         );
       }
@@ -707,7 +722,10 @@ describe('§3.1 Documents at the HTTP boundary (e2e)', () => {
       expect(res.status).toBe(200);
       expect(fx.stubs.document.listDocumentFlags).toHaveBeenCalledWith(
         expect.objectContaining({
-          flagTypes: [DocumentFlagType.UNRETRIEVED, DocumentFlagType.UNCITED],
+          flagTypes: [
+            toProtoDocumentFlagType(DocumentFlagType.UNRETRIEVED),
+            toProtoDocumentFlagType(DocumentFlagType.UNCITED),
+          ],
         }),
         expect.anything(),
       );

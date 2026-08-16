@@ -1,3 +1,10 @@
+import {
+  AiModelTier,
+  AnalyticsExportKind,
+  AnalyticsExportStatus,
+  DocumentFlagType,
+} from '@synapsedesk/common';
+
 /**
  * The analytics response shapes — 19-doc §3. **REST only.**
  *
@@ -145,7 +152,15 @@ export class AiUsageDto {
   totalCostMicros!: number;
   totalGenerations!: number;
   monthlyBudgetMicros!: number;
-  aiModelTier!: string;
+  /**
+   * `FAST` | `QUALITY`, or null.
+   *
+   * The wire field was a bare `string` while `billing.proto` spelled the same
+   * fact as `AiModelTier` — drift rather than a decision, and it is an enum on
+   * both now. Null only for UNSPECIFIED, which means auth-service returned no
+   * entitlement.
+   */
+  aiModelTier!: AiModelTier | null;
   draftAcceptance!: RateDto;
   emptyRetrievalRate!: RateDto;
   computedAt!: Date | null;
@@ -177,7 +192,7 @@ export class AgentStatDto {
  *
  * **A dashboard where nine tiles render and one says "unavailable" is far more
  * useful than a 500**, and it is what someone diagnosing an incident actually
- * needs: the failure is localised to a service rather than to "analytics".
+ * needs: the failure is localized to a service rather than to "analytics".
  */
 export class UnavailableBlockDto {
   /** Which leg failed, by service name. */
@@ -205,7 +220,7 @@ export class AgentAnalyticsDto {
 export class KnowledgeGapFlagDto {
   documentId!: string;
   documentTitle!: string;
-  flagType!: string;
+  flagType!: DocumentFlagType | null;
   detail!: string;
 }
 
@@ -241,9 +256,16 @@ export class DocumentAnalyticsDto {
 
 export class AnalyticsExportDto {
   id!: string;
-  /** PENDING | READY | FAILED. */
-  status!: string;
-  kind!: string;
+  /**
+   * The enums, where these were `string` with the members named in a comment.
+   *
+   * A comment listing `PENDING | READY | FAILED` is the arrangement the whole
+   * pass exists to replace: it tells a reader the vocabulary and tells the
+   * compiler nothing, and the Swagger plugin publishes `type: string` for a
+   * field with exactly three values.
+   */
+  status!: AnalyticsExportStatus | null;
+  kind!: AnalyticsExportKind | null;
   rowCount!: number | null;
   /**
    * The newest rollup run behind the file — the disputed-number guard.

@@ -1,3 +1,7 @@
+import {
+  MAX_AVATAR_BYTES,
+  MAX_UPLOAD_FILE_NAME_LENGTH,
+} from '../../../../common/config/dto.config';
 import { Transform, Type } from 'class-transformer';
 import {
   IsIn,
@@ -8,8 +12,14 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
-import { trimIfString } from '@synapsedesk/common';
+import {
+  AVATAR_MIME_TYPES,
+  trimIfString,
+  type AvatarMimeType,
+  MAX_OBJECT_PATH_LENGTH,
+} from '@synapsedesk/common';
 
+// ASK This `docblock` seems to be invalid
 /**
  * The avatar allowlist and cap, duplicated from storage-service's
  * `PURPOSE_POLICY` — deliberately, and this is the two-layer pattern §7.2
@@ -20,17 +30,18 @@ import { trimIfString } from '@synapsedesk/common';
  * service is asking. Neither can be removed on the grounds that the other
  * exists — and the storage suite tests that one, so a divergence shows up as a
  * gateway 200 followed by a storage 400, not as a silent widening.
+ *
+ * `MAX_AVATAR_BYTES` moved to `dto.config.ts`; `AVATAR_MIME_TYPES` lives in
+ * `@synapsedesk/common` beside the other MIME lists. The rationale stays here,
+ * where both are used together.
  */
-const AVATAR_MIME_TYPES = ['image/png', 'image/jpeg', 'image/webp'] as const;
-const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
-
 export class PresignAvatarDto {
   /**
    * No SVG. An SVG is a document that can carry script — the one image type
    * that behaves like an executable when served.
    */
   @IsIn(AVATAR_MIME_TYPES)
-  readonly contentType!: string;
+  readonly contentType!: AvatarMimeType;
 
   @Type(() => Number)
   @IsInt()
@@ -40,7 +51,7 @@ export class PresignAvatarDto {
 
   @IsString()
   @MinLength(1)
-  @MaxLength(255)
+  @MaxLength(MAX_UPLOAD_FILE_NAME_LENGTH)
   @Transform(trimIfString)
   readonly fileName!: string;
 }
@@ -57,7 +68,7 @@ export class ConfirmAvatarDto {
    */
   @IsString()
   @MinLength(1)
-  @MaxLength(1024)
+  @MaxLength(MAX_OBJECT_PATH_LENGTH)
   readonly objectPath!: string;
 }
 

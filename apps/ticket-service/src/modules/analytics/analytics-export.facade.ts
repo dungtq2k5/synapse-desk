@@ -1,13 +1,15 @@
 import { Injectable } from '@nestjs/common';
-import {
-  AnalyticsExportStatus,
-  CallerContext,
-  requireTenant,
-} from '@synapsedesk/common';
+import { RpcException } from '@nestjs/microservices';
+import { status } from '@grpc/grpc-js';
+import { CallerContext, requireTenant } from '@synapsedesk/common';
 import {
   CreateExportRequest,
   ExportResponse,
   toProtoTimestamp,
+  fromProtoAnalyticsExportKind,
+  toProtoAnalyticsExportKind,
+  toProtoAnalyticsExportStatus,
+  AnalyticsExportStatus as ProtoAnalyticsExportStatus,
 } from '@synapsedesk/grpc-proto';
 import { AnalyticsExportService } from './analytics-export.service';
 import { StorageReferenceService } from '../storage-client/storage-reference.service';
@@ -30,9 +32,25 @@ export class AnalyticsExportFacade {
     request: CreateExportRequest,
     context: CallerContext,
   ): Promise<ExportResponse> {
+    // **Rejected rather than defaulted**, and as INVALID_ARGUMENT rather than as
+    // a bare throw: guessing TICKET_DAILY would hand somebody a file of the
+    // wrong shape under a name they chose.
+    //
+    // Null covers both remaining cases now that the field is an enum —
+    // UNSPECIFIED, meaning the caller named no kind, and UNRECOGNIZED, meaning
+    // a kind some newer build knows and this one cannot produce. Neither is
+    // something to answer with a file.
+    const kind = fromProtoAnalyticsExportKind(request.kind);
+    if (!kind) {
+      throw new RpcException({
+        code: status.INVALID_ARGUMENT,
+        message: 'Unknown export kind',
+      });
+    }
+
     const { exportId } = await this.exports.request(
       {
-        kind: request.kind,
+        kind,
         from: parseDay(request.from),
         to: parseDay(request.to),
         departmentId: request.departmentId,
@@ -50,17 +68,21 @@ export class AnalyticsExportFacade {
     // The URL is minted PER REQUEST rather than stored: a signed link to a
     // tenant's full ticket history is a credential, and putting one in a
     // database turns a read into a durable secret.
+    // Narrowed ONCE, and reused for both the link decision and the response —
+    // `row.status` is a VarChar, so comparing it directly against the enum is
+    // asserting the very thing being checked.
+    const status = toProtoAnalyticsExportStatus(row.status);
+
     const downloadUrl =
-      // Compared as a STRING: `status` is a VarChar off the wire, and a direct
-      // enum comparison would assert the very thing being checked.
-      row.status === String(AnalyticsExportStatus.READY) && row.objectPath
+      status === ProtoAnalyticsExportStatus.ANALYTICS_EXPORT_STATUS_READY &&
+      row.objectPath
         ? await this.storage.resolveExportUrl(row.objectPath, organizationId)
         : null;
 
     return {
       id: row.id,
-      status: row.status,
-      kind: row.kind,
+      status,
+      kind: toProtoAnalyticsExportKind(row.kind),
       rowCount: row.rowCount ?? undefined,
       rollupComputedAt: row.rollupComputedAt
         ? toProtoTimestamp(row.rollupComputedAt)

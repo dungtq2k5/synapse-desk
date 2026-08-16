@@ -21,7 +21,7 @@ import { AiModelTier, OrgStatus } from "./common";
  * fail for every event forever (14-doc §3.2).
  *
  * Verification happens HERE rather than at the gateway, so the webhook secret
- * lives with the service that owns the rows it authorises writes to. The
+ * lives with the service that owns the rows it authorizes writes to. The
  * gateway stays a pipe that cannot forge an entitlement change.
  */
 export interface StripeWebhookRequest {
