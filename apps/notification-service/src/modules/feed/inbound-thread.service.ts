@@ -10,7 +10,7 @@ import type {
 import { PrismaService } from '../prisma/prisma.service';
 
 /**
- * The ticket an outbound notification was about
+ * The ticket an outbound notification was about.
  *
  * **The `In-Reply-To` fallback, and it lives here because the data does.** A
  * reply that carries no ticket token — someone answering a forwarded copy, or

@@ -16,7 +16,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionGuard } from '../../common/guards/permission.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ResponseMessage } from '../../common/decorators/response-message.decorator';
-import { KnowledgeGrpcClient } from './knowledge-grpc.client';
+import { KnowledgeService } from './knowledge.service';
 import { KnowledgeSearchDto } from './dto/rest/knowledge.dto';
 import { KnowledgeSearchResponseDto } from './dto/rest/knowledge-response.dto';
 import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -47,9 +47,9 @@ import {
 @Controller('knowledge')
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class KnowledgeController {
-  constructor(private readonly knowledge: KnowledgeGrpcClient) {}
+  constructor(private readonly knowledge: KnowledgeService) {}
 
-  // A per-USER minute limit, on top of the monthly quota The
+  // A per-USER minute limit, on top of the monthly quota. The
   // quota is a month budget checked per request and does nothing to stop one
   // user spending the whole month in ten minutes.
   @Throttle({ [AI_THROTTLER_TIER]: ROUTE_THROTTLE.knowledgeSearch })

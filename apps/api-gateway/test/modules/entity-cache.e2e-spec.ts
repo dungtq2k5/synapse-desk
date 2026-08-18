@@ -18,14 +18,14 @@ import {
 import { createUserSummaryLoader } from '../../src/common/graphql/loaders/user-summary.loader';
 
 /**
- * The GraphQL entity cache
+ * The GraphQL entity cache.
  *
  * **The layer that pays and stays correct.** A response cache key is a hash of
  * the question and says nothing about which entities are in the answer; an
  * entity key is enumerable, so the mutation that changed a name evicts exactly
  * one key. These tests are about that difference.
  */
-describe('§30 §2 the entity cache (e2e)', () => {
+describe('The entity cache (e2e)', () => {
   let fx: E2eFixture;
   let cache: CacheService;
 
@@ -46,6 +46,19 @@ describe('§30 §2 the entity cache (e2e)', () => {
     fullName,
     avatarUrl: undefined,
     isLocked: false,
+  });
+
+  /**
+   * What the loader ANSWERS for that row: `createUserSummaryLoader` maps the
+   * wire message itself, so a caller receives the GraphQL edge type. Not the
+   * same object as `wireSummary`, which is what the RPC stub returns.
+   */
+  const loadedSummary = (userId: string, fullName: string) => ({
+    id: userId,
+    fullName,
+    avatarUrl: null,
+    isLocked: false,
+    deletedAt: null,
   });
 
   /** Enum fields are NUMBERS on the wire — the generated proto types, not the DTO. */
@@ -286,7 +299,7 @@ describe('§30 §2 the entity cache (e2e)', () => {
       );
 
       await expect(loader.load(userId)).resolves.toEqual(
-        wireSummary(userId, 'From the RPC'),
+        loadedSummary(userId, 'From the RPC'),
       );
 
       dead.disconnect();

@@ -1,3 +1,4 @@
+import type { GrpcPeer } from '@synapsedesk/grpc-proto';
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import {
   checkStaleness,
@@ -8,12 +9,12 @@ import {
   ScheduledJobName,
 } from '@synapsedesk/common';
 import { PlatformJobsClient } from './platform-jobs.client';
+import { BackfillJobDto } from './dto/platform-jobs.dto';
 import {
-  BackfillJobDto,
   JobHealthResponseDto,
-  JobRunResultDto,
-  JobRunStatusDto,
-} from './dto/platform-jobs.dto';
+  JobRunResultResponseDto,
+  JobRunStatusResponseDto,
+} from './dto/platform-jobs-response.dto';
 
 /**
  * Which service owns each schedule.
@@ -25,7 +26,7 @@ import {
  * auth-service off `@Cron` failed to build here until its two jobs were given
  * a leg to be read from.
  */
-const JOB_OWNER: Record<ScheduledJobName, string> = {
+const JOB_OWNER: Record<ScheduledJobName, GrpcPeer> = {
   [SCHEDULED_JOBS.ANALYTICS_DAILY]: 'ticket-service',
   [SCHEDULED_JOBS.LEDGER_DAILY]: 'ingestion-service',
   [SCHEDULED_JOBS.LEDGER_HOURLY]: 'ingestion-service',
@@ -62,14 +63,14 @@ export class PlatformJobsService {
    * is precisely what happened for two domains.
    */
   async health(
-    // `RequestOrigin` too, not just `RequestContext` The Prometheus
+    // `RequestOrigin` too, not just `RequestContext`. The Prometheus
     // scrape reads the same heartbeats and has no user, and inventing one would
     // put a fake actor in the audit trail of a read that nobody performed.
     context: RequestContext | RequestOrigin,
   ): Promise<JobHealthResponseDto> {
     // Three legs, because the heartbeat table lives in each service's own
-    // database — auth-service joined them when it moved off `@nestjs/schedule`
-    //.
+    // database — auth-service joined them when it moved off `@nestjs/schedule`.
+    //
     const [ticketLeg, ingestionLeg, authLeg] = await Promise.all([
       this.client.tryLeg('ticket-service', () =>
         this.client.ticketHeartbeats(context),
@@ -83,7 +84,7 @@ export class PlatformJobsService {
     ]);
 
     const unavailable: string[] = [];
-    const rows: Omit<JobRunStatusDto, 'health'>[] = [];
+    const rows: Omit<JobRunStatusResponseDto, 'health'>[] = [];
 
     for (const leg of [ticketLeg, ingestionLeg, authLeg]) {
       if ('failure' in leg) {
@@ -113,7 +114,7 @@ export class PlatformJobsService {
       checkStaleness(reachable, heartbeats).map((v) => [v.jobName, v.reason]),
     );
 
-    const items: JobRunStatusDto[] = reachable.map((name) => {
+    const items: JobRunStatusResponseDto[] = reachable.map((name) => {
       const row = rows.find((candidate) => candidate.jobName === name);
 
       return {
@@ -146,7 +147,7 @@ export class PlatformJobsService {
   }
 
   /**
-   * Runs one job NOW
+   * Runs one job NOW.
    *
    * The first run after this ships is a backfill of everything since the tables
    * were created, and a rollup bug can only be corrected by recomputation.
@@ -154,15 +155,15 @@ export class PlatformJobsService {
   async run(
     jobName: string,
     context: RequestContext,
-  ): Promise<JobRunResultDto> {
+  ): Promise<JobRunResultResponseDto> {
     return this.dispatch(jobName, context);
   }
 
   /**
-   * Recomputes an explicit range
+   * Recomputes an explicit range.
    *
    * **Safe to expose only because the jobs are idempotent and range-bounded**
-   * . Without that property this endpoint would be a way to
+   *. Without that property this endpoint would be a way to
    * double every counter in a quarter, which is why the range is required
    * rather than optional.
    */
@@ -170,7 +171,7 @@ export class PlatformJobsService {
     jobName: string,
     dto: BackfillJobDto,
     context: RequestContext,
-  ): Promise<JobRunResultDto> {
+  ): Promise<JobRunResultResponseDto> {
     if (dto.from > dto.to) {
       throw new BadRequestException('from must not be after to');
     }
@@ -189,7 +190,7 @@ export class PlatformJobsService {
     jobName: string,
     context: RequestContext,
     range?: { from: string; to: string },
-  ): Promise<JobRunResultDto> {
+  ): Promise<JobRunResultResponseDto> {
     switch (jobName) {
       case SCHEDULED_JOBS.ANALYTICS_DAILY: {
         const outcome = await this.client.runTicketRollup(context, range);

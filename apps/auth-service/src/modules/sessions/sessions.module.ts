@@ -14,7 +14,7 @@ import { SessionsGrpcController } from './sessions-grpc.controller';
 @Module({
   imports: [PrismaModule, AuditModule, NotificationsModule],
   controllers: [SessionsGrpcController],
-  // The expired-records pruner has moved to `SchedulerModule`
+  // The expired-records pruner has moved to `SchedulerModule`.
   // It used to live here and run itself via `@Cron`; it is a plain method now,
   // and the module that owns the CLOCK owns it, so there is one place to look
   // for what runs when.

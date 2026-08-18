@@ -163,7 +163,7 @@ def test_readiness_checks_no_peer_service():
     A grep-style assertion because the failure it guards against is a line
     somebody adds in good faith: a readiness probe that called ingestion-service
     would look correct, pass its own test, and only misbehave when that service
-    is down — which is exactly when nobody wants to discover it. That is §1's
+    is down — which is exactly when nobody wants to discover it. That is the readiness cascade's
     cascade one level down.
     """
     import inspect

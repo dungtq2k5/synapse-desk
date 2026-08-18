@@ -7,8 +7,8 @@ import { join } from 'node:path';
  * `AUTH_SERVICE_NAME` (generated from the proto). They are different concepts:
  *   - AUTH_SERVICE_NAME -> the `service` name declared inside auth.proto
  *   - AUTH_GRPC_CLIENT  -> the token Nest uses to inject the ClientGrpc proxy
- * Conflating them is how you end up with a provider registered under one
- * string and injected under another.
+ *     Conflating them is how you end up with a provider registered under one
+ *     string and injected under another.
  */
 export const AUTH_GRPC_CLIENT = Symbol('AUTH_GRPC_CLIENT');
 
@@ -49,12 +49,12 @@ export const NOTIFICATION_GRPC_CLIENT = Symbol('NOTIFICATION_GRPC_CLIENT');
  * Resolved from __dirname so it holds regardless of the caller's cwd (dev,
  * docker, or a built dist/). scripts/copy-protos.mjs mirrors this tree into
  * each app's dist during build, because tsc emits only JavaScript and the gRPC
- * loader reads the .proto files at startup.
+ * loader reads the.proto files at startup.
  */
 export const PROTO_ROOT = join(__dirname, 'proto');
 
 /**
- * The service-bearing .proto files of the `synapsedesk.auth.v1` package.
+ * The service-bearing.proto files of the `synapsedesk.auth.v1` package.
  *
  * Only files whose SERVICES a peer calls need listing. Messages arrive
  * transitively: `auth.proto` imports `common.proto`, so loading `auth.proto`
@@ -81,7 +81,7 @@ export const AUTH_PROTO_PATHS = [
 ].map((file) => join(PROTO_ROOT, 'synapsedesk', 'auth', file));
 
 /**
- * The service-bearing .proto files of the `synapsedesk.ticket` package.
+ * The service-bearing.proto files of the `synapsedesk.ticket` package.
  *
  * `common.proto` is absent for the same reason it is absent from the auth list:
  * it declares no service, and its messages arrive transitively through the
@@ -146,7 +146,7 @@ export const NOTIFICATION_PROTO_PATHS = [
  *   - longs:Number    -> int64 as number, matching ts-proto's default mapping
  *   - enums:Number    -> numeric enums, matching the generated enum members
  *   - defaults:true   -> proto3 zero-values populated instead of undefined
- * Both the client and the server must use these, or they disagree on the wire.
+ *     Both the client and the server must use these, or they disagree on the wire.
  *
  * `includeDirs` is what makes `import "synapsedesk/auth/v1/common.proto"`
  * resolvable: those paths are relative to the include root, not to the
@@ -184,7 +184,7 @@ export const GRPC_CHANNEL_OPTIONS = {
 
 /**
  * The ops surface every gRPC service serves ALONGSIDE its domain package —
- * §3.
+ *
  *
  * NestJS's gRPC transport takes arrays for both `package` and `protoPath`, so a
  * service registers its own package plus these two and gets probes and a version
@@ -194,8 +194,8 @@ export const GRPC_CHANNEL_OPTIONS = {
  * process.
  *
  * ```ts
- * package:   [AUTH_PACKAGE_NAME, ...OPS_PACKAGE_NAMES],
- * protoPath: [...AUTH_PROTO_PATHS, ...OPS_PROTO_PATHS],
+ * package:   [AUTH_PACKAGE_NAME...OPS_PACKAGE_NAMES],
+ * protoPath: [...AUTH_PROTO_PATHS...OPS_PROTO_PATHS],
  * ```
  */
 export const HEALTH_PACKAGE_NAME = 'grpc.health.v1';
@@ -220,3 +220,23 @@ export const OPS_PROTO_PATHS = [
  * the second one being able to get the container restarted.
  */
 export const READINESS_SERVICE = 'readiness';
+
+/**
+ * The peers a gateway client can name in a timeout message.
+ *
+ * A union rather than a bare `string` on `BaseGrpcClient.serviceName`, so a typo
+ * becomes a compile error instead of a 504 that blames a service that does not
+ * exist. Deliberately the DEPLOYMENT name — what an operator greps for in logs —
+ * not the `service` declared inside a `.proto` (`AUTH_SERVICE_NAME`), and not
+ * the DI token (`AUTH_GRPC_CLIENT`). Three names, three purposes.
+ */
+export const GRPC_PEERS = [
+  'auth-service',
+  'ticket-service',
+  'storage-service',
+  'ingestion-service',
+  'notification-service',
+  'rag-service',
+] as const;
+
+export type GrpcPeer = (typeof GRPC_PEERS)[number];

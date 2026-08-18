@@ -1,4 +1,4 @@
-export class RetrievedChunkDto {
+export class RetrievedChunkResponseDto {
   chunkId!: string;
   documentId!: string;
   documentTitle!: string;
@@ -12,15 +12,15 @@ export class RetrievedChunkDto {
 }
 
 export class KnowledgeSearchResponseDto {
-  chunks!: RetrievedChunkDto[];
+  chunks!: RetrievedChunkResponseDto[];
 
+  // In the RESPONSE rather than only in a log: a caller that cannot tell
+  // degraded results from normal ones presents them as normal ones, and "the
+  // search got worse" then gets reported as a quality problem, not a billing one.
   /**
-   * Why this result set is thinner than usual, or null when it is not.
+   * Why this result set is thinner than usual, or `null` when it is not.
    *
-   * Present in the RESPONSE rather than only in a log, because a caller that
-   * cannot tell degraded results from normal ones will present them as normal
-   * ones — and "the search got worse" is then reported as a quality problem
-   * rather than as a billing one.
+   * `LEXICAL_ONLY` means the vector search was skipped.
    */
   degraded!: 'LEXICAL_ONLY' | null;
 }

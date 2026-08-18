@@ -1,5 +1,5 @@
 /**
- * Process-level options and the SPA's own routes.
+ * @file Process-level options and the SPA's own routes.
  *
  * The unions here are what `env.validation` checks a deployment against, so a
  * bad `NODE_ENV` fails at boot rather than at the first branch that reads it.

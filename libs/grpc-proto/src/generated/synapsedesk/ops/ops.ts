@@ -10,7 +10,7 @@ import { GrpcMethod, GrpcStreamMethod } from "@nestjs/microservices";
 import { Observable } from "rxjs";
 
 /**
- * `/version` for a service with no HTTP port — 23-doc §3.
+ * `/version` for a service with no HTTP port.
  *
  * **Serve it from EVERY service, not just the gateway.** A rolling deploy where
  * one service lagged is precisely the state this diagnoses, and a gateway-only

@@ -14,7 +14,7 @@ import { StorageReferenceService } from './storage-reference.service';
 /**
  * auth-service's connection to `storage-service`.
  *
- * The gateway never calls storage-service directly (§1.5) — every upload is
+ * The gateway never calls storage-service directly — every upload is
  * initiated through the service that owns the resulting row, which for an
  * avatar is this one. That keeps the gateway's routing table at one owning
  * service per URL prefix, and keeps storage-service a pure utility only ever

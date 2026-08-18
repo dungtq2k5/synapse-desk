@@ -102,7 +102,7 @@ export class PlatformService {
       request.status === undefined ? null : fromProtoOrgStatus(request.status);
     const where: Prisma.OrganizationWhereInput = {
       ...(request.includeDeleted ? {} : { deletedAt: null }),
-      // The wire carries the enum; Prisma's column is a VarChar (§7.3), so the
+      // The wire carries the enum; Prisma's column is a VarChar, so the
       // filter is the DOMAIN value. UNSPECIFIED and absent both mean "every
       // status" — `fromProtoOrgStatus` maps the former to null, which is
       // exactly the same branch.
@@ -313,7 +313,7 @@ export class PlatformService {
     // intact; the enum moved that gate onto the wire, where protobuf rejects
     // an unknown value before the handler runs (conventions §7.3). What is
     // left is proto3's zero value, which means "not set" and is never a
-    // status — §6.5 says reject rather than default, and there is no safe
+    // status.5 says reject rather than default, and there is no safe
     // default here: ACTIVE would unfreeze a tenant, FROZEN would lock one out.
     if (to === null) {
       throw new RpcException({
@@ -355,7 +355,7 @@ export class PlatformService {
   }
 
   /**
-   * Rolls the metering window. **BREAK-GLASS since billing shipped**
+   * Rolls the metering window. **BREAK-GLASS since billing shipped**.
    *
    * It was routine tenant administration. Two things changed underneath it:
    *

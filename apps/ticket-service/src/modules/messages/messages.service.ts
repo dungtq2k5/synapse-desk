@@ -184,13 +184,13 @@ export class MessagesService {
    * still be able to be down once it does — and rolling back would throw away
    * what the human actually typed because a machine could not answer them.
    *
-   * **Attachments are bound HERE, in the same call** Presign and
+   * **Attachments are bound HERE, in the same call**. Presign and
    * confirm both took a `messageId`, so an attachment row could only be written
    * after its message existed, while `invokeAi` fires during this very call:
    * a first-turn screenshot was stored a moment after the answer that needed
    * it. Binding at create leaves no ordering for a client to get wrong.
    *
-   * **A failed confirm skips that file and keeps the message** — §1.3.1. The
+   * **A failed confirm skips that file and keeps the message**. The
    * presign record lives 600 seconds, and a user writing a careful ticket
    * around a screenshot takes longer than that often enough. `confirmUpload`
    * deliberately cannot tell an expired record from a forged path, so the only
@@ -214,7 +214,7 @@ export class MessagesService {
       });
     }
 
-    // **Idempotency, for the WebSocket path**
+    // **Idempotency, for the WebSocket path**.
     //
     // A socket that reconnects holding an unacked message re-emits it, which is
     // correct client behaviour and double-posts. Returning the ORIGINAL rather
@@ -350,7 +350,7 @@ export class MessagesService {
   }
 
   /**
-   * Confirms every uploaded path, and reports the ones that did not — §1.3.1.
+   * Confirms every uploaded path, and reports the ones that did not.
    *
    * Sequential rather than `Promise.all`: these are writes against a peer, the
    * count is capped at {@link MAX_ATTACHMENTS_PER_MESSAGE}, and a burst of
@@ -383,7 +383,7 @@ export class MessagesService {
           // one stored months ago.
           //
           // **`object.objectPath`, not `attachment.objectPath`**
-          // §1.3.2. The caller presigned into `pending/` and the object has
+          // The caller presigned into `pending/` and the object has
           // just moved out of it; storing what the client sent would record the
           // one path a lifecycle sweep is entitled to delete.
           fileUrl: object.objectPath,
@@ -445,7 +445,7 @@ export class MessagesService {
         senderId: null,
         content,
         isAiGenerated: true,
-        // **Persisted, where it used to be dropped** The gateway
+        // **Persisted, where it used to be dropped**. The gateway
         // held this in the completion frame and threw it away on write, so once
         // the socket closed a thread could not tell a refusal from an answer.
         answerStatus: fromProtoMessageAnswerStatus(request.answerStatus),
@@ -453,7 +453,7 @@ export class MessagesService {
       include: { attachments: true },
     });
 
-    // This is what puts `message:new` in the ticket room The
+    // This is what puts `message:new` in the ticket room. The
     // socket that asked for the stream gets `ai:stream:done` as well, and the
     // two are not duplication: one settles a pending request, the other tells
     // a thread something appeared.
@@ -475,7 +475,7 @@ export class MessagesService {
   }
 
   /**
-   * Marks a message as unusable for AI context
+   * Marks a message as unusable for AI context.
    *
    * **The row survives and stays visible.** A refused message is the record of
    * what somebody attempted, and its position in the timeline is real — the
@@ -619,7 +619,7 @@ export class MessagesService {
       include: { attachments: true },
     });
 
-    // **No content on the wire** The moderator removed those
+    // **No content on the wire**. The moderator removed those
     // words; shipping them in the removal notice would be the most direct way
     // to defeat the redaction.
     this.events.publish({
@@ -636,19 +636,19 @@ export class MessagesService {
   }
 
   // -------------------------------------------------------------------------
-  // Attachments — 10-storage-service.md §3.2
+  // Attachments
   // -------------------------------------------------------------------------
 
   /**
    * Presign an attachment upload.
    *
-   * **`messageId` is optional** With one, this attaches to a
+   * **`messageId` is optional**. With one, this attaches to a
    * message that already exists and nothing changes. Without one, the client is
    * uploading files it will hand to `CreateMessage`, which is the only ordering
    * in which a first-turn attachment can be read by that turn's answer.
    *
    * The per-message CAP is enforced HERE **when there is a message**, before
-   * storage-service is called at all — §3.2 test 1 asks for exactly that.
+   * storage-service is called at all.2 test 1 asks for exactly that.
    * Checking it downstream instead would hand a caller who is already at the
    * cap a perfectly usable upload URL, and they would only discover the refusal
    * after uploading the bytes. With no message there is nothing to count, so
@@ -912,7 +912,7 @@ export class MessagesService {
       // the last line of it. rag-service owns no conversation rows — a second
       // copy in a second database is a consistency problem nobody asked for.
       const history = await this.prisma.ticketMessage.findMany({
-        // The same exclusion as the co-pilot's transcript Two
+        // The same exclusion as the co-pilot's transcript. Two
         // Prisma readers, one clause each, and a refusal that reached only one
         // of them would be a defence on one surface and a delay on the other.
         where: { ticketId, excludedFromAiContext: false },
@@ -979,7 +979,7 @@ export class MessagesService {
   }
 
   /**
-   * Marks a refused message so it cannot reach a later prompt
+   * Marks a refused message so it cannot reach a later prompt.
    *
    * **Only on an actual refusal.** A timeout, an outage or a cap are different
    * failures whose message is perfectly usable next time, and excluding on
@@ -1073,7 +1073,7 @@ export class MessagesService {
   /**
    * The internal-note filter, as a WHERE fragment.
    *
-   * A fragment rather than a post-fetch `.filter()` on purpose, and §2.5 calls
+   * A fragment rather than a post-fetch `.filter()` on purpose, and that is what it calls
    * this out specifically: filtering after the query leaks the notes' EXISTENCE
    * through the row count and the response timing, and leaves one forgotten
    * call site away from leaking the content itself.
@@ -1124,7 +1124,7 @@ export class MessagesService {
   }
 
   /**
-   * An earlier message with this client id, or null
+   * An earlier message with this client id, or null.
    *
    * Scoped to the TICKET as well as the id, matching the index: uniqueness is
    * per ticket, so a client reusing an id across threads gets two messages

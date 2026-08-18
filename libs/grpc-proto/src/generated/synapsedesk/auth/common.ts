@@ -41,7 +41,7 @@ export enum OrgStatus {
 }
 
 /**
- * The AI tier a plan grants — doc 15 §2.1, mirroring `AiModelTier` in
+ * The AI tier a plan grants, mirroring `AiModelTier` in
  * `@synapsedesk/common`.
  *
  * Two values, because two is a decision a customer makes in five seconds and
@@ -91,7 +91,7 @@ export interface UserResponse {
     | Timestamp
     | undefined;
   /**
-   * When a temporary lock lapses; absent means INDEFINITE -- 21-doc §2.
+   * When a temporary lock lapses; absent means INDEFINITE.
    *
    * `is_locked` stays the authoritative boolean a client should render on. This
    * is here so an admin screen can say "locked until Friday" rather than just

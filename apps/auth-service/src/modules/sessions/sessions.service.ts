@@ -47,7 +47,7 @@ import { Prisma } from '../../generated/prisma/client';
 // tie it to a class instance for zero benefit — every call site would become
 // `this.liveSession()` for no added information, and its visibility is already
 // exactly what a private method's would be (unexported, file-scoped). Same
-// pattern as `emptyPage()` in departments.service.ts.
+// pattern as `emptyPage()` in `libs/grpc-proto/src/pagination.ts`.
 function liveSession(): Prisma.DeviceSessionWhereInput {
   return { rotatedAt: null, expiresAt: { gt: new Date() } };
 }

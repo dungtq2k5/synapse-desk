@@ -4,43 +4,28 @@ import {
   AUTH_GRPC_CLIENT,
   USER_SERVICE_NAME,
   UserServiceClient,
-  requireProtoTimestamp,
-  toPageRequest,
-  toProtoTimestamp,
+  ConfirmAvatarUploadRequest,
+  CreateUserRequest,
+  CreateUserResponse,
+  DeleteUserResponse,
+  CurrentUserResponse,
+  GetUserPermissionsResponse,
+  ListUsersRequest,
+  ListUsersResponse,
+  LockUserRequest,
+  LockUserResponse,
+  PresignAvatarUploadRequest,
+  PresignAvatarUploadResponse,
+  ResetUserTwoFactorResponse,
+  SetUserDepartmentsRequest,
+  SetUserRolesRequest,
+  UpdateOwnProfileRequest,
+  UpdateUserRequest,
+  UserResponse,
+  UserSummaryResponse,
 } from '@synapsedesk/grpc-proto';
-import {
-  PermissionCode,
-  RequestContext,
-  RequestOrigin,
-} from '@synapsedesk/common';
-import {
-  ConfirmAvatarDto,
-  PresignAvatarDto,
-  PresignAvatarResponseDto,
-} from './dto/rest/avatar.dto';
+import { RequestContext, RequestOrigin } from '@synapsedesk/common';
 import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
-import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
-import { toPaginationMetaDataResponseDto } from '../../common/mappers/pagination.mapper';
-import {
-  toProfileFields,
-  toUserResponseDto,
-  toUserSummaryResponseDto,
-} from './user.mapper';
-import {
-  CurrentUserResponseDto,
-  UserResponseDto,
-} from './dto/rest/user-response.dto';
-import { UpdateOwnProfileDto, UpdateUserDto } from './dto/rest/update-user.dto';
-import {
-  CreateUserDto,
-  ListUsersQueryDto,
-  LockUserDto,
-  SetUserDepartmentsDto,
-  SetUserRolesDto,
-  UserSummaryResponseDto,
-  RevokedSessionCountDto,
-  UntrustedDeviceCountDto,
-} from './dto/rest/user-admin.dto';
 
 @Injectable()
 export class UserServiceGrpcClient
@@ -60,205 +45,122 @@ export class UserServiceGrpcClient
       this.client.getService<UserServiceClient>(USER_SERVICE_NAME);
   }
 
-  async getCurrentUser(
+  getCurrentUser(
     userId: string,
     origin: RequestOrigin,
-  ): Promise<CurrentUserResponseDto> {
-    const response = await this.call(
+  ): Promise<CurrentUserResponse> {
+    return this.call(
       (metadata) => this.userGrpcService.getCurrentUser({ userId }, metadata),
       origin,
     );
-
-    return {
-      user: toUserResponseDto(response.user!),
-      // The proto declares `repeated string`; narrowing it to PermissionCode[]
-      // is this boundary's job, and the codes originate from our own seeded
-      // catalogue rather than from user input.
-      permissionCodes: response.permissionCodes as PermissionCode[],
-      departmentIds: response.departmentIds,
-    };
   }
 
-  async updateOwnProfile(
-    dto: UpdateOwnProfileDto,
+  updateOwnProfile(
+    request: UpdateOwnProfileRequest,
     context: RequestContext,
-  ): Promise<UserResponseDto> {
+  ): Promise<UserResponse> {
     return this.call(
-      (metadata) =>
-        this.userGrpcService.updateOwnProfile(toProfileFields(dto), metadata),
+      (metadata) => this.userGrpcService.updateOwnProfile(request, metadata),
       context,
-    ).then(toUserResponseDto);
+    );
   }
 
   // ------------------------------------------------------------- avatars
 
-  async presignAvatar(
-    dto: PresignAvatarDto,
+  presignAvatar(
+    request: PresignAvatarUploadRequest,
     context: RequestContext,
-  ): Promise<PresignAvatarResponseDto> {
+  ): Promise<PresignAvatarUploadResponse> {
     return this.call(
-      (metadata) =>
-        this.userGrpcService.presignAvatarUpload(
-          {
-            contentType: dto.contentType,
-            sizeBytes: dto.sizeBytes,
-            originalFileName: dto.fileName,
-          },
-          metadata,
-        ),
+      (metadata) => this.userGrpcService.presignAvatarUpload(request, metadata),
       context,
-    ).then((response) => ({
-      uploadUrl: response.uploadUrl,
-      objectPath: response.objectPath,
-      expiresAt: requireProtoTimestamp(response.expiresAt, 'expiresAt'),
-    }));
+    );
   }
 
-  async confirmAvatar(
-    dto: ConfirmAvatarDto,
+  confirmAvatar(
+    request: ConfirmAvatarUploadRequest,
     context: RequestContext,
-  ): Promise<UserResponseDto> {
+  ): Promise<UserResponse> {
     return this.call(
-      (metadata) =>
-        this.userGrpcService.confirmAvatarUpload(
-          { objectPath: dto.objectPath },
-          metadata,
-        ),
+      (metadata) => this.userGrpcService.confirmAvatarUpload(request, metadata),
       context,
-    ).then(toUserResponseDto);
+    );
   }
 
-  async deleteAvatar(context: RequestContext): Promise<UserResponseDto> {
+  deleteAvatar(context: RequestContext): Promise<UserResponse> {
     return this.call(
       (metadata) => this.userGrpcService.deleteAvatar({}, metadata),
       context,
-    ).then(toUserResponseDto);
+    );
   }
 
-  async list(
-    query: ListUsersQueryDto,
+  list(
+    request: ListUsersRequest,
     context: RequestContext,
-  ): Promise<PaginationResponseDto<UserSummaryResponseDto>> {
-    const response = await this.call(
-      (metadata) =>
-        this.userGrpcService.listUsers(
-          {
-            page: toPageRequest(query),
-            departmentId: query.departmentId,
-            roleId: query.roleId,
-            isLocked: query.isLocked,
-            includeDeleted: query.includeDeleted,
-          },
-          metadata,
-        ),
+  ): Promise<ListUsersResponse> {
+    return this.call(
+      (metadata) => this.userGrpcService.listUsers(request, metadata),
       context,
     );
-
-    return {
-      items: response.items.map(toUserSummaryResponseDto),
-      meta: toPaginationMetaDataResponseDto(response.meta),
-    };
   }
 
-  async get(
-    id: string,
-    context: RequestContext,
-  ): Promise<UserSummaryResponseDto> {
+  get(id: string, context: RequestContext): Promise<UserSummaryResponse> {
     return this.call(
       (metadata) => this.userGrpcService.getUser({ id }, metadata),
       context,
-    ).then(toUserSummaryResponseDto);
+    );
   }
 
-  async getPermissions(id: string, context: RequestContext): Promise<string[]> {
-    const response = await this.call(
+  getPermissions(
+    id: string,
+    context: RequestContext,
+  ): Promise<GetUserPermissionsResponse> {
+    return this.call(
       (metadata) => this.userGrpcService.getUserPermissions({ id }, metadata),
       context,
     );
-
-    return response.permissionCodes;
   }
 
-  async create(
-    dto: CreateUserDto,
+  create(
+    request: CreateUserRequest,
     context: RequestContext,
-  ): Promise<UserSummaryResponseDto> {
-    const response = await this.call(
-      (metadata) =>
-        this.userGrpcService.createUser(
-          {
-            email: dto.email,
-            fullName: dto.fullName,
-            roleIds: dto.roleIds ?? [],
-            departmentIds: dto.departmentIds ?? [],
-            primaryDepartmentId: dto.primaryDepartmentId,
-          },
-          metadata,
-        ),
+  ): Promise<CreateUserResponse> {
+    return this.call(
+      (metadata) => this.userGrpcService.createUser(request, metadata),
       context,
     );
-
-    return toUserSummaryResponseDto(response.user!);
   }
 
-  async update(
-    id: string,
-    dto: UpdateUserDto,
+  update(
+    request: UpdateUserRequest,
     context: RequestContext,
-  ): Promise<UserSummaryResponseDto> {
+  ): Promise<UserSummaryResponse> {
     return this.call(
-      (metadata) =>
-        this.userGrpcService.updateUser(
-          {
-            id,
-            ...toProfileFields(dto),
-            phoneNumber: dto.phoneNumber ?? undefined,
-          },
-          metadata,
-        ),
+      (metadata) => this.userGrpcService.updateUser(request, metadata),
       context,
-    ).then(toUserSummaryResponseDto);
+    );
   }
 
-  async remove(
-    id: string,
-    context: RequestContext,
-  ): Promise<RevokedSessionCountDto> {
+  remove(id: string, context: RequestContext): Promise<DeleteUserResponse> {
     return this.call(
       (metadata) => this.userGrpcService.deleteUser({ id }, metadata),
       context,
     );
   }
 
-  async restore(
-    id: string,
-    context: RequestContext,
-  ): Promise<UserSummaryResponseDto> {
+  restore(id: string, context: RequestContext): Promise<UserSummaryResponse> {
     return this.call(
       (metadata) => this.userGrpcService.restoreUser({ id }, metadata),
       context,
-    ).then(toUserSummaryResponseDto);
+    );
   }
 
   lock(
-    id: string,
-    dto: LockUserDto,
+    request: LockUserRequest,
     context: RequestContext,
-  ): Promise<RevokedSessionCountDto> {
+  ): Promise<LockUserResponse> {
     return this.call(
-      (metadata) =>
-        this.userGrpcService.lockUser(
-          {
-            id,
-            reason: dto.reason,
-            // Absent stays absent — an INDEFINITE lock, which is the existing
-            // behaviour and what an admin gets by not choosing.
-            lockedUntil: dto.lockedUntil
-              ? toProtoTimestamp(new Date(dto.lockedUntil))
-              : undefined,
-          },
-          metadata,
-        ),
+      (metadata) => this.userGrpcService.lockUser(request, metadata),
       context,
     );
   }
@@ -273,40 +175,30 @@ export class UserServiceGrpcClient
   resetTwoFactor(
     id: string,
     context: RequestContext,
-  ): Promise<UntrustedDeviceCountDto> {
+  ): Promise<ResetUserTwoFactorResponse> {
     return this.call(
       (metadata) => this.userGrpcService.resetUserTwoFactor({ id }, metadata),
       context,
     );
   }
 
-  async setRoles(
-    id: string,
-    dto: SetUserRolesDto,
+  setRoles(
+    request: SetUserRolesRequest,
     context: RequestContext,
-  ): Promise<UserSummaryResponseDto> {
+  ): Promise<UserSummaryResponse> {
     return this.call(
-      (metadata) =>
-        this.userGrpcService.setUserRoles(
-          { id, roleIds: dto.roleIds },
-          metadata,
-        ),
+      (metadata) => this.userGrpcService.setUserRoles(request, metadata),
       context,
-    ).then(toUserSummaryResponseDto);
+    );
   }
 
-  async setDepartments(
-    id: string,
-    dto: SetUserDepartmentsDto,
+  setDepartments(
+    request: SetUserDepartmentsRequest,
     context: RequestContext,
-  ): Promise<UserSummaryResponseDto> {
+  ): Promise<UserSummaryResponse> {
     return this.call(
-      (metadata) =>
-        this.userGrpcService.setUserDepartments(
-          { id, departments: dto.departments },
-          metadata,
-        ),
+      (metadata) => this.userGrpcService.setUserDepartments(request, metadata),
       context,
-    ).then(toUserSummaryResponseDto);
+    );
   }
 }

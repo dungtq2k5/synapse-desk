@@ -83,7 +83,7 @@ export class StorageReferenceService implements OnModuleInit {
    * `documentId` is a freshly minted uuid rather than an existing row's: the
    * `documents` row is created at CONFIRM, not at presign, so there is no id to
    * use yet. The path therefore carries the id the row WILL have, which is what
-   * lets confirm tie the object back to the request that authorised it.
+   * lets confirm tie the object back to the request that authorized it.
    */
   async presignDocument(
     input: {
@@ -224,7 +224,7 @@ export class StorageReferenceService implements OnModuleInit {
   }
 
   /**
-   * Fire-and-forget, exactly like `AuditPublisher` — §1.6.
+   * Fire-and-forget, exactly like `AuditPublisher`.
    *
    * A delete that fails must never roll back or block the document removal the
    * user actually asked for. The worst case is an orphaned object, which costs

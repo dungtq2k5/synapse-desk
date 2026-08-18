@@ -433,11 +433,11 @@ describe('Departments (e2e)', () => {
   });
 
   /**
-   * The batch contract Same six properties as `ListUsersByIds`,
+   * The batch contract. Same six properties as `ListUsersByIds`,
    * asserted per RPC because "it is just a `WHERE id IN (…)`" is exactly the
    * framing under which the tenant check gets skipped.
    */
-  describe('§1 ListDepartmentsByIds — the batch contract', () => {
+  describe('ListDepartmentsByIds — the batch contract', () => {
     const make = async (
       t: Awaited<ReturnType<typeof seedTenantWithUser>>,
       name: string,

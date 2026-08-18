@@ -6,7 +6,7 @@ import { MetricsRegistry } from './metrics.registry';
 import { JobMetricsCollector } from './job-metrics.collector';
 
 /**
- * `/metrics`, on its OWN listener
+ * `/metrics`, on its OWN listener.
  *
  * **A separate port bound to the internal interface, not a route on the public
  * app.** The spec says "not via Nginx", and a distinct listener makes that
@@ -15,7 +15,7 @@ import { JobMetricsCollector } from './job-metrics.collector';
  * metrics endpoint reachable from the internet is an inventory of your traffic
  * volumes, error rates and queue depths, offered to anyone who asks.
  *
- * It also means the guarantee is TESTABLE: §4's test 1 asks the public listener
+ * It also means the guarantee is TESTABLE: a test asks the public listener
  * for `/metrics` and requires a 404, and that is a fact about this process
  * rather than about a proxy configuration living in another repository.
  *

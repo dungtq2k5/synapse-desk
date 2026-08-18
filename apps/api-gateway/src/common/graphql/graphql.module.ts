@@ -13,37 +13,25 @@ import { CacheModule } from '../cache/cache.module';
 import { CacheService } from '../cache/cache.service';
 
 /**
- * The GraphQL surface
+ * The GraphQL surface.
  *
- * **REST is not deprecated by it; both are permanent, with different jobs**
- *: REST stays the surface for commands, files and machine callers,
- * GraphQL is the read surface for the SPA. Saying so at the registration
- * prevents the slow drift where half the mutations live in one place and half in
- * the other with no rule.
+ * **REST is not deprecated by it; both are permanent, with different jobs.**
+ * REST stays the surface for commands, files and machine callers; GraphQL is
+ * the read surface for the SPA. Stating that here is what prevents half the
+ * mutations drifting into one and half into the other.
  *
- * **A module again, after being inlined into `app.module.ts` and then brought
- * back — and the reversal is the point rather than churn.** It was inlined when
- * its whole body was `forRootAsync({ driver, imports: [ConfigModule,
- * AuthModule], inject: [ConfigService, AUTH_GRPC_CLIENT], useFactory })`: at
- * that size a module was a name to look up on the way to the thing you wanted.
- * The registration has since doubled — four imports, four injects — and it grows
- * again with every loader, because each new batch RPC is another channel the
- * factory must be handed. Seven symbols existed in `app.module.ts` for this one
- * entry and nothing else.
+ * Lives beside the rule, the plugin and the loaders it wires — a module is a
+ * wiring file, and it sits next to what it wires.
  *
- * So it now sits beside the rule, the plugin and the loaders it wires, exactly
- * as `cache.module.ts` sits beside `cache.service.ts`. The rule that decides
- * this is the same one everywhere in `common/`: a module is a wiring file, and
- * it lives next to what it wires.
+ * Resolvers are unaffected: they are providers of the feature modules whose
+ * controllers they mirror, and `GraphQLModule` discovers them from the
+ * container rather than from an import list. Nothing here knows what a ticket
+ * is.
  *
- * Resolvers are unaffected — they are providers of the feature modules whose
- * controllers they mirror, and `GraphQLModule` discovers them from the container
- * rather than from an import list. Nothing here knows what a ticket is.
- *
- * The class is `GraphqlApiModule` rather than `GraphqlModule` because the latter
- * differs from `@nestjs/graphql`'s `GraphQLModule` — imported directly below —
- * by capitalisation alone, and two symbols one shift-key apart in the same file
- * is a misread waiting to happen.
+ * The class is `GraphqlApiModule`, not `GraphqlModule`: the latter differs from
+ * `@nestjs/graphql`'s `GraphQLModule` — imported below — by capitalization
+ * alone, and two symbols one shift-key apart in one file is a misread waiting
+ * to happen.
  */
 @Module({
   imports: [

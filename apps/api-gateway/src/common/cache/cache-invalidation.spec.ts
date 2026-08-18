@@ -9,12 +9,12 @@ import { CacheInvalidationInterceptor } from '../interceptors/cache-invalidation
 import { CACHE_SCOPES } from '../config/cache.config';
 import type { CacheService } from './cache.service';
 
-/** The subjects a method actually subscribes to, read back from metadata. */
-const patternsOf = (method: (...args: never[]) => unknown): string[] =>
-  (Reflect.getMetadata(PATTERN_METADATA, method) as string[]) ?? [];
-
 describe('cache invalidation', () => {
-  describe('§4.2 the consumer subscribes to what it claims', () => {
+  /** The subjects a method actually subscribes to, read back from metadata. */
+  const patternsOf = (method: (...args: never[]) => unknown): string[] =>
+    (Reflect.getMetadata(PATTERN_METADATA, method) as string[]) ?? [];
+
+  describe('The consumer subscribes to what it claims', () => {
     it('**every ticket pattern, not just one**', () => {
       // The bug this pins is invisible in review and in production logs alike.
       // `@EventPattern` writes its metadata with
@@ -46,14 +46,14 @@ describe('cache invalidation', () => {
       ).not.toContain(DOCUMENT_PATTERNS.uploaded);
     });
 
-    it('and the billing event that 15-doc §1.3 already specified', () => {
+    it('and the billing event the settings cache listens for', () => {
       expect(
         patternsOf(CacheInvalidationConsumer.prototype.entitlementsChanged),
       ).toEqual([BILLING_PATTERNS.entitlementsChanged]);
     });
   });
 
-  describe('§4.2 test 5 — a consumer failure never kills the process', () => {
+  describe('A consumer failure never kills the process', () => {
     const consumerWith = (cache: Partial<CacheService>) =>
       new CacheInvalidationConsumer(cache as CacheService);
 
@@ -100,7 +100,7 @@ describe('cache invalidation', () => {
     });
   });
 
-  describe('§4.1 test 2 — the decorator runs AFTER the handler', () => {
+  describe('The decorator runs AFTER the handler', () => {
     /**
      * A request the real `RequestContextService.fromRequest` accepts.
      *

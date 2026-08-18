@@ -2,7 +2,7 @@ import { checkStaleness, JobHeartbeat } from './job-staleness';
 import { SCHEDULED_JOBS } from '../configs/scheduler.config';
 
 /**
- * §4 tests 1–3 — **alert on staleness, not on failure**.
+ * tests 1–3 — **alert on staleness, not on failure**.
  *
  * A failed job logs. A job that never ran logs nothing at all, which is exactly
  * what happened here: seven jobs with no scheduler, producing zeros that every

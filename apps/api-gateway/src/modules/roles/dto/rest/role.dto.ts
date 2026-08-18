@@ -21,31 +21,24 @@ import {
 import { SearchPaginationDto } from '../../../../common/dto/rest/search-pagination.dto';
 import { ToBoolean } from '../../../../common/decorators/to-boolean.decorator';
 import {
+  MAX_ROLE_DESCRIPTION_LENGTH,
   MAX_ROLE_NAME_LENGTH,
   MIN_ROLE_NAME_LENGTH,
 } from '../../../../common/config/dto.config';
 
-/**
- * `OmitType` then re-declare `sortBy`, so the allowlist, the TYPE and the
- * default are one decision instead of three. Inheriting the base's plain
- * `sortBy: string` would accept any column name here and only fail two hops
- * away, in auth-service.
- */
+// `OmitType` then re-declare `sortBy`, so the allowlist, the type and the
+// default are ONE decision. Inheriting the base's plain `sortBy: string` would
+// accept any column name and fail two hops away, inside auth-service.
+/** Query parameters for `GET /roles`. */
 export class ListRolesQueryDto extends OmitType(SearchPaginationDto, [
   'sortBy',
 ] as const) {
   @IsOptional()
   @IsString()
   @IsIn(ROLE_SORTABLE_FIELDS)
-  /**
-   * Optional in the API and, without this, REQUIRED in the docs
-   *
-   * The plugin derives `required` from TYPESCRIPT optionality, not from
-   * `@IsOptional()`. A field declared `page: number = 1` is non-optional to the
-   * compiler even though the validator lets a caller omit it, so the generated
-   * spec demanded it — and a generated client would refuse to send a request
-   * without one.
-   */
+  // `@ApiPropertyOptional()` is required here: the Swagger plugin derives
+  // `required` from TYPESCRIPT optionality, so a defaulted non-optional field
+  // is documented as mandatory and a generated client refuses to omit it.
   @ApiPropertyOptional()
   readonly sortBy: RoleSortableField = DEFAULT_SEARCH.SORT_BY;
 
@@ -63,14 +56,12 @@ export class ListRolesQueryDto extends OmitType(SearchPaginationDto, [
   readonly includeSystem: boolean = false;
 }
 
-/**
- * `@IsIn(PERMISSION_CODES)` rather than a bare `@IsString()`.
- *
- * The service re-checks this, so the validation here is not what makes it safe
- * — it is what makes the failure legible: a typo'd code is a 400 naming the
- * field at the edge, rather than a gRPC INVALID_ARGUMENT surfacing from two
- * hops away.
- */
+// `@IsIn(PERMISSION_CODES)` rather than a bare `@IsString()`.
+//
+// The service re-checks this, so the validation here is not what makes it safe
+// — it is what makes the failure legible: a typo'd code is a 400 naming the
+// field at the edge, rather than a gRPC INVALID_ARGUMENT surfacing from two
+// hops away.
 class PermissionCodesDto {
   @IsArray()
   @ArrayMaxSize(PERMISSION_CODES.length)
@@ -87,7 +78,7 @@ export class CreateRoleDto extends PermissionCodesDto {
 
   @IsOptional()
   @IsString()
-  @MaxLength(2000)
+  @MaxLength(MAX_ROLE_DESCRIPTION_LENGTH)
   readonly description?: string;
 }
 
@@ -101,29 +92,9 @@ export class UpdateRoleDto {
 
   @IsOptional()
   @IsString()
-  @MaxLength(2000)
+  @MaxLength(MAX_ROLE_DESCRIPTION_LENGTH)
   readonly description?: string;
 }
 
 /** REPLACE semantics — the submitted set becomes the role's permissions. */
 export class SetRolePermissionsDto extends PermissionCodesDto {}
-
-export class RoleResponseDto {
-  readonly id!: string;
-  readonly name!: string;
-  readonly description!: string | null;
-  /** Readable by every tenant, mutable by none. */
-  readonly isSystemRole!: boolean;
-  readonly userAssigned!: number;
-  readonly permissionCodes!: string[];
-  readonly createdAt!: Date;
-  readonly updatedAt!: Date;
-}
-
-export class PermissionResponseDto {
-  readonly id!: string;
-  readonly code!: string;
-  readonly name!: string;
-  /** The `target` prefix of the code, for grouping in the role editor. */
-  readonly group!: string;
-}

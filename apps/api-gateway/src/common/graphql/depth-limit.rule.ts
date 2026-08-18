@@ -8,21 +8,6 @@ import {
 import { MAX_QUERY_DEPTH } from '../config/graphql-limits.config';
 
 /**
- * Refuses a query nested deeper than {@link MAX_QUERY_DEPTH}
- *
- * **A validation rule, not a plugin**, and that is the point: validation runs
- * before execution begins, so a rejected query never reaches a resolver and
- * therefore never makes a gRPC call, which its test asserts exactly —
- * refusing *after* the fan-out is not a limit, it is a log line.
- *
- * Hand-written rather than `graphql-depth-limit`, which is unmaintained
- * (last published 2018), types-free, and forty lines. The forty lines are below.
- *
- * Introspection is exempt: `__schema` is legitimately deep and every GraphQL IDE
- * sends it, so counting it would break tooling in the only environments where
- * introspection is on.
- */
-/**
  * The deepest path through `selectionSet`, counting from `current`.
  *
  * At module scope rather than nested inside the rule: it closes over nothing —
@@ -67,6 +52,21 @@ function depthOf(
   return deepest;
 }
 
+/**
+ * Refuses a query nested deeper than {@link MAX_QUERY_DEPTH}.
+ *
+ * **A validation rule, not a plugin**, and that is the point: validation runs
+ * before execution begins, so a rejected query never reaches a resolver and
+ * therefore never makes a gRPC call, which its test asserts exactly —
+ * refusing *after* the fan-out is not a limit, it is a log line.
+ *
+ * Hand-written rather than `graphql-depth-limit`, which is unmaintained
+ * (last published 2018), types-free, and forty lines. The forty lines are below.
+ *
+ * Introspection is exempt: `__schema` is legitimately deep and every GraphQL IDE
+ * sends it, so counting it would break tooling in the only environments where
+ * introspection is on.
+ */
 export function depthLimitRule(maxDepth = MAX_QUERY_DEPTH) {
   return (context: ValidationContext): ASTVisitor => ({
     OperationDefinition(operation) {

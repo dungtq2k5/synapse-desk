@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-# The image for EVERY Node service in this monorepo
+# The image for EVERY Node service in this monorepo.
 #
 # **One parameterized file rather than six near-identical ones.** The six differ
 # only in which workspace they build, and six copies of the same five-stage
@@ -11,7 +11,7 @@
 #       --build-arg SERVICE=api-gateway \
 #       --build-arg GIT_SHA="$(git rev-parse HEAD)" \
 #       --build-arg BUILD_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-#       -t synapsedesk/api-gateway .
+# -t synapsedesk/api-gateway.
 #
 # `rag-service` is Python and has its own file; it is the one service where the
 # stages genuinely differ.
@@ -89,11 +89,11 @@ ARG SERVICE
 COPY --from=prune /app/out/full/ ./
 # `scripts/` sits outside every workspace, so prune leaves it behind — and
 # `grpc-proto`'s build shells out to `scripts/copy-protos.mjs`, without which
-# the image has compiled types and no .proto files to load at boot.
+# the image has compiled types and no.proto files to load at boot.
 COPY --from=prune /app/scripts ./scripts
 # The ROOT tsconfig, which `prisma.config.ts` extends. Prisma 7 loads that config
 # through the TypeScript compiler, so without it `db:generate` fails with
-# `File '../../tsconfig.json' not found`. Copied from the prune stage's own
+# `File '././tsconfig.json' not found`. Copied from the prune stage's own
 # checkout rather than `out/`, which does not carry root config files.
 #
 # It lives HERE rather than in `deps` because generation moved into this stage
@@ -140,13 +140,13 @@ ENV NODE_ENV=production \
 COPY --from=prod-deps /app/node_modules ./node_modules
 
 # The workspace libraries, at the SAME relative paths. npm workspaces links
-# `node_modules/@synapsedesk/common` to `../../libs/common`, so a runtime image
+# `node_modules/@synapsedesk/common` to `././libs/common`, so a runtime image
 # that copied only `apps/` would carry a symlink pointing at nothing — and the
 # failure is a module-not-found at boot, after the image has been pushed.
 COPY --from=build /app/libs/common/package.json ./libs/common/
 COPY --from=build /app/libs/common/dist ./libs/common/dist
 COPY --from=build /app/libs/grpc-proto/package.json ./libs/grpc-proto/
-# `dist/proto` carries the .proto FILES, not just the compiled types. gRPC's
+# `dist/proto` carries the.proto FILES, not just the compiled types. gRPC's
 # loader reads them at startup, so an image without them fails to boot rather
 # than failing on the first call — see `scripts/copy-protos.mjs`.
 COPY --from=build /app/libs/grpc-proto/dist ./libs/grpc-proto/dist
@@ -198,14 +198,14 @@ CMD ["sh", "-c", "exec node \"$ENTRY\""]
 
 # ============================================================== runtime-ocr
 #
-# ingestion-service only
+# ingestion-service only.
 #
 #     docker build -f docker/node-service.Dockerfile \
 #       --target runtime-ocr \
 #       --build-arg SERVICE=ingestion-service \
 #       --build-arg GIT_SHA="$(git rev-parse HEAD)" \
 #       --build-arg BUILD_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-#       -t synapsedesk/ingestion-service .
+# -t synapsedesk/ingestion-service.
 #
 # **A second target rather than a bigger base.** Installing these in `runtime`
 # would put a rasteriser and an OCR engine into api-gateway, auth-service,

@@ -26,7 +26,7 @@ import { RequirePermission } from '../../common/decorators/require-permission.de
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ResponseMessage } from '../../common/decorators/response-message.decorator';
 import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
-import { UserServiceGrpcClient } from './users-service-grpc.client';
+import { UsersService } from './users.service';
 import { UpdateUserDto } from './dto/rest/update-user.dto';
 import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AUTH_SCHEMES } from '../../common/config/swagger.config';
@@ -39,13 +39,15 @@ import {
   CreateUserDto,
   ListUsersQueryDto,
   LockUserDto,
-  RevokedSessionCountDto,
   SetUserDepartmentsDto,
   SetUserRolesDto,
-  UntrustedDeviceCountDto,
+} from './dto/rest/user-admin.dto';
+import {
+  RevokedSessionCountResponseDto,
+  UntrustedDeviceCountResponseDto,
   UserPermissionsResponseDto,
   UserSummaryResponseDto,
-} from './dto/rest/user-admin.dto';
+} from './dto/rest/user-admin-response.dto';
 
 /**
  * Tenant administration of OTHER users (api-endpoints-plan).
@@ -61,7 +63,7 @@ import {
 @Controller('users')
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class UserAdminController {
-  constructor(private readonly usersGrpcClient: UserServiceGrpcClient) {}
+  constructor(private readonly users: UsersService) {}
 
   @ApiOperation({ summary: 'List tenant users' })
   @ApiWrappedResponse(Paginated(UserSummaryResponseDto))
@@ -85,7 +87,7 @@ export class UserAdminController {
       );
     }
 
-    return this.usersGrpcClient.list(query, context);
+    return this.users.list(query, context);
   }
 
   @ApiOperation({ summary: 'Detail + roles + departments' })
@@ -97,7 +99,7 @@ export class UserAdminController {
     @CurrentUser() context: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<UserSummaryResponseDto> {
-    return this.usersGrpcClient.get(id, context);
+    return this.users.get(id, context);
   }
 
   /**
@@ -115,9 +117,7 @@ export class UserAdminController {
     @CurrentUser() context: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<UserPermissionsResponseDto> {
-    return {
-      permissionCodes: await this.usersGrpcClient.getPermissions(id, context),
-    };
+    return this.users.getPermissions(id, context);
   }
 
   /**
@@ -134,7 +134,7 @@ export class UserAdminController {
     @CurrentUser() context: RequestContext,
     @Body() createUserDto: CreateUserDto,
   ): Promise<UserSummaryResponseDto> {
-    return this.usersGrpcClient.create(createUserDto, context);
+    return this.users.create(createUserDto, context);
   }
 
   @ApiOperation({ summary: 'Update' })
@@ -148,7 +148,7 @@ export class UserAdminController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateUserDto: UpdateUserDto,
   ): Promise<UserSummaryResponseDto> {
-    return this.usersGrpcClient.update(id, updateUserDto, context);
+    return this.users.update(id, updateUserDto, context);
   }
 
   /**
@@ -158,7 +158,7 @@ export class UserAdminController {
    * 409 on self, and on the last active Org Admin.
    */
   @ApiOperation({ summary: 'Remove' })
-  @ApiWrappedResponse(RevokedSessionCountDto)
+  @ApiWrappedResponse(RevokedSessionCountResponseDto)
   @ApiFilterErrors(['400', '401', '403', '404'])
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
@@ -167,8 +167,8 @@ export class UserAdminController {
   remove(
     @CurrentUser() context: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
-  ): Promise<RevokedSessionCountDto> {
-    return this.usersGrpcClient.remove(id, context);
+  ): Promise<RevokedSessionCountResponseDto> {
+    return this.users.remove(id, context);
   }
 
   /** 409 if the address was taken while the account was deactivated. */
@@ -183,12 +183,12 @@ export class UserAdminController {
     @CurrentUser() context: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<UserSummaryResponseDto> {
-    return this.usersGrpcClient.restore(id, context);
+    return this.users.restore(id, context);
   }
 
   /** Same self / last-admin guards as delete, and the same session revocation. */
   @ApiOperation({ summary: 'Lock' })
-  @ApiWrappedResponse(RevokedSessionCountDto)
+  @ApiWrappedResponse(RevokedSessionCountResponseDto)
   @ApiFilterErrors(['400', '401', '403', '404'])
   @Post(':id/lock')
   @HttpCode(HttpStatus.OK)
@@ -198,8 +198,8 @@ export class UserAdminController {
     @CurrentUser() context: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() lockUserDto: LockUserDto,
-  ): Promise<RevokedSessionCountDto> {
-    return this.usersGrpcClient.lock(id, lockUserDto, context);
+  ): Promise<RevokedSessionCountResponseDto> {
+    return this.users.lock(id, lockUserDto, context);
   }
 
   /** No sessions restored: unlocking permits signing in, it does not sign in. */
@@ -214,7 +214,7 @@ export class UserAdminController {
     @CurrentUser() context: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<void> {
-    return this.usersGrpcClient.unlock(id, context);
+    return this.users.unlock(id, context);
   }
 
   /**
@@ -224,7 +224,7 @@ export class UserAdminController {
    * exists.
    */
   @ApiOperation({ summary: 'Reset two factor' })
-  @ApiWrappedResponse(UntrustedDeviceCountDto)
+  @ApiWrappedResponse(UntrustedDeviceCountResponseDto)
   @ApiFilterErrors(['400', '401', '403', '404'])
   @Post(':id/2fa/reset')
   @HttpCode(HttpStatus.OK)
@@ -233,8 +233,8 @@ export class UserAdminController {
   resetTwoFactor(
     @CurrentUser() context: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
-  ): Promise<UntrustedDeviceCountDto> {
-    return this.usersGrpcClient.resetTwoFactor(id, context);
+  ): Promise<UntrustedDeviceCountResponseDto> {
+    return this.users.resetTwoFactor(id, context);
   }
 
   /**
@@ -255,7 +255,7 @@ export class UserAdminController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() setUserRolesDto: SetUserRolesDto,
   ): Promise<UserSummaryResponseDto> {
-    return this.usersGrpcClient.setRoles(id, setUserRolesDto, context);
+    return this.users.setRoles(id, setUserRolesDto, context);
   }
 
   /** Exactly one entry must be primary when the list is non-empty. */
@@ -271,10 +271,6 @@ export class UserAdminController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() setUserDepartmentsDto: SetUserDepartmentsDto,
   ): Promise<UserSummaryResponseDto> {
-    return this.usersGrpcClient.setDepartments(
-      id,
-      setUserDepartmentsDto,
-      context,
-    );
+    return this.users.setDepartments(id, setUserDepartmentsDto, context);
   }
 }

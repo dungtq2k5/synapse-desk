@@ -18,12 +18,12 @@ import {
   RequestOrigin,
 } from '@synapsedesk/common';
 import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
-import { JobRunStatusDto } from './dto/platform-jobs.dto';
+import { JobRunStatusResponseDto } from './dto/platform-jobs-response.dto';
 
 /**
  * Who is asking for a heartbeat read.
  *
- * Widened from `RequestContext` to include a bare origin A
+ * Widened from `RequestContext` to include a bare origin. A
  * Prometheus scrape has no user, and `BaseGrpcClient.call` already takes the
  * union for exactly this reason: an unauthenticated caller is a real caller with
  * no identity, not a caller to fabricate one for.
@@ -33,7 +33,7 @@ type HeartbeatCaller = RequestContext | RequestOrigin;
 /** A heartbeat row plus which service it came from. */
 export type ServiceHeartbeats = {
   service: string;
-  rows: Omit<JobRunStatusDto, 'health'>[];
+  rows: Omit<JobRunStatusResponseDto, 'health'>[];
 };
 
 /**

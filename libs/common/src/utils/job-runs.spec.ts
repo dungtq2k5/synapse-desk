@@ -8,7 +8,7 @@ import {
 } from './job-runs';
 
 /**
- * An in-memory `JobRunStore` test 2.
+ * An in-memory `JobRunStore`.
  *
  * **The point of the interface.** The shared recorder is exercised here with no
  * Prisma client, no database and no Nest module: the three services differ only
@@ -83,7 +83,7 @@ class FakeJobRunStore implements JobRunStore {
   }
 }
 
-describe('the shared heartbeat — 20-doc §4.5', () => {
+describe('the shared heartbeat', () => {
   let store: FakeJobRunStore;
   let recorder: JobRunRecorder;
   let health: JobHealthService;

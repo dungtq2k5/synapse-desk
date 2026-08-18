@@ -1,10 +1,21 @@
 import { Logger } from '@nestjs/common';
 import {
   AuditLogResponse,
+  ListAuditLogsRequest,
+  toPageRequest,
+  toProtoAuditAction,
+  toProtoAuditResourceType,
+  toProtoTimestamp,
+  ListAuditActionsResponse,
+  ListAuditLogsResponse,
   fromProtoAuditAction,
   fromProtoAuditResourceType,
   requireProtoTimestamp,
 } from '@synapsedesk/grpc-proto';
+import { AuditAction } from '@synapsedesk/common';
+import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
+import { toPaginationMetaDataResponseDto } from '../../common/mappers/pagination.mapper';
+import { ListAuditLogsQueryDto } from './dto/rest/audit-log.dto';
 import { AuditLogResponseDto } from './dto/rest/audit-log-response.dto';
 
 const logger = new Logger('AuditLogMapper');
@@ -55,4 +66,50 @@ export function parseAuditMetadata(
     logger.warn(`Audit log ${logId} has unparseable metadata`);
     return {};
   }
+}
+
+/** Converts a `ListAuditLogsResponse` into the paginated REST envelope. */
+export function toAuditLogPageDto(
+  response: ListAuditLogsResponse,
+): PaginationResponseDto<AuditLogResponseDto> {
+  return {
+    items: response.items.map(toAuditLogResponseDto),
+    meta: toPaginationMetaDataResponseDto(response.meta),
+  };
+}
+
+/**
+ * Converts a `ListAuditActionsResponse` into the filter-dropdown list.
+ *
+ * Drops any action this build cannot name rather than rendering it as
+ * `UNSPECIFIED`, which would be an option that selects nothing.
+ */
+export function toAuditActionList(
+  response: ListAuditActionsResponse,
+): AuditAction[] {
+  return response.actions
+    .map(fromProtoAuditAction)
+    .filter((action): action is AuditAction => action !== null);
+}
+
+/**
+ * Builds a `ListAuditLogsRequest` from the REST query.
+ *
+ * The two enumerated filters go as UNSPECIFIED when absent — proto3's zero
+ * value already carries "no filter".
+ */
+export function toListAuditLogsRequest(
+  query: ListAuditLogsQueryDto,
+  platformScope: boolean,
+): ListAuditLogsRequest {
+  return {
+    page: toPageRequest(query),
+    action: toProtoAuditAction(query.action),
+    userId: query.userId ?? '',
+    resourceType: toProtoAuditResourceType(query.resourceType),
+    resourceId: query.resourceId ?? '',
+    from: toProtoTimestamp(query.from ?? null),
+    to: toProtoTimestamp(query.to ?? null),
+    platformScope,
+  };
 }

@@ -112,12 +112,16 @@ export class OtpService {
       request,
       OtpPurpose.EMAIL_VERIFICATION,
     );
-    if (!response.verified) return response;
 
-    await this.prisma.user.update({
-      where: { id: request.userId },
-      data: { isEmailVerified: true },
-    });
+    // The branch guards the WRITE, not the answer: `consume` has already
+    // decided the outcome, and a failed verification returns the same response
+    // it would otherwise -- it just must not mark the address verified.
+    if (response.verified) {
+      await this.prisma.user.update({
+        where: { id: request.userId },
+        data: { isEmailVerified: true },
+      });
+    }
 
     return response;
   }
@@ -157,14 +161,16 @@ export class OtpService {
       request,
       OtpPurpose.PHONE_VERIFICATION,
     );
-    if (!response.verified) return response;
 
-    // The target is copied onto the user only now — this is what makes the
-    // endpoint safe to use for changing a number.
-    await this.prisma.user.update({
-      where: { id: request.userId },
-      data: { phoneNumber: otp.target, isPhoneVerified: true },
-    });
+    // The branch guards the WRITE, not the answer. The target is copied onto
+    // the user only on success, which is what makes this endpoint safe to use
+    // for CHANGING a number.
+    if (response.verified) {
+      await this.prisma.user.update({
+        where: { id: request.userId },
+        data: { phoneNumber: otp.target, isPhoneVerified: true },
+      });
+    }
 
     return response;
   }

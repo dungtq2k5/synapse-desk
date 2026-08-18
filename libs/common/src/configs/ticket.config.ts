@@ -64,26 +64,23 @@ export enum ReassignmentReason {
 /**
  * THE state machine. Every legal `(from, to)` edge, and nothing else.
  *
- * **This table is the single encoding of the transition rules**, and that is the
- * point rather than a stylistic preference. `escalate`, `resolve`, `reopen` and
- * `close` are convenience RPCs over the same generic status change — if each
- * carried its own idea of what it may transition from, `POST /tickets/:id/resolve`
- * and `POST /tickets/:id/status {status: RESOLVED}` would diverge the first time
- * one was updated and the other was not. They call one validator, which reads
- * this.
+ * **The single encoding of the transition rules.** `escalate`, `resolve`,
+ * `reopen` and `close` are convenience RPCs over the same generic status
+ * change; if each carried its own idea of what it may transition from,
+ * `POST /tickets/:id/resolve` and `POST /tickets/:id/status` would diverge the
+ * first time one was updated. They call one validator, which reads this.
  *
- * The shape mirrors `ORG_STATUS_TRANSITIONS` deliberately: same idea, same
- * lookup, so a reader who has met one already knows how to read the other.
+ * Mirrors `ORG_STATUS_TRANSITIONS` so a reader who has met one can read either.
  *
- * Notes on the edges that are absent on purpose:
+ * Edges absent on purpose:
  *   - Nothing returns to NEW. It means "nobody has looked at this yet", which
  *     stops being true permanently.
- *   - RESOLVED and CLOSED both reopen to OPEN, never to NEW or PENDING_AGENT —
- *     a reopened ticket is work in progress, and routing it back through triage
+ *   - RESOLVED and CLOSED reopen to OPEN, never to NEW or PENDING_AGENT — a
+ *     reopened ticket is work in progress, and routing it back through triage
  *     would lose its history of having been handled.
- *   - ESCALATED cannot fall back to OPEN. De-escalation is a real workflow, but
- *     it is a reassignment decision rather than a status one, and conflating
- *     them would let a status change silently move a ticket off a tier-2 queue.
+ *   - ESCALATED cannot fall back to OPEN. De-escalation is a reassignment
+ *     decision rather than a status one, and conflating them would let a status
+ *     change silently move a ticket off a tier-2 queue.
  */
 export const TICKET_STATUS_TRANSITIONS: Record<
   TicketStatus,
@@ -139,7 +136,7 @@ export enum AnswerStatus {
   /** The tenant is at the AI cap. The caller escalates rather than erroring. */
   AT_CAP = 'AT_CAP',
   /**
-   * Refused by prompt-injection detection
+   * Refused by prompt-injection detection.
    *
    * **Not GREETING**, which is what reusing that short-circuit reported: a
    * refusal filed as a greeting is wrong in the thread, in the WebSocket frame
@@ -184,7 +181,7 @@ export const FEEDBACK_SORTABLE_FIELDS = ['createdAt', 'rating'] as const;
 export type FeedbackSortableField = (typeof FEEDBACK_SORTABLE_FIELDS)[number];
 
 // ---------------------------------------------------------------------------
-// Attachments — validated now, stored when object storage exists (§1.8)
+// Attachments — validated now, stored when object storage exists
 // ---------------------------------------------------------------------------
 
 /**
@@ -234,27 +231,22 @@ export type AllowedAttachmentMimeType =
   (typeof ALLOWED_ATTACHMENT_MIME_TYPES)[number];
 
 /**
- * Which attachments may reach the MODEL
+ * Which attachments may reach the MODEL.
  *
- * **A different question from `ALLOWED_ATTACHMENT_MIME_TYPES` above, and the
- * two must not be merged.** That list is a security allowlist answering "may a
- * user store this?"; this one is a capability allowlist answering "may this
- * reach the model?". Storage exists for the AGENT first — a human opens these
- * through `GET :id/download` — and the model reading them is a bonus on two
- * surfaces. Tying what a customer may send to what one vendor's model can read
- * would make a model-capability change a storage-policy change.
+ * **A different question from `ALLOWED_ATTACHMENT_MIME_TYPES`, and the two must
+ * not be merged.** That list is a security allowlist — "may a user store this?"
+ * — while this is a capability allowlist — "may this reach the model?". Tying
+ * what a customer may send to what one vendor's model can read would make a
+ * model-capability change into a storage-policy change.
  *
  * **The invariant is one-directional: every STORABLE type must be AI-eligible.**
- * Not the reverse. This list may legitimately be wider — `image/gif` and
- * `text/csv` are here and storable nowhere, which is pre-approval for the day a
- * storage policy widens. It must never be NARROWER, because that is the state
- * that produces a file a user uploaded and the model silently ignores.
- * `mime.spec.ts` pins that direction.
+ * Not the reverse. This list may be wider — `image/gif` and `text/csv` are here
+ * and storable nowhere — but never NARROWER, which is the state that produces a
+ * file the user uploaded and the model silently ignores. `mime.spec.ts` pins it.
  *
- * Everything absent from here stays storable, downloadable and human-readable.
- * It simply never becomes a prompt part: sending a zip spends tokens to produce
- * nothing, and the user is told what was left out through `skippedAttachments`
- * rather than left to discover it.
+ * Everything absent stays storable, downloadable and human-readable; it simply
+ * never becomes a prompt part, and the user is told through
+ * `skippedAttachments`.
  */
 export const AI_ELIGIBLE_MIME_TYPES = [
   'image/png',
@@ -268,31 +260,28 @@ export const AI_ELIGIBLE_MIME_TYPES = [
 export type AiEligibleMimeType = (typeof AI_ELIGIBLE_MIME_TYPES)[number];
 
 /**
- * How many attachment bytes one message may send to the model
+ * How many attachment bytes one message may send to the model.
  *
  * **The TOTAL across a message, not per file.** Five 3 MB screenshots are one
  * request, and a per-file cap would let them through together.
  *
- * **Derived from two ceilings, and the lower one wins.** Written out because a
- * number with no derivation is one nobody can defend when a user asks why their
- * 9 MB PDF was skipped:
+ * **Derived from two ceilings, and the lower one wins:**
  *
  * | Ceiling | Value |
  * | :------ | :---- |
- * | Gemini's inline-data limit — text, system instructions and bytes together | 20 MB |
+ * | Gemini's inline-data limit — text, instructions and bytes together | 20 MB |
  * | **gRPC message limit on `ChatRequest`/`DraftRequest`** | **10 MB** |
  *
- * The transport binds, at `GRPC_CHANNEL_OPTIONS` in `libs/grpc-proto` — and it
- * binds on both ends only because rag-service's Python server now sets matching
- * options; before that it was 4 MB and the mismatch was invisible
- * until a request failed.
+ * The transport binds, at `GRPC_CHANNEL_OPTIONS` — and on both ends only
+ * because rag-service's Python server sets matching options.
  *
- * The request carries more than the files. Worst case is 40 transcript turns at
- * `MAX_MESSAGE_CONTENT_LENGTH` — about 800 KB — plus the question and protobuf
- * framing. **8 MB leaves roughly 2 MB of headroom**, which is deliberate
- * over-provision: skipping one attachment is a message the user can act on,
- * while exceeding the transport limit is a `RESOURCE_EXHAUSTED` that fails the
- * whole question and tells them nothing.
+ * The request carries more than the files: worst case is 40 transcript turns at
+ * `MAX_MESSAGE_CONTENT_LENGTH` plus framing. **8 MB leaves roughly 2 MB of
+ * headroom**, deliberately over-provisioned — skipping one attachment is a
+ * message the user can act on, while exceeding the transport limit is a
+ * `RESOURCE_EXHAUSTED` that fails the whole question.
+ *
+ * See `docs/decisions/0017-attachments-reach-retrieval.md`.
  */
 export const MAX_AI_ATTACHMENT_BYTES = 8 * 1024 * 1024;
 

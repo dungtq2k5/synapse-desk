@@ -1,18 +1,16 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { DocumentsGrpcClient } from './documents-grpc.client';
+import { DocumentsService } from './documents.service';
 import { DocumentsController } from './documents.controller';
 import { DocumentsResolver } from './documents.resolver';
 
-/**
- * `INGESTION_GRPC_CLIENT` needs no import: `IngestionGrpcModule` is `@Global`,
- * because Domain C's surface will span several gateway modules and every one
- * must share the single channel to ingestion-service.
- */
+// `INGESTION_GRPC_CLIENT` needs no import here: `IngestionGrpcModule` is
+// `@Global`, so every module shares the one channel to ingestion-service.
 @Module({
   imports: [AuthModule],
   controllers: [DocumentsController],
-  providers: [DocumentsGrpcClient, DocumentsResolver],
-  exports: [DocumentsGrpcClient],
+  providers: [DocumentsGrpcClient, DocumentsService, DocumentsResolver],
+  exports: [DocumentsService],
 })
 export class DocumentsModule {}

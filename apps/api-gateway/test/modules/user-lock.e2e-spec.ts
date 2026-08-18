@@ -12,10 +12,10 @@ import {
  *
  * The service-side behaviour has its own suite against a real database. What is
  * under test here is what only exists at this layer: **the DTO validation**,
- * which is where §2.4's "a future date is required" is supposed to be enforced,
+ * which is where "a future date is required" is supposed to be enforced,
  * and the pass-through that turns an ISO string into a proto timestamp.
  */
-describe('§2 Locking with an expiry, at the HTTP boundary (e2e)', () => {
+describe('Locking with an expiry, at the HTTP boundary (e2e)', () => {
   let fx: E2eFixture;
 
   const targetId = faker.string.uuid();

@@ -8,7 +8,7 @@ import {
 } from '@synapsedesk/common';
 
 /**
- * Tells notification-service that mail was refused
+ * Tells notification-service that mail was refused.
  *
  * **The gateway's first NATS PUBLISHER**, which is worth naming: it has
  * consumed events since the realtime work and has never emitted one, so the client is new

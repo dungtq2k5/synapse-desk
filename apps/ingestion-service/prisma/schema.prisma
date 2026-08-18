@@ -49,7 +49,7 @@ model Document {
   /// DocumentStatus.
   status String @default("PENDING") @db.VarChar(20)
 
-  /// ISO 639-1 codes the uploader declared for OCR
+  /// ISO 639-1 codes the uploader declared for OCR.
   ///
   /// **`[]` means "not specified", NOT null**, and the difference matters
   /// because every other optional column here is nullable: Prisma scalar lists
@@ -57,7 +57,7 @@ model Document {
   /// falls back to `eng`.
   ///
   /// Stored in ISO 639-1 (`vi`, `ja`) rather than tesseract's own codes
-  /// (`vie`, `jpn`) — §4.2.1. The mapping lives in `@synapsedesk/common`, so a
+  /// (`vie`, `jpn`). The mapping lives in `@synapsedesk/common`, so a
   /// different OCR engine changes one table rather than every stored row.
   ///
   /// Almost always empty, and that is inherent: an uploader cannot know a PDF
@@ -122,7 +122,7 @@ model DocumentChunk {
   vectorPointId String? @unique @map("vector_point_id") @db.Uuid
 
   // ---------------------------------------------------------------------
-  // The four DENORMALISED scope columns
+  // The four DENORMALISED scope columns.
   //
   // Not a cache: they are the lexical retrieval arm's half of the security
   // boundary. Without them that arm expresses the same rule as a join through
@@ -310,7 +310,7 @@ model AiGenerationDailyStat {
 
   organizationId String @map("organization_id") @db.Uuid
 
-  /// A DATE in the TENANT'S timezone, not UTC test 4.
+  /// A DATE in the TENANT'S timezone, not UTC.
   day DateTime @db.Date
 
   /// AiGenerationPurpose. **The per-purpose split is the point**:
@@ -359,7 +359,7 @@ model AiGenerationDailyStat {
   @@map("ai_generation_daily_stats")
 }
 
-/// The HEARTBEAT
+/// The HEARTBEAT.
 ///
 /// **One row per job name, and the deepest fix in that document.** The jobs not
 /// running was not the real problem; the real problem was that nothing anywhere

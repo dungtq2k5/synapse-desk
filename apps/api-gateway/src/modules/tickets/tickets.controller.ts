@@ -21,9 +21,9 @@ import { RequirePermission } from '../../common/decorators/require-permission.de
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ResponseMessage } from '../../common/decorators/response-message.decorator';
 import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
-import { TicketsGrpcClient } from './tickets-grpc.client';
-import { AssignmentsGrpcClient } from './assignments-grpc.client';
-import { AiGrpcClient } from './ai-grpc.client';
+import { TicketsService } from './tickets.service';
+import { AssignmentsService } from './assignments.service';
+import { AiService } from './ai.service';
 import {
   BulkTicketStatusDto,
   ChangeTicketStatusDto,
@@ -40,7 +40,7 @@ import {
   AssignTicketToSelfDto,
 } from './dto/rest/assignment.dto';
 import { AssignmentResponseDto } from './dto/rest/assignment-response.dto';
-import { SimilarTicketDto } from './dto/rest/ai-response.dto';
+import { SimilarTicketResponseDto } from './dto/rest/ai-response.dto';
 import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AUTH_SCHEMES } from '../../common/config/swagger.config';
 import {
@@ -50,7 +50,7 @@ import {
 } from '../../common/decorators/api-response.decorator';
 
 /**
- * Tickets (api-endpoints-plan §2.1).
+ * Tickets (`api-endpoints-plan.md - §2.1`).
  *
  * The tenant is never a parameter — it travels in the caller's verified context
  * — and neither is the caller's identity, which matters more here than in
@@ -70,9 +70,9 @@ import {
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class TicketsController {
   constructor(
-    private readonly ticketsGrpcClient: TicketsGrpcClient,
-    private readonly assignmentsGrpcClient: AssignmentsGrpcClient,
-    private readonly aiGrpcClient: AiGrpcClient,
+    private readonly tickets: TicketsService,
+    private readonly assignments: AssignmentsService,
+    private readonly ai: AiService,
   ) {}
 
   @ApiOperation({ summary: 'Queue view' })
@@ -89,7 +89,7 @@ export class TicketsController {
     // end user their own ticket list.
     this.assertMayIncludeDeleted(context, query);
 
-    return this.ticketsGrpcClient.list(query, context);
+    return this.tickets.list(query, context);
   }
 
   /**
@@ -110,7 +110,7 @@ export class TicketsController {
     @CurrentUser() context: RequestContext,
     @Param('ticketNumber', ParseIntPipe) ticketNumber: number,
   ): Promise<TicketResponseDto> {
-    return this.ticketsGrpcClient.getByNumber(ticketNumber, context);
+    return this.tickets.getByNumber(ticketNumber, context);
   }
 
   @ApiOperation({
@@ -124,7 +124,7 @@ export class TicketsController {
     @CurrentUser() context: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<TicketResponseDto> {
-    return this.ticketsGrpcClient.get(id, context);
+    return this.tickets.get(id, context);
   }
 
   @ApiOperation({ summary: 'Create' })
@@ -137,7 +137,7 @@ export class TicketsController {
     @CurrentUser() context: RequestContext,
     @Body() dto: CreateTicketDto,
   ): Promise<TicketResponseDto> {
-    return this.ticketsGrpcClient.create(dto, context);
+    return this.tickets.create(dto, context);
   }
 
   @ApiOperation({ summary: 'Update' })
@@ -151,7 +151,7 @@ export class TicketsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateTicketDto,
   ): Promise<TicketResponseDto> {
-    return this.ticketsGrpcClient.update(id, dto, context);
+    return this.tickets.update(id, dto, context);
   }
 
   // -------------------------------------------------------------------------
@@ -184,7 +184,7 @@ export class TicketsController {
     @CurrentUser() context: RequestContext,
     @Body() dto: BulkTicketStatusDto,
   ): Promise<BulkTicketStatusResponseDto> {
-    return this.ticketsGrpcClient.bulkChangeStatus(dto, context);
+    return this.tickets.bulkChangeStatus(dto, context);
   }
 
   @ApiOperation({ summary: 'Change status' })
@@ -199,14 +199,14 @@ export class TicketsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: ChangeTicketStatusDto,
   ): Promise<TicketResponseDto> {
-    return this.ticketsGrpcClient.changeStatus(id, dto, context);
+    return this.tickets.changeStatus(id, dto, context);
   }
 
-  /**
-   * Separate routes rather than one with a status body, so each carries its own
-   * permission — escalating and resolving are different rights, and a single
-   * `ticket.update` gate would grant both to anyone who could rename a ticket.
-   */
+  // The status transitions below are SEPARATE routes rather than one route with
+  // a status body, so each carries its own permission: escalating and resolving
+  // are different rights, and a single `ticket.update` gate would grant both to
+  // anyone who could rename a ticket.
+
   /**
    * NOT permission-gated, and that is a correction rather than an omission.
    *
@@ -231,7 +231,7 @@ export class TicketsController {
     @CurrentUser() context: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<TicketResponseDto> {
-    return this.ticketsGrpcClient.escalate(id, context);
+    return this.tickets.escalate(id, context);
   }
 
   @ApiOperation({ summary: 'Resolve' })
@@ -245,7 +245,7 @@ export class TicketsController {
     @CurrentUser() context: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<TicketResponseDto> {
-    return this.ticketsGrpcClient.resolve(id, context);
+    return this.tickets.resolve(id, context);
   }
 
   @ApiOperation({ summary: 'Reopen' })
@@ -259,7 +259,7 @@ export class TicketsController {
     @CurrentUser() context: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<TicketResponseDto> {
-    return this.ticketsGrpcClient.reopen(id, context);
+    return this.tickets.reopen(id, context);
   }
 
   @ApiOperation({ summary: 'Close' })
@@ -273,7 +273,7 @@ export class TicketsController {
     @CurrentUser() context: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<TicketResponseDto> {
-    return this.ticketsGrpcClient.close(id, context);
+    return this.tickets.close(id, context);
   }
 
   /**
@@ -288,18 +288,17 @@ export class TicketsController {
    * 503 today — rag-service is not started.
    */
   @ApiOperation({
-    summary:
-      'Past resolved tickets with similar content — agent co-pilot (product §6.3)',
+    summary: 'Past resolved tickets with similar content — agent co-pilot',
   })
-  @ApiWrappedResponse(SimilarTicketDto, { isArray: true })
+  @ApiWrappedResponse(SimilarTicketResponseDto, { isArray: true })
   @ApiFilterErrors(['400', '401', '403', '404'])
   @Get(':id/similar')
   @RequirePermission('ticket.read.all')
   listSimilar(
     @CurrentUser() context: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
-  ): Promise<SimilarTicketDto[]> {
-    return this.aiGrpcClient.listSimilarTickets(id, context);
+  ): Promise<SimilarTicketResponseDto[]> {
+    return this.ai.listSimilarTickets(id, context);
   }
 
   // -------------------------------------------------------------------------
@@ -326,7 +325,7 @@ export class TicketsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: AssignTicketDto,
   ): Promise<AssignmentResponseDto> {
-    return this.assignmentsGrpcClient.assign(id, dto, context);
+    return this.assignments.assign(id, dto, context);
   }
 
   /**
@@ -350,7 +349,7 @@ export class TicketsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: AssignTicketDto,
   ): Promise<AssignmentResponseDto> {
-    return this.assignmentsGrpcClient.reassign(id, dto, context);
+    return this.assignments.reassign(id, dto, context);
   }
 
   /**
@@ -371,7 +370,7 @@ export class TicketsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: AssignTicketToSelfDto,
   ): Promise<AssignmentResponseDto> {
-    return this.assignmentsGrpcClient.assignToSelf(id, dto, context);
+    return this.assignments.assignToSelf(id, dto, context);
   }
 
   @ApiOperation({ summary: 'Unassign' })
@@ -384,7 +383,7 @@ export class TicketsController {
     @CurrentUser() context: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<void> {
-    return this.assignmentsGrpcClient.unassign(id, context);
+    return this.assignments.unassign(id, context);
   }
 
   /**
@@ -406,7 +405,7 @@ export class TicketsController {
     @CurrentUser() context: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<AssignmentResponseDto[]> {
-    return this.assignmentsGrpcClient.list(id, context);
+    return this.assignments.list(id, context);
   }
 
   // -------------------------------------------------------------------------
@@ -421,7 +420,7 @@ export class TicketsController {
     @CurrentUser() context: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<void> {
-    return this.ticketsGrpcClient.remove(id, context);
+    return this.tickets.remove(id, context);
   }
 
   @ApiOperation({ summary: 'Restore' })
@@ -435,7 +434,7 @@ export class TicketsController {
     @CurrentUser() context: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<TicketResponseDto> {
-    return this.ticketsGrpcClient.restore(id, context);
+    return this.tickets.restore(id, context);
   }
 
   /**

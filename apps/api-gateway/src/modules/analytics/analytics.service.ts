@@ -1,4 +1,17 @@
-import { fromProtoDocumentFlagType } from '@synapsedesk/grpc-proto';
+import {
+  toProtoAnalyticsExportKind,
+  fromProtoDocumentFlagType,
+} from '@synapsedesk/grpc-proto';
+import {
+  toAiUsageResponseDto,
+  toAnalyticsExportResponseDto,
+  toAnalyticsRangeRequest,
+  toDeflectionResponseDto,
+  toOverviewResponseDto,
+  toResponseTimesResponseDto,
+  toSatisfactionResponseDto,
+  toVolumeResponseDto,
+} from './analytics.mapper';
 import { Injectable } from '@nestjs/common';
 import { RequestContext } from '@synapsedesk/common';
 import { AnalyticsCacheService } from './analytics-cache.service';
@@ -10,17 +23,18 @@ import {
   DocumentAnalyticsQueryDto,
 } from './dto/rest/analytics.dto';
 import {
-  AgentAnalyticsDto,
-  AgentStatDto,
-  DocumentAnalyticsDto,
-  KnowledgeGapsDto,
-  UnavailableBlockDto,
-  AiUsageDto,
-  DeflectionDto,
-  OverviewDto,
-  ResponseTimesDto,
-  SatisfactionDto,
-  VolumeDto,
+  AgentAnalyticsResponseDto,
+  AgentStatResponseDto,
+  DocumentAnalyticsResponseDto,
+  KnowledgeGapsResponseDto,
+  UnavailableBlockResponseDto,
+  AiUsageResponseDto,
+  DeflectionResponseDto,
+  OverviewResponseDto,
+  ResponseTimesResponseDto,
+  SatisfactionResponseDto,
+  VolumeResponseDto,
+  AnalyticsExportResponseDto,
 } from './dto/rest/analytics-response.dto';
 
 /**
@@ -51,54 +65,69 @@ export class AnalyticsService {
   overview(
     query: AnalyticsRangeQueryDto,
     context: RequestContext,
-  ): Promise<OverviewDto> {
+  ): Promise<OverviewResponseDto> {
     return this.cached('overview', query, context, () =>
-      this.client.overview(query, context),
+      this.client
+        .overview(toAnalyticsRangeRequest(query), context)
+        .then(toOverviewResponseDto),
     );
   }
 
   deflection(
     query: AnalyticsRangeQueryDto,
     context: RequestContext,
-  ): Promise<DeflectionDto> {
+  ): Promise<DeflectionResponseDto> {
     return this.cached('deflection', query, context, () =>
-      this.client.deflection(query, context),
+      this.client
+        .deflection(toAnalyticsRangeRequest(query), context)
+        .then(toDeflectionResponseDto),
     );
   }
 
   responseTimes(
     query: AnalyticsRangeQueryDto,
     context: RequestContext,
-  ): Promise<ResponseTimesDto> {
+  ): Promise<ResponseTimesResponseDto> {
     return this.cached('response-times', query, context, () =>
-      this.client.responseTimes(query, context),
+      this.client
+        .responseTimes(toAnalyticsRangeRequest(query), context)
+        .then(toResponseTimesResponseDto),
     );
   }
 
   volume(
     query: AnalyticsRangeQueryDto,
     context: RequestContext,
-  ): Promise<VolumeDto> {
+  ): Promise<VolumeResponseDto> {
     return this.cached('volume', query, context, () =>
-      this.client.volume(query, context),
+      this.client
+        .volume(toAnalyticsRangeRequest(query), context)
+        .then(toVolumeResponseDto),
     );
   }
 
   satisfaction(
     query: AnalyticsRangeQueryDto,
     context: RequestContext,
-  ): Promise<SatisfactionDto> {
+  ): Promise<SatisfactionResponseDto> {
     return this.cached('satisfaction', query, context, () =>
-      this.client.satisfaction(query, context),
+      this.client
+        .satisfaction(toAnalyticsRangeRequest(query), context)
+        .then(toSatisfactionResponseDto),
     );
   }
 
   aiUsage(
     query: AnalyticsRangeQueryDto,
     context: RequestContext,
-  ): Promise<AiUsageDto> {
+  ): Promise<AiUsageResponseDto> {
     return this.cached('ai-usage', query, context, () =>
-      this.client.aiUsage(query, context),
+      this.client
+        .aiUsage(
+          { from: query.from, to: query.to, granularity: query.granularity },
+          context,
+        )
+        .then(toAiUsageResponseDto),
     );
   }
 
@@ -122,7 +151,7 @@ export class AnalyticsService {
     query: AnalyticsRangeQueryDto,
     context: RequestContext,
     /**
-     * **`false` skips the name-hydration leg entirely**
+     * **`false` skips the name-hydration leg entirely**.
      *
      * GraphQL passes it, because there the hydration IS the users loader:
      * `AgentStat.agent` resolves through the same `ListUsersByIds` this leg
@@ -137,7 +166,7 @@ export class AnalyticsService {
      * leg marked unavailable.
      */
     options: { hydrateNames?: boolean } = {},
-  ): Promise<AgentAnalyticsDto> {
+  ): Promise<AgentAnalyticsResponseDto> {
     const hydrateNames = options.hydrateNames ?? true;
 
     return this.cached(
@@ -145,7 +174,7 @@ export class AnalyticsService {
       query,
       context,
       async () => {
-        const unavailable: UnavailableBlockDto[] = [];
+        const unavailable: UnavailableBlockResponseDto[] = [];
 
         const [statsLeg, usageLeg] = await Promise.all([
           this.client.agentStats(query, context),
@@ -155,24 +184,26 @@ export class AnalyticsService {
         const stats = unwrap(statsLeg, unavailable);
         const usage = unwrap(usageLeg, unavailable);
 
-        const items: AgentStatDto[] = (stats?.items ?? []).map((row) => ({
-          agentId: row.agentId,
-          fullName: null,
-          assigned: row.assigned,
-          resolved: row.resolved,
-          messagesSent: row.messagesSent,
-          resolutionSeconds: {
-            mean: row.resolutionSeconds?.mean ?? null,
-            count: row.resolutionSeconds?.count ?? 0,
-          },
-          draftAcceptance: usage
-            ? {
-                rate: usage.draftAcceptance?.rate ?? null,
-                numerator: usage.draftAcceptance?.numerator ?? 0,
-                denominator: usage.draftAcceptance?.denominator ?? 0,
-              }
-            : null,
-        }));
+        const items: AgentStatResponseDto[] = (stats?.items ?? []).map(
+          (row) => ({
+            agentId: row.agentId,
+            fullName: null,
+            assigned: row.assigned,
+            resolved: row.resolved,
+            messagesSent: row.messagesSent,
+            resolutionSeconds: {
+              mean: row.resolutionSeconds?.mean ?? null,
+              count: row.resolutionSeconds?.count ?? 0,
+            },
+            draftAcceptance: usage
+              ? {
+                  rate: usage.draftAcceptance?.rate ?? null,
+                  numerator: usage.draftAcceptance?.numerator ?? 0,
+                  denominator: usage.draftAcceptance?.denominator ?? 0,
+                }
+              : null,
+          }),
+        );
 
         // Hydration LAST and only if there is anything to hydrate: an empty
         // agent list must not cost a round trip to auth-service, and a name is
@@ -186,7 +217,7 @@ export class AnalyticsService {
           const names = unwrap(namesLeg, unavailable);
 
           if (names) {
-            // `summaries`, not `items` The request now asks for the
+            // `summaries`, not `items`. The request now asks for the
             // SUMMARY projection, so the notification-shaped `items` is empty and
             // reading it would leave every name null with nothing failing.
             const byId = new Map(
@@ -221,12 +252,11 @@ export class AnalyticsService {
   async knowledgeGaps(
     query: AnalyticsTopNQueryDto,
     context: RequestContext,
-  ): Promise<KnowledgeGapsDto> {
+  ): Promise<KnowledgeGapsResponseDto> {
     return this.cached('knowledge-gaps', query, context, async () => {
-      const unavailable: UnavailableBlockDto[] = [];
+      const unavailable: UnavailableBlockResponseDto[] = [];
       const leg = await this.client.knowledgeGaps(
-        query,
-        query.limit ?? 20,
+        { from: query.from, to: query.to, limit: query.limit },
         context,
       );
       const gaps = unwrap(leg, unavailable);
@@ -264,21 +294,23 @@ export class AnalyticsService {
   async documents(
     query: DocumentAnalyticsQueryDto,
     context: RequestContext,
-  ): Promise<DocumentAnalyticsDto> {
+  ): Promise<DocumentAnalyticsResponseDto> {
     return this.cached(
       'documents',
       { limit: query.limit },
       context,
       async () => {
-        const unavailable: UnavailableBlockDto[] = [];
+        const unavailable: UnavailableBlockResponseDto[] = [];
 
         const [documentsLeg, satisfactionLeg] = await Promise.all([
-          this.client.documentAnalytics(query.limit ?? 20, context),
+          this.client.documentAnalytics(query.limit, context),
           // Citation accuracy is a ticket-side metric — it comes from feedback on
           // messages. A wide range so the figure means something: accuracy over
           // three days of ratings is a number nobody should act on.
           this.client.tryLeg('ticket-service', () =>
-            this.client.satisfaction(lastYear(), context),
+            this.client
+              .satisfaction(toAnalyticsRangeRequest(lastYear()), context)
+              .then(toSatisfactionResponseDto),
           ),
         ]);
 
@@ -312,12 +344,25 @@ export class AnalyticsService {
    * that never resolves, which is the one failure a progress indicator must not
    * have.
    */
-  createExport(dto: CreateExportDto, context: RequestContext) {
-    return this.client.createExport(dto, context);
+  async createExport(
+    dto: CreateExportDto,
+    context: RequestContext,
+  ): Promise<AnalyticsExportResponseDto> {
+    return toAnalyticsExportResponseDto(
+      await this.client.createExport(
+        { ...dto, kind: toProtoAnalyticsExportKind(dto.kind) },
+        context,
+      ),
+    );
   }
 
-  getExport(id: string, context: RequestContext) {
-    return this.client.getExport(id, context);
+  async getExport(
+    id: string,
+    context: RequestContext,
+  ): Promise<AnalyticsExportResponseDto> {
+    return toAnalyticsExportResponseDto(
+      await this.client.getExport(id, context),
+    );
   }
 
   /**
@@ -362,7 +407,7 @@ export class AnalyticsService {
  */
 function unwrap<T>(
   leg: { value: T } | { failure: LegFailure },
-  unavailable: UnavailableBlockDto[],
+  unavailable: UnavailableBlockResponseDto[],
 ): T | null {
   if ('value' in leg) return leg.value;
 
@@ -372,7 +417,7 @@ function unwrap<T>(
 }
 
 /**
- * The OLDEST `dataThrough` among the legs
+ * The OLDEST `dataThrough` among the legs.
  *
  * A composed answer is only as fresh as its stalest input. Reporting the
  * freshest would let a healthy service vouch for a broken one, which is the

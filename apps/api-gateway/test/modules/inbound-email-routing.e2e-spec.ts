@@ -31,7 +31,7 @@ import {
  * thread by editing an address, and it looks exactly like ordinary email
  * working.
  */
-describe('§32 §4 inbound email routing (e2e)', () => {
+describe('Inbound email routing (e2e)', () => {
   let fx: E2eFixture;
   let secret: string;
 
@@ -99,7 +99,7 @@ describe('§32 §4 inbound email routing (e2e)', () => {
       ).expect(200);
 
       expect(response.body.data.outcome).toBe('unroutable_address');
-      // **The order is the security property** Resolving the
+      // **The order is the security property**. Resolving the
       // sender first would mean querying it unscoped.
       expect(fx.stubs.user.resolveInboundSender).not.toHaveBeenCalled();
       expect(fx.stubs.ticket.createTicket).not.toHaveBeenCalled();

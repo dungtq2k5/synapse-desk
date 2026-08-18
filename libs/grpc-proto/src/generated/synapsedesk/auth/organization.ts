@@ -26,7 +26,7 @@ export interface OrganizationResponse {
   /**
    * Read by `ingestion-service`'s settings layer so it can resolve a
    * generation model without a Postgres reach-across, and cached there against
-   * `billing.entitlements_changed` — doc 15 §3.1.
+   * `billing.entitlements_changed`
    */
   aiModelTier: AiModelTier;
   billingCycleStart: Timestamp | undefined;
@@ -156,7 +156,7 @@ export interface GetOrganizationEntitlementsRequest {
 }
 
 /**
- * Tenant timezones, in BULK — 19-doc §2.2.
+ * Tenant timezones, in BULK.
  *
  * The daily rollup jobs bucket by the tenant's local date, and they run across
  * every tenant that had activity rather than on behalf of one caller. So this
@@ -182,7 +182,7 @@ export interface ListOrganizationTimezonesResponse {
 }
 
 /**
- * Every tenant's BILLING CYCLE START, in bulk -- 20-doc §3.1.
+ * Every tenant's BILLING CYCLE START, in bulk.
  *
  * Exists because quota reconciliation is per tenant and the cycle start differs
  * per tenant. The job it serves previously took ONE cycle start and applied it
@@ -224,7 +224,7 @@ export interface OrganizationUsageResponse {
     | Timestamp
     | undefined;
   /**
-   * Added by doc 15 §3.1: this becomes the page a customer opens when they hit
+   * This becomes the page a customer opens when they hit
    * a limit, so it has to say what they are ON as well as what they have used.
    *
    * A limit with no plan beside it is a number the reader cannot act on — the
@@ -271,7 +271,7 @@ export interface DeleteOrganizationResponse {
   revokedSessionCount: number;
 }
 
-/** Resolve the tenant from the token in an inbound support address — 31-doc §2. */
+/** Resolve the tenant from the token in an inbound support address. */
 export interface ResolveOrgByInboundTokenRequest {
   inboundToken: string;
 }
@@ -301,7 +301,7 @@ export interface ResolveOrgByInboundTokenResponse {
  * The tenant's inbound token, BY tenant — the reverse of the lookup above.
  *
  * notification-service needs it to build the `Reply-To` that makes an emailed
- * notification answerable (31-doc §4). Absent means the tenant has inbound
+ * notification answerable. Absent means the tenant has inbound
  * email switched off, which is the default.
  */
 export interface GetInboundTokenRequest {
@@ -313,11 +313,11 @@ export interface GetInboundTokenResponse {
 }
 
 /**
- * Issue or ROTATE the tenant's inbound-mail token — 31-doc §2.
+ * Issue or ROTATE the tenant's inbound-mail token.
  *
  * One message for both, because "enable" and "rotate" differ only in whether
  * the row already had a value — and rotation is one of the three properties
- * §2 chose an opaque token for: an abused address can be replaced without
+ * an opaque token was chosen for: an abused address can be replaced without
  * touching anything else.
  *
  * No `organization_id`: like every other method on this service, the tenant
@@ -332,7 +332,7 @@ export interface IssueInboundTokenResponse {
 }
 
 /**
- * Switch inbound mail off without deleting the tenant — 31-doc §2. Sets NULL,
+ * Switch inbound mail off without deleting the tenant. Sets NULL,
  * which is the state a tenant that never enabled email is already in.
  */
 export interface RevokeInboundTokenRequest {
@@ -385,7 +385,7 @@ export interface OrganizationServiceClient {
 
   /**
    * Read by ingestion-service and rag-service on the AI hot path, and CACHED
-   * there against `billing.entitlements_changed` (doc 15 §1.3) — so this is a
+   * there against `billing.entitlements_changed` — so this is a
    * cache fill rather than a per-request call.
    */
 
@@ -473,7 +473,7 @@ export interface OrganizationServiceController {
 
   /**
    * Read by ingestion-service and rag-service on the AI hot path, and CACHED
-   * there against `billing.entitlements_changed` (doc 15 §1.3) — so this is a
+   * there against `billing.entitlements_changed` — so this is a
    * cache fill rather than a per-request call.
    */
 

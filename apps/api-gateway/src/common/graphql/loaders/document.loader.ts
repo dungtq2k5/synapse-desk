@@ -2,12 +2,13 @@ import type { ClientGrpc } from '@nestjs/microservices';
 import {
   DOCUMENT_SERVICE_NAME,
   packRequestContext,
-  type DocumentResponse,
   type DocumentServiceClient,
 } from '@synapsedesk/grpc-proto';
 import { BATCH_ID_LIMIT, type RequestContext } from '@synapsedesk/common';
 import { firstValueFrom } from 'rxjs';
 import { alignToKeys, createLoader } from './loaders.factory';
+import { toDocumentResponseGqlDto } from '../../../modules/documents/document.mapper';
+import type { DocumentResponseGqlDto } from '../../../modules/documents/dto/graphql/document-response.gql-dto';
 
 /**
  * The documents loader
@@ -21,7 +22,7 @@ import { alignToKeys, createLoader } from './loaders.factory';
  * it.
  *
  * Tenant scope comes from the caller CONTEXT inside the RPC, not from anything
- * passed here, property 1. Analytics rows carry raw document ids
+ * passed here. Analytics rows carry raw document ids
  * out of a rollup table, so this is the boundary that stops one from resolving
  * across tenants.
  */
@@ -33,7 +34,7 @@ export function createDocumentLoader(
     DOCUMENT_SERVICE_NAME,
   );
 
-  return createLoader<string, DocumentResponse>(
+  return createLoader<string, DocumentResponseGqlDto>(
     async (ids) => {
       const response = await firstValueFrom(
         documents.listDocumentsByIds(
@@ -42,7 +43,11 @@ export function createDocumentLoader(
         ),
       );
 
-      return alignToKeys(ids, response.items, (document) => document.id);
+      return alignToKeys(
+        ids,
+        response.items.map((document) => toDocumentResponseGqlDto(document)),
+        (document) => document.id,
+      );
     },
     { maxBatchSize: BATCH_ID_LIMIT },
   );

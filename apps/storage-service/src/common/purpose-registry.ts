@@ -1,7 +1,7 @@
 import { StoragePurpose, type MimeType } from '@synapsedesk/common';
 
 /**
- * What each purpose allows — §2.1.
+ * What each purpose allows.
  *
  * ONE table, not a `switch` scattered across handlers. Three things have to
  * move together whenever a purpose changes (the allowlist, the cap, and the
@@ -20,7 +20,7 @@ export type PurposePolicy = {
   /**
    * Whether the path CAN take a second owner id — a message, for an attachment.
    *
-   * **Permitted, not required** It was required until the
+   * **Permitted, not required**. It was required until the
    * one-shot case turned up: presign and confirm both took a `message_id`, so
    * the attachment row could only exist after the message did, while
    * `invoke_ai` runs during the create. The screenshot arrived a moment too

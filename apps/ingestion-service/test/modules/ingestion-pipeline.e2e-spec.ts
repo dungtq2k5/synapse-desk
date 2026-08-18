@@ -25,9 +25,9 @@ import { AuthReferenceService } from '../../src/modules/auth-client/auth-referen
 import { QUOTA_REDIS } from '../../src/modules/ai-ledger/quota-counter.service';
 import { faultInjector } from '@synapsedesk/common/testing/fault';
 
-describe('§3 The ingestion pipeline (e2e)', () => {
+describe('The ingestion pipeline (e2e)', () => {
   // Every injected fault in this file is registered here and restored in an
-  // `afterEach` that runs whether the test passed, failed or threw
+  // `afterEach` that runs whether the test passed, failed or threw.
   const faults = faultInjector();
 
   let fx: E2eFixture;
@@ -252,7 +252,7 @@ describe('§3 The ingestion pipeline (e2e)', () => {
       }
     });
 
-    it('6. **A document with NO extractable text FAILS, with a reason** — §3.5 F4', async () => {
+    it('6. **A document with NO extractable text FAILS, with a reason**', async () => {
       // This asserted the opposite once: zero chunks reported
       // INDEXED, on the reasoning that FAILED "would send someone hunting for
       // a bug". That holds for a generic failure and not for a NAMED one.
@@ -307,7 +307,7 @@ describe('§3 The ingestion pipeline (e2e)', () => {
     });
 
     it('and the error log never contains document TEXT', async () => {
-      // §6 test 4. `error_log` is operator-facing and the document is tenant
+      // `error_log` is operator-facing and the document is tenant
       // content — the same rule that applies to detection logs.
       const secret = 'CONFIDENTIAL-ACQUISITION-PROJECT-CODENAME';
       downloadObject.mockResolvedValue(
@@ -325,36 +325,36 @@ describe('§3 The ingestion pipeline (e2e)', () => {
   });
 
   /**
-   * **Every page is either in the corpus or recorded as missing**
+   * **Every page is either in the corpus or recorded as missing**.
    *
    * The invariant that closes BOTH silent drops. They fail identically from
    * outside — the document reports INDEXED and part of it is simply not
    * searchable — so the check compares page numbers in the chunk rows against
    * the page count the parser saw, which catches either.
    */
-  describe('§6 pages that did not reach the corpus', () => {
+  describe('Pages that did not reach the corpus', () => {
     const flagsFor = (documentId: string) =>
       fx.prisma.documentFlag.findMany({ where: { documentId } });
 
-    //: A page that lands in the GAP between the two thresholds
-    //:
-    //: 61 characters, so it clears the parser's `MIN_PAGE_CHARACTERS` of 32 and
-    //: is never sent to OCR; 13 tokens, so it falls under the chunker's
-    //: `MIN_CHUNK_TOKENS` of 16 and is discarded there. That gap is precisely
-    //: where a page used to disappear having been counted a success, and a
-    //: fixture landing anywhere else would test a different drop.
+    // A page that lands in the GAP between the two thresholds
+    //
+    // 61 characters, so it clears the parser's `MIN_PAGE_CHARACTERS` of 32 and
+    // is never sent to OCR; 13 tokens, so it falls under the chunker's
+    // `MIN_CHUNK_TOKENS` of 16 and is discarded there. That gap is precisely
+    // where a page used to disappear having been counted a success, and a
+    // fixture landing anywhere else would test a different drop.
     const THIN_PAGE =
       'Appendix C — Signature page, retained for the records office.';
 
-    //: Long enough to survive both, with `repeat: 1` so the thin page above is
-    //: not padded alongside it.
+    // Long enough to survive both, with `repeat: 1` so the thin page above is
+    // not padded alongside it.
     const FULL_PAGE =
       'The annual leave policy grants twelve paid days each year and permits ' +
       'five of them to carry over into the following year, provided they are ' +
       'used before the thirty-first of March.';
 
     it('**a page dropped by the CHUNKER is flagged, not silently lost**', async () => {
-      // §1.1's second drop point, and the one closing the parser alone would
+      // The second drop point, and the one closing the parser alone would
       // have missed: this page has text, so the parser keeps it — and then it
       // falls under `MIN_CHUNK_TOKENS` and vanishes at chunking having been
       // counted a success.
@@ -393,7 +393,7 @@ describe('§3 The ingestion pipeline (e2e)', () => {
     });
 
     it('**the flag names page numbers and never document text**', async () => {
-      // §6 test 4. `DocumentFlag.detail` is `@db.Text` and operator-facing,
+      // `DocumentFlag.detail` is `@db.Text` and operator-facing,
       // which puts it under the same rule as `error_log` — and it is the field
       // most likely to grow a helpful excerpt later.
       // 50 characters and 12 tokens — in the same gap as `THIN_PAGE`, so the
@@ -483,7 +483,7 @@ describe('§3 The ingestion pipeline (e2e)', () => {
 
   describe('PDF page attribution', () => {
     it('6b. Attributes each chunk to the PAGE it came from', async () => {
-      // §3 test 2 — the citation payload. "Page 4, §2.1" is a fact about the
+      // test 2 — the citation payload. "Page 4, §2.1" is a fact about the
       // document, and the only place it can be recovered is during parsing:
       // the default PDF extraction concatenates everything into one string,
       // and reconstructing page boundaries afterwards means guessing at form
@@ -522,7 +522,7 @@ describe('§3 The ingestion pipeline (e2e)', () => {
 
   describe('observability', () => {
     it('6c. Is LOCATABLE mid-flight, not silently PARSING for ten minutes', async () => {
-      // §3 test 8, and the assertion is deliberately made WHILE the job runs.
+      // and the assertion is deliberately made WHILE the job runs.
       //
       // The purpose of RDM Table 20 is that a stuck 200-page PDF can be found:
       // someone looking at the document sees which phase it is in. Asserting

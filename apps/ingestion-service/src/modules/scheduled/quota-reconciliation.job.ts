@@ -14,7 +14,7 @@ import { AuthReferenceService } from '../auth-client/auth-reference.service';
 const RECENT_SPEND_WINDOW_MS = 45 * 24 * 60 * 60 * 1000;
 
 /**
- * Re-derives spend from the LEDGER and corrects the Redis counter — §4.4.
+ * Re-derives spend from the LEDGER and corrects the Redis counter.
  *
  * **This is what makes `record()`'s non-throwing behaviour safe.** The ledger
  * write swallows failures on purpose: the generation already happened and
@@ -79,7 +79,7 @@ export class QuotaReconciliationJob {
   /**
    * Every tenant with recent spend, each reconciled against **its OWN cycle**.
    *
-   * **This took no parameter by design** The previous signature
+   * **This took no parameter by design**. The previous signature
    * was `reconcileAll(cycleStart: Date)`, which applied one date to every
    * tenant and directly contradicted the warning on `reconcile()` above.
    *

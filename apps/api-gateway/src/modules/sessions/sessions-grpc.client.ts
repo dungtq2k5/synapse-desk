@@ -2,18 +2,15 @@ import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { ClientGrpc } from '@nestjs/microservices';
 import {
   AUTH_GRPC_CLIENT,
+  ListSessionsResponse,
+  RevokeSessionResponse,
+  RevokeTrustResponse,
+  RevokeUserSessionsResponse,
   SESSION_SERVICE_NAME,
   SessionServiceClient,
 } from '@synapsedesk/grpc-proto';
 import { RequestContext } from '@synapsedesk/common';
 import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
-import {
-  RevokeCountResponseDto,
-  RevokeTrustResponseDto,
-  RevokeSessionResult,
-  SessionResponseDto,
-} from './dto/rest/session.dto';
-import { toSessionResponseDto } from './session.mapper';
 
 @Injectable()
 export class SessionsGrpcClient extends BaseGrpcClient implements OnModuleInit {
@@ -30,24 +27,22 @@ export class SessionsGrpcClient extends BaseGrpcClient implements OnModuleInit {
       this.client.getService<SessionServiceClient>(SESSION_SERVICE_NAME);
   }
 
-  async list(
+  list(
     refreshToken: string | undefined,
     context: RequestContext,
-  ): Promise<SessionResponseDto[]> {
-    const response = await this.call(
+  ): Promise<ListSessionsResponse> {
+    return this.call(
       (metadata) =>
         this.sessionGrpcService.listSessions({ refreshToken }, metadata),
       context,
     );
-
-    return response.items.map(toSessionResponseDto);
   }
 
   revoke(
     sessionId: string,
     refreshToken: string | undefined,
     context: RequestContext,
-  ): Promise<RevokeSessionResult> {
+  ): Promise<RevokeSessionResponse> {
     return this.call(
       (metadata) =>
         this.sessionGrpcService.revokeSession(
@@ -61,7 +56,7 @@ export class SessionsGrpcClient extends BaseGrpcClient implements OnModuleInit {
   revokeTrust(
     sessionId: string,
     context: RequestContext,
-  ): Promise<RevokeTrustResponseDto> {
+  ): Promise<RevokeTrustResponse> {
     return this.call(
       (metadata) =>
         this.sessionGrpcService.revokeSessionTrust({ sessionId }, metadata),
@@ -69,30 +64,28 @@ export class SessionsGrpcClient extends BaseGrpcClient implements OnModuleInit {
     );
   }
 
-  revokeAllTrust(context: RequestContext): Promise<RevokeTrustResponseDto> {
+  revokeAllTrust(context: RequestContext): Promise<RevokeTrustResponse> {
     return this.call(
       (metadata) => this.sessionGrpcService.revokeAllTrust({}, metadata),
       context,
     );
   }
 
-  async listForUser(
+  listForUser(
     userId: string,
     context: RequestContext,
-  ): Promise<SessionResponseDto[]> {
-    const response = await this.call(
+  ): Promise<ListSessionsResponse> {
+    return this.call(
       (metadata) =>
         this.sessionGrpcService.listUserSessions({ userId }, metadata),
       context,
     );
-
-    return response.items.map(toSessionResponseDto);
   }
 
   revokeForUser(
     userId: string,
     context: RequestContext,
-  ): Promise<RevokeCountResponseDto> {
+  ): Promise<RevokeUserSessionsResponse> {
     return this.call(
       (metadata) =>
         this.sessionGrpcService.revokeUserSessions({ userId }, metadata),

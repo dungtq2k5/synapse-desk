@@ -1,39 +1,30 @@
+import { PageMetaResponseGqlDto } from '../../../../common/dto/graphql/page-meta-response.gql-dto';
 import { Field, ID, ObjectType } from '@nestjs/graphql';
 import { Gender } from '@synapsedesk/common';
 import '../../../../common/graphql/enums';
 
 /**
- * The FULL user, as the GraphQL schema serves it
+ * The FULL user, as the GraphQL schema serves it.
  *
- * **Independent of `UserResponseDto`, deliberately.** The two describe the same
- * domain object and share no class: a DTO is a transport contract, and coupling
- * the two made the REST layer import `@nestjs/graphql` while giving the GraphQL
- * layer no protection it did not already have. `user-response.contract.spec.ts`
- * asserts the field sets agree, so the duplication is checked rather than
- * trusted.
- *
- * **No `class-validator` here, and that is the point of the split.** Validators
- * run on the way IN; this type is only ever written OUT. On the shared class
- * they were dead weight on every response field — carried because the REST half
- * needed them for `PickType`, not because anything here reads them.
- *
- * **Every `@Field()` names its GraphQL type explicitly.** TypeScript's `number`
- * cannot distinguish `Int` from `Float`, nor `string` an `ID` from a `String`,
- * so an inferred choice is wrong about half the time in a way nothing catches —
- * both serialise identically until a client generates types from the SDL.
- *
- * **Reachable only from `Query.user` and `Query.me`, never from an edge.** This
- * carries `email`, `phoneNumber` and `lastLoginAt`; `UserSummaryGqlDto` carries
- * a name and an avatar. That split is the security model:
+ * **Reachable only from `Query.user` and `Query.me`, never from an edge.** It
+ * carries `email`, `phoneNumber` and `lastLoginAt`; `UserSummaryResponseGqlDto` carries
+ * a name and an avatar. That split is the security model — the fields are not
+ * in the reachable type, so no query can ask for them:
  *
  * ```graphql
  * query { ticket(id: "…") { assignee { email } } }   # cannot be written
  * ```
  *
- * A caller with ticket access and no `user.read` would otherwise assemble an
- * agent's contact details out of two permissions, neither of which grants them.
- * The fields are not in the reachable type, so no query can ask for them —
- * structural rather than a guard somebody has to remember on all sixteen.
+ * **Independent of `UserResponseDto`.** `user-response.contract.spec.ts`
+ * asserts the field sets agree, so the duplication is checked rather than
+ * trusted. No `class-validator` here: validators run on the way IN, and this
+ * type is only ever written OUT.
+ *
+ * **Every `@Field()` names its GraphQL type explicitly** — TypeScript's
+ * `number` cannot distinguish `Int` from `Float`, and both serialize
+ * identically until a client generates types from the SDL.
+ *
+ * See `docs/decisions/0014-narrow-graphql-edge-types.md`.
  */
 @ObjectType('User', {
   description:
@@ -53,7 +44,7 @@ export class UserResponseGqlDto {
    * The ids, flat. The resolved departments are the `departments` edge.
    *
    * **Exposed for the reason every other type here exposes its ids**
-   * §3, the same rule behind `Ticket.currentAssigneeId`, `Document.departmentIds`
+   * the same rule behind `Ticket.currentAssigneeId`, `Document.departmentIds`
    * and `Notification.actorId`: a client that only wants the ids must not pay a
    * network call for them, and `departments { id }` would.
    *
@@ -109,7 +100,7 @@ export class UserResponseGqlDto {
   readonly isLocked!: boolean;
 
   /**
-   * When a temporary lock lapses; `null` means INDEFINITE
+   * When a temporary lock lapses; `null` means INDEFINITE.
    *
    * `isLocked` stays the field a client renders on. This is here so an admin
    * screen can say "locked until Friday" instead of just "locked".
@@ -125,4 +116,67 @@ export class UserResponseGqlDto {
 
   @Field(() => Date)
   readonly updatedAt!: Date;
+}
+
+/** A page of users, from `Query.users` — behind `user.read`, like the REST list. */
+@ObjectType('UserPage')
+export class UserPageResponseGqlDto {
+  @Field(() => [UserResponseGqlDto])
+  items!: UserResponseGqlDto[];
+
+  @Field(() => PageMetaResponseGqlDto)
+  meta!: PageMetaResponseGqlDto;
+}
+
+/**
+ * What an EDGE is allowed to see of a user.
+ *
+ * The narrow type IS the security model. GraphQL authorizes nothing by default,
+ * so a caller holding ticket access but no `user.read` could otherwise compose
+ * their way to an agent's email and login history:
+ *
+ * ```graphql
+ * query { ticket(id: "…") { assignee { email phoneNumber lastLoginAt } } }
+ * ```
+ *
+ * Those fields are not in this type, so no query can reach them. The wide
+ * `User` is reachable only from `Query.user`, behind the same `user.read` check
+ * the REST route applies.
+ *
+ * Enforced at the wire too: `ListUsersByIds`'s summary projection never sends an
+ * address, so this is not a mapper that must remember to drop one.
+ *
+ * **No contract test**, deliberately — there is no narrow-user REST response to
+ * agree with, because REST has no traversal to narrow.
+ *
+ * See `docs/decisions/0014-narrow-graphql-edge-types.md`.
+ */
+@ObjectType('UserSummary', {
+  description:
+    'A user as seen through an edge — name and avatar only. Reachable with ' +
+    'whatever permission the edge itself required; `User` and its contact ' +
+    'details are behind `Query.user` and `user.read`.',
+})
+export class UserSummaryResponseGqlDto {
+  @Field(() => ID)
+  id!: string;
+
+  @Field(() => String)
+  fullName!: string;
+
+  @Field(() => String, { nullable: true })
+  avatarUrl!: string | null;
+
+  /**
+   * Whether this account is locked.
+   *
+   * Carried so a client can render "Former employee" rather than infer it from
+   * an absence — which it cannot distinguish from a row that never existed.
+   */
+  @Field(() => Boolean)
+  isLocked!: boolean;
+
+  /** Set when the account was soft-deleted. Same reasoning as `isLocked`. */
+  @Field(() => Date, { nullable: true })
+  deletedAt!: Date | null;
 }

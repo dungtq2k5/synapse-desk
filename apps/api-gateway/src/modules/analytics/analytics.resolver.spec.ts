@@ -1,8 +1,8 @@
 import DataLoader from 'dataloader';
-import type { UserSummary } from '@synapsedesk/grpc-proto';
+import type { UserSummaryResponseGqlDto } from '../users/dto/graphql/user-response.gql-dto';
 import type { GqlContext } from '../../common/graphql/loaders/loaders.factory';
 import { AgentStatResolver } from './analytics.resolver';
-import type { AgentStatGqlDto } from './dto/graphql/analytics-response.gql-dto';
+import type { AgentStatResponseGqlDto } from './dto/graphql/analytics-response.gql-dto';
 
 /**
  * `AgentStat.agent` resolves through the USERS loader.
@@ -18,24 +18,29 @@ import type { AgentStatGqlDto } from './dto/graphql/analytics-response.gql-dto';
  * actually runs.
  */
 describe('AgentStat.agent', () => {
-  const wireSummary = (userId: string): UserSummary => ({
-    userId,
+  // The shape the loader ANSWERS, not the row it fetches: `createUserSummaryLoader`
+  // maps the wire message itself, so an edge receives the edge type. A stub that
+  // returned the proto here would be testing a loader that no longer exists.
+  const loadedSummary = (id: string): UserSummaryResponseGqlDto => ({
+    id,
     fullName: 'Ada Lovelace',
     avatarUrl: 'https://example.test/ada.png',
     isLocked: false,
-    deletedAt: undefined,
+    deletedAt: null,
   });
 
   const contextWith = (batch: jest.Mock): GqlContext =>
     ({
-      loaders: { users: new DataLoader<string, UserSummary | null>(batch) },
+      loaders: {
+        users: new DataLoader<string, UserSummaryResponseGqlDto | null>(batch),
+      },
     }) as unknown as GqlContext;
 
-  const stat = (agentId: string) => ({ agentId }) as AgentStatGqlDto;
+  const stat = (agentId: string) => ({ agentId }) as AgentStatResponseGqlDto;
 
   it('loads through the users loader', async () => {
     const batch = jest.fn((ids: readonly string[]) =>
-      Promise.resolve(ids.map((id) => wireSummary(id))),
+      Promise.resolve(ids.map((id) => loadedSummary(id))),
     );
 
     const agent = await new AgentStatResolver().agent(
@@ -56,7 +61,7 @@ describe('AgentStat.agent', () => {
     // The property the loader exists for, and the one an output assertion
     // cannot see. Fifty agent rows resolved without it are fifty RPCs.
     const batch = jest.fn((ids: readonly string[]) =>
-      Promise.resolve(ids.map((id) => wireSummary(id))),
+      Promise.resolve(ids.map((id) => loadedSummary(id))),
     );
     const resolver = new AgentStatResolver();
     const context = contextWith(batch);

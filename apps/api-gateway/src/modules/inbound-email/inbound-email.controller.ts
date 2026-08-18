@@ -26,37 +26,26 @@ import { InboundEmailService } from './inbound-email.service';
 /**
  * `POST /webhooks/email/inbound` — the mail Worker's only entry point.
  *
- * **A separate controller from `/webhooks/stripe`, sharing its tag and path.**
- * Says it "joins the existing `@ApiTags('Webhooks')` controller",
- * and it joins the TAG — the two appear together at `/docs`, which is what that
- * sentence is about. It does not join the billing MODULE: an email intake route
- * owned by billing is organisation-by-layer, and conventions §1.2 is explicit
- * that a feature module owns its own surface.
+ * A separate controller from `/webhooks/stripe`, sharing its `@ApiTags`
+ * (so the two appear together at `/docs`) but not its module — a feature module
+ * owns its own surface.
  *
  * **Four global mechanisms it bypasses, the same four Stripe documents:**
  *
  * | Mechanism | Why it must not apply |
  * | --- | --- |
- * | **Auth guard** | There is no JWT. The Worker's signature is the credential, and this gateway has no global auth guard — an unguarded controller is genuinely unauthenticated, which is why the signature guard below is not optional |
- * | **Lifecycle gate** | The INTERCEPTOR cannot run: it reads the status off the caller's identity, and the tenant is resolved FROM the payload instead. So the bypass is where the check happens, not whether it happens — the service re-applies it the moment the tenant is known, or a suspended tenant quietly accumulates tickets nobody is paying for |
+ * | **Auth guard** | There is no JWT. The Worker's signature is the credential, and this gateway has no global auth guard — so the signature guard is not optional |
+ * | **Lifecycle gate** | The interceptor reads status off the caller's identity, and the tenant is resolved FROM the payload. The service re-applies the check once the tenant is known, or a suspended tenant quietly accumulates tickets |
  * | **Tenant scoping** | There is no tenant context until the address is parsed |
  * | **Rate limiting** | `@SkipThrottle`. A provider retry storm is Cloudflare doing its job; throttling it drops mail |
  *
- * Ticket creation is not metered on this route — and not on any other either:
- * the product has no per-tenant ticket quota, and the commercial control that
- * does exist is the lifecycle gate in the row above. Adding a limit here alone
- * would mean an emailed ticket could be refused where the identical ticket
- * typed into the web app is accepted.
+ * **200 for every outcome except a bad signature**, including mail this system
+ * deliberately drops. A 4xx tells the provider the request was malformed and
+ * worth retrying, so one misconfigured mail rule would become a retry loop.
+ * A signature failure answers 401 precisely so the provider stops; an
+ * infrastructure failure answers 5xx, where the retry is the recovery.
  *
- * **200 for every outcome except a bad signature** — including mail this system
- * deliberately drops. An unknown tenant token, a disallowed sender domain and an
- * unparseable message all answer 200, because a 4xx tells the provider the
- * request was malformed and worth retrying, and one misconfigured mail rule
- * would become a retry loop against this endpoint.
- *
- * The exception is a signature failure, which is 401 precisely so the provider
- * stops. An infrastructure failure is the one thing that legitimately answers
- * 5xx: it means "unknown", and the provider's retry is the recovery.
+ * See `docs/decisions/0018-inbound-email-routing-and-threading.md`.
  */
 @ApiTags('Webhooks')
 @Controller('webhooks')
@@ -83,7 +72,7 @@ export class InboundEmailController {
       'Accepted, or deliberately dropped. The body carries an acknowledgement ' +
       'and the outcome, never the message.',
   })
-  // **401, not Stripe's 400** The credential was presented and
+  // **401, not Stripe's 400**. The credential was presented and
   // rejected, and 401 is the answer that tells the provider to stop rather
   // than retry.
   //
@@ -102,7 +91,7 @@ export class InboundEmailController {
   })
   @Post('email/inbound')
   // The guard, not a check in the handler: "a bad signature causes nothing to
-  // happen" is only true if nothing has run yet
+  // happen" is only true if nothing has run yet.
   @UseGuards(InboundSignatureGuard)
   @HttpCode(HttpStatus.OK)
   async inbound(

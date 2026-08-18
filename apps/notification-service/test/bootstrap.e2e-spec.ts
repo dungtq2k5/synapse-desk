@@ -26,7 +26,7 @@ import { NotificationRealtimePublisher } from '../src/modules/realtime/notificat
  * So test 2 is the one that matters: the NATS handlers must still be reachable
  * and must still write rows.
  */
-describe('§1.1 notification-service foundations (e2e)', () => {
+describe('Notification-service foundations (e2e)', () => {
   let fx: E2eFixture;
 
   const ORG = '11111111-1111-4111-8111-111111111111';
@@ -66,7 +66,7 @@ describe('§1.1 notification-service foundations (e2e)', () => {
   });
 
   it('2. **The existing NATS consumers still fire after the gRPC server was added**', async () => {
-    // The regression the hybrid conversion actually risks test 2.
+    // The regression the hybrid conversion actually risks.
     // Asserted by driving the handler and checking for a ROW, because a
     // consumer that was registered and does nothing looks identical to one that
     // was never registered at all.
@@ -116,7 +116,7 @@ describe('§1.1 notification-service foundations (e2e)', () => {
       }
     }
 
-    expect([...patterns].sort()).toEqual(
+    expect([...patterns].sort(compareAlphabetically)).toEqual(
       [
         IN_APP_NOTIFICATION_PATTERN,
         NOTIFICATION_PATTERNS.sendEmail,

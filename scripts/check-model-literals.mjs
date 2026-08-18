@@ -44,6 +44,11 @@ const SKIP_DIRECTORIES = new Set([
  * pricing models by an alias, which is a worse problem.
  */
 const ALLOWED = [
+  // The catalogue itself. It DECLARES the names the other two files key off, so
+  // it is the one place a literal is the point rather than a leak — and
+  // `MODEL_PRICING` being `Record<AiModel, …>` is what turns "unpriced model"
+  // from a boot-time throw into a compile error.
+  join('libs', 'common', 'src', 'configs', 'ai-models.config.ts'),
   join('libs', 'common', 'src', 'configs', 'ai-settings.config.ts'),
   join('libs', 'common', 'src', 'configs', 'ai-pricing.config.ts'),
   join('apps', 'rag-service', 'rag_service', 'settings.py'),
@@ -185,7 +190,7 @@ if (violations.length > 0) {
       '',
       '  A literal here is a tenant on the premium tier silently receiving the',
       '  cheap model — nothing errors, the answer is merely worse, and it is',
-      '  worse for the customer paying more (doc 15 §1.2).',
+      '  worse for the customer paying more.',
       '',
       `  If this genuinely belongs in the settings layer, add the file to ALLOWED`,
       `  in ${relative(ROOT, fileURLToPath(import.meta.url))} — and expect that to be the`,

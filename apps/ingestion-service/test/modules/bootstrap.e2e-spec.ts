@@ -4,7 +4,7 @@ type IndexRow = { indexname: string };
 type ConstraintRow = { count: bigint };
 
 /**
- * §1.2 tests 1-2 — the service boots, and every index the seeder promises
+ * -2 — the service boots, and every index the seeder promises
  * actually exists.
  *
  * The index assertions are not ceremony. Two of these five are load-bearing:
@@ -14,7 +14,7 @@ type ConstraintRow = { count: bigint };
  * returns correct answers, just slower and slower as the corpus grows — which
  * is invisible until a query that took 20 ms takes 20 s.
  */
-describe('§1.2 ingestion-service foundations (e2e)', () => {
+describe('Ingestion-service foundations (e2e)', () => {
   let fx: E2eFixture;
 
   beforeAll(async () => {

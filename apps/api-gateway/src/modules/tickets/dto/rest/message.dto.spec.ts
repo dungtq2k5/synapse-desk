@@ -7,10 +7,10 @@ import {
 import { UploadAttachmentDto } from './message.dto';
 
 /**
- * The attachment guard, tested where it is CHEAPEST — §2.5 test 7.
+ * The attachment guard, tested where it is CHEAPEST.
  *
  * `storage-service` will check the same two things against its own
- * `PURPOSE_POLICY` (10-storage-service.md §2.2). That is not duplication for
+ * `PURPOSE_POLICY` in storage-service. That is not duplication for
  * its own sake: this layer refuses a 2 GB request before it costs a network
  * hop, and that layer holds no matter which service is asking. Neither can be
  * dropped because the other exists — so both need a test, and this one needs no

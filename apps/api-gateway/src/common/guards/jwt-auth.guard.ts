@@ -4,7 +4,7 @@ import type { Request } from 'express';
 import { requestOf } from '../utils/execution-request.util';
 
 /**
- * The access-token guard, on BOTH transports
+ * The access-token guard, on BOTH transports.
  *
  * **`AuthGuard` is HTTP-only until `getRequest` is overridden.** Passport's Nest
  * adapter calls `context.switchToHttp().getRequest()` and then `req.logIn(…)`;

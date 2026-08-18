@@ -57,7 +57,7 @@ def _borrow_api_key_from_dev_env() -> None:
     developer's own Postgres is a worse problem than the one being solved.
 
     **Why this exists at all:** the acceptance test for attachments
-    (`test_multimodal_e2e.py`) needs a real cheap-tier call, and 36-doc's build
+    (`test_multimodal_e2e.py`) needs a real cheap-tier call, and the attachment build
     order says the feature is finished when it passes. It skipped in every
     normal run because the credential lived one file over. Borrowing it here
     means the gate runs where the claim is made, without copying a secret into
@@ -213,8 +213,8 @@ async def seed(qdrant, pool):
             # no department and not deleted. The chunk row carries whatever the
             # test actually asked for. So a lexical query that reached the
             # boundary by JOINING through `documents` — the structurally
-            # different query the denormalisation exists to eliminate — returns
-            # visibly different results from one reading the denormalised
+            # different query the denormalization exists to eliminate — returns
+            # visibly different results from one reading the denormalized
             # columns, and every isolation test below fails loudly instead of
             # passing for the wrong reason.
             await connection.execute(
@@ -310,7 +310,7 @@ def tenant_b() -> Tenant:
 
 
 class FakeEmbeddingClient:
-    """HONOURS the embedding contract — §2.3.
+    """HONOURS the embedding contract
 
     A permissive fake would make every test here pass while production stayed
     broken in exactly the way the test claimed to cover. So this keeps the
@@ -480,7 +480,7 @@ class ScriptedGenerator:
         #: other two. Empty means the old behaviour.
         self.answers: list[str] = []
         #: Every prompt as given, parts included. `calls` keeps only the text,
-        #: which cannot answer "did the file go?"
+        #: which cannot answer "did the file go?".
         self.prompts: list[Prompt] = []
         self.fail_next: Exception | None = None
 

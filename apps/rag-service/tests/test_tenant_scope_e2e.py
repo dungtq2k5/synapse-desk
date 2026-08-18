@@ -1,4 +1,4 @@
-"""§2.1 — the isolation tests, PER ARM.
+"""The isolation tests, PER ARM.
 
 The whole point of this file is the word "per arm". A test that queries hybrid
 and passes proves nothing about *which* arm enforced the boundary: the vector
@@ -69,7 +69,7 @@ class TestCollection:
 
 
 class TestTenantIsolation:
-    """§2.1 tests 1-2 — org A's query never returns org B's points."""
+    """Org A's query never returns org B's points."""
 
     @pytest.mark.parametrize("run_arm", ARMS)
     async def test_never_returns_another_tenants_chunk(
@@ -107,7 +107,7 @@ class TestTenantIsolation:
         # nothing in Postgres but is a perfectly good Qdrant payload value, so a
         # silent fallback would produce a filter that quietly matched the wrong
         # partition rather than failing.
-        with pytest.raises(MissingTenantError):
+        with pytest.raises(MissingTenantError): # NOSONAR
             tenant_scope(CallerContext(organization_id=None, sub="u"))
 
     async def test_a_super_admin_gets_no_bypass(self):
@@ -116,14 +116,14 @@ class TestTenantIsolation:
         # does not SHOW an operator another tenant's document — it blends it
         # into prose that names no source. A super admin reads documents through
         # `GET /documents/:id`, where the disclosure is explicit and auditable.
-        with pytest.raises(MissingTenantError):
+        with pytest.raises(MissingTenantError): # NOSONAR
             tenant_scope(
                 CallerContext(organization_id=None, sub="u", is_super_admin=True)
             )
 
 
 class TestDepartmentScoping:
-    """§2.1 test 3 — a separate boundary from tenancy, and often the missed one."""
+    """A separate boundary from tenancy, and often the missed one."""
 
     @pytest.mark.parametrize("run_arm", ARMS)
     async def test_org_wide_is_visible_to_everyone(
@@ -397,7 +397,7 @@ class TestSemanticArmSpecifics:
 
 
 class TestRescopeTakesEffectPerArm:
-    """12-doc §2.3 test 2 and §2.4 test 1 — the SECURITY consequence, per arm.
+    """The SECURITY consequence, per arm.
 
     The fan-out's own tests prove both stores were written. These prove what
     that write means to a user: the document stops coming back.
@@ -514,7 +514,7 @@ class TestRescopeTakesEffectPerArm:
 
 
 class TestTheTwoRenderingsAgree:
-    """§2.1 test 6 — the drift guard itself.
+    """The drift guard itself.
 
     Every other test in this file runs one arm and checks the answer. This one
     compares the two RENDERINGS against each other over a fixture covering all

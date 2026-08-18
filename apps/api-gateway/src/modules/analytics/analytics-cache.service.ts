@@ -39,7 +39,7 @@ export type CacheKeyInput = {
 };
 
 /**
- * The analytics cache
+ * The analytics cache.
  *
  * Read-only, tolerant of staleness, and expensive to compute: the ideal cache
  * case, and the three decisions below are where the wins and the bugs are.
@@ -60,7 +60,7 @@ export class AnalyticsCacheService {
   constructor(private readonly cache: CacheService) {}
 
   /**
-   * The key, delegated
+   * The key, delegated.
    *
    * **What stayed here is what is genuinely analytics**: the endpoint-to-scope
    * mapping and the `computedAt` freshness segment. The tenant-first ordering,

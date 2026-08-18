@@ -32,7 +32,7 @@ class EmbeddingResult:
 class EmbeddingClient(Protocol):
     """The capability, as a protocol so tests can substitute it.
 
-    A substitute must honour the contract completely (§2.3): the right
+    A substitute must honour the contract completely: the right
     dimensionality, a real token count, and an EXCEPTION on failure. A fake that
     returned a zero vector would be rejected by cosine distance in production
     and accepted in the test, which is the worst of both.

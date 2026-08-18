@@ -52,7 +52,7 @@ import { ScopeChangedConsumer } from './scope-changed.consumer';
     ),
     PrismaModule,
     StorageClientModule,
-    // For `DocumentFlagService.raise` Ingestion raises
+    // For `DocumentFlagService.raise`. Ingestion raises
     // `PAGES_NOT_INDEXED` at index time and must follow the same
     // never-re-raise-a-dismissed-flag policy the sweeps do; importing the
     // module that owns flag writing is what keeps that one implementation

@@ -1,7 +1,7 @@
 import { SetMetadata, type ExecutionContext } from '@nestjs/common';
 import type { Request } from 'express';
 import { RequestContextService } from '../contexts/request.context';
-import { entityScope } from '../config/cache.config';
+import { entityScope, type EntityScopeKind } from '../config/cache.config';
 
 export const INVALIDATE_CACHE_KEY = 'cache:invalidate';
 
@@ -9,7 +9,7 @@ export const INVALIDATE_CACHE_KEY = 'cache:invalidate';
  * A scope to drop, or a function that derives one from the request.
  *
  * **It cannot name a tenant, and that is the type doing the work**
- * §4.1. A target that builds its own key is a target that can omit the tenant,
+ * A target that builds its own key is a target that can omit the tenant,
  * and an invalidation missing its tenant segment either clears nothing or
  * reaches for a pattern that touches everyone. The tenant comes from the
  * request context, in one place, where it cannot be forgotten.
@@ -18,7 +18,7 @@ export type CacheInvalidationTarget =
   string | ((context: ExecutionContext) => string | string[]);
 
 /**
- * Drops cache scopes after this handler succeeds
+ * Drops cache scopes after this handler succeeds.
  *
  * ```ts
  * ＠Patch(':id')
@@ -30,50 +30,41 @@ export type CacheInvalidationTarget =
  * updateOwnProfile(...) { … }
  * ```
  *
- * **It runs AFTER the handler, and after it SUCCEEDED**, both of which are
- * load-bearing:
+ * **It runs AFTER the handler, and only if it SUCCEEDED.** Invalidating before
+ * the write lets a concurrent read repopulate with the pre-write value, which
+ * then survives its full TTL — strictly worse than not invalidating. Dropping
+ * the scope after a failed handler turns every rejected request into a stampede
+ * against an origin that just rejected something.
  *
- *   - *Before* the write, a concurrent read repopulates the entry with the
- *     pre-write value — and that entry then survives its full TTL, so
- *     invalidating early is strictly worse than not invalidating at all.
- *   - After a FAILED handler there is nothing to invalidate, and dropping the
- *     scope anyway turns every rejected request into a cache stampede against
- *     an origin that just rejected something.
- *
- * **Scopes, not keys.** A mutation knows which scope it changed; it cannot
- * enumerate the cached keys, because a list read's key carries the caller's
- * filters and page. Dropping the entry with no parameters would leave
- * `?page=2&status=OPEN` stale — which is the version of this bug that reaches a
- * bug report, since the person who notices is looking at a filtered list.
+ * **Scopes, not keys.** A mutation knows which scope it changed but cannot
+ * enumerate cached keys, because a list read's key carries the caller's filters
+ * and page — so dropping the parameterless entry alone would leave
+ * `?page=2&status=OPEN` stale.
  */
 export const InvalidateCache = (...targets: CacheInvalidationTarget[]) =>
   SetMetadata(INVALIDATE_CACHE_KEY, targets);
 
-/**
- * `@InvalidateCache` targets for the entity cache step 2.
- *
- * **An entity cache with no eviction is a staleness bug with a hit rate**, and
- * these are the eviction. An earlier design expected `user.*` NATS events to do
- * this job; there are none, and there should not be — every writer of a
- * `UserSummary`'s fields is a gateway mutation, so a decorator here is PRECISE
- * invalidation rather than a fallback, and a contract with no publisher would
- * be worse than no contract.
- *
- * Two shapes, because the id arrives two ways:
- *
- *   - `PATCH /users/:id` names it in the route.
- *   - `PATCH /users/me` and the avatar routes mean the CALLER, whose id is only
- *     in the verified token.
- *
- * Getting that wrong is silent in the direction that matters: a target reading
- * `params.id` on `/users/me` resolves to `undefined`, evicts
- * `entity:user:undefined`, and leaves the real entry serving the old name for
- * its whole TTL — with the request returning 200 and the eviction "running".
- */
+// `@InvalidateCache` targets for the entity cache.
+//
+// **An entity cache with no eviction is a staleness bug with a hit rate**, and
+// these are the eviction. There is no `user.*` NATS contract and there should
+// not be — every writer of a `UserSummary`'s fields is a gateway mutation, so a
+// decorator here is PRECISE invalidation rather than a fallback.
+//
+// Two shapes, because the id arrives two ways:
+//
+//   - `PATCH /users/:id` names it in the route.
+//   - `PATCH /users/me` and the avatar routes mean the CALLER, whose id is only
+//     in the verified token.
+//
+// Getting that wrong is silent in the direction that matters: a target reading
+// `params.id` on `/users/me` resolves to `undefined`, evicts
+// `entity:user:undefined`, and leaves the real entry serving the old name for
+// its whole TTL — with the request returning 200 and the eviction "running".
 
 /** The entity named by a route parameter — `PATCH /departments/:id`. */
 export const entityFromParam =
-  (kind: 'user' | 'department', param = 'id'): CacheInvalidationTarget =>
+  (kind: EntityScopeKind, param = 'id'): CacheInvalidationTarget =>
   (context: ExecutionContext) => {
     const request = context.switchToHttp().getRequest<Request>();
     const id = (request.params as Record<string, string | undefined>)[param];
@@ -85,7 +76,7 @@ export const entityFromParam =
 
 /** The entity that IS the caller — `PATCH /users/me`, the avatar routes. */
 export const entityFromCaller =
-  (kind: 'user' | 'department'): CacheInvalidationTarget =>
+  (kind: EntityScopeKind): CacheInvalidationTarget =>
   (context: ExecutionContext) => {
     const request = context.switchToHttp().getRequest<Request>();
     const sub = RequestContextService.fromRequest(request)?.sub;

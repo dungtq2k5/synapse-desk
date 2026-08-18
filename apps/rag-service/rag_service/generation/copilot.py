@@ -112,7 +112,7 @@ class CopilotService:
         self._generator = generator
         self._ledger = ledger
         self._quota = quota
-        #: **A collaborator this class did not have**
+        #: **A collaborator this class did not have**.
         #:
         #: Its only import from the retrieval module was `BudgetState`, a type.
         #: "`suggest()` gains the retrieval call" therefore meant a constructor
@@ -498,7 +498,7 @@ def _json_array(text: str) -> list:
 
 
 def _first_parsable(text: str, opening: str, closing: str, kind: type):
-    r"""The first BALANCED span that parses Gap 1.
+    r"""The first BALANCED span that parses.
 
     The previous implementation was `re.search(r"\{.*\}", text, re.DOTALL)`,
     which with a greedy `.*` spans from the FIRST opening brace to the LAST one

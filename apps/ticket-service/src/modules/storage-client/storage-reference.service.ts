@@ -71,7 +71,7 @@ export class StorageReferenceService implements OnModuleInit {
   async presignAttachment(
     input: {
       ticketId: string;
-      /** Absent before the message exists */
+      /** Absent before the message exists. */
       messageId?: string;
       contentType: string;
       sizeBytes: number;
@@ -106,7 +106,7 @@ export class StorageReferenceService implements OnModuleInit {
   }
 
   /**
-   * The analytics export's upload slot
+   * The analytics export's upload slot.
    *
    * A BACKGROUND job has no caller context: it runs from a queue, on behalf of
    * a request that finished minutes ago. So the tenant is passed explicitly and
@@ -192,7 +192,7 @@ export class StorageReferenceService implements OnModuleInit {
 
     return {
       // **The path storage-service RETURNED, not the one we sent**
-      // §1.3.2. A confirmed attachment moves out of `pending/`, so the presign
+      // A confirmed attachment moves out of `pending/`, so the presign
       // path is where the object no longer is — and a row built from it would
       // point at exactly what the lifecycle rule is about to delete.
       objectPath: response.objectPath,
@@ -202,7 +202,7 @@ export class StorageReferenceService implements OnModuleInit {
   }
 
   /**
-   * The bytes of one object
+   * The bytes of one object.
    *
    * **New here, and it is the first byte path this service has had.** Everything
    * above hands out signed URLs: presign to upload, `resolveReadUrls` so a
@@ -289,7 +289,7 @@ export class StorageReferenceService implements OnModuleInit {
   }
 
   /**
-   * Fire-and-forget, exactly like `AuditPublisher` — §1.6.
+   * Fire-and-forget, exactly like `AuditPublisher`.
    *
    * A delete that fails must never roll back or block the attachment removal
    * the user actually asked for. The worst case is an orphaned object, which costs

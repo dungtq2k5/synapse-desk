@@ -1,6 +1,10 @@
 import { GatewayTimeoutException } from '@nestjs/common';
 import { Metadata } from '@grpc/grpc-js';
-import { GRPC_DEADLINE_MS, packRequestContext } from '@synapsedesk/grpc-proto';
+import {
+  GRPC_DEADLINE_MS,
+  packRequestContext,
+  type GrpcPeer,
+} from '@synapsedesk/grpc-proto';
 import { RequestContext, RequestOrigin } from '@synapsedesk/common';
 import {
   catchError,
@@ -26,10 +30,10 @@ import {
  */
 export abstract class BaseGrpcClient {
   /** Named in the timeout message so a 504 says which peer went quiet. */
-  protected abstract readonly serviceName: string;
+  protected abstract readonly serviceName: GrpcPeer;
 
   /**
-   * Where outbound gRPC latency is recorded
+   * Where outbound gRPC latency is recorded.
    *
    * **A static, set once by `MetricsRegistry`'s constructor**, and this is the
    * one place in the gateway that uses one. Every gRPC client extends this

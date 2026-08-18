@@ -1,9 +1,3 @@
-import {
-  EXTENSION_BY_MIME,
-  UNKNOWN_EXTENSION,
-  type MimeType,
-} from './mime.config';
-
 /**
  * Domain C's enumerated columns and bounds.
  *
@@ -12,6 +6,12 @@ import {
  * this repo keeps the values in TypeScript, where they can be imported by the
  * gateway, the service and the tests as one definition.
  */
+
+import {
+  EXTENSION_BY_MIME,
+  UNKNOWN_EXTENSION,
+  type MimeType,
+} from './mime.config';
 
 /** `documents.status` — the ingestion pipeline's view of a document. */
 export enum DocumentStatus {
@@ -49,8 +49,8 @@ export const INGESTION_JOB_STATUSES = Object.values(IngestionJobStatus);
  * The stages a job may still make progress from.
  *
  * `QUEUED` is in here on purpose and it is the interesting entry: a job parked
- * because the tenant is over AI budget stays `QUEUED` and resumes at cycle roll
- *. Marking it `FAILED` would discard parsing work already done and
+ * because the tenant is over AI budget stays `QUEUED` and resumes at cycle roll.
+ * Marking it `FAILED` would discard parsing work already done and
  * would punish document onboarding for chat overspend.
  */
 export const RESUMABLE_INGESTION_STATUSES = [
@@ -77,7 +77,7 @@ export enum DocumentFlagType {
   NEGATIVE_FEEDBACK = 'NEGATIVE_FEEDBACK',
   CONFLICTING = 'CONFLICTING',
   /**
-   * Part of the document is not in the corpus
+   * Part of the document is not in the corpus.
    *
    * **Its provenance differs from every value above it, and that is worth a
    * sentence rather than a silent addition.** The others are derived from
@@ -135,7 +135,7 @@ export enum AiGenerationPurpose {
   REFORMULATION = 'REFORMULATION',
   EMBEDDING = 'EMBEDDING',
   /**
-   * The co-pilot's review pass
+   * The co-pilot's review pass.
    *
    * A distinct purpose because it is a distinct COST: a draft with two review
    * passes is three generations, and folding them under `DRAFT` would make the
@@ -144,7 +144,7 @@ export enum AiGenerationPurpose {
    */
   REVIEW = 'REVIEW',
   /**
-   * Prompt-injection detection on `Ask` and `Draft`
+   * Prompt-injection detection on `Ask` and `Draft`.
    *
    * **`Chat` does not book this.** Its detection is fused into the greeting
    * classification it already made, so that call keeps `GREETING_CLASSIFY` —
@@ -199,7 +199,7 @@ export type AllowedDocumentMimeType =
   (typeof ALLOWED_DOCUMENT_MIME_TYPES)[number];
 
 /**
- * The languages OCR can be asked for
+ * The languages OCR can be asked for.
  *
  * **Here rather than in `ocr.config` because this is API contract, not engine
  * tuning.** The gateway validates uploads against this set, it appears in a
@@ -212,7 +212,7 @@ export type AllowedDocumentMimeType =
  * place rather than a code someone adds here because tesseract happens to ship
  * a model for it.
  *
- * **ISO 639-1, because the API speaks ISO 639-1** (§4.2.1). Tesseract's own
+ * **ISO 639-1, because the API speaks ISO 639-1**. Tesseract's own
  * codes are 639-2 (`vie`, `jpn`) and its apt packages are a third spelling
  * again (`tesseract-ocr-chi-sim`, hyphen where the language code has an
  * underscore). Storing the engine's alphabet would make the column unportable
@@ -231,7 +231,7 @@ export const OCR_LANGUAGES = [
 export type OcrLanguage = (typeof OCR_LANGUAGES)[number];
 
 /**
- * ISO 639-1 -> tesseract's `-l` code
+ * ISO 639-1 -> tesseract's `-l` code.
  *
  * **Exported once so the parser never spells a code itself.** Three alphabets
  * for the same language is the kind of mistake that type-checks: `zh` is
@@ -254,45 +254,19 @@ export const TESSERACT_CODE_BY_LANGUAGE: Record<OcrLanguage, string> = {
 };
 
 /**
- * How many languages one document may declare, MEASURED.
+ * How many OCR languages one document may declare.
  *
- * **The measurement reversed the reasoning, so it is recorded here rather than
- * in the document that guessed.** The design expected accuracy to degrade as
- * languages were added, and hypothesized a cap of 2. It does not. Rendered at
- * 300 dpi and OCR'd with tesseract 5.3.4:
+ * Four. The cap is a CPU bound, not an accuracy one — extra languages cost time
+ * but no accuracy, while **order** costs accuracy, which is why the list is
+ * stored and passed in the order given and **never sorted**.
  *
- * | `-l`                    | char error rate | time  |
- * | :---------------------- | :-------------- | :---- |
- * | `vie`                   | 0.00%           |  651ms |
- * | `vie+eng`               | 0.00%           |  699ms |
- * | `vie+eng+jpn`           | 0.00%           |  739ms |
- * | `vie+eng+jpn+chi_sim`   | 0.00%           |  893ms |
- * | `eng+vie` (order swapped) | **2.41%**     |  776ms |
- * | `eng` alone             | **24.41%**      |  642ms |
- *
- * **Three findings, and only the third sets this number.**
- *
- * 1. Extra languages cost NO accuracy. Four was as exact as one.
- * 2. **Order is what costs accuracy** — naming English first on a Vietnamese
- *    document was worse than every four-language combination. Which is why the
- *    list is stored and passed in the order given, never sorted.
- * 3. Extra languages cost TIME, roughly linearly, and CJK models cost most:
- *    `jpn` 578ms against `jpn+eng+chi_sim` 1359ms.
- *
- * So the cap is a CPU bound, not an accuracy one. Four permits every realistic
- * document — one language, English technical terms, and a CJK script — while
- * holding the worst case near +40% on a path that already has a per-page
- * timeout.
- *
- * **The caveat that keeps this honest:** these were clean synthetic renders of
- * digital fonts, which is the easy case. Real scans are noisy and skewed, and
- * language confusion grows with noise. The numbers bound the BEST case, so they
- * are a reason not to tighten the cap rather than a licence to loosen it.
+ * Measurements behind the number:
+ * `docs/decisions/0035-ocr-language-cap-is-a-cpu-bound.md`.
  */
 export const MAX_OCR_LANGUAGES = 4;
 
 /**
- * At most one of these may be named rule 3.
+ * At most one of these may be named.
  *
  * **The rule survives; its stated reason did not.** The design said `jpn+zho`
  * was "close to worthless — two models competing over the same Han
@@ -379,7 +353,7 @@ export const INGESTION_QUEUE = 'document-ingestion';
 export const INGESTION_JOB_NAME = 'ingest-document';
 
 /**
- * The scope fan-out's queue — §2.3.
+ * The scope fan-out's queue.
  *
  * A SEPARATE queue from ingestion, not a second job name on the same one. The
  * two have opposite shapes: ingestion jobs are long, few and CPU-heavy, so

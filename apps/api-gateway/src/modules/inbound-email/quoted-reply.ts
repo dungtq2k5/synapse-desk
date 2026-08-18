@@ -74,7 +74,7 @@ export function stripQuotedReply(text: string): string {
  * `<div class="gmail_quote">`, Outlook in `<div id="appendonsend">` followed by
  * a divider, and everything else in `<blockquote>`. Slicing at the first of
  * those is crude and predictable; running an HTML parser to do it properly
- * would add a dependency and a sanitisation surface for a value that is about
+ * would add a dependency and a sanitization surface for a value that is about
  * to be converted to text anyway.
  */
 export function stripQuotedHtml(html: string): string {

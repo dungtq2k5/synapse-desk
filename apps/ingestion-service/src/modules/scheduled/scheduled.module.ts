@@ -15,7 +15,7 @@ import { DocumentFlagService } from './document-flag.service';
  * projection triggered by a schedule can only be tested by waiting, and a test
  * that waits is a test that gets deleted. The scheduler that calls them is a
  * thin layer above; the ORDER it calls them in is the part that matters —
- * projection before retention, always (§4.1).
+ * projection before retention, always.
  *
  * `AiGenerationRollupJob` shares that constraint and deliberately
  * does NOT live here: it writes `ai_generation_daily_stats`, and the module

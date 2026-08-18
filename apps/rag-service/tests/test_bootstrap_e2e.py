@@ -1,4 +1,4 @@
-"""§1.2 test 1 — the service boots and its three stores are reachable.
+"""The service boots and its three stores are reachable.
 
 The smoke test every other service here has, and it earns its place for the same
 reason: a suite where every test fails with a connection error tells you nothing
@@ -97,7 +97,7 @@ class TestServicerWiring:
 
 
 class TestTheGrpcCeilingMatchesTheTypeScriptHalf:
-    """35-doc §7.1 — the one constant where a MISSING value was the bug.
+    """The one constant where a MISSING value was the bug.
 
     Every TypeScript client and server applies `GRPC_CHANNEL_OPTIONS`, so both
     ends of a Node-to-Node call agree. `grpc.aio.server()` takes no options,

@@ -16,11 +16,11 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ResponseMessage } from '../../common/decorators/response-message.decorator';
 import { JwtCookieService } from '../auth/jwt-cookie.service';
-import { SessionsGrpcClient } from './sessions-grpc.client';
+import { SessionsService } from './sessions.service';
 import {
   RevokeTrustResponseDto,
   SessionResponseDto,
-} from './dto/rest/session.dto';
+} from './dto/rest/session-response.dto';
 import { OrgAccessKind } from '../../common/decorators/org-access.decorator';
 import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AUTH_SCHEMES } from '../../common/config/swagger.config';
@@ -30,7 +30,7 @@ import {
 } from '../../common/decorators/api-response.decorator';
 
 /**
- * The caller's own device sessions (api-endpoints-plan).
+ * The caller's own device sessions (`api-endpoints-plan.md`).
  *
  * `/auth/sessions` rather than `/users/me/sessions`: these are credentials, and
  * they sit beside `/auth/logout` which does the same job for one session.
@@ -47,7 +47,7 @@ import {
 @UseGuards(JwtAuthGuard)
 export class SessionsController {
   constructor(
-    private readonly sessionsGrpcClient: SessionsGrpcClient,
+    private readonly sessions: SessionsService,
     private readonly jwtCookieService: JwtCookieService,
   ) {}
 
@@ -59,7 +59,7 @@ export class SessionsController {
     @CurrentUser() context: RequestContext,
     @Req() request: Request,
   ): Promise<SessionResponseDto[]> {
-    return this.sessionsGrpcClient.list(
+    return this.sessions.list(
       this.jwtCookieService.readRefreshToken(request),
       context,
     );
@@ -83,7 +83,7 @@ export class SessionsController {
   revokeAllTrust(
     @CurrentUser() context: RequestContext,
   ): Promise<RevokeTrustResponseDto> {
-    return this.sessionsGrpcClient.revokeAllTrust(context);
+    return this.sessions.revokeAllTrust(context);
   }
 
   /**
@@ -108,7 +108,7 @@ export class SessionsController {
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ): Promise<{ revokedCount: number }> {
-    const result = await this.sessionsGrpcClient.revoke(
+    const result = await this.sessions.revoke(
       id,
       this.jwtCookieService.readRefreshToken(request),
       context,
@@ -139,6 +139,6 @@ export class SessionsController {
     @CurrentUser() context: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<RevokeTrustResponseDto> {
-    return this.sessionsGrpcClient.revokeTrust(id, context);
+    return this.sessions.revokeTrust(id, context);
   }
 }

@@ -10,7 +10,7 @@ import { AiSettingsService } from './ai-settings.service';
 import { AuthReferenceService } from '../auth-client/auth-reference.service';
 import { EntitlementsConsumer } from './entitlements.consumer';
 
-describe('§3b AiSettingsService (unit)', () => {
+describe('B AiSettingsService (unit)', () => {
   let service: AiSettingsService;
   let consumer: EntitlementsConsumer;
   let authReference: jest.Mocked<AuthReferenceService>;
@@ -104,7 +104,7 @@ describe('§3b AiSettingsService (unit)', () => {
     });
   });
 
-  describe('the tier — doc 14 step 6', () => {
+  describe('the tier, read over gRPC', () => {
     it('12. Resolves the QUALITY generation model for a QUALITY tenant', async () => {
       // The whole tier feature, end to end. Nothing but `resolveTier` changed
       // to ship it: no caller moved, no endpoint signature moved, and no call

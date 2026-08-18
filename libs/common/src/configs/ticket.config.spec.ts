@@ -8,7 +8,7 @@ import {
 /**
  * The state machine, tested where it is DEFINED.
  *
- * §3.3 asks for one data table that both the unit test and the e2e test import,
+ * The plan asked for one data table that both the unit test and the e2e test import,
  * so the two can never disagree about what "legal" means. This is that table's
  * own test: the e2e suite drives the same `canTransition` against a real
  * database, and neither restates the edges.
@@ -22,7 +22,7 @@ describe('the ticket state machine (unit)', () => {
 
   it('every status has an entry — no status is a dead lookup', () => {
     // A missing key makes `TICKET_STATUS_TRANSITIONS[from]` undefined, and a
-    // naive `?.includes()` on it returns false for EVERY target — silently
+    // naive `?includes()` on it returns false for EVERY target — silently
     // freezing tickets in that status with no error to explain it.
     for (const status of ALL) {
       expect(TICKET_STATUS_TRANSITIONS[status]).toBeDefined();

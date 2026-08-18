@@ -21,7 +21,7 @@ installed. `test/utils/ocr-binaries.ts` is what decides, and
 machine has.
 
 **poppler alone is enough to build the fixtures.** `buildScannedPdf` draws text,
-rasterises it through `pdftoppm`, and embeds the PNG back into a PDF — which is
+rasterizes it through `pdftoppm`, and embeds the PNG back into a PDF — which is
 how a page that pdf.js reads as empty gets generated rather than committed as a
 binary blob. tesseract is needed only to read one back.
 
@@ -55,7 +55,7 @@ docker build -f docker/node-service.Dockerfile \
 
 Building it without the target produces a working image whose scanned pages all
 fail with `binary_missing` — loudly, once, at the first scanned document, and
-never at boot (34-doc §6.1). Every other document still ingests.
+never at boot. Every other document still ingests.
 
 **After changing the Dockerfile, run the two checks:**
 

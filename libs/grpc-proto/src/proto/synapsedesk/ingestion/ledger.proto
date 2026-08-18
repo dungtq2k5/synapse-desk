@@ -20,7 +20,7 @@ import "synapsedesk/ingestion/document.proto";
 // builder a shared constant with a contract test on both sides.
 
 // The ledger's enumerated values, declared HERE so both languages GENERATE
-// them
+// them.
 //
 // These values now exist in TypeScript and in Python, and a hand-copied
 // `GREETING_CLASSIFY` that becomes `GREETING_CLASSIFICATION` on one side meters
@@ -44,7 +44,7 @@ enum AiGenerationPurpose {
   // a distinct cost: a draft with two review passes is three generations, and
   // folding them under DRAFT would make the per-draft cost look like one call.
   AI_GENERATION_PURPOSE_REVIEW = 9;
-  // Layer B of prompt-injection detection on `Ask` and `Draft`
+  // Layer B of prompt-injection detection on `Ask` and `Draft`.
   //
   // **Not booked by `Chat`**, whose detection is fused into the greeting
   // classification it was already making and stays under GREETING_CLASSIFY,
@@ -100,7 +100,7 @@ message RecordGenerationRequest {
   optional string content = 10;
 
   // What the generation SAW. Empty is the knowledge-gap signal, and it is a
-  // signal rather than an omission
+  // signal rather than an omission.
   repeated string retrieved_chunk_ids = 11;
   // The subset it CITED. Always a subset; the difference is what the model was
   // given and chose not to use, and without it `UNCITED` is not computable.
@@ -137,7 +137,7 @@ message RecordGenerationOutcomeResponse {
   AiGenerationOutcome outcome = 1;
 }
 
-// AI spend and quality, from `ai_generation_daily_stats`
+// AI spend and quality, from `ai_generation_daily_stats`.
 //
 // Never from `ai_generations` itself: that table is retention-rolled (RDM Table
 // 29), so a query against raw rows silently loses history the moment retention
@@ -196,7 +196,7 @@ message AiUsageResponse {
 
   optional google.protobuf.Timestamp computed_at = 10;
 
-  // The last day `ai_generation_daily_stats` covers See the note
+  // The last day `ai_generation_daily_stats` covers. See the note
   // on `ticket.OverviewResponse.data_through`; this is the same fact for a
   // different table, and the two can disagree when one scheduler is down.
   optional string data_through = 11;

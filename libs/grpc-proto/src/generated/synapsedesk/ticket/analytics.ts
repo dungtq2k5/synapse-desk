@@ -31,7 +31,7 @@ export enum AnalyticsExportStatus {
 }
 
 /**
- * A rate and the count it was computed over — 19-doc §3.1.
+ * A rate and the count it was computed over.
  *
  * **Every rate carries its denominator.** A percentage with a hidden
  * denominator is how "our CSAT is 100%" reaches a board deck on two responses.
@@ -85,7 +85,7 @@ export interface OverviewResponse {
   /**
    * The counterweight to `resolution_seconds`, which is biased OPTIMISTIC
    * because it can only see tickets that closed — a ticket open for 40 days is
-   * invisible to it (19-doc §3.1).
+   * invisible to it.
    */
   openTicketMedianAgeSeconds?:
     | number
@@ -99,7 +99,7 @@ export interface OverviewResponse {
     | Timestamp
     | undefined;
   /**
-   * *The last DAY the rollups cover for this tenant** (20-doc §4.3), as
+   * *The last DAY the rollups cover for this tenant**, as
    * `YYYY-MM-DD`, or absent when no rollup has ever run.
    *
    * NOT the same fact as `computed_at`, and the difference is the point:
@@ -219,7 +219,7 @@ export interface AgentStatsResponse {
 /**
  * The rollup job, exposed so a scheduler and an operator can both reach it.
  * ---------------------------------------------------------------------------
- * Job health -- 20-doc §4.1, §4.4.
+ * Job health.
  *
  * **Alerting on staleness rather than on failure.** A failed job logs; a job
  * that never ran logs nothing at all, which is precisely what happened here --

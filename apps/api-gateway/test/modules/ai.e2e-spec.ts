@@ -12,7 +12,7 @@ import {
 import { grpcError, timestamp, wireCreatedMessage } from '../fixtures/wire';
 
 /**
- * §2.6 The AI co-pilot at the HTTP boundary.
+ * The AI co-pilot at the HTTP boundary.
  *
  * Every generation route answers 503 today — that is the contract, not a gap.
  * What is fully live and therefore what this suite is really about: the
@@ -20,7 +20,7 @@ import { grpcError, timestamp, wireCreatedMessage } from '../fixtures/wire';
  * anything is `ticket.ai.use`, which costs money on every call. Collapsing the
  * two would hand a metered budget to everyone who could read a ticket.
  */
-describe('§2.6 AI Co-Pilot at the HTTP boundary (e2e)', () => {
+describe('AI Co-Pilot at the HTTP boundary (e2e)', () => {
   let fx: E2eFixture;
 
   const ticketId = faker.string.uuid();
@@ -258,7 +258,7 @@ describe('§2.6 AI Co-Pilot at the HTTP boundary (e2e)', () => {
     });
 
     it('**5. citations reach the client, and `vectorPointId` does not**', async () => {
-      // §2. The narrowing is the decision, so it needs the assertion: a Qdrant
+      // The narrowing is the decision, so it needs the assertion: a Qdrant
       // point id is an internal retrieval identifier, and publishing it in a
       // response DTO would make it part of the product surface by accident.
       //
@@ -377,7 +377,7 @@ describe('§2.6 AI Co-Pilot at the HTTP boundary (e2e)', () => {
       score: 0.82,
     });
 
-    it('**returns a WRAPPER, not a bare array** — 39-doc §2', async () => {
+    it('**returns a WRAPPER, not a bare array**', async () => {
       // The breaking change, asserted rather than assumed. A client reading
       // `data[0].title` reads `data.nextSteps[0].title` now, and this is the
       // SECOND such change's `CreateMessageResponse` was the

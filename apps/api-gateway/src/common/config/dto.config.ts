@@ -6,10 +6,6 @@
  * 50,000 addresses, while `organizations.max_agent_seats` is what limits how
  * many invitations may exist. The two are easy to confuse and live in different
  * services for exactly that reason.
- *
- * Named `dto.config` rather than `app.config` because the previous name invited
- * anything vaguely global — the throttler policy and a duplicate of the REST
- * envelope types had both accumulated here.
  */
 
 export const MIN_FULL_NAME_LENGTH = 2;
@@ -124,3 +120,130 @@ export const PRINTABLE_ASCII = /^[\x21-\x7E]+$/;
  * decide how much a digest costs.
  */
 export const MAX_DATE_HEADER_LENGTH = 255;
+
+/**
+ * Most results one knowledge search may ask for.
+ *
+ * A request-body bound, not a retrieval policy: rag-service clamps to its own
+ * `final_context_k` regardless of what arrives.
+ */
+export const MAX_KNOWLEDGE_SEARCH_LIMIT = 50;
+
+/**
+ * The `limit` a knowledge search sends when the caller does not choose one.
+ *
+ * Zero is rag-service's documented "use the configured default" — its
+ * `_clamped_limit(requested, final_context_k)` falls back whenever the value is
+ * not positive, so the gateway does not have to know what that default is.
+ */
+export const DEFAULT_KNOWLEDGE_SEARCH_LIMIT = 0;
+
+// ------------------------------------------------------------ organizations
+//
+// One tenant, two surfaces: `/platform/*` (Super Admin, may set quotas) and
+// `/organizations/*` (the tenant editing itself). The bounds are the same on
+// both, which is the reason they are here rather than beside either DTO.
+
+/** Matches `organizations.name` — `@db.VarChar(255)`. */
+export const MAX_ORGANIZATION_NAME_LENGTH = 255;
+export const MIN_ORGANIZATION_NAME_LENGTH = 2;
+
+/** Matches `organizations.slug` — `@db.VarChar(100)`, and `@unique`. */
+export const MAX_ORGANIZATION_SLUG_LENGTH = 100;
+export const MIN_ORGANIZATION_SLUG_LENGTH = 2;
+
+/** Matches `organizations.domain` — `@db.VarChar(255)`. */
+export const MAX_ORGANIZATION_DOMAIN_LENGTH = 255;
+
+/**
+ * How many domains one tenant may allow for self-signup.
+ *
+ * Bounds the request body. Each entry is itself capped by
+ * {@link MAX_ORGANIZATION_DOMAIN_LENGTH}, matching the `VarChar(255)` on
+ * `organizations.allowed_email_domains`.
+ */
+export const MAX_ALLOWED_EMAIL_DOMAINS = 50;
+
+/**
+ * The free-text reason a privileged action carries into `audit_logs`.
+ *
+ * Shared by every "why did you do that" field — suspend, reset billing cycle,
+ * offboard, delete. One bound because they are one kind of thing: the answer to
+ * "why is Acme frozen?", read six months later by somebody else.
+ */
+export const MAX_ADMIN_REASON_LENGTH = 500;
+
+/** `roles.description` is `@db.Text`; this bounds the REQUEST, not the column. */
+export const MAX_ROLE_DESCRIPTION_LENGTH = 2000;
+
+/**
+ * Floors for the tenant quotas a Super Admin sets.
+ *
+ * Seats start at one because a tenant with zero could never be used. Storage and
+ * token budget start at zero, which is a real setting: a suspended tenant keeps
+ * its data and spends nothing.
+ */
+export const MIN_AGENT_SEATS = 1;
+export const MIN_STORAGE_BYTES = 0;
+export const MIN_AI_TOKEN_BUDGET = 0;
+
+// -------------------------------------------------------- codes & secrets
+
+/**
+ * The range a submitted OTP may fall in.
+ *
+ * **A range, not a fixed length, and deliberately.** auth-service generates
+ * `OTP_LENGTH` digits and that is an ENV VAR — the gateway cannot know what a
+ * given deployment set it to, so this bounds the field without claiming to know
+ * the exact length. The real check is auth-service comparing the hash.
+ */
+export const MIN_OTP_CODE_LENGTH = 4;
+export const MAX_OTP_CODE_LENGTH = 10;
+
+/** TOTP is six digits — RFC 6238's default, and what the authenticator shows. */
+export const TOTP_CODE_LENGTH = 6;
+
+/** Bounds an id accepted for PREVIEW, where the point is to take bad data and report on it. */
+export const MAX_PREVIEW_ID_LENGTH = 64;
+
+// ------------------------------------------------------------- free text
+
+/** `departments.description` is `@db.Text`; this bounds the REQUEST. */
+export const MAX_DEPARTMENT_DESCRIPTION_LENGTH = 2000;
+
+/** Longest reason accepted when locking an account. */
+export const MAX_LOCK_REASON_LENGTH = 500;
+
+/** One knowledge query. A 50,000-character "query" is one embedding call charged to the tenant. */
+export const MAX_KNOWLEDGE_QUERY_LENGTH = 1_000;
+
+/** Stripe price ids are opaque; this only stops an unbounded string reaching the API. */
+export const MAX_BILLING_PRICE_ID_LENGTH = 255;
+
+/**
+ * The validation every Stripe redirect URL in this file gets.
+ *
+ * All three fields are the same thing — a URL we hand to Stripe, which Stripe
+ * later hands to a BROWSER — so they share one rule rather than three copies
+ * that can drift. A copy that lost `protocols` would still look like
+ * validation while accepting `javascript:` or `data:`, and nothing at the call
+ * site would show the difference.
+ *
+ * `require_tld: false` so a `localhost` redirect works in development. The
+ * PROTOCOL restriction is the part that matters, and the part that must not be
+ * relaxed for convenience.
+ */
+export const STRIPE_REDIRECT_URL = {
+  require_tld: false,
+  protocols: ['http', 'https'],
+};
+
+/**
+ * Ceiling on a password-reset token arriving in a request body.
+ *
+ * A bound, not the token's length: auth-service generates 32 random bytes as
+ * base64url (43 characters) and this only stops an unbounded string reaching a
+ * hash-and-lookup. Generous on purpose — the gateway must not break when the
+ * generator's byte count changes.
+ */
+export const MAX_RESET_TOKEN_LENGTH = 256;

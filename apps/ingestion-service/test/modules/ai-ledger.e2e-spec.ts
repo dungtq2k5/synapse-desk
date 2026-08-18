@@ -35,9 +35,9 @@ import {
 import { AuthReferenceService } from '../../src/modules/auth-client/auth-reference.service';
 import { faultInjector } from '@synapsedesk/common/testing/fault';
 
-describe('§1.3 The AI ledger and quota gate (e2e)', () => {
+describe('The AI ledger and quota gate (e2e)', () => {
   // Every injected fault in this file is registered here and restored in an
-  // `afterEach` that runs whether the test passed, failed or threw
+  // `afterEach` that runs whether the test passed, failed or threw.
   const faults = faultInjector();
 
   let fx: E2eFixture;
@@ -119,7 +119,7 @@ describe('§1.3 The AI ledger and quota gate (e2e)', () => {
   // ----------------------------------------------------------------- the gate
 
   describe('the budget gate', () => {
-    it('1. passes under budget and refuses over it — §1.3 test 1', async () => {
+    it('1. passes under budget and refuses over it', async () => {
       const under = await ledger.checkBudget(
         tenant.organizationId,
         AiSurface.DRAFT,
@@ -273,7 +273,7 @@ describe('§1.3 The AI ledger and quota gate (e2e)', () => {
       expect(decision.allowed).toBe(false);
     });
 
-    it('8. FAILS CLOSED when Redis is unreachable — §1.3 test 8', async () => {
+    it('8. FAILS CLOSED when Redis is unreachable', async () => {
       // The one place a cache miss must not mean "allow". Returning zero on a
       // connection error would open the gate for every tenant at once, at
       // exactly the moment nobody can see what is being spent.
@@ -288,7 +288,7 @@ describe('§1.3 The AI ledger and quota gate (e2e)', () => {
       expect(decision.allowed).toBe(false);
     });
 
-    it('8b. FAILS CLOSED when AUTH-SERVICE is unreachable — 16-doc §4', async () => {
+    it('8b. FAILS CLOSED when AUTH-SERVICE is unreachable', async () => {
       // The row to check first, and the one that goes the
       // OPPOSITE way from `listDepartments`.
       //
@@ -331,7 +331,7 @@ describe('§1.3 The AI ledger and quota gate (e2e)', () => {
       });
     });
 
-    it('10. a cycle ROLL makes the tenant immediately under budget — §1.3 test 5', async () => {
+    it('10. a cycle ROLL makes the tenant immediately under budget', async () => {
       // The cycle start is in the Redis key, so a billing reset invalidates the
       // counter for free — no cache bust, no migration, no job.
       await setSpend(BUDGET_MICROS);
@@ -365,7 +365,7 @@ describe('§1.3 The AI ledger and quota gate (e2e)', () => {
   // -------------------------------------------------------------- the charge
 
   describe('charge', () => {
-    it('1. is SYNCHRONOUS — N concurrent requests, room for one — §1.3 test 2', async () => {
+    it('1. is SYNCHRONOUS — N concurrent requests, room for one', async () => {
       // THE burst test, and the reason `charge()` is awaited. With an
       // asynchronous increment all N read the same stale value, all pass the
       // gate and all spend; reconciliation reports the overrun after the money
@@ -436,7 +436,7 @@ describe('§1.3 The AI ledger and quota gate (e2e)', () => {
   // --------------------------------------------------------------- the record
 
   describe('record', () => {
-    it('1. returns a generationId SYNCHRONOUSLY — §1.3 test 4', async () => {
+    it('1. returns a generationId SYNCHRONOUSLY', async () => {
       // Before the write completes, because the caller needs it in the response
       // body (`generatedFromId` closes the draft-acceptance loop) and awaiting a
       // durable write for an id we already know would put a Postgres round trip
@@ -447,7 +447,7 @@ describe('§1.3 The AI ledger and quota gate (e2e)', () => {
       expect(await waitForRows(1)).toBe(true);
     });
 
-    it('2. SWALLOWS a write failure and still returns an id — §1.3 test 4', async () => {
+    it('2. SWALLOWS a write failure and still returns an id', async () => {
       faults.fail(
         fx.prisma.aiGeneration,
         'create',
@@ -546,7 +546,7 @@ describe('§1.3 The AI ledger and quota gate (e2e)', () => {
   // ------------------------------------------------------- reconciliation
 
   describe('reconciliation', () => {
-    it('1. counter and SUM diverge after a swallowed failure, and reconciliation converges — §1.3 test 3', async () => {
+    it('1. counter and SUM diverge after a swallowed failure, and reconciliation converges', async () => {
       // The ACTUAL invariant. Asserting the two always agree would directly
       // contradict `record()` swallowing failures: if it swallows, they WILL
       // diverge, and what must hold is that reconciliation restores agreement.
@@ -628,7 +628,7 @@ describe('§1.3 The AI ledger and quota gate (e2e)', () => {
         (call) => call[0] === IN_APP_NOTIFICATION_PATTERN,
       );
 
-    it('1. fires ONCE per threshold per cycle — §1.3 test 7', async () => {
+    it('1. fires ONCE per threshold per cycle', async () => {
       // Publish twice, assert one notification. The durable guard is Domain E's
       // `UNIQUE (recipient_id, event_id)`; this one is the local guard that
       // makes the behaviour true today, while Domain E does not exist.
@@ -739,7 +739,7 @@ describe('§1.3 The AI ledger and quota gate (e2e)', () => {
   // -------------------------------------------------- the shared key format
 
   describe('the quota key', () => {
-    it('1. is built from the org and the CYCLE START in seconds — §1.3 test 9', () => {
+    it('1. is built from the org and the CYCLE START in seconds', () => {
       // The format is duplicated in Python, because every service that spends
       // increments this counter directly rather than over gRPC. Seconds and not
       // milliseconds is the single most likely way the two implementations
@@ -766,7 +766,7 @@ describe('§1.3 The AI ledger and quota gate (e2e)', () => {
   });
 });
 
-describe('§4.2 The acceptance loop (e2e)', () => {
+describe('The acceptance loop (e2e)', () => {
   let fx: E2eFixture;
   let ledger: AiLedgerService;
   let tenant: TenantFixture;

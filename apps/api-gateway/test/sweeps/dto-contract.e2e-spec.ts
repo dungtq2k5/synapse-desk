@@ -2,7 +2,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { compareContract, type DtoContract } from '../utils/dto-contract';
 
-describe('§2 REST and GraphQL DTOs are independent but not divergent', () => {
+describe('REST and GraphQL DTOs are independent but not divergent', () => {
   const SRC = join(__dirname, '../../src/modules');
 
   /**
@@ -43,7 +43,7 @@ describe('§2 REST and GraphQL DTOs are independent but not divergent', () => {
       // Internal object paths resolved per request — publishing them would
       // advertise the storage layout and hand clients a value that does not work.
       //
-      // `excludedFromAiContext` is REST-only BY DECISION It is on
+      // `excludedFromAiContext` is REST-only BY DECISION. It is on
       // the REST shape for ONE consumer: `AiStreamService.transcript()`, which
       // filters on it after fetching because the same route serves the UI where
       // the row must stay visible. No client has a use for it, and publishing it
@@ -76,7 +76,7 @@ describe('§2 REST and GraphQL DTOs are independent but not divergent', () => {
       // `fileUrl` is an internal path, not a URL; `deletedById` is an audit field
       // with no edge behind it.
       //
-      // `ocrLanguages` is REST-only BY DECISION `@Field()` is
+      // `ocrLanguages` is REST-only BY DECISION. `@Field()` is
       // not inherited (conventions §12.2), so a GraphQL DTO would need its own
       // line; the field is an advanced upload option that no screen reads yet,
       // and adding it to the public schema before anything queries it is how a
@@ -100,27 +100,36 @@ describe('§2 REST and GraphQL DTOs are independent but not divergent', () => {
       restOnly: ['data', 'groupKey', 'groupCount'],
     },
     {
+      // Paired only since the GraphQL side was renamed off `ApiInfo`: same three
+      // fields, one build identity, two transports.
+      name: 'Version',
+      restPath: join(SRC, 'health/dto/rest/health-response.dto.ts'),
+      restClass: 'VersionResponseDto',
+      gqlPath: join(SRC, 'health/dto/graphql/version-response.gql-dto.ts'),
+      gqlClass: 'VersionResponseGqlDto',
+    },
+    {
       name: 'Rate',
       restPath: join(SRC, 'analytics/dto/rest/analytics-response.dto.ts'),
-      restClass: 'RateDto',
+      restClass: 'RateResponseDto',
       gqlPath: join(SRC, 'analytics/dto/graphql/analytics-response.gql-dto.ts'),
-      gqlClass: 'RateGqlDto',
+      gqlClass: 'RateResponseGqlDto',
     },
     {
       name: 'Mean',
       restPath: join(SRC, 'analytics/dto/rest/analytics-response.dto.ts'),
-      restClass: 'MeanDto',
+      restClass: 'MeanResponseDto',
       gqlPath: join(SRC, 'analytics/dto/graphql/analytics-response.gql-dto.ts'),
-      gqlClass: 'MeanGqlDto',
+      gqlClass: 'MeanResponseGqlDto',
     },
     {
       name: 'AnalyticsOverview',
       restPath: join(SRC, 'analytics/dto/rest/analytics-response.dto.ts'),
-      restClass: 'OverviewDto',
+      restClass: 'OverviewResponseDto',
       gqlPath: join(SRC, 'analytics/dto/graphql/analytics-response.gql-dto.ts'),
-      gqlClass: 'AnalyticsOverviewGqlDto',
+      gqlClass: 'AnalyticsOverviewResponseGqlDto',
     },
-    // ---------------------------------------- the three composed reads, §3.1
+    // ---------------------------------------- the three composed reads
     //
     // `agents`, `documents` and `knowledge-gaps` earned a GraphQL query because
     // their rows carry entity ids a loader can resolve. The chart series did
@@ -129,16 +138,16 @@ describe('§2 REST and GraphQL DTOs are independent but not divergent', () => {
     {
       name: 'UnavailableBlock',
       restPath: join(SRC, 'analytics/dto/rest/analytics-response.dto.ts'),
-      restClass: 'UnavailableBlockDto',
+      restClass: 'UnavailableBlockResponseDto',
       gqlPath: join(SRC, 'analytics/dto/graphql/analytics-response.gql-dto.ts'),
-      gqlClass: 'UnavailableBlockGqlDto',
+      gqlClass: 'UnavailableBlockResponseGqlDto',
     },
     {
       name: 'AgentStat',
       restPath: join(SRC, 'analytics/dto/rest/analytics-response.dto.ts'),
-      restClass: 'AgentStatDto',
+      restClass: 'AgentStatResponseDto',
       gqlPath: join(SRC, 'analytics/dto/graphql/analytics-response.gql-dto.ts'),
-      gqlClass: 'AgentStatGqlDto',
+      gqlClass: 'AgentStatResponseGqlDto',
       // The one field that could not stay. REST fills it from a hydration leg
       // called unconditionally; in GraphQL that leg IS the `agent` edge, so
       // carrying the name flat would mean paying for the round trip the edge
@@ -149,42 +158,42 @@ describe('§2 REST and GraphQL DTOs are independent but not divergent', () => {
     {
       name: 'AgentAnalytics',
       restPath: join(SRC, 'analytics/dto/rest/analytics-response.dto.ts'),
-      restClass: 'AgentAnalyticsDto',
+      restClass: 'AgentAnalyticsResponseDto',
       gqlPath: join(SRC, 'analytics/dto/graphql/analytics-response.gql-dto.ts'),
-      gqlClass: 'AgentAnalyticsGqlDto',
+      gqlClass: 'AgentAnalyticsResponseGqlDto',
     },
     {
       name: 'DocumentUsage',
       restPath: join(SRC, 'analytics/dto/rest/analytics-response.dto.ts'),
-      restClass: 'DocumentUsageDto',
+      restClass: 'DocumentUsageResponseDto',
       gqlPath: join(SRC, 'analytics/dto/graphql/analytics-response.gql-dto.ts'),
-      gqlClass: 'DocumentUsageGqlDto',
+      gqlClass: 'DocumentUsageResponseGqlDto',
     },
     {
       name: 'DocumentAnalytics',
       restPath: join(SRC, 'analytics/dto/rest/analytics-response.dto.ts'),
-      restClass: 'DocumentAnalyticsDto',
+      restClass: 'DocumentAnalyticsResponseDto',
       gqlPath: join(SRC, 'analytics/dto/graphql/analytics-response.gql-dto.ts'),
-      gqlClass: 'DocumentAnalyticsGqlDto',
+      gqlClass: 'DocumentAnalyticsResponseGqlDto',
     },
     {
       name: 'KnowledgeGapFlag',
       restPath: join(SRC, 'analytics/dto/rest/analytics-response.dto.ts'),
-      restClass: 'KnowledgeGapFlagDto',
+      restClass: 'KnowledgeGapFlagResponseDto',
       gqlPath: join(SRC, 'analytics/dto/graphql/analytics-response.gql-dto.ts'),
-      gqlClass: 'KnowledgeGapFlagGqlDto',
+      gqlClass: 'KnowledgeGapFlagResponseGqlDto',
     },
     {
       name: 'KnowledgeGaps',
       restPath: join(SRC, 'analytics/dto/rest/analytics-response.dto.ts'),
-      restClass: 'KnowledgeGapsDto',
+      restClass: 'KnowledgeGapsResponseDto',
       gqlPath: join(SRC, 'analytics/dto/graphql/analytics-response.gql-dto.ts'),
-      gqlClass: 'KnowledgeGapsGqlDto',
+      gqlClass: 'KnowledgeGapsResponseGqlDto',
     },
   ];
 
   /**
-   * REST response shapes with **no GraphQL twin, on purpose**
+   * REST response shapes with **no GraphQL twin, on purpose**.
    *
    * **The sweep is organised by PAIRS, so a shape with no twin is invisible to
    * it.** That is not a small hole: `AiDraftResponseDto` sat outside every
@@ -207,8 +216,8 @@ describe('§2 REST and GraphQL DTOs are independent but not divergent', () => {
     // tickets — the co-pilot is a REST surface; no client reads drafts,
     // summaries or suggestions through the schema.
     AiSummaryResponseDto: 'co-pilot output, REST-only surface',
-    AiDraftResponseDto: 'co-pilot output, REST-only surface — 38-doc §5',
-    AiSuggestionsResponseDto: 'co-pilot output, REST-only surface — 39-doc §7',
+    AiDraftResponseDto: 'co-pilot output, REST-only surface',
+    AiSuggestionsResponseDto: 'co-pilot output, REST-only surface',
     // Envelopes and one-shot results rather than entities: nothing would query
     // them by id, which is what a GraphQL type is for.
     AttachmentResponseDto: 'nested inside MessageResponse, not queried alone',
@@ -237,6 +246,41 @@ describe('§2 REST and GraphQL DTOs are independent but not divergent', () => {
     CurrentUserResponseDto: 'an envelope around UserResponseDto',
     UserSummaryResponseDto: 'an envelope around UserResponseDto',
     UserPermissionsResponseDto: 'a permission list, not an entity',
+    // analytics — the schema exposes the OVERVIEW shapes (`Rate`, `Mean`,
+    // `AnalyticsOverview`, …) and none of the time series behind them: a chart
+    // series is read once for a dashboard, never resolved through an edge.
+    DeflectionPointResponseDto: 'a time-series point, REST-only',
+    DeflectionResponseDto: 'a time series, REST-only',
+    ResponseTimePointResponseDto: 'a time-series point, REST-only',
+    ResponseTimesResponseDto: 'a time series, REST-only',
+    VolumePointResponseDto: 'a time-series point, REST-only',
+    VolumeBreakdownResponseDto: 'nested inside VolumeResponseDto',
+    VolumeResponseDto: 'a time series, REST-only',
+    SatisfactionPointResponseDto: 'a time-series point, REST-only',
+    SatisfactionResponseDto: 'a time series, REST-only',
+    AiUsageSliceResponseDto: 'nested inside AiUsageResponseDto',
+    AiUsagePointResponseDto: 'a time-series point, REST-only',
+    AiUsageResponseDto: 'a time series, REST-only',
+    AnalyticsExportResponseDto: 'a download descriptor, never a query',
+    // audit logs / documents — scalar lists in a wrapper
+    AuditActionsResponseDto: 'a filter vocabulary, not an entity',
+    // health probes — an orchestrator calls these, never a GraphQL client
+    LivenessResponseDto: 'a k8s probe payload, not a product shape',
+    ReadinessResponseDto: 'a k8s probe payload, not a product shape',
+    ReadinessDependenciesResponseDto: 'nested inside ReadinessResponse',
+    // Newly in scope: these gained the `Response` suffix, so the scan sees them.
+    // All are nested rows or one-shot results, not entities a client queries.
+    DraftCitationResponseDto:
+      'nested inside AiDraftResponse, co-pilot REST-only',
+    SuggestedArticleResponseDto:
+      'nested inside AiSuggestionsResponse, REST-only',
+    AiSuggestionResponseDto: 'nested inside AiSuggestionsResponse, REST-only',
+    AiClassificationResponseDto: 'co-pilot output, REST-only surface',
+    SimilarTicketResponseDto: 'co-pilot output, REST-only surface',
+    BulkTicketFailureResponseDto: 'a per-row failure inside a bulk RESULT',
+    RevokedSessionCountResponseDto: 'a write RESULT, not an entity',
+    UntrustedDeviceCountResponseDto: 'a write RESULT, not an entity',
+    DocumentDepartmentsResponseDto: 'an id list, reached through Document',
   };
 
   it('the contract list covers every paired shape', () => {
@@ -248,6 +292,7 @@ describe('§2 REST and GraphQL DTOs are independent but not divergent', () => {
       'User',
       'Document',
       'Notification',
+      'Version',
       'Rate',
       'Mean',
       'AnalyticsOverview',

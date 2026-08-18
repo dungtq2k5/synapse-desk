@@ -63,7 +63,7 @@ enum DocumentFlagType {
   DOCUMENT_FLAG_TYPE_LOW_CONFIDENCE = 4;
   DOCUMENT_FLAG_TYPE_NEGATIVE_FEEDBACK = 5;
   DOCUMENT_FLAG_TYPE_CONFLICTING = 6;
-  // Raised by ingestion itself at index time Its provenance
+  // Raised by ingestion itself at index time. Its provenance
   // differs from every value above: those are observations about how a document
   // has been USED, this is a fact about the document.
   DOCUMENT_FLAG_TYPE_PAGES_NOT_INDEXED = 7;
@@ -93,7 +93,7 @@ message DocumentResponse {
   google.protobuf.Timestamp updated_at = 13;
   optional google.protobuf.Timestamp deleted_at = 14;
   optional string deleted_by_id = 15;
-  // ISO 639-1 codes the uploader declared for OCR
+  // ISO 639-1 codes the uploader declared for OCR.
   //
   // Empty means "not specified", which is almost every document: an uploader
   // cannot know a PDF is scanned until it is parsed. `repeated` needs no
@@ -119,7 +119,7 @@ message ConfirmDocumentRequest {
   bool is_organization_wide = 3;
   repeated string department_ids = 4;
   string file_name = 5;
-  // ISO 639-1, validated at the gateway against `OCR_LANGUAGES`
+  // ISO 639-1, validated at the gateway against `OCR_LANGUAGES`.
   //
   // NOT tesseract's own codes: the engine wants `vie`/`chi_sim`, and storing
   // those would put the engine's alphabet in the API contract and in every row.

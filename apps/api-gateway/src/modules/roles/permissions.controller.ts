@@ -6,8 +6,8 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionGuard } from '../../common/guards/permission.guard';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { RolesGrpcClient } from './roles-grpc.client';
-import { PermissionResponseDto } from './dto/rest/role.dto';
+import { RolesService } from './roles.service';
+import { PermissionResponseDto } from './dto/rest/role-response.dto';
 import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AUTH_SCHEMES } from '../../common/config/swagger.config';
 import {
@@ -35,7 +35,7 @@ import {
 @Controller('permissions')
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class PermissionsController {
-  constructor(private readonly rolesGrpcClient: RolesGrpcClient) {}
+  constructor(private readonly roles: RolesService) {}
 
   @ApiOperation({
     summary:
@@ -53,6 +53,6 @@ export class PermissionsController {
   list(
     @CurrentUser() context: RequestContext,
   ): Promise<PermissionResponseDto[]> {
-    return this.rolesGrpcClient.listPermissions(context);
+    return this.roles.listPermissions(context);
   }
 }

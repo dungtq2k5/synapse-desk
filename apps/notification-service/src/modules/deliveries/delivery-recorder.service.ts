@@ -8,7 +8,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 
 /**
- * `notification_deliveries` **Telemetry, not a feature.**
+ * `notification_deliveries`. **Telemetry, not a feature.**
  *
  * No HTTP endpoint anywhere: a user seeing `BOUNCED` on their own address
  * cannot act on it, and `provider_message_id` leaks the ESP relationship. This

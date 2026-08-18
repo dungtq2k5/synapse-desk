@@ -9,24 +9,22 @@ import { AuditPublisher } from '../audit/audit-publisher.service';
 import { NotificationPublisher } from '../notifications/notification-publisher.service';
 
 /**
- * Clears locks whose expiry has passed, mechanism 2.
+ * Clears locks whose expiry has passed — the second of two mechanisms.
  *
- * **Why this exists when the login path already unlocks lazily.** The lazy
- * unlock fires only when the user tries to sign in — which for a locked account
- * may be never. Until then they stay *listed* as locked, stay excluded from
- * both notification audiences, and keep counting as inactive for the
- * last-Org-Admin check. This sweep is what makes all of those correct without
- * any of them learning about time, which is the whole reason `is_locked` could
- * stay the one authoritative boolean and this change could touch three call
- * sites instead of 22.
+ * **Why this exists when the login path unlocks lazily.** The lazy unlock fires
+ * only when the user tries to sign in, which for a locked account may be never.
+ * Until then they stay *listed* as locked, excluded from both notification
+ * audiences, and counted as inactive for the last-Org-Admin check. This sweep
+ * makes all of those correct without any of them learning about time.
  *
- * **Why the lazy unlock exists when this sweep already runs.** The sweep is
- * hourly, so alone it leaves up to an hour in which a user whose lock has
- * expired still cannot log in. That is the visible, complaint-generating
- * failure — and the one the user is standing in front of.
+ * **Why the lazy unlock exists when this sweep runs.** The sweep is hourly, so
+ * alone it leaves up to an hour in which a user whose lock expired still cannot
+ * log in — the visible, complaint-generating failure.
  *
- * Each covers the other's gap, and both are two-line operations. At expiry they
- * routinely fire at once, which is why the write is conditional: see `sweep`.
+ * Each covers the other's gap. At expiry they routinely fire at once, which is
+ * why the write is conditional.
+ *
+ * See `docs/decisions/0027-lock-state-is-constrained-not-conventional.md`.
  */
 @Injectable()
 export class ExpiredLockSweep {
@@ -41,7 +39,7 @@ export class ExpiredLockSweep {
   /**
    * Unlocks everyone whose `lockedUntil` has passed.
    *
-   * **A plain method taking `now`, with no `@Cron`** The scheduler
+   * **A plain method taking `now`, with no `@Cron`**. The scheduler
    * calls it; that is what makes it testable without waiting an hour.
    *
    * The scan is on `isLocked: true`, which is why the column carries no index:
@@ -64,7 +62,7 @@ export class ExpiredLockSweep {
       // **Conditional on the row still being locked**, so this and the login
       // path's lazy unlock racing the same user produce ONE unlock and one
       // audit row. At expiry both firing at once is the normal case, not an
-      // edge case test 6.
+      // edge case.
       const { count } = await this.prisma.user.updateMany({
         where: { id: user.id, isLocked: true },
         data: { isLocked: false, lockedUntil: null },

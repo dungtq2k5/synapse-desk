@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { FeedbackGrpcClient } from './feedback-grpc.client';
+import { FeedbackService } from './feedback.service';
 import {
   FeedbackController,
   MessageFeedbackController,
@@ -9,7 +10,7 @@ import {
 @Module({
   imports: [AuthModule],
   controllers: [MessageFeedbackController, FeedbackController],
-  providers: [FeedbackGrpcClient],
-  exports: [FeedbackGrpcClient],
+  providers: [FeedbackGrpcClient, FeedbackService],
+  exports: [FeedbackService],
 })
 export class FeedbackModule {}

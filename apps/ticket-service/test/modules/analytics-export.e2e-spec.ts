@@ -29,7 +29,7 @@ import { StorageReferenceService } from '../../src/modules/storage-client/storag
  *   - **A failed export reports FAILURE rather than an empty file.** An empty
  *     CSV reads as "no data", which is a wrong answer rather than an error.
  */
-describe('§5 The analytics export (e2e)', () => {
+describe('The analytics export (e2e)', () => {
   let fx: E2eFixture;
   let facade: AnalyticsExportFacade;
   let processor: AnalyticsExportProcessor;

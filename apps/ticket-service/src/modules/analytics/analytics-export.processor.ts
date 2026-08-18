@@ -15,7 +15,7 @@ import {
 } from './analytics-export.service';
 
 /**
- * Produces the file
+ * Produces the file.
  *
  * A BullMQ worker rather than a detached promise, and the difference is one
  * property: an export in flight when a replica restarts is RETRIED rather than
@@ -211,7 +211,7 @@ export class AnalyticsExportProcessor extends WorkerHost {
 
     return {
       // Agent IDs, not names. This service has never known a display name (RDM
-      // §1.13), and resolving hundreds of them per export to decorate a file
+      // Resolving hundreds of them per export to decorate a file
       // would put a cross-service read inside a background job for a column
       // nobody joins on.
       header: [

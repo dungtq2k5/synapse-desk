@@ -70,7 +70,7 @@ export function toUserResponse(
     gender: toProtoGender(user.gender),
     lastLoginAt: toProtoTimestamp(user.lastLoginAt),
     isLocked: user.isLocked,
-    // Absent means the lock is INDEFINITE Carried so an admin
+    // Absent means the lock is INDEFINITE. Carried so an admin
     // screen can say "locked until Friday" rather than just "locked".
     lockedUntil: toProtoTimestamp(user.lockedUntil),
     isTwoFactorEnabled: user.isTwoFactorEnabled,

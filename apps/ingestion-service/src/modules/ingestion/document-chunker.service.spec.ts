@@ -5,7 +5,7 @@ import {
   rebalanceSentenceEnds,
 } from './document-chunker.service';
 
-describe('§3 DocumentChunkerService (unit)', () => {
+describe('DocumentChunkerService (unit)', () => {
   const chunker = new DocumentChunkerService();
 
   const page = (markdown: string) => [{ pageNumber: 1, markdown }];
@@ -192,7 +192,7 @@ describe('§3 DocumentChunkerService (unit)', () => {
     });
   });
 
-  describe('the AST edge cases the swap is supposed to buy — 21-doc §3.4', () => {
+  describe('the AST edge cases the swap is supposed to buy', () => {
     it('13. **a heading inside a CODE FENCE does not split**', async () => {
       // `# install` in a shell sample is a comment, not a section. Splitting
       // there tears the sample in half and invents a section named after a
@@ -281,7 +281,7 @@ describe('§3 DocumentChunkerService (unit)', () => {
     });
   });
 
-  describe('§3.5 F2 — the regression the library swap introduced', () => {
+  describe('F2 — the regression the library swap introduced', () => {
     it('17. **a sentence keeps its terminator; no chunk begins with ". "**', async () => {
       // `RecursiveCharacterTextSplitter` splits with a LOOKAHEAD, so a
       // separator lands at the start of the FOLLOWING chunk:

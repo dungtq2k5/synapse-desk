@@ -1,5 +1,5 @@
 /**
- * Does the file's CONTENT match the type the client declared?
+ * @file Does the file's CONTENT match the type the client declared?
  *
  * The presign design puts the bytes on a path the server never carries: the
  * client PUTs straight to Firebase. Everything the server does control — the
@@ -24,16 +24,11 @@
 
 import type { MimeType } from '@synapsedesk/common';
 
-// ASK This `docblock` seems to be invalid
-/**
- * Every content type a storage purpose may declare.
- *
- * `as const` keeps the literals so the signature table below is checked for
- * totality; `satisfies` holds every member to the shared {@link MimeType}
- * vocabulary, so a misspelling is a compile error rather than an upload nobody
- * checks. Add a member here and the matcher below stops compiling until it
- * knows how to recognise it.
- */
+// `as const satisfies` and not a plain annotation: `as const` keeps the
+// literals so `MATCHERS` below is checked for totality, and `satisfies` holds
+// every member to {@link MimeType}. Add one here and `MATCHERS` stops compiling
+// until it knows how to recognise it.
+/** Every content type a storage purpose may declare. */
 export const VALIDATED_MIME_TYPES = [
   'image/png',
   'image/jpeg',
@@ -57,18 +52,14 @@ export const SIGNATURE_SAMPLE_BYTES = 4096;
 const startsWith = (head: Buffer, bytes: readonly number[]): boolean =>
   head.length >= bytes.length && bytes.every((b, i) => head[i] === b);
 
-// ASK This `docblock` seems to be invalid
 /**
- * A text file has no signature, so "is this really text?" is answered the only
- * way it can be: it must not be something else, and it must decode.
+ * Whether the sampled head looks like text.
  *
- * A NUL byte is the discriminator that matters. Every binary format this system
- * accepts carries one within the first few bytes, and no legitimate UTF-8 text
- * file contains one — so this rejects a PNG or a PDF renamed to `.txt` while
- * accepting any real document, in any language.
+ * Text has no signature, so this answers the only way it can: the bytes must
+ * contain no NUL — every binary format here carries one early, no real UTF-8
+ * text does — and must decode as UTF-8.
  *
- * The decode check catches the rest: arbitrary binary that happens to avoid NUL
- * is still overwhelmingly likely to contain an invalid UTF-8 sequence.
+ * @param head - the first {@link SIGNATURE_SAMPLE_BYTES} of the upload
  */
 function looksLikeText(head: Buffer): boolean {
   if (head.includes(0)) return false;

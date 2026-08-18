@@ -1,10 +1,8 @@
-import { createHmac, timingSafeEqual } from 'node:crypto';
-
 /**
  * Constant-time comparison and HMAC verification for webhook signatures.
  *
- * **Here rather than in a service, because the gateway now needs it**
- * §6.1. `safeCompareHex` lived only in `apps/auth-service/src/common/utils/crypto.ts`,
+ * **Here rather than in a service, because the gateway needs it too.**
+ * `safeCompareHex` lived only in `apps/auth-service/src/common/utils/crypto.ts`,
  * which is where Stripe's signature is checked; the inbound-email route
  * verifies at the EDGE, and a gateway cannot import a service's private
  * utility.
@@ -14,6 +12,8 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
  * reliably a non-constant-time compare, because the obvious spelling — `===`,
  * or `Buffer.compare` on unequal lengths — is the wrong one and looks right.
  */
+
+import { createHmac, timingSafeEqual } from 'node:crypto';
 
 /**
  * Constant-time comparison of two hex digests.
@@ -37,9 +37,9 @@ export function safeCompareHex(a: string, b: string): boolean {
 /**
  * Verifies an HMAC-SHA256 signature over the EXACT bytes received.
  *
- * **`payload` must be the raw body, never a re-serialised object**
- * §3.2, and the trap is worth restating at the one place both webhooks reach.
- * A JSON parser deserialises and re-serialises: different key order, different
+ * **`payload` must be the raw body, never a re-serialized object**
+ * and the trap is worth restating at the one place both webhooks reach.
+ * A JSON parser deserializes and re-serializes: different key order, different
  * whitespace, a different digest, and verification fails for every request
  * forever while passing every local test that builds the body itself.
  *

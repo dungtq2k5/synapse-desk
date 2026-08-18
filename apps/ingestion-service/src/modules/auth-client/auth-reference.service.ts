@@ -17,21 +17,16 @@ import { DEFAULT_AI_MODEL_TIER, formatErrorMsg } from '@synapsedesk/common';
 
 /**
  * Validates the ids this service stores but does not own, and reads the one
- * ENTITLEMENT it enforces.
+ * entitlement it enforces.
  *
- * `documents.created_by_id` and `department_documents.department_id` point into
- * `postgres_auth` — a different physical database — so Postgres cannot enforce
- * a foreign key on either. That is the correct shape for service-per-database,
- * and it creates exactly one obligation: check at WRITE time, over gRPC. And
- * never again afterwards: Domain A only soft-deletes, so a reference that
- * resolved once cannot dangle.
- *
- * The entitlement read is the other half. `max_storage_bytes` lives on
- * `organizations` in auth-service; the USED bytes are `SUM(file_size_bytes)`
- * over `documents`, which lives here. Neither service can answer the quota
- * question alone, and this is the cheaper split — one scalar crosses the wire
- * rather than a sum that grows with the corpus.
+ * The quota answer needs both services: `max_storage_bytes` lives on
+ * `organizations` in auth-service, the used bytes are `SUM(file_size_bytes)`
+ * over `documents` here. One scalar crosses the wire, not a growing sum.
  */
+// Checked at WRITE time and never again: `documents.created_by_id` and
+// `department_documents.department_id` point into `postgres_auth`, a different
+// physical database, so no foreign key can enforce them. Domain A only
+// soft-deletes, so a reference that resolved once cannot later dangle.
 @Injectable()
 export class AuthReferenceService implements OnModuleInit {
   private readonly logger = new Logger(AuthReferenceService.name);
@@ -134,7 +129,7 @@ export class AuthReferenceService implements OnModuleInit {
   ): Promise<{ budgetMicros: bigint; billingCycleStart: Date }> {
     try {
       // `GetOrganizationEntitlements`, not `GetCurrentOrganization`
-      // §3.1. The latter ships a tenant's name, slug, allowed email domains
+      // The latter ships a tenant's name, slug, allowed email domains
       // and onboarding state on a call that reads two numbers, and it invites
       // a gate to start depending on a field that has nothing to do with
       // entitlements.
@@ -252,7 +247,7 @@ export class AuthReferenceService implements OnModuleInit {
   }
 
   /**
-   * Tenant timezones for a set of ids
+   * Tenant timezones for a set of ids.
    *
    * Called by the daily rollup jobs, which run across every tenant that had
    * activity rather than on behalf of a caller. Bulk, so one run costs one
@@ -296,7 +291,7 @@ export class AuthReferenceService implements OnModuleInit {
   }
 
   /**
-   * Each tenant's BILLING CYCLE START, in bulk
+   * Each tenant's BILLING CYCLE START, in bulk.
    *
    * **Reconciling against the wrong cycle is worse than not reconciling.**
    * `QuotaCounterService` keys on `quota:{org}:{cycleStartEpoch}`, so a

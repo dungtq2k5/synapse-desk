@@ -2,7 +2,7 @@
  * Genuine file headers, one per allowlisted type.
  *
  * `confirmUpload` reads the first bytes of an uploaded object and checks them
- * against the declared `contentType` (§2.4a), so a test that uploads the string
+ * against the declared `contentType`, so a test that uploads the string
  * `'x'` as `image/png` is now correctly rejected. These are the smallest inputs
  * that are honestly what they claim to be.
  *
@@ -37,7 +37,7 @@ export const TEXT_BYTES = Buffer.from('a plain text attachment\n', 'utf8');
  * Content that is NOT what it will claim to be.
  *
  * A PNG, used in tests that declare `text/plain` — the disguised-payload case
- * §2.4 exists to catch, and the direction that matters: binary hiding behind a
+ * What this exists to catch, and the direction that matters: binary hiding behind a
  * type a human would open without thinking.
  */
 export const DISGUISED_BYTES = PNG_BYTES;

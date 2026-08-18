@@ -44,7 +44,7 @@ export const BUILD_INFO_ENV_KEYS = [
 /**
  * Reads the three, and nothing else.
  *
- * **The exact key set is the contract** test 3. This is the endpoint
+ * **The exact key set is the contract**. This is the endpoint
  * that accretes fields: the Node version, the dependency list and the
  * environment name all look harmless and helpful, and each one turns a support
  * aid into a reconnaissance endpoint on a route that is deliberately public.

@@ -14,38 +14,27 @@ import {
 import { InAppNotificationService } from './in-app-notification.service';
 
 /**
- * `ticket.*` → notifications, the largest piece of Domain E.
+ * `ticket.*` → notifications.
  *
- * **Three rules decide who gets notified, and every handler applies all
- * three.** Each has a failure mode worse than a missing notification:
+ * Three rules decide the audience, and every handler applies all three:
  *
- *   1. **Never notify the actor.** An agent who assigns a ticket to themselves,
- *      or replies to their own thread, must not be told about it. Getting this
- *      wrong makes the feature feel broken on first use — and it is the first
- *      thing anyone tests by hand. Enforced centrally in
+ * 1. **Never notify the actor.** Enforced centrally in
  *      `InAppNotificationService.deliver()` via `actorId`, so a new producer
- *      gets it for free rather than having to remember.
+ * gets it for free.
+ * 2. **`isInternalNote` never reaches the requester.** A disclosure, not a UX
+ * preference. Checked here rather than in the audience, because a note
+ * still notifies the agent side normally.
+ * 3. **Notify a person, not a queue** — except `ticket.escalated`, where the
+ * point is that a human queue must react. `ticket.unassigned` notifies
+ * nobody.
  *
- *   2. **`isInternalNote` never reaches the requester.** Not a UX preference —
- *      a DISCLOSURE. The event carries the flag precisely so this consumer can
- *      check it, and the check is here rather than in the audience because a
- *      note still notifies the agent side normally.
+ * **`ticket.created` produces no notification**: highest volume, lowest
+ * information, and nobody is assigned yet.
  *
- *   3. **Notify a person, not a queue — with one exception.** `ticket.assigned`
- *      notifies the assignee; `ticket.unassigned` notifies nobody, because a
- *      ticket returning to a queue is a dashboard fact and telling a whole
- *      department produces the noise that trains people to ignore the badge.
- *      `ticket.escalated` is the exception: the point there IS that a human
- *      queue must react.
+ * No handler calls back to ticket-service. The event union carries every party
+ * it needs, which is what keeps this fan-out cheap.
  *
- * **`ticket.created` produces no notification at all** — the highest-volume
- * event with the lowest information. Whoever created it knows, and nobody is
- * assigned yet.
- *
- * No handler makes a gRPC call back to ticket-service. The event union carries
- * every party it needs, which is what keeps this fan-out cheap: an RPC per
- * notification on the highest-volume event in the system is the thing that
- * makes people turn notifications off.
+ * See `docs/decisions/0019-notification-grouping-is-unread-scoped.md`.
  */
 @Controller()
 export class TicketNotificationConsumer {
@@ -163,7 +152,7 @@ export class TicketNotificationConsumer {
 
   /**
    * The highest-volume event, and the one that decides whether this feature is
-   * usable
+   * usable.
    *
    * Two things happen here that happen nowhere else:
    *

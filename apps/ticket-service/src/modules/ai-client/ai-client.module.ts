@@ -16,7 +16,7 @@ import { LedgerClientService } from './ledger-client.service';
 
 /**
  * The `rag-service` seam, in its own module so both the message thread
- * (`invokeAi`, §2.5) and the AI Co-Pilot surface (§2.6) share one instance and
+ * (`invokeAi`) and the AI Co-Pilot surface share one instance and
  * one availability check.
  */
 @Module({

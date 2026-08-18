@@ -180,8 +180,8 @@ describe('mapper round-trip sweep (unit)', () => {
     });
 
     it('maps an unknown string to UNSPECIFIED, never to ACTIVE', () => {
-      // `to*` takes a bare string because it usually receives a Prisma VarChar
-      // (§7.3). This is the RESPONSE path, so a column holding something
+      // `to*` takes a bare string because it usually receives a Prisma VarChar.
+      // This is the RESPONSE path, so a column holding something
       // unrecognised must surface as unset rather than as full access.
       expect(toProtoOrgStatus('NOT_A_STATUS')).toBe(
         ProtoOrgStatus.ORG_STATUS_UNSPECIFIED,
@@ -272,7 +272,7 @@ describe('mapper round-trip sweep (unit)', () => {
     });
 
     it('maps an unknown string to UNSPECIFIED, never to a level', () => {
-      // `notifications.priority` is a VarChar defaulting to "NORMAL" (§7.3), so
+      // `notifications.priority` is a VarChar defaulting to "NORMAL", so
       // this receives whatever is in the column. An unrecognised value must
       // surface as unset rather than as a plausible-looking level.
       expect(toProtoNotificationPriority('URGENT')).toBe(
@@ -309,7 +309,7 @@ describe('mapper round-trip sweep (unit)', () => {
 
     it('maps an unknown string to UNSPECIFIED, never to a channel', () => {
       // The `to*` direction takes a bare string because it usually receives a
-      // Prisma VarChar (§7.3). A column holding something unrecognised must
+      // Prisma VarChar. A column holding something unrecognised must
       // surface as unset rather than as a plausible-looking EMAIL.
       expect(toProtoNotificationChannel('CARRIER_PIGEON')).toBe(
         ProtoNotificationChannel.NOTIFICATION_CHANNEL_UNSPECIFIED,

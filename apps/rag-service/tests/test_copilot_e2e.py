@@ -1,4 +1,4 @@
-"""§2.4 and §4.2 — `/knowledge/ask` and the co-pilot's non-drafting surfaces.
+"""`/knowledge/ask` and the co-pilot's non-drafting surfaces.
 
 The behaviour worth pinning here is not the generation — it is what each surface
 does when it CANNOT answer, and what each one does at the cap. Those differ per
@@ -14,14 +14,14 @@ import uuid
 
 import pytest
 
+from rag_service.common.caller_context import CallerContext
 from rag_service.enums import AiGenerationPurpose
 from rag_service.generated.synapsedesk.rag import rag_pb2
-from rag_service.common.caller_context import CallerContext
-from rag_service.generation.parts import attachments_of, prompt_text
 from rag_service.generation.corag import (
     DOC_MISSING_NO_HANDOFF,
     DOC_MISSING_WITH_HANDOFF,
 )
+from rag_service.generation.parts import attachments_of, prompt_text
 from tests.conftest import FakeServicerContext
 from tests.fakes import FakeAbort
 
@@ -36,7 +36,7 @@ def turns(*pairs):
 
 
 class TestAskRefusesWithoutOverPromising:
-    """§2.4 test 4 — the difference between Ask and chat, made mechanical."""
+    """The difference between Ask and chat, made mechanical."""
 
     async def test_DOC_MISSING_offers_NO_handoff_it_cannot_perform(
         self, servicer, tenant_a
@@ -102,7 +102,7 @@ class TestAskRefusesWithoutOverPromising:
 
 
 class TestCitationsResolve:
-    """§4.1 test 2 — a citation that cannot be resolved is not a citation."""
+    """A citation that cannot be resolved is not a citation."""
 
     async def test_a_citation_carries_the_vector_point_id_it_resolves_through(
         self, servicer, seed, tenant_a, generator, pool
@@ -265,7 +265,7 @@ class TestSummarize:
 
 
 class TestTheEscalationAsymmetry:
-    """§4.2 tests 7-8 and doc 15 §3.2 — deliberately NOT uniform.
+    """Deliberately NOT uniform.
 
     At the cap, deflection stops: every question that would have been answered
     by AI now becomes a ticket, so volume spikes 3-5x. The escalation summary is
@@ -298,7 +298,7 @@ class TestTheEscalationAsymmetry:
         )
         assert escalation.summary_text
 
-        with pytest.raises(FakeAbort) as raised:
+        with pytest.raises(FakeAbort) as raised: # NOSONAR
             await servicer.Summarize(
                 rag_pb2.SummaryRequest(
                     ticket_id=TICKET_ID,
@@ -318,7 +318,7 @@ class TestTheEscalationAsymmetry:
         budget_limit["limit_micros"] = 1_000
         await redis_client.set(_quota_key(tenant_a), "1101")
 
-        with pytest.raises(FakeAbort):
+        with pytest.raises(FakeAbort): # NOSONAR
             await servicer.Summarize(
                 rag_pb2.SummaryRequest(
                     ticket_id=TICKET_ID,
@@ -335,7 +335,7 @@ class TestTheEscalationAsymmetry:
         # the CAP, not from knowing where the cap is — granting it on an
         # unreadable counter would make an outage the cheapest way to get free
         # generations.
-        with pytest.raises(FakeAbort):
+        with pytest.raises(FakeAbort): # NOSONAR
             await servicer.Summarize(
                 rag_pb2.SummaryRequest(
                     ticket_id=TICKET_ID,
@@ -416,7 +416,7 @@ class TestClassify:
         """This prompt used plain-text `TITLE:` / `BODY:` delimiters.
 
         `summarize` and `suggest` both wrap their untrusted text; classify
-        interpolated it — the exact pattern 33-doc §4 exists to remove, and a
+        interpolated it — the exact pattern the nonce boundary exists to remove, and a
         body containing its own `BODY:` line could restate the task.
 
         It mattered less while this surface was unguarded AND text-only: the
@@ -711,7 +711,7 @@ class TestClassifyAttachmentBoundary:
     async def test_the_attachment_block_carries_THIS_requests_nonce(
         self, servicer, tenant_a, generator
     ):
-        """37-doc §3's third test, which did not exist when the doc claimed it.
+        """'s third test, which did not exist when the doc claimed it.
 
         The doc listed it as "parameterised with the other builders" — it was
         neither parameterised nor present. `test_boundary.py`'s builders are
@@ -764,7 +764,7 @@ class TestClassifyAttachmentBoundary:
 
 
 class TestSuggestedArticles:
-    """The article sidebar, product §6.3's first third.
+    """The article sidebar.
 
     **Two outputs from two different inputs.** The next steps come from the
     transcript, because what to do next depends on where the conversation got
@@ -846,7 +846,7 @@ class TestSuggestedArticles:
     async def test_1b_the_QUERY_is_the_ticket_subject_not_the_transcript(
         self, servicer, tenant_a, generator, seed
     ):
-        """§3's decision, asserted where it is visible.
+        """'s decision, asserted where it is visible.
 
         A sidebar that churns every time the customer sends a message loses the
         agent the article they were about to open. The transcript must not reach
@@ -875,7 +875,7 @@ class TestSuggestedArticles:
         self, servicer, tenant_a, generator, seed
     ):
         # A new caller of `retrieve()` is exactly where a scope filter gets
-        # passed wrong Retrieval's own isolation is tested against
+        # passed wrong. Retrieval's own isolation is tested against
         # real stores elsewhere; what this adds is that the sidebar goes THROUGH
         # it with the caller's own context rather than around it.
         await seed(tenant_a.organization_id, text="anything")
@@ -988,7 +988,7 @@ class TestSuggestedArticles:
     async def test_6_ONE_generation_call_plus_the_embedding_it_retrieves_with(
         self, servicer, tenant_a, generator, seed, ledger
     ):
-        """§3's "free" claim, stated precisely.
+        """'s "free" claim, stated precisely.
 
         **Two ledger rows is the CORRECT answer, not one.** `retrieve()` books
         its own `EMBEDDING` row — it embeds the query — so a test asserting "one
@@ -1013,7 +1013,7 @@ class TestSuggestedArticles:
     async def test_7_the_whole_call_is_REFUSED_at_the_cap(
         self, servicer, tenant_a, generator, seed, at_cap
     ):
-        """**39-doc §3.2 is right about retrieval and wrong about this
+        """**Right about retrieval and wrong about this
         endpoint.**
 
         `retrieve()` genuinely degrades at the cap — the lexical arm needs no
@@ -1035,7 +1035,7 @@ class TestSuggestedArticles:
             title="Runbook",
         )
 
-        with pytest.raises(FakeAbort) as raised:
+        with pytest.raises(FakeAbort) as raised: # NOSONAR
             await self._suggest(
                 servicer,
                 tenant_a.outsider(),

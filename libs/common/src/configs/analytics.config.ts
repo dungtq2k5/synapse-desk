@@ -289,8 +289,8 @@ export const ANALYTICS_GRANULARITIES = Object.values(AnalyticsGranularity);
  *
  * Not a paranoid limit: a five-year range over daily rows is 1,825 buckets per
  * department, which is a response no dashboard renders and a query that holds a
- * connection while it serialises. Multi-year ranges are the warehouse's job
- *.
+ * connection while it serializes. Multi-year ranges are the warehouse's job.
+ *
  */
 export const MAX_ANALYTICS_RANGE_DAYS = 400;
 

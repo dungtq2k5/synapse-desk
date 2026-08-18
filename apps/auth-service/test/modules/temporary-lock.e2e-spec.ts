@@ -22,7 +22,7 @@ import { SchedulerProcessor } from '../../src/modules/scheduler/scheduler.proces
 import { DatabaseSeeder } from '../../src/modules/prisma/database.seeder';
 
 /**
- * **Temporary locks**
+ * **Temporary locks**.
  *
  * The design under test is the one that kept this feature to three call sites
  * instead of 22: `is_locked` stays the single authoritative boolean that every
@@ -35,7 +35,7 @@ import { DatabaseSeeder } from '../../src/modules/prisma/database.seeder';
  * 22 chances to get a boolean wrong in code where wrong means either a locked
  * user logs in or an unlocked one cannot.
  */
-describe('§2 Temporary locks (e2e)', () => {
+describe('Temporary locks (e2e)', () => {
   let fx: E2eFixture;
   let auth: AuthService;
   let users: UsersService;
@@ -251,7 +251,7 @@ describe('§2 Temporary locks (e2e)', () => {
       const before = await users.listUsersByIds({
         organizationId: tenant.org.id,
         userIds: [member.id],
-        // The NOTIFICATION caller, unchanged test 4. `false` here
+        // The NOTIFICATION caller, unchanged. `false` here
         // is what keeps "a notification to a deactivated account is a row
         // nobody reads" true after the flag was added for the loader.
         includeInactive: false,
@@ -448,7 +448,7 @@ describe('§2 Temporary locks (e2e)', () => {
    * for the write that FORGETS to — and every one of those would otherwise
    * produce a row that looks perfectly fine.
    */
-  describe('§2.2b the state matrix', () => {
+  describe('B the state matrix', () => {
     /** Writes the pair directly, bypassing every service that maintains it. */
     const writePair = (
       id: string,

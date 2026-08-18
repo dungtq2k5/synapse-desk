@@ -45,7 +45,7 @@ describe('e2e bootstrap (ticket-service)', () => {
   });
 
   it('applies the partial unique index that schema.prisma cannot express', async () => {
-    // Without it, the concurrent-reassign test in §2.4 passes for the wrong
+    // Without it, the concurrent-reassign test passes for the wrong
     // reason: the service-layer transaction alone cannot stop two callers both
     // reading "no current assignment" and both inserting one.
     const indexes = await fx.prisma.$queryRaw<{ indexname: string }[]>`
@@ -180,7 +180,7 @@ describe('e2e bootstrap (ticket-service)', () => {
 });
 
 /**
- * The hybrid-app claim from §1.2, proven rather than asserted in a comment.
+ * The hybrid-app claim, proven rather than asserted in a comment.
  *
  * Separate `describe` because it boots its OWN application with both transports
  * actually bound — the shared fixture deliberately does not, since almost no
@@ -259,7 +259,7 @@ describe('2. ticket-service boots as a hybrid app (e2e)', () => {
 
     // A real channel, actually connected — `waitForReady` fails if nothing is
     // listening, which is the assertion. No RPC is called: there are no
-    // handlers registered yet (that is §2.3 onward), and this test is about the
+    // handlers registered yet (those come later), and this test is about the
     // TRANSPORT accepting a connection.
     const ctor = ticketPackage.TicketService as ServiceClientConstructor;
     const client = new ctor(url, credentials.createInsecure());
@@ -274,7 +274,7 @@ describe('2. ticket-service boots as a hybrid app (e2e)', () => {
   }, 15_000);
 
   it('the NATS transport is connected and accepts a publish', async () => {
-    // The consumer side has no handler yet either (§2.2 adds AuditConsumer), so
+    // The consumer side has no handler yet either (AuditConsumer comes later), so
     // what is provable here is that the second transport came up alongside the
     // first — the specific thing `createMicroservice` alone could never do.
     expect(nats.isClosed()).toBe(false);

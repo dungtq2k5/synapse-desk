@@ -118,7 +118,7 @@ def build_refine_prompt(
     The sources are repeated rather than assumed remembered: each pass is an
     independent call with no shared state, so a refine prompt without them is a
     request to improve a text from general knowledge — which is precisely the
-    behaviour §1.6 forbids, arriving through the quality mechanism.
+    behaviour the grounding rule forbids, arriving through the quality mechanism.
     """
     sources = "\n\n".join(
         f"[{index + 1}] {chunk.content_text}" for index, chunk in enumerate(chunks)

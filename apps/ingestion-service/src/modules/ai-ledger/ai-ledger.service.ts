@@ -42,20 +42,21 @@ export type AiGenerationEntry = {
 /**
  * Every LLM and embedding call goes through this. There is no other write path.
  *
- * The interface is three methods and the split between them is the whole
- * design (RDM §1.14):
+ * Three methods, and the split between them is the design (RDM §1.14):
  *
  *   - **`checkBudget`** reads Redis, never `SUM()`. The sum is the DEFINITION
  *     of spend and a growing scan on the hot path.
- *   - **`charge`** is SYNCHRONOUS and awaited. One INCRBY, sub-millisecond, on
- *     the hot path deliberately — it is the only thing standing between a burst
- *     of concurrent requests and all of them passing a stale gate.
+ *   - **`charge`** is SYNCHRONOUS and awaited. One INCRBY, sub-millisecond,
+ *     deliberately on the hot path — the only thing between a burst of
+ *     concurrent requests and all of them passing a stale gate.
  *   - **`record`** is fire-and-forget and NON-THROWING. The generation already
- *     happened and already cost money; failing the request because bookkeeping
- *     failed loses the work AND the money. Reconciliation fixes the drift.
+ *     cost money; failing the request because bookkeeping failed loses the work
+ *     AND the money. Reconciliation fixes the drift.
  *
- * Merging charge into record — the obvious one-call interface — reopens exactly
- * the hole the counter exists to close, by making the increment asynchronous.
+ * Merging charge into record reopens the exact hole the counter closes, by
+ * making the increment asynchronous.
+ *
+ * See `docs/decisions/0005-meter-cost-not-tokens.md`.
  */
 @Injectable()
 export class AiLedgerService {

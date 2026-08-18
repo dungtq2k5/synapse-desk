@@ -32,7 +32,7 @@ class RagServiceStub:
     @_typing.overload
     def __new__(cls, channel: _aio.Channel) -> RagServiceAsyncStub: ...
     Search: _grpc.UnaryUnaryMultiCallable[_rag_pb2.SearchRequest, _rag_pb2.SearchResponse]
-    """Retrieval with NO generation — the test seam (13-doc §2.3). It exists
+    """Retrieval with NO generation — the test seam. It exists
     before anything calls an LLM because it is the only point where isolation
     and relevance can be proven cheaply and deterministically; once generation
     is layered on, those tests become slow, non-deterministic and skipped.
@@ -43,7 +43,7 @@ class RagServiceStub:
     Self-RAG cannot stream, structurally: it generates N candidates, judges
     them, then picks a winner, and you cannot stream an answer you have not
     chosen. Co-RAG's Mode A draft is a single generation, streamable from the
-    first token (11-doc §1.1).
+    first token.
     """
     Ask: _grpc.UnaryUnaryMultiCallable[_rag_pb2.ChatRequest, _rag_pb2.ChatResponse]
     """One-shot Q&A with no conversation to escalate into. `DOC_MISSING` here
@@ -62,7 +62,7 @@ class RagServiceStub:
 class RagServiceAsyncStub(RagServiceStub):
     def __init__(self, channel: _aio.Channel) -> None: ...
     Search: _aio.UnaryUnaryMultiCallable[_rag_pb2.SearchRequest, _rag_pb2.SearchResponse]  # type: ignore[assignment]
-    """Retrieval with NO generation — the test seam (13-doc §2.3). It exists
+    """Retrieval with NO generation — the test seam. It exists
     before anything calls an LLM because it is the only point where isolation
     and relevance can be proven cheaply and deterministically; once generation
     is layered on, those tests become slow, non-deterministic and skipped.
@@ -73,7 +73,7 @@ class RagServiceAsyncStub(RagServiceStub):
     Self-RAG cannot stream, structurally: it generates N candidates, judges
     them, then picks a winner, and you cannot stream an answer you have not
     chosen. Co-RAG's Mode A draft is a single generation, streamable from the
-    first token (11-doc §1.1).
+    first token.
     """
     Ask: _aio.UnaryUnaryMultiCallable[_rag_pb2.ChatRequest, _rag_pb2.ChatResponse]  # type: ignore[assignment]
     """One-shot Q&A with no conversation to escalate into. `DOC_MISSING` here
@@ -95,7 +95,7 @@ class RagServiceServicer(metaclass=_abc_1.ABCMeta):
         request: _rag_pb2.SearchRequest,
         context: _ServicerContext,
     ) -> _typing.Union[_rag_pb2.SearchResponse, _abc.Awaitable[_rag_pb2.SearchResponse]]:
-        """Retrieval with NO generation — the test seam (13-doc §2.3). It exists
+        """Retrieval with NO generation — the test seam. It exists
         before anything calls an LLM because it is the only point where isolation
         and relevance can be proven cheaply and deterministically; once generation
         is layered on, those tests become slow, non-deterministic and skipped.
@@ -112,7 +112,7 @@ class RagServiceServicer(metaclass=_abc_1.ABCMeta):
         Self-RAG cannot stream, structurally: it generates N candidates, judges
         them, then picks a winner, and you cannot stream an answer you have not
         chosen. Co-RAG's Mode A draft is a single generation, streamable from the
-        first token (11-doc §1.1).
+        first token.
         """
 
     @_abc_1.abstractmethod

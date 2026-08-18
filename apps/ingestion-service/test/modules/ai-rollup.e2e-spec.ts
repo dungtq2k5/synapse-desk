@@ -19,7 +19,7 @@ import { AuthReferenceService } from '../../src/modules/auth-client/auth-referen
  * makes test 14, the under-reporting one, the most consequential test in the
  * file even though it looks like bookkeeping.
  */
-describe('§2.2 The AI generation rollup (e2e)', () => {
+describe('The AI generation rollup (e2e)', () => {
   let fx: E2eFixture;
   let rollup: AiGenerationRollupJob;
   let listOrganizationTimezones: jest.SpyInstance;
@@ -210,8 +210,8 @@ describe('§2.2 The AI generation rollup (e2e)', () => {
     });
 
     it('9. Counts every draft OUTCOME, including DISCARDED', async () => {
-      // The denominator's third term, and the one that depends on the sweep
-      //. Without it acceptance divides by drafts that were USED
+      // The denominator's third term, and the one that depends on the sweep.
+      // Without it acceptance divides by drafts that were USED
       // and reports ~100% regardless of quality.
       await generation({
         purpose: AiGenerationPurpose.DRAFT,

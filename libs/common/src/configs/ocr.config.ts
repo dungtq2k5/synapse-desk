@@ -1,5 +1,5 @@
 /**
- * Engine tuning for scanned-page OCR
+ * Engine tuning for scanned-page OCR.
  *
  * Read by the ingestion worker only; none of it reaches the API. The OCR values
  * that ARE API contract — `OCR_LANGUAGES`, `TESSERACT_CODE_BY_LANGUAGE`,
@@ -8,7 +8,7 @@
 
 /**
  * Below this many extracted characters, a PDF page is treated as an image and
- * sent to OCR
+ * sent to OCR.
  *
  * Deliberately biased to over-OCR: re-reading a sparse but genuine page costs
  * one page of CPU, while missing an image page loses it from the corpus.
@@ -16,7 +16,7 @@
 // No character floor can fully separate the two populations — a scanner stamp
 // ("Scanned by CamScanner", 21 chars) and a real title page ("Employee Handbook
 // 2026", 22 chars) are the same size. Pages this misses are caught instead by
-// §6's post-chunking page check. Ending the guessing needs a stronger signal —
+// The post-chunking page check. Ending the guessing needs a stronger signal —
 // asking pdf.js whether a full-page image covers the page — not a new number.
 export const MIN_PAGE_CHARACTERS = 32;
 
@@ -41,7 +41,7 @@ export const OCR_STAGE_TIMEOUT_MS = 30_000;
 /**
  * How many pages of one document may be OCR'd.
  *
- * Pages past the cap are reported by the same §6 check that reports an OCR
+ * Pages past the cap are reported by the same page check that reports an OCR
  * failure, not silently dropped.
  */
 // This is what bounds worker occupancy: 50 pages x 2 stages x

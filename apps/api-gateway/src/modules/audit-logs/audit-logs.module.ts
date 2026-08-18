@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { AuditLogsGrpcClient } from './audit-logs-grpc.client';
+import { AuditLogsService } from './audit-logs.service';
 import {
   AuditLogsController,
   PlatformAuditLogsController,
@@ -9,7 +10,7 @@ import {
 @Module({
   imports: [AuthModule],
   controllers: [AuditLogsController, PlatformAuditLogsController],
-  providers: [AuditLogsGrpcClient],
-  exports: [AuditLogsGrpcClient],
+  providers: [AuditLogsGrpcClient, AuditLogsService],
+  exports: [AuditLogsService],
 })
 export class AuditLogsModule {}

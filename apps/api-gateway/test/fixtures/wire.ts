@@ -1,3 +1,15 @@
+/**
+ * WIRE-shaped fixtures — what auth-service would actually put on the gRPC
+ * connection, not what the REST response looks like.
+ *
+ * These exist because the gateway's mappers are strict on purpose:
+ * `requireProtoTimestamp` throws on a missing `createdAt` rather than substituting a
+ * date, so a hand-written stub like `{ id, email, fullName }` produces a 500
+ * instead of the 200 the test expects — and the failure points at the mapper,
+ * not at the fixture that caused it. Building the shapes once, correctly, is
+ * what keeps every e2e assertion about the route rather than about the stub.
+ */
+
 import { faker } from '@faker-js/faker';
 import {
   AssignmentResponse,
@@ -17,18 +29,6 @@ import {
   UserSummaryResponse,
   MessageAnswerStatus,
 } from '@synapsedesk/grpc-proto';
-
-/**
- * WIRE-shaped fixtures — what auth-service would actually put on the gRPC
- * connection, not what the REST response looks like.
- *
- * These exist because the gateway's mappers are strict on purpose:
- * `requireProtoTimestamp` throws on a missing `createdAt` rather than substituting a
- * date, so a hand-written stub like `{ id, email, fullName }` produces a 500
- * instead of the 200 the test expects — and the failure points at the mapper,
- * not at the fixture that caused it. Building the shapes once, correctly, is
- * what keeps every e2e assertion about the route rather than about the stub.
- */
 
 /** protobuf's Timestamp: seconds + nanos, never a JS Date. */
 export function timestamp(date: Date = new Date()): ProtoTimestamp {
@@ -284,7 +284,7 @@ export function wireMessage(
 }
 
 /**
- * What `CreateMessage` puts on the wire
+ * What `CreateMessage` puts on the wire.
  *
  * A wrapper because a create has a second outcome: an attachment whose confirm
  * failed is named and the message is written anyway. `skippedAttachments`

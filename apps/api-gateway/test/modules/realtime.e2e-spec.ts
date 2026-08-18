@@ -230,7 +230,7 @@ describe('the real-time relay (e2e)', () => {
     });
 
     it('REFUSES a caller who is neither author, assignee, nor read-all', async () => {
-      // The re-authorization §1.6 calls non-optional. A room name is a
+      // The re-authorization that is non-optional. A room name is a
       // guessable UUID-keyed string, so joining one cannot be the permission
       // check.
       const socket = await fx.connectClient({
@@ -326,7 +326,7 @@ describe('the real-time relay (e2e)', () => {
    * customer with the page open saw the agent-only note appear, and the same
    * customer after a refresh did not.
    */
-  describe('§1 internal notes never reach the requester', () => {
+  describe('Internal notes never reach the requester', () => {
     const internalNote = () => ({ ...messageEvent(), isInternalNote: true });
 
     /** A socket joined as the ticket's author — a customer, no permissions. */
@@ -402,8 +402,8 @@ describe('the real-time relay (e2e)', () => {
     it('4. losing `ticket.read.all` lands on RE-JOIN, not immediately', async () => {
       // Documents the boundary honestly rather than implying live revocation.
       // Room membership is authorized at join, so a socket that joined as an
-      // agent keeps receiving until it re-joins — which is what §6.3 states and
-      // what §8 defers.
+      // agent keeps receiving until it re-joins — which is the stated boundary, and
+      // what is deferred.
       //
       // The second socket is the "after re-join" case: same user, a token
       // without the permission, so it never enters the internal room.
@@ -438,7 +438,7 @@ describe('the real-time relay (e2e)', () => {
    * layer owns: the write predicate, the ack, and the idempotency the transport
    * itself creates.
    */
-  describe('§2 message:send', () => {
+  describe('Message:send', () => {
     const messageId = faker.string.uuid();
 
     const sendFrom = async (
@@ -466,7 +466,7 @@ describe('the real-time relay (e2e)', () => {
     });
 
     it('1. reaches the SAME RPC the HTTP controller calls', async () => {
-      // The whole design of §2.1. Asserting the RPC — rather than a row — is
+      // The whole design of the transport. Asserting the RPC — rather than a row — is
       // what proves there is no second write path: every downstream behaviour
       // (the two-write invokeAi path, `ticket.message_created`, the audit row,
       // the notification producer) follows from this call being the same one.
@@ -483,7 +483,7 @@ describe('the real-time relay (e2e)', () => {
     });
 
     it('2. the sender receives EXACTLY ONE message:new', async () => {
-      // The double-delivery trap in §2.1: emitting from the handler "for
+      // The double-delivery trap: emitting from the handler "for
       // latency" as well as from the NATS consumer delivers twice to the room,
       // including to the sender's own socket.
       const author = await fx.connectClient({ sub: authorId, organizationId });
@@ -506,7 +506,7 @@ describe('the real-time relay (e2e)', () => {
     });
 
     it('3. **a `ticket.read.all` holder who is neither author nor assignee is DENIED**', async () => {
-      // §2.2's first row, and the one a read-predicate reuse gets wrong. Read-all
+      // The first row of the matrix, and the one a read-predicate reuse gets wrong. Read-all
       // is an oversight permission, not a licence to reply as the support
       // organisation — and the failure is silent: the message posts, attributed
       // to someone who never took the ticket.
@@ -629,7 +629,7 @@ describe('the real-time relay (e2e)', () => {
    * Whether a cancelled generation writes its CANCELLED ledger row is
    * rag-service's half and is tested there.
    */
-  describe('§5 AI streaming', () => {
+  describe('AI streaming', () => {
     const aiMessageId = faker.string.uuid();
 
     /** The envelope every server->client frame in this gateway uses. */
@@ -717,7 +717,7 @@ describe('the real-time relay (e2e)', () => {
       );
       // The transcript read the relay performs before opening the stream.
       fx.stubs.message.listMessages.mockReturnValue(of(wirePage([])));
-      // The attachment read, which ticket-service answers Empty by
+      // The attachment read, which ticket-service answers. Empty by
       // default because that is the common question.
       fx.stubs.message.getAiAttachments.mockReturnValue(
         of({ parts: [], skipped: [] }),
@@ -784,9 +784,9 @@ describe('the real-time relay (e2e)', () => {
       expect((persisted as { content: string }).content).toBe(streamed);
     });
 
-    it('**a refused message is left OUT of the transcript** — §7', async () => {
+    it('**a refused message is left OUT of the transcript**', async () => {
       // The filter is here rather than in ticket-service's `where` clause, and
-      // §7.1 is why: the same route serves the UI, where this row must stay
+      // That is why: the same route serves the UI, where this row must stay
       // visible. So the gateway drops rows its caller is entitled to see — the
       // opposite of the `isInternalNote` rule, which the next reader will
       // otherwise "fix" this into.
@@ -824,7 +824,7 @@ describe('the real-time relay (e2e)', () => {
       ]);
     });
 
-    it('**a REFUSED completion marks the message that was asked** — §7', async () => {
+    it('**a REFUSED completion marks the message that was asked**', async () => {
       // The gateway holds this id, so the gateway sets the flag. Without it the
       // refused question stays in the transcript and every later turn in this
       // conversation re-sends it to the model.
@@ -871,7 +871,7 @@ describe('the real-time relay (e2e)', () => {
       expect(fx.stubs.message.excludeFromAiContext).not.toHaveBeenCalled();
     });
 
-    it('**the screenshot reaches `chat()`** — the third call site, §2', async () => {
+    it('**the screenshot reaches `chat()`** — the third call site', async () => {
       // Chat is the surface this is about: a customer attaches an error
       // screenshot and asks what it means. Reaching generation without the
       // bytes produces an answer about the sentence alone.
@@ -930,7 +930,7 @@ describe('the real-time relay (e2e)', () => {
       await done;
     });
 
-    it('3. **chunks reach ONLY the requesting socket** — §5.1', async () => {
+    it('3. **chunks reach ONLY the requesting socket**', async () => {
       // The room gets the message; the socket gets the stream. An agent
       // watching the thread has no use for another user's answer assembling
       // itself, and the finished message reaches them by the path that already
@@ -954,7 +954,7 @@ describe('the real-time relay (e2e)', () => {
     });
 
     it('4. **cancel UNSUBSCRIBES the gRPC call** rather than muting the socket', async () => {
-      // The distinction is the whole point of §5.2. Unsubscribing is what Nest
+      // The distinction is the whole point of the backpressure cap. Unsubscribing is what Nest
       // turns into `call.cancel()`, which reaches rag-service as a real
       // CANCELLED status and triggers the shielded ledger write there. A
       // socket-side `return` that merely stopped emitting would leave the
@@ -1121,13 +1121,13 @@ describe('the real-time relay (e2e)', () => {
   /**
    * Edits, redactions, and Domain C's announcements.
    *
-   * Two of these are disclosure tests wearing different clothes. §1 established
-   * that a message-shaped frame picks its room from `isInternalNote`; §6.1's job
+   * Two of these are disclosure tests wearing different clothes. The internal-note fix established
+   * that a message-shaped frame picks its room from `isInternalNote`; the edit path's job
    * is to prove the two later events INHERIT that rather than re-deriving it.
-   * §6.2 is the same shape one domain over: a department boundary that the
+   * This is the same shape one domain over: a department boundary that the
    * obvious room choice would walk straight through.
    */
-  describe('§6.1 edits and redactions', () => {
+  describe('Edits and redactions', () => {
     const messageId = faker.string.uuid();
 
     const editEvent = (
@@ -1170,7 +1170,7 @@ describe('the real-time relay (e2e)', () => {
     };
 
     it('1. an INTERNAL edit reaches an agent and NOT the requester', async () => {
-      // §1's fix, inherited. The requester is in `ticket:{id}` — they are its
+      // The internal-note fix, inherited. The requester is in `ticket:{id}` — they are its
       // author — so an edit routed to that room alone would deliver the new
       // text of an agent-only note to the customer.
       const agent = await joined(agentId, ['ticket.read.all']);
@@ -1232,7 +1232,7 @@ describe('the real-time relay (e2e)', () => {
     });
   });
 
-  describe('§6.2 document:indexed and the dept: rooms', () => {
+  describe('Document:indexed and the dept: rooms', () => {
     const documentId = faker.string.uuid();
     const departmentId = faker.string.uuid();
     const uploaderId = faker.string.uuid();
@@ -1380,7 +1380,7 @@ describe('the real-time relay (e2e)', () => {
    * case, the crashed-pod case and the two-instance case are exactly the three
    * things process memory cannot express.
    */
-  describe('§4 presence', () => {
+  describe('Presence', () => {
     const presenceUser = faker.string.uuid();
 
     const presenceOf = (organization: string, user: string) =>
@@ -1535,7 +1535,7 @@ describe('the real-time relay (e2e)', () => {
     }, 40_000);
   });
 
-  describe('§3 typing', () => {
+  describe('Typing', () => {
     const joined = async (sub: string) => {
       const socket = await fx.connectClient({ sub, organizationId });
       socket.emit(CLIENT_EVENTS.ticketJoin, ticketId);
@@ -1946,7 +1946,7 @@ describe('the real-time relay (e2e)', () => {
     it('is installed — events go through pub/sub, not the in-memory adapter', () => {
       // Asserted structurally: with the in-memory adapter a second replica
       // would never see this room, and that failure is invisible to a
-      // single-instance test. §2.2 test 7 (two instances, one Redis) is the
+      // single-instance test. The two-instance test (one Redis) is the
       // behavioural proof and is deliberately kept out of the default run.
       const server = (
         fx.app as unknown as {

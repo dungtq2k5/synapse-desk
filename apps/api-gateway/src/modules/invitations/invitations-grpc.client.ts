@@ -2,37 +2,21 @@ import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { ClientGrpc } from '@nestjs/microservices';
 import {
   AUTH_GRPC_CLIENT,
-  fromProtoTimestamp,
   INVITATION_SERVICE_NAME,
   InvitationServiceClient,
-  toPageRequest,
-  toProtoInvitationStatus,
+  AcceptInvitationRequest,
+  AcceptInvitationResponse,
+  CreateInvitationsRequest,
+  CreateInvitationsResponse,
+  InvitationResponse,
+  ListInvitationsRequest,
+  ListInvitationsResponse,
+  PreviewInvitationResponse,
+  PreviewInvitationsRequest,
+  PreviewInvitationsResponse,
 } from '@synapsedesk/grpc-proto';
 import { RequestContext, RequestOrigin } from '@synapsedesk/common';
-import { toInvitationResponseDto } from './invitation.mapper';
 import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
-import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
-import { toPaginationMetaDataResponseDto } from '../../common/mappers/pagination.mapper';
-import { toUserResponseDto } from '../users/user.mapper';
-import { UserResponseDto } from '../users/dto/rest/user-response.dto';
-import {
-  AcceptInvitationDto,
-  CreateInvitationsDto,
-  CreateInvitationsResponseDto,
-  InvitationResponseDto,
-  ListInvitationsQueryDto,
-  PreviewInvitationResponseDto,
-  PreviewInvitationsDto,
-  PreviewInvitationsResponseDto,
-} from './dto/rest/invitation.dto';
-
-/** Accepting signs the invitee in, so the controller needs the raw tokens. */
-export type AcceptInvitationResult = {
-  user: UserResponseDto;
-  accessToken: string;
-  refreshToken: string;
-  skipped: string[];
-};
 
 @Injectable()
 export class InvitationsGrpcClient
@@ -52,70 +36,35 @@ export class InvitationsGrpcClient
       this.client.getService<InvitationServiceClient>(INVITATION_SERVICE_NAME);
   }
 
-  async create(
-    organizationId: string,
-    invitedById: string,
-    dto: CreateInvitationsDto,
+  create(
+    request: CreateInvitationsRequest,
     origin: RequestOrigin,
-  ): Promise<CreateInvitationsResponseDto> {
-    const response = await this.call(
+  ): Promise<CreateInvitationsResponse> {
+    return this.call(
       (metadata) =>
-        this.invitationGrpcService.createInvitations(
-          {
-            organizationId,
-            invitedById,
-            invitations: dto.invitations.map((invitation) => ({
-              email: invitation.email,
-              roleIds: invitation.roleIds ?? [],
-              departmentIds: invitation.departmentIds ?? [],
-              primaryDepartmentId: invitation.primaryDepartmentId,
-            })),
-          },
-          metadata,
-        ),
+        this.invitationGrpcService.createInvitations(request, metadata),
       origin,
     );
-
-    return {
-      created: response.created.map(toInvitationResponseDto),
-      failed: response.failed,
-      batchId: response.batchId ?? null,
-    };
   }
 
-  async list(
-    organizationId: string,
-    query: ListInvitationsQueryDto,
-    origin: RequestOrigin,
-  ): Promise<PaginationResponseDto<InvitationResponseDto>> {
-    const response = await this.call(
+  list(
+    request: ListInvitationsRequest,
+    context: RequestOrigin,
+  ): Promise<ListInvitationsResponse> {
+    return this.call(
       (metadata) =>
-        this.invitationGrpcService.listInvitations(
-          {
-            organizationId,
-            status: query.status
-              ? toProtoInvitationStatus(query.status)
-              : undefined,
-            page: toPageRequest(query),
-          },
-          metadata,
-        ),
-      origin,
+        this.invitationGrpcService.listInvitations(request, metadata),
+      context,
     );
-
-    return {
-      items: response.items.map(toInvitationResponseDto),
-      meta: toPaginationMetaDataResponseDto(response.meta),
-    };
   }
 
-  async resend(
+  resend(
     organizationId: string,
     invitationId: string,
     actorId: string,
     origin: RequestOrigin,
-  ): Promise<InvitationResponseDto> {
-    const response = await this.call(
+  ): Promise<InvitationResponse> {
+    return this.call(
       (metadata) =>
         this.invitationGrpcService.resendInvitation(
           { organizationId, invitationId, actorId },
@@ -123,8 +72,6 @@ export class InvitationsGrpcClient
         ),
       origin,
     );
-
-    return toInvitationResponseDto(response);
   }
 
   async revoke(
@@ -143,101 +90,51 @@ export class InvitationsGrpcClient
     );
   }
 
-  async previewByToken(
+  previewByToken(
     token: string,
     origin: RequestOrigin,
-  ): Promise<PreviewInvitationResponseDto> {
-    const response = await this.call(
+  ): Promise<PreviewInvitationResponse> {
+    return this.call(
       (metadata) =>
         this.invitationGrpcService.previewInvitation({ token }, metadata),
       origin,
     );
-
-    return {
-      valid: response.valid,
-      organizationName: response.organizationName ?? null,
-      inviterName: response.inviterName ?? null,
-      email: response.email ?? null,
-      roleNames: response.roleNames,
-      expiresAt: fromProtoTimestamp(response.expiresAt) ?? null,
-    };
   }
 
-  async accept(
-    dto: AcceptInvitationDto,
+  accept(
+    request: AcceptInvitationRequest,
     origin: RequestOrigin,
-  ): Promise<AcceptInvitationResult> {
-    const response = await this.call(
+  ): Promise<AcceptInvitationResponse> {
+    return this.call(
       (metadata) =>
-        this.invitationGrpcService.acceptInvitation(
-          {
-            token: dto.token,
-            fullName: dto.fullName,
-            password: dto.password,
-            deviceName: dto.deviceName,
-          },
-          metadata,
-        ),
+        this.invitationGrpcService.acceptInvitation(request, metadata),
       origin,
     );
-
-    return {
-      user: toUserResponseDto(response.user!),
-      accessToken: response.accessToken,
-      refreshToken: response.refreshToken,
-      skipped: response.skipped,
-    };
   }
-  async previewBatch(
-    organizationId: string,
-    dto: PreviewInvitationsDto,
+
+  previewBatch(
+    request: PreviewInvitationsRequest,
     context: RequestContext,
-  ): Promise<PreviewInvitationsResponseDto> {
-    const response = await this.call(
+  ): Promise<PreviewInvitationsResponse> {
+    return this.call(
       (metadata) =>
-        this.invitationGrpcService.previewInvitations(
-          {
-            organizationId,
-            invitations: dto.invitations.map((invitation) => ({
-              email: invitation.email,
-              roleIds: invitation.roleIds ?? [],
-              departmentIds: invitation.departmentIds ?? [],
-              primaryDepartmentId: invitation.primaryDepartmentId,
-            })),
-          },
-          metadata,
-        ),
+        this.invitationGrpcService.previewInvitations(request, metadata),
       context,
     );
-
-    return {
-      rows: response.rows.map((row) => ({
-        email: row.email,
-        ok: row.ok,
-        reason: row.reason ?? null,
-        unknownRoleIds: row.unknownRoleIds,
-        unknownDepartmentIds: row.unknownDepartmentIds,
-      })),
-      seatsInUse: response.seatsInUse,
-      maxAgentSeats: response.maxAgentSeats,
-      seatOverrun: response.seatOverrun,
-    };
   }
 
-  async get(
+  get(
     organizationId: string,
     invitationId: string,
     context: RequestContext,
-  ): Promise<InvitationResponseDto> {
-    return toInvitationResponseDto(
-      await this.call(
-        (metadata) =>
-          this.invitationGrpcService.getInvitation(
-            { organizationId, invitationId },
-            metadata,
-          ),
-        context,
-      ),
+  ): Promise<InvitationResponse> {
+    return this.call(
+      (metadata) =>
+        this.invitationGrpcService.getInvitation(
+          { organizationId, invitationId },
+          metadata,
+        ),
+      context,
     );
   }
 }

@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { OtpController } from './otp.controller';
 import { OtpGrpcClient } from './otp-grpc.client';
+import { OtpService } from './otp.service';
 
 /**
  * Imports AuthModule for the gRPC client provider (AUTH_GRPC_CLIENT) and
@@ -11,6 +12,6 @@ import { OtpGrpcClient } from './otp-grpc.client';
 @Module({
   imports: [AuthModule],
   controllers: [OtpController],
-  providers: [OtpGrpcClient],
+  providers: [OtpGrpcClient, OtpService],
 })
 export class OtpModule {}

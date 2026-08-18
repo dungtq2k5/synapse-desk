@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Writes the Prometheus staleness rules from `SCHEDULED_JOBS`
+ * Writes the Prometheus staleness rules from `SCHEDULED_JOBS`.
  *
  * **Generated, not hand-written.** The scheduler work's entire subject was seven jobs that
  * existed and were never invoked, and the failure that kept it invisible was

@@ -13,7 +13,7 @@ import { PrismaService } from './prisma.service';
  *
  * Both are idempotent (`IF NOT EXISTS`), so running on every boot is safe and
  * running twice concurrently across replicas is safe. No advisory lock is
- * needed here for the same reason: `CREATE ... IF NOT EXISTS` has no read-then-
+ * needed here for the same reason: `CREATE... IF NOT EXISTS` has no read-then-
  * write race to lose, whereas auth-service's row seeding did.
  */
 @Injectable()
@@ -56,7 +56,7 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
   /**
    * Fail with an ACTIONABLE message when the database has no schema at all.
    *
-   * Without this the first statement of the seed is a raw `CREATE INDEX ... ON
+   * Without this the first statement of the seed is a raw `CREATE INDEX... ON
    * ticket_assignments`, so an unpushed database reports `relation "ticket_assignments" does not
    * exist` from inside a helper — a symptom that reads like a seeder bug and
    * takes a stack trace to trace back to the real cause, which is simply that
@@ -103,7 +103,7 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
       CREATE UNIQUE INDEX IF NOT EXISTS "ticket_assignments_current_key"
         ON "ticket_assignments" ("ticket_id") WHERE "is_current" = true;
 
-      -- The WebSocket idempotency guard — 22-doc §2.3.
+      -- The WebSocket idempotency guard.
       --
       -- A socket that reconnects holding an unacked message re-emits it. That
       -- is correct client behaviour, and without this index it double-posts:
@@ -119,7 +119,7 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
         WHERE "client_message_id" IS NOT NULL;
     `);
 
-    // The analytics rollup's uniqueness guard
+    // The analytics rollup's uniqueness guard.
     //
     // A PAIR, because `department_id` is NULLable and Postgres treats NULLs as
     // DISTINCT in a unique index: a plain `@@unique([organizationId, day,

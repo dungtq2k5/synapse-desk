@@ -12,7 +12,7 @@ import {
 } from '../utils';
 import { grpcError } from '../fixtures/wire';
 
-describe('§3-§4 Billing at the gateway (e2e)', () => {
+describe('Billing at the gateway (e2e)', () => {
   let fx: E2eFixture;
 
   beforeAll(async () => {
@@ -31,9 +31,9 @@ describe('§3-§4 Billing at the gateway (e2e)', () => {
     await fx.close();
   });
 
-  // --------------------------------------------------- §3.2 the raw body
+  // --------------------------------------------------- the raw body
 
-  describe('§3.2 the raw-body trap', () => {
+  describe('The raw-body trap', () => {
     it('5. Hands the webhook the RAW BYTES, even with a global JSON parser registered', async () => {
       // **The single most common way this integration fails on first deploy**,
       // and it fails in the most expensive shape available: locally it often
@@ -119,9 +119,9 @@ describe('§3-§4 Billing at the gateway (e2e)', () => {
     });
   });
 
-  // ------------------------------------------------- §3.3 the four bypasses
+  // ------------------------------------------------- the four bypasses
 
-  describe('§3.3 what the webhook bypasses', () => {
+  describe('What the webhook bypasses', () => {
     it('Accepts a request with NO Authorization header at all', async () => {
       // There is no JWT. The request is authenticated by Stripe's signature,
       // which is a STRONGER claim than a bearer token rather than a weaker one.
@@ -198,9 +198,9 @@ describe('§3-§4 Billing at the gateway (e2e)', () => {
     });
   });
 
-  // ------------------------------------------------------- §4 /billing/*
+  // ------------------------------------------------------- /billing/*
 
-  describe('§4 /billing', () => {
+  describe('/billing', () => {
     it('Requires authentication', async () => {
       await request(fx.app.getHttpServer())
         .get(`${API}/billing/subscription`)

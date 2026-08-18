@@ -36,7 +36,7 @@ model Notification {
   /// permission at delivery time by asking auth-service.
   recipientId String @map("recipient_id") @db.Uuid
 
-  /// **The ORIGINATING event, never the transport subject**
+  /// **The ORIGINATING event, never the transport subject**.
   ///
   /// `ticket.assigned`, `document.indexed`, `quota.exceeded`. This used to be
   /// written as `IN_APP_NOTIFICATION_PATTERN`, which is identical on every row
@@ -92,7 +92,7 @@ model Notification {
   /// alert is exactly the producer that retries.
   eventId String? @map("event_id") @db.VarChar(100)
 
-  /// The event id that last INCREMENTED this group
+  /// The event id that last INCREMENTED this group.
   ///
   /// Grouping and `event_id` idempotency pull in opposite directions: the
   /// INSERT is deduped by the unique index, but an increment has no such
@@ -132,7 +132,7 @@ model Notification {
   @@map("notifications")
 }
 
-/// One auto-reply per address per TENANT per day
+/// One auto-reply per address per TENANT per day.
 ///
 /// **A table rather than Redis, and the reason is not convenience.** This
 /// service has no Redis client, and adding one for a counter would put the loop
@@ -215,7 +215,7 @@ model NotificationDelivery {
 
 /// RDM Table 25 — per (user, type, channel) opt-in and batching.
 ///
-/// **Ships WITH the producers, not after them**. §3 turns on the
+/// **Ships WITH the producers, not after them**. The producers turn on the
 /// volume and this is the only thing that lets a user survive it — and a user
 /// who disables notifications in week one is not recovered by shipping
 /// preferences in week three.

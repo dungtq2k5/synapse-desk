@@ -11,7 +11,7 @@ import { UsersService } from '../../src/modules/users/users.service';
  * detail; these two decide which tenant a stranger's email lands in and whether
  * it may create an account there.
  */
-describe('§31 inbound email resolution (e2e)', () => {
+describe('Inbound email resolution (e2e)', () => {
   let fx: E2eFixture;
   let organizations: OrganizationsService;
   let users: UsersService;

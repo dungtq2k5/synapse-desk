@@ -1,5 +1,5 @@
 /**
- * What AI costs, and what happens when a tenant runs out of it.
+ * @file What AI costs, and what happens when a tenant runs out of it.
  *
  * Three things live here because all three are needed by more than one service
  * and one of them will shortly be needed by a service written in a different
@@ -10,6 +10,8 @@
  *   - the per-SURFACE policy at the cap, which is a product decision rather
  *     than something each caller should improvise
  */
+
+import type { AiModel } from './ai-models.config';
 
 /**
  * Cost per million tokens, in micros (millionths of a currency unit).
@@ -32,7 +34,7 @@ export type ModelPricing = {
   completionMicrosPerMillion: number;
 };
 
-export const MODEL_PRICING: Record<string, ModelPricing> = {
+export const MODEL_PRICING: Record<AiModel, ModelPricing> = {
   // Generation — the QUALITY tier, sellable once billing lands.
   'gemini-2.5-pro': {
     promptMicrosPerMillion: 1_250_000,
@@ -57,7 +59,12 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
 
 /** The pricing entry, or a thrown error naming the model. Never a silent zero. */
 export function pricingFor(modelName: string): ModelPricing {
-  const pricing = MODEL_PRICING[modelName];
+  // Takes `string`, not `AiModel`: the name arrives from `ai_generations.
+  // model_name`, a VarChar, so this lookup is exactly where a value outside the
+  // catalogue has to be caught rather than assumed away by the type.
+  const pricing = (MODEL_PRICING as Record<string, ModelPricing | undefined>)[
+    modelName
+  ];
   if (!pricing) {
     throw new Error(
       `No pricing for model '${modelName}'. Add it to MODEL_PRICING — an unpriced model meters as free.`,

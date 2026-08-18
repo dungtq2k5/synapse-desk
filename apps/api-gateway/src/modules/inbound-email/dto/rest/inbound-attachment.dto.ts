@@ -1,3 +1,4 @@
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
   MAX_EMAIL_ADDRESS_LENGTH,
   MAX_FULL_NAME_LENGTH,
@@ -30,13 +31,9 @@ export class InboundAttachmentDto {
   @MaxLength(MAX_ATTACHMENT_FILE_NAME_LENGTH)
   readonly fileName!: string;
 
-  /**
-   * **Validated against the allowlist HERE, so the Worker does not hold a copy
-   * of it.** The Worker reports what the MIME part declared; this route decides
-   * whether it may be stored. A second copy of the allowlist in a Cloudflare
-   * Worker is a copy that drifts, and the one place it must not drift from is
-   * the policy storage-service enforces at presign anyway.
-   */
+  // Checked HERE so the Worker holds no copy of the allowlist: it reports what
+  // the MIME part declared, this route decides whether it may be stored.
+  /** The attachment's declared MIME type. */
   @IsIn([...ALLOWED_ATTACHMENT_MIME_TYPES])
   readonly mimeType!: AllowedAttachmentMimeType;
 
@@ -46,7 +43,7 @@ export class InboundAttachmentDto {
 }
 
 /**
- * What the Worker asks for BEFORE it posts the webhook
+ * What the Worker asks for BEFORE it posts the webhook.
  *
  * **The routing fields are here because the ticket has to be resolved twice.**
  * The Worker cannot presign against a ticket it does not know, and it cannot
@@ -82,7 +79,8 @@ export class InboundAttachmentUploadRequestDto {
   @IsArray()
   @IsString({ each: true })
   @MaxLength(MAX_MESSAGE_ID_LENGTH, { each: true })
-  readonly references?: string[];
+  @ApiPropertyOptional()
+  readonly references: string[] = [];
 
   @IsArray()
   @ArrayMaxSize(MAX_PRESENTED_ATTACHMENTS)

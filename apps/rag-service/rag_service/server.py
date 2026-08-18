@@ -120,7 +120,7 @@ def with_http_status(status_code: int, message: str) -> str:
     return f"[http:{status_code}] {message}"
 
 
-#: The injection refusal `Draft` aborts with
+#: The injection refusal `Draft` aborts with.
 #:
 #: **`Draft` refuses by NOT returning a draft**, which is why this is an abort
 #: rather than an empty `DraftResponse`. `ticket-service.generateDraft` maps
@@ -169,7 +169,7 @@ class Dependencies:
     ledger: LedgerClient
     settings: AiSettingsResolver
 
-    #: Prompt-injection detection
+    #: Prompt-injection detection.
     #:
     #: **Defaulted, and the default is the point.** A guard that every test and
     #: the eval harness had to remember to pass is a guard that is absent
@@ -178,8 +178,8 @@ class Dependencies:
     #:
     #: Nothing here can fail at boot: Layer B is a call to a provider whose
     #: credential the embedding client already validates at startup (
-    #: §3.4). An earlier design loaded a local model and needed a boot-time
-    #: check; §3.1 records why that was measured and rejected.
+    #: run-open). An earlier design loaded a local model and needed a boot-time
+    #: check; that approach was measured and rejected.
     injection: InjectionGuard = field(default_factory=InjectionGuard)
 
     def retrieval(self) -> RetrievalService:
@@ -200,7 +200,7 @@ class RagServicer(rag_pb2_grpc.RagServiceServicer):
         self._preprocess = PreprocessPipeline(
             deps.generator, deps.ledger, QuotaCounter(deps.redis)
         )
-        # **One guard, three surfaces** Constructed here rather
+        # **One guard, three surfaces**. Constructed here rather
         # than inside the pipeline because the pipeline serves `Chat` alone,
         # and `Ask` and `Draft` are two thirds of what needs defending.
         self._injection = deps.injection
@@ -211,7 +211,7 @@ class RagServicer(rag_pb2_grpc.RagServiceServicer):
             deps.generator,
             deps.ledger,
             QuotaCounter(deps.redis),
-            # **The collaborator this class did not have** The
+            # **The collaborator this class did not have**. The
             # same retriever the answering path uses, so the article sidebar is
             # scoped by the same `tenant_scope()` and cannot see further than a
             # `Chat` answer can.
@@ -321,7 +321,7 @@ class RagServicer(rag_pb2_grpc.RagServiceServicer):
         ]
         ticket_id = request.ticket_id if request.HasField("ticket_id") else None
 
-        # The files that came with THIS message History turns
+        # The files that came with THIS message. History turns
         # contribute their text and nothing else.
         attachments = _attachments_of(request)
 
@@ -338,7 +338,7 @@ class RagServicer(rag_pb2_grpc.RagServiceServicer):
             # A canned reply — a greeting or a refusal. No LLM call, no ledger
             # row, no citations, and it works at the cap.
             #
-            # **The status distinguishes the two, and it has to**
+            # **The status distinguishes the two, and it has to**.
             # The gateway persists any completion that is not AT_CAP as an AI
             # message and passes the label onward, so a refusal reported as
             # GREETING is wrong in the ticket thread and wrong in the frame the
@@ -378,7 +378,7 @@ class RagServicer(rag_pb2_grpc.RagServiceServicer):
             retrieved_chunk_ids=result.retrieved_chunk_ids,
             user_id=ctx.sub,
             ticket_id=ticket_id,
-            # The answering call sees the file too Reformulation
+            # The answering call sees the file too. Reformulation
             # turned it into search terms; this is where it becomes something
             # the answer can describe.
             attachments=attachments,
@@ -418,11 +418,11 @@ class RagServicer(rag_pb2_grpc.RagServiceServicer):
             )
 
         # **The guard, called here because `Ask` never touches the preprocess
-        # pipeline** Both layers at once: there is no greeting
+        # pipeline**. Both layers at once: there is no greeting
         # check on this surface to split them around, and greetings do not
         # arrive at a programmatic one.
         #
-        # **No attachments here, and none possible**
+        # **No attachments here, and none possible**.
         # `/knowledge/ask` has no ticket and no message, so there is nothing to
         # attach. Adding the parameter would advertise a capability the RPC
         # cannot carry.
@@ -449,7 +449,7 @@ class RagServicer(rag_pb2_grpc.RagServiceServicer):
             # NULL, deliberately: this surface creates no ticket, so attributing
             # its spend to one would be inventing an association.
             ticket_id=None,
-            # **No handoff offer** There is no conversation to
+            # **No handoff offer**. There is no conversation to
             # escalate into, so offering one promises something this surface
             # cannot perform, and a user who accepts gets nothing.
             can_escalate=False,
@@ -484,7 +484,7 @@ class RagServicer(rag_pb2_grpc.RagServiceServicer):
 
         question = _last_user_message(request.history)
 
-        # **The guard, on the surface that most needs it** This
+        # **The guard, on the surface that most needs it**. This
         # "question" is the last message on a ticket, and with inbound email
         # that can be an email from outside the organisation: an agent clicks
         # *suggest a reply* and a stranger's text becomes the question in a
@@ -641,7 +641,7 @@ class RagServicer(rag_pb2_grpc.RagServiceServicer):
             settings,
             budget=budget,
             user_id=ctx.sub,
-            # The retrieval query What the ticket IS, not where the
+            # The retrieval query. What the ticket IS, not where the
             # conversation got to, so the sidebar holds still while the thread
             # moves.
             title=request.title,
@@ -769,7 +769,7 @@ def build_injection_guard(config: Config, metered) -> InjectionGuard:
     from the design this replaced: the classifier is a call to a provider whose
     credential the embedding client already validates at startup, so there is no
     boot-closed check left to make. What can still fail is the call itself, and
-    §3.4's answer to that is run-open with a distinct log event.
+    The answer is run-open with a distinct log event.
 
     Both switches are explicit rather than implied by whether a collaborator was
     passed, because "no patterns" and "patterns that match nothing" are
@@ -894,7 +894,7 @@ async def _readiness_status(deps: Dependencies) -> health_pb2.HealthCheckRespons
     **No peer is checked**, and that is the rule rather than an omission. This
     service is called by the gateway and calls ingestion-service's ledger; making
     either part of readiness would let one service's database failure take this
-    one out of rotation too, which is §1's cascade one level down.
+    one out of rotation too, which is the readiness cascade one level down.
 
     Every probe is bounded and reuses a connection the process already holds. A
     probe every five seconds that dials is a connection leak with a schedule.
@@ -958,7 +958,7 @@ async def serve() -> None:
 
     deps = await build_dependencies(config)
 
-    # **Options, not the default** Without these the server sits
+    # **Options, not the default**. Without these the server sits
     # at gRPC's 4 MB while every TypeScript client and server is at 10 MB, and
     # the mismatch only shows up as RESOURCE_EXHAUSTED on a request the caller
     # had no reason to think was too large.
@@ -978,7 +978,7 @@ async def serve() -> None:
     # i.e. as the process being unhealthy.
     #
     # Imported from `_async` rather than through `health.aio`: the alias exists
-    # (`health.py` does `from . import _async as aio`) but it is an
+    # (`health.py` does `from. import _async as aio`) but it is an
     # `unused-import` re-export that type checkers do not see through.
     health_servicer = health_aio.HealthServicer()
     # `""` is the standard's "the server as a whole" — liveness. Set SERVING

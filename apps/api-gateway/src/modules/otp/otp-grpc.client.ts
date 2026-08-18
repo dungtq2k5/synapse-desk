@@ -2,18 +2,15 @@ import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { ClientGrpc } from '@nestjs/microservices';
 import {
   AUTH_GRPC_CLIENT,
-  fromProtoTimestamp,
   OTP_SERVICE_NAME,
+  OtpStatusResponse,
+  RequestOtpResponse,
+  VerifyOtpResponse,
   OtpServiceClient,
   toProtoOtpPurpose,
 } from '@synapsedesk/grpc-proto';
 import { OtpPurpose, RequestOrigin } from '@synapsedesk/common';
 import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
-import {
-  OtpStatusResponseDto,
-  RequestOtpResponseDto,
-  VerifyOtpResponseDto,
-} from '../auth/dto/rest/otp.dto';
 
 @Injectable()
 export class OtpGrpcClient extends BaseGrpcClient implements OnModuleInit {
@@ -33,7 +30,7 @@ export class OtpGrpcClient extends BaseGrpcClient implements OnModuleInit {
   requestEmailVerification(
     userId: string,
     origin: RequestOrigin,
-  ): Promise<RequestOtpResponseDto> {
+  ): Promise<RequestOtpResponse> {
     return this.call(
       (metadata) =>
         this.otpGrpcService.requestEmailVerification({ userId }, metadata),
@@ -45,7 +42,7 @@ export class OtpGrpcClient extends BaseGrpcClient implements OnModuleInit {
     userId: string,
     code: string,
     origin: RequestOrigin,
-  ): Promise<VerifyOtpResponseDto> {
+  ): Promise<VerifyOtpResponse> {
     return this.call(
       (metadata) => this.otpGrpcService.verifyEmail({ userId, code }, metadata),
       origin,
@@ -56,7 +53,7 @@ export class OtpGrpcClient extends BaseGrpcClient implements OnModuleInit {
     userId: string,
     phoneNumber: string,
     origin: RequestOrigin,
-  ): Promise<RequestOtpResponseDto> {
+  ): Promise<RequestOtpResponse> {
     return this.call(
       (metadata) =>
         this.otpGrpcService.requestPhoneVerification(
@@ -71,19 +68,19 @@ export class OtpGrpcClient extends BaseGrpcClient implements OnModuleInit {
     userId: string,
     code: string,
     origin: RequestOrigin,
-  ): Promise<VerifyOtpResponseDto> {
+  ): Promise<VerifyOtpResponse> {
     return this.call(
       (metadata) => this.otpGrpcService.verifyPhone({ userId, code }, metadata),
       origin,
     );
   }
 
-  async getOtpStatus(
+  getOtpStatus(
     userId: string,
     purpose: OtpPurpose,
     origin: RequestOrigin,
-  ): Promise<OtpStatusResponseDto> {
-    const response = await this.call(
+  ): Promise<OtpStatusResponse> {
+    return this.call(
       (metadata) =>
         this.otpGrpcService.getOtpStatus(
           // Domain enum -> proto enum happens here, at the transport boundary,
@@ -94,12 +91,5 @@ export class OtpGrpcClient extends BaseGrpcClient implements OnModuleInit {
         ),
       origin,
     );
-
-    return {
-      pending: response.pending,
-      target: response.target ?? null,
-      expiresAt: fromProtoTimestamp(response.expiresAt) ?? null,
-      attemptsRemaining: response.attemptsRemaining,
-    };
   }
 }

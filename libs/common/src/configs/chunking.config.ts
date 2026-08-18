@@ -41,9 +41,9 @@ export const MIN_CHUNK_TOKENS = 16;
 
 /**
  * **The chunker counts with `js-tiktoken` (`cl100k_base`), and that is an
- * ESTIMATE of the tokenizer that actually bills us**
+ * ESTIMATE of the tokenizer that actually bills us**.
  *
- * **Trap 1 of §3.2: treating a `cl100k_base` count as exact.** It is
+ * **Trap 1: treating a `cl100k_base` count as exact.** It is
  * **OpenAI's** tokenizer. We embed with Gemini `gemini-embedding-2` and
  * generate with Gemini, whose tokenizer is a different one with no JS
  * implementation. So this is a far better estimate than `chars / 4` — measured
@@ -86,7 +86,7 @@ export const EMBEDDING_BATCH_SIZE = 32;
  * The markdown heading levels that start a new chunk.
  *
  * Splitting on structure before splitting on length is what makes "page 4,
- * §2.1" a real citation rather than a character offset. A section shorter than
+ * " a real citation rather than a character offset. A section shorter than
  * the target simply stays whole — a chunk is allowed to be small when the
  * document says it is a unit.
  */

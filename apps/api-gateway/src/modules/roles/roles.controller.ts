@@ -23,7 +23,7 @@ import { RequirePermission } from '../../common/decorators/require-permission.de
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ResponseMessage } from '../../common/decorators/response-message.decorator';
 import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
-import { RolesGrpcClient } from './roles-grpc.client';
+import { RolesService } from './roles.service';
 import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AUTH_SCHEMES } from '../../common/config/swagger.config';
 import {
@@ -34,13 +34,13 @@ import {
 import {
   CreateRoleDto,
   ListRolesQueryDto,
-  RoleResponseDto,
   SetRolePermissionsDto,
   UpdateRoleDto,
 } from './dto/rest/role.dto';
+import { RoleResponseDto } from './dto/rest/role-response.dto';
 
 /**
- * Roles (api-endpoints-plan).
+ * Roles (`api-endpoints-plan.md`).
  *
  * A tenant sees its own roles plus the four global system roles, and may modify
  * none of the latter — enforced in auth-service, not just greyed out here. A
@@ -51,7 +51,7 @@ import {
 @Controller('roles')
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class RolesController {
-  constructor(private readonly rolesGrpcClient: RolesGrpcClient) {}
+  constructor(private readonly roles: RolesService) {}
 
   @ApiOperation({
     summary:
@@ -70,7 +70,7 @@ export class RolesController {
     @CurrentUser() context: RequestContext,
     @Query() query: ListRolesQueryDto,
   ): Promise<PaginationResponseDto<RoleResponseDto>> {
-    return this.rolesGrpcClient.list(query, context);
+    return this.roles.list(query, context);
   }
 
   @ApiOperation({ summary: 'Detail + attached permissions + user_assigned' })
@@ -82,7 +82,7 @@ export class RolesController {
     @CurrentUser() context: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<RoleResponseDto> {
-    return this.rolesGrpcClient.get(id, context);
+    return this.roles.get(id, context);
   }
 
   /**
@@ -105,7 +105,7 @@ export class RolesController {
     @CurrentUser() context: RequestContext,
     @Body() createRoleDto: CreateRoleDto,
   ): Promise<RoleResponseDto> {
-    return this.rolesGrpcClient.create(createRoleDto, context);
+    return this.roles.create(createRoleDto, context);
   }
 
   /** 403 on a system role. */
@@ -120,7 +120,7 @@ export class RolesController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateRoleDto: UpdateRoleDto,
   ): Promise<RoleResponseDto> {
-    return this.rolesGrpcClient.update(id, updateRoleDto, context);
+    return this.roles.update(id, updateRoleDto, context);
   }
 
   /** 409 while any user still holds it — roles are hard-deleted and cascade. */
@@ -136,7 +136,7 @@ export class RolesController {
     @CurrentUser() context: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<void> {
-    return this.rolesGrpcClient.remove(id, context);
+    return this.roles.remove(id, context);
   }
 
   /**
@@ -156,10 +156,6 @@ export class RolesController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() setRolePermissionsDto: SetRolePermissionsDto,
   ): Promise<RoleResponseDto> {
-    return this.rolesGrpcClient.setPermissions(
-      id,
-      setRolePermissionsDto,
-      context,
-    );
+    return this.roles.setPermissions(id, setRolePermissionsDto, context);
   }
 }

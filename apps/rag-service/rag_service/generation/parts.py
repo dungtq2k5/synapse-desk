@@ -26,7 +26,7 @@ class Attachment:
     """One file the user attached, already filtered and capped by the caller.
 
     **The bytes are here rather than an object path** because rag-service has no
-    storage client Giving it one would add a peer, a credential and
+    storage client. Giving it one would add a peer, a credential and
     a failure mode to the query path, and what makes inline bytes safe is a cap
     that has to exist anyway.
 

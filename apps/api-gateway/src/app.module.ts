@@ -37,7 +37,6 @@ import { RagGrpcModule } from './common/grpc/rag-grpc.module';
 import { NotificationGrpcModule } from './common/grpc/notification-grpc.module';
 import { MetricsModule } from './modules/metrics/metrics.module';
 import { HttpMetricsInterceptor } from './modules/metrics/http-metrics.interceptor';
-import { ApiInfoModule } from './modules/api-info/api-info.module';
 
 @Module({
   imports: [
@@ -55,35 +54,20 @@ import { ApiInfoModule } from './modules/api-info/api-info.module';
 
     OrganizationStatusModule,
     // The shared cache, its `@InvalidateCache` interceptor and the NATS
-    // eviction consumer Registered here rather than left to the
+    // eviction consumer. Registered here rather than left to the
     // feature modules that cache reads, because the interceptor is global and
     // the consumer is a subscription the app must hold whether or not any
     // particular feature module was imported.
     CacheModule,
-    // The mail Worker's entry point The gateway is the email
+    // The mail Worker's entry point. The gateway is the email
     // adapter; no other service knows what an email is.
     InboundEmailModule,
-    // The single channel to ticket-service, global because Domain B's surface
-    // will span several gateway modules and all of them must share one.
+    // The single channel to ticket-service, `@Global` because Domain B's surface
+    // spans several gateway modules and all of them must share one.
     //
-    // Not a feature module for the same reason a Domain B feature module
-    // doesn't exist yet: `realtime` is A consumer, not THE consumer — the
-    // TICKET_PROTO_PATHS surface already covers six services (ticket,
-    // assignment, message, ai, feedback, audit), and only one of them
-    // (`TicketAccessService`, used by `realtime`) has a caller so far. Owning
-    // the registration inside `realtime` would work today but misname the
-    // relationship: the day a REST ticket module needs the same channel, it
-    // would import a module called "realtime" for a connection that has
-    // nothing to do with sockets.
-    //
-    // This is not actually different from AuthModule's pattern, just viewed
-    // from a different angle: AuthModule ALSO separates the ClientsModule
-    // registration from most of its consumers (OtpModule, DepartmentsModule,
-    // etc. all import AuthModule from elsewhere to reach AUTH_GRPC_CLIENT). The
-    // one difference is that Auth has a natural first home (`modules/auth`) to
-    // register from; Ticket does not yet, so the registration lives in
-    // `common/grpc/` alongside `base-grpc.client.ts` — the other thing here
-    // that isn't owned by one feature.
+    // Registered here rather than from a feature module because there is no
+    // ticket feature module yet -- `realtime` is A consumer, not THE consumer,
+    // and owning the registration there would misname the relationship.
     TicketGrpcModule,
     IngestionGrpcModule,
     RagGrpcModule,
@@ -123,9 +107,8 @@ import { ApiInfoModule } from './modules/api-info/api-info.module';
     RealtimeModule,
     HealthModule,
     MetricsModule,
-    ApiInfoModule,
 
-    // The read surface for the SPA REST is not deprecated by it;
+    // The read surface for the SPA. REST is not deprecated by it;
     // both are permanent, with different jobs. See the module for the rest.
     GraphqlApiModule,
   ],
@@ -138,7 +121,7 @@ import { ApiInfoModule } from './modules/api-info/api-info.module';
     // so this would execute before JwtAuthGuard had resolved the caller and
     // would have no tenant to gate on. Interceptors run after every guard.
     { provide: APP_INTERCEPTOR, useClass: OrganizationStatusInterceptor },
-    // RED metrics for every route Global, so a route added later
+    // RED metrics for every route. Global, so a route added later
     // is measured by DEFAULT: a per-controller registration means the endpoint
     // somebody forgets is invisible, and that is reliably the interesting one.
     { provide: APP_INTERCEPTOR, useClass: HttpMetricsInterceptor },

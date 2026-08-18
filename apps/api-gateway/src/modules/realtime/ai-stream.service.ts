@@ -1,3 +1,7 @@
+import {
+  UNSPECIFIED_FRAME_STATUS,
+  type FrameAnswerStatus,
+} from './realtime.config';
 import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ClientGrpc } from '@nestjs/microservices';
 import { randomUUID } from 'node:crypto';
@@ -20,13 +24,11 @@ import {
 } from '@synapsedesk/common';
 import type { ErrorResponse } from '../../common/interfaces/http-response.interface';
 import { WsResponse } from '../../common/interfaces/ws-response.interface';
-import { MessagesGrpcClient } from '../tickets/messages-grpc.client';
-import { TicketsGrpcClient } from '../tickets/tickets-grpc.client';
+import { MessagesService } from '../tickets/messages.service';
+import { TicketsService } from '../tickets/tickets.service';
 import { ListMessagesQueryDto } from '../tickets/dto/rest/message.dto';
 import { REALTIME_EVENTS } from './realtime.config';
 import {
-  UNSPECIFIED_FRAME_STATUS,
-  type FrameAnswerStatus,
   AiStreamAttachmentsSkippedPayloadDto,
   AiStreamChunkPayloadDto,
   AiStreamDonePayloadDto,
@@ -39,7 +41,7 @@ const TRANSCRIPT_TURNS = 40;
 
 /**
  * The most frames Socket.IO may have queued for a socket before the stream is
- * abandoned
+ * abandoned.
  *
  * **Socket.IO applies no backpressure.** `emit` returns immediately whether the
  * peer is reading or not; unsent frames accumulate in the engine's write buffer.
@@ -87,8 +89,8 @@ export class AiStreamService implements OnModuleInit {
 
   constructor(
     @Inject(RAG_GRPC_CLIENT) private readonly client: ClientGrpc,
-    private readonly messages: MessagesGrpcClient,
-    private readonly tickets: TicketsGrpcClient,
+    private readonly messages: MessagesService,
+    private readonly tickets: TicketsService,
   ) {}
 
   onModuleInit(): void {
@@ -111,7 +113,7 @@ export class AiStreamService implements OnModuleInit {
     question: string,
     context: RequestContext,
     /**
-     * The message this question was stored as
+     * The message this question was stored as.
      *
      * Optional so the one existing caller that has no message (a retry, a test)
      * still compiles, and because a question with no attachments is the common
@@ -129,7 +131,7 @@ export class AiStreamService implements OnModuleInit {
 
     // **Asked for, not fetched.** This service has no storage client, and
     // ticket-service already does the identical filter-and-fetch for its two
-    // `Draft` call sites Eligibility is decided from the row
+    // `Draft` call sites. Eligibility is decided from the row
     // there, so an attached zip never costs a download.
     const attachments = messageId
       ? await this.messages.aiAttachments(messageId, context)
@@ -199,7 +201,7 @@ export class AiStreamService implements OnModuleInit {
         },
         error: (error: unknown) => {
           this.forget(client, streamId);
-          // **Nothing is persisted here** test 7. A partial answer
+          // **Nothing is persisted here**. A partial answer
           // written as though it were complete is worse than no answer: it
           // enters the permanent thread, is indistinguishable from a finished
           // one, and the user reads a policy that stops mid-sentence.
@@ -227,7 +229,7 @@ export class AiStreamService implements OnModuleInit {
   }
 
   /**
-   * `ai:stream:cancel`
+   * `ai:stream:cancel`.
    *
    * **Only works on the instance holding the call**, and that is a property of
    * the design rather than a limitation to route around. A socket lives on one
@@ -238,7 +240,7 @@ export class AiStreamService implements OnModuleInit {
    *
    * **A stream this socket does not own is IGNORED**, not refused — the map is
    * per-socket, so an id belonging to somebody else simply is not in it. That is
-   * §5 test 8, and the failure it prevents is one socket cancelling another
+   * and the failure it prevents is one socket cancelling another
    * user's generation by guessing a uuid.
    */
   cancel(client: Socket, streamId: string): boolean {
@@ -301,17 +303,17 @@ export class AiStreamService implements OnModuleInit {
       citations: Citation[];
       generationId?: string;
     },
-    /** The message that was asked — needed only on the refusal path, §7. */
+    /** The message that was asked — needed only on the refusal path. */
     messageId?: string,
   ): Promise<void> {
     this.forget(client, streamId);
 
     try {
-      // **At the cap this is `done`, never `error`** The tenant
+      // **At the cap this is `done`, never `error`**. The tenant
       // has run out of AI budget, the conversation auto-escalates, and a human
       // now has it. A 402-shaped error frame would tell the user the product is
       // broken at the moment it did the most useful thing it can do.
-      // **`REFUSED` deliberately does NOT branch here** A
+      // **`REFUSED` deliberately does NOT branch here**. A
       // question refused by injection detection takes the same path as a
       // greeting: the reply is appended, the thread keeps its record, and
       // nothing escalates, because the workspace's budget is untouched and
@@ -334,7 +336,7 @@ export class AiStreamService implements OnModuleInit {
         return;
       }
 
-      // **The write-back, on the refusal path only** The gateway
+      // **The write-back, on the refusal path only**. The gateway
       // is the one that holds this id, so the gateway is the one that sets the
       // flag: without it the refused question stays in the transcript and every
       // later turn in this conversation re-sends it to the model.
@@ -422,7 +424,7 @@ export class AiStreamService implements OnModuleInit {
   }
 
   /**
-   * Names what did not reach the model
+   * Names what did not reach the model.
    *
    * A zip, a `.docx`, or a file past the byte ceiling is skipped rather than
    * failing the question: an answer about the screenshot beats no answer
@@ -522,7 +524,7 @@ export class AiStreamService implements OnModuleInit {
     this.streamsOf(client).delete(streamId);
   }
 
-  /** Whether Socket.IO has more queued for this socket than §5.2 allows. */
+  /** Whether Socket.IO has more queued for this socket than the backpressure cap allows. */
   private isWedged(client: Socket): boolean {
     // `writeBuffer` is engine.io internals, absent from its public types.
     // Read structurally rather than tracked with a counter of our own, because
@@ -551,36 +553,24 @@ export class AiStreamService implements OnModuleInit {
   }
 }
 
-// ASK This `docblock` seems to be invalid
 /**
  * The WebSocket frame's status, as a name a client can switch on.
  *
- * **This used to BE the conversion**, doing it with a reverse enum lookup and a
- * string edit: `AnswerStatus[status]?.replace('ANSWER_STATUS_', '') ??
- * 'UNSPECIFIED'`. That value was both emitted on the socket AND persisted into
- * `ticket_messages.answer_status`, a `VarChar(30)` — so the column's whole
- * vocabulary was decided by a `.replace()`, and an enum member this build did
- * not know wrote the literal `'UNSPECIFIED'` into a row.
- *
- * `fromProtoRagAnswerStatus` does the crossing now, against a domain enum that
- * exists. What is left here is the FRAME's rendering, which keeps `'UNSPECIFIED'`
- * as its own case deliberately: a socket frame has to carry something, and a
+ * Keeps `'UNSPECIFIED'` as its own case: a frame has to carry something, and a
  * client switching on the value needs a default arm it can name.
+ *
+ * For the FRAME only — anything persisted takes the domain `AnswerStatus`.
  */
 function toFrameAnswerStatus(status: AnswerStatus): FrameAnswerStatus {
   return fromProtoRagAnswerStatus(status) ?? UNSPECIFIED_FRAME_STATUS;
 }
 
-// ASK This `docblock` seems to be invalid
 /**
  * How many frames engine.io still has queued for this socket, or `null` when
- * the internal is no longer readable.
+ * that internal is no longer readable.
  *
- * The single place that reaches past Socket.IO's public types. Isolated here so
- * the next person upgrading engine.io has one function to check rather than a
- * cast buried in a guard, and so the read is validated rather than asserted:
- * `Array.isArray` is what distinguishes "nothing queued" from "this property is
- * gone", which `?.length ?? 0` reported identically.
+ * The single place reaching past Socket.IO's public types — check this one
+ * function when upgrading engine.io.
  */
 function bufferedFrames(client: Socket): number | null {
   const { writeBuffer } = client.conn as unknown as {

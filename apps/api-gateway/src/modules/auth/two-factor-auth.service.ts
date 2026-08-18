@@ -1,16 +1,22 @@
 import { Injectable } from '@nestjs/common';
 import { RequestOrigin } from '@synapsedesk/common';
+import { TwoFactorAuthGrpcClient } from './two-factor-auth-grpc.client';
 import {
+  toBackupCodesStatusDto,
+  toTwoFactorAuthenticateResult,
   TwoFactorAuthenticateResult,
-  TwoFactorAuthGrpcClient,
-} from './two-factor-auth-grpc.client';
+} from './two-factor-auth.mapper';
 import {
   AuthenticateTwoFactorDto,
-  BackupCodesStatusResponseDto,
   DisableTwoFactorDto,
-  GenerateTwoFactorResponseDto,
 } from './dto/rest/two-factor.dto';
+import {
+  BackupCodesResponseDto,
+  BackupCodesStatusResponseDto,
+  GenerateTwoFactorResponseDto,
+} from './dto/rest/two-factor-response.dto';
 
+/** The gateway's two-factor surface. Returns REST DTOs; the wire stays in the client. */
 @Injectable()
 export class TwoFactorAuthService {
   constructor(private readonly twoFactorGrpcClient: TwoFactorAuthGrpcClient) {}
@@ -26,19 +32,26 @@ export class TwoFactorAuthService {
     userId: string,
     code: string,
     origin: RequestOrigin,
-  ): Promise<string[]> {
+  ): Promise<BackupCodesResponseDto> {
     return this.twoFactorGrpcClient.activateTwoFactor(userId, code, origin);
   }
 
-  authenticate(
+  async authenticate(
     twoFactorToken: string,
     dto: AuthenticateTwoFactorDto,
     origin: RequestOrigin,
   ): Promise<TwoFactorAuthenticateResult> {
-    return this.twoFactorGrpcClient.authenticateTwoFactor(
-      twoFactorToken,
-      dto,
-      origin,
+    return toTwoFactorAuthenticateResult(
+      await this.twoFactorGrpcClient.authenticateTwoFactor(
+        {
+          twoFactorToken,
+          code: dto.code,
+          backupCode: dto.backupCode,
+          rememberDevice: dto.rememberDevice ?? false,
+          deviceName: dto.deviceName,
+        },
+        origin,
+      ),
     );
   }
 
@@ -47,14 +60,19 @@ export class TwoFactorAuthService {
     dto: DisableTwoFactorDto,
     origin: RequestOrigin,
   ): Promise<void> {
-    return this.twoFactorGrpcClient.disableTwoFactor(userId, dto, origin);
+    return this.twoFactorGrpcClient.disableTwoFactor(
+      userId,
+      dto.code,
+      dto.password,
+      origin,
+    );
   }
 
   regenerateBackupCodes(
     userId: string,
     password: string,
     origin: RequestOrigin,
-  ): Promise<string[]> {
+  ): Promise<BackupCodesResponseDto> {
     return this.twoFactorGrpcClient.regenerateBackupCodes(
       userId,
       password,
@@ -62,10 +80,12 @@ export class TwoFactorAuthService {
     );
   }
 
-  getBackupCodesStatus(
+  async getBackupCodesStatus(
     userId: string,
     origin: RequestOrigin,
   ): Promise<BackupCodesStatusResponseDto> {
-    return this.twoFactorGrpcClient.getBackupCodesStatus(userId, origin);
+    return toBackupCodesStatusDto(
+      await this.twoFactorGrpcClient.getBackupCodesStatus(userId, origin),
+    );
   }
 }

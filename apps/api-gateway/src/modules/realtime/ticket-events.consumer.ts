@@ -138,7 +138,7 @@ export class TicketEventsConsumer {
     @Payload() event: TicketEventOf<typeof TICKET_PATTERNS.messageCreated>,
   ): void {
     this.relay(event.pattern, () => {
-      // **Two rooms, chosen by `isInternalNote`**
+      // **Two rooms, chosen by `isInternalNote`**.
       //
       // The previous version sent every message to `ticket:{id}` alone, with
       // the reasoning that membership there is authorized and the org room is
@@ -157,10 +157,10 @@ export class TicketEventsConsumer {
   }
 
   /**
-   * An edit
+   * An edit.
    *
    * The same room split, by construction: it calls the same helper, so the
-   * disclosure §1 closed cannot reopen here. The new content rides on the frame,
+   * disclosure the internal-note fix closed cannot reopen here. The new content rides on the frame,
    * which is safe precisely because of that split — it never reaches a socket
    * that could not already read the message.
    */
@@ -176,7 +176,7 @@ export class TicketEventsConsumer {
   }
 
   /**
-   * A REDACTION
+   * A REDACTION.
    *
    * **The event carries no content and neither does this frame.** The whole
    * payload is forwarded rather than rebuilt precisely so that stays true: the
@@ -203,7 +203,7 @@ export class TicketEventsConsumer {
    * inherit the fix rather than the bug.
    */
   private messageRoom(ticketId: string, isInternalNote: boolean) {
-    return isInternalNote ? ticketInternalRoom(ticketId) : ticketRoom(ticketId);
+    return isInternalNote ? ticketInternalRoom(ticketId) : ticketRoom(ticketId); // NOSONAR
   }
 
   /**
@@ -220,7 +220,7 @@ export class TicketEventsConsumer {
       emit();
       // Counted here rather than at each call site: every relayed event passes
       // through this boundary, so a handler added later is measured without
-      // anyone remembering to measure it
+      // anyone remembering to measure it.
       this.gateway.countEvent(pattern);
     } catch (error) {
       this.logger.error(`Failed to relay ${pattern}: ${formatErrorMsg(error)}`);

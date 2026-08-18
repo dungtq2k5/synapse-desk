@@ -55,7 +55,7 @@ export enum AuditAction {
   USER_TWO_FACTOR_RESET = 'USER_TWO_FACTOR_RESET',
   USER_ROLES_UPDATED = 'USER_ROLES_UPDATED',
   USER_DEPARTMENTS_UPDATED = 'USER_DEPARTMENTS_UPDATED',
-  /** An avatar was set, replaced or cleared (10-storage-service.md §3.1). */
+  /** An avatar was set, replaced or cleared  */
   USER_AVATAR_UPDATED = 'USER_AVATAR_UPDATED',
 
   // Organization

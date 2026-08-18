@@ -30,7 +30,7 @@ export type CacheableOptions = {
 };
 
 /**
- * Caches this GET, tenant-first
+ * Caches this GET, tenant-first.
  *
  * ```ts
  * ＠Get()
@@ -43,16 +43,16 @@ export type CacheableOptions = {
  * notifications are excluded because a user watching their own ticket must not
  * watch their own reply disappear for a minute.
  *
- * `GET /notifications/unread-count` is the one that looks obvious and is not —
- * it is the most-polled route in the product, and the WebSocket already pushes
- * `notification:unread-count` authoritatively. The polling a cache
- * would optimise is polling that should stop.
+ * `GET /notifications/unread-count` looks obvious and is not — it is the
+ * most-polled route in the product, and the WebSocket already pushes
+ * `notification:unread-count` authoritatively. The polling a cache would
+ * optimize is polling that should stop.
  *
- * **It documents itself, in the same call** step 3. The OpenAPI
- * operation gains an `x-cache` extension carrying exactly these values, so a
- * client can see which reads are cached and on what terms without anybody
- * maintaining a second list. A hand-written list of cached routes is a list
- * that is wrong the first time somebody changes a TTL.
+ * **It documents itself in the same call**: the OpenAPI operation gains an
+ * `x-cache` extension carrying these values, so nobody maintains a second list
+ * of cached routes — which would be wrong the first time a TTL changed.
+ *
+ * See `docs/decisions/0012-cache-keys-are-tenant-first.md`.
  */
 export const Cacheable = (options: CacheableOptions) =>
   applyDecorators(

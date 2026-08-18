@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { HealthController } from './health.controller';
 import { VersionController } from './version.controller';
+import { VersionResolver } from './version.resolver';
 import { ServiceRegistry } from './service-registry.service';
 import { RedisHealthService } from './redis-health.service';
 
@@ -10,6 +11,6 @@ import { RedisHealthService } from './redis-health.service';
   // throttler's or the adapter's — see the class note. A shared client queues
   // commands while disconnected, which turns the one probe that must fail fast
   // into the one that hangs.
-  providers: [ServiceRegistry, RedisHealthService],
+  providers: [VersionResolver, ServiceRegistry, RedisHealthService],
 })
 export class HealthModule {}

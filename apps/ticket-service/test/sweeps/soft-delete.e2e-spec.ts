@@ -22,7 +22,7 @@ import { AuthReferenceService } from '../../src/modules/auth-client/auth-referen
 import { TicketEventPublisher } from '../../src/modules/events/ticket-event.publisher';
 
 /**
- * §3.2 The soft-delete sweep.
+ * The soft-delete sweep.
  *
  * TICKETS ONLY, and the scope is the interesting part. Messages, attachments
  * and assignments have no independent soft-delete: they follow their parent
@@ -34,7 +34,7 @@ import { TicketEventPublisher } from '../../src/modules/events/ticket-event.publ
  * invisible everywhere, surfacing it takes BOTH a permission and an explicit
  * flag, and restoring it brings back everything that hung off it untouched.
  */
-describe('§3.2 soft-delete sweep (e2e)', () => {
+describe('Soft-delete sweep (e2e)', () => {
   let fx: E2eFixture;
   let tickets: TicketsService;
   let messages: MessagesService;

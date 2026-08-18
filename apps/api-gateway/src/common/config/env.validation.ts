@@ -11,7 +11,7 @@ import * as Joi from 'joi';
  * the worst one: `;` is the cookie SEPARATOR, so the name silently ends the
  * previous pair.
  */
-const cookieName = Joi.string()
+const validCookieName = Joi.string()
   .required()
   .pattern(/^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/)
   .message('{{#label}} is not a valid cookie name');
@@ -19,25 +19,11 @@ const cookieName = Joi.string()
 export const envValidationSchema = Joi.object({
   PORT: Joi.number().required(),
 
-  // **Which build is this?** Baked at image build time, never read
-  // from git at runtime: a container has no `.git`, so a runtime lookup returns
-  // nothing and the natural fallback is `"unknown"` — the answer you get at
-  // exactly the moment you need the real one.
-  //
-  // `required()` rather than a default, and that is the enforcement: an image
-  // that cannot identify itself fails to BOOT, loudly and immediately, instead
-  // of starting happily and lying to the person trying to end an outage. The
-  // Dockerfile's `test -n "$GIT_SHA"` guard is the same rule one stage earlier.
-  // `/docs` and `/docs-json` **Config, not an inline
-  // `NODE_ENV !== 'production'`**: that check is the one that gets inverted
-  // during a refactor and nobody notices, because the failure direction is MORE
-  // exposure and more exposure looks like everything working.
-  //
   // Defaults to FALSE, so an environment that never considered the question is
   // closed rather than open.
   SWAGGER_ENABLED: Joi.boolean().default(false),
 
-  // `/metrics`, on its OWN listener A distinct port is what makes
+  // `/metrics`, on its OWN listener. A distinct port is what makes
   // "not reachable from the internet" structural rather than a rule Nginx has
   // to keep enforcing correctly forever.
   METRICS_PORT: Joi.number().required(),
@@ -46,6 +32,19 @@ export const envValidationSchema = Joi.object({
   // so a deployment that never thought about it is safe rather than exposed.
   METRICS_HOST: Joi.string().default('127.0.0.1'),
 
+  // **Which build is this?**. Baked at image build time, never read
+  // from git at runtime: a container has no `.git`, so a runtime lookup returns
+  // nothing and the natural fallback is `"unknown"` — the answer you get at
+  // exactly the moment you need the real one.
+  //
+  // `required()` rather than a default, and that is the enforcement: an image
+  // that cannot identify itself fails to BOOT, loudly and immediately, instead
+  // of starting happily and lying to the person trying to end an outage. The
+  // Dockerfile's `test -n "$GIT_SHA"` guard is the same rule one stage earlier.
+  // `/docs` and `/docs-json`. **Config, not an inline
+  // `NODE_ENV !== 'production'`**: that check is the one that gets inverted
+  // during a refactor and nobody notices, because the failure direction is MORE
+  // exposure and more exposure looks like everything working.
   APP_VERSION: Joi.string().required(),
   BUILD_SHA: Joi.string().required(),
   BUILD_TIME: Joi.string().isoDate().required(),
@@ -57,23 +56,23 @@ export const envValidationSchema = Joi.object({
     .valid(...NODE_ENV_OPTIONS)
     .required(),
 
-  JWT_ACCESS_NAME: cookieName,
+  JWT_ACCESS_NAME: validCookieName,
   JWT_ACCESS_PUBLIC_KEY_PATH: Joi.string().required(),
 
-  JWT_REFRESH_NAME: cookieName,
+  JWT_REFRESH_NAME: validCookieName,
 
-  JWT_2FA_NAME: cookieName,
+  JWT_2FA_NAME: validCookieName,
   // Public half of the 2FA pair — separate from the access pair, so a challenge
   // token cannot verify where an access token is expected and vice versa. The
   // gateway holds no signing material of any kind: it verifies, never mints.
   JWT_2FA_PUBLIC_KEY_PATH: Joi.string().required(),
 
   // Short-lived token carrying a multi-tenant login between its two legs.
-  TENANT_SELECTION_NAME: cookieName,
+  TENANT_SELECTION_NAME: validCookieName,
 
   // Opaque "remember this device" secret. Not a JWT — hence the different
   // prefix; it is never verified, only looked up.
-  DEVICE_TOKEN_NAME: cookieName,
+  DEVICE_TOKEN_NAME: validCookieName,
 
   COOKIE_ACCESS_MAX_AGE: Joi.number().required(),
   COOKIE_REFRESH_MAX_AGE: Joi.number().required(),
@@ -88,10 +87,10 @@ export const envValidationSchema = Joi.object({
   AUTH_SERVICE_URL: Joi.string().required(),
   TICKET_SERVICE_URL: Joi.string().required(),
 
-  // ingestion-service — Domain C's document and knowledge surface.
+  // ingestion-service — document and knowledge surface.
   INGESTION_SERVICE_URL: Joi.string().required(),
 
-  // Domain E's gRPC server, added with the feed API. Required
+  // Notification gRPC server, added with the feed API. Required
   // like every other peer: a gateway that boots without it would answer 500 on
   // the notification bell rather than failing where the misconfiguration is.
   NOTIFICATION_SERVICE_URL: Joi.string().required(),

@@ -2,13 +2,24 @@ import {
   DepartmentMemberResponse,
   DepartmentResponse,
   fromProtoTimestamp,
+  ListDepartmentMembersRequest,
+  ListDepartmentMembersResponse,
+  ListDepartmentsRequest,
+  ListDepartmentsResponse,
   requireProtoTimestamp,
+  toPageRequest,
 } from '@synapsedesk/grpc-proto';
-import { toUserResponseDto } from '../users/user.mapper';
+import {
+  ListDepartmentMembersQueryDto,
+  ListDepartmentsQueryDto,
+} from './dto/rest/department.dto';
 import {
   DepartmentMemberResponseDto,
   DepartmentResponseDto,
-} from './dto/rest/department.dto';
+} from './dto/rest/department-response.dto';
+import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
+import { toPaginationMetaDataResponseDto } from '../../common/mappers/pagination.mapper';
+import { toUserResponseDto } from '../users/user.mapper';
 import { DepartmentResponseGqlDto } from './dto/graphql/department-response.gql-dto';
 
 /**
@@ -42,27 +53,60 @@ export function toDepartmentMemberResponseDto(
 }
 
 /**
- * Wire -> GraphQL edge type, for `Ticket.department`, `User.departments` and
- * `Document.departments`.
+ * Wire `DepartmentResponse` -> the GraphQL `Department` edge type, used for
+ * `Ticket.department`, `User.departments` and `Document.departments`.
  *
- * Beside the REST mappers rather than in the DTO file, for the reason
- * {@link toUserSummaryGqlDto} spells out: every wire→DTO mapping in this gateway
- * lives in a `<feature>.mapper.ts`, and the near-identical `toDepartmentResponseDto`
- * sitting directly above is exactly the neighbour that makes the difference
- * between them visible.
+ * Called by `createDepartmentLoader`, so a resolver reaches an edge through
+ * `loaders.departments.load(id)` and never maps for itself. A missing id is the
+ * loader's `null`, not this function's.
  *
- * **`null` in, `null` out** — a loader answers `null` for an id the batch RPC
- * omitted, and an empty object would render a blank card the client could not
- * tell apart from a real one.
+ * @example
+ * const rows = response.items.map((d) => toDepartmentResponseGqlDto(d));
+ *
+ * @param department - one department off the wire
+ * @returns the edge type the GraphQL schema declares
  */
 export function toDepartmentResponseGqlDto(
-  department: DepartmentResponse | null,
-): DepartmentResponseGqlDto | null {
-  if (!department) return null;
-
+  department: DepartmentResponse,
+): DepartmentResponseGqlDto {
   return {
     id: department.id,
     name: department.name,
     description: department.description ?? null,
   };
+}
+
+/** Converts a `ListDepartmentsResponse` into the paginated REST envelope. */
+export function toDepartmentPageDto(
+  response: ListDepartmentsResponse,
+): PaginationResponseDto<DepartmentResponseDto> {
+  return {
+    items: response.items.map(toDepartmentResponseDto),
+    meta: toPaginationMetaDataResponseDto(response.meta),
+  };
+}
+
+/** Converts a `ListDepartmentMembersResponse` into the paginated REST envelope. */
+export function toDepartmentMemberPageDto(
+  response: ListDepartmentMembersResponse,
+): PaginationResponseDto<DepartmentMemberResponseDto> {
+  return {
+    items: response.items.map(toDepartmentMemberResponseDto),
+    meta: toPaginationMetaDataResponseDto(response.meta),
+  };
+}
+
+/** Builds a `ListDepartmentsRequest` from the REST query. */
+export function toListDepartmentsRequest(
+  query: ListDepartmentsQueryDto,
+): ListDepartmentsRequest {
+  return { page: toPageRequest(query), includeDeleted: query.includeDeleted };
+}
+
+/** Builds a `ListDepartmentMembersRequest` from the REST query. */
+export function toListDepartmentMembersRequest(
+  departmentId: string,
+  query: ListDepartmentMembersQueryDto,
+): ListDepartmentMembersRequest {
+  return { departmentId, page: toPageRequest(query) };
 }

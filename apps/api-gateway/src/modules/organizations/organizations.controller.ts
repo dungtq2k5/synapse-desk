@@ -20,17 +20,19 @@ import { PermissionGuard } from '../../common/guards/permission.guard';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ResponseMessage } from '../../common/decorators/response-message.decorator';
-import { OrganizationsGrpcClient } from './organizations-grpc.client';
+import { OrganizationsService } from './organizations.service';
 import {
   DeleteOrganizationDto,
+  UpdateOrganizationDto,
+  UpdateOrganizationSettingsDto,
+} from './dto/rest/organization.dto';
+import {
   OffboardResponseDto,
   OnboardingResponseDto,
   OrganizationResponseDto,
   OrganizationSettingsResponseDto,
   OrganizationUsageResponseDto,
-  UpdateOrganizationDto,
-  UpdateOrganizationSettingsDto,
-} from './dto/rest/organization.dto';
+} from './dto/rest/organization-response.dto';
 import { OrgAccessKind } from '../../common/decorators/org-access.decorator';
 import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AUTH_SCHEMES } from '../../common/config/swagger.config';
@@ -38,7 +40,7 @@ import {
   ApiFilterErrors,
   ApiWrappedResponse,
 } from '../../common/decorators/api-response.decorator';
-import { InboundAddressResponseDto } from './dto/rest/inbound-address.dto';
+import { InboundAddressResponseDto } from './dto/rest/inbound-address-response.dto';
 
 /**
  * The caller's OWN tenant (api-endpoints-plan).
@@ -55,9 +57,7 @@ import { InboundAddressResponseDto } from './dto/rest/inbound-address.dto';
 @Controller('organizations/current')
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class OrganizationsController {
-  constructor(
-    private readonly organizationsGrpcClient: OrganizationsGrpcClient,
-  ) {}
+  constructor(private readonly organizations: OrganizationsService) {}
 
   /**
    * NO permission requirement, unlike everything else here.
@@ -81,11 +81,11 @@ export class OrganizationsController {
   get(
     @CurrentUser() context: RequestContext,
   ): Promise<OrganizationResponseDto> {
-    return this.organizationsGrpcClient.getCurrent(context);
+    return this.organizations.getCurrent(context);
   }
 
   /**
-   * Issues the tenant's inbound support address, or ROTATES it
+   * Issues the tenant's inbound support address, or ROTATES it.
    *
    * **The same route for both**, because "enable" and "rotate" differ only in
    * whether the tenant already had a token. A separate rotate endpoint would
@@ -117,11 +117,11 @@ export class OrganizationsController {
   issueInboundToken(
     @CurrentUser() context: RequestContext,
   ): Promise<InboundAddressResponseDto> {
-    return this.organizationsGrpcClient.issueInboundToken(context);
+    return this.organizations.issueInboundToken(context);
   }
 
   /**
-   * Switches inbound email off
+   * Switches inbound email off.
    *
    * Returns the tenant to the state one that never enabled email is already in.
    * Idempotent, because the caller's intent is satisfied either way.
@@ -137,7 +137,7 @@ export class OrganizationsController {
   @RequirePermission('organization.update')
   @HttpCode(HttpStatus.NO_CONTENT)
   revokeInboundToken(@CurrentUser() context: RequestContext): Promise<void> {
-    return this.organizationsGrpcClient.revokeInboundToken(context);
+    return this.organizations.revokeInboundToken(context);
   }
 
   /** `slug` changes break existing links; `domain` is security-relevant. */
@@ -151,7 +151,7 @@ export class OrganizationsController {
     @CurrentUser() context: RequestContext,
     @Body() updateOrganizationDto: UpdateOrganizationDto,
   ): Promise<OrganizationResponseDto> {
-    return this.organizationsGrpcClient.update(updateOrganizationDto, context);
+    return this.organizations.update(updateOrganizationDto, context);
   }
 
   @ApiOperation({
@@ -164,7 +164,7 @@ export class OrganizationsController {
   getSettings(
     @CurrentUser() context: RequestContext,
   ): Promise<OrganizationSettingsResponseDto> {
-    return this.organizationsGrpcClient.getSettings(context);
+    return this.organizations.getSettings(context);
   }
 
   /**
@@ -188,7 +188,7 @@ export class OrganizationsController {
     @Body() updateOrganizationSettingsDto: UpdateOrganizationSettingsDto,
     @Res({ passthrough: true }) response: Response,
   ): Promise<OrganizationSettingsResponseDto> {
-    const settings = await this.organizationsGrpcClient.updateSettings(
+    const settings = await this.organizations.updateSettings(
       updateOrganizationSettingsDto,
       context,
     );
@@ -215,7 +215,7 @@ export class OrganizationsController {
   getUsage(
     @CurrentUser() context: RequestContext,
   ): Promise<OrganizationUsageResponseDto> {
-    return this.organizationsGrpcClient.getUsage(context);
+    return this.organizations.getUsage(context);
   }
 
   /** Derived live from the data — never a stored checklist. */
@@ -231,7 +231,7 @@ export class OrganizationsController {
   getOnboarding(
     @CurrentUser() context: RequestContext,
   ): Promise<OnboardingResponseDto> {
-    return this.organizationsGrpcClient.getOnboarding(context);
+    return this.organizations.getOnboarding(context);
   }
 
   /** PENDING_ONBOARDING -> ACTIVE only. 409 from any other status. */
@@ -247,13 +247,13 @@ export class OrganizationsController {
   completeOnboarding(
     @CurrentUser() context: RequestContext,
   ): Promise<OrganizationResponseDto> {
-    return this.organizationsGrpcClient.completeOnboarding(context);
+    return this.organizations.completeOnboarding(context);
   }
 
   /**
    * REQUESTS offboarding: freezes the tenant and signs everyone out now.
    *
-   * Not the irreversible part — a Super Admin finalises that. Self-service
+   * Not the irreversible part — a Super Admin finalizes that. Self-service
    * tenant deletion with no cooling-off is a support incident waiting to
    * happen, and the audit row is what the platform acts on.
    *
@@ -273,7 +273,7 @@ export class OrganizationsController {
     @Body() deleteOrganizationDto: DeleteOrganizationDto,
     @Res({ passthrough: true }) response: Response,
   ): Promise<OffboardResponseDto> {
-    const result = await this.organizationsGrpcClient.requestOffboard(
+    const result = await this.organizations.requestOffboard(
       deleteOrganizationDto,
       context,
     );

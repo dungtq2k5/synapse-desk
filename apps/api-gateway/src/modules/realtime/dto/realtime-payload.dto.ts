@@ -22,7 +22,7 @@
  * exists, and the two would drift.
  */
 
-import { AnswerStatus as DomainAnswerStatus } from '@synapsedesk/common';
+import { type FrameAnswerStatus } from '../realtime.config';
 import { Citation } from '@synapsedesk/grpc-proto';
 import { PresenceState } from '../realtime.config';
 
@@ -54,8 +54,8 @@ export class PresencePayloadDto {
  * `typing` — someone is replying. Room: `ticket:{id}`, minus the sender.
  *
  * `ttlMs` is on the frame because the CLIENT expires the indicator: `typing:stop`
- * is a hint that a closed tab, a dead battery and a lost network all skip
- *.
+ * is a hint that a closed tab, a dead battery and a lost network all skip.
+ *
  */
 export class TypingPayloadDto {
   ticketId!: string;
@@ -70,14 +70,6 @@ export class AiStreamChunkPayloadDto {
   ticketId!: string;
   token!: string;
 }
-
-/** Frame status for an answer status this build does not recognise. */
-export const UNSPECIFIED_FRAME_STATUS = 'UNSPECIFIED';
-
-/** Every value `ai:stream:done` may carry in `status`. */
-// ASK Is there a reason we declare it at here? Why is shouldn't be in config? What about proto?
-export type FrameAnswerStatus =
-  DomainAnswerStatus | typeof UNSPECIFIED_FRAME_STATUS;
 
 /**
  * `ai:stream:done` — the stream finished.

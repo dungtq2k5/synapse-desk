@@ -20,26 +20,20 @@ import { AppModule } from './app.module';
 /**
  * A HYBRID microservice — gRPC server AND NATS consumer in one process.
  *
- * auth-service is pure gRPC: it publishes to NATS but never subscribes.
- * ticket-service is the first service here that must do both — it serves
- * TicketService/MessageService/etc. to the gateway over gRPC, while consuming
- * `audit.record` and publishing `ticket.*` domain events.
+ * It serves TicketService/MessageService/etc. to the gateway over gRPC while
+ * consuming `audit.record` and publishing `ticket.*` domain events.
  *
- * **`NestFactory.create`, not `createMicroservice`.** That is not a stylistic
- * choice: `createMicroservice` returns an `INestMicroservice`, which has no
- * `connectMicroservice` at all — one call gets exactly one transport. Attaching
- * a second requires an `INestApplication`, which only `create` returns.
+ * **`NestFactory.create`, not `createMicroservice`.** The latter returns an
+ * `INestMicroservice`, which has no `connectMicroservice` at all — one call
+ * gets one transport. Attaching a second requires an `INestApplication`.
  *
  * **`init()`, not `listen()`.** `create` builds an HTTP adapter, but this
- * service serves no HTTP and must not bind a port — `init()` runs the whole
- * lifecycle (so `onApplicationBootstrap`, and therefore the seeder, fires)
- * while leaving the adapter unbound. `listen()` here would open a port nothing
- * answers on.
+ * service serves no HTTP and must not bind a port. `init()` runs the whole
+ * lifecycle — so `onApplicationBootstrap`, and therefore the seeder, fires —
+ * while leaving the adapter unbound.
  *
- * The alternative — two separate `createMicroservice` processes — would mean
- * two DI containers and two Prisma pools for one logical service, and a
- * consumer that could drift out of step with the RPC surface it shares a
- * database with.
+ * Two separate `createMicroservice` processes would mean two DI containers and
+ * two Prisma pools for one logical service.
  */
 async function bootstrap() {
   const logger = new Logger(AppModule.name);
@@ -51,7 +45,7 @@ async function bootstrap() {
   app.connectMicroservice<MicroserviceOptions>({
     transport: Transport.GRPC,
     options: {
-      // Domain package PLUS the ops packages Probes and
+      // Domain package PLUS the ops packages. Probes and
       // `/version` ride the port this service already listens on: no HTTP
       // listener, no second port, and the kubelet speaks `grpc.health.v1`
       // natively.

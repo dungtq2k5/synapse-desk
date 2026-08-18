@@ -4,26 +4,18 @@ import {
   AUTH_GRPC_CLIENT,
   DEPARTMENT_SERVICE_NAME,
   DepartmentServiceClient,
-  toPageRequest,
+  AddDepartmentMembersRequest,
+  AddDepartmentMembersResponse,
+  CreateDepartmentRequest,
+  DepartmentResponse,
+  ListDepartmentMembersResponse,
+  ListDepartmentsResponse,
+  ListDepartmentMembersRequest,
+  ListDepartmentsRequest,
+  UpdateDepartmentRequest,
 } from '@synapsedesk/grpc-proto';
 import { RequestContext } from '@synapsedesk/common';
 import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
-import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
-import { toPaginationMetaDataResponseDto } from '../../common/mappers/pagination.mapper';
-import {
-  toDepartmentResponseDto,
-  toDepartmentMemberResponseDto,
-} from './department.mapper';
-import {
-  AddDepartmentMembersDto,
-  AddDepartmentMembersResponseDto,
-  CreateDepartmentDto,
-  DepartmentMemberResponseDto,
-  DepartmentResponseDto,
-  ListDepartmentMembersQueryDto,
-  ListDepartmentsQueryDto,
-  UpdateDepartmentDto,
-} from './dto/rest/department.dto';
 
 /**
  * Every method takes the full `RequestContext`, not a bare origin.
@@ -51,73 +43,43 @@ export class DepartmentsGrpcClient
       this.client.getService<DepartmentServiceClient>(DEPARTMENT_SERVICE_NAME);
   }
 
-  async list(
-    query: ListDepartmentsQueryDto,
+  list(
+    request: ListDepartmentsRequest,
     context: RequestContext,
-  ): Promise<PaginationResponseDto<DepartmentResponseDto>> {
-    const response = await this.call(
+  ): Promise<ListDepartmentsResponse> {
+    return this.call(
       (metadata) =>
-        this.departmentGrpcService.listDepartments(
-          {
-            page: toPageRequest(query),
-            includeDeleted: query.includeDeleted,
-          },
-          metadata,
-        ),
+        this.departmentGrpcService.listDepartments(request, metadata),
       context,
     );
-
-    return {
-      items: response.items.map(toDepartmentResponseDto),
-      meta: toPaginationMetaDataResponseDto(response.meta),
-    };
   }
 
-  async get(
-    id: string,
-    context: RequestContext,
-  ): Promise<DepartmentResponseDto> {
-    return toDepartmentResponseDto(
-      await this.call(
-        (metadata) =>
-          this.departmentGrpcService.getDepartment({ id }, metadata),
-        context,
-      ),
+  get(id: string, context: RequestContext): Promise<DepartmentResponse> {
+    return this.call(
+      (metadata) => this.departmentGrpcService.getDepartment({ id }, metadata),
+      context,
     );
   }
 
-  async create(
-    dto: CreateDepartmentDto,
+  create(
+    request: CreateDepartmentRequest,
     context: RequestContext,
-  ): Promise<DepartmentResponseDto> {
-    return toDepartmentResponseDto(
-      await this.call(
-        (metadata) =>
-          this.departmentGrpcService.createDepartment(
-            { name: dto.name, description: dto.description },
-            metadata,
-          ),
-        context,
-      ),
+  ): Promise<DepartmentResponse> {
+    return this.call(
+      (metadata) =>
+        this.departmentGrpcService.createDepartment(request, metadata),
+      context,
     );
   }
 
-  async update(
-    id: string,
-    dto: UpdateDepartmentDto,
+  update(
+    request: UpdateDepartmentRequest,
     context: RequestContext,
-  ): Promise<DepartmentResponseDto> {
-    return toDepartmentResponseDto(
-      await this.call(
-        (metadata) =>
-          this.departmentGrpcService.updateDepartment(
-            // Passed through as-is: an absent key stays absent on the wire,
-            // which is what carries "leave unchanged" to the service.
-            { id, name: dto.name, description: dto.description },
-            metadata,
-          ),
-        context,
-      ),
+  ): Promise<DepartmentResponse> {
+    return this.call(
+      (metadata) =>
+        this.departmentGrpcService.updateDepartment(request, metadata),
+      context,
     );
   }
 
@@ -129,54 +91,32 @@ export class DepartmentsGrpcClient
     );
   }
 
-  async restore(
-    id: string,
-    context: RequestContext,
-  ): Promise<DepartmentResponseDto> {
-    return toDepartmentResponseDto(
-      await this.call(
-        (metadata) =>
-          this.departmentGrpcService.restoreDepartment({ id }, metadata),
-        context,
-      ),
+  restore(id: string, context: RequestContext): Promise<DepartmentResponse> {
+    return this.call(
+      (metadata) =>
+        this.departmentGrpcService.restoreDepartment({ id }, metadata),
+      context,
     );
   }
 
-  async listMembers(
-    departmentId: string,
-    query: ListDepartmentMembersQueryDto,
+  listMembers(
+    request: ListDepartmentMembersRequest,
     context: RequestContext,
-  ): Promise<PaginationResponseDto<DepartmentMemberResponseDto>> {
-    const response = await this.call(
+  ): Promise<ListDepartmentMembersResponse> {
+    return this.call(
       (metadata) =>
-        this.departmentGrpcService.listDepartmentMembers(
-          { departmentId, page: toPageRequest(query) },
-          metadata,
-        ),
+        this.departmentGrpcService.listDepartmentMembers(request, metadata),
       context,
     );
-
-    return {
-      items: response.items.map(toDepartmentMemberResponseDto),
-      meta: toPaginationMetaDataResponseDto(response.meta),
-    };
   }
 
   addMembers(
-    departmentId: string,
-    dto: AddDepartmentMembersDto,
+    request: AddDepartmentMembersRequest,
     context: RequestContext,
-  ): Promise<AddDepartmentMembersResponseDto> {
+  ): Promise<AddDepartmentMembersResponse> {
     return this.call(
       (metadata) =>
-        this.departmentGrpcService.addDepartmentMembers(
-          {
-            departmentId,
-            userIds: dto.userIds,
-            isPrimary: dto.isPrimary,
-          },
-          metadata,
-        ),
+        this.departmentGrpcService.addDepartmentMembers(request, metadata),
       context,
     );
   }

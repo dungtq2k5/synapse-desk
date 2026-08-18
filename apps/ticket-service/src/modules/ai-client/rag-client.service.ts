@@ -42,16 +42,10 @@ export type AiReplyDraft = {
   }>;
 };
 
-// ASK This `docblock` seems to be invalid
-/**
- * A summary, WITHOUT token columns.
- *
- * `ai_summaries` has none in the RDM, and the reason is that summaries
- * append to `ai_generations` like every other spend. Adding token columns here
- * would grow a SECOND metering path beside the ledger — and the quota gate sums
- * the ledger, so the second path would be a number nobody gates on that looks
- * exactly like one they do.
- */
+// Deliberately NO token columns: summaries append to `ai_generations` like
+// every other spend. A second set here would be a metering path the quota gate
+// does not sum -- a number that looks like the one it does.
+/** A summary as rag-service produces it, before it is persisted. */
 export type AiSummaryDraft = {
   summaryText: string;
   suggestedAction: string;
@@ -61,7 +55,7 @@ export type AiSummaryDraft = {
 };
 
 /**
- * One article to recommend beside the next steps
+ * One article to recommend beside the next steps.
  *
  * **Not `AiCitation` reused, and they must not be merged.** A citation points
  * at the PASSAGE an answer used and carries a `chunkId` so the answer can be
@@ -101,10 +95,10 @@ export type SimilarTicket = {
 };
 
 /**
- * `ticket-service`'s connection to `rag-service` — §1.7's seam, now real.
+ * `ticket-service`'s connection to `rag-service`.7's seam, now real.
  *
  * **Nothing here names a model, and that is the easiest possible version of doc
- * 15 §1.2.** This service never sees a model name as an INPUT: it sends a
+ * **This service never sees a model name as an INPUT: it sends a
  * conversation and gets back text plus the `model_name` that was actually used,
  * for display and for the `ticket_messages` row. Resolution happens inside
  * rag-service from `settings_for(organization_id)`, so there is no call site
@@ -149,7 +143,7 @@ export class RagClientService implements OnModuleInit {
     context: CallerContext,
     maxRetries: number = 1,
     /**
-     * The last user message's attachments
+     * The last user message's attachments.
      *
      * Defaulted empty so a caller that has none says nothing, and so this
      * signature reads the same on both `Draft` paths. Filtered and fetched by
@@ -174,7 +168,7 @@ export class RagClientService implements OnModuleInit {
     return {
       content: response.draft,
       // **THE RULE: populate model/token fields only where they cannot be read
-      // as the meter.**
+      // as the meter.**.
       //
       // Written down because this looks exactly like an inconsistency with
       // `generateSummary` below, which passes `modelName` straight through, and

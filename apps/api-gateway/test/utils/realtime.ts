@@ -83,7 +83,7 @@ export async function bootstrapRealtimeTest(
     .useValue(clientGrpc)
     .overrideProvider(TICKET_GRPC_CLIENT)
     .useValue(clientGrpc)
-    // Domain C's Python peer, for the AI streaming relay Stubbed
+    // Domain C's Python peer, for the AI streaming relay. Stubbed
     // like the others: what the gateway can prove alone is that it RELAYS a
     // server-stream correctly, which is a property of this process. Whether a
     // cancelled generation writes its ledger row is rag-service's half, and is

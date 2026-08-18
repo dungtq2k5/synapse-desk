@@ -1,26 +1,48 @@
 import {
+  CurrentUserResponse,
   fromProtoGender,
-  toProtoGender,
   fromProtoTimestamp,
+  ListUsersRequest,
+  ListUsersResponse,
+  LockUserRequest,
+  PresignAvatarUploadResponse,
+  requireField,
   requireProtoTimestamp,
+  toPageRequest,
+  toProtoGender,
+  toProtoTimestamp,
   UserResponse,
   UserSummary,
   UserSummaryResponse,
 } from '@synapsedesk/grpc-proto';
-import { UserResponseDto } from './dto/rest/user-response.dto';
-import { UserSummaryResponseDto } from './dto/rest/user-admin.dto';
-import { UserSummaryGqlDto } from './dto/graphql/user-summary.gql-dto';
-import { UserResponseGqlDto } from './dto/graphql/user-response.gql-dto';
+import { PermissionCode } from '@synapsedesk/common';
+import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
+import { toPaginationMetaDataResponseDto } from '../../common/mappers/pagination.mapper';
+import { PresignAvatarResponseDto } from './dto/rest/avatar-response.dto';
+import {
+  CurrentUserResponseDto,
+  UserResponseDto,
+} from './dto/rest/user-response.dto';
+import { ListUsersQueryDto, LockUserDto } from './dto/rest/user-admin.dto';
+import { UserSummaryResponseDto } from './dto/rest/user-admin-response.dto';
+import {
+  UserSummaryResponseGqlDto,
+  UserResponseGqlDto,
+} from './dto/graphql/user-response.gql-dto';
 
-// ASK This `docblock` seems to be invalid
 /**
- * Wire -> REST boundary, the mirror of auth-service's `toUserResponse`.
+ * Wire `UserResponse` -> the REST `UserResponseDto`.
  *
- * protobuf has no null, so an unset field arrives as `undefined`. The REST
- * contract commits to `null` instead — that is what `@IsNullable()` on
- * `UserResponseDto` already assumes, and it means a client (or an OpenAPI
- * schema) sees a stable key set rather than fields that vanish. So every
- * optional field is converted deliberately here.
+ * Every optional field is converted to `null`, never left `undefined`: the REST
+ * contract commits to a stable key set, which is what `@IsNullable()` on
+ * `UserResponseDto` and the published OpenAPI schema both describe.
+ *
+ * @example
+ * const dto = toUserResponseDto(await client.get(id, context));
+ *
+ * @param user - the message off the wire
+ * @returns the REST DTO, with every optional field present as `null`
+ * @throws Error if `createdAt` or `updatedAt` is missing, which the proto requires
  */
 export function toUserResponseDto(user: UserResponse): UserResponseDto {
   return {
@@ -59,32 +81,27 @@ export function toUserSummaryResponseDto(
   };
 }
 
-// ASK This `docblock` seems to be invalid
 /**
- * Wire -> GraphQL edge type, for `Ticket.assignee`, `Document.createdBy` and
- * the other resolved-user fields.
+ * Wire `UserSummary` -> the GraphQL `UserSummary` edge type, used for
+ * `Ticket.assignee`, `Ticket.author`, `TicketMessage.sender`,
+ * `Notification.actor`, `Document.createdBy` and `AgentStat.agent`.
  *
- * **Here rather than beside the type it produces.** Every other wire→DTO
- * mapping in this gateway lives in a `<feature>.mapper.ts` — ten of them — and
- * a mapper in a DTO file is the kind of local consistency that reads fine in
- * one file and wrong across the module.
+ * Called by `createUserSummaryLoader`, so a resolver reaches an edge through
+ * `loaders.users.load(id)` and never maps for itself. A missing id is the
+ * loader's `null`, not this function's.
  *
- * Being next to {@link toUserSummaryResponseDto} is the other half of the reason. That
- * one returns the ADMIN summary — a user plus roles and departments — and the
- * two names are close enough to swap by accident. Side by side, the difference
- * is visible; a folder apart, it is a guess.
+ * Not to be confused with {@link toUserSummaryResponseDto}, which returns the
+ * ADMIN summary — a user plus their roles and departments.
  *
- * **`null` in, `null` out.** A loader returns `null` for an id the batch RPC
- * omitted — a deleted row, or one in another tenant — and every edge is nullable
- * precisely so that answer can be given. Mapping it to an empty
- * object instead would render a card with a blank name and no way for the client
- * to tell that anything was missing.
+ * @example
+ * const rows = response.summaries.map((s) => toUserSummaryGqlDto(s));
+ *
+ * @param user - one summary row off the wire
+ * @returns the edge type the GraphQL schema declares
  */
 export function toUserSummaryGqlDto(
-  user: UserSummary | null,
-): UserSummaryGqlDto | null {
-  if (!user) return null;
-
+  user: UserSummary,
+): UserSummaryResponseGqlDto {
   return {
     id: user.userId,
     fullName: user.fullName,
@@ -94,42 +111,21 @@ export function toUserSummaryGqlDto(
   };
 }
 
-// ASK This `docblock` seems to be invalid
 /**
  * The user envelope -> the FLAT shape the GraphQL `User` type declares.
  *
- * **This exists because a cast was standing in for it, and the cast was wrong.**
- * `UserServiceGrpcClient.get()` returns `UserSummaryResponseDto`, whose user
- * fields are NESTED under `.user` alongside `roleIds` and `departmentIds`. The
- * resolver handed that envelope straight back as
- * `as unknown as UserResponseGqlDto` — so `id`, `email` and every other field
- * resolved to `undefined`, and `Query.user` answered
- * `Cannot return null for non-nullable field User.id` for every caller. The same
- * cast on `Query.users` broke every row of the list.
+ * The envelope nests the user under `.user` and carries `departmentIds` beside
+ * it; this flattens the two into one object. `departmentIds` is kept because
+ * `User.departments` resolves off the parent.
  *
- * A double cast is the only thing TypeScript accepts between two unrelated
- * shapes, which is exactly why it silences the one error that would have caught
- * this. The fix is a real translation, and the reason it belongs in a mapper
- * rather than inline is that all three call sites need it.
+ * Used by the `getCurrentUserGql`, `getGql` and `listGql` methods on
+ * {@link UsersService}, so a resolver returns the value as it stands.
  *
- * **`departmentIds` is carried through deliberately.** It is a sibling of `user`
- * on the envelope, not a property of it, so unwrapping alone loses it — and
- * `User.departments` reads it off the parent. `Query.me` had that bug in its
- * quieter form: it correctly returned `current.user`, so it rendered, and the
- * `departments` edge silently returned `[]` for every caller because the ids
- * had been left behind on the envelope.
+ * @example
+ * const user = toUserResponseGqlDto(await this.get(id, context));
  *
- * **The return type is exactly `UserResponseGqlDto`**, with nothing riding
- * along. It was briefly an intersection — the schema type PLUS a `departmentIds`
- * the schema did not declare — which worked, because GraphQL serializes only
- * declared fields, and was the wrong shape of solution: a function named for a
- * DTO that does not return that DTO, feeding a resolver whose parameter had to
- * be widened to see the extra property. Declaring the field on the type instead
- * made the carrier the contract.
- *
- * Typed by structure rather than by naming the two DTOs: `UserSummaryResponseDto`
- * and `CurrentUserResponseDto` share this shape and nothing else, and the two
- * fields below are all this needs.
+ * @param source - any envelope carrying a user and its department ids
+ * @returns the flat `User` the GraphQL schema declares
  */
 export function toUserResponseGqlDto(source: {
   user: UserResponseDto;
@@ -154,5 +150,73 @@ export function toProfileFields(dto: {
     fullName: dto.fullName,
     gender: dto.gender === undefined ? undefined : toProtoGender(dto.gender),
     dob: dto.dob === null ? '' : dto.dob,
+  };
+}
+
+/** Builds a `ListUsersRequest` from the REST query. */
+export function toListUsersRequest(query: ListUsersQueryDto): ListUsersRequest {
+  return {
+    page: toPageRequest(query),
+    departmentId: query.departmentId,
+    roleId: query.roleId,
+    isLocked: query.isLocked,
+    includeDeleted: query.includeDeleted,
+  };
+}
+
+/** Builds a `LockUserRequest`. An absent `lockedUntil` means an indefinite lock. */
+export function toLockUserRequest(
+  id: string,
+  dto: LockUserDto,
+): LockUserRequest {
+  return {
+    id,
+    reason: dto.reason,
+    lockedUntil: dto.lockedUntil
+      ? toProtoTimestamp(new Date(dto.lockedUntil))
+      : undefined,
+  };
+}
+
+/**
+ * Converts a `GetCurrentUserResponse` off the wire into its REST DTO.
+ *
+ * `permissionCodes` is narrowed here: the proto declares `repeated string`, and
+ * the codes come from our own seeded catalogue rather than from user input.
+ *
+ * @throws Error if the response carries no user, which the proto requires.
+ */
+export function toCurrentUserResponseDto(
+  response: CurrentUserResponse,
+): CurrentUserResponseDto {
+  return {
+    user: toUserResponseDto(requireField(response.user, 'user')),
+    permissionCodes: response.permissionCodes as PermissionCode[],
+    departmentIds: response.departmentIds,
+  };
+}
+
+/** Converts a `ListUsersResponse` into the paginated REST envelope. */
+export function toUserSummaryPageDto(
+  response: ListUsersResponse,
+): PaginationResponseDto<UserSummaryResponseDto> {
+  return {
+    items: response.items.map(toUserSummaryResponseDto),
+    meta: toPaginationMetaDataResponseDto(response.meta),
+  };
+}
+
+/**
+ * Converts a `PresignAvatarUploadResponse` off the wire into its REST DTO.
+ *
+ * @throws Error if `expiresAt` is missing, which the proto requires.
+ */
+export function toPresignAvatarResponseDto(
+  response: PresignAvatarUploadResponse,
+): PresignAvatarResponseDto {
+  return {
+    uploadUrl: response.uploadUrl,
+    objectPath: response.objectPath,
+    expiresAt: requireProtoTimestamp(response.expiresAt, 'expiresAt'),
   };
 }

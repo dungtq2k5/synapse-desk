@@ -75,7 +75,7 @@ class RagServiceServicer:
     """Missing associated documentation comment in .proto file."""
 
     def Search(self, request, context):
-        """Retrieval with NO generation — the test seam (13-doc §2.3). It exists
+        """Retrieval with NO generation — the test seam. It exists
         before anything calls an LLM because it is the only point where isolation
         and relevance can be proven cheaply and deterministically; once generation
         is layered on, those tests become slow, non-deterministic and skipped.
@@ -90,7 +90,7 @@ class RagServiceServicer:
         Self-RAG cannot stream, structurally: it generates N candidates, judges
         them, then picks a winner, and you cannot stream an answer you have not
         chosen. Co-RAG's Mode A draft is a single generation, streamable from the
-        first token (11-doc §1.1).
+        first token.
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')

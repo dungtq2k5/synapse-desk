@@ -2,20 +2,19 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 /**
- * Rolls the ledger's chunk arrays into `document_chunks` counters — §4.1.
+ * Rolls the ledger's chunk arrays into `document_chunks` counters.
  *
- * **A projection rather than a query, and the reason is retention.** An earlier
- * draft called the document flags "a pure query over
- * `ai_generations.retrieved_chunk_ids`". It is not pure, and worse, it is
- * temporary: retention rolls the ledger into daily per-(org, purpose, model)
- * aggregates that **do not carry the chunk arrays** (RDM Table 29), so a flag
- * defined against them stops working the moment rollups ship — silently,
- * reporting zero findings, which reads exactly like a healthy corpus.
+ * **A projection rather than a query, because of retention.** Retention rolls
+ * the ledger into daily per-(org, purpose, model) aggregates that **do not
+ * carry the chunk arrays**, so a flag defined against them stops working the
+ * moment rollups ship — silently, reporting zero findings, which reads exactly
+ * like a healthy corpus.
  *
- * **Ordering constraint, and it is real: projection BEFORE retention over the
- * same window.** Reversed, the retention job deletes rows the projection has
- * not read yet, and the counters under-report forever with nothing to
- * recompute them from.
+ * **Ordering constraint: projection BEFORE retention over the same window.**
+ * Reversed, retention deletes rows the projection has not read, and the
+ * counters under-report forever with nothing to recompute them from.
+ *
+ * See `docs/decisions/0025-chunk-usage-is-a-projection.md`.
  */
 @Injectable()
 export class ChunkUsageProjection {

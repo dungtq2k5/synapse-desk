@@ -18,7 +18,7 @@ import { Timestamp } from "../../google/protobuf/timestamp";
  * enum right here and wrong there.
  *
  * `LOW` and `HIGH` are declared and nothing branches on them yet — they behave
- * as `NORMAL` (18-doc §8). They are on the wire regardless: a producer needs
+ * as `NORMAL`. They are on the wire regardless: a producer needs
  * somewhere to put "this matters more than a reply", and a value that survives
  * the round trip can be acted on later without a proto change. `CRITICAL` is
  * the one that already means something — it bypasses quiet hours and digest
@@ -37,7 +37,7 @@ export enum NotificationPriority {
  * Mirrors `NotificationChannel` in `@synapsedesk/common` — RDM Table 24.
  *
  * `WEBHOOK` is present for completeness and is NOT a valid preference: it has
- * no implementation (18-doc §8), so a preference for it would control nothing.
+ * no implementation, so a preference for it would control nothing.
  * That exclusion stays in the service layer, because it is a policy about which
  * channels are configurable, not a statement about which channels exist.
  */
@@ -53,8 +53,8 @@ export enum NotificationChannel {
 /**
  * Mirrors `DigestMode` in `@synapsedesk/common` — RDM Table 25.
  *
- * `HOURLY` and `DAILY` are read by the resolver but the SCHEDULER is deferred
- * (18-doc §8), so only `IMMEDIATE` and `OFF` change behaviour today. They are
+ * `HOURLY` and `DAILY` are read by the resolver but the SCHEDULER is deferred,
+ * so only `IMMEDIATE` and `OFF` change behaviour today. They are
  * on the wire anyway: a user can choose one, and the value must survive the
  * round trip rather than being silently rewritten.
  */
@@ -87,7 +87,7 @@ export interface NotificationResponse {
   organizationId: string;
   /**
    * The ORIGINATING event — `ticket.assigned`, `quota.threshold`. Never the
-   * transport subject (18-doc §1.3).
+   * transport subject.
    *
    * Stays a `string` where `priority` below became an enum, and the difference
    * is open set versus closed: every producer that emits a new event adds a
@@ -117,7 +117,7 @@ export interface NotificationResponse {
 }
 
 /**
- * CURSOR pagination, not offset — 18-doc §2.
+ * CURSOR pagination, not offset.
  *
  * The feed grows at the head while it is being read, so an offset shifts rows
  * under the reader: page 2 silently repeats a row or skips one, and neither is
@@ -152,7 +152,7 @@ export interface NotificationIdRequest {
 }
 
 /**
- * Bulk read, two shapes — 18-doc §2.
+ * Bulk read, two shapes.
  *
  * `{ resourceType, resourceId }` is the one that makes the feature usable
  * rather than annoying: opening ticket #1042 clears all twelve of its
@@ -171,7 +171,7 @@ export interface MarkReadResponse {
 }
 
 /**
- * The RESOLVED value plus where it came from — 18-doc §4.
+ * The RESOLVED value plus where it came from.
  *
  * `source` is what lets the UI show "inherited" rather than pretending every
  * value was chosen. A settings screen that renders a default as a choice is one
@@ -215,7 +215,7 @@ export interface UpdatePreferenceRequest {
 
 /**
  * The ticket an outbound notification was about, found by its `Message-ID`.
- * 31-doc §4 — the `In-Reply-To` fallback.
+ * The `In-Reply-To` fallback.
  *
  * **A two-hop join, and both hops are here**: `notification_deliveries`
  * carries the provider's `Message-ID`, and the `notifications` row it belongs

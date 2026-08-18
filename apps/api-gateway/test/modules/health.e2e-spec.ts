@@ -6,7 +6,7 @@ import { RedisHealthService } from '../../src/modules/health/redis-health.servic
 import { compareAlphabetically } from '@synapsedesk/common';
 
 /**
- * `/health` and `/health/ready`
+ * `/health` and `/health/ready`.
  *
  * **The bug this suite exists for turned any single outage into a total one.**
  * Readiness computed `every(peer => peer.health !== 'DOWN')`, so one gRPC peer
@@ -19,7 +19,7 @@ import { compareAlphabetically } from '@synapsedesk/common';
  * endpoint returned a plausible shape, and nothing asserted what the boolean
  * was allowed to depend on.
  */
-describe('§1 health probes (e2e)', () => {
+describe('Health probes (e2e)', () => {
   let fx: E2eFixture;
 
   const readiness = () => request(fx.app.getHttpServer()).get('/health/ready');
@@ -133,14 +133,14 @@ describe('§1 health probes (e2e)', () => {
 });
 
 /**
- * `/version`
+ * `/version`.
  *
  * Trivial to serve and easy to make useless. The two ways it goes wrong are
  * both tested here: reporting the wrong build (test 1's values come from the
  * environment, which is where the image bakes them), and accreting fields until
  * a deliberately public endpoint is an inventory of the runtime (test 3).
  */
-describe('§3 /version (e2e)', () => {
+describe('/version (e2e)', () => {
   let fx: E2eFixture;
 
   const version = () => request(fx.app.getHttpServer()).get('/version');

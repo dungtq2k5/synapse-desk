@@ -18,7 +18,7 @@ import { StorageClientModule } from '../storage-client/storage-client.module';
  *
  * Imports StorageClientModule because auth-service OWNS `users.avatar_url`, so
  * it is the service that initiates an avatar upload and calls storage-service
- * internally — the gateway never talks to storage-service directly (§1.5).
+ * internally — the gateway never talks to storage-service directly.
  *
  * Imports SessionsModule because deactivating or locking a user must revoke
  * their sessions in the same operation: otherwise they keep working until their

@@ -14,7 +14,7 @@ import {
 import { grpcError, timestamp, wireAssignment } from '../fixtures/wire';
 
 /**
- * §2.4 Assignment at the HTTP boundary.
+ * Assignment at the HTTP boundary.
  *
  * ticket-service is stubbed: the one-transaction invariant, the partial unique
  * index and the ledger/cache agreement all have their own suite against a real
@@ -22,7 +22,7 @@ import { grpcError, timestamp, wireAssignment } from '../fixtures/wire';
  * DIFFERENT permissions, the route shapes, and the reason enum in both
  * directions.
  */
-describe('§2.4 Assignment at the HTTP boundary (e2e)', () => {
+describe('Assignment at the HTTP boundary (e2e)', () => {
   let fx: E2eFixture;
 
   const ticketId = faker.string.uuid();

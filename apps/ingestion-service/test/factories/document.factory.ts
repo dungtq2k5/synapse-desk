@@ -92,7 +92,7 @@ export async function createScopedDocument(
   return document;
 }
 
-/** Chunks carrying the four denormalised scope columns, as ingestion writes them. */
+/** Chunks carrying the four denormalized scope columns, as ingestion writes them. */
 export async function createChunks(
   prisma: PrismaService,
   document: {

@@ -2,10 +2,8 @@ import type { CacheService } from '../../cache/cache.service';
 import { entityScope } from '../../config/cache.config';
 import { createCachedLoader } from './loaders.factory';
 
-type Row = { userId: string; fullName: string };
-
 /**
- * The entity cache's ordering contract test 2, written first.
+ * The entity cache's ordering contract, written first.
  *
  * **The batch-alignment bug, in its new and likelier form.** A DataLoader batch must
  * return `results[i]` for `keys[i]`. With a cache in front, the natural
@@ -20,6 +18,8 @@ type Row = { userId: string; fullName: string };
 describe('createCachedLoader', () => {
   const ttlSeconds = 300;
   const organizationId = 'org-1';
+
+  type Row = { userId: string; fullName: string };
 
   /** A cache that hits for exactly the ids given. */
   const cacheWith = (hits: Record<string, Row>) => {
@@ -113,7 +113,7 @@ describe('createCachedLoader', () => {
   });
 
   it('an all-hit batch makes NO rpc call at all', async () => {
-    // The point of the layer test 1, at the unit level.
+    // The point of the layer, at the unit level.
     const fetch = jest.fn(() => Promise.resolve([]));
 
     const { loader } = build(

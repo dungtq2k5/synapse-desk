@@ -39,7 +39,7 @@ export type IngestionJobData = {
   objectPath: string;
   fileType: string;
   /**
-   * ISO 639-1 codes for OCR
+   * ISO 639-1 codes for OCR.
    *
    * Optional because jobs enqueued before this field existed are still in
    * Redis, and a worker that crashed on them would stall every document behind
@@ -52,7 +52,7 @@ export type IngestionJobData = {
 class BudgetExhausted extends Error {}
 
 /**
- * Raised when a document parses to no text at all F4.
+ * Raised when a document parses to no text at all.
  *
  * **A named failure rather than a silent success.** It reaches `fail()` like
  * any other error, so the reason lands in `ingestion_jobs.error_log`, which is
@@ -66,10 +66,10 @@ class NoExtractableText extends Error {
   constructor(fileType: string) {
     super(
       fileType === 'pdf'
-        ? // **The advice changed because the system changed** — 34-doc §6.
+        ? // **The advice changed because the system changed.**
           // It used to end "run OCR on it first", which stops making sense
           // once we run OCR ourselves: by the time a PDF reaches this error,
-          // every image page has been rasterised and read and still produced
+          // every image page has been rasterized and read and still produced
           // nothing.
           //
           // So the actionable input is LANGUAGE, because it is the one thing
@@ -138,7 +138,7 @@ export class IngestionProcessor {
       const parsed = await this.parser.parse(
         bytes,
         data.fileType,
-        // From the EVENT, not a database read `objectPath` and
+        // From the EVENT, not a database read. `objectPath` and
         // `fileType` are there for the same reason: the worker needs no lookup
         // to start, and this service's only document read happens later,
         // inside `writeChunkRows`.
@@ -149,7 +149,7 @@ export class IngestionProcessor {
       const chunks = await this.chunker.chunk(parsed.pages);
 
       if (chunks.length === 0) {
-        // **FAILED, with a reason a human can act on** F4.
+        // **FAILED, with a reason a human can act on.**
         //
         // This used to report INDEXED, reasoning that FAILED "would send
         // someone hunting for a bug". That holds for a GENERIC failure and not
@@ -159,7 +159,7 @@ export class IngestionProcessor {
         // a feedback channel to the person who caused it.
         //
         // Naming "scanned" is the cheap half of the scanned-PDF detection that
-        // §5 argues for before OCR exists: a document that parses to no text at
+        // argues for before OCR exists: a document that parses to no text at
         // all is almost certainly an image, and saying so converts a silent
         // wrong answer into an actionable one.
         throw new NoExtractableText(data.fileType);
@@ -203,27 +203,24 @@ export class IngestionProcessor {
   // -------------------------------------------------------------------------
 
   /**
-   * **Every page is either in the corpus or recorded as missing**
+   * **Every page is either in the corpus or recorded as missing.**
    *
-   * The invariant, checked in the one place that holds both halves. Two silent
-   * drops sit between a PDF and the index and they fail identically from
-   * outside — the document reports INDEXED and three of its pages are simply
-   * not searchable, forever:
+   * Two silent drops sit between a PDF and the index, and they fail
+   * identically from outside — the document reports INDEXED while three of its
+   * pages are simply not searchable, forever:
    *
-   *   1. the parser drops a page OCR could not read (or that it never tried,
-   *      past `MAX_OCR_PAGES_PER_DOCUMENT`);
+   *   1. the parser drops a page OCR could not read, or never tried past
+   *      `MAX_OCR_PAGES_PER_DOCUMENT`;
    *   2. the chunker drops a chunk under `MIN_CHUNK_TOKENS`, so a page that
    *      OCR'd to eight tokens vanishes having been counted a success.
    *
-   * Comparing page numbers in the CHUNK ROWS against the page count the parser
-   * saw catches both at once, which is why the check lives here rather than
-   * being instrumented at each drop.
+   * Comparing page numbers in the CHUNK ROWS against the count the parser saw
+   * catches both at once, which is why the check lives here rather than being
+   * instrumented at each drop.
    *
-   * **A flag, never a failure.** A 200-page handbook where three pages could
-   * not be read is 197 pages of value, and discarding it to signal three is a
-   * bad trade — while silently indexing 197 is the bug this whole document
-   * exists to fix. So: index what worked, and put the rest on a worklist a
-   * human already reviews.
+   * **A flag, never a failure.** A 200-page handbook with three unreadable
+   * pages is 197 pages of value; discarding it to signal three is a bad trade.
+   * Index what worked, and put the rest on a worklist a human already reviews.
    */
   private async reportMissingPages(
     data: IngestionJobData,
@@ -450,7 +447,7 @@ export class IngestionProcessor {
       this.prisma.document.update({
         where: { id: data.documentId },
         data: { status: DocumentStatus.INDEXED },
-        // The uploader, the title and the SCOPE Taken from the
+        // The uploader, the title and the SCOPE. Taken from the
         // row this write already returns rather than fetched afterwards: the
         // relay decides which rooms the announcement reaches, and a
         // department-scoped document announced tenant-wide would disclose its
@@ -532,7 +529,7 @@ export class IngestionProcessor {
       documentId: data.documentId,
       occurredAt: new Date().toISOString(),
       reason: message,
-      // The uploader is the ONLY recipient A failure is one
+      // The uploader is the ONLY recipient. A failure is one
       // person's document not working, not department news.
       uploaderId: document.createdById,
       title: document.title,

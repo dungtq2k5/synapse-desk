@@ -1,5 +1,5 @@
 /**
- * Inbound email, as a domain event
+ * @file Inbound email, as a domain event.
  *
  * **One event, and it flows gateway → notification-service.** The gateway is
  * the email adapter and knows a message was refused; it does not send mail, and
@@ -10,7 +10,7 @@ export const EMAIL_INBOUND_PATTERNS = {
   /**
    * Mail this system refused, and the sender should be told once.
    *
-   * **An EVENT, not an RPC** The webhook must answer 200 whatever
+   * **An EVENT, not an RPC**. The webhook must answer 200 whatever
    * happens, so the drop path must not be able to fail because a mailbox was
    * slow. An RPC would couple the two, and the drop path is precisely the one
    * that must never throw.

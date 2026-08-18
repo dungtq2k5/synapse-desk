@@ -2,8 +2,6 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 describe('the entity cache rests on who writes these fields', () => {
-  const users = () => readFileSync(USERS_SERVICE, 'utf8');
-
   /**
    * Who writes a cached entity's fields.
    *
@@ -34,6 +32,8 @@ describe('the entity cache rests on who writes these fields', () => {
     __dirname,
     '../../../../auth-service/src/modules/departments/departments.service.ts',
   );
+
+  const users = () => readFileSync(USERS_SERVICE, 'utf8');
 
   /** The index just past the `{` at `open`, brace-matched to its close. */
   const matchBrace = (code: string, open: number): number => {

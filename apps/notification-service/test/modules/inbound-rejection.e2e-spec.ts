@@ -10,13 +10,13 @@ import { EmailService } from '../../src/modules/email/email.service';
 import { InboundRejectionConsumer } from '../../src/modules/inbound-email/inbound-rejection.consumer';
 
 /**
- * The reply to mail the gateway refused
+ * The reply to mail the gateway refused.
  *
  * **The rate limit lives here because the sending does.** A limit enforced by
  * the publisher counts intentions; enforced by the sender it counts messages,
  * and a mail loop is made of messages.
  */
-describe('§32 §5 inbound rejection auto-reply (e2e)', () => {
+describe('Inbound rejection auto-reply (e2e)', () => {
   let fx: E2eFixture;
   let consumer: InboundRejectionConsumer;
   let send: jest.SpyInstance;

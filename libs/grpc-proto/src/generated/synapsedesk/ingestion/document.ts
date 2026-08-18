@@ -59,14 +59,14 @@ export enum DocumentFlagType {
   /**
    * DOCUMENT_FLAG_TYPE_UNCITED - A genuinely different finding from UNRETRIEVED — it keeps winning a context
    * slot without earning one, displacing the sources that would have answered.
-   * 16-doc §5: the two were once one flag, and the filter must keep them apart.
+   * The two were once one flag, and the filter must keep them apart.
    */
   DOCUMENT_FLAG_TYPE_UNCITED = 3,
   DOCUMENT_FLAG_TYPE_LOW_CONFIDENCE = 4,
   DOCUMENT_FLAG_TYPE_NEGATIVE_FEEDBACK = 5,
   DOCUMENT_FLAG_TYPE_CONFLICTING = 6,
   /**
-   * DOCUMENT_FLAG_TYPE_PAGES_NOT_INDEXED - Raised by ingestion itself at index time — 34-doc §6. Its provenance
+   * DOCUMENT_FLAG_TYPE_PAGES_NOT_INDEXED - Raised by ingestion itself at index time. Its provenance
    * differs from every value above: those are observations about how a document
    * has been USED, this is a fact about the document.
    */
@@ -102,7 +102,7 @@ export interface DocumentResponse {
     | string
     | undefined;
   /**
-   * ISO 639-1 codes the uploader declared for OCR — 34-doc §4.
+   * ISO 639-1 codes the uploader declared for OCR.
    *
    * Empty means "not specified", which is almost every document: an uploader
    * cannot know a PDF is scanned until it is parsed. `repeated` needs no
@@ -130,7 +130,7 @@ export interface ConfirmDocumentRequest {
   departmentIds: string[];
   fileName: string;
   /**
-   * ISO 639-1, validated at the gateway against `OCR_LANGUAGES` — 34-doc §4.2.
+   * ISO 639-1, validated at the gateway against `OCR_LANGUAGES`.
    *
    * NOT tesseract's own codes: the engine wants `vie`/`chi_sim`, and storing
    * those would put the engine's alphabet in the API contract and in every row.
@@ -225,7 +225,7 @@ export interface ListDocumentFlagsRequest {
   /**
    * EMPTY means every type, and the filter accepts more than one.
    *
-   * 16-doc §5: `UNRETRIEVED` and `UNCITED` were once a single flag under a name
+   * `UNRETRIEVED` and `UNCITED` were once a single flag under a name
    * that fitted only one of them. A filter that accepts only `UNCITED` would
    * quietly re-merge them in the UI, because the type nobody can select is the
    * type nobody sees.
@@ -249,7 +249,7 @@ export interface StorageUsageResponse {
 
 /**
  * ---------------------------------------------------------------------------
- * `ListXByIds` — the contract behind every DataLoader (27-doc §1).
+ * `ListXByIds` — the contract behind every DataLoader.
  *
  * Six properties, and five of them are things DataLoader depends on:
  *
@@ -265,7 +265,7 @@ export interface StorageUsageResponse {
  *   5. BATCH SIZE CAPPED, and the cap is an ERROR rather than a truncation —
  *      truncation is indistinguishable from missing data.
  *   6. ORDER IS NOT GUARANTEED. The response is a SET; the caller maps it back
- *      onto its keys (27-doc §2), because a database returns `WHERE id IN
+ * onto its keys, because a database returns `WHERE id IN
  *      ('c','a','b')` as a, b, c and handing that straight to DataLoader
  *      renders the wrong entity against every key.
  *
@@ -283,7 +283,7 @@ export interface ListDocumentsByIdsResponse {
 
 /**
  * Citation previews. **The largest payloads in the system** — a chunk carries
- * its whole text — so this one is capped hardest (27-doc §3).
+ * its whole text — so this one is capped hardest.
  */
 export interface ListDocumentChunksByIdsRequest {
   chunkIds: string[];

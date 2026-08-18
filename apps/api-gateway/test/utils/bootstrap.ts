@@ -114,7 +114,7 @@ export async function bootstrapE2eTest(
     }),
   );
 
-  // `/docs` and `/docs-json`, exactly as `main.ts` mounts them
+  // `/docs` and `/docs-json`, exactly as `main.ts` mounts them.
   // **Before `init()`**, which is the whole reason it lives here rather than in
   // the one suite that reads it: `SwaggerModule.setup` registers routes on the
   // Express instance, and registering them after the app has initialised

@@ -23,7 +23,7 @@ import { grpcError, timestamp } from '../fixtures/wire';
  * over rows reports a clean bill of health for a scheduler that was never
  * wired.
  */
-describe('§4.4 Platform job health (e2e)', () => {
+describe('Platform job health (e2e)', () => {
   let fx: E2eFixture;
 
   const hoursAgo = (hours: number) =>
@@ -240,7 +240,7 @@ describe('§4.4 Platform job health (e2e)', () => {
     });
   });
 
-  describe('manual run and backfill — 20-doc §5', () => {
+  describe('manual run and backfill', () => {
     it('7. **run is a POST, and it reaches the owning service**', async () => {
       // Not a GET. It creates work; a GET is something a browser prefetch or an
       // automatic retry can trigger with nobody asking.
@@ -300,7 +300,7 @@ describe('§4.4 Platform job health (e2e)', () => {
         .send({
           from: '2026-01-01',
           to: '2026-01-31',
-          reason: 'deflection denominator fix, doc 20',
+          reason: 'deflection denominator fix',
         })
         .expect(200);
 

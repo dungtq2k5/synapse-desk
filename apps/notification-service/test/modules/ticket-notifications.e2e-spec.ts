@@ -20,7 +20,7 @@ import { EmailService } from '../../src/modules/email/email.service';
  * disclosure, and notifying a queue is what trains people to ignore the badge.
  * Grouping is the fourth thing, and without it this is a spam machine.
  */
-describe('§3 Ticket notifications (e2e)', () => {
+describe('Ticket notifications (e2e)', () => {
   let fx: E2eFixture;
   let consumer: TicketNotificationConsumer;
 
@@ -321,7 +321,7 @@ describe('§3 Ticket notifications (e2e)', () => {
     });
   });
 
-  describe('grouping — §3.2, the anti-spam rule', () => {
+  describe('grouping — the anti-spam rule', () => {
     it('15. **12 messages on one ticket → ONE row with group_count 12**', async () => {
       // Shipped ungrouped, a busy ticket produces a notification per reply and
       // the user turns notifications off in week one and never turns them back
@@ -357,7 +357,7 @@ describe('§3 Ticket notifications (e2e)', () => {
     });
 
     it('17. Redelivering the SAME message does not increment twice', async () => {
-      // The §3.2 guard, at exactly the limit of what it claims: the insert is
+      // The grouping guard, at exactly the limit of what it claims: the insert is
       // deduped by the unique index, an INCREMENT is not, and comparing the
       // last triggering event id covers CONSECUTIVE redelivery — which is the
       // case NATS actually produces.

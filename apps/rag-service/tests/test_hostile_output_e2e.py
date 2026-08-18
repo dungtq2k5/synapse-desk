@@ -1,4 +1,4 @@
-"""17-doc §1.2 Gap 3 — the whole SYSTEM survives a hostile model response.
+"""The whole SYSTEM survives a hostile model response.
 
 The parse sites are individually well covered (`_confidence` defaulting to zero,
 the unparseable review, the bounds-checked `[n]` markers). What was missing is
@@ -51,7 +51,7 @@ HOSTILE = [
     pytest.param("", id="empty"),
     pytest.param("I'm sorry, I can't help with that.", id="refusal-no-json"),
     pytest.param('```json\n{"summary":', id="truncated-mid-object"),
-    # Gap 1: `re.search(r"\{.*\}",...)` with DOTALL spans from the
+    # Gap 1: `re.search(r"\{.*\}"...)` with DOTALL spans from the
     # FIRST brace to the LAST, so two objects capture a span that is not valid
     # JSON and the caller gets an empty result with a good object inside the
     # text.

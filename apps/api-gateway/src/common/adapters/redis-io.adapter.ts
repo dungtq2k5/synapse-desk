@@ -8,11 +8,10 @@ import { Server, ServerOptions } from 'socket.io';
 /**
  * Socket.IO over Redis pub/sub, so a broadcast reaches clients on EVERY replica.
  *
- * Without it everything works perfectly on one instance and fails silently on
- * two: a client connected to replica A never hears an event emitted on replica
- * B, because the default in-memory adapter only knows about its own process's
- * sockets. Nothing errors — the message is simply delivered to a subset of the
- * room and the rest of the room waits forever.
+ * Without it everything works on one instance and fails silently on two: a
+ * client on replica A never hears an event emitted on replica B, because the
+ * default in-memory adapter only knows its own process's sockets. Nothing
+ * errors — the message reaches a subset of the room and the rest wait forever.
  *
  * ```txt
  *                         ┌──────────────────────────┐
@@ -28,9 +27,8 @@ import { Server, ServerOptions } from 'socket.io';
  * ```
  *
  * `ioredis` rather than `@keyv/redis` or `node-redis`: it is already this
- * gateway's Redis client for the throttler storage and the organization-status
- * cache. A second client library in one process is a second connection pool, a
- * second set of retry semantics and a second thing to configure, for no gain.
+ * gateway's client, and a second library means a second connection pool and a
+ * second set of retry semantics for no gain.
  */
 export class RedisIoAdapter extends IoAdapter {
   private readonly logger = new Logger(RedisIoAdapter.name);

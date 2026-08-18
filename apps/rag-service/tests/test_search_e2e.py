@@ -1,4 +1,4 @@
-"""§2.2-2.3 — hybrid retrieval, fusion, and `Search` as the TEST SEAM.
+"""Hybrid retrieval, fusion, and `Search` as the TEST SEAM.
 
 Why this endpoint exists at all: it is the only point where isolation and
 relevance can be proven cheaply, deterministically, and with no model in the
@@ -25,7 +25,7 @@ SHARED_TEXT = "annual leave carryover policy"
 
 
 class TestSearchIsolation:
-    """The §2.1 assertions, re-made through the endpoint — 13-doc §2.3 test 2."""
+    """The retrieval assertions, re-made through the endpoint."""
 
     async def test_never_returns_another_tenants_chunk(
         self, search, seed, tenant_a, tenant_b
@@ -68,14 +68,14 @@ class TestSearchIsolation:
         # "this request was malformed".
         from rag_service.common.caller_context import CallerContext
 
-        with pytest.raises(FakeAbort) as raised:
+        with pytest.raises(FakeAbort) as raised: # NOSONAR
             await search(SHARED_TEXT, CallerContext(organization_id=None, sub="u"))
 
         assert raised.value.code.name == "FAILED_PRECONDITION"
 
 
 class TestCitationPayload:
-    """13-doc §2.3 test 1 — enough to render a citation, or it is not one."""
+    """Enough to render a citation, or it is not one."""
 
     async def test_returns_the_document_title_page_and_score(
         self, search, seed, tenant_a
@@ -111,7 +111,7 @@ class TestCitationPayload:
 
 
 class TestDegradedAtCap:
-    """13-doc §2.3 tests 3-4 — degraded must mean CHEAPER, not relabelled."""
+    """S 3-4 — degraded must mean CHEAPER, not relabelled."""
 
     async def test_at_cap_returns_200_with_lexical_only(
         self, search, seed, tenant_a, at_cap
@@ -232,7 +232,7 @@ class TestLimitClamp:
 
 
 class TestFusion:
-    """§2.2 — RRF, and both of the corrections 11-doc §1.5 makes."""
+    """RRF, and both of the fusion corrections."""
 
     def _chunk(self, key: str) -> RetrievedChunk:
         return RetrievedChunk(
@@ -345,7 +345,7 @@ class TestRerankSkip:
 
 
 class TestUnderReturn:
-    """§2.2 test 4 — "fewer than k" is NOT "nothing relevant"."""
+    """"fewer than k" is NOT "nothing relevant"."""
 
     async def test_an_under_returning_arm_triggers_a_RELAXED_retry(
         self, servicer, seed, tenant_a, monkeypatch
@@ -411,7 +411,7 @@ class TestUnderReturn:
 
 
 class TestExactPhrase:
-    """§2.2 test 5 — the reason hybrid retrieval exists at all."""
+    """The reason hybrid retrieval exists at all."""
 
     async def test_a_policy_number_the_embedding_blurs_is_found_LEXICALLY(
         self, servicer, seed, tenant_a, embeddings

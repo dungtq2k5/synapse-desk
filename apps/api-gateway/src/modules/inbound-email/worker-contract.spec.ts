@@ -4,27 +4,24 @@ import { plainToInstance } from 'class-transformer';
 import { validateSync } from 'class-validator';
 import { InboundEmailDto } from './dto/rest/inbound-email.dto';
 
-/**
- * The Worker's payloads satisfy the endpoint's contract
- *
- * **Both halves of this contract are ours**, which is the difference from the
- * Stripe route: that DTO documents somebody else's payload, and this one *is*
- * the agreement between `workers/email-inbound/` and the endpoint. The Worker
- * cannot import the DTO — it is a Workers runtime outside the workspace — so
- * the agreement is checked against recorded payloads instead of assumed.
- *
- * **These are hand-built and that is a known weakness**, stated rather than
- * hidden: this asks for payloads captured from a real Worker run, because
- * a synthetic fixture agrees with whatever the parser does while a recorded one
- * disagrees — and the disagreement is the point. Replace them after the first
- * live run; the shapes here are what `buildPayload` is written to produce.
- */
-const PAYLOADS = join(
-  __dirname,
-  '../../../test/fixtures/inbound-email/payloads',
-);
-
 describe('the mail Worker’s payload contract', () => {
+  /**
+   * The Worker's payloads satisfy the endpoint's contract.
+   *
+   * **Both halves are ours**, unlike the Stripe route whose DTO documents
+   * somebody else's payload. The Worker cannot import the DTO — it is a Workers
+   * runtime outside the workspace — so the agreement is checked against recorded
+   * payloads rather than assumed.
+   *
+   * **These are hand-built, and that is a known weakness.** A synthetic fixture
+   * agrees with whatever the parser does; a recorded one can disagree, and the
+   * disagreement is the point. Replace them after the first live run.
+   */
+  const PAYLOADS = join(
+    __dirname,
+    '../../../test/fixtures/inbound-email/payloads',
+  );
+
   const fixtures = readdirSync(PAYLOADS).filter((name) =>
     name.endsWith('.json'),
   );

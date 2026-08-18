@@ -182,7 +182,7 @@ export class TicketsService {
       where: {
         ...tenantScope(context),
         ...this.visibilityScope(context),
-        // Soft-deleted tickets ARE returned by id A notification
+        // Soft-deleted tickets ARE returned by id. A notification
         // citing a deleted ticket still has to render something, and omitting
         // it makes the edge null, which the UI cannot distinguish from a ticket
         // that never existed.
@@ -215,7 +215,7 @@ export class TicketsService {
       await this.authReference.assertUserExists(authorId, context);
     }
 
-    // **The dedup row and the ticket share one transaction**
+    // **The dedup row and the ticket share one transaction**.
     // Recorded separately, a request that inserted the row and then failed
     // would make the provider's retry a no-op, losing the mail on the one
     // delivery that could still have saved it.
@@ -339,7 +339,7 @@ export class TicketsService {
       departmentId: ticket.currentDepartmentId,
     });
 
-    // Fire-and-forget, §1.7. Not awaited and its rejection is handled inside —
+    // Fire-and-forget. Not awaited and its rejection is handled inside —
     // an escalation is the agent's action and must succeed on its own terms. A
     // summary that could not be generated is a missing convenience, not a
     // failed escalation.

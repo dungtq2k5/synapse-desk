@@ -55,7 +55,7 @@ export class QdrantService implements OnApplicationBootstrap {
    *
    * Idempotent, and run on every boot by BOTH services — the same discipline
    * the Postgres seeders use. Two services racing to create one collection is
-   * fine for exactly the reason `CREATE ... IF NOT EXISTS` is: there is no
+   * fine for exactly the reason `CREATE... IF NOT EXISTS` is: there is no
    * read-then-write window to lose.
    */
   async onApplicationBootstrap(): Promise<void> {

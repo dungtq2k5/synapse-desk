@@ -12,7 +12,7 @@ import { Timestamp } from "../../google/protobuf/timestamp";
 import { Gender, PageMeta, PageRequest, UserResponse } from "./common";
 
 export enum UserProjection {
-  /** USER_PROJECTION_NOTIFICATION - The default keeps 18-doc's caller working with no change at its call site. */
+  /** USER_PROJECTION_NOTIFICATION - The default keeps the existing caller working with no change at its call site. */
   USER_PROJECTION_NOTIFICATION = 0,
   USER_PROJECTION_SUMMARY = 1,
   UNRECOGNIZED = -1,
@@ -71,7 +71,7 @@ export interface ListPermissionHoldersRequest {
   /** A `target.action` code from the canonical registry. */
   permissionCode: string;
   /**
-   * Narrows the audience to one DEPARTMENT — 18-doc §3.1.
+   * Narrows the audience to one DEPARTMENT.
    *
    * Absent means the whole tenant, which is right for a quota alert (an
    * organization has one budget) and wrong for a ticket escalation: paging
@@ -85,7 +85,7 @@ export interface ListPermissionHoldersRequest {
  * A notification recipient, with everything needed to DECIDE about them.
  *
  * The quiet-hours fields ride along on this read rather than needing a second
- * one (18-doc §4): notification-service already asks auth-service who the
+ * one: notification-service already asks auth-service who the
  * recipients are, and an extra round trip per notification to learn whether it
  * is 3am for them would put a cross-service read on the fan-out path.
  *
@@ -113,7 +113,7 @@ export interface ListPermissionHoldersResponse {
 }
 
 /**
- * The OTHER audience kind — 18-doc §1.3.
+ * The OTHER audience kind.
  *
  * A ticket event already knows who the assignee is. Resolving `ticket.read`
  * holders instead would notify every agent in the tenant that one of them got
@@ -127,7 +127,7 @@ export interface ListUsersByIdsRequest {
   organizationId: string;
   userIds: string[];
   /**
-   * *Include locked and soft-deleted users** — 27-doc §3.
+   * *Include locked and soft-deleted users**.
    *
    * Two callers, two different questions:
    *
@@ -143,11 +143,11 @@ export interface ListUsersByIdsRequest {
    */
   includeInactive: boolean;
   /**
-   * Which shape to return — 27-doc §3.
+   * Which shape to return.
    *
    * The notification projection carries `email`, `quiet_hours_*` and `timezone`.
    * Quiet hours are meaningless to a loader, and **`email` is precisely what
-   * `UserSummary` must not expose** (25-doc §4). Sending it anyway would make
+   * `UserSummary` must not expose**. Sending it anyway would make
    * the gateway hold, on every batch, forever, a field it is obliged to discard
    * — and "we fetch it and drop it" is one careless mapper away from a leak.
    */
@@ -155,7 +155,7 @@ export interface ListUsersByIdsRequest {
 }
 
 /**
- * What a GraphQL edge is allowed to see — 25-doc §4.
+ * What a GraphQL edge is allowed to see.
  *
  * A type reached by TRAVERSAL exposes only what the traversal's own permission
  * justifies. `Ticket.assignee` is reachable with ticket access alone, so it
@@ -256,8 +256,7 @@ export interface LockUserRequest {
    */
   reason: string;
   /**
-   * *Absent means INDEFINITE** -- the existing behaviour, unchanged (21-doc
-   * §2). Supplied, it must be in the FUTURE: a past value would lock and
+   * *Absent means INDEFINITE** -- the existing behaviour, unchanged. Supplied, it must be in the FUTURE: a past value would lock and
    * instantly unlock, which the database accepts and nobody understands. The
    * gateway rejects that; this service re-checks, because the gateway is not
    * the only possible caller.
@@ -317,13 +316,12 @@ export interface DeleteAvatarRequest {
 
 /**
  * Resolve the SENDER of an inbound email, within an already-known tenant.
- * 31-doc §3.
  *
  * **The `organization_id` is what makes this safe, and it is the whole design.**
  * Self-signup answers the same policy question — "may this address join
  * automatically?" — but its implementation has a second branch: no domain match
  * CREATES an organization and makes the registrant its Org Admin. Reached from
- * inbound mail, that turns an email from an unrecognised domain into a new
+ * inbound mail, that turns an email from an unrecognized domain into a new
  * tenant owned by a stranger.
  *
  * This RPC receives the tenant, so there is no branch in which it can mint one.
@@ -413,9 +411,9 @@ export interface UserServiceClient {
   resetUserTwoFactor(request: UserIdRequest, metadata?: Metadata): Observable<ResetUserTwoFactorResponse>;
 
   /**
-   * Avatars — 10-storage-service.md §3.1. auth-service owns `users.avatar_url`,
+   * Avatars. auth-service owns `users.avatar_url`,
    * so it initiates the upload and calls storage-service internally; the
-   * gateway never talks to storage-service directly (§1.5).
+   * gateway never talks to storage-service directly.
    */
 
   presignAvatarUpload(
@@ -521,9 +519,9 @@ export interface UserServiceController {
   ): Promise<ResetUserTwoFactorResponse> | Observable<ResetUserTwoFactorResponse> | ResetUserTwoFactorResponse;
 
   /**
-   * Avatars — 10-storage-service.md §3.1. auth-service owns `users.avatar_url`,
+   * Avatars. auth-service owns `users.avatar_url`,
    * so it initiates the upload and calls storage-service internally; the
-   * gateway never talks to storage-service directly (§1.5).
+   * gateway never talks to storage-service directly.
    */
 
   presignAvatarUpload(

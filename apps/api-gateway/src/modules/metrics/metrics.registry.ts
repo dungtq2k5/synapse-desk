@@ -9,7 +9,7 @@ import {
 import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
 
 /**
- * Label names that must NEVER appear on a metric
+ * Label names that must NEVER appear on a metric.
  *
  * **Prometheus creates one time series per unique label combination**, and in a
  * multi-tenant system the tempting labels are the fatal ones:
@@ -78,13 +78,13 @@ export function assertLabelsAreBounded(
       `Metric '${metricName}' declares unbounded label(s): ${offending.join(', ')}. ` +
         'Prometheus creates one series per unique label combination, so a tenant ' +
         'or resource id makes the series count unbounded and permanent. Per-tenant ' +
-        'figures belong in the rollups (19-doc §2), not here.',
+        'figures belong in the rollups, not here.',
     );
   }
 }
 
 /**
- * The gateway's metrics
+ * The gateway's metrics.
  *
  * **Served on a SEPARATE listener** (see `metrics.server.ts`), never as a route
  * on the public app. The spec says "not via Nginx", and a distinct port bound to
@@ -105,12 +105,12 @@ export class MetricsRegistry {
   /** Where cross-service latency actually shows up. */
   readonly grpcDuration: Histogram<'peer' | 'code'>;
 
-  /** Currently invisible without this */
+  /** Currently invisible without this. */
   readonly websocketConnections: Gauge<string>;
   readonly websocketEvents: Counter<'event'>;
 
   /**
-   * **The one worth building first**
+   * **The one worth building first**.
    *
    * Specifies a staleness alert over the `job_runs` heartbeat, and
    * exporting that table as a gauge turns it into a two-line Prometheus rule:
@@ -181,7 +181,7 @@ export class MetricsRegistry {
 
     this.aiGenerationDuration = this.histogram({
       name: 'ai_generation_duration_seconds',
-      help: 'AI generation latency, by purpose. NO tenant label — see 23-doc §4.',
+      help: 'AI generation latency, by purpose. NO tenant label: cardinality.',
       labelNames: ['purpose'],
       buckets: [0.5, 1, 2, 3, 5, 8, 13, 21, 34],
     });

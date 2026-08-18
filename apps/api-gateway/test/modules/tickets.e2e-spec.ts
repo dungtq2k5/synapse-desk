@@ -313,7 +313,7 @@ describe('Tickets at the HTTP boundary (e2e)', () => {
     );
 
     it('POST /tickets/:id/escalate needs NO permission at all', async () => {
-      // The one state-machine route that is open, and api-endpoints-plan §2.1
+      // The one state-machine route that is open, and `api-endpoints-plan.md §2.1`
       // marks it `USER` for a reason: "one-click hand-off to a human" is the
       // self-service product's core affordance, and a customer who needs a
       // person cannot be made to wait for an administrator to grant them the

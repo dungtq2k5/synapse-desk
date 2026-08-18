@@ -53,7 +53,7 @@ export class OrganizationStatusService implements OnModuleInit {
     @Inject(AUTH_GRPC_CLIENT) private readonly client: ClientGrpc,
     redis: RedisService,
   ) {
-    // The SHARED connection This service opened its own, with its
+    // The SHARED connection. This service opened its own, with its
     // own shutdown hook, to run two commands; that is a connection and a
     // lifecycle written a fourth time for no property the shared one lacks.
     this.redis = redis.client;

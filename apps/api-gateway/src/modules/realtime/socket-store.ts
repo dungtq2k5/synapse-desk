@@ -5,20 +5,16 @@ import type { Socket } from 'socket.io';
  *
  * **Per-socket state lives on the socket, deliberately.** `client.data` dies
  * with the connection, so a disconnect — clean, abrupt, or a pod that crashed —
- * leaves nothing to prune. The alternative, a provider-level `Map` keyed by
- * socket id, needs a `handleDisconnect` to stay correct and still leaks the
- * entries belonging to an instance that died without running one.
+ * leaves nothing to prune. A provider-level `Map` keyed by socket id needs a
+ * `handleDisconnect` to stay correct and still leaks entries belonging to an
+ * instance that died without running one.
  *
- * It exists as a function because `client.data` is typed `any` by socket.io, so
- * every call site otherwise repeats the same two things: an
- * `eslint-disable-next-line` for the unsafe member access, and a cast asserting
- * what was just written. Both now happen once, here, where the unsafety is one
- * line rather than one line per store.
+ * A function because `client.data` is typed `any` by socket.io: the
+ * `eslint-disable` and the cast happen once here rather than at every call
+ * site.
  *
- * `??=` rather than a `has`/`set` pair so the read and the create cannot
- * interleave — an ordinary object property assignment is not a place a second
- * caller can land, but writing it as two statements invites someone to add an
- * `await` between them later.
+ * `??=` rather than a `has`/`set` pair, so nobody is invited to add an `await`
+ * between the read and the create later.
  */
 export function socketStore<T>(
   client: Socket,

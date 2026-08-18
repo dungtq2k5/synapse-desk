@@ -22,7 +22,7 @@ export function toAttachmentResponse(
     fileName: attachment.fileName,
     // An internal object PATH, not a public URL — the column holds a storage
     // key, and whatever resolves it to a signed URL does so per request. See
-    // 10-storage-service.md §1.3.
+    // Object paths are storage-service's contract.
     fileUrl: attachment.fileUrl,
     fileSizeBytes: Number(attachment.fileSizeBytes),
     mimeType: attachment.mimeType,
@@ -51,7 +51,7 @@ export function toMessageResponse(
     // empty list rather than a crash on `.map`.
     attachments: (message.attachments ?? []).map(toAttachmentResponse),
     // **On the read shape so the gateway can filter after fetching**
-    // §7. Its transcript builder drops these rows itself rather than asking for
+    // Its transcript builder drops these rows itself rather than asking for
     // a filtered list, because the same route serves the UI where a refused
     // message must stay visible.
     excludedFromAiContext: message.excludedFromAiContext,

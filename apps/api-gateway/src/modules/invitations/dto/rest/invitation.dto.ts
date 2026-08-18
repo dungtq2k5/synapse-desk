@@ -17,12 +17,15 @@ import {
   DEFAULT_SEARCH,
   INVITATION_SORTABLE_FIELDS,
   InvitationStatus,
+  MIN_PASSWORD_LENGTH,
   type InvitationSortableField,
 } from '@synapsedesk/common';
 import { SearchPaginationDto } from '../../../../common/dto/rest/search-pagination.dto';
 import {
   MAX_DEVICE_NAME_LENGTH,
+  MAX_EMAIL_ADDRESS_LENGTH,
   MAX_INVITATIONS_PER_BATCH,
+  MAX_PREVIEW_ID_LENGTH,
 } from '../../../../common/config/dto.config';
 
 export class InviteUserDto {
@@ -36,12 +39,14 @@ export class InviteUserDto {
   @IsOptional()
   @IsArray()
   @IsUUID('all', { each: true })
-  readonly roleIds?: string[];
+  @ApiPropertyOptional()
+  readonly roleIds: string[] = [];
 
   @IsOptional()
   @IsArray()
   @IsUUID('all', { each: true })
-  readonly departmentIds?: string[];
+  @ApiPropertyOptional()
+  readonly departmentIds: string[] = [];
 
   @IsOptional()
   @IsUUID()
@@ -74,15 +79,9 @@ export class ListInvitationsQueryDto extends OmitType(SearchPaginationDto, [
   @IsOptional()
   @IsString()
   @IsIn(INVITATION_SORTABLE_FIELDS)
-  /**
-   * Optional in the API and, without this, REQUIRED in the docs
-   *
-   * The plugin derives `required` from TYPESCRIPT optionality, not from
-   * `@IsOptional()`. A field declared `page: number = 1` is non-optional to the
-   * compiler even though the validator lets a caller omit it, so the generated
-   * spec demanded it — and a generated client would refuse to send a request
-   * without one.
-   */
+  // `@ApiPropertyOptional()` is required here: the Swagger plugin derives
+  // `required` from TYPESCRIPT optionality, so a defaulted non-optional field
+  // is documented as mandatory and a generated client refuses to omit it.
   @ApiPropertyOptional()
   readonly sortBy: InvitationSortableField = DEFAULT_SEARCH.SORT_BY;
 }
@@ -96,58 +95,13 @@ export class AcceptInvitationDto {
   readonly fullName!: string;
 
   @IsString()
-  @MinLength(12)
+  @MinLength(MIN_PASSWORD_LENGTH)
   readonly password!: string;
 
   @IsOptional()
   @IsString()
   @MaxLength(MAX_DEVICE_NAME_LENGTH)
   readonly deviceName?: string;
-}
-
-export class InvitationResponseDto {
-  readonly id!: string;
-  readonly email!: string;
-  readonly status!: InvitationStatus;
-  readonly roleIds!: string[];
-  readonly departmentIds!: string[];
-  readonly primaryDepartmentId!: string | null;
-  readonly invitedByName!: string | null;
-  readonly resentCount!: number;
-  readonly lastSentAt!: Date;
-  readonly expiresAt!: Date;
-  readonly createdAt!: Date;
-}
-
-export class FailedInvitationDto {
-  readonly email!: string;
-  readonly reason!: string;
-}
-
-/**
- * Per-address outcomes. Surfaced as 207 when anything failed, so one typo in a
- * 200-row paste does not discard 199 good invitations.
- */
-export class CreateInvitationsResponseDto {
-  readonly created!: InvitationResponseDto[];
-  readonly failed!: FailedInvitationDto[];
-  readonly batchId!: string | null;
-}
-
-/** Public preview. `email` is masked; every unusable token reads `valid: false`. */
-export class PreviewInvitationResponseDto {
-  readonly valid!: boolean;
-  readonly organizationName!: string | null;
-  readonly inviterName!: string | null;
-  readonly email!: string | null;
-  readonly roleNames!: string[];
-  readonly expiresAt!: Date | null;
-}
-
-export class AcceptInvitationResponseDto {
-  readonly user!: unknown;
-  /** Role/department ids that no longer resolved. Reported, never fatal. */
-  readonly skipped!: string[];
 }
 
 /**
@@ -165,24 +119,26 @@ export class AcceptInvitationResponseDto {
  */
 export class PreviewInviteUserDto {
   @IsString()
-  @MaxLength(320)
+  @MaxLength(MAX_EMAIL_ADDRESS_LENGTH)
   readonly email!: string;
 
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  @MaxLength(64, { each: true })
-  readonly roleIds?: string[];
+  @MaxLength(MAX_PREVIEW_ID_LENGTH, { each: true })
+  @ApiPropertyOptional()
+  readonly roleIds: string[] = [];
 
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  @MaxLength(64, { each: true })
-  readonly departmentIds?: string[];
+  @MaxLength(MAX_PREVIEW_ID_LENGTH, { each: true })
+  @ApiPropertyOptional()
+  readonly departmentIds: string[] = [];
 
   @IsOptional()
   @IsString()
-  @MaxLength(64)
+  @MaxLength(MAX_PREVIEW_ID_LENGTH)
   readonly primaryDepartmentId?: string;
 }
 
@@ -193,21 +149,4 @@ export class PreviewInvitationsDto {
   @ValidateNested({ each: true })
   @Type(() => PreviewInviteUserDto)
   readonly invitations!: PreviewInviteUserDto[];
-}
-
-export class InvitationPreviewRowDto {
-  readonly email!: string;
-  readonly ok!: boolean;
-  readonly reason!: string | null;
-  /** Reported even on an OK row: these are skipped at redemption, not fatal. */
-  readonly unknownRoleIds!: string[];
-  readonly unknownDepartmentIds!: string[];
-}
-
-export class PreviewInvitationsResponseDto {
-  readonly rows!: InvitationPreviewRowDto[];
-  readonly seatsInUse!: number;
-  readonly maxAgentSeats!: number;
-  /** Non-zero means the batch would be partially rejected at commit time. */
-  readonly seatOverrun!: number;
 }

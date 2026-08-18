@@ -12,7 +12,7 @@ import { RedisHealthService } from './redis-health.service';
 import {
   LivenessResponseDto,
   ReadinessResponseDto,
-} from './dto/health-response.dto';
+} from './dto/rest/health-response.dto';
 
 /**
  * Liveness and readiness probes (api-endpoints-plan §6). Both PUBLIC — an
@@ -58,30 +58,18 @@ export class HealthController {
   /**
    * Readiness: should this instance receive traffic?
    *
-   * **Peer health does NOT gate this, and that is the fix.** The previous
-   * version computed `every(s => s.health !== 'DOWN')` over the gRPC peers, so a
-   * single peer being down made every gateway instance report not-ready and
-   * Kubernetes pulled all of them — turning one service's outage into a total
-   * one. The blast radius of any one service became the whole product, and the
-   * mechanism was the health check itself.
+   * **Peer health does NOT gate this.** The test for belonging here is whether
+   * removing THIS instance from rotation would help:
    *
-   * The test for belonging here is whether removing THIS instance from rotation
-   * would help:
-   *
-   *   - **Redis**: yes. Sessions, throttling and the Socket.IO adapter all need
-   *     it, and a partitioned instance can be routed around while others serve.
+   *   - **Redis**: yes. Sessions, throttling and the Socket.IO adapter need it,
+   *     and a partitioned instance can be routed around while others serve.
    *   - **A gRPC peer**: no. Every instance sees the same peer down, so pulling
-   *     them all helps nobody and ends every session in the process.
+   *     them all helps nobody and ends every session.
    *
-   * Peers are still reported, because during an incident that is genuinely
-   * useful — just in the body, where it informs rather than decides. **A partial
-   * outage should look partial**: requests that need the down peer get a 503
-   * from the route that needs it, and everything else keeps working.
+   * Peers are still reported, in the body, where they inform rather than
+   * decide. **A partial outage should look partial.**
    *
-   * Not gated on `auth-service` either, despite every authenticated route
-   * verifying through it — JWTs verify LOCALLY against the public key, so a
-   * brief auth-service outage leaves existing sessions working and pulling the
-   * gateway would be the thing that ends them.
+   * See `docs/decisions/0010-readiness-probes-do-not-cascade.md`.
    */
   @ApiOperation({
     summary: 'Readiness — should traffic reach THIS instance?',

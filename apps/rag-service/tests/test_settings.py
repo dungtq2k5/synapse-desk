@@ -1,4 +1,4 @@
-"""§3b — the settings layer, and the half of the contract test that lives here.
+"""B — the settings layer, and the half of the contract test that lives here.
 
 The TypeScript half is `libs/common/src/configs/ai-settings.config.spec.ts`.
 Between them, a default changed on one side and not the other fails that side's
@@ -203,7 +203,7 @@ class TestCache:
 
 
 class TestCrossLanguageContract:
-    """Doc 15 §1.4 test 6 — the half of the drift guard that runs in Python."""
+    """The half of the drift guard that runs in Python."""
 
     def test_the_model_tables_match_the_contract(self, contract):
         assert CHEAP_MODEL == contract["cheapModel"]

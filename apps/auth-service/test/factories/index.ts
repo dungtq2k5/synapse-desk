@@ -6,6 +6,7 @@
  * (three relative paths that shift whenever a file moves) is churn with no
  * benefit.
  */
+
 export * from './organization.factory';
 export * from './user.factory';
 export * from './department.factory';

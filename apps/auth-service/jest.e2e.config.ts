@@ -24,7 +24,7 @@ import baseConfig from '../../jest.config.base.ts';
 const config: Config = {
   ...baseConfig,
   displayName: 'auth-service:e2e',
-  testRegex: '\\.e2e-spec\\.ts$',
+  testRegex: String.raw`\.e2e-spec\.ts$`,
 
   // Override the base exclusion — this project IS the e2e run, so the files the
   // unit project deliberately skips are the only ones here.

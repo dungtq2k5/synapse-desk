@@ -1,5 +1,5 @@
 /**
- * The window a daily rollup job runs over
+ * The window a daily rollup job runs over.
  *
  * Shared because THREE jobs in two services need the identical semantics, and
  * the two ways to get this wrong are both silent:

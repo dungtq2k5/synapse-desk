@@ -13,7 +13,7 @@ import { PrismaService } from '../prisma/prisma.service';
 const DISCARD_AFTER_HOURS = 24;
 
 /**
- * `outcome = DISCARDED` is an ABSENCE — §4.3.
+ * `outcome = DISCARDED` is an ABSENCE.
  *
  * Ignoring a draft produces no request, so nothing ever sets it. Without this
  * sweep those rows stay NULL forever and acceptance rate divides by only the

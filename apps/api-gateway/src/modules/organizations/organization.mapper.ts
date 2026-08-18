@@ -3,11 +3,16 @@ import {
   OrganizationResponse,
   requireProtoTimestamp,
   UsageMeter,
+  fromProtoAiModelTier,
+  OnboardingResponse,
+  OrganizationUsageResponse,
 } from '@synapsedesk/grpc-proto';
 import {
+  OnboardingResponseDto,
   OrganizationResponseDto,
-  UsageMeterDto,
-} from './dto/rest/organization.dto';
+  OrganizationUsageResponseDto,
+  UsageMeterResponseDto,
+} from './dto/rest/organization-response.dto';
 
 /**
  * Wire -> REST for an organization.
@@ -46,7 +51,9 @@ export function toOrganizationResponseDto(
  * whose domain does not exist yet cannot make that claim, and the difference
  * matters to anyone reading a usage page before deciding to upgrade.
  */
-export function toUsageMeterDto(meter: UsageMeter | undefined): UsageMeterDto {
+export function toUsageMeterDto(
+  meter: UsageMeter | undefined,
+): UsageMeterResponseDto {
   if (!meter) {
     throw new Error('Received a usage response without a meter');
   }
@@ -57,4 +64,38 @@ export function toUsageMeterDto(meter: UsageMeter | undefined): UsageMeterDto {
     limit: meter.available ? (meter.limit ?? null) : null,
     unavailableReason: meter.unavailableReason ?? null,
   };
+}
+
+/**
+ * Converts an `OrganizationUsageResponse` off the wire into its REST DTO.
+ *
+ * `aiModelTier` becomes the domain string; the proto enum's number is
+ * meaningless to a client rendering a plan.
+ *
+ * @throws Error if `billingCycleStart` is missing, which the proto requires.
+ */
+export function toOrganizationUsageResponseDto(
+  response: OrganizationUsageResponse,
+): OrganizationUsageResponseDto {
+  return {
+    seats: toUsageMeterDto(response.seats),
+    storage: toUsageMeterDto(response.storage),
+    aiTokens: toUsageMeterDto(response.aiTokens),
+    aiModelTier: fromProtoAiModelTier(response.aiModelTier),
+    planName: response.planName,
+    currentPeriodEnd: response.currentPeriodEnd
+      ? requireProtoTimestamp(response.currentPeriodEnd, 'currentPeriodEnd')
+      : null,
+    billingCycleStart: requireProtoTimestamp(
+      response.billingCycleStart,
+      'billingCycleStart',
+    ),
+  };
+}
+
+/** Converts an `OnboardingResponse` off the wire into its REST DTO. */
+export function toOnboardingResponseDto(
+  response: OnboardingResponse,
+): OnboardingResponseDto {
+  return { ...response, status: fromProtoOrgStatus(response.status) ?? '' };
 }

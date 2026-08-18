@@ -18,7 +18,7 @@ import { AuthService } from '../../src/modules/auth/auth.service';
 import { FirebaseService } from '../../src/modules/firebase/firebase.service';
 
 /**
- * §2.1–§2.3 of the storage validation checklist — `users.avatar_url` end to end.
+ * The storage validation checklist — `users.avatar_url` end to end.
  *
  * This file exists because the checklist found the avatar path had ONE
  * incidental test reference against the attachment path's fifty-eight, and that
@@ -30,7 +30,7 @@ import { FirebaseService } from '../../src/modules/firebase/firebase.service';
  * so these assert auth-service's USE of storage — which is where both defects
  * were. storage-service's own suite proves the storage layer itself.
  */
-describe('§2 avatar_url end to end (e2e)', () => {
+describe('Avatar_url end to end (e2e)', () => {
   let fx: E2eFixture;
   let users: UsersService;
   let auth: AuthService;
@@ -51,7 +51,7 @@ describe('§2 avatar_url end to end (e2e)', () => {
 
   // --------------------------------------------------------------- read path
 
-  describe('the read path resolves paths into URLs — §2.1', () => {
+  describe('the read path resolves paths into URLs', () => {
     it('1. getCurrentUser returns a SIGNED URL, never the object path', async () => {
       // The headline defect: `resolveAvatarUrls` existed and nothing called it,
       // so every response carrying a user shipped `organizations/{org}/...`
@@ -151,7 +151,7 @@ describe('§2 avatar_url end to end (e2e)', () => {
 
   // -------------------------------------------------------------- write path
 
-  describe('the write path supersedes exactly once — §1.3', () => {
+  describe('the write path supersedes exactly once', () => {
     it('5. a SECOND confirm supersedes the OLD path, exactly once', async () => {
       // The ordering bug the service comments guard against: reading the column
       // AFTER overwriting it would supersede the avatar just uploaded.
@@ -214,9 +214,9 @@ describe('§2 avatar_url end to end (e2e)', () => {
 
   // ------------------------------------------------- the column's ONE meaning
 
-  describe('avatar_url holds an object path and nothing else — §2.2', () => {
+  describe('avatar_url holds an object path and nothing else', () => {
     it('8. Google sign-in does NOT store the provider’s CDN URL', async () => {
-      // Pins the §2.2(a) decision so it cannot silently revert. Storing
+      // Pins the storage-path decision so it cannot silently revert. Storing
       // `https://lh3.googleusercontent.com/...` here made the column mean two
       // things: `organizationIdFromObjectPath` returns null for it, so the
       // tenant check silently passes nothing, and replacing such an avatar sent
@@ -262,7 +262,7 @@ describe('§2 avatar_url end to end (e2e)', () => {
 
       // Both Google paths too — account CREATION and the backfill on a
       // subsequent sign-in are separate writers, and each was a way in for a
-      // CDN URL. Without these the sweep would silently not cover §2.2.
+      // CDN URL. Without these the sweep would silently not cover the presign path.
       const firebase = fx.moduleRef.get<{
         verifyGoogleIdToken: (token: string) => Promise<unknown>;
       }>(FirebaseService);

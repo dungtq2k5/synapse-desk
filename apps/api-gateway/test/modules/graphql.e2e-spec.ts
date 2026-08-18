@@ -41,7 +41,7 @@ import { compareAlphabetically } from '@synapsedesk/common';
  * run before execution, and that the REST envelope stays off. The entity graph
  * is the resolver layer's.
  */
-describe('§25 the GraphQL surface (e2e)', () => {
+describe('The GraphQL surface (e2e)', () => {
   let fx: E2eFixture;
 
   /** The committed SDL, which the drift test above keeps current. */
@@ -85,28 +85,28 @@ describe('§25 the GraphQL surface (e2e)', () => {
 
   afterAll(() => fx.close());
 
-  describe('§1 the surface answers', () => {
+  describe('The surface answers', () => {
     it('1. `/graphql` answers a trivial query', async () => {
-      const response = await gql('{ apiInfo { version sha builtAt } }').expect(
+      const response = await gql('{ version { version sha builtAt } }').expect(
         200,
       );
 
       expect(response.body.errors).toBeUndefined();
-      expect(response.body.data.apiInfo).toEqual({
+      expect(response.body.data.version).toEqual({
         version: process.env.APP_VERSION,
         sha: process.env.BUILD_SHA,
         builtAt: process.env.BUILD_TIME,
       });
     });
 
-    it('2. **the REST envelope does NOT appear** — 25-doc §3', async () => {
+    it('2. **the REST envelope does NOT appear**', async () => {
       // `TransformInterceptor` bypasses for GraphQL and `AllHttpExceptionFilter`
       // re-throws so Apollo formats the error. Both were already true before
       // GraphQL existed; this asserts they stay that way, because the envelope
       // breaks nested resolution structurally — `ticket { data { assignee {
       // data { … } } } }` is what wrapping every type produces, and composing a
       // graph rather than a stack of boxes is the entire point.
-      const response = await gql('{ apiInfo { version } }').expect(200);
+      const response = await gql('{ version { version } }').expect(200);
 
       // `response.body` is `any` from supertest, and `Object.keys` takes `{}` —
       // narrowing it here keeps the unsafe-argument rule satisfied without
@@ -137,7 +137,7 @@ describe('§25 the GraphQL surface (e2e)', () => {
     });
   });
 
-  describe('§5 cost limits run BEFORE execution', () => {
+  describe('Cost limits run BEFORE execution', () => {
     it('1. **a query nested past the depth limit is refused at VALIDATION**', async () => {
       // Validation runs before execution begins, so a
       // refused query never reaches a resolver and never makes a gRPC call —
@@ -165,15 +165,15 @@ describe('§25 the GraphQL surface (e2e)', () => {
 
     it('2. a query within the limits is allowed', async () => {
       // The guard against a limit tuned so tight the feature is pointless.
-      const response = await gql('{ apiInfo { version } }').expect(200);
+      const response = await gql('{ version { version } }').expect(200);
 
       expect(response.body.errors).toBeUndefined();
     });
   });
 
-  describe('§1.1 `@CurrentUser` works in a resolver', () => {
+  describe('`@CurrentUser` works in a resolver', () => {
     it('**resolves the same caller GraphQL and REST see**', async () => {
-      // Conventions §15 gap 6: `@CurrentUser` was HTTP-only, so in a resolver it
+      // `@CurrentUser` was once HTTP-only, so in a resolver it
       // returned null and surfaced as a misleading 500 about a missing guard.
       // Asserted through the shared helper both transports now use, because the
       // property is that they cannot diverge — not that each happens to work.
@@ -212,7 +212,7 @@ describe('§25 the GraphQL surface (e2e)', () => {
     });
   });
 
-  describe('§6 loaders are per-request', () => {
+  describe('Loaders are per-request', () => {
     it('**two requests never share a loader instance**', async () => {
       // A singleton loader caches one tenant's row under a bare uuid
       // and serves it to whoever asks for that id next — a cross-tenant leak
@@ -238,7 +238,7 @@ describe('§25 the GraphQL surface (e2e)', () => {
     });
   });
 
-  describe('§1.2 the committed schema', () => {
+  describe('The committed schema', () => {
     it('**matches the generated one**', () => {
       // `schema.gql` is generated, and committing a
       // generated file looks redundant until the first breaking change: with
@@ -276,8 +276,8 @@ describe('§25 the GraphQL surface (e2e)', () => {
 
     it('is sorted WITHIN each type, so a diff is a change not a reshuffle', () => {
       // Per type, not across the file: fields are only ordered relative to
-      // their siblings, and concatenating them would compare `ApiInfo.version`
-      // against `Query.apiInfo` and fail for no reason.
+      // their siblings, and concatenating them would compare `Version.version`
+      // against `Query.version` and fail for no reason.
       const generated = readFileSync(SCHEMA_PATH, 'utf8');
 
       for (const [, body] of generated.matchAll(
@@ -291,7 +291,7 @@ describe('§25 the GraphQL surface (e2e)', () => {
       }
     });
 
-    it('**every object type has at least one field** — 26-doc §2 test 1', () => {
+    it('**every object type has at least one field**', () => {
       // The wrong-`PickType` trap, caught across the whole schema at once.
       //
       // `@nestjs/swagger` exports `PickType`, `OmitType` and `PartialType` too,
@@ -337,7 +337,7 @@ describe('§25 the GraphQL surface (e2e)', () => {
     });
   });
 
-  describe('§5 introspection', () => {
+  describe('Introspection', () => {
     it('is ON in non-production, where the tooling lives', async () => {
       const response = await gql('{ __schema { queryType { name } } }').expect(
         200,
@@ -374,14 +374,14 @@ describe('§25 the GraphQL surface (e2e)', () => {
   });
 
   /**
-   * Root resolvers
+   * Root resolvers.
    *
    * **A resolver is a transport, not an implementation.** Every test here is
    * really one claim: that the query and its REST twin share a call, guards and
    * all. Asserting the shape alone would pass against a second implementation
    * that happened to agree today.
    */
-  describe('§4 root resolvers', () => {
+  describe('Root resolvers', () => {
     const ticketId = faker.string.uuid();
 
     const wireTicket = (overrides: Record<string, unknown> = {}) => ({
@@ -447,13 +447,13 @@ describe('§25 the GraphQL surface (e2e)', () => {
       const response = await agent()
         .post('/graphql')
         .send({
-          query: `{ ticket(id: "${faker.string.uuid()}") { id } apiInfo { version } }`,
+          query: `{ ticket(id: "${faker.string.uuid()}") { id } version { version } }`,
         })
         .expect(200);
 
       expect(response.body.data.ticket).toBeNull();
       // The sibling survived, which is the whole point.
-      expect(response.body.data.apiInfo.version).toBe(process.env.APP_VERSION);
+      expect(response.body.data.version.version).toBe(process.env.APP_VERSION);
     });
 
     it("3. **a cross-tenant id is null, never another tenant's row**", async () => {
@@ -476,7 +476,7 @@ describe('§25 the GraphQL surface (e2e)', () => {
     });
 
     it('4. **an unauthenticated caller is refused on BOTH transports**', async () => {
-      // Same guards, proven rather than assumed test 3. The guard
+      // Same guards, proven rather than assumed. The guard
       // classes are literally the controller's, so this is checking they were
       // actually applied to the resolver.
       const rest = await request(fx.app.getHttpServer()).get(
@@ -532,7 +532,7 @@ describe('§25 the GraphQL surface (e2e)', () => {
    * **Test 1 is the test this whole design exists for**, and test 2 is the one
    * that renders a convincing page with the wrong people on it if it fails.
    */
-  describe('§5 field resolvers and batching', () => {
+  describe('Field resolvers and batching', () => {
     const agentId = faker.string.uuid();
     const otherAgentId = faker.string.uuid();
     const departmentId = faker.string.uuid();
@@ -662,7 +662,7 @@ describe('§25 the GraphQL surface (e2e)', () => {
     });
 
     it('3. **the same user on twenty tickets is fetched once**', async () => {
-      // Per-request dedup, which is most of the win test 2.
+      // Per-request dedup, which is most of the win.
       const ids = Array.from({ length: 20 }, () => faker.string.uuid());
 
       fx.stubs.ticket.listTickets.mockReturnValue(
@@ -783,7 +783,7 @@ describe('§25 the GraphQL surface (e2e)', () => {
   /**
    * The rest of the type graph and the selective mutations
    */
-  describe('§3/§6 the wider graph', () => {
+  describe('The wider graph', () => {
     const agentId = faker.string.uuid();
     const ticketId = faker.string.uuid();
 
@@ -996,7 +996,7 @@ describe('§25 the GraphQL surface (e2e)', () => {
    * why a fully broken query shipped alongside a byte-identical schema: the SDL
    * describes what a resolver PROMISES, never what it returns.
    */
-  describe('§4 the user queries return a User, not its envelope', () => {
+  describe('The user queries return a User, not its envelope', () => {
     const agent = () =>
       authenticatedAgent(fx.app, { permissionCodes: ['user.read'] });
 
@@ -1094,9 +1094,9 @@ describe('§25 the GraphQL surface (e2e)', () => {
   });
 
   /**
-   * List edges: cap or paginate, never both
+   * List edges: cap or paginate, never both.
    */
-  describe('§3.2 capped edge lists', () => {
+  describe('Capped edge lists', () => {
     const userId = faker.string.uuid();
 
     const agent = () =>
@@ -1204,14 +1204,14 @@ describe('§25 the GraphQL surface (e2e)', () => {
     });
   });
   /**
-   * The analytics reads that earned a GraphQL query
+   * The analytics reads that earned a GraphQL query.
    *
    * `agents` is the one that justifies the rule, and these tests pin the reason
    * rather than the wiring: in REST the agent names come from a hydration leg
    * called last and unconditionally; here that leg IS the users loader, so a
    * client that only wants throughput never pays for it.
    */
-  describe('§3.1 analytics composes rather than reaching parity', () => {
+  describe('Analytics composes rather than reaching parity', () => {
     const agent = () =>
       authenticatedAgent(fx.app, { permissionCodes: ['analytics.read'] });
 

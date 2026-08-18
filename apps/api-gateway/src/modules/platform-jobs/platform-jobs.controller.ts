@@ -20,11 +20,11 @@ import {
   ApiFilterErrors,
   ApiWrappedResponse,
 } from '../../common/decorators/api-response.decorator';
+import { BackfillJobDto } from './dto/platform-jobs.dto';
 import {
-  BackfillJobDto,
   JobHealthResponseDto,
-  JobRunResultDto,
-} from './dto/platform-jobs.dto';
+  JobRunResultResponseDto,
+} from './dto/platform-jobs-response.dto';
 
 /**
  * Scheduled-job operations
@@ -47,7 +47,7 @@ export class PlatformJobsController {
    * build expects rather than the rows that exist, so a scheduler that was
    * never wired reports `never-ran` instead of nothing at all.
    */
-  @ApiOperation({ summary: 'Scheduled-job health — 20-doc §4.4' })
+  @ApiOperation({ summary: 'Scheduled-job health' })
   @ApiWrappedResponse(JobHealthResponseDto)
   @ApiFilterErrors(['401'])
   @Get()
@@ -63,8 +63,8 @@ export class PlatformJobsController {
    * A POST because it does work — and specifically not a GET, which a browser
    * prefetch or an automatic retry can trigger without anyone asking.
    */
-  @ApiOperation({ summary: 'Runs a rollup now — 20-doc §5' })
-  @ApiWrappedResponse(JobRunResultDto)
+  @ApiOperation({ summary: 'Runs a rollup now' })
+  @ApiWrappedResponse(JobRunResultResponseDto)
   @ApiFilterErrors(['401', '404'])
   @Post(':name/run')
   @HttpCode(HttpStatus.OK)
@@ -72,7 +72,7 @@ export class PlatformJobsController {
   run(
     @Param('name') name: string,
     @CurrentUser() context: RequestContext,
-  ): Promise<JobRunResultDto> {
+  ): Promise<JobRunResultResponseDto> {
     return this.jobs.run(name, context);
   }
 
@@ -88,7 +88,7 @@ export class PlatformJobsController {
   @ApiOperation({
     summary: 'Recomputes an explicit from..to range, with a mandatory reason',
   })
-  @ApiWrappedResponse(JobRunResultDto)
+  @ApiWrappedResponse(JobRunResultResponseDto)
   @ApiFilterErrors(['400', '401', '404'])
   @Post(':name/backfill')
   @HttpCode(HttpStatus.OK)
@@ -97,7 +97,7 @@ export class PlatformJobsController {
     @Param('name') name: string,
     @Body() dto: BackfillJobDto,
     @CurrentUser() context: RequestContext,
-  ): Promise<JobRunResultDto> {
+  ): Promise<JobRunResultResponseDto> {
     return this.jobs.backfill(name, dto, context);
   }
 }

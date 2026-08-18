@@ -26,7 +26,7 @@ import {
 /**
  * A consumer that records whatever arrives, per pattern.
  *
- * Deliberately NOT one of Domain B's real consumers. What §3.4 asks about is
+ * Deliberately NOT one of Domain B's real consumers. What this sweep asks about is
  * the CONTRACT — that every variant survives the wire with no field lost — and
  * a real consumer would also apply its own logic, so a failure could be either
  * the wire or that logic. This one only remembers.
@@ -92,7 +92,7 @@ class ContractProbeConsumer {
 class ProbeModule {}
 
 /**
- * §3.4 The NATS contract sweep.
+ * The NATS contract sweep.
  *
  * Every `TicketDomainEvent` variant, published over a REAL broker and read back
  * by a real subscriber. The property is that nothing is lost in between.
@@ -104,7 +104,7 @@ class ProbeModule {}
  * that is not there and behaves as though the event said something else. This
  * is the only layer where that can be caught.
  */
-describe('§3.4 NATS contract sweep (e2e)', () => {
+describe('NATS contract sweep (e2e)', () => {
   let app: INestApplication;
   let client: ClientProxy;
 
@@ -206,7 +206,7 @@ describe('§3.4 NATS contract sweep (e2e)', () => {
     {
       // **No `content` field, and the sweep is where that is pinned.** The
       // frame this becomes announces a redaction; carrying the removed words in
-      // it would be the most direct way to defeat the redaction
+      // it would be the most direct way to defeat the redaction.
       pattern: TICKET_PATTERNS.messageRedacted,
       organizationId,
       ticketId,

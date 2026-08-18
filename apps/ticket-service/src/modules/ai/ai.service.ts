@@ -33,7 +33,7 @@ import { AiSummary } from '../../generated/prisma/client';
 const TRANSCRIPT_TURNS = 40;
 
 /**
- * The AI co-pilot — contract-first, per §1.7.
+ * The AI co-pilot — contract-first.
  *
  * `rag-service` is Python and is not started, so every generation call answers
  * UNAVAILABLE today. What is REAL here and worth building now:
@@ -61,7 +61,7 @@ export class AiService {
   /**
    * The stored summary, or NOT_FOUND.
    *
-   * 404 rather than an empty object, and §2.6 asks for exactly this. "No
+   * 404 rather than an empty object, which is exactly right. "No
    * summary has been generated" and "the summary is blank" are different facts,
    * and a client that got `{}` for the first would render an empty summary
    * panel instead of a "generate" button.
@@ -132,7 +132,7 @@ export class AiService {
   }
 
   /**
-   * The escalation hook — §1.7's fire-and-forget rule.
+   * The escalation hook.7's fire-and-forget rule.
    *
    * Escalating a ticket is the agent's action and must succeed on its own
    * terms. A summary that could not be generated is a missing convenience, not
@@ -178,7 +178,7 @@ export class AiService {
     const ticket = await this.access.load(request.ticketId, context);
 
     // The customer's last message may carry a screenshot, and this is the
-    // surface replying to it Filtered from the row before anything
+    // surface replying to it. Filtered from the row before anything
     // is downloaded, so an attached zip costs nothing.
     const attachments = await this.aiAttachments.forLastUserMessage(
       ticket.id,
@@ -195,7 +195,7 @@ export class AiService {
         attachments.parts,
       );
     } catch (error) {
-      // **The write-back, on the refusal path only** The message
+      // **The write-back, on the refusal path only**. The message
       // that was just refused must not reach the NEXT draft's transcript;
       // without this the guard refuses the same question every time an agent
       // presses the button, which makes the refusal a delay rather than a
@@ -364,7 +364,7 @@ export class AiService {
    */
   private async transcript(ticketId: string): Promise<ConversationTurn[]> {
     const messages = await this.prisma.ticketMessage.findMany({
-      // **Refused messages never reach a prompt**
+      // **Refused messages never reach a prompt**.
       //
       // Filtered in the WHERE because this query is a dedicated transcript
       // read serving nothing else: there is no reason to fetch a row only to

@@ -12,36 +12,23 @@ export type DocumentScope = {
 };
 
 /**
- * The ONE place a visibility change touches the retrievable stores — §2.3.
+ * The ONE place a visibility change touches the retrievable stores.
  *
- * Both `document_chunks` and the Qdrant payload carry the same four scope
- * fields, so every change has to be written twice, and **the
- * order is a security property that is not symmetric**:
+ * `document_chunks` and the Qdrant payload carry the same four scope fields, so
+ * every change is written twice — and **the order is a security property that
+ * is not symmetric**:
  *
- *   - **Restrictions** — removing departments, `is_organization_wide: true →
- *     false`, delete — write **Qdrant first, then `document_chunks`**, and only
- *     then `documents`. Failing partway over-restricts: the document vanishes
- *     from retrieval while still appearing in lists. Safe, visible, and fixed
- *     by a retry.
- *   - **Grants** — adding departments, `false → true`, restore — write
- *     `documents` first. Failing partway under-grants: someone waits for
- *     access they were promised.
+ * - **Restrictions** — Qdrant first, then `document_chunks`, then
+ * `documents`. Both retrievable stores are written SYNCHRONOUSLY.
+ * - **Grants** — `documents` first.
  *
- * Reverse a restriction and you get the failure that matters: the document is
- * IT-only in every list view and **still retrievable by everyone**. A user who
- * just lost access keeps receiving it inside AI answers, while every screen
- * insists that is impossible — and nothing errors, so nothing reports it.
+ * Reverse a restriction and the document is IT-only in every list view and
+ * still retrievable by everyone, with nothing erroring.
  *
- * **Both retrievable stores are written SYNCHRONOUSLY on a restriction**, which
- * is the part an earlier version of this code got wrong: it narrowed the chunk
- * rows and left Qdrant to an async job, so for as long as that job was queued
- * the semantic arm kept serving a document the API had just said was
- * restricted. "The endpoint returns once the restricting store is updated"
- * means both of them, because both are retrievable.
+ * The BullMQ job is the RECONCILER, not the writer: it re-applies the same
+ * scope with retries so a partial failure converges.
  *
- * The BullMQ job (§2.3) is the RECONCILER, not the writer: it re-applies the
- * same scope with retries and backoff, so a partial failure converges instead
- * of needing a human.
+ * See `docs/decisions/0036-scope-fanout-order-is-asymmetric.md`.
  */
 @Injectable()
 export class ScopeWriterService {

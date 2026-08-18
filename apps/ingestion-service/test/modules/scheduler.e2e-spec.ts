@@ -19,7 +19,7 @@ import { QuotaReconciliationJob } from '../../src/modules/scheduled/quota-reconc
 import { AiGenerationRollupJob } from '../../src/modules/analytics/ai-generation-rollup.job';
 
 /**
- * §2, §6 — the scheduler.
+ * The scheduler.
  *
  * **The layer whose absence was the entire bug.** Six jobs in this service were
  * written correctly, exported, imported into `AppModule`, and invoked by
@@ -31,7 +31,7 @@ import { AiGenerationRollupJob } from '../../src/modules/analytics/ai-generation
  * sequence runs in the one order that is unrecoverable if reversed, and that a
  * failure part-way does not cost the rest of the night.
  */
-describe('§1 The scheduler (e2e)', () => {
+describe('The scheduler (e2e)', () => {
   let fx: E2eFixture;
   let processor: SchedulerProcessor;
   let registrar: SchedulerRegistrar;
@@ -235,7 +235,7 @@ describe('§1 The scheduler (e2e)', () => {
       expect(reconcile).toHaveBeenCalledTimes(1);
     });
 
-    it('9. **calls reconcileAll with NO cycle argument** — 20-doc §3.1', async () => {
+    it('9. **calls reconcileAll with NO cycle argument**', async () => {
       // The signature is the fix. `reconcileAll(cycleStart)` applied one date to
       // every tenant, writing each corrected counter under a Redis key the gate
       // never reads — reconciliation that reported success and corrected
@@ -301,7 +301,7 @@ describe('§1 The scheduler (e2e)', () => {
    * only what is local: that a run recorded through the injected recorder lands
    * in this service's own database, in the same failure domain as the work.
    */
-  describe('§4.5 the shared recorder is bound to THIS database', () => {
+  describe('The shared recorder is bound to THIS database', () => {
     it('13. a tracked run writes a row readable through this service’s Prisma', async () => {
       const recorder = fx.moduleRef.get(JobRunRecorder);
 

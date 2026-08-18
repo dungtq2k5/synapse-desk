@@ -31,7 +31,7 @@ python-dotenv==1.0.1
 # on startup rather than a surprise later.
 google-genai==1.44.0
 
-# The reranker
+# The reranker.
 #
 # Undeclared for the same reason, and this is the DANGEROUS half. `rerank()`
 # imports it inside a deliberately broad `except` that logs a warning and falls
@@ -41,7 +41,7 @@ google-genai==1.44.0
 # permanently rerank-less behind one log line per request.
 flashrank==0.2.10
 
-# The STANDARD gRPC health service The Python equivalent of the
+# The STANDARD gRPC health service. The Python equivalent of the
 # `grpc.health.v1` implementation the Node services share, and the reason the
 # probe is a gRPC service rather than an HTTP route: Kubernetes speaks it
 # natively, so a `createMicroservice`-shaped process needs no HTTP listener to

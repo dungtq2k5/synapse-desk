@@ -4,38 +4,32 @@ import { of } from 'rxjs';
 import { RAG_GRPC_CLIENT } from '@synapsedesk/grpc-proto';
 import { memberContext } from '@synapsedesk/common/testing/context';
 import { RagClientService } from './rag-client.service';
-
-/** Any caller will do — none of this affects the mapping under test. */
-const CONTEXT = memberContext({
-  id: '11111111-1111-4111-8111-111111111111',
-  organizationId: '22222222-2222-4222-8222-222222222222',
-});
-
 /**
- * **populate model/token fields only where they cannot be read as
- * the meter.**
+ * **Populate model/token fields only where they cannot be read as the meter.**
  *
  * The rule looks like an inconsistency, which is the dangerous combination:
  * `generateReplyDraft` zeroes `modelName`/`promptTokens` while
- * `generateSummary` passes `modelName` straight through, and a tidying pass
- * unifies them in one line.
- *
- * The asymmetry is the whole design:
+ * `generateSummary` passes `modelName` through, and a tidying pass unifies them
+ * in one line. The asymmetry is the design:
  *
  *   - A draft lands on `ticket_messages`, which HAS token columns. Leaving them
- *     empty is what stops a second metering path forming beside `ai_generations`
- *     — the one the quota gate actually sums.
+ *     empty is what stops a second metering path forming beside
+ *     `ai_generations` — the one the quota gate actually sums.
  *   - A summary lands on `ai_summaries`, where `model_name` is NOT NULL and
- *     there are NO token columns. It is display metadata and cannot be mistaken
- *     for spend.
+ *     there are NO token columns. Display metadata, not spend.
  *
- * Asserted here rather than in `messages.e2e-spec.ts` because this mapper is
- * where the invariant lives. An e2e test that stubs the adapter and then checks
- * the columns are zero proves only that zero was stored — it would pass against
- * a mapper that had stopped zeroing anything. So the wire responses below
- * deliberately carry real numbers.
+ * Asserted here rather than in an e2e test: one that stubs the adapter and
+ * checks the columns are zero proves only that zero was stored, and would pass
+ * against a mapper that had stopped zeroing. The wire responses below carry
+ * real numbers deliberately.
  */
 describe('RagClientService — the single metering path', () => {
+  /** Any caller will do — none of this affects the mapping under test. */
+  const CONTEXT = memberContext({
+    id: '11111111-1111-4111-8111-111111111111',
+    organizationId: '22222222-2222-4222-8222-222222222222',
+  });
+
   /**
    * A stand-in, NOT a real model name.
    *

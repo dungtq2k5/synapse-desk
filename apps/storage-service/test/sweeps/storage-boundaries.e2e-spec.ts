@@ -18,9 +18,9 @@ import { PURPOSE_POLICY } from '../../src/common/purpose-registry';
 import { VALIDATED_MIME_TYPES } from '../../src/common/content-signature';
 
 /**
- * §4 The cross-cutting storage sweeps.
+ * The cross-cutting storage sweeps.
  *
- * Three of the four §4 suites are here, parametrized over every real purpose
+ * Three of the four suites are here, parametrized over every real purpose
  * rather than spot-checked on one:
  *
  *   - the tenant boundary on every presigned path
@@ -31,7 +31,7 @@ import { VALIDATED_MIME_TYPES } from '../../src/common/content-signature';
  * where the NATS wiring already is — a second copy here would prove the same
  * thing twice with one of the copies eventually rotting.
  */
-describe('§4 storage boundary sweeps (e2e)', () => {
+describe('Storage boundary sweeps (e2e)', () => {
   let fx: E2eFixture;
   let storage: StorageService;
 
@@ -284,7 +284,7 @@ describe('§4 storage boundary sweeps (e2e)', () => {
       }
     });
 
-    it('has a CONTENT MATCHER for every allowlisted type — §2.4a', () => {
+    it('has a CONTENT MATCHER for every allowlisted type', () => {
       // `matchesDeclaredType` fails closed on a type it does not know, so a
       // type added to an allowlist without a matcher would reject every upload
       // of it — at confirm, after the bytes are already in the bucket, which is

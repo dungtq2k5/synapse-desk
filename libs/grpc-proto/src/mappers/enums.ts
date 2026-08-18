@@ -179,7 +179,7 @@ export function toProtoInvitationStatus(
 /**
  * `UNSPECIFIED` maps to null rather than to a status.
  *
- * proto3's zero value means "the field was not set" (§6.5), and there is no
+ * proto3's zero value means "the field was not set", and there is no
  * safe status to read that as: defaulting to ACTIVE would let an unset field
  * unfreeze a tenant, and defaulting to FROZEN would lock one out. The caller is
  * given null and decides how to complain, because it knows its own transport.
@@ -204,7 +204,7 @@ export function fromProtoOrgStatus(status: ProtoOrgStatus): OrgStatus | null {
 
 /**
  * Takes the domain enum, but also the bare `string` Prisma hands back for a
- * `VarChar` column (§7.3 — enumerated columns are strings in Postgres).
+ * `VarChar` column (conventions §7.3 — enumerated columns are strings in Postgres).
  *
  * An unknown string maps to UNSPECIFIED rather than throwing: this runs on the
  * RESPONSE path, and a row carrying a status nobody recognises should surface
@@ -245,7 +245,7 @@ export function fromProtoAiModelTier(
 /**
  * Takes a plain `string`, not `AiModelTier | string` — that union collapses to
  * `string` and the linter is right to say so. The parameter is wide ON PURPOSE:
- * the caller is usually handing over a Prisma `VarChar` column (§7.3), and an
+ * the caller is usually handing over a Prisma `VarChar` column, and an
  * unrecognised value maps to UNSPECIFIED rather than throwing, for the same
  * reason `toProtoOrgStatus` does.
  */
@@ -266,7 +266,7 @@ export function toProtoAiModelTier(tier: string): ProtoAiModelTier {
  * Same UNSPECIFIED-is-null rule as the pairs above, and the `to*` direction is
  * deliberately wide (`string`) for the same reason: the caller is usually
  * handing over a Prisma `VarChar` column, because enumerated columns are
- * strings in Postgres (§7.3).
+ * strings in Postgres.
  *
  * The asymmetry is the point. `to*` is the RESPONSE path and must not throw —
  * a row carrying a value nobody recognizes should read as "unset" rather than
@@ -315,7 +315,7 @@ export function fromProtoNotificationPriority(
 
 /**
  * Takes a bare `string`: `notifications.priority` is a `VarChar` with a
- * `"NORMAL"` default (§7.3), so this is what Prisma hands back.
+ * `"NORMAL"` default, so this is what Prisma hands back.
  */
 export function toProtoNotificationPriority(
   priority: string,

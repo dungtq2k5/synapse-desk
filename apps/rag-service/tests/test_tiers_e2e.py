@@ -1,7 +1,7 @@
-"""§2.3 — the tier, and the four things it must NOT change.
+"""The tier, and the four things it must NOT change.
 
 Every test here is a commercial claim rather than a technical one. The tier is
-the product's only sellable AI knob, and each row of doc 15 §2.2 is a
+the product's only sellable AI knob, and each row of the tier table is a
 plausible-sounding extension that would break something:
 
   - scaling the EMBEDDING model with the tier is a full re-embed migration of
@@ -144,7 +144,7 @@ class TestWhatTheTierChanges:
 
 
 class TestWhatTheTierMustNotChange:
-    """Doc 15 §2.2 — each row a plausible extension that breaks something."""
+    """Each row a plausible extension that breaks something."""
 
     async def test_2_a_QUALITY_tenant_still_classifies_on_the_CHEAP_model(
         self, ledger, budget
@@ -247,7 +247,7 @@ class TestTheCommercialConsequence:
 
 class TestDowngrade:
     async def test_5_the_NEXT_request_uses_the_FAST_model_after_a_downgrade(self):
-        # §1.3's invalidation, end to end on the Python side. Without it a
+        # Invalidation, end to end on the Python side. Without it a
         # downgraded tenant keeps the premium model for the whole cache TTL —
         # the system giving away the exact thing it just stopped being paid for,
         # in the direction that costs money rather than the one someone

@@ -15,7 +15,7 @@ import { MessagesService } from '../../src/modules/messages/messages.service';
 import { StorageReferenceService } from '../../src/modules/storage-client/storage-reference.service';
 
 /**
- * Binding attachments AT CREATE
+ * Binding attachments AT CREATE.
  *
  * Presign and confirm both took a `messageId`, so a row could only be written
  * after its message existed, while `invokeAi` runs during the create: a
@@ -29,7 +29,7 @@ import { StorageReferenceService } from '../../src/modules/storage-client/storag
  * open across a network call, and that a failed confirm costs one file rather
  * than the message.
  */
-describe('§1.3 attachments bound at message create (e2e)', () => {
+describe('Attachments bound at message create (e2e)', () => {
   let fx: E2eFixture;
   let messages: MessagesService;
   let storage: StorageReferenceService;
@@ -56,8 +56,8 @@ describe('§1.3 attachments bound at message create (e2e)', () => {
     tenant = buildTenant();
 
     confirmUpload = jest.spyOn(storage, 'confirmUpload').mockResolvedValue({
-      // The COMMITTED path — the object left `pending/` on the way through
-      //, and this is what the row must record.
+      // The COMMITTED path — the object left `pending/` on the way through,
+      // and this is what the row must record.
       objectPath: 'organizations/o/tickets/t/attachments/committed.png',
       sizeBytes: 2048,
       contentType: 'image/png',
@@ -74,7 +74,7 @@ describe('§1.3 attachments bound at message create (e2e)', () => {
   afterAll(() => fx.close());
 
   it('1. **a one-shot message carries its attachments into the same turn**', async () => {
-    // The assertion §1.3 exists for. The rows are visible the instant the
+    // The assertion this exists for. The rows are visible the instant the
     // message is — which is the instant `invokeAi` fires.
     const ticket = await createTicket(fx.prisma, tenant);
 
@@ -126,7 +126,7 @@ describe('§1.3 attachments bound at message create (e2e)', () => {
   });
 
   it('3. **a path that fails its confirm is named, and the message is created**', async () => {
-    // §1.3.1 picks this over failing the create, and the reason is a rule this
+    // The rule picks this over failing the create, and the reason is a rule this
     // codebase already set: a rollback here would throw away what a human typed
     // because a machine could not answer them.
     const ticket = await createTicket(fx.prisma, tenant);

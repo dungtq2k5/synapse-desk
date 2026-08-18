@@ -1,40 +1,28 @@
 import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { ClientGrpc } from '@nestjs/microservices';
 import {
+  BulkTicketStatusRequest,
+  BulkTicketStatusResponse,
+  ChangeTicketStatusRequest,
+  CreateTicketRequest,
+  ListTicketsRequest,
+  ListTicketsResponse,
   TICKET_GRPC_CLIENT,
   TICKET_SERVICE_NAME,
+  TicketResponse,
   TicketServiceClient,
-  toPageRequest,
-  toProtoTicketPriority,
-  toProtoTicketSource,
-  toProtoTicketStatus,
+  UpdateTicketRequest,
 } from '@synapsedesk/grpc-proto';
 import { RequestContext } from '@synapsedesk/common';
 import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
-import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
-import { toPaginationMetaDataResponseDto } from '../../common/mappers/pagination.mapper';
-import { toTicketResponseDto } from './ticket.mapper';
-import {
-  BulkTicketStatusDto,
-  ChangeTicketStatusDto,
-  CreateTicketDto,
-  ListTicketsQueryDto,
-  UpdateTicketDto,
-} from './dto/rest/ticket.dto';
-import {
-  BulkTicketStatusResponseDto,
-  TicketResponseDto,
-} from './dto/rest/ticket-response.dto';
 
 /**
- * Every method takes the full `RequestContext`, not a bare origin.
+ * The gateway's client for ticket-service.
  *
- * `BaseGrpcClient.call` packs it into metadata, which is how BOTH the tenant
- * and the caller's identity reach ticket-service — and the identity matters
- * more here than in Domain A, because the visibility filter (author-or-assignee
- * for a non-agent) reads `sub` and `permissionCodes` directly. Narrowing any of
- * these to `RequestOrigin` would strip that and the service would return an
- * empty list rather than an error, which is the worse failure.
+ * Every method takes the full `RequestContext`, never a bare `RequestOrigin`:
+ * ticket-service's visibility filter reads `sub` and `permissionCodes` off the
+ * metadata, and narrowing the parameter would strip them — which returns an
+ * empty list rather than an error.
  */
 @Injectable()
 export class TicketsGrpcClient extends BaseGrpcClient implements OnModuleInit {
@@ -51,116 +39,62 @@ export class TicketsGrpcClient extends BaseGrpcClient implements OnModuleInit {
       this.client.getService<TicketServiceClient>(TICKET_SERVICE_NAME);
   }
 
-  async list(
-    query: ListTicketsQueryDto,
+  list(
+    request: ListTicketsRequest,
     context: RequestContext,
-  ): Promise<PaginationResponseDto<TicketResponseDto>> {
-    const response = await this.call(
-      (metadata) =>
-        this.ticketGrpcService.listTickets(
-          {
-            page: toPageRequest(query),
-            status: toProtoTicketStatus(query.status),
-            priority: toProtoTicketPriority(query.priority),
-            source: toProtoTicketSource(query.source),
-            // '' rather than undefined: proto3 scalars have no null, and the
-            // service reads the empty string as "no filter".
-            assigneeId: query.assigneeId ?? '',
-            departmentId: query.departmentId ?? '',
-            authorId: query.authorId ?? '',
-            includeDeleted: query.includeDeleted,
-          },
-          metadata,
-        ),
+  ): Promise<ListTicketsResponse> {
+    return this.call(
+      (metadata) => this.ticketGrpcService.listTickets(request, metadata),
       context,
     );
-
-    return {
-      items: response.items.map(toTicketResponseDto),
-      meta: toPaginationMetaDataResponseDto(response.meta),
-    };
   }
 
-  async get(id: string, context: RequestContext): Promise<TicketResponseDto> {
-    return toTicketResponseDto(
-      await this.call(
-        (metadata) => this.ticketGrpcService.getTicket({ id }, metadata),
-        context,
-      ),
+  get(id: string, context: RequestContext): Promise<TicketResponse> {
+    return this.call(
+      (metadata) => this.ticketGrpcService.getTicket({ id }, metadata),
+      context,
     );
   }
 
-  async getByNumber(
+  getByNumber(
     ticketNumber: number,
     context: RequestContext,
-  ): Promise<TicketResponseDto> {
-    return toTicketResponseDto(
-      await this.call(
-        (metadata) =>
-          this.ticketGrpcService.getTicketByNumber({ ticketNumber }, metadata),
-        context,
-      ),
+  ): Promise<TicketResponse> {
+    return this.call(
+      (metadata) =>
+        this.ticketGrpcService.getTicketByNumber({ ticketNumber }, metadata),
+      context,
     );
   }
 
-  async create(
-    dto: CreateTicketDto,
+  create(
+    request: CreateTicketRequest,
     context: RequestContext,
-  ): Promise<TicketResponseDto> {
-    return toTicketResponseDto(
-      await this.call(
-        (metadata) =>
-          this.ticketGrpcService.createTicket(
-            {
-              title: dto.title,
-              description: dto.description,
-              priority: toProtoTicketPriority(dto.priority),
-              source: toProtoTicketSource(dto.source),
-              authorId: dto.authorId,
-            },
-            metadata,
-          ),
-        context,
-      ),
+  ): Promise<TicketResponse> {
+    return this.call(
+      (metadata) => this.ticketGrpcService.createTicket(request, metadata),
+      context,
     );
   }
 
-  async update(
-    id: string,
-    dto: UpdateTicketDto,
+  update(
+    request: UpdateTicketRequest,
     context: RequestContext,
-  ): Promise<TicketResponseDto> {
-    return toTicketResponseDto(
-      await this.call(
-        (metadata) =>
-          this.ticketGrpcService.updateTicket(
-            {
-              id,
-              title: dto.title,
-              description: dto.description,
-              priority: toProtoTicketPriority(dto.priority),
-            },
-            metadata,
-          ),
-        context,
-      ),
+  ): Promise<TicketResponse> {
+    return this.call(
+      (metadata) => this.ticketGrpcService.updateTicket(request, metadata),
+      context,
     );
   }
 
-  async changeStatus(
-    id: string,
-    dto: ChangeTicketStatusDto,
+  changeStatus(
+    request: ChangeTicketStatusRequest,
     context: RequestContext,
-  ): Promise<TicketResponseDto> {
-    return toTicketResponseDto(
-      await this.call(
-        (metadata) =>
-          this.ticketGrpcService.changeTicketStatus(
-            { id, status: toProtoTicketStatus(dto.status), reason: dto.reason },
-            metadata,
-          ),
-        context,
-      ),
+  ): Promise<TicketResponse> {
+    return this.call(
+      (metadata) =>
+        this.ticketGrpcService.changeTicketStatus(request, metadata),
+      context,
     );
   }
 
@@ -171,69 +105,43 @@ export class TicketsGrpcClient extends BaseGrpcClient implements OnModuleInit {
    * permission them separately — escalating and closing are different rights —
    * while the SERVICE routes all four through one transition validator.
    */
-  async escalate(
-    id: string,
-    context: RequestContext,
-  ): Promise<TicketResponseDto> {
-    return toTicketResponseDto(
-      await this.call(
-        (metadata) => this.ticketGrpcService.escalateTicket({ id }, metadata),
-        context,
-      ),
-    );
-  }
-
-  async resolve(
-    id: string,
-    context: RequestContext,
-  ): Promise<TicketResponseDto> {
-    return toTicketResponseDto(
-      await this.call(
-        (metadata) => this.ticketGrpcService.resolveTicket({ id }, metadata),
-        context,
-      ),
-    );
-  }
-
-  async reopen(
-    id: string,
-    context: RequestContext,
-  ): Promise<TicketResponseDto> {
-    return toTicketResponseDto(
-      await this.call(
-        (metadata) => this.ticketGrpcService.reopenTicket({ id }, metadata),
-        context,
-      ),
-    );
-  }
-
-  async close(id: string, context: RequestContext): Promise<TicketResponseDto> {
-    return toTicketResponseDto(
-      await this.call(
-        (metadata) => this.ticketGrpcService.closeTicket({ id }, metadata),
-        context,
-      ),
-    );
-  }
-
-  async bulkChangeStatus(
-    dto: BulkTicketStatusDto,
-    context: RequestContext,
-  ): Promise<BulkTicketStatusResponseDto> {
-    const response = await this.call(
-      (metadata) =>
-        this.ticketGrpcService.bulkChangeTicketStatus(
-          {
-            ticketIds: dto.ticketIds,
-            status: toProtoTicketStatus(dto.status),
-            reason: dto.reason,
-          },
-          metadata,
-        ),
+  escalate(id: string, context: RequestContext): Promise<TicketResponse> {
+    return this.call(
+      (metadata) => this.ticketGrpcService.escalateTicket({ id }, metadata),
       context,
     );
+  }
 
-    return { updated: response.updated, failed: response.failed };
+  resolve(id: string, context: RequestContext): Promise<TicketResponse> {
+    return this.call(
+      (metadata) => this.ticketGrpcService.resolveTicket({ id }, metadata),
+      context,
+    );
+  }
+
+  reopen(id: string, context: RequestContext): Promise<TicketResponse> {
+    return this.call(
+      (metadata) => this.ticketGrpcService.reopenTicket({ id }, metadata),
+      context,
+    );
+  }
+
+  close(id: string, context: RequestContext): Promise<TicketResponse> {
+    return this.call(
+      (metadata) => this.ticketGrpcService.closeTicket({ id }, metadata),
+      context,
+    );
+  }
+
+  bulkChangeStatus(
+    request: BulkTicketStatusRequest,
+    context: RequestContext,
+  ): Promise<BulkTicketStatusResponse> {
+    return this.call(
+      (metadata) =>
+        this.ticketGrpcService.bulkChangeTicketStatus(request, metadata),
+      context,
+    );
   }
 
   async remove(id: string, context: RequestContext): Promise<void> {
@@ -243,15 +151,10 @@ export class TicketsGrpcClient extends BaseGrpcClient implements OnModuleInit {
     );
   }
 
-  async restore(
-    id: string,
-    context: RequestContext,
-  ): Promise<TicketResponseDto> {
-    return toTicketResponseDto(
-      await this.call(
-        (metadata) => this.ticketGrpcService.restoreTicket({ id }, metadata),
-        context,
-      ),
+  restore(id: string, context: RequestContext): Promise<TicketResponse> {
+    return this.call(
+      (metadata) => this.ticketGrpcService.restoreTicket({ id }, metadata),
+      context,
     );
   }
 }

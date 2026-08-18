@@ -72,7 +72,7 @@ message ListPermissionHoldersRequest {
   string organization_id = 1;
   // A `target.action` code from the canonical registry.
   string permission_code = 2;
-  // Narrows the audience to one DEPARTMENT
+  // Narrows the audience to one DEPARTMENT.
   //
   // Absent means the whole tenant, which is right for a quota alert (an
   // organization has one budget) and wrong for a ticket escalation: paging
@@ -105,7 +105,7 @@ message NotificationRecipient {
 
 message ListPermissionHoldersResponse { repeated NotificationRecipient items = 1; }
 
-// The OTHER audience kind
+// The OTHER audience kind.
 //
 // A ticket event already knows who the assignee is. Resolving `ticket.read`
 // holders instead would notify every agent in the tenant that one of them got
@@ -118,7 +118,7 @@ message ListUsersByIdsRequest {
   string organization_id = 1;
   repeated string user_ids = 2;
 
-  // **Include locked and soft-deleted users**
+  // **Include locked and soft-deleted users**.
   //
   // Two callers, two different questions:
   //
@@ -133,7 +133,7 @@ message ListUsersByIdsRequest {
   // get scoping wrong. Defaults false, so the existing caller is unchanged.
   bool include_inactive = 3;
 
-  // Which shape to return
+  // Which shape to return.
   //
   // The notification projection carries `email`, `quiet_hours_*` and `timezone`.
   // Quiet hours are meaningless to a loader, and **`email` is precisely what
@@ -149,7 +149,7 @@ enum UserProjection {
   USER_PROJECTION_SUMMARY = 1;
 }
 
-// What a GraphQL edge is allowed to see
+// What a GraphQL edge is allowed to see.
 //
 // A type reached by TRAVERSAL exposes only what the traversal's own permission
 // justifies. `Ticket.assignee` is reachable with ticket access alone, so it
@@ -356,9 +356,9 @@ service UserService {
   rpc UnlockUser(UserIdRequest) returns (UnlockUserResponse);
   rpc ResetUserTwoFactor(UserIdRequest) returns (ResetUserTwoFactorResponse);
 
-  // Avatars — 10-storage-service.md §3.1. auth-service owns `users.avatar_url`,
+  // Avatars. auth-service owns `users.avatar_url`,
   // so it initiates the upload and calls storage-service internally; the
-  // gateway never talks to storage-service directly (§1.5).
+  // gateway never talks to storage-service directly.
   rpc PresignAvatarUpload(PresignAvatarUploadRequest) returns (PresignAvatarUploadResponse);
   rpc ConfirmAvatarUpload(ConfirmAvatarUploadRequest) returns (UserResponse);
   rpc DeleteAvatar(DeleteAvatarRequest) returns (UserResponse);

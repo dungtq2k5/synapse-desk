@@ -26,7 +26,7 @@ import {
   ApiWrappedResponse,
   Paginated,
 } from '../../common/decorators/api-response.decorator';
-import { MessagesGrpcClient } from './messages-grpc.client';
+import { MessagesService } from './messages.service';
 import {
   ConfirmAttachmentDto,
   CreateMessageDto,
@@ -62,7 +62,7 @@ import {
 @Controller('tickets/:ticketId/messages')
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class MessagesController {
-  constructor(private readonly messagesGrpcClient: MessagesGrpcClient) {}
+  constructor(private readonly messages: MessagesService) {}
 
   @ApiOperation({
     summary: 'Chronological thread, cursor-paginated (?before=&limit=)',
@@ -75,7 +75,7 @@ export class MessagesController {
     @Param('ticketId', ParseUUIDPipe) ticketId: string,
     @Query() query: ListMessagesQueryDto,
   ): Promise<PaginationResponseDto<MessageResponseDto>> {
-    return this.messagesGrpcClient.list(ticketId, query, context);
+    return this.messages.list(ticketId, query, context);
   }
 
   /**
@@ -108,7 +108,7 @@ export class MessagesController {
     @Param('ticketId', ParseUUIDPipe) ticketId: string,
     @Body() dto: CreateMessageDto,
   ): Promise<CreateMessageResponseDto> {
-    return this.messagesGrpcClient.create(ticketId, dto, context);
+    return this.messages.create(ticketId, dto, context);
   }
 
   @ApiOperation({
@@ -125,7 +125,7 @@ export class MessagesController {
     @Param('messageId', ParseUUIDPipe) messageId: string,
     @Body() dto: UpdateMessageDto,
   ): Promise<MessageResponseDto> {
-    return this.messagesGrpcClient.update(ticketId, messageId, dto, context);
+    return this.messages.update(ticketId, messageId, dto, context);
   }
 
   /**
@@ -151,13 +151,13 @@ export class MessagesController {
     @Param('ticketId', ParseUUIDPipe) ticketId: string,
     @Param('messageId', ParseUUIDPipe) messageId: string,
   ): Promise<MessageResponseDto> {
-    return this.messagesGrpcClient.redact(ticketId, messageId, context);
+    return this.messages.redact(ticketId, messageId, context);
   }
 
   // -------------------------------------------------------------- attachments
 
   /**
-   * The same presign, for a message that does NOT exist yet
+   * The same presign, for a message that does NOT exist yet.
    *
    * **This route is what makes a first-turn attachment readable.** Its sibling
    * below is nested under `:messageId`, so a client could only upload after
@@ -184,16 +184,11 @@ export class MessagesController {
     @Param('ticketId', ParseUUIDPipe) ticketId: string,
     @Body() dto: UploadAttachmentDto,
   ): Promise<PresignAttachmentResponseDto> {
-    return this.messagesGrpcClient.presignAttachment(
-      ticketId,
-      undefined,
-      dto,
-      context,
-    );
+    return this.messages.presignAttachment(ticketId, undefined, dto, context);
   }
 
   /**
-   * Presign — 10-storage-service.md §3.2.
+   * Presign, step 1 of presign → upload → confirm.
    *
    * Returns a URL the CLIENT PUTs the bytes to directly. The per-message cap is
    * enforced in ticket-service BEFORE anything is signed, so a caller already
@@ -216,12 +211,7 @@ export class MessagesController {
     @Param('messageId', ParseUUIDPipe) messageId: string,
     @Body() dto: UploadAttachmentDto,
   ): Promise<PresignAttachmentResponseDto> {
-    return this.messagesGrpcClient.presignAttachment(
-      ticketId,
-      messageId,
-      dto,
-      context,
-    );
+    return this.messages.presignAttachment(ticketId, messageId, dto, context);
   }
 
   @ApiOperation({
@@ -237,12 +227,7 @@ export class MessagesController {
     @Param('messageId', ParseUUIDPipe) messageId: string,
     @Body() dto: ConfirmAttachmentDto,
   ): Promise<AttachmentResponseDto> {
-    return this.messagesGrpcClient.confirmAttachment(
-      ticketId,
-      messageId,
-      dto,
-      context,
-    );
+    return this.messages.confirmAttachment(ticketId, messageId, dto, context);
   }
 
   @ApiOperation({ summary: 'List attachments' })
@@ -254,10 +239,6 @@ export class MessagesController {
     @Param('ticketId', ParseUUIDPipe) ticketId: string,
     @Param('messageId', ParseUUIDPipe) messageId: string,
   ): Promise<AttachmentResponseDto[]> {
-    return this.messagesGrpcClient.listAttachments(
-      ticketId,
-      messageId,
-      context,
-    );
+    return this.messages.listAttachments(ticketId, messageId, context);
   }
 }

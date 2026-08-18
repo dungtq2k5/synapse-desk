@@ -2,29 +2,20 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 /**
- * **The drift guard** test 1.
+ * **The drift guard.**
  *
- * `model JobRun` is declared three times, in `postgres_auth`, `postgres_ticket`
- * and `postgres_ingestion`. That is correct and deliberate: three tables
- * holding different rows is not duplication of facts — auth's holds auth's
- * jobs, ingestion's holds ingestion's — and writing the heartbeat into the same
- * failure domain as the work it describes is the only thing that makes it mean
- * anything. A remote heartbeat can succeed while the job's own database is
- * unreachable, reporting healthy for a job writing nothing, which is the
- * original bug with extra infrastructure.
+ * `model JobRun` is declared three times — `postgres_auth`, `postgres_ticket`,
+ * `postgres_ingestion` — and that is deliberate: writing the heartbeat into the
+ * same failure domain as the work it describes is the only thing that makes it
+ * mean anything. A remote heartbeat can succeed while the job's own database is
+ * unreachable, reporting healthy for a job writing nothing.
  *
- * What that costs is a shape three files have to agree on, with no compiler
- * checking it: Prisma has no cross-package schema imports, and generating the
- * block from a canonical partial adds build machinery for twelve lines.
+ * The cost is a shape three files must agree on with no compiler checking it:
+ * Prisma has no cross-package schema imports.
  *
- * **The drift is not hypothetical — it had already started.** Two of the three
- * carried the full docblock explaining why `lastSucceededAt` survives a
- * failure; auth-service's had a two-line stub. Comments only, so harmless — and
- * the first inch of exactly the movement this test exists to stop.
- *
- * So this compares FIELDS, not comments: a divergent explanation is a
- * readability problem, and a divergent column is `JobRunStore` lying to one of
- * its three bindings.
+ * **It compares FIELDS, not comments.** A divergent explanation is a
+ * readability problem; a divergent column is `JobRunStore` lying to one of its
+ * three bindings.
  */
 describe('model JobRun is identical across the three schemas', () => {
   const SERVICES = ['auth-service', 'ticket-service', 'ingestion-service'];
@@ -45,7 +36,7 @@ describe('model JobRun is identical across the three schemas', () => {
 
     const block = /model JobRun \{([\s\S]*?)\n\}/.exec(schema);
     if (!block) {
-      throw new Error(`${service} has no 'model JobRun' — 20-doc §4.1`);
+      throw new Error(`${service} has no 'model JobRun'`);
     }
 
     return block[1]

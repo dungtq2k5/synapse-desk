@@ -76,7 +76,7 @@ export class AuthReferenceService implements OnModuleInit {
   }
 
   /**
-   * Addresses for recipients the producer ALREADY NAMED
+   * Addresses for recipients the producer ALREADY NAMED.
    *
    * The distinction matters: this decides nothing about who should be
    * notified. A ticket event knows its assignee, and asking "who holds
@@ -95,7 +95,7 @@ export class AuthReferenceService implements OnModuleInit {
           .listUsersByIds({
             organizationId,
             userIds,
-            // **The notification audience, unchanged** `false`
+            // **The notification audience, unchanged**. `false`
             // keeps "a notification to a deactivated account is a row nobody
             // reads" true now that the flag exists for the GraphQL loader,
             // which wants the opposite answer.

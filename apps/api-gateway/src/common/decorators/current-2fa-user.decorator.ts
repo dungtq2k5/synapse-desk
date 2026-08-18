@@ -3,9 +3,8 @@ import {
   ExecutionContext,
   InternalServerErrorException,
 } from '@nestjs/common';
-import { GqlExecutionContext } from '@nestjs/graphql';
-import type { Request } from 'express';
 import { TwoFactorJwtPayload } from '@synapsedesk/common';
+import { requestOf } from '../utils/execution-request.util';
 
 /**
  * The subject of an in-progress 2FA challenge.
@@ -18,12 +17,9 @@ import { TwoFactorJwtPayload } from '@synapsedesk/common';
  */
 export const Current2faUser = createParamDecorator(
   (_data: unknown, context: ExecutionContext): TwoFactorJwtPayload => {
-    const request =
-      context.getType<string>() === 'graphql'
-        ? GqlExecutionContext.create(context).getContext<{ req: Request }>().req
-        : context.switchToHttp().getRequest<Request>();
+    const request = requestOf(context);
 
-    const payload = request.user as TwoFactorJwtPayload | undefined;
+    const payload = request?.user as TwoFactorJwtPayload | undefined;
     if (!payload) {
       throw new InternalServerErrorException(
         '@Current2faUser was used on a route handler that is missing Jwt2faGuard',

@@ -127,7 +127,7 @@ export class DepartmentsService {
     const { ids, overLimit } = normalizeBatchIds(request.departmentIds);
 
     if (overLimit) {
-      // An ERROR rather than a truncation, property 5. A truncated
+      // An ERROR rather than a truncation. A truncated
       // batch is indistinguishable from those rows having been deleted, so the
       // page renders with silent gaps and nothing reports a problem.
       throw new RpcException({
@@ -235,7 +235,7 @@ export class DepartmentsService {
    * Soft delete, BLOCKED while the department still has members.
    *
    * Deleting one with members silently strips their `is_primary` and their
-   * document scoping — a permission and routing change nobody authorised. The
+   * document scoping — a permission and routing change nobody authorized. The
    * caller is told how many are in the way so they can reassign first.
    *
    * (The plan's real rule is "blocked while it holds open tickets". That is
@@ -320,9 +320,7 @@ export class DepartmentsService {
     return toDepartmentResponse(await this.loadWithCounts(department.id));
   }
 
-  // -------------------------------------------------------------------------
-  // Membership
-  // -------------------------------------------------------------------------
+  // ----------------------------------------------------------------------- Membership
 
   async listDepartmentMembers(
     request: ListDepartmentMembersRequest,
@@ -625,10 +623,3 @@ export class DepartmentsService {
     }
   }
 }
-
-/**
- * ts-proto types every message-valued field as `T | undefined`, so a caller
- * that omits `page` entirely is representable. The defaults below are the same
- * ones the gateway DTO applies, so behaviour does not depend on which edge the
- * request came through.
- */

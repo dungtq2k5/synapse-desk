@@ -25,7 +25,7 @@ import { TicketRollupJob } from './ticket-rollup.job';
 import { AnalyticsExportFacade } from './analytics-export.facade';
 
 /**
- * Domain B's analytics surface
+ * Domain B's analytics surface.
  *
  * Every read unpacks the caller context, and every one is tenant-scoped by
  * `requireTenant` inside the service. The rollup tables are NEW tables written
@@ -118,7 +118,7 @@ export class AnalyticsGrpcController implements AnalyticsServiceController {
     };
   }
   /**
-   * The heartbeat
+   * The heartbeat.
    *
    * Platform-operated, like `runRollup` above. Returns every row unjudged: the
    * staleness decision needs the list of jobs this build EXPECTS, and a job

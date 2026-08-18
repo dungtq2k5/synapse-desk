@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 
 /**
- * Whether the OCR binaries are installed on THIS machine
+ * Whether the OCR binaries are installed on THIS machine.
  *
  * **Jest runs on the developer's host, not in the image.** `runtime-ocr` puts
  * poppler and tesseract where the service runs; it puts them nowhere jest can
@@ -31,7 +31,7 @@ function probe(binary: string, args: string[]): boolean {
   }
 }
 
-/** poppler's rasteriser. Also required by the mixed-page FIXTURE — §8.1. */
+/** poppler's rasteriser. Also required by the mixed-page FIXTURE. */
 export const HAS_POPPLER = probe('pdftoppm', ['-v']);
 
 /** The OCR engine itself. */
@@ -51,7 +51,7 @@ export const OCR_SKIP_REASON =
   '(see apps/ingestion-service/README.md)';
 
 /**
- * `describe` that skips when the binaries are absent
+ * `describe` that skips when the binaries are absent.
  *
  * Used instead of a bare `describe.skip` so the reason travels with the skip:
  * jest prints the suite name, and a name ending in the install command is the

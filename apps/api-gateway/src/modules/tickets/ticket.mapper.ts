@@ -3,9 +3,18 @@ import {
   fromProtoTicketSource,
   fromProtoTicketStatus,
   fromProtoTimestamp,
+  ListTicketsRequest,
+  ListTicketsResponse,
   requireProtoTimestamp,
   TicketResponse,
+  toPageRequest,
+  toProtoTicketPriority,
+  toProtoTicketSource,
+  toProtoTicketStatus,
 } from '@synapsedesk/grpc-proto';
+import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
+import { toPaginationMetaDataResponseDto } from '../../common/mappers/pagination.mapper';
+import { ListTicketsQueryDto } from './dto/rest/ticket.dto';
 import { TicketResponseDto } from './dto/rest/ticket-response.dto';
 
 /**
@@ -44,5 +53,35 @@ export function toTicketResponseDto(ticket: TicketResponse): TicketResponseDto {
     updatedAt: requireProtoTimestamp(ticket.updatedAt, 'updatedAt'),
     deletedAt: fromProtoTimestamp(ticket.deletedAt) ?? null,
     deletedById: ticket.deletedById ?? null,
+  };
+}
+
+/** Builds a `ListTicketsRequest` from the REST query. */
+export function toListTicketsRequest(
+  query: ListTicketsQueryDto,
+): ListTicketsRequest {
+  return {
+    page: toPageRequest(query),
+    status: toProtoTicketStatus(query.status),
+    priority: toProtoTicketPriority(query.priority),
+    source: toProtoTicketSource(query.source),
+    // `''` rather than `undefined`, and the proto field stays NON-optional on
+    // purpose. For a FILTER, "absent" and "empty" mean the same thing -- no
+    // filter -- so explicit presence would buy a distinction nothing uses while
+    // obliging the service to accept both spellings of it.
+    assigneeId: query.assigneeId ?? '',
+    departmentId: query.departmentId ?? '',
+    authorId: query.authorId ?? '',
+    includeDeleted: query.includeDeleted,
+  };
+}
+
+/** Converts a `ListTicketsResponse` into the paginated REST envelope. */
+export function toTicketPageDto(
+  response: ListTicketsResponse,
+): PaginationResponseDto<TicketResponseDto> {
+  return {
+    items: response.items.map(toTicketResponseDto),
+    meta: toPaginationMetaDataResponseDto(response.meta),
   };
 }

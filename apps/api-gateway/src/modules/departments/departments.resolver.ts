@@ -5,19 +5,21 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionGuard } from '../../common/guards/permission.guard';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { DepartmentsGrpcClient } from './departments-grpc.client';
-import { DepartmentResponseGqlDto } from './dto/graphql/department-response.gql-dto';
-import { DepartmentPageGqlDto } from './dto/graphql/department-page.gql-dto';
+import { DepartmentsService } from './departments.service';
+import {
+  DepartmentResponseGqlDto,
+  DepartmentPageResponseGqlDto,
+} from './dto/graphql/department-response.gql-dto';
 import { PageArgsGqlDto } from '../../common/dto/graphql/page-args.gql-dto';
-import { toPageQuery } from '../../common/mappers/pagination.mapper';
+import { toPageQuery } from '../../common/graphql/page-query';
 
-/** `Query.departments` */
+/** `Query.departments`. */
 @Resolver(() => DepartmentResponseGqlDto)
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class DepartmentsResolver {
-  constructor(private readonly client: DepartmentsGrpcClient) {}
+  constructor(private readonly departments: DepartmentsService) {}
 
-  @Query(() => DepartmentPageGqlDto, {
+  @Query(() => DepartmentPageResponseGqlDto, {
     name: 'departments',
     description: 'Departments in the caller’s tenant.',
   })
@@ -25,8 +27,8 @@ export class DepartmentsResolver {
   async departmentPage(
     @Args() args: PageArgsGqlDto,
     @CurrentUser() context: RequestContext,
-  ): Promise<DepartmentPageGqlDto> {
-    return await this.client.list(
+  ): Promise<DepartmentPageResponseGqlDto> {
+    return await this.departments.list(
       {
         // `name` rather than the shared `createdAt` default: a department list
         // is read as a picker, and alphabetical is what a picker wants. Both

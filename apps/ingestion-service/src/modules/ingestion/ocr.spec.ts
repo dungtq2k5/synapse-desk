@@ -18,7 +18,7 @@ import {
  * Scanned-page OCR
  *
  * **These tests need binaries on the HOST**, and the Docker target does not
- * provide them: jest runs on the developer's machine (§3.4). Install with
+ * provide them: jest runs on the developer's machine. Install with
  *
  *     sudo apt-get install -y poppler-utils tesseract-ocr tesseract-ocr-eng
  *
@@ -29,7 +29,7 @@ import {
  * a red suite nobody can fix locally gets deleted, a visibly skipped one gets
  * the package installed.
  */
-describe('§34 scanned PDFs', () => {
+describe('Scanned PDFs', () => {
   const parser = new DocumentParserService(new OcrService());
 
   const parse = async (bytes: Buffer) =>
@@ -60,9 +60,9 @@ describe('§34 scanned PDFs', () => {
     expect(describeWithOcr === describe).toBe(HAS_OCR_BINARIES);
   });
 
-  describeWithOcr('§1 — the pages pdfjs cannot read', () => {
+  describeWithOcr('the pages pdfjs cannot read', () => {
     it('**a fully scanned PDF yields text instead of nothing**', async () => {
-      // §1 test 2, and the behaviour it replaces is worth naming: this page
+      // and the behaviour it replaces is worth naming: this page
       // used to come back as an empty list, because `parsePdf` ended in
       // `pages.filter((page) => page.markdown.trim().length > 0)`. The
       // document then produced no chunks and failed as `NoExtractableText` —
@@ -75,7 +75,7 @@ describe('§34 scanned PDFs', () => {
     }, 120_000);
 
     it('4. **page numbers survive OCR**, which is what citations resolve to', async () => {
-      // §1 test 4. Rasterisation is per page, so the number is carried rather
+      // Rasterisation is per page, so the number is carried rather
       // than inferred — and OCR'd pages are appended as they complete, so the
       // list is sorted before it leaves the parser. A citation resolving to
       // "page 4" from a list where 4 followed 7 would be confidently wrong.
@@ -98,8 +98,8 @@ describe('§34 scanned PDFs', () => {
     }, 180_000);
 
     it('and the parser reports how many pages the document HAS', async () => {
-      // §1.1. `pages.length` stops being the page count once anything can be
-      // dropped, and §6's check needs the real number to compare against.
+      // `pages.length` stops being the page count once anything can be
+      // dropped, and the page-count check needs the real number to compare against.
       const parsed = await parser.parse(
         await buildMixedPdf(['Born digital', { scanned: 'SCANNED' }]),
         'pdf',
@@ -110,37 +110,34 @@ describe('§34 scanned PDFs', () => {
     }, 120_000);
   });
 
-  describeWithOcr(
-    '§1 test 1 — text pages and image pages both yield text',
-    () => {
-      it('**a mixed PDF returns all three pages, with page numbers intact**', async () => {
-        const pages = await parse(
-          await buildMixedPdf([
-            'Born digital page one',
-            { scanned: 'SCANNED APPENDIX' },
-            'Born digital page three',
-          ]),
-        );
+  describeWithOcr('text pages and image pages both yield text', () => {
+    it('**a mixed PDF returns all three pages, with page numbers intact**', async () => {
+      const pages = await parse(
+        await buildMixedPdf([
+          'Born digital page one',
+          { scanned: 'SCANNED APPENDIX' },
+          'Born digital page three',
+        ]),
+      );
 
-        expect(pages.map((page) => page.pageNumber)).toEqual([1, 2, 3]);
-        expect(pages[1].markdown).toMatch(/SCANNED/i);
-      }, 120_000);
-    },
-  );
+      expect(pages.map((page) => page.pageNumber)).toEqual([1, 2, 3]);
+      expect(pages[1].markdown).toMatch(/SCANNED/i);
+    }, 120_000);
+  });
 });
 
 /**
- * §3 — the pipeline's own properties.
+ * The pipeline's own properties.
  *
  * These are SPY-based and run everywhere, which is fortunate: they are the ones
- * guarding cost and the offline property (§3.4), and a machine without
+ * guarding cost and the offline property, and a machine without
  * tesseract is exactly where a regression in them would go unnoticed.
  */
-describe('§3 the OCR pipeline', () => {
+describe('The OCR pipeline', () => {
   const ocr = new OcrService();
 
   it('1. **a watermark-only text layer is OCR’d, not kept**', async () => {
-    // §3.2, in the case that motivates the threshold. `trim().length > 0` was
+    // in the case that motivates the threshold. `trim().length > 0` was
     // the wrong test: this page has 21 characters of scanner stamp and is an
     // image. The floor is 32, measured — see `MIN_PAGE_CHARACTERS`.
     const parser = new DocumentParserService(ocr);
@@ -158,7 +155,7 @@ describe('§3 the OCR pipeline', () => {
   }, 120_000);
 
   it('3. **a born-digital PDF invokes no OCR at all**', async () => {
-    // §1 test 3. OCR on the common path is pure cost, and this is the test
+    // OCR on the common path is pure cost, and this is the test
     // that keeps it off.
     const parser = new DocumentParserService(ocr);
     const spy = jest.spyOn(ocr, 'recognisePage');
@@ -190,8 +187,8 @@ describe('§3 the OCR pipeline', () => {
     spy.mockRestore();
   }, 120_000);
 
-  it('**the tenant’s PDF is never written to disk** — §3.1', async () => {
-    // The property §2's offline claim rests on. Both tools take stdin and give
+  it('**the tenant’s PDF is never written to disk**', async () => {
+    // The property the offline claim rests on. Both tools take stdin and give
     // stdout, so nothing lands: "documents never leave the deployment" reads as
     // an empty promise if the same document is sitting in /tmp while it is read.
     //
@@ -245,7 +242,7 @@ describe('§3 the OCR pipeline', () => {
 });
 
 /**
- * §6.1 — a missing binary is run-open, not boot-closed.
+ * — a missing binary is run-open, not boot-closed.
  *
  * Argued the opposite for the injection classifier and both are
  * right, which is why the difference is asserted rather than assumed. That was
@@ -255,7 +252,7 @@ describe('§3 the OCR pipeline', () => {
  * would take ingestion down for every tenant because a minority feature is
  * unavailable.
  */
-describe('§6.1 when the binaries are missing', () => {
+describe('When the binaries are missing', () => {
   it('**the document fails with a NAMED reason, and nothing throws at construction**', async () => {
     const ocr = new OcrService();
     // Construction is unconditional — no probe, no throw. That is the
@@ -268,7 +265,7 @@ describe('§6.1 when the binaries are missing', () => {
   });
 
   it('and the page is RECORDED as failed rather than dropped', async () => {
-    // Which is what makes the failure visible: §6's check reports it, and the
+    // Which is what makes the failure visible: the page-count check reports it, and the
     // Knowledge Manager sees "page 2 could not be indexed" instead of a
     // document that is quietly one page short.
     const ocr = new OcrService();

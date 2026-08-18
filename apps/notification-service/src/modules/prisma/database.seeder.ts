@@ -4,28 +4,22 @@ import { formatErrorMsg } from '@synapsedesk/common';
 import { PrismaService } from './prisma.service';
 
 /**
- * Bootstrap DDL for notification-service
+ * Bootstrap DDL for notification-service.
  *
  * Seeds no ROWS. Domain E has no reference data: a preference row is created
- * when a user changes something, and its absence is a permissive default rather
- * than a gap to fill.
+ * when a user changes something, and its absence is a permissive default.
  *
- * What it applies is the four PARTIAL indexes `schema.prisma` cannot express,
- * and one of them is not an optimisation:
+ * It applies the four PARTIAL indexes `schema.prisma` cannot express, one of
+ * which is not an optimisation: `notifications_event_key` is the NATS
+ * redelivery guard the in-app consumer relies on. It is PARTIAL
+ * (`WHERE event_id IS NOT NULL`) rather than a plain `@@unique` because most
+ * rows have no event id, which keeps the index small and the intent readable.
  *
- *   - `notifications_event_key` is the NATS redelivery guard the in-app
- *     consumer already relies on. It has to be PARTIAL (`WHERE event_id IS NOT
- *     NULL`) rather than the `@@unique` Prisma would generate, because most
- *     rows have no event id at all — and while Postgres does treat NULLs as
- *     distinct today, saying so explicitly is what keeps the index small and
- *     the intent readable.
+ * The other three are read-path indexes; the notes below name the query each
+ * one serves, because an index whose query nobody can name is the first one
+ * somebody drops.
  *
- * The other three are read-path indexes, and the notes below say which query
- * each one is for, because an index whose query nobody can name is the first
- * one somebody drops.
- *
- * All idempotent (`IF NOT EXISTS`), so running on every boot is safe and so is
- * running concurrently across replicas.
+ * All idempotent (`IF NOT EXISTS`), so boot and concurrent replicas are safe.
  */
 @Injectable()
 export class DatabaseSeeder implements OnApplicationBootstrap {
@@ -60,7 +54,7 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
   /**
    * Fail with an ACTIONABLE message when the database has no schema at all.
    *
-   * Without this the first statement of the seed is a raw `CREATE INDEX ... ON
+   * Without this the first statement of the seed is a raw `CREATE INDEX... ON
    * notifications`, so an unpushed database reports `relation "notifications" does not
    * exist` from inside a helper — a symptom that reads like a seeder bug and
    * takes a stack trace to trace back to the real cause, which is simply that

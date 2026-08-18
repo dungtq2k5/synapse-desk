@@ -69,7 +69,7 @@ message NotificationResponse {
   google.protobuf.Timestamp created_at = 16;
 }
 
-// CURSOR pagination, not offset
+// CURSOR pagination, not offset.
 //
 // The feed grows at the head while it is being read, so an offset shifts rows
 // under the reader: page 2 silently repeats a row or skips one, and neither is
@@ -96,7 +96,7 @@ message UnreadCountResponse { int32 count = 1; }
 
 message NotificationIdRequest { string id = 1; }
 
-// Bulk read, two shapes
+// Bulk read, two shapes.
 //
 // `{ resourceType, resourceId }` is the one that makes the feature usable
 // rather than annoying: opening ticket #1042 clears all twelve of its
@@ -145,8 +145,8 @@ enum NotificationChannel {
 
 // Mirrors `DigestMode` in `@synapsedesk/common` — RDM Table 25.
 //
-// `HOURLY` and `DAILY` are read by the resolver but the SCHEDULER is deferred
-//, so only `IMMEDIATE` and `OFF` change behaviour today. They are
+// `HOURLY` and `DAILY` are read by the resolver but the SCHEDULER is deferred,
+// so only `IMMEDIATE` and `OFF` change behaviour today. They are
 // on the wire anyway: a user can choose one, and the value must survive the
 // round trip rather than being silently rewritten.
 enum DigestMode {
@@ -169,7 +169,7 @@ enum PreferenceSource {
   PREFERENCE_SOURCE_DEFAULT = 3;
 }
 
-// The RESOLVED value plus where it came from
+// The RESOLVED value plus where it came from.
 //
 // `source` is what lets the UI show "inherited" rather than pretending every
 // value was chosen. A settings screen that renders a default as a choice is one

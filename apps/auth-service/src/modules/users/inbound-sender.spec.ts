@@ -49,7 +49,7 @@ function resolveInboundSenderBody(): string {
   throw new Error('resolveInboundSender body did not close');
 }
 
-describe('§4.4 test 4 — the inbound sender path cannot create a tenant', () => {
+describe('The inbound sender path cannot create a tenant', () => {
   const body = resolveInboundSenderBody();
 
   it('the scan found a real body', () => {

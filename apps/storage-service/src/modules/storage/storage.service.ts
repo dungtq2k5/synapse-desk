@@ -34,7 +34,7 @@ import {
 import { PendingUploadStore } from './pending-upload.store';
 
 /**
- * Presign → upload → confirm, one mechanism for every file type (§1.2).
+ * Presign → upload → confirm, one mechanism for every file type.
  *
  * The file bytes never touch an application server: the client PUTs them
  * straight to Firebase Storage using a signed URL. What this service does is
@@ -200,7 +200,7 @@ export class StorageService {
       // path with the record still keyed to the pending one. Refusing here
       // would then report the opposite of what happened — "no object was
       // uploaded" for an upload that landed AND was committed — and the
-      // residue sits outside `pending/`, where the lifecycle rule §1.3.2 exists
+      // residue sits outside `pending/`, where the lifecycle rule exists
       // for will never touch it.
       //
       // Nothing can close the window: there is no transaction spanning a bucket
@@ -294,7 +294,7 @@ export class StorageService {
   }
 
   /**
-   * Batched from day one — §1.3.
+   * Batched from day one.
    *
    * One round trip for N paths, because the alternative is one signing call per
    * file per response: a list of 50 tickets each showing an avatar would be 50
@@ -451,7 +451,7 @@ export class StorageService {
     }
 
     // **The message segment is omitted rather than filled with a placeholder**
-    // when the message does not exist yet A literal `pending`
+    // when the message does not exist yet. A literal `pending`
     // would read as a real message id to anyone browsing the bucket, and would
     // be the one path segment that means something different from all the
     // others.
@@ -461,7 +461,7 @@ export class StorageService {
       : fileName;
 
     return {
-      // **Uploaded under `pending/`, committed out of it**
+      // **Uploaded under `pending/`, committed out of it**.
       //
       // Nothing else makes the prefix sweepable. `confirmUpload` never moved
       // the object, so a live attachment on a real ticket had the same path

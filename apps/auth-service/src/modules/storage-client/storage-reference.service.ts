@@ -161,7 +161,7 @@ export class StorageReferenceService implements OnModuleInit {
   }
 
   /**
-   * Fire-and-forget, exactly like `AuditPublisher` — §1.6.
+   * Fire-and-forget, exactly like `AuditPublisher`.
    *
    * A delete that fails must never roll back or block the avatar change the
    * user actually asked for. The worst case is an orphaned object, which costs

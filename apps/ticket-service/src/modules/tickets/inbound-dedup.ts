@@ -24,7 +24,7 @@ export class InboundEmailAlreadyProcessed extends Error {
 }
 
 /**
- * Records that an inbound message produced a write
+ * Records that an inbound message produced a write.
  *
  * **Called INSIDE the caller's transaction**, which is the whole point. Dedup
  * written outside it can be recorded by a request that then fails, and the mail
@@ -74,7 +74,7 @@ export async function recordInboundEmail(
 // attempt, so a redelivery would have produced a new key, a new ticket, and
 // exactly the retry storm the fallback exists to prevent. Removed rather than
 // fixed — ticket-service receives a key and stays ignorant of email (
-// §6), so it has no business minting one.
+// so it has no business minting one.
 
 /**
  * Runs a write, turning a redelivery into `ALREADY_EXISTS`.

@@ -39,7 +39,7 @@ enum MessageAnswerStatus {
   MESSAGE_ANSWER_STATUS_GREETING = 3;
   // The tenant is at the AI cap. The caller escalates rather than erroring.
   MESSAGE_ANSWER_STATUS_AT_CAP = 4;
-  // Refused by prompt-injection detection **Not GREETING**: a
+  // Refused by prompt-injection detection. **Not GREETING**: a
   // refusal filed as a greeting is wrong in the thread, in the WebSocket frame
   // and in anything reading the trail afterwards.
   MESSAGE_ANSWER_STATUS_REFUSED = 5;
@@ -71,7 +71,7 @@ message MessageResponse {
   optional google.protobuf.Timestamp redacted_at = 11;
   google.protobuf.Timestamp created_at = 12;
   repeated AttachmentResponse attachments = 13;
-  // Whether this message is kept OUT of AI prompts
+  // Whether this message is kept OUT of AI prompts.
   //
   // On the read shape because the gateway's transcript builder filters AFTER
   // the fetch, and cannot filter on what it cannot see. Deliberately not a
@@ -112,7 +112,7 @@ message CreateMessageRequest {
   optional string client_message_id = 6;
 
   // The inbound email's `Message-ID`, when this write came from mail
-  // §6.2. Written as an `inbound_emails` row in the SAME transaction, so a
+  // Written as an `inbound_emails` row in the SAME transaction, so a
   // provider redelivery is a duplicate-key violation rather than a second
   // reply. Absent for every other transport, and absent is not an error.
   optional string inbound_message_id = 7;
@@ -130,7 +130,7 @@ message CreateMessageRequest {
   //
   // Each path is confirmed against storage-service before the write. A path
   // that fails comes back in `skipped_attachments` and the message is still
-  // created; see §1.3.1 for why that is the only safe outcome.
+  // created; that is the only safe outcome.
   repeated NewAttachment attachments = 8;
 }
 
@@ -144,7 +144,7 @@ message NewAttachment {
   string file_name = 2;
 }
 
-// What `CreateMessage` answers with
+// What `CreateMessage` answers with.
 //
 // A wrapper rather than a bare `MessageResponse`, because a create now has a
 // second outcome to report: an attachment whose confirm failed is SKIPPED and
@@ -177,7 +177,7 @@ message AppendAiMessageRequest {
   // The `ai_generations` row the answer came from, when there is one. Absent
   // for a canned greeting, which never reaches an LLM and never gets a row.
   optional string generation_id = 3;
-  // The status this answer was produced with, persisted on the row
+  // The status this answer was produced with, persisted on the row.
   //
   // UNSPECIFIED for a canned greeting. The gateway held this in the completion
   // frame and threw it away on write, so a thread could not distinguish a
@@ -185,7 +185,7 @@ message AppendAiMessageRequest {
   MessageAnswerStatus answer_status = 4;
 }
 
-// Marks a message as unusable for AI context
+// Marks a message as unusable for AI context.
 //
 // **A separate RPC rather than a flag on `UpdateMessage`**, because that route
 // edits CONTENT on behalf of a human and carries authorship rules with it. This
@@ -224,12 +224,12 @@ message RedactMessageResponse {
   MessageResponse message = 1;
 }
 
-// Presign → upload → confirm, per 10-storage-service.md §3.2. The bytes go
+// Presign → upload → confirm, per storage-service's presign flow. The bytes go
 // straight from the client to Firebase Storage; ticket-service only decides
 // whether the upload may happen and records it once it has.
 message UploadAttachmentRequest {
   string ticket_id = 1;
-  // **Absent when the message does not exist yet** Optional
+  // **Absent when the message does not exist yet**. Optional
   // rather than removed, so the `:messageId`-nested routes keep serving
   // "attach to a message that already exists".
   optional string message_id = 2;
@@ -266,7 +266,7 @@ message GetAiAttachmentsRequest {
 }
 
 // Field-for-field identical to `synapsedesk.rag.AttachmentPart`, and declared
-// here rather than imported
+// here rather than imported.
 //
 // A proto import would point this package at rag's, which is backwards: rag is
 // downstream of ticket, not the other way round. Declaring it twice costs
@@ -286,7 +286,7 @@ message GetAiAttachmentsResponse {
   // case and is not an error.
   repeated AiAttachmentPart parts = 1;
   // File NAMES that did not qualify, so the caller can tell the user
-  // §2.2. Never their contents.
+  // Never their contents.
   repeated string skipped = 2;
 }
 
@@ -305,7 +305,7 @@ service MessageService {
   rpc ListMessages(ListMessagesRequest) returns (ListMessagesResponse);
   rpc UpdateMessage(UpdateMessageRequest) returns (MessageResponse);
   rpc RedactMessage(RedactMessageRequest) returns (RedactMessageResponse);
-  // The write-back on the refusal path Called by whoever holds the
+  // The write-back on the refusal path. Called by whoever holds the
   // id of the message that was just refused: the gateway for `Chat`,
   // ticket-service internally for the two `Draft` paths.
   rpc ExcludeFromAiContext(ExcludeFromAiContextRequest) returns (MessageResponse);
@@ -315,7 +315,7 @@ service MessageService {
   rpc UploadAttachment(UploadAttachmentRequest) returns (PresignAttachmentResponse);
   rpc ConfirmAttachment(ConfirmAttachmentRequest) returns (AttachmentResponse);
   rpc DownloadAttachment(DownloadAttachmentRequest) returns (DownloadAttachmentResponse);
-  // The AI-eligible attachments of one message, as bytes
+  // The AI-eligible attachments of one message, as bytes.
   //
   // **The gateway asks rather than fetching.** It has no storage client, and
   // giving it one would add a peer and a credential to the chat path for work

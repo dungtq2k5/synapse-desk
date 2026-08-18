@@ -7,35 +7,22 @@ import {
   type RequestOrigin,
 } from '@synapsedesk/common';
 
-/**
- * Re-exported, not redefined.
- *
- * `CallerContext` and `hasIdentity` moved to `libs/common` so `tenantScope()`
- * could join them there without `common` importing `grpc-proto` — which would
- * be a package cycle, since grpc-proto already imports common. Re-exporting
- * keeps every `from '@synapsedesk/grpc-proto'` call site working: the context
- * still reads as a gRPC-boundary concept at the places that unpack it from
- * metadata, which is where it is most legible.
- *
- * `hasIdentity` is re-exported via `export … from` directly — it is never
- * called in this file, only handed onward. `CallerContext` still needs its own
- * `import` above as well, because it IS used locally (see `unpackCallerContext`
- * below); `export … from` does not create a local binding, only an `import`
- * does. The two coexist without conflict — one is a value import for local
- * use, the other a pure re-export.
- */
+// Re-exported, not redefined: `CallerContext` and `hasIdentity` live in
+// `libs/common` so `tenantScope()` can sit beside them without `common`
+// importing `grpc-proto` -- that would be a package cycle. Re-exporting keeps
+// every `from '@synapsedesk/grpc-proto'` call site working.
+//
+// `CallerContext` ALSO needs the `import` above: `export … from` creates no
+// local binding, and `unpackCallerContext` below uses the type locally.
 export { hasIdentity } from '@synapsedesk/common';
 export type { CallerContext };
 
-/**
- * The single round trip for caller context across a service hop.
- *
- * Both halves live here on purpose. Metadata is stringly-typed, so a key that
- * only one side knows about does not fail — it silently reads back as an empty
- * string and the audit row is quietly wrong, or the tenant filter is quietly
- * absent. Keeping pack and unpack adjacent, both driven by
- * `GRPC_CONTEXT_METADATA`, is what stops the two ends drifting.
- */
+// ---- The single round trip for caller context across a service hop.
+//
+// Pack and unpack live together on purpose. Metadata is stringly-typed, so a
+// key only one side knows about does not fail -- it reads back as an empty
+// string and the audit row is quietly wrong, or the tenant filter quietly
+// absent. Both halves driven by `GRPC_CONTEXT_METADATA` is what stops that.
 
 /**
  * Packs whatever the caller has.

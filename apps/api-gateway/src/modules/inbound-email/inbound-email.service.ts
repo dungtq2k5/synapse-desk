@@ -17,13 +17,14 @@ import {
   TicketSource as ProtoTicketSource,
   TicketStatus as ProtoTicketStatus,
   USER_SERVICE_NAME,
+  fromProtoOrgStatus,
+  type GrpcPeer,
   type MessageServiceClient,
   type NotificationServiceClient,
-  type TicketResponse,
   type OrganizationServiceClient,
+  type TicketResponse,
   type TicketServiceClient,
   type UserServiceClient,
-  fromProtoOrgStatus,
 } from '@synapsedesk/grpc-proto';
 import {
   extractEmailAddress,
@@ -53,7 +54,7 @@ import { toStoredBody } from './quoted-reply';
 /**
  * Why a message did not become a ticket, or what it became.
  *
- * **Every one of these is answered with a 200** A 4xx tells the
+ * **Every one of these is answered with a 200**. A 4xx tells the
  * provider the request was malformed and worth retrying, so one misconfigured
  * mail rule would become a retry loop against this endpoint. The outcome
  * travels in the body instead, where an operator can see it and a provider
@@ -64,10 +65,10 @@ export enum InboundOutcome {
   APPENDED = 'message_appended',
   DUPLICATE = 'duplicate',
   UNROUTABLE = 'unroutable_address',
-  /** A real tenant, but not one currently accepting anything */
+  /** A real tenant, but not one currently accepting anything. */
   TENANT_INACTIVE = 'tenant_inactive',
   SENDER_REFUSED = 'sender_not_permitted',
-  /** Our own notification came back to us */
+  /** Our own notification came back to us. */
   SELF_LOOP = 'self_addressed',
 }
 
@@ -86,7 +87,7 @@ export enum InboundOutcome {
  * latency metric that every other gateway client reports.
  */
 class InboundPeer extends BaseGrpcClient {
-  constructor(protected readonly serviceName: string) {
+  constructor(protected readonly serviceName: GrpcPeer) {
     super();
   }
 
@@ -202,7 +203,7 @@ export class InboundEmailService implements OnModuleInit {
   async accept(payload: InboundEmailDto): Promise<InboundOutcome> {
     // ------------------------------------------------------- 0. loop guards
     //
-    // **Before anything else, and unconditionally** A mail loop is
+    // **Before anything else, and unconditionally**. A mail loop is
     // the classic way an email integration takes out a mailbox, and its blast
     // radius is somebody else's.
     if (this.isSelfAddressed(payload.from)) {
@@ -319,7 +320,7 @@ export class InboundEmailService implements OnModuleInit {
    * ticket can still say what was left out.
    *
    * **A mail that would CREATE a ticket declines everything**, because there is
-   * no ticket for the object path to hang under — the new-ticket half of §0,
+   * no ticket for the object path to hang under — the new-ticket half,
    * which is blocked on a separate decision.
    */
   async presignAttachments(
@@ -409,31 +410,25 @@ export class InboundEmailService implements OnModuleInit {
   }
 
   /**
-   * The tenant, the sender and the ticket a message threads onto — the prefix
-   * `accept` and the Worker's presign route both need.
+   * The tenant, the sender and the ticket a message threads onto — what both
+   * `accept` and the Worker's presign route need.
    *
-   * **Extracted rather than duplicated**, and the reason is that the two must
-   * not be able to disagree. The Worker presigns against a ticket BEFORE the
-   * webhook runs, and the webhook then binds the objects to whatever ticket it
-   * resolves — so if the two resolutions ever diverged, a customer's screenshot
-   * would be uploaded under one ticket's prefix and attached to another's
-   * message. One implementation makes that unrepresentable.
+   * **Extracted rather than duplicated**, because the two must not be able to
+   * disagree. The Worker presigns against a ticket BEFORE the webhook runs, and
+   * the webhook binds the objects to whatever ticket it resolves — so a
+   * divergence would upload a customer's screenshot under one ticket's prefix
+   * and attach it to another's message.
    *
-   * **Failures come back as an OUTCOME rather than as `null`**, because
-   * `accept` distinguishes them: unroutable, suspended tenant and refused
-   * sender are three different drop events with three different telemetry
-   * meanings. Collapsing them here would have forced `accept` to keep its own
-   * copy of this sequence to tell them apart — which is the duplication this
-   * method exists to remove.
+   * **Failures come back as an OUTCOME rather than `null`**: unroutable,
+   * suspended tenant and refused sender are three drop events with three
+   * telemetry meanings, and collapsing them would force `accept` to keep its own
+   * copy of this sequence to tell them apart.
    *
-   * A `ticket` of `null` on success means the mail would CREATE a ticket rather
-   * than thread onto one — the case the Worker cannot presign for, because
-   * there is no ticket to own the path.
+   * A `ticket` of `null` on success means the mail would CREATE a ticket — the
+   * case the Worker cannot presign for, because no ticket owns the path.
    *
-   * **Read-only.** It resolves and may PROVISION a sender (that is
-   * `resolveInboundSender`'s existing behaviour), but it writes no ticket and
-   * no message, so the presign route calling it does not half-process a mail
-   * the webhook has not accepted yet.
+   * **Read-only.** It may PROVISION a sender, but writes no ticket and no
+   * message, so the presign route does not half-process an unaccepted mail.
    */
   private async resolveRouting(
     payload: RoutingFacts,
@@ -601,7 +596,7 @@ export class InboundEmailService implements OnModuleInit {
             isInternalNote: false,
             invokeAi: false,
             inboundMessageId,
-            // **Uploaded by the Worker before this webhook ran**
+            // **Uploaded by the Worker before this webhook ran**.
             //
             // This list is for a client that uploaded BEFORE the message
             // existed, and inbound mail is now exactly that client: the Worker
@@ -725,7 +720,7 @@ export class InboundEmailService implements OnModuleInit {
   }
 
   /**
-   * Notes what was dropped, in the body
+   * Notes what was dropped, in the body.
    *
    * *"Attachments silently vanish"* is something a customer finds before you
    * do, so the omission is visible to everyone on the thread rather than only
@@ -762,7 +757,7 @@ export class InboundEmailService implements OnModuleInit {
         (tenantStatus ? ` status=${tenantStatus}` : ''),
     );
 
-    // **Never reply to an auto-reply** An auto-responder on the
+    // **Never reply to an auto-reply**. An auto-responder on the
     // other end plus a courtesy reply from us is an unbounded exchange, and
     // these two headers are the standard way a machine says it is one. They are
     // invisible once the body is parsed, which is why the Worker forwards

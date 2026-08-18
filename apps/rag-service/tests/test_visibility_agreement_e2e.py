@@ -1,4 +1,4 @@
-"""12-doc §2.2 test 4 — the two visibility predicates must AGREE.
+"""The two visibility predicates must AGREE.
 
 `GET /documents` narrows with a Prisma `where` in TypeScript; retrieval narrows
 with `tenant_scope()` in Python. They are the same rule — org-wide ∪ the

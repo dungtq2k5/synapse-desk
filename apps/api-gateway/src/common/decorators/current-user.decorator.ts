@@ -11,22 +11,20 @@ import { requestOf } from '../utils/execution-request.util';
  * `@CurrentUser()` → the entire `RequestContext`; `@CurrentUser('sub')` → one
  * field of it.
  *
- * **Works in a RESOLVER as well as a controller** step 1, closing
- * docs/reference/known-gaps.md #6. It used to call `switchToHttp()` unconditionally, which
- * returns an empty object under GraphQL: `RequestContextService.fromRequest`
- * then found no user and this threw "no authenticating guard" at a resolver
- * whose guard had run perfectly. The message sent you looking at the guard,
- * which was not the problem.
+ * **Works in a RESOLVER as well as a controller.** It resolves the request
+ * through `requestOf()`, which branches on transport — `switchToHttp()` returns
+ * an empty object under GraphQL, so a decorator calling it unconditionally
+ * throws "no authenticating guard" at a resolver whose guard ran perfectly.
  *
- * Blocking for the whole GraphQL surface, because every resolver needs the
- * caller — which is why it is step 1 of the build order rather than a detail.
+ * Requires an authenticating guard. Without one it throws a 500 that names the
+ * missing guard.
  */
 export const CurrentUser = createParamDecorator(
   <K extends keyof RequestContext>(
     data: K | undefined,
     ctx: ExecutionContext,
   ) => {
-    // The one line that made this HTTP-only. See `requestOf`.
+    // The one line that made this HTTP-only. See `requestOf` in `execution-request.util.ts` .
     const request = requestOf(ctx);
     const user = request && RequestContextService.fromRequest(request);
 

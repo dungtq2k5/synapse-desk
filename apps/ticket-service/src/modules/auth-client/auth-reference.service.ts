@@ -200,7 +200,7 @@ export class AuthReferenceService implements OnModuleInit {
   }
 
   /**
-   * Tenant timezones for a set of ids
+   * Tenant timezones for a set of ids.
    *
    * Called by the daily rollup jobs, which run across every tenant that had
    * activity rather than on behalf of a caller. Bulk, so one run costs one

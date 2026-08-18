@@ -726,7 +726,7 @@ describe('Users (e2e)', () => {
   // ------------------------------------------------- notification audiences
 
   /**
-   * The two AUDIENCE resolvers
+   * The two AUDIENCE resolvers.
    *
    * **notification-service mocks both, in three suites.** That is correct for
    * those tests, which are about fan-out and quiet hours rather than about
@@ -981,7 +981,7 @@ describe('Users (e2e)', () => {
    * a naive `WHERE id IN (…)` gets two of them wrong, both silently, and one of
    * those serves one tenant's data under another tenant's key.
    */
-  describe('§1 ListUsersByIds — the batch contract', () => {
+  describe('ListUsersByIds — the batch contract', () => {
     const ask = (
       organizationId: string,
       userIds: string[],

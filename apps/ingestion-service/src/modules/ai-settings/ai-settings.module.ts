@@ -12,7 +12,7 @@ import { EntitlementsConsumer } from './entitlements.consumer';
  * importing it into each of those modules. And it holds a per-tenant cache:
  * providing it twice would give two caches, so an invalidation would clear one
  * of them and the other would keep serving a downgraded tenant the premium
- * model — the exact §1.3 failure, reintroduced through DI rather than through
+ * model — the exact cache-invalidation failure, reintroduced through DI rather than through
  * a missing event.
  */
 @Global()

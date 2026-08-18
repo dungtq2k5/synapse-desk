@@ -4,37 +4,24 @@ import {
   DOCUMENT_SERVICE_NAME,
   DocumentServiceClient,
   INGESTION_GRPC_CLIENT,
-  requireProtoTimestamp,
-  toPageRequest,
-  toProtoDocumentFileType,
-  toProtoDocumentFlagType,
-  toProtoDocumentStatus,
+  ConfirmDocumentRequest,
+  DocumentChunkResponse,
+  DocumentResponse,
+  DownloadDocumentResponse,
+  ListDocumentChunksResponse,
+  ListDocumentDepartmentsResponse,
+  ListDocumentFlagsRequest,
+  ListDocumentFlagsResponse,
+  ListDocumentsRequest,
+  ListDocumentsResponse,
+  PresignDocumentRequest,
+  PresignDocumentResponse,
+  SetDocumentDepartmentsRequest,
+  StorageUsageResponse,
+  UpdateDocumentRequest,
 } from '@synapsedesk/grpc-proto';
 import { RequestContext } from '@synapsedesk/common';
 import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
-import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
-import { toPaginationMetaDataResponseDto } from '../../common/mappers/pagination.mapper';
-import {
-  ConfirmDocumentDto,
-  ListDocumentFlagsQueryDto,
-  ListDocumentsQueryDto,
-  PresignDocumentDto,
-  SetDocumentDepartmentsDto,
-  UpdateDocumentDto,
-} from './dto/rest/document.dto';
-import {
-  DocumentChunkResponseDto,
-  DocumentFlagResponseDto,
-  DocumentResponseDto,
-  DownloadDocumentResponseDto,
-  PresignDocumentResponseDto,
-  StorageUsageResponseDto,
-} from './dto/rest/document-response.dto';
-import {
-  toDocumentChunkResponseDto,
-  toDocumentResponseDto,
-  toDocumentFlagResponseDto,
-} from './document.mapper';
 
 @Injectable()
 export class DocumentsGrpcClient
@@ -57,116 +44,50 @@ export class DocumentsGrpcClient
     );
   }
 
-  async presign(
-    dto: PresignDocumentDto,
+  presign(
+    request: PresignDocumentRequest,
     context: RequestContext,
-  ): Promise<PresignDocumentResponseDto> {
-    const response = await this.call(
-      (metadata) =>
-        this.documentGrpcService.presignDocument(
-          {
-            contentType: dto.contentType,
-            sizeBytes: dto.sizeBytes,
-            fileName: dto.fileName,
-          },
-          metadata,
-        ),
+  ): Promise<PresignDocumentResponse> {
+    return this.call(
+      (metadata) => this.documentGrpcService.presignDocument(request, metadata),
       context,
     );
-
-    return {
-      uploadUrl: response.uploadUrl,
-      objectPath: response.objectPath,
-      expiresAt: requireProtoTimestamp(response.expiresAt, 'expiresAt'),
-    };
   }
 
-  async confirm(
-    dto: ConfirmDocumentDto,
+  confirm(
+    request: ConfirmDocumentRequest,
     context: RequestContext,
-  ): Promise<DocumentResponseDto> {
-    return toDocumentResponseDto(
-      await this.call(
-        (metadata) =>
-          this.documentGrpcService.confirmDocument(
-            {
-              objectPath: dto.objectPath,
-              title: dto.title,
-              // `?? true`: proto3 booleans have no null, and an absent flag
-              // means the RDM default rather than "unspecified". The DTO field
-              // stays optional because the OpenAPI schema takes its `required`
-              // list from TypeScript optionality.
-              isOrganizationWide: dto.isOrganizationWide ?? true,
-              departmentIds: dto.departmentIds ?? [],
-              // `?? []` for the same reason: proto3 repeated fields are
-              // absent-by-default, and empty is exactly "not specified" —
-              // there is no third state to preserve.
-              ocrLanguages: dto.ocrLanguages ?? [],
-              fileName: dto.fileName ?? '',
-            },
-            metadata,
-          ),
-        context,
-      ),
-    );
-  }
-
-  async list(
-    query: ListDocumentsQueryDto,
-    context: RequestContext,
-  ): Promise<PaginationResponseDto<DocumentResponseDto>> {
-    const response = await this.call(
-      (metadata) =>
-        this.documentGrpcService.listDocuments(
-          {
-            page: toPageRequest(query),
-            // UNSPECIFIED for the two enumerated filters — proto3's zero
-            // value already means "no filter", so the empty string that used to
-            // stand in for it is gone. `departmentId` stays a string because a
-            // uuid is not a vocabulary.
-            status: toProtoDocumentStatus(query.status),
-            departmentId: query.departmentId ?? '',
-            fileType: toProtoDocumentFileType(query.fileType),
-            includeDeleted: query.includeDeleted ?? false,
-          },
-          metadata,
-        ),
+  ): Promise<DocumentResponse> {
+    return this.call(
+      (metadata) => this.documentGrpcService.confirmDocument(request, metadata),
       context,
     );
-
-    return {
-      items: response.items.map(toDocumentResponseDto),
-      meta: toPaginationMetaDataResponseDto(response.meta),
-    };
   }
 
-  async get(id: string, context: RequestContext): Promise<DocumentResponseDto> {
-    return toDocumentResponseDto(
-      await this.call(
-        (metadata) => this.documentGrpcService.getDocument({ id }, metadata),
-        context,
-      ),
+  list(
+    request: ListDocumentsRequest,
+    context: RequestContext,
+  ): Promise<ListDocumentsResponse> {
+    return this.call(
+      (metadata) => this.documentGrpcService.listDocuments(request, metadata),
+      context,
     );
   }
 
-  async update(
-    id: string,
-    dto: UpdateDocumentDto,
+  get(id: string, context: RequestContext): Promise<DocumentResponse> {
+    return this.call(
+      (metadata) => this.documentGrpcService.getDocument({ id }, metadata),
+      context,
+    );
+  }
+
+  update(
+    request: UpdateDocumentRequest,
     context: RequestContext,
-  ): Promise<DocumentResponseDto> {
-    return toDocumentResponseDto(
-      await this.call(
-        (metadata) =>
-          this.documentGrpcService.updateDocument(
-            {
-              id,
-              title: dto.title,
-              isOrganizationWide: dto.isOrganizationWide,
-            },
-            metadata,
-          ),
-        context,
-      ),
+  ): Promise<DocumentResponse> {
+    return this.call(
+      (metadata) => this.documentGrpcService.updateDocument(request, metadata),
+      context,
     );
   }
 
@@ -177,146 +98,92 @@ export class DocumentsGrpcClient
     );
   }
 
-  async restore(
-    id: string,
-    context: RequestContext,
-  ): Promise<DocumentResponseDto> {
-    return toDocumentResponseDto(
-      await this.call(
-        (metadata) =>
-          this.documentGrpcService.restoreDocument({ id }, metadata),
-        context,
-      ),
+  restore(id: string, context: RequestContext): Promise<DocumentResponse> {
+    return this.call(
+      (metadata) => this.documentGrpcService.restoreDocument({ id }, metadata),
+      context,
     );
   }
 
-  async download(
+  download(
     id: string,
     context: RequestContext,
-  ): Promise<DownloadDocumentResponseDto> {
-    const response = await this.call(
+  ): Promise<DownloadDocumentResponse> {
+    return this.call(
       (metadata) => this.documentGrpcService.downloadDocument({ id }, metadata),
       context,
     );
-
-    return {
-      downloadUrl: response.downloadUrl,
-      expiresAt: requireProtoTimestamp(response.expiresAt, 'expiresAt'),
-    };
   }
 
-  async listDepartments(
+  listDepartments(
     id: string,
     context: RequestContext,
-  ): Promise<string[]> {
-    const response = await this.call(
+  ): Promise<ListDocumentDepartmentsResponse> {
+    return this.call(
       (metadata) =>
         this.documentGrpcService.listDocumentDepartments({ id }, metadata),
       context,
     );
-
-    return response.departmentIds;
   }
 
-  async setDepartments(
-    id: string,
-    dto: SetDocumentDepartmentsDto,
+  setDepartments(
+    request: SetDocumentDepartmentsRequest,
     context: RequestContext,
-  ): Promise<DocumentResponseDto> {
-    return toDocumentResponseDto(
-      await this.call(
-        (metadata) =>
-          this.documentGrpcService.setDocumentDepartments(
-            { id, departmentIds: dto.departmentIds },
-            metadata,
-          ),
-        context,
-      ),
+  ): Promise<DocumentResponse> {
+    return this.call(
+      (metadata) =>
+        this.documentGrpcService.setDocumentDepartments(request, metadata),
+      context,
     );
   }
 
-  async listChunks(
+  listChunks(
     documentId: string,
-    query: ListDocumentsQueryDto,
+    page: ListDocumentsRequest['page'],
     context: RequestContext,
-  ): Promise<PaginationResponseDto<DocumentChunkResponseDto>> {
-    const response = await this.call(
+  ): Promise<ListDocumentChunksResponse> {
+    return this.call(
       (metadata) =>
         this.documentGrpcService.listDocumentChunks(
-          { documentId, page: toPageRequest(query) },
+          { documentId, page },
           metadata,
         ),
       context,
     );
-
-    return {
-      items: response.items.map(toDocumentChunkResponseDto),
-      meta: toPaginationMetaDataResponseDto(response.meta),
-    };
   }
 
-  async getChunk(
+  getChunk(
     documentId: string,
     chunkId: string,
     context: RequestContext,
-  ): Promise<DocumentChunkResponseDto> {
-    return toDocumentChunkResponseDto(
-      await this.call(
-        (metadata) =>
-          this.documentGrpcService.getDocumentChunk(
-            { documentId, chunkId },
-            metadata,
-          ),
-        context,
-      ),
-    );
-  }
-
-  /**
-   * The flag worklist.
-   *
-   * `type` is forwarded as an ARRAY and an empty one means "every type" — the
-   * filter must be able to express `UNRETRIEVED` and `UNCITED` separately AND
-   * together, because they are different findings with different fixes.
-   */
-  async listFlags(
-    query: ListDocumentFlagsQueryDto,
-    context: RequestContext,
-  ): Promise<PaginationResponseDto<DocumentFlagResponseDto>> {
-    const response = await this.call(
+  ): Promise<DocumentChunkResponse> {
+    return this.call(
       (metadata) =>
-        this.documentGrpcService.listDocumentFlags(
-          {
-            flagTypes: (query.type ?? []).map(toProtoDocumentFlagType),
-            includeResolved: query.includeResolved ?? false,
-            page: toPageRequest(query),
-          },
+        this.documentGrpcService.getDocumentChunk(
+          { documentId, chunkId },
           metadata,
         ),
       context,
     );
-
-    return {
-      items: response.items.map(toDocumentFlagResponseDto),
-      meta: toPaginationMetaDataResponseDto(response.meta),
-    };
   }
 
-  async storageUsage(
+  listFlags(
+    request: ListDocumentFlagsRequest,
     context: RequestContext,
-  ): Promise<StorageUsageResponseDto> {
-    const response = await this.call(
-      // The id is ignored — storage usage is a WORKSPACE total. The proto
-      // reuses `DocumentIdRequest` rather than adding an empty message.
+  ): Promise<ListDocumentFlagsResponse> {
+    return this.call(
+      (metadata) =>
+        this.documentGrpcService.listDocumentFlags(request, metadata),
+      context,
+    );
+  }
+
+  /** The id is ignored — storage usage is a WORKSPACE total. */
+  storageUsage(context: RequestContext): Promise<StorageUsageResponse> {
+    return this.call(
       (metadata) =>
         this.documentGrpcService.getStorageUsage({ id: '' }, metadata),
       context,
     );
-
-    return {
-      usedBytes: response.usedBytes,
-      limitBytes: response.limitBytes,
-      documentCount: response.documentCount,
-    };
   }
 }

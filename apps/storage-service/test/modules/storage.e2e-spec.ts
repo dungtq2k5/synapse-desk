@@ -17,18 +17,18 @@ import { StorageService } from '../../src/modules/storage/storage.service';
 import { PendingUploadStore } from '../../src/modules/storage/pending-upload.store';
 
 /**
- * §2.2–2.4 Presign, Confirm and batched read URLs.
+ * Presign, Confirm and batched read URLs.
  *
  * **The emulator does not honour signed URLs** (it answers 501 — pinned in
  * `bootstrap.e2e-spec.ts`), so the byte upload in these tests goes through the
  * Admin SDK rather than through the returned `uploadUrl`. That is a real gap
- * against §2.2 test 4, and it is worth being precise about what it costs: the
+ * against the presign test, and it is worth being precise about what it costs: the
  * SIGNATURE is unproven end-to-end, but everything the signature protects is
  * not. The path construction, the tenant boundary, the PendingUpload lifecycle
  * and the confirm authorization are all exercised against real infra here, and
  * those are where the bugs would be.
  */
-describe('§2.2–2.4 Storage presign, confirm and read URLs (e2e)', () => {
+describe('Storage presign, confirm and read URLs (e2e)', () => {
   let fx: E2eFixture;
   let storage: StorageService;
   let pendingStore: PendingUploadStore;
@@ -63,7 +63,7 @@ describe('§2.2–2.4 Storage presign, confirm and read URLs (e2e)', () => {
    * Puts real bytes at a path, standing in for the client's PUT.
    *
    * The body defaults to content that genuinely IS `contentType` — since
-   * §2.4a, `confirmUpload` reads the header and rejects a mismatch, so `'x'`
+   * `confirmUpload` reads the header and rejects a mismatch, so `'x'`
    * declared as a PNG is now an INVALID_ARGUMENT rather than a valid fixture.
    */
   const putBytes = (
@@ -85,7 +85,7 @@ describe('§2.2–2.4 Storage presign, confirm and read URLs (e2e)', () => {
 
   afterAll(() => fx.close());
 
-  // ------------------------------------------------------------- §2.2 presign
+  // ------------------------------------------------------------- presign
 
   describe('presignUpload', () => {
     it('1. returns a URL, a scoped path and an expiry, and records the pending upload', async () => {
@@ -113,7 +113,7 @@ describe('§2.2–2.4 Storage presign, confirm and read URLs (e2e)', () => {
       expect(ttl).toBeLessThanOrEqual(600);
     });
 
-    it('3. takes the tenant from the CONTEXT, never from the request — §2.2 test 5', async () => {
+    it('3. takes the tenant from the CONTEXT, never from the request', async () => {
       // The tenant-boundary assertion, stated as a test rather than only as a
       // rule. A request body is something a caller asserts; the tenant boundary
       // is not theirs to assert.
@@ -186,7 +186,7 @@ describe('§2.2–2.4 Storage presign, confirm and read URLs (e2e)', () => {
     });
 
     it('9. builds the ATTACHMENT path from both owner ids, under `pending/`', async () => {
-      // **`pending/` is new** A presigned object is
+      // **`pending/` is new**. A presigned object is
       // unreferenced until confirm moves it out, and keeping the two apart is
       // what makes a lifecycle rule over the prefix safe: before this, an
       // abandoned upload and a live attachment had identical path shapes.
@@ -203,7 +203,7 @@ describe('§2.2–2.4 Storage presign, confirm and read URLs (e2e)', () => {
     });
 
     it('10. ACCEPTS an attachment with no secondary owner, and omits the segment', async () => {
-      // **This test used to assert the opposite** Requiring the
+      // **This test used to assert the opposite**. Requiring the
       // message id here is what made presign-before-the-message impossible, and
       // that is what left a first-turn screenshot unreadable by the answer to
       // the very message it was attached to.
@@ -278,7 +278,7 @@ describe('§2.2–2.4 Storage presign, confirm and read URLs (e2e)', () => {
     });
   });
 
-  // ------------------------------------------------------------- §2.3 confirm
+  // ------------------------------------------------------------- confirm
 
   describe('confirmUpload', () => {
     /** Presigns and actually puts the bytes, so confirm has something to find. */
@@ -302,11 +302,11 @@ describe('§2.2–2.4 Storage presign, confirm and read URLs (e2e)', () => {
       expect(confirmed.objectPath).toBe(presigned.objectPath);
       expect(confirmed.contentType).toBe('image/png');
       // From the fixture, not a literal: the uploaded bytes must be a genuine
-      // PNG since §2.4a, so the size follows whatever that fixture is.
+      // PNG since content validation landed, so the size follows whatever that fixture is.
       expect(confirmed.sizeBytes).toBe(bytesFor('image/png').length);
     });
 
-    it('2. answers NOT_FOUND for a path never presigned — §2.3 test 2', async () => {
+    it('2. answers NOT_FOUND for a path never presigned', async () => {
       await putBytes('organizations/x/avatars/y/rogue.png', 'image/png');
 
       await expectRpc(
@@ -318,7 +318,7 @@ describe('§2.2–2.4 Storage presign, confirm and read URLs (e2e)', () => {
       );
     });
 
-    it('3. answers NOT_FOUND once the pending record has EXPIRED — §2.3 test 3', async () => {
+    it('3. answers NOT_FOUND once the pending record has EXPIRED', async () => {
       // Expiry simulated by deleting the key rather than by sleeping ten
       // minutes. What is under test is the branch, not Redis's TTL clock.
       const presigned = await presignAndUpload();
@@ -330,8 +330,8 @@ describe('§2.2–2.4 Storage presign, confirm and read URLs (e2e)', () => {
       );
     });
 
-    it('4. answers NOT_FOUND across TENANTS — §2.3 test 4', async () => {
-      // The actual authorization check §1.2 exists for. NOT_FOUND rather than
+    it('4. answers NOT_FOUND across TENANTS', async () => {
+      // The actual authorization check the pending record exists for. NOT_FOUND rather than
       // PERMISSION_DENIED: confirming that the path exists is itself the leak.
       const presigned = await presignAndUpload();
 
@@ -344,7 +344,7 @@ describe('§2.2–2.4 Storage presign, confirm and read URLs (e2e)', () => {
       );
     });
 
-    it('5. is NOT idempotent — a second confirm fails — §2.3 test 5', async () => {
+    it('5. is NOT idempotent — a second confirm fails', async () => {
       // By design. A second confirm of the same path is suspicious rather than
       // a retry to shrug off: the legitimate client already has its success
       // response from the first call.
@@ -360,7 +360,7 @@ describe('§2.2–2.4 Storage presign, confirm and read URLs (e2e)', () => {
       );
     });
 
-    it('6. FAILS when nothing was actually uploaded — §2.3 test 6', async () => {
+    it('6. FAILS when nothing was actually uploaded', async () => {
       // The client skipped step 4 of the flow. FAILED_PRECONDITION rather than
       // NOT_FOUND: the authorization passed, and "your upload never landed" is
       // actionable in a way a 404 would not be.
@@ -388,7 +388,7 @@ describe('§2.2–2.4 Storage presign, confirm and read URLs (e2e)', () => {
       ).resolves.toBeDefined();
     });
 
-    // --------------------------------------------- §2.4a content validation
+    // --------------------------------------------- content validation
 
     it('8. REJECTS content that is not what it claims, and DELETES it', async () => {
       // The gap the presign design leaves open: `contentType` is pinned into
@@ -463,7 +463,7 @@ describe('§2.2–2.4 Storage presign, confirm and read URLs (e2e)', () => {
     });
   });
 
-  // ---------------------------------------------------------- §2.4 read URLs
+  // ---------------------------------------------------------- read URLs
 
   describe('getSignedReadUrls', () => {
     const seedObject = async () => {
@@ -472,7 +472,7 @@ describe('§2.2–2.4 Storage presign, confirm and read URLs (e2e)', () => {
       return presigned.objectPath;
     };
 
-    it('1. returns a URL for every valid path in ONE call — §2.4 test 1', async () => {
+    it('1. returns a URL for every valid path in ONE call', async () => {
       const paths = [
         await seedObject(),
         await seedObject(),
@@ -492,7 +492,7 @@ describe('§2.2–2.4 Storage presign, confirm and read URLs (e2e)', () => {
       }
     });
 
-    it('2. OMITS a missing path rather than failing the batch — §2.4 test 2', async () => {
+    it('2. OMITS a missing path rather than failing the batch', async () => {
       // Partial success. One deleted file must not blank a whole page, and the
       // caller decides how to render a missing avatar.
       const live = await seedObject();
@@ -542,7 +542,7 @@ describe('§2.2–2.4 Storage presign, confirm and read URLs (e2e)', () => {
       expect(urlsByPath).toEqual({});
     });
 
-    it('6. signs with an EXPIRY — §2.4 test 3, as far as the emulator allows', async () => {
+    it('6. signs with an EXPIRY', async () => {
       // The emulator will not honour a signed URL at all (501), so "it 403s
       // after the TTL" cannot be observed here. What IS observable is that the
       // URL carries a bounded expiry rather than none — a URL signed without
@@ -570,7 +570,7 @@ describe('§2.2–2.4 Storage presign, confirm and read URLs (e2e)', () => {
 });
 
 /**
- * Segregate at presign, move at confirm
+ * Segregate at presign, move at confirm.
  *
  * **The prefix is the point, not the move.** `confirmUpload` never relocated
  * anything, so a live attachment on a real ticket had the same path shape as
@@ -583,7 +583,7 @@ describe('§2.2–2.4 Storage presign, confirm and read URLs (e2e)', () => {
  * `pending/`. Same shape as the OCR image checks — the deployment artifact
  * is not testable, so test the property it depends on.
  */
-describe('§1.3.2 ticket attachments are segregated until confirmed (e2e)', () => {
+describe('Ticket attachments are segregated until confirmed (e2e)', () => {
   let fx: E2eFixture;
   let storage: StorageService;
 
@@ -631,7 +631,7 @@ describe('§1.3.2 ticket attachments are segregated until confirmed (e2e)', () =
   });
 
   it('1. **after confirm, nothing remains under `pending/`**', async () => {
-    // The invariant the lifecycle rule depends on, and the reason §1.3.2 is a
+    // The invariant the lifecycle rule depends on, and the reason the lifecycle rule is a
     // code change rather than a console change.
     const presigned = await presign();
     await fx.firebase.bucket
@@ -656,7 +656,7 @@ describe('§1.3.2 ticket attachments are segregated until confirmed (e2e)', () =
   });
 
   it('3. **a confirm that FAILS leaves the object under `pending/`**', async () => {
-    // So §1.3.1's named skip and the sweep agree on what "unconfirmed" means.
+    // So the named skip and the sweep agree on what "unconfirmed" means.
     // If a failed confirm moved the object anyway, a skipped attachment would
     // sit in the committed prefix forever with no row pointing at it — the
     // exact orphan class this section exists to make sweepable.
@@ -726,7 +726,7 @@ describe('§1.3.2 ticket attachments are segregated until confirmed (e2e)', () =
     // Refusing there would report the opposite of what happened: "no object was
     // uploaded" for an upload that landed and was committed. And the residue
     // sits OUTSIDE `pending/`, where the lifecycle rule can never reach it —
-    // precisely the unsweepable orphan §1.3.2 exists to prevent, arriving
+    // precisely the unsweepable orphan the lifecycle rule exists to prevent, arriving
     // through a narrower door.
     const presigned = await presign();
     await fx.firebase.bucket

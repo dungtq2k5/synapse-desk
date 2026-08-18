@@ -27,7 +27,7 @@ export enum SearchDegradation {
 
 /**
  * What a generation concluded, kept from Self-RAG's taxonomy even though
- * Self-RAG itself is deferred (11-doc §1.1). It maps onto a PRODUCT decision
+ * Self-RAG itself is deferred. It maps onto a PRODUCT decision
  * the notebook app never had: whether to answer or to hand off.
  */
 export enum AnswerStatus {
@@ -37,7 +37,7 @@ export enum AnswerStatus {
   /**
    * ANSWER_STATUS_DOC_MISSING - Nothing retrieved above threshold. **Not an invitation to improvise** —
    * an enterprise support bot inventing a policy is worse than one that
-   * escalates (11-doc §1.6).
+   * escalates.
    */
   ANSWER_STATUS_DOC_MISSING = 2,
   /** ANSWER_STATUS_GREETING - A greeting, answered from the canned table. No LLM call, no ledger row. */
@@ -45,7 +45,7 @@ export enum AnswerStatus {
   /** ANSWER_STATUS_AT_CAP - The tenant is at the AI cap. The caller escalates rather than erroring. */
   ANSWER_STATUS_AT_CAP = 4,
   /**
-   * ANSWER_STATUS_REFUSED - The question was refused by prompt-injection detection — 33-doc §5.1.
+   * ANSWER_STATUS_REFUSED - The question was refused by prompt-injection detection.
    *
    * **Not GREETING, which is what reusing that short-circuit would have
    * reported.** The gateway persists any completion that is not AT_CAP as an
@@ -62,7 +62,7 @@ export interface SearchRequest {
   query: string;
   /**
    * Clamped server-side regardless of what is asked for. An unclamped limit is
-   * a direct path to enormous prompts downstream (doc 15 §1.4).
+   * a direct path to enormous prompts downstream.
    */
   limit: number;
   /**
@@ -104,7 +104,7 @@ export interface ConversationTurn {
 }
 
 /**
- * One attachment, already filtered and capped by the CALLER — 35-doc §7, §8.
+ * One attachment, already filtered and capped by the CALLER
  *
  * The bytes arrive inline rather than as an object path because rag-service
  * has no storage client, and giving it one would add a peer, a credential and
@@ -133,7 +133,7 @@ export interface ChatRequest {
     | string
     | undefined;
   /**
-   * The CURRENT message's attachments only — 35-doc §3.1.
+   * The CURRENT message's attachments only.
    *
    * History turns contribute TEXT. Re-sending their images would put four turns
    * times five files on every call to recover information the assistant's own
@@ -152,7 +152,7 @@ export interface Citation {
     | number
     | undefined;
   /**
-   * The id a citation RESOLVES THROUGH — 13-doc §4.1 test 2.
+   * The id a citation RESOLVES THROUGH.
    *
    * Carried alongside `chunk_id` even though either would find the row,
    * because this is the key the two arms fuse on and the one Qdrant returns
@@ -202,7 +202,7 @@ export interface DraftRequest {
   maxRetries: number;
   /**
    * The LAST USER message's attachments — the ones the agent is about to reply
-   * to. After 31-doc/32-doc those can come from a sender who never
+   * to. With inbound email those can come from a sender who never
    * authenticated, which makes this the highest-trust position an untrusted
    * file reaches in this system.
    */
@@ -280,7 +280,6 @@ export interface SuggestionsRequest {
   history: ConversationTurn[];
   /**
    * What the ticket IS — the retrieval query for the article sidebar,
-   * 39-doc §3.
    *
    * **Not the transcript, and the reason is the sidebar rather than the cost.**
    * A sidebar is a panel an agent glances at; articles that churn every time
@@ -307,15 +306,15 @@ export interface SuggestionsResponse {
   suggestions: Suggestion[];
   generationId: string;
   /**
-   * Knowledge-base articles relevant to the ticket — product §6.3's first
-   * third, 39-doc §1. The other two need a ticket corpus, which is a threat
-   * model change rather than a queue (§4).
+   * Knowledge-base articles relevant to the ticket — the co-pilot sidebar's first
+   * third. The other two need a ticket corpus, which is a threat
+   * model change rather than a queue.
    */
   articles: SuggestedArticle[];
 }
 
 /**
- * One article to recommend — 39-doc §2.
+ * One article to recommend.
  *
  * **Deliberately NOT `Citation` reused.** They differ by more than a field: a
  * citation points at the PASSAGE an answer used, and carries `chunk_id` so the
@@ -323,7 +322,7 @@ export interface SuggestionsResponse {
  * an agent should open, and a chunk id would be an implementation detail of how
  * it was found.
  *
- * `vector_point_id` is absent for 38-doc §2's reason — a Qdrant point id is an
+ * `vector_point_id` is absent deliberately — a Qdrant point id is an
  * internal retrieval identifier, not part of the product's surface.
  */
 export interface SuggestedArticle {
@@ -346,7 +345,7 @@ export interface ChatResponse {
 
 export interface RagServiceClient {
   /**
-   * Retrieval with NO generation — the test seam (13-doc §2.3). It exists
+   * Retrieval with NO generation — the test seam. It exists
    * before anything calls an LLM because it is the only point where isolation
    * and relevance can be proven cheaply and deterministically; once generation
    * is layered on, those tests become slow, non-deterministic and skipped.
@@ -360,7 +359,7 @@ export interface RagServiceClient {
    * Self-RAG cannot stream, structurally: it generates N candidates, judges
    * them, then picks a winner, and you cannot stream an answer you have not
    * chosen. Co-RAG's Mode A draft is a single generation, streamable from the
-   * first token (11-doc §1.1).
+   * first token.
    */
 
   chat(request: ChatRequest, metadata?: Metadata): Observable<ChatChunk>;
@@ -389,7 +388,7 @@ export interface RagServiceClient {
 
 export interface RagServiceController {
   /**
-   * Retrieval with NO generation — the test seam (13-doc §2.3). It exists
+   * Retrieval with NO generation — the test seam. It exists
    * before anything calls an LLM because it is the only point where isolation
    * and relevance can be proven cheaply and deterministically; once generation
    * is layered on, those tests become slow, non-deterministic and skipped.
@@ -406,7 +405,7 @@ export interface RagServiceController {
    * Self-RAG cannot stream, structurally: it generates N candidates, judges
    * them, then picks a winner, and you cannot stream an answer you have not
    * chosen. Co-RAG's Mode A draft is a single generation, streamable from the
-   * first token (11-doc §1.1).
+   * first token.
    */
 
   chat(request: ChatRequest, metadata?: Metadata): Observable<ChatChunk>;

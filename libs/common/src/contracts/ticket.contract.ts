@@ -31,10 +31,10 @@ export const TICKET_PATTERNS = {
   unassigned: 'ticket.unassigned',
   statusChanged: 'ticket.status_changed',
   messageCreated: 'ticket.message_created',
-  /** An edit Same room split as the message itself. */
+  /** An edit. Same room split as the message itself. */
   messageUpdated: 'ticket.message_updated',
   /**
-   * A REDACTION
+   * A REDACTION.
    *
    * Named for what happened rather than for the frame it produces: the row
    * survives with its content replaced, and calling the event `deleted` would
@@ -164,7 +164,7 @@ export type TicketMessageCreatedEvent = TicketEventBase & {
 };
 
 /**
- * An edit
+ * An edit.
  *
  * Carries `isInternalNote` for the same reason `ticket.message_created` does:
  * the relay routes on it, and a consumer that had to fetch the message to learn
@@ -184,7 +184,7 @@ export type TicketMessageUpdatedEvent = TicketEventBase & {
 };
 
 /**
- * A REDACTION
+ * A REDACTION.
  *
  * **Carries no content, and that is the whole design.** The row survives with
  * its text replaced; this announces *that* it happened plus which message. An

@@ -13,7 +13,7 @@ import type { RawBodyRequest } from '@nestjs/common';
 import type { Request } from 'express';
 import { CurrentOrigin } from '../../common/decorators/current-origin.decorator';
 import { RequestOrigin } from '@synapsedesk/common';
-import { BillingGrpcClient } from './billing-grpc.client';
+import { BillingService } from './billing.service';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiFilterErrors,
@@ -21,8 +21,8 @@ import {
 } from '../../common/decorators/api-response.decorator';
 
 /**
- * `POST /webhooks/stripe` — and four global mechanisms it bypasses on purpose
- *.
+ * `POST /webhooks/stripe` — and four global mechanisms it bypasses on purpose.
+ *
  *
  * | Mechanism | Why it must not apply |
  * | --- | --- |
@@ -43,7 +43,7 @@ import {
 export class WebhooksController {
   private readonly logger = new Logger(WebhooksController.name);
 
-  constructor(private readonly billing: BillingGrpcClient) {}
+  constructor(private readonly billing: BillingService) {}
 
   /**
    * **Authenticated by SIGNATURE, not by a scheme OpenAPI can express** —
@@ -81,7 +81,7 @@ export class WebhooksController {
     @Headers('stripe-signature') signature: string,
     @CurrentOrigin() origin: RequestOrigin,
   ): Promise<{ received: true; status: string }> {
-    // **THE trap** Stripe's signature is computed over the
+    // **THE trap**. Stripe's signature is computed over the
     // exact bytes of the request, and a JSON body parser deserializes and
     // re-serializes them: different key order, different whitespace, and
     // verification fails for every event forever.

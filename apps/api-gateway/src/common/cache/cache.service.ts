@@ -27,10 +27,10 @@ const CACHE_PREFIX = 'cache:';
  */
 const NO_TENANT = 'no-tenant';
 
-/** What a key is built from */
+/** What a key is built from. */
 export type CacheKeyInput = {
   /**
-   * **The FIRST segment, always**
+   * **The FIRST segment, always**.
    *
    * Two tenants asking the identical question produce different keys before any
    * parameter is considered, so a cross-tenant hit is unreachable rather than
@@ -59,28 +59,19 @@ export type CacheKeyInput = {
 };
 
 /**
- * The shared cache
+ * The shared cache.
  *
- * Generalized from `AnalyticsCacheService`, which had the design right and only
- * lacked reach: tenant-first keys, sorted parameters, `wrap()` as the single
- * read path, and `SCAN`-based invalidation. Analytics keeps the parts that are
- * genuinely analytics — its range-derived TTL and its `computedAt` segment —
- * and calls this for the rest.
+ * Generalized from `AnalyticsCacheService`: tenant-first keys, sorted
+ * parameters, `wrap()` as the single read path, `SCAN`-based invalidation.
+ * Analytics keeps what is genuinely analytics — its range-derived TTL and
+ * `computedAt` segment — and calls this for the rest.
  *
- * **Not `@nestjs/cache-manager`, and the reason is specific rather than a
- * preference.** `CacheModule` brings `CacheInterceptor`, whose default key is
- * the request URL — which contains no tenant. `GET /roles` would be ONE key for
- * every tenant on the platform, so the second tenant to ask receives the
- * first's roles, with no error and no trace. It can be subclassed to override
- * `trackBy`, and at that point `cache-manager` is supplying a `get`/`set`
- * wrapper over a Redis client this gateway already has. **The abstraction is
- * not earning the risk of its default.**
+ * **A cache fails OPEN.** Every Redis error is logged and swallowed: a cache
+ * outage must make the product slow, not down. That is the opposite of the
+ * throttler next door, which fails closed because an unmetered surface is worse
+ * than a refused request — worth stating because the two sit side by side.
  *
- * **A cache fails OPEN.** Every Redis error here is logged and swallowed: a
- * cache outage must make the product slow, not down. That is the exact opposite
- * of the throttler next door, which fails closed because an unmetered surface
- * is worse than a refused request — worth stating because the two sit beside
- * each other and the asymmetry is deliberate.
+ * See `docs/decisions/0012-cache-keys-are-tenant-first.md`.
  */
 @Injectable()
 export class CacheService {
@@ -99,7 +90,7 @@ export class CacheService {
    * bug; the severe version is an invalidation that clears one spelling and
    * leaves the other serving stale data forever.
    *
-   * `undefined`, `null` and `''` are DROPPED rather than serialised, so "filter
+   * `undefined`, `null` and `''` are DROPPED rather than serialized, so "filter
    * not supplied" and "filter set to nothing" agree — they are the same
    * question and a client that omits a field and one that sends an empty string
    * must not split the cache between them.
@@ -127,36 +118,12 @@ export class CacheService {
    * second, slightly different way — and the two spellings then diverge, with
    * an invalidation clearing one of them.
    *
-   * **`produce()` throwing is not cached.** Caching a failure turns one bad
-   * response into a minute of them, and does it precisely when the origin is
-   * already in trouble.
+   * **`produce()` throwing is not cached.**
    *
-   * ---
-   *
-   * **The read-repopulate race, which is accepted rather than fixed.**
-   * Written down because the symptom is indistinguishable from a real bug,
-   * and somebody will otherwise spend a day on it.
-   *
-   * ```txt
-   * reader:  get (miss) ── produce() ────────────── set(stale)
-   * writer:                    └─ invalidate() ──┘
-   * ```
-   *
-   * An invalidation landing between `produce()` and `set` is overwritten by the
-   * value that was already in flight, and that pre-write value then lives for
-   * its full TTL. The window is one gRPC round trip — tens of milliseconds —
-   * and it needs a mutation to land inside it.
-   *
-   * **Not fixed on purpose.** Double-delete, versioned keys and a distributed
-   * lock each add a failure mode larger than the one they close: a lock adds an
-   * outage path to a component whose entire contract is failing open. The worst
-   * case here is one entry stale for one TTL.
-   *
-   * What keeps it a narrow window rather than the common case is that
-   * `CacheInvalidationInterceptor` evicts AFTER the handler resolves
-   * (`concatMap`, asserted in `cache-invalidation.spec.ts`). Evicting before
-   * the write would make the interleaving above the normal ordering rather than
-   * a race.
+   * There is an accepted read-repopulate race here: an invalidation landing
+   * between `produce()` and `set` is overwritten, and that value lives for its
+   * full TTL. The symptom is indistinguishable from a real bug, so read
+   * `docs/decisions/0034-read-repopulate-race-is-accepted.md` before chasing it.
    */
   async wrap<T>(
     input: CacheKeyInput,
@@ -321,41 +288,21 @@ export class CacheService {
 const DATE_TAG = '__cache_date__';
 
 /**
- * JSON, plus `Date` — and the `Date` half is a bug fix, not a nicety.
+ * JSON, plus tagged `Date` round-tripping.
  *
- * **What plain `JSON.stringify` did here:** a cached `Date` comes back as an
- * ISO *string*, and `GraphQLISODateTime.serialize()` given a string returns
- * **`null`** — it does not throw. So `analyticsOverview { computedAt }`
- * answered the real timestamp on a cache MISS and `null` on a cache HIT.
+ * Plain `JSON.stringify` returns a `Date` as an ISO string, and
+ * `GraphQLISODateTime.serialize()` given a string returns **`null`** rather than
+ * throwing — so a cached timestamp reads as "never computed" on every hit.
  *
- * That is not a cosmetic difference. `computedAt: null` has a defined meaning
- * in this system — *the rollups have never run for this tenant* — and it is
- * half of the diagnostic pair defined against `dataThrough`. So the
- * cache made a healthy scheduler report as one that had never started, for the
- * length of a TTL at a time, on a field whose whole purpose is telling an
- * operator whether the scheduler is working.
+ * **Tagged rather than guessed.** A reviver that turns any ISO-looking string
+ * into a `Date` would convert real strings too — a ticket titled with a
+ * timestamp, or a `dataThrough` that is deliberately a `YYYY-MM-DD` string.
  *
- * Invisible on REST, where a `Date` and its ISO string serialise identically.
- * Which is why it survived: the surface that shows the bug was built after the
- * cache that causes it.
- *
- * **Tagged rather than guessed.** The tempting fix is a reviver that turns any
- * ISO-looking string back into a `Date`; that converts real strings too — a
- * ticket whose title is a timestamp, a `dataThrough` that is deliberately a
- * `YYYY-MM-DD` string and must stay one.
- *
- * **`BigInt` is not handled, and in the gateway it cannot arrive.**
- * `maxStorageBytes` and `monthlyAiTokenBudget` are `int64` on the wire, and
- * `GRPC_LOADER_OPTIONS` sets `longs: Number`, so the generated types are
- * `number`; the gateway never holds a Prisma row.
- *
- * **It would matter the first time a SERVICE caches**, because there those
- * columns are real `BigInt`s and `JSON.stringify` throws
- * `TypeError: Do not know how to serialize a BigInt`. The throw lands inside
- * `wrap()`'s write `try`, which logs and continues — so the symptom is a
- * permanent silent miss that reads as "caching does not work on this route",
- * with a warning nobody correlates. Add a `BigInt` branch here before moving
- * this file service-side.
+ * **`BigInt` is not handled and cannot arrive in the gateway** (`longs: Number`
+ * in `GRPC_LOADER_OPTIONS`, and no Prisma rows here). It would matter the first
+ * time a SERVICE caches: `JSON.stringify` throws on `BigInt`, the throw lands in
+ * `wrap()`'s write `try`, and the symptom is a permanent silent miss. Add a
+ * `BigInt` branch before moving this file service-side.
  */
 function encode(value: unknown): string {
   // A regular function, not an arrow, and that is load-bearing: `JSON.stringify`
@@ -403,26 +350,22 @@ function scopePattern(organizationId: string | null, scope: string): string {
 /**
  * One parameter value as a STABLE, COLLISION-FREE key segment.
  *
- * **`String(value)` was not enough, and the gap was reachable from a query
- * string.** `CacheableInterceptor` spreads `request.query` into the params, and
- * Express's default (`extended`) parser produces objects and arrays from it:
- * `?f[x]=1` arrives as `{ f: { x: '1' } }`. `String()` renders every one of
- * those as `[object Object]`, so `?f[x]=1` and `?f[y]=2` built the SAME key —
- * and the second caller was served the answer computed for the first's filter.
+ * **`String(value)` is not enough, and the gap is reachable from a query
+ * string.** `CacheableInterceptor` spreads `request.query`, and Express's
+ * default parser produces objects and arrays: `?f[x]=1` arrives as
+ * `{ f: { x: '1' } }`. `String()` renders every one of those as
+ * `[object Object]`, so `?f[x]=1` and `?f[y]=2` build the SAME key — and the
+ * second caller is served the first's answer.
  *
- * That is the collision `buildKey`'s own docblock warns about, arriving through
- * the one input nobody controls.
+ * **Objects serialize with SORTED keys**, recursively, for the same reason the
+ * top-level params are sorted: `{a,b}` and `{b,a}` are one question. Plain
+ * `JSON.stringify` preserves insertion order and would split them.
  *
- * **Objects are serialized with SORTED keys**, recursively, for the same reason
- * the top-level params are sorted: `{a,b}` and `{b,a}` are the same question and
- * must not split the cache. Plain `JSON.stringify` preserves insertion order and
- * would.
+ * **Arrays are bracketed** so `?a=1&a=2` cannot collide with the literal
+ * string `'1,2'`.
  *
- * **Arrays are bracketed** so `?a=1&a=2` (`['1','2']`) cannot collide with the
- * literal string `'1,2'` — a join alone makes those two indistinguishable.
- *
- * `Date` is ISO rather than `String(date)`, which is locale- and zone-shaped and
- * would key the same instant differently on two machines.
+ * `Date` is ISO rather than `String(date)`, which is locale- and zone-shaped
+ * and would key the same instant differently on two machines.
  */
 function stringifyParam(value: unknown): string {
   if (value instanceof Date) return value.toISOString();

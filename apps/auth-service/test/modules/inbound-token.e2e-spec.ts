@@ -5,14 +5,14 @@ import { seedTenantWithUser } from '../factories';
 import { OrganizationsService } from '../../src/modules/organizations/organizations.service';
 
 /**
- * Issuing, rotating and revoking a tenant's inbound address
+ * Issuing, rotating and revoking a tenant's inbound address.
  *
  * **Rotation is one of the three properties an opaque token was chosen for**,
  * and until these existed it was the one nothing implemented: the column could
  * be written by hand-editing a row and by nothing else, so no tenant could be
  * given an address at all.
  */
-describe('§31 §2 the inbound token lifecycle (e2e)', () => {
+describe('The inbound token lifecycle (e2e)', () => {
   let fx: E2eFixture;
   let organizations: OrganizationsService;
 

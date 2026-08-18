@@ -9,15 +9,15 @@ import {
 } from './grpc-health';
 
 /**
- * The shared gRPC health service
+ * The shared gRPC health service.
  *
  * Two of these are behavioural and two are the RULE: that no service's
  * readiness references another service. That rule decays first, because "we
  * depend on it, so check it" always looks like diligence — and the consequence
- * is §1's outage happening one level down, where a single Postgres failure in
+ * is the readiness cascade one level down, where a single Postgres failure in
  * one service takes every service out of rotation.
  */
-describe('§2 GrpcHealthService', () => {
+describe('GrpcHealthService', () => {
   const REPO_ROOT = join(__dirname, '../../../..');
 
   const up = (name: string): DependencyProbe => ({
@@ -99,7 +99,7 @@ describe('§2 GrpcHealthService', () => {
   });
 
   /**
-   * The static half test 3.
+   * The static half.
    *
    * A grep-style assertion rather than a behavioural one, because the failure it
    * guards against is a line somebody ADDS in good faith. There is no state to

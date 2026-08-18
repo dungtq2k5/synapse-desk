@@ -22,12 +22,12 @@ import {
 } from '@synapsedesk/common';
 import {
   MAX_FULL_NAME_LENGTH,
+  MAX_LOCK_REASON_LENGTH,
   MIN_FULL_NAME_LENGTH,
 } from '../../../../common/config/dto.config';
 import { SearchPaginationDto } from '../../../../common/dto/rest/search-pagination.dto';
 import { ToBoolean } from '../../../../common/decorators/to-boolean.decorator';
 import { IsFutureDate } from '../../../../common/decorators/is-future-date.decorator';
-import { UserResponseDto } from './user-response.dto';
 
 export class ListUsersQueryDto extends OmitType(SearchPaginationDto, [
   'sortBy',
@@ -35,16 +35,9 @@ export class ListUsersQueryDto extends OmitType(SearchPaginationDto, [
   @IsOptional()
   @IsString()
   @IsIn(USER_SORTABLE_FIELDS)
-  // ASK This `docblock` seems to be invalid
-  /**
-   * Optional in the API and, without this, REQUIRED in the docs
-   *
-   * The plugin derives `required` from TYPESCRIPT optionality, not from
-   * `@IsOptional()`. A field declared `page: number = 1` is non-optional to the
-   * compiler even though the validator lets a caller omit it, so the generated
-   * spec demanded it — and a generated client would refuse to send a request
-   * without one.
-   */
+  // `@ApiPropertyOptional()` is required here: the Swagger plugin derives
+  // `required` from TYPESCRIPT optionality, so a defaulted non-optional field
+  // is documented as mandatory and a generated client refuses to omit it.
   @ApiPropertyOptional()
   readonly sortBy: UserSortableField = DEFAULT_SEARCH.SORT_BY;
 
@@ -69,7 +62,6 @@ export class ListUsersQueryDto extends OmitType(SearchPaginationDto, [
   readonly includeDeleted: boolean = false;
 }
 
-// ASK This `docblock` seems to be invalid
 /**
  * Direct creation, for seeding and service accounts.
  *
@@ -90,12 +82,14 @@ export class CreateUserDto {
   @IsOptional()
   @IsArray()
   @IsUUID('all', { each: true })
-  readonly roleIds?: string[];
+  @ApiPropertyOptional()
+  readonly roleIds: string[] = [];
 
   @IsOptional()
   @IsArray()
   @IsUUID('all', { each: true })
-  readonly departmentIds?: string[];
+  @ApiPropertyOptional()
+  readonly departmentIds: string[] = [];
 
   @IsOptional()
   @IsUUID()
@@ -103,25 +97,22 @@ export class CreateUserDto {
 }
 
 export class LockUserDto {
-  // ASK This `docblock` seems to be invalid
   /**
-   * Required, not optional. It lands in the audit metadata and in the email to
-   * the user, and "why is this account locked?" is asked months later by
-   * someone who was not there.
+   * Why the account is being locked. Required — it lands in the audit metadata
+   * and in the email to the user.
    */
   @IsString()
   @IsNotEmpty()
-  @MaxLength(500)
+  @MaxLength(MAX_LOCK_REASON_LENGTH)
   readonly reason!: string;
 
-  // ASK This `docblock` seems to be invalid
   /**
-   * When the lock should lapse
+   * When the lock should lapse.
    *
    * **Absent means INDEFINITE**, which is the existing product and the default
    * an admin gets by not thinking about it.
    *
-   * **A PAST date is rejected**, not accepted (§2.4). The database would take
+   * **A PAST date is rejected**, not accepted. The database would take
    * it happily and the account would lock and unlock in the same instant —
    * legal, and incomprehensible to the admin who set it and the user who got
    * the email. Validated here and re-checked in auth-service, because the
@@ -137,6 +128,8 @@ export class SetUserRolesDto {
   @IsArray()
   @ArrayMaxSize(50)
   @IsUUID('all', { each: true })
+  // Required, and NOT defaulted to `[]`: this route SETS the role list, so an
+  // omitted body would read as "strip every role" rather than "change nothing".
   readonly roleIds!: string[];
 }
 
@@ -149,37 +142,17 @@ export class DepartmentAssignmentDto {
 }
 
 export class SetUserDepartmentsDto {
-  // ASK This `docblock` seems to be invalid
   /**
-   * Exactly one entry must be primary when the list is non-empty — validated in
-   * the service, because zero is as invalid as two and the partial unique index
-   * only catches the "two" case.
+   * The departments to assign, and which of them is primary.
+   *
+   * Exactly one entry must be primary when the list is non-empty; the service
+   * enforces it, because zero is as invalid as two.
    */
   @IsArray()
+  // Required for the same reason as `SetUserRolesDto.roleIds`: this route SETS
+  // the list, so a default would turn an omitted body into a mass unassignment.
   @ArrayMaxSize(50)
   @ValidateNested({ each: true })
   @Type(() => DepartmentAssignmentDto)
   readonly departments!: DepartmentAssignmentDto[];
-}
-
-export class UserSummaryResponseDto {
-  readonly user!: UserResponseDto;
-  readonly roleIds!: string[];
-  readonly roleNames!: string[];
-  readonly departmentIds!: string[];
-  /** Non-null only on a deactivated account. */
-  readonly deletedAt!: Date | null;
-  readonly deletedByName!: string | null;
-}
-
-export class RevokedSessionCountDto {
-  readonly revokedSessionCount!: number;
-}
-
-export class UntrustedDeviceCountDto {
-  readonly untrustedDeviceCount!: number;
-}
-
-export class UserPermissionsResponseDto {
-  readonly permissionCodes!: string[];
 }

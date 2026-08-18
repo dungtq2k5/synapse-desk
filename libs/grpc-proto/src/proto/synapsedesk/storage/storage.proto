@@ -5,7 +5,7 @@ package synapsedesk.storage;
 import "google/protobuf/timestamp.proto";
 
 // Object storage, behind one service that is the ONLY holder of Storage-write
-// credentials (§1.4). Every other service asks; none of them can write
+// credentials. Every other service asks; none of them can write
 // directly, because none of them holds a key that could.
 
 enum StoragePurpose {
@@ -14,7 +14,7 @@ enum StoragePurpose {
   STORAGE_PURPOSE_TICKET_ATTACHMENT = 2;
   // Reserved — Domain C's ingestion-service. No caller today.
   STORAGE_PURPOSE_DOCUMENT = 3;
-  // An analytics export A new purpose rather than a second file
+  // An analytics export. A new purpose rather than a second file
   // path, so the signed-URL discipline and the tenant prefix are reused rather
   // than reinvented.
   STORAGE_PURPOSE_EXPORT = 4;
@@ -58,7 +58,7 @@ message ConfirmUploadResponse {
 // routing it through a signed URL would mean this service minting a public,
 // time-limited, unauthenticated link purely so its own sibling can read a file
 // it is already entitled to. Asking is both simpler and narrower — and it keeps
-// §1.4's rule intact, that every other service ASKS rather than holding a key.
+// Rule intact, that every other service ASKS rather than holding a key.
 message DownloadObjectRequest { string object_path = 1; }
 
 // STREAMED, because a document may be 25 MB against a 10 MB gRPC message
@@ -78,7 +78,7 @@ service StorageService {
   rpc GetSignedReadUrls(GetSignedReadUrlsRequest) returns (GetSignedReadUrlsResponse);
   rpc DownloadObject(DownloadObjectRequest) returns (stream DownloadObjectChunk);
 
-  // No DeleteObject RPC, deliberately. Deletion is NATS-only (§1.6) — the same
+  // No DeleteObject RPC, deliberately. Deletion is NATS-only — the same
   // "no write path exists in the contract" discipline audit_logs uses, so a
   // contributor cannot add one without first noticing there is none.
 }

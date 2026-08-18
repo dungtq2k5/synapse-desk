@@ -21,9 +21,9 @@ import { AuthReferenceService } from '../../src/modules/auth-client/auth-referen
 import { TicketEventPublisher } from '../../src/modules/events/ticket-event.publisher';
 import { faultInjector } from '@synapsedesk/common/testing/fault';
 
-describe('§2.4 Assignment & reassignment (e2e)', () => {
+describe('Assignment & reassignment (e2e)', () => {
   // Every injected fault in this file is registered here and restored in an
-  // `afterEach` that runs whether the test passed, failed or threw
+  // `afterEach` that runs whether the test passed, failed or threw.
   const faults = faultInjector();
 
   let fx: E2eFixture;
@@ -79,7 +79,7 @@ describe('§2.4 Assignment & reassignment (e2e)', () => {
 
     // auth-service and NATS are not running for this suite. Both boundaries
     // have their own dedicated coverage — the validation failure below, and
-    // §2.2's real publish/subscribe test.
+    // Real publish/subscribe test.
     assertUserExists = jest.spyOn(authReference, 'assertUserExists');
     assertDepartmentExists = jest.spyOn(
       authReference,
@@ -112,7 +112,7 @@ describe('§2.4 Assignment & reassignment (e2e)', () => {
       const state = await readState(ticket.id);
 
       // The ledger and the cache, asserted together. Either one alone would
-      // pass while the other was wrong, which is the exact bug §2.4 warns is
+      // pass while the other was wrong, which is the exact bug this warns is
       // most likely: `GET /tickets` reads the cache, not the ledger.
       expect(state.live).toHaveLength(1);
       expect(state.live[0].assignedToId).toBe(tenant.agentId);
@@ -227,7 +227,7 @@ describe('§2.4 Assignment & reassignment (e2e)', () => {
       );
     });
 
-    it('8. writes NOTHING when the department does not resolve — §1.1', async () => {
+    it('8. writes NOTHING when the department does not resolve', async () => {
       // The cross-service check standing in for a foreign key Postgres cannot
       // enforce, because `departments` lives in another database.
       const ticket = await createTicket(fx.prisma, tenant);
@@ -292,7 +292,7 @@ describe('§2.4 Assignment & reassignment (e2e)', () => {
     });
 
     it('2. rolls back the ledger when the CACHE write fails', async () => {
-      // The atomicity proof §2.4 asks for. `syncTicketCache` is step 3 of the
+      // The atomicity proof. `syncTicketCache` is step 3 of the
       // transaction — the step most likely to be forgotten or to fail — so
       // making it throw is the honest way to ask "did steps 1 and 2 survive?".
       // They must not: a closed prior row with no successor would leave the
@@ -405,7 +405,7 @@ describe('§2.4 Assignment & reassignment (e2e)', () => {
 
   describe('assignTicketToSelf', () => {
     it('1. produces the SAME state as assign with assigneeId = the caller', async () => {
-      // §2.4's "one code path" rule, asserted on the resulting STATE rather
+      // "one code path" rule, asserted on the resulting STATE rather
       // than on the call graph. Proving `assignToSelf` delegates somewhere
       // would only prove today's wiring; proving the two produce identical
       // rows is the property that has to keep holding.

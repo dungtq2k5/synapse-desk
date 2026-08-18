@@ -1,29 +1,5 @@
 /**
- * Fault injection that cleans up after ITSELF
- *
- * The bug this exists to make impossible: an injected `qdrant is down` fault
- * escaped `documents.e2e-spec.ts` and failed a later test in the same file,
- * then did not reproduce in isolation. Not reproducing in isolation is the
- * diagnosis rather than a reason to defer — **a fault that survives its own
- * test is a teardown bug**, and teardown bugs only surface when a later test
- * runs in the same process.
- *
- * The two mechanisms, both present in the tree before this:
- *
- *   1. `spy.mockRestore()` as the LAST STATEMENT OF THE TEST BODY. A test that
- *      throws never reaches its last statement — and a fault-injection test is
- *      the one most likely to throw, because it exists to assert on a failure
- *      path. One unexpected error message and the spy outlives the test.
- *
- *   2. `mockRejectedValueOnce`, which is consumed only if the mocked method is
- *      actually CALLED. If the code path fails earlier, the once-mock stays
- *      armed and detonates inside whichever later test reaches that method
- *      first. That is precisely the "fails in the suite, passes alone" shape.
- *
- * So restoration cannot live in the test body. `faultInjector()` registers an
- * `afterEach` once and restores unconditionally — the same guarantee `afterEach`
- * gives `fx.reset()`, extended to the mocks, so no future test can leak one
- * either.
+ * Fault injection that cleans up after itself.
  *
  * ```ts
  * const faults = faultInjector();
@@ -33,6 +9,11 @@
  *   // …no restore here, and none needed even if this line throws.
  * });
  * ```
+ *
+ * **Never restore in the test body.** A test that throws never reaches its last
+ * statement, and a `mockRejectedValueOnce` that was never called stays armed and
+ * detonates inside a later test — the "fails in the suite, passes alone" shape.
+ * `faultInjector()` registers one `afterEach` and restores unconditionally.
  *
  * **Test-only**: excluded from this library's build.
  */

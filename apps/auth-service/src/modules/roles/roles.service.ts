@@ -229,7 +229,7 @@ export class RolesService {
    *
    * That is precisely why the `user_assigned > 0` guard is not a nicety: it is
    * the only thing between a mis-click and silently stripping a role from forty
-   * people, which is a permission change nobody authorised and which nothing
+   * people, which is a permission change nobody authorized and which nothing
    * records well enough to undo.
    */
   async deleteRole(

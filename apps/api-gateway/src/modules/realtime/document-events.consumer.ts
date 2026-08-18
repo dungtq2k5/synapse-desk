@@ -15,23 +15,19 @@ import {
 } from './realtime.config';
 
 /**
- * Domain C's half of the relay.
+ * Domain C's half of the relay — Knowledge & RAG (`ingestion-service` +
+ * `rag-service`), specced in `docs/api-endpoints-plan.md` §3.
  *
- * There was no document consumer at all before this, which mattered in one
- * direction: a Knowledge Manager uploaded a file and then watched it sit in
- * `PROCESSING` with no way to learn it had finished, or failed, short of
- * refreshing.
+ * Without it a Knowledge Manager uploads a file and watches it sit in
+ * `PROCESSING` with no way to learn it finished or failed, short of refreshing.
  *
- * **Adding one raises the room question, and the obvious answer is wrong.**
- * `org:{organizationId}` is the room every other tenant-wide announcement uses
- * and it is a disclosure here: a department-scoped document is invisible to
- * users outside its departments, so announcing it tenant-wide leaks its
- * EXISTENCE and its TITLE to exactly the people that boundary excludes. The
- * title is often the sensitive part — "Q3 Redundancy Plan" discloses the thing
- * whether or not anyone can open the file.
+ * **The rooms follow the document's own scope, not `org:{id}`.** A
+ * department-scoped document is invisible to users outside its departments, so
+ * announcing it tenant-wide leaks its EXISTENCE and its TITLE to exactly the
+ * people that boundary excludes — and the title is often the sensitive part.
+ * "Q3 Redundancy Plan" discloses the thing whether or not anyone can open it.
  *
- * So the rooms follow the document's own scope, which is why `dept:` exists and
- * why nothing needed it until now.
+ * That is why `dept:` rooms exist.
  */
 @Controller()
 export class DocumentEventsConsumer {

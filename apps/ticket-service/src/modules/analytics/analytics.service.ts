@@ -37,10 +37,10 @@ import { PrismaService } from '../prisma/prisma.service';
 type DailyRow = TicketStatSums & { day: Date; computedAt: Date };
 
 /**
- * The six single-service analytics endpoints
+ * The six single-service analytics endpoints.
  *
  * **Every query reads `ticket_daily_stats`, never `tickets`.** That is the
- * whole point of §2: an aggregation over a quarter of tickets, on the table
+ * whole point of the rollups: an aggregation over a quarter of tickets, on the table
  * serving ticket creation, is a Monday-morning dashboard competing with the hot
  * path. The two deliberate exceptions are marked where they occur — both answer
  * "right now", which a rollup of daily events structurally cannot.
@@ -255,34 +255,22 @@ export class AnalyticsService {
   }
 
   /**
-   * **The last day the rollups cover for this tenant**
+   * The last day the rollups cover for this tenant.
    *
-   * The cheapest thing in this file and the most valuable: a dashboard showing
-   * zeros beside *"data through 12 Aug"* diagnoses itself, where the same
-   * dashboard showing only zeros looks like a quiet tenant. That distinction is
-   * exactly what nobody could make when the rollup jobs turned out to have no
-   * scheduler at all — every endpoint answered correctly, and every answer was
-   * zero.
+   * A dashboard showing zeros beside *"data through 12 Aug"* diagnoses itself;
+   * the same dashboard showing only zeros looks like a quiet tenant.
    *
    * **Deliberately NOT clipped to the requested range.** "How fresh is our
-   * data" must not change its answer because the caller asked about March. A
-   * range-clipped version would report `2026-03-31` for a March query and hide
-   * that nothing has been rolled up since.
+   * data" must not change its answer because the caller asked about March.
    *
-   * `null` for a tenant with no rows at all, which a caller must render as
-   * "never" rather than as today.
+   * `null` for a tenant with no rows at all — render as "never", not as today.
    *
-   * **The known limitation, accepted deliberately.** This is the last day with
-   * a ROW, and the job writes a row only for days that had activity — so a
-   * tenant with no tickets since Tuesday reports Tuesday however healthy the
-   * scheduler is. It answers "what period does this dashboard cover", which is
-   * near to but not the same as "is the job running".
-   *
-   * Kept because it fails in the SAFE direction. A false "your data looks old"
-   * costs somebody a glance at the job status; the inverse — a dead scheduler
-   * reporting today because it ran and found nothing — is the exact failure
-   * Exists about. "Is it running" is answered separately by the
-   * heartbeat table (§4.1), on `/platform/metrics`, where it belongs.
+   * **Known limitation.** This is the last day with a ROW, and the job writes a
+   * row only for days that had activity, so a tenant with no tickets since
+   * Tuesday reports Tuesday however healthy the scheduler is. It answers "what
+   * period does this dashboard cover", not "is the job running" — which the
+   * heartbeat table answers on `/platform/metrics`. Kept because it fails in
+   * the safe direction.
    */
   private async dataThrough(
     organizationId: string,

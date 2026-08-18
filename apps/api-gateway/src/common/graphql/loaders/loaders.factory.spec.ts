@@ -1,7 +1,5 @@
 import { alignToKeys, createLoader } from './loaders.factory';
 
-type User = { id: string; fullName: string };
-
 /**
  * The loader seam
  *
@@ -9,11 +7,12 @@ type User = { id: string; fullName: string };
  * in this area is visible; this one renders a completely convincing page with
  * the wrong people on it.
  *
- * Written against a STUB, before any batch RPC exists step 1. The
+ * Written against a STUB, before any batch RPC exists. The
  * bug lives in the mapping, not in the RPC, and writing the mapping while
  * thinking about the RPC is how it gets written wrong.
  */
-describe('§6/§2 loader key alignment', () => {
+describe('loader key alignment', () => {
+  type User = { id: string; fullName: string };
   const user = (id: string): User => ({ id, fullName: `User ${id}` });
 
   it('1. **a response in a DIFFERENT order maps each entity to the right key**', async () => {

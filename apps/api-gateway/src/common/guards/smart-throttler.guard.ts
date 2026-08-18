@@ -16,18 +16,17 @@ import { IS_AUTH_ROUTE_KEY } from '../decorators/auth-throttle.decorator';
  * Routes requests to ONE tier set instead of all of them.
  *
  * Four tiers are registered globally, and without this guard every route would
- * be evaluated against all four. That is wrong in both directions:
+ * be evaluated against all four — wrong in both directions:
  *
  *   - a login would also be governed by the loose `short` tier, so 100
- *     attempts/second would pass whichever general limit is most permissive
- *     before the strict one ever bit;
- *   - every ordinary read would be counted against the strict auth budget, and
- *     a busy dashboard would 429 itself out of the product.
+ *     attempts/second would pass the most permissive general limit before the
+ *     strict one ever bit;
+ *   - every ordinary read would count against the strict auth budget, and a
+ *     busy dashboard would 429 itself out of the product.
  *
- * So: routes marked `@AuthThrottle()` see `authTier` ONLY; everything else sees
- * the general tiers only. The split is driven by metadata rather than a
- * hardcoded list of paths, which is what stops it going stale the moment
- * someone adds a route.
+ * Routes marked `@AuthThrottle()` see `authTier` ONLY; everything else sees the
+ * general tiers. Driven by metadata rather than a path list, which is what
+ * stops it going stale the moment someone adds a route.
  */
 @Injectable()
 export class SmartThrottlerGuard extends ThrottlerGuard {
@@ -62,34 +61,23 @@ export class SmartThrottlerGuard extends ThrottlerGuard {
   /**
    * The counter key: per USER, else per IP **and submitted account**.
    *
-   * Three cases, in order:
-   *
    *   1. **Authenticated** -> `user:<id>`. Keying an authenticated route by IP
-   *      would put a whole corporate NAT in one bucket, so one heavy user
-   *      throttles their colleagues.
-   *
+   *     puts a whole corporate NAT in one bucket, so one heavy user throttles
+   *     their colleagues.
    *   2. **Unauthenticated but carrying an identifier** (login, register,
-   *      forgot-password) -> `ip:<ip>|acct:<email>`. Keying these by IP ALONE
-   *      is the same NAT problem in its worst form: five bad passwords from one
-   *      office would lock every other employee out of signing in. Including
-   *      the submitted address gives each ACCOUNT its own small budget, which
-   *      is what actually stops password guessing — the attacker is guessing
-   *      one account at a time.
-   *
+   *     forgot-password) -> `ip:<ip>|acct:<email>`. By IP alone, five bad
+   *     passwords from one office would lock every other employee out of
+   *     signing in. Per-account budgets are also what actually stops password
+   *     guessing — the attacker guesses one account at a time.
    *   3. **Neither** -> `ip:<ip>`.
    *
-   * `req.body` is populated here because body-parser is middleware and
-   * middleware runs before guards.
+   * `req.body` is populated here because body-parser is middleware, and
+   * middleware runs before guards. The prefixes keep the key spaces disjoint.
    *
-   * **What this does NOT cover:** spraying one password across thousands of
-   * DIFFERENT accounts from one IP. Each address gets its own budget, so the
-   * per-account limit never trips. That needs a per-IP ceiling counted across
-   * accounts, which the general tiers cannot express here because they share
-   * this tracker — it is a genuinely separate control and belongs with a WAF or
-   * fail2ban rather than being half-built in application code.
-   *
-   * The prefixes keep the key spaces disjoint: without them a user whose id
-   * happened to equal an IP string would share a counter with that address.
+   * **Not covered:** spraying one password across thousands of DIFFERENT
+   * accounts from one IP. Each address gets its own budget, so the per-account
+   * limit never trips. That needs a per-IP ceiling counted across accounts, and
+   * belongs with a WAF or fail2ban rather than half-built here.
    */
   protected override getTracker(req: Request): Promise<string> {
     // `req.user` is populated by `JwtAuthGuard`, which is a ROUTE-level guard —
@@ -119,18 +107,14 @@ export class SmartThrottlerGuard extends ThrottlerGuard {
    *
    * Decoding without verifying would be worse than the IP fallback it replaces:
    * an attacker could mint an unsigned token with a random `sub` per request
-   * and get a fresh bucket every time, which is a rate limiter that raises the
-   * cost of evading it to zero. So the signature is checked with the same
-   * public key `JwtStrategy` uses.
+   * and get a fresh bucket every time — a rate limiter whose evasion cost is
+   * zero. The signature is checked with the same public key `JwtStrategy` uses.
    *
-   * The cost is one asymmetric verify per request that `JwtAuthGuard` will then
-   * repeat — real, and the right trade: the alternative is a per-user limit
-   * that is not per user.
+   * The cost is one asymmetric verify per request that `JwtAuthGuard` repeats.
+   * The alternative is a per-user limit that is not per user.
    *
-   * Returns null for anything that does not verify, and the caller falls back
-   * to the IP-based keys. A request with a bad token is refused by the auth
-   * guard moments later anyway; what matters here is that it cannot choose its
-   * own bucket.
+   * Returns null for anything that does not verify; the caller falls back to
+   * the IP-based keys.
    */
   private subjectFromToken(req: Request): string | null {
     const token = extractAccessToken(req, this.accessCookieName);
@@ -268,7 +252,7 @@ export class SmartThrottlerGuard extends ThrottlerGuard {
  * The account a request is ABOUT, when it names one.
  *
  * Lower-cased so `Alice@x.com` and `alice@x.com` share a budget — otherwise
- * changing the capitalisation is a free reset of the guessing limit.
+ * changing the capitalization is a free reset of the guessing limit.
  */
 function extractAccountIdentifier(req: Request): string | null {
   const body: unknown = req.body;

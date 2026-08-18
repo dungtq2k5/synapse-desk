@@ -1,33 +1,19 @@
-// ASK This `docblock` seems to be invalid
 /**
  * The MIME vocabulary — every content type this system may see, declared once.
  *
- * **This is a spelling table, not a policy.** Nothing is permitted by appearing
- * here; the allowlists that decide what may be uploaded, stored or sent to a
- * model each name their own subset. What this buys is that those subsets are
- * *typed*, so a mistyped member is a compile error rather than a rule that
- * silently matches nothing.
+ * **A spelling table, not a policy.** Nothing is permitted by appearing here;
+ * the allowlists that decide what may be uploaded, stored or sent to a model
+ * each name their own subset. What this buys is that those subsets are *typed*,
+ * so a mistyped member is a compile error rather than a rule that silently
+ * matches nothing — `'image/jpg'`, missing the `e`, used to compile cleanly and
+ * refuse every JPEG upload.
  *
- * **The hazard is specific and was live.** `PurposePolicy.mimeAllowlist` was
- * `readonly string[]`, so `'image/jpg'` — the natural misspelling, missing the
- * `e` — compiled cleanly and refused every JPEG upload with a message naming a
- * type the user had not sent. Typed as `readonly MimeType[]`, it does not
- * build. That was the standing FIXME on `PurposePolicy`.
- *
- * **`'image/png'` had been written out eleven times across five files** — two
- * configs in `libs/common`, two in storage-service, and a private `const` in a
- * DTO — with no relationship between them that anything checked.
- *
- * **What this deliberately does NOT do is enforce the RELATIONSHIPS.** A shared
- * vocabulary makes every list spell types the same way; it says nothing about
+ * **It deliberately does NOT enforce the RELATIONSHIPS** between lists —
  * whether the gateway's allowlist is a subset of storage's, or whether every
- * storable type can reach a model. Those are invariants between lists, and they
- * live in `mime.spec.ts` where they can be asserted rather than hoped for.
+ * storable type can reach a model. Those live in `mime.spec.ts`, where they can
+ * be asserted.
  *
- * **Members are added when a list needs them, never in advance.** A vocabulary
- * entry no allowlist names is a type nobody can send, sitting in the file that
- * exists to say what may be sent — which is the shape of the problem this
- * replaces.
+ * **Members are added when a list needs them, never in advance.**
  */
 export const MIME_TYPES = [
   'image/png',

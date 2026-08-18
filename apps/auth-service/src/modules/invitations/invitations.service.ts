@@ -166,84 +166,6 @@ export class InvitationsService {
     return { created, failed, batchId };
   }
 
-  private async createOne(context: {
-    organizationId: string;
-    organizationName: string;
-    maxAgentSeats: number;
-    inviterName: string;
-    invitedById: string;
-    batchId: string;
-    email: string;
-    input: CreateInvitationsRequest['invitations'][number];
-    origin: RequestOrigin;
-  }): Promise<UserInvitation> {
-    const rawToken = generateSecureToken();
-
-    const invitation = await this.prisma.$transaction(async (tx) => {
-      // Already a member of THIS tenant. The same address in another tenant is
-      // fine and is the whole point of the feature.
-      const existingUser = await tx.user.findFirst({
-        where: {
-          email: context.email,
-          organizationId: context.organizationId,
-          deletedAt: null,
-        },
-        select: { id: true },
-      });
-      if (existingUser) {
-        throw new RpcException({
-          code: status.ALREADY_EXISTS,
-          message: 'That address already has an account here',
-        });
-      }
-
-      if (
-        (await this.organizationsService.seatsInUse(
-          tx,
-          context.organizationId,
-        )) >= context.maxAgentSeats
-      ) {
-        throw new RpcException({
-          code: status.RESOURCE_EXHAUSTED,
-          message: 'No seats remaining on this plan',
-        });
-      }
-
-      return tx.userInvitation.create({
-        data: {
-          organizationId: context.organizationId,
-          email: context.email,
-          tokenHash: hashToken(rawToken),
-          roleIds: context.input.roleIds,
-          departmentIds: context.input.departmentIds,
-          primaryDepartmentId: context.input.primaryDepartmentId,
-          invitedById: context.invitedById,
-          batchId: context.batchId,
-          expiresAt: addDays(new Date(), this.INVITATION_TTL_DAYS),
-        },
-      });
-    });
-
-    const roleNames = await this.resolveRoleNames(invitation.roleIds);
-
-    // The RAW token leaves the service exactly here, in a link. Only its hash
-    // is stored.
-    this.notifications.sendEmail({
-      template: EmailTemplateName.INVITATION,
-      to: invitation.email,
-      data: {
-        organizationName: context.organizationName,
-        inviterName: context.inviterName,
-        roleNames,
-        acceptUrl: this.acceptUrl(rawToken),
-        expiresAt: invitation.expiresAt.toISOString(),
-        origin: context.origin,
-      },
-    });
-
-    return invitation;
-  }
-
   async listInvitations(
     request: ListInvitationsRequest,
   ): Promise<ListInvitationsResponse> {
@@ -735,6 +657,84 @@ export class InvitationsService {
     }
 
     return { expiredCount: count };
+  }
+
+  private async createOne(context: {
+    organizationId: string;
+    organizationName: string;
+    maxAgentSeats: number;
+    inviterName: string;
+    invitedById: string;
+    batchId: string;
+    email: string;
+    input: CreateInvitationsRequest['invitations'][number];
+    origin: RequestOrigin;
+  }): Promise<UserInvitation> {
+    const rawToken = generateSecureToken();
+
+    const invitation = await this.prisma.$transaction(async (tx) => {
+      // Already a member of THIS tenant. The same address in another tenant is
+      // fine and is the whole point of the feature.
+      const existingUser = await tx.user.findFirst({
+        where: {
+          email: context.email,
+          organizationId: context.organizationId,
+          deletedAt: null,
+        },
+        select: { id: true },
+      });
+      if (existingUser) {
+        throw new RpcException({
+          code: status.ALREADY_EXISTS,
+          message: 'That address already has an account here',
+        });
+      }
+
+      if (
+        (await this.organizationsService.seatsInUse(
+          tx,
+          context.organizationId,
+        )) >= context.maxAgentSeats
+      ) {
+        throw new RpcException({
+          code: status.RESOURCE_EXHAUSTED,
+          message: 'No seats remaining on this plan',
+        });
+      }
+
+      return tx.userInvitation.create({
+        data: {
+          organizationId: context.organizationId,
+          email: context.email,
+          tokenHash: hashToken(rawToken),
+          roleIds: context.input.roleIds,
+          departmentIds: context.input.departmentIds,
+          primaryDepartmentId: context.input.primaryDepartmentId,
+          invitedById: context.invitedById,
+          batchId: context.batchId,
+          expiresAt: addDays(new Date(), this.INVITATION_TTL_DAYS),
+        },
+      });
+    });
+
+    const roleNames = await this.resolveRoleNames(invitation.roleIds);
+
+    // The RAW token leaves the service exactly here, in a link. Only its hash
+    // is stored.
+    this.notifications.sendEmail({
+      template: EmailTemplateName.INVITATION,
+      to: invitation.email,
+      data: {
+        organizationName: context.organizationName,
+        inviterName: context.inviterName,
+        roleNames,
+        acceptUrl: this.acceptUrl(rawToken),
+        expiresAt: invitation.expiresAt.toISOString(),
+        origin: context.origin,
+      },
+    });
+
+    return invitation;
   }
 
   /** Scoped to the tenant, so one admin cannot touch another's invitations. */

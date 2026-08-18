@@ -14,7 +14,7 @@ import { plainEmail, signPayload } from '../fixtures/inbound-email';
  * nothing to happen* — which is the reason verification is local rather than
  * forwarded.
  */
-describe('§32 §3 the inbound email webhook (e2e)', () => {
+describe('The inbound email webhook (e2e)', () => {
   let fx: E2eFixture;
   let secret: string;
 
@@ -56,7 +56,7 @@ describe('§32 §3 the inbound email webhook (e2e)', () => {
 
       const response = await post(body, signature).expect(200);
 
-      // **200 even though the mail was dropped** A 4xx would
+      // **200 even though the mail was dropped**. A 4xx would
       // tell the provider to retry an address that will never resolve.
       expect(response.body.data).toEqual({
         received: true,

@@ -4,7 +4,7 @@ import Redis from 'ioredis';
 export const STORAGE_REDIS = Symbol('STORAGE_REDIS');
 
 /**
- * What was authorized, and for whom — §1.2.
+ * What was authorized, and for whom.
  *
  * Recorded at presign, checked again at confirm. This record is the ENTIRE
  * reason confirm is an authorization check rather than a formality: without it,
@@ -16,7 +16,7 @@ export const STORAGE_REDIS = Symbol('STORAGE_REDIS');
 export type PendingUpload = {
   objectPath: string;
   /**
-   * Where this object moves to on a successful confirm
+   * Where this object moves to on a successful confirm.
    *
    * **Decided at presign, not derived at confirm.** Both paths come out of
    * `buildObjectPath`, so the two shapes are chosen in one place; computing the
@@ -38,7 +38,7 @@ export type PendingUpload = {
 };
 
 /**
- * Redis, not Postgres — §1.2.
+ * Redis, not Postgres.
  *
  * Two reasons, and both are about this record having no value once the upload
  * window closes. Redis's TTL *is* the cleanup mechanism, so there is no pruning

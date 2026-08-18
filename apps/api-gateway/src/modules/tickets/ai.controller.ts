@@ -20,7 +20,7 @@ import { PermissionGuard } from '../../common/guards/permission.guard';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ResponseMessage } from '../../common/decorators/response-message.decorator';
-import { AiGrpcClient } from './ai-grpc.client';
+import { AiService } from './ai.service';
 import { GenerateDraftDto } from './dto/rest/ai.dto';
 import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AUTH_SCHEMES } from '../../common/config/swagger.config';
@@ -29,7 +29,7 @@ import {
   ApiWrappedResponse,
 } from '../../common/decorators/api-response.decorator';
 import {
-  AiClassificationDto,
+  AiClassificationResponseDto,
   AiDraftResponseDto,
   AiSuggestionsResponseDto,
   AiSummaryResponseDto,
@@ -39,7 +39,7 @@ import {
  * The AI co-pilot (api-endpoints-plan §2.3).
  *
  * Every route here answers **503** today — `rag-service` is Python and is not
- * started (§1.7). The wiring is real so Domain C is a service swap, and 503
+ * started. The wiring is real so Domain C is a service swap, and 503
  * rather than 404-or-nothing is what lets a client tell "not built yet" from
  * "broken" and from "you asked for the wrong thing".
  *
@@ -52,7 +52,7 @@ import {
 @Controller('tickets/:ticketId/ai')
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class AiController {
-  constructor(private readonly aiGrpcClient: AiGrpcClient) {}
+  constructor(private readonly ai: AiService) {}
 
   /**
    * Reading a STORED summary costs nothing and needs no model — so it is gated
@@ -67,7 +67,7 @@ export class AiController {
     @CurrentUser() context: RequestContext,
     @Param('ticketId', ParseUUIDPipe) ticketId: string,
   ): Promise<AiSummaryResponseDto> {
-    return this.aiGrpcClient.getSummary(ticketId, context);
+    return this.ai.getSummary(ticketId, context);
   }
 
   /**
@@ -78,7 +78,7 @@ export class AiController {
    * first, and a client keying off 201 would treat a replacement as a new
    * resource.
    */
-  // A per-USER minute limit, on top of the monthly quota The
+  // A per-USER minute limit, on top of the monthly quota. The
   // quota is a month budget checked per request and does nothing to stop one
   // user spending the whole month in ten minutes.
   @Throttle({ [AI_THROTTLER_TIER]: ROUTE_THROTTLE.aiSummary })
@@ -93,7 +93,7 @@ export class AiController {
     @CurrentUser() context: RequestContext,
     @Param('ticketId', ParseUUIDPipe) ticketId: string,
   ): Promise<AiSummaryResponseDto> {
-    return this.aiGrpcClient.generateSummary(ticketId, context);
+    return this.ai.generateSummary(ticketId, context);
   }
 
   /**
@@ -103,7 +103,7 @@ export class AiController {
    * `invokeAi` is the path that does persist, and keeping the two separate is
    * what stops an unreviewed generated reply reaching a customer.
    */
-  // A per-USER minute limit, on top of the monthly quota The
+  // A per-USER minute limit, on top of the monthly quota. The
   // quota is a month budget checked per request and does nothing to stop one
   // user spending the whole month in ten minutes.
   @Throttle({ [AI_THROTTLER_TIER]: ROUTE_THROTTLE.aiDraft })
@@ -118,10 +118,10 @@ export class AiController {
     @Param('ticketId', ParseUUIDPipe) ticketId: string,
     @Body() dto: GenerateDraftDto,
   ): Promise<AiDraftResponseDto> {
-    return this.aiGrpcClient.generateDraft(ticketId, dto, context);
+    return this.ai.generateDraft(ticketId, dto, context);
   }
 
-  // A per-USER minute limit, on top of the monthly quota The
+  // A per-USER minute limit, on top of the monthly quota. The
   // quota is a month budget checked per request and does nothing to stop one
   // user spending the whole month in ten minutes.
   @Throttle({ [AI_THROTTLER_TIER]: ROUTE_THROTTLE.aiSuggestions })
@@ -135,15 +135,15 @@ export class AiController {
     @CurrentUser() context: RequestContext,
     @Param('ticketId', ParseUUIDPipe) ticketId: string,
   ): Promise<AiSuggestionsResponseDto> {
-    return this.aiGrpcClient.getSuggestions(ticketId, context);
+    return this.ai.getSuggestions(ticketId, context);
   }
 
-  // A per-USER minute limit, on top of the monthly quota The
+  // A per-USER minute limit, on top of the monthly quota. The
   // quota is a month budget checked per request and does nothing to stop one
   // user spending the whole month in ten minutes.
   @Throttle({ [AI_THROTTLER_TIER]: ROUTE_THROTTLE.aiClassify })
   @ApiOperation({ summary: 'Classify' })
-  @ApiWrappedResponse(AiClassificationDto)
+  @ApiWrappedResponse(AiClassificationResponseDto)
   @ApiFilterErrors(['400', '401', '403', '404'])
   @Post('classify')
   @RequirePermission('ticket.ai.use')
@@ -151,7 +151,7 @@ export class AiController {
   classify(
     @CurrentUser() context: RequestContext,
     @Param('ticketId', ParseUUIDPipe) ticketId: string,
-  ): Promise<AiClassificationDto> {
-    return this.aiGrpcClient.classifyTicket(ticketId, context);
+  ): Promise<AiClassificationResponseDto> {
+    return this.ai.classifyTicket(ticketId, context);
   }
 }

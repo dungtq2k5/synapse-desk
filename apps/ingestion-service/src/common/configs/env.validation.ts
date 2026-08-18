@@ -2,7 +2,7 @@ import * as Joi from 'joi';
 import { NODE_ENV_OPTIONS } from '@synapsedesk/common';
 
 export const envValidationSchema = Joi.object({
-  // **Which build is this?** Baked at image build time, never read
+  // **Which build is this?**. Baked at image build time, never read
   // from git at runtime: a container has no `.git`, so a runtime lookup returns
   // nothing and the natural fallback is `"unknown"` — the answer you get at
   // exactly the moment you need the real one.
@@ -66,7 +66,7 @@ export const envValidationSchema = Joi.object({
   QDRANT_URL: Joi.string().required(),
 
   // Required in every environment EXCEPT test, where the pipeline runs against
-  // a substitute embedding client (§2.6) — deliberately, so the ingestion tests
+  // a substitute embedding client — deliberately, so the ingestion tests
   // need no API key, no network and no per-run spend.
   GEMINI_API_KEY: Joi.string().when('NODE_ENV', {
     is: 'test',

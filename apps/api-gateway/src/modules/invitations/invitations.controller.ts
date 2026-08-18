@@ -23,19 +23,21 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { CurrentOrigin } from '../../common/decorators/current-origin.decorator';
 import { ResponseMessage } from '../../common/decorators/response-message.decorator';
 import { JwtCookieService } from '../auth/jwt-cookie.service';
-import { InvitationsGrpcClient } from './invitations-grpc.client';
+import { InvitationsService } from './invitations.service';
 import {
   AcceptInvitationDto,
   CreateInvitationsDto,
+  ListInvitationsQueryDto,
+  PreviewInvitationsDto,
+} from './dto/rest/invitation.dto';
+import {
   CreateInvitationsResponseDto,
   InvitationResponseDto,
-  ListInvitationsQueryDto,
   PreviewInvitationResponseDto,
-  PreviewInvitationsDto,
   PreviewInvitationsResponseDto,
-} from './dto/rest/invitation.dto';
+} from './dto/rest/invitation-response.dto';
 import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
-import { LoginResponseDto } from '../auth/dto/rest/login.dto';
+import { LoginResponseDto } from '../auth/dto/rest/login-response.dto';
 import { Throttle } from '@nestjs/throttler';
 import {
   AUTH_THROTTLER_TIER,
@@ -64,7 +66,7 @@ import {
 @Controller('users/invitations')
 export class InvitationsController {
   constructor(
-    private readonly invitationsGrpcClient: InvitationsGrpcClient,
+    private readonly invitations: InvitationsService,
     private readonly jwtCookieService: JwtCookieService,
   ) {}
 
@@ -88,7 +90,7 @@ export class InvitationsController {
     @Body() createInvitationsDto: CreateInvitationsDto,
     @Res({ passthrough: true }) response: Response,
   ): Promise<CreateInvitationsResponseDto> {
-    const result = await this.invitationsGrpcClient.create(
+    const result = await this.invitations.create(
       context.organizationId!,
       context.sub,
       createInvitationsDto,
@@ -118,11 +120,7 @@ export class InvitationsController {
     // The envelope is built by the SERVICE now, via the shared PageMeta —
     // this used to recompute it here from `totalItems`, which meant the page
     // maths existed twice and only one copy honoured the service-side clamp.
-    return this.invitationsGrpcClient.list(
-      context.organizationId!,
-      query,
-      context,
-    );
+    return this.invitations.list(context.organizationId!, query, context);
   }
 
   /** Rotates the token — the previous link stops working immediately. */
@@ -140,7 +138,7 @@ export class InvitationsController {
     @CurrentUser() context: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<InvitationResponseDto> {
-    return this.invitationsGrpcClient.resend(
+    return this.invitations.resend(
       context.organizationId!,
       id,
       context.sub,
@@ -160,7 +158,7 @@ export class InvitationsController {
     @CurrentUser() context: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<void> {
-    return this.invitationsGrpcClient.revoke(
+    return this.invitations.revoke(
       context.organizationId!,
       id,
       context.sub,
@@ -196,7 +194,7 @@ export class InvitationsController {
     @Param('token') token: string,
     @CurrentOrigin() origin: RequestOrigin,
   ): Promise<PreviewInvitationResponseDto> {
-    return this.invitationsGrpcClient.previewByToken(token, origin);
+    return this.invitations.previewByToken(token, origin);
   }
 
   /**
@@ -222,10 +220,7 @@ export class InvitationsController {
     @CurrentOrigin() origin: RequestOrigin,
     @Res({ passthrough: true }) response: Response,
   ): Promise<LoginResponseDto> {
-    const result = await this.invitationsGrpcClient.accept(
-      acceptInvitationDto,
-      origin,
-    );
+    const result = await this.invitations.accept(acceptInvitationDto, origin);
 
     this.jwtCookieService.setAccessTokenCookie(response, result.accessToken);
     this.jwtCookieService.setRefreshTokenCookie(response, result.refreshToken);
@@ -259,7 +254,7 @@ export class InvitationsController {
     @CurrentUser() context: RequestContext,
     @Body() previewInvitationsDto: PreviewInvitationsDto,
   ): Promise<PreviewInvitationsResponseDto> {
-    return this.invitationsGrpcClient.previewBatch(
+    return this.invitations.previewBatch(
       context.organizationId!,
       previewInvitationsDto,
       context,
@@ -282,6 +277,6 @@ export class InvitationsController {
     @CurrentUser() context: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<InvitationResponseDto> {
-    return this.invitationsGrpcClient.get(context.organizationId!, id, context);
+    return this.invitations.get(context.organizationId!, id, context);
   }
 }

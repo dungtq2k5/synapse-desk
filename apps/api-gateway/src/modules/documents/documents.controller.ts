@@ -22,7 +22,7 @@ import { RequirePermission } from '../../common/decorators/require-permission.de
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ResponseMessage } from '../../common/decorators/response-message.decorator';
 import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
-import { DocumentsGrpcClient } from './documents-grpc.client';
+import { DocumentsService } from './documents.service';
 import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AUTH_SCHEMES } from '../../common/config/swagger.config';
 import {
@@ -40,6 +40,7 @@ import {
 } from './dto/rest/document.dto';
 import {
   DocumentChunkResponseDto,
+  DocumentDepartmentsResponseDto,
   DocumentFlagResponseDto,
   DocumentResponseDto,
   DownloadDocumentResponseDto,
@@ -62,7 +63,7 @@ import {
 @Controller('documents')
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class DocumentsController {
-  constructor(private readonly documentsGrpcClient: DocumentsGrpcClient) {}
+  constructor(private readonly documents: DocumentsService) {}
 
   @ApiOperation({
     summary:
@@ -80,17 +81,12 @@ export class DocumentsController {
     @CurrentUser() context: RequestContext,
     @Query() query: ListDocumentsQueryDto,
   ): Promise<PaginationResponseDto<DocumentResponseDto>> {
-    return this.documentsGrpcClient.list(query, context);
+    return this.documents.list(query, context);
   }
 
-  /**
-   * Declared BEFORE `@Get(':id')`.
-   *
-   * Nest matches in declaration order and `:id` would swallow both `presign`
-   * and `storage`, turning them into a `ParseUUIDPipe` 400 that reads as a
-   * client bug rather than a routing mistake. The same hazard `bulk/status` hit
-   * in Domain B and `by-number` before it.
-   */
+  // MUST stay declared BEFORE `@Get(':id')`: Nest matches in declaration order,
+  // and `:id` would swallow `presign` and `storage` -- surfacing as a
+  // `ParseUUIDPipe` 400 that reads as a client bug, not a routing mistake.
   @ApiOperation({ summary: 'Storage usage breakdown vs max_storage_bytes' })
   @ApiWrappedResponse(StorageUsageResponseDto)
   @ApiFilterErrors(['401', '403'])
@@ -99,11 +95,11 @@ export class DocumentsController {
   storageUsage(
     @CurrentUser() context: RequestContext,
   ): Promise<StorageUsageResponseDto> {
-    return this.documentsGrpcClient.storageUsage(context);
+    return this.documents.storageUsage(context);
   }
 
   /**
-   * The flag worklist Declared before `@Get(':id')`, like
+   * The flag worklist. Declared before `@Get(':id')`, like
    * `storage`.
    *
    * `document.read` rather than open to every member: a flag names a document
@@ -119,16 +115,12 @@ export class DocumentsController {
     @CurrentUser() context: RequestContext,
     @Query() query: ListDocumentFlagsQueryDto,
   ): Promise<PaginationResponseDto<DocumentFlagResponseDto>> {
-    return this.documentsGrpcClient.listFlags(query, context);
+    return this.documents.listFlags(query, context);
   }
 
-  /**
-   * 200, not 201 — nothing has been created yet.
-   *
-   * The STORAGE QUOTA is checked in ingestion-service before anything is
-   * signed, so a tenant over `max_storage_bytes` never receives a usable URL
-   * rather than discovering it after uploading 25 MB.
-   */
+  // 200, not 201: nothing is created yet. The storage quota is checked in
+  // ingestion-service BEFORE anything is signed, so a tenant over
+  // `max_storage_bytes` never gets a usable URL rather than finding out at 25MB.
   @ApiOperation({
     summary:
       '{ contentType, sizeBytes, fileName } → storage-service.PresignUpload(purpose: DOCUMENT) → { uploadUrl, objectPath, expiresAt }',
@@ -142,7 +134,7 @@ export class DocumentsController {
     @CurrentUser() context: RequestContext,
     @Body() dto: PresignDocumentDto,
   ): Promise<PresignDocumentResponseDto> {
-    return this.documentsGrpcClient.presign(dto, context);
+    return this.documents.presign(dto, context);
   }
 
   /**
@@ -161,7 +153,7 @@ export class DocumentsController {
     @CurrentUser() context: RequestContext,
     @Body() dto: ConfirmDocumentDto,
   ): Promise<DocumentResponseDto> {
-    return this.documentsGrpcClient.confirm(dto, context);
+    return this.documents.confirm(dto, context);
   }
 
   @ApiOperation({
@@ -174,7 +166,7 @@ export class DocumentsController {
     @CurrentUser() context: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<DocumentResponseDto> {
-    return this.documentsGrpcClient.get(id, context);
+    return this.documents.get(id, context);
   }
 
   @ApiOperation({ summary: 'Update' })
@@ -188,7 +180,7 @@ export class DocumentsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateDocumentDto,
   ): Promise<DocumentResponseDto> {
-    return this.documentsGrpcClient.update(id, dto, context);
+    return this.documents.update(id, dto, context);
   }
 
   @ApiOperation({ summary: 'Remove' })
@@ -201,7 +193,7 @@ export class DocumentsController {
     @CurrentUser() context: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<void> {
-    return this.documentsGrpcClient.remove(id, context);
+    return this.documents.remove(id, context);
   }
 
   @ApiOperation({ summary: 'Restore' })
@@ -215,7 +207,7 @@ export class DocumentsController {
     @CurrentUser() context: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<DocumentResponseDto> {
-    return this.documentsGrpcClient.restore(id, context);
+    return this.documents.restore(id, context);
   }
 
   /**
@@ -233,19 +225,19 @@ export class DocumentsController {
     @CurrentUser() context: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<DownloadDocumentResponseDto> {
-    return this.documentsGrpcClient.download(id, context);
+    return this.documents.download(id, context);
   }
 
   @ApiOperation({ summary: 'Departments scoped to this document' })
-  @ApiWrappedResponse()
+  @ApiWrappedResponse(DocumentDepartmentsResponseDto)
   @ApiFilterErrors(['400', '401', '403', '404'])
   @Get(':id/departments')
   @RequirePermission('document.read')
   listDepartments(
     @CurrentUser() context: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
-  ): Promise<string[]> {
-    return this.documentsGrpcClient.listDepartments(id, context);
+  ): Promise<DocumentDepartmentsResponseDto> {
+    return this.documents.listDepartments(id, context);
   }
 
   /**
@@ -268,7 +260,7 @@ export class DocumentsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: SetDocumentDepartmentsDto,
   ): Promise<DocumentResponseDto> {
-    return this.documentsGrpcClient.setDepartments(id, dto, context);
+    return this.documents.setDepartments(id, dto, context);
   }
 
   @ApiOperation({
@@ -284,7 +276,7 @@ export class DocumentsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Query() query: ListDocumentsQueryDto,
   ): Promise<PaginationResponseDto<DocumentChunkResponseDto>> {
-    return this.documentsGrpcClient.listChunks(id, query, context);
+    return this.documents.listChunks(id, query, context);
   }
 
   /**
@@ -301,6 +293,6 @@ export class DocumentsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Param('chunkId', ParseUUIDPipe) chunkId: string,
   ): Promise<DocumentChunkResponseDto> {
-    return this.documentsGrpcClient.getChunk(id, chunkId, context);
+    return this.documents.getChunk(id, chunkId, context);
   }
 }

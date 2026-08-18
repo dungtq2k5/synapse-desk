@@ -1,3 +1,7 @@
+import {
+  MAX_OTP_CODE_LENGTH,
+  MIN_OTP_CODE_LENGTH,
+} from '../../../../common/config/dto.config';
 import { IsIn, IsNumberString, IsPhoneNumber, Length } from 'class-validator';
 import { OTP_PURPOSES, OtpPurpose } from '@synapsedesk/common';
 
@@ -12,39 +16,19 @@ export class RequestPhoneVerificationDto {
 }
 
 export class VerifyOtpDto {
-  /** `@IsNumberString` rather than `@IsString`: the code is digits only, and a
-   * non-numeric value should be a 400 rather than a wasted attempt. */
+  // `@IsNumberString`, not `@IsString`: the code is digits only, so a
+  // non-numeric value should be a 400 rather than a wasted attempt.
+  //
+  // A RANGE, not a fixed length: auth-service generates `OTP_LENGTH` digits and
+  // that is an env var, so the gateway cannot know the exact length here.
   @IsNumberString()
-  @Length(4, 10)
+  @Length(MIN_OTP_CODE_LENGTH, MAX_OTP_CODE_LENGTH)
   readonly code!: string;
 }
 
 export class OtpStatusQueryDto {
-  /**
-   * The REST surface stays a readable string (`?purpose=email_verification`)
-   * rather than the proto's integer — a query param is a public contract and
-   * `?purpose=1` is nobody's idea of one. `@IsIn` over the shared domain enum is
-   * what makes the two agree; the gRPC client maps it to the proto enum.
-   */
+  // A readable string (`?purpose=email_verification`), never the proto's
+  // integer: a query param is a public contract. The gRPC client maps it.
   @IsIn(OTP_PURPOSES)
   readonly purpose!: OtpPurpose;
-}
-
-export class RequestOtpResponseDto {
-  /** Masked: `a***e@acme.com` or `+44******1234`. */
-  readonly target!: string;
-  readonly expiresInMinutes!: number;
-}
-
-export class VerifyOtpResponseDto {
-  readonly verified!: boolean;
-  readonly attemptsRemaining!: number;
-  readonly mustRequestNewCode!: boolean;
-}
-
-export class OtpStatusResponseDto {
-  readonly pending!: boolean;
-  readonly target!: string | null;
-  readonly expiresAt!: Date | null;
-  readonly attemptsRemaining!: number;
 }

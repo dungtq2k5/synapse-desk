@@ -11,7 +11,7 @@ import { ExpiredLockSweep } from '../users/expired-lock.sweep';
 import { ExpiredRecordsPruner } from '../sessions/expired-records.job';
 
 /**
- * auth-service's scheduler
+ * auth-service's scheduler.
  *
  * **Migrated off `@nestjs/schedule`, which had the replica problem.** Both jobs
  * here used `@Cron`, which runs in-process: three pods fired each of them three

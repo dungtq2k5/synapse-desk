@@ -1,3 +1,19 @@
+import {
+  MAX_ADMIN_REASON_LENGTH,
+  MAX_ALLOWED_EMAIL_DOMAINS,
+  MAX_FULL_NAME_LENGTH,
+  MAX_ORGANIZATION_DOMAIN_LENGTH,
+  MAX_ORGANIZATION_NAME_LENGTH,
+  MAX_ORGANIZATION_SLUG_LENGTH,
+  MAX_ROLE_DESCRIPTION_LENGTH,
+  MAX_ROLE_NAME_LENGTH,
+  MIN_AGENT_SEATS,
+  MIN_AI_TOKEN_BUDGET,
+  MIN_FULL_NAME_LENGTH,
+  MIN_ORGANIZATION_NAME_LENGTH,
+  MIN_ORGANIZATION_SLUG_LENGTH,
+  MIN_STORAGE_BYTES,
+} from '../../../../common/config/dto.config';
 import { Transform } from 'class-transformer';
 import {
   ArrayMaxSize,
@@ -28,8 +44,6 @@ import {
 } from '@synapsedesk/common';
 import { SearchPaginationDto } from '../../../../common/dto/rest/search-pagination.dto';
 import { ToBoolean } from '../../../../common/decorators/to-boolean.decorator';
-import { UserResponseDto } from '../../../users/dto/rest/user-response.dto';
-import { OrganizationResponseDto } from '../../../organizations/dto/rest/organization.dto';
 
 export class ListPlatformOrganizationsQueryDto extends OmitType(
   SearchPaginationDto,
@@ -38,15 +52,9 @@ export class ListPlatformOrganizationsQueryDto extends OmitType(
   @IsOptional()
   @IsString()
   @IsIn(ORGANIZATION_SORTABLE_FIELDS)
-  /**
-   * Optional in the API and, without this, REQUIRED in the docs
-   *
-   * The plugin derives `required` from TYPESCRIPT optionality, not from
-   * `@IsOptional()`. A field declared `page: number = 1` is non-optional to the
-   * compiler even though the validator lets a caller omit it, so the generated
-   * spec demanded it — and a generated client would refuse to send a request
-   * without one.
-   */
+  // `@ApiPropertyOptional()` is required here: the Swagger plugin derives
+  // `required` from TYPESCRIPT optionality, so a defaulted non-optional field
+  // is documented as mandatory and a generated client refuses to omit it.
   @ApiPropertyOptional()
   readonly sortBy: OrganizationSortableField = DEFAULT_SEARCH.SORT_BY;
 
@@ -90,51 +98,64 @@ export class ListPlatformUsersQueryDto extends OmitType(SearchPaginationDto, [
  */
 export class CreatePlatformOrganizationDto {
   @IsString()
-  @MinLength(2)
-  @MaxLength(255)
+  @MinLength(MIN_ORGANIZATION_NAME_LENGTH)
+  @MaxLength(MAX_ORGANIZATION_NAME_LENGTH)
   @Transform(trimIfString)
   readonly name!: string;
 
   @IsString()
-  @MinLength(2)
-  @MaxLength(100)
+  @MinLength(MIN_ORGANIZATION_SLUG_LENGTH)
+  @MaxLength(MAX_ORGANIZATION_SLUG_LENGTH)
   @Transform(trimIfString)
   readonly slug!: string;
 
   @IsOptional()
   @IsString()
-  @MaxLength(255)
+  @MaxLength(MAX_ORGANIZATION_DOMAIN_LENGTH)
   @Transform(trimIfString)
   readonly domain?: string;
 
   @IsOptional()
   @IsArray()
-  @ArrayMaxSize(50)
+  @ArrayMaxSize(MAX_ALLOWED_EMAIL_DOMAINS)
   @IsString({ each: true })
-  readonly allowedEmailDomains?: string[];
+  @ApiPropertyOptional()
+  readonly allowedEmailDomains: string[] = [];
 
   @IsEmail()
   readonly adminEmail!: string;
 
   @IsString()
-  @MinLength(2)
-  @MaxLength(150)
+  @MinLength(MIN_FULL_NAME_LENGTH)
+  @MaxLength(MAX_FULL_NAME_LENGTH)
   @Transform(trimIfString)
   readonly adminFullName!: string;
 
   @IsOptional()
   @IsInt()
-  @Min(1)
+  @Min(MIN_AGENT_SEATS)
+  // The `?` is load-bearing: this maps to an `optional` proto field, where
+  // ABSENT and zero are different messages. The proto says it outright --
+  // "absent takes the schema default rather than zero" -- so a default here
+  // would create a tenant with no storage, or reset a quota on every PATCH.
   readonly maxAgentSeats?: number;
 
   @IsOptional()
   @IsInt()
-  @Min(0)
+  @Min(MIN_STORAGE_BYTES)
+  // The `?` is load-bearing: this maps to an `optional` proto field, where
+  // ABSENT and zero are different messages. The proto says it outright --
+  // "absent takes the schema default rather than zero" -- so a default here
+  // would create a tenant with no storage, or reset a quota on every PATCH.
   readonly maxStorageBytes?: number;
 
   @IsOptional()
   @IsInt()
-  @Min(0)
+  @Min(MIN_AI_TOKEN_BUDGET)
+  // The `?` is load-bearing: this maps to an `optional` proto field, where
+  // ABSENT and zero are different messages. The proto says it outright --
+  // "absent takes the schema default rather than zero" -- so a default here
+  // would create a tenant with no storage, or reset a quota on every PATCH.
   readonly monthlyAiTokenBudget?: number;
 }
 
@@ -142,37 +163,49 @@ export class CreatePlatformOrganizationDto {
 export class UpdatePlatformOrganizationDto {
   @IsOptional()
   @IsString()
-  @MinLength(2)
-  @MaxLength(255)
+  @MinLength(MIN_ORGANIZATION_NAME_LENGTH)
+  @MaxLength(MAX_ORGANIZATION_NAME_LENGTH)
   @Transform(trimIfString)
   readonly name?: string;
 
   @IsOptional()
   @IsString()
-  @MinLength(2)
-  @MaxLength(100)
+  @MinLength(MIN_ORGANIZATION_SLUG_LENGTH)
+  @MaxLength(MAX_ORGANIZATION_SLUG_LENGTH)
   @Transform(trimIfString)
   readonly slug?: string;
 
   @IsOptional()
   @IsString()
-  @MaxLength(255)
+  @MaxLength(MAX_ORGANIZATION_DOMAIN_LENGTH)
   @Transform(trimIfString)
   readonly domain?: string;
 
   @IsOptional()
   @IsInt()
-  @Min(1)
+  @Min(MIN_AGENT_SEATS)
+  // The `?` is load-bearing: this maps to an `optional` proto field, where
+  // ABSENT and zero are different messages. The proto says it outright --
+  // "absent takes the schema default rather than zero" -- so a default here
+  // would create a tenant with no storage, or reset a quota on every PATCH.
   readonly maxAgentSeats?: number;
 
   @IsOptional()
   @IsInt()
-  @Min(0)
+  @Min(MIN_STORAGE_BYTES)
+  // The `?` is load-bearing: this maps to an `optional` proto field, where
+  // ABSENT and zero are different messages. The proto says it outright --
+  // "absent takes the schema default rather than zero" -- so a default here
+  // would create a tenant with no storage, or reset a quota on every PATCH.
   readonly maxStorageBytes?: number;
 
   @IsOptional()
   @IsInt()
-  @Min(0)
+  @Min(MIN_AI_TOKEN_BUDGET)
+  // The `?` is load-bearing: this maps to an `optional` proto field, where
+  // ABSENT and zero are different messages. The proto says it outright --
+  // "absent takes the schema default rather than zero" -- so a default here
+  // would create a tenant with no storage, or reset a quota on every PATCH.
   readonly monthlyAiTokenBudget?: number;
 }
 
@@ -183,12 +216,12 @@ export class SetOrganizationStatusDto {
   /** Required — the audit row is read months later by someone who was not there. */
   @IsString()
   @IsNotEmpty()
-  @MaxLength(500)
+  @MaxLength(MAX_ADMIN_REASON_LENGTH)
   readonly reason!: string;
 }
 
 /**
- * A reason, required
+ * A reason, required.
  *
  * This endpoint used to be routine tenant administration. Since billing
  * shipped it is BREAK-GLASS: `billing_cycle_start` follows Stripe's invoice
@@ -200,27 +233,27 @@ export class SetOrganizationStatusDto {
 export class ResetBillingCycleDto {
   @IsString()
   @IsNotEmpty()
-  @MaxLength(500)
+  @MaxLength(MAX_ADMIN_REASON_LENGTH)
   readonly reason!: string;
 }
 
 export class OffboardOrganizationDto {
   @IsString()
   @IsNotEmpty()
-  @MaxLength(500)
+  @MaxLength(MAX_ADMIN_REASON_LENGTH)
   readonly reason!: string;
 }
 
 export class CreateGlobalRoleDto {
   @IsString()
-  @MinLength(2)
-  @MaxLength(100)
+  @MinLength(MIN_ORGANIZATION_NAME_LENGTH)
+  @MaxLength(MAX_ROLE_NAME_LENGTH)
   @Transform(trimIfString)
   readonly name!: string;
 
   @IsOptional()
   @IsString()
-  @MaxLength(2000)
+  @MaxLength(MAX_ROLE_DESCRIPTION_LENGTH)
   readonly description?: string;
 
   @IsArray()
@@ -229,54 +262,7 @@ export class CreateGlobalRoleDto {
   readonly permissionCodes!: PermissionCode[];
 }
 
-export class PlatformOrganizationResponseDto {
-  readonly organization!: OrganizationResponseDto;
-  readonly userCount!: number;
-  readonly pendingInvitationCount!: number;
-  readonly departmentCount!: number;
-  readonly deletedAt!: Date | null;
-}
-
-export class PlatformUserResponseDto {
-  readonly user!: UserResponseDto;
-  /** Always present on a tenant user; null only for a platform Super Admin. */
-  readonly organizationId!: string | null;
-  readonly organizationName!: string | null;
-  readonly roleNames!: string[];
-  readonly deletedAt!: Date | null;
-}
-
-export class CreatePlatformOrganizationResponseDto {
-  readonly organization!: PlatformOrganizationResponseDto;
-  readonly admin!: UserResponseDto;
-}
-
-export class OffboardResponseDto {
-  readonly revokedSessionCount!: number;
-}
-
-export class PlatformMetricsResponseDto {
-  readonly totalOrganizations!: number;
-  readonly organizationsByStatus!: Record<string, number>;
-  readonly totalUsers!: number;
-  readonly activeUsers!: number;
-  readonly pendingInvitations!: number;
-  readonly liveSessions!: number;
-  readonly seatsAllocated!: number;
-  readonly seatsInUse!: number;
-  readonly generatedAt!: Date;
-}
-
-// **`export`, not `export type`** Re-exported as a VALUE because
-// `@ApiWrappedResponse(RoleResponseDto)` needs its runtime identity to build a
-// `$ref`; a type-only re-export erases the class and the reference cannot be
-// built at all.
-//
-// **Live, and it reads as dead because nothing here mentions it again.** Both
-// `platform.controller.ts` and `platform-grpc.client.ts` import
-// `RoleResponseDto` from THIS module rather than from `roles/`, and the
-// controller passes it to four `@ApiWrappedResponse(…)` calls. Deleting the line
-// fails the build in both files — which is the check worth running before
-// deleting any re-export, because a barrel that is only ever read through is
-// indistinguishable from an unused one at the point of declaration.
-export { RoleResponseDto } from '../../../roles/dto/rest/role.dto';
+// Live, though nothing below mentions it: the platform controller and client
+// both import `RoleResponseDto` from HERE rather than from `roles/`. Deleting
+// this line fails the build in both.
+export { RoleResponseDto } from '../../../roles/dto/rest/role-response.dto';

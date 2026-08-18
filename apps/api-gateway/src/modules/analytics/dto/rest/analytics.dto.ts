@@ -1,3 +1,4 @@
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   IsIn,
@@ -48,7 +49,8 @@ export class AnalyticsTopNQueryDto extends AnalyticsRangeQueryDto {
   @IsInt()
   @Min(ANALYTICS_TOP_N.MIN)
   @Max(ANALYTICS_TOP_N.MAX)
-  readonly limit?: number = ANALYTICS_TOP_N.DEFAULT;
+  @ApiPropertyOptional()
+  readonly limit: number = ANALYTICS_TOP_N.DEFAULT;
 }
 
 /**
@@ -64,11 +66,12 @@ export class DocumentAnalyticsQueryDto {
   @IsInt()
   @Min(ANALYTICS_TOP_N.MIN)
   @Max(ANALYTICS_TOP_N.MAX)
-  readonly limit?: number = ANALYTICS_TOP_N.DEFAULT;
+  @ApiPropertyOptional()
+  readonly limit: number = ANALYTICS_TOP_N.DEFAULT;
 }
 
 /**
- * The export request
+ * The export request.
  *
  * A POST rather than the `GET /analytics/export` the endpoint plan names,
  * because it CREATES a job: a GET that writes a row and queues work is one that

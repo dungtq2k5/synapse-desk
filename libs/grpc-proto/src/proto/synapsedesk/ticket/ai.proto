@@ -67,7 +67,7 @@ message SuggestionResponse {
 
 message GetSuggestionsResponse {
   repeated SuggestionResponse items = 1;
-  // Carried through from rag-service `items` is the next-step
+  // Carried through from rag-service. `items` is the next-step
   // list this endpoint already produced; these are the articles beside it.
   repeated SuggestedArticleResponse articles = 2;
 }

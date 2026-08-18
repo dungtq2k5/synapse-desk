@@ -14,14 +14,9 @@ import baseConfig from '../../jest.config.base.ts';
  */
 const config: Config = {
   ...baseConfig,
-  /**
-   * ts-jest, PLUS the swagger plugin
-   *
-   * The base config's transform is redeclared here rather than spread-and-patched
-   * because it is a nested object: `...baseConfig` copies the reference, so
-   * mutating it would silently add the transformer to every other workspace's
-   * runs too.
-   */
+  // ts-jest, PLUS the swagger plugin. REDECLARED rather than spread-and-patched:
+  // `transform` is a nested object, so `...baseConfig` copies the reference and
+  // mutating it would add the transformer to every other workspace's runs too.
   transform: {
     '^.+\\.(t|j|mj)s$': [
       'ts-jest',

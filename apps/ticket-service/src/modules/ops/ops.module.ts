@@ -22,13 +22,13 @@ import { AnalyticsModule } from '../analytics/analytics.module';
  * **ticket-service owns three things and checks exactly those three**: its
  * Postgres, NATS, and the Redis its BullMQ queues run on. It calls auth-service
  * on nearly every write and auth-service is deliberately NOT here — that is the
- * rule §2 exists to state, and it is the one that decays first, because "we
+ * rule this exists to state, and it is the one that decays first, because "we
  * depend on it, so check it" always sounds like diligence. It is how one
  * database failure becomes a cluster-wide not-ready.
  *
  * The Redis probe goes through the SCHEDULER queue's existing client rather
  * than a new connection: a probe every five seconds that dials is a connection
- * leak with a schedule (§2 test 4).
+ * leak with a schedule.
  */
 @Module({
   imports: [

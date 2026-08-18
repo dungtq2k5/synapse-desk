@@ -14,8 +14,8 @@ import { PermissionGuard } from '../../common/guards/permission.guard';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ResponseMessage } from '../../common/decorators/response-message.decorator';
-import { SessionsGrpcClient } from './sessions-grpc.client';
-import { SessionResponseDto } from './dto/rest/session.dto';
+import { SessionsService } from './sessions.service';
+import { SessionResponseDto } from './dto/rest/session-response.dto';
 import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AUTH_SCHEMES } from '../../common/config/swagger.config';
 import {
@@ -39,7 +39,7 @@ import {
 @Controller('users/:userId/sessions')
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class UserSessionsController {
-  constructor(private readonly sessionsGrpcClient: SessionsGrpcClient) {}
+  constructor(private readonly sessions: SessionsService) {}
 
   @ApiOperation({ summary: 'List invitations' })
   @ApiWrappedResponse(SessionResponseDto, { isArray: true })
@@ -50,7 +50,7 @@ export class UserSessionsController {
     @CurrentUser() context: RequestContext,
     @Param('userId', ParseUUIDPipe) userId: string,
   ): Promise<SessionResponseDto[]> {
-    return this.sessionsGrpcClient.listForUser(userId, context);
+    return this.sessions.listForUser(userId, context);
   }
 
   /**
@@ -69,6 +69,6 @@ export class UserSessionsController {
     @CurrentUser() context: RequestContext,
     @Param('userId', ParseUUIDPipe) userId: string,
   ): Promise<{ revokedCount: number }> {
-    return this.sessionsGrpcClient.revokeForUser(userId, context);
+    return this.sessions.revokeForUser(userId, context);
   }
 }

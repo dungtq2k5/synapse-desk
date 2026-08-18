@@ -8,20 +8,20 @@ import { PrismaService } from './prisma.service';
  *
  * Like ticket-service's, this seeds no ROWS — Domain C has no reference data.
  * What it applies is the five indexes `schema.prisma` cannot express, and two
- * of them are not optimisations:
+ * of them are not optimizations:
  *
  *   - `documents_org_hash_key` is the PER-TENANT dedup rule. A plain
  *     `@@unique([organizationId, fileHash])` would survive a soft delete and
  *     block re-uploading a document you had deleted; the partial index releases
  *     the slot, which is the whole reason it is partial.
  *   - `document_chunks_fts_idx` is the lexical retrieval arm's index, and it is
- * COMPOSITE for a security-adjacent reason: tenant filtering
+ *     COMPOSITE for a security-adjacent reason: tenant filtering
  *     must happen BEFORE text matching. A GIN index on the tsvector alone
  *     matches text across every tenant's chunks and filters afterwards — not a
  *     leak, but a query that degrades exactly as the corpus grows.
  *
  * All idempotent (`IF NOT EXISTS`), so running on every boot is safe and so is
- * running concurrently across replicas: `CREATE ... IF NOT EXISTS` has no
+ * running concurrently across replicas: `CREATE... IF NOT EXISTS` has no
  * read-then-write race to lose.
  */
 @Injectable()
@@ -57,7 +57,7 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
   /**
    * Fail with an ACTIONABLE message when the database has no schema at all.
    *
-   * Without this the first statement of the seed is a raw `CREATE INDEX ... ON
+   * Without this the first statement of the seed is a raw `CREATE INDEX... ON
    * documents`, so an unpushed database reports `relation "documents" does not
    * exist` from inside a helper — a symptom that reads like a seeder bug and
    * takes a stack trace to trace back to the real cause, which is simply that
@@ -87,7 +87,7 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
   }
 
   /**
-   * The five indexes Prisma cannot express — §7.2 discipline.
+   * The five indexes Prisma cannot express.2 discipline.
    *
    * `pg_trgm` is deliberately absent: the lexical arm is full-text search, not
    * fuzzy matching, and adding an extension nothing queries would be one more

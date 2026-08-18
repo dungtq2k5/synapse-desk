@@ -18,7 +18,7 @@ export interface WsResponse<T = unknown> {
 }
 
 /**
- * What an ACK-based handler answers with
+ * What an ACK-based handler answers with.
  *
  * **A refusal must arrive in the ACK, not only as an `exception` frame.** The
  * ack is what lets the client clear its pending state, and a refused

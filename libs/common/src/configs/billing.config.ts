@@ -150,7 +150,7 @@ export enum BillingEventStatus {
  * Stripe subscription status → tenant lifecycle status.
  *
  * **The enum was designed before billing existed and maps onto Stripe's
- * statuses without modification** (RDM §1.15), which is why §0.4's lifecycle
+ * statuses without modification** (RDM §1.15), which is why the lifecycle
  * gate is the enforcement mechanism billing needed most and did not have to be
  * built. `incomplete` is deliberately absent: it means checkout has not
  * completed, and a tenant mid-checkout has whatever status they already had.

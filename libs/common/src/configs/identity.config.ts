@@ -1,5 +1,5 @@
 /**
- * Who is calling — JWT payload shapes, the caller context services act under,
+ * @file Who is calling — JWT payload shapes, the caller context services act under,
  * and the metadata keys that carry it across a service hop.
  *
  * The distinction this file exists to keep sharp: `JwtPayload` is what the
@@ -195,6 +195,10 @@ export const GRPC_CONTEXT_METADATA = {
  * an inline literal allocates on every call and is mutable, so anything
  * downstream could modify what the signature presents as a constant.
  */
+// `Object.freeze`, NOT `as const`. `as const` is erased at compile time: it
+// narrows the type and leaves the object mutable, so any consumer of this
+// SHARED value could still write to it and change what every other caller
+// sees. Freezing is the runtime half the annotation cannot provide.
 export const UNKNOWN_ORIGIN: Readonly<RequestOrigin> = Object.freeze({
   ip: '',
   userAgent: '',

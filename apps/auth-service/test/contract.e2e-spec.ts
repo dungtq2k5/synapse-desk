@@ -28,33 +28,22 @@ import { compareAlphabetically } from '@synapsedesk/common';
 import { AppModule } from '../src/app.module';
 
 /**
- * the cross-service gRPC contract test.
+ * The cross-service gRPC contract test.
  *
- * The one test with no equivalent in a single-process app, because this is the
- * one place a mocked peer hides the exact failure `GRPC_LOADER_OPTIONS`' own
- * docblock warns about: *"both ends must use these, or they disagree on the
- * wire."* Every other suite in this repo stubs one side or the other; here both
- * ends are real, and the connection between them is the thing under test.
+ * The one test with no equivalent in a single-process app: every other suite
+ * stubs one side or the other, and a mocked peer hides exactly what
+ * `GRPC_LOADER_OPTIONS` warns about — *"both ends must use these, or they
+ * disagree on the wire."* Here both ends are real.
  *
- * **What it asserts, and why that is enough.** For each RPC: the method is
- * REACHABLE (not `UNIMPLEMENTED`), the request SERIALISES, and the reply — a
- * response message or a gRPC error — DESERIALISES. It deliberately does not
- * care whether the business logic succeeded: a `NOT_FOUND` for an empty request
- * is a perfectly good outcome, because it means the request crossed the wire,
- * was decoded, reached a handler, and the handler's answer came back decoded.
- * The business rules are the per-module suites' job, with fixtures that make
- * them meaningful.
+ * **What it asserts.** For each RPC: the method is REACHABLE (not
+ * `UNIMPLEMENTED`), the request SERIALISES, and the reply — message or gRPC
+ * error — DESERIALISES. It does not care whether the business logic succeeded;
+ * a `NOT_FOUND` for an empty request means the request crossed the wire, was
+ * decoded, reached a handler, and the answer came back decoded.
  *
  * **The method list comes from the PROTOS**, read through the same
- * `@grpc/proto-loader` the runtime uses — not from a hand-written array. A new
- * RPC is therefore covered the moment it is declared, which is precisely when
- * the mistake this test catches gets made.
- *
- * Two failures it is built to catch:
- *   - a proto regenerated on one side and not the other -> `UNIMPLEMENTED`, or
- *     a decode error naming the field that moved;
- *   - a loader option that drifts between the two peers -> the mismatch shows
- *     up as a serialisation failure rather than as silently wrong values.
+ * `@grpc/proto-loader` the runtime uses — so a new RPC is covered the moment it
+ * is declared, which is when the mistake this catches gets made.
  */
 describe('gRPC wire contract (e2e)', () => {
   let app: INestMicroservice;
@@ -494,7 +483,7 @@ describe('ops surface over gRPC (e2e)', () => {
   }, 30_000);
 
   it('4. **`GetVersion` answers on the port this service already has**', async () => {
-    // Served from EVERY service, not just the gateway A rolling
+    // Served from EVERY service, not just the gateway. A rolling
     // deploy where one service lagged is precisely the state this diagnoses,
     // and a gateway-only version endpoint would report the new SHA while the
     // peer running the old code is the one causing the incident.

@@ -22,13 +22,10 @@ import { InAppNotificationService } from '../../src/modules/in-app/in-app-notifi
 import { AuthReferenceService } from '../../src/modules/auth-client/auth-reference.service';
 import { EmailService } from '../../src/modules/email/email.service';
 
-const ORG = '11111111-1111-4111-8111-111111111111';
-const ME = '22222222-2222-4222-8222-222222222222';
-
 /**
  * Preferences and quiet hours.
  *
- * **The section most likely to be deferred and least safe to defer.** §3 turns
+ * **The section most likely to be deferred and least safe to defer.** The producers turn
  * on the volume; this is the only thing that lets a user survive it, and a user
  * who disables notifications in week one is not recovered by shipping
  * preferences in week three.
@@ -37,7 +34,7 @@ const ME = '22222222-2222-4222-8222-222222222222';
  * notified"* is unanswerable without one, and it is the single most common
  * support question this feature will generate.
  */
-describe('§4 Preferences and quiet hours (e2e)', () => {
+describe('Preferences and quiet hours (e2e)', () => {
   let fx: E2eFixture;
   let resolver: PreferenceResolver;
   let preferences: PreferencesService;
@@ -45,6 +42,9 @@ describe('§4 Preferences and quiet hours (e2e)', () => {
 
   let listPermissionHolders: jest.SpyInstance;
   let sendEmail: jest.SpyInstance;
+
+  const ORG = '11111111-1111-4111-8111-111111111111';
+  const ME = '22222222-2222-4222-8222-222222222222';
 
   const me = () => memberContext({ id: ME, organizationId: ORG });
 
@@ -309,7 +309,7 @@ describe('§4 Preferences and quiet hours (e2e)', () => {
 
     it('10. REFUSES the WEBHOOK channel, which controls nothing', async () => {
       // In the enum for completeness and deliberately unimplemented (
-      // §8). A preference for it would be a switch wired to nothing.
+      // It is deferred, so a preference for it would be a switch wired to nothing.
       await expectRpc(
         preferences.update(
           {

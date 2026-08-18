@@ -25,9 +25,9 @@ import { QuotaCounterService } from '../../src/modules/ai-ledger/quota-counter.s
 import { AuthReferenceService } from '../../src/modules/auth-client/auth-reference.service';
 import { faultInjector } from '@synapsedesk/common/testing/fault';
 
-describe('§2.3, §4 The fan-out and the scheduled jobs (e2e)', () => {
+describe('The fan-out and the scheduled jobs (e2e)', () => {
   // Every injected fault in this file is registered here and restored in an
-  // `afterEach` that runs whether the test passed, failed or threw
+  // `afterEach` that runs whether the test passed, failed or threw.
   const faults = faultInjector();
 
   let fx: E2eFixture;
@@ -87,7 +87,7 @@ describe('§2.3, §4 The fan-out and the scheduled jobs (e2e)', () => {
     await fx.close();
   });
 
-  describe('§2.3 the scope fan-out', () => {
+  describe('The scope fan-out', () => {
     it('1. Re-scopes EVERY chunk row, not just the first page', async () => {
       // A document with more chunks than one page is the ordinary case, and a
       // loop that stopped early would leave the tail at the OLD scope —
@@ -252,7 +252,7 @@ describe('§2.3, §4 The fan-out and the scheduled jobs (e2e)', () => {
     });
   });
 
-  describe('§2.3 the reconciler queue', () => {
+  describe('The reconciler queue', () => {
     it('6. Actually QUEUES a job — the enqueue failure is swallowed by design', async () => {
       // This test exists because the swallow hid a real bug: BullMQ rejects a
       // custom job id containing `:`, the id was built from an ISO timestamp,
@@ -320,7 +320,7 @@ describe('§2.3, §4 The fan-out and the scheduled jobs (e2e)', () => {
     });
   });
 
-  describe('§4.1 the chunk-usage projection', () => {
+  describe('The chunk-usage projection', () => {
     const ledgerRow = async (
       retrieved: string[],
       cited: string[],
@@ -391,7 +391,7 @@ describe('§2.3, §4 The fan-out and the scheduled jobs (e2e)', () => {
     });
   });
 
-  describe('§4.2 document flags', () => {
+  describe('Document flags', () => {
     it('8. Flags a never-retrieved document as UNRETRIEVED', async () => {
       await documentWithChunks(2);
 
@@ -478,7 +478,7 @@ describe('§2.3, §4 The fan-out and the scheduled jobs (e2e)', () => {
     });
   });
 
-  describe('§4.3 the DISCARDED sweep', () => {
+  describe('The DISCARDED sweep', () => {
     const draft = async (createdAt: Date, overrides = {}) => {
       return fx.prisma.aiGeneration.create({
         data: {
@@ -551,7 +551,7 @@ describe('§2.3, §4 The fan-out and the scheduled jobs (e2e)', () => {
     });
   });
 
-  describe('§4.4 quota reconciliation', () => {
+  describe('Quota reconciliation', () => {
     it('17. CONVERGES a counter that drifted from the ledger', async () => {
       // The actual invariant. An earlier draft asserted counter and SUM()
       // always agree, which directly contradicts `record()` swallowing
@@ -641,7 +641,7 @@ describe('§2.3, §4 The fan-out and the scheduled jobs (e2e)', () => {
      * **A single-tenant test passes against the broken version**, which is why
      * these use two tenants with genuinely different cycles.
      */
-    describe('20-doc §3.1 — every tenant against its OWN cycle', () => {
+    describe('every tenant against its OWN cycle', () => {
       const OTHER_CYCLE = new Date(CYCLE_START.getTime() + 10 * 24 * HOUR);
 
       const spend = (organizationId: string, micros: bigint, at: Date) =>

@@ -14,20 +14,20 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionGuard } from '../../common/guards/permission.guard';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { DocumentsGrpcClient } from './documents-grpc.client';
-import { DocumentResponseGqlDto } from './dto/graphql/document-response.gql-dto';
-import { DocumentPageGqlDto } from './dto/graphql/document-page.gql-dto';
-import { UserSummaryGqlDto } from '../users/dto/graphql/user-summary.gql-dto';
+import { DocumentsService } from './documents.service';
+import {
+  DocumentResponseGqlDto,
+  DocumentPageResponseGqlDto,
+} from './dto/graphql/document-response.gql-dto';
+import { UserSummaryResponseGqlDto } from '../users/dto/graphql/user-response.gql-dto';
 import { DepartmentResponseGqlDto } from '../departments/dto/graphql/department-response.gql-dto';
 import { PageArgsGqlDto } from '../../common/dto/graphql/page-args.gql-dto';
-import { toPageQuery } from '../../common/mappers/pagination.mapper';
+import { toPageQuery } from '../../common/graphql/page-query';
 import type { GqlContext } from '../../common/graphql/loaders/loaders.factory';
-import { toUserSummaryGqlDto } from '../users/user.mapper';
-import { toDepartmentResponseGqlDto } from '../departments/department.mapper';
 import { MAX_EDGE_LIST } from '../../common/config/graphql-limits.config';
 
 /**
- * `Query.document`, `Query.documents` and the document edges
+ * `Query.document` and the document edges
  *
  * The department boundary is ingestion-service's, applied inside the same call
  * the REST route makes: a document scoped to a department is invisible outside
@@ -36,7 +36,7 @@ import { MAX_EDGE_LIST } from '../../common/config/graphql-limits.config';
 @Resolver(() => DocumentResponseGqlDto)
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class DocumentsResolver {
-  constructor(private readonly documents: DocumentsGrpcClient) {}
+  constructor(private readonly documents: DocumentsService) {}
 
   @Query(() => DocumentResponseGqlDto, {
     nullable: true,
@@ -56,7 +56,7 @@ export class DocumentsResolver {
     }
   }
 
-  @Query(() => DocumentPageGqlDto, {
+  @Query(() => DocumentPageResponseGqlDto, {
     // **Named explicitly**, because the METHOD cannot be called `documents`:
     // the constructor property already is, and a class cannot have both. The
     // schema must not inherit that collision — `documents_` would be the field
@@ -68,26 +68,37 @@ export class DocumentsResolver {
   async documentPage(
     @Args() args: PageArgsGqlDto,
     @CurrentUser() context: RequestContext,
-  ): Promise<DocumentPageGqlDto> {
-    return await this.documents.list(toPageQuery(args), context);
+  ): Promise<DocumentPageResponseGqlDto> {
+    return await this.documents.list(
+      {
+        ...toPageQuery(args),
+
+        // Not negotiable from this surface, the same rule `users.resolver.ts`
+        // states: the REST route gates `includeDeleted` on `document.delete`
+        // inside the controller, and re-deriving that check in a resolver would
+        // be a second implementation of a permission rule.
+        includeDeleted: false,
+      },
+      context,
+    );
   }
 
   /** `Document.createdBy` — the uploader. */
-  @ResolveField(() => UserSummaryGqlDto, {
+  @ResolveField(() => UserSummaryResponseGqlDto, {
     nullable: true,
     description: 'Who uploaded this document.',
   })
   async createdBy(
     @Parent() document: DocumentResponseGqlDto,
     @Context() { loaders }: GqlContext,
-  ): Promise<UserSummaryGqlDto | null> {
+  ): Promise<UserSummaryResponseGqlDto | null> {
     if (!document.createdById) return null;
 
-    return toUserSummaryGqlDto(await loaders.users.load(document.createdById));
+    return await loaders.users.load(document.createdById);
   }
 
   /**
-   * The flat count beside the capped edge See
+   * The flat count beside the capped edge. See
    * `UsersResolver.departmentCount` for why it is a field rather than a
    * `totalCount` on the connection.
    */
@@ -129,15 +140,9 @@ export class DocumentsResolver {
       ids.slice(0, MAX_EDGE_LIST),
     );
 
-    return departments
-      .map((department) =>
-        department instanceof Error
-          ? null
-          : toDepartmentResponseGqlDto(department),
-      )
-      .filter(
-        (department): department is DepartmentResponseGqlDto =>
-          department !== null,
-      );
+    return departments.filter(
+      (department): department is DepartmentResponseGqlDto =>
+        department !== null && !(department instanceof Error),
+    );
   }
 }

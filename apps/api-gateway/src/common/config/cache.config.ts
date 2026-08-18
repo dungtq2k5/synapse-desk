@@ -15,14 +15,23 @@ export const CACHE_SCOPES = {
   documents: 'documents',
   tickets: 'tickets',
   users: 'users',
-  /** The AI settings and tier */
+  /** The AI settings and tier. */
   settings: 'settings',
 } as const;
 
 export type CacheScope = (typeof CACHE_SCOPES)[keyof typeof CACHE_SCOPES];
 
 /**
- * The scope for ONE cached entity
+ * The entities that get a cache scope of their own.
+ *
+ * Named because two places take it — {@link entityScope} and
+ * `entityFromParam` — and a second inline `'user' | 'department'` is one that
+ * stops matching the moment a third entity is added.
+ */
+export type EntityScopeKind = 'user' | 'department';
+
+/**
+ * The scope for ONE cached entity.
  *
  * `entity:user:abc` rather than a `entity:user` scope with an `id` parameter,
  * and the difference is what makes eviction work at two granularities with one
@@ -37,11 +46,11 @@ export type CacheScope = (typeof CACHE_SCOPES)[keyof typeof CACHE_SCOPES];
  * The precise form is the one a mutation uses. The coarse one is there for the
  * day something changes users in bulk.
  */
-export const entityScope = (kind: 'user' | 'department', id: string): string =>
+export const entityScope = (kind: EntityScopeKind, id: string): string =>
   `entity:${kind}:${id}`;
 
 /**
- * How long a cached entity lives
+ * How long a cached entity lives.
  *
  * **The TTL is the backstop, not the mechanism.** Every writer of a
  * `UserSummary`'s fields is a gateway mutation (`updateOwnProfile`,

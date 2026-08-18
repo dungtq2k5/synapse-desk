@@ -60,7 +60,7 @@ export class NotificationsController {
   }
 
   /**
-   * The subscriber this subject did not have
+   * The subscriber this subject did not have.
    *
    * `IN_APP_NOTIFICATION_PATTERN` was published to from the moment the quota
    * alert existed, on the same reasoning that had `audit.record` emitting
@@ -79,7 +79,7 @@ export class NotificationsController {
       // Dropped rather than guessed at. An audience of "everyone" is the one
       // interpretation a malformed command must never receive — and a missing
       // `type` would produce a row no preference can ever silence (
-      // §1.3), which is worse than no row at all.
+      // Which is worse than no row at all.
       this.logger.error(
         `${IN_APP_NOTIFICATION_PATTERN} arrived without a tenant, a type or an audience`,
       );

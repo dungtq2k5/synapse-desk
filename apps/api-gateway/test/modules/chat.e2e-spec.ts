@@ -17,14 +17,14 @@ import { wireCreatedMessage, wirePage, wireTicket } from '../fixtures/wire';
 import { StartConversationDto } from 'apps/api-gateway/src/modules/chat/dto/rest/chat.dto';
 
 /**
- * §2.7 Self-service chat — proving it is a WRAPPER, not a second implementation.
+ * Self-service chat — proving it is a WRAPPER, not a second implementation.
  *
  * Almost every assertion here is of the form "the chat route forwarded the same
  * request the tickets route would have". That is the only thing worth testing
  * about this module: it has no logic of its own, and the failure mode it exists
  * to prevent is somebody adding some.
  */
-describe('§2.7 Self-service chat at the HTTP boundary (e2e)', () => {
+describe('Self-service chat at the HTTP boundary (e2e)', () => {
   let fx: E2eFixture;
 
   const conversationId = faker.string.uuid();
@@ -133,7 +133,7 @@ describe('§2.7 Self-service chat at the HTTP boundary (e2e)', () => {
     });
 
     it('8. produces a request IDENTICAL to POST /tickets but for the source', async () => {
-      // §2.7 test 1, stated directly: "indistinguishable from a direct
+      // Stated directly: "indistinguishable from a direct
       // POST /tickets except for that field".
       fx.stubs.ticket.createTicket.mockReturnValue(of(wireTicket()));
 
@@ -242,7 +242,7 @@ describe('§2.7 Self-service chat at the HTTP boundary (e2e)', () => {
 
   describe('POST /chat/conversations/:id/escalate', () => {
     it('1. is a literal ALIAS — same RPC, same request', async () => {
-      // §2.7 test 2. Re-deriving the transition here would give chat its own
+      // Re-deriving the transition here would give chat its own
       // escalation semantics, and the first divergence would be a ticket that
       // escalated without an `escalated_at`.
       fx.stubs.ticket.escalateTicket.mockReturnValue(

@@ -1,6 +1,7 @@
 import { getQueueToken } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import {
+  compareAlphabetically,
   InvitationStatus,
   JobHealthService,
   JobRunRecorder,
@@ -30,7 +31,7 @@ import { SchedulerRegistrar } from '../../src/modules/scheduler/scheduler.regist
  * These jobs also had NO tests before this file — a `@Cron` can only be tested
  * by waiting, which is the second reason the decorator had to go.
  */
-describe('§3.2 The scheduler (e2e)', () => {
+describe('The scheduler (e2e)', () => {
   let fx: E2eFixture;
   let processor: SchedulerProcessor;
   let registrar: SchedulerRegistrar;
@@ -83,11 +84,11 @@ describe('§3.2 The scheduler (e2e)', () => {
       const repeats = await queue.getJobSchedulers();
 
       expect(repeats).toHaveLength(2);
-      expect(repeats.map((r) => r.key).sort()).toEqual(
+      expect(repeats.map((r) => r.key).sort(compareAlphabetically)).toEqual(
         [
           repeatJobId(SCHEDULED_JOBS.AUTH_DAILY),
           repeatJobId(SCHEDULED_JOBS.AUTH_HOURLY),
-        ].sort(),
+        ].sort(compareAlphabetically),
       );
     });
   });
@@ -162,7 +163,7 @@ describe('§3.2 The scheduler (e2e)', () => {
   });
 
   describe('the heartbeat', () => {
-    it('7. a run records last_succeeded_at — 20-doc §4.1', async () => {
+    it('7. a run records last_succeeded_at', async () => {
       await runJob(SCHEDULED_JOBS.AUTH_HOURLY);
 
       const row = await fx.prisma.jobRun.findUniqueOrThrow({
@@ -178,7 +179,7 @@ describe('§3.2 The scheduler (e2e)', () => {
       // That was the mechanism by which the shared queue silently deleted runs:
       // every service received its neighbours' jobs and marked them complete.
       //
-      // With one queue per service an unrecognised name can only be a repeat
+      // With one queue per service an unrecognized name can only be a repeat
       // entry from an older deploy, which is a defect worth seeing in `failed`.
       await expect(runJob('auth-weekly-from-2024')).rejects.toThrow(
         "Unknown scheduled job 'auth-weekly-from-2024'",
@@ -207,7 +208,7 @@ describe('§3.2 The scheduler (e2e)', () => {
    * only what is local: that a run recorded through the injected recorder lands
    * in this service's own database, in the same failure domain as the work.
    */
-  describe('§4.5 the shared recorder is bound to THIS database', () => {
+  describe('The shared recorder is bound to THIS database', () => {
     it('9. a tracked run writes a row readable through this service’s Prisma', async () => {
       const recorder = fx.moduleRef.get(JobRunRecorder);
 

@@ -21,7 +21,7 @@ export type Env = {
   /** Where the gateway serves the webhook. */
   WEBHOOK_URL: string;
   /**
-   * Where the gateway presigns attachment uploads
+   * Where the gateway presigns attachment uploads.
    *
    * A sibling of `WEBHOOK_URL` rather than derived from it: deriving would
    * assume the two always share a prefix, and a deployment that serves them
@@ -59,7 +59,7 @@ export default {
   async email(message: EmailMessage, env: Env): Promise<void> {
     const parsed = await PostalMime.parse(message.raw);
 
-    // **The attachments go to storage BEFORE the webhook**
+    // **The attachments go to storage BEFORE the webhook**.
     //
     // The bytes travel from here straight to the bucket and never reach an
     // application server, which is the property the presign flow exists to
@@ -73,7 +73,7 @@ export default {
     // this existed.
     const { uploaded, dropped } = await uploadAttachments(message, parsed, env);
 
-    // **Serialize ONCE, sign that, send that**
+    // **Serialize ONCE, sign that, send that**.
     //
     // Signing a re-serialized copy is the Stripe raw-body trap in a new
     // costume: key order or whitespace differs, the digest differs, and every
@@ -92,7 +92,7 @@ export default {
       body,
     });
 
-    // **Do not swallow this** A Worker that catches and returns
+    // **Do not swallow this**. A Worker that catches and returns
     // success loses the mail; throwing makes Cloudflare retry, and the
     // gateway's `(organization_id, message_id)` dedup is what makes that retry
     // safe rather than duplicating a ticket.
@@ -143,12 +143,12 @@ export function buildPayload(
     // re-run on failure, and each run stamps a new one.
     date: message.headers.get('date') ?? undefined,
     references: splitReferences(parsed.references),
-    // **Only the two loop headers** They are invisible once the
+    // **Only the two loop headers**. They are invisible once the
     // body is parsed, and they are what stop an auto-responder and this system
     // replying to each other forever. Read from the ENVELOPE headers rather
     // than the parsed set: Cloudflare gives them verbatim.
     headers: loopHeaders(message.headers),
-    // **What the gateway agreed to store**, already in the bucket
+    // **What the gateway agreed to store**, already in the bucket.
     // Only paths travel; the bytes went direct.
     attachments: uploaded.map(({ objectPath, fileName }) => ({
       objectPath,
@@ -164,7 +164,7 @@ export function buildPayload(
 }
 
 /**
- * Presigns, PUTs, and reports what did not make it
+ * Presigns, PUTs, and reports what did not make it.
  *
  * **The gateway decides eligibility, not this Worker.** It is told which files
  * it may store and where; the allowlist, the size cap and the per-message

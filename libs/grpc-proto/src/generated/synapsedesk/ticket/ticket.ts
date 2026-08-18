@@ -24,8 +24,8 @@ export interface CreateTicketRequest {
     | string
     | undefined;
   /**
-   * The inbound email's `Message-ID`, when this write came from mail — 31-doc
-   * §6.2. Written as an `inbound_emails` row in the SAME transaction, so a
+   * The inbound email's `Message-ID`, when this write came from mail
+   * Written as an `inbound_emails` row in the SAME transaction, so a
    * provider redelivery is a duplicate-key violation rather than a second
    * ticket. Absent for every other transport, and absent is not an error.
    */
@@ -115,7 +115,7 @@ export interface BulkTicketStatusResponse {
 
 /**
  * ---------------------------------------------------------------------------
- * `ListXByIds` — the contract behind every DataLoader (27-doc §1).
+ * `ListXByIds` — the contract behind every DataLoader.
  *
  * Six properties, and five of them are things DataLoader depends on:
  *
@@ -131,7 +131,7 @@ export interface BulkTicketStatusResponse {
  *   5. BATCH SIZE CAPPED, and the cap is an ERROR rather than a truncation —
  *      truncation is indistinguishable from missing data.
  *   6. ORDER IS NOT GUARANTEED. The response is a SET; the caller maps it back
- *      onto its keys (27-doc §2), because a database returns `WHERE id IN
+ * onto its keys, because a database returns `WHERE id IN
  *      ('c','a','b')` as a, b, c and handing that straight to DataLoader
  *      renders the wrong entity against every key.
  *

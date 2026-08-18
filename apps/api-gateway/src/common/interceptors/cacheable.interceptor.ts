@@ -20,7 +20,7 @@ import {
 } from '../decorators/cacheable.decorator';
 
 /**
- * Serves `@Cacheable` reads from Redis
+ * Serves `@Cacheable` reads from Redis.
  *
  * **Written rather than subclassed from `CacheInterceptor`.** `@nestjs/cache-manager`'s
  * default key is the request URL, which carries no tenant: `GET /roles` would
@@ -52,7 +52,7 @@ export class CacheableInterceptor implements NestInterceptor {
     // returns an EMPTY OBJECT under GraphQL rather than throwing, which is how
     // five guards in this gateway silently stopped working. A global
     // interceptor must check, not assume.
-    const request: Request | undefined = context.switchToHttp().getRequest();
+    const request = context.switchToHttp().getRequest<Request | undefined>();
 
     if (request?.method !== 'GET') return next.handle();
 
@@ -87,39 +87,22 @@ export class CacheableInterceptor implements NestInterceptor {
 /**
  * A stable digest of what the caller is allowed to SEE.
  *
- * **Visibility, not identity.** Keying on `sub` would give every user their own
- * entry and collapse the hit rate to nothing; keying on the department set
- * means two agents in the same departments share one, which is exactly the
- * granularity `visibilityScope` filters at in ingestion-service.
+ * Keys on the department set, not on `sub`: two agents in the same departments
+ * share one entry, which is the granularity `visibilityScope` filters at.
+ * Sorted before hashing because a department list is a SET, and hashed so a user
+ * in fifty departments does not produce a two-kilobyte key. Truncation is safe —
+ * the tenant segment is the boundary, so a collision can only merge two
+ * department sets within one tenant.
  *
- * Sorted before hashing, because a department list is a SET — an id order that
- * varies between tokens would split one audience into several entries.
+ * **This must mirror `DocumentsService.visibilityScope` in ingestion-service.**
+ * They are a pair: this decides who SHARES an answer, that decides what the
+ * answer CONTAINS. They drift by someone widening the filter and not the digest,
+ * and the symptom is a cached answer shown to a caller the filter would have
+ * narrowed.
  *
- * Hashed rather than inlined so a user in fifty departments does not produce a
- * two-kilobyte Redis key. Truncated because this is a cache discriminator, not
- * a security boundary — the tenant segment is the boundary, and a collision
- * here can only merge two department sets WITHIN one tenant.
- *
- * **No freshness problem beyond the one that already exists:** `departmentIds`
- * comes from the caller's JWT, and the uncached path filters on the same claim.
- * A user removed from a department keeps their old view until the token
- * refreshes either way.
- *
- * ---
- *
- * **This must mirror `DocumentsService.visibilityScope` in ingestion-service**,
- * which is the only other place caller visibility is computed.
- * The two are a pair and only one of them looks like it is about security: this
- * one decides who SHARES an answer, that one decides what the answer CONTAINS.
- * They drift by someone widening the filter and not the digest, and the symptom
- * is a cached answer shown to a caller the filter would have narrowed.
- *
- * **If a permission ever affects a cached read's result set, it belongs here
- * too.** Today none does — `roles`, `departments`, `organizations` and
- * `permissions` are tenant-wide, and `/departments`'s one permission-dependent
- * parameter is enforced by `QueryPermissionGuard` before this interceptor runs
- * rather than by narrowing rows. A `document.read.all`-style grant would change
- * that, and today's digest would serve the broader view to the narrower caller.
+ * **If a permission ever affects a cached read's result set, add it here.**
+ * None does today; a `document.read.all`-style grant would change that, and
+ * today's digest would serve the broader view to the narrower caller.
  */
 function visibilityDigest(caller: RequestContext): string {
   const material = caller.isSuperAdmin

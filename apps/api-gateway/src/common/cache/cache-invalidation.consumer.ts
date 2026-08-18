@@ -10,41 +10,25 @@ import { CacheService } from './cache.service';
 import { CACHE_SCOPES } from '../config/cache.config';
 
 /**
- * Cache eviction driven by domain events
+ * Cache eviction driven by domain events.
  *
- * **This is the mechanism; `@InvalidateCache` is the fast path.** A decorator on
- * a gateway route sees writes that went through this gateway, and a ticket
- * changes in at least four ways that did not: a `message:send` over
- * the WebSocket, the escalation side effects inside `ticket-service`, a
- * scheduled job, and another service writing through its own path. Shipping the
- * decorator alone would look complete and be silently partial — which is why
- * Invalidation and the cached read must land together.
+ * This is the mechanism; `@InvalidateCache` is the fast path. A decorator only
+ * sees writes that went through this gateway, and a ticket changes in ways that
+ * did not — a `message:send` over the WebSocket, escalation side effects inside
+ * `ticket-service`, a scheduled job, another service writing its own path.
  *
- * > Redis is shared, so cross-INSTANCE invalidation is already free: a `del`
- * > from any gateway pod is global. What this solves is **origin fan-out** — a
- * > change the gateway never saw.
+ * Redis is shared, so cross-INSTANCE invalidation is already free. What this
+ * solves is **origin fan-out**: a change the gateway never saw.
  *
  * **Every handler is fire-and-forget and must never throw.** A failed
  * invalidation costs one stale entry until its TTL; an unhandled rejection in a
- * NATS handler takes the process down. That is the same rule
- * `ticket-events.consumer.ts` already applies to relaying, and the reason both
- * of them wrap the body rather than trusting it.
+ * NATS handler takes the process down.
  *
- * ---
- *
- * **On what is NOT here.** An earlier design listed `user.*` events, and there are
- * none — auth-service publishes audit records, billing entitlements,
- * notifications and storage supersessions, and nothing about users. That is not
- * a gap to fill: every writer of a user's name or avatar is a gateway mutation
- * (`updateOwnProfile`, `updateUser`, `confirmAvatarUpload`, `deleteAvatar`), so
- * the decorator IS precise invalidation there rather than a fallback, and
- * publishing a `user.*` contract now would mean a contract with no publisher.
- * Departments are the same shape: `PATCH /departments/:id` is the only writer.
- *
- * **What changes that answer** is a non-gateway writer of `fullName` or
- * `avatarUrl` — a SCIM sync, a directory import, an admin tool talking to
- * auth-service directly. On the day one appears, the users and departments
- * scopes need the contract, and this class is where the subscription goes.
+ * **There is deliberately no `user.*` subscription.** Every writer of a user's
+ * name or avatar is a gateway mutation, so the decorator is precise
+ * invalidation there rather than a fallback. Departments are the same shape.
+ * That answer changes the day a non-gateway writer appears — a SCIM sync, a
+ * directory import — and this class is where the subscription would go.
  */
 @Controller()
 export class CacheInvalidationConsumer {

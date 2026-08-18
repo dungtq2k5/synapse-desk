@@ -4,16 +4,13 @@
  * **The publisher is the Stripe webhook** — see
  * `docs/decisions/0026-stripe-webhook-idempotency.md`.
  *
- * The consumer exists because of the exact failure mode of
- * shipping the cache without it: a downgraded tenant keeps receiving the
- * premium model for the length of the cache TTL. That is the system giving away
- * the thing it just stopped being paid for — a failure in the direction that
- * costs money rather than the direction someone complains about, so nothing
- * surfaces it.
+ * Without the consumer, a downgraded tenant keeps receiving the premium model
+ * for the length of the cache TTL: the system giving away the thing it just
+ * stopped being paid for, in the direction that costs money rather than the
+ * direction someone complains about.
  *
- * Defined here rather than in the billing service so that when the webhook is
- * written it emits against a subject and a payload that already have a reader,
- * instead of inventing both and discovering the mismatch in staging.
+ * Defined here rather than in the billing service so the webhook emits against
+ * a subject and payload that already have a reader.
  */
 export const BILLING_PATTERNS = {
   /**

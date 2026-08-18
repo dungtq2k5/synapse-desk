@@ -2,7 +2,7 @@ import { createHmac } from 'node:crypto';
 import { generateInboundToken } from '@synapsedesk/common';
 
 /**
- * Recorded-shape payloads for the inbound-email webhook
+ * Recorded-shape payloads for the inbound-email webhook.
  *
  * **Built here rather than captured, for now.** The doc asks for payloads
  * recorded from a real Worker run, and it is right: a synthetic fixture agrees
@@ -30,9 +30,9 @@ export function plainEmail(overrides: Record<string, unknown> = {}) {
 }
 
 /**
- * Signs a payload the way the Worker does
+ * Signs a payload the way the Worker does.
  *
- * **Serialise once, sign that, send that.** Signing a re-serialised copy is the
+ * **Serialize once, sign that, send that.** Signing a re-serialized copy is the
  * Stripe raw-body trap in a new costume: key order or whitespace differs, the
  * digest differs, and every request fails in production while passing here.
  * Returning both the bytes and the signature is what makes that impossible to

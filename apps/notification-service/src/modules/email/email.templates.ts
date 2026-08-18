@@ -20,7 +20,7 @@ export type RenderedEmail = {
 };
 
 /**
- * Templates as functions rather than .hbs files on purpose: a templating engine
+ * Templates as functions rather than.hbs files on purpose: a templating engine
  * would need its files copied into `dist` via nest-cli assets config, and a
  * missing asset only fails at send time in production. These fail at compile
  * time instead, and the discriminated `SendEmailCommand` means each renderer can
@@ -279,7 +279,7 @@ function securityAlert(
 }
 
 /**
- * The one-time reply to mail this system refused
+ * The one-time reply to mail this system refused.
  *
  * **Says what to do, and does not say why in detail.** "Your address is not
  * permitted in this workspace" tells an outsider which tenants exist and who

@@ -69,7 +69,7 @@ export class OrganizationsService {
   }
 
   /**
-   * The tenant behind an inbound support address
+   * The tenant behind an inbound support address.
    *
    * **Absent rather than an exception for an unroutable token**, and the
    * distinction is load-bearing: the caller must drop unroutable mail with a
@@ -145,10 +145,10 @@ export class OrganizationsService {
   }
 
   /**
-   * Issues the tenant's inbound-mail token, or ROTATES an existing one
+   * Issues the tenant's inbound-mail token, or ROTATES an existing one.
    *
    * **One method for both, because they differ only in whether a row already
-   * had a value.** Rotation is one of the three properties §2 chose an opaque
+   * had a value.** Rotation is one of the three properties that motivated an opaque
    * token over a slug for — *an abused address can be rotated without touching
    * anything else* — and it is the property nothing could exercise until this
    * existed: the column was writable by hand-editing a row and by nothing else,
@@ -187,7 +187,7 @@ export class OrganizationsService {
   }
 
   /**
-   * Switches inbound mail off
+   * Switches inbound mail off.
    *
    * Sets NULL rather than deleting anything, which returns the tenant to the
    * state one that never enabled email is already in. Idempotent: revoking
@@ -473,7 +473,7 @@ export class OrganizationsService {
   }
 
   /**
-   * Tenant timezones, in BULK
+   * Tenant timezones, in BULK.
    *
    * **Service-to-service, with no actor.** The daily rollup jobs run across
    * every tenant that had activity, not on behalf of a caller, so the ids are a
@@ -514,7 +514,7 @@ export class OrganizationsService {
   }
 
   /**
-   * Every tenant's BILLING CYCLE START, in bulk
+   * Every tenant's BILLING CYCLE START, in bulk.
    *
    * **The read that makes per-tenant quota reconciliation possible.** The cycle
    * start differs per tenant, so a sweep that assumed one would reconcile
@@ -703,15 +703,15 @@ export class OrganizationsService {
    * Seats used: active members PLUS pending invitations.
    *
    * THE definition, owned here because a seat is an organization-level quota.
-   * It previously existed twice — once in InvitationsService and once in
-   * UsersService — which is how an invite gets rejected by a counter the usage
-   * page says has room.
+   * It previously existed twice — in InvitationsService and UsersService —
+   * which is how an invite gets rejected by a counter the usage page says has
+   * room.
    *
-   * Pending invitations reserve a seat (RDM): counting only active users
-   * would let an admin send 50 invites against 10 seats and blow the quota the
-   * moment they were accepted. Expiry is what releases a reservation.
+   * Pending invitations reserve a seat: counting only active users would let an
+   * admin send 50 invites against 10 seats and blow the quota the moment they
+   * were accepted. Expiry releases the reservation.
    *
-   * Takes a client rather than using `this.prisma` so a caller inside a
+   * Takes a client rather than using `this.prisma`, so a caller inside a
    * transaction counts through the same connection — otherwise the seat check
    * and the insert it guards see different snapshots.
    */

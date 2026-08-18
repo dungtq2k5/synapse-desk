@@ -21,7 +21,7 @@ import {
  * whole difference between a limit that protects the system and one that merely
  * annoys clients.
  */
-describe('§5 query complexity', () => {
+describe('Query complexity', () => {
   const cost = (query: string) => scoreDocument(parse(query));
 
   it('1. **a cross-service field scores higher than a scalar**', () => {
@@ -93,7 +93,7 @@ describe('§5 query complexity', () => {
     expect(CROSS_SERVICE_FIELDS.size).toBeGreaterThan(0);
   });
 
-  describe('§1.3 the list-default blind spot', () => {
+  describe('The list-default blind spot', () => {
     // The real schema, so the defaults are the ones clients actually meet.
     const schema = buildSchema(readFileSync(SCHEMA_PATH, 'utf8'));
     const defaults = listFieldDefaults(schema);
@@ -107,7 +107,7 @@ describe('§5 query complexity', () => {
       // resolver's `defaultValue` returned fifty.
       //
       // Sharp because of which field it is. `Ticket.messages` is also the one
-      // allowlisted direct gRPC call (§5), so `tickets(first: 50) { messages }`
+      // allowlisted direct gRPC call, so `tickets(first: 50) { messages }`
       // is fifty calls returning fifty rows each — the one sanctioned N+1 in
       // the system, under-priced by 50x.
       const omitted = priced('{ ticket(id: "x") { messages { id } } }');

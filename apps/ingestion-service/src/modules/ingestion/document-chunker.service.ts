@@ -48,33 +48,25 @@ const RECURSIVE_SEPARATORS = [
 ];
 
 /**
- * Markdown -> chunks, splitting on STRUCTURE first and length second
+ * Markdown -> chunks, splitting on STRUCTURE first and length second.
  *
- * The ordering is the whole design. Splitting purely by length cuts through the
- * middle of sections, so a chunk begins mid-sentence under no heading and the
- * citation it produces can only be a character offset. Splitting on headings
- * first means a chunk is a section, and "page 4, §2.1" is a fact about the
- * document rather than a computed position.
+ * The ordering is the design. Splitting purely by length cuts through the
+ * middle of sections, so a chunk begins mid-sentence under no heading and its
+ * citation can only be a character offset. Splitting on headings first makes a
+ * chunk a section, and "page 4, §2.1" a fact about the document.
  *
  * **The heading path is kept IN the chunk text, not only in metadata.** A
  * paragraph reading "this must be approved in advance" is ambiguous alone and
  * unambiguous under "Expense Policy › Travel" — and the embedding sees only the
- * text, so a heading held in a metadata column is invisible to the one
- * component that most needs it.
+ * text, so a heading held in a metadata column is invisible to the component
+ * that most needs it.
  *
- * **Pass 1 is ours; pass 2 is `RecursiveCharacterTextSplitter`**,
- * which states that heading extraction stays custom.
- *
- * `MarkdownHeaderTextSplitter` is the obvious candidate for pass 1 and is
- * **trap 5 of §3.2: it does not exist in `@langchain/textsplitters`**. It is a
- * Python-LangChain class; the JS package exports `CharacterTextSplitter`,
- * `LatexTextSplitter`, `MarkdownTextSplitter`, `RecursiveCharacterTextSplitter`,
- * `TextSplitter` and `TokenTextSplitter`. `MarkdownTextSplitter` is not a
- * substitute: it splits on markdown syntax without extracting the heading path,
- * which is the one thing that pass exists to produce.
- *
- * So the heading walk below stays, and the library does the length-bounded
- * splitting it is genuinely better at.
+ * **Pass 1 is ours; pass 2 is `RecursiveCharacterTextSplitter`.** Heading
+ * extraction stays custom because `MarkdownHeaderTextSplitter` — the obvious
+ * candidate — **does not exist in `@langchain/textsplitters`**; it is a
+ * Python-LangChain class. `MarkdownTextSplitter` is not a substitute: it splits
+ * on markdown syntax without extracting the heading path, which is the one
+ * thing that pass exists to produce.
  */
 @Injectable()
 export class DocumentChunkerService {
@@ -215,7 +207,7 @@ export class DocumentChunkerService {
 
 /**
  * Moves a stranded sentence terminator back onto the chunk it belongs to —
- * F2.
+ * The length-bounded second pass.
  *
  * **The one behaviour the library swap lost.** `RecursiveCharacterTextSplitter`
  * splits with a LOOKAHEAD, so a separator lands at the start of the *following*
@@ -234,7 +226,7 @@ export class DocumentChunkerService {
  * `keepSeparator: false` is not the fix: it deletes the period outright.
  *
  * All 12 pre-existing chunker tests passed through this regression because none
- * of them asserted it — which is why §3.5's test 3 exists.
+ * of them asserted it — which is why its test exists.
  */
 export function rebalanceSentenceEnds(pieces: string[]): string[] {
   const out = [...pieces];

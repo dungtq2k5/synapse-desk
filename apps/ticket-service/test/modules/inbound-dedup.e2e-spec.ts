@@ -21,7 +21,7 @@ import { MessagesService } from '../../src/modules/messages/messages.service';
  * the provider's retry a silent no-op — the mail lost on the one delivery that
  * could still have recovered it.
  */
-describe('§31 §6.2 inbound email dedup (e2e)', () => {
+describe('Inbound email dedup (e2e)', () => {
   let fx: E2eFixture;
   let tickets: TicketsService;
   let messages: MessagesService;

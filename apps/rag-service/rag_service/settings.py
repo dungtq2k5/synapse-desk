@@ -1,6 +1,6 @@
 """`settings_for(organization_id)` — **the only place this service names a model.**
 
-Doc 15 §1.2 states the rule and this module is the single exception: no model
+States the rule and this module is the single exception: no model
 name in a retrieval module, a prompt builder, a test fixture or a config read
 at a call site. The failure mode is quiet — a `"gemini-3.5-flash-lite"` typed into a
 generator is a tenant on the premium tier silently receiving the cheap model,
@@ -52,7 +52,7 @@ GENERATION_MODEL_BY_TIER: dict[AiModelTier, str] = {
 #:
 #: They are separate CONSTANTS because they answer different questions — one is
 #: a tier the tenant buys, the other is an internal volume call — and the tier
-#: §2.2 is explicit that the cheap call must not scale with the tier. Pointing
+#: The cheap call must not scale with the tier. Pointing
 #: both at one model is a pricing decision, not a merge: the moment a cheaper
 #: generation model exists, only this line moves.
 #:
@@ -69,7 +69,7 @@ CHEAP_MODEL = "gemini-3.5-flash-lite"
 #: Never tenant-varying and never tier-varying. A Qdrant collection fixes vector
 #: dimension at creation, so a per-tenant embedding model forces per-tenant
 #: collections and makes every tier change a full re-embed migration
-#:.
+#:
 EMBEDDING_MODEL = "gemini-embedding-2"
 
 ALL_CONFIGURED_MODELS: list[str] = [
@@ -91,7 +91,7 @@ RETRIEVAL_DEFAULTS: dict[str, float] = {
     "co_rag_max_retries": 0,
 }
 
-#: Server-side bounds on every numeric setting Applied whether
+#: Server-side bounds on every numeric setting. Applied whether
 #: or not tenants can currently set anything: an unclamped `final_context_k` is
 #: a direct path to enormous prompts and a blown budget, and the value that
 #: gets there does not have to arrive from a tenant. A bad default, a migration
@@ -114,12 +114,12 @@ class AiSettings:
     """What an AI request is allowed to know about models and retrieval.
 
     Note what is absent: no RPC takes a model name today, and none would once
-    tiers ship. That is the property keeping step 3 of doc 15's resolution
+    tiers ship. That is the property keeping step 3 of the resolution
     order — per-tenant overrides — additive rather than a refactor.
     """
 
     generation_model: str
-    """Resolved from the tier. The ONLY tier-varying value — doc 15 §2.2."""
+    """Resolved from the tier. The ONLY tier-varying value."""
 
     cheap_model: str
     lexical_weight: float
@@ -164,7 +164,7 @@ def as_ai_model_tier(value: str | None) -> AiModelTier:
 
 
 def resolve_ai_settings(tier: AiModelTier) -> AiSettings:
-    """Resolution steps 1 and 2 of doc 15 §1.1 — and in v1 there are only two.
+    """Resolution steps 1 and 2 — and in v1 there are only two.
 
     Pure and I/O-free, matching `resolveAiSettings` in TypeScript exactly. The
     caching, the tier lookup and the invalidation belong to the resolver
@@ -230,7 +230,7 @@ class AiSettingsResolver:
     def invalidate(self, organization_id: str) -> None:
         """Drops ONE tenant's cached settings.
 
-        One tenant, never all of them (doc 15 §1.4 test 4). Stripe webhooks
+        One tenant, never all of them. Stripe webhooks
         arrive in bursts — a plan change, an invoice and a subscription update
         within seconds — and a global flush on each would re-resolve every
         active tenant at once, at exactly the moment the system can least
@@ -264,7 +264,7 @@ class AiSettingsResolver:
         which is the difference between this being finished work and a stub.
         Every call site already goes through the mapping, so shipping the tier
         is replacing this method body — no caller moves, which is the claim
-        doc 15 §1.1 makes about the whole layer.
+        Makes about the whole layer.
         """
         _ = organization_id
         return DEFAULT_AI_MODEL_TIER

@@ -17,7 +17,7 @@ import {
 import { StorageService } from './storage.service';
 
 /**
- * Four methods. There is no delete — that is NATS-only (§1.6), and the absence
+ * Four methods. There is no delete — that is NATS-only, and the absence
  * is expressed in the proto so a contributor cannot add one here without first
  * noticing the contract has none to extend.
  */

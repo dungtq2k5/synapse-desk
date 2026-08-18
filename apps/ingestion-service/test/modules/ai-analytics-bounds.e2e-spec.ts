@@ -9,27 +9,20 @@ import {
 import { AiAnalyticsService } from '../../src/modules/analytics/ai-analytics.service';
 
 /**
- * The top-N bound on the gRPC side
+ * The top-N bound on the gRPC side.
  *
  * **This is the door with no `ValidationPipe` in front of it.** The gateway
- * DTOs reject an out-of-range `limit` before dialling, and that is tested at
- * the HTTP boundary — but these methods are reachable from any service over
- * gRPC, where nothing validated anything and proto3 sends `0` for a field the
- * caller omitted. `clampLimit` is the only thing standing between that and an
- * unbounded `take`.
+ * DTOs reject an out-of-range `limit` before dialling, but these methods are
+ * reachable from any service over gRPC — where nothing validates and proto3
+ * sends `0` for an omitted field. `clampLimit` is the only thing between that
+ * and an unbounded `take`.
  *
- * It went untested while the bound was written as three separate literals
- * (`1`/`100`/`20` in two gateway DTOs and again here). They are one constant
- * now, `ANALYTICS_TOP_N`, so a widened cap moves every door at once — and these
- * tests are what prove this door is one of them, rather than a fourth copy that
- * merely happens to agree today.
- *
- * The bounds are read FROM the constant deliberately. A literal `100` here
+ * The bounds are read FROM `ANALYTICS_TOP_N` deliberately. A literal `100` here
  * would assert that somebody once typed 100, which is not a property worth
  * protecting; what matters is that the service honours whatever the shared
  * constant says.
  */
-describe('§4 the AI analytics top-N bound (e2e)', () => {
+describe('The AI analytics top-N bound (e2e)', () => {
   let fx: E2eFixture;
   let analytics: AiAnalyticsService;
 

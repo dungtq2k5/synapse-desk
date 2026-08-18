@@ -36,7 +36,7 @@ export class TicketsArgsGqlDto {
   /**
    * How many tickets to return.
    *
-   * **Clamped server-side to {@link MAX_PAGE_SIZE}, not rejected**
+   * **Clamped server-side to {@link MAX_PAGE_SIZE}, not rejected**.
    * An unbounded list multiplies every nested field beneath it, but rejecting
    * `first: 500` makes the cap a breaking change for a client that worked
    * yesterday. Clamping keeps them working with less data than they asked for,

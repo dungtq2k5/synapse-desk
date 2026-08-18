@@ -69,26 +69,22 @@ export function isUniqueConstraintViolation(
 /**
  * Every place a P2002 might name its constraint. All of them are read.
  *
- * There are TWO shapes because Prisma reports this differently depending on how
- * the client talks to Postgres, and the difference is silent:
+ * Prisma reports this differently depending on how the client talks to
+ * Postgres, and the difference is silent:
  *
  *   - **Without a driver adapter**, `meta.target` carries the index name (raw
  *     SQL index) or a field-name array (Prisma-declared `@@unique`).
- *   - **With a driver adapter** — which is what this repo uses on Prisma 7 —
+ *   - **With a driver adapter** — what this repo uses on Prisma 7 —
  *     `meta.target` is ABSENT and the name appears only inside
- *     `meta.driverAdapterError.cause.originalMessage`, as
- *     `duplicate key value violates unique constraint "documents_org_hash_key"`.
+ *     `meta.driverAdapterError.cause.originalMessage`.
  *
- * Reading only `target` therefore made every raw-SQL-index check return false
- * under the adapter, which is how this was found: a partial unique index fired
- * correctly in Postgres, the service failed to recognise it, and a clean 409
- * surfaced as an unhandled 500. Exactly the failure mode the `instanceof` note
- * above describes, arriving by a second route.
+ * Reading only `target` made every raw-SQL-index check return false under the
+ * adapter: a partial unique index fired correctly in Postgres, the service
+ * failed to recognise it, and a clean 409 surfaced as an unhandled 500.
  *
- * `constraint.fields` is deliberately NOT consulted: it lists COLUMN names, and
- * matching an index name against columns would make `documents_org_hash_key`
- * and any other index over the same two columns indistinguishable — which is
- * the whole thing the `index` argument exists to tell apart.
+ * `constraint.fields` is deliberately NOT consulted — it lists COLUMN names, so
+ * matching against it would make any two indexes over the same columns
+ * indistinguishable, which is the whole thing `index` exists to tell apart.
  */
 function constraintNameFrom(known: PrismaKnownRequestError): string[] {
   const names: string[] = [];

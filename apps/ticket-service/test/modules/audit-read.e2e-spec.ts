@@ -24,7 +24,7 @@ import {
 import { buildTenant, createAuditLog, TenantFixture } from '../factories';
 import { AuditReadService } from '../../src/modules/audit/audit-read.service';
 
-describe('§2.9 Audit logs read API (e2e)', () => {
+describe('Audit logs read API (e2e)', () => {
   let fx: E2eFixture;
   let audit: AuditReadService;
 
@@ -94,7 +94,7 @@ describe('§2.9 Audit logs read API (e2e)', () => {
       expect(items[0].organizationId).toBe(tenant.organizationId);
     });
 
-    it('2. NEVER mixes platform rows into a tenant’s view — §2.9 test 1', async () => {
+    it('2. NEVER mixes platform rows into a tenant’s view', async () => {
       // `organization_id IS NULL` events belong to the platform, not to any
       // customer. Folding them in would show one customer's admin things that
       // happened to other customers.
@@ -269,7 +269,7 @@ describe('§2.9 Audit logs read API (e2e)', () => {
   // -------------------------------------------------------------- actions
 
   describe('listAuditActions', () => {
-    it('1. returns only actions that ACTUALLY occurred — §2.9 test 2', async () => {
+    it('1. returns only actions that ACTUALLY occurred', async () => {
       // Not the full enum. A dropdown offering `PLATFORM_*` to a customer who
       // can never trigger it is full of guaranteed-empty options, which trains
       // people to distrust the filter.

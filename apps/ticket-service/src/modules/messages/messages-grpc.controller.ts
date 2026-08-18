@@ -88,7 +88,7 @@ export class MessagesGrpcController implements MessageServiceController {
 
   /**
    * The PRESIGN step. Returns a URL rather than a stored row, because no row
-   * exists until the bytes have actually landed — 10-storage-service.md §3.2.
+   * exists until the bytes have actually landed.
    */
   uploadAttachment(
     request: UploadAttachmentRequest,
@@ -141,7 +141,7 @@ export class MessagesGrpcController implements MessageServiceController {
   }
 
   /**
-   * The gateway's route to attachment bytes
+   * The gateway's route to attachment bytes.
    *
    * It has no storage client of its own, and this service already does the
    * identical filter-and-fetch for its two `Draft` call sites. One

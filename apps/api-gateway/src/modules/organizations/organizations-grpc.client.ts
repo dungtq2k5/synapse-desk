@@ -1,31 +1,20 @@
-import { ConfigService } from '@nestjs/config';
 import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { ClientGrpc } from '@nestjs/microservices';
 import {
   AUTH_GRPC_CLIENT,
   ORGANIZATION_SERVICE_NAME,
   OrganizationServiceClient,
-  fromProtoAiModelTier,
-  requireProtoTimestamp,
-  fromProtoOrgStatus,
+  IssueInboundTokenResponse,
+  OnboardingResponse,
+  OrganizationResponse,
+  OrganizationSettingsResponse,
+  OrganizationUsageResponse,
+  DeleteOrganizationResponse,
+  UpdateOrganizationRequest,
+  UpdateOrganizationSettingsRequest,
 } from '@synapsedesk/grpc-proto';
-import { buildInboundAddress, RequestContext } from '@synapsedesk/common';
+import { RequestContext } from '@synapsedesk/common';
 import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
-import {
-  toOrganizationResponseDto,
-  toUsageMeterDto,
-} from './organization.mapper';
-import { InboundAddressResponseDto } from './dto/rest/inbound-address.dto';
-import {
-  DeleteOrganizationDto,
-  OffboardResponseDto,
-  OnboardingResponseDto,
-  OrganizationResponseDto,
-  OrganizationSettingsResponseDto,
-  OrganizationUsageResponseDto,
-  UpdateOrganizationDto,
-  UpdateOrganizationSettingsDto,
-} from './dto/rest/organization.dto';
 
 @Injectable()
 export class OrganizationsGrpcClient
@@ -36,10 +25,7 @@ export class OrganizationsGrpcClient
 
   private organizationGrpcService!: OrganizationServiceClient;
 
-  constructor(
-    @Inject(AUTH_GRPC_CLIENT) private readonly client: ClientGrpc,
-    private readonly configService: ConfigService,
-  ) {
+  constructor(@Inject(AUTH_GRPC_CLIENT) private readonly client: ClientGrpc) {
     super();
   }
 
@@ -50,23 +36,15 @@ export class OrganizationsGrpcClient
       );
   }
 
-  /**
-   * Issues or rotates the tenant's inbound-mail address
-   *
-   * Returns the ADDRESS rather than the bare token, because the token alone is
-   * unusable: the mail domain is deployment configuration, and a client that
-   * had to assemble the two would be the third place that format is spelled.
-   */
-  async issueInboundToken(
+  /** Issues or rotates the tenant's inbound-mail token. */
+  issueInboundToken(
     context: RequestContext,
-  ): Promise<InboundAddressResponseDto> {
-    const { inboundToken } = await this.call(
+  ): Promise<IssueInboundTokenResponse> {
+    return this.call(
       (metadata) =>
         this.organizationGrpcService.issueInboundToken({}, metadata),
       context,
     );
-
-    return { inboundAddress: this.addressFor(inboundToken) };
   }
 
   /** Switches inbound mail off. Idempotent — see the service. */
@@ -78,42 +56,26 @@ export class OrganizationsGrpcClient
     );
   }
 
-  private addressFor(inboundToken: string): string {
-    return buildInboundAddress(
-      this.configService.getOrThrow<string>('INBOUND_EMAIL_DOMAIN'),
-      inboundToken,
+  getCurrent(context: RequestContext): Promise<OrganizationResponse> {
+    return this.call(
+      (metadata) =>
+        this.organizationGrpcService.getCurrentOrganization({}, metadata),
+      context,
     );
   }
 
-  async getCurrent(context: RequestContext): Promise<OrganizationResponseDto> {
-    return toOrganizationResponseDto(
-      await this.call(
-        (metadata) =>
-          this.organizationGrpcService.getCurrentOrganization({}, metadata),
-        context,
-      ),
-    );
-  }
-
-  async update(
-    dto: UpdateOrganizationDto,
+  update(
+    request: UpdateOrganizationRequest,
     context: RequestContext,
-  ): Promise<OrganizationResponseDto> {
-    return toOrganizationResponseDto(
-      await this.call(
-        (metadata) =>
-          this.organizationGrpcService.updateOrganization(
-            { name: dto.name, slug: dto.slug, domain: dto.domain },
-            metadata,
-          ),
-        context,
-      ),
+  ): Promise<OrganizationResponse> {
+    return this.call(
+      (metadata) =>
+        this.organizationGrpcService.updateOrganization(request, metadata),
+      context,
     );
   }
 
-  getSettings(
-    context: RequestContext,
-  ): Promise<OrganizationSettingsResponseDto> {
+  getSettings(context: RequestContext): Promise<OrganizationSettingsResponse> {
     return this.call(
       (metadata) =>
         this.organizationGrpcService.getOrganizationSettings({}, metadata),
@@ -122,89 +84,49 @@ export class OrganizationsGrpcClient
   }
 
   updateSettings(
-    dto: UpdateOrganizationSettingsDto,
+    request: UpdateOrganizationSettingsRequest,
     context: RequestContext,
-  ): Promise<OrganizationSettingsResponseDto> {
+  ): Promise<OrganizationSettingsResponse> {
     return this.call(
       (metadata) =>
         this.organizationGrpcService.updateOrganizationSettings(
-          {
-            enforceTwoFactor: dto.enforceTwoFactor,
-            allowedEmailDomains: dto.allowedEmailDomains ?? [],
-            // protobuf cannot distinguish an omitted repeated field from an
-            // empty one, so presence at the REST edge is carried explicitly.
-            // Without this, an update touching only `enforceTwoFactor` would
-            // wipe the domain allowlist.
-            replaceAllowedEmailDomains: dto.allowedEmailDomains !== undefined,
-          },
+          request,
           metadata,
         ),
       context,
     );
   }
 
-  async getUsage(
-    context: RequestContext,
-  ): Promise<OrganizationUsageResponseDto> {
-    const response = await this.call(
+  getUsage(context: RequestContext): Promise<OrganizationUsageResponse> {
+    return this.call(
       (metadata) =>
         this.organizationGrpcService.getOrganizationUsage({}, metadata),
       context,
     );
-
-    return {
-      seats: toUsageMeterDto(response.seats),
-      storage: toUsageMeterDto(response.storage),
-      aiTokens: toUsageMeterDto(response.aiTokens),
-      // Mapped back to the DOMAIN string rather than passed through as a proto
-      // enum number: `aiModelTier: 1` in a JSON body is meaningless to the
-      // client that has to render it.
-      aiModelTier: fromProtoAiModelTier(response.aiModelTier),
-      planName: response.planName,
-      currentPeriodEnd: response.currentPeriodEnd
-        ? requireProtoTimestamp(response.currentPeriodEnd, 'currentPeriodEnd')
-        : null,
-      billingCycleStart: requireProtoTimestamp(
-        response.billingCycleStart,
-        'billingCycleStart',
-      ),
-    };
   }
 
-  async getOnboarding(context: RequestContext): Promise<OnboardingResponseDto> {
-    const response = await this.call(
+  getOnboarding(context: RequestContext): Promise<OnboardingResponse> {
+    return this.call(
       (metadata) => this.organizationGrpcService.getOnboarding({}, metadata),
       context,
     );
-
-    // Mapped rather than passed through: `status` is a proto enum on the wire
-    // and a string in the DTO, so returning the response verbatim would ship a
-    // NUMBER to the client under a field the contract types as a string.
-    return { ...response, status: fromProtoOrgStatus(response.status) ?? '' };
   }
 
-  async completeOnboarding(
-    context: RequestContext,
-  ): Promise<OrganizationResponseDto> {
-    return toOrganizationResponseDto(
-      await this.call(
-        (metadata) =>
-          this.organizationGrpcService.completeOnboarding({}, metadata),
-        context,
-      ),
+  completeOnboarding(context: RequestContext): Promise<OrganizationResponse> {
+    return this.call(
+      (metadata) =>
+        this.organizationGrpcService.completeOnboarding({}, metadata),
+      context,
     );
   }
 
   requestOffboard(
-    dto: DeleteOrganizationDto,
+    reason: string,
     context: RequestContext,
-  ): Promise<OffboardResponseDto> {
+  ): Promise<DeleteOrganizationResponse> {
     return this.call(
       (metadata) =>
-        this.organizationGrpcService.deleteOrganization(
-          { reason: dto.reason },
-          metadata,
-        ),
+        this.organizationGrpcService.deleteOrganization({ reason }, metadata),
       context,
     );
   }

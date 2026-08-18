@@ -1,5 +1,5 @@
 /**
- * Quiet hours, evaluated in the USER'S timezone
+ * Quiet hours, evaluated in the USER'S timezone.
  *
  * Two things here are easy to get wrong and both reach production:
  *

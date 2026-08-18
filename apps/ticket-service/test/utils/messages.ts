@@ -8,7 +8,7 @@ import type { MessagesService } from '../../src/modules/messages/messages.servic
  *
  * The RPC takes `attachments` and answers with `{ message, skippedAttachments }`
  * because a create can partially succeed: a file whose confirm failed is named
- * and the message is written anyway (§1.3.1). Most tests predate that and assert
+ * and the message is written anyway. Most tests predate that and assert
  * on the message alone, so this supplies the empty list and hands back the
  * message — leaving the wrapper to the tests that are actually about it.
  *

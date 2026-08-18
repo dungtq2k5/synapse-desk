@@ -122,7 +122,7 @@ export type ParsedCookie = {
 export function parseSetCookie(
   header: string | string[] | undefined,
 ): Record<string, ParsedCookie> {
-  const raw = Array.isArray(header) ? header : header ? [header] : [];
+  const raw = Array.isArray(header) ? header : header ? [header] : []; // NOSONAR
   const out: Record<string, ParsedCookie> = {};
 
   for (const line of raw) {

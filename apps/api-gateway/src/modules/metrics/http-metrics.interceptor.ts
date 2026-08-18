@@ -9,10 +9,10 @@ import { Observable, tap } from 'rxjs';
 import { MetricsRegistry } from './metrics.registry';
 
 /**
- * RED metrics for every HTTP request
+ * RED metrics for every HTTP request.
  *
  * **The `route` label is the PATH TEMPLATE, never the resolved path.** This is
- * §4's test 3 and it is the same cardinality trap wearing different clothes:
+ * a test asserts it, and it is the same cardinality trap wearing different clothes:
  * `/tickets/<uuid>` looks like a route label and is per-ticket cardinality, so a
  * busy tenant creates one time series per ticket, forever, in a metric that
  * looks perfectly ordinary.

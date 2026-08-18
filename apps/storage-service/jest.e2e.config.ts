@@ -7,7 +7,7 @@ import baseConfig from '../../jest.config.base.ts';
  * request actually does.
  *
  * "Real infra, no mocks" means something different here than for the other
- * services, because this one has no Postgres at all (§1.2) — the infra it needs
+ * services, because this one has no Postgres at all — the infra it needs
  * is the emulator plus Redis. Pointing tests at a real bucket would be the same
  * mistake as pointing them at the dev database, applied to cloud infra.
  */

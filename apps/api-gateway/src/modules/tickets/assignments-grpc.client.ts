@@ -4,16 +4,13 @@ import {
   ASSIGNMENT_SERVICE_NAME,
   AssignmentServiceClient,
   TICKET_GRPC_CLIENT,
-  toProtoReassignmentReason,
+  AssignmentResponse,
+  AssignTicketRequest,
+  AssignTicketToSelfRequest,
+  ListAssignmentsResponse,
 } from '@synapsedesk/grpc-proto';
 import { RequestContext } from '@synapsedesk/common';
 import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
-import { toAssignmentResponseDto } from './assignment.mapper';
-import { AssignmentResponseDto } from './dto/rest/assignment-response.dto';
-import {
-  AssignTicketDto,
-  AssignTicketToSelfDto,
-} from './dto/rest/assignment.dto';
 
 /**
  * Shares the single `TICKET_GRPC_CLIENT` channel with `TicketsGrpcClient` —
@@ -37,25 +34,13 @@ export class AssignmentsGrpcClient
       this.client.getService<AssignmentServiceClient>(ASSIGNMENT_SERVICE_NAME);
   }
 
-  async assign(
-    ticketId: string,
-    dto: AssignTicketDto,
+  assign(
+    request: AssignTicketRequest,
     context: RequestContext,
-  ): Promise<AssignmentResponseDto> {
-    return toAssignmentResponseDto(
-      await this.call(
-        (metadata) =>
-          this.assignmentGrpcService.assignTicket(
-            {
-              ticketId,
-              assigneeId: dto.assigneeId,
-              departmentId: dto.departmentId,
-              reason: toProtoReassignmentReason(dto.reason),
-            },
-            metadata,
-          ),
-        context,
-      ),
+  ): Promise<AssignmentResponse> {
+    return this.call(
+      (metadata) => this.assignmentGrpcService.assignTicket(request, metadata),
+      context,
     );
   }
 
@@ -64,42 +49,25 @@ export class AssignmentsGrpcClient
    * with the same service method as `AssignTicket` — the distinction is a
    * PERMISSION one at the gateway, not a behavioural one in the service.
    */
-  async reassign(
-    ticketId: string,
-    dto: AssignTicketDto,
+  reassign(
+    request: AssignTicketRequest,
     context: RequestContext,
-  ): Promise<AssignmentResponseDto> {
-    return toAssignmentResponseDto(
-      await this.call(
-        (metadata) =>
-          this.assignmentGrpcService.reassignTicket(
-            {
-              ticketId,
-              assigneeId: dto.assigneeId,
-              departmentId: dto.departmentId,
-              reason: toProtoReassignmentReason(dto.reason),
-            },
-            metadata,
-          ),
-        context,
-      ),
+  ): Promise<AssignmentResponse> {
+    return this.call(
+      (metadata) =>
+        this.assignmentGrpcService.reassignTicket(request, metadata),
+      context,
     );
   }
 
-  async assignToSelf(
-    ticketId: string,
-    dto: AssignTicketToSelfDto,
+  assignToSelf(
+    request: AssignTicketToSelfRequest,
     context: RequestContext,
-  ): Promise<AssignmentResponseDto> {
-    return toAssignmentResponseDto(
-      await this.call(
-        (metadata) =>
-          this.assignmentGrpcService.assignTicketToSelf(
-            { ticketId, departmentId: dto.departmentId },
-            metadata,
-          ),
-        context,
-      ),
+  ): Promise<AssignmentResponse> {
+    return this.call(
+      (metadata) =>
+        this.assignmentGrpcService.assignTicketToSelf(request, metadata),
+      context,
     );
   }
 
@@ -111,16 +79,14 @@ export class AssignmentsGrpcClient
     );
   }
 
-  async list(
+  list(
     ticketId: string,
     context: RequestContext,
-  ): Promise<AssignmentResponseDto[]> {
-    const response = await this.call(
+  ): Promise<ListAssignmentsResponse> {
+    return this.call(
       (metadata) =>
         this.assignmentGrpcService.listAssignments({ ticketId }, metadata),
       context,
     );
-
-    return response.items.map(toAssignmentResponseDto);
   }
 }

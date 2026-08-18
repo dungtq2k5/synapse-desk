@@ -21,8 +21,8 @@ import { PermissionGuard } from '../../common/guards/permission.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ResponseMessage } from '../../common/decorators/response-message.decorator';
 import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
-import { TicketsGrpcClient } from '../tickets/tickets-grpc.client';
-import { MessagesGrpcClient } from '../tickets/messages-grpc.client';
+import { TicketsService } from '../tickets/tickets.service';
+import { MessagesService } from '../tickets/messages.service';
 import { TicketResponseDto } from '../tickets/dto/rest/ticket-response.dto';
 import {
   CreateMessageResponseDto,
@@ -63,8 +63,8 @@ import {
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class ChatController {
   constructor(
-    private readonly ticketsGrpcClient: TicketsGrpcClient,
-    private readonly messagesGrpcClient: MessagesGrpcClient,
+    private readonly tickets: TicketsService,
+    private readonly messages: MessagesService,
   ) {}
 
   /**
@@ -87,7 +87,7 @@ export class ChatController {
     @CurrentUser() context: RequestContext,
     @Body() dto: StartConversationDto,
   ): Promise<TicketResponseDto> {
-    return this.ticketsGrpcClient.create(
+    return this.tickets.create(
       {
         title: dto.title,
         description: dto.message,
@@ -119,7 +119,7 @@ export class ChatController {
     @CurrentUser() context: RequestContext,
     @Query() query: ListTicketsQueryDto,
   ): Promise<PaginationResponseDto<TicketResponseDto>> {
-    return this.ticketsGrpcClient.list(
+    return this.tickets.list(
       {
         ...query,
         source: TicketSource.CHAT,
@@ -138,7 +138,7 @@ export class ChatController {
     @CurrentUser() context: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<TicketResponseDto> {
-    return this.ticketsGrpcClient.get(id, context);
+    return this.tickets.get(id, context);
   }
 
   @ApiOperation({ summary: 'List messages' })
@@ -150,7 +150,7 @@ export class ChatController {
     @Param('id', ParseUUIDPipe) id: string,
     @Query() query: ListMessagesQueryDto,
   ): Promise<PaginationResponseDto<MessageResponseDto>> {
-    return this.messagesGrpcClient.list(id, query, context);
+    return this.messages.list(id, query, context);
   }
 
   /**
@@ -161,7 +161,7 @@ export class ChatController {
    * mean the only thing stopping a chat client from writing one is a permission
    * check it could not see. It is refused here, at the shape.
    */
-  // A per-USER minute limit, on top of the monthly quota The
+  // A per-USER minute limit, on top of the monthly quota. The
   // quota is a month budget checked per request and does nothing to stop one
   // user spending the whole month in ten minutes.
   @Throttle({ [AI_THROTTLER_TIER]: ROUTE_THROTTLE.chatMessage })
@@ -175,13 +175,13 @@ export class ChatController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: CreateMessageDto,
   ): Promise<CreateMessageResponseDto> {
-    return this.messagesGrpcClient.create(
+    return this.messages.create(
       id,
       {
         content: dto.content,
         isInternalNote: false,
         invokeAi: dto.invokeAi,
-        // Forwarded rather than dropped This is the surface a
+        // Forwarded rather than dropped. This is the surface a
         // customer asks a question from, so it is the surface where the
         // screenshot and the question arrive together.
         attachments: dto.attachments,
@@ -211,6 +211,6 @@ export class ChatController {
     @CurrentUser() context: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<TicketResponseDto> {
-    return this.ticketsGrpcClient.escalate(id, context);
+    return this.tickets.escalate(id, context);
   }
 }

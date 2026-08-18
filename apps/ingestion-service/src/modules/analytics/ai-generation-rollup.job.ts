@@ -17,7 +17,7 @@ export type AiRollupOutcome = {
 };
 
 /**
- * `ai_generation_daily_stats`
+ * `ai_generation_daily_stats`.
  *
  * **Not an optimisation. The only durable record.** `ai_generations` is
  * retention-rolled (RDM Table 29): raw rows aggregate away after ~90 days, so
@@ -52,7 +52,7 @@ export class AiGenerationRollupJob {
   }
 
   /**
-   * The BACKFILL entry point
+   * The BACKFILL entry point.
    *
    * Load-bearing here in a way it is not for tickets: a bug in this rollup is
    * uncorrectable once retention has eaten the raw rows, so the backfill is the
@@ -171,7 +171,7 @@ export class AiGenerationRollupJob {
                COUNT(*) FILTER (WHERE g.outcome = 'ACCEPTED')::int,
                COUNT(*) FILTER (WHERE g.outcome = 'EDITED')::int,
                -- The denominator's third term, and the one that depends on the
-               -- sweep (12-doc §4.3). Without it, acceptance divides by drafts
+               -- sweep. Without it, acceptance divides by drafts
                -- that were USED and reports ~100% regardless of quality.
                COUNT(*) FILTER (WHERE g.outcome = 'DISCARDED')::int,
                NOW()

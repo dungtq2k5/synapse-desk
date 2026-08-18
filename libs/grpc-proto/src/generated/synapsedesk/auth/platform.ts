@@ -101,7 +101,7 @@ export interface SetOrganizationStatusRequest {
 export interface ResetBillingCycleRequest {
   organizationId: string;
   /**
-   * *Mandatory since billing shipped** (14-doc §5). `billing_cycle_start` now
+   * *Mandatory since billing shipped**. `billing_cycle_start` now
    * follows Stripe's `current_period_start` AND its epoch sits inside the Redis
    * quota key — so a manual roll both desynchronizes the quota window from the
    * invoice period and silently grants a fresh AI budget. The endpoint stays
@@ -168,7 +168,7 @@ export interface GetPlatformMetricsRequest {
 }
 
 /**
- * Job health -- 20-doc §4.4. auth-service's two scheduled jobs, since it moved
+ * Job health. auth-service's two scheduled jobs, since it moved
  * off `@nestjs/schedule`: the heartbeat table lives in each service's own
  * database, so `/platform/jobs` is a three-leg fan-out.
  */

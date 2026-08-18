@@ -1,32 +1,26 @@
 /**
- * The cost limits
+ * The cost limits.
  *
- * **REST bounds cost structurally**: one route, one handler, a known fan-out.
+ * REST bounds cost structurally — one route, one handler, a known fan-out.
  * GraphQL hands the client a query language, and with cross-service field
- * resolvers it hands them a way to turn one HTTP request into thousands of gRPC
- * calls:
+ * resolvers, a way to turn one HTTP request into thousands of gRPC calls:
  *
  * ```graphql
  * query {
  *   tickets(first: 100) {
  *     assignee { departments { members { tickets(first: 100) { … } } } }
  *   }
- * }
+ *   }
  * ```
  *
- * These exist BEFORE the first resolver, deliberately. They are a constraint on
- * a surface nobody uses yet; added later they are a restriction on one clients
- * already depend on, and the conversation changes from "what is safe" to "whose
- * dashboard breaks".
- *
  * **A separate file from `graphql.config.ts`, and it has to be.** That file
- * holds `getGraphqlConfig`, which builds the driver options — so it imports
- * `depthLimitRule` and `queryCostPlugin`, and both of those read the numbers
- * below. Keeping the numbers there would make `config → graphql → config` a
- * cycle: it would happen to work, because every read is inside a function body
- * rather than at module scope, and it is exactly the arrangement that breaks
- * the day someone moves one of those reads to a top-level constant. This file
- * imports nothing, so it can be a leaf of both.
+ * builds the driver options, so it imports `depthLimitRule` and
+ * `queryCostPlugin`, and both read the numbers below. Keeping them there makes
+ * `config → graphql → config` a cycle that happens to work only because every
+ * read sits inside a function body. This file imports nothing, so it can be a
+ * leaf of both.
+ *
+ * See `docs/decisions/0014-narrow-graphql-edge-types.md`.
  */
 
 /**
@@ -91,26 +85,24 @@ export const FIELD_COST = {
 } as const;
 
 /**
- * The most items a LIST EDGE returns
+ * The most items a LIST EDGE returns.
  *
  * **A cap, not pagination, and the two are mutually exclusive.** A paginated
  * edge's DataLoader key is `(parentId, first, offset, orderBy)`, so the batch
- * RPC behind it would have to page PER PARENT — a window function partitioned
- * by parent id, which no `ListXByIds` expresses and none should. Which approach
- * an edge gets is decided by cardinality:
+ * RPC would have to page PER PARENT — a window function partitioned by parent
+ * id, which no `ListXByIds` expresses. Cardinality decides which an edge gets:
  *
  *   - `Ticket.messages` — hundreds, a long thread is normal → **paginate**, and
- *     that is exactly why it is the allowlisted direct call rather than a loader.
+ *     that is why it is the allowlisted direct call rather than a loader.
  *   - `User.departments`, `Document.departments` — single digits → **cap**.
  *
- * Fifty rather than {@link MAX_PAGE_SIZE}: these are single-digit lists in
- * practice, and the cap exists to bound the pathological case rather than to
- * page a normal one.
+ * Fifty rather than {@link MAX_PAGE_SIZE}: the cap bounds the pathological case
+ * rather than paging a normal one.
  *
- * **The ids are capped BEFORE the batch, never the results after**
- * property 5. A user in 250 departments produces a 250-key batch against a
- * ~200-id RPC cap, and that cap is an ERROR rather than a truncation: an
- * uncapped parent does not return fewer departments, it fails the whole field.
- * Slicing first turns a hard failure into a documented ceiling.
+ * **The ids are capped BEFORE the batch, never the results after.** A user in
+ * 250 departments produces a 250-key batch against a ~200-id RPC cap, and that
+ * cap is an ERROR rather than a truncation — an uncapped parent does not return
+ * fewer departments, it fails the whole field. Slicing first turns a hard
+ * failure into a documented ceiling.
  */
 export const MAX_EDGE_LIST = 50;

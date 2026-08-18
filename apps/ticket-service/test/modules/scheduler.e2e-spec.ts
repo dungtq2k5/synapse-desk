@@ -20,7 +20,7 @@ import { TicketRollupJob } from '../../src/modules/analytics/ticket-rollup.job';
  * and **all six analytics endpoints returned zeros** — correctly, from empty
  * tables, which is exactly why every test passed.
  */
-describe('§1 The scheduler (e2e)', () => {
+describe('The scheduler (e2e)', () => {
   let fx: E2eFixture;
   let processor: SchedulerProcessor;
   let registrar: SchedulerRegistrar;
@@ -160,7 +160,7 @@ describe('§1 The scheduler (e2e)', () => {
     it('8. **a failure records the error and KEEPS the previous success**', async () => {
       // The previous success is what the staleness alert reads. Clearing it
       // here would turn "broken since Tuesday" into "never ran" and lose the
-      // one piece of information worth having test 2.
+      // one piece of information worth having.
       const rollup = jest.spyOn(fx.moduleRef.get(TicketRollupJob), 'run');
 
       rollup.mockResolvedValue({ tenants: 0, ticketRows: 0, agentRows: 0 });
@@ -242,7 +242,7 @@ describe('§1 The scheduler (e2e)', () => {
    * only what is local: that a run recorded through the injected recorder lands
    * in this service's own database, in the same failure domain as the work.
    */
-  describe('§4.5 the shared recorder is bound to THIS database', () => {
+  describe('The shared recorder is bound to THIS database', () => {
     it('11. a tracked run writes a row readable through this service’s Prisma', async () => {
       const recorder = fx.moduleRef.get(JobRunRecorder);
 

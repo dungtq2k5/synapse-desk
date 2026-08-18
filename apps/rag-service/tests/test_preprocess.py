@@ -1,4 +1,4 @@
-"""§3 — greeting detection then reformulation, and the ORDER between them.
+"""Greeting detection then reformulation, and the ORDER between them.
 
 The most valuable test in this file is the ordering one. Reversing the two
 steps costs money on every social turn of every conversation and changes no
@@ -189,7 +189,7 @@ class TestOrdering:
     async def test_an_ATTACHMENT_alone_triggers_reformulation(
         self, generator, ledger, settings, budget
     ):
-        """36-doc §5 test 1 — the condition change, and the whole feature.
+        """The condition change, and the whole feature.
 
         `if history:` skips this call on the first message of a conversation,
         which is exactly when somebody pastes a screenshot and types six words
@@ -216,7 +216,7 @@ class TestOrdering:
     async def test_only_the_CURRENT_message_attachments_are_ever_sent(
         self, generator, ledger, settings, budget
     ):
-        """36-doc §5 test 3, asserted as a property.
+        """Asserted as a property.
 
         Four turns times five files is twenty images on every call, on the
         highest-volume path in the system. Only the CURRENT message's files go;
@@ -225,7 +225,7 @@ class TestOrdering:
         code when it answered.
 
         **Stated as "every call sent exactly these parts", not as a count per
-        call.** The count version said `[0, 1]` and broke the moment 36-doc §4
+        call.** The count version said `[0, 1]` and broke the moment the attachment path
         gave the fused classification the parts too — a correct change that
         looked like a regression. What must never vary is WHICH parts go.
         """
@@ -251,7 +251,7 @@ class TestOrdering:
     async def test_LAYER_A_runs_on_the_reformulated_query(
         self, generator, ledger, settings, budget
     ):
-        """36-doc §5 test 4 — already true, pinned because this widens it.
+        """Already true, pinned because this widens it.
 
         The guard scanned `message`; what is embedded, retrieved with and
         answered is `query`. Those differ after a rewrite — and now the rewrite

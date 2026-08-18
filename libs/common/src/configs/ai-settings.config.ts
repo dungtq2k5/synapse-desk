@@ -1,5 +1,5 @@
 /**
- * AI model and retrieval settings — the only TypeScript file that may name a model.
+ * @file AI model and retrieval settings — the only TypeScript file that may name a model.
  *
  * `scripts/check-model-literals.mjs` enforces that; this file and
  * `ai-pricing.config.ts` are its allowlist. Values are mirrored in
@@ -7,6 +7,8 @@
  *
  * See `docs/decisions/0007-settings-layer-owns-model-names.md`.
  */
+
+import type { AiModel } from './ai-models.config';
 
 /**
  * The tier a tenant's generation model is resolved from.
@@ -48,8 +50,11 @@ export type AiSettings = {
 
 /**
  * Tier -> generation model. This mapping is the entire tier feature.
+ *
+ * Typed `AiModel`, so a model named here without a price in `MODEL_PRICING`
+ * is a compile error rather than a `pricingFor()` throw in production.
  */
-export const GENERATION_MODEL_BY_TIER: Record<AiModelTier, string> = {
+export const GENERATION_MODEL_BY_TIER: Record<AiModelTier, AiModel> = {
   FAST: 'gemini-3.5-flash-lite',
   QUALITY: 'gemini-2.5-pro',
 };
@@ -67,11 +72,11 @@ export const GENERATION_MODEL_BY_TIER: Record<AiModelTier, string> = {
  * change a full re-embed migration. It is stated here as a
  * constant rather than a setting anyone could vary.
  */
-export const CHEAP_MODEL = 'gemini-3.5-flash-lite';
-export const EMBEDDING_MODEL = 'gemini-embedding-2';
+export const CHEAP_MODEL: AiModel = 'gemini-3.5-flash-lite';
+export const EMBEDDING_MODEL: AiModel = 'gemini-embedding-2';
 
 /** Every model the system can be configured to use — for the boot-time price check. */
-export const ALL_CONFIGURED_MODELS: string[] = [
+export const ALL_CONFIGURED_MODELS: AiModel[] = [
   ...Object.values(GENERATION_MODEL_BY_TIER),
   CHEAP_MODEL,
   EMBEDDING_MODEL,

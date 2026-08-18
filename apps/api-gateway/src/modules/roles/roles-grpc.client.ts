@@ -4,21 +4,16 @@ import {
   AUTH_GRPC_CLIENT,
   ROLE_SERVICE_NAME,
   RoleServiceClient,
-  toPageRequest,
+  CreateRoleRequest,
+  ListPermissionsResponse,
+  ListRolesResponse,
+  RoleResponse,
+  SetRolePermissionsRequest,
+  ListRolesRequest,
+  UpdateRoleRequest,
 } from '@synapsedesk/grpc-proto';
 import { RequestContext } from '@synapsedesk/common';
 import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
-import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
-import { toPaginationMetaDataResponseDto } from '../../common/mappers/pagination.mapper';
-import { toPermissionResponseDto, toRoleResponseDto } from './role.mapper';
-import {
-  CreateRoleDto,
-  ListRolesQueryDto,
-  PermissionResponseDto,
-  RoleResponseDto,
-  SetRolePermissionsDto,
-  UpdateRoleDto,
-} from './dto/rest/role.dto';
 
 @Injectable()
 export class RolesGrpcClient extends BaseGrpcClient implements OnModuleInit {
@@ -35,68 +30,40 @@ export class RolesGrpcClient extends BaseGrpcClient implements OnModuleInit {
       this.client.getService<RoleServiceClient>(ROLE_SERVICE_NAME);
   }
 
-  async list(
-    query: ListRolesQueryDto,
+  list(
+    request: ListRolesRequest,
     context: RequestContext,
-  ): Promise<PaginationResponseDto<RoleResponseDto>> {
-    const response = await this.call(
-      (metadata) =>
-        this.roleGrpcService.listRoles(
-          { page: toPageRequest(query), includeSystem: query.includeSystem },
-          metadata,
-        ),
+  ): Promise<ListRolesResponse> {
+    return this.call(
+      (metadata) => this.roleGrpcService.listRoles(request, metadata),
       context,
     );
-
-    return {
-      items: response.items.map(toRoleResponseDto),
-      meta: toPaginationMetaDataResponseDto(response.meta),
-    };
   }
 
-  async get(id: string, context: RequestContext): Promise<RoleResponseDto> {
-    return toRoleResponseDto(
-      await this.call(
-        (metadata) => this.roleGrpcService.getRole({ id }, metadata),
-        context,
-      ),
+  get(id: string, context: RequestContext): Promise<RoleResponse> {
+    return this.call(
+      (metadata) => this.roleGrpcService.getRole({ id }, metadata),
+      context,
     );
   }
 
-  async create(
-    dto: CreateRoleDto,
+  create(
+    request: CreateRoleRequest,
     context: RequestContext,
-  ): Promise<RoleResponseDto> {
-    return toRoleResponseDto(
-      await this.call(
-        (metadata) =>
-          this.roleGrpcService.createRole(
-            {
-              name: dto.name,
-              description: dto.description,
-              permissionCodes: dto.permissionCodes,
-            },
-            metadata,
-          ),
-        context,
-      ),
+  ): Promise<RoleResponse> {
+    return this.call(
+      (metadata) => this.roleGrpcService.createRole(request, metadata),
+      context,
     );
   }
 
-  async update(
-    id: string,
-    dto: UpdateRoleDto,
+  update(
+    request: UpdateRoleRequest,
     context: RequestContext,
-  ): Promise<RoleResponseDto> {
-    return toRoleResponseDto(
-      await this.call(
-        (metadata) =>
-          this.roleGrpcService.updateRole(
-            { id, name: dto.name, description: dto.description },
-            metadata,
-          ),
-        context,
-      ),
+  ): Promise<RoleResponse> {
+    return this.call(
+      (metadata) => this.roleGrpcService.updateRole(request, metadata),
+      context,
     );
   }
 
@@ -107,31 +74,20 @@ export class RolesGrpcClient extends BaseGrpcClient implements OnModuleInit {
     );
   }
 
-  async setPermissions(
-    id: string,
-    dto: SetRolePermissionsDto,
+  setPermissions(
+    request: SetRolePermissionsRequest,
     context: RequestContext,
-  ): Promise<RoleResponseDto> {
-    return toRoleResponseDto(
-      await this.call(
-        (metadata) =>
-          this.roleGrpcService.setRolePermissions(
-            { id, permissionCodes: dto.permissionCodes },
-            metadata,
-          ),
-        context,
-      ),
+  ): Promise<RoleResponse> {
+    return this.call(
+      (metadata) => this.roleGrpcService.setRolePermissions(request, metadata),
+      context,
     );
   }
 
-  async listPermissions(
-    context: RequestContext,
-  ): Promise<PermissionResponseDto[]> {
-    const response = await this.call(
+  listPermissions(context: RequestContext): Promise<ListPermissionsResponse> {
+    return this.call(
       (metadata) => this.roleGrpcService.listPermissions({}, metadata),
       context,
     );
-
-    return response.items.map(toPermissionResponseDto);
   }
 }

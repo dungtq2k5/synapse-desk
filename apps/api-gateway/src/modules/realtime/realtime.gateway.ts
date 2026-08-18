@@ -28,7 +28,7 @@ import {
 } from '../../common/interfaces/ws-response.interface';
 import { socketStore } from './socket-store';
 import { TicketAccessService } from './ticket-access.service';
-import { MessagesGrpcClient } from '../tickets/messages-grpc.client';
+import { MessagesService } from '../tickets/messages.service';
 import { AiStreamService } from './ai-stream.service';
 import { PresenceService } from './presence.service';
 import { MetricsRegistry } from '../metrics/metrics.registry';
@@ -85,7 +85,7 @@ export class RealtimeGateway
     private readonly configService: ConfigService,
     private readonly wsThrottler: WsThrottlerService,
     private readonly ticketAccess: TicketAccessService,
-    private readonly messages: MessagesGrpcClient,
+    private readonly messages: MessagesService,
     private readonly aiStreams: AiStreamService,
     private readonly presence: PresenceService,
     private readonly metrics: MetricsRegistry,
@@ -124,7 +124,7 @@ export class RealtimeGateway
         await client.join(orgRoom(payload.organizationId));
       }
 
-      // **The department rooms, from the token**
+      // **The department rooms, from the token**.
       //
       // Same reasoning as `user:` and `org:`: the ids come from a verified JWT,
       // so no authorization call is needed and a client cannot ask for a
@@ -174,7 +174,7 @@ export class RealtimeGateway
   }
 
   /**
-   * Cancels whatever this socket still had running
+   * Cancels whatever this socket still had running.
    *
    * **This is the cancellation that actually happens.** `ai:stream:cancel`
    * covers a user who pressed stop; closing the tab is the same intent
@@ -198,7 +198,7 @@ export class RealtimeGateway
   }
 
   /**
-   * `presence:update`
+   * `presence:update`.
    *
    * **The ONLY writer.** Connecting sets a floor and a heartbeat refreshes a
    * TTL; neither states anything about the user's intent. Keeping one writer is
@@ -283,14 +283,14 @@ export class RealtimeGateway
 
     await client.join(ticketRoom(id));
 
-    // **The agent-only half** Joined only by a socket that holds
+    // **The agent-only half**. Joined only by a socket that holds
     // `ticket.read.all` at THIS moment, which is what makes the internal-note
     // fan-out a single room emit rather than a per-socket permission read on
     // every message.
     //
     // Read from the verified token, not re-fetched: the permission set is a JWT
     // claim, and the whole design accepts that a revocation lands on the next
-    // join (§6.3).
+    // join.
     if (payload.permissionCodes.includes('ticket.read.all')) {
       await client.join(ticketInternalRoom(id));
     }
@@ -321,33 +321,31 @@ export class RealtimeGateway
   }
 
   /**
-   * `message:send`
+   * `message:send`.
    *
-   * **A transport, not a second write path.** The spec says it "mirrors
-   * `POST /tickets/:id/messages`", and mirroring is the trap: a second
-   * implementation of a write means two validators, two audit call sites, two
-   * notification triggers and two rate limits, and they diverge on the first
-   * change to either. This calls the SAME `MessagesGrpcClient.create` the HTTP
-   * controller calls, so the two-write `invokeAi` path, `ticket.message_created`,
-   * the audit row and the notification producer all come along unchanged —
-   * because it is literally the same code.
+   * **A transport, not a second write path.** This calls the SAME
+   * `MessagesService.create` the HTTP controller calls, so the two-write
+   * `invokeAi` path, `ticket.message_created`, the audit row and the
+   * notification producer all come along unchanged.
    *
    * Three things this owns that the controller does not:
    *
    *   1. Building a `RequestContext` from the socket rather than a request.
    *   2. Acking to the sender, so the client can clear its pending state.
-   *   3. **NOT emitting `message:new`.** The NATS consumer already does that for
-   *      every path; emitting here too double-delivers to the room including the
-   *      sender. That is the mistake that looks like a feature — "send it
-   *      straight back for latency" — and it is why the ack carries the message
-   *      id and nothing else.
+   *   3. **NOT emitting `message:new`.** The NATS consumer already does that
+   *      for every path; emitting here too double-delivers to the room,
+   *      including the sender. That is the mistake that looks like a feature —
+   *      "send it straight back for latency" — and it is why the ack carries
+   *      the message id and nothing else.
+   *
+   * See `docs/decisions/0011-websocket-is-a-transport.md`.
    */
   @SubscribeMessage(CLIENT_EVENTS.messageSend)
   async handleMessageSend(
     @ConnectedSocket() client: Socket,
     @MessageBody() body: unknown,
   ): Promise<WsAck<{ messageId: string; streamId?: string }>> {
-    // **Every refusal returns in the ACK rather than throwing**
+    // **Every refusal returns in the ACK rather than throwing**.
     //
     // The ack is what lets the client clear its pending state, and a refused
     // send is exactly when clearing matters most. A thrown `WsException` leaves
@@ -361,7 +359,7 @@ export class RealtimeGateway
   }
 
   /**
-   * `ai:stream:cancel`
+   * `ai:stream:cancel`.
    *
    * Acked, because a client that pressed stop needs to know the stream is
    * actually gone before it re-enables its composer. A cancel for a stream this
@@ -389,7 +387,7 @@ export class RealtimeGateway
   }
 
   /**
-   * `typing:start` / `typing:stop`
+   * `typing:start` / `typing:stop`.
    *
    * **Ephemeral, and that word does the work.** No table, no NATS subject, no
    * audit. A typing frame is worth less than the bytes it costs, which is why
@@ -408,7 +406,7 @@ export class RealtimeGateway
    * **Internal-note typing does not exist**, deliberately. There is no way to
    * know which composer an agent is typing in, so this only ever means "someone
    * is replying" — inferring internal activity from a keystroke would be a leak
-   * of exactly the kind §1 just closed.
+   * of exactly the kind the internal-note fix closed.
    */
   @SubscribeMessage(CLIENT_EVENTS.typingStart)
   async handleTypingStart(
@@ -533,34 +531,22 @@ export class RealtimeGateway
   }
 
   /**
-   * Validates a socket frame against a DTO
+   * Validates a socket frame against a DTO, by hand.
    *
    * **Not because the global `ValidationPipe` cannot see socket frames — it
-   * can.** `useGlobalPipes` binds across every execution context, so typing a
-   * handler's `@MessageBody()` as a DTO really would validate it, exactly as the
-   * HTTP routes do. The reason to do it by hand is what happens when validation
-   * FAILS.
-   *
-   * A pipe rejects BEFORE the handler body runs, so the throw never reaches
+   * can.** The reason is what happens when validation FAILS: a pipe rejects
+   * before the handler body runs, so the throw never reaches
    * {@link acknowledge} and never becomes a failure ack. Socket.IO's ack
-   * callback is then never invoked: the client's spinner runs forever and its
-   * retry never fires, which is the precise failure `WsAck`'s docblock and
-   * Exist to prevent. The `exception` frame the filter emits is not
-   * a substitute, because the client is awaiting THIS call.
+   * callback is then never invoked, the client's spinner runs forever and its
+   * retry never fires. The `exception` frame the filter emits is no substitute,
+   * because the client is awaiting THIS call.
    *
-   * Measured rather than argued: registering the pipe in the realtime fixture
-   * and typing `presence:update`'s body as `PresenceUpdateDto` leaves the six
-   * happy-path presence tests green and fails the one asserting that a bad
-   * `state` comes back as a refusal ack.
-   *
-   * Two smaller reasons the DTO-typed parameter does not fit here either way:
+   * Two smaller reasons a DTO-typed parameter does not fit either way:
    * `ticket:join` and the typing frames accept a BARE STRING as well as an
-   * object, which no DTO class can express; and four of the seven handlers
-   * return `void`, so only three are bound by the ack contract at all — a split
-   * that would leave the parameter style inconsistent across one file.
+   * object, which no DTO class expresses; and four of the seven handlers return
+   * `void`, so only three are bound by the ack contract at all.
    *
-   * `whitelist` + `forbidNonWhitelisted` mirror the HTTP configuration, so an
-   * unknown field is refused here exactly as it would be on a REST route.
+   * `whitelist` + `forbidNonWhitelisted` mirror the HTTP configuration.
    */
   private async validateBody<T extends object>(
     Dto: new () => T,
@@ -591,7 +577,7 @@ export class RealtimeGateway
   }
 
   /**
-   * Spends one unit of this event's budget, or refuses the frame
+   * Spends one unit of this event's budget, or refuses the frame.
    *
    * **Throws rather than returning false.** Every caller here wants the client
    * told: a refused join or send that returned silently would leave the UI
@@ -619,7 +605,7 @@ export class RealtimeGateway
     const id =
       typeof value === 'string'
         ? value
-        : typeof value === 'object' && value !== null
+        : typeof value === 'object' && value !== null // NOSONAR
           ? (value as { ticketId?: unknown }).ticketId
           : undefined;
 
@@ -667,7 +653,7 @@ export class RealtimeGateway
   }
 
   /**
-   * Fanned to `org:{organizationId}`
+   * Fanned to `org:{organizationId}`.
    *
    * Not a ticket room, which is far too narrow to be useful: presence answers
    * "who is around right now?", and the people asking are colleagues who have
@@ -701,7 +687,7 @@ export class RealtimeGateway
 
     const dto = await this.validateBody(MessageSendDto, body);
 
-    // `canWrite`, NOT `canRead` A `ticket.read.all` holder may
+    // `canWrite`, NOT `canRead`. A `ticket.read.all` holder may
     // watch any thread in the tenant and post into none of them.
     //
     // Note what this check is FOR: ticket-service re-validates on its own, so
@@ -715,7 +701,7 @@ export class RealtimeGateway
       dto.ticketId,
       {
         content: dto.content,
-        isInternalNote: dto.isInternalNote,
+        isInternalNote: dto.isInternalNote ?? false,
         // **Always false, even when the client asked for AI** — see
         // `startAnswerStream` below. Forwarding the flag would make
         // ticket-service run its own unary `Draft` and append a SECOND reply,
@@ -763,7 +749,7 @@ export class RealtimeGateway
       message: 'Message sent',
       // **On the ack, not as a separate frame.** A file that did not confirm is
       // an outcome of THIS send, and the client is already awaiting this
-      // response `ai:stream:attachments-skipped` answers a
+      // response. `ai:stream:attachments-skipped` answers a
       // different question (the model could not read it) and would be the wrong
       // channel for "it was never attached".
       data: { messageId: message.id, streamId, skippedAttachments },
@@ -805,7 +791,7 @@ export class RealtimeGateway
     const id =
       typeof value === 'string'
         ? value
-        : typeof value === 'object' && value !== null
+        : typeof value === 'object' && value !== null // NOSONAR
           ? (value as { streamId?: unknown }).streamId
           : undefined;
 
@@ -862,7 +848,7 @@ export class RealtimeGateway
    *
    * **Kept on the SOCKET, not in a service-level map.** `client.data` dies with
    * the connection, so a disconnect leaves nothing to clean up and nothing to
-   * leak — which is what §3 test 3 asserts. A `Map` keyed by socket id in a
+   * leak — which is what its test asserts. A `Map` keyed by socket id in a
    * provider would need a `handleDisconnect` to prune it, and the entry for a
    * socket on a pod that crashed would never be pruned at all.
    *
@@ -896,18 +882,18 @@ export class RealtimeGateway
   }
 
   /**
-   * Counts one outbound event
+   * Counts one outbound event.
    *
    * Labelled by EVENT NAME only. The names come from `REALTIME_EVENTS`, a fixed
    * object, so the cardinality is its size; adding the ticket or the recipient
-   * would make it unbounded, which is the trap §4 is entirely about.
+   * would make it unbounded, which is the trap presence is entirely about.
    */
   countEvent(event: string): void {
     this.metrics.websocketEvents.inc({ event });
   }
 
   /**
-   * ONE emit addressing several rooms
+   * ONE emit addressing several rooms.
    *
    * Not a convenience wrapper around a loop, and the difference is the whole
    * reason it exists. Socket.IO deduplicates recipients WITHIN a single emit and

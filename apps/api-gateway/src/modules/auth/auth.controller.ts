@@ -14,7 +14,8 @@ import {
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
-import { RegisterDto, RegisterResponseDto } from './dto/rest/register.dto';
+import { RegisterDto } from './dto/rest/register.dto';
+import { RegisterResponseDto } from './dto/rest/register-response.dto';
 import { JwtCookieService } from './jwt-cookie.service';
 import { RequestContext, RequestOrigin, OrgAccess } from '@synapsedesk/common';
 import { CurrentOrigin } from '../../common/decorators/current-origin.decorator';
@@ -24,32 +25,32 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { ForgotPasswordDto } from './dto/rest/forgot-password.dto';
 import {
   ChangePasswordDto,
-  ChangePasswordResponseDto,
   ResetPasswordDto,
+} from './dto/rest/reset-password.dto';
+import {
+  ChangePasswordResponseDto,
   ResetPasswordResponseDto,
   ValidatePasswordResetTokenResponseDto,
-} from './dto/rest/reset-password.dto';
+} from './dto/rest/reset-password-response.dto';
 import { GuestGuard } from '../../common/guards/guest.guard';
+import { LoginDto, LoginWithTenantDto } from './dto/rest/login.dto';
+// The three members of `LoginOutcomeDto`. The union itself is a type alias with
+// no runtime identity, so `oneOf` over its members is the only way to describe
+// it; documenting only the happy one would tell a client that the 2FA challenge
+// is a malformed response. The third member lives with the 2FA DTOs.
 import {
-  LoginDto,
   LoginOutcomeDto,
   LoginResponseDto,
-  LoginWithTenantDto,
-  // The three members of `LoginOutcomeDto` The union itself is a
-  // type alias with no runtime identity, so `oneOf` over its members is the only
-  // way to describe it; documenting only the happy one would tell a client that
-  // the 2FA challenge is a malformed response.
   TenantSelectionResponseDto,
-} from './dto/rest/login.dto';
-// The third member of `LoginOutcomeDto`, which lives with the 2FA DTOs.
-import { TwoFactorRequiredResponseDto } from './dto/rest/two-factor.dto';
-import type { LoginResult } from './auth-service-grpc.client';
+} from './dto/rest/login-response.dto';
+import { TwoFactorRequiredResponseDto } from './dto/rest/two-factor-response.dto';
+import type { LoginResult } from './auth.service';
 import { GoogleSignInDto } from './dto/rest/google-sign-in.dto';
+import { LogoutDto } from './dto/rest/logout.dto';
 import {
   LogoutAllResponseDto,
-  LogoutDto,
   LogoutResponseDto,
-} from './dto/rest/logout.dto';
+} from './dto/rest/logout-response.dto';
 import { AuthThrottle } from '../../common/decorators/auth-throttle.decorator';
 import { Throttle } from '@nestjs/throttler';
 import {
@@ -272,13 +273,13 @@ export class AuthController {
   ): Promise<LogoutResponseDto> {
     const refreshToken = this.jwtCookieService.readRefreshToken(request);
 
-    const revokedSessionCount = refreshToken
+    const result: LogoutResponseDto = refreshToken
       ? await this.authService.logout(
           refreshToken,
           logoutDto.allDevices ?? false,
           origin,
         )
-      : 0;
+      : { revokedSessionCount: 0 };
 
     // Cleared unconditionally. Even with no server-side session left to revoke,
     // the caller asked to be logged out and must not keep holding cookies.
@@ -287,7 +288,7 @@ export class AuthController {
       this.jwtCookieService.clearDeviceTokenCookie(response);
     }
 
-    return { revokedSessionCount };
+    return result;
   }
 
   /**
@@ -313,12 +314,12 @@ export class AuthController {
     @CurrentUser() context: RequestContext,
     @Res({ passthrough: true }) response: Response,
   ): Promise<LogoutAllResponseDto> {
-    const revokedSessionCount = await this.authService.logoutAll(context);
+    const result = await this.authService.logoutAll(context);
 
     this.jwtCookieService.clearSessionCookies(response);
     this.jwtCookieService.clearDeviceTokenCookie(response);
 
-    return { revokedSessionCount };
+    return result;
   }
 
   /**
@@ -344,14 +345,12 @@ export class AuthController {
     @Body() changePasswordDto: ChangePasswordDto,
     @Req() request: Request,
   ): Promise<ChangePasswordResponseDto> {
-    const revokedSessionCount = await this.authService.changePassword(
+    return this.authService.changePassword(
       changePasswordDto,
       // Identifies the session to SPARE. Read from the cookie, never the body.
       this.jwtCookieService.readRefreshToken(request),
       context,
     );
-
-    return { revokedSessionCount };
   }
 
   /**
@@ -365,7 +364,7 @@ export class AuthController {
   @ApiOperation({
     summary: 'Rotate the refresh token',
     description:
-      'Authenticated by the REFRESH cookie, not the access one — 24-doc §3. It ' +
+      'Authenticated by the REFRESH cookie, not the access one. It ' +
       'is the only route that accepts it, which is what limits the blast radius ' +
       'of a stolen refresh token to this single endpoint.',
     // Set here rather than with `@ApiCookieAuth`, which would APPEND to the

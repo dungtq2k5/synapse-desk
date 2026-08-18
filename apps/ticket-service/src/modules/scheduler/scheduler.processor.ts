@@ -58,7 +58,7 @@ export class SchedulerProcessor extends WorkerHost {
     const startedAt = Date.now();
 
     // Wrapped so a run that never happens is visible as an ageing
-    // `last_succeeded_at` rather than as silence
+    // `last_succeeded_at` rather than as silence.
     return this.runs.track(job.name, async () => {
       try {
         // **A TRAILING window, not yesterday.** This is what makes one 02:00 UTC

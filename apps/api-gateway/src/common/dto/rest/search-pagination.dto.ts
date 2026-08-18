@@ -14,7 +14,7 @@ export class SearchPaginationDto {
   @Type(() => Number)
   // Guaranteed that this query will always be provided even if the client does not provide it
   /**
-   * Optional in the API and, without this, REQUIRED in the docs
+   * Optional in the API and, without this, REQUIRED in the docs.
    *
    * The plugin derives `required` from TYPESCRIPT optionality, not from
    * `@IsOptional()`. A field declared `page: number = 1` is non-optional to the
@@ -23,7 +23,7 @@ export class SearchPaginationDto {
    * without one.
    */
   @ApiPropertyOptional()
-  page: number = DEFAULT_SEARCH.PAGE;
+  readonly page: number = DEFAULT_SEARCH.PAGE;
 
   @IsOptional()
   @IsInt()
@@ -31,11 +31,11 @@ export class SearchPaginationDto {
   @Max(DEFAULT_SEARCH.MAX_LIMIT)
   @Type(() => Number)
   @ApiPropertyOptional()
-  limit: number = DEFAULT_SEARCH.LIMIT;
+  readonly limit: number = DEFAULT_SEARCH.LIMIT;
 
   @IsOptional()
   @IsString()
-  searchTerm?: string;
+  readonly searchTerm?: string;
 
   /**
    * Default sort column. `createdAt` suits most resources, but NOT all —
@@ -50,11 +50,11 @@ export class SearchPaginationDto {
   @IsOptional()
   @IsString()
   @ApiPropertyOptional()
-  sortBy: string = DEFAULT_SEARCH.SORT_BY;
+  readonly sortBy: string = DEFAULT_SEARCH.SORT_BY;
 
   @IsOptional()
   @IsString()
   @IsIn(SORT_ORDER_OPTIONS)
   @ApiPropertyOptional()
-  sortOrder: SortOrder = DEFAULT_SEARCH.SORT_ORDER;
+  readonly sortOrder: SortOrder = DEFAULT_SEARCH.SORT_ORDER;
 }

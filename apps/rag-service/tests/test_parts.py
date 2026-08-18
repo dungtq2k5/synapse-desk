@@ -48,7 +48,7 @@ def test_order_is_preserved():
     """Text before image, or after it, is the caller's decision to make.
 
     The reformulation prompt puts its instruction first and the file second;
-    the boundary in §6 wraps parts between two text markers. Neither works if
+    the boundary wraps parts between two text markers. Neither works if
     this reorders.
     """
     contents = _to_contents(["before", SCREENSHOT, "after"])

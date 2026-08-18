@@ -5,8 +5,8 @@ import { DEFAULT_SEARCH } from '@synapsedesk/common';
 /**
  * The pagination arguments every list query takes.
  *
- * **`first` carries no `@Max`, deliberately** It is CLAMPED to
- * `MAX_PAGE_SIZE` by `toPageQuery` in `common/mappers/pagination.mapper.ts`, and
+ * **`first` carries no `@Max`, deliberately**. It is CLAMPED to
+ * `MAX_PAGE_SIZE` by `toPageQuery` in `common/graphql/page-query.ts`, and
  * a validator here would turn that clamp into the rejection it exists to
  * replace — making the cap a breaking change for a client that worked
  * yesterday.
@@ -22,16 +22,20 @@ export class PageArgsGqlDto {
   @IsOptional()
   @IsInt()
   @Min(1)
-  page: number = DEFAULT_SEARCH.PAGE;
+  readonly page: number = DEFAULT_SEARCH.PAGE;
 
   @Field(() => Int, { defaultValue: DEFAULT_SEARCH.LIMIT })
   @IsOptional()
   @IsInt()
   @Min(1)
-  first: number = DEFAULT_SEARCH.LIMIT;
+  // No `@Max`: `toPageQuery` CLAMPS this to `MAX_PAGE_SIZE` rather than
+  // rejecting it. A validator here would turn the clamp into the 400 it exists
+  // to replace -- asking for 10,000 rows should return the first hundred, not
+  // fail the query.
+  readonly first: number = DEFAULT_SEARCH.LIMIT;
 
   @Field(() => String, { nullable: true })
   @IsOptional()
   @IsString()
-  searchTerm?: string;
+  readonly searchTerm?: string;
 }

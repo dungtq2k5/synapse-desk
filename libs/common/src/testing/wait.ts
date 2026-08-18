@@ -2,21 +2,17 @@
  * Polling helpers for asserting on work that lands AFTER the call that
  * triggered it.
  *
- * Several paths in this system are fire-and-forget by design — `AuditPublisher`,
- * the ledger write, the supersede emit — so the row they write arrives after
- * the method returns. A bare `setImmediate` is not enough: those are real round
- * trips to Postgres or Redis, and asserting immediately makes a test fail on
- * timing rather than on behaviour.
+ * Several paths here are fire-and-forget by design — `AuditPublisher`, the
+ * ledger write, the supersede emit — so the row arrives after the method
+ * returns. A bare `setImmediate` is not enough: those are real round trips, and
+ * asserting immediately fails on timing rather than behaviour.
  *
- * Two shapes, because the call sites genuinely want different things, and that
- * difference is exactly what had been copied into two near-identical local
- * helpers:
+ * Two shapes, because call sites want different things:
  *
- *   - `waitUntil` RETURNS whether it happened, so the spec can assert on it and
- *     get "expected true, received false" naming the assertion that failed.
- *   - `waitFor` THROWS, for the setup step that must have completed before the
- *     interesting assertions run — there, a boolean nobody checks would let the
- *     real failure surface later and somewhere else.
+ *   - `waitUntil` RETURNS whether it happened, so the spec asserts on it and
+ *     gets "expected true, received false" naming the failure.
+ *   - `waitFor` THROWS, for a setup step that must have completed before the
+ *     interesting assertions run.
  *
  * **Test-only**: excluded from this library's build.
  */

@@ -6,7 +6,7 @@ import { HttpMetricsInterceptor } from './http-metrics.interceptor';
 import { PlatformJobsModule } from '../platform-jobs/platform-jobs.module';
 
 /**
- * Metrics
+ * Metrics.
  *
  * `@Global` for one reason: `MetricsRegistry` is a single prom-client registry,
  * and providing it twice would give the process two disjoint sets of counters —

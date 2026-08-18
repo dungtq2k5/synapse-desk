@@ -28,7 +28,7 @@ import { QdrantService } from '../qdrant/qdrant.service';
  * What is deliberately ABSENT is auth-service, which this service calls for
  * entitlements on every document write. Depending on something is not the same
  * as being unable to serve without it — and treating it as such is how a single
- * Postgres failure in one service becomes a cluster-wide not-ready (§2).
+ * Postgres failure in one service becomes a cluster-wide not-ready.
  */
 @Module({
   imports: [PrismaModule, AiLedgerModule],

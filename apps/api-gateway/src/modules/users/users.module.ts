@@ -13,6 +13,6 @@ import { UsersResolver } from './users.resolver';
   // ParseUUIDPipe rejects the bootstrap call every SPA makes first.
   controllers: [UsersController, UserAdminController],
   providers: [UsersService, UserServiceGrpcClient, UsersResolver],
-  exports: [UsersService, UserServiceGrpcClient],
+  exports: [UsersService],
 })
 export class UsersModule {}

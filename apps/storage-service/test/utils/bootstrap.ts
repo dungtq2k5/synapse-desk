@@ -16,8 +16,8 @@ export type E2eFixture = {
 /**
  * Boots the real storage-service wiring against the EMULATOR and a real Redis.
  *
- * Same shape as ticket-service's, minus Prisma — this service has no database
- * (§1.2). What "real infra, no mocks" means here is the emulator plus a
+ * Same shape as ticket-service's, minus Prisma — this service has no database.
+ * What "real infra, no mocks" means here is the emulator plus a
  * test-index Redis, and both are torn down between tests.
  */
 export async function bootstrapE2eTest(): Promise<E2eFixture> {
@@ -29,7 +29,7 @@ export async function bootstrapE2eTest(): Promise<E2eFixture> {
   const redis = moduleRef.get<Redis>(STORAGE_REDIS);
 
   // `compile()` alone does not fire `onModuleInit`, so the Firebase app has not
-  // been initialised yet and `firebase.bucket` would be undefined.
+  // been initialized yet and `firebase.bucket` would be undefined.
   await moduleRef.init();
 
   const reset = async (): Promise<void> => {

@@ -18,14 +18,9 @@ import { SearchPaginationDto } from '../../../../common/dto/rest/search-paginati
 import { ToBoolean } from '../../../../common/decorators/to-boolean.decorator';
 
 export class SubmitFeedbackDto {
-  /**
-   * A thumb, not a scale.
-   *
-   * `@IsIn` over the shared constant rather than a `@Min(-1) @Max(1)` range,
-   * which would also admit 0 — and 0 is the proto zero value the LIST request
-   * reads as "no filter". A rating of zero would mean two different things in
-   * two places.
-   */
+  // `@IsIn`, not `@Min(-1) @Max(1)`: a range would also admit 0, and 0 is the
+  // proto zero value the LIST request reads as "no filter".
+  /** A thumb: `1` for up, `-1` for down. */
   @Type(() => Number)
   @IsInt()
   @IsIn(FEEDBACK_RATINGS)

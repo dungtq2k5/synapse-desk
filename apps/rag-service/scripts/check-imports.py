@@ -176,7 +176,7 @@ def source_files(directory: str) -> list[pathlib.Path]:
     ]
 
 
-def main() -> int:
+def main() -> int: # NOSONAR
     owner = build_owner_index()
     failures: list[str] = []
     checked = 0

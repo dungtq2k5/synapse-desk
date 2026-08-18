@@ -16,7 +16,7 @@ import {
 } from '../config/graphql-limits.config';
 
 /**
- * Field names resolved by a call to ANOTHER SERVICE
+ * Field names resolved by a call to ANOTHER SERVICE.
  *
  * A hand-maintained list, and deliberately so: the alternative is reading a
  * custom directive or an extension off the schema, which means the weighting
@@ -39,14 +39,6 @@ export const CROSS_SERVICE_FIELDS = new Set<string>([
 ]);
 
 /**
- * Scores a query before it executes, and refuses it if it is too expensive.
- *
- * **`didResolveOperation` is the hook that matters**: it runs after parse and
- * validation and BEFORE execution, so a refusal costs nothing downstream. A
- * check inside a resolver would fire after the fan-out it was meant to prevent —
- * which its test asserts by checking no gRPC stub was called.
- */
-/**
  * The plugin type, taken from `ApolloDriverConfig` rather than from
  * `@apollo/server` directly.
  *
@@ -60,6 +52,14 @@ export const CROSS_SERVICE_FIELDS = new Set<string>([
  */
 type DriverPlugin = NonNullable<ApolloDriverConfig['plugins']>[number];
 
+/**
+ * Scores a query before it executes, and refuses it if it is too expensive.
+ *
+ * **`didResolveOperation` is the hook that matters**: it runs after parse and
+ * validation and BEFORE execution, so a refusal costs nothing downstream. A
+ * check inside a resolver would fire after the fan-out it was meant to prevent —
+ * which its test asserts by checking no gRPC stub was called.
+ */
 export function queryCostPlugin(
   maxComplexity = MAX_QUERY_COMPLEXITY,
 ): DriverPlugin {
@@ -80,7 +80,7 @@ export function queryCostPlugin(
           schema: GraphQLSchema;
         }) {
           // The schema is what knows each list field's declared default — the
-          // query AST alone cannot, which is the whole of §1.3's blind spot.
+          // query AST alone cannot, which is the whole of the depth limit's blind spot.
           const cost = scoreDocument(
             document,
             operationName ?? undefined,
@@ -107,7 +107,7 @@ export function queryCostPlugin(
 }
 
 /**
- * The default page size each list field declares, by field name
+ * The default page size each list field declares, by field name.
  *
  * **Only fields that DECLARE a `first` / `limit` argument appear here**, and
  * that restriction is load-bearing. `TicketPage.items` is also a list, and its
@@ -285,12 +285,12 @@ function listSizeOf(
   );
 
   if (!argument) {
-    // **The blind spot** `listSizeOf` reads the QUERY, and a
+    // **The blind spot**. `listSizeOf` reads the QUERY, and a
     // client that omits `first` leaves nothing to read — so the field scored as
     // one item while the resolver's own `defaultValue` returned fifty.
     //
     // Sharp because of which field it is: `Ticket.messages` declares
-    // `defaultValue: 50` AND is the one allowlisted direct gRPC call (§5), so
+    // `defaultValue: 50` AND is the one allowlisted direct gRPC call, so
     // `tickets(first: 50) { messages { … } }` is fifty calls returning fifty
     // rows each — and the scorer charged it fifty. **The one sanctioned N+1 in
     // the system was the one under-priced by 50x.**

@@ -22,7 +22,7 @@ class Config:
     #: `ingestion-service`, for the durable ledger row. The quota COUNTER does
     #: not go through it — that is a direct Redis INCRBY (RDM §1.14).
     ingestion_service_url: str
-    #: Absent in tests, where the embedding client is substituted (§2.6) so the
+    #: Absent in tests, where the embedding client is substituted so the
     #: retrieval suite needs no API key, no network and no per-run spend.
     gemini_api_key: str
 

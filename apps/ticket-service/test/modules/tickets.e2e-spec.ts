@@ -74,7 +74,7 @@ describe('Tickets (e2e)', () => {
     // Stubbed rather than merely observed. The cross-service validation is a
     // real gRPC call to a peer that is not running in this suite, and the
     // publisher is fire-and-forget into a broker whose delivery nothing here
-    // asserts. Both have their own dedicated tests — §2.2 for the wire, and the
+    // asserts. Both have their own dedicated tests.2 for the wire, and the
     // NOT_FOUND case below for the validation.
     assertUserExists = jest
       .spyOn(authReference, 'assertUserExists')
@@ -145,7 +145,7 @@ describe('Tickets (e2e)', () => {
     });
 
     it('11. an authorId that does not resolve is INVALID_ARGUMENT, and NOTHING is written', async () => {
-      // §1.1's write-time validation, actually running rather than documented.
+      // Write-time validation, actually running rather than documented.
       // There is no foreign key that could catch this — the users table is in
       // another database.
       assertUserExists.mockRejectedValue(
@@ -837,14 +837,14 @@ describe('Tickets (e2e)', () => {
   });
 
   /**
-   * The batch contract
+   * The batch contract.
    *
    * The property specific to THIS service: `visibilityScope` applies to a batch
    * read exactly as it does to the list. A batch RPC that skipped it would be a
    * way to fetch any ticket in the tenant one id at a time — which is precisely
    * what "it is just a simple `WHERE id IN (…)`" makes easy to miss.
    */
-  describe('§1 ListTicketsByIds — the batch contract', () => {
+  describe('ListTicketsByIds — the batch contract', () => {
     it("1. **returns only the caller's tenant**", async () => {
       const mine = await tickets.createTicket(createRequest(), member());
       // A second tenant is just a second set of ids — this service holds no

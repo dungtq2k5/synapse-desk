@@ -1,4 +1,5 @@
 import { Field, ID, Int, ObjectType } from '@nestjs/graphql';
+import { AnswerStatus } from '@synapsedesk/common';
 
 /**
  * One message in a ticket thread, as the GraphQL schema serves it.
@@ -37,6 +38,9 @@ export class TicketMessageResponseGqlDto {
   @Field(() => Boolean)
   isInternalNote!: boolean;
 
+  // Free-form on purpose -- the provider's model id, e.g. `gemini-2.0-flash`.
+  // NOT `AiModelTier`, which is the FAST/QUALITY knob a tenant sets; the tier
+  // chooses the model, it does not name it.
   @Field(() => String, { nullable: true })
   modelName!: string | null;
 
@@ -66,12 +70,15 @@ export class TicketMessageResponseGqlDto {
    * How this AI message was produced — `REFUSED`, `DOC_ANSWER`, `DOC_MISSING`.
    * Null for a human message.
    *
-   * **Exposed here as well as on REST** An agent scrolling a
+   * **Exposed here as well as on REST**. An agent scrolling a
    * conversation should be able to tell a refusal from an escalation from a
    * real answer, and that is true whichever transport they read it through.
    * Before this it lived only in a WebSocket frame nobody persisted, so the
    * distinction vanished the moment the socket closed.
    */
+  // `AnswerStatus`, matching the REST DTO -- this was `string` on the GraphQL
+  // side alone, which is the divergence `dto-contract.e2e-spec.ts` exists to
+  // catch. Still `@Field(() => String)`: the SDL keeps its scalar shape.
   @Field(() => String, { nullable: true })
-  answerStatus!: string | null;
+  answerStatus!: AnswerStatus | null;
 }

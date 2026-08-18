@@ -41,7 +41,7 @@ export function expectedIntervalMs(name: ScheduledJobName): number {
 }
 
 /**
- * **Alerts on STALENESS, not on failure**
+ * **Alerts on STALENESS, not on failure**.
  *
  * A failed job logs. A job that never ran logs nothing at all, which is exactly
  * the case that occurred here: seven jobs with no scheduler, producing zeros
@@ -69,7 +69,7 @@ export function checkStaleness(
     // No row at all. Reported as its own reason rather than folded into
     // `stale`, because the two need different responses: "never ran" is a
     // wiring bug and "stale" is an outage.
-    if (!row || !row.lastSucceededAt) {
+    if (!row?.lastSucceededAt) {
       return [
         {
           jobName: name,
@@ -98,3 +98,12 @@ export function checkStaleness(
     return [];
   });
 }
+
+/**
+ * What the platform job surface reports for one row's `health`.
+ *
+ * `StalenessVerdict['reason']` plus the two states that are not verdicts:
+ * `healthy` (a job that ran on time) and `step` (a per-step row, which is never
+ * judged for staleness because a step only runs when its parent does).
+ */
+export type JobHealth = StalenessVerdict['reason'] | 'healthy' | 'step';

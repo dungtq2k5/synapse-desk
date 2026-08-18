@@ -21,7 +21,7 @@ import { InboundSignatureGuard } from '../../common/guards/inbound-signature.gua
   // existing connections — email adds no new peer, only new calls.
   imports: [
     AuthModule,
-    // The `In-Reply-To` fallback's owner
+    // The `In-Reply-To` fallback's owner.
     NotificationGrpcModule,
     // **The gateway's first NATS publisher.** It has consumed events since
     // And never emitted one, so this is a new client rather than a

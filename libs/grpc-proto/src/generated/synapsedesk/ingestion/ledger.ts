@@ -14,7 +14,7 @@ import { DocumentFlagType } from "./document";
 
 /**
  * The ledger's enumerated values, declared HERE so both languages GENERATE
- * them — 13-doc §1.1.
+ * them.
  *
  * These values now exist in TypeScript and in Python, and a hand-copied
  * `GREETING_CLASSIFY` that becomes `GREETING_CLASSIFICATION` on one side meters
@@ -36,13 +36,13 @@ export enum AiGenerationPurpose {
   AI_GENERATION_PURPOSE_REFORMULATION = 7,
   AI_GENERATION_PURPOSE_EMBEDDING = 8,
   /**
-   * AI_GENERATION_PURPOSE_REVIEW - The co-pilot's review pass (13-doc §4.2). A distinct purpose because it is
+   * AI_GENERATION_PURPOSE_REVIEW - The co-pilot's review pass. A distinct purpose because it is
    * a distinct cost: a draft with two review passes is three generations, and
    * folding them under DRAFT would make the per-draft cost look like one call.
    */
   AI_GENERATION_PURPOSE_REVIEW = 9,
   /**
-   * AI_GENERATION_PURPOSE_INJECTION_CLASSIFY - Layer B of prompt-injection detection on `Ask` and `Draft` — 33-doc §3.3.
+   * AI_GENERATION_PURPOSE_INJECTION_CLASSIFY - Layer B of prompt-injection detection on `Ask` and `Draft`.
    *
    * **Not booked by `Chat`**, whose detection is fused into the greeting
    * classification it was already making and stays under GREETING_CLASSIFY,
@@ -65,7 +65,7 @@ export enum AiGenerationStatus {
 
 /**
  * Drafts only, written after the fact when the agent acts — or when the hourly
- * sweep gives up and calls it DISCARDED (12-doc §4.3).
+ * sweep gives up and calls it DISCARDED.
  *
  * **DISCARDED is what makes acceptance rate mean anything.** Without the sweep
  * the denominator is drafts that were USED, and the metric reports ~100%
@@ -113,7 +113,7 @@ export interface RecordGenerationRequest {
     | undefined;
   /**
    * What the generation SAW. Empty is the knowledge-gap signal, and it is a
-   * signal rather than an omission — 11-doc §1.6.
+   * signal rather than an omission.
    */
   retrievedChunkIds: string[];
   /**
@@ -160,7 +160,7 @@ export interface RecordGenerationOutcomeResponse {
 }
 
 /**
- * AI spend and quality, from `ai_generation_daily_stats` — 19-doc §3.2.
+ * AI spend and quality, from `ai_generation_daily_stats`.
  *
  * Never from `ai_generations` itself: that table is retention-rolled (RDM Table
  * 29), so a query against raw rows silently loses history the moment retention
@@ -216,7 +216,7 @@ export interface AiUsageResponse {
    */
   aiModelTier: AiModelTier;
   /**
-   * Draft quality, and its denominator needs the DISCARDED sweep (12-doc §4.3)
+   * Draft quality, and its denominator needs the DISCARDED sweep
    * — without it, acceptance divides by drafts that were USED and reports
    * ~100% regardless of quality.
    */
@@ -229,7 +229,7 @@ export interface AiUsageResponse {
     | Timestamp
     | undefined;
   /**
-   * The last day `ai_generation_daily_stats` covers — 20-doc §4.3. See the note
+   * The last day `ai_generation_daily_stats` covers. See the note
    * on `ticket.OverviewResponse.data_through`; this is the same fact for a
    * different table, and the two can disagree when one scheduler is down.
    */
@@ -293,7 +293,7 @@ export interface DocumentAnalyticsResponse {
 
 /**
  * ---------------------------------------------------------------------------
- * Job health -- 20-doc §4.1, §4.4.
+ * Job health.
  *
  * **Alerting on staleness rather than on failure.** A failed job logs; a job
  * that never ran logs nothing at all, which is precisely what happened here --

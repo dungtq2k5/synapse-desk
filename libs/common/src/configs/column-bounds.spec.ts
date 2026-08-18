@@ -9,28 +9,19 @@ import { MAX_DOCUMENT_TITLE_LENGTH } from './document.config';
 /**
  * Every DTO bound that MIRRORS a `VarChar` column actually matches it.
  *
- * **The claim is already written down; this is what makes it true.**
- * `MAX_ATTACHMENT_FILE_NAME_LENGTH`'s docblock says it plainly — *"two places
- * have to agree, and if they drift the DTO accepts what the database rejects —
- * a 500 where a 400 belongs, on a request the caller could have fixed."* That
- * is exactly right and nothing checked it: the constant removed the drift
- * BETWEEN the three DTOs that carry it, and left the drift between the constant
- * and the column it exists to mirror.
- *
- * **It is not one constant's problem.** Three bounds pair with a `VarChar(255)`
- * across two services, and all three agree today by coincidence of everyone
- * having typed 255 twice. A `@db.VarChar(200)` in a migration would break the
- * pair silently, and the symptom arrives as a Postgres error surfacing as a 5xx
- * on a request that validated cleanly.
+ * Three bounds pair with a `VarChar(255)` across two services, and all three
+ * agree today by coincidence of everyone having typed 255 twice. A
+ * `@db.VarChar(200)` in a migration would break the pair silently, and the
+ * symptom arrives as a Postgres error surfacing as a 5xx on a request that
+ * validated cleanly.
  *
  * **Read out of `schema.prisma` rather than restated**, following
- * `job-run-schema.spec.ts` — the drift guard for a model declared in three
- * databases, and the same shape of problem. A test that hard-coded 255 would
- * agree with a broken schema.
+ * `job-run-schema.spec.ts`: a test that hard-coded 255 would agree with a
+ * broken schema.
  *
- * A bound with NO column behind it does not belong here: `MAX_OBJECT_PATH_LENGTH`
- * guards a `@db.Text` and its own docblock says so — *"a bound, not a
- * contract"*. Adding it would invent a constraint the database does not have.
+ * A bound with NO column behind it does not belong here —
+ * `MAX_OBJECT_PATH_LENGTH` guards a `@db.Text`, so adding it would invent a
+ * constraint the database does not have.
  */
 type Pairing = {
   readonly constant: number;

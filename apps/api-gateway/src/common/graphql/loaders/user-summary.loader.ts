@@ -4,11 +4,12 @@ import {
   USER_SERVICE_NAME,
   UserProjection,
   type UserServiceClient,
-  type UserSummary,
 } from '@synapsedesk/grpc-proto';
 import { BATCH_ID_LIMIT, type RequestContext } from '@synapsedesk/common';
 import { firstValueFrom } from 'rxjs';
 import { createCachedLoader } from './loaders.factory';
+import { toUserSummaryGqlDto } from '../../../modules/users/user.mapper';
+import type { UserSummaryResponseGqlDto } from '../../../modules/users/dto/graphql/user-response.gql-dto';
 import type { CacheService } from '../../cache/cache.service';
 import { ENTITY_TTL_SECONDS, entityScope } from '../../config/cache.config';
 
@@ -20,7 +21,7 @@ import { ENTITY_TTL_SECONDS, entityScope } from '../../config/cache.config';
  * serving every login in the system calls that an outage rather
  * than a missed optimisation, and it is triggered by a query string.
  *
- * **And now Redis in front of that** A `UserSummary` is the ideal
+ * **And now Redis in front of that**. A `UserSummary` is the ideal
  * thing to cache and that is not a coincidence: it is small, read on nearly
  * every edge in the schema, and changed by four handlers nobody calls often. It
  * is also shared across QUERIES — one cached user serves `Ticket.assignee`,
@@ -34,13 +35,13 @@ export function createUserSummaryLoader(
 ) {
   const users = client.getService<UserServiceClient>(USER_SERVICE_NAME);
 
-  return createCachedLoader<UserSummary>({
+  return createCachedLoader<UserSummaryResponseGqlDto>({
     cache,
     organizationId: () => context().organizationId,
     scopeOf: (id) => entityScope('user', id),
     ttlSeconds: ENTITY_TTL_SECONDS,
-    keyOf: (user) => user.userId,
-    // Never more than the RPC will accept, property 5. Without
+    keyOf: (user) => user.id,
+    // Never more than the RPC will accept. Without
     // this, one page of 100 tickets with two user edges is a 200-id batch that
     // the service refuses outright, and the whole column nulls.
     //
@@ -54,7 +55,7 @@ export function createUserSummaryLoader(
           {
             organizationId: context().organizationId ?? '',
             userIds: [...ids],
-            // **`true`** The notification caller wants "who can act
+            // **`true`**. The notification caller wants "who can act
             // on this?"; a loader wants "who IS this?". A ticket assigned to
             // somebody locked this morning must still render their name, and
             // excluding them shows a blank where "Former employee" belongs.
@@ -69,9 +70,12 @@ export function createUserSummaryLoader(
       );
 
       // The alignment moved INTO `createCachedLoader`, where it now has to hold
-      // across a partial hit as well test 2. Returning the rows is
+      // across a partial hit as well. Returning the rows is
       // all this function does.
-      return response.summaries;
+      // Mapped HERE rather than in the resolvers: a loader that answers
+      // proto forces all six `@ResolveField`s to map, and a routing layer
+      // that maps is how two edges over one RPC drift apart.
+      return response.summaries.map((summary) => toUserSummaryGqlDto(summary));
     },
   });
 }

@@ -93,7 +93,7 @@ export class OpsGrpcController {
   }
 
   /**
-   * `/version` for a service with no HTTP port
+   * `/version` for a service with no HTTP port.
    *
    * **Every service, not just the gateway.** A rolling deploy where one service
    * lagged is precisely the state this diagnoses, and a gateway-only version

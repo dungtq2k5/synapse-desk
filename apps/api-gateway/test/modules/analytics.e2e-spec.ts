@@ -25,7 +25,7 @@ import { grpcError, timestamp } from '../fixtures/wire';
  * **partial-failure shape** for the cross-service endpoints, and that every
  * rate reaches a client with its denominator.
  */
-describe('§4 Analytics at the HTTP boundary (e2e)', () => {
+describe('Analytics at the HTTP boundary (e2e)', () => {
   let fx: E2eFixture;
 
   const agentId = faker.string.uuid();
@@ -389,7 +389,7 @@ describe('§4 Analytics at the HTTP boundary (e2e)', () => {
     const stubNames = () =>
       fx.stubs.user.listUsersByIds.mockReturnValue(
         of({
-          // **`summaries`, not `items`** This path now asks for the
+          // **`summaries`, not `items`**. This path now asks for the
           // SUMMARY projection, so the notification-shaped `items` is empty on
           // the wire. Note what is NOT here any more: `email`. A performance
           // table renders names, and receiving an address it would have to
@@ -605,7 +605,7 @@ describe('§4 Analytics at the HTTP boundary (e2e)', () => {
     });
   });
 
-  describe('export — 19-doc §5', () => {
+  describe('export', () => {
     const exportId = faker.string.uuid();
 
     const wireExport = (overrides: Record<string, unknown> = {}) => ({

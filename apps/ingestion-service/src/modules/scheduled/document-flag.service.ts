@@ -16,20 +16,18 @@ import { PrismaService } from '../prisma/prisma.service';
 const UNCITED_MIN_RETRIEVALS = 20;
 
 /**
- * Corpus quality flags — §4.2.
+ * Corpus quality flags.
  *
- * **`UNRETRIEVED` and `UNCITED` were previously one flag under a name that fit
- * only one of them**, and the distinction is the whole value:
+ * `UNRETRIEVED` and `UNCITED` are separate, and the distinction is the value:
  *
  * | Flag | Condition | What it means |
  * | --- | --- | --- |
  * | `UNRETRIEVED` | `retrieval_count = 0` | Nobody's question ever came near it. Mis-titled, or genuinely unwanted |
- * | `UNCITED` | retrieved often, cited never | **The interesting one.** The retriever keeps selecting it and the generator keeps declining to use it — it is occupying a context slot a useful document would hold. *Polluting* context, which is worse than being ignored |
+ * | `UNCITED` | retrieved often, cited never | **The interesting one.** The retriever keeps selecting it and the generator keeps declining to use it — occupying a context slot a useful document would hold |
  *
- * These read the counters the §4.1 projection writes, never `ai_generations`
- * directly. A flag defined against the ledger stops working the moment
- * retention rolls it up — silently, reporting zero findings, which reads
- * exactly like a healthy corpus.
+ * These read the counters the chunk-usage projection writes, never
+ * `ai_generations` directly — see
+ * `docs/decisions/0025-chunk-usage-is-a-projection.md`.
  */
 @Injectable()
 export class DocumentFlagService {

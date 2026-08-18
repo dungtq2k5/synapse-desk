@@ -17,7 +17,7 @@ import { RedisService } from '../../src/common/redis/redis.service';
 import { compareAlphabetically } from '@synapsedesk/common';
 
 /**
- * The shared cache, against a REAL Redis
+ * The shared cache, against a REAL Redis.
  *
  * The unit suite beside `cache.service.ts` covers key construction and the
  * fail-open behaviour with a fake. These two need the real thing: one is about
@@ -25,7 +25,7 @@ import { compareAlphabetically } from '@synapsedesk/common';
  * and the other is about what an actually-unreachable Redis does, which a fake
  * that throws on command can only approximate.
  */
-describe('§29 the shared cache (e2e)', () => {
+describe('The shared cache (e2e)', () => {
   let fx: E2eFixture;
   let cache: CacheService;
 
@@ -44,7 +44,7 @@ describe('§29 the shared cache (e2e)', () => {
 
   afterAll(() => fx.close());
 
-  describe('§1 test 1 — two tenants never share an entry', () => {
+  describe('Two tenants never share an entry', () => {
     it("**the second tenant receives ITS OWN answer, not the first tenant's**", async () => {
       // The whole reason this service exists, and asserted on the retrieved
       // VALUE rather than on key inequality: two keys can differ and a lookup
@@ -89,7 +89,7 @@ describe('§29 the shared cache (e2e)', () => {
     });
   });
 
-  describe('§1 test 4 — a cache fails OPEN', () => {
+  describe('A cache fails OPEN', () => {
     it('**an unreachable Redis still answers, from the origin**', async () => {
       // A cache outage must make the product slow, not down. Against a port
       // nothing is listening on, so the failure is a real connection refusal
@@ -127,7 +127,7 @@ describe('§29 the shared cache (e2e)', () => {
     });
   });
 
-  describe('§3 cached reads', () => {
+  describe('Cached reads', () => {
     const permissionsAgent = (organizationId: string) =>
       authenticatedAgent(fx.app, {
         organizationId,
@@ -257,7 +257,7 @@ describe('§29 the shared cache (e2e)', () => {
     });
   });
 
-  describe("§3 `varyBy: 'caller'` — the leak it exists to prevent", () => {
+  describe("`varyBy: 'caller'` — the leak it exists to prevent", () => {
     const inDepartments = (departmentIds: string[]) =>
       authenticatedAgent(fx.app, {
         organizationId: ORG_A,

@@ -8,7 +8,7 @@ export type ParsedPage = {
   pageNumber: number | null;
   markdown: string;
   /**
-   * How the text was obtained
+   * How the text was obtained.
    *
    * `ocr` text is FLAT: tesseract emits no headings, so an OCR'd page falls
    * through to the chunker's length-based split exactly as a `.txt` file does,
@@ -24,10 +24,10 @@ export type ParsedDocument = {
   /** sha256 of the actual BYTES — see the note in `parse`. */
   contentHash: string;
   /**
-   * How many pages the document HAS, which is not `pages.length`
+   * How many pages the document HAS, which is not `pages.length`.
    *
    * Pages with no usable text are absent from `pages`, so this is the only way
-   * downstream can tell that page 7 existed at all. §6's check compares the
+   * downstream can tell that page 7 existed at all. The page-count check compares the
    * page numbers that survived chunking against this number, which is the one
    * comparison that catches BOTH silent drops: the parser's filter and the
    * chunker's `MIN_CHUNK_TOKENS`.
@@ -50,40 +50,23 @@ export type ParsedDocument = {
 const LINE_TOLERANCE_Y = 2;
 
 /**
- * Bytes -> markdown, per format
+ * Bytes -> markdown, per format.
  *
- * **Markdown rather than plain text**, because the headings are what the
- * chunker splits on and what turns a retrieved chunk into "page 4, §2.1"
- * instead of a character offset. Extracting to plain text throws that structure
- * away at the one moment it is still present.
+ * **Markdown rather than plain text**, because the headings are what the chunker
+ * splits on and what turns a retrieved chunk into "page 4, §2.1" instead of a
+ * character offset.
  *
- * **Page numbers survive for PDFs and are NULL elsewhere**, rather than being
- * faked as 1. A DOCX has no pages until something paginates it, and a citation
- * that says "page 1" of a fifty-page Word document is worse than one that says
- * nothing — it is confidently wrong, and a user who clicks through learns not
- * to trust citations.
+ * **Page numbers survive for PDFs and are NULL elsewhere**, never faked as 1. A
+ * DOCX has no pages until something paginates it, and a citation saying "page 1"
+ * of a fifty-page document is confidently wrong.
  *
- * **A tenant's document never leaves the deployment, and never touches the
- * disk** That is the requirement; "100% in-process", which this
- * docblock used to claim, was the shape the requirement happened to take before
- * OCR existed.
+ * **A tenant's document never leaves the deployment and never touches the
+ * disk.** Scanned pages shell out to `pdftoppm` and `tesseract`, but both accept
+ * stdin and write stdout, so the rendered image never lands.
+ * `document-parser.service.spec.ts` asserts all three halves: network stubbed to
+ * throw, the subprocess table, and an empty `TMPDIR` after a scanned page.
  *
- * The claim changed because scanned pages now run `pdftoppm` and `tesseract`,
- * which are system binaries. **All three reasons behind the original rule
- * survive that**: the binaries are in our own image, so no document reaches a
- * third party; they bill nothing per page; and their failure mode is garbled
- * text rather than *better output*, which is what made a vision-API parser
- * dangerous — nothing would have looked wrong.
- *
- * **What "never touches the disk" is buying**, and why it is stated rather than
- * assumed: both tools accept stdin and write stdout, so the PDF is piped in and
- * the rendered image never lands (§3.1). "Documents never leave the deployment"
- * reads as an empty promise if the same document is sitting in `/tmp` while it
- * is read, and the temp-file alternative was rejected for exactly that reason.
- *
- * `document-parser.service.spec.ts` asserts all three halves: the network
- * stubbed to throw, the subprocess table, and an empty `TMPDIR` after a scanned
- * page.
+ * See `docs/decisions/0016-ocr-is-a-per-page-branch.md`.
  */
 @Injectable()
 export class DocumentParserService {
@@ -104,7 +87,7 @@ export class DocumentParserService {
     bytes: Buffer,
     fileType: string,
     /**
-     * ISO 639-1 codes for OCR
+     * ISO 639-1 codes for OCR.
      *
      * Arrives on `DocumentUploadedEvent` rather than being read from the
      * document row, so the worker still needs no lookup to start. Empty is
@@ -132,7 +115,7 @@ export class DocumentParserService {
     const pages = await this.extract(bytes, fileType);
 
     // One "page" that is not a page — DOCX, TXT and MD have no pagination, so
-    // there is nothing for §6 to count and nothing that could go missing
+    // there is nothing for the page-count check to count and nothing that could go missing
     // page-wise.
     return { pages, contentHash, pageCount: 0, failedPages: [] };
   }
@@ -163,9 +146,9 @@ export class DocumentParserService {
    * PDF -> one `ParsedPage` per page, via **pdfjs-dist**.
    *
    * **Page-by-page is the citation guarantee**, and it is why this does not use
-   * a converter that returns one string
+   * a converter that returns one string.
    *
-   * Trap 2 of §3.2 is the package landscape here, and it is genuinely
+   * Trap 2 is the package landscape here, and it is genuinely
    * confusing: `@opendocsg/pdf2md` returns the whole document with
    * `<!-- PAGE_BREAK -->` markers, so page numbers survive only by splitting a
    * magic comment; the bare `pdf2md` on npm is not a text extractor at all — it
@@ -204,7 +187,7 @@ export class DocumentParserService {
       // the type is what is narrow.
       isEvalSupported: false,
       useSystemFonts: false,
-      // **Pointed at the package's own bundled fonts** F5.
+      // **Pointed at the package's own bundled fonts.**
       //
       // `undefined` made pdf.js log `UnknownErrorException: Ensure that the
       // standardFontDataUrl API parameter is provided` once per document, on
@@ -220,7 +203,7 @@ export class DocumentParserService {
     const pages: ParsedPage[] = [];
     const thin: number[] = [];
     // Read before the loop, because `task.destroy()` in the `finally` makes the
-    // document unusable and this number outlives it — §6 compares against it.
+    // document unusable and this number outlives it — the page-count check compares against it.
     const pageCount = document.numPages;
 
     try {
@@ -229,7 +212,7 @@ export class DocumentParserService {
         const content = await page.getTextContent();
         const markdown = toLines(content.items);
 
-        // **"Too little", not "empty"** `trim().length > 0` was
+        // **"Too little", not "empty"**. `trim().length > 0` was
         // the wrong test: a page carrying a scanner stamp or a partial OCR
         // layer has a handful of characters and is still an image.
         if (markdown.trim().length >= MIN_PAGE_CHARACTERS) {
@@ -269,7 +252,7 @@ export class DocumentParserService {
    * page rather than per document.
    *
    * Sequential rather than parallel: each page already runs `pdftoppm` over the
-   * whole file (§3.1), and N of those at once multiplies peak memory by N on a
+   * whole file, and N of those at once multiplies peak memory by N on a
    * worker that is also embedding.
    */
   private async ocrThinPages(
@@ -315,32 +298,23 @@ export class DocumentParserService {
   }
 
   /**
-   * DOCX -> markdown, via **mammoth then turndown** F1.
+   * DOCX -> markdown, via **mammoth then turndown**.
    *
-   * **It is easy to misdiagnose which half was broken**
-   * "Mammoth plus custom regular expressions" reads as one failing unit and is
-   * not: mammoth was the working half, and the 80-line hand-written
-   * `htmlToMarkdown` after it was the liability. Replacing that one function
-   * with turndown fixes the actual defect, and always could have.
+   * Mammoth was always the working half; the 80-line hand-written
+   * `htmlToMarkdown` after it was the liability. `turndown-plugin-gfm` emits
+   * correct tables, delimiter row included.
    *
-   * This also replaced `@aidalinfo/office-to-markdown`, taken earlier on the
-   * strength of its two advertised features — GFM tables and OMML math — **both
-   * of which are broken** (traps 6 and 7). It is a thin wrapper around these
-   * same two packages (`jszip`, `mammoth`, `turndown`) plus a layer that damages
-   * both of turndown's relevant outputs: tables without a GFM delimiter row, and
-   * OMML converted to double-escaped LaTeX that renders as a literal `\frac`.
-   * Undoing that in a repair pass was the worst position available — depending
-   * on a package *and* maintaining patches for it, where an upstream fix would
-   * silently double the repair.
-   *
-   * `turndown-plugin-gfm` emits correct tables, delimiter row included, which
-   * is the whole reason it exists.
+   * **`@aidalinfo/office-to-markdown` was removed.** It is a thin wrapper around
+   * these same packages plus a layer that damages both of turndown's relevant
+   * outputs — tables without a GFM delimiter row, and OMML converted to
+   * double-escaped LaTeX rendering as a literal `\frac`. Repairing that meant
+   * depending on a package *and* maintaining patches for it.
    *
    * **Math is dropped, and that is the trade.** Mammoth ignores OMML, so a
-   * formula becomes absent rather than wrong. The chunk text is *embedded*, and
-   * an embedding model reads `$\frac{1}{2}$` as a string — LaTeX buys no
-   * retrieval quality over `1/2` and tokenizes worse. If a tenant ever needs
-   * formulas, mammoth's `transformDocument` hook is where an OMML step goes.
+   * formula becomes absent rather than wrong — and the chunk text is
+   * *embedded*, where `$\frac{1}{2}$` reads as a string that tokenizes worse
+   * than `1/2`. If a tenant ever needs formulas, mammoth's `transformDocument`
+   * hook is where an OMML step goes.
    */
   private async parseDocx(bytes: Buffer): Promise<ParsedPage[]> {
     const mammoth = await import('mammoth');
@@ -375,24 +349,19 @@ export class DocumentParserService {
 /**
  * Loads pdfjs through **Node's own `require`**, not through `import()`.
  *
- * pdfjs-dist is ESM-only — there is no CJS build in v4 or v5, and its `main` is
- * a `.mjs` — and this service compiles to CommonJS, where TypeScript downlevels
- * `await import()` into a plain `require()`. That works in production because
- * Node >= 22.12 can `require()` an ESM module, but it does NOT work under jest,
- * whose module registry intercepts `require` and hands the `.mjs` to a CJS
- * transformer that then chokes on `import.meta.url`.
+ * pdfjs-dist is ESM-only and this service compiles to CommonJS, where
+ * TypeScript downlevels `await import()` into `require()`. That works in
+ * production — Node >= 22.12 can `require()` an ESM module — but not under
+ * jest, whose module registry intercepts `require` and hands the `.mjs` to a
+ * CJS transformer that chokes on `import.meta.url`.
  *
  * **This package is the ONLY reason `engines.node` is pinned.** Every other
- * dependency in the parsing stack is require-able on any Node: mammoth,
- * turndown and turndown-plugin-gfm are real CommonJS, and js-tiktoken and
- * @langchain/textsplitters declare `type: module` but ship `.cjs` entries.
- * Drop pdfjs and the floor goes with it.
+ * dependency in the parsing stack is require-able on any Node.
  *
  * `process.getBuiltinModule('module')` returns the real builtin regardless of
- * the sandbox, so the require below is Node's, and the same code path runs in
- * tests and in production. The alternative — mocking pdfjs in unit tests —
- * would leave the page-number guarantee, which is what every citation in the
- * product resolves to, asserted against a fake.
+ * the sandbox, so the same code path runs in tests and in production. Mocking
+ * pdfjs instead would leave the page-number guarantee — what every citation
+ * resolves to — asserted against a fake.
  *
  * The `legacy` build specifically: the default entry targets browsers and pulls
  * in DOM globals that do not exist here.
@@ -423,31 +392,23 @@ function standardFontsPath(): string {
 /**
  * Groups positioned text runs into LINES.
  *
- * A PDF has no lines — only runs with a transform matrix — so the previous
- * implementation joined every run on a page with a space and produced one
- * enormous paragraph. That is not a cosmetic problem: the chunker splits on
- * paragraph and line boundaries, so a page with none of either falls straight
- * through to a hard character cut, and every chunk from every PDF began
- * mid-sentence.
+ * A PDF has no lines — only runs with a transform matrix — and joining every
+ * run on a page produces one enormous paragraph. That is not cosmetic: the
+ * chunker splits on paragraph and line boundaries, so a page with neither falls
+ * through to a hard character cut and every chunk begins mid-sentence.
  *
  * `transform[5]` is the Y translation. Runs are grouped by it within a
  * tolerance, then ordered top-to-bottom — PDF Y grows upward, hence the
  * descending sort.
  *
- * **KNOWN LIMITATION: two-column PDFs merge into nonsense** F3.
- * Grouping by Y alone means two columns at the same vertical position
- * concatenate, so every line of a two-column policy document becomes
- * left-column text followed by right-column text.
- *
- * **Recorded rather than fixed, deliberately.** An X-gap heuristic has its own
- * false positives — a table's cells look exactly like columns — and a wrong
- * split is worse than an honest limitation, because it produces plausible
- * sentences that were never in the document. Build it when a tenant's corpus is
- * known to contain two-column documents, and test it against THAT corpus rather
- * than a synthetic one.
+ * **KNOWN LIMITATION: two-column PDFs merge into nonsense.** Grouping by Y
+ * alone concatenates two columns at the same vertical position. Recorded rather
+ * than fixed: an X-gap heuristic has its own false positives (a table's cells
+ * look exactly like columns), and a wrong split produces plausible sentences
+ * that were never in the document. Build it against a real two-column corpus.
  *
  * `join('')` rather than `join(' ')` is safe and was verified: pdf.js emits
- * explicit space items, so adjacent runs do not run together.
+ * explicit space items.
  */
 function toLines(items: readonly unknown[]): string {
   const rows = new Map<number, { x: number; text: string }[]>();

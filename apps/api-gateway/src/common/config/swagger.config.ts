@@ -7,7 +7,7 @@ import {
 } from '@nestjs/swagger';
 
 /**
- * The security-scheme KEYS routes reference
+ * The security-scheme KEYS routes reference.
  *
  * **This API authenticates with four cookies, not one bearer token**, and three
  * of them are genuine credentials with genuinely different scopes. Naming them
@@ -25,7 +25,7 @@ export const AUTH_SCHEMES = {
 } as const;
 
 /**
- * The staleness contract, published step 3.
+ * The staleness contract, published.
  *
  * **Written before any response cache exists, deliberately.** A limit stated up
  * front is a contract; the same limit discovered by a client is a bug report.
@@ -35,15 +35,6 @@ export const AUTH_SCHEMES = {
  * Rendered at `/docs`, so it reaches the people the caching actually affects
  * rather than living in a design document only this team reads.
  */
-// **Here, not `cache.config.ts`.** This is not a cache setting — it is the
-// PROSE rendered into the OpenAPI description, and its only consumer is the
-// builder below. `cache.config.ts` holds what the cache mechanism reads at
-// runtime (`CACHE_SCOPES`, `ENTITY_TTL_SECONDS`); moving a documentation string
-// there would make the cache module the owner of Swagger copy and give this
-// file an import it needs for one paragraph.
-//
-// It sits beside `AUTH_SCHEMES` for the same reason: both are document
-// presentation, and both are read exactly once, twenty lines below.
 const CACHING_CONTRACT = [
   '## Caching and staleness',
   '',
@@ -94,7 +85,7 @@ const CACHING_CONTRACT = [
 ].join('\n');
 
 /**
- * Builds the OpenAPI document
+ * Builds the OpenAPI document.
  *
  * Exported and called from BOTH `main.ts` and the spec tests, deliberately. A
  * test that built its own document would assert on a spec no client ever
@@ -137,7 +128,7 @@ export function buildOpenApiDocument(
       cookie(configService.getOrThrow<string>('JWT_REFRESH_NAME')),
       AUTH_SCHEMES.refresh,
     )
-    // **`TENANT_SELECTION_NAME` is deliberately absent** It carries
+    // **`TENANT_SELECTION_NAME` is deliberately absent**. It carries
     // a half-finished multi-tenant login between its two legs; it is not a
     // credential, and documenting it as a security scheme invites a client to
     // treat it as one and send it where an access token belongs.
@@ -147,7 +138,7 @@ export function buildOpenApiDocument(
 }
 
 /**
- * Mounts `/docs` and `/docs-json` when config allows
+ * Mounts `/docs` and `/docs-json` when config allows.
  *
  * **Gated on `SWAGGER_ENABLED`, not on an inline `NODE_ENV` check.** The plan
  * says "PUBLIC in non-prod", and `NODE_ENV !== 'production'` written at a call

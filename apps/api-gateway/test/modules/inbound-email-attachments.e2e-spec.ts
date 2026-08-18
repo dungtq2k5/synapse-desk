@@ -20,7 +20,7 @@ import {
 
 /**
  * Attachments on an inbound REPLY, the reply half of the
- * co-pilot plan's §0.
+ * co-pilot plan.
  *
  * **The bytes never reach this server.** The Worker presigns here, PUTs to
  * storage directly, and the webhook carries only object paths — so the one
@@ -32,7 +32,7 @@ import {
  * that opens a ticket has no message to attach to, because `createTicket`
  * writes a ticket row and nothing else.
  */
-describe('§0 inbound email attachments — the reply half (e2e)', () => {
+describe('Inbound email attachments — the reply half (e2e)', () => {
   let fx: E2eFixture;
   let secret: string;
 

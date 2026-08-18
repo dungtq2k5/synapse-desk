@@ -88,8 +88,8 @@ export class AiLedgerGrpcController implements AiLedgerServiceController {
    *
    * Awaited rather than fire-and-forget, unlike `recordGeneration`: this is an
    * UPDATE to an existing row and the caller needs the classification in its
-   * own response. That is precisely why it is a gRPC call rather than an event
-   *.
+   * own response. That is precisely why it is a gRPC call rather than an event.
+   *
    */
   async recordGenerationOutcome(
     request: RecordGenerationOutcomeRequest,
@@ -167,7 +167,7 @@ export class AiLedgerGrpcController implements AiLedgerServiceController {
   }
 
   /**
-   * The heartbeat
+   * The heartbeat.
    *
    * Every row, unjudged. The staleness decision needs the list of jobs this
    * build EXPECTS, because a job that never ran has no row to return — which is

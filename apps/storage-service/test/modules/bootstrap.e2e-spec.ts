@@ -1,14 +1,14 @@
 import { bootstrapE2eTest, E2eFixture, uploadTo } from '../utils';
 
 /**
- * §2.1 test 1 — the bootstrap smoke test.
+ * — the bootstrap smoke test.
  *
  * Every other suite in this service assumes the emulator and Redis are both up
  * and that the Firebase app initialized with the right bucket. When that
  * assumption is wrong, every suite fails at once with an error from deep inside
  * the SDK. This one fails first, and says which piece is missing.
  */
-describe('§2.1 storage-service boots against the emulator (e2e)', () => {
+describe('Storage-service boots against the emulator (e2e)', () => {
   let fx: E2eFixture;
 
   beforeAll(async () => {
@@ -78,7 +78,7 @@ describe('§2.1 storage-service boots against the emulator (e2e)', () => {
     // limitation of the emulator, not of the signing — the URL above is
     // well-formed and would work against a real bucket.
     //
-    // It matters because 10-storage-service.md §2.2 test 4 asks for "PUT to the
+    // It matters because the plan asked for "PUT to the
     // returned uploadUrl succeeds against the emulator", which cannot pass
     // here. Pinning the 501 means that if a future emulator release DOES
     // implement signed URLs, this test fails and tells somebody the real

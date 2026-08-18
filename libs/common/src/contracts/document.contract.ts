@@ -1,5 +1,5 @@
 /**
- * Domain C's NATS contract — what `ingestion-service` publishes.
+ * @file Domain C's NATS contract — what `ingestion-service` publishes.
  *
  * Same reasoning as `ticket.contract.ts`: NATS is untyped on the wire, so an
  * untyped emit is a silent failure waiting for a consumer that reads
@@ -41,19 +41,15 @@ export type DocumentUploadedEvent = DocumentEventBase & {
   objectPath: string;
   fileType: string;
   /**
-   * ISO 639-1 codes for OCR, empty when unspecified
+   * ISO 639-1 codes for OCR, empty when unspecified.
    *
-   * **Here for the same reason `fileType` is**: it is document configuration
-   * the PARSE needs, and the alternative is a database read before parsing —
-   * which is precisely the lookup the line above exists to avoid. The
-   * processor's only `findUniqueOrThrow` happens after the parse, inside
-   * `writeChunkRows`, so hoisting it would move a query to the front of the
-   * hottest path in this service to serve a minority of documents.
+   * **Carried on the event for the same reason `fileType` is**: it is
+   * configuration the PARSE needs, and the alternative is a database read
+   * before parsing — moving a query to the front of the hottest path in this
+   * service to serve a minority of documents.
    *
-   * **The cost is acknowledged rather than hidden:** this is a field on a
-   * broadcast contract that one consumer reads, for a case most documents
-   * never hit. `fileType` already paid that price once, and the no-lookup rule
-   * is what both are buying.
+   * The cost is a field on a broadcast contract that one consumer reads, for a
+   * case most documents never hit. The no-lookup rule is what it buys.
    */
   ocrLanguages: string[];
 };
@@ -68,7 +64,7 @@ export type DocumentIndexedEvent = DocumentEventBase & {
   /** Rendered by the client without a follow-up fetch. */
   title: string;
   /**
-   * The visibility, CARRIED rather than re-read
+   * The visibility, CARRIED rather than re-read.
    *
    * The relay decides which rooms this reaches, and a department-scoped
    * document announced tenant-wide would disclose its existence and title to
@@ -86,7 +82,7 @@ export type DocumentIngestionFailedEvent = DocumentEventBase & {
   /** Already redacted for display — never a raw stack trace. */
   reason: string;
   /**
-   * The uploader, and the ONLY recipient
+   * The uploader, and the ONLY recipient.
    *
    * A failure is not department news: it is one person's document not working.
    * Carried for the same reason as above, and with a sharper edge — the

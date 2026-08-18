@@ -17,26 +17,17 @@ import { RedisIoAdapter } from './common/adapters/redis-io.adapter';
 async function bootstrap() {
   const logger = new Logger(AppModule.name);
 
-  // Cast the app to NestExpressApplication to access underlying Express settings
+  // `rawBody: true` is NOT optional -- it is what makes the Stripe webhook
+  // verifiable. Stripe signs the EXACT BYTES of the request, and the global JSON
+  // parser deserializes and re-serializes them, so verification fails for every
+  // event. `POST /webhooks/stripe` reads the buffered original from
+  // `req.rawBody`.
   //
-  // `rawBody: true` is NOT optional — it is the fix for the Stripe webhook, the single
-  // most common way a Stripe integration fails on first deploy. Stripe's
-  // signature is computed over the EXACT BYTES of the request; the global JSON
-  // parser deserializes and re-serializes them, and verification then fails for
-  // every event. This buffers the original bytes before that happens, and
-  // `POST /webhooks/stripe` reads them from `req.rawBody`.
-  //
-  // Buffering globally rather than mounting a raw parser on the webhook path
-  // costs a little memory per request and removes a coupling that would
-  // otherwise bite: a path-mounted parser has to know the GLOBAL PREFIX, so
-  // changing `GLOBAL_PREFIX` would silently stop it applying — and the symptom
-  // is exactly the one this option exists to prevent, arriving from a config
-  // change nobody would connect to billing.
-  //
-  // The failure shape is what makes it worth this comment: locally it often
-  // works (fewer middleware layers), in production every webhook 400s, and
-  // entitlements silently stop tracking subscriptions while the app looks
-  // entirely healthy.
+  // Buffered globally rather than mounted on the webhook path: a path-mounted
+  // parser would have to know `GLOBAL_PREFIX`, so changing that would silently
+  // stop it applying -- the same failure, arriving from an unrelated config
+  // change. Locally it usually still works; in production every webhook 400s
+  // and entitlements stop tracking while the app looks healthy.
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     rawBody: true,
   });
@@ -99,40 +90,30 @@ async function bootstrap() {
     }),
   );
 
-  /**
-   * Socket.IO over Redis pub/sub.
-   *
-   * Awaited BEFORE `useWebSocketAdapter`, because `createIOServer` runs
-   * synchronously the moment the first gateway initialises and cannot wait for
-   * a connection that has not been made — attaching the adapter afterwards is a
-   * no-op that presents as "works locally, drops half the events in staging".
-   */
+  // Socket.IO over Redis pub/sub. Awaited BEFORE `useWebSocketAdapter`:
+  // `createIOServer` runs synchronously the moment the first gateway
+  // initializes and cannot wait for a connection that has not been made.
+  // Attaching afterwards is a no-op -- "works locally, drops events in staging".
   const redisIoAdapter = new RedisIoAdapter(app, configService);
   await redisIoAdapter.connect();
   app.useWebSocketAdapter(redisIoAdapter);
 
-  /**
-   * The gateway is a HYBRID app: HTTP for clients, plus a NATS consumer.
-   *
-   * It subscribes to the `ticket.*` domain events ticket-service publishes and
-   * relays them into WebSocket rooms. It publishes nothing — the direction is
-   * one-way by design, and a gateway that emitted domain events would be a
-   * gateway with business logic in it.
-   *
-   * `startAllMicroservices` before `listen`: a client that connects the instant
-   * the HTTP port opens must not find a socket layer with no event source
-   * behind it.
-   */
+  // A HYBRID app: HTTP for clients, plus a NATS consumer that relays
+  // `ticket.*` events into WebSocket rooms. One-way by design -- a gateway
+  // that PUBLISHED domain events would be a gateway with business logic.
+  //
+  // `startAllMicroservices` before `listen`, so a client connecting the instant
+  // the port opens cannot find a socket layer with no event source behind it.
   app.connectMicroservice<MicroserviceOptions>(
     createNatsTransport(configService),
   );
   await app.startAllMicroservices();
 
-  // `/docs` and `/docs-json`, when config allows Before `listen`
+  // `/docs` and `/docs-json`, when config allows. Before `listen`
   // so the routes exist the moment the port opens.
   setupSwagger(app, configService, logger);
 
-  // The metrics listener, BEFORE the public one A scraper that
+  // The metrics listener, BEFORE the public one. A scraper that
   // finds the app serving traffic and the metrics port refused would report a
   // scrape failure for a process that is perfectly healthy.
   //

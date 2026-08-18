@@ -1,15 +1,38 @@
 import {
+  ConfirmDocumentRequest,
   DocumentChunkResponse,
   DocumentFlagResponse,
   DocumentResponse,
+  DownloadDocumentResponse,
   fromProtoDocumentFileType,
   fromProtoDocumentFlagSeverity,
   fromProtoDocumentFlagType,
   fromProtoDocumentStatus,
   fromProtoTimestamp,
+  ListDocumentChunksResponse,
+  ListDocumentFlagsRequest,
+  ListDocumentFlagsResponse,
+  ListDocumentsRequest,
+  ListDocumentsResponse,
+  PresignDocumentResponse,
   requireProtoTimestamp,
+  StorageUsageResponse,
+  toPageRequest,
+  toProtoDocumentFileType,
+  toProtoDocumentFlagType,
+  toProtoDocumentStatus,
 } from '@synapsedesk/grpc-proto';
+import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
+import { toPaginationMetaDataResponseDto } from '../../common/mappers/pagination.mapper';
 import {
+  ConfirmDocumentDto,
+  ListDocumentFlagsQueryDto,
+  ListDocumentsQueryDto,
+} from './dto/rest/document.dto';
+import {
+  DownloadDocumentResponseDto,
+  PresignDocumentResponseDto,
+  StorageUsageResponseDto,
   DocumentChunkResponseDto,
   DocumentFlagResponseDto,
   DocumentResponseDto,
@@ -125,5 +148,113 @@ export function toDocumentFlagResponseDto(
     // that is different from a score of zero.
     confidenceScore: flag.confidenceScore ?? null,
     detectedAt: requireProtoTimestamp(flag.detectedAt, 'detectedAt'),
+  };
+}
+
+/** Builds a `ConfirmDocumentRequest` from the REST body. */
+export function toConfirmDocumentRequest(
+  dto: ConfirmDocumentDto,
+): ConfirmDocumentRequest {
+  return {
+    objectPath: dto.objectPath,
+    title: dto.title,
+    isOrganizationWide: dto.isOrganizationWide,
+    departmentIds: dto.departmentIds,
+    ocrLanguages: dto.ocrLanguages,
+    fileName: dto.fileName ?? '',
+  };
+}
+
+/** Builds a `ListDocumentsRequest` from the REST query. */
+export function toListDocumentsRequest(
+  query: ListDocumentsQueryDto,
+): ListDocumentsRequest {
+  return {
+    page: toPageRequest(query),
+    departmentId: query.departmentId ?? '',
+    status: toProtoDocumentStatus(query.status),
+    fileType: toProtoDocumentFileType(query.fileType),
+    includeDeleted: query.includeDeleted,
+  };
+}
+
+/** Builds a `ListDocumentFlagsRequest` from the REST query. */
+export function toListDocumentFlagsRequest(
+  query: ListDocumentFlagsQueryDto,
+): ListDocumentFlagsRequest {
+  return {
+    flagTypes: query.type.map(toProtoDocumentFlagType),
+    includeResolved: query.includeResolved,
+    page: toPageRequest(query),
+  };
+}
+
+/** Converts a `ListDocumentsResponse` into the paginated REST envelope. */
+export function toDocumentPageDto(
+  response: ListDocumentsResponse,
+): PaginationResponseDto<DocumentResponseDto> {
+  return {
+    items: response.items.map(toDocumentResponseDto),
+    meta: toPaginationMetaDataResponseDto(response.meta),
+  };
+}
+
+/** Converts a `ListDocumentChunksResponse` into the paginated REST envelope. */
+export function toDocumentChunkPageDto(
+  response: ListDocumentChunksResponse,
+): PaginationResponseDto<DocumentChunkResponseDto> {
+  return {
+    items: response.items.map(toDocumentChunkResponseDto),
+    meta: toPaginationMetaDataResponseDto(response.meta),
+  };
+}
+
+/** Converts a `ListDocumentFlagsResponse` into the paginated REST envelope. */
+export function toDocumentFlagPageDto(
+  response: ListDocumentFlagsResponse,
+): PaginationResponseDto<DocumentFlagResponseDto> {
+  return {
+    items: response.items.map(toDocumentFlagResponseDto),
+    meta: toPaginationMetaDataResponseDto(response.meta),
+  };
+}
+
+/**
+ * Converts a `PresignDocumentResponse` off the wire into its REST DTO.
+ *
+ * @throws Error if `expiresAt` is missing, which the proto requires.
+ */
+export function toPresignDocumentResponseDto(
+  response: PresignDocumentResponse,
+): PresignDocumentResponseDto {
+  return {
+    uploadUrl: response.uploadUrl,
+    objectPath: response.objectPath,
+    expiresAt: requireProtoTimestamp(response.expiresAt, 'expiresAt'),
+  };
+}
+
+/**
+ * Converts a `DownloadDocumentResponse` off the wire into its REST DTO.
+ *
+ * @throws Error if `expiresAt` is missing, which the proto requires.
+ */
+export function toDownloadDocumentResponseDto(
+  response: DownloadDocumentResponse,
+): DownloadDocumentResponseDto {
+  return {
+    downloadUrl: response.downloadUrl,
+    expiresAt: requireProtoTimestamp(response.expiresAt, 'expiresAt'),
+  };
+}
+
+/** Converts a `StorageUsageResponse` off the wire into its REST DTO. */
+export function toStorageUsageResponseDto(
+  response: StorageUsageResponse,
+): StorageUsageResponseDto {
+  return {
+    usedBytes: response.usedBytes,
+    limitBytes: response.limitBytes,
+    documentCount: response.documentCount,
   };
 }

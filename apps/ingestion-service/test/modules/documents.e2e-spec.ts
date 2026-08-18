@@ -46,9 +46,9 @@ import { StorageReferenceService } from '../../src/modules/storage-client/storag
 import { DocumentEventPublisher } from '../../src/modules/events/document-event.publisher';
 import { faultInjector } from '@synapsedesk/common/testing/fault';
 
-describe('§2 Documents (e2e)', () => {
+describe('Documents (e2e)', () => {
   // Every injected fault in this file is registered here and restored in an
-  // `afterEach` that runs whether the test passed, failed or threw
+  // `afterEach` that runs whether the test passed, failed or threw.
   const faults = faultInjector();
 
   let fx: E2eFixture;
@@ -185,7 +185,7 @@ describe('§2 Documents (e2e)', () => {
 
   afterAll(() => fx.close());
 
-  // ------------------------------------------------------------- §2.1 upload
+  // ------------------------------------------------------------- upload
 
   describe('presign', () => {
     it('1. returns an upload URL for a tenant under quota', async () => {
@@ -199,7 +199,7 @@ describe('§2 Documents (e2e)', () => {
       expect(result.expiresAt).toBeDefined();
     });
 
-    it('2. REFUSES over quota, and storage-service is never called — §2.1 test 1', async () => {
+    it('2. REFUSES over quota, and storage-service is never called', async () => {
       // The gate must SHORT-CIRCUIT rather than merely also-reject downstream:
       // a tenant over quota must never receive a usable URL, or they discover
       // the refusal only after uploading 25 MB.
@@ -254,7 +254,7 @@ describe('§2 Documents (e2e)', () => {
       );
     });
 
-    it('6. creates NO documents row — §2.1 test 3', async () => {
+    it('6. creates NO documents row', async () => {
       // An abandoned presign must leave nothing pointing at an object that
       // never arrived.
       await documents.presignDocument(presignRequest(), manager());
@@ -264,7 +264,7 @@ describe('§2 Documents (e2e)', () => {
   });
 
   describe('confirm', () => {
-    it('1. creates the row PENDING and enqueues one job — §2.1 test 2', async () => {
+    it('1. creates the row PENDING and enqueues one job', async () => {
       const document = await documents.confirmDocument(
         confirmRequest(),
         manager(),
@@ -387,7 +387,7 @@ describe('§2 Documents (e2e)', () => {
       expect(confirmUpload).not.toHaveBeenCalled();
     });
 
-    it('7. REJECTS a second confirm of the same object — §1.2 test 4', async () => {
+    it('7. REJECTS a second confirm of the same object', async () => {
       // Per-tenant dedup, and here the "duplicate" is a replayed confirm of one
       // upload. The partial unique index is what refuses it.
       const request = confirmRequest();
@@ -401,7 +401,7 @@ describe('§2 Documents (e2e)', () => {
       expect(await fx.prisma.document.count()).toBe(1);
     });
 
-    it('8. lets TWO TENANTS confirm byte-identical uploads — §1.2 test 3', async () => {
+    it('8. lets TWO TENANTS confirm byte-identical uploads', async () => {
       // Dedup is per tenant. Global dedup would leak the existence of one
       // tenant's upload to another, which is the kind of leak nobody looks for.
       const other = buildTenant();
@@ -427,10 +427,10 @@ describe('§2 Documents (e2e)', () => {
     });
   });
 
-  // --------------------------------------------------------- §2.2 visibility
+  // --------------------------------------------------------- visibility
 
   describe('visibility — org-wide ∪ the caller’s departments', () => {
-    it('1. an ORG-WIDE document is visible to every member — §2.2 test 1', async () => {
+    it('1. an ORG-WIDE document is visible to every member', async () => {
       const document = await createDocument(fx.prisma, tenant, {
         isOrganizationWide: true,
       });
@@ -443,7 +443,7 @@ describe('§2 Documents (e2e)', () => {
       expect(items.map((d) => d.id)).toEqual([document.id]);
     });
 
-    it('2. a DEPARTMENT-SCOPED document is invisible outside it — §2.2 test 2', async () => {
+    it('2. a DEPARTMENT-SCOPED document is invisible outside it', async () => {
       await createScopedDocument(fx.prisma, tenant, [tenant.departmentId]);
 
       const { items, meta } = await documents.listDocuments(
@@ -457,7 +457,7 @@ describe('§2 Documents (e2e)', () => {
       expect(meta!.totalItems).toBe(0);
     });
 
-    it('3. a user in ONE of several departments can see it — §2.2 test 3', async () => {
+    it('3. a user in ONE of several departments can see it', async () => {
       // The SQL side of `MatchAny`'s intersection semantics: overlap, not
       // containment. Requiring the caller to be in every listed department
       // would make multi-department scoping useless.
@@ -487,7 +487,7 @@ describe('§2 Documents (e2e)', () => {
       ).resolves.toBeDefined();
     });
 
-    it('5. answers NOT_FOUND across TENANTS — §2.1 test 4', async () => {
+    it('5. answers NOT_FOUND across TENANTS', async () => {
       const document = await createDocument(fx.prisma, tenant);
 
       await expectRpc(
@@ -534,12 +534,12 @@ describe('§2 Documents (e2e)', () => {
     });
   });
 
-  // ---------------------------------------------------------- §2.3 re-scoping
+  // ---------------------------------------------------------- re-scoping
 
   describe('re-scoping', () => {
     it('1. replaces the department set and fans out to the CHUNK rows', async () => {
-      // The chunk rows are the lexical retrieval arm's half of the boundary
-      //. A re-scope that updated `documents` alone would leave
+      // The chunk rows are the lexical retrieval arm's half of the boundary.
+      // A re-scope that updated `documents` alone would leave
       // that arm serving the document to people who just lost access.
       const document = await createScopedDocument(fx.prisma, tenant, [
         tenant.departmentId,
@@ -560,7 +560,7 @@ describe('§2 Documents (e2e)', () => {
       }
     });
 
-    it('2. is REFUSED while the document is organization-wide (409) — §2.3 test 4', async () => {
+    it('2. is REFUSED while the document is organization-wide (409)', async () => {
       // Refused rather than silently ignored: an admin scoping a document to
       // two departments believes they have restricted it, and a request that
       // "succeeded" while leaving it visible to everyone is the worst answer.
@@ -654,10 +654,10 @@ describe('§2 Documents (e2e)', () => {
     });
   });
 
-  // ------------------------------------------------------- §2.4 soft delete
+  // ------------------------------------------------------- soft delete
 
   describe('soft delete', () => {
-    it('1. flips is_deleted on the CHUNKS, never removing them — §2.4 test 2', async () => {
+    it('1. flips is_deleted on the CHUNKS, never removing them', async () => {
       // Citations in already-sent ticket messages must still resolve to their
       // chunk text (RDM §1.4, §1.6). Flipping takes them out of retrieval
       // without taking them out of history.
@@ -770,7 +770,7 @@ describe('§2 Documents (e2e)', () => {
       expect(chunks.every((chunk) => !chunk.isDeleted)).toBe(true);
     });
 
-    it('6. restoring into a TAKEN hash slot is 409, not 500 — §2.4 test 3', async () => {
+    it('6. restoring into a TAKEN hash slot is 409, not 500', async () => {
       // The partial unique index released the slot when the document was
       // soft-deleted, and somebody re-uploaded the same file since. The P2002
       // must be caught and NAMED — a raw 500 tells an admin nothing about why
@@ -903,7 +903,7 @@ describe('§2 Documents (e2e)', () => {
     });
   });
 
-  // ------------------------------------------------- §16 §5 — the flag list
+  // ------------------------------------------------- the flag list
 
   describe('listDocumentFlags', () => {
     /**
@@ -1093,7 +1093,7 @@ describe('§2 Documents (e2e)', () => {
    * document in the tenant one id at a time — including its TITLE, which is
    * usually the sensitive part.
    */
-  describe('§1 ListDocumentsByIds / ListDocumentChunksByIds', () => {
+  describe('ListDocumentsByIds / ListDocumentChunksByIds', () => {
     it('1. **the department boundary applies to a batch read**', async () => {
       const scoped = await createScopedDocument(fx.prisma, tenant, [
         tenant.departmentId,

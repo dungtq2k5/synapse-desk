@@ -136,7 +136,7 @@ message OrganizationEntitlementsResponse {
 
 message GetOrganizationEntitlementsRequest {}
 
-// Tenant timezones, in BULK
+// Tenant timezones, in BULK.
 //
 // The daily rollup jobs bucket by the tenant's local date, and they run across
 // every tenant that had activity rather than on behalf of one caller. So this
@@ -241,7 +241,7 @@ message DeleteOrganizationResponse {
 
 // ---------------------------------------------------------------- inbound mail
 
-// Resolve the tenant from the token in an inbound support address
+// Resolve the tenant from the token in an inbound support address.
 message ResolveOrgByInboundTokenRequest {
   string inbound_token = 1;
 }
@@ -270,11 +270,11 @@ message ResolveOrgByInboundTokenResponse {
 message GetInboundTokenRequest { string organization_id = 1; }
 message GetInboundTokenResponse { optional string inbound_token = 1; }
 
-// Issue or ROTATE the tenant's inbound-mail token
+// Issue or ROTATE the tenant's inbound-mail token.
 //
 // One message for both, because "enable" and "rotate" differ only in whether
 // the row already had a value — and rotation is one of the three properties
-// §2 chose an opaque token for: an abused address can be replaced without
+// an opaque token was chosen for: an abused address can be replaced without
 // touching anything else.
 //
 // No `organization_id`: like every other method on this service, the tenant
@@ -283,7 +283,7 @@ message GetInboundTokenResponse { optional string inbound_token = 1; }
 message IssueInboundTokenRequest {}
 message IssueInboundTokenResponse { string inbound_token = 1; }
 
-// Switch inbound mail off without deleting the tenant Sets NULL,
+// Switch inbound mail off without deleting the tenant. Sets NULL,
 // which is the state a tenant that never enabled email is already in.
 message RevokeInboundTokenRequest {}
 message RevokeInboundTokenResponse {}

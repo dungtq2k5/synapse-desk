@@ -1,4 +1,5 @@
 import { AnswerStatus } from '@synapsedesk/common';
+
 export class AttachmentResponseDto {
   id!: string;
   messageId!: string;
@@ -10,21 +11,14 @@ export class AttachmentResponseDto {
   createdAt!: Date;
 }
 
-// ASK This `docblock` seems to be invalid
 /**
  * A message as the REST API returns it.
  *
- * **REST only.** The schema's `type TicketMessage` is
- * `TicketMessageResponseGqlDto` in `../graphql/`; `message-response.contract.spec.ts`
- * checks the two agree, and records `attachments` as a deliberate REST-only
- * field — the URLs are internal object paths, so publishing them in a schema
- * would advertise the storage layout and hand clients a value that does not
- * work.
+ * `attachments` is REST-only: the URLs are internal object paths, so the
+ * GraphQL `TicketMessage` deliberately omits them.
  *
- * `redactedAt` non-null means `content` is the placeholder, not what was
- * written — a client showing "[message removed]" as ordinary text would be
- * misleading, so the flag travels alongside it rather than being inferred from
- * the string.
+ * A non-null `redactedAt` means `content` holds the placeholder rather than
+ * what was written — branch on the flag, not on the string.
  */
 export class MessageResponseDto {
   id!: string;
@@ -42,28 +36,23 @@ export class MessageResponseDto {
   createdAt!: Date;
   attachments!: AttachmentResponseDto[];
   /**
-   * Kept OUT of AI prompts
+   * Kept OUT of AI prompts.
    *
    * Exposed rather than stripped: the transcript builder in `AiStreamService`
    * filters on it AFTER fetching, because the same route serves the UI, where a
    * refused message stays visible.
    */
   excludedFromAiContext!: boolean;
-  // ASK This `docblock` seems to be invalid
   /**
-   * What the generation concluded — null for a human message.
+   * What the generation concluded.
    *
-   * The FIXME here asked for the enum "if it's right", and it was: the
-   * vocabulary existed in two protos and in no TypeScript at all, so there was
-   * nothing to name. `AnswerStatus` in `@synapsedesk/common` is that name now,
-   * and `message.mapper.ts` narrows the wire value through the shared bridge —
-   * null covers both a human message and a status this build cannot name.
+   * `null` for a human message, and also for a status this build cannot name.
    */
   answerStatus!: AnswerStatus | null;
 }
 
 /**
- * What a create answers with
+ * What a create answers with.
  *
  * A wrapper because a create now has a second outcome: an attachment whose
  * confirm failed is **skipped and named**, and the message is created anyway.
@@ -84,14 +73,9 @@ export class CreateMessageResponseDto {
 }
 
 /**
- * A presigned direct-to-storage upload.
+ * A presigned direct-to-storage upload for a message attachment.
  *
- * Here rather than in `messages-grpc.client.ts`, where it was declared and
- * exported beside the client that returns it. A DTO in a client file is a shape
- * two controllers import from a place that describes a transport — and the
- * documents module already has this exact pair in its own `dto/rest/`
- * (`PresignDocumentResponseDto`, `DownloadDocumentResponseDto`), which is the
- * convention this now follows in name as well as in location.
+ * The message-module counterpart of {@link PresignDocumentResponseDto}.
  */
 export class PresignAttachmentResponseDto {
   uploadUrl!: string;

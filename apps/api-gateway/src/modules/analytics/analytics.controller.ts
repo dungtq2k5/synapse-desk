@@ -29,20 +29,20 @@ import {
   DocumentAnalyticsQueryDto,
 } from './dto/rest/analytics.dto';
 import {
-  AgentAnalyticsDto,
-  AiUsageDto,
-  AnalyticsExportDto,
-  DeflectionDto,
-  DocumentAnalyticsDto,
-  KnowledgeGapsDto,
-  OverviewDto,
-  ResponseTimesDto,
-  SatisfactionDto,
-  VolumeDto,
+  AgentAnalyticsResponseDto,
+  AiUsageResponseDto,
+  AnalyticsExportResponseDto,
+  DeflectionResponseDto,
+  DocumentAnalyticsResponseDto,
+  KnowledgeGapsResponseDto,
+  OverviewResponseDto,
+  ResponseTimesResponseDto,
+  SatisfactionResponseDto,
+  VolumeResponseDto,
 } from './dto/rest/analytics-response.dto';
 
 /**
- * The executive dashboard — api-endpoints-plan §4.
+ * The executive dashboard — `api-endpoints-plan - §4`.
  *
  * **`analytics.read` throughout, and every route is a GET.** Analytics is a
  * read projection: there is nothing here to create, and the one write-shaped
@@ -63,109 +63,109 @@ export class AnalyticsController {
   constructor(private readonly analytics: AnalyticsService) {}
 
   @ApiOperation({ summary: 'Overview' })
-  @ApiWrappedResponse(OverviewDto)
+  @ApiWrappedResponse(OverviewResponseDto)
   @ApiFilterErrors(['401', '403'])
   @Get('overview')
   overview(
     @CurrentUser() context: RequestContext,
     @Query() query: AnalyticsRangeQueryDto,
-  ): Promise<OverviewDto> {
+  ): Promise<OverviewResponseDto> {
     return this.analytics.overview(query, context);
   }
 
-  /** The product's headline claim (product-overview §7), defined once in §3.1. */
+  /** The product's headline claim (`product-overview - §7`), defined once in the rollup. */
   @ApiOperation({ summary: 'Deflection' })
-  @ApiWrappedResponse(DeflectionDto)
+  @ApiWrappedResponse(DeflectionResponseDto)
   @ApiFilterErrors(['401', '403'])
   @Get('deflection')
   deflection(
     @CurrentUser() context: RequestContext,
     @Query() query: AnalyticsRangeQueryDto,
-  ): Promise<DeflectionDto> {
+  ): Promise<DeflectionResponseDto> {
     return this.analytics.deflection(query, context);
   }
 
   /** Human and AI first-response reported SEPARATELY, never blended. */
   @ApiOperation({ summary: 'Response times' })
-  @ApiWrappedResponse(ResponseTimesDto)
+  @ApiWrappedResponse(ResponseTimesResponseDto)
   @ApiFilterErrors(['401', '403'])
   @Get('response-times')
   responseTimes(
     @CurrentUser() context: RequestContext,
     @Query() query: AnalyticsRangeQueryDto,
-  ): Promise<ResponseTimesDto> {
+  ): Promise<ResponseTimesResponseDto> {
     return this.analytics.responseTimes(query, context);
   }
 
   @ApiOperation({ summary: 'Volume' })
-  @ApiWrappedResponse(VolumeDto)
+  @ApiWrappedResponse(VolumeResponseDto)
   @ApiFilterErrors(['401', '403'])
   @Get('volume')
   volume(
     @CurrentUser() context: RequestContext,
     @Query() query: AnalyticsRangeQueryDto,
-  ): Promise<VolumeDto> {
+  ): Promise<VolumeResponseDto> {
     return this.analytics.volume(query, context);
   }
 
   @ApiOperation({ summary: 'Satisfaction' })
-  @ApiWrappedResponse(SatisfactionDto)
+  @ApiWrappedResponse(SatisfactionResponseDto)
   @ApiFilterErrors(['401', '403'])
   @Get('satisfaction')
   satisfaction(
     @CurrentUser() context: RequestContext,
     @Query() query: AnalyticsRangeQueryDto,
-  ): Promise<SatisfactionDto> {
+  ): Promise<SatisfactionResponseDto> {
     return this.analytics.satisfaction(query, context);
   }
 
   @ApiOperation({ summary: 'Ai usage' })
-  @ApiWrappedResponse(AiUsageDto)
+  @ApiWrappedResponse(AiUsageResponseDto)
   @ApiFilterErrors(['401', '403'])
   @Get('ai-usage')
   aiUsage(
     @CurrentUser() context: RequestContext,
     @Query() query: AnalyticsRangeQueryDto,
-  ): Promise<AiUsageDto> {
+  ): Promise<AiUsageResponseDto> {
     return this.analytics.aiUsage(query, context);
   }
 
   /** Cross-service: ticket stats ∪ ledger acceptance ∪ name hydration. */
   @ApiOperation({ summary: 'Agents' })
-  @ApiWrappedResponse(AgentAnalyticsDto)
+  @ApiWrappedResponse(AgentAnalyticsResponseDto)
   @ApiFilterErrors(['401', '403'])
   @Get('agents')
   agents(
     @CurrentUser() context: RequestContext,
     @Query() query: AnalyticsRangeQueryDto,
-  ): Promise<AgentAnalyticsDto> {
+  ): Promise<AgentAnalyticsResponseDto> {
     return this.analytics.agents(query, context);
   }
 
   @ApiOperation({ summary: 'Knowledge gaps' })
-  @ApiWrappedResponse(KnowledgeGapsDto)
+  @ApiWrappedResponse(KnowledgeGapsResponseDto)
   @ApiFilterErrors(['401', '403'])
   @Get('knowledge-gaps')
   knowledgeGaps(
     @CurrentUser() context: RequestContext,
     @Query() query: AnalyticsTopNQueryDto,
-  ): Promise<KnowledgeGapsDto> {
+  ): Promise<KnowledgeGapsResponseDto> {
     return this.analytics.knowledgeGaps(query, context);
   }
 
   @ApiOperation({ summary: 'Documents' })
-  @ApiWrappedResponse(DocumentAnalyticsDto)
+  @ApiWrappedResponse(DocumentAnalyticsResponseDto)
   @ApiFilterErrors(['401', '403'])
   @Get('documents')
   documents(
     @CurrentUser() context: RequestContext,
     @Query() query: DocumentAnalyticsQueryDto,
-  ): Promise<DocumentAnalyticsDto> {
+  ): Promise<DocumentAnalyticsResponseDto> {
     return this.analytics.documents(query, context);
   }
 
   /**
-   * Queues an export
+   * Queues an export.
    *
    * **POST, not the GET the endpoint plan names.** It creates a job and
    * produces a file: a GET that writes is one a browser prefetch, a link
@@ -177,26 +177,28 @@ export class AnalyticsController {
    * 202, because the work has been accepted and has not happened.
    */
   @ApiOperation({ summary: 'Create export' })
-  @ApiWrappedResponse(AnalyticsExportDto, { status: HttpStatus.ACCEPTED })
+  @ApiWrappedResponse(AnalyticsExportResponseDto, {
+    status: HttpStatus.ACCEPTED,
+  })
   @ApiFilterErrors(['400', '401', '403'])
   @Post('export')
   @HttpCode(HttpStatus.ACCEPTED)
   createExport(
     @CurrentUser() context: RequestContext,
     @Body() dto: CreateExportDto,
-  ): Promise<AnalyticsExportDto> {
+  ): Promise<AnalyticsExportResponseDto> {
     return this.analytics.createExport(dto, context);
   }
 
   /** Poll for the file. Another tenant's id answers 404, never 403. */
   @ApiOperation({ summary: 'Get export' })
-  @ApiWrappedResponse(AnalyticsExportDto)
+  @ApiWrappedResponse(AnalyticsExportResponseDto)
   @ApiFilterErrors(['400', '401', '403', '404'])
   @Get('export/:id')
   getExport(
     @CurrentUser() context: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
-  ): Promise<AnalyticsExportDto> {
+  ): Promise<AnalyticsExportResponseDto> {
     return this.analytics.getExport(id, context);
   }
 }

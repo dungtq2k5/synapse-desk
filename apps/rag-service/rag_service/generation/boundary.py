@@ -13,7 +13,7 @@ prompt's delimiters were plain text, so a question containing
 
 produced a prompt with two source blocks and two questions, one set written by
 the user. That is direct injection — the payload is in the question, not in a
-document — which is why it is in scope where indirect injection is not (§8).
+document — which is why it is in scope where indirect injection is not.
 
 **A per-request nonce is what fixes it**, and not the angle brackets. The
 wrapper reads as structure to a model trained on the whole internet, which is
@@ -246,7 +246,7 @@ def scrub_boundary(text: str) -> str:
     **Tags, and deliberately not the bare id.** A `<sources id="…">` in an
     answer is never legitimate content, so removing it cannot lose anything a
     user wanted. A bare sixteen-character hex string might be an error code, a
-    commit sha or an asset tag — exactly the kind of exact value 21-doc asks the
+    commit sha or an asset tag — exactly the kind of exact value the prompt asks the
     model to preserve verbatim — and a filter that stripped those would corrupt
     real answers to tidy an unlikely one.
 

@@ -1,44 +1,45 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-/**
- * Who is allowed to construct a Redis connection
- *
- * The doc's premise was *"seven `new Redis(...)` sites, replace them with one"*.
- * Read as written that is wrong in three places, and each is wrong for a reason
- * worth keeping rather than a detail worth fixing — so the list below is the
- * corrected version, pinned.
- *
- * **The concern the doc actually names is an EIGHTH ad-hoc client**, and a count
- * that only ever goes up is not caught by review. This is.
- */
-const SRC = join(__dirname, '../..');
-
-/** Every `.ts` under `src/`, excluding specs. */
-const walk = (dir: string, out: string[] = []): string[] => {
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    const path = join(dir, entry.name);
-    if (entry.isDirectory()) walk(path, out);
-    else if (path.endsWith('.ts') && !path.endsWith('.spec.ts')) out.push(path);
-  }
-
-  return out;
-};
-
-/**
- * Source with comments removed.
- *
- * Without this the sweep flags `throttler.config.ts`, whose docblock explains
- * why it does NOT pass `new Redis(...)` — a file caught for describing the rule
- * it follows. A scan that cannot tell code from prose reports the careful files
- * and teaches everyone to add an exemption.
- */
-const code = (path: string): string =>
-  readFileSync(path, 'utf8')
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/^\s*\/\/.*$/gm, '');
-
 describe('Redis connections', () => {
+  /**
+   * Who is allowed to construct a Redis connection.
+   *
+   * The doc's premise was *"seven `new Redis(...)` sites, replace them with one"*.
+   * Read as written that is wrong in three places, and each is wrong for a reason
+   * worth keeping rather than a detail worth fixing — so the list below is the
+   * corrected version, pinned.
+   *
+   * **The concern the doc actually names is an EIGHTH ad-hoc client**, and a count
+   * that only ever goes up is not caught by review. This is.
+   */
+  const SRC = join(__dirname, '../..');
+
+  /** Every `.ts` under `src/`, excluding specs. */
+  const walk = (dir: string, out: string[] = []): string[] => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) walk(path, out);
+      else if (path.endsWith('.ts') && !path.endsWith('.spec.ts'))
+        out.push(path);
+    }
+
+    return out;
+  };
+
+  /**
+   * Source with comments removed.
+   *
+   * Without this the sweep flags `throttler.config.ts`, whose docblock explains
+   * why it does NOT pass `new Redis(...)` — a file caught for describing the rule
+   * it follows. A scan that cannot tell code from prose reports the careful files
+   * and teaches everyone to add an exemption.
+   */
+  const code = (path: string): string =>
+    readFileSync(path, 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/^\s*\/\/.*$/gm, '');
+
   const constructors = () =>
     walk(SRC)
       .filter((path) => /new Redis\(/.test(code(path)))

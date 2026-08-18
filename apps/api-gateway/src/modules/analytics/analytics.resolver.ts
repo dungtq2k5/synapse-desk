@@ -15,18 +15,16 @@ import { RequirePermission } from '../../common/decorators/require-permission.de
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AnalyticsService } from './analytics.service';
 import {
-  AgentAnalyticsGqlDto,
-  AgentStatGqlDto,
-  AnalyticsOverviewGqlDto,
-  DocumentAnalyticsGqlDto,
-  DocumentUsageGqlDto,
-  KnowledgeGapFlagGqlDto,
-  KnowledgeGapsGqlDto,
+  AgentAnalyticsResponseGqlDto,
+  AgentStatResponseGqlDto,
+  AnalyticsOverviewResponseGqlDto,
+  DocumentAnalyticsResponseGqlDto,
+  DocumentUsageResponseGqlDto,
+  KnowledgeGapFlagResponseGqlDto,
+  KnowledgeGapsResponseGqlDto,
 } from './dto/graphql/analytics-response.gql-dto';
-import { UserSummaryGqlDto } from '../users/dto/graphql/user-summary.gql-dto';
+import { UserSummaryResponseGqlDto } from '../users/dto/graphql/user-response.gql-dto';
 import { DocumentResponseGqlDto } from '../documents/dto/graphql/document-response.gql-dto';
-import { toUserSummaryGqlDto } from '../users/user.mapper';
-import { toDocumentResponseGqlDto } from '../documents/document.mapper';
 import type { GqlContext } from '../../common/graphql/loaders/loaders.factory';
 import { ANALYTICS_TOP_N } from '@synapsedesk/common';
 
@@ -40,7 +38,7 @@ import { ANALYTICS_TOP_N } from '@synapsedesk/common';
  * in any row, so a GraphQL query for one would be a REST call with more syntax
  * and a second cache path.
  *
- * `overview` is the one WITHOUT edges. See {@link AnalyticsOverviewGqlDto} for
+ * `overview` is the one WITHOUT edges. See {@link AnalyticsOverviewResponseGqlDto} for
  * why decomposing it would be a mistake rather than an improvement.
  *
  * It calls `AnalyticsService` rather than a gRPC client, and that is not an
@@ -53,7 +51,7 @@ import { ANALYTICS_TOP_N } from '@synapsedesk/common';
 export class AnalyticsResolver {
   constructor(private readonly analytics: AnalyticsService) {}
 
-  @Query(() => AnalyticsOverviewGqlDto, {
+  @Query(() => AnalyticsOverviewResponseGqlDto, {
     description:
       'Headline figures for a date range. `computedAt` says when the rollups ' +
       'ran and `dataThrough` says what they cover — the gap between them is ' +
@@ -64,11 +62,11 @@ export class AnalyticsResolver {
     @Args('from', { type: () => String }) from: string,
     @Args('to', { type: () => String }) to: string,
     @CurrentUser() context: RequestContext,
-  ): Promise<AnalyticsOverviewGqlDto> {
+  ): Promise<AnalyticsOverviewResponseGqlDto> {
     return await this.analytics.overview({ from, to }, context);
   }
 
-  @Query(() => AgentAnalyticsGqlDto, {
+  @Query(() => AgentAnalyticsResponseGqlDto, {
     description:
       'Per-agent throughput. Ask for `agent { … }` to resolve names through ' +
       'the users loader; a query that only wants the numbers costs no call ' +
@@ -79,8 +77,8 @@ export class AnalyticsResolver {
     @Args('from', { type: () => String }) from: string,
     @Args('to', { type: () => String }) to: string,
     @CurrentUser() context: RequestContext,
-  ): Promise<AgentAnalyticsGqlDto> {
-    // **`hydrateNames: false` is the whole point of the edge**
+  ): Promise<AgentAnalyticsResponseGqlDto> {
+    // **`hydrateNames: false` is the whole point of the edge**.
     // The service's third leg calls the same `ListUsersByIds` the users loader
     // does; running it here as well would make every numbers-only query pay
     // for a round trip whose result no field reads.
@@ -89,7 +87,7 @@ export class AnalyticsResolver {
     });
   }
 
-  @Query(() => DocumentAnalyticsGqlDto, {
+  @Query(() => DocumentAnalyticsResponseGqlDto, {
     description:
       'Which documents the AI retrieves and cites. `mostCited`, ' +
       '`neverRetrieved` and `retrievedNeverCited` are three different ' +
@@ -104,11 +102,11 @@ export class AnalyticsResolver {
     })
     limit: number,
     @CurrentUser() context: RequestContext,
-  ): Promise<DocumentAnalyticsGqlDto> {
+  ): Promise<DocumentAnalyticsResponseGqlDto> {
     return await this.analytics.documents({ limit }, context);
   }
 
-  @Query(() => KnowledgeGapsGqlDto, {
+  @Query(() => KnowledgeGapsResponseGqlDto, {
     description:
       'Where the knowledge base fails to answer — the empty-retrieval rate, ' +
       'and the documents flagged behind it.',
@@ -124,7 +122,7 @@ export class AnalyticsResolver {
     })
     limit: number,
     @CurrentUser() context: RequestContext,
-  ): Promise<KnowledgeGapsGqlDto> {
+  ): Promise<KnowledgeGapsResponseGqlDto> {
     return await this.analytics.knowledgeGaps({ from, to, limit }, context);
   }
 }
@@ -142,22 +140,22 @@ export class AnalyticsResolver {
  * An agent who left last month still has last month's numbers, and their id
  * resolves to nothing.
  */
-@Resolver(() => AgentStatGqlDto)
+@Resolver(() => AgentStatResponseGqlDto)
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class AgentStatResolver {
-  @ResolveField(() => UserSummaryGqlDto, {
+  @ResolveField(() => UserSummaryResponseGqlDto, {
     nullable: true,
     description:
       'The agent behind these numbers. Null when the account no longer ' +
       'exists — a rollup row outlives the user it counts.',
   })
   async agent(
-    @Parent() stat: AgentStatGqlDto,
+    @Parent() stat: AgentStatResponseGqlDto,
     @Context() { loaders }: GqlContext,
-  ): Promise<UserSummaryGqlDto | null> {
+  ): Promise<UserSummaryResponseGqlDto | null> {
     const user = await loaders.users.load(stat.agentId);
 
-    return user ? toUserSummaryGqlDto(user) : null;
+    return user;
   }
 }
 
@@ -168,7 +166,7 @@ export class AgentStatResolver {
  * client asks for when it needs the CURRENT document — the title after a
  * rename, the status after a re-ingest. Null when it has since been deleted.
  */
-@Resolver(() => DocumentUsageGqlDto)
+@Resolver(() => DocumentUsageResponseGqlDto)
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class DocumentUsageResolver {
   @ResolveField(() => DocumentResponseGqlDto, {
@@ -178,17 +176,17 @@ export class DocumentUsageResolver {
       'the rollup counted it — `title` above is what the rollup recorded.',
   })
   async document(
-    @Parent() usage: DocumentUsageGqlDto,
+    @Parent() usage: DocumentUsageResponseGqlDto,
     @Context() { loaders }: GqlContext,
   ): Promise<DocumentResponseGqlDto | null> {
     const document = await loaders.documents.load(usage.documentId);
 
-    return document ? toDocumentResponseGqlDto(document) : null;
+    return document;
   }
 }
 
 /** `KnowledgeGapFlag.document` — the same edge, over the same loader. */
-@Resolver(() => KnowledgeGapFlagGqlDto)
+@Resolver(() => KnowledgeGapFlagResponseGqlDto)
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class KnowledgeGapFlagResolver {
   @ResolveField(() => DocumentResponseGqlDto, {
@@ -198,11 +196,11 @@ export class KnowledgeGapFlagResolver {
       'since the flag was raised.',
   })
   async document(
-    @Parent() flag: KnowledgeGapFlagGqlDto,
+    @Parent() flag: KnowledgeGapFlagResponseGqlDto,
     @Context() { loaders }: GqlContext,
   ): Promise<DocumentResponseGqlDto | null> {
     const document = await loaders.documents.load(flag.documentId);
 
-    return document ? toDocumentResponseGqlDto(document) : null;
+    return document;
   }
 }

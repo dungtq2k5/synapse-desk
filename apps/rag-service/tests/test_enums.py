@@ -1,4 +1,4 @@
-"""§1.2 test 2 — the enum drift guard, made mechanical.
+"""The enum drift guard, made mechanical.
 
 Names this as *"the one genuinely new drift risk"*: these values now
 exist in TypeScript and in Python, and a hand-copied `GREETING_CLASSIFY` that

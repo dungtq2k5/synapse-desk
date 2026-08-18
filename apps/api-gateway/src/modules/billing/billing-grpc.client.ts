@@ -4,22 +4,16 @@ import {
   AUTH_GRPC_CLIENT,
   BILLING_SERVICE_NAME,
   BillingServiceClient,
-  requireProtoTimestamp,
-  fromProtoAiModelTier,
-  fromProtoOrgStatus,
+  CheckoutSessionResponse,
+  CreateCheckoutSessionRequest,
+  CreatePortalSessionRequest,
+  ListInvoicesResponse,
+  PortalSessionResponse,
+  StripeWebhookResponse,
+  SubscriptionResponse,
 } from '@synapsedesk/grpc-proto';
 import { RequestContext, RequestOrigin } from '@synapsedesk/common';
 import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
-import {
-  CreateCheckoutSessionDto,
-  CreatePortalSessionDto,
-} from './dto/rest/billing.dto';
-import {
-  CheckoutSessionResponseDto,
-  InvoiceResponseDto,
-  PortalSessionResponseDto,
-  SubscriptionResponseDto,
-} from './dto/rest/billing-response.dto';
 
 /**
  * Stripe's own API is slow enough that the shared 5-second deadline turns an
@@ -55,8 +49,8 @@ export class BillingGrpcClient extends BaseGrpcClient implements OnModuleInit {
     payload: Buffer,
     signature: string,
     origin: RequestOrigin,
-  ): Promise<{ status: string }> {
-    const response = await this.call(
+  ): Promise<StripeWebhookResponse> {
+    return this.call(
       (metadata) =>
         this.billingGrpcService.handleStripeWebhook(
           { payload, signature },
@@ -65,76 +59,48 @@ export class BillingGrpcClient extends BaseGrpcClient implements OnModuleInit {
       origin,
       STRIPE_DEADLINE_MS,
     );
-
-    return { status: response.status };
   }
 
-  async getSubscription(
-    context: RequestContext,
-  ): Promise<SubscriptionResponseDto> {
-    const response = await this.call(
+  getSubscription(context: RequestContext): Promise<SubscriptionResponse> {
+    return this.call(
       (metadata) => this.billingGrpcService.getSubscription({}, metadata),
       context,
     );
-
-    return {
-      stripeCustomerId: response.stripeCustomerId ?? null,
-      stripeSubscriptionId: response.stripeSubscriptionId ?? null,
-      planName: response.planName,
-      maxAgentSeats: response.maxAgentSeats,
-      maxStorageBytes: response.maxStorageBytes,
-      monthlyAiTokenBudget: response.monthlyAiTokenBudget,
-      aiModelTier: fromProtoAiModelTier(response.aiModelTier) ?? '',
-      billingCycleStart: requireProtoTimestamp(
-        response.billingCycleStart,
-        'billingCycleStart',
-      ),
-      status: fromProtoOrgStatus(response.status) ?? '',
-    };
   }
 
   createCheckoutSession(
-    dto: CreateCheckoutSessionDto,
+    request: CreateCheckoutSessionRequest,
     context: RequestContext,
-  ): Promise<CheckoutSessionResponseDto> {
+  ): Promise<CheckoutSessionResponse> {
     return this.call(
       (metadata) =>
-        this.billingGrpcService.createCheckoutSession(dto, metadata),
+        this.billingGrpcService.createCheckoutSession(request, metadata),
       context,
       STRIPE_DEADLINE_MS,
     );
   }
 
   createPortalSession(
-    dto: CreatePortalSessionDto,
+    request: CreatePortalSessionRequest,
     context: RequestContext,
-  ): Promise<PortalSessionResponseDto> {
+  ): Promise<PortalSessionResponse> {
     return this.call(
-      (metadata) => this.billingGrpcService.createPortalSession(dto, metadata),
+      (metadata) =>
+        this.billingGrpcService.createPortalSession(request, metadata),
       context,
       STRIPE_DEADLINE_MS,
     );
   }
 
-  async listInvoices(
+  listInvoices(
     limit: number | undefined,
     context: RequestContext,
-  ): Promise<InvoiceResponseDto[]> {
-    const response = await this.call(
+  ): Promise<ListInvoicesResponse> {
+    return this.call(
       (metadata) =>
         this.billingGrpcService.listInvoices({ limit: limit ?? 0 }, metadata),
       context,
       STRIPE_DEADLINE_MS,
     );
-
-    return response.items.map((invoice) => ({
-      id: invoice.id,
-      number: invoice.number,
-      amountDue: invoice.amountDue,
-      currency: invoice.currency,
-      status: invoice.status,
-      created: requireProtoTimestamp(invoice.created, 'created'),
-      hostedInvoiceUrl: invoice.hostedInvoiceUrl,
-    }));
   }
 }

@@ -22,7 +22,7 @@ import { InboundRejectionConsumer } from './modules/inbound-email/inbound-reject
       validationSchema: envValidationSchema,
       validationOptions: { allowUnknown: true },
     }),
-    // Domain E gained a database when in-app notifications landed
+    // Domain E gained a database when in-app notifications landed.
     // Email and SMS carry their recipient in the command and need no storage;
     // an in-app feed is storage by definition.
     PrismaModule,
@@ -34,7 +34,7 @@ import { InboundRejectionConsumer } from './modules/inbound-email/inbound-reject
     DeliveriesModule,
     PreferencesModule,
     NotificationRealtimeModule,
-    // The read half Domain E was NATS-only until this existed:
+    // The read half. Domain E was NATS-only until this existed:
     // it consumed events and wrote rows nobody could read back.
     FeedModule,
     OpsModule,

@@ -52,6 +52,11 @@ describe('inbound email loop guards', () => {
     text: 'Please help',
     html: null,
     receivedAt: new Date().toISOString(),
+    // Present because the DTO now defaults them rather than leaving them
+    // `undefined`; a literal standing in for a parsed body has to say so too.
+    references: [],
+    droppedAttachments: [],
+    attachments: [],
     ...overrides,
   });
 

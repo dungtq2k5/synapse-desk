@@ -16,7 +16,7 @@ import "google/protobuf/timestamp.proto";
 // aggregating a quarter of tickets competes with ticket creation, and no
 // endpoint design fixes that.
 
-// A rate and the count it was computed over
+// A rate and the count it was computed over.
 //
 // **Every rate carries its denominator.** A percentage with a hidden
 // denominator is how "our CSAT is 100%" reaches a board deck on two responses.
@@ -211,7 +211,7 @@ message RunRollupResponse {
   int32 agent_rows = 3;
 }
 
-// The async export
+// The async export.
 
 enum AnalyticsExportKind {
   ANALYTICS_EXPORT_KIND_UNSPECIFIED = 0;

@@ -15,21 +15,19 @@ import { UsersService } from '../../src/modules/users/users.service';
 import { InvitationsService } from '../../src/modules/invitations/invitations.service';
 
 /**
- * the tenant isolation sweep.
+ * The tenant-isolation sweep.
  *
- * Every by-id read and write, against a resource belonging to someone else,
+ * Every by-id read and write against a resource belonging to someone else,
  * parametrized over one table rather than written per module. Adding an
  * endpoint later means adding one row here.
  *
  * **404, never 403.** A 403 says "that id exists, and it is not yours", which
- * is the whole answer an attacker enumerating ids is after — it turns every
- * protected endpoint into a cross-tenant existence oracle. 404 says nothing at
- * all, and is what `tenantScope()` produces naturally: the row simply is not in
- * the caller's result set.
+ * is exactly what an attacker enumerating ids is after. 404 says nothing, and
+ * is what `tenantScope()` produces naturally.
  *
- * The per-module suites already cover this for their own routes; this file is
- * the one that catches an endpoint added WITHOUT it, because a new row here is
- * the obvious place to look and a missing test in someone else's file is not.
+ * The per-module suites cover their own routes; this file catches an endpoint
+ * added WITHOUT one, because a missing row here is visible and a missing test
+ * in someone else's file is not.
  */
 describe('tenant isolation sweep (e2e)', () => {
   let fx: E2eFixture;

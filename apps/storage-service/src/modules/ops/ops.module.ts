@@ -24,7 +24,7 @@ import { FirebaseStorageService } from '../firebase/firebase-storage.service';
  * trade.** `main.ts` connects NATS as a microservice CONSUMER, and that
  * connection is owned by the transport rather than exposed through DI, so there
  * is nothing to borrow. One extra long-lived connection per pod buys the ability
- * to notice a broker outage; the rule §2 test 4 states is that a probe must not
+ * to notice a broker outage; the rule is that a probe must not
  * dial PER PROBE, and this dials once at boot.
  */
 @Module({

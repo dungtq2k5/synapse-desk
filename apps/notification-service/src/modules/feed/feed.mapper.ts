@@ -8,7 +8,7 @@ import { Notification } from '../../generated/prisma/client';
 /**
  * Row → wire.
  *
- * `data` is serialised to a STRING rather than sent as a `Struct`: proto3 has
+ * `data` is serialized to a STRING rather than sent as a `Struct`: proto3 has
  * no `map<string, any>`, and a `Struct` would make every client depend on the
  * well-known types to read a deep-link payload it forwards to the SPA verbatim.
  * The gateway parses it back once, at the boundary that already speaks JSON.
@@ -20,7 +20,7 @@ export function toNotificationResponse(
     id: notification.id,
     organizationId: notification.organizationId,
     type: notification.type,
-    // A `VarChar` column (§7.3), so this is a plain string out of Prisma and
+    // A `VarChar` column, so this is a plain string out of Prisma and
     // the mapper takes it as one.
     priority: toProtoNotificationPriority(notification.priority),
     title: notification.title,

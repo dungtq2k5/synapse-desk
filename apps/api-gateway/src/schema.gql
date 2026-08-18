@@ -36,12 +36,6 @@ type AnalyticsOverview {
   ticketsResolved: Int!
 }
 
-type ApiInfo {
-  builtAt: String!
-  sha: String!
-  version: String!
-}
-
 """
 A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date-time format.
 """
@@ -191,12 +185,12 @@ type Notification {
   createdAt: DateTime!
   id: ID!
   organizationId: ID!
-  priority: String!
+  priority: String
   readAt: DateTime
   resourceId: ID
   resourceType: String
   title: String!
-  type: String!
+  type: String
 }
 
 type NotificationFeed {
@@ -233,11 +227,6 @@ type Query {
   Headline figures for a date range. `computedAt` says when the rollups ran and `dataThrough` says what they cover — the gap between them is how a stale scheduler is diagnosed.
   """
   analyticsOverview(from: String!, to: String!): AnalyticsOverview!
-
-  """
-  Which build is answering this request. The GraphQL twin of GET /version.
-  """
-  apiInfo: ApiInfo!
 
   """Departments in the caller’s tenant."""
   departments(first: Int! = 10, page: Int! = 1, searchTerm: String): DepartmentPage!
@@ -280,6 +269,11 @@ type Query {
   Users in the tenant. Requires `user.read`, like `GET /users`. The rows are summaries, not full profiles — the same narrowing the REST list applies.
   """
   users(first: Int! = 10, page: Int! = 1, searchTerm: String): UserPage!
+
+  """
+  Which build is answering this request. The GraphQL twin of GET /version.
+  """
+  version: Version!
 }
 
 type Rate {
@@ -437,4 +431,10 @@ type UserSummary {
   fullName: String!
   id: ID!
   isLocked: Boolean!
+}
+
+type Version {
+  builtAt: String!
+  sha: String!
+  version: String!
 }

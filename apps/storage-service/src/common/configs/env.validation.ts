@@ -2,7 +2,7 @@ import * as Joi from 'joi';
 import { NODE_ENV_OPTIONS } from '@synapsedesk/common';
 
 export const envValidationSchema = Joi.object({
-  // **Which build is this?** Baked at image build time, never read
+  // **Which build is this?**. Baked at image build time, never read
   // from git at runtime: a container has no `.git`, so a runtime lookup returns
   // nothing and the natural fallback is `"unknown"` — the answer you get at
   // exactly the moment you need the real one.
@@ -22,11 +22,11 @@ export const envValidationSchema = Joi.object({
   // NO DATABASE_URL. `storage-service` has no Postgres at all — its only state
   // is a few-minutes-lived PendingUpload, which is a cache entry, and giving it
   // a database tier for that would be provisioning a whole service for
-  // something Redis's TTL already cleans up for free (§1.2).
+  // something Redis's TTL already cleans up for free.
 
   // A SEPARATE service account from auth-service's. That one is scoped to
   // Firebase Auth and has no Storage grant; this one is scoped to Storage and
-  // has no Auth grant. Neither can do the other's job (§1.4).
+  // has no Auth grant. Neither can do the other's job.
   FIREBASE_STORAGE_SERVICE_ACCOUNT_PATH: Joi.string().required(),
   FIREBASE_STORAGE_BUCKET: Joi.string().required(),
 

@@ -1,5 +1,5 @@
 /**
- * The tenant lifecycle: what each `organizations.status` permits, and which
+ * @file The tenant lifecycle: what each `organizations.status` permits, and which
  * transitions between them are legal.
  *
  * Both tables are POLICY rather than data, which is why they live beside the

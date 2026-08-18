@@ -1,3 +1,4 @@
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
@@ -25,6 +26,7 @@ import {
   normalizeStringArray,
   MAX_DOCUMENT_TITLE_LENGTH,
   MAX_OBJECT_PATH_LENGTH,
+  lowerIfString,
   trimIfString,
   type AllowedDocumentMimeType,
   type OcrLanguage,
@@ -40,14 +42,9 @@ import {
 } from '../../../../common/config/dto.config';
 
 export class PresignDocumentDto {
-  // ASK this `docblock` seem to be invalid
-  /**
-   * The allowlist, mirrored from storage-service's `PURPOSE_POLICY[DOCUMENT]`.
-   *
-   * Two layers on purpose: this one refuses a 50 MB `.exe` before it costs a
-   * network hop and documents the limit in the API contract; that one holds no
-   * matter which service is asking. Widen BOTH when the parser handles more.
-   */
+  // Mirrored from storage-service's `PURPOSE_POLICY[DOCUMENT]`. Widen BOTH:
+  // this one only saves a network hop, that one is the real check.
+  /** The document's MIME type. Must be one the parser accepts. */
   @IsIn(ALLOWED_DOCUMENT_MIME_TYPES)
   readonly contentType!: AllowedDocumentMimeType;
 
@@ -65,15 +62,10 @@ export class PresignDocumentDto {
 }
 
 export class ConfirmDocumentDto {
-  /**
-   * Echoed back from the presign response.
-   *
-   * Not shape-validated here: ingestion-service passes it to storage-service,
-   * which checks it against the `PendingUpload` it recorded — a real
-   * authorization check rather than a syntactic one. A regex here would only
-   * reject well-formed paths that were never authorized, which is the case the
-   * real check catches better.
-   */
+  // Deliberately not shape-validated: storage-service checks it against the
+  // `PendingUpload` it recorded, which is an authorization check, not a
+  // syntactic one. A regex here would only reject well-formed paths.
+  /** The object path, echoed back from the presign response. */
   @IsString()
   @MinLength(1)
   @MaxLength(MAX_OBJECT_PATH_LENGTH)
@@ -85,7 +77,6 @@ export class ConfirmDocumentDto {
   @Transform(trimIfString)
   readonly title!: string;
 
-  // ASK this `docblock` seem to be invalid
   /**
    * Defaults TRUE, matching RDM Table 17.
    *
@@ -97,17 +88,16 @@ export class ConfirmDocumentDto {
    */
   @IsOptional()
   @IsBoolean()
-  // `1`/`0` and mixed case are accepted; anything else is a 400 rather than a
-  // silent `false`. The default below is NOT dead — an absent key never reaches
-  // the transform, which `to-boolean.decorator.spec.ts` pins.
   @ToBoolean()
-  readonly isOrganizationWide?: boolean = true;
+  @ApiPropertyOptional()
+  readonly isOrganizationWide: boolean = true;
 
   @IsOptional()
   @IsArray()
   @ArrayMaxSize(MAX_DOCUMENT_DEPARTMENTS)
   @IsUUID('4', { each: true })
-  readonly departmentIds?: string[] = [];
+  @ApiPropertyOptional()
+  readonly departmentIds: string[] = [];
 
   @IsOptional()
   @IsString()
@@ -115,18 +105,11 @@ export class ConfirmDocumentDto {
   @Transform(trimIfString)
   readonly fileName?: string;
 
-  // ASK this `docblock` seem to be invalid
   /**
-   * ISO 639-1 codes for OCR, if the uploader knows
+   * ISO 639-1 codes for OCR, if the uploader knows them.
    *
-   * **Empty on almost every upload, and that is inherent**: nobody knows their
-   * PDF is scanned until it is parsed, which is the premise of the whole
-   * feature. So this is an escape hatch for the tenant who knows they are
-   * uploading scanned Vietnamese forms — an advanced field in the UI, never a
-   * question asked of every upload.
-   *
-   * Unspecified falls back to `eng` at the parser. `[]` and absent are the same
-   * thing all the way down, because Prisma scalar lists cannot be null.
+   * An advanced field: leave it empty unless the upload is known to be scanned.
+   * `[]` and absent are the same thing, and the parser falls back to `eng`.
    */
   @IsOptional()
   // **Lower-cased and de-duplicated before validation**, order preserved.
@@ -152,10 +135,8 @@ export class ConfirmDocumentDto {
   @ArrayMaxSize(MAX_OCR_LANGUAGES)
   @IsIn(OCR_LANGUAGES, { each: true })
   @AtMostOneNonLatinScript()
-  // `?` is required even with a default: the Swagger plugin derives `required`
-  // from TypeScript optionality rather than from `@IsOptional()`, so dropping it
-  // would document this as mandatory. See `openapi.e2e-spec.ts` §1 test 3.
-  readonly ocrLanguages?: OcrLanguage[] = [];
+  @ApiPropertyOptional()
+  readonly ocrLanguages: OcrLanguage[] = [];
 }
 
 export class UpdateDocumentDto {
@@ -177,7 +158,7 @@ export class SetDocumentDepartmentsDto {
    * The FULL replacement set, not a delta.
    *
    * Replacement rather than add/remove because the fan-out ordering (
-   * §1.4b) turns on whether a change restricts, and that is answerable from a
+   * The fan-out ordering turns on whether a change restricts, and that is answerable from a
    * before/after pair but not from a stream of deltas applied in unknown order.
    */
   @IsArray()
@@ -197,17 +178,20 @@ export class ListDocumentsQueryDto extends SearchPaginationDto {
 
   @IsOptional()
   @IsIn(DOCUMENT_FILE_TYPES)
-  // ASK Why not transform to lowercase?
+  // The stored values are lowercase, so `?fileType=PDF` would otherwise 400 on
+  // a filter the caller spelled reasonably. `@IsIn` still owns the SET.
+  @Transform(lowerIfString)
   readonly fileType?: DocumentFileType;
 
   @IsOptional()
   @IsBoolean()
   @ToBoolean()
-  readonly includeDeleted?: boolean = false;
+  @ApiPropertyOptional()
+  readonly includeDeleted: boolean = false;
 }
 
 /**
- * The flag worklist filter
+ * The flag worklist filter.
  *
  * `type` accepts EVERY member of `DocumentFlagType` and any number of them.
  * `UNRETRIEVED` and `UNCITED` were once one flag under a name that fitted only
@@ -224,15 +208,18 @@ export class ListDocumentFlagsQueryDto extends SearchPaginationDto {
   @IsOptional()
   // A single `?type=UNCITED` arrives as a string, not an array. Normalising
   // here rather than in the client keeps `@IsIn` meaningful for both shapes.
-  @Transform(({ value }) =>
-    value === undefined ? undefined : Array.isArray(value) ? value : [value],
+  @Transform(
+    ({ value }) =>
+      value === undefined ? undefined : Array.isArray(value) ? value : [value], // NOSONAR
   )
   @IsArray()
   @IsIn(DOCUMENT_FLAG_TYPES, { each: true })
-  readonly type?: DocumentFlagType[];
+  @ApiPropertyOptional()
+  readonly type: DocumentFlagType[] = [];
 
   @IsOptional()
   @IsBoolean()
   @ToBoolean()
-  readonly includeResolved?: boolean = false;
+  @ApiPropertyOptional()
+  readonly includeResolved: boolean = false;
 }

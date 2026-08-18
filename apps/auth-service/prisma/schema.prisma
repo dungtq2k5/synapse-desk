@@ -26,7 +26,7 @@ model Organization {
   enforceTwoFactor    Boolean  @default(false) @map("enforce_two_factor")
   allowedEmailDomains String[] @map("allowed_email_domains") @db.VarChar(255)
 
-  /// The tenant's inbound-mail address token
+  /// The tenant's inbound-mail address token.
   ///
   /// The support address is `support+{inbound_token}@<domain>`, delivered by
   /// one catch-all route. NOT the slug: a slug is guessable, which makes every
@@ -39,7 +39,7 @@ model Organization {
   /// — and it makes "unroutable" a state the lookup returns rather than one it
   /// has to infer.
   ///
-  /// **32 hex characters, not `generateSecureToken()`** That
+  /// **32 hex characters, not `generateSecureToken()`**. That
   /// helper is `base64url`, which is 43 characters (too long for this column)
   /// and CASE-SENSITIVE. Mail systems normalise local-part case in practice, so
   /// one hop lowercasing the address would silently unroute the tenant, and
@@ -51,7 +51,7 @@ model Organization {
   maxStorageBytes      BigInt @default(5368709120) @map("max_storage_bytes")
   monthlyAiTokenBudget BigInt @default(1000000) @map("monthly_ai_token_budget")
 
-  /// Follows Stripe's `current_period_start` once billing is live (§1.15).
+  /// Follows Stripe's `current_period_start` once billing is live.
   ///
   /// **Load-bearing beyond its own column:** its epoch is inside the Redis
   /// quota key, so anything that writes this implicitly re-arms every quota
@@ -67,7 +67,7 @@ model Organization {
   /// the settings layer would be an unresolvable model name at request time.
   aiModelTier String @default("FAST") @map("ai_model_tier") @db.VarChar(20)
 
-  /// The tenant's business timezone
+  /// The tenant's business timezone.
   ///
   /// Distinct from `users.timezone`, which is a person's quiet hours. This one
   /// answers "when does this tenant's Monday start", and every daily analytics
@@ -533,7 +533,7 @@ model UserInvitation {
 /// RDM Table 30 — every Stripe webhook the system ACCEPTED as genuine.
 ///
 /// Exists for idempotency and ordering, not for reporting. Append-only and
-/// never edited: §1.6's audit-field policy does not apply, because this is an
+/// never edited: the audit-field policy does not apply, because this is an
 /// event log — the closest thing to it here is `audit_logs`, which is
 /// append-only for the same reason.
 ///
@@ -587,7 +587,7 @@ model BillingEvent {
   @@map("billing_events")
 }
 
-/// The HEARTBEAT
+/// The HEARTBEAT.
 ///
 /// **One row per job name, and the deepest fix in that document.** The jobs not
 /// running was not the real problem; the real problem was that nothing anywhere

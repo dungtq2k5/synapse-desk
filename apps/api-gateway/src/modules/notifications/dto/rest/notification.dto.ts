@@ -1,3 +1,4 @@
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
   MAX_BULK_NOTIFICATION_IDS,
   MAX_FEED_CURSOR_LENGTH,
@@ -43,12 +44,14 @@ export class ListNotificationsQueryDto {
   @IsOptional()
   @IsBoolean()
   @ToBoolean()
-  readonly unreadOnly?: boolean = false;
+  @ApiPropertyOptional()
+  readonly unreadOnly: boolean = false;
 
   @IsOptional()
   @IsBoolean()
   @ToBoolean()
-  readonly includeArchived?: boolean = false;
+  @ApiPropertyOptional()
+  readonly includeArchived: boolean = false;
 
   @IsOptional()
   @IsString()
@@ -60,7 +63,8 @@ export class ListNotificationsQueryDto {
   @IsInt()
   @Min(1)
   @Max(NOTIFICATION_FEED_LIMIT.MAX)
-  readonly limit?: number = NOTIFICATION_FEED_LIMIT.DEFAULT;
+  @ApiPropertyOptional()
+  readonly limit: number = NOTIFICATION_FEED_LIMIT.DEFAULT;
 }
 
 /**
@@ -75,7 +79,8 @@ export class MarkManyReadDto {
   @IsArray()
   @ArrayMaxSize(MAX_BULK_NOTIFICATION_IDS)
   @IsUUID('4', { each: true })
-  readonly ids?: string[];
+  @ApiPropertyOptional()
+  readonly ids: string[] = [];
 
   @IsOptional()
   @IsIn(Object.values(NotificationResourceType))

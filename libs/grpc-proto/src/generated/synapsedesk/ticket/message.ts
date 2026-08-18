@@ -36,7 +36,7 @@ export enum MessageAnswerStatus {
   MESSAGE_ANSWER_STATUS_DOC_ANSWER = 1,
   /**
    * MESSAGE_ANSWER_STATUS_DOC_MISSING - Nothing retrieved above threshold — the escalation case, never an
-   * invitation to improvise (11-doc §1.6).
+   * invitation to improvise.
    */
   MESSAGE_ANSWER_STATUS_DOC_MISSING = 2,
   /** MESSAGE_ANSWER_STATUS_GREETING - A greeting, answered from the canned table. No LLM call, no ledger row. */
@@ -44,7 +44,7 @@ export enum MessageAnswerStatus {
   /** MESSAGE_ANSWER_STATUS_AT_CAP - The tenant is at the AI cap. The caller escalates rather than erroring. */
   MESSAGE_ANSWER_STATUS_AT_CAP = 4,
   /**
-   * MESSAGE_ANSWER_STATUS_REFUSED - Refused by prompt-injection detection — 33-doc §5.1. **Not GREETING**: a
+   * MESSAGE_ANSWER_STATUS_REFUSED - Refused by prompt-injection detection. **Not GREETING**: a
    * refusal filed as a greeting is wrong in the thread, in the WebSocket frame
    * and in anything reading the trail afterwards.
    */
@@ -81,7 +81,7 @@ export interface MessageResponse {
   createdAt: Timestamp | undefined;
   attachments: AttachmentResponse[];
   /**
-   * Whether this message is kept OUT of AI prompts — 36-doc §7.
+   * Whether this message is kept OUT of AI prompts.
    *
    * On the read shape because the gateway's transcript builder filters AFTER
    * the fetch, and cannot filter on what it cannot see. Deliberately not a
@@ -123,7 +123,7 @@ export interface CreateMessageRequest {
     | string
     | undefined;
   /**
-   * The SENDER's own id, for idempotency -- 22-doc §2.3.
+   * The SENDER's own id, for idempotency.
    *
    * Absent for an HTTP call and REQUIRED for the WebSocket path, because a
    * socket that reconnects with an unacked message re-emits it. A duplicate
@@ -134,8 +134,8 @@ export interface CreateMessageRequest {
     | string
     | undefined;
   /**
-   * The inbound email's `Message-ID`, when this write came from mail — 31-doc
-   * §6.2. Written as an `inbound_emails` row in the SAME transaction, so a
+   * The inbound email's `Message-ID`, when this write came from mail
+   * Written as an `inbound_emails` row in the SAME transaction, so a
    * provider redelivery is a duplicate-key violation rather than a second
    * reply. Absent for every other transport, and absent is not an error.
    */
@@ -144,7 +144,6 @@ export interface CreateMessageRequest {
     | undefined;
   /**
    * Objects the client already uploaded, bound to the message as it is created
-   * — 36-doc §1.3.
    *
    * **This is what makes a first-turn attachment readable.** Presign and
    * confirm both took a `message_id`, so the row could only exist after the
@@ -156,7 +155,7 @@ export interface CreateMessageRequest {
    *
    * Each path is confirmed against storage-service before the write. A path
    * that fails comes back in `skipped_attachments` and the message is still
-   * created; see §1.3.1 for why that is the only safe outcome.
+   * created; that is the only safe outcome.
    */
   attachments: NewAttachment[];
 }
@@ -174,7 +173,7 @@ export interface NewAttachment {
 }
 
 /**
- * What `CreateMessage` answers with — 36-doc §1.3.1.
+ * What `CreateMessage` answers with.
  *
  * A wrapper rather than a bare `MessageResponse`, because a create now has a
  * second outcome to report: an attachment whose confirm failed is SKIPPED and
@@ -195,7 +194,7 @@ export interface CreateMessageResponse {
 }
 
 /**
- * Persists a STREAMED AI answer — 22-doc §5.1, write #2.
+ * Persists a STREAMED AI answer, write #2.
  *
  * The gateway holds the `Chat` stream, because tokens have to reach a socket
  * and ticket-service has none. What it does NOT hold is the shape of an AI
@@ -219,7 +218,7 @@ export interface AppendAiMessageRequest {
     | string
     | undefined;
   /**
-   * The status this answer was produced with, persisted on the row — 36-doc §7.
+   * The status this answer was produced with, persisted on the row.
    *
    * UNSPECIFIED for a canned greeting. The gateway held this in the completion
    * frame and threw it away on write, so a thread could not distinguish a
@@ -229,7 +228,7 @@ export interface AppendAiMessageRequest {
 }
 
 /**
- * Marks a message as unusable for AI context — 36-doc §7.
+ * Marks a message as unusable for AI context.
  *
  * **A separate RPC rather than a flag on `UpdateMessage`**, because that route
  * edits CONTENT on behalf of a human and carries authorship rules with it. This
@@ -272,14 +271,14 @@ export interface RedactMessageResponse {
 }
 
 /**
- * Presign → upload → confirm, per 10-storage-service.md §3.2. The bytes go
+ * Presign → upload → confirm, per storage-service's presign flow. The bytes go
  * straight from the client to Firebase Storage; ticket-service only decides
  * whether the upload may happen and records it once it has.
  */
 export interface UploadAttachmentRequest {
   ticketId: string;
   /**
-   * *Absent when the message does not exist yet** — 36-doc §1.3. Optional
+   * *Absent when the message does not exist yet**. Optional
    * rather than removed, so the `:messageId`-nested routes keep serving
    * "attach to a message that already exists".
    */
@@ -324,7 +323,7 @@ export interface GetAiAttachmentsRequest {
 
 /**
  * Field-for-field identical to `synapsedesk.rag.AttachmentPart`, and declared
- * here rather than imported — 36-doc §2.
+ * here rather than imported.
  *
  * A proto import would point this package at rag's, which is backwards: rag is
  * downstream of ticket, not the other way round. Declaring it twice costs
@@ -347,8 +346,8 @@ export interface GetAiAttachmentsResponse {
    */
   parts: AiAttachmentPart[];
   /**
-   * File NAMES that did not qualify, so the caller can tell the user — 36-doc
-   * §2.2. Never their contents.
+   * File NAMES that did not qualify, so the caller can tell the user
+   * Never their contents.
    */
   skipped: string[];
 }
@@ -374,7 +373,7 @@ export interface MessageServiceClient {
   redactMessage(request: RedactMessageRequest, metadata?: Metadata): Observable<RedactMessageResponse>;
 
   /**
-   * The write-back on the refusal path — 36-doc §7. Called by whoever holds the
+   * The write-back on the refusal path. Called by whoever holds the
    * id of the message that was just refused: the gateway for `Chat`,
    * ticket-service internally for the two `Draft` paths.
    */
@@ -393,7 +392,7 @@ export interface MessageServiceClient {
   downloadAttachment(request: DownloadAttachmentRequest, metadata?: Metadata): Observable<DownloadAttachmentResponse>;
 
   /**
-   * The AI-eligible attachments of one message, as bytes — 36-doc §2.
+   * The AI-eligible attachments of one message, as bytes.
    *
    * **The gateway asks rather than fetching.** It has no storage client, and
    * giving it one would add a peer and a credential to the chat path for work
@@ -435,7 +434,7 @@ export interface MessageServiceController {
   ): Promise<RedactMessageResponse> | Observable<RedactMessageResponse> | RedactMessageResponse;
 
   /**
-   * The write-back on the refusal path — 36-doc §7. Called by whoever holds the
+   * The write-back on the refusal path. Called by whoever holds the
    * id of the message that was just refused: the gateway for `Chat`,
    * ticket-service internally for the two `Draft` paths.
    */
@@ -466,7 +465,7 @@ export interface MessageServiceController {
   ): Promise<DownloadAttachmentResponse> | Observable<DownloadAttachmentResponse> | DownloadAttachmentResponse;
 
   /**
-   * The AI-eligible attachments of one message, as bytes — 36-doc §2.
+   * The AI-eligible attachments of one message, as bytes.
    *
    * **The gateway asks rather than fetching.** It has no storage client, and
    * giving it one would add a peer and a credential to the chat path for work

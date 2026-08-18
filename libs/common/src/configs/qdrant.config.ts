@@ -12,7 +12,7 @@
  * `ai-settings.contract.json` like every other cross-language constant.
  */
 
-/** ONE collection, payload-partitioned Not one per tenant. */
+/** ONE collection, payload-partitioned. Not one per tenant. */
 export const QDRANT_COLLECTION = 'document_chunks';
 
 /**

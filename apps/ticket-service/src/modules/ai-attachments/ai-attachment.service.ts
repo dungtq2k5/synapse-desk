@@ -8,7 +8,7 @@ import { AttachmentPart, CallerContext } from '@synapsedesk/grpc-proto';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageReferenceService } from '../storage-client/storage-reference.service';
 
-/** What was sent, and what was not */
+/** What was sent, and what was not. */
 export type AiAttachments = {
   parts: AttachmentPart[];
   /** File names left out, for telling the user. Never their contents. */
@@ -16,11 +16,11 @@ export type AiAttachments = {
 };
 
 /**
- * Attachments as model input
+ * Attachments as model input.
  *
  * **One implementation for three call sites.** `Chat` is the gateway's,
- * co-pilot `Draft` and the `invokeAi` auto-reply are ticket-service's
- *, and all three need the same two decisions made the same way.
+ * co-pilot `Draft` and the `invokeAi` auto-reply are ticket-service's,
+ * and all three need the same two decisions made the same way.
  * A copy per caller is three places for the eligibility rule to drift, on a
  * path where drift means either spending tokens on a zip or silently dropping
  * a screenshot.
@@ -124,8 +124,8 @@ export class AiAttachmentService {
    * An agent asking for a suggested reply is replying to what the customer last
    * sent, and with inbound email that message can have arrived by email from
    * someone who never authenticated. That makes this the highest-trust position
-   * an untrusted file reaches in this system, which is why the guard covers it
-   *.
+   * an untrusted file reaches in this system, which is why the guard covers it.
+   *
    *
    * AI messages are skipped rather than the newest row taken: the last message
    * on a busy ticket is often the assistant's own reply, which has no
@@ -151,26 +151,24 @@ export class AiAttachmentService {
   /**
    * The parts for the ticket's EARLIEST message — `Classify`.
    *
-   * **The third selection rule, and the three belong together.** `Chat` sends
-   * the current message's, `Draft` the last user message's, and this one the
-   * first — because `title` and `description` describe how the ticket opened,
-   * and classify never reads anything later.
+   * The third of three selection rules: `Chat` sends the current message's
+   * attachments, `Draft` the last user message's, and this one the first —
+   * because `title` and `description` describe how the ticket opened, and
+   * classify never reads anything later.
    *
-   * **Nothing carries terms forward to this surface.** Summaries inherit error
-   * codes for free once the AI's own replies name them; classify reads neither
+   * **Nothing carries terms forward to this surface.** Classify reads neither
    * the replies nor the conversation, so a ticket whose body says "see
    * attached" routes on those two words unless the file is here.
    *
-   * **Empty is the ordinary case for an emailed ticket**, and that is accepted
-   * rather than worked around: `createTicket` writes a ticket row and no
-   * message, so a ticket opened by mail has none until somebody replies.
-   * Classify is agent-triggered, so by the time anyone clicks it a message
-   * usually exists — and when it does not, re-running it is one click. Waiting
-   * or re-running automatically would both cost more than the blindness does.
+   * **Empty is the ordinary case for an emailed ticket**, and accepted:
+   * `createTicket` writes a ticket row and no message. Classify is
+   * agent-triggered, so a message usually exists by the time anyone clicks —
+   * and re-running is one click.
    *
-   * User messages only, for the same reason `forLastUserMessage` skips AI ones:
-   * an assistant reply carries no attachments and taking it would return empty
-   * for a customer's screenshot.
+   * User messages only, like `forLastUserMessage`: an assistant reply carries
+   * no attachments.
+   *
+   * See `docs/decisions/0030-refused-turns-exclude-their-attachments.md`.
    */
   async forEarliestMessage(
     ticketId: string,
@@ -202,7 +200,7 @@ export class AiAttachmentService {
   }
 
   /**
-   * The id of the message a draft is replying to
+   * The id of the message a draft is replying to.
    *
    * Public because the refusal write-back needs the same row this class already
    * resolves: when rag-service refuses a draft, what was refused is this

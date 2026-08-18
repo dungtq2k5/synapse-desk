@@ -69,7 +69,7 @@ export class InAppNotificationService {
       command.audience,
     );
 
-    // **Never notify the actor** rule 1.
+    // **Never notify the actor.**
     //
     // Applied HERE rather than in each producer, so a new producer gets it for
     // free. An agent who assigns a ticket to themselves being told about it is
@@ -128,7 +128,7 @@ export class InAppNotificationService {
         }
       } catch (error) {
         // **One recipient's failure must not cost the others theirs**
-        // . A fan-out that aborts halfway is worse than one
+        //. A fan-out that aborts halfway is worse than one
         // that loses a single row: the recipients it did not reach have no
         // record that anything was attempted.
         this.logger.error(
@@ -157,7 +157,7 @@ export class InAppNotificationService {
   }
 
   /**
-   * The audience, by whichever kind the producer used
+   * The audience, by whichever kind the producer used.
    *
    * A `users` audience makes **no call to auth-service for resolution**: the
    * producer already knows who, and a permission lookup here is the exact bug

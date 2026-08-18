@@ -35,24 +35,12 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthReferenceService } from '../auth-client/auth-reference.service';
 
-// ASK This `docblock` seems to be invalid
-/**
- * The purposes that ANSWER a question — the only ones an empty retrieval means
- * anything for.
- *
- * **No new enum**, which was the ASK here: `AiGenerationPurpose` already names
- * every member, and a second enum listing two of them would be a copy that can
- * disagree with its source. What this needed was not a new vocabulary but the
- * existing one — the literals were the problem, not the Set.
- *
- * Typed `ReadonlySet<string>` but BUILT from enum members, which is the pair
- * that matters: `row.purpose` is a Prisma `VarChar`, so `has()` has to take a
- * string, while a renamed enum member still fails to compile at the two
- * references below. Typing the Set itself as the enum would force a cast at the
- * call site and lose the check that the cast was hiding — the literals here
- * used to match no row at all if a purpose were renamed, reporting an
- * empty-retrieval rate of zero for a tenant whose rate is not zero.
- */
+// `ReadonlySet<string>` but BUILT from enum members, and both halves matter:
+// `row.purpose` is a Prisma `VarChar` so `has()` must take a string, while a
+// renamed enum member still fails to compile here. Typing the Set as the enum
+// would force a cast; string literals would silently match no row and report an
+// empty-retrieval rate of zero for a tenant whose rate is not zero.
+/** The purposes that ANSWER a question — the only ones an empty retrieval means anything for. */
 const ANSWERING_PURPOSES: ReadonlySet<string> = new Set([
   AiGenerationPurpose.CHAT_ANSWER,
   AiGenerationPurpose.DRAFT,
@@ -67,7 +55,7 @@ type AiDailyRow = AiStatSums & {
 };
 
 /**
- * AI spend and corpus health
+ * AI spend and corpus health.
  *
  * **Reads `ai_generation_daily_stats`, never `ai_generations`.** That table is
  * retention-rolled (RDM Table 29): raw rows aggregate away after ~90 days, so a
@@ -136,8 +124,8 @@ export class AiAnalyticsService {
       totalGenerations: totals.generations,
       monthlyBudgetMicros: Number(entitlement.budgetMicros),
       aiModelTier: toProtoAiModelTier(tier),
-      draftAcceptance: toRate(draftAcceptanceRate(totals)),
-      emptyRetrievalRate: toRate(
+      draftAcceptance: toAiRateValue(draftAcceptanceRate(totals)),
+      emptyRetrievalRate: toAiRateValue(
         emptyRetrievalRate(sumAll(answeringOnly(rows))),
       ),
       computedAt: latestComputedAt(rows),
@@ -146,7 +134,7 @@ export class AiAnalyticsService {
   }
 
   /**
-   * The content backlog
+   * The content backlog.
    *
    * Two signals that answer different questions and are useless apart: the
    * empty-retrieval RATE says how often the corpus had nothing, and the
@@ -182,7 +170,7 @@ export class AiAnalyticsService {
     return {
       emptyRetrievals: totals.emptyRetrievals,
       answeringGenerations: totals.generations,
-      emptyRetrievalRate: toRate(emptyRetrievalRate(totals)),
+      emptyRetrievalRate: toAiRateValue(emptyRetrievalRate(totals)),
       flags: flags.map((flag) => ({
         documentId: flag.documentId,
         documentTitle: flag.document.title,
@@ -194,7 +182,7 @@ export class AiAnalyticsService {
   }
 
   /**
-   * Corpus health from the chunk counters
+   * Corpus health from the chunk counters.
    *
    * **`UNRETRIEVED` and `UNCITED` are DIFFERENT findings** (RDM Table 27) and
    * are returned as separate lists. A document nobody's question came near may
@@ -264,7 +252,7 @@ export class AiAnalyticsService {
   }
 
   /**
-   * **The last day `ai_generation_daily_stats` covers**
+   * **The last day `ai_generation_daily_stats` covers**.
    *
    * See the note on ticket-service's equivalent: this is what lets a dashboard
    * of zeros say *why* it is zero. Tenant-wide and not clipped to the requested
@@ -362,8 +350,8 @@ function slice(
         promptTokens: stats.promptTokens,
         completionTokens: stats.completionTokens,
         costMicros: stats.costMicros,
-        latencyMs: toMean(meanLatencyMs(stats)),
-        failureRate: toRate(failureRate(stats)),
+        latencyMs: toAiMeanValue(meanLatencyMs(stats)),
+        failureRate: toAiRateValue(failureRate(stats)),
       }))
       // Most expensive first: the question this answers is "where does the money
       // go", and an alphabetical list makes the reader find that out themselves.
@@ -473,7 +461,7 @@ function latestComputedAt(rows: AiDailyRow[]) {
   );
 }
 
-function toRate(value: Rate): AiRateValue {
+function toAiRateValue(value: Rate): AiRateValue {
   return {
     rate: value.rate ?? undefined,
     numerator: value.numerator,
@@ -481,6 +469,6 @@ function toRate(value: Rate): AiRateValue {
   };
 }
 
-function toMean(value: Mean): AiMeanValue {
+function toAiMeanValue(value: Mean): AiMeanValue {
   return { mean: value.mean ?? undefined, count: value.count };
 }

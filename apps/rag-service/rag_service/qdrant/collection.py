@@ -36,7 +36,7 @@ COLLECTION_NAME = "document_chunks"
 EMBEDDING_MODEL = SETTINGS_EMBEDDING_MODEL
 EMBEDDING_DIMENSION = 768
 
-#: The four payload fields the retrieval filter compares
+#: The four payload fields the retrieval filter compares.
 #:
 #: **Payload indexes are mandatory, not an optimisation.** Without them Qdrant
 #: cannot estimate filter cardinality and falls back to scanning, which turns
@@ -115,7 +115,7 @@ async def _ensure_payload_indexes(client: AsyncQdrantClient) -> None:
         (DEPARTMENT_IDS, qm.PayloadSchemaType.KEYWORD),
         (IS_ORGANIZATION_WIDE, qm.PayloadSchemaType.BOOL),
         # Not part of the filter. Indexed because the re-scoping fan-out
-        #  updates every point of one document, and without this
+        # updates every point of one document, and without this
         # that update scans the whole collection.
         (DOCUMENT_ID, qm.PayloadSchemaType.KEYWORD),
     ]
@@ -143,7 +143,7 @@ async def _assert_model_matches(client: AsyncQdrantClient) -> None:
 
     The dimension is the only part Qdrant itself will enforce (at insert time,
     with an opaque error). This turns that into a boot-time failure naming the
-    actual problem — and it is the reason 11-doc §1.3 says to record model and
+    actual problem — and it is the reason to record model and
     dimension in the first place: a same-dimension *different* model produces
     no error at all, just quietly meaningless neighbours.
     """

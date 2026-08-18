@@ -24,7 +24,7 @@ async function bootstrap() {
     {
       transport: Transport.GRPC,
       options: {
-        // The domain package PLUS the ops packages Both fields
+        // The domain package PLUS the ops packages. Both fields
         // take arrays, so probes and `/version` ride the port this service
         // already listens on: no HTTP listener, no second port, and the kubelet
         // speaks `grpc.health.v1` natively.

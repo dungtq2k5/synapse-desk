@@ -8,7 +8,7 @@ import {
 import { FirebaseStorageService } from '../firebase/firebase-storage.service';
 
 /**
- * Deleting a superseded object — §1.6, async and at-most-once.
+ * Deleting a superseded object, async and at-most-once.
  *
  * The owning service emits this the moment it commits the new `avatar_url` or
  * removes the row. Fire-and-forget, exactly like `AuditPublisher`: a delete

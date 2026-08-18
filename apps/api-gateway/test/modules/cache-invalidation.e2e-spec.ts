@@ -17,7 +17,7 @@ import { CacheService } from '../../src/common/cache/cache.service';
 import { CACHE_SCOPES } from '../../src/common/config/cache.config';
 
 /**
- * Cache eviction, both halves
+ * Cache eviction, both halves.
  *
  * **On the realtime fixture rather than the plain one**, because the half that
  * matters here needs a REAL NATS round trip: the gateway must evict on a change
@@ -25,7 +25,7 @@ import { CACHE_SCOPES } from '../../src/common/config/cache.config';
  * exercise the framing production uses (a raw publish of a domain event looks
  * like an envelope to Nest's deserializer and delivers `undefined`).
  */
-describe('§29 §4 cache invalidation (e2e)', () => {
+describe('Cache invalidation (e2e)', () => {
   let fx: RealtimeFixture;
   let cache: CacheService;
 
@@ -87,7 +87,7 @@ describe('§29 §4 cache invalidation (e2e)', () => {
 
   afterAll(() => fx.close());
 
-  describe('§4.2 test 3 — a change the gateway never saw', () => {
+  describe('A change the gateway never saw', () => {
     it('**a ticket write originating in ticket-service evicts the gateway entry**', async () => {
       // **The test worth writing first.** Everything else in this file fails
       // visibly; a decorator-only implementation looks complete and is silently
@@ -160,7 +160,7 @@ describe('§29 §4 cache invalidation (e2e)', () => {
     });
   });
 
-  describe('§4.1 test 1 — a gateway mutation evicts what the next read would hit', () => {
+  describe('A gateway mutation evicts what the next read would hit', () => {
     const agent = () =>
       authenticatedAgent(fx.app, {
         organizationId,
@@ -241,7 +241,7 @@ describe('§29 §4 cache invalidation (e2e)', () => {
     });
   });
 
-  describe('§4.2 test 4 — invalidation is tenant-scoped', () => {
+  describe('Invalidation is tenant-scoped', () => {
     it("**one tenant's write leaves another tenant's entry alone**", async () => {
       await seed(organizationId, CACHE_SCOPES.tickets);
       await seed(otherOrganizationId, CACHE_SCOPES.tickets);
@@ -277,7 +277,7 @@ describe('§29 §4 cache invalidation (e2e)', () => {
     });
   });
 
-  describe('§4.2 test 5 — a malformed event does not kill the gateway', () => {
+  describe('A malformed event does not kill the gateway', () => {
     it('an event with no tenant is survived', async () => {
       // A producer-side bug must not be a gateway outage. If the process died
       // here, every assertion after it would fail as a connection error rather

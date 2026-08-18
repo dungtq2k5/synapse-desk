@@ -11,7 +11,7 @@ import type {
 } from '@nestjs/swagger/dist/interfaces/open-api-spec.interface';
 
 /**
- * The success envelope's own fields, declared ONCE, fix 3.
+ * The success envelope's own fields, declared ONCE.
  *
  * Both decorators below reference this rather than inlining the property list.
  * Two copies of an envelope shape drift the first time a field is added, and
@@ -105,14 +105,13 @@ const PAGINATION_META: SchemaObject = {
 };
 
 /**
- * Documents the SUCCESS response, envelope included
+ * Documents the SUCCESS response, envelope included.
  *
- * **Without this, every documented response in the API is wrong.** A handler
- * returns `TicketResponseDto`; `TransformInterceptor` wraps it, so the wire
- * carries `{ success, statusCode, message, warning, data: TicketResponseDto }`.
- * Swagger sees only the handler's return type, so the generated schema
+ * A handler returns `TicketResponseDto`; `TransformInterceptor` wraps it, so the
+ * wire carries `{ success, statusCode, message, warning, data }`. Swagger sees
+ * only the handler's return type, so without this the generated schema
  * describes the payload while the client receives the envelope — and a
- * generated client built from it fails on every single call.
+ * generated client fails on every call.
  *
  * ```ts
  * ＠ApiWrappedResponse(TicketResponseDto)            // data: { $ref: … }
@@ -121,16 +120,11 @@ const PAGINATION_META: SchemaObject = {
  * ＠ApiWrappedResponse(TicketResponseDto, { isArray: true })
  * ```
  *
- * **The status is derived, not hardcoded**, fix 2. The obvious
- * implementation reaches for `ApiOkResponse`, which means every `@Post`
- * documents a 200 while returning 201. A silently-wrong status is worse than an
- * absent one, because a client generator emits it and the resulting client
- * treats every successful create as an error.
+ * **The status is derived, not hardcoded.** Reaching for `ApiOkResponse` makes
+ * every `@Post` document a 200 while returning 201, and a client generator emits
+ * it — so every successful create reads as an error.
  *
- * **Why not a global generic wrapper?** Because the wrapping is not generic at
- * the type level: the interceptor adds it at runtime and the handler signature
- * never mentions it. A decorator per route is the honest description of what
- * happens, and it is one line.
+ * See `docs/decisions/0028-swagger-envelope-is-a-per-route-decorator.md`.
  */
 export function ApiWrappedResponse(
   model?: Type<unknown> | Type<unknown>[] | PaginatedModel<unknown>,
@@ -144,8 +138,8 @@ export function ApiWrappedResponse(
   const page = isPaginated(model) ? model.paginatedItem : null;
   const models: Type<unknown>[] = page
     ? [page]
-    : model
-      ? Array.isArray(model)
+    : model // NOSONAR
+      ? Array.isArray(model) // NOSONAR
         ? model
         : [model as Type<unknown>]
       : [];
@@ -195,43 +189,23 @@ export function ApiWrappedResponse(
 }
 
 /**
- * Documents the ERROR responses a route can produce, fix 1.
+ * Documents the ERROR responses a route can produce.
  *
- * **`500` is added unconditionally and `429` is added by default**, because the
- * global exception filter and the global throttler apply to every route in the
- * gateway. A document that omits them describes a different API than the one
- * running.
- *
- * **The two are not the same kind of automatic, which is why only one of them
- * can be turned off.** `500` comes from the global exception filter, and
- * nothing opts out of that — the webhook routes least of all, since an
- * infrastructure failure is exactly the case where they must answer 5xx so the
- * provider retries. `429` comes from the throttler, and `@SkipThrottle()` genuinely
- * removes it: `/webhooks/stripe` and `/webhooks/email/inbound` cannot produce a
- * 429 under any input, so documenting one is a claim about the API that is
- * simply false. A single flag that dropped BOTH would trade a wrong 429 for a
- * wrong absence of 500.
+ * `500` is added unconditionally and `429` by default, because the global
+ * exception filter and the global throttler apply to every gateway route.
  *
  * ```ts
  * ＠ApiFilterErrors(['404'])                       // 404, 429, 500
  * ＠ApiFilterErrors(['401'], { throttled: false })  // 401, 500 — see @SkipThrottle
  * ```
  *
- * **`throttled: false` must mirror `@SkipThrottle()` on the same route**, and
- * nothing about the type system makes it. `openapi.e2e-spec.ts` asserts the
- * pairing in both directions against the controllers' actual decorators, so
- * removing one without the other fails there rather than shipping a document
- * that quietly disagrees with the guard.
- *
- * **`403` is handled**, which the reference implementation this is ported from
- * did not do: its union accepted `'403'` and its body ignored it, so
- * `@ApiFilterErrors(['403'])` type-checked, read as documentation, and produced
- * nothing at all. **This system needs 403 more than the reference did** —
- * permission-guarded routes are most of the API.
+ * Only `429` can be turned off, and **`throttled: false` must mirror
+ * `@SkipThrottle()` on the same route** — nothing in the type system enforces
+ * that, so `openapi.e2e-spec.ts` asserts the pairing in both directions.
  *
  * `'429'` and `'500'` are deliberately absent from {@link ApiErrorStatus}:
- * passing them was already a no-op, and a parameter that does nothing is worse
- * than one that does not exist.
+ * passing them is a no-op, and a parameter that does nothing is worse than one
+ * that does not exist.
  */
 export function ApiFilterErrors(
   statuses: ApiErrorStatus[] = [],

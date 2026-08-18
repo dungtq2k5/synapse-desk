@@ -2,26 +2,27 @@ import type { ClientGrpc } from '@nestjs/microservices';
 import {
   DEPARTMENT_SERVICE_NAME,
   packRequestContext,
-  type DepartmentResponse,
   type DepartmentServiceClient,
 } from '@synapsedesk/grpc-proto';
 import { BATCH_ID_LIMIT, type RequestContext } from '@synapsedesk/common';
 import { firstValueFrom } from 'rxjs';
 import { createCachedLoader } from './loaders.factory';
+import { toDepartmentResponseGqlDto } from '../../../modules/departments/department.mapper';
+import type { DepartmentResponseGqlDto } from '../../../modules/departments/dto/graphql/department-response.gql-dto';
 import type { CacheService } from '../../cache/cache.service';
 import { ENTITY_TTL_SECONDS, entityScope } from '../../config/cache.config';
 
 /**
- * The departments loader
+ * The departments loader.
  *
  * The second-most-traversed edge: `Ticket.department`, `Document.departments`
  * and `User.departments` all arrive here.
  *
  * Tenant scope comes from the caller CONTEXT inside the RPC, not from anything
- * passed here, property 1. That is what makes an id-keyed cache
+ * passed here. That is what makes an id-keyed cache
  * safe: the key carries no tenant, so the RPC has to be the boundary.
  *
- * **Cached in Redis as well** A department is three fields that
+ * **Cached in Redis as well**. A department is three fields that
  * change when somebody renames one, which is roughly never, and it is read on
  * every ticket, document and user edge in the schema. The Redis key DOES carry
  * the tenant, so the two boundaries are independent: the key stops a
@@ -36,7 +37,7 @@ export function createDepartmentLoader(
     DEPARTMENT_SERVICE_NAME,
   );
 
-  return createCachedLoader<DepartmentResponse>({
+  return createCachedLoader<DepartmentResponseGqlDto>({
     cache,
     organizationId: () => context().organizationId,
     scopeOf: (id) => entityScope('department', id),
@@ -51,7 +52,9 @@ export function createDepartmentLoader(
         ),
       );
 
-      return response.items;
+      return response.items.map((department) =>
+        toDepartmentResponseGqlDto(department),
+      );
     },
   });
 }

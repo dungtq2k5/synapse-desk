@@ -16,22 +16,23 @@ const SCRAPE_ORIGIN: RequestOrigin = {
 };
 
 /**
- * Exports `job_last_success_timestamp_seconds`, and the item the
- * doc says to build first.
+ * Exports `job_last_success_timestamp_seconds` from the `job_runs` heartbeat.
  *
- * Specifies a staleness alert over the `job_runs` heartbeat.
- * Exporting that table as a gauge turns the alert into a Prometheus rule:
+ * Exporting that table as a gauge turns a staleness alert into a Prometheus
+ * rule:
  *
  * ```txt
  * time() - job_last_success_timestamp_seconds{job="ledger.daily"} > 172800
  * ```
  *
  * Two lines instead of a bespoke alerting path — and it fires for *"it broke"*
- * and *"it was never wired"* alike, which were indistinguishable and equally bad
- * when seven jobs sat uncalled.
+ * and *"it was never wired"* alike, which were indistinguishable and equally
+ * bad when seven jobs sat uncalled.
  *
  * **Collected ON SCRAPE rather than on a timer**, so the value is never staler
  * than the scrape interval and nothing runs in a pod nobody is scraping.
+ *
+ * See `docs/decisions/0003-bullmq-over-nest-cron.md`.
  */
 @Injectable()
 export class JobMetricsCollector {
@@ -53,7 +54,7 @@ export class JobMetricsCollector {
       this.metrics.jobLastSuccess.reset();
 
       for (const item of health.items) {
-        // **ABSENT, not zero** test 4. Zero is 1970, which
+        // **ABSENT, not zero**. Zero is 1970, which
         // satisfies any `time() - x > threshold` rule and reads as
         // catastrophically stale rather than as unknown. A job that has never
         // run must produce NO series, so the alert distinguishes "no data"

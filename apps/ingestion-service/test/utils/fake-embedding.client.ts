@@ -5,28 +5,25 @@ import {
 } from '../../src/modules/embeddings/embedding.contract';
 
 /**
- * A substitute that HONOURS the embedding contract — §2.3.
+ * A substitute that HONOURS the embedding contract.
  *
- * The temptation with a fake is to make it maximally permissive: return
- * whatever, never throw, never validate. That fake makes every pipeline test
- * pass while the production path stays broken in exactly the way the test
- * claimed to cover. So this one keeps the properties the real client has and
- * the pipeline actually depends on:
+ * A maximally permissive fake — return whatever, never throw — makes every
+ * pipeline test pass while the production path stays broken in exactly the way
+ * the test claimed to cover. This one keeps the properties the pipeline depends
+ * on:
  *
  *   - **one vector per text, in input order** — the caller zips these against
  *     chunk rows by index, so a reordered or short response silently attaches
  *     vectors to the wrong chunks;
- *   - **the right dimensionality**, so a Qdrant upsert that would be rejected
- *     in production is rejected here;
- *   - **a real `promptTokens`**, so the ledger rows and the quota counter carry
- *     numbers with the same shape as production's;
- *   - **it throws on failure**, because the pipeline's recovery path is built
- *     on that and a fake that returned empties would prove the wrong thing.
+ *   - **the right dimensionality**, so a Qdrant upsert rejected in production is
+ *     rejected here;
+ *   - **a real `promptTokens`**, so ledger rows and the quota counter carry
+ *     production-shaped numbers;
+ *   - **it throws on failure**, because the pipeline's recovery path is built on
+ *     that.
  *
- * Vectors are DETERMINISTIC from the text, which matters more than it looks:
- * the same text embeds to the same point every run, so a retrieval assertion is
- * reproducible rather than passing on whichever random vector happened to land
- * nearest.
+ * Vectors are DETERMINISTIC from the text, so a retrieval assertion is
+ * reproducible rather than passing on whichever random vector landed nearest.
  */
 export class FakeEmbeddingClient implements EmbeddingClient {
   /** Every batch it was asked for — the "was the cap respected" assertions. */

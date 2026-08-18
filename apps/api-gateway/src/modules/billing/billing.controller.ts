@@ -15,7 +15,7 @@ import { RequirePermission } from '../../common/decorators/require-permission.de
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ResponseMessage } from '../../common/decorators/response-message.decorator';
 import { OrgAccessKind } from '../../common/decorators/org-access.decorator';
-import { BillingGrpcClient } from './billing-grpc.client';
+import { BillingService } from './billing.service';
 import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AUTH_SCHEMES } from '../../common/config/swagger.config';
 import {
@@ -47,7 +47,7 @@ import {
 @UseGuards(JwtAuthGuard, PermissionGuard)
 @OrgAccessKind(OrgAccess.BILLING)
 export class BillingController {
-  constructor(private readonly billing: BillingGrpcClient) {}
+  constructor(private readonly billing: BillingService) {}
 
   /**
    * Reads POSTGRES, and makes zero Stripe calls.

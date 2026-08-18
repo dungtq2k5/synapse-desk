@@ -1,3 +1,4 @@
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
@@ -44,7 +45,8 @@ export class CreateMessageDto {
   @IsOptional()
   @IsBoolean()
   @ToBoolean()
-  readonly isInternalNote?: boolean = false;
+  @ApiPropertyOptional()
+  readonly isInternalNote: boolean = false;
 
   /**
    * Ask for an AI draft after this message lands.
@@ -57,11 +59,12 @@ export class CreateMessageDto {
   @IsOptional()
   @IsBoolean()
   @ToBoolean()
-  readonly invokeAi?: boolean = false;
+  @ApiPropertyOptional()
+  readonly invokeAi: boolean = false;
 
   /**
    * Objects already uploaded, bound to this message as it is created
-   * §1.3.
+   *
    *
    * **This is the ordering that makes a first-turn attachment readable.**
    * Presign then confirm-against-a-message meant the row could only exist after
@@ -69,33 +72,22 @@ export class CreateMessageDto {
    * screenshot the question was about arrived a moment too late to be seen.
    *
    * A path that fails its confirm comes back in `skippedAttachments` and the
-   * message is still created; §1.3.1 is why that is the only safe outcome.
+   * message is still created, and that is why that is the only safe outcome.
    */
   @IsOptional()
   @IsArray()
   @ArrayMaxSize(MAX_ATTACHMENTS_PER_MESSAGE)
   @ValidateNested({ each: true })
   @Type(() => NewAttachmentDto)
-  readonly attachments?: NewAttachmentDto[];
+  @ApiPropertyOptional()
+  readonly attachments: NewAttachmentDto[] = [];
 
-  // ASK This `docblock` seems to be invalid
   /**
-   * The `ai_generations` row this reply came from, the loop's
-   * inbound half.
+   * The `ai_generations` row this reply came from — `AiDraftResponseDto`'s
+   * `generationId`, handed back.
    *
-   * **The other end of `AiDraftResponseDto.generationId`.** An agent presses
-   * *suggest a reply*, edits it or not, and posts; sending this back is what
-   * lets ticket-service compare the text against the stored draft and record
-   * ACCEPTED or EDITED instead of letting the sweep mark it DISCARDED.
-   *
-   * **This half was missing too**, which is why the loop was broken in both
-   * directions at exactly one service. The proto has carried the field since
-   * `message.proto:71` and ticket-service has always read it; the gateway
-   * neither returned the id nor accepted it back, so a client could not have
-   * closed the loop even knowing to try.
-   *
-   * Absent for an ordinary reply, and absent is not an error — most replies are
-   * typed by a human from nothing.
+   * Send it when posting an AI-drafted reply so the draft is recorded ACCEPTED
+   * or EDITED rather than DISCARDED. Absent for an ordinary reply.
    */
   @IsOptional()
   @IsUUID()
@@ -136,7 +128,7 @@ export class UpdateMessageDto {
  * Attachment metadata, validated HERE as the first of two layers.
  *
  * `storage-service` will check the same things against its own `PURPOSE_POLICY`
- * (10-storage-service.md §2.2). That is not redundancy for its own sake: this
+ * in storage-service. That is not redundancy for its own sake: this
  * layer rejects a 2 GB request before it costs a network hop, and that layer
  * holds regardless of which service asks — neither can be removed on the
  * grounds that the other exists.

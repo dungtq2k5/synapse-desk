@@ -15,7 +15,7 @@ import { MessagesService } from '../../src/modules/messages/messages.service';
 import { RagClientService } from '../../src/modules/ai-client/rag-client.service';
 
 /**
- * A refused message never reaches a later prompt
+ * A refused message never reaches a later prompt.
  *
  * **The failure this prevents makes a refusal a delay rather than a defence.**
  * The guard refuses an injection, the row stays in the thread, and the next
@@ -25,11 +25,11 @@ import { RagClientService } from '../../src/modules/ai-client/rag-client.service
  * the row is.
  *
  * **Two of the three builders live here** and are asserted directly. The
- * gateway's is a different mechanism for a documented reason (§7.1) and is
+ * gateway's is a different mechanism for a documented reason and is
  * asserted in its own suite — but the property is the same, so the table below
  * names all three and this file proves the two it owns.
  */
-describe('§7 refused messages are excluded from AI context (e2e)', () => {
+describe('Refused messages are excluded from AI context (e2e)', () => {
   let fx: E2eFixture;
   let ai: AiService;
   let messages: MessagesService;
@@ -66,7 +66,7 @@ describe('§7 refused messages are excluded from AI context (e2e)', () => {
    * The two builders this service owns, called through one signature.
    *
    * **Parameterised because one filtered builder and two unfiltered is the
-   * likely half-implementation** — §7 test 2. They read the same table for the
+   * likely half-implementation**. They read the same table for the
    * same purpose through two separate queries, and nothing but a test makes
    * them agree.
    */
@@ -118,7 +118,7 @@ describe('§7 refused messages are excluded from AI context (e2e)', () => {
   describe('2. every transcript builder excludes it', () => {
     it.each(BUILDERS)('$name', async ({ run }) => {
       // `ask1` was refused; `ask3` is a legitimate follow-up. The prompt for
-      // `ask3` must contain no trace of `ask1` — §7 test 1's scenario, asserted
+      // `ask3` must contain no trace of `ask1`'s scenario, asserted
       // on the PROMPT rather than on the answer, because an answer that happens
       // not to mention it proves nothing about what the model was shown.
       const ticket = await createTicket(fx.prisma, tenant);

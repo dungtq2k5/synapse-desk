@@ -1,10 +1,12 @@
 import {
   fromProtoTimestamp,
+  ListSessionsResponse,
   requireProtoTimestamp,
   SessionResponse,
 } from '@synapsedesk/grpc-proto';
-import { SessionResponseDto } from './dto/rest/session.dto';
+import { SessionResponseDto } from './dto/rest/session-response.dto';
 
+/** Converts a `SessionResponse` off the wire into its REST DTO. */
 export function toSessionResponseDto(
   session: SessionResponse,
 ): SessionResponseDto {
@@ -19,4 +21,11 @@ export function toSessionResponseDto(
     expiresAt: requireProtoTimestamp(session.expiresAt, 'expiresAt'),
     createdAt: requireProtoTimestamp(session.createdAt, 'createdAt'),
   };
+}
+
+/** Converts a `ListSessionsResponse` off the wire into its REST DTOs. */
+export function toSessionResponseDtos(
+  response: ListSessionsResponse,
+): SessionResponseDto[] {
+  return response.items.map(toSessionResponseDto);
 }

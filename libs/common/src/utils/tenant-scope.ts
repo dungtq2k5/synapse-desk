@@ -11,19 +11,12 @@ export type TenantScope = {
 /**
  * The tenant filter every tenant-scoped query starts from, in EVERY service.
  *
- * Lives in `libs/common` rather than in one service because it is now needed by
- * two: auth-service since it was written, and ticket-service from its first
- * query. A second copy is exactly the drift `libs/` exists to prevent — and
- * this function is the one place a copy would be most expensive, since a
- * divergence in it is a cross-tenant read rather than a cosmetic difference.
- *
  * A Super Admin (`organizationId === null`) legitimately reads across tenants,
- * so for them the filter collapses to soft-delete only. That is exactly the
- * branch that must never be reachable by a tenant user — which is why it keys
- * off the VERIFIED context the gateway packed into gRPC metadata rather than
- * anything in the request body.
+ * so for them the filter collapses to soft-delete only. That branch must never
+ * be reachable by a tenant user, which is why it keys off the VERIFIED context
+ * the gateway packed into gRPC metadata rather than anything in the request.
  *
- * Rules that go with it, and the reason each exists:
+ * Rules that go with it:
  *
  *   - **Every** `findMany`/`count` spreads `...tenantScope(ctx)`.
  *   - **Every** single-row read by id uses
@@ -31,10 +24,9 @@ export type TenantScope = {
  *     `findUnique({ where: { id } })`. `findUnique` CANNOT express the tenant
  *     filter — its `where` accepts only unique fields — so it returns another
  *     tenant's row and the handler happily 200s it. This is the single most
- *     likely security bug in any service that owns tenant-scoped rows.
- *   - A miss returns NOT_FOUND, never PERMISSION_DENIED. "You may not see this"
- *     confirms the row exists, which turns id enumeration into a
- *     tenant-membership oracle.
+ *     likely security bug in any service owning tenant-scoped rows.
+ *   - A miss returns NOT_FOUND, never PERMISSION_DENIED: "you may not see this"
+ *     confirms the row exists, turning id enumeration into a membership oracle.
  */
 export function tenantScope(context: CallerContext): TenantScope {
   if (!hasIdentity(context)) {

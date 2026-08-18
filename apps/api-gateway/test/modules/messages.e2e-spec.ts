@@ -23,7 +23,7 @@ import {
 } from '../fixtures/wire';
 
 /**
- * §2.5 The ticket thread at the HTTP boundary.
+ * The ticket thread at the HTTP boundary.
  *
  * ticket-service is stubbed. The internal-note SQL filter, the edit window and
  * the redaction semantics all have their own suite against a real database —
@@ -31,7 +31,7 @@ import {
  * them, deliberately), the attachment DTO's two-layer validation, and the 503
  * that a client has to be able to tell apart from a crash.
  */
-describe('§2.5 Ticket messages at the HTTP boundary (e2e)', () => {
+describe('Ticket messages at the HTTP boundary (e2e)', () => {
   let fx: E2eFixture;
 
   const ticketId = faker.string.uuid();
@@ -253,7 +253,7 @@ describe('§2.5 Ticket messages at the HTTP boundary (e2e)', () => {
     it('7. **names the attachments that did not confirm, and still returns 201**', async () => {
       // The presign record lives ten minutes and this list is routinely
       // non-empty for an honest caller — so it is a normal response to render,
-      // not an error path. §1.3.1 is why the message survives at all.
+      // not an error path. That is why the message survives at all.
       fx.stubs.message.createMessage.mockReturnValue(
         of(wireCreatedMessage({ content: 'Here is the error' }, ['stale.png'])),
       );

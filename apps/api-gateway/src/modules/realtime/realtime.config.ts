@@ -1,3 +1,5 @@
+import { AnswerStatus } from '@synapsedesk/common';
+
 /**
  * Room names and outbound event names — the two strings a client and the server
  * must agree on exactly, declared once.
@@ -61,6 +63,9 @@ export const deptRoom = (departmentId: string): DeptRoom =>
  * distinction reads `payload.pattern` — the same discriminant every other
  * consumer switches on.
  */
+// An `as const` map with a derived union, NOT an `enum`: these values are wire
+// strings a client matches literally, and the union keeps them assignable from
+// a plain string literal. Same shape as `CLIENT_EVENTS` and `CACHE_SCOPES`.
 export const REALTIME_EVENTS = {
   /** Any change to a ticket's own fields. Room: `ticket:{id}` and `org:{id}`. */
   ticketUpdated: 'ticket:updated',
@@ -267,3 +272,15 @@ export const WS_EVENT_LIMITS = {
   [CLIENT_EVENTS.presenceUpdate]: { limit: 120, ttlMs: 60_000 },
   [CLIENT_EVENTS.aiStreamCancel]: { limit: 60, ttlMs: 60_000 },
 } as const satisfies Record<ClientEvent, { limit: number; ttlMs: number }>;
+
+/**
+ * Frame status for an answer status this build does not recognise.
+ *
+ * Gateway-side vocabulary, NOT the proto's `MESSAGE_ANSWER_STATUS_UNSPECIFIED`:
+ * a socket frame carries a NAME a client switches on, and that client needs a
+ * default arm it can spell.
+ */
+export const UNSPECIFIED_FRAME_STATUS = 'UNSPECIFIED';
+
+/** Every value `ai:stream:done` may carry in `status`. */
+export type FrameAnswerStatus = AnswerStatus | typeof UNSPECIFIED_FRAME_STATUS;

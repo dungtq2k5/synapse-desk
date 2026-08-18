@@ -3,7 +3,7 @@ import { validateSync } from 'class-validator';
 import { SubmitFeedbackDto } from './feedback.dto';
 
 /**
- * §2.8 test 2, at the cheapest layer.
+ * At the cheapest layer.
  *
  * The rating is constrained in THREE places: here, in ticket-service, and by a
  * Postgres CHECK the seeder applies. That is not paranoia — each catches a

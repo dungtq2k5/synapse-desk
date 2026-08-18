@@ -8,7 +8,7 @@ they add a second binary to the repo.
 
 **Via `pdftoppm`, because there is no imaging library here.** Neither Pillow nor
 ImageMagick is a dependency, and adding one to draw four words would be a real
-dependency for a test helper. Poppler is already required — 34-doc's OCR path
+dependency for a test helper. Poppler is already required — the OCR path
 rasterises with exactly this binary — so a hand-written PDF rendered through it
 costs nothing new.
 

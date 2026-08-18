@@ -39,29 +39,25 @@ type SeedSummary = {
 /**
  * Bootstrap seeder for auth-service.
  *
- * Populates the rows the platform cannot function without — the permission
- * catalogue, the global system roles, the system actor and the first Super
- * Admin — and does so idempotently, so it is safe to run on every startup:
+ * Populates the rows the platform cannot function without, idempotently, so it
+ * is safe on every startup:
  *
  *   1. `permissions`  — one row per PERMISSION_CODES entry, so RBAC codes in
  *                       the source and rows in the DB cannot drift.
- *   2. system user    — the non-login actor that owns rows no human created
- *                       (`roles.created_by_id` on global system roles).
- *   3. super admin    — the first real platform operator (RDM).
+ *   2. system user    — the non-login actor owning rows no human created.
+ *   3. super admin    — the first real platform operator.
  *   4. system roles   — Org Admin / Knowledge Manager / Support Agent / End
  *                       User, `organization_id IS NULL`, `is_system_role`.
  *
- * Steps 1-4 run in a single transaction guarded by a Postgres advisory lock, so
- * the database only ever moves between "unseeded" and "fully seeded" — never to
- * a half-state such as roles existing with no permissions attached, which would
- * 403 every request. The index creation and password hashing that bracket it
- * are deliberately outside; see the comments in `seed()`.
+ * Steps 1-4 run in one transaction behind a Postgres advisory lock, so the
+ * database only ever moves between "unseeded" and "fully seeded" — never to a
+ * half-state such as roles existing with no permissions, which would 403 every
+ * request. Index creation and password hashing sit outside it deliberately.
  *
- * "Smart" here means: create only what is missing, never clobber operator
- * changes. Specifically, an existing Super Admin's password is left alone (so a
- * rotated password is not reset to the .env value on the next deploy), while
- * role→permission grants ARE reconciled every boot so that a newly released
- * permission code lands on Org Admin without a manual migration.
+ * **Creates only what is missing, never clobbers operator changes.** An existing
+ * Super Admin's password is left alone; role→permission grants ARE reconciled
+ * every boot, so a newly released permission code lands on Org Admin without a
+ * migration.
  */
 @Injectable()
 export class DatabaseSeeder implements OnApplicationBootstrap {
@@ -259,49 +255,22 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
   }
 
   /**
-   * Constraints Prisma cannot expressb.
+   * Constraints Prisma cannot express.
    *
-   * **`locked_until` without `is_locked` is unrepresentable, not merely
-   * unwritten.** Two columns is four states on paper and only three mean
-   * anything:
+   * Adds the `users` lock CHECK: `locked_until` without `is_locked` is
+   * unrepresentable, so only three of the four column states are writable.
+   * `true` + past is deliberately allowed — it is the converging window between
+   * an expiry passing and a mechanism noticing, not a state.
    *
-   *   - `true` + NULL — an indefinite lock; an admin must unlock. The existing
-   *     behaviour.
-   *   - `true` + future — a temporary lock; it auto-unlocks.
-   *   - `false` + NULL — not locked.
+   * Uses `DO $$` because Postgres has no `ADD CONSTRAINT IF NOT EXISTS`, so a
+   * second boot would fail without the catalogue check.
    *
-   * The two the constraint prevents are both SILENT if written:
-   *
-   *   - `false` + past is stale residue that nobody reading a row should have
-   *     to interpret as "behaviourally unlocked".
-   *   - `false` + future reads like "not locked, but scheduled to stop being
-   *     locked", which is meaningless — and specifically it is NOT a scheduled
-   *     future lock. That is a plausible different feature needing its own
-   *     column (`locked_from`) and its own sweep, and leaving this state
-   *     invalid is what stops somebody half-implementing it by setting a field.
-   *
-   * Both mechanisms that clear a lock already clear the pair together, so
-   * nothing legitimate is blocked. **The constraint exists for the write that
-   * FORGETS to** — and every one of those would otherwise produce a row that
-   * looks fine.
-   *
-   * `true` + past is deliberately NOT prevented: it is the converging window
-   * between an expiry passing and a mechanism noticing, and it is a window
-   * rather than a state.
-   *
-   * `DO $$` rather than `ADD CONSTRAINT IF NOT EXISTS`: Postgres has no
-   * `IF NOT EXISTS` for constraints, so a second boot would fail without the
-   * catalogue check. Same pattern as ticket-service's `rating` constraint —
-   * which is the codebase's ONLY existing example.
-   * There is no `(organization_id IS NULL) = is_super_admin` CHECK on `users`
-   * today; that invariant is enforced in the service layer and by
-   * `users_super_admin_email_key`, not by the database. Worth adding one day,
-   * and out of scope here.
-   *
-   * Run from the SEED for the same reason as the partial indexes:
+   * Runs from the seed for the same reason as the partial indexes:
    * `db push --force-reset` neither creates nor preserves a hand-written
    * constraint, so a reset would silently drop it and leave a schema that looks
    * correct.
+   *
+   * See `docs/decisions/0027-lock-state-is-constrained-not-conventional.md`.
    */
   private async applyCheckConstraints(): Promise<void> {
     await this.prisma.$executeRawUnsafe(`
@@ -322,7 +291,7 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
   /**
    * Fail with an ACTIONABLE message when the database has no schema at all.
    *
-   * Without this the first statement of the seed is a `CREATE INDEX ... ON
+   * Without this the first statement of the seed is a `CREATE INDEX... ON
    * roles`, so an unmigrated database reports `relation "roles" does not exist`
    * from deep inside a raw-SQL helper — a symptom that reads like a seeder bug
    * and takes a stack trace to trace back to the real cause, which is simply

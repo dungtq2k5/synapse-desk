@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { NotificationsGrpcClient } from './notifications-grpc.client';
+import { NotificationsService } from './notifications.service';
 import { NotificationsController } from './notifications.controller';
 import { NotificationsResolver } from './notifications.resolver';
 
@@ -11,7 +12,11 @@ import { NotificationsResolver } from './notifications.resolver';
 @Module({
   imports: [AuthModule],
   controllers: [NotificationsController],
-  providers: [NotificationsGrpcClient, NotificationsResolver],
-  exports: [NotificationsGrpcClient],
+  providers: [
+    NotificationsGrpcClient,
+    NotificationsService,
+    NotificationsResolver,
+  ],
+  exports: [NotificationsService],
 })
 export class NotificationsModule {}

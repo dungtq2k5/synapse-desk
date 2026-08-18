@@ -8,7 +8,7 @@ import JSZip from 'jszip';
  * committed binary makes both impossible to review. Here the table's cells and
  * the formula are a few lines of code beside the assertion.
  *
- * A .docx is a zip of XML parts, so this writes the three that matter:
+ * A.docx is a zip of XML parts, so this writes the three that matter:
  * `[Content_Types].xml`, `_rels/.rels` and `word/document.xml`. Word writes
  * many more; the parser reads only this one.
  */

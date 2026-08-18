@@ -1,3 +1,13 @@
+import {
+  DigestMode,
+  NotificationChannel,
+  NotificationPriority,
+  NotificationResourceType,
+  NotificationType,
+  PreferenceSource,
+  PREFERENCE_WILDCARD_TYPE,
+} from '@synapsedesk/common';
+
 /**
  * The feed's response shapes — api-endpoints-plan §4b.
  *
@@ -13,16 +23,27 @@
 export class NotificationResponseDto {
   id!: string;
   organizationId!: string;
-  /** The ORIGINATING event — `ticket.assigned`, never the NATS subject. */
-  type!: string;
-  priority!: string;
+  /**
+   * The ORIGINATING event — `ticket.assigned`, never the NATS subject.
+   *
+   * `null` for a type this build does not recognise.
+   */
+  type!: NotificationType | null;
+  /** How urgent it is. `null` when the wire value is one this build cannot name. */
+  priority!: NotificationPriority | null;
   title!: string;
   body!: string | null;
+  /** The event's payload, decoded from the JSON string the wire carries. */
   data!: Record<string, unknown>;
   actionUrl!: string | null;
   actorId!: string | null;
-  resourceType!: string | null;
+  /** What the notification is ABOUT. `null` when unset or unrecognized. */
+  resourceType!: NotificationResourceType | null;
   resourceId!: string | null;
+  /**
+   * What collapses several events into one row — free-form, and deliberately
+   * not an enum: the service composes it from a resource id.
+   */
   groupKey!: string | null;
   /** "12 new messages on #1042" — how many events this row represents. */
   groupCount!: number;
@@ -57,16 +78,17 @@ export class MarkReadResponseDto {
 }
 
 export class PreferenceResponseDto {
-  type!: string;
-  channel!: string;
+  /** The event this preference is for, or `'*'` for the catch-all row. */
+  type!: NotificationType | typeof PREFERENCE_WILDCARD_TYPE | null;
+  /** The transport this preference governs. */
+  channel!: NotificationChannel | null;
   isEnabled!: boolean;
-  digest!: string;
+  /** Whether matching notifications batch into a digest. */
+  digest!: DigestMode | null;
   /**
-   * `explicit` | `wildcard` | `default`.
+   * Where the value came from.
    *
-   * What lets the UI show "inherited" rather than pretending every value was
-   * chosen — a settings screen that renders a default as a choice is one the
-   * user cannot reason about.
+   * Lets the UI show "inherited" rather than presenting a default as a choice.
    */
-  source!: string;
+  source!: PreferenceSource | null;
 }

@@ -1,3 +1,4 @@
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
@@ -125,10 +126,11 @@ export class InboundEmailDto {
   @IsArray()
   @IsString({ each: true })
   @MaxLength(MAX_MESSAGE_ID_LENGTH, { each: true })
-  readonly references?: string[];
+  @ApiPropertyOptional()
+  readonly references: string[] = [];
 
   /**
-   * The loop-guard headers, and only those
+   * The loop-guard headers, and only those.
    *
    * `Auto-Submitted` and `Precedence` are invisible once the body is parsed,
    * and they are what stop an auto-responder and this system replying to each
@@ -141,7 +143,7 @@ export class InboundEmailDto {
   readonly headers?: Record<string, string>;
 
   /**
-   * Filenames of attachments the Worker DROPPED
+   * Filenames of attachments the Worker DROPPED.
    *
    * Carried so the ticket can say what was omitted. *"Attachments silently
    * vanish"* is something a customer discovers before you do.
@@ -149,10 +151,11 @@ export class InboundEmailDto {
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  readonly droppedAttachments?: string[];
+  @ApiPropertyOptional()
+  readonly droppedAttachments: string[] = [];
 
   /**
-   * Attachments the Worker ALREADY UPLOADED, as object paths
+   * Attachments the Worker ALREADY UPLOADED, as object paths.
    *
    * **The bytes came nowhere near this server.** The Worker asked
    * `POST /webhooks/email/attachments` which files it could store, PUT them to
@@ -165,21 +168,22 @@ export class InboundEmailDto {
    * `message_attachments` parent. The presign route declines everything for
    * that case and those names arrive in `droppedAttachments` instead.
    *
-   * Each path is confirmed by ticket-service as the message is written
-   *; a path that fails is skipped and named, never fatal.
+   * Each path is confirmed by ticket-service as the message is written;
+   * a path that fails is skipped and named, never fatal.
    */
   @IsOptional()
   @IsArray()
   @ArrayMaxSize(MAX_ATTACHMENTS_PER_MESSAGE)
   @ValidateNested({ each: true })
   @Type(() => InboundUploadedAttachmentDto)
-  readonly attachments?: InboundUploadedAttachmentDto[];
+  @ApiPropertyOptional()
+  readonly attachments: InboundUploadedAttachmentDto[] = [];
 
   /**
    * The message's own `Date` header, verbatim.
    *
    * **A property of the MESSAGE, which is what makes it usable as an
-   * idempotency key** `receivedAt` below is generated fresh on
+   * idempotency key**. `receivedAt` below is generated fresh on
    * every delivery attempt, so a key built from it changes on each retry and
    * dedups nothing.
    *

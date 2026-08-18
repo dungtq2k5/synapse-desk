@@ -6,7 +6,7 @@ import { formatErrorMsg } from '@synapsedesk/common';
 /**
  * How long a readiness probe will wait on Redis before calling it down.
  *
- * **A probe that hangs is a probe that fails** test 4. Kubernetes
+ * **A probe that hangs is a probe that fails**. Kubernetes
  * gives a readiness check a few seconds and then counts the timeout as a
  * failure, so an unbounded check does not produce "unknown", it produces
  * not-ready *plus* a request holding a worker for the whole timeout. Bounding it
@@ -17,20 +17,17 @@ const PROBE_TIMEOUT_MS = 1_000;
 /**
  * Is Redis reachable from THIS instance?
  *
- * The one dependency that genuinely gates gateway readiness. Sessions, the
+ * The one dependency that genuinely gates gateway readiness: sessions, the
  * throttler store and the Socket.IO adapter all run through it, so an instance
- * that cannot reach Redis serves errors on nearly every route — and, critically,
- * **another instance might not be in that state**. That is the whole test for
- * whether something belongs in readiness: would removing this instance from
- * rotation help? For Redis it can. For a gRPC peer every instance sees the same
- * failure, so removing them all helps nobody and takes the product down.
+ * that cannot reach Redis serves errors on nearly every route — and **another
+ * instance might not be in that state**.
  *
- * **Its own connection, deliberately.** The obvious economy is to reuse the
- * throttler's or the adapter's client, and it inverts the meaning of the check:
- * those clients queue commands while disconnected and retry, which is right for
- * them and turns a probe into a hang. This one is configured to fail fast and
- * to never queue, so "is Redis reachable right now?" gets an answer rather than
- * a promise that resolves once it is.
+ * **Its own connection, deliberately.** Reusing the throttler's or the
+ * adapter's client inverts the meaning of the check: those queue commands while
+ * disconnected and retry, which is right for them and turns a probe into a
+ * hang. This one fails fast and never queues.
+ *
+ * See `docs/decisions/0010-readiness-probes-do-not-cascade.md`.
  */
 @Injectable()
 export class RedisHealthService implements OnApplicationShutdown {

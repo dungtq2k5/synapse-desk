@@ -275,7 +275,7 @@ export class UsersService {
         // of addressing it by permission.
         //
         // **`isLocked` is the authoritative boolean, and this filter is
-        // deliberately NOT temporal** A `lockedUntil` column
+        // deliberately NOT temporal**. A `lockedUntil` column
         // does now exist, but it is only an EXPIRY: two mechanisms act on it
         // (a lazy unlock on the login path and the hourly `ExpiredLockSweep`),
         // and both clear `isLocked` when they fire. Reading the expiry here as
@@ -290,14 +290,14 @@ export class UsersService {
         isLocked: false,
         // `user_roles` and `role_permissions` are IMPLICIT many-to-many
         // relations, so the nesting is user → roles → permissions directly.
-        // A join-model shape (`some: { role: { ... } }`) compiles against an
+        // A join-model shape (`some: { role: {... } }`) compiles against an
         // explicit relation and is a type error here — which is the schema
         // telling the truth about itself.
         roles: {
           some: { permissions: { some: { code: request.permissionCode } } },
         },
         // Narrowed to one DEPARTMENT when the caller asked for it
-        // §3.1. Absent means the whole tenant, which is right for a quota
+        // Absent means the whole tenant, which is right for a quota
         // alert (one budget per organization) and wrong for a ticket
         // escalation: every agent in the company hearing about one
         // department's queue is the noise that makes people stop reading.
@@ -316,7 +316,7 @@ export class UsersService {
   }
 
   /**
-   * The OTHER audience kind
+   * The OTHER audience kind.
    *
    * A ticket event already knows who the assignee is; resolving `ticket.read`
    * holders instead would tell every agent in the tenant that one of them got a
@@ -366,7 +366,7 @@ export class UsersService {
       id: { in: userIds },
       organizationId: request.organizationId,
       // **`includeInactive` decides this, and the two callers want opposite
-      // answers** A notification to a deactivated account is a row
+      // answers**. A notification to a deactivated account is a row
       // nobody reads; a ticket whose assignee was locked this morning still has
       // to render their name, and omitting them shows a blank where "Former
       // employee" belongs.
@@ -684,7 +684,7 @@ export class UsersService {
     await this.prisma.user.update({
       where: { id: target.id },
       // `lockedUntil: null` when absent, not left alone: a re-lock must not
-      // inherit an expiry from a previous temporary lock
+      // inherit an expiry from a previous temporary lock.
       data: { isLocked: true, lockedUntil },
     });
 
@@ -712,7 +712,7 @@ export class UsersService {
       data: {
         fullName: target.fullName,
         headline: 'Your account has been locked',
-        // **Says when it ends** For a temporary lock, "until
+        // **Says when it ends**. For a temporary lock, "until
         // Friday 09:00" is the difference between a support ticket and no
         // support ticket, and the user has no other way to find out.
         detail: lockUntilSentence(request.reason, lockedUntil, target.timezone),
@@ -724,7 +724,7 @@ export class UsersService {
   }
 
   /**
-   * Validates an optional lock expiry
+   * Validates an optional lock expiry.
    *
    * **A past date is rejected rather than accepted.** It would lock and
    * instantly unlock: legal in the database, and incomprehensible to the admin
@@ -752,7 +752,7 @@ export class UsersService {
   /**
    * No sessions restored: unlocking permits signing in, it does not sign in.
    *
-   * **Clears `lockedUntil` too** An admin unlocking a
+   * **Clears `lockedUntil` too**. An admin unlocking a
    * temporarily-locked user must not leave a stale expiry behind for a later
    * indefinite re-lock to inherit.
    */
@@ -835,37 +835,29 @@ export class UsersService {
   }
 
   /**
-   * The sender of an inbound email, resolved WITHIN a known tenant
+   * The sender of an inbound email, resolved WITHIN a known tenant.
    *
-   * **The `organizationId` argument is the security design, not a convenience.**
-   * Self-signup answers the same policy question — *may this address join
-   * automatically?* — and its implementation has a second branch:
+   * **Taking `organizationId` is the security design, not a convenience.**
+   * Self-signup answers the same policy question and has a second branch this
+   * must never grow:
    *
    * ```ts
    * const org = existingOrg ?? (await tx.organization.create({ … })); // a TENANT
    * const isFounder = existingOrg === null;                           // an ORG ADMIN
    * ```
    *
-   * A human deliberately registering can afford that branch — it is the only
-   * way a tenant gets its first admin. An inbound email is a stranger arriving
-   * unannounced, and the same code would turn mail from an unrecognised domain
-   * — the case the policy calls a DROP — into a new organization owned by the
-   * sender.
+   * There is no branch here that can create an organization —
+   * `inbound-sender.spec.ts` asserts that statically — so mail from an
+   * unrecognized domain cannot become a new tenant owned by its sender.
    *
-   * Receiving the tenant is what makes that unreachable rather than merely
-   * avoided: there is no branch here in which an organization can be created,
-   * and `inbound-sender.spec.ts` asserts it statically.
+   * **The domain check is scoped to THIS tenant**, never the global lookup
+   * self-signup uses: unscoped, a sender whose domain matches some other tenant
+   * would be provisioned into that tenant while their mail was addressed here.
    *
-   * **The domain check is scoped to THIS tenant**, never the global
-   * `findFirst({ allowedEmailDomains: { has: domain } })` self-signup uses.
-   * Unscoped, a sender whose domain matches some other tenant is provisioned
-   * into that tenant while their mail was addressed to yours — a cross-tenant
-   * misroute produced by a correct-looking domain check.
+   * **Absent `userId` means "may not author here"** — not an error. The caller
+   * answers with a drop and one auto-reply.
    *
-   * **Absent `userId` means "may not author here"**, which the caller answers
-   * with a drop and one auto-reply. It is not an error: a public address
-   * receives mail from strangers constantly, and an exception per message would
-   * make the normal case look like a fault.
+   * See `docs/decisions/0018-inbound-email-routing-and-threading.md`.
    */
   async resolveInboundSender(
     request: ResolveInboundSenderRequest,
@@ -1152,7 +1144,7 @@ export class UsersService {
   }
 
   // -------------------------------------------------------------------------
-  // Avatars — 10-storage-service.md §3.1
+  // Avatars
   // -------------------------------------------------------------------------
 
   /**
@@ -1269,7 +1261,7 @@ export class UsersService {
   }
 
   /**
-   * Turns stored object PATHS into signed read URLs — §1.3.
+   * Turns stored object PATHS into signed read URLs.
    *
    * Batched across a whole page rather than one call per row: a list of fifty
    * users each showing an avatar would otherwise be fifty signing calls. A path
@@ -1304,7 +1296,7 @@ export class UsersService {
     dob?: string;
     gender?: number;
   }): Prisma.UserUpdateInput {
-    // **`fullName` and `avatarUrl` are CACHED by the gateway**
+    // **`fullName` and `avatarUrl` are CACHED by the gateway**.
     // The entity cache behind the GraphQL user edges is invalidated
     // by the gateway MUTATIONS that reach this service, because today every
     // writer of those two columns is one: `updateOwnProfile`, `updateUser`,
@@ -1337,7 +1329,7 @@ export class UsersService {
 }
 
 /**
- * The lock email's body
+ * The lock email's body.
  *
  * **Formatted in the RECIPIENT's timezone**, not the server's or the admin's.
  * `users.timezone` is already there for quiet hours, and an unlock time in a

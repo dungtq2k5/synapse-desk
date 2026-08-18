@@ -14,24 +14,24 @@ import { RequestContext, TicketStatus } from '@synapsedesk/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionGuard } from '../../common/guards/permission.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { TicketsGrpcClient } from './tickets-grpc.client';
-import { AssignmentsGrpcClient } from './assignments-grpc.client';
-import { MessagesGrpcClient } from './messages-grpc.client';
+import { TicketsService } from './tickets.service';
+import { AssignmentsService } from './assignments.service';
+import { MessagesService } from './messages.service';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { TicketMessageResponseGqlDto } from './dto/graphql/message-response.gql-dto';
-import { TicketMutationPayloadGqlDto } from './dto/graphql/ticket-payload.gql-dto';
+import {
+  TicketMutationPayloadResponseGqlDto,
+  TicketResponseGqlDto,
+  TicketPageResponseGqlDto,
+} from './dto/graphql/ticket-response.gql-dto';
 import { MAX_PAGE_SIZE } from '../../common/config/graphql-limits.config';
-import { TicketResponseGqlDto } from './dto/graphql/ticket-response.gql-dto';
-import { TicketPageGqlDto } from './dto/graphql/ticket-page.gql-dto';
 import { TicketsArgsGqlDto } from './dto/graphql/tickets-args.gql-dto';
-import { UserSummaryGqlDto } from '../users/dto/graphql/user-summary.gql-dto';
+import { UserSummaryResponseGqlDto } from '../users/dto/graphql/user-response.gql-dto';
 import { DepartmentResponseGqlDto } from '../departments/dto/graphql/department-response.gql-dto';
 import type { GqlContext } from '../../common/graphql/loaders/loaders.factory';
-import { toUserSummaryGqlDto } from '../users/user.mapper';
-import { toDepartmentResponseGqlDto } from '../departments/department.mapper';
 
 /**
- * `Query.ticket` and `Query.tickets`
+ * `Query.ticket`.
  *
  * **A resolver is a transport, not an implementation.** The same rule as
  * `message:send`: it calls the same gRPC client the controller
@@ -57,15 +57,15 @@ export class TicketsResolver {
   // and a field and a method of the same name on one class is a duplicate
   // identifier rather than a shadowing warning.
   constructor(
-    private readonly client: TicketsGrpcClient,
-    private readonly assignments: AssignmentsGrpcClient,
-    private readonly messagesClient: MessagesGrpcClient,
+    private readonly ticketsService: TicketsService,
+    private readonly assignments: AssignmentsService,
+    private readonly messagesService: MessagesService,
   ) {}
 
   /**
    * One ticket, or `null`.
    *
-   * **`nullable: true` is deliberate** REST returns 404; GraphQL's
+   * **`nullable: true` is deliberate**. REST returns 404; GraphQL's
    * idiom is `null` plus an error entry where it matters. A non-null field that
    * throws takes its parent's whole `data` with it, so one missing ticket would
    * null an entire dashboard rather than one card on it.
@@ -86,7 +86,7 @@ export class TicketsResolver {
     @CurrentUser() context: RequestContext,
   ): Promise<TicketResponseGqlDto | null> {
     try {
-      return await this.client.get(id, context);
+      return await this.ticketsService.get(id, context);
     } catch {
       // The gRPC NOT_FOUND that the REST route turns into a 404. Swallowed to
       // `null` here rather than rethrown, because a thrown error on a non-null
@@ -102,7 +102,7 @@ export class TicketsResolver {
    * unless they hold `ticket.read.all` — the same visibility filter the REST
    * list applies, because it is the same call.
    */
-  @Query(() => TicketPageGqlDto, {
+  @Query(() => TicketPageResponseGqlDto, {
     description:
       'A page of tickets visible to the caller. `first` is clamped to ' +
       `${MAX_PAGE_SIZE}; asking for more returns that many rather than an error.`,
@@ -110,11 +110,11 @@ export class TicketsResolver {
   async tickets(
     @Args() args: TicketsArgsGqlDto,
     @CurrentUser() context: RequestContext,
-  ): Promise<TicketPageGqlDto> {
-    const page = await this.client.list(
+  ): Promise<TicketPageResponseGqlDto> {
+    const page = await this.ticketsService.list(
       {
         page: args.page,
-        // **Clamped, not rejected** An unbounded list multiplies
+        // **Clamped, not rejected**. An unbounded list multiplies
         // every nested field beneath it; refusing the request instead would
         // make the cap a breaking change for a client that worked yesterday.
         limit: Math.min(args.first, MAX_PAGE_SIZE),
@@ -144,7 +144,7 @@ export class TicketsResolver {
    *   1. **Never a gRPC client, only a loader.** A direct call here is an N+1
    *      that works perfectly in every test with one parent row and becomes 50
    *      concurrent calls into auth-service on a real page.
-   * 2. **The loader comes from the CONTEXT**, never injected
+   *   2. **The loader comes from the CONTEXT**, never injected.
    *      Injection means either a cache shared across tenants or request scope
    *      bubbling through the module graph.
    *   3. **Return `null` for an absent edge; do not load `undefined`.**
@@ -152,10 +152,10 @@ export class TicketsResolver {
    *      failure, so an unassigned ticket would poison the batch for every
    *      other row on the page.
    *   4. **Re-check nothing the edge already justified, and expose nothing it
-   *      does not** — which is `UserSummaryGqlDto` doing the work structurally so
+   *      does not** — which is `UserSummaryResponseGqlDto` doing the work structurally so
    *      this method does not have to do it procedurally.
    */
-  @ResolveField(() => UserSummaryGqlDto, {
+  @ResolveField(() => UserSummaryResponseGqlDto, {
     nullable: true,
     description:
       'The agent this ticket is assigned to. Null when unassigned, or when ' +
@@ -165,33 +165,31 @@ export class TicketsResolver {
   async assignee(
     @Parent() ticket: TicketResponseGqlDto,
     @Context() { loaders }: GqlContext,
-  ): Promise<UserSummaryGqlDto | null> {
+  ): Promise<UserSummaryResponseGqlDto | null> {
     // Rule 3, and rule 1 of the flat-field decision: a client asking
     // for `assignee { id }` is asking for something already on the parent, but
     // it asked through the edge — so this still loads. `currentAssigneeId` is
     // the field that costs nothing, and it is exposed for exactly that reason.
     if (!ticket.currentAssigneeId) return null;
 
-    return toUserSummaryGqlDto(
-      await loaders.users.load(ticket.currentAssigneeId),
-    );
+    return await loaders.users.load(ticket.currentAssigneeId);
   }
 
   /** `Ticket.author` — the requester. Same loader, same batch. */
-  @ResolveField(() => UserSummaryGqlDto, {
+  @ResolveField(() => UserSummaryResponseGqlDto, {
     nullable: true,
     description: 'Who raised the ticket.',
   })
   async author(
     @Parent() ticket: TicketResponseGqlDto,
     @Context() { loaders }: GqlContext,
-  ): Promise<UserSummaryGqlDto | null> {
+  ): Promise<UserSummaryResponseGqlDto | null> {
     if (!ticket.authorId) return null;
 
     // The SAME loader instance as `assignee`, which is most of the win: a page
     // where an agent authored ten tickets and is assigned five others fetches
     // them once, not fifteen times.
-    return toUserSummaryGqlDto(await loaders.users.load(ticket.authorId));
+    return await loaders.users.load(ticket.authorId);
   }
 
   @ResolveField(() => DepartmentResponseGqlDto, {
@@ -204,15 +202,13 @@ export class TicketsResolver {
   ): Promise<DepartmentResponseGqlDto | null> {
     if (!ticket.currentDepartmentId) return null;
 
-    return toDepartmentResponseGqlDto(
-      await loaders.departments.load(ticket.currentDepartmentId),
-    );
+    return await loaders.departments.load(ticket.currentDepartmentId);
   }
 
   /**
    * `Ticket.messages` — the thread.
    *
-   * **No loader, deliberately** The messages live in the SAME
+   * **No loader, deliberately**. The messages live in the SAME
    * service as the ticket and are fetched by ticket id, so this is one call per
    * ticket rather than a batch across tickets: there is no `ListMessagesByIds`
    * to batch into, and inventing one would batch a query nobody makes.
@@ -235,7 +231,7 @@ export class TicketsResolver {
     @CurrentUser() context: RequestContext,
     @Args('first', { type: () => Int, defaultValue: 50 }) first: number,
   ): Promise<TicketMessageResponseGqlDto[]> {
-    const page = await this.messagesClient.list(
+    const page = await this.messagesService.list(
       ticket.id,
       {
         page: 1,
@@ -252,7 +248,7 @@ export class TicketsResolver {
   // ---------------------------------------------------------- mutations
 
   /**
-   * **Four mutations, chosen rather than transcribed**
+   * **Four mutations, chosen rather than transcribed**.
    *
    * A mutation gains nothing from GraphQL except sharing a request with a
    * query, so the rule is: add one when a SCREEN wants it beside its reads.
@@ -264,7 +260,7 @@ export class TicketsResolver {
    * out, and "REST and GraphQL both exist" is a permanent state
    * rather than a migration.
    */
-  @Mutation(() => TicketMutationPayloadGqlDto, {
+  @Mutation(() => TicketMutationPayloadResponseGqlDto, {
     description: 'Assigns the ticket to an agent.',
   })
   @RequirePermission('ticket.assign')
@@ -279,18 +275,18 @@ export class TicketsResolver {
     @Args('departmentId', { type: () => ID }, ParseUUIDPipe)
     departmentId: string,
     @CurrentUser() context: RequestContext,
-  ): Promise<TicketMutationPayloadGqlDto> {
+  ): Promise<TicketMutationPayloadResponseGqlDto> {
     await this.assignments.assign(id, { assigneeId, departmentId }, context);
 
     // The TICKET, not the assignment row: the screen renders a ticket, and the
     // assignment is an audit artefact it has no field for.
     return {
-      ticket: await this.client.get(id, context),
+      ticket: await this.ticketsService.get(id, context),
       message: 'Ticket assigned',
     };
   }
 
-  @Mutation(() => TicketMutationPayloadGqlDto, {
+  @Mutation(() => TicketMutationPayloadResponseGqlDto, {
     description:
       'Hands the ticket to a human agent. Runs the same transition table, ' +
       'side effects and summary as `POST /tickets/:id/escalate`.',
@@ -298,17 +294,17 @@ export class TicketsResolver {
   async escalateTicket(
     @Args('id', { type: () => ID }, ParseUUIDPipe) id: string,
     @CurrentUser() context: RequestContext,
-  ): Promise<TicketMutationPayloadGqlDto> {
+  ): Promise<TicketMutationPayloadResponseGqlDto> {
     // No `@RequirePermission`, matching the REST route: escalating is what an
     // end user does when self-service has not helped, and requiring a grant
     // would make the handoff unreachable for exactly the person who needs it.
     return {
-      ticket: await this.client.escalate(id, context),
+      ticket: await this.ticketsService.escalate(id, context),
       message: 'Handed off to an agent',
     };
   }
 
-  @Mutation(() => TicketMutationPayloadGqlDto, {
+  @Mutation(() => TicketMutationPayloadResponseGqlDto, {
     description:
       'Moves the ticket to a new status. The transition table is ' +
       "ticket-service's; an illegal move is an error, not a silent no-op.",
@@ -320,8 +316,8 @@ export class TicketsResolver {
     @Args('reason', { type: () => String, nullable: true })
     reason: string | undefined,
     @CurrentUser() context: RequestContext,
-  ): Promise<TicketMutationPayloadGqlDto> {
-    const ticket = await this.client.changeStatus(
+  ): Promise<TicketMutationPayloadResponseGqlDto> {
+    const ticket = await this.ticketsService.changeStatus(
       id,
       { status, reason },
       context,

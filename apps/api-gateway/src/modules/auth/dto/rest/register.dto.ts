@@ -24,13 +24,3 @@ export class RegisterDto {
   @MaxLength(MAX_FULL_NAME_LENGTH)
   readonly fullName!: string;
 }
-
-export class RegisterResponseDto {
-  readonly userId!: string;
-
-  readonly organizationId!: string;
-
-  readonly email!: string;
-
-  readonly requiresEmailVerification!: boolean;
-}

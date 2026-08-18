@@ -16,13 +16,13 @@ import {
 import { timestamp, wirePage } from '../fixtures/wire';
 
 /**
- * §2.9 The audit trail at the HTTP boundary.
+ * The audit trail at the HTTP boundary.
  *
  * Two things are under test and neither is a filter: that the PLATFORM view is
  * a different path with a different guard rather than a query flag, and that a
  * row whose metadata cannot be parsed does not take the whole page down.
  */
-describe('§2.9 Audit logs at the HTTP boundary (e2e)', () => {
+describe('Audit logs at the HTTP boundary (e2e)', () => {
   let fx: E2eFixture;
 
   beforeAll(async () => {
@@ -223,7 +223,7 @@ describe('§2.9 Audit logs at the HTTP boundary (e2e)', () => {
       expect(res.status).toBe(200);
       // The gateway converts back to NAMES for the client — the REST body
       // must never carry the wire's integers.
-      expect(res.body.data).toEqual([AuditAction.USER_CREATED]);
+      expect(res.body.data).toEqual({ actions: [AuditAction.USER_CREATED] });
       expect(fx.stubs.audit.listAuditLogs).not.toHaveBeenCalled();
     });
 

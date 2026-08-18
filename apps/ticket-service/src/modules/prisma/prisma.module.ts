@@ -6,7 +6,7 @@ import { DatabaseSeeder } from './database.seeder';
  * `@Global` for the same reason auth-service's is: every feature module needs
  * the client, and importing PrismaModule in each of them is ceremony that says
  * nothing. Reserved for genuinely cross-cutting infrastructure — see
- * conventions §1.3 on not making everything global.
+ * the convention on not making everything global.
  */
 @Global()
 @Module({

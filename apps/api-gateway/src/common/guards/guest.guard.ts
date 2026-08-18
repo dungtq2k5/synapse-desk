@@ -44,7 +44,7 @@ export class GuestGuard implements CanActivate {
   }
 
   canActivate(context: ExecutionContext): boolean {
-    // `requestOf`, not `switchToHttp()` This guard runs on
+    // `requestOf`, not `switchToHttp()`. This guard runs on
     // GraphQL too, where `switchToHttp()` returns an empty object and the read
     // below throws. The property that matters is that both transports are
     // guarded by the SAME code: a rule enforced on one and skipped on the other

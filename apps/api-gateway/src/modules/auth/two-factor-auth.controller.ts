@@ -27,18 +27,21 @@ import {
 import { Jwt2faGuard } from '../../common/guards/jwt-2fa.guard';
 import { Current2faUser } from '../../common/decorators/current-2fa-user.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { CurrentOrigin } from '../../common/decorators/current-origin.decorator';
 import { TwoFactorAuthService } from './two-factor-auth.service';
 import { JwtCookieService } from './jwt-cookie.service';
 import {
   ActivateTwoFactorDto,
   AuthenticateTwoFactorDto,
+  DisableTwoFactorDto,
+  RegenerateBackupCodesDto,
+} from './dto/rest/two-factor.dto';
+import {
   BackupCodesResponseDto,
   BackupCodesStatusResponseDto,
-  DisableTwoFactorDto,
   GenerateTwoFactorResponseDto,
-  RegenerateBackupCodesDto,
   TwoFactorAuthenticatedResponseDto,
-} from './dto/rest/two-factor.dto';
+} from './dto/rest/two-factor-response.dto';
 import { AuthThrottle } from '../../common/decorators/auth-throttle.decorator';
 import { Throttle } from '@nestjs/throttler';
 import {
@@ -120,14 +123,12 @@ export class TwoFactorAuthController {
     @CurrentEnrollee() enrollee: EnrolleeContext,
     @Body() activateTwoFactorDto: ActivateTwoFactorDto,
   ): Promise<BackupCodesResponseDto> {
-    const backupCodes = await this.twoFactorAuthService.activate(
+    // The only time these are ever readable. Only hashes are stored.
+    return this.twoFactorAuthService.activate(
       enrollee.sub,
       activateTwoFactorDto.code,
       enrollee,
     );
-
-    // The only time these are ever readable. Only hashes are stored.
-    return { backupCodes };
   }
 
   /**
@@ -146,8 +147,8 @@ export class TwoFactorAuthController {
   @ApiOperation({
     summary: 'Second leg of login',
     description:
-      'Authenticated by the 2FA CHALLENGE cookie, not the access one — 24-doc ' +
-      '§3. That token proves a password and nothing else; it is signed by a ' +
+      'Authenticated by the 2FA CHALLENGE cookie, not the access one. ' +
+      'That token proves a password and nothing else; it is signed by a ' +
       'different keypair so it cannot verify where an access token is expected.',
     // **Set here rather than with `@ApiCookieAuth`**: that decorator APPENDS to
     // the controller-level requirement, and two entries in `security` mean OR —
@@ -164,6 +165,7 @@ export class TwoFactorAuthController {
     @Current2faUser() challenge: TwoFactorJwtPayload,
     @Body() authenticateTwoFactorDto: AuthenticateTwoFactorDto,
     @Req() request: Request,
+    @CurrentOrigin() origin: RequestOrigin,
     @Res({ passthrough: true }) response: Response,
   ): Promise<TwoFactorAuthenticatedResponseDto> {
     // Non-null is safe here and nowhere else: Jwt2faGuard read this very cookie
@@ -191,7 +193,7 @@ export class TwoFactorAuthController {
     const result = await this.twoFactorAuthService.authenticate(
       twoFactorToken,
       authenticateTwoFactorDto,
-      this.requestOrigin(request),
+      origin,
     );
 
     // The challenge is spent — clear it before setting the real session, so a
@@ -239,13 +241,11 @@ export class TwoFactorAuthController {
     @CurrentUser() context: RequestContext,
     @Body() regenerateBackupCodesDto: RegenerateBackupCodesDto,
   ): Promise<BackupCodesResponseDto> {
-    const backupCodes = await this.twoFactorAuthService.regenerateBackupCodes(
+    return this.twoFactorAuthService.regenerateBackupCodes(
       context.sub,
       regenerateBackupCodesDto.password,
       context,
     );
-
-    return { backupCodes };
   }
 
   /** Counts only — never hashes, never plaintext. */
@@ -260,12 +260,5 @@ export class TwoFactorAuthController {
     @CurrentUser() context: RequestContext,
   ): Promise<BackupCodesStatusResponseDto> {
     return this.twoFactorAuthService.getBackupCodesStatus(context.sub, context);
-  }
-
-  private requestOrigin(request: Request): RequestOrigin {
-    return {
-      ip: request.ip ?? '',
-      userAgent: request.get('user-agent') ?? '',
-    };
   }
 }

@@ -25,26 +25,25 @@ export class ExpiredRecordsPruner {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * **A plain method, with no `@Cron`**
+   * **A plain method, with no `@Cron`.**
    *
-   * It carried `@Cron(EVERY_DAY_AT_3AM)` once. `@nestjs/schedule` runs
-   * in-process, so three pods pruned three times, and under a rolling deploy
-   * zero or four. Every statement is idempotent (`expiresAt < now`) so the cost
-   * was duplicated write load rather than wrong data — genuinely low severity,
-   * and not why it changed.
+   * It carried `@Cron(EVERY_DAY_AT_3AM)` once. Every statement is idempotent
+   * (`expiresAt < now`), so three pods pruning three times cost duplicated
+   * write load rather than wrong data — low severity, and not why it changed.
    *
    * It changed because **two mechanisms for one concern is how a third
    * appears**: whoever adds the next scheduled job copies whichever they find
    * first. `SchedulerProcessor` now calls this on a BullMQ repeat consumed by
-   * exactly one worker, like every other scheduled job in the system.
+   * exactly one worker.
    *
-   * **Errors are no longer swallowed here.** The old body caught everything and
-   * logged, which made a permanently broken sweep indistinguishable from a
-   * working one. The scheduler records the failure on the heartbeat and BullMQ
-   * retries — strictly more than a log line nobody reads.
+   * **Errors are no longer swallowed here.** Catching and logging made a
+   * permanently broken sweep indistinguishable from a working one; the
+   * scheduler records the failure on the heartbeat and BullMQ retries.
    *
-   * Returns the row count, so the caller can log something meaningful and a
-   * test can assert on it without parsing output.
+   * Returns the row count, so a caller can log something meaningful and a test
+   * can assert without parsing output.
+   *
+   * See `docs/decisions/0003-bullmq-over-nest-cron.md`.
    */
   async prune(): Promise<number> {
     const now = new Date();

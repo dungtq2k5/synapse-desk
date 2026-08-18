@@ -69,7 +69,7 @@ BUILDERS = [
 
 @pytest.mark.parametrize(("name", "build"), BUILDERS)
 def test_every_prompt_carries_the_boundary(name, build):
-    """§4 test 2 — all three, so a fourth builder is caught by this file."""
+    """All three, so a fourth builder is caught by this file."""
     _ = name
     prompt = build("how much leave carries over?", [chunk()])
 
@@ -85,7 +85,7 @@ def test_every_prompt_carries_the_boundary(name, build):
 
 @pytest.mark.parametrize(("name", "build"), BUILDERS)
 def test_a_forged_source_block_lands_inside_the_question(name, build):
-    """§4 test 1 — the defect this section exists for.
+    """The defect this section exists for.
 
     The forged text still appears in the prompt: it is the user's question and
     removing it would answer a different one. What changed is WHERE it appears
@@ -109,7 +109,7 @@ def test_a_forged_source_block_lands_inside_the_question(name, build):
 
 @pytest.mark.parametrize(("name", "build"), BUILDERS)
 def test_the_nonce_differs_between_requests(name, build):
-    """§4 test 3 — a constant delimiter is one an attacker learns once."""
+    """A constant delimiter is one an attacker learns once."""
     _ = name
     first = _nonce_of(build("q", [chunk()]))
     second = _nonce_of(build("q", [chunk()]))
@@ -119,7 +119,7 @@ def test_the_nonce_differs_between_requests(name, build):
 
 @pytest.mark.parametrize(("name", "build"), BUILDERS)
 def test_a_question_carrying_the_current_nonce_has_it_stripped(name, build):
-    """§4 test 4 — the replay case.
+    """The replay case.
 
     A caller cannot know the nonce, which is the whole point. But it can leak —
     into an answer that gets quoted back, a log somebody pastes, a document that
@@ -144,7 +144,7 @@ def test_strip_nonce_removes_every_occurrence():
 
 
 def test_citation_extraction_is_unchanged():
-    """§4 test 5 — the `[N]` labels are the citation contract.
+    """The `[N]` labels are the citation contract.
 
     The boundary adds structure AROUND content; it must not touch the labels,
     which are parsed by regex and validated `cited ⊆ retrieved`.
@@ -387,7 +387,7 @@ def test_scrubbing_leaves_exact_values_alone():
     """**The reason this strips tags and not bare ids.**
 
     A sixteen-character hex string might be an error code, a commit sha or an
-    asset tag — the exact values 21-doc asks the model to preserve verbatim. A
+    asset tag — the exact values the prompt asks the model to preserve verbatim. A
     filter that removed those would corrupt real answers to tidy an unlikely
     one, and a leaked bare id cannot be replayed: every request mints a fresh
     nonce.
@@ -491,7 +491,7 @@ def test_exactly_the_builders_expected_take_attachments():
 
 @pytest.mark.parametrize(("name", "build"), ATTACHMENT_BUILDERS)
 def test_the_attachment_block_carries_THIS_requests_nonce(name, build):
-    """§6 test 2 — the file is named inside the boundary, not beside it."""
+    """The file is named inside the boundary, not beside it."""
     _ = name
     prompt = build_prompt(
         "what does this error mean?", [chunk()], [SCREENSHOT]
@@ -551,7 +551,7 @@ def test_the_attachment_block_is_ABSENT_when_no_file_was_sent():
 
 
 def test_the_generation_prompt_carries_NO_conversation_history():
-    """§6 test 4's decision, pinned rather than assumed.
+    """'s decision, pinned rather than assumed.
 
     History reaches reformulation and the classification; it does not reach the
     answering prompt. Pinned so the next person adding conversation context here
@@ -566,7 +566,7 @@ def test_the_generation_prompt_carries_NO_conversation_history():
 
 
 def test_an_answer_can_never_cite_an_ATTACHMENT():
-    """§6 test 1 — `cited ⊆ retrieved` still holds with parts present.
+    """`cited ⊆ retrieved` still holds with parts present.
 
     The attachment is not a numbered source and has no index, so a model that
     cited `[2]` over one retrieved chunk is inventing. Bounds-checking is what

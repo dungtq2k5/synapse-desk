@@ -19,7 +19,7 @@ from typing import Any
 
 from rag_service.common.caller_context import CallerContext
 
-#: Mirrors `GRPC_CHANNEL_OPTIONS` in `libs/grpc-proto/src/constants.ts`
+#: Mirrors `GRPC_CHANNEL_OPTIONS` in `libs/grpc-proto/src/constants.ts`.
 #:
 #: **The one place in this service where a MISSING value is the bug.** Every
 #: TypeScript client and every TypeScript server applies those options, so both

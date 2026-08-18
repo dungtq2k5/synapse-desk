@@ -202,7 +202,7 @@ export class EntitlementWriterService {
    * Stripe's subscription status → the tenant lifecycle enum.
    *
    * The enum was designed before billing existed and maps onto Stripe's
-   * statuses without modification (RDM §1.15) — §0.4's lifecycle gate is the
+   * statuses without modification (RDM §1.15) — the lifecycle gate is the
    * enforcement mechanism billing needed most and did not have to be built.
    *
    * Returns undefined for a status with no mapping (`incomplete`, mid-checkout)

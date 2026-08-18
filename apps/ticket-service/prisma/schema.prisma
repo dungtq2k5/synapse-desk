@@ -6,7 +6,7 @@
 // names a user, department or organization is therefore a plain @db.Uuid with
 // NO foreign key — Postgres cannot enforce one across databases, and that is
 // the correct shape for service-per-database rather than a shortcut. The
-// obligation it creates is validation at WRITE time over gRPC; see §1.1 of
+// obligation it creates is validation at WRITE time over gRPC; see
 // TicketsService.
 
 generator client {
@@ -114,7 +114,7 @@ model InboundEmail {
   organizationId String @map("organization_id") @db.Uuid
 
   /// The message's `Message-ID` header, or a synthesized digest when it had
-  /// none
+  /// none.
   ///
   /// **255, not 998, and the unit is why.** This column is half of the unique
   /// index below, and Postgres refuses a btree tuple over roughly 2704 BYTES —
@@ -213,7 +213,7 @@ model TicketMessage {
   /// fetched-then-filtered — see TicketMessagesService.
   isInternalNote Boolean @default(false) @map("is_internal_note")
 
-  /// Set when this message was REFUSED as prompt injection
+  /// Set when this message was REFUSED as prompt injection.
   ///
   /// **A filter, not a label.** The transcript builders exclude these, so a
   /// refused question cannot reach a later reformulation. Instructing a model
@@ -231,7 +231,7 @@ model TicketMessage {
   /// keeping.
   excludedFromAiContext Boolean @default(false) @map("excluded_from_ai_context")
 
-  /// `AnswerStatus` for an AI message NULL for a human one.
+  /// `AnswerStatus` for an AI message. NULL for a human one.
   ///
   /// **For reading a thread, not for analytics.** An agent scrolling a
   /// conversation should be able to tell a refusal from an escalation from a
@@ -273,7 +273,7 @@ model TicketMessage {
   redactedAt   DateTime? @map("redacted_at") @db.Timestamptz
   redactedById String?   @map("redacted_by_id") @db.Uuid
 
-  /// The SENDER's own id for this message
+  /// The SENDER's own id for this message.
   ///
   /// **Exists because WebSocket clients retry in a way HTTP clients do not.** A
   /// user clicks Send once; a socket reconnects, and a client holding an unacked
@@ -450,7 +450,7 @@ model TicketDailyStat {
 
   organizationId String @map("organization_id") @db.Uuid
 
-  /// A DATE in the TENANT'S timezone, not UTC test 4.
+  /// A DATE in the TENANT'S timezone, not UTC.
   ///
   /// A tenant at UTC+7 whose Monday starts at 17:00 Sunday UTC would otherwise
   /// see every daily figure split across two rows, and no consumer could
@@ -485,7 +485,7 @@ model TicketDailyStat {
   firstResponseSecondsSum Int @default(0) @map("first_response_seconds_sum")
   firstResponseCount      Int @default(0) @map("first_response_count")
 
-  /// Split from the human figures deliberately
+  /// Split from the human figures deliberately.
   ///
   /// An AI reply in 2 seconds genuinely IS a first response, and blending it
   /// with human response time produces a headline that improves whenever AI
@@ -601,7 +601,7 @@ model AnalyticsExport {
   @@map("analytics_exports")
 }
 
-/// The HEARTBEAT
+/// The HEARTBEAT.
 ///
 /// **One row per job name, and the deepest fix in that document.** The jobs not
 /// running was not the real problem; the real problem was that nothing anywhere

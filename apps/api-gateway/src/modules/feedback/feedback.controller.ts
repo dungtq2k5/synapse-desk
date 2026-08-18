@@ -18,7 +18,7 @@ import { RequirePermission } from '../../common/decorators/require-permission.de
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ResponseMessage } from '../../common/decorators/response-message.decorator';
 import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
-import { FeedbackGrpcClient } from './feedback-grpc.client';
+import { FeedbackService } from './feedback.service';
 import { FeedbackResponseDto } from './dto/rest/feedback-response.dto';
 import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AUTH_SCHEMES } from '../../common/config/swagger.config';
@@ -46,14 +46,10 @@ import {
 @Controller('messages/:messageId/feedback')
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class MessageFeedbackController {
-  constructor(private readonly feedbackGrpcClient: FeedbackGrpcClient) {}
+  constructor(private readonly feedback: FeedbackService) {}
 
-  /**
-   * 200, not 201 — an UPSERT.
-   *
-   * A user changing 👍 to 👎 is the normal case, not an error, and "created"
-   * would be a lie every time after the first.
-   */
+  // 200, not 201: this is an UPSERT. Changing a thumb up to a thumb down is the
+  // normal case, and "created" would be a lie every time after the first.
   @ApiOperation({
     summary:
       'Thumbs up/down on an AI answer → ai_response_feedbacks (rating ∈ {1,-1}, feedback_text?, citation_accurate?)',
@@ -68,14 +64,12 @@ export class MessageFeedbackController {
     @Param('messageId', ParseUUIDPipe) messageId: string,
     @Body() dto: SubmitFeedbackDto,
   ): Promise<FeedbackResponseDto> {
-    return this.feedbackGrpcClient.submit(messageId, dto, context);
+    return this.feedback.submit(messageId, dto, context);
   }
 
-  /**
-   * SELF only, and structurally so: the service keys the delete on
-   * `(messageId, callerId)`, so there is no parameter through which one user
-   * could withdraw another's opinion.
-   */
+  // SELF only, and structurally so: the service keys the delete on
+  // `(messageId, callerId)`, so there is no parameter through which one user
+  // could withdraw another's opinion.
   @ApiOperation({ summary: 'Withdraw feedback' })
   @ApiWrappedResponse(undefined, { status: HttpStatus.NO_CONTENT })
   @ApiFilterErrors(['400', '401', '404'])
@@ -85,7 +79,7 @@ export class MessageFeedbackController {
     @CurrentUser() context: RequestContext,
     @Param('messageId', ParseUUIDPipe) messageId: string,
   ): Promise<void> {
-    return this.feedbackGrpcClient.withdraw(messageId, context);
+    return this.feedback.withdraw(messageId, context);
   }
 }
 
@@ -100,7 +94,7 @@ export class MessageFeedbackController {
 @Controller('feedback')
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class FeedbackController {
-  constructor(private readonly feedbackGrpcClient: FeedbackGrpcClient) {}
+  constructor(private readonly feedback: FeedbackService) {}
 
   @ApiOperation({ summary: 'Own feedback on that message' })
   @ApiWrappedResponse(Paginated(FeedbackResponseDto))
@@ -111,6 +105,6 @@ export class FeedbackController {
     @CurrentUser() context: RequestContext,
     @Query() query: ListFeedbackQueryDto,
   ): Promise<PaginationResponseDto<FeedbackResponseDto>> {
-    return this.feedbackGrpcClient.list(query, context);
+    return this.feedback.list(query, context);
   }
 }

@@ -21,7 +21,7 @@ import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis'
 export const AUTH_THROTTLER_TIER = 'authTier';
 
 /**
- * The tier AI routes override
+ * The tier AI routes override.
  *
  * **A general tier, deliberately NOT `authTier`.** The guard skips `authTier`
  * on any route not marked `@AuthThrottle()`, so overriding it here would have
@@ -73,7 +73,7 @@ export const ROUTE_THROTTLE = {
   twoFactorAuthenticate: { ttl: 15 * 60_000, limit: 10 },
 
   // ---------------------------------------------------------------------
-  // AI surfaces
+  // AI surfaces.
   //
   // **The monthly quota does not cover this, and the reasoning was already
   // written down one entry up.** `otpRequest` is throttled specifically

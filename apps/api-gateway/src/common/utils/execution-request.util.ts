@@ -15,13 +15,6 @@ import type { Request } from 'express';
  * of Nest's built-in context types, so the generic parameter is what widens the
  * union to include it. Without it, `getType()` is typed as `'http' | 'rpc' |
  * 'ws'` and the comparison against `'graphql'` does not compile.
- *
- * **Extracted rather than repeated**, because it is now needed in five places —
- * `LoggingInterceptor`, `TransformInterceptor`, `Jwt2faGuard`,
- * `AllHttpExceptionFilter` and, as of this document, `@CurrentUser`. The one
- * that was missing it returned `null` in every resolver and surfaced as a
- * misleading 500 about a missing guard (docs/reference/known-gaps.md #6), which is exactly
- * the shape of bug a fifth hand-written copy produces.
  */
 export function requestOf(context: ExecutionContext): Request | undefined {
   if (context.getType<GqlContextType>() === 'graphql') {

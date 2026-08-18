@@ -19,7 +19,7 @@ import { RagClientService } from '../../src/modules/ai-client/rag-client.service
 import { StorageReferenceService } from '../../src/modules/storage-client/storage-reference.service';
 
 /**
- * Filter, THEN fetch
+ * Filter, THEN fetch.
  *
  * The order is the design rather than a detail: `mimeType` and `fileSizeBytes`
  * are on the row, so an ineligible file is rejected without a download.
@@ -30,7 +30,7 @@ import { StorageReferenceService } from '../../src/modules/storage-client/storag
  * "did not send it" and "did not fetch it" are different properties and only
  * the second one costs money.
  */
-describe('§36 attachments as model input (e2e)', () => {
+describe('Attachments as model input (e2e)', () => {
   let fx: E2eFixture;
   let service: AiAttachmentService;
   let storage: StorageReferenceService;
@@ -79,7 +79,7 @@ describe('§36 attachments as model input (e2e)', () => {
 
   it('1. **an ineligible type is never downloaded**', async () => {
     // The upload allowlist permits a zip; the model cannot read one. Two lists,
-    // two questions
+    // two questions.
     const ticket = await createTicket(fx.prisma, tenant);
     const message = await createMessage(fx.prisma, ticket.id);
     await attach(message.id, 'application/zip', 1024, 'logs.zip');
@@ -169,7 +169,7 @@ describe('§36 attachments as model input (e2e)', () => {
   });
 
   /**
-   * §2's fifth test — **both `Draft` call sites**, driven end to end.
+   * **Both `Draft` call sites**, driven end to end.
    *
    * `generateReplyDraft` has exactly two callers and they are in different
    * modules, which is how the first draft came to name only the
@@ -267,7 +267,7 @@ describe('§36 attachments as model input (e2e)', () => {
   });
 
   /**
-   * **§1.3 test 2 — this test used to assert the opposite, and that was the
+   * **This test used to assert the opposite, and that was the
    * bug.**
    *
    * Presign and confirm both took a `messageId`, so an attachment row could only
@@ -284,7 +284,7 @@ describe('§36 attachments as model input (e2e)', () => {
     const ticket = await createTicket(fx.prisma, tenant);
     const objectPath = `organizations/${tenant.organizationId}/tickets/${ticket.id}/attachments/pending/${faker.string.uuid()}.png`;
     confirmUpload.mockResolvedValue({
-      // Out of `pending/`
+      // Out of `pending/`.
       objectPath: objectPath.replace('/pending/', '/'),
       sizeBytes: 2048,
       contentType: 'image/png',
@@ -377,25 +377,20 @@ describe('§36 attachments as model input (e2e)', () => {
   /**
    * **A refused message's ATTACHMENTS do not reach a later prompt.**
    *
-   * 's rule, which was half-applied: all three transcript builders
-   * dropped a refused message's text, and all three attachment rules sent its
-   * files anyway. A user sends injection text plus a screenshot, the guard
-   * refuses it, the write-back sets the flag — and the next co-pilot draft
-   * excludes the sentence and hands over the image.
+   * The rule was half-applied: all three transcript builders dropped a refused
+   * message's text, and all three attachment rules sent its files anyway. A
+   * user sends injection text plus a screenshot, the guard refuses it, the
+   * write-back sets the flag — and the next co-pilot draft excludes the
+   * sentence and hands over the image.
    *
    * **Inverted with respect to risk.** The file is the half Layer A cannot read
    * at all and Layer B only classifies, so it is the half the exclusion most
    * needed to cover.
    *
-   * **One test, not three.** The property is one thing — "excluded from AI
-   * context" means excluded — and asserting it per rule would let a fourth rule
-   * be added without one.
+   * **One test, not three.** The property is one thing, and asserting it per
+   * rule would let a fourth rule be added without one.
    *
-   * **Exclusion is per TURN, not per file**, and nothing marks the attachment
-   * row itself. That is deliberate: what was refused is a message, and a file
-   * that arrived with a refused message is untrusted by association rather than
-   * on its own evidence. The same file re-sent on a clean turn is fine, and
-   * would be — which is the behaviour you want.
+   * See `docs/decisions/0030-refused-turns-exclude-their-attachments.md`.
    */
   describe('a refused message keeps its files out of AI context', () => {
     const RULES = [

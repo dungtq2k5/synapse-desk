@@ -34,7 +34,7 @@ export function hashToken(token: string): string {
 /**
  * Constant-time comparison of two hex digests.
  *
- * **Moved to `libs/common`** The inbound-email webhook verifies
+ * **Moved to `libs/common`**. The inbound-email webhook verifies
  * its signature at the GATEWAY, which cannot import a service's private
  * utility, and a second constant-time compare is reliably a non-constant-time
  * one. Re-exported here so the twenty call sites in this service keep their

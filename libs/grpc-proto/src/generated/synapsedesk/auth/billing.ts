@@ -18,7 +18,7 @@ import { AiModelTier, OrgStatus } from "./common";
  * point of this message shape. Stripe's signature is computed over the exact
  * bytes of the request; a JSON round trip through the gateway would re-serialize
  * them — different key order, different whitespace — and verification would
- * fail for every event forever (14-doc §3.2).
+ * fail for every event forever.
  *
  * Verification happens HERE rather than at the gateway, so the webhook secret
  * lives with the service that owns the rows it authorizes writes to. The
@@ -74,7 +74,7 @@ export interface CreateCheckoutSessionRequest {
 }
 
 /**
- * A URL and nothing else. **Checkout grants nothing** (14-doc §4): entitlements
+ * A URL and nothing else. **Checkout grants nothing**: entitlements
  * are written when the webhook confirms, so a user who closes the tab mid-flow
  * is not upgraded and a user who pays does not depend on their browser making
  * it back to a redirect.
@@ -119,7 +119,7 @@ export interface BillingEmptyRequest {
 export interface BillingServiceClient {
   /**
    * *Bypasses the auth guard, the lifecycle gate, tenant scoping and
-   * per-tenant rate limiting** — 14-doc §3.3, and each for a different reason.
+   * per-tenant rate limiting**, and each for a different reason.
    * The lifecycle bypass is the one that matters most: this endpoint WRITES
    * `organizations.status`, so gating it on that status would make suspension
    * a one-way door.
@@ -142,7 +142,7 @@ export interface BillingServiceClient {
 export interface BillingServiceController {
   /**
    * *Bypasses the auth guard, the lifecycle gate, tenant scoping and
-   * per-tenant rate limiting** — 14-doc §3.3, and each for a different reason.
+   * per-tenant rate limiting**, and each for a different reason.
    * The lifecycle bypass is the one that matters most: this endpoint WRITES
    * `organizations.status`, so gating it on that status would make suspension
    * a one-way door.

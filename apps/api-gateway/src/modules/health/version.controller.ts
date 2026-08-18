@@ -6,10 +6,10 @@ import {
 } from '../../common/decorators/api-response.decorator';
 import { ConfigService } from '@nestjs/config';
 import { readBuildInfo } from '@synapsedesk/common';
-import { VersionResponseDto } from './dto/health-response.dto';
+import { VersionResponseDto } from './dto/rest/health-response.dto';
 
 /**
- * `GET /version`
+ * `GET /version`.
  *
  * **Which build is this?** During an incident, "did the fix actually roll out?"
  * is the first question anyone asks, and without this every answer is inference

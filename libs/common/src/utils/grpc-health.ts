@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { formatErrorMsg } from './utils';
+import { formatErrorMsg } from './format-error';
 
 /**
  * One dependency this service owns, and how to ask it whether it is there.
@@ -15,7 +15,7 @@ export type DependencyProbe = {
 };
 
 /**
- * How long the whole readiness answer may take test 4.
+ * How long the whole readiness answer may take.
  *
  * Every probe races this. A dependency that has stopped answering does not
  * usually refuse a connection; it accepts one and never replies, so an
@@ -29,35 +29,29 @@ export const SERVING = 1;
 export const NOT_SERVING = 2;
 
 /**
- * The gRPC health service every backing service registers
+ * The gRPC health service every backing service registers.
  *
- * **Kubernetes could not tell whether any of these processes was alive.** They
- * are `createMicroservice`-only, so there was no HTTP endpoint to probe, and
- * adding an HTTP server to a gRPC service means a listener, a port and a config
- * surface for one route. The standard `grpc.health.v1.Health` service rides the
- * port that already exists and the kubelet speaks it natively.
+ * These processes are `createMicroservice`-only, so there is no HTTP endpoint
+ * to probe. The standard `grpc.health.v1.Health` service rides the port that
+ * already exists, and the kubelet speaks it natively.
  *
- * **Liveness and readiness are genuinely different questions here**, split by
- * the `service` field the caller sends:
+ * **Liveness and readiness are different questions**, split by the `service`
+ * field the caller sends:
  *
  *   - `""` — *is this process alive?* Checks NOTHING. A restart repairs only a
- *     wedged process, and killing a healthy container because its database is
- *     down removes an instance that could still serve reads, in the middle of an
- *     incident, from every replica at once.
+ *     wedged process; killing a healthy container because its database is down
+ *     removes an instance that could still serve reads, from every replica at
+ *     once, mid-incident.
  *   - `"readiness"` — *can it serve?* Checks what this service OWNS.
  *
- * **No service probes another service**, and that is the rule that stops §1's
- * cascade recurring one level down. `ingestion-service` needing `auth-service`
- * for entitlements does not make `auth-service` part of its readiness: it would
- * make one Postgres failure into a cluster-wide not-ready, by exactly the
- * mechanism the gateway's readiness bug used. The rule decays first because
- * "just check the peer too" always looks helpful, so there is a static test
- * asserting it.
+ * **No service probes another service.** A static test asserts it, because
+ * "just check the peer too" always looks helpful — and it is what turns one
+ * Postgres failure into a cluster-wide not-ready.
  *
- * Shared here rather than copied per service — the same shape as
- * {@link JobRunRecorder}: behaviour once, wired per service, because the six
- * copies would differ within a month and the one that drifts is the one nobody
- * probes.
+ * Shared here rather than copied per service, the same shape as
+ * {@link JobRunRecorder}.
+ *
+ * See `docs/decisions/0010-readiness-probes-do-not-cascade.md`.
  */
 @Injectable()
 export class GrpcHealthService {
@@ -134,7 +128,7 @@ export class GrpcHealthService {
  *
  * `SELECT 1` rather than a real query: it proves the pool has a live connection
  * and touches no table, so it cannot start failing because a migration renamed
- * something. **No new connection is opened** test 4. A probe every
+ * something. **No new connection is opened**. A probe every
  * five seconds that connects is a connection leak with a schedule, and it is
  * the shape a health check most often takes when written in a hurry.
  */

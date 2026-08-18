@@ -17,7 +17,7 @@ import { PrismaService } from '../prisma/prisma.service';
  * it could be tempted to check — which makes it the clearest statement of the
  * rule: *each service answers for its own dependencies*. A service that probed
  * its callers would turn one database failure into a cluster-wide not-ready by
- * exactly the mechanism the gateway's readiness bug used (§1).
+ * exactly the mechanism the gateway's readiness bug used.
  *
  * The controller and the decision logic are shared; only this wiring is local,
  * because only this service knows what it owns.

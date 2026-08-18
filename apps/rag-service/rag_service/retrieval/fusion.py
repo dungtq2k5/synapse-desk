@@ -47,7 +47,7 @@ def reciprocal_rank_fusion(
     reason the lexical arm carries a column it never filters on.
 
     **Weights change ORDERING and never eligibility.** The correction the design
-    §1.5 makes: scaling `k` per arm (`k = top_n × w_semantic`) truncates an
+    Scaling `k` per arm (`k = top_n × w_semantic`) truncates an
     arm's contribution unpredictably, so a low-weighted arm can never surface
     its rank-8 result even when that result is the right one. Both arms are
     asked for the same k and the weighting happens HERE, where it can only

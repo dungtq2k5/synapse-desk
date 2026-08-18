@@ -1,37 +1,29 @@
 /**
- * The analytics shapes the GraphQL schema serves
+ * The analytics shapes the GraphQL schema serves.
  *
  * **Analytics is a WHOLE SHAPE, not an entity graph.** The overview is one
- * composed read with its own caching and its own daily rollups behind it
- * . Decomposing it into resolvable fields would re-run that composition
- * per field: `deflection` and `csat` come from the same query, so a client
- * asking for both would pay for it twice, while a client asking for one would
- * still pay for the whole rollup join. So there are no edges here, and the schema
- * defers `@ResolveField` into analytics permanently rather than "for now".
+ * composed read with its own caching and daily rollups behind it. Decomposing
+ * it into resolvable fields would re-run that composition per field, so there
+ * are no edges here and `@ResolveField` is deferred permanently rather than
+ * "for now".
  *
- * **Four of the ten REST reads appear here, and the rule is composition rather
- * than parity** A read earns a GraphQL query when its rows carry
- * entity ids an existing loader can resolve, or when it is the headline figure
- * a screen opens with. The chart series — `DeflectionDto`, `VolumeDto`,
- * `AiUsageDto` and the rest — are buckets and numbers with no entity id in any
- * row: there is nothing to traverse to, so a query for one would be a REST call
- * with more syntax and a second cache path.
- *
- * That is also why these are separate classes rather than one set shared with
- * `../rest/`: the two surfaces genuinely expose different amounts of this
- * domain, and a shared base could only have covered the overlap.
+ * **Four of the ten REST reads appear here; the rule is composition, not
+ * parity.** A read earns a GraphQL query when its rows carry entity ids a
+ * loader can resolve, or when it is the headline figure a screen opens with.
+ * The chart series are buckets and numbers with no entity id in any row —
+ * nothing to traverse to, so a query would be a REST call with more syntax and
+ * a second cache path.
  *
  * **Every rate carries its denominator, at every level.** A percentage with a
  * hidden denominator is how *"our CSAT is 100%"* reaches a board deck on two
- * responses, and the shape here makes that impossible to do accidentally: there
- * is no bare number to read.
+ * responses. There is no bare number to read.
  */
 
 import { DocumentFlagType } from '@synapsedesk/common';
 import { Field, Float, ID, Int, ObjectType } from '@nestjs/graphql';
 
 @ObjectType('Rate')
-export class RateGqlDto {
+export class RateResponseGqlDto {
   /** null when the denominator is zero — NOT zero. The two are different facts. */
   @Field(() => Float, { nullable: true })
   rate!: number | null;
@@ -44,7 +36,7 @@ export class RateGqlDto {
 }
 
 @ObjectType('Mean')
-export class MeanGqlDto {
+export class MeanResponseGqlDto {
   @Field(() => Float, { nullable: true })
   mean!: number | null;
 
@@ -53,7 +45,7 @@ export class MeanGqlDto {
 }
 
 @ObjectType('AnalyticsOverview')
-export class AnalyticsOverviewGqlDto {
+export class AnalyticsOverviewResponseGqlDto {
   @Field(() => Int)
   ticketsCreated!: number;
 
@@ -66,21 +58,21 @@ export class AnalyticsOverviewGqlDto {
   @Field(() => Int)
   openTickets!: number;
 
-  @Field(() => RateGqlDto)
-  deflection!: RateGqlDto;
+  @Field(() => RateResponseGqlDto)
+  deflection!: RateResponseGqlDto;
 
-  @Field(() => RateGqlDto)
-  csat!: RateGqlDto;
+  @Field(() => RateResponseGqlDto)
+  csat!: RateResponseGqlDto;
 
   /** Reported apart from the AI figure, always. */
-  @Field(() => MeanGqlDto)
-  humanFirstResponseSeconds!: MeanGqlDto;
+  @Field(() => MeanResponseGqlDto)
+  humanFirstResponseSeconds!: MeanResponseGqlDto;
 
-  @Field(() => MeanGqlDto)
-  aiFirstResponseSeconds!: MeanGqlDto;
+  @Field(() => MeanResponseGqlDto)
+  aiFirstResponseSeconds!: MeanResponseGqlDto;
 
-  @Field(() => MeanGqlDto)
-  resolutionSeconds!: MeanGqlDto;
+  @Field(() => MeanResponseGqlDto)
+  resolutionSeconds!: MeanResponseGqlDto;
 
   /**
    * The counterweight to `resolutionSeconds`, which can only see tickets that
@@ -106,7 +98,7 @@ export class AnalyticsOverviewGqlDto {
 }
 
 /**
- * A leg that did not answer
+ * A leg that did not answer.
  *
  * **Present on every composed read, and never merged into the numbers.** A
  * dashboard where nine tiles render and one names the service that is down is
@@ -115,7 +107,7 @@ export class AnalyticsOverviewGqlDto {
  * chart and mean opposite things.
  */
 @ObjectType('UnavailableBlock')
-export class UnavailableBlockGqlDto {
+export class UnavailableBlockResponseGqlDto {
   /** Which leg failed, by service name. */
   @Field(() => String)
   source!: string;
@@ -142,9 +134,9 @@ export class UnavailableBlockGqlDto {
  * `agent { fullName }` is the way.
  */
 @ObjectType('AgentStat')
-export class AgentStatGqlDto {
+export class AgentStatResponseGqlDto {
   /**
-   * The agent's id, flat beside the `agent` edge
+   * The agent's id, flat beside the `agent` edge.
    *
    * Same rule as `Ticket.currentAssigneeId`: a client that only wants the id
    * must not pay a network call for it.
@@ -161,21 +153,21 @@ export class AgentStatGqlDto {
   @Field(() => Int)
   messagesSent!: number;
 
-  @Field(() => MeanGqlDto)
-  resolutionSeconds!: MeanGqlDto;
+  @Field(() => MeanResponseGqlDto)
+  resolutionSeconds!: MeanResponseGqlDto;
 
   /** From the AI ledger. Null when that leg was unavailable — see above. */
-  @Field(() => RateGqlDto, { nullable: true })
-  draftAcceptance!: RateGqlDto | null;
+  @Field(() => RateResponseGqlDto, { nullable: true })
+  draftAcceptance!: RateResponseGqlDto | null;
 }
 
 @ObjectType('AgentAnalytics')
-export class AgentAnalyticsGqlDto {
-  @Field(() => [AgentStatGqlDto])
-  items!: AgentStatGqlDto[];
+export class AgentAnalyticsResponseGqlDto {
+  @Field(() => [AgentStatResponseGqlDto])
+  items!: AgentStatResponseGqlDto[];
 
   /**
-   * **The STALEST leg's coverage**, not the freshest
+   * **The STALEST leg's coverage**, not the freshest.
    *
    * This spans two schedulers in two services, so one can be days behind the
    * other, and reporting the fresher would let the healthy one vouch for the
@@ -184,8 +176,8 @@ export class AgentAnalyticsGqlDto {
   @Field(() => String, { nullable: true })
   dataThrough!: string | null;
 
-  @Field(() => [UnavailableBlockGqlDto])
-  unavailable!: UnavailableBlockGqlDto[];
+  @Field(() => [UnavailableBlockResponseGqlDto])
+  unavailable!: UnavailableBlockResponseGqlDto[];
 }
 
 /**
@@ -197,7 +189,7 @@ export class AgentAnalyticsGqlDto {
  * a live `title` is the honest rendering of that.
  */
 @ObjectType('DocumentUsage')
-export class DocumentUsageGqlDto {
+export class DocumentUsageResponseGqlDto {
   @Field(() => ID)
   documentId!: string;
 
@@ -216,9 +208,9 @@ export class DocumentUsageGqlDto {
 }
 
 @ObjectType('DocumentAnalytics')
-export class DocumentAnalyticsGqlDto {
-  @Field(() => [DocumentUsageGqlDto])
-  mostCited!: DocumentUsageGqlDto[];
+export class DocumentAnalyticsResponseGqlDto {
+  @Field(() => [DocumentUsageResponseGqlDto])
+  mostCited!: DocumentUsageResponseGqlDto[];
 
   /**
    * **Two DIFFERENT findings** (RDM Table 27), never merged into one list.
@@ -228,27 +220,27 @@ export class DocumentAnalyticsGqlDto {
    * versus rewrite it — so a combined "unused documents" list would send every
    * reader down the wrong one half the time.
    */
-  @Field(() => [DocumentUsageGqlDto])
-  neverRetrieved!: DocumentUsageGqlDto[];
+  @Field(() => [DocumentUsageResponseGqlDto])
+  neverRetrieved!: DocumentUsageResponseGqlDto[];
 
-  @Field(() => [DocumentUsageGqlDto])
-  retrievedNeverCited!: DocumentUsageGqlDto[];
+  @Field(() => [DocumentUsageResponseGqlDto])
+  retrievedNeverCited!: DocumentUsageResponseGqlDto[];
 
   /** Citation accuracy from `ai_response_feedbacks` — the other service's leg. */
-  @Field(() => RateGqlDto, { nullable: true })
-  citationAccuracy!: RateGqlDto | null;
+  @Field(() => RateResponseGqlDto, { nullable: true })
+  citationAccuracy!: RateResponseGqlDto | null;
 
   /** See `AgentAnalytics.dataThrough`. */
   @Field(() => String, { nullable: true })
   dataThrough!: string | null;
 
-  @Field(() => [UnavailableBlockGqlDto])
-  unavailable!: UnavailableBlockGqlDto[];
+  @Field(() => [UnavailableBlockResponseGqlDto])
+  unavailable!: UnavailableBlockResponseGqlDto[];
 }
 
 /** One flagged document. `document` resolves through the documents loader. */
 @ObjectType('KnowledgeGapFlag')
-export class KnowledgeGapFlagGqlDto {
+export class KnowledgeGapFlagResponseGqlDto {
   @Field(() => ID)
   documentId!: string;
 
@@ -265,7 +257,7 @@ export class KnowledgeGapFlagGqlDto {
 }
 
 @ObjectType('KnowledgeGaps')
-export class KnowledgeGapsGqlDto {
+export class KnowledgeGapsResponseGqlDto {
   @Field(() => Int)
   emptyRetrievals!: number;
 
@@ -279,16 +271,16 @@ export class KnowledgeGapsGqlDto {
    * retrievals out of sixty is a broken knowledge base and out of fifty
    * thousand is noise.
    */
-  @Field(() => RateGqlDto)
-  emptyRetrievalRate!: RateGqlDto;
+  @Field(() => RateResponseGqlDto)
+  emptyRetrievalRate!: RateResponseGqlDto;
 
-  @Field(() => [KnowledgeGapFlagGqlDto])
-  flags!: KnowledgeGapFlagGqlDto[];
+  @Field(() => [KnowledgeGapFlagResponseGqlDto])
+  flags!: KnowledgeGapFlagResponseGqlDto[];
 
   /** See `AgentAnalytics.dataThrough`. */
   @Field(() => String, { nullable: true })
   dataThrough!: string | null;
 
-  @Field(() => [UnavailableBlockGqlDto])
-  unavailable!: UnavailableBlockGqlDto[];
+  @Field(() => [UnavailableBlockResponseGqlDto])
+  unavailable!: UnavailableBlockResponseGqlDto[];
 }

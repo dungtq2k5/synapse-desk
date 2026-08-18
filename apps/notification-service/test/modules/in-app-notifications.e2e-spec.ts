@@ -15,14 +15,8 @@ import { InAppNotificationService } from '../../src/modules/in-app/in-app-notifi
 import { AuthReferenceService } from '../../src/modules/auth-client/auth-reference.service';
 import { EmailService } from '../../src/modules/email/email.service';
 
-const ORG = '11111111-1111-4111-8111-111111111111';
-
-/** The permission `quota-alert.service.ts` addresses its alerts to. */
-const AUDIENCE = 'organization.update';
-const CYCLE_START = new Date('2026-08-01T00:00:00.000Z');
-
 /**
- * §3, §5 — Domain E's write path.
+ * Domain E's write path.
  *
  * **Every assertion here is on something a user could SEE**: a row in their
  * feed, a captured outbound email, or a delivery record that answers *"why
@@ -32,13 +26,19 @@ const CYCLE_START = new Date('2026-08-01T00:00:00.000Z');
  * subscriber, and a test asserting the emit is exactly what let it reach
  * production looking finished.
  */
-describe('§1 In-app notification delivery (e2e)', () => {
+describe('In-app notification delivery (e2e)', () => {
   let fx: E2eFixture;
   let inApp: InAppNotificationService;
 
   let listPermissionHolders: jest.SpyInstance;
   let listUsersByIds: jest.SpyInstance;
   let sendEmail: jest.SpyInstance;
+
+  const ORG = '11111111-1111-4111-8111-111111111111';
+
+  /** The permission `quota-alert.service.ts` addresses its alerts to. */
+  const AUDIENCE = 'organization.update';
+  const CYCLE_START = new Date('2026-08-01T00:00:00.000Z');
 
   const ADMINS = [
     {
@@ -130,7 +130,7 @@ describe('§1 In-app notification delivery (e2e)', () => {
       expect(rows[0].readAt).toBeNull();
     });
 
-    it('2. Stores the ORIGINATING type, not the transport subject — §1.3', async () => {
+    it('2. Stores the ORIGINATING type, not the transport subject', async () => {
       // The latent bug here. `type` used to be written as
       // `IN_APP_NOTIFICATION_PATTERN`, identical on every row — harmless with
       // one producer and a blocker with two, because `?type=` would match
@@ -168,7 +168,7 @@ describe('§1 In-app notification delivery (e2e)', () => {
     });
   });
 
-  describe('the audience union — §1.3', () => {
+  describe('the audience union', () => {
     const RECIPIENT = ADMINS[0].userId;
 
     it('5. A `users` audience makes NO permission lookup', async () => {
@@ -209,7 +209,7 @@ describe('§1 In-app notification delivery (e2e)', () => {
       await expect(fx.prisma.notification.count()).resolves.toBe(0);
     });
 
-    it('8. Never notifies the ACTOR — §3.1 rule 1', async () => {
+    it('8. Never notifies the ACTOR', async () => {
       // An agent who assigns a ticket to themselves must not be told about it.
       // Applied centrally, so a new producer gets it for free rather than
       // having to remember.
@@ -351,7 +351,7 @@ describe('§1 In-app notification delivery (e2e)', () => {
     });
   });
 
-  describe('delivery records — §5', () => {
+  describe('delivery records', () => {
     it('17. Writes an IN_APP delivery row for every notification', async () => {
       // Even though the in-app channel cannot fail: this table answers "was I
       // notified at all, and on what", and a channel missing from it reads as
@@ -475,7 +475,7 @@ describe('§1 In-app notification delivery (e2e)', () => {
     });
   });
 
-  describe('real-time — §6', () => {
+  describe('real-time', () => {
     it('24. Publishes `notification.created` for the socket to relay', async () => {
       await inApp.deliver(quotaAlert(80));
 

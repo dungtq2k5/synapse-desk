@@ -117,7 +117,7 @@ export class PreferencesService {
     });
 
     return {
-      // Both columns are Postgres `VarChar` (§7.3), so these are plain strings
+      // Both columns are Postgres `VarChar`, so these are plain strings
       // on the way out of Prisma and the mappers take them as such.
       type: row.type,
       channel: toProtoNotificationChannel(row.channel),
@@ -152,18 +152,14 @@ export class PreferencesService {
   }
 
   /**
-   * Still here, and no longer checking the same thing.
+   * Rejects a channel that is not a configurable PREFERENCE.
    *
-   * It used to answer *"is this a channel at all?"* by comparing `String(value)`
-   * against the domain enum — a hand-written gate that existed because the
-   * field arrived off the wire as unconstrained text. The proto enum answers
-   * that now, before any handler runs, so an unknown channel never reaches
-   * this method.
+   * The proto enum already answers "is this a channel at all?" before any
+   * handler runs, so an unknown channel never reaches here.
    *
-   * What remains is a POLICY, which no wire type can express: `WEBHOOK` is a
-   * real channel that is not a configurable preference. It has no
-   * implementation, so a preference for it would be a setting that
-   * controls nothing. `PREFERENCE_CHANNELS` is Table 25; the enum is Table 24.
+   * What remains is a POLICY no wire type can express: `WEBHOOK` is a real
+   * channel with no implementation, so a preference for it would be a setting
+   * that controls nothing.
    *
    * `UNSPECIFIED` lands here too — a caller that omitted the field — and gets
    * the same refusal, because a write has to know which channel it is writing.

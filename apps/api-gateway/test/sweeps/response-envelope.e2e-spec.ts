@@ -176,7 +176,7 @@ describe('response envelope sweep (e2e)', () => {
     },
 
     // ---------------------------------------------------------------------
-    // Domain B. Rows, not a second sweep file — §3.5 says to reuse this
+    // Domain B. Rows, not a second sweep file.5 says to reuse this
     // harness, and a parallel one would be a second definition of "the
     // envelope" that could drift from this one.
     // ---------------------------------------------------------------------

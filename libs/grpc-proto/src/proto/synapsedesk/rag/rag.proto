@@ -88,7 +88,7 @@ message ChatRequest {
   // Present for a ticket conversation, absent for `/knowledge/ask`. It decides
   // `ai_generations.ticket_id`, which is how spend is attributed to a ticket.
   optional string ticket_id = 3;
-  // The CURRENT message's attachments only
+  // The CURRENT message's attachments only.
   //
   // History turns contribute TEXT. Re-sending their images would put four turns
   // times five files on every call to recover information the assistant's own
@@ -113,7 +113,7 @@ enum AnswerStatus {
   ANSWER_STATUS_GREETING = 3;
   // The tenant is at the AI cap. The caller escalates rather than erroring.
   ANSWER_STATUS_AT_CAP = 4;
-  // The question was refused by prompt-injection detection
+  // The question was refused by prompt-injection detection.
   //
   // **Not GREETING, which is what reusing that short-circuit would have
   // reported.** The gateway persists any completion that is not AT_CAP as an
@@ -129,7 +129,7 @@ message Citation {
   string document_id = 2;
   string document_title = 3;
   optional int32 page_number = 4;
-  // The id a citation RESOLVES THROUGH test 2.
+  // The id a citation RESOLVES THROUGH.
   //
   // Carried alongside `chunk_id` even though either would find the row,
   // because this is the key the two arms fuse on and the one Qdrant returns
@@ -264,13 +264,13 @@ message Suggestion {
 message SuggestionsResponse {
   repeated Suggestion suggestions = 1;
   string generation_id = 2;
-  // Knowledge-base articles relevant to the ticket — product §6.3's first
+  // Knowledge-base articles relevant to the ticket — the co-pilot sidebar's first
   // third. The other two need a ticket corpus, which is a threat
-  // model change rather than a queue (§4).
+  // model change rather than a queue.
   repeated SuggestedArticle articles = 3;
 }
 
-// One article to recommend
+// One article to recommend.
 //
 // **Deliberately NOT `Citation` reused.** They differ by more than a field: a
 // citation points at the PASSAGE an answer used, and carries `chunk_id` so the

@@ -1,4 +1,4 @@
-"""§4.1 through the SERVICER — the orderings that only show up end to end.
+"""Through the SERVICER — the orderings that only show up end to end.
 
 The unit tests prove each step; these prove the sequence. Every one of the three
 orderings below was wrong in an earlier draft and none of them changes visible
@@ -201,7 +201,7 @@ class TestAsk:
         # Retrieval could degrade; an ANSWER has no free version. 402 rather
         # than 429, carried by the `[http:402]` marker because no gRPC code
         # means "buy more".
-        with pytest.raises(FakeAbort) as raised:
+        with pytest.raises(FakeAbort) as raised: # NOSONAR
             await servicer.Ask(
                 rag_pb2.ChatRequest(message="what is the policy?"),
                 FakeServicerContext(tenant_a.outsider()),

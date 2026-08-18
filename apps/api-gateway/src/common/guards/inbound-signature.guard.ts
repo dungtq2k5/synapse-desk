@@ -10,30 +10,27 @@ import type { RawBodyRequest } from '@nestjs/common';
 import type { Request } from 'express';
 import { verifyHmacSignature } from '@synapsedesk/common';
 
-/** The header the mail Worker signs with */
+/** The header the mail Worker signs with. */
 export const INBOUND_SIGNATURE_HEADER = 'x-inbound-signature';
 
 /**
- * Authenticates the inbound-email webhook
+ * Authenticates the inbound-email webhook.
  *
  * **A GUARD rather than a check inside the handler**, because the property this
  * endpoint is built around is *"a bad signature causes nothing to happen"* — no
  * lookup, no RPC, no job, no log of the body. Guards run before interceptors,
- * pipes and the handler, so expressing it here makes that structural instead of
- * a promise every future edit has to keep. a test asserts it by
- * spying the auth-service client.
+ * pipes and the handler, so expressing it here makes that structural rather
+ * than a promise every future edit has to keep. A test asserts it by spying the
+ * auth-service client.
  *
- * **Verified HERE, which is deliberately not what Stripe does**
- * `/webhooks/stripe` forwards raw bytes and auth-service verifies, and copying
- * that would spend a gRPC call before authenticating. The credentials also
- * differ in kind: Stripe's secret is a billing-domain credential held where the
- * rest of that domain lives, while this one is an edge credential between two
- * components in this repo, protecting a route rather than a domain.
+ * **Verified HERE, unlike `/webhooks/stripe`**, which forwards raw bytes for
+ * auth-service to verify. Copying that would spend a gRPC call before
+ * authenticating, and the credentials differ in kind: Stripe's is a
+ * billing-domain credential, this one an edge credential between two components
+ * in this repo.
  *
  * **401, not 400 and never 5xx.** A 5xx tells the provider to retry, so a
- * misconfigured secret would become an unbounded retry loop against this
- * endpoint. 401 says the credential was presented and rejected, which is both
- * accurate and a signal to stop.
+ * misconfigured secret would become an unbounded retry loop.
  */
 @Injectable()
 export class InboundSignatureGuard implements CanActivate {
@@ -47,8 +44,8 @@ export class InboundSignatureGuard implements CanActivate {
       .getRequest<RawBodyRequest<Request>>();
 
     // **The raw bytes, not the parsed body**, the trap this
-    // codebase has already been caught by once. A JSON parser deserialises and
-    // re-serialises: different key order, different whitespace, a different
+    // codebase has already been caught by once. A JSON parser deserializes and
+    // re-serializes: different key order, different whitespace, a different
     // digest, and every signature fails in production while passing every local
     // test that builds the body itself.
     //

@@ -8,14 +8,14 @@ import { bootstrapE2eTest, E2eFixture } from '../utils/bootstrap';
 import { InboundThreadService } from '../../src/modules/feed/inbound-thread.service';
 
 /**
- * The `In-Reply-To` fallback
+ * The `In-Reply-To` fallback.
  *
  * **A two-hop join, and the second hop is the tenant check.** A `Message-ID` is
  * a string a sender's client echoes back; it is not a credential, and anyone
  * who has ever received a notification from this system holds one. What stops
  * it addressing another tenant's ticket is that the join is scoped.
  */
-describe('§31 §4 resolving a ticket from a Message-ID (e2e)', () => {
+describe('Resolving a ticket from a Message-ID (e2e)', () => {
   let fx: E2eFixture;
   let threads: InboundThreadService;
 

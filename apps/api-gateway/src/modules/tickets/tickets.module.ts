@@ -2,11 +2,15 @@ import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { TicketsController } from './tickets.controller';
 import { TicketsGrpcClient } from './tickets-grpc.client';
+import { TicketsService } from './tickets.service';
 import { AssignmentsGrpcClient } from './assignments-grpc.client';
+import { AssignmentsService } from './assignments.service';
 import { MessagesGrpcClient } from './messages-grpc.client';
+import { MessagesService } from './messages.service';
 import { MessagesController } from './messages.controller';
 import { AttachmentsController } from './attachments.controller';
 import { AiGrpcClient } from './ai-grpc.client';
+import { AiService } from './ai.service';
 import { AiController } from './ai.controller';
 import { TicketsResolver } from './tickets.resolver';
 import { TicketMessagesResolver } from './ticket-messages.resolver';
@@ -30,17 +34,19 @@ import { TicketMessagesResolver } from './ticket-messages.resolver';
   ],
   providers: [
     TicketsGrpcClient,
+    TicketsService,
     AssignmentsGrpcClient,
+    AssignmentsService,
     MessagesGrpcClient,
+    MessagesService,
     AiGrpcClient,
+    AiService,
     TicketsResolver,
     TicketMessagesResolver,
   ],
-  exports: [
-    TicketsGrpcClient,
-    AssignmentsGrpcClient,
-    MessagesGrpcClient,
-    AiGrpcClient,
-  ],
+  // `MessagesService` rather than `MessagesGrpcClient`: the realtime gateway and
+  // the chat controller both write messages through the service, and the client
+  // is now reachable only from inside it.
+  exports: [TicketsService, AssignmentsService, MessagesService, AiService],
 })
 export class TicketsModule {}

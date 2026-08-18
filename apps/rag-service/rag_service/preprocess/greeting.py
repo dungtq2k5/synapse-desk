@@ -27,7 +27,7 @@ from enum import StrEnum
 class Intent(StrEnum):
     GREETING = "GREETING"
     FACTUAL = "FACTUAL"
-    #: Refused by prompt-injection detection Carries a `reply` like
+    #: Refused by prompt-injection detection. Carries a `reply` like
     #: a greeting does, so it travels the same free short-circuit; the proto
     #: status is what keeps the two distinguishable downstream.
     REFUSED = "REFUSED"
@@ -138,7 +138,7 @@ def canned_reply(language: str | None) -> str:
     return CANNED_REPLIES.get(language or "en", CANNED_REPLIES["en"])
 
 
-#: What a refused question is told
+#: What a refused question is told.
 #:
 #: **It names no pattern and no rule.** A message that explains what tripped the
 #: detector is a free oracle for tuning an attack against it, and the tuning
@@ -185,7 +185,7 @@ REFUSAL_REPLIES: dict[str, str] = {
 def refusal_reply(language: str | None) -> str:
     """The refusal, by language. English when neither layer could name one.
 
-    **Both layers can name it** Layer A knows the language of the
+    **Both layers can name it**. Layer A knows the language of the
     pattern that fired; Layer B asks for it in the same eight-token answer, so
     `INJECTION es` costs exactly what `INJECTION` would have. That second half
     is what the cheap-tier classification bought: a classifier head returns a

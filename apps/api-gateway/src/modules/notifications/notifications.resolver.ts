@@ -14,16 +14,15 @@ import type { RequestContext } from '@synapsedesk/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionGuard } from '../../common/guards/permission.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { NotificationsGrpcClient } from './notifications-grpc.client';
-import { NotificationResponseGqlDto } from './dto/graphql/notification-response.gql-dto';
+import { NotificationsService } from './notifications.service';
 import {
-  NotificationFeedGqlDto,
-  MarkNotificationReadPayloadGqlDto,
-} from './dto/graphql/notification-feed.gql-dto';
-import { UserSummaryGqlDto } from '../users/dto/graphql/user-summary.gql-dto';
+  NotificationResponseGqlDto,
+  NotificationFeedResponseGqlDto,
+  MarkNotificationReadPayloadResponseGqlDto,
+} from './dto/graphql/notification-response.gql-dto';
+import { UserSummaryResponseGqlDto } from '../users/dto/graphql/user-response.gql-dto';
 import { MAX_PAGE_SIZE } from '../../common/config/graphql-limits.config';
 import type { GqlContext } from '../../common/graphql/loaders/loaders.factory';
-import { toUserSummaryGqlDto } from '../users/user.mapper';
 
 /**
  * The notification feed, and one mutation.
@@ -35,9 +34,9 @@ import { toUserSummaryGqlDto } from '../users/user.mapper';
 @Resolver(() => NotificationResponseGqlDto)
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class NotificationsResolver {
-  constructor(private readonly notifications: NotificationsGrpcClient) {}
+  constructor(private readonly notifications: NotificationsService) {}
 
-  @Query(() => NotificationFeedGqlDto, {
+  @Query(() => NotificationFeedResponseGqlDto, {
     name: 'notifications',
     description: "The caller's own notification feed, newest first.",
   })
@@ -45,12 +44,18 @@ export class NotificationsResolver {
     @CurrentUser() context: RequestContext,
     @Args('first', { type: () => Int, defaultValue: 20 }) first: number,
     @Args('cursor', { type: () => String, nullable: true }) cursor?: string,
-  ): Promise<NotificationFeedGqlDto> {
+  ): Promise<NotificationFeedResponseGqlDto> {
     return await this.notifications.list(
       {
-        // Clamped, like every other list
+        // Clamped, like every other list.
         limit: Math.min(first, MAX_PAGE_SIZE),
         cursor,
+
+        // The GraphQL feed is the unfiltered one; the REST route is where those
+        // two filters are offered. Stated rather than defaulted so adding a
+        // filter to the DTO cannot silently change what this query returns.
+        unreadOnly: false,
+        includeArchived: false,
       },
       context,
     );
@@ -76,17 +81,17 @@ export class NotificationsResolver {
    * its recipient with no permission at all, so it must not become a way to
    * read an agent's contact details.
    */
-  @ResolveField(() => UserSummaryGqlDto, {
+  @ResolveField(() => UserSummaryResponseGqlDto, {
     nullable: true,
     description: 'Who caused this notification. Null for a system event.',
   })
   async actor(
     @Parent() notification: NotificationResponseGqlDto,
     @Context() { loaders }: GqlContext,
-  ): Promise<UserSummaryGqlDto | null> {
+  ): Promise<UserSummaryResponseGqlDto | null> {
     if (!notification.actorId) return null;
 
-    return toUserSummaryGqlDto(await loaders.users.load(notification.actorId));
+    return await loaders.users.load(notification.actorId);
   }
 
   /**
@@ -94,7 +99,7 @@ export class NotificationsResolver {
    * screen that renders the feed marks rows read from the same component, so
    * sharing a request with the query it updates is the whole point.
    */
-  @Mutation(() => MarkNotificationReadPayloadGqlDto, {
+  @Mutation(() => MarkNotificationReadPayloadResponseGqlDto, {
     description:
       'Marks one notification read. Idempotent — re-reading an already-read ' +
       'row succeeds and changes nothing.',
@@ -102,7 +107,7 @@ export class NotificationsResolver {
   async markNotificationRead(
     @Args('id', { type: () => ID }, ParseUUIDPipe) id: string,
     @CurrentUser() context: RequestContext,
-  ): Promise<MarkNotificationReadPayloadGqlDto> {
+  ): Promise<MarkNotificationReadPayloadResponseGqlDto> {
     const { unreadCount } = await this.notifications.markRead(id, context);
 
     // The new BADGE, not the row. The client is rendering the list it just

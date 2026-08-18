@@ -14,7 +14,7 @@ import { SCHEDULED_JOBS } from './scheduler.config';
  * rules is unmonitored, and it looks completely fine — an alert that does not
  * exist never fires.
  */
-describe('§4 job staleness alerts', () => {
+describe('Job staleness alerts', () => {
   const committed = () => readFileSync(ALERTS, 'utf8');
 
   const REPO_ROOT = join(__dirname, '../../../..');

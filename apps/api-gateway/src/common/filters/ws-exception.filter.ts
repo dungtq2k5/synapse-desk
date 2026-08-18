@@ -34,9 +34,9 @@ export class AllWsExceptionsFilter extends BaseWsExceptionFilter {
     const message =
       exception instanceof WsException
         ? exception.getError()
-        : exception instanceof HttpException
+        : exception instanceof HttpException // NOSONAR
           ? exception.getResponse()
-          : exception instanceof Error
+          : exception instanceof Error // NOSONAR
             ? exception.message
             : 'An unexpected real-time error occurred';
 

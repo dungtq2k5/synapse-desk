@@ -82,30 +82,25 @@ export class TicketAccessService implements OnModuleInit {
   /**
    * "May this person POST into this ticket?"
    *
-   * **A distinct method, not a flag on `canRead`.** Until `message:send` existed
-   * nothing a socket could *do* depended on access: join authorization gated
-   * only what a socket RECEIVED. Writing is a different question with different
-   * answers, and a boolean parameter invites a call site to pass the wrong one
-   * and get a plausible result — two named methods make the wrong choice visible
-   * in review.
+   * **A distinct method, not a flag on `canRead`** — a boolean parameter invites
+   * a call site to pass the wrong one and get a plausible result.
    *
-   * The differences from `canRead`, each deliberate:
+   * Two deliberate differences from `canRead`:
    *
    *   - **A `ticket.read.all` holder who is neither author nor assignee is
-   *     REFUSED.** Read-all is an oversight permission, not a licence to reply
-   *     as the support organisation. This is the row a read-predicate reuse gets
-   *     wrong, and it fails silently: the message posts and is attributed to
-   *     someone who never took the ticket.
-   *   - **A `CLOSED` ticket is refused.** History stays readable; posting into
-   *     it would reopen a ticket as a side effect of a message, and reopening is
-   *     a state transition the machine owns.
+   *     REFUSED.** Read-all is an oversight permission, not a license to reply
+   *     as the support organization. This is the row a read-predicate reuse gets
+   *     wrong, and it fails silently — the message posts, attributed to someone
+   *     who never took the ticket.
+   *   - **A `CLOSED` ticket is refused.** History stays readable; posting would
+   *     reopen it as a side effect, and reopening is the state machine's.
    *
-   * > **This check exists for the ERROR, not for the security.** `ticket-service`
-   * > re-validates on its own, so removing this would not open a hole — it would
-   * > produce a gRPC error where an ack should be. Worth saying, so nobody
-   * > deletes it as redundant.
+   * > **This check exists for the ERROR, not for the security.**
+   * > `ticket-service` re-validates, so removing it would produce a gRPC error
+   * > where an ack should be rather than open a hole. Said so nobody deletes it
+   * > as redundant.
    *
-   * Fails CLOSED on every error path, like `canRead`.
+   * Fails CLOSED on every error path.
    */
   async canWrite(
     ticketId: string,

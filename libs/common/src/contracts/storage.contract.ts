@@ -1,5 +1,5 @@
 /**
- * The storage contract — §1.1's path scheme and §1.6's async delete.
+ * The storage contract: the object path scheme and the async delete.
  *
  * Lives in `libs/common` rather than in `storage-service` because BOTH ends
  * need it: the owning services build/consume object paths and emit the delete
@@ -21,7 +21,7 @@ export enum StoragePurpose {
   /** Reserved for Domain C's `ingestion-service`. No caller today. */
   DOCUMENT = 'DOCUMENT',
   /**
-   * An analytics export
+   * An analytics export.
    *
    * A new purpose rather than a second file path: the signed-URL discipline,
    * the tenant path prefix and the deletion story all already exist here, and
@@ -70,7 +70,7 @@ export type ObjectSupersededEvent = {
 };
 
 /**
- * The path scheme, as functions — §1.1.
+ * The path scheme, as functions.
  *
  * Functions rather than a documented convention, because every consequence of
  * getting a path wrong is silent: a mistyped prefix writes an object nothing
@@ -112,7 +112,7 @@ export function documentObjectPath(
  * The tenant segment of a path, or null if it has none.
  *
  * Used to re-check that an object a caller is confirming lives under THEIR
- * organization — §1.2's authorization check, and the reason the tenant is the
+ * organization.2's authorization check, and the reason the tenant is the
  * first segment rather than buried mid-path.
  */
 export function organizationIdFromObjectPath(

@@ -1,31 +1,23 @@
 /**
- * Carrying an HTTP status across the gRPC wire, for the cases where no gRPC
+ * @file Carrying an HTTP status across the gRPC wire, for the cases where no gRPC
  * code means the right thing.
  *
- * **Why this exists at all.** Only `code` and `details` survive a gRPC hop —
- * extra fields on an `RpcException` payload are dropped by the transport, so
- * "just add `httpStatus` to the object" does not work and fails silently. The
- * gateway therefore maps `code -> status` from a fixed table, which is correct
- * for almost everything.
+ * Only `code` and `details` survive a gRPC hop — extra fields on an
+ * `RpcException` payload are dropped by the transport, silently. The gateway
+ * maps `code -> status` from a fixed table, which is right for almost
+ * everything.
  *
- * The exception is **402 Payment Required**. gRPC has no code that means it:
+ * The exception is **402 Payment Required**, which has no gRPC code:
+ * `RESOURCE_EXHAUSTED` already means 429 here (OTP throttling says "slow down",
+ * not "buy more"), `PERMISSION_DENIED` would send an admin hunting role grants,
+ * and `FAILED_PRECONDITION` claims the request was malformed. It was not.
  *
- *   - `RESOURCE_EXHAUSTED` already means 429 in this system, and legitimately —
- *     OTP throttling uses it to say "slow down", which is a different
- *     instruction from "buy more".
- *   - `PERMISSION_DENIED` maps to 403 and would send an admin looking at role
- *     grants for a problem that has nothing to do with roles.
- *   - `FAILED_PRECONDITION` maps to 400, which says the request was malformed.
- *     It was not.
+ * So the status travels in the DETAILS, behind a marker the gateway strips —
+ * the same shape as `google.rpc.ErrorInfo`, done with a string because Nest's
+ * transport does not surface `ErrorInfo`.
  *
- * So the status travels in the DETAILS, behind a marker the gateway strips.
- * This is the same shape gRPC's own `google.rpc.ErrorInfo` uses — structured
- * information riding in the error payload because the status code alone cannot
- * carry it — done with a string because Nest's transport does not surface
- * `ErrorInfo`.
- *
- * Deliberately narrow: this is for the handful of cases where the table is
- * genuinely wrong, not a general-purpose override. Reach for a gRPC code first.
+ * **Deliberately narrow.** Reach for a gRPC code first; this is for the handful
+ * of cases where the table is genuinely wrong.
  */
 
 const MARKER = /^\[http:(\d{3})]\s*/;

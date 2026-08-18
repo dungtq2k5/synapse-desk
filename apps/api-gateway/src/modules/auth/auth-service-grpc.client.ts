@@ -4,98 +4,27 @@ import {
   AUTH_GRPC_CLIENT,
   AUTH_SERVICE_NAME,
   AuthServiceClient,
+  ChangePasswordRequest,
+  ChangePasswordResponse,
+  GoogleSignInRequest,
+  LoginRequest,
   type LoginResponse as ProtoLoginResponse,
+  LoginWithTenantRequest,
+  LogoutResponse,
+  RefreshTokenResponse,
+  RegisterRequest,
+  RegisterResponse,
+  ResetPasswordResponse,
+  ValidatePasswordResetTokenResponse,
 } from '@synapsedesk/grpc-proto';
 import { RequestContext, RequestOrigin } from '@synapsedesk/common';
 import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
-import { RegisterDto, RegisterResponseDto } from './dto/rest/register.dto';
-import {
-  LoginDto,
-  LoginWithTenantDto,
-  TenantOptionDto,
-} from './dto/rest/login.dto';
-import { GoogleSignInDto } from './dto/rest/google-sign-in.dto';
-import { UserResponseDto } from '../users/dto/rest/user-response.dto';
-import { toUserResponseDto } from '../users/user.mapper';
-import {
-  ResetPasswordResponseDto,
-  ValidatePasswordResetTokenResponseDto,
-} from './dto/rest/reset-password.dto';
-
-/**
- * Result of a login, discriminated exactly as the proto is.
- *
- * THREE shapes, and callers must branch on `requiresTenantSelection` FIRST:
- * 2FA policy is a per-tenant setting, so it cannot be evaluated until the
- * tenant is known.
- */
-export type LoginResult =
-  | {
-      requiresTenantSelection: true;
-      tenantSelectionToken: string;
-      tenants: TenantOptionDto[];
-    }
-  | {
-      requiresTenantSelection: false;
-      requiresTwoFactor: true;
-      /**
-       * The challenge is an ENROLMENT one: the tenant requires 2FA and this
-       * account has none yet, so the client must open setup rather than prompt
-       * for a code that does not exist.
-       */
-      requiresTwoFactorSetup: boolean;
-      twoFactorToken: string;
-    }
-  | {
-      requiresTenantSelection: false;
-      requiresTwoFactor: false;
-      user: UserResponseDto;
-      accessToken: string;
-      refreshToken: string;
-    };
-
-/**
- * The proto's three-way union, unpacked once so every caller of `login` and
- * `googleSignIn` branches identically instead of re-deriving the precedence.
- */
-function toLoginResult(response: ProtoLoginResponse): LoginResult {
-  if (response.requiresTenantSelection) {
-    return {
-      requiresTenantSelection: true,
-      tenantSelectionToken: response.tenantSelectionToken ?? '',
-      tenants: response.tenants.map((tenant) => ({
-        organizationId: tenant.organizationId,
-        name: tenant.name,
-        slug: tenant.slug,
-      })),
-    };
-  }
-
-  if (response.requiresTwoFactor) {
-    return {
-      requiresTenantSelection: false,
-      requiresTwoFactor: true,
-      requiresTwoFactorSetup: response.requiresTwoFactorSetup,
-      twoFactorToken: response.twoFactorToken ?? '',
-    };
-  }
-
-  return {
-    requiresTenantSelection: false,
-    requiresTwoFactor: false,
-    user: toUserResponseDto(response.user!),
-    accessToken: response.accessToken ?? '',
-    refreshToken: response.refreshToken ?? '',
-  };
-}
 
 /**
  * Transport adapter for auth-service.
  *
- * This is the ONLY file in the gateway allowed to import from
- * `@synapsedesk/grpc-proto`. It takes gateway DTOs in and returns gateway DTOs
- * out, so a rename inside auth.proto surfaces as a compile error here rather
- * than silently changing the public REST contract. The proto's `undefined` ->
+ * Takes and returns proto messages; `auth.mapper.ts` converts them and
+ * `AuthService` composes. The proto's `undefined` ->
  * REST `null` conversion lives here too, in `user.mapper.ts`.
  */
 @Injectable()
@@ -116,110 +45,56 @@ export class AuthServiceGrpcClient
       this.client.getService<AuthServiceClient>(AUTH_SERVICE_NAME);
   }
 
-  async register(
-    registerDto: RegisterDto,
+  register(
+    request: RegisterRequest,
     origin: RequestOrigin,
-  ): Promise<RegisterResponseDto> {
-    const response = await this.call(
-      (metadata) =>
-        this.authGrpcService.register(
-          {
-            email: registerDto.email,
-            password: registerDto.password,
-            fullName: registerDto.fullName,
-          },
-          metadata,
-        ),
+  ): Promise<RegisterResponse> {
+    return this.call(
+      (metadata) => this.authGrpcService.register(request, metadata),
       origin,
     );
-
-    return {
-      userId: response.userId,
-      organizationId: response.organizationId,
-      email: response.email,
-      requiresEmailVerification: response.requiresEmailVerification,
-    };
   }
 
-  async login(
-    loginDto: LoginDto,
+  login(
+    request: LoginRequest,
     origin: RequestOrigin,
-    deviceToken: string | undefined,
-  ): Promise<LoginResult> {
-    const response = await this.call(
-      (metadata) =>
-        this.authGrpcService.login(
-          {
-            email: loginDto.email,
-            password: loginDto.password,
-            deviceName: loginDto.deviceName,
-            // From the HttpOnly cookie, never from the request body.
-            deviceToken,
-          },
-          metadata,
-        ),
+  ): Promise<ProtoLoginResponse> {
+    return this.call(
+      (metadata) => this.authGrpcService.login(request, metadata),
       origin,
     );
-
-    return toLoginResult(response);
   }
 
-  async googleSignIn(
-    dto: GoogleSignInDto,
+  googleSignIn(
+    request: GoogleSignInRequest,
     origin: RequestOrigin,
-    deviceToken: string | undefined,
-  ): Promise<LoginResult> {
-    const response = await this.call(
-      (metadata) =>
-        this.authGrpcService.googleSignIn(
-          {
-            idToken: dto.idToken,
-            deviceName: dto.deviceName,
-            deviceToken,
-          },
-          metadata,
-        ),
+  ): Promise<ProtoLoginResponse> {
+    return this.call(
+      (metadata) => this.authGrpcService.googleSignIn(request, metadata),
       origin,
     );
-
-    return toLoginResult(response);
   }
 
-  async loginWithTenant(
-    dto: LoginWithTenantDto,
-    tenantSelectionToken: string,
+  loginWithTenant(
+    request: LoginWithTenantRequest,
     origin: RequestOrigin,
-    deviceToken: string | undefined,
-  ): Promise<LoginResult> {
-    const response = await this.call(
-      (metadata) =>
-        this.authGrpcService.loginWithTenant(
-          {
-            tenantSelectionToken,
-            organizationId: dto.organizationId,
-            deviceName: dto.deviceName,
-            deviceToken,
-          },
-          metadata,
-        ),
+  ): Promise<ProtoLoginResponse> {
+    return this.call(
+      (metadata) => this.authGrpcService.loginWithTenant(request, metadata),
       origin,
     );
-
-    return toLoginResult(response);
   }
 
-  async logout(
+  logout(
     refreshToken: string,
     allDevices: boolean,
     origin: RequestOrigin,
-  ): Promise<number> {
-    const response = await this.call(
+  ): Promise<LogoutResponse> {
+    return this.call(
       (metadata) =>
         this.authGrpcService.logout({ refreshToken, allDevices }, metadata),
       origin,
     );
-
-    return response.revokedSessionCount;
   }
 
   /**
@@ -227,56 +102,32 @@ export class AuthServiceGrpcClient
    * authenticated caller rather than a presented refresh token, so the identity
    * has to cross the hop.
    */
-  async logoutAll(context: RequestContext): Promise<number> {
-    const response = await this.call(
+  logoutAll(context: RequestContext): Promise<LogoutResponse> {
+    return this.call(
       (metadata) => this.authGrpcService.logoutAll({}, metadata),
       context,
     );
-
-    return response.revokedSessionCount;
   }
 
-  async changePassword(
-    dto: { currentPassword: string; newPassword: string },
-    refreshToken: string | undefined,
+  changePassword(
+    request: ChangePasswordRequest,
     context: RequestContext,
-  ): Promise<number> {
-    const response = await this.call(
-      (metadata) =>
-        this.authGrpcService.changePassword(
-          {
-            currentPassword: dto.currentPassword,
-            newPassword: dto.newPassword,
-            // Identifies the ONE session the change spares.
-            refreshToken,
-          },
-          metadata,
-        ),
+  ): Promise<ChangePasswordResponse> {
+    return this.call(
+      (metadata) => this.authGrpcService.changePassword(request, metadata),
       context,
     );
-
-    return response.revokedSessionCount;
   }
 
-  async refreshToken(
+  refreshToken(
     refreshToken: string,
     origin: RequestOrigin,
-  ): Promise<{
-    user: UserResponseDto;
-    accessToken: string;
-    refreshToken: string;
-  }> {
-    const response = await this.call(
+  ): Promise<RefreshTokenResponse> {
+    return this.call(
       (metadata) =>
         this.authGrpcService.refreshToken({ refreshToken }, metadata),
       origin,
     );
-
-    return {
-      user: toUserResponseDto(response.user!),
-      accessToken: response.accessToken,
-      refreshToken: response.refreshToken,
-    };
   }
 
   async forgotPassword(email: string, origin: RequestOrigin): Promise<void> {
@@ -286,30 +137,26 @@ export class AuthServiceGrpcClient
     );
   }
 
-  async validatePasswordResetToken(
+  validatePasswordResetToken(
     token: string,
     origin: RequestOrigin,
-  ): Promise<ValidatePasswordResetTokenResponseDto> {
-    const response = await this.call(
+  ): Promise<ValidatePasswordResetTokenResponse> {
+    return this.call(
       (metadata) =>
         this.authGrpcService.validatePasswordResetToken({ token }, metadata),
       origin,
     );
-
-    return { valid: response.valid, email: response.email ?? null };
   }
 
-  async resetPassword(
+  resetPassword(
     token: string,
     newPassword: string,
     origin: RequestOrigin,
-  ): Promise<ResetPasswordResponseDto> {
-    const response = await this.call(
+  ): Promise<ResetPasswordResponse> {
+    return this.call(
       (metadata) =>
         this.authGrpcService.resetPassword({ token, newPassword }, metadata),
       origin,
     );
-
-    return { revokedSessionCount: response.revokedSessionCount };
   }
 }

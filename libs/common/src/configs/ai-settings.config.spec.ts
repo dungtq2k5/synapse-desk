@@ -15,25 +15,25 @@ import {
 } from './ai-settings.config';
 import { assertPricingTableCovers, MODEL_PRICING } from './ai-pricing.config';
 
-/**
- * Read rather than imported, so this spec fails when the JSON and the TS
- * disagree instead of when TypeScript cannot resolve the module. `resolveJson-
- * Module` would also bake the file into `dist/`, which is precisely what the
- * fixture's header says it must not be — it is a test artifact, not a runtime
- * dependency of either service.
- */
-const contract = JSON.parse(
-  readFileSync(join(__dirname, 'ai-settings.contract.json'), 'utf8'),
-) as {
-  cheapModel: string;
-  embeddingModel: string;
-  generationModelByTier: Record<string, string>;
-  defaultTier: string;
-  retrievalDefaults: Record<string, number>;
-  clamps: Record<string, { min: number; max: number }>;
-};
+describe('B AI settings (unit)', () => {
+  /**
+   * Read rather than imported, so this spec fails when the JSON and the TS
+   * disagree instead of when TypeScript cannot resolve the module. `resolveJson-
+   * Module` would also bake the file into `dist/`, which is precisely what the
+   * fixture's header says it must not be — it is a test artifact, not a runtime
+   * dependency of either service.
+   */
+  const contract = JSON.parse(
+    readFileSync(join(__dirname, 'ai-settings.contract.json'), 'utf8'),
+  ) as {
+    cheapModel: string;
+    embeddingModel: string;
+    generationModelByTier: Record<string, string>;
+    defaultTier: string;
+    retrievalDefaults: Record<string, number>;
+    clamps: Record<string, { min: number; max: number }>;
+  };
 
-describe('§3b AI settings (unit)', () => {
   describe('resolveAiSettings', () => {
     it('1. Resolves global DEFAULTS with no tier and no overrides', () => {
       const settings = resolveAiSettings(DEFAULT_AI_MODEL_TIER);

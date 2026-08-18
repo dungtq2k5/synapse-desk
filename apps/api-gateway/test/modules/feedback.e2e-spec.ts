@@ -11,7 +11,7 @@ import {
 } from '../utils';
 import { grpcError, timestamp, wirePage } from '../fixtures/wire';
 
-describe('§2.8 AI feedback at the HTTP boundary (e2e)', () => {
+describe('AI feedback at the HTTP boundary (e2e)', () => {
   let fx: E2eFixture;
 
   const messageId = faker.string.uuid();

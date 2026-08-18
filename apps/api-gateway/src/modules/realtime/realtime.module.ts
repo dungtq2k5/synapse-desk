@@ -22,7 +22,7 @@ import { WsThrottlerService } from './ws-throttler.service';
  * only walks controllers.
  */
 @Module({
-  // `TicketsModule` for `MessagesGrpcClient` — `message:send` calls the SAME
+  // `TicketsModule` for `MessagesService` — `message:send` calls the SAME
   // RPC the HTTP controller calls, so it reuses that client
   // rather than opening a second path to the same write.
   imports: [AuthModule, TicketsModule, RedisModule],

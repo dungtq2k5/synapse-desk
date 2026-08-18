@@ -1,33 +1,24 @@
-"""The ledger's enumerated values, DERIVED FROM THE PROTO
+"""The ledger's enumerated values, derived from the proto.
 
-These values exist in TypeScript and in Python, and the doc names the failure
-precisely: *"a hand-copied `GREETING_CLASSIFY` that becomes
-`GREETING_CLASSIFICATION` on one side meters into a purpose nothing queries."*
-Nothing errors when that happens. Rows are written, the counter increments, and
-every dashboard grouped by purpose simply omits them.
+These values exist in TypeScript and in Python, and a hand-copied
+`GREETING_CLASSIFY` that becomes `GREETING_CLASSIFICATION` on one side meters
+into a purpose nothing queries. Nothing errors: rows are written, the counter
+increments, and every dashboard grouped by purpose simply omits them.
 
-The members are DECLARED here and the proto is still authoritative — the
-agreement is enforced by `test_every_proto_purpose_has_a_python_member`, which
-compares these against the generated descriptor and fails the build on any
-divergence in either direction.
+The members are DECLARED here and the proto stays authoritative — the agreement
+is enforced by `test_every_proto_purpose_has_a_python_member`, which compares
+these against the generated descriptor and fails on divergence in either
+direction.
 
-They were previously built functionally, `StrEnum("AiGenerationPurpose",
-_members(...))`, so that adding a purpose to the proto added it here for free.
-That saved a one-line edit and cost every static guarantee: no checker can see
-the members of a runtime-computed enum, so `AiGenerationPurpose.CLASSIFY` and
-`AiGenerationPurpose.CLASIFY` were equally unknown, and the typo became an
-`AttributeError` at whatever hour that branch first ran. The drift the dynamic
-form prevented was never prevented by it — the test was already doing that job,
-and still is.
-
-This also matches how the TypeScript side declares the same values: written
-out, guarded by a test. One less asymmetry between the two halves.
+Written out rather than computed at runtime: no checker can see the members of a
+dynamically built enum, so `AiGenerationPurpose.CLASIFY` would be an
+`AttributeError` at whatever hour that branch first ran. The TypeScript side
+declares the same values the same way.
 
 The stored VALUE is the bare name — `CHAT_ANSWER`, not
 `AI_GENERATION_PURPOSE_CHAT_ANSWER` — because `ai_generations.purpose` is a
-`VARCHAR` shared with TypeScript, whose enum uses the bare form. The prefix is
-protobuf's requirement that enum value names be unique within a package, not
-part of the domain vocabulary.
+`VARCHAR` shared with TypeScript. The prefix is protobuf's uniqueness
+requirement, not part of the domain vocabulary.
 """
 
 from __future__ import annotations

@@ -6,12 +6,9 @@ import { ToBoolean } from './to-boolean.decorator';
 /**
  * The contract every `@ToBoolean()` field depends on.
  *
- * Written because the decorator's behaviour was ARGUED about in three comments
- * across two DTOs and asserted by nothing: one FIXME claimed an absent value
- * became `false` and killed the `= true` default, another asked for `1`/`0`
- * support, and a TODO warned that changing any of it would need every usage
- * revisited. Two of those three were about behaviour that could have been
- * checked in ten lines.
+ * Pins three behaviours the DTOs rely on and none of them state: `'false'` is
+ * `false`, `'1'`/`'0'` are accepted, and an ABSENT key keeps its declared
+ * default rather than becoming `false`.
  */
 class Flags {
   @IsOptional()
@@ -67,11 +64,10 @@ describe('@ToBoolean', () => {
   });
 
   describe('an ABSENT flag keeps its declared default', () => {
-    // **The claim a FIXME made and got backwards.** It read `@ToBoolean` as
-    // turning `undefined` into `false`, which would make the documented TRUE
-    // default of `isOrganizationWide` dead and every new document
-    // department-scoped. class-transformer does not run a transform for a key
-    // the payload never had, so the default survives.
+    // The one worth asserting: class-transformer does NOT run a transform for a
+    // key the payload never had, so a `= true` default survives. Read the other
+    // way -- `undefined` becoming `false` -- the documented default of
+    // `isOrganizationWide` would be dead and every new document scoped.
     it('keeps `= true` when the key is missing', () => {
       const dto = parse({});
 

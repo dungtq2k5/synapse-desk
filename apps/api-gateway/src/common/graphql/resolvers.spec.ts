@@ -2,45 +2,45 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 /**
- * Every feature module in the gateway — because resolvers do not live in one
- * folder, and this file does not live beside them.
- *
- * Resolvers sit next to the controllers they mirror
- * (`modules/tickets/tickets.resolver.ts`, `modules/users/users.resolver.ts`, …)
- * while the GraphQL infrastructure lives in `common/graphql/`. So the path is
- * spelled out from `src/`: a relative `'..'` would resolve to `common/`, find no
- * resolvers at all, and — but for the pinned list in the first test — pass every
- * rule below over an empty set.
- */
-const MODULES_DIR = join(__dirname, '../../modules');
-
-/** Every `*.resolver.ts` under `modules/`, at any depth. */
-const walkFiles = (dir: string, out: string[] = []): string[] => {
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    const path = join(dir, entry.name);
-    if (entry.isDirectory()) walkFiles(path, out);
-    else out.push(path);
-  }
-
-  return out;
-};
-
-/**
- * The rule that decays first test 5.
+ * The rule that decays first.
  *
  * **A FIELD resolver never calls a gRPC client directly; only a loader.** A
  * direct call is an N+1 that works perfectly in every test with one parent row,
  * and only misbehaves at fifty — which is the page size the product actually
  * uses.
  *
- * Says to write this test early, and the reason is behavioural rather
+ * Write this test early. The reason is behavioural rather
  * than technical: people break rule 1 in the direction that works locally.
  *
- * **Written now, before the first field resolver exists** (those need the batch RPCs'
+ * **Written now, before the first field resolver exists** (those need the
  * batch RPCs). A guard added after the thing it guards is a guard written while
  * looking at the code it is supposed to judge.
  */
-describe('§5 field resolvers never inject a gRPC client', () => {
+describe('Field resolvers never inject a gRPC client', () => {
+  /**
+   * Every feature module in the gateway — because resolvers do not live in one
+   * folder, and this file does not live beside them.
+   *
+   * Resolvers sit next to the controllers they mirror
+   * (`modules/tickets/tickets.resolver.ts`, `modules/users/users.resolver.ts`, …)
+   * while the GraphQL infrastructure lives in `common/graphql/`. So the path is
+   * spelled out from `src/`: a relative `'.'` would resolve to `common/`, find no
+   * resolvers at all, and — but for the pinned list in the first test — pass every
+   * rule below over an empty set.
+   */
+  const MODULES_DIR = join(__dirname, '../../modules');
+
+  /** Every `*.resolver.ts` under `modules/`, at any depth. */
+  const walkFiles = (dir: string, out: string[] = []): string[] => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) walkFiles(path, out);
+      else out.push(path);
+    }
+
+    return out;
+  };
+
   const resolverFiles = () =>
     walkFiles(MODULES_DIR)
       .filter((path) => path.endsWith('.resolver.ts'))
@@ -66,30 +66,31 @@ describe('§5 field resolvers never inject a gRPC client', () => {
 
     expect(found).toEqual([
       'analytics.resolver.ts',
-      'api-info.resolver.ts',
       'departments.resolver.ts',
       'documents.resolver.ts',
       'notifications.resolver.ts',
       'ticket-messages.resolver.ts',
       'tickets.resolver.ts',
       'users.resolver.ts',
+      'version.resolver.ts',
     ]);
   });
 
   /**
-   * The ONE sanctioned direct call
+   * Direct client calls a `@ResolveField` is allowed to make. Currently none.
    *
-   * `Ticket.messages` has no loader because there is nothing to batch INTO:
-   * messages live in the same service as the ticket and are fetched by ticket
-   * id, so no `ListMessagesByIds` exists and inventing one would batch a query
-   * nobody makes. The doc's own edge table records it as "same service, one
-   * call".
+   * `Ticket.messages` was the one entry, and it is deliberately still an
+   * unbatched per-ticket fetch: messages live in the same service as the ticket
+   * and are read by ticket id, so no `ListMessagesByIds` exists and inventing
+   * one would batch a query nobody makes. What changed is the layer it goes
+   * through — the edge now calls `MessagesService`, not the gRPC client — so the
+   * rule this file states is satisfied without an exemption.
    *
    * **An allowlist rather than a widened rule.** Relaxing the pattern would
-   * exempt every future direct call too; naming this one keeps the rule intact
+   * exempt every future direct call too; naming each one keeps the rule intact
    * and makes the next exception a deliberate edit with a reason beside it.
    */
-  const SANCTIONED_DIRECT_CALLS = ['tickets.resolver.ts:messages'];
+  const SANCTIONED_DIRECT_CALLS: string[] = [];
 
   /** Every `@ResolveField` method, as `file:fieldName`. */
   const resolveFields = () =>

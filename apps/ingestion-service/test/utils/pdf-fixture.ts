@@ -62,25 +62,21 @@ export async function buildPdf(
 /**
  * A PDF whose pages are IMAGES — the input the whole OCR feature exists for.
  *
- * **Generated, not committed**, for the same reason `buildPdf` is: a binary
- * blob in git makes it impossible to tell from a diff what page 2 is supposed
- * to say, and page attribution is exactly what these tests assert.
+ * **Generated, not committed.** A binary blob in git makes it impossible to
+ * tell from a diff what page 2 is supposed to say, and page attribution is
+ * exactly what these tests assert.
  *
- * The route adds no dependency: `pdf-lib` draws text but
- * cannot rasterise it, so the text is drawn into a PDF, `pdftoppm` renders that
- * page to a PNG, and `embedPng` puts the PNG back into a document as a
- * full-bleed image. pdfjs then extracts **zero** text items from it — verified,
- * not assumed — which is precisely the page `parsePdf` silently drops today.
+ * No new dependency: `pdf-lib` draws text but cannot rasterise, so the text is
+ * drawn into a PDF, `pdftoppm` renders that page to a PNG, and `embedPng` puts
+ * it back as a full-bleed image. pdfjs then extracts **zero** text items —
+ * verified, not assumed.
  *
- * **Requires poppler on the host**. Callers guard with
- * `describeWithPoppler`; this throws rather than returning a broken fixture,
- * because a test that silently received a text page would pass for the wrong
- * reason.
+ * **Requires poppler on the host.** Callers guard with `describeWithPoppler`;
+ * this throws rather than returning a broken fixture, because a test that
+ * silently received a text page would pass for the wrong reason.
  *
- * The rendering DPI is deliberately not 300: the fixture only has to be legible
- * to tesseract, and 150 halves the bytes flowing through the pipe in every test
- * that builds one. Production uses 300 (§3.3), and that difference is a fixture
- * detail rather than a disagreement.
+ * Rendering DPI is 150, not production's 300: the fixture only has to be
+ * legible to tesseract, and halving the bytes speeds every test that builds one.
  */
 export async function buildScannedPdf(
   pages: string[],
@@ -90,7 +86,7 @@ export async function buildScannedPdf(
   // has no `input` option — that belongs to the sync form — so passing one
   // spawns `pdftoppm` against a stdin nothing ever writes or closes, and the
   // fixture hangs forever instead of failing. A fixture builder may block; the
-  // production path (§3.1) writes to `child.stdin` explicitly.
+  // production path writes to `child.stdin` explicitly.
   const { execFileSync } = await import('node:child_process');
 
   const out = await PDFDocument.create();
@@ -104,7 +100,7 @@ export async function buildScannedPdf(
     page.drawText(text, { x: 50, y: 600, size, font });
 
     // 2. Rasterised through poppler — stdin to stdout, no temp file, which is
-    //    the same pipe route §3.1 chooses for production.
+    // the same pipe route production uses.
     const rendered = execFileSync(
       'pdftoppm',
       ['-f', '1', '-l', '1', '-r', '150', '-png', '-'],
@@ -157,7 +153,7 @@ export async function buildMixedPdf(
 }
 
 /**
- * An image page carrying a small text stamp — the case §3.2's floor exists for.
+ * An image page carrying a small text stamp — the case the text floor exists for.
  *
  * A scanner header, a page number, or a partial OCR layer leaves a handful of
  * characters on a page that is otherwise an image. `trim().length > 0` keeps

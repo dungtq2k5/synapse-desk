@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { Cacheable, CACHEABLE_KEY } from './cacheable.decorator';
 
 /**
- * Which reads are cached, and whether anything ever evicts them
+ * Which reads are cached, and whether anything ever evicts them.
  *
  * Static, because the failure this guards is an ABSENCE: a `@Cacheable` added
  * to a read whose scope nothing invalidates does not fail, does not log, and
@@ -28,7 +28,7 @@ const sources = () =>
     text: readFileSync(path, 'utf8'),
   }));
 
-describe('§30 §4 a cached route documents itself', () => {
+describe('A cached route documents itself', () => {
   // Read back from the metadata rather than from a built
   // OpenAPI document, so this holds without booting the app — and so the
   // failure names the decorator rather than a missing key in a large object.
@@ -80,7 +80,7 @@ describe('§30 §4 a cached route documents itself', () => {
   });
 });
 
-describe('§3 what is cached', () => {
+describe('What is cached', () => {
   /** Every `scope: CACHE_SCOPES.x` inside a `@Cacheable({ … })`. */
   const cachedScopes = (): string[] =>
     sources()
@@ -116,7 +116,7 @@ describe('§3 what is cached', () => {
     expect(sources().length).toBeGreaterThan(100);
   });
 
-  it('**exactly the reads 29-doc §3 argued for, and no others**', () => {
+  it('**exactly the intended reads, and no others**', () => {
     // A short list on purpose. A cache on a read that changes constantly is a
     // bug with a hit rate, and the way this list grows is one plausible
     // addition at a time.

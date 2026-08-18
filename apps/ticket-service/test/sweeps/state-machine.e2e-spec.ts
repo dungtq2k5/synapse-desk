@@ -13,10 +13,10 @@ import { TicketEventPublisher } from '../../src/modules/events/ticket-event.publ
 import { toProtoTicketStatus } from '../../src/modules/tickets/ticket.mapper';
 
 /**
- * §3.3 The state-machine sweep — the full 6×6 grid, against a real database.
+ * The state-machine sweep — the full 6×6 grid, against a real database.
  *
  * The expectation is DERIVED from `canTransition`, never restated. That is the
- * whole design §3.3 asks for: one data table which both the unit test (in
+ * whole design asks for: one data table which both the unit test (in
  * `libs/common`, where the table lives) and this test import, so the two can
  * never disagree about what "legal" means. A hand-written list of legal pairs
  * here would be a second source of truth, and the first edit to the table would
@@ -27,7 +27,7 @@ import { toProtoTicketStatus } from '../../src/modules/tickets/ticket.mapper';
  * between them is where a "legal" transition could quietly become a different
  * one.
  */
-describe('§3.3 state machine sweep (e2e)', () => {
+describe('State machine sweep (e2e)', () => {
   let fx: E2eFixture;
   let tickets: TicketsService;
   let tenant: TenantFixture;
@@ -131,9 +131,9 @@ describe('§3.3 state machine sweep (e2e)', () => {
         const routeResult = await attempt(
           route === 'escalate'
             ? tickets.escalateTicket({ id: viaRoute.id }, agent())
-            : route === 'resolve'
+            : route === 'resolve' // NOSONAR
               ? tickets.resolveTicket({ id: viaRoute.id }, agent())
-              : route === 'reopen'
+              : route === 'reopen' // NOSONAR
                 ? tickets.reopenTicket({ id: viaRoute.id }, agent())
                 : tickets.closeTicket({ id: viaRoute.id }, agent()),
         );

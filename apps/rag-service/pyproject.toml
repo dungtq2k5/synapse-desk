@@ -90,7 +90,7 @@ asyncio_default_fixture_loop_scope = "function"
 # **`-rs` reports every SKIP with its reason** — the validation doc's V1.
 #
 # `test_multimodal_e2e.py` is the acceptance test the build order names: "the
-# feature is finished when §5 test 2 passes." It skips without a real API key,
+# feature is finished when the e2e test passes." It skips without a real API key,
 # which is right — a missing credential must not read as a broken feature — but
 # a silent skip among hundreds reads exactly like a pass in a `487 passed` line.
 #

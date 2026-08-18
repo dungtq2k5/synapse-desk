@@ -1,10 +1,10 @@
-"""16-doc §3 — every path that reaches retrieval goes through `tenant_scope()`.
+"""Every path that reaches retrieval goes through `tenant_scope()`.
 
 The behaviour is already covered from the outside: `test_tenant_scope_e2e.py`
 exercises both arms in isolation and the four-clause boundary over every
 combination, and `test_visibility_agreement_e2e.py` proves the two arms agree.
 
-What none of those can catch is a NEW retrieval path. The failure mode 16-doc §3
+What none of those can catch is a NEW retrieval path. The failure mode hardening
 names is a fallback branch that skips the boundary because it is "just keyword
 search" — and a fallback branch, by definition, only runs in the degraded
 conditions the e2e tests are least likely to reproduce. It would ship green.
@@ -16,7 +16,7 @@ So this asserts the structure rather than the behaviour, from two directions:
   2. Every servicer RPC that retrieves does so by calling the ONE service method
      that builds that scope.
 
-The check is the one 16-doc §3 spells as two greps, kept as a test because a
+The check is the one spelled as two greps, kept as a test because a
 grep in a document is run once and a test is run every time.
 """
 

@@ -10,7 +10,7 @@ import {
   TESSERACT_CODE_BY_LANGUAGE,
 } from '@synapsedesk/common';
 
-/** Why a page has no text after OCR. Carried upward so §6 can report it. */
+/** Why a page has no text after OCR. Carried upward so the page-count check can report it. */
 export type OcrFailure =
   'timeout' | 'binary_missing' | 'engine_error' | 'no_text';
 
@@ -18,11 +18,11 @@ export type OcrResult =
   { ok: true; text: string } | { ok: false; reason: OcrFailure };
 
 /**
- * `pdftoppm` then `tesseract`, per page
+ * `pdftoppm` then `tesseract`, per page.
  *
- * **Nothing touches the disk** (§3.1). Both tools read stdin and write stdout,
+ * **Nothing touches the disk**. Both tools read stdin and write stdout,
  * so the PDF is piped in, the PNG never lands, and the text comes back on a
- * pipe. That is the property §2's offline claim now rests on: "a tenant's
+ * pipe. That is the property the offline claim now rests on: "a tenant's
  * document never leaves the deployment" reads as an empty promise if the same
  * document is sitting in `/tmp` while it is being read.
  *
@@ -46,26 +46,24 @@ export class OcrService implements OnModuleInit {
   private available: boolean | null = null;
 
   /**
-   * Probes at startup so a bad build is a DEPLOY-time diagnostic
+   * Probes at startup so a bad build is a DEPLOY-time diagnostic.
    *
-   * The warning this produces says "build ingestion-service with
-   * `--target runtime-ocr`". That is a message for whoever deployed the
-   * service, and delivering it lazily — on the first scanned PDF, which could
-   * be days later — delivers it to the wrong person at the wrong time, in a log
-   * nobody is reading at that moment.
+   * The warning says "build ingestion-service with `--target runtime-ocr`" —
+   * a message for whoever deployed the service. Delivering it lazily, on the
+   * first scanned PDF days later, delivers it to the wrong person at the wrong
+   * time.
    *
-   * **Not awaited, and CAUGHT — both halves are the §6.1 rule.** OCR is a
-   * capability, not a requirement: a deployment without the binaries must
-   * still ingest every other document, so a failing probe cannot be allowed to
-   * fail the boot. Awaiting would make a hung `execFile` into a service that
-   * never starts; a bare `void` would be worse — an unhandled rejection
-   * terminates the process on Node 22+, so the one line meant to keep a
-   * missing binary from stopping the boot would have stopped it.
+   * **Not awaited, and CAUGHT — both halves are the run-open rule.** OCR is a
+   * capability, not a requirement, so a failing probe must not fail the boot.
+   * Awaiting would turn a hung `execFile` into a service that never starts; a
+   * bare `void` would be worse, since an unhandled rejection terminates the
+   * process on Node 22+.
    *
-   * **And it deliberately does NOT reach the readiness probe.** A service
-   * reporting itself unready because a minority feature is unavailable is the
-   * boot-closed behaviour §6.1 rejected, one layer up — the obvious next
-   * thought, and the wrong one.
+   * **It deliberately does NOT reach the readiness probe.** Reporting unready
+   * because a minority feature is unavailable is the boot-closed behaviour the
+   * run-open rule rejects, one layer up.
+   *
+   * See `docs/decisions/0016-ocr-is-a-per-page-branch.md`.
    */
   onModuleInit(): void {
     this.checkAvailability().catch((error: unknown) => {
@@ -84,7 +82,7 @@ export class OcrService implements OnModuleInit {
    * nothing and the eager one decides when the warning lands.
    *
    * A missing model made the injection classifier fail its process (
-   * §3.2) because that was a SECURITY control: absent, it silently stops
+   * Because that was a SECURITY control: absent, it silently stops
    * defending. This is a CAPABILITY. Absent, PDFs needing OCR fail with a named
    * reason and every other document still ingests — and failing the boot would
    * take ingestion down for every tenant because a minority feature is
@@ -150,7 +148,7 @@ export class OcrService implements OnModuleInit {
    * One page: rasterise, recognise, return the text.
    *
    * Returns a result rather than throwing, because every caller has something
-   * better to do than fail the document — §6's whole argument is that 197 good
+   * better to do than fail the document's whole argument is that 197 good
    * pages beat discarding all 200 to signal three.
    */
   async recognisePage(
@@ -173,7 +171,7 @@ export class OcrService implements OnModuleInit {
           '-r',
           String(OCR_DPI),
           '-png',
-          // stdin. The whole point of §3.1.
+          // stdin. The whole point of piping.
           '-',
         ],
         pdf,
@@ -203,7 +201,7 @@ export class OcrService implements OnModuleInit {
   }
 
   /**
-   * Runs a binary with `input` on stdin and returns stdout
+   * Runs a binary with `input` on stdin and returns stdout.
    *
    * **`spawn`, never `exec`.** No shell means an argument can never become a
    * command; there is no filename in these arguments today, and the guarantee

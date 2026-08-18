@@ -24,7 +24,7 @@ import {
 import { grpcError, timestamp } from '../fixtures/wire';
 
 /**
- * Domain E's feed at the HTTP boundary — api-endpoints-plan §4b.
+ * Domain E's feed at the HTTP boundary — `api-endpoints-plan.md §4b`.
  *
  * notification-service is stubbed: cursor pagination, group collapse and the
  * three notification rules all have their own suite against a real database.
@@ -33,7 +33,7 @@ import { grpcError, timestamp } from '../fixtures/wire';
  * that `unread-count` and `preferences` would otherwise lose to `:id`, and the
  * deliberate ABSENCE of a create endpoint.
  */
-describe('§4b Notifications at the HTTP boundary (e2e)', () => {
+describe('B Notifications at the HTTP boundary (e2e)', () => {
   let fx: E2eFixture;
 
   const notificationId = faker.string.uuid();

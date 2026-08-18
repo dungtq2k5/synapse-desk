@@ -1,27 +1,26 @@
 import { readFileSync } from 'node:fs';
 
 /**
- * The drift guard that replaced inheritance, revised.
+ * The drift guard that replaced inheritance.
  *
- * REST and GraphQL DTOs are now independent classes. That buys separation of
- * concerns and costs duplicated field declarations, and the cost is only
- * acceptable if the duplication cannot drift silently. This is what makes it
- * cannot.
+ * REST and GraphQL DTOs are independent classes. That buys separation and costs
+ * duplicated field declarations, and the cost is only acceptable if the
+ * duplication cannot drift silently. This is what stops it.
  *
- * **Why a test rather than a shared base class.** The original design was
- * `TicketType extends TicketResponseDto`, defended as making drift a compile
- * error. It did not: inheritance makes a new field present and typed in the
- * subclass, so a field added to the parent reached REST and was absent from the
- * schema with nothing failing. Collapsing to one class fixed that direction and
- * introduced the opposite one — a field added with `@Field()` that should have
- * been REST-only appears in the PUBLIC schema, which is the worse failure.
+ * **A test rather than a shared base class.** `TicketType extends
+ * TicketResponseDto` was defended as making drift a compile error, and did not:
+ * inheritance makes a new field present and typed in the subclass, so a field
+ * added to the parent reached REST and was absent from the schema with nothing
+ * failing. Collapsing to one class fixed that direction and introduced the
+ * worse one — a REST-only field appearing in the PUBLIC schema.
  *
- * Reading both sources catches both directions, and needs no coupling at all.
+ * Reading both sources catches both directions and needs no coupling.
  *
  * **Source text rather than metadata.** `TypeMetadataStorage` is empty until a
  * full schema build has run, so a metadata-based check iterates nothing and
- * passes vacuously — asserting a pairing over zero fields, which is the exact
- * failure this guards against one level up.
+ * passes vacuously.
+ *
+ * See `docs/decisions/0014-narrow-graphql-edge-types.md`.
  */
 export type DtoContract = {
   /** The REST class's source file. */
@@ -126,7 +125,7 @@ export function compareContract(contract: DtoContract): {
 }
 
 /**
- * Fields whose nullability disagrees test 2, the second half.
+ * Fields whose nullability disagrees, the second half.
  *
  * Compared on both sides from the SOURCE, for the reason the file note gives:
  * `TypeMetadataStorage` is empty until a schema build has run, so a
@@ -272,8 +271,17 @@ function classBody(source: string, className: string): string[] {
 function decoratorsAbove(lines: string[], index: number): string[] {
   const decorators: string[] = [];
 
-  for (let at = index - 1; at >= 0 && /^ {2}@/.test(lines[at]); at--) {
-    decorators.push(lines[at]);
+  for (let at = index - 1; at >= 0; at--) {
+    const line = lines[at];
+
+    // Comments are STEPPED OVER, not treated as the end of the run. TypeScript
+    // allows one between a decorator and the property it decorates, and reading
+    // it as a boundary reports a decorated field as undecorated — a failure
+    // that names the right field for entirely the wrong reason.
+    if (/^\s*(\/\/|\/?\*)/.test(line)) continue;
+    if (!/^ {2}@/.test(line)) break;
+
+    decorators.push(line);
   }
 
   return decorators;

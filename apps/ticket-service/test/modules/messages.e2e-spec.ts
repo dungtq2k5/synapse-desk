@@ -29,7 +29,7 @@ import { RagClientService } from '../../src/modules/ai-client/rag-client.service
 import { StorageReferenceService } from '../../src/modules/storage-client/storage-reference.service';
 import { LedgerClientService } from '../../src/modules/ai-client/ledger-client.service';
 
-describe('§2.5 Ticket messages & attachments (e2e)', () => {
+describe('Ticket messages & attachments (e2e)', () => {
   let fx: E2eFixture;
   let messages: MessagesService;
   let events: TicketEventPublisher;
@@ -129,7 +129,7 @@ describe('§2.5 Ticket messages & attachments (e2e)', () => {
     });
 
     it('3. excludes notes from the non-agent COUNT, not just the rows', async () => {
-      // The test §2.5 actually asks for: a filter applied at serialization
+      // The test that matters: a filter applied at serialization
       // leaves the count intact, and `totalItems` would then tell an end user
       // exactly how many notes exist about their ticket — the notes' existence
       // leaked through the pagination meta while their content stayed hidden.
@@ -306,7 +306,7 @@ describe('§2.5 Ticket messages & attachments (e2e)', () => {
    * it. That is correct client behaviour and it double-posts. HTTP clients do
    * not do this, which is exactly why it is easy to miss.
    */
-  describe('§2.3 clientMessageId idempotency', () => {
+  describe('ClientMessageId idempotency', () => {
     it('20. **a repeated clientMessageId yields ONE row and the ORIGINAL id**', async () => {
       // Returning the original rather than an error is deliberate: the client's
       // intent was satisfied, and an error would make it retry again.
@@ -443,7 +443,7 @@ describe('§2.5 Ticket messages & attachments (e2e)', () => {
 
   describe('invokeAi', () => {
     it('1. KEEPS the user message when the AI call fails', async () => {
-      // §2.5's second test, and the reason the two writes are separate. A
+      // The second test, and the reason the two writes are separate. A
       // rollback here would throw away what a human typed because a machine
       // could not answer them.
       isAvailable.mockReturnValue(true);
@@ -789,7 +789,7 @@ describe('§2.5 Ticket messages & attachments (e2e)', () => {
         .spyOn(storage, 'presignAttachment')
         .mockResolvedValue({
           uploadUrl: 'https://storage.example/put',
-          // Presign hands back a `pending/` path
+          // Presign hands back a `pending/` path.
           objectPath: 'organizations/o/tickets/t/attachments/pending/m/abc.png',
           expiresAt: new Date(Date.now() + 600_000),
         });
@@ -859,7 +859,7 @@ describe('§2.5 Ticket messages & attachments (e2e)', () => {
       expect(presignAttachment).not.toHaveBeenCalled();
     });
 
-    it('3. REFUSES a sixth attachment before signing anything — §3.2 test 1', async () => {
+    it('3. REFUSES a sixth attachment before signing anything', async () => {
       // The cap must SHORT-CIRCUIT, not merely also-reject downstream: a caller
       // already at the cap must never receive a usable URL, or they discover
       // the refusal only after uploading the bytes.
@@ -895,14 +895,14 @@ describe('§2.5 Ticket messages & attachments (e2e)', () => {
       ).resolves.toBeDefined();
     });
 
-    it('5. confirming writes the row with the REAL size and type — §3.2 test 2', async () => {
+    it('5. confirming writes the row with the REAL size and type', async () => {
       // Not the values the client declared at presign — those were a hint for
       // the policy check, and a row built from them would record whatever the
       // client felt like claiming.
       const ticket = await createTicket(fx.prisma, tenant);
       const message = await createMessage(fx.prisma, ticket.id);
       confirmUpload.mockResolvedValue({
-        // The committed path, which is what the row records
+        // The committed path, which is what the row records.
         objectPath: 'organizations/o/t/a/real.pdf',
         sizeBytes: 9999,
         contentType: 'application/pdf',
@@ -962,7 +962,7 @@ describe('§2.5 Ticket messages & attachments (e2e)', () => {
       expect(items[0].attachments[0].fileName).toBe('invoice.pdf');
     });
 
-    it('8. download re-checks tenant + ticket ACL BEFORE signing — §3.2 test 4', async () => {
+    it('8. download re-checks tenant + ticket ACL BEFORE signing', async () => {
       // `message_attachments` has no tenant column; it reaches one only through
       // message -> ticket. A lookup by attachment id alone would hand another
       // tenant's file to whoever guessed the id — and storage-service does not
@@ -1037,7 +1037,7 @@ describe('§2.5 Ticket messages & attachments (e2e)', () => {
       );
     });
 
-    it('13. deleting removes the row AND emits the supersede — §3.2 test 3', async () => {
+    it('13. deleting removes the row AND emits the supersede', async () => {
       const ticket = await createTicket(fx.prisma, tenant);
       const message = await createMessage(fx.prisma, ticket.id);
       const attachment = await createAttachment(fx.prisma, message.id, {
@@ -1098,7 +1098,7 @@ describe('§2.5 Ticket messages & attachments (e2e)', () => {
     });
   });
 
-  // ---------------------------------------- §16 §4 — the review loop's join
+  // ---------------------------------------- the review loop's join
 
   describe('generatedFromId', () => {
     let recordOutcome: jest.SpyInstance;

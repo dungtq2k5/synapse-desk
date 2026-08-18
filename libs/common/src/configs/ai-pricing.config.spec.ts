@@ -20,14 +20,14 @@ import {
  *
  * Two of these matter more than the rest:
  *
- *   - **the startup check** (§1.3 test 6), because an unpriced model discovered
+ * - **the startup check**, because an unpriced model discovered
  *     at first use has already been billed as free at least once, and the whole
  *     point is that it never is;
- *   - **the key format** (§1.3 test 9), because it is about to have a second
+ * - **the key format**, because it is about to have a second
  *     implementation in Python and the two must agree byte for byte.
  */
 describe('the model pricing table (unit)', () => {
-  it('fails at STARTUP for an unpriced model — §1.3 test 6', () => {
+  it('fails at STARTUP for an unpriced model', () => {
     // Not at first use, when it would meter as free and report a tenant
     // comfortably under budget while they spent freely.
     expect(() =>
@@ -134,7 +134,7 @@ describe('the model pricing table (unit)', () => {
 describe('the quota counter key (unit)', () => {
   const cycleStart = new Date('2026-08-01T00:00:00.000Z');
 
-  it('is org + cycle start in SECONDS — §1.3 test 9', () => {
+  it('is org + cycle start in SECONDS', () => {
     // Seconds and not milliseconds is the single most likely way the TypeScript
     // and Python implementations silently disagree: Python's
     // `datetime.timestamp()` yields seconds, JavaScript's `getTime()` yields

@@ -1,4 +1,4 @@
-"""§1.4 test 7 — every LLM call site obtains its model from the settings layer.
+"""Every LLM call site obtains its model from the settings layer.
 
 *"The one that catches a new call site added six months from now."*
 

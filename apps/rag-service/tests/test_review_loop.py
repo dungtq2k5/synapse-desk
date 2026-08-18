@@ -1,4 +1,4 @@
-"""§4.2 test 3 — the co-pilot's review loop, and the two ways it must not fail.
+"""The co-pilot's review loop, and the two ways it must not fail.
 
 The loop is the co-pilot's whole differentiator: the same generator Tier 1 chat
 uses, with review passes an agent's latency budget can afford. The tests that
@@ -127,7 +127,7 @@ class TestTheLoop:
     async def test_PARTIAL_refines_and_re_reviews(
         self, ledger, quota, settings, budget
     ):
-        # §4.2 test 3. PARTIAL → refine → review, and COMPLETE on the second
+        # PARTIAL → refine → review, and COMPLETE on the second
         # pass ends it.
         generator = ScriptedPasses(
             reviews=["PARTIAL\nMissing the carryover limit.", "COMPLETE\n"],
@@ -301,7 +301,7 @@ class TestVerdictParsing:
         assert "Missing the carryover limit." in prompt
         # The sources are REPEATED. Each pass is an independent call with no
         # shared state, so a refine prompt without them asks the model to
-        # improve a text from general knowledge — the behaviour §1.6 forbids,
+        # improve a text from general knowledge — the behaviour the grounding rule forbids,
         # arriving through the quality mechanism.
         assert "Policy text number 1." in prompt
 
@@ -311,7 +311,7 @@ class TestUngroundedDowngrade:
         self, ledger, quota, settings, budget
     ):
         # Rather than shipped as an answer with a green tick on it. The sources
-        # did not support it, and saying so is what §1.6 asks for.
+        # did not support it, and saying so is what the grounding rule asks for.
         generator = ScriptedPasses(reviews=["UNGROUNDED\ninvented"] * 5)
 
         answer = await run_reviewed(

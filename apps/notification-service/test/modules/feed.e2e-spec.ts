@@ -12,13 +12,6 @@ import {
 import { bootstrapE2eTest, E2eFixture } from '../utils/bootstrap';
 import { FeedService } from '../../src/modules/feed/feed.service';
 
-const ORG = '11111111-1111-4111-8111-111111111111';
-const ME = '22222222-2222-4222-8222-222222222222';
-const COLLEAGUE = '33333333-3333-4333-8333-333333333333';
-const OTHER_TENANT_USER = '44444444-4444-4444-8444-444444444444';
-
-const TICKET_ID = '55555555-5555-4555-8555-555555555555';
-
 /**
  * The personal inbox.
  *
@@ -27,9 +20,16 @@ const TICKET_ID = '55555555-5555-4555-8555-555555555555';
  * that **every route is self-scoped**. Both fail silently — a duplicated page
  * looks like a UI bug, and a leak looks like nothing at all.
  */
-describe('§2 The notification feed (e2e)', () => {
+describe('The notification feed (e2e)', () => {
   let fx: E2eFixture;
   let feed: FeedService;
+
+  const ORG = '11111111-1111-4111-8111-111111111111';
+  const ME = '22222222-2222-4222-8222-222222222222';
+  const COLLEAGUE = '33333333-3333-4333-8333-333333333333';
+  const OTHER_TENANT_USER = '44444444-4444-4444-8444-444444444444';
+
+  const TICKET_ID = '55555555-5555-4555-8555-555555555555';
 
   const me = () => memberContext({ id: ME, organizationId: ORG });
   const colleague = () => memberContext({ id: COLLEAGUE, organizationId: ORG });
@@ -144,7 +144,7 @@ describe('§2 The notification feed (e2e)', () => {
     });
 
     it('5. Filters by TYPE, which is only possible because type is the originating event', async () => {
-      // §1.3 in practice: with `type` written as the transport subject, every
+      // The bug in practice: with `type` written as the transport subject, every
       // row would match every filter and this test could not exist.
       await seed(2);
       await seed(1, { type: NOTIFICATION_TYPES.quotaThreshold });
@@ -195,7 +195,7 @@ describe('§2 The notification feed (e2e)', () => {
     });
 
     it('8. **A row inserted between page 1 and page 2 does not shift page 2**', async () => {
-      // The reason for cursors, made mechanical test 3.
+      // The reason for cursors, made mechanical.
       //
       // With `OFFSET`, an arrival at the head pushes every row down one, so
       // page 2 re-serves a row the client already has. Nothing in the response

@@ -1,11 +1,9 @@
 import DataLoader from 'dataloader';
 import type { ClientGrpc } from '@nestjs/microservices';
 import type { Request, Response } from 'express';
-import type {
-  DepartmentResponse,
-  DocumentResponse,
-  UserSummary,
-} from '@synapsedesk/grpc-proto';
+import type { UserSummaryResponseGqlDto } from '../../../modules/users/dto/graphql/user-response.gql-dto';
+import type { DepartmentResponseGqlDto } from '../../../modules/departments/dto/graphql/department-response.gql-dto';
+import type { DocumentResponseGqlDto } from '../../../modules/documents/dto/graphql/document-response.gql-dto';
 import { createUserSummaryLoader } from './user-summary.loader';
 import { createDepartmentLoader } from './department.loader';
 import { createDocumentLoader } from './document.loader';
@@ -16,18 +14,18 @@ import type { CacheService } from '../../cache/cache.service';
 /**
  * Every DataLoader available to a resolver, for ONE request.
  *
- * One entry per cross-service edge A field resolver reaches for
+ * One entry per cross-service edge. A field resolver reaches for
  * one of these and never for a gRPC client, which is the rule that makes the
  * whole design work and the one people break, because a direct call is easier
  * to write and passes every test with a single parent row.
  */
 export type RequestLoaders = {
   /** `Ticket.assignee`, `Ticket.author`, `TicketMessage.sender`, … */
-  users: DataLoader<string, UserSummary | null, string>;
+  users: DataLoader<string, UserSummaryResponseGqlDto | null, string>;
   /** `Ticket.department`, `Document.departments`, `User.departments`. */
-  departments: DataLoader<string, DepartmentResponse | null, string>;
-  /** `DocumentUsage.document`, `KnowledgeGapFlag.document` */
-  documents: DataLoader<string, DocumentResponse | null, string>;
+  departments: DataLoader<string, DepartmentResponseGqlDto | null, string>;
+  /** `DocumentUsage.document`, `KnowledgeGapFlag.document`. */
+  documents: DataLoader<string, DocumentResponseGqlDto | null, string>;
 };
 
 /**
@@ -47,7 +45,7 @@ export type GqlContext = {
 };
 
 /**
- * Builds a fresh set of loaders for one request
+ * Builds a fresh set of loaders for one request.
  *
  * **This is a security boundary, not a performance helper.** A DataLoader is a
  * cache keyed by id, and an id carries no tenant. Three ways to construct them,
@@ -58,7 +56,7 @@ export type GqlContext = {
  *     is a performance optimisation, which is the hardest kind to spot in
  *     review because the code reads as obviously good practice.
  *   - **`Scope.REQUEST` providers** — correct, and expensive in a way that
- *     spreads: conventions §2.5 records that request scope BUBBLES UP the
+ *     spreads: request scope BUBBLES UP the
  *     dependency tree, so every provider injecting a loader becomes
  *     request-scoped, and so does everything injecting those. The gateway's
  *     resolvers would drag half the module graph with them.
@@ -90,7 +88,7 @@ export function createLoaders(
   // with `Object.assign`, which fires a getter immediately. So it lives here,
   // in the batch function, which runs during execution.
   //
-  // Each batch RPC is tenant-scoped from this context, property 1
+  // Each batch RPC is tenant-scoped from this context
   // — which is what makes an id-keyed cache safe at all.
   //
   // A genuinely unauthenticated request still gets loaders, and now they are
@@ -107,7 +105,7 @@ export function createLoaders(
   return {
     users: createUserSummaryLoader(clients.auth, context, clients.cache),
     departments: createDepartmentLoader(clients.auth, context, clients.cache),
-    // **Deliberately NOT cached** The entity cache is for the
+    // **Deliberately NOT cached**. The entity cache is for the
     // narrow types an edge traverses constantly; a `Document` is none of the
     // three things that make one worth caching. It is large, it changes
     // asynchronously as ingestion re-indexes it, and its only consumers are the
@@ -155,7 +153,7 @@ export function callerOf(request: Request): RequestContext | undefined {
 }
 
 /**
- * The shape every batch function must have
+ * The shape every batch function must have.
  *
  * Exported here rather than in a loader file because it is the CONTRACT, and
  * the contract is what the mapping helper below enforces.
@@ -165,36 +163,27 @@ export type BatchFn<K, V> = (
 ) => Promise<(V | Error | null)[]>;
 
 /**
- * Maps a set-shaped RPC response back onto the loader's keys
+ * Maps a set-shaped RPC response back onto the loader's keys.
  *
- * **The single highest-value function in the GraphQL work**, because the bug it
- * prevents renders a completely plausible page with the wrong people on it.
- *
- * DataLoader's core contract is POSITIONAL: given `keys`, the batch function
- * must return an array of the same length, in the same order, where `results[i]`
- * belongs to `keys[i]`. A database does not work that way —
+ * DataLoader's contract is POSITIONAL: given `keys`, the batch function must
+ * return the same length in the same order. A database does not work that way —
  *
  * ```sql
  * SELECT * FROM users WHERE id IN ('c', 'a', 'b')   -- returns a, b, c
  * ```
  *
- * — so handing the response straight back assigns **a** to key `c`, **b** to key
- * `a` and **c** to key `b`. Every field resolver then renders the wrong user's
- * name against the wrong ticket. No error, no exception, and with `UserSummary`
- * being a name and an avatar, nothing on the page looks wrong.
+ * — so handing the response straight back renders the wrong user against the
+ * wrong ticket, with no error and nothing on the page looking wrong. A missing
+ * id shifts every slot after it: the same bug, worse.
  *
- * Add one missing id and the array is short, so everything after it shifts by
- * one: the same bug, worse, and still silent.
+ * **Mapped from the KEYS, never from the response**, so an absent id becomes a
+ * `null` in its own slot.
  *
- * **Mapped from the KEYS, never from the response.** That is the whole property:
- * the output is positional by construction, and an absent id becomes a `null` in
- * its own slot rather than a shift in every slot after it.
+ * It lives here rather than in the RPC: making every `ListXByIds`
+ * order-preserving is a promise five services must keep and no test naturally
+ * checks. The RPC's contract stays "a set".
  *
- * **It lives here rather than in the RPC.** Making every `ListXByIds`
- * order-preserving would be a promise five services must keep and no test
- * naturally checks; this is four lines, local, and correct regardless of what
- * the RPC returns — so the RPC's contract stays "a set", which is what a
- * database gives you anyway.
+ * See `docs/decisions/0013-batch-rpcs-map-from-keys.md`.
  */
 export function alignToKeys<K, V>(
   keys: readonly K[],
@@ -208,13 +197,7 @@ export function alignToKeys<K, V>(
 }
 
 /**
- * A loader that reads Redis before the RPC
- *
- * **The entity cache, and it goes INSIDE the batch function rather than around
- * the loader.** The positional contract ({@link alignToKeys}) must hold whether
- * a key came from Redis or from the wire, so the merge happens here, once,
- * mapped from the KEYS — a cache changes where data comes from and never the
- * ordering guarantee.
+ * A loader that reads Redis before the RPC.
  *
  * ```txt
  * loader.load('user-123')
@@ -223,34 +206,18 @@ export function alignToKeys<K, V>(
  *        └─ MISS → ListUsersByIds, for the misses ONLY
  * ```
  *
- * **Why this layer and not a response cache**: an entity key is
- * enumerable, so `user.updated` — or, here, the gateway mutation that wrote the
- * name — evicts exactly one key. A response cache key is a hash of the
- * question, and nothing in it says which entities are in the answer. This buys
- * less per hit (the resolver tree still runs, against cheaper data) and it is
- * the difference between a cache you can reason about and one you apologise
- * for.
+ * The cache sits INSIDE the batch function, not around the loader: the
+ * positional contract ({@link alignToKeys}) must hold whether a key came from
+ * Redis or from the wire, so the merge happens here, once, mapped from the keys.
  *
- * **No negative caching, deliberately.** An id that resolves to nothing is
- * re-fetched every request. Remembering the absence would need a miss and a
- * cached `null` to be distinguishable, and `MGET` reports both as `null` — so
- * the distinction would have to be encoded in the value, and the failure mode
- * of getting it wrong is a live user permanently invisible behind a cached
- * "does not exist". The cost of not doing it is bounded: the ids still arrive
- * in one batch, so it is one extra RPC per request, not per row.
+ * Two behaviours callers need to know:
  *
- * **No tenant, no cache.** An anonymous request keys under no organization at
- * all; the RPC behind it resolves nothing anyway, and a shared bucket is not
- * worth the sentence explaining why it is safe.
+ * - **No negative caching.** An id resolving to nothing is re-fetched every
+ * request. Bounded: ids still arrive in one batch, so it costs one extra
+ * RPC per request, not per row.
+ * - **No tenant, no cache.** An anonymous request keys under no organization.
  *
- * **What a dangling id costs, bounded.** A purged user still
- * referenced by an old ticket is a miss on every request, forever. That is one
- * extra batch RPC per request, not per row: DataLoader dedups within the query,
- * so a page of fifty tickets all naming the same dead assignee is a single
- * one-key batch. A client polling that page pays one RPC per poll — the same
- * cost it would pay with no cache at all, which is the ceiling rather than a
- * new risk. Soft-deleted users do not reach this at all: `user-summary.loader`
- * asks for `includeInactive: true`, so they resolve and cache normally.
+ * See `docs/decisions/0029-graphql-caches-entities-not-responses.md`.
  */
 export function createCachedLoader<V>(options: {
   cache: CacheService;

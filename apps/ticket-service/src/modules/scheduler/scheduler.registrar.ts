@@ -11,11 +11,11 @@ import {
 } from '@synapsedesk/common';
 
 /**
- * Registers this service's repeat entry on boot
+ * Registers this service's repeat entry on boot.
  *
  * **`onApplicationBootstrap`, not `onModuleInit`.** The first scheduled tick
  * can arrive as soon as the entry exists, and it calls into jobs across several
- * modules; registering before every module has initialised invites a job that
+ * modules; registering before every module has initialized invites a job that
  * fires against a half-built dependency graph.
  *
  * **Stable `jobId`s, which is the whole trick.** Without one, every deploy adds
@@ -41,7 +41,7 @@ export class SchedulerRegistrar implements OnApplicationBootstrap {
    *
    * A failure here is logged rather than thrown: a service that will not boot
    * because Redis was briefly unavailable is a worse outcome than one whose
-   * schedule is missing — and the staleness alert (§4.2) is what catches the
+   * schedule is missing — and the staleness alert is what catches the
    * latter. Throwing would also make the failure mode "no service at all"
    * rather than "no rollups", which is a strictly larger blast radius.
    */

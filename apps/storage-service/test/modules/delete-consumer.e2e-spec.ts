@@ -18,7 +18,7 @@ import { waitUntil } from '@synapsedesk/common/testing/wait';
 import { FirebaseStorageService } from '../../src/modules/firebase/firebase-storage.service';
 
 /**
- * §2.5 The async delete consumer, driven over a REAL NATS connection.
+ * The async delete consumer, driven over a REAL NATS connection.
  *
  * Calling `consumer.handle(event)` directly would prove the bucket call and
  * nothing else — and the bucket call is the part least likely to be wrong. What
@@ -27,7 +27,7 @@ import { FirebaseStorageService } from '../../src/modules/firebase/firebase-stor
  * what a direct method call cannot tell you, and exactly what stayed broken for
  * the whole of Domain A while nothing was subscribed.
  */
-describe('§2.5 storage delete consumer over NATS (e2e)', () => {
+describe('Storage delete consumer over NATS (e2e)', () => {
   let app: INestApplication;
   let firebase: FirebaseStorageService;
   let client: ClientProxy;
@@ -91,7 +91,7 @@ describe('§2.5 storage delete consumer over NATS (e2e)', () => {
     await app?.close();
   });
 
-  it('1. DELETES an existing object — §2.5 test 1', async () => {
+  it('1. DELETES an existing object', async () => {
     const path = await seed(
       `organizations/${faker.string.uuid()}/avatars/${faker.string.uuid()}/old.png`,
     );
@@ -101,7 +101,7 @@ describe('§2.5 storage delete consumer over NATS (e2e)', () => {
     expect(await waitUntil(async () => !(await exists(path)))).toBe(true);
   });
 
-  it('2. is a silent NO-OP for a path that never existed — §2.5 test 2', async () => {
+  it('2. is a silent NO-OP for a path that never existed', async () => {
     // `ignoreNotFound`, proven. The event is at-most-once and NATS core can
     // redeliver, so a delete-of-already-deleted MUST be a no-op — otherwise the
     // first redelivery turns a successful cleanup into a permanent error in the

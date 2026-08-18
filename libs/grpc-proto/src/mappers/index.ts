@@ -8,6 +8,7 @@
  *
  * Import from `@synapsedesk/grpc-proto`; this barrel is re-exported there.
  */
+
 export * from './timestamp';
 export * from './enum-bridge';
 export * from './enums';

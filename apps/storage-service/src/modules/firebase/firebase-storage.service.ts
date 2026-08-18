@@ -7,25 +7,24 @@ import { getStorage } from 'firebase-admin/storage';
 import type { Bucket } from '@google-cloud/storage';
 
 /**
- * The ONLY holder of Storage credentials in this system — §1.4.
+ * The ONLY holder of Storage credentials in this system.
  *
- * A separate Firebase service account from the one `auth-service` holds: that
- * one is scoped to Firebase Auth token verification and has no Storage grant;
- * this one is scoped to Storage read/write and has no Auth grant. Neither
- * service can do the other's job with its own key, which is the point — a
- * compromised `ticket-service` cannot read or write Storage directly, because
- * it never holds a key that could. It can only ask, over gRPC.
+ * A separate Firebase service account from `auth-service`'s: that one is scoped
+ * to Auth token verification with no Storage grant, this one to Storage
+ * read/write with no Auth grant. Neither service can do the other's job with
+ * its own key — so a compromised `ticket-service` cannot touch Storage
+ * directly, because it never holds a key that could. It can only ask, over
+ * gRPC.
  *
- * A PATH to the JSON key, not inline credentials, for the same reason
- * `auth-service`'s `FirebaseService` gives: the private key is a multi-line
- * PEM, env files cannot hold real newlines, and getting the un-escaping wrong
- * produces an opaque crypto error rather than "bad config".
+ * A PATH to the JSON key, not inline credentials: the private key is a
+ * multi-line PEM, env files cannot hold real newlines, and getting the
+ * un-escaping wrong produces an opaque crypto error rather than "bad config".
  *
- * V4 signing needs no extra IAM setup because of that key file: signing
- * requires either a local private key (which the JSON provides) or the
- * `iam.serviceAccountTokenCreator` role for keyless signing. This repo already
- * authenticates with a downloaded key, so signing works the moment the bucket
- * handle exists.
+ * V4 signing needs no extra IAM setup because of that key file — signing
+ * requires either a local private key or the `iam.serviceAccountTokenCreator`
+ * role, and the JSON provides the former.
+ *
+ * See `docs/decisions/0024-one-upload-mechanism.md`.
  */
 @Injectable()
 export class FirebaseStorageService implements OnModuleInit {
@@ -89,7 +88,7 @@ export class FirebaseStorageService implements OnModuleInit {
   }
 
   /**
-   * Readiness, WITHOUT a network call
+   * Readiness, WITHOUT a network call.
    *
    * The tempting probe is `bucket.exists()`, and it is wrong twice over: it
    * bills a GCS operation every five seconds per pod, and it makes Google's

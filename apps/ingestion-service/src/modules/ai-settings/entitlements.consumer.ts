@@ -32,7 +32,7 @@ export class EntitlementsConsumer {
     // A missing organizationId cannot be interpreted as "all of them". That
     // reading turns one malformed message into a full cache flush and a
     // re-resolve for every active tenant at once — the thundering herd
-    // §1.4 test 4 exists to prevent, arriving from the one input nobody
+    // The thundering herd this exists to prevent, arriving from the one input nobody
     // validated.
     if (!event?.organizationId) {
       this.logger.error(

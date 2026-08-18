@@ -41,20 +41,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   validate(payload: MaybeJwtPayload): JwtPayload {
-    /**
-     * Rejects a 2FA CHALLENGE token presented as an access token.
-     *
-     * Strictly speaking: no, this is no longer required. The two token types are
-     * signed by separate key pairs, so a challenge token fails signature
-     * verification above and never reaches `validate`.
-     *
-     * It stays anyway, for two reasons. The failure it guards against is severe
-     * and silent — a caller who merely STARTED a login satisfying every
-     * protected route — and the check is a single property read on an object
-     * already in hand. And it keeps working if the keys are ever consolidated,
-     * or if some future token is minted from the 2FA key for another purpose.
-     * Defence that costs nothing is worth keeping even once it is redundant.
-     */
+    // Rejects a 2FA CHALLENGE token presented as an access token. Redundant
+    // today -- the two token types are signed by separate key pairs, so a
+    // challenge token fails verification above and never reaches here -- but
+    // kept: it costs one property read, and it still holds if the keys are ever
+    // consolidated or a future token is minted from the 2FA key.
     if (payload.is2faPending) {
       throw new UnauthorizedException(
         'Two-factor challenge is not complete; finish it before using this token',

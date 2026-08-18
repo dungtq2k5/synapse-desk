@@ -60,7 +60,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # Domain E's own database
+  # Domain E's own database.
   #
   # Added when the quota alert became the first LOAD-BEARING consumer of the
   # in-app notification subject: the alert was published correctly, idempotently
@@ -102,7 +102,7 @@ services:
     # What that reasoning missed is that **BullMQ locks DO carry an expiry**, and
     # it is the shortest one in the instance. From BullMQ's own Lua:
     #
-    #     rcall("SET", jobKey .. ':lock', token, "PX", opts['lockDuration'])
+    # rcall("SET", jobKey. ':lock', token, "PX", opts['lockDuration'])
     #
     # `lockDuration` defaults to 30s, against cache entries at 60s–1h and the
     # quota counter at 70 days. `volatile-ttl` evicts NEAREST-EXPIRY FIRST, so
@@ -171,7 +171,7 @@ services:
     volumes:
       - qdrant_data:/qdrant/storage
 
-  # The Firebase Storage EMULATOR — §1.7.
+  # The Firebase Storage EMULATOR.
   #
   # Tests point here instead of at a real bucket, for the same reason they point
   # at a test database instead of the dev one: a suite that deletes objects

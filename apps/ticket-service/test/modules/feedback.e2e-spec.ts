@@ -17,7 +17,7 @@ import {
 } from '../factories';
 import { FeedbackService } from '../../src/modules/feedback/feedback.service';
 
-describe('§2.8 AI feedback (e2e)', () => {
+describe('AI feedback (e2e)', () => {
   let fx: E2eFixture;
   let feedback: FeedbackService;
 
@@ -83,7 +83,7 @@ describe('§2.8 AI feedback (e2e)', () => {
     });
 
     it('2. UPDATES on a second submission — never a second row', async () => {
-      // §2.8 test 1. `(ticket_message_id, user_id)` is unique, so appending
+      // `(ticket_message_id, user_id)` is unique, so appending
       // would throw — but the real reason is the metric: a user who changes
       // their mind must be counted once, with the later opinion. Double
       // counting would make the number drift further from the truth the more
@@ -275,7 +275,7 @@ describe('§2.8 AI feedback (e2e)', () => {
 
   describe('withdrawFeedback', () => {
     it('1. removes only the CALLER’S own row', async () => {
-      // §2.8 test 3. Two users rate the same message; one withdraws.
+      // Two users rate the same message; one withdraws.
       const { reply } = await seedAiReply();
       await feedback.submitFeedback(
         {

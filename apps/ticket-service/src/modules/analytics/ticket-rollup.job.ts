@@ -12,9 +12,7 @@ import { AuthReferenceService } from '../auth-client/auth-reference.service';
 /** How many trailing days a routine run recomputes. */
 const DEFAULT_TRAILING_DAYS = 2;
 
-// ASK Why we have two `docblock`?
-/** What one run did, for the log and the tests. */
-/** What one rollup run wrote. */
+/** What one rollup run wrote — read by the log line and by the tests. */
 export type RollupOutcome = {
   tenants: number;
   ticketRows: number;
@@ -22,34 +20,27 @@ export type RollupOutcome = {
 };
 
 /**
- * `ticket_daily_stats` and `agent_daily_stats`
+ * `ticket_daily_stats` and `agent_daily_stats`.
  *
- * **A plain method taking a window, with no `@Cron` decorator.** The same shape
- * `chunk-usage.projection.ts` and `quota-reconciliation.job.ts` take, and for
- * the same reason: a job triggered by a schedule can only be tested by waiting,
- * and a test that waits gets deleted. The scheduler calls `run()`; the tests
- * call it with an explicit window.
+ * A plain method taking a window, with no `@Cron`. The scheduler calls `run()`;
+ * tests call it with an explicit window.
  *
- * **Idempotent by construction, and that is the property that matters.** Each
- * tenant's affected days are DELETED and re-inserted inside one transaction, so
- * re-running recomputes a day from source rather than adding to it. A job that
- * cannot be safely re-run cannot be fixed after a bug — the numbers stay wrong
- * forever because the correction only applies going forward.
+ * **Idempotent by construction.** Each tenant's affected days are DELETED and
+ * re-inserted inside one transaction, so re-running recomputes a day from
+ * source rather than adding to it.
  *
  * Delete-then-insert rather than `ON CONFLICT DO UPDATE` for one concrete
  * reason: `department_id` is NULLable, so the uniqueness guard is a PARTIAL
- * index pair, and a single `ON CONFLICT` clause cannot name two indexes. The
- * alternative — a sentinel uuid standing in for "no department" — would put a
- * fake id in a column every consumer joins on.
+ * index pair, and a single `ON CONFLICT` clause cannot name two indexes.
  *
- * **Sums and counts, never averages.** An average of daily averages weights a
- * Tuesday with 3 tickets equally with a Monday with 300. Every rate and mean is
+ * **Sums and counts, never averages** — an average of daily averages weights a
+ * Tuesday with 3 tickets equally with a Monday with 300. Rates and means are
  * computed at read time.
  *
- * **Recomputes a TRAILING window rather than only yesterday.** A ticket created
- * on Monday and resolved on Wednesday changes Monday's cohort figures on
- * Wednesday, so a job that only ever touched the previous day would leave
- * deflection and resolution counts permanently short.
+ * **Recomputes a TRAILING window, not just yesterday.** A ticket created Monday
+ * and resolved Wednesday changes Monday's cohort figures on Wednesday.
+ *
+ * See `docs/decisions/0009-rollups-are-plain-tables.md`.
  */
 @Injectable()
 export class TicketRollupJob {
@@ -69,7 +60,7 @@ export class TicketRollupJob {
   }
 
   /**
-   * The BACKFILL entry point
+   * The BACKFILL entry point.
    *
    * Shipped from day one because it is fifteen minutes while the job is fresh
    * and the alternative is discovering a rollup bug with no way to recompute:
@@ -258,7 +249,7 @@ export class TicketRollupJob {
       -- **Time to first response** — the first message from a DIFFERENT party
       -- than the ticket's author. Not "the first message": the author's own
       -- follow-up is not a response, and counting it reads as a suspiciously
-      -- fast team (19-doc §3.1).
+      -- fast team.
       --
       -- Internal notes are excluded: a note the requester cannot see is not a
       -- response to them.
@@ -285,7 +276,7 @@ export class TicketRollupJob {
                -- HUMAN and AI kept apart. An AI reply in 2 seconds genuinely is
                -- a first response, and blending it with human response time
                -- produces a headline that improves whenever AI usage rises —
-               -- the metric measuring itself (19-doc §3.1).
+               -- the metric measuring itself.
                COALESCE(SUM(GREATEST(
                  EXTRACT(EPOCH FROM (f.responded_at - f.asked_at)), 0
                )) FILTER (WHERE NOT f.is_ai_generated)::int, 0)

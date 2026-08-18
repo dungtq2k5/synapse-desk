@@ -19,7 +19,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ResponseMessage } from '../../common/decorators/response-message.decorator';
 import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
 import { OrganizationStatusService } from '../../common/organization-status/organization-status.service';
-import { PlatformGrpcClient } from './platform-grpc.client';
+import { PlatformService } from './platform.service';
 import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AUTH_SCHEMES } from '../../common/config/swagger.config';
 import {
@@ -30,19 +30,21 @@ import {
 import {
   CreateGlobalRoleDto,
   CreatePlatformOrganizationDto,
-  CreatePlatformOrganizationResponseDto,
   ListPlatformOrganizationsQueryDto,
   ListPlatformUsersQueryDto,
   OffboardOrganizationDto,
   ResetBillingCycleDto,
-  OffboardResponseDto,
-  PlatformMetricsResponseDto,
-  PlatformOrganizationResponseDto,
-  PlatformUserResponseDto,
   RoleResponseDto,
   SetOrganizationStatusDto,
   UpdatePlatformOrganizationDto,
 } from './dto/rest/platform.dto';
+import {
+  CreatePlatformOrganizationResponseDto,
+  OffboardResponseDto,
+  PlatformMetricsResponseDto,
+  PlatformOrganizationResponseDto,
+  PlatformUserResponseDto,
+} from './dto/rest/platform-response.dto';
 
 /**
  * Platform administration (api-endpoints-plan).
@@ -61,7 +63,7 @@ import {
 @UseGuards(JwtAuthGuard, SuperAdminGuard)
 export class PlatformController {
   constructor(
-    private readonly platformGrpcClient: PlatformGrpcClient,
+    private readonly platform: PlatformService,
     private readonly organizationStatus: OrganizationStatusService,
   ) {}
 
@@ -77,7 +79,7 @@ export class PlatformController {
     @CurrentUser() context: RequestContext,
     @Query() query: ListPlatformOrganizationsQueryDto,
   ): Promise<PaginationResponseDto<PlatformOrganizationResponseDto>> {
-    return this.platformGrpcClient.listOrganizations(query, context);
+    return this.platform.listOrganizations(query, context);
   }
 
   /** Tenant + its first Org Admin, in one transaction. Half of it is useless. */
@@ -91,7 +93,7 @@ export class PlatformController {
     @CurrentUser() context: RequestContext,
     @Body() createPlatformOrganizationDto: CreatePlatformOrganizationDto,
   ): Promise<CreatePlatformOrganizationResponseDto> {
-    return this.platformGrpcClient.createOrganization(
+    return this.platform.createOrganization(
       createPlatformOrganizationDto,
       context,
     );
@@ -105,7 +107,7 @@ export class PlatformController {
     @CurrentUser() context: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<PlatformOrganizationResponseDto> {
-    return this.platformGrpcClient.getOrganization(id, context);
+    return this.platform.getOrganization(id, context);
   }
 
   /** Unlike the tenant-facing PATCH, this may change quotas. */
@@ -118,7 +120,7 @@ export class PlatformController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updatePlatformOrganizationDto: UpdatePlatformOrganizationDto,
   ): Promise<PlatformOrganizationResponseDto> {
-    const result = await this.platformGrpcClient.updateOrganization(
+    const result = await this.platform.updateOrganization(
       id,
       updatePlatformOrganizationDto,
       context,
@@ -147,7 +149,7 @@ export class PlatformController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() setOrganizationStatusDto: SetOrganizationStatusDto,
   ): Promise<PlatformOrganizationResponseDto> {
-    const result = await this.platformGrpcClient.setStatus(
+    const result = await this.platform.setStatus(
       id,
       setOrganizationStatusDto,
       context,
@@ -158,7 +160,7 @@ export class PlatformController {
   }
 
   /**
-   * Rolls the metering window. **BREAK-GLASS, not routine**
+   * Rolls the metering window. **BREAK-GLASS, not routine**.
    *
    * Two things happen that the response cannot show. `billing_cycle_start` now
    * follows Stripe's `current_period_start`, so a manual roll desynchronizes
@@ -183,7 +185,7 @@ export class PlatformController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: ResetBillingCycleDto,
   ): Promise<PlatformOrganizationResponseDto> {
-    return this.platformGrpcClient.resetBillingCycle(id, dto.reason, context);
+    return this.platform.resetBillingCycle(id, dto.reason, context);
   }
 
   /** The irreversible half that `DELETE /organizations/current` only requests. */
@@ -198,7 +200,7 @@ export class PlatformController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() offboardOrganizationDto: OffboardOrganizationDto,
   ): Promise<OffboardResponseDto> {
-    const result = await this.platformGrpcClient.offboard(
+    const result = await this.platform.offboard(
       id,
       offboardOrganizationDto,
       context,
@@ -218,7 +220,7 @@ export class PlatformController {
     @CurrentUser() context: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<PlatformOrganizationResponseDto> {
-    const result = await this.platformGrpcClient.restore(id, context);
+    const result = await this.platform.restore(id, context);
     await this.organizationStatus.invalidate(id);
 
     return result;
@@ -238,7 +240,7 @@ export class PlatformController {
     @CurrentUser() context: RequestContext,
     @Query() query: ListPlatformUsersQueryDto,
   ): Promise<PaginationResponseDto<PlatformUserResponseDto>> {
-    return this.platformGrpcClient.listUsers(query, context);
+    return this.platform.listUsers(query, context);
   }
 
   @ApiOperation({ summary: 'Manage global system roles' })
@@ -249,7 +251,7 @@ export class PlatformController {
     @CurrentUser() context: RequestContext,
     @Query() query: ListPlatformUsersQueryDto,
   ): Promise<PaginationResponseDto<RoleResponseDto>> {
-    return this.platformGrpcClient.listGlobalRoles(query, context);
+    return this.platform.listGlobalRoles(query, context);
   }
 
   /** A role visible in EVERY tenant, which is why only the platform mints one. */
@@ -261,10 +263,7 @@ export class PlatformController {
     @CurrentUser() context: RequestContext,
     @Body() createGlobalRoleDto: CreateGlobalRoleDto,
   ): Promise<RoleResponseDto> {
-    return this.platformGrpcClient.createGlobalRole(
-      createGlobalRoleDto,
-      context,
-    );
+    return this.platform.createGlobalRole(createGlobalRoleDto, context);
   }
 
   /** Full-table counts — cached by the client, never joined into a hot path. */
@@ -277,6 +276,6 @@ export class PlatformController {
   getMetrics(
     @CurrentUser() context: RequestContext,
   ): Promise<PlatformMetricsResponseDto> {
-    return this.platformGrpcClient.getMetrics(context);
+    return this.platform.getMetrics(context);
   }
 }

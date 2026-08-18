@@ -1,4 +1,4 @@
-# The golden set
+# The golden set.
 #
 # ~30 questions against a fixed corpus (`corpus/`), weighted toward the cases
 # that ACTUALLY break rather than spread evenly over the ones that are easy to

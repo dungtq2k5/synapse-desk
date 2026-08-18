@@ -22,7 +22,7 @@ import { buildOpenApiDocument } from '../../src/common/config/swagger.config';
 import { compareAlphabetically } from '@synapsedesk/common';
 import { INBOUND_SIGNATURE_HEADER } from '../../src/common/guards/inbound-signature.guard';
 
-describe('§1/§5 the OpenAPI document', () => {
+describe('The OpenAPI document', () => {
   let fx: E2eFixture;
   let doc: OpenAPIObject;
 
@@ -98,9 +98,9 @@ describe('§1/§5 the OpenAPI document', () => {
 
   afterAll(() => fx.close());
 
-  // ------------------------------------------------------------------ §1
+  // ------------------------------------------------------------------
 
-  describe('§1 the CLI plugin', () => {
+  describe('The CLI plugin', () => {
     it('1. **every DTO schema has non-empty `properties`**', () => {
       // Catches a `dtoFileNameSuffix` miss across the whole codebase at once
       // rather than one DTO at a time. A class the plugin did not process still
@@ -215,9 +215,9 @@ describe('§1/§5 the OpenAPI document', () => {
     });
   });
 
-  // ------------------------------------------------------------------ §2
+  // ------------------------------------------------------------------
 
-  describe('§2 the response envelope', () => {
+  describe('The response envelope', () => {
     /** A representative documented success response. */
     const success = (path: string, method: 'get' | 'post' = 'get') =>
       doc.paths[path]?.[method]?.responses as
@@ -272,7 +272,7 @@ describe('§1/§5 the OpenAPI document', () => {
     });
 
     it('3. **`ApiFilterErrors([403])` actually produces a 403**', () => {
-      // The silent no-op, fix 1. The reference implementation's
+      // The silent no-op. The reference implementation's
       // union accepted `'403'` and its body ignored it, so the annotation
       // type-checked, read as documentation, and produced nothing. This system
       // needs 403 more than the reference did: permission-guarded routes are
@@ -399,7 +399,7 @@ describe('§1/§5 the OpenAPI document', () => {
 
         expect(without).toEqual([
           // Presigns an inbound mail's attachments before the webhook
-          // §5. On the same controller and therefore under the same
+          // On the same controller and therefore under the same
           // `@SkipThrottle()`: a Worker rate-limited mid-delivery would drop a
           // customer's file, and the signature is what bounds this route's
           // callers, not a counter.
@@ -411,9 +411,9 @@ describe('§1/§5 the OpenAPI document', () => {
     });
   });
 
-  // ------------------------------------------------------------------ §3
+  // ------------------------------------------------------------------
 
-  describe('§3 auth schemes', () => {
+  describe('Auth schemes', () => {
     it('1. an authenticated route carries a security requirement', () => {
       const operation = doc.paths['/api/v1/tickets']?.get;
 
@@ -457,9 +457,9 @@ describe('§1/§5 the OpenAPI document', () => {
     });
   });
 
-  // ------------------------------------------------------------------ §5
+  // ------------------------------------------------------------------
 
-  describe('§5 structural assertions over all 184 routes', () => {
+  describe('Structural assertions over all 184 routes', () => {
     it('1. **every route has a non-empty `summary`**', () => {
       // The one thing the plugin cannot generate, so the one that gets skipped.
       // This is the test that fails when somebody adds route 185 and forgets —
@@ -513,10 +513,10 @@ describe('§1/§5 the OpenAPI document', () => {
     });
   });
 
-  // ---------------------------------------------------- §5 tests 4 and 5
+  // ---------------------------------------------------- tests 4 and 5
 
   /**
-   * **The test that makes this stay true**
+   * **The test that makes this stay true**.
    *
    * Documentation drifts silently: nothing about a wrong schema fails, the page
    * still renders, and the first person to notice is a consumer whose generated
@@ -528,7 +528,7 @@ describe('§1/§5 the OpenAPI document', () => {
    * code that is not what the route returns, a DTO that gained a field the
    * schema did not.
    */
-  describe('§30 §4 the caching contract is PUBLISHED', () => {
+  describe('The caching contract is PUBLISHED', () => {
     it('**the description carries the staleness contract**', () => {
       // The order is the point: written before any
       // response cache exists, so it is a stated limit rather than one a client
@@ -604,7 +604,7 @@ describe('§1/§5 the OpenAPI document', () => {
     });
   });
 
-  describe('§32 §3.1 the inbound-email webhook documents itself', () => {
+  describe('The inbound-email webhook documents itself', () => {
     const inbound = () =>
       operations().find(
         ({ method, path }) =>
@@ -660,7 +660,7 @@ describe('§1/§5 the OpenAPI document', () => {
     });
   });
 
-  describe('§5 a real response validates against its documented schema', () => {
+  describe('A real response validates against its documented schema', () => {
     let validate: (
       path: string,
       method: string,
@@ -794,9 +794,9 @@ describe('§1/§5 the OpenAPI document', () => {
     });
   });
 
-  // ------------------------------------------------------------------ §4
+  // ------------------------------------------------------------------
 
-  describe('§4 exposure', () => {
+  describe('Exposure', () => {
     it('**is gated on `SWAGGER_ENABLED`, not on an inline NODE_ENV check**', () => {
       // `NODE_ENV !== 'production'` written at a call site is the
       // condition that gets inverted during a refactor with nobody noticing,

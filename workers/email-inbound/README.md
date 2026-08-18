@@ -2,7 +2,7 @@
 
 Parses inbound MIME, signs a JSON payload, and posts it to
 `POST /webhooks/email/inbound`. Decisions are in
-[31-doc §1](../../docs/31-inbound-email-architecture.md); the payload contract is
+the architecture notes; the payload contract is
 `InboundEmailDto` in the gateway, and this Worker is the only caller.
 
 ## Why it is not under `apps/`
@@ -29,7 +29,7 @@ Set `WEBHOOK_URL` in `wrangler.toml` to the deployed gateway.
 
 ## The MX record — do this LAST
 
-31-doc §9 step 8 is deliberate: everything above is testable from a recorded
+Leaving the MX record until last is deliberate: everything above is testable from a recorded
 payload, and pointing a live MX record at an unfinished endpoint means debugging
 business logic through a mail transport, where every iteration is an email you
 send yourself and wait for.
@@ -46,7 +46,7 @@ send yourself and wait for.
 ## What it does not do
 
 - **Attachments are dropped**, and their filenames travel so the ticket can say
-  what was omitted (31-doc §5). The bytes never reach an application server,
+  what was omitted. The bytes never reach an application server,
   which is the property the presign flow exists to keep.
 - **Errors are not swallowed.** A failure throws so Cloudflare retries; the
   gateway's `(organization_id, message_id)` dedup makes a retry safe. The one

@@ -1,17 +1,16 @@
 /**
- * The comparison that decides whether the co-pilot's headline metric is real.
+ * @file The comparison that decides whether the co-pilot's headline metric is real.
  *
  * An agent who presses "send" on a draft without changing a word has ACCEPTED
  * it. Exact string equality says otherwise surprisingly often: a rich-text
  * editor adds a trailing newline, collapses a double space, or emits `é` as
- * `e` + a combining accent instead of the precomposed character. Every one of
- * those reports as EDITED, and acceptance rate — the single number justifying
- * the feature — is understated by a margin nobody can see.
+ * `e` + a combining accent. Every one reports as EDITED, and acceptance rate —
+ * the number justifying the feature — is understated invisibly.
  *
- * Normalising in the other direction has a cost too: a genuinely edited draft
- * that differs only in whitespace would be called ACCEPTED. That is the right
- * trade, because whitespace-only edits are not what "the agent rewrote it"
- * means to anyone reading the metric.
+ * The reverse costs something too: a genuinely edited draft differing only in
+ * whitespace is called ACCEPTED. That is the right trade, because
+ * whitespace-only edits are not what "the agent rewrote it" means to anyone
+ * reading the metric.
  */
 
 /**

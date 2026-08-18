@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { formatErrorMsg } from './utils';
+import { formatErrorMsg } from './format-error';
 import type { JobHeartbeat } from './job-staleness';
 
 /** A heartbeat row, as it is written and read. */
@@ -36,7 +36,7 @@ export type JobRunStatusRow = {
 };
 
 /**
- * **The two operations a heartbeat needs, and no more**
+ * **The two operations a heartbeat needs, and no more**.
  *
  * Declared by hand rather than by importing Prisma's generated `JobRunDelegate`:
  * the generated types differ per service by client path, so depending on one
@@ -74,7 +74,7 @@ export interface JobRunStore {
 export const JOB_RUN_STORE = Symbol('JOB_RUN_STORE');
 
 /**
- * Records that a job ran, hoisted here by §4.5.
+ * Records that a job ran.
  *
  * **The observability half of the fix, and the deeper one.** The jobs not
  * running was not the worst of it; the worst of it was that nothing anywhere
@@ -156,7 +156,7 @@ export class JobRunRecorder {
    *
    * That field is what the staleness alert reads. Clearing it here would turn
    * "broken since Tuesday" into "never ran" and lose the only piece of
-   * information worth having test 2.
+   * information worth having.
    */
   private fail(
     jobName: string,
@@ -185,7 +185,7 @@ export class JobRunRecorder {
 }
 
 /**
- * Reads the heartbeat, hoisted here by §4.5.
+ * Reads the heartbeat.
  *
  * **Every row, unfiltered.** The caller decides what is stale, because the
  * check has to be told which jobs it EXPECTS: a job that has never run has no

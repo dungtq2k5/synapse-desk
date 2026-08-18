@@ -11,22 +11,18 @@ import { SchedulerProcessor } from '../../src/modules/scheduler/scheduler.proces
 /**
  * A scheduled job reaches only the service that owns it.
  *
- * **The test the bug needed and no suite had**, because it takes two services at
- * once and every suite runs one. `SCHEDULER_QUEUE` was a bare `'scheduler'`:
- * each service registered only its own repeat entries and ran a worker on
- * everyone's queue, so BullMQ handed each job to whichever worker claimed it
- * first. `ledger-hourly` arrived at ticket-service, hit its unknown-job branch,
- * and that branch RETURNED — so BullMQ recorded success and advanced the
- * schedule. Roughly two thirds of every service's runs evaporated, silently.
+ * **The test the bug needed and no suite had**, because it takes two services
+ * at once and every suite runs one. `SCHEDULER_QUEUE` was a bare `'scheduler'`:
+ * each service registered its own repeat entries and ran a worker on everyone's
+ * queue, so BullMQ handed each job to whichever worker claimed it first.
+ * `ledger-hourly` arrived at ticket-service, hit its unknown-job branch, and
+ * that branch RETURNED — so BullMQ recorded success and advanced the schedule.
+ * Roughly two thirds of every service's runs evaporated, silently.
  *
  * **Driven with raw `Queue`/`Worker` rather than two Nest applications.** The
- * property under test is delivery — which queue a job lands on and which worker
- * may claim it — and that is decided entirely by the names in
- * `SCHEDULER_QUEUE`. Booting auth-service and ingestion-service in one jest
- * process would add a database, a gRPC server and a NATS connection to a test
- * whose subject is a Redis key. The queue names and job names below are the
- * real exported constants, so a rename cannot make this test pass by drifting
- * away from production.
+ * property under test is delivery, decided entirely by the names in
+ * `SCHEDULER_QUEUE`. The names below are the real exported constants, so a
+ * rename cannot make this pass by drifting away from production.
  *
  * It lives in auth-service's suite because that is a harness with a real Redis;
  * it asserts nothing about auth-service in particular.
@@ -165,7 +161,7 @@ describe('scheduled jobs reach only their owner (e2e)', () => {
   }, 30_000);
 
   it('**an unrecognised name lands in `failed`, never `completed`**', async () => {
-    // §5.2. The old branch returned, so BullMQ recorded SUCCESS and advanced
+    // The old branch returned, so BullMQ recorded SUCCESS and advanced
     // the schedule for a run that did not happen — which is what made the
     // shared-queue loss invisible: the queue looked healthy because every
     // stolen job completed.

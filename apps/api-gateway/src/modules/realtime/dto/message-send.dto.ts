@@ -1,3 +1,4 @@
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
@@ -17,7 +18,7 @@ import {
 import { NewAttachmentDto } from '../../tickets/dto/rest/message.dto';
 
 /**
- * The `message:send` payload
+ * The `message:send` payload.
  *
  * **Validated explicitly, because a socket frame has no ValidationPipe.** There
  * is no global pipe on a WebSocket message unless one is wired per handler, so
@@ -33,7 +34,7 @@ export class MessageSendDto {
   readonly content!: string;
 
   /**
-   * **Required, unlike its HTTP twin**
+   * **Required, unlike its HTTP twin**.
    *
    * A socket that reconnects holding an unacked message re-emits it. That is
    * correct client behaviour, and without an id to dedup on it double-posts.
@@ -45,7 +46,7 @@ export class MessageSendDto {
   readonly clientMessageId!: string;
 
   /**
-   * **Refused rather than coerced when the caller is not an agent** — §2.2.
+   * **Refused rather than coerced when the caller is not an agent**.
    *
    * The chat surface forces this false at its DTO. A socket must not silently do
    * the same: silent coercion hides a client bug, where a refusal reports it.
@@ -60,7 +61,7 @@ export class MessageSendDto {
   readonly invokeAi?: boolean;
 
   /**
-   * Objects already uploaded, bound as this message is created
+   * Objects already uploaded, bound as this message is created.
    *
    * **The socket needs this as much as HTTP does**, and more: this is the
    * surface where a customer attaches a screenshot and asks about it in the
@@ -76,5 +77,6 @@ export class MessageSendDto {
   @ArrayMaxSize(MAX_ATTACHMENTS_PER_MESSAGE)
   @ValidateNested({ each: true })
   @Type(() => NewAttachmentDto)
-  readonly attachments?: NewAttachmentDto[];
+  @ApiPropertyOptional()
+  readonly attachments: NewAttachmentDto[] = [];
 }

@@ -1,5 +1,5 @@
 /**
- * Paging, sorting, and the per-entity sortable allowlists.
+ * @file Paging, sorting, and the per-entity sortable allowlists.
  *
  * Shared by BOTH edges deliberately — the gateway DTO validates with
  * class-validator and every list RPC clamps again, because a service is
@@ -30,18 +30,17 @@ export const DEFAULT_SEARCH = {
 /**
  * Sortable columns, per entity, declared ONCE for both edges.
  *
- * Each array drives four things that must agree and previously did not:
- *   1. `@IsIn(...)` on the entity's list DTO — a bad value is a 400 naming the
- *      field at the REST edge, not a gRPC INVALID_ARGUMENT from two hops away.
- *   2. The DTO's `sortBy` TYPE, so a typo in gateway code is a compile error
- *      rather than a runtime rejection.
- *   3. That DTO's DEFAULT, which must be a member of its own allowlist. This is
- *      the one that actually bit: the base default is `createdAt`, and
- *      `user_departments` has no such column, so listing members with NO query
+ * Each array drives four things that must agree:
+ *
+ *   1. `@IsIn(...)` on the list DTO — a bad value is a 400 naming the field at
+ *      the REST edge, not a gRPC INVALID_ARGUMENT two hops away.
+ *   2. The DTO's `sortBy` TYPE, so a typo is a compile error.
+ *   3. That DTO's DEFAULT, which must be a member of its own allowlist —
+ *      `user_departments` has no `createdAt`, so listing members with no query
  *      parameters returned 400 until the default was overridden.
- *   4. The service-side allowlist passed to `toPrismaPage`, which stays as
- *      defence in depth — auth-service is reachable from other services over
- *      gRPC, where no ValidationPipe ever ran.
+ *   4. The service-side allowlist passed to `toPrismaPage`, as defence in
+ *      depth: auth-service is reachable over gRPC, where no `ValidationPipe`
+ *      ever ran.
  *
  * The `as const` + derived type is what makes (2) work; keep both.
  */

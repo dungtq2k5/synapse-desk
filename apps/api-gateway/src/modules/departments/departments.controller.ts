@@ -27,7 +27,7 @@ import { RequirePermission } from '../../common/decorators/require-permission.de
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ResponseMessage } from '../../common/decorators/response-message.decorator';
 import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
-import { DepartmentsGrpcClient } from './departments-grpc.client';
+import { DepartmentsService } from './departments.service';
 import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AUTH_SCHEMES } from '../../common/config/swagger.config';
 import {
@@ -37,14 +37,16 @@ import {
 } from '../../common/decorators/api-response.decorator';
 import {
   AddDepartmentMembersDto,
-  AddDepartmentMembersResponseDto,
   CreateDepartmentDto,
-  DepartmentMemberResponseDto,
-  DepartmentResponseDto,
   ListDepartmentMembersQueryDto,
   ListDepartmentsQueryDto,
   UpdateDepartmentDto,
 } from './dto/rest/department.dto';
+import {
+  AddDepartmentMembersResponseDto,
+  DepartmentMemberResponseDto,
+  DepartmentResponseDto,
+} from './dto/rest/department-response.dto';
 
 /**
  * Departments (api-endpoints-plan).
@@ -66,7 +68,7 @@ import {
 @Controller('departments')
 @UseGuards(JwtAuthGuard, PermissionGuard, QueryPermissionGuard)
 export class DepartmentsController {
-  constructor(private readonly departmentsGrpcClient: DepartmentsGrpcClient) {}
+  constructor(private readonly departments: DepartmentsService) {}
 
   @ApiOperation({
     summary: 'List departments in tenant (+ member counts, open-ticket counts)',
@@ -97,7 +99,7 @@ export class DepartmentsController {
     @CurrentUser() context: RequestContext,
     @Query() query: ListDepartmentsQueryDto,
   ): Promise<PaginationResponseDto<DepartmentResponseDto>> {
-    return this.departmentsGrpcClient.list(query, context);
+    return this.departments.list(query, context);
   }
 
   @ApiOperation({ summary: 'Detail' })
@@ -109,7 +111,7 @@ export class DepartmentsController {
     @CurrentUser() context: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<DepartmentResponseDto> {
-    return this.departmentsGrpcClient.get(id, context);
+    return this.departments.get(id, context);
   }
 
   @ApiOperation({ summary: 'Create' })
@@ -122,7 +124,7 @@ export class DepartmentsController {
     @CurrentUser() context: RequestContext,
     @Body() createDepartmentDto: CreateDepartmentDto,
   ): Promise<DepartmentResponseDto> {
-    return this.departmentsGrpcClient.create(createDepartmentDto, context);
+    return this.departments.create(createDepartmentDto, context);
   }
 
   @ApiOperation({ summary: 'Update' })
@@ -136,7 +138,7 @@ export class DepartmentsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateDepartmentDto: UpdateDepartmentDto,
   ): Promise<DepartmentResponseDto> {
-    return this.departmentsGrpcClient.update(id, updateDepartmentDto, context);
+    return this.departments.update(id, updateDepartmentDto, context);
   }
 
   /** Soft delete. 409 while the department still has members. */
@@ -152,7 +154,7 @@ export class DepartmentsController {
     @CurrentUser() context: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<void> {
-    return this.departmentsGrpcClient.remove(id, context);
+    return this.departments.remove(id, context);
   }
 
   /** 409 if the name was re-used while this one was deleted. */
@@ -168,7 +170,7 @@ export class DepartmentsController {
     @CurrentUser() context: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<DepartmentResponseDto> {
-    return this.departmentsGrpcClient.restore(id, context);
+    return this.departments.restore(id, context);
   }
 
   // -------------------------------------------------------------------------
@@ -187,7 +189,7 @@ export class DepartmentsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Query() query: ListDepartmentMembersQueryDto,
   ): Promise<PaginationResponseDto<DepartmentMemberResponseDto>> {
-    return this.departmentsGrpcClient.listMembers(id, query, context);
+    return this.departments.listMembers(id, query, context);
   }
 
   @ApiOperation({ summary: 'Add members' })
@@ -203,11 +205,7 @@ export class DepartmentsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() addDepartmentMembersDto: AddDepartmentMembersDto,
   ): Promise<AddDepartmentMembersResponseDto> {
-    return this.departmentsGrpcClient.addMembers(
-      id,
-      addDepartmentMembersDto,
-      context,
-    );
+    return this.departments.addMembers(id, addDepartmentMembersDto, context);
   }
 
   /**
@@ -228,6 +226,6 @@ export class DepartmentsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Param('userId', ParseUUIDPipe) userId: string,
   ): Promise<void> {
-    return this.departmentsGrpcClient.removeMember(id, userId, context);
+    return this.departments.removeMember(id, userId, context);
   }
 }

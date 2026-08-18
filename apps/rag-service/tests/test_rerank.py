@@ -1,20 +1,19 @@
 """The cross-encoder pass, against the REAL FlashRank model.
 
-Every other suite substitutes `RecordingReranker`, and that substitution is
-right for what those suites assert — whether rerank *ran*, not how it ordered.
-But it meant nothing in the tree ever constructed `FlashRankReranker` except the
-production wiring in `server.py`, and the one thing a fake cannot check is
-whether the real implementation can read its own input.
+Every other suite substitutes `RecordingReranker`, which is right for what those
+suites assert — whether rerank *ran*, not how it ordered. But it meant nothing
+in the tree ever constructed `FlashRankReranker` except the production wiring,
+and the one thing a fake cannot check is whether the real implementation can
+read its own input.
 
-It could not. `rerank()` took `FusedChunk`, whose `.chunk` is an
-`arms.RetrievedChunk` carrying ids and a score and no text, and reached for
-`.content_text` — so every reranked search raised `AttributeError`, in
-production only, on the hot path of every question. The pipeline now hydrates
-before reranking, which is the only order a cross-encoder can work in.
+It could not: `rerank()` reached for `.content_text` on a chunk that carries
+ids and a score and no text, so every reranked search raised `AttributeError` —
+in production only, on the hot path of every question.
 
 These tests are deliberately few and deliberately real. The model is ~3MB,
-downloaded once and cached by FlashRank; the alternative — a fake — is exactly
-what hid the defect.
+downloaded once and cached; a fake is exactly what hid the defect.
+
+See docs/decisions/0008-hydrate-before-rerank.md.
 """
 
 from __future__ import annotations
@@ -109,7 +108,7 @@ class TestTheRealReranker:
 
 class TestApplyRerank:
     def test_it_SKIPS_when_the_pool_is_no_bigger_than_what_is_kept(self, reranker):
-        # §2.3 test 6. Reordering three candidates when three are being kept
+        # Reordering three candidates when three are being kept
         # cannot change which chunks reach the prompt, so the cross-encoder pass
         # is pure cost — and for a narrow-department user, whose pool is
         # legitimately small, this is the common case rather than the edge one.

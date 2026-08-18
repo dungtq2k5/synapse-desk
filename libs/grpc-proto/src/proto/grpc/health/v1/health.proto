@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-// The STANDARD gRPC Health Checking Protocol
+// The STANDARD gRPC Health Checking Protocol.
 //
 // Copied verbatim from grpc/grpc-proto rather than invented, and the package
 // name `grpc.health.v1` is the load-bearing part: Kubernetes probes it natively

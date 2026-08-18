@@ -137,7 +137,7 @@ class TestTheGoldenSetIsWellFormed:
 
 
 class TestRefusalAccuracy:
-    """17-doc calls this the single most damaging failure mode."""
+    """The single most damaging failure mode."""
 
     def test_answering_a_DOC_MISSING_question_is_a_failure(self):
         # Inventing a policy is worse than no answer, every time.
@@ -213,7 +213,7 @@ class TestCitationRate:
 
 
 class TestLanguageMatch:
-    """17-doc §2.1, made permanently visible."""
+    """Made permanently visible."""
 
     def test_an_English_answer_to_a_Vietnamese_question_FAILS(self):
         # The exact defect: retrieval works, generation succeeds, a real source
@@ -292,7 +292,7 @@ class TestChunking:
 
 
 class TestTheMarkdownContract:
-    """21-doc §1 — the output format, scored rather than assumed.
+    """The output format, scored rather than assumed.
 
     Markdown came out of the generation prompt before it was ever asked for,
     because the training data is full of it. That is a property of the MODEL:
@@ -366,7 +366,7 @@ class TestTheMarkdownContract:
 
 
 class TestTheInjectionSuite:
-    """33-doc §9 — the third `expect` state, and the group that decides Layer B."""
+    """The third `expect` state, and the group that decides Layer B."""
 
     def setup_method(self):
         self.entries = yaml.safe_load((EVAL_DIR / "golden.yaml").read_text())
@@ -429,7 +429,7 @@ class TestTheInjectionSuite:
 
 
 class TestTheThirdExpectState:
-    """`expect: REFUSED` scores as its own outcome — 33-doc §9."""
+    """`expect: REFUSED` scores as its own outcome"""
 
     def test_a_refused_injection_is_correct(self):
         result = outcome(

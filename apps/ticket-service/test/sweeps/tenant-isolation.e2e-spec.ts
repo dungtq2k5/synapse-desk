@@ -32,7 +32,7 @@ import { AuthReferenceService } from '../../src/modules/auth-client/auth-referen
 import { TicketEventPublisher } from '../../src/modules/events/ticket-event.publisher';
 
 /**
- * §3.1 The tenant-isolation sweep.
+ * The tenant-isolation sweep.
  *
  * One table, every by-id read and write in Domain B. The property is uniform
  * and absolute: a caller in tenant A, holding EVERY permission their tenant can
@@ -47,7 +47,7 @@ import { TicketEventPublisher } from '../../src/modules/events/ticket-event.publ
  * Written as a table so a new module is one row. A per-module copy of this test
  * is how a module eventually gets added without one.
  */
-describe('§3.1 tenant isolation sweep (e2e)', () => {
+describe('Tenant isolation sweep (e2e)', () => {
   let fx: E2eFixture;
 
   let tickets: TicketsService;

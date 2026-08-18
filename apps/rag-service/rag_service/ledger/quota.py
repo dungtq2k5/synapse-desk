@@ -1,6 +1,6 @@
 """The quota counter, incremented DIRECTLY rather than over gRPC.
 
-RDM §1.14 and 12-doc §1.3: routing the charge through `ingestion-service` would
+RDM §1.14: routing the charge through `ingestion-service` would
 put a network round trip on the hot path of every AI request in order to avoid
 duplicating one string format. The format is duplicated instead — here — and
 guarded by a contract test that builds the same key on both sides.

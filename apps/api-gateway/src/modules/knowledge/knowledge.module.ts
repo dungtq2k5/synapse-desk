@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { KnowledgeGrpcClient } from './knowledge-grpc.client';
+import { KnowledgeService } from './knowledge.service';
 import { KnowledgeController } from './knowledge.controller';
 
 /**
@@ -12,7 +13,7 @@ import { KnowledgeController } from './knowledge.controller';
 @Module({
   imports: [AuthModule],
   controllers: [KnowledgeController],
-  providers: [KnowledgeGrpcClient],
-  exports: [KnowledgeGrpcClient],
+  providers: [KnowledgeGrpcClient, KnowledgeService],
+  exports: [KnowledgeService],
 })
 export class KnowledgeModule {}

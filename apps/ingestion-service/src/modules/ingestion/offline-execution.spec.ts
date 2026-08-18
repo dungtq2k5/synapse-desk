@@ -3,7 +3,7 @@ import { buildPdf, buildScannedPdf } from '../../../test/utils/pdf-fixture';
 import { describeWithOcr } from '../../../test/utils/ocr-binaries';
 
 /**
- * **Which binaries this service is allowed to run**
+ * **Which binaries this service is allowed to run**.
  *
  * Its own file because of how the observation has to be made. `jest.spyOn`
  * cannot patch `node:child_process` — its exports are non-configurable, and
@@ -19,7 +19,7 @@ import { describeWithOcr } from '../../../test/utils/ocr-binaries';
  * weaker statement than that it calls exactly those two and gets text back.
  *
  * Without this file, "no system binary" simply stops being true and nothing
- * notices the next shell-out — which is the whole reason §2 asks for it rather
+ * notices the next shell-out — which is the whole reason this exists rather
  * than merely relaxing the claim.
  */
 jest.mock('node:child_process', () => {
@@ -49,7 +49,7 @@ const execFileMock = execFile as unknown as jest.Mock;
 import { DocumentParserService } from './document-parser.service';
 import { OcrService } from './ocr.service';
 
-describe('§2 the only subprocesses are the OCR pair', () => {
+describe('The only subprocesses are the OCR pair', () => {
   const parser = new DocumentParserService(new OcrService());
 
   const parse = async (bytes: Buffer, type: string) =>
@@ -111,7 +111,7 @@ describe('§2 the only subprocesses are the OCR pair', () => {
   });
 });
 
-describe('§6.1 the availability probe', () => {
+describe('The availability probe', () => {
   it('**runs once per process, not once per page**', async () => {
     // A fifty-page scanned document must not fork a hundred probes, and on a
     // deployment WITHOUT the binaries it must not print the same warning fifty
@@ -134,7 +134,7 @@ describe('§6.1 the availability probe', () => {
   }, 30_000);
 });
 
-describe('§6.1 the probe runs at BOOT, not at first use', () => {
+describe('The probe runs at BOOT, not at first use', () => {
   it('**module init probes, before any document is processed**', async () => {
     // The warning says "build with `--target runtime-ocr`" — a message for
     // whoever deployed the service. Probing lazily delivers it on the first
@@ -156,7 +156,7 @@ describe('§6.1 the probe runs at BOOT, not at first use', () => {
     ).toEqual(['pdftoppm', 'tesseract']);
   }, 30_000);
 
-  it('**a failing probe does not fail boot** — §6.1 is not boot-closed', () => {
+  it('**a failing probe does not fail boot** — the probe is not boot-closed', () => {
     // The rule this fix must not accidentally invert. OCR is a capability: a
     // deployment without the binaries still ingests every other document, so
     // the hook returns void and swallows nothing it should have thrown.

@@ -9,7 +9,7 @@ import {
 import { ScopeWriterService } from './scope-writer.service';
 
 /**
- * The RECONCILER — §2.3, and it is deliberately not the writer.
+ * The RECONCILER, and it is deliberately not the writer.
  *
  * The endpoint already applied the change to both retrievable stores before it
  * returned (`ScopeWriterService.apply`), in the order that makes a partial
@@ -27,7 +27,7 @@ import { ScopeWriterService } from './scope-writer.service';
  */
 @Processor(SCOPE_FANOUT_QUEUE, {
   // Higher than the ingestion worker's. These jobs are short and can arrive in
-  // bursts when an admin reorganises departments, and each one is a
+  // bursts when an admin reorganizes departments, and each one is a
   // security-relevant write that should not wait behind another tenant's.
   concurrency: 8,
 })
@@ -49,21 +49,18 @@ export class ScopeFanoutProcessor extends WorkerHost {
     /**
      * **The document's CURRENT scope, not the one the event carried.**
      *
-     * A queued job is a promise to make the stores agree with `documents` —
-     * not to replay a scope that was true when it was enqueued. Those are the
-     * same thing right up until the document changes again before the job
-     * runs, and then replaying is actively wrong: delete a document, restore it
-     * a second later, and the deferred fan-out re-hides the chunks of a
-     * document every screen says is live.
+     * A queued job is a promise to make the stores agree with `documents` — not
+     * to replay a scope that was true when it was enqueued. Those coincide right
+     * up until the document changes again before the job runs, and then
+     * replaying is actively wrong: delete a document, restore it a second later,
+     * and the deferred fan-out re-hides the chunks of a document every screen
+     * says is live.
      *
-     * That is not a hypothetical. It showed up as an intermittent e2e failure —
-     * "restore un-flips the chunks" passing four runs in five — which is what a
-     * production race looks like from the inside: rare, unreproducible on
-     * demand, and blamed on the test.
+     * It showed up as an intermittent e2e failure — passing four runs in five —
+     * which is what a production race looks like from the inside.
      *
-     * Reading the row also makes the job naturally idempotent: any number of
-     * stale jobs for one document now converge on the same answer instead of
-     * fighting over which snapshot wins.
+     * Reading the row also makes the job idempotent: any number of stale jobs
+     * for one document converge instead of fighting over which snapshot wins.
      */
     const current = await this.writer.currentScope(event.documentId);
     if (!current) {

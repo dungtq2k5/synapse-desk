@@ -3,12 +3,11 @@ import { UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionGuard } from '../../common/guards/permission.guard';
 import { TicketMessageResponseGqlDto } from './dto/graphql/message-response.gql-dto';
-import { UserSummaryGqlDto } from '../users/dto/graphql/user-summary.gql-dto';
+import { UserSummaryResponseGqlDto } from '../users/dto/graphql/user-response.gql-dto';
 import type { GqlContext } from '../../common/graphql/loaders/loaders.factory';
-import { toUserSummaryGqlDto } from '../users/user.mapper';
 
 /**
- * `TicketMessage.sender`
+ * `TicketMessage.sender`.
  *
  * Its own resolver class because `@ResolveField` attaches to the type named by
  * `@Resolver()`, and this field belongs to `TicketMessage` rather than to
@@ -19,7 +18,7 @@ import { toUserSummaryGqlDto } from '../users/user.mapper';
 @Resolver(() => TicketMessageResponseGqlDto)
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class TicketMessagesResolver {
-  @ResolveField(() => UserSummaryGqlDto, {
+  @ResolveField(() => UserSummaryResponseGqlDto, {
     nullable: true,
     description:
       'Who wrote the message. Null for an AI-generated one — no user did, ' +
@@ -28,11 +27,11 @@ export class TicketMessagesResolver {
   async sender(
     @Parent() message: TicketMessageResponseGqlDto,
     @Context() { loaders }: GqlContext,
-  ): Promise<UserSummaryGqlDto | null> {
+  ): Promise<UserSummaryResponseGqlDto | null> {
     if (!message.senderId) return null;
 
     // The SAME loader the ticket's `assignee` and `author` use, so a thread
     // where one agent wrote twelve messages fetches them once.
-    return toUserSummaryGqlDto(await loaders.users.load(message.senderId));
+    return await loaders.users.load(message.senderId);
   }
 }

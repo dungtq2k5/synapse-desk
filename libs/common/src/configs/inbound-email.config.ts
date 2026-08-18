@@ -1,5 +1,3 @@
-import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
-
 /**
  * Inbound email addressing
  *
@@ -9,6 +7,8 @@ import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
  * second spelling of this format in any one of them is mail that routes in
  * tests and drops in production.
  */
+
+import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 
 /**
  * The fixed local part every inbound address begins with.
@@ -34,7 +34,7 @@ const INBOUND_TOKEN_BYTES = 16;
 /**
  * A tenant's inbound token: 32 lowercase hex characters.
  *
- * **Hex, not `generateSecureToken()`** That helper produces 43
+ * **Hex, not `generateSecureToken()`**. That helper produces 43
  * `base64url` characters, which does not fit `organizations.inbound_token` and,
  * far worse, is CASE-SENSITIVE: local-part case is preserved in theory and
  * normalised by plenty of real mail systems in practice, so one hop lowercasing
@@ -55,7 +55,7 @@ export type InboundAddress = {
   /**
    * The per-ticket reply token, when the sender replied to a notification.
    *
-   * An HMAC of the ticket id rather than the id itself A raw id
+   * An HMAC of the ticket id rather than the id itself. A raw id
    * would let anyone who can construct the address post into any ticket;
    * holding the HMAC is the authorization, which is what a reply is.
    */
@@ -149,7 +149,7 @@ const REPLY_TOKEN_SEPARATOR = '-';
 export const MAX_ADDRESSABLE_TICKET_NUMBER = 36 ** 8 - 1;
 
 /**
- * The per-ticket half of a reply address
+ * The per-ticket half of a reply address.
  *
  * `{base36 ticket number}-{MAC}`, so it is both **readable back** and
  * **unforgeable**:

@@ -14,7 +14,7 @@ import {
 import { RequestContext } from '@synapsedesk/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { NotificationsGrpcClient } from './notifications-grpc.client';
+import { NotificationsService } from './notifications.service';
 import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AUTH_SCHEMES } from '../../common/config/swagger.config';
 import {
@@ -41,7 +41,7 @@ import {
  * read someone else's feed, and there is none. The recipient is `ctx.sub`,
  * carried in gRPC metadata, and no request shape here can name a different one.
  *
- * **Prefix is `/notifications`, not `/users/me/notifications`** — the §8
+ * **Prefix is `/notifications`, not `/users/me/notifications`** — the endpoint plan's
  * ownership map routes by path prefix and `/users/*` belongs to auth-service. A
  * top-level prefix is what makes the owning service unambiguous from the route.
  *
@@ -55,9 +55,7 @@ import {
 @Controller('notifications')
 @UseGuards(JwtAuthGuard)
 export class NotificationsController {
-  constructor(
-    private readonly notificationsGrpcClient: NotificationsGrpcClient,
-  ) {}
+  constructor(private readonly notifications: NotificationsService) {}
 
   @ApiOperation({
     summary:
@@ -70,7 +68,7 @@ export class NotificationsController {
     @CurrentUser() context: RequestContext,
     @Query() query: ListNotificationsQueryDto,
   ): Promise<NotificationFeedResponseDto> {
-    return this.notificationsGrpcClient.list(query, context);
+    return this.notifications.list(query, context);
   }
 
   /**
@@ -88,7 +86,7 @@ export class NotificationsController {
   unreadCount(
     @CurrentUser() context: RequestContext,
   ): Promise<UnreadCountResponseDto> {
-    return this.notificationsGrpcClient.unreadCount(context);
+    return this.notifications.unreadCount(context);
   }
 
   @ApiOperation({
@@ -101,7 +99,7 @@ export class NotificationsController {
   listPreferences(
     @CurrentUser() context: RequestContext,
   ): Promise<PreferenceResponseDto[]> {
-    return this.notificationsGrpcClient.listPreferences(context);
+    return this.notifications.listPreferences(context);
   }
 
   /** Upsert on `(user_id, type, channel)` — never a duplicate-row insert. */
@@ -113,7 +111,7 @@ export class NotificationsController {
     @CurrentUser() context: RequestContext,
     @Body() dto: UpdatePreferenceDto,
   ): Promise<PreferenceResponseDto> {
-    return this.notificationsGrpcClient.updatePreference(dto, context);
+    return this.notifications.updatePreference(dto, context);
   }
 
   /**
@@ -131,7 +129,7 @@ export class NotificationsController {
     @CurrentUser() context: RequestContext,
     @Body() dto: MarkManyReadDto,
   ): Promise<MarkReadResponseDto> {
-    return this.notificationsGrpcClient.markManyRead(dto, context);
+    return this.notifications.markManyRead(dto, context);
   }
 
   /**
@@ -149,7 +147,7 @@ export class NotificationsController {
     @CurrentUser() context: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<MarkReadResponseDto> {
-    return this.notificationsGrpcClient.markRead(id, context);
+    return this.notifications.markRead(id, context);
   }
 
   /**
@@ -167,6 +165,6 @@ export class NotificationsController {
     @CurrentUser() context: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<MarkReadResponseDto> {
-    return this.notificationsGrpcClient.archive(id, context);
+    return this.notifications.archive(id, context);
   }
 }

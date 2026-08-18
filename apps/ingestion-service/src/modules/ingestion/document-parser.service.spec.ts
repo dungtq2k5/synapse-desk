@@ -8,15 +8,15 @@ import { buildPdf } from '../../../test/utils/pdf-fixture';
 import { buildDocx } from '../../../test/utils/docx-fixture';
 
 /**
- * The parser, on libraries rather than hand-written parsing
+ * The parser, on libraries rather than hand-written parsing.
  *
  * Most of these exist because the hand-written version got them WRONG, not
  * because a library upgrade might: a DOCX table became a run-on sentence, OMML
  * math vanished, `chars / 4` under-counted CJK by 3.7x, and a `#` inside a code
- * fence split a chunk in half (§3.1). Each is now a property the stack has to
+ * fence split a chunk in half. Each is now a property the stack has to
  * keep.
  */
-describe('§3 DocumentParserService (unit)', () => {
+describe('DocumentParserService (unit)', () => {
   const parser = new DocumentParserService(new OcrService());
   const chunker = new DocumentChunkerService();
 
@@ -45,7 +45,7 @@ describe('§3 DocumentParserService (unit)', () => {
 
       const [page] = await parse(bytes, 'docx');
 
-      // **Real GFM, with no repair pass** F1. The delimiter row
+      // **Real GFM, with no repair pass.** The delimiter row
       // comes from `turndown-plugin-gfm`, which is what that plugin exists for.
       // The wrapper this replaced emitted no delimiter row, and ~50 lines of
       // ours put one back.
@@ -61,7 +61,7 @@ describe('§3 DocumentParserService (unit)', () => {
       expect(withTable?.contentText).toContain('APAC');
     });
 
-    it('2. **OMML math is DROPPED, and that is the recorded trade** — §3.5 F1', async () => {
+    it('2. **OMML math is DROPPED, and that is the recorded trade**', async () => {
       // The wrapper converted OMML to LaTeX and double-escaped it, so
       // `$\\frac{1}{2}$` rendered as a literal `\frac`: the math survived the
       // parse and then meant nothing. Mammoth ignores OMML entirely, so a
@@ -174,7 +174,7 @@ describe('§3 DocumentParserService (unit)', () => {
     });
   });
 
-  describe('log noise — §3.5 F5', () => {
+  describe('log noise', () => {
     it('7b. **parsing a normal PDF emits no pdf.js warning**', async () => {
       // pdf.js logged `UnknownErrorException: Ensure that the
       // standardFontDataUrl API parameter is provided` once per document, on
@@ -196,7 +196,7 @@ describe('§3 DocumentParserService (unit)', () => {
     });
   });
 
-  describe('the repair layer is GONE — §3.5 F1', () => {
+  describe('the repair layer is GONE', () => {
     it('8. **`repairOfficeMarkdown` no longer exists**', async () => {
       // Deleting code is the deliverable, so assert it stayed deleted. The
       // helper existed only to undo damage a wrapper did to turndown's output;

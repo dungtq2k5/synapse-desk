@@ -80,6 +80,7 @@ export class InvitationsGrpcController implements InvitationServiceController {
   expireStaleInvitations(): Promise<ExpireStaleInvitationsResponse> {
     return this.invitationsService.expireStaleInvitations();
   }
+
   /** Dry run: no writes, no mail. */
   previewInvitations(
     request: PreviewInvitationsRequest,

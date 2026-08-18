@@ -1,9 +1,9 @@
-"""§5 test 2 — the acceptance test for the whole feature.
+"""The acceptance test for the whole feature.
 
 **A real cheap-tier call, against a real image.** Every other test in this
 change asserts wiring: that the condition changed, that the part reached the
 call, that the count is right. All of them pass against a model that looks at
-the image and says nothing useful — and 35-doc §1's failure would still be
+the image and says nothing useful — and the context-only failure would still be
 live, because retrieval would still find nothing and `corag.py` would still
 return `DOC_MISSING` before generation ever ran.
 

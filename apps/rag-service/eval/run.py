@@ -120,7 +120,7 @@ class Outcome:
     def refusal_correct(self) -> bool | None:
         """Did it answer, escalate or refuse exactly when it should have?
 
-        **Three states, not two** `expect` used to mean "is this a
+        **Three states, not two**. `expect` used to mean "is this a
         DOC_MISSING question", which made the metric a boolean about the corpus;
         prompt-injection refusals are a third outcome with its own proto status,
         and folding them into either existing branch would score a refused
@@ -159,7 +159,7 @@ class Outcome:
     def language_match(self) -> bool | None:
         """Did the answer come back in the question's language?
 
-        17-doc §2.1. Skipped for refusals, whose text is a fixed canned string
+        Skipped for refusals, whose text is a fixed canned string
         in one language — measuring it there would score the constant.
         """
         if self.status in {"DOC_MISSING", "REFUSED"} or not self.answer.strip():
@@ -501,7 +501,7 @@ def rate(values: list[bool | None]) -> tuple[float, int]:
     return (sum(applicable) / len(applicable), len(applicable))
 
 
-def report(outcomes: list[Outcome]) -> dict:
+def report(outcomes: list[Outcome]) -> dict: # NOSONAR
     metrics = {
         "retrieval_hit_rate": rate([o.retrieval_hit for o in outcomes]),
         "citation_rate": rate([o.cited_anything for o in outcomes]),
@@ -570,7 +570,7 @@ def report(outcomes: list[Outcome]) -> dict:
     }
 
 
-async def main() -> int:
+async def main() -> int: # NOSONAR
     parser = argparse.ArgumentParser(description="Run the RAG eval golden set.")
     parser.add_argument(
         "--baseline",
@@ -707,7 +707,7 @@ async def main() -> int:
                 continue
 
             delta = current["rate"] - before
-            arrow = "▲" if delta > 0 else ("▼" if delta < 0 else "=")
+            arrow = "▲" if delta > 0 else ("▼" if delta < 0 else "=") # NOSONAR
             print(f"  {name:24} {arrow} {delta:+.1%}  ({before:.1%} → {current['rate']:.1%})")
 
     if args.write_baseline:

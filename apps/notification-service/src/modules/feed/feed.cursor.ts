@@ -1,24 +1,20 @@
 /**
- * The feed cursor
+ * @file The feed cursor.
  *
- * **Cursors, not offsets, and the reason is mechanical rather than stylistic.**
- * The feed grows at the head while it is being read: between the request for
- * page 1 and the request for page 2, three new notifications can arrive. With
+ * **Cursors, not offsets.** The feed grows at the head while it is being read:
+ * between page 1 and page 2, three new notifications can arrive. With
  * `OFFSET 20` those three push the rows down, so page 2 re-serves rows the
- * client already has — and nothing about the response says so. The client
- * renders duplicates, or (on a delete) skips a row nobody ever sees.
+ * client already has — and nothing in the response says so.
  *
  * A cursor names a POSITION rather than a distance, so the same rows follow it
  * regardless of what arrived in front.
  *
- * `(created_at, id)` rather than `created_at` alone: two notifications can
- * share a millisecond — group collapse refreshes `created_at` to `NOW()` for a
- * whole fan-out — and a cursor on a non-unique column either repeats or skips
- * every row that ties with it.
+ * `(created_at, id)` rather than `created_at` alone: two notifications can share
+ * a millisecond — group collapse refreshes `created_at` for a whole fan-out —
+ * and a cursor on a non-unique column either repeats or skips every tie.
  *
- * Opaque to the client, base64 of a JSON pair. Opaque so that changing the sort
- * key later is not a breaking API change, and so nobody starts constructing one
- * by hand.
+ * Opaque to the client, base64 of a JSON pair: so changing the sort key later is
+ * not a breaking change, and so nobody hand-constructs one.
  */
 
 export type FeedCursor = {

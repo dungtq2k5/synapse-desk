@@ -205,7 +205,11 @@ describe('Auth core (e2e)', () => {
       const results = await Promise.allSettled([attempt(), attempt()]);
 
       const fulfilled = results.filter((r) => r.status === 'fulfilled');
-      const rejected = results.filter((r) => r.status === 'rejected');
+      // A type-guard predicate, not a bare comparison: `.filter()` does not
+      // narrow a union, so `.reason` below is only reachable through one.
+      const rejected = results.filter(
+        (r): r is PromiseRejectedResult => r.status === 'rejected',
+      );
 
       expect(fulfilled).toHaveLength(1);
       expect(rejected).toHaveLength(1);
@@ -597,7 +601,7 @@ describe('Auth core (e2e)', () => {
 
       await expectRpc(
         auth.changePassword(
-          { currentPassword: 'WrongOne1!', newPassword: 'BrandNew1!' },
+          { currentPassword: 'WrongOne1!', newPassword: 'BrandNew1!' }, // NOSONAR
           memberContext({ id: user.id, organizationId: org.id }),
         ),
         status.UNAUTHENTICATED,

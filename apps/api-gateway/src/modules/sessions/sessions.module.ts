@@ -3,6 +3,7 @@ import { AuthModule } from '../auth/auth.module';
 import { SessionsController } from './sessions.controller';
 import { UserSessionsController } from './user-sessions.controller';
 import { SessionsGrpcClient } from './sessions-grpc.client';
+import { SessionsService } from './sessions.service';
 
 /**
  * Imports AuthModule for `AUTH_GRPC_CLIENT`, the JWT guards, and
@@ -13,6 +14,6 @@ import { SessionsGrpcClient } from './sessions-grpc.client';
 @Module({
   imports: [AuthModule],
   controllers: [SessionsController, UserSessionsController],
-  providers: [SessionsGrpcClient],
+  providers: [SessionsGrpcClient, SessionsService],
 })
 export class SessionsModule {}

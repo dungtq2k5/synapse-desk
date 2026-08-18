@@ -19,17 +19,13 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ResponseMessage } from '../../common/decorators/response-message.decorator';
 import { UsersService } from './users.service';
-import { UserServiceGrpcClient } from './users-service-grpc.client';
 import {
   CurrentUserResponseDto,
   UserResponseDto,
 } from './dto/rest/user-response.dto';
 import { UpdateOwnProfileDto } from './dto/rest/update-user.dto';
-import {
-  ConfirmAvatarDto,
-  PresignAvatarDto,
-  PresignAvatarResponseDto,
-} from './dto/rest/avatar.dto';
+import { ConfirmAvatarDto, PresignAvatarDto } from './dto/rest/avatar.dto';
+import { PresignAvatarResponseDto } from './dto/rest/avatar-response.dto';
 import { OrgAccessKind } from '../../common/decorators/org-access.decorator';
 import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AUTH_SCHEMES } from '../../common/config/swagger.config';
@@ -56,15 +52,11 @@ import {
 export class UsersController {
   constructor(
     private readonly usersService: UsersService,
-    private readonly usersGrpcClient: UserServiceGrpcClient,
+    private readonly users: UsersService,
   ) {}
 
-  // ASK This `docblock` seems to be invalid
-  /**
-   * Takes the whole RequestContext rather than just `sub`: `ip` and `userAgent`
-   * are two of its fields, so the origin needs no separate derivation once a
-   * caller is authenticated.
-   */
+  // The whole `RequestContext`, not just `sub`: it extends `RequestOrigin`, so
+  // `ip` and `userAgent` come with it and need no separate derivation.
   @OrgAccessKind(OrgAccess.AUTH)
   @ApiOperation({
     summary: 'Own profile + org + departments + effective permission codes',
@@ -78,19 +70,9 @@ export class UsersController {
     return this.usersService.getCurrentUser(context.sub, context);
   }
 
-  // ASK This `docblock` seems to be invalid
-  /**
-   * `fullName`, `dob`, `gender` — and nothing else.
-   *
-   * `avatarUrl` is NOT here: it is written only by the avatar confirm endpoint
-   * below, which is what verifies the object was actually uploaded by this
-   * caller and cleans up the one it replaces.
-   *
-   * `email` and `phoneNumber` change through the OTP flow, which is what proves
-   * the new address belongs to the user; the rest are administrative. The DTO
-   * is the enforcement: `forbidNonWhitelisted` rejects any other key with a
-   * 400, so keeping it narrow is a security control rather than a convention.
-   */
+  // Keeping `UpdateOwnProfileDto` narrow is a SECURITY control, not a style
+  // choice: `forbidNonWhitelisted` 400s any other key. `avatarUrl` is written
+  // only by the avatar-confirm route; `email`/`phoneNumber` only via OTP.
   @ApiOperation({
     summary: 'Update own profile fields (fullName, dob, gender)',
   })
@@ -103,13 +85,13 @@ export class UsersController {
     @CurrentUser() context: RequestContext,
     @Body() updateOwnProfileDto: UpdateOwnProfileDto,
   ): Promise<UserResponseDto> {
-    return this.usersGrpcClient.updateOwnProfile(updateOwnProfileDto, context);
+    return this.users.updateOwnProfile(updateOwnProfileDto, context);
   }
 
   // ---------------------------------------------------------------- avatars
 
   /**
-   * Step 1 of presign → upload → confirm — 10-storage-service.md §3.1.
+   * Step 1 of presign → upload → confirm.
    *
    * Returns a URL the CLIENT PUTs the bytes to directly, bypassing every
    * application server. That is the whole point of the design: a 2 MB image
@@ -130,7 +112,7 @@ export class UsersController {
     @CurrentUser() context: RequestContext,
     @Body() dto: PresignAvatarDto,
   ): Promise<PresignAvatarResponseDto> {
-    return this.usersGrpcClient.presignAvatar(dto, context);
+    return this.users.presignAvatar(dto, context);
   }
 
   /**
@@ -152,7 +134,7 @@ export class UsersController {
     @CurrentUser() context: RequestContext,
     @Body() dto: ConfirmAvatarDto,
   ): Promise<UserResponseDto> {
-    return this.usersGrpcClient.confirmAvatar(dto, context);
+    return this.users.confirmAvatar(dto, context);
   }
 
   /**
@@ -174,6 +156,6 @@ export class UsersController {
   deleteAvatar(
     @CurrentUser() context: RequestContext,
   ): Promise<UserResponseDto> {
-    return this.usersGrpcClient.deleteAvatar(context);
+    return this.users.deleteAvatar(context);
   }
 }

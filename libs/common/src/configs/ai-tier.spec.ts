@@ -11,7 +11,7 @@ import {
 
 const REPO_ROOT = join(__dirname, '../../../..');
 
-describe('§2 The AI tier (unit)', () => {
+describe('The AI tier (unit)', () => {
   describe('what makes it safe to sell', () => {
     it('1. Prices QUALITY above FAST, so the CAP keeps meaning what it meant', () => {
       // Under TOKEN budgeting, a premium tenant consumes the same token count
@@ -80,12 +80,12 @@ describe('§2 The AI tier (unit)', () => {
     });
   });
 
-  describe('§3.2 test 3 — ticket-service names no model', () => {
+  describe('Ticket-service names no model', () => {
     it('6. Contains no model-name literal ANYWHERE', () => {
       // Applied to the service that should never have one. `ticket-service`
       // calls rag-service, which resolves settings itself — so this service
       // never sees a model name as an input, which is the easiest possible
-      // version of §1.2. The check is repo-wide; this asserts it for the one
+      // version of the model-literal rule. The check is repo-wide; this asserts it for the one
       // service the doc calls out by name.
       const output = execFileSync(
         process.execPath,

@@ -60,9 +60,9 @@ const DEFAULT_PREFERENCE = {
 } as const;
 
 /**
- * Preferences and quiet hours
+ * Preferences and quiet hours.
  *
- * **Ships WITH the producers, not after them.** §3 turns on the volume and this
+ * **Ships WITH the producers, not after them.** The producers turn on the volume and this
  * is the only thing that lets a user survive it: `ticket.message_created` fires
  * on every message, and shipping that with no quiet hours means emailing an
  * agent at 2am in week one. You get one chance at a user's notification

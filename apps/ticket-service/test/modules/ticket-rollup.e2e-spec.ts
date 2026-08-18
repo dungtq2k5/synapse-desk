@@ -23,7 +23,7 @@ import { AuthReferenceService } from '../../src/modules/auth-client/auth-referen
  * corrected, and **tenant-timezone bucketing**, which a UTC-only fixture passes
  * against an implementation that never converts.
  */
-describe('§2.2 The ticket rollup (e2e)', () => {
+describe('The ticket rollup (e2e)', () => {
   let fx: E2eFixture;
   let rollup: TicketRollupJob;
   let analytics: AnalyticsService;
@@ -62,7 +62,7 @@ describe('§2.2 The ticket rollup (e2e)', () => {
 
   const at = (iso: string) => new Date(iso);
 
-  /** Relative to NOW — §6 test 7 must land inside the trailing window. */
+  /** Relative to NOW — the test must land inside the trailing window. */
   const hoursAgo = (hours: number) =>
     new Date(Date.now() - hours * 60 * 60 * 1000);
 
@@ -581,7 +581,7 @@ describe('§2.2 The ticket rollup (e2e)', () => {
    * query. `dataThrough` is what separates "quiet tenant" from "nothing has
    * ever run" without reading a log.
    */
-  describe('dataThrough — freshness, 20-doc §4.3', () => {
+  describe('dataThrough — freshness', () => {
     const context = () => ({ organizationId: tenant.organizationId }) as never;
     const range = { from: '2026-03-01', to: '2026-03-31' };
 
@@ -726,7 +726,7 @@ describe('§2.2 The ticket rollup (e2e)', () => {
    * Nothing anywhere drove the SCHEDULER and then read the ENDPOINT — so the
    * one thing nobody verified was that the two were connected at all.
    */
-  describe('§6 test 7 — seed → SCHEDULER → endpoint', () => {
+  describe('Seed → SCHEDULER → endpoint', () => {
     const context = () => ({ organizationId: tenant.organizationId }) as never;
 
     it('28. **after a scheduled run on seeded data, the overview is NON-ZERO**', async () => {

@@ -41,7 +41,7 @@ export interface GenerateDraftResponse {
   promptTokens: number;
   completionTokens: number;
   /**
-   * The `ai_generations` row this draft was recorded as — doc 15 §3.2.
+   * The `ai_generations` row this draft was recorded as
    *
    * The client hands it back as `generatedFromId` when the agent posts, which
    * is what closes the ACCEPTANCE LOOP. Without it the outcome is never
@@ -69,7 +69,7 @@ export interface SuggestionResponse {
 export interface GetSuggestionsResponse {
   items: SuggestionResponse[];
   /**
-   * Carried through from rag-service — 39-doc §1. `items` is the next-step
+   * Carried through from rag-service. `items` is the next-step
    * list this endpoint already produced; these are the articles beside it.
    */
   articles: SuggestedArticleResponse[];

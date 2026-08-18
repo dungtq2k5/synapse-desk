@@ -1,4 +1,4 @@
-"""§4.1 — Co-RAG generation, streaming, and the two things that must not break.
+"""Co-RAG generation, streaming, and the two things that must not break.
 
 The most valuable tests here are the metering ones. A generation that produces a
 perfect answer and records nothing is indistinguishable from a working system
@@ -159,7 +159,7 @@ class TestGrounding:
     async def test_DOC_MISSING_with_a_file_says_what_the_file_SHOWED(
         self, ledger, quota, settings, budget
     ):
-        """36-doc §6.1 — the gap stays a gap, and stops wasting the agent's time.
+        """The gap stays a gap, and stops wasting the agent's time.
 
         Retrieval genuinely found nothing: the knowledge base may have no
         article on that error, and improvising a policy remains worse than
@@ -416,13 +416,13 @@ class TestCitations:
 
 
 class TestCodeSpanStripping:
-    """21-doc §1.3 — the stripper itself, including its cost.
+    """The stripper itself, including its cost.
 
     Its input is a MODEL's output: untrusted, occasionally pathological, and
     reachable by anyone who can upload a document. The obvious regexes for both
     halves are super-linear on backtracking, and this codebase has already paid
-    for that twice — `stripHtmlTags`'s measured quadratic blowup and
-    `HEADING_PATTERN`'s standing FIXME.
+    for that once -- see "bounded time on pathological input" in
+    ingestion-service's ``document-parser.service.spec.ts``.
     """
 
     def test_the_result_is_the_SAME_LENGTH_as_the_input(self):
@@ -542,7 +542,7 @@ class TestCancellation:
 
 
 class TestTruncationIsDiagnosable:
-    """17-doc §1.2 Gap 2 — `MAX_TOKENS` must leave a trace.
+    """`MAX_TOKENS` must leave a trace.
 
     Truncation and a badly-answered question produce the SAME downstream
     symptom: the JSON is cut off mid-object, `_json_object` returns `{}`, and
@@ -650,7 +650,7 @@ class TestTruncationIsDiagnosable:
 
 
 class TestJsonExtraction:
-    r"""17-doc §1.2 Gap 1 — the greedy regex, and what it silently cost.
+    r"""The greedy regex, and what it silently cost.
 
     `re.search(r"\{.*\}", text, re.DOTALL)` spans from the FIRST opening brace
     to the LAST one in the response. One object: correct. Anything else — prose

@@ -1,5 +1,5 @@
 /**
- * The `@nestjs/swagger` CLI plugin, as a ts-jest AST transformer
+ * @file The `@nestjs/swagger` CLI plugin, as a ts-jest AST transformer.
  *
  * **Without this, every OpenAPI test in this workspace passes vacuously.** The
  * plugin is a TypeScript transformer that reads existing types and
@@ -22,6 +22,7 @@
  * drift here is caught by `swagger-plugin.e2e-spec.ts`, which asserts the
  * behaviour both configs exist to produce rather than the configs themselves.
  */
+
 const swaggerPlugin = require('@nestjs/swagger/plugin');
 
 module.exports = {

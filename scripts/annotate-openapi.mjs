@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Adds `@ApiOperation` / `@ApiWrappedResponse` / `@ApiFilterErrors` to every
- * gateway route
+ * gateway route.
  *
  *     node scripts/annotate-openapi.mjs [--dry]
  *
@@ -46,7 +46,7 @@ function loadPlan() {
     const [, method, path, description, auth] = m;
     // Only the FIRST sentence. The plan's prose explains decisions to
     // developers; `summary` is read by API consumers who need behaviour, not
-    // history
+    // history.
     rows.set(`${method} ${path.split(' ')[0]}`, {
       description: firstSentence(description),
       auth: auth.trim(),
@@ -337,7 +337,7 @@ for (const file of files) {
     if (!entry) withoutPlan.push(`${route.verb} ${route.path}`);
 
     // **PUBLIC is opted into per route; everything else inherits the
-    // controller's cookie requirement** 184 routes are
+    // controller's cookie requirement**. 184 routes are
     // authenticated and roughly ten are not, so annotating the ten is both less
     // work and self-correcting: a route added later and forgotten defaults to
     // documented-as-authenticated, which is the safe direction to be wrong in.

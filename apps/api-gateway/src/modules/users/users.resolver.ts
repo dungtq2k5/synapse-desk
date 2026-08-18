@@ -14,19 +14,19 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionGuard } from '../../common/guards/permission.guard';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { UserServiceGrpcClient } from './users-service-grpc.client';
-import { UserResponseGqlDto } from './dto/graphql/user-response.gql-dto';
+import { UsersService } from './users.service';
+import {
+  UserResponseGqlDto,
+  UserPageResponseGqlDto,
+} from './dto/graphql/user-response.gql-dto';
 import { DepartmentResponseGqlDto } from '../departments/dto/graphql/department-response.gql-dto';
-import { UserPageGqlDto } from './dto/graphql/user-page.gql-dto';
 import { PageArgsGqlDto } from '../../common/dto/graphql/page-args.gql-dto';
-import { toPageQuery } from '../../common/mappers/pagination.mapper';
+import { toPageQuery } from '../../common/graphql/page-query';
 import type { GqlContext } from '../../common/graphql/loaders/loaders.factory';
-import { toDepartmentResponseGqlDto } from '../departments/department.mapper';
-import { toUserResponseGqlDto } from './user.mapper';
 import { MAX_EDGE_LIST } from '../../common/config/graphql-limits.config';
 
 /**
- * `Query.me`, `Query.user`
+ * `Query.me`, `Query.user`.
  *
  * **`Query.user` carries `@RequirePermission('user.read')`, and `Ticket.assignee`
  * does not**, and that is the entire reason the two return different
@@ -37,7 +37,7 @@ import { MAX_EDGE_LIST } from '../../common/config/graphql-limits.config';
 @Resolver(() => UserResponseGqlDto)
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class UsersResolver {
-  constructor(private readonly users: UserServiceGrpcClient) {}
+  constructor(private readonly users: UsersService) {}
 
   /**
    * The caller themselves. No `user.read`, deliberately.
@@ -57,9 +57,7 @@ export class UsersResolver {
     // other: `departmentIds` is a SIBLING of `user` on the envelope, so `me`
     // rendered correctly while `me { departments }` returned `[]` for every
     // caller — the quiet version of the bug `Query.user` had loudly.
-    return toUserResponseGqlDto(
-      await this.users.getCurrentUser(context.sub, context),
-    );
+    return await this.users.getCurrentUserGql(context.sub, context);
   }
 
   @Query(() => UserResponseGqlDto, {
@@ -79,7 +77,7 @@ export class UsersResolver {
       // through `as unknown as UserResponseGqlDto` left every declared field
       // `undefined`, so this query answered `Cannot return null for
       // non-nullable field User.id` to every caller that reached it.
-      return toUserResponseGqlDto(await this.users.get(id, context));
+      return await this.users.getGql(id, context);
     } catch {
       // `null` rather than an error, for the same reason as `Query.ticket`: a
       // non-null field that throws takes the whole query's data with it.
@@ -87,7 +85,7 @@ export class UsersResolver {
     }
   }
 
-  @Query(() => UserPageGqlDto, {
+  @Query(() => UserPageResponseGqlDto, {
     name: 'users',
     description:
       'Users in the tenant. Requires `user.read`, like `GET /users`. The ' +
@@ -98,11 +96,11 @@ export class UsersResolver {
   async userPage(
     @Args() args: PageArgsGqlDto,
     @CurrentUser() context: RequestContext,
-  ): Promise<UserPageGqlDto> {
+  ): Promise<UserPageResponseGqlDto> {
     // Both casts here were hiding the same envelope mismatch as `Query.user`,
     // one level deeper: every ROW was a `UserSummaryResponseDto`, so each item
     // in the page failed `User.id` and took the whole query's data with it.
-    const page = await this.users.list(
+    const page = await this.users.listGql(
       {
         ...toPageQuery(args),
 
@@ -119,17 +117,11 @@ export class UsersResolver {
       context,
     );
 
-    return {
-      // An arrow rather than `.map(toUserResponseGqlDto)`: `map` passes the index as a
-      // second argument, and a mapper that later grows an optional parameter
-      // would start receiving it silently.
-      items: page.items.map((summary) => toUserResponseGqlDto(summary)),
-      meta: page.meta,
-    };
+    return page;
   }
 
   /**
-   * **The flat count beside the capped edge**
+   * **The flat count beside the capped edge**.
    *
    * Without it a capped list is indistinguishable from a complete one: a client
    * showing fifty departments cannot tell whether that is all of them, and the
@@ -146,25 +138,16 @@ export class UsersResolver {
       `capped at ${MAX_EDGE_LIST}; this is the true total.`,
   })
   departmentCount(@Parent() user: UserResponseGqlDto): number {
-    // The plain parent type, and no `?? 0`. Both were left over from when
-    // `departmentIds` was a property the schema did not declare: the parameter
-    // was widened with `& { departmentIds?: string[] }` in order to see it, and
-    // the fallback covered its absence. The field is declared and required now,
-    // so the widening asserted the OPPOSITE of the class and the fallback could
-    // only fire on a shape the compiler already rejects.
-    //
-    // Leaving them would matter more than it reads: `departments` directly below
-    // takes the plain type and reads the field outright, so two resolvers over
-    // the SAME parent disagreed about whether it can be missing — and the one
-    // that tolerated absence answered `0` rather than failing, which is exactly
-    // how `me { departments }` returned an empty list for every caller.
+    // No `?? 0`: `departmentIds` is declared and required on the parent, so a
+    // fallback could only fire on a shape the compiler already rejects -- and
+    // one that answered `0` would hide a resolver that forgot to carry the ids.
     return user.departmentIds.length;
   }
 
   /**
-   * `User.departments`
+   * `User.departments`.
    *
-   * On `UserResponseGqlDto` rather than `UserSummaryGqlDto`: department membership is
+   * On `UserResponseGqlDto` rather than `UserSummaryResponseGqlDto`: department membership is
    * organizational information, and an edge that reached it from a ticket would
    * tell a customer which teams an agent belongs to.
    */
@@ -175,18 +158,13 @@ export class UsersResolver {
     @Parent() user: UserResponseGqlDto,
     @Context() { loaders }: GqlContext,
   ): Promise<DepartmentResponseGqlDto[]> {
-    // `user.departmentIds`, plainly. This read used to be
-    // `user.departmentIds ?? []` against a parent typed
-    // `UserResponseGqlDto & { departmentIds?: string[] }` — an optional field
-    // widened onto the parameter because the schema type did not declare it.
-    // The `??` then turned "the resolver forgot to carry the ids" into an empty
-    // list, which is what let `Query.me` return no departments for every caller
-    // without anything failing. The field is declared now, so its absence is a
-    // type error rather than a default.
+    // Read plainly, with no `?? []`: the field is declared and required on the
+    // parent, so a resolver that failed to carry the ids is a TYPE ERROR rather
+    // than an empty list nobody notices.
     const ids = user.departmentIds;
     if (ids.length === 0) return [];
 
-    // **Sliced BEFORE the batch, not after** A user in 250
+    // **Sliced BEFORE the batch, not after**. A user in 250
     // departments produces a 250-key batch, and `ListDepartmentsByIds` caps at
     // 200 with an ERROR rather than a truncation — so
     // an uncapped parent does not return fewer departments, it fails the whole
@@ -196,15 +174,9 @@ export class UsersResolver {
       ids.slice(0, MAX_EDGE_LIST),
     );
 
-    return departments
-      .map((department) =>
-        department instanceof Error
-          ? null
-          : toDepartmentResponseGqlDto(department),
-      )
-      .filter(
-        (department): department is DepartmentResponseGqlDto =>
-          department !== null,
-      );
+    return departments.filter(
+      (department): department is DepartmentResponseGqlDto =>
+        department !== null && !(department instanceof Error),
+    );
   }
 }

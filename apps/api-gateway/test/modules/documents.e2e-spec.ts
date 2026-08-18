@@ -33,7 +33,7 @@ import { grpcError, timestamp, wirePage } from '../fixtures/wire';
  * permission split, the two-layer upload validation, and the route ordering
  * that `presign` and `storage` would otherwise lose to `:id`.
  */
-describe('§3.1 Documents at the HTTP boundary (e2e)', () => {
+describe('Documents at the HTTP boundary (e2e)', () => {
   let fx: E2eFixture;
 
   const documentId = faker.string.uuid();
@@ -648,7 +648,7 @@ describe('§3.1 Documents at the HTTP boundary (e2e)', () => {
     });
   });
 
-  // ------------------------------------------------- §16 §5 — the flag list
+  // ------------------------------------------------- the flag list
 
   describe('GET /documents/flags', () => {
     const wireFlag = (overrides: Record<string, unknown> = {}) => ({

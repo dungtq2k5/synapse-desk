@@ -15,21 +15,19 @@ import {
 } from '@synapsedesk/common';
 import { PrismaService } from '../prisma/prisma.service';
 
-// ASK Why we have two `docblock` for `ExportJobData`?
-/** What the worker needs to produce the file. */
-/** The BullMQ payload for one export job. */
+/** The BullMQ payload for one export job — what the worker needs to produce the file. */
 export type ExportJobData = {
   exportId: string;
 };
 
 /**
- * `GET /analytics/export`
+ * `GET /analytics/export`.
  *
  * **Not a read.** It creates a job, produces a file and returns a download URL,
  * which is why it needs an owner at all: ticket-service owns most of the source
  * data.
  *
- * Two things §5 calls out as easy to get wrong, both handled here:
+ * Two things that are easy to get wrong, both handled here:
  *
  *   - **An export is a SNAPSHOT with a timestamp in it.** Two people exporting
  *     "last quarter" a week apart get different numbers if a backfill ran

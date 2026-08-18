@@ -23,9 +23,9 @@ import { OrganizationsService } from '../../src/modules/organizations/organizati
 import { AuditPublisher } from '../../src/modules/audit/audit-publisher.service';
 import { faultInjector } from '@synapsedesk/common/testing/fault';
 
-describe('§2-§4 Billing and entitlements (e2e)', () => {
+describe('Billing and entitlements (e2e)', () => {
   // Every injected fault in this file is registered here and restored in an
-  // `afterEach` that runs whether the test passed, failed or threw
+  // `afterEach` that runs whether the test passed, failed or threw.
   const faults = faultInjector();
 
   let fx: E2eFixture;
@@ -40,7 +40,7 @@ describe('§2-§4 Billing and entitlements (e2e)', () => {
   /** Matches `STRIPE_WEBHOOK_SECRET` in .env.test. */
   const WEBHOOK_SECRET = 'whsec_test_secret_for_the_e2e_suite';
 
-  /** A stable id for the operator in the §5 audit assertions. */
+  /** A stable id for the operator in the audit assertions. */
   const SUPER_ADMIN_ID = '00000000-0000-4000-8000-00000000dead';
 
   const STARTER = 'price_starter_monthly';
@@ -155,9 +155,9 @@ describe('§2-§4 Billing and entitlements (e2e)', () => {
     await fx.close();
   });
 
-  // ------------------------------------------------------- §2 the schema
+  // ------------------------------------------------------- the schema
 
-  describe('§2 schema and the grandfathered path', () => {
+  describe('Schema and the grandfathered path', () => {
     it('1. Defaults BOTH Stripe columns to NULL, and such a tenant is fully usable', async () => {
       // The grandfathering path, and the test that fails if someone makes the
       // columns required. On the day this ships, EVERY tenant looks like this.
@@ -198,9 +198,9 @@ describe('§2-§4 Billing and entitlements (e2e)', () => {
     });
   });
 
-  // ------------------------------------------- §3 the entitlement writer
+  // ------------------------------------------- the entitlement writer
 
-  describe('§3 the entitlement writer', () => {
+  describe('The entitlement writer', () => {
     it('1. Applies entitlements to the right organization', async () => {
       const organization = await subscribedOrganization('cus_apply');
 
@@ -412,7 +412,7 @@ describe('§2-§4 Billing and entitlements (e2e)', () => {
 
     it('8. Maps past_due → SUSPENDED_PAST_DUE, and a later active back to ACTIVE', async () => {
       // The lifecycle enum was designed before billing existed and maps onto
-      // Stripe's statuses without modification (RDM §1.15) — §0.4's gate is the
+      // Stripe's statuses without modification (RDM §1.15) — the lifecycle gate is the
       // enforcement mechanism billing needed most and did not have to be built.
       const organization = await subscribedOrganization('cus_lifecycle');
       const now = new Date();
@@ -447,7 +447,7 @@ describe('§2-§4 Billing and entitlements (e2e)', () => {
     });
 
     it('9. Reaches its handler while the tenant is FROZEN', async () => {
-      // The §3.3 bypass, proven. The gate reads `organizations.status` and this
+      // The webhook bypass, proven. The gate reads `organizations.status` and this
       // endpoint's job is to WRITE it — so gating on it would make suspension a
       // one-way door: a frozen tenant whose payment succeeds could never
       // receive the event that reactivates them.
@@ -561,9 +561,9 @@ describe('§2-§4 Billing and entitlements (e2e)', () => {
     });
   });
 
-  // ------------------------------------------------------- §4 /billing/*
+  // ------------------------------------------------------- /billing/*
 
-  describe('§4 /billing', () => {
+  describe('/billing', () => {
     it('2. Reads Postgres and makes ZERO Stripe calls', async () => {
       // A dashboard that fans out to a third party on every load fails when
       // they do — and this is the page a customer opens when something is
@@ -684,9 +684,9 @@ describe('§2-§4 Billing and entitlements (e2e)', () => {
     });
   });
 
-  // ------------------ §5 what changes in already-shipped Domain A code
+  // ------------------ what changes in already-shipped Domain A code
 
-  describe('§5 the meaning changes', () => {
+  describe('The meaning changes', () => {
     it('1. REFUSES a billing-cycle reset with no reason', async () => {
       // The endpoint used to be routine. It now desynchronizes the quota window
       // from the Stripe invoice period AND grants a fresh AI budget, neither of
@@ -780,9 +780,9 @@ describe('§2-§4 Billing and entitlements (e2e)', () => {
     });
   });
 
-  // ------------------------ §3.1 what Domain A exposes for the tier
+  // ------------------------ what Domain A exposes for the tier
 
-  describe('§3.1 entitlements over gRPC', () => {
+  describe('Entitlements over gRPC', () => {
     it('1. Answers the tier AND the quota columns in ONE call', async () => {
       // Both spending services need both, and neither may read postgres_auth
       // (RDM §1.13). A second round trip for the tier would put two calls on

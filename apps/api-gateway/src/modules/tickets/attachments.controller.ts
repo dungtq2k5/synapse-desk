@@ -20,7 +20,7 @@ import {
   ApiWrappedResponse,
 } from '../../common/decorators/api-response.decorator';
 import { DownloadAttachmentResponseDto } from './dto/rest/message-response.dto';
-import { MessagesGrpcClient } from './messages-grpc.client';
+import { MessagesService } from './messages.service';
 
 /**
  * `/attachments/*` — a TOP-LEVEL prefix, not nested under its ticket.
@@ -41,7 +41,7 @@ import { MessagesGrpcClient } from './messages-grpc.client';
 @Controller('attachments')
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class AttachmentsController {
-  constructor(private readonly messagesGrpcClient: MessagesGrpcClient) {}
+  constructor(private readonly messages: MessagesService) {}
 
   /**
    * Returns `{ downloadUrl, expiresAt }` rather than a 302.
@@ -62,7 +62,7 @@ export class AttachmentsController {
     @CurrentUser() context: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<DownloadAttachmentResponseDto> {
-    return this.messagesGrpcClient.downloadAttachment(id, context);
+    return this.messages.downloadAttachment(id, context);
   }
 
   /**
@@ -86,6 +86,6 @@ export class AttachmentsController {
     @CurrentUser() context: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<void> {
-    return this.messagesGrpcClient.deleteAttachment(id, context);
+    return this.messages.deleteAttachment(id, context);
   }
 }

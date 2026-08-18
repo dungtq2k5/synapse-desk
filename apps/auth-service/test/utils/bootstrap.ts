@@ -188,7 +188,7 @@ export async function bootstrapE2eTest(): Promise<E2eFixture> {
       // Billing events reference organizations with ON DELETE SetNull, so they
       // would survive the sweep as orphans and the idempotency test would then
       // hit a UNIQUE violation on a re-used event id from a previous test.
-      // The heartbeat Not tenant data, but a row surviving into
+      // The heartbeat. Not tenant data, but a row surviving into
       // the next test carries its consecutive_failures with it.
       prisma.$executeRawUnsafe('DELETE FROM job_runs'),
       prisma.$executeRawUnsafe('DELETE FROM billing_events'),

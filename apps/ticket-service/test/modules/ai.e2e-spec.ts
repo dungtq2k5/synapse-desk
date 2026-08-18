@@ -17,7 +17,7 @@ import { TicketsService } from '../../src/modules/tickets/tickets.service';
 import { RagClientService } from '../../src/modules/ai-client/rag-client.service';
 import { TicketEventPublisher } from '../../src/modules/events/ticket-event.publisher';
 
-describe('§2.6 AI Co-Pilot (e2e)', () => {
+describe('AI Co-Pilot (e2e)', () => {
   let fx: E2eFixture;
   let ai: AiService;
   let tickets: TicketsService;
@@ -99,7 +99,7 @@ describe('§2.6 AI Co-Pilot (e2e)', () => {
    */
   describe('degrades to UNAVAILABLE when rag-service is unconfigured', () => {
     it('1. answers UNAVAILABLE from EVERY generation RPC — never a 500', async () => {
-      // §2.6 test 1. Parametrized over every RPC rather than spot-checked: a
+      // Parametrized over every RPC rather than spot-checked: a
       // new one added without the gate would answer 500, and a 500 sends
       // somebody debugging a feature that was never built.
       const ticket = await createTicket(fx.prisma, tenant);
@@ -172,7 +172,7 @@ describe('§2.6 AI Co-Pilot (e2e)', () => {
   // ------------------------------------------- configured AND reachable
 
   /**
-   * The case that matters now
+   * The case that matters now.
    *
    * The suite above proves the system degrades. Nothing proved it *works*:
    * every RPC could have answered UNAVAILABLE for a second reason — a wrong
@@ -205,7 +205,7 @@ describe('§2.6 AI Co-Pilot (e2e)', () => {
             confidenceScore: 0.6,
           },
         ],
-        // The article sidebar Empty here: this test is about the
+        // The article sidebar. Empty here: this test is about the
         // next-step list, which arrives beside them rather than instead.
         articles: [],
       });
@@ -269,7 +269,7 @@ describe('§2.6 AI Co-Pilot (e2e)', () => {
 
   describe('getSummary', () => {
     it('1. answers NOT_FOUND when none has been generated — not an empty object', async () => {
-      // §2.6 test 4. "No summary yet" and "the summary is blank" are different
+      // "No summary yet" and "the summary is blank" are different
       // facts: a client given `{}` for the first renders an empty panel where
       // it should render a "generate" button.
       const ticket = await createTicket(fx.prisma, tenant);
@@ -325,7 +325,7 @@ describe('§2.6 AI Co-Pilot (e2e)', () => {
     });
 
     it('2. REPLACES on re-generation — still exactly one row', async () => {
-      // §2.6 test 3. `ai_summaries.ticket_id` is unique, so a second `create`
+      // `ai_summaries.ticket_id` is unique, so a second `create`
       // would throw — but the real point is the product one: two summaries of
       // one ticket give no way to tell which describes the conversation as it
       // now stands.
@@ -376,7 +376,7 @@ describe('§2.6 AI Co-Pilot (e2e)', () => {
 
   describe('escalation triggers summarization', () => {
     it('1. does NOT fail the escalation when summarization 503s', async () => {
-      // §2.6 test 2 / §1.7's fire-and-forget rule. Escalating is the agent's
+      // The fire-and-forget rule. Escalating is the agent's
       // action; a summary that could not be generated is a missing convenience.
       isAvailable.mockReturnValue(true);
       const ticket = await createTicket(fx.prisma, tenant, {

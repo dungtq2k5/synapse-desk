@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { InvitationsController } from './invitations.controller';
 import { InvitationsGrpcClient } from './invitations-grpc.client';
+import { InvitationsService } from './invitations.service';
 
 /**
  * Imports AuthModule for `AUTH_GRPC_CLIENT` and `JwtCookieService` — accepting
@@ -14,6 +15,6 @@ import { InvitationsGrpcClient } from './invitations-grpc.client';
 @Module({
   imports: [AuthModule],
   controllers: [InvitationsController],
-  providers: [InvitationsGrpcClient],
+  providers: [InvitationsGrpcClient, InvitationsService],
 })
 export class InvitationsModule {}

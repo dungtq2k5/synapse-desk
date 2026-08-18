@@ -16,7 +16,7 @@ type PersistOutcome = {
 };
 
 /**
- * Pushes a notification toward the socket
+ * Pushes a notification toward the socket.
  *
  * **Publishes a fact; decides no rooms.** The socket server lives at the
  * gateway, with the Redis adapter and the `user:{id}` rooms every other

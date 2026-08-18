@@ -1,6 +1,6 @@
 import { isSameText, normalizeForComparison } from './text-normalize';
 
-describe('§3.2 The acceptance comparison (unit)', () => {
+describe('The acceptance comparison (unit)', () => {
   it('1. Treats a TRAILING NEWLINE as the same text', () => {
     // A rich-text editor adds one on send, and exact
     // equality then reports every untouched draft as EDITED — understating
@@ -21,7 +21,7 @@ describe('§3.2 The acceptance comparison (unit)', () => {
   });
 
   it('4. Still reports a REAL edit as different', () => {
-    // The trade this normalisation makes has a limit: whitespace-only edits
+    // The trade this normalization makes has a limit: whitespace-only edits
     // read as accepted, but a changed word must not.
     expect(isSameText('The limit is 500.', 'The limit is 750.')).toBe(false);
   });

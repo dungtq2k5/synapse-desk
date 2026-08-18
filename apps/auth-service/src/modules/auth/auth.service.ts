@@ -490,7 +490,7 @@ export class AuthService {
    *
    * **Both columns are cleared together.** Leaving `lockedUntil` set on an
    * unlocked account would let a later indefinite re-lock silently inherit an
-   * expiry nobody asked for — the same reasoning as §2.4's rule for manual
+   * expiry nobody asked for — the same reasoning as the rule for manual
    * unlocks.
    *
    * **Returns whether the lock is still IN FORCE, not whether this call did the
@@ -537,7 +537,7 @@ export class AuthService {
     device: RequestOrigin,
     client: { deviceName?: string; deviceToken?: string },
   ): Promise<LoginResponse> {
-    // **Lazy unlock, before the check**
+    // **Lazy unlock, before the check**.
     //
     // The one place where being locked matters in real time, so the expiry is
     // honoured the moment the user tries to use it, with no dependency on a
@@ -1267,17 +1267,6 @@ export class AuthService {
   }
 
   /**
-   * The 2FA challenge token: RS256, signed with its OWN key pair.
-   *
-   * Its own, not the access token's, and that is the point — the SIGNATURE now
-   * distinguishes the two token types, so a challenge token simply does not
-   * verify where an access token is expected. Sharing one pair worked but left
-   * the `is2faPending` claim checks load-bearing: one forgotten check anywhere
-   * and a half-authenticated caller passes as a complete one. Separate keys make
-   * those checks defence-in-depth instead of the only line of defence, and let
-   * either pair be rotated without invalidating the other's tokens.
-   */
-  /**
    * Short-lived proof that these user ids already passed a password check.
    *
    * Without it, `POST /auth/login/tenant` would accept any organizationId for
@@ -1303,6 +1292,17 @@ export class AuthService {
     );
   }
 
+  /**
+   * The 2FA challenge token: RS256, signed with its OWN key pair.
+   *
+   * Its own, not the access token's, and that is the point — the SIGNATURE now
+   * distinguishes the two token types, so a challenge token simply does not
+   * verify where an access token is expected. Sharing one pair worked but left
+   * the `is2faPending` claim checks load-bearing: one forgotten check anywhere
+   * and a half-authenticated caller passes as a complete one. Separate keys make
+   * those checks defence-in-depth instead of the only line of defence, and let
+   * either pair be rotated without invalidating the other's tokens.
+   */
   private generate2faToken(userId: string): string {
     return this.jwtService.sign(
       {

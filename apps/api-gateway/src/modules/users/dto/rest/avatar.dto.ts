@@ -19,22 +19,11 @@ import {
   MAX_OBJECT_PATH_LENGTH,
 } from '@synapsedesk/common';
 
-// ASK This `docblock` seems to be invalid
-/**
- * The avatar allowlist and cap, duplicated from storage-service's
- * `PURPOSE_POLICY` — deliberately, and this is the two-layer pattern §7.2
- * describes.
- *
- * This layer refuses a 50 MB request before it costs a network hop and
- * documents the limit in the API contract; that layer holds no matter which
- * service is asking. Neither can be removed on the grounds that the other
- * exists — and the storage suite tests that one, so a divergence shows up as a
- * gateway 200 followed by a storage 400, not as a silent widening.
- *
- * `MAX_AVATAR_BYTES` moved to `dto.config.ts`; `AVATAR_MIME_TYPES` lives in
- * `@synapsedesk/common` beside the other MIME lists. The rationale stays here,
- * where both are used together.
- */
+// The allowlist and cap are duplicated from storage-service's
+// `PURPOSE_POLICY`, deliberately: this layer refuses a 50 MB request before it
+// costs a network hop, that layer holds whichever service is asking. Neither
+// can be dropped because the other exists -- widen BOTH or neither.
+/** Asks for a presigned URL to upload a new avatar. */
 export class PresignAvatarDto {
   /**
    * No SVG. An SVG is a document that can carry script — the one image type
@@ -70,10 +59,4 @@ export class ConfirmAvatarDto {
   @MinLength(1)
   @MaxLength(MAX_OBJECT_PATH_LENGTH)
   readonly objectPath!: string;
-}
-
-export class PresignAvatarResponseDto {
-  uploadUrl!: string;
-  objectPath!: string;
-  expiresAt!: Date;
 }

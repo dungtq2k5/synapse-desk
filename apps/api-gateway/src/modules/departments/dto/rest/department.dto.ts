@@ -1,4 +1,4 @@
-import { Transform, Type } from 'class-transformer';
+import { Transform } from 'class-transformer';
 import {
   ArrayMaxSize,
   ArrayMinSize,
@@ -22,6 +22,7 @@ import {
 import { SearchPaginationDto } from '../../../../common/dto/rest/search-pagination.dto';
 import { ToBoolean } from '../../../../common/decorators/to-boolean.decorator';
 import {
+  MAX_DEPARTMENT_DESCRIPTION_LENGTH,
   MAX_DEPARTMENT_MEMBERS_PER_BATCH,
   MAX_DEPARTMENT_NAME_LENGTH,
   MIN_DEPARTMENT_NAME_LENGTH,
@@ -34,15 +35,9 @@ export class ListDepartmentsQueryDto extends OmitType(SearchPaginationDto, [
   @IsOptional()
   @IsString()
   @IsIn(DEPARTMENT_SORTABLE_FIELDS)
-  /**
-   * Optional in the API and, without this, REQUIRED in the docs
-   *
-   * The plugin derives `required` from TYPESCRIPT optionality, not from
-   * `@IsOptional()`. A field declared `page: number = 1` is non-optional to the
-   * compiler even though the validator lets a caller omit it, so the generated
-   * spec demanded it — and a generated client would refuse to send a request
-   * without one.
-   */
+  // `@ApiPropertyOptional()` is required here: the Swagger plugin derives
+  // `required` from TYPESCRIPT optionality, so a defaulted non-optional field
+  // is documented as mandatory and a generated client refuses to omit it.
   @ApiPropertyOptional()
   readonly sortBy: DepartmentSortableField = DEFAULT_SEARCH.SORT_BY;
 
@@ -87,7 +82,7 @@ export class CreateDepartmentDto {
 
   @IsOptional()
   @IsString()
-  @MaxLength(2000)
+  @MaxLength(MAX_DEPARTMENT_DESCRIPTION_LENGTH)
   readonly description?: string;
 }
 
@@ -107,7 +102,7 @@ export class UpdateDepartmentDto {
 
   @IsOptional()
   @IsString()
-  @MaxLength(2000)
+  @MaxLength(MAX_DEPARTMENT_DESCRIPTION_LENGTH)
   readonly description?: string;
 }
 
@@ -123,34 +118,10 @@ export class AddDepartmentMembersDto {
    * most one primary, so setting it here demotes whichever they had.
    */
   @IsOptional()
+  // `@ToBoolean()`, NOT `@Type(() => Boolean)`: the latter resolves the STRING
+  // `'false'` to `true`, so a caller opting out would silently opt in.
+  @ToBoolean()
   @IsBoolean()
-  @Type(() => Boolean)
   @ApiPropertyOptional()
   readonly isPrimary: boolean = false;
-}
-
-export class DepartmentResponseDto {
-  readonly id!: string;
-  readonly name!: string;
-  readonly description!: string | null;
-  readonly memberCount!: number;
-  /** Non-null only on a soft-deleted row. */
-  readonly deletedAt!: Date | null;
-  readonly deletedByName!: string | null;
-  readonly createdAt!: Date;
-  readonly updatedAt!: Date;
-}
-
-export class DepartmentMemberResponseDto {
-  readonly user!: unknown;
-  readonly isPrimary!: boolean;
-  readonly assignedByName!: string | null;
-  readonly assignedAt!: Date;
-}
-
-export class AddDepartmentMembersResponseDto {
-  /** New memberships. */
-  readonly addedCount!: number;
-  /** Existing memberships whose `isPrimary`/assigner were refreshed instead. */
-  readonly updatedCount!: number;
 }

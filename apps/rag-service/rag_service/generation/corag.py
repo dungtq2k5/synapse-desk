@@ -55,7 +55,7 @@ class Citation:
     document_id: str
     document_title: str
     page_number: int | None
-    #: The id a citation RESOLVES THROUGH test 2.
+    #: The id a citation RESOLVES THROUGH.
     #:
     #: Carried even though `chunk_id` would also find the row, because it is
     #: the key the two arms fuse on and the one Qdrant returns natively. A
@@ -102,11 +102,11 @@ class GenerationDelta:
 #:
 #: A constant rather than a generation: paying a model to say "I don't know" is
 #: spend on the one answer that needs no intelligence, and a generated version
-#: would vary — sometimes hedging into a guess, which is exactly what §1.6
+#: would vary — sometimes hedging into a guess, which is exactly what the grounding rule
 #: forbids.
 #:
 #: **Two of them, because the surfaces differ in one important way** (
-#: §2.4). Tier 1 chat sits in a conversation that can be escalated, so it offers
+#: the co-pilot). Tier 1 chat sits in a conversation that can be escalated, so it offers
 #: the handoff. `/knowledge/ask` has no conversation and no ticket — there is
 #: nothing to escalate INTO — so offering a handoff there is promising something
 #: the system cannot perform, and a user who accepts the offer gets nothing.
@@ -146,7 +146,7 @@ def doc_missing_answer(
     """The refusal text for a surface. Never invents, never over-promises.
 
     **With an attachment it also says what the file appeared to show**
-    §6.1. Retrieval can genuinely find nothing: the knowledge base may have no
+    Retrieval can genuinely find nothing: the knowledge base may have no
     article on that error, and improvising a policy stays worse than admitting
     the gap. But by this point the system has computed something an agent wants
     — the error code lifted out of the screenshot — and dropping it means a
@@ -195,7 +195,7 @@ def build_prompt(
     retrieved but none of them actually answer the question — which no amount
     of retrieval logic can detect.
 
-    **Attachments arrive as PARTS, listed inside the boundary**
+    **Attachments arrive as PARTS, listed inside the boundary**.
     The user asked about the screenshot, so the answering call has to see it;
     what the block and its instruction add is that it is material to read rather
     than an instruction to follow, and — the half that matters — **never a
@@ -289,7 +289,7 @@ def build_prompt(
 def strip_code_spans(markdown: str) -> str:
     """Blanks fenced blocks and inline code, preserving everything else.
 
-    **The collision the markdown contract creates** Asking for
+    **The collision the markdown contract creates**. Asking for
     markdown means more code in answers, and a code sample containing
     ``array[0]`` or ``items[2]`` parses as a citation of source 2 under the
     ``\\[(\\d+)\\]`` pattern below. It is bounds-checked so it cannot crash — it
@@ -310,9 +310,10 @@ def strip_code_spans(markdown: str) -> str:
     ``(`+)(?:(?!\\1).)*\\1`` for inline spans — are super-linear on
     backtracking, and this input is a MODEL's output: untrusted, occasionally
     pathological, and reachable by anyone who can upload a document. This
-    codebase has already paid for that lesson twice (`stripHtmlTags`'s measured
-    quadratic blowup, `HEADING_PATTERN`'s standing FIXME); a third is not worth
-    the four lines it would save.
+    codebase has already paid for that lesson -- the regression test in
+    ingestion-service's ``document-parser.service.spec.ts`` ("bounded time on
+    pathological input") outlived the code that earned it; another instance is
+    not worth the four lines a regex would save.
     """
     lines = markdown.split("\n")
     in_fence = False
@@ -475,7 +476,7 @@ class CoRagGenerator:
 
         **An empty retrieval never reaches the model.** It yields the canned
         `DOC_MISSING` answer and still writes a ledger row — with EMPTY
-        `retrieved_chunk_ids`, which is the knowledge-gap signal (13-doc §4.1
+        `retrieved_chunk_ids`, which is the knowledge-gap signal (
         test 4). Skipping the row would make gaps invisible precisely where
         they matter.
 
@@ -712,7 +713,7 @@ class CoRagGenerator:
         The cheap tier because judging "is this grounded in these passages" is
         a comparison rather than a composition, and scaling it with the tier
         would multiply a premium tenant's bill on the pass least likely to
-        benefit (doc 15 §2.2's reasoning, applied to a third volume call).
+        benefit — the tier reasoning, applied to a third volume call.
         """
         text = await self._one_pass(
             build_review_prompt(query, answer.content, chunks),
@@ -963,7 +964,7 @@ def _apply_review_result(
 
     An UNGROUNDED draft that survived the retry budget is reported as
     `DOC_MISSING` rather than shipped as an answer. The sources did not support
-    it, and saying so is what §1.6 asks for — the alternative is handing an
+    it, and saying so is what the grounding rule asks for — the alternative is handing an
     agent a confident invention with a green tick on it.
     """
     return GeneratedAnswer(

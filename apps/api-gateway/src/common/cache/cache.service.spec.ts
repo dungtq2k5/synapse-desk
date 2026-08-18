@@ -74,6 +74,8 @@ describe('CacheService', () => {
   let redis: FakeRedis;
   let cache: CacheService;
 
+  const ORG = 'org-1';
+
   beforeEach(() => {
     redis = new FakeRedis();
     cache = new CacheService({
@@ -81,9 +83,7 @@ describe('CacheService', () => {
     } as RedisService);
   });
 
-  const ORG = 'org-1';
-
-  describe('§1 test 2 — the key is order-insensitive', () => {
+  describe('The key is order-insensitive', () => {
     it('reordered parameters hit the same entry', () => {
       // The mild failure is a halved hit rate, invisibly. The severe one is an
       // invalidation that clears one spelling and leaves the other serving
@@ -107,7 +107,7 @@ describe('CacheService', () => {
     });
   });
 
-  describe('§1 test 3 — absent and empty agree', () => {
+  describe('Absent and empty agree', () => {
     it.each([
       ['undefined', undefined],
       ['null', null],
@@ -141,7 +141,7 @@ describe('CacheService', () => {
     });
   });
 
-  describe('§2 the tenant is the first segment', () => {
+  describe('The tenant is the first segment', () => {
     it('two tenants asking the identical question produce different keys', () => {
       const input = { scope: 'roles', params: { page: 1 } };
 
@@ -158,7 +158,7 @@ describe('CacheService', () => {
     });
   });
 
-  describe('§1 test 5 — a failure is never cached', () => {
+  describe('A failure is never cached', () => {
     it('`produce()` throwing propagates and writes nothing', async () => {
       // Caching a failure turns one bad response into a minute of them, and
       // does it exactly when the origin is already struggling.
@@ -189,7 +189,7 @@ describe('CacheService', () => {
     });
   });
 
-  describe('§1 test 4 — a cache fails OPEN', () => {
+  describe('A cache fails OPEN', () => {
     it('a Redis outage still answers, from the origin', async () => {
       // The opposite of the throttler next door, which fails CLOSED. A cache
       // outage must make the product slow; it must not make it down.
@@ -307,7 +307,7 @@ describe('CacheService', () => {
     });
   });
 
-  describe('§4 test 6 — invalidation uses SCAN, never KEYS', () => {
+  describe('Invalidation uses SCAN, never KEYS', () => {
     beforeEach(async () => {
       const seed = async (organizationId: string, scope: string) => {
         await cache.wrap({ organizationId, scope }, 60, () =>

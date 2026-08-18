@@ -11,7 +11,7 @@ import {
 import { ROUTE_THROTTLE } from '../../src/common/config/throttler.config';
 
 /**
- * §16 H2 — every AI route carries an explicit limit, and it FIRES.
+ * Every AI route carries an explicit limit, and it FIRES.
  *
  * **The assertion is a 429, not the presence of a decorator.** The first attempt
  * at this fix overrode `authTier`, which `SmartThrottlerGuard` skips on any
@@ -24,7 +24,7 @@ import { ROUTE_THROTTLE } from '../../src/common/config/throttler.config';
  * month in ten minutes, and when they do, every symptom points at a cap working
  * exactly as designed.
  */
-describe('§2 AI route rate limiting (e2e)', () => {
+describe('AI route rate limiting (e2e)', () => {
   let fx: E2eFixture;
 
   const TICKET_ID = '44444444-4444-4444-8444-444444444444';

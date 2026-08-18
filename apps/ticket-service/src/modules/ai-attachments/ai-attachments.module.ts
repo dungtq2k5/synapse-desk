@@ -4,7 +4,7 @@ import { StorageClientModule } from '../storage-client/storage-client.module';
 import { AiAttachmentService } from './ai-attachment.service';
 
 /**
- * Its own module, and the cycle is why
+ * Its own module, and the cycle is why.
  *
  * All three AI call sites need the same filter-and-fetch, and two of them live
  * in ticket-service. The obvious home was `MessagesModule`, which

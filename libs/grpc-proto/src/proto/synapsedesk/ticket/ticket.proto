@@ -20,7 +20,7 @@ message CreateTicketRequest {
   optional string author_id = 5;
 
   // The inbound email's `Message-ID`, when this write came from mail
-  // §6.2. Written as an `inbound_emails` row in the SAME transaction, so a
+  // Written as an `inbound_emails` row in the SAME transaction, so a
   // provider redelivery is a duplicate-key violation rather than a second
   // ticket. Absent for every other transport, and absent is not an error.
   optional string inbound_message_id = 6;

@@ -30,7 +30,7 @@ export enum EmailTemplateName {
   PASSWORD_CHANGED = 'PASSWORD_CHANGED',
   INVITATION = 'INVITATION',
   SECURITY_ALERT = 'SECURITY_ALERT',
-  /** A budget threshold crossing */
+  /** A budget threshold crossing. */
   QUOTA_ALERT = 'QUOTA_ALERT',
 }
 
@@ -202,7 +202,7 @@ export enum NotificationChannel {
   IN_APP = 'IN_APP',
   EMAIL = 'EMAIL',
   SMS = 'SMS',
-  // Declared but unimplemented
+  // Declared but unimplemented.
   WEBHOOK = 'WEBHOOK',
 }
 
@@ -244,7 +244,7 @@ export enum DigestMode {
 }
 
 /**
- * Where a resolved preference came from
+ * Where a resolved preference came from.
  *
  * The UI renders `DEFAULT` and `WILDCARD` as "inherited" rather than as a
  * choice the user made. Values are lower-case, matching what is stored.
@@ -267,7 +267,7 @@ export enum NotificationResourceType {
 }
 
 /**
- * Who receives a notification
+ * Who receives a notification.
  *
  * Use `users` whenever the producer knows the recipients; `permission` only
  * when it genuinely cannot, since resolving a permission reaches everyone who
@@ -311,7 +311,7 @@ export type CreateInAppNotificationCommand = {
   priority: NotificationPriority;
   occurredAt: string;
 
-  /** Who caused it. Excluded from the recipients rule 1. */
+  /** Who caused it. Excluded from the recipients. */
   actorId?: string;
 
   /** Deep-link payload for the SPA: `{ ticketId, ticketNumber, actorName }`. */
@@ -327,7 +327,7 @@ export type CreateInAppNotificationCommand = {
    * Collapse key — e.g. `ticket:{ticketId}:message`.
    *
    * An unread notification with the same key for the same recipient is
-   * incremented rather than duplicated
+   * incremented rather than duplicated.
    */
   groupKey?: string;
 };
@@ -338,7 +338,7 @@ export type CreateInAppNotificationCommand = {
 
 /**
  * Subjects the gateway subscribes to in order to push a notification down a
- * socket
+ * socket.
  *
  * The socket is a delivery optimisation, not a channel of record: write the row
  * first and emit fire-and-forget, so a disconnected user still finds the
