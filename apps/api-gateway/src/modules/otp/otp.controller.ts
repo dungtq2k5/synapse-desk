@@ -69,7 +69,7 @@ export class OtpController {
    */
   @ApiOperation({
     summary:
-      'Issue an otps row (purpose = email_verification, target = users.email) and mail the 6-digit code',
+      'Issue an otps row (purpose = EMAIL_VERIFICATION, target = users.email) and mail the 6-digit code',
   })
   @ApiWrappedResponse(RequestOtpResponseDto, { status: HttpStatus.ACCEPTED })
   @ApiFilterErrors(['401'])
@@ -102,7 +102,7 @@ export class OtpController {
 
   @ApiOperation({
     summary:
-      'Issue an otps row (purpose = phone_verification) and SMS the code',
+      'Issue an otps row (purpose = PHONE_VERIFICATION) and SMS the code',
   })
   @ApiWrappedResponse(RequestOtpResponseDto, { status: HttpStatus.ACCEPTED })
   @ApiFilterErrors(['400', '401'])

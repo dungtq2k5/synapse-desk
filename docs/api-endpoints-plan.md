@@ -2,7 +2,7 @@
 
 **Scope:** every HTTP endpoint the `api-gateway` (BFF) must expose, plus the gRPC methods and NATS/WebSocket events each one is backed by.
 
-**Global prefix:** `api/v1` (set in [main.ts](apps/api-gateway/src/main.ts)) — paths below omit it.
+**Global prefix:** `api/v1` (set in [main.ts](../apps/api-gateway/src/main.ts)) — paths below omit it.
 
 ---
 
@@ -93,9 +93,9 @@ A global interceptor checks `organizations.status` (RDM §1.8) before dispatch:
 
 | Method | Path | Description | Auth |
 | :---- | :---- | :---- | :---- |
-| POST | `/auth/email/verify/request` | Issue an `otps` row (`purpose = email_verification`, `target = users.email`) and mail the 6-digit code. Invalidates the user's prior outstanding email codes; Redis-rate-limited per user. | USER |
+| POST | `/auth/email/verify/request` | Issue an `otps` row (`purpose = EMAIL_VERIFICATION`, `target = users.email`) and mail the 6-digit code. Invalidates the user's prior outstanding email codes; Redis-rate-limited per user. | USER |
 | POST | `/auth/email/verify` | Submit `{ code }`. On match → `is_email_verified = true`. On mismatch → `attempts_count++`; at `max_attempts` the code is burned (`is_used = true`) and the response is **429** with `mustRequestNewCode: true`. | USER |
-| POST | `/auth/phone/verify/request` | Issue an `otps` row (`purpose = phone_verification`) and SMS the code. `{ phoneNumber }` in the body becomes `otps.target`, which lets this same endpoint serve **first-time verification and change-of-number** — `users.phone_number` is not touched until the code for that exact target verifies. | SELF |
+| POST | `/auth/phone/verify/request` | Issue an `otps` row (`purpose = PHONE_VERIFICATION`) and SMS the code. `{ phoneNumber }` in the body becomes `otps.target`, which lets this same endpoint serve **first-time verification and change-of-number** — `users.phone_number` is not touched until the code for that exact target verifies. | SELF |
 | POST | `/auth/phone/verify` | Submit `{ code }`. On match, copy `otps.target` into `users.phone_number` and set `is_phone_verified = true`. Same attempt-counter semantics as above. | SELF |
 | GET | `/auth/otp/status` | `?purpose=` — outstanding-challenge state for the resend UI: `{ pending, target (masked), expiresAt, attemptsRemaining }`. Never returns `code_hash`. | SELF |
 
@@ -191,7 +191,7 @@ Tenant admins only ever address their **own** org; the tenant comes from the JWT
 | PATCH | `/users/:id` ✎ | Update `full_name`, `phone_number`, `dob`, `gender`, `avatar_url`. | perm:`user.update` |
 | DELETE | `/users/:id` ✎ | Soft delete (deactivate) + revoke all sessions. Blocked on self. | perm:`user.delete` |
 | POST | `/users/:id/restore` ✎ | Reactivate. | perm:`user.delete` |
-| POST | `/users/:id/lock` ✎ | `{ reason, lockedUntil? }` → `is_locked = true` + revoke sessions. **`lockedUntil` is optional and must be in the future**; omitting it means an indefinite lock, which is the existing behaviour unchanged. `is_locked` stays the one boolean every read asks about — `locked_until` is an *expiry*, cleared by a lazy unlock on the login path and by an hourly sweep ([21-doc §2](./21-cross-cutting-modifications.md)). The lock email states the end time in the recipient's timezone. | perm:`user.lock` |
+| POST | `/users/:id/lock` ✎ | `{ reason, lockedUntil? }` → `is_locked = true` + revoke sessions. **`lockedUntil` is optional and must be in the future**; omitting it means an indefinite lock, which is the existing behaviour unchanged. `is_locked` stays the one boolean every read asks about — `locked_until` is an *expiry*, cleared by a lazy unlock on the login path and by an hourly sweep ([ADR 0027](./decisions/0027-lock-state-is-constrained-not-conventional.md)). The lock email states the end time in the recipient's timezone. | perm:`user.lock` |
 | POST | `/users/:id/unlock` ✎ | `is_locked = false` **and `locked_until = NULL`** — clearing only the boolean would leave a stale expiry for a later re-lock to inherit. Grants no sessions back: unlocking permits signing in, it does not sign in. | perm:`user.lock` |
 | POST | `/users/:id/2fa/reset` ✎ | Admin clears `two_factor_secret` + backup codes (lost-device recovery). | perm:`user.2fa.reset` |
 | PUT | `/users/:id/departments` ✎ | Replace the full membership set; exactly one `is_primary` enforced (partial unique index, RDM Table 4). | perm:`department.member.assign` |
@@ -206,7 +206,7 @@ Tenant admins only ever address their **own** org; the tenant comes from the JWT
 | :---- | :---- | :---- | :---- |
 | GET | `/users/me` | Own profile + org + departments + effective permission codes. **Implemented.** | SELF |
 | PATCH | `/users/me` | Update own profile fields (`fullName`, `dob`, `gender`). Explicitly **not** `avatarUrl` — that goes through the two rows below, never a direct field write, because writing it here would bypass the old-file cleanup and the confirm-time existence check — nor `email`/`phoneNumber` (the OTP flow), nor `isEmailVerified`/`isLocked`/roles/departments. **Implemented**, minus the `avatarUrl` field which was never actually wired to write it. | SELF |
-| POST | `/users/me/avatar/upload-url` | Presign a direct-to-Firebase-Storage upload: `{ contentType, sizeBytes }` → `{ uploadUrl, objectPath, expiresAt }`. Image mime allowlist + 2MB cap enforced before signing. See [10-storage-service.md §3.1](./10-storage-service.md). | SELF |
+| POST | `/users/me/avatar/upload-url` | Presign a direct-to-Firebase-Storage upload: `{ contentType, sizeBytes }` → `{ uploadUrl, objectPath, expiresAt }`. Image mime allowlist + 2MB cap enforced before signing. See [ADR 0024](./decisions/0024-one-upload-mechanism.md). | SELF |
 | POST | `/users/me/avatar/confirm` | `{ objectPath }` — confirms the upload landed, writes `users.avatar_url` (an object path, not a URL — RDM Table 3), audits, and emits the async delete of the **previous** avatar if one existed. | SELF |
 | DELETE | `/users/me/avatar` | Clear `avatar_url` to `null`; emits the async delete of the object that was there. | SELF |
 | GET | `/users/me/tickets` | Own tickets (end-user "my requests" view). **Domain B** — listed here because it hangs off `/users/me`, but owned by `ticket-service`. | SELF |
@@ -257,15 +257,15 @@ RDM §1.7: `organization_id IS NULL`, `is_super_admin = true`; audit rows writte
 | POST | `/platform/permissions` ✎ | Register a new permission `code` on feature release. **NOT BUILT, and arguably should never be** — `PERMISSION_CODES` in `libs/common` is the single source of truth and seeds the table (§9). A runtime-created code would have no `PermissionCode` union member, so no route could reference it and no guard could enforce it. A new permission ships with a deploy. | SUPER |
 | GET | `/platform/audit-logs` | Cross-tenant audit trail, incl. `organization_id IS NULL` rows. **Blocked on Domain D** — `audit_logs` lives in `ticket-service`, which is a scaffold. Domain A already *publishes* audit events over NATS (§8.1); this endpoint appears when the sink does. | SUPER |
 | GET | `/platform/metrics` | Platform-wide health: tenant count, MRR-ish usage, AI spend. | SUPER |
-| GET | `/platform/jobs` | **Scheduled-job health** — 20-doc §4.4. Every job this build EXPECTS, with `lastSucceededAt`, duration, consecutive failures and a verdict of `healthy` / `stale` / `failing` / `never-ran`. Judged against the expected list rather than the rows returned, because a job that has never run has no row — which is exactly how seven uncalled jobs stayed invisible for two domains. Three-leg fan-out: the heartbeat table lives in each owning service's database. | SUPER |
-| POST | `/platform/jobs/:name/run` | Runs a rollup now — 20-doc §5. A POST rather than a GET because it does work, and a GET is something a browser prefetch or an automatic retry can trigger with nobody asking. | SUPER |
-| POST | `/platform/jobs/:name/backfill` | Recomputes an explicit `from`..`to` range, with a **mandatory `reason`**. Safe to expose only because the jobs are idempotent and range-bounded (19-doc §2.2 test 1). Needed because a rollup bug fixed going forward leaves the wrong numbers in place permanently. | SUPER |
+| GET | `/platform/jobs` | **Scheduled-job health.** Every job this build EXPECTS, with `lastSucceededAt`, duration, consecutive failures and a verdict of `healthy` / `stale` / `failing` / `never-ran`. Judged against the expected list rather than the rows returned, because a job that has never run has no row — which is exactly how seven uncalled jobs stayed invisible for two domains. Three-leg fan-out: the heartbeat table lives in each owning service's database. | SUPER |
+| POST | `/platform/jobs/:name/run` | Runs a rollup now. A POST rather than a GET because it does work, and a GET is something a browser prefetch or an automatic retry can trigger with nobody asking. | SUPER |
+| POST | `/platform/jobs/:name/backfill` | Recomputes an explicit `from`..`to` range, with a **mandatory `reason`**. Safe to expose only because the jobs are idempotent and range-bounded ([ADR 0009](./decisions/0009-rollups-are-plain-tables.md)). Needed because a rollup bug fixed going forward leaves the wrong numbers in place permanently. | SUPER |
 
 ---
 
 ### 1.9 Billing & Subscription — `/billing`, `/webhooks/stripe`
 
-**Not built.** Specced here because it changes the meaning of endpoints that *are* built (§1.8's quota edits and cycle reset) and because Domain C's AI tier depends on it. Full design in [14-billing-and-entitlements.md](./14-billing-and-entitlements.md); RDM §1.15 and Table 30.
+**Not built.** Specced here because it changes the meaning of endpoints that *are* built (§1.8's quota edits and cycle reset) and because Domain C's AI tier depends on it. Full design in [ADR 0026](./decisions/0026-stripe-webhook-idempotency.md); RDM §1.15 and Table 30.
 
 **The division of labour:** Stripe owns plans, prices, cards and renewals. This system owns *entitlements* — the five columns on `organizations`. The webhook is the only thing that connects them.
 
@@ -326,7 +326,7 @@ The unified Tier 1 + Tier 2 timeline (RDM §1.3).
 | GET | `/tickets/:ticketId/messages/:messageId` | Single message + attachments + citations. **NOT BUILT** — no proto RPC exists; the thread listing (`GET .../messages`) already returns attachments and citations, so this is only needed for a deep link to one message. | USER |
 | PATCH | `/tickets/:ticketId/messages/:messageId` | Edit own message inside a short window; internal notes editable by agents. | SELF / perm:`ticket.message.moderate` |
 | DELETE | `/tickets/:ticketId/messages/:messageId` | Redact a message (content replaced, row retained for the audit timeline). | perm:`ticket.message.moderate` |
-| POST | `/tickets/:ticketId/messages/:messageId/attachments/upload-url` | Presign a direct-to-Firebase-Storage upload: `{ contentType, sizeBytes }` → `{ uploadUrl, objectPath, expiresAt }`. Enforces the per-message attachment count cap (todo note: "set maximum file (image) attachments") **before** signing — a caller already at the cap never receives a usable URL. See [10-storage-service.md §3.2](./10-storage-service.md). | USER |
+| POST | `/tickets/:ticketId/messages/:messageId/attachments/upload-url` | Presign a direct-to-Firebase-Storage upload: `{ contentType, sizeBytes }` → `{ uploadUrl, objectPath, expiresAt }`. Enforces the per-message attachment count cap (todo note: "set maximum file (image) attachments") **before** signing — a caller already at the cap never receives a usable URL. See [ADR 0024](./decisions/0024-one-upload-mechanism.md). | USER |
 | POST | `/tickets/:ticketId/messages/:messageId/attachments/confirm` | `{ objectPath }` — confirms, writes the `message_attachments` row. | USER |
 | GET | `/tickets/:ticketId/messages/:messageId/attachments` | List attachments. | USER |
 | GET | `/attachments/:id/download` | Short-lived pre-signed Firebase Storage URL (302 or `{ url, expiresAt }`). Tenant + ticket ACL re-checked **before** the signing call, not delegated to it. | USER |
@@ -337,7 +337,7 @@ The unified Tier 1 + Tier 2 timeline (RDM §1.3).
 
 Gateway → `ticket-service` → `rag-service` over gRPC. All cost-metered against `ai_generations` (RDM Table 29).
 
-**Generated text is GitHub-flavoured Markdown, by contract** ([21-doc §1](./21-cross-cutting-modifications.md)) — not by habit. Models emit markdown anyway, which is a property of the model rather than of the system: a version change, a tier change or a prompt edit can silently return plain text into a renderer expecting structure, and nothing fails. The prompt now states the format, and tests assert it. **Clients must render markdown with raw HTML disabled** — the text is generated from tenant-uploaded documents, so a document containing markup can reach the renderer through an answer.
+**Generated text is GitHub-flavoured Markdown, by contract** ([ai-output-contract.md](./reference/ai-output-contract.md)) — not by habit. Models emit markdown anyway, which is a property of the model rather than of the system: a version change, a tier change or a prompt edit can silently return plain text into a renderer expecting structure, and nothing fails. The prompt now states the format, and tests assert it. **Clients must render markdown with raw HTML disabled** — the text is generated from tenant-uploaded documents, so a document containing markup can reach the renderer through an answer.
 
 | Method | Path | Description | Auth |
 | :---- | :---- | :---- | :---- |
@@ -412,8 +412,8 @@ No `POST`/`PATCH`/`DELETE` — `audit_logs` is append-only and written internall
 | DELETE | `/documents/:id` ✎ | Soft delete — drops it from RAG context while preserving historical citations (RDM §1.6). | perm:`document.delete` |
 | POST | `/documents/:id/restore` ✎ | Restore + re-add to the retrievable set. | perm:`document.delete` |
 | GET | `/documents/:id/download` | Short-lived signed URL via `GetSignedReadUrls`. Visibility (org-wide ∪ caller's departments) re-checked **before** the storage call, never delegated to it — same discipline as `GET /attachments/:id/download`. | USER |
-| POST | `/documents/:id/replace` ✎ | Same presign/confirm pair against the existing document id → re-chunk, re-embed, swap vectors atomically, then emit `storage.object.superseded` (`REPLACED`) for the **old** `file_url`. Read the old path before overwriting it — the ordering trap `10-storage-service.md §3.1` calls out for avatars applies identically. | perm:`document.update` |
-| POST | `/documents/:id/reindex` ✎ | Re-run ingestion without a new file (model or chunking-strategy change). **Not built.** Unnecessary in development, where a parsing change is handled by resetting and re-uploading — and **required before the first real tenant**, because from then on a chunking change with no re-index path means the improvement reaches only documents uploaded after it ([21-doc §3.3](./21-cross-cutting-modifications.md)). | perm:`document.reindex` |
+| POST | `/documents/:id/replace` ✎ | Same presign/confirm pair against the existing document id → re-chunk, re-embed, swap vectors atomically, then emit `storage.object.superseded` (`REPLACED`) for the **old** `file_url`. Read the old path before overwriting it — the ordering trap that applies to avatars applies identically. | perm:`document.update` |
+| POST | `/documents/:id/reindex` ✎ | Re-run ingestion without a new file (model or chunking-strategy change). **Not built.** Unnecessary in development, where a parsing change is handled by resetting and re-uploading — and **required before the first real tenant**, because from then on a chunking change with no re-index path means the improvement reaches only documents uploaded after it. | perm:`document.reindex` |
 | GET | `/documents/:id/departments` | Departments scoped to this document. | perm:`document.read` |
 | PUT | `/documents/:id/departments` ✎ | Replace `department_documents` links. Ignored while `is_organization_wide = true` (**409** to make the conflict explicit). | perm:`document.share` |
 | GET | `/documents/:id/chunks` | Paginated `document_chunks`: `chunk_index`, `content_text`, `page_number`, `token_count`. Powers citation preview. | perm:`document.read` |
@@ -451,7 +451,7 @@ Direct RAG surface, independent of a ticket thread.
 
 | Method | Path | Description | Auth |
 | :---- | :---- | :---- | :---- |
-| POST | `/knowledge/search` | Hybrid semantic + keyword retrieval, filtered by tenant **and** the caller's departments (RDM §1.2). Returns ranked chunks with document/page metadata. **The test seam for Domain C** — retrieval with no LLM in the loop, which is the only place isolation can be proven deterministically ([13-domain-c-rag-service.md §2.3](./13-domain-c-rag-service.md)). At the AI cap it degrades to lexical-only with `degraded: "LEXICAL_ONLY"` rather than 402. | USER |
+| POST | `/knowledge/search` | Hybrid semantic + keyword retrieval, filtered by tenant **and** the caller's departments (RDM §1.2). Returns ranked chunks with document/page metadata. **The test seam for Domain C** — retrieval with no LLM in the loop, which is the only place isolation can be proven deterministically. At the AI cap it degrades to lexical-only with `degraded: "LEXICAL_ONLY"` rather than 402. | USER |
 | POST | `/knowledge/ask` | One-shot Q&A: retrieve → rerank → generate, with citations. Markdown by contract (§2.3). Metered as `purpose = CHAT_ANSWER` with `ticket_id = NULL`. No ticket created, and **no escalation path** — unlike Tier 1 chat there is no conversation to escalate, so `DOC_MISSING` returns an explicit empty answer plus the gap log rather than an invented one. 402 at cap. | USER |
 | GET | `/knowledge/articles` | Curated/published KB article listing. | USER |
 | GET | `/knowledge/articles/:id` | Article detail. | USER |
@@ -462,7 +462,7 @@ Direct RAG surface, independent of a ticket thread.
 
 > **Not a domain.** Analytics owns no tables — it reads across Domains B, C and D. **RDM Domain D is *Audit & Feedback*** (`ai_response_feedbacks`, `audit_logs`), whose endpoints are §2.5 and §2.6, owned by `ticket-service`. This section previously carried the "Domain D" label, which made "Domain D" mean one thing here and another in [rdm-specs.md](./rdm-specs.md).
 
-Executive dashboard (product §6.6). Read-only, Redis-cached, `perm:analytics.read` throughout. **Implementation: [19-analytics-and-dashboards.md](./19-analytics-and-dashboards.md)** — including why no `analytics-service` is created, and the daily rollup tables these endpoints read instead of the raw OLTP tables.
+Executive dashboard (product §6.6). Read-only, Redis-cached, `perm:analytics.read` throughout. These read daily rollup tables rather than the raw OLTP tables, and there is deliberately no `analytics-service` — [ADR 0009](./decisions/0009-rollups-are-plain-tables.md).
 
 | Method | Path | Description |
 | :---- | :---- | :---- |
@@ -512,7 +512,7 @@ Numbered `4b` rather than `5` — the same convention §2.3b and §3.1b already 
 
 Namespace `/ws`, JWT-authenticated on handshake, rate-limited via `ThrottlerStorageRedisService`, fanned out across instances by `@socket.io/redis-adapter`. Rooms: `org:{organizationId}`, `ticket:{ticketId}`, `user:{userId}`, `dept:{departmentId}`, and `ticket:{ticketId}:internal` for agent-only fan-out.
 
-**Implementation: [22-websocket-realtime.md](./22-websocket-realtime.md).** The transport, `ticket:join`/`leave` and every notification event are built; `message:send`, typing, presence and the AI stream relay are not. That doc also records a **live disclosure in the shipped `message:new` fan-out** — the ticket room contains the requester, so internal notes reach them — which is why the `:internal` room above exists.
+**[ADR 0011](./decisions/0011-websocket-is-a-transport.md).** The transport, `ticket:join`/`leave` and every notification event are built; `message:send`, typing, presence and the AI stream relay are not. There was a **live disclosure in the shipped `message:new` fan-out** — the ticket room contains the requester, so internal notes reach them — which is why the `:internal` room above exists.
 
 | Direction | Event | Payload / purpose |
 | :---- | :---- | :---- |
@@ -523,7 +523,7 @@ Namespace `/ws`, JWT-authenticated on handshake, rate-limited via `ThrottlerStor
 | C→S | `ai:stream:cancel` | Abort an in-flight generation. |
 | S→C | `message:new` | New message in a joined thread. |
 | S→C | `message:updated` / `message:deleted` | Edit / redaction. |
-| S→C | `ai:stream:chunk` | Token-by-token LLM output. **Markdown arrives incomplete by construction** — mid-stream the client holds an unclosed code fence or half a list ([21-doc §1.3](./21-cross-cutting-modifications.md)). The renderer must tolerate unterminated constructs, or the answer flickers between raw and formatted on every chunk. |
+| S→C | `ai:stream:chunk` | Token-by-token LLM output. **Markdown arrives incomplete by construction** — mid-stream the client holds an unclosed code fence or half a list ([ai-output-contract.md](./reference/ai-output-contract.md)). The renderer must tolerate unterminated constructs, or the answer flickers between raw and formatted on every chunk. |
 | S→C | `ai:stream:done` | Final message id, citations, token counts. |
 | S→C | `ai:stream:error` | Generation failure or quota exhaustion. |
 | S→C | `ticket:updated` | Status / priority / assignee change. |
@@ -534,14 +534,14 @@ Namespace `/ws`, JWT-authenticated on handshake, rate-limited via `ThrottlerStor
 | S→C | `notification:updated` | An existing notification was **coalesced** — same `group_key`, `group_count` incremented. The client updates the existing toast in place ("12 new messages on #1042") instead of stacking a 12th. Without this event, grouping exists in the database and is invisible in the UI. |
 | S→C | `notification:read` | Read/archive state changed **for this user on another device**. Fanned to `user:{userId}`, which every one of that user's sockets joins — so dismissing on mobile clears the desktop badge. `read_at` is per-row, not per-connection; without this event, two open tabs disagree until refresh. |
 | S→C | `notification:unread-count` | Authoritative unread total, pushed on every change. Lets the client stop polling `GET /notifications/unread-count` entirely and avoids the drift that comes from incrementing a local counter. |
-| S→C | `document:indexed` | Ingestion finished — refresh the KB list. Fanned to the uploader plus each `dept:{departmentId}` the document is scoped to, or `org:` only when it is organization-wide: a department-scoped document is invisible outside its departments, so a tenant-wide announcement would disclose its existence and title to exactly the people that boundary excludes (22-doc §6.2). |
+| S→C | `document:indexed` | Ingestion finished — refresh the KB list. Fanned to the uploader plus each `dept:{departmentId}` the document is scoped to, or `org:` only when it is organization-wide: a department-scoped document is invisible outside its departments, so a tenant-wide announcement would disclose its existence and title to exactly the people that boundary excludes. |
 | S→C | `document:failed` | Indexing failed, carrying the pre-redacted `reason`. **To the uploader alone** — a failure is not department news, and without it a Knowledge Manager watches a document sit in `PROCESSING` forever. |
 
 ---
 
 ## 6. Ops & Infrastructure Endpoints
 
-**Implementation: [23-ops-endpoints.md](./23-ops-endpoints.md)** — `/health` exists, `/version` and `/metrics` do not, and no backing service has a probe of any kind. That doc also records a live availability bug: gateway readiness currently gates on gRPC peer health, so one service being down removes every gateway instance from rotation.
+**[ADR 0010](./decisions/0010-readiness-probes-do-not-cascade.md)** — `/health` exists, `/version` and `/metrics` do not, and no backing service has a probe of any kind. There was a live availability bug: gateway readiness gated on gRPC peer health, so one service being down removes every gateway instance from rotation.
 
 | Method | Path | Description | Auth |
 | :---- | :---- | :---- | :---- |
@@ -549,9 +549,9 @@ Namespace `/ws`, JWT-authenticated on handshake, rate-limited via `ThrottlerStor
 | GET | `/health/ready` | Readiness — Postgres, Redis, NATS, gRPC peers, Qdrant. | PUBLIC |
 | GET | `/version` | Build SHA + semver. | PUBLIC |
 | GET | `/metrics` | Prometheus scrape (bound to the internal interface, not via Nginx). | internal |
-| GET | `/docs` · `/docs-json` | Swagger UI / OpenAPI spec. **Implementation: [24-swagger-openapi.md](./24-swagger-openapi.md)** — the CLI plugin (which turns 50 files of hand annotation into one config block), the two envelope decorators, and the four cookie auth schemes this API actually uses. Gate exposure on validated config, never on an inline `NODE_ENV` check. | PUBLIC in non-prod |
-| GET | `/graphql` | Apollo endpoint + Playground (non-prod). **Implementation: [25](./25-graphql-architecture.md) (design), [26](./26-graphql-schema-and-resolvers.md) (gateway), [27](./27-batch-rpcs.md) (batch RPCs).** REST and GraphQL are permanent peers, not a migration — GraphQL is the SPA's read surface, REST keeps commands, files and machine callers. | USER |
-| POST | `/webhooks/email/inbound` | Email-to-ticket ingestion. HMAC-signature verified. **Implementation: [31](./31-inbound-email-architecture.md) (decisions), [32](./32-inbound-email-implementation.md).** The address is `support+{inbound_token}@…`, so the tenant comes from the recipient rather than from the sender's domain; unknown senders are auto-provisioned only when their domain is already in `allowed_email_domains`, reusing the self-signup rule. Attachments and non-user senders are out of v1 scope, declared rather than discovered. | signature |
+| GET | `/docs` · `/docs-json` | Swagger UI / OpenAPI spec. **[ADR 0028](./decisions/0028-swagger-envelope-is-a-per-route-decorator.md)** — the CLI plugin (which turns 50 files of hand annotation into one config block), the two envelope decorators, and the four cookie auth schemes this API actually uses. Gate exposure on validated config, never on an inline `NODE_ENV` check. | PUBLIC in non-prod |
+| GET | `/graphql` | Apollo endpoint + Playground (non-prod). **[ADR 0014](./decisions/0014-narrow-graphql-edge-types.md) and [ADR 0013](./decisions/0013-batch-rpcs-map-from-keys.md).** REST and GraphQL are permanent peers, not a migration — GraphQL is the SPA's read surface, REST keeps commands, files and machine callers. | USER |
+| POST | `/webhooks/email/inbound` | Email-to-ticket ingestion. HMAC-signature verified. **[ADR 0018](./decisions/0018-inbound-email-routing-and-threading.md).** The address is `support+{inbound_token}@…`, so the tenant comes from the recipient rather than from the sender's domain; unknown senders are auto-provisioned only when their domain is already in `allowed_email_domains`, reusing the self-signup rule. Attachments and non-user senders are out of v1 scope, declared rather than discovered. | signature |
 | ~~POST~~ | ~~`/webhooks/storage/s3`~~ | **Removed.** A storage-side upload-complete callback is redundant under presign/confirm: `POST /documents/confirm` *is* the completion signal, and it is the one that carries the caller's identity, the `PendingUpload` authorization and the ingestion trigger. GCS can emit equivalent Pub/Sub notifications, but wiring them would create a **second, racing completion path** — one authenticated and authorized, one not — for the same event. If object-side notification is ever genuinely needed (detecting an upload that was presigned and never confirmed), it belongs as a reconciliation job, not a webhook that competes with confirm. | — |
 
 ---
@@ -582,7 +582,7 @@ REST stays the contract for uploads, webhooks, and streaming; GraphQL serves the
 | `/billing/*`, `/webhooks/stripe` | `auth-service` | gRPC `auth.proto` — it owns `organizations`, and entitlements are columns on that row. A separate billing service would need write access to another service's table, which is the thing service-per-database exists to prevent |
 | `/analytics/*` | fan-out (`ticket` + `ingestion` + `auth`) | gRPC, Redis-cached |
 | `/ws` | `api-gateway` | Socket.IO + Redis adapter |
-| *(no gateway route — internal only)* | `storage-service` | gRPC `storage.proto` + NATS in. Never called by the gateway directly; called server-to-server by whichever service owns the row a file belongs to ([10-storage-service.md §1.5](./10-storage-service.md)). |
+| *(no gateway route — internal only)* | `storage-service` | gRPC `storage.proto` + NATS in. Never called by the gateway directly; called server-to-server by whichever service owns the row a file belongs to ([ADR 0024](./decisions/0024-one-upload-mechanism.md)). |
 
 ### 8.1 NATS domain events
 
@@ -603,8 +603,8 @@ Per the todo note: **gRPC for synchronous cross-service reads, NATS for backgrou
 | `document.deleted` | ingestion-service | rag-service (purge Qdrant points), notifications |
 | `user.invited` · `user.locked` · `user.deleted` | auth-service | notifications (create delivery rows), session revocation |
 | `notification.created` | notification-consumer | delivery-worker (fan to `notification_deliveries`, enqueue `email/sms` BullMQ jobs), WS fan-out to `user:{id}` |
-| `audit.record` | any service (via `AuditPublisher`, `libs/common/src/contracts/audit.contract.ts`) | ticket-service (`AuditConsumer`, [09-domain-b-support-engine.md §1.5](./09-domain-b-support-engine.md)) |
-| `storage.object.superseded` | auth-service (avatar replace/clear), ticket-service (attachment delete) | storage-service (async object delete, [10-storage-service.md §1.6](./10-storage-service.md)) |
+| `audit.record` | any service (via `AuditPublisher`, `libs/common/src/contracts/audit.contract.ts`) | ticket-service (`AuditConsumer`) |
+| `storage.object.superseded` | auth-service (avatar replace/clear), ticket-service (attachment delete) | storage-service (async object delete) |
 | `quota.exceeded` | any | notifications (CRITICAL priority, bypass quiet hours), platform alerting |
 | `billing.entitlements_changed` | auth-service (Stripe webhook) | ingestion-service (invalidate the cached settings/tier for that tenant — a stale cache keeps a downgraded tenant on the premium model), analytics, audit |
 
@@ -653,8 +653,8 @@ Aligned with `docs/todo.txt` §8.
 | **3 — Helpdesk** | `/tickets/*`, `/tickets/:id/messages`, attachments, status machine, assignment, `/ws` chat |
 | **3b — Notifications (Domain E)** | `/notifications/*` (§4b), the `notifications`/`notification_deliveries`/`notification_preferences` schema, the NATS consumer that creates rows from `ticket.*` events, and the `notification:*` WS events. **Runs alongside phase 3, not after it** — every phase-3 event (`ticket.assigned`, `ticket.message_created`) already specifies "→ notification" in §8.1, so shipping the helpdesk without this means shipping events with no consumer. `notification-service` today handles only fire-and-forget email/SMS and owns no database; the feed needs one. |
 | **4 — Knowledge** | `/documents/*`, `/ingestion-jobs/*`, department scoping |
-| **5 — AI** | `/knowledge/search` · `/ask`, `/chat/*`, `/tickets/:id/ai/*`, streaming, cost metering (`ai_generations` + the Redis counter), `/feedback`. **The settings layer ships with this phase, not after it** — every model choice reads `settingsFor(orgId)` from day one, because retrofitting it means auditing every LLM call site in two languages ([15-ai-tiers-and-settings-layer.md](./15-ai-tiers-and-settings-layer.md)) |
-| **5b — Billing** | `/billing/*`, `/webhooks/stripe`, the entitlement writer, `billing_events` ([14-billing-and-entitlements.md](./14-billing-and-entitlements.md)). After phase 5 because cost metering must exist before a plan can grant an AI budget that means anything |
+| **5 — AI** | `/knowledge/search` · `/ask`, `/chat/*`, `/tickets/:id/ai/*`, streaming, cost metering (`ai_generations` + the Redis counter), `/feedback`. **The settings layer ships with this phase, not after it** — every model choice reads `settingsFor(orgId)` from day one, because retrofitting it means auditing every LLM call site in two languages ([ADR 0007](./decisions/0007-settings-layer-owns-model-names.md)) |
+| **5b — Billing** | `/billing/*`, `/webhooks/stripe`, the entitlement writer, `billing_events` ([ADR 0026](./decisions/0026-stripe-webhook-idempotency.md)). After phase 5 because cost metering must exist before a plan can grant an AI budget that means anything |
 | **5c — AI tiers** | `ai_model_tier` wired into the settings layer and mapped from Stripe price ids. One column and one mapping, *because* 5 built the indirection and 5b built the writer |
 | **6 — Insight** | `/analytics/*`, `/platform/*`, GraphQL layer, exports |
 
@@ -674,6 +674,6 @@ Aligned with `docs/todo.txt` §8.
 
 5. ✅ **`documents/stale` detection** — Resolved as `document_flags` table (RDM Table 27) with `flag_type ∈ { OUTDATED | UNRETRIEVED | UNCITED | LOW_CONFIDENCE | NEGATIVE_FEEDBACK | CONFLICTING }`. Heuristics ship in phase 4 and read `document_chunks` usage counters, **not** the ledger, which is retention-rolled; LLM conflict detection (CONFLICTING) in phase 6 with scheduled batch jobs. `UNRETRIEVED` (never once retrieved) and `UNCITED` (retrieved repeatedly, never cited) were originally one flag under a name that fit only the first.
 
-6. ✅ **Invitation persistence & email scoping** — `/users/invitations` had no backing table, and `users.email` was globally `UNIQUE`, which made one human equal to one tenant forever: contractors could not be invited, and soft-deleting a user locked their address permanently. Resolved by (a) scoping email uniqueness to `(organization_id, email)` via two partial indexes filtered on `deleted_at IS NULL` (RDM §1.10, Table 3), and (b) adding `user_invitations` (RDM Table 28). Costs a tenant-disambiguation step on login (`POST /auth/login/tenant`). Both halves are **implemented**; the reasoning is preserved in [00-domain-a-foundations.md §4.2](./00-domain-a-foundations.md).
+6. ✅ **Invitation persistence & email scoping** — `/users/invitations` had no backing table, and `users.email` was globally `UNIQUE`, which made one human equal to one tenant forever: contractors could not be invited, and soft-deleting a user locked their address permanently. Resolved by (a) scoping email uniqueness to `(organization_id, email)` via two partial indexes filtered on `deleted_at IS NULL` (RDM §1.10, Table 3), and (b) adding `user_invitations` (RDM Table 28). Costs a tenant-disambiguation step on login (`POST /auth/login/tenant`). Both halves are **implemented**; the reasoning is preserved in [ADR 0020](./decisions/0020-email-uniqueness-is-per-tenant.md).
 
 **Previously resolved:** password reset and email/phone verification tokens now have first-class tables — `password_reset_tokens` and `otps` (RDM §1.9, Tables 11–12) — so no stateless-JWT fallback is needed.

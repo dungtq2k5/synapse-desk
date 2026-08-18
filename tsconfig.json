@@ -14,6 +14,12 @@
   "compilerOptions": {
     "module": "commonjs",
     "declaration": true,
+    // Emits `.d.ts.map` beside every `.d.ts`. A library clears `paths` (see
+    // `libs/*/tsconfig.json`), so an editor resolving `@synapsedesk/common` from
+    // INSIDE another library lands on `dist/main.d.ts` — compiled output with no
+    // comments and no implementation. The map is what lets "go to definition"
+    // follow through to `src/`, which is where the answer actually is.
+    "declarationMap": true,
     "removeComments": true,
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,

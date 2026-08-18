@@ -5,6 +5,7 @@
   "types": "dist/main.d.ts",
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
+    "dev": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
     "clean": "rimraf dist *.tsbuildinfo",
     "lint": "eslint \"src/**/*.ts\""
   },

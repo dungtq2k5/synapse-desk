@@ -346,7 +346,7 @@ Because the database does not enforce the set, the service layer **MUST**:
 - Type the Prisma read side back into the domain enum at the mapper boundary (`row.status as InvitationStatus`).
 - Validate the **transition**, not just the value, for any state machine.
 
-**Values are `SCREAMING_SNAKE_CASE`.** `OtpPurpose` (`'email_verification'`) is the one existing exception — leave it, don't copy it.
+**Values are `SCREAMING_SNAKE_CASE`, with no exceptions.**
 
 #### `enum` or `as const`? Ask what the value IS
 

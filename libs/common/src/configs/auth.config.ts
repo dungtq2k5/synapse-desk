@@ -22,8 +22,8 @@ export enum InvitationStatus {
 }
 
 export enum OtpPurpose {
-  EMAIL_VERIFICATION = 'email_verification',
-  PHONE_VERIFICATION = 'phone_verification',
+  EMAIL_VERIFICATION = 'EMAIL_VERIFICATION',
+  PHONE_VERIFICATION = 'PHONE_VERIFICATION',
 }
 export const OTP_PURPOSES = [
   OtpPurpose.EMAIL_VERIFICATION,

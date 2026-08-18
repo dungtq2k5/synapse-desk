@@ -94,7 +94,7 @@ The two conditions are kept in lockstep by a CHECK constraint (see Table 3) so a
 
 Three flows need a single-use secret that lives outside the JWT lifecycle. They are deliberately split into two tables because their delivery channel, format, and threat model differ.
 
-* **otps (numeric codes, user-typed):** A 6-digit code delivered to a channel the user must prove they control — email (purpose = email_verification) or SMS (purpose = phone_verification). Because the code is short enough to guess, the row carries its own brute-force counter: every failed verification increments attempts_count, and once it reaches max_attempts (default 5) the handler sets is_used = true, burning the code and forcing a new request. Only the SHA-256 code_hash is stored.
+* **otps (numeric codes, user-typed):** A 6-digit code delivered to a channel the user must prove they control — email (purpose = EMAIL_VERIFICATION) or SMS (purpose = PHONE_VERIFICATION). Because the code is short enough to guess, the row carries its own brute-force counter: every failed verification increments attempts_count, and once it reaches max_attempts (default 5) the handler sets is_used = true, burning the code and forcing a new request. Only the SHA-256 code_hash is stored.
 * **The target column:** The code is bound to the *exact* address or number it was sent to, stored separately from users.email / users.phone_number. This is what makes a **change-of-address** flow safe: a user requesting a new phone number gets an OTP with target = the new number, and users.phone_number / is_phone_verified are only written after that specific code verifies. A code issued for one target can never validate a different one.
 * **password_reset_tokens (opaque links, machine-generated):** A high-entropy token embedded in a reset URL, so it needs no attempt counter — guessing is infeasible. token_hash is UNIQUE, which makes lookup a single indexed read and makes token collision a database-level impossibility. ip_address and user_agent record where the reset was requested from; both are surfaced in the reset email ("this request came from Chrome on macOS") so a victim can recognize an attack, and are copied into audit_logs.
 * **Shared invariants:** Both tables are consumed once (is_used) and expire (expires_at) — a row is valid only when `is_used = false AND expires_at > NOW()`. Both hard-delete via ON DELETE CASCADE from users, since an expired secret has no historical or compliance value. A scheduled job prunes rows past expires_at. Successfully consuming a password reset revokes every device_sessions row for that user.
@@ -173,7 +173,7 @@ Every table below marked **FK ➔ users.id**, **FK ➔ departments.id**, or **FK
 2. **Never re-validate after the write, and never build a job to detect "orphans."** `users`, `departments` and `organizations` are **never hard-deleted** (§1.6) — only soft-deleted — so a reference recorded once remains resolvable forever. A locked agent's historical tickets still correctly show who handled them. There is no dangling-reference case for a reconciliation job to find, because the thing that would normally cause one (hard delete) cannot happen.
 3. **`ON DELETE CASCADE` / `SET NULL` annotations on these columns are aspirational, not literal.** They describe what the *application* does when it observes the referenced row change state (e.g., a soft-deleted user's `deleted_by_id` references elsewhere are left alone, since nothing enforces the alternative) — read them as intent, not as DDL that exists on the `ticket_messages`/`tickets`/`ticket_assignments` tables themselves.
 
-Full reasoning and the gRPC client wiring this requires: [09-domain-b-support-engine.md §1.1](./09-domain-b-support-engine.md).
+Full reasoning: [ADR 0022](./decisions/0022-no-cross-service-fks.md).
 
 ### **1.14 AI Metering, Cost and the Quota Gate (Table 29)**
 
@@ -342,7 +342,7 @@ Domain membership, not the number, is what tells you where a table belongs.
 | **is_email_verified** | BOOLEAN | NOT NULL, false | True if user verified email ownership via magic link/OTP. |
 | **password_hash** | VARCHAR(255) | Nullable | Argon2/Bcrypt hash. Null if user authenticated via OAuth2. |
 | **full_name** | VARCHAR(150) | NOT NULL | User's full display name (e.g., "John Doe"). |
-| **avatar_url** | TEXT | Nullable | An **internal Firebase Storage object path** (`organizations/{orgId}/avatars/{userId}/{uuid}.{ext}`), not a URL — despite the column name, kept for historical continuity with earlier drafts of this spec. `storage-service` resolves it to a fresh short-lived signed URL at read time; see [10-storage-service.md](./10-storage-service.md). |
+| **avatar_url** | TEXT | Nullable | An **internal Firebase Storage object path** (`organizations/{orgId}/avatars/{userId}/{uuid}.{ext}`), not a URL — despite the column name, kept for historical continuity with earlier drafts of this spec. `storage-service` resolves it to a fresh short-lived signed URL at read time; see [ADR 0024](./decisions/0024-one-upload-mechanism.md). |
 | **phone_number** | VARCHAR(30) | Nullable | Contact number for SMS alerts or 2FA. |
 | **is_phone_verified** | BOOLEAN | NOT NULL, false | True if phone number was verified via SMS code. |
 | **dob** | DATE | Nullable | Date of birth (optional profile/HR metric). |
@@ -496,7 +496,7 @@ Earlier revisions of this document specified both columns on both tables. **They
 | :---- | :---- | :---- | :---- |
 | **id** | UUID | Primary Key, gen_random_uuid() | Unique identifier for this OTP challenge. |
 | **user_id** | UUID | NOT NULL, FK ➔ users.id, On Delete CASCADE | User the code was issued to. |
-| **purpose** | ENUM | NOT NULL | Channel being verified: email_verification, phone_verification. |
+| **purpose** | ENUM | NOT NULL | Channel being verified: EMAIL_VERIFICATION, PHONE_VERIFICATION. |
 | **target** | VARCHAR(255) | NOT NULL | The specific email address or phone number receiving the code. Binds the code to one destination so it cannot be replayed against a different address (see §1.9). |
 | **code_hash** | VARCHAR(255) | NOT NULL | SHA-256 hash of the 6-digit code. The plaintext is never persisted. |
 | **attempts_count** | INT | NOT NULL, Default: 0 | Failed verification attempts against this code. |
@@ -509,7 +509,7 @@ Earlier revisions of this document specified both columns on both tables. **They
 * **Validity Predicate:** A code is redeemable only when `is_used = false AND expires_at > NOW() AND attempts_count < max_attempts`.
 * **Indexes:** `(user_id, purpose)` for "latest outstanding code" lookups; `(expires_at)` for the pruning job.
 * **Request Throttling:** Re-issuing a code invalidates the user's prior outstanding codes for the same purpose. Resend requests are additionally rate-limited at the gateway (Redis) to stop SMS-pumping abuse.
-* **On Success:** email_verification sets users.is_email_verified = true; phone_verification writes target into users.phone_number and sets is_phone_verified = true.
+* **On Success:** EMAIL_VERIFICATION sets users.is_email_verified = true; PHONE_VERIFICATION writes target into users.phone_number and sets is_phone_verified = true.
 
 #### **Table 12: password_reset_tokens**
 
@@ -624,7 +624,7 @@ Conceptually a sibling of Tables 11–12 (§1.9) — a hashed, expiring, single-
 | **created_at** | TIMESTAMPTZ | NOT NULL, NOW(), Indexed | Message dispatch timestamp. |
 
 * **Token Metering:** The RAG worker records the exact prompt/completion counts returned by the provider on every generated message. Billing sums these per tenant since organizations.billing_cycle_start to enforce organizations.monthly_ai_token_budget.
-* **Edit & Redaction (added post-implementation — see [09-domain-b-support-engine.md §2.5](./09-domain-b-support-engine.md)):** editing is time-boxed for the sender's own messages; agents may edit internal notes past the window via `ticket.message.moderate`. Redaction is content replacement, not row deletion, for the identical reason soft-delete exists elsewhere — something else may already reference this row's position in the thread.
+* **Edit & Redaction:** editing is time-boxed for the sender's own messages; agents may edit internal notes past the window via `ticket.message.moderate`. Redaction is content replacement, not row deletion, for the identical reason soft-delete exists elsewhere — something else may already reference this row's position in the thread.
 
 #### **Table 15: message_attachments**
 
@@ -635,7 +635,7 @@ Conceptually a sibling of Tables 11–12 (§1.9) — a hashed, expiring, single-
 | **id** | UUID | Primary Key, gen_random_uuid() | Unique attachment identifier. |
 | **message_id** | UUID | NOT NULL, FK ➔ ticket_messages.id | Parent chat message containing this file. |
 | **file_name** | VARCHAR(255) | NOT NULL | Original filename uploaded by user (e.g., screenshot.png). |
-| **file_url** | TEXT | NOT NULL | An internal Firebase Storage object path, same discipline as `users.avatar_url` — see [10-storage-service.md §1.3](./10-storage-service.md). Not a URL despite the name; resolved to a signed URL only at the moment `GET /attachments/:id/download` (or a message-thread fetch) actually needs one. |
+| **file_url** | TEXT | NOT NULL | An internal Firebase Storage object path, same discipline as `users.avatar_url` — see [ADR 0024](./decisions/0024-one-upload-mechanism.md). Not a URL despite the name; resolved to a signed URL only at the moment `GET /attachments/:id/download` (or a message-thread fetch) actually needs one. |
 | **file_size_bytes** | BIGINT | NOT NULL | File size in bytes. |
 | **mime_type** | VARCHAR(100) | NOT NULL | Internet media type (e.g., image/png, application/pdf). |
 | **created_at** | TIMESTAMPTZ | NOT NULL, NOW() | Upload timestamp. |
@@ -689,7 +689,7 @@ Conceptually a sibling of Tables 11–12 (§1.9) — a hashed, expiring, single-
 | **organization_id** | UUID | NOT NULL, FK ➔ organizations.id | Tenant isolation boundary. |
 | **created_by_id** | UUID | NOT NULL, FK ➔ users.id | Knowledge Manager or Admin who uploaded the document. |
 | **title** | VARCHAR(255) | NOT NULL | Document title (e.g., "2026 Employee Handbook"). |
-| **file_url** | TEXT | NOT NULL | An internal Firebase Storage object path (`documents` purpose — reserved, not yet wired: [10-storage-service.md §6](./10-storage-service.md)), same discipline as `users.avatar_url` and `message_attachments.file_url`. Not a URL despite the name. |
+| **file_url** | TEXT | NOT NULL | An internal Firebase Storage object path (`documents` purpose — reserved, not yet wired), same discipline as `users.avatar_url` and `message_attachments.file_url`. Not a URL despite the name. |
 | **file_type** | VARCHAR(50) | NOT NULL | File extension (pdf, docx, md, txt). |
 | **file_size_bytes** | BIGINT | NOT NULL | File size in bytes. |
 | **is_organization_wide** | BOOLEAN | NOT NULL, Default: true | If true, document is accessible across all departments in the org. |
@@ -736,7 +736,7 @@ Conceptually a sibling of Tables 11–12 (§1.9) — a hashed, expiring, single-
 | **created_at** | TIMESTAMPTZ | NOT NULL, NOW() | Ingestion timestamp. |
 
 * **Why four columns are denormalized here.** Hybrid retrieval runs two arms over two stores, and **both must enforce the same four-clause boundary** (§1.2 + soft-delete). The semantic arm reads a Qdrant payload that already carries all four, denormalized deliberately — a filter needing a Postgres round trip per ANN candidate would defeat the index. Without these columns the lexical arm would express the *same rule* as a `document_chunks → documents` join plus an `EXISTS` against `department_documents`, which means the security boundary is **two different queries over different tables** that only a test can prove equivalent. With them, both arms compare the same four fields, and the drift test compares like with like. The same denormalization argument that was accepted for Qdrant applies here for the same reason.
-* **Consequence, stated plainly:** `PUT /documents/:id/departments`, `PATCH /documents/:id` (`is_organization_wide`) and `DELETE /documents/:id` now fan out to **both** stores — the identical fan-out already accepted for Qdrant, in the same shape. The ordering rule for that fan-out is in [11-domain-c-architecture.md §1.8](./11-domain-c-architecture.md), and it is not symmetric: restrictions apply to the retrievable stores first.
+* **Consequence, stated plainly:** `PUT /documents/:id/departments`, `PATCH /documents/:id` (`is_organization_wide`) and `DELETE /documents/:id` now fan out to **both** stores — the identical fan-out already accepted for Qdrant, in the same shape. The ordering rule for that fan-out is in [ADR 0036](./decisions/0036-scope-fanout-order-is-asymmetric.md), and it is not symmetric: restrictions apply to the retrievable stores first.
 * **Index:** the FTS index is **composite** — `(organization_id, to_tsvector('simple', content_text))` — so tenant filtering happens *before* text matching. A GIN index on the `tsvector` alone would match text across every tenant's chunks and filter afterwards: not a leak, but a query that slows down precisely as the corpus grows.
 * **The usage counters are a projection, not a hot-path write.** They exist because `ai_generations` is retention-rolled (Table 29) and the rollups do not carry chunk ids — so a flag defined as "never retrieved in N months" would silently stop working the moment rollups ship. The daily job projects the ledger's arrays into these counters *before* the retention job trims the rows it read.
 
@@ -817,7 +817,7 @@ Conceptually a sibling of Tables 11–12 (§1.9) — a hashed, expiring, single-
 | **metadata** | JSONB | Nullable, Default `'{}'` | A **redacted** before/after diff. Never a password hash, a 2FA secret, or any `*_token_hash`/`code_hash` — the publisher whitelists what it records per resource type; a blacklist forgets the next secret someone adds to a model. |
 | **created_at** | TIMESTAMPTZ | NOT NULL, NOW(), Indexed | Event occurrence timestamp, stamped by the **publisher's** clock, not the consumer's — a consumer restart must not backdate a backlog of events to the moment it caught up. |
 
-* **Populated only by the NATS consumer in `ticket-service`, never by an RPC.** The proto for this module declares no `CreateAuditLog` message — a write path that doesn't exist in the contract cannot be added by accident, and the trail's value depends entirely on nobody being able to write to it directly. See [09-domain-b-support-engine.md §1.5](./09-domain-b-support-engine.md).
+* **Populated only by the NATS consumer in `ticket-service`, never by an RPC.** The proto for this module declares no `CreateAuditLog` message — a write path that doesn't exist in the contract cannot be added by accident, and the trail's value depends entirely on nobody being able to write to it directly.
 * **At-most-once, by design.** NATS core (not JetStream) can drop a message; `AuditPublisher`'s own contract already treats that as acceptable (*"the trail can have holes when NATS is down"*) rather than a stronger guarantee every write in the system would have to pay for. Revisit only if a gap-free trail becomes a hard requirement — that is an upgrade to both the publisher and this consumer, not a fix to one.
 
 #### **Table 29: ai_generations**

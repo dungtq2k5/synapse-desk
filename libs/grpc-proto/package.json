@@ -5,6 +5,7 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc -p tsconfig.build.json && node ../../scripts/copy-protos.mjs dist/proto",
+    "dev": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
     "proto:generate": "buf generate && node ../../scripts/generate-python-protos.mjs",
     "proto:lint": "buf lint",
     "proto:breaking": "buf breaking --against '../../.git#branch=main,subdir=libs/grpc-proto'",

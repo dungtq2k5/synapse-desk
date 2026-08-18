@@ -27,7 +27,7 @@ export class VerifyOtpDto {
 }
 
 export class OtpStatusQueryDto {
-  // A readable string (`?purpose=email_verification`), never the proto's
+  // A readable string (`?purpose=EMAIL_VERIFICATION`), never the proto's
   // integer: a query param is a public contract. The gRPC client maps it.
   @IsIn(OTP_PURPOSES)
   readonly purpose!: OtpPurpose;

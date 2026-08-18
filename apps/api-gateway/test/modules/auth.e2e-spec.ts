@@ -397,7 +397,7 @@ describe('auth at the HTTP boundary (e2e)', () => {
       );
 
       const res = await authenticatedAgent(fx.app).get(
-        `${API}/auth/otp/status?purpose=email_verification`,
+        `${API}/auth/otp/status?purpose=EMAIL_VERIFICATION`,
       );
 
       expect(res.status).toBe(200);

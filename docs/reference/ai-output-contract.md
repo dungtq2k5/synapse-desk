@@ -13,7 +13,7 @@ Every parse site returns a safe empty rather than raising, defaults toward *less
 | `_json_object` / `_json_array` | **searches** for JSON, returns `{}` / `[]` | Models wrap JSON in prose and fences regardless of instructions. Searching is the correct posture; parsing the whole response is not |
 | `_confidence` | **0**, not 1 | A UI that hides low-confidence output must hide the *unreadable* ones. Defaulting to 1 promotes exactly the malformed responses |
 | `classify` → `department_id` | validated against the **candidate set** | The one whose failure is a routing error rather than an exception: an invented id files a ticket into a department that does not exist |
-| `parse_review` | unrecognisable verdict → **COMPLETE** | Counter-intuitive and right: an unparseable review means the *reviewer* failed, not that the draft is bad. Treating it as PARTIAL turns one flaky model into a doubled bill |
+| `parse_review` | unrecognizable verdict → **COMPLETE** | Counter-intuitive and right: an unparseable review means the *reviewer* failed, not that the draft is bad. Treating it as PARTIAL turns one flaky model into a doubled bill |
 
 **The ledger clause is the one most likely to be missed.** A generation that produced unusable output still cost money and is still ledgered. A parse failure that skips the ledger row is a metering hole in the shape of a bug fix — the spend already happened. `tests/test_hostile_output_e2e.py` fires ten hostile responses at every generation RPC and asserts all three properties, including that one.
 

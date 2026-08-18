@@ -402,7 +402,7 @@ model Otp {
   id     String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId String @map("user_id") @db.Uuid
 
-  // 'email_verification' | 'phone_verification'
+  // 'EMAIL_VERIFICATION' | 'PHONE_VERIFICATION'
   purpose String @db.VarChar(50)
 
   // The exact email address or phone number the code was dispatched to. Kept
