@@ -17,7 +17,7 @@
     // to be remembered at all.
     "db:generate": {
       "inputs": ["prisma/schema.prisma", "prisma.config.ts"],
-      "outputs": ["src/generated/**"]
+      "outputs": ["src/generated/**", "**/docs/reference/erd/**.md"]
     },
     "build": {
       // `db:generate` is this package's OWN (no `^`): a service compiles against

@@ -17,6 +17,12 @@ generator client {
   output   = "../src/generated/prisma"
 }
 
+generator erd {
+  provider = "prisma-erd-generator"
+  output   = "../../../docs/reference/erd/notification-service.md"
+  theme    = "default"
+}
+
 datasource db {
   provider = "postgresql"
 }

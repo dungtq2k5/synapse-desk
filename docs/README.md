@@ -62,7 +62,44 @@ Edited, never added to. A new feature updates one of these; it does not create a
 | Document | Describes |
 | :---- | :---- |
 | [ai-output-contract.md](./reference/ai-output-contract.md) | Parse-site defaults and the Markdown answer contract |
+| [sys-flows.md](./reference/sys-flows.md) | The core cross-service flows, as mermaid |
 | [known-gaps.md](./reference/known-gaps.md) | What is currently broken or inconsistent, with the file that proves it |
+| [erd/](./reference/erd/) | **Generated** — one entity-relationship diagram per service. Never hand-edit |
+
+## Diagrams
+
+**Diagrams live with the thing they describe, not in a folder of their own.** A
+folder that only grows is the problem the numbered files already demonstrated,
+and a diagram rots more quietly than prose because nobody re-renders one to
+check it. So they are sorted the same way everything else here is — by what
+invalidates them:
+
+| Kind | Where it goes | Why it cannot rot |
+| :---- | :---- | :---- |
+| Illustrates a **decision** | Inline in the ADR that owns it | ADRs are append-only, so the diagram freezes with the decision |
+| A **cross-service flow** | Inline in [sys-flows.md](./reference/sys-flows.md) — as content, never a new page | The edit that changes the prose shows you the diagram |
+| **Derivable from source** | Generated: `reference/erd/` today | Regenerating *is* the update |
+| Per-endpoint, per-function | **Nowhere.** 189 routes is 189 artifacts stale on arrival — Swagger already documents endpoints from the code | — |
+
+**Format is mermaid in markdown, not `.drawio`.** A mermaid change is reviewable
+in a diff; a `.drawio` change is an opaque blob where you cannot tell whether an
+arrow reversed. It also renders on GitHub with no export step, so there is no
+committed SVG to drift from its source. Reach for drawio only for a presentation
+artifact — an architecture poster — which is not documentation.
+
+### The ERDs
+
+`npm run db:generate` regenerates all four, because each `schema.prisma`
+declares a `prisma-erd-generator` block alongside its client generator. There is
+no server to start and no database connection involved — the generator reads the
+schema, not the data.
+
+**There is deliberately no unified ERD.** Prisma cannot express a relation across
+schemas, and the cross-service edges are absent from every schema on purpose —
+see [ADR 0022](./decisions/0022-no-cross-service-fks.md). Merging the four into
+one diagram would draw foreign keys that do not exist. The ownership map that
+*does* span services is hand-drawn, in `sys-flows.md`, and changes only when a
+new kind of cross-service reference is introduced.
 
 ## The numbered `NN-*.md` files
 
