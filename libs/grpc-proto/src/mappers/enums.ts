@@ -11,6 +11,7 @@ import {
   DocumentFlagSeverity,
   DocumentFlagType,
   DocumentStatus,
+  IngestionJobStatus,
   Gender,
   InvitationStatus,
   NotificationChannel,
@@ -42,6 +43,7 @@ import {
   DocumentFlagSeverity as ProtoDocumentFlagSeverity,
   DocumentFlagType as ProtoDocumentFlagType,
   DocumentStatus as ProtoDocumentStatus,
+  IngestionJobStatus as ProtoIngestionJobStatus,
 } from '../generated/synapsedesk/ingestion/document';
 import { AiGenerationOutcome as ProtoAiGenerationOutcome } from '../generated/synapsedesk/ingestion/ledger';
 import {
@@ -443,9 +445,46 @@ const documentStatus = enumBridge<DocumentStatus, ProtoDocumentStatus>(
 export const toProtoDocumentStatus = documentStatus.toProto;
 export const fromProtoDocumentStatus = documentStatus.fromProto;
 
+/**
+ * `ingestion_jobs.status`.
+ *
+ * Seven members, and `CANCELLED` has no counterpart in `documentStatus` above
+ * on purpose — a cancelled job leaves its document `FAILED`. The `Record` this
+ * bridge takes is exhaustive, so adding a member to either enum without its
+ * partner is a compile error rather than a value that silently maps to
+ * UNSPECIFIED.
+ */
+const ingestionJobStatus = enumBridge<
+  IngestionJobStatus,
+  ProtoIngestionJobStatus
+>(
+  {
+    [IngestionJobStatus.QUEUED]:
+      ProtoIngestionJobStatus.INGESTION_JOB_STATUS_QUEUED,
+    [IngestionJobStatus.PARSING]:
+      ProtoIngestionJobStatus.INGESTION_JOB_STATUS_PARSING,
+    [IngestionJobStatus.CHUNKING]:
+      ProtoIngestionJobStatus.INGESTION_JOB_STATUS_CHUNKING,
+    [IngestionJobStatus.EMBEDDING]:
+      ProtoIngestionJobStatus.INGESTION_JOB_STATUS_EMBEDDING,
+    [IngestionJobStatus.COMPLETED]:
+      ProtoIngestionJobStatus.INGESTION_JOB_STATUS_COMPLETED,
+    [IngestionJobStatus.FAILED]:
+      ProtoIngestionJobStatus.INGESTION_JOB_STATUS_FAILED,
+    [IngestionJobStatus.CANCELLED]:
+      ProtoIngestionJobStatus.INGESTION_JOB_STATUS_CANCELLED,
+  },
+  ProtoIngestionJobStatus.INGESTION_JOB_STATUS_UNSPECIFIED,
+);
+
+export const toProtoIngestionJobStatus = ingestionJobStatus.toProto;
+export const fromProtoIngestionJobStatus = ingestionJobStatus.fromProto;
+
 const documentFileType = enumBridge<DocumentFileType, ProtoDocumentFileType>(
   {
     pdf: ProtoDocumentFileType.DOCUMENT_FILE_TYPE_PDF,
+    doc: ProtoDocumentFileType.DOCUMENT_FILE_TYPE_DOC,
+    docx: ProtoDocumentFileType.DOCUMENT_FILE_TYPE_DOCX,
     txt: ProtoDocumentFileType.DOCUMENT_FILE_TYPE_TXT,
     md: ProtoDocumentFileType.DOCUMENT_FILE_TYPE_MD,
     // A real stored value: confirm writes it for an accepted type with no

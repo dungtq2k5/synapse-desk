@@ -27,6 +27,7 @@ import { ChatModule } from './modules/chat/chat.module';
 import { FeedbackModule } from './modules/feedback/feedback.module';
 import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
 import { DocumentsModule } from './modules/documents/documents.module';
+import { IngestionJobsModule } from './modules/ingestion-jobs/ingestion-jobs.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { KnowledgeModule } from './modules/knowledge/knowledge.module';
@@ -100,6 +101,7 @@ import { HttpMetricsInterceptor } from './modules/metrics/http-metrics.intercept
     FeedbackModule,
     AuditLogsModule,
     DocumentsModule,
+    IngestionJobsModule,
     NotificationsModule,
     AnalyticsModule,
     KnowledgeModule,

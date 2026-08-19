@@ -185,24 +185,6 @@ export type FeedbackSortableField = (typeof FEEDBACK_SORTABLE_FIELDS)[number];
 // ---------------------------------------------------------------------------
 
 /**
- * What may be stored as a user AVATAR — mirrors `PURPOSE_POLICY[AVATAR]`.
- *
- * **No SVG**, and it is the one exclusion worth naming: an SVG is a document
- * that can carry script, so it is the single image type that behaves like an
- * executable when served.
- *
- * Here rather than as a private `const` in `avatar.dto.ts`, where it lived —
- * the same three literals as storage's policy, in a file storage never reads,
- * with nothing relating the two. `mime.spec.ts` now fails if they diverge.
- */
-export const AVATAR_MIME_TYPES = [
-  'image/png',
-  'image/jpeg',
-  'image/webp',
-] as const satisfies readonly MimeType[];
-export type AvatarMimeType = (typeof AVATAR_MIME_TYPES)[number];
-
-/**
  * What may be STORED as a ticket attachment — a security allowlist.
  *
  * An allowlist, never a denylist: a denylist is a promise to have thought of
@@ -285,6 +267,15 @@ export type AiEligibleMimeType = (typeof AI_ELIGIBLE_MIME_TYPES)[number];
  */
 export const MAX_AI_ATTACHMENT_BYTES = 8 * 1024 * 1024;
 
+/**
+ * The largest one attachment may be.
+ *
+ * Read by the gateway's presign DTO and by
+ * `PURPOSE_POLICY[TICKET_ATTACHMENT].maxSizeBytes` — two layers, one number.
+ *
+ * Distinct from {@link MAX_AI_ATTACHMENT_BYTES}, which is a TRANSPORT bound on
+ * everything one message sends to the model at once.
+ */
 export const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 export const MAX_ATTACHMENTS_PER_MESSAGE = 5;
 

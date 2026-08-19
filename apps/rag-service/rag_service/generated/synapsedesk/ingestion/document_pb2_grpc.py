@@ -114,6 +114,31 @@ class DocumentServiceStub:
                 request_serializer=synapsedesk_dot_ingestion_dot_document__pb2.DocumentIdRequest.SerializeToString,
                 response_deserializer=synapsedesk_dot_ingestion_dot_document__pb2.StorageUsageResponse.FromString,
                 _registered_method=True)
+        self.ListIngestionJobs = channel.unary_unary(
+                '/synapsedesk.ingestion.DocumentService/ListIngestionJobs',
+                request_serializer=synapsedesk_dot_ingestion_dot_document__pb2.ListIngestionJobsRequest.SerializeToString,
+                response_deserializer=synapsedesk_dot_ingestion_dot_document__pb2.ListIngestionJobsResponse.FromString,
+                _registered_method=True)
+        self.GetIngestionJob = channel.unary_unary(
+                '/synapsedesk.ingestion.DocumentService/GetIngestionJob',
+                request_serializer=synapsedesk_dot_ingestion_dot_document__pb2.IngestionJobIdRequest.SerializeToString,
+                response_deserializer=synapsedesk_dot_ingestion_dot_document__pb2.IngestionJobResponse.FromString,
+                _registered_method=True)
+        self.RetryIngestionJob = channel.unary_unary(
+                '/synapsedesk.ingestion.DocumentService/RetryIngestionJob',
+                request_serializer=synapsedesk_dot_ingestion_dot_document__pb2.IngestionJobIdRequest.SerializeToString,
+                response_deserializer=synapsedesk_dot_ingestion_dot_document__pb2.IngestionJobResponse.FromString,
+                _registered_method=True)
+        self.CancelIngestionJob = channel.unary_unary(
+                '/synapsedesk.ingestion.DocumentService/CancelIngestionJob',
+                request_serializer=synapsedesk_dot_ingestion_dot_document__pb2.IngestionJobIdRequest.SerializeToString,
+                response_deserializer=synapsedesk_dot_ingestion_dot_document__pb2.CancelIngestionJobResponse.FromString,
+                _registered_method=True)
+        self.ListDocumentIngestionJobs = channel.unary_unary(
+                '/synapsedesk.ingestion.DocumentService/ListDocumentIngestionJobs',
+                request_serializer=synapsedesk_dot_ingestion_dot_document__pb2.DocumentIdRequest.SerializeToString,
+                response_deserializer=synapsedesk_dot_ingestion_dot_document__pb2.ListIngestionJobsResponse.FromString,
+                _registered_method=True)
 
 
 class DocumentServiceServicer:
@@ -215,6 +240,42 @@ class DocumentServiceServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def ListIngestionJobs(self, request, context):
+        """On this service rather than its own: a second service would need a second
+        client, a second health entry and a second registration for five methods
+        that share a database and a permission family.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetIngestionJob(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def RetryIngestionJob(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def CancelIngestionJob(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ListDocumentIngestionJobs(self, request, context):
+        """Unpaginated, and reusing `DocumentIdRequest`: retries are rare, and a
+        document with enough jobs to need a page is a document with a problem a
+        page boundary would hide.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_DocumentServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -297,6 +358,31 @@ def add_DocumentServiceServicer_to_server(servicer, server):
                     servicer.GetStorageUsage,
                     request_deserializer=synapsedesk_dot_ingestion_dot_document__pb2.DocumentIdRequest.FromString,
                     response_serializer=synapsedesk_dot_ingestion_dot_document__pb2.StorageUsageResponse.SerializeToString,
+            ),
+            'ListIngestionJobs': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListIngestionJobs,
+                    request_deserializer=synapsedesk_dot_ingestion_dot_document__pb2.ListIngestionJobsRequest.FromString,
+                    response_serializer=synapsedesk_dot_ingestion_dot_document__pb2.ListIngestionJobsResponse.SerializeToString,
+            ),
+            'GetIngestionJob': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetIngestionJob,
+                    request_deserializer=synapsedesk_dot_ingestion_dot_document__pb2.IngestionJobIdRequest.FromString,
+                    response_serializer=synapsedesk_dot_ingestion_dot_document__pb2.IngestionJobResponse.SerializeToString,
+            ),
+            'RetryIngestionJob': grpc.unary_unary_rpc_method_handler(
+                    servicer.RetryIngestionJob,
+                    request_deserializer=synapsedesk_dot_ingestion_dot_document__pb2.IngestionJobIdRequest.FromString,
+                    response_serializer=synapsedesk_dot_ingestion_dot_document__pb2.IngestionJobResponse.SerializeToString,
+            ),
+            'CancelIngestionJob': grpc.unary_unary_rpc_method_handler(
+                    servicer.CancelIngestionJob,
+                    request_deserializer=synapsedesk_dot_ingestion_dot_document__pb2.IngestionJobIdRequest.FromString,
+                    response_serializer=synapsedesk_dot_ingestion_dot_document__pb2.CancelIngestionJobResponse.SerializeToString,
+            ),
+            'ListDocumentIngestionJobs': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListDocumentIngestionJobs,
+                    request_deserializer=synapsedesk_dot_ingestion_dot_document__pb2.DocumentIdRequest.FromString,
+                    response_serializer=synapsedesk_dot_ingestion_dot_document__pb2.ListIngestionJobsResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -731,6 +817,141 @@ class DocumentService:
             '/synapsedesk.ingestion.DocumentService/GetStorageUsage',
             synapsedesk_dot_ingestion_dot_document__pb2.DocumentIdRequest.SerializeToString,
             synapsedesk_dot_ingestion_dot_document__pb2.StorageUsageResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ListIngestionJobs(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/synapsedesk.ingestion.DocumentService/ListIngestionJobs',
+            synapsedesk_dot_ingestion_dot_document__pb2.ListIngestionJobsRequest.SerializeToString,
+            synapsedesk_dot_ingestion_dot_document__pb2.ListIngestionJobsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetIngestionJob(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/synapsedesk.ingestion.DocumentService/GetIngestionJob',
+            synapsedesk_dot_ingestion_dot_document__pb2.IngestionJobIdRequest.SerializeToString,
+            synapsedesk_dot_ingestion_dot_document__pb2.IngestionJobResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def RetryIngestionJob(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/synapsedesk.ingestion.DocumentService/RetryIngestionJob',
+            synapsedesk_dot_ingestion_dot_document__pb2.IngestionJobIdRequest.SerializeToString,
+            synapsedesk_dot_ingestion_dot_document__pb2.IngestionJobResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def CancelIngestionJob(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/synapsedesk.ingestion.DocumentService/CancelIngestionJob',
+            synapsedesk_dot_ingestion_dot_document__pb2.IngestionJobIdRequest.SerializeToString,
+            synapsedesk_dot_ingestion_dot_document__pb2.CancelIngestionJobResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ListDocumentIngestionJobs(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/synapsedesk.ingestion.DocumentService/ListDocumentIngestionJobs',
+            synapsedesk_dot_ingestion_dot_document__pb2.DocumentIdRequest.SerializeToString,
+            synapsedesk_dot_ingestion_dot_document__pb2.ListIngestionJobsResponse.FromString,
             options,
             channel_credentials,
             insecure,

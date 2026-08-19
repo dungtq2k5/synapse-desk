@@ -35,6 +35,27 @@ export enum DocumentStatus {
 }
 
 /**
+ * Where one ingestion attempt got to. Mirrors `IngestionJobStatus` in
+ * `document.config.ts`.
+ *
+ * **`CANCELLED` is deliberately absent from `DocumentStatus` above.** A
+ * cancelled job leaves its document `FAILED`, because that enum's own
+ * documentation delegates the reason here — the document says "not indexed",
+ * the job says why. `AiGenerationStatus` draws the same line.
+ */
+export enum IngestionJobStatus {
+  INGESTION_JOB_STATUS_UNSPECIFIED = 0,
+  INGESTION_JOB_STATUS_QUEUED = 1,
+  INGESTION_JOB_STATUS_PARSING = 2,
+  INGESTION_JOB_STATUS_CHUNKING = 3,
+  INGESTION_JOB_STATUS_EMBEDDING = 4,
+  INGESTION_JOB_STATUS_COMPLETED = 5,
+  INGESTION_JOB_STATUS_FAILED = 6,
+  INGESTION_JOB_STATUS_CANCELLED = 7,
+  UNRECOGNIZED = -1,
+}
+
+/**
  * The EXTENSION a document is filed under, not its MIME type — the distinction
  * the `DocumentFileType` doc comment exists to make. The column holds `pdf`; a
  * filter naming `application/pdf` matches no row and reports no error.
@@ -49,6 +70,8 @@ export enum DocumentFileType {
   DOCUMENT_FILE_TYPE_TXT = 2,
   DOCUMENT_FILE_TYPE_MD = 3,
   DOCUMENT_FILE_TYPE_BIN = 4,
+  DOCUMENT_FILE_TYPE_DOC = 5,
+  DOCUMENT_FILE_TYPE_DOCX = 6,
   UNRECOGNIZED = -1,
 }
 
@@ -302,6 +325,52 @@ export interface ListDocumentChunksByIdsResponse {
   items: DocumentChunkSummary[];
 }
 
+/** One ingestion attempt, as the pipeline dashboard reads it. */
+export interface IngestionJobResponse {
+  id: string;
+  documentId: string;
+  /**
+   * Empty until the worker records it — the row is created in the same
+   * transaction as the document, before BullMQ has accepted anything, so an
+   * empty value here is a job that has not been queued yet rather than a bug.
+   */
+  bullmqJobId: string;
+  status: IngestionJobStatus;
+  errorLog: string;
+  /**
+   * Set when the attempt reached a terminal state. Absent while it is still
+   * running, which is why this one is `optional` and `created_at` is not.
+   */
+  processedAt?: Timestamp | undefined;
+  createdAt: Timestamp | undefined;
+}
+
+export interface ListIngestionJobsRequest {
+  page:
+    | PageRequest
+    | undefined;
+  /**
+   * UNSPECIFIED and "" mean "no filter", which is what proto3's zero value is
+   * for — and why neither is `optional`. Same convention as
+   * `ListDocumentsRequest`.
+   */
+  status: IngestionJobStatus;
+  documentId: string;
+}
+
+export interface ListIngestionJobsResponse {
+  items: IngestionJobResponse[];
+  meta: PageMeta | undefined;
+}
+
+export interface IngestionJobIdRequest {
+  id: string;
+}
+
+export interface CancelIngestionJobResponse {
+  cancelled: boolean;
+}
+
 export interface DocumentServiceClient {
   listDocumentsByIds(request: ListDocumentsByIdsRequest, metadata?: Metadata): Observable<ListDocumentsByIdsResponse>;
 
@@ -337,6 +406,28 @@ export interface DocumentServiceClient {
   listDocumentFlags(request: ListDocumentFlagsRequest, metadata?: Metadata): Observable<ListDocumentFlagsResponse>;
 
   getStorageUsage(request: DocumentIdRequest, metadata?: Metadata): Observable<StorageUsageResponse>;
+
+  /**
+   * On this service rather than its own: a second service would need a second
+   * client, a second health entry and a second registration for five methods
+   * that share a database and a permission family.
+   */
+
+  listIngestionJobs(request: ListIngestionJobsRequest, metadata?: Metadata): Observable<ListIngestionJobsResponse>;
+
+  getIngestionJob(request: IngestionJobIdRequest, metadata?: Metadata): Observable<IngestionJobResponse>;
+
+  retryIngestionJob(request: IngestionJobIdRequest, metadata?: Metadata): Observable<IngestionJobResponse>;
+
+  cancelIngestionJob(request: IngestionJobIdRequest, metadata?: Metadata): Observable<CancelIngestionJobResponse>;
+
+  /**
+   * Unpaginated, and reusing `DocumentIdRequest`: retries are rare, and a
+   * document with enough jobs to need a page is a document with a problem a
+   * page boundary would hide.
+   */
+
+  listDocumentIngestionJobs(request: DocumentIdRequest, metadata?: Metadata): Observable<ListIngestionJobsResponse>;
 }
 
 export interface DocumentServiceController {
@@ -425,6 +516,43 @@ export interface DocumentServiceController {
     request: DocumentIdRequest,
     metadata?: Metadata,
   ): Promise<StorageUsageResponse> | Observable<StorageUsageResponse> | StorageUsageResponse;
+
+  /**
+   * On this service rather than its own: a second service would need a second
+   * client, a second health entry and a second registration for five methods
+   * that share a database and a permission family.
+   */
+
+  listIngestionJobs(
+    request: ListIngestionJobsRequest,
+    metadata?: Metadata,
+  ): Promise<ListIngestionJobsResponse> | Observable<ListIngestionJobsResponse> | ListIngestionJobsResponse;
+
+  getIngestionJob(
+    request: IngestionJobIdRequest,
+    metadata?: Metadata,
+  ): Promise<IngestionJobResponse> | Observable<IngestionJobResponse> | IngestionJobResponse;
+
+  retryIngestionJob(
+    request: IngestionJobIdRequest,
+    metadata?: Metadata,
+  ): Promise<IngestionJobResponse> | Observable<IngestionJobResponse> | IngestionJobResponse;
+
+  cancelIngestionJob(
+    request: IngestionJobIdRequest,
+    metadata?: Metadata,
+  ): Promise<CancelIngestionJobResponse> | Observable<CancelIngestionJobResponse> | CancelIngestionJobResponse;
+
+  /**
+   * Unpaginated, and reusing `DocumentIdRequest`: retries are rare, and a
+   * document with enough jobs to need a page is a document with a problem a
+   * page boundary would hide.
+   */
+
+  listDocumentIngestionJobs(
+    request: DocumentIdRequest,
+    metadata?: Metadata,
+  ): Promise<ListIngestionJobsResponse> | Observable<ListIngestionJobsResponse> | ListIngestionJobsResponse;
 }
 
 export function DocumentServiceControllerMethods() {
@@ -446,6 +574,11 @@ export function DocumentServiceControllerMethods() {
       "getDocumentChunk",
       "listDocumentFlags",
       "getStorageUsage",
+      "listIngestionJobs",
+      "getIngestionJob",
+      "retryIngestionJob",
+      "cancelIngestionJob",
+      "listDocumentIngestionJobs",
     ];
     for (const method of grpcMethods) {
       const descriptor: any = Reflect.getOwnPropertyDescriptor(constructor.prototype, method);

@@ -50,10 +50,12 @@ erDiagram
 
   "ingestion_jobs" {
     String id "🗝️"
+    String organization_id 
     String document_id 
     String bullmq_job_id 
     String status 
     String error_log "❓"
+    String superseded_by_id "❓"
     DateTime processed_at "❓"
     DateTime created_at 
     }

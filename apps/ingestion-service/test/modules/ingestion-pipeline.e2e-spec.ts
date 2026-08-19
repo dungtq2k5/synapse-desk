@@ -72,6 +72,7 @@ describe('The ingestion pipeline (e2e)', () => {
     });
     const job = await fx.prisma.ingestionJob.create({
       data: {
+        organizationId: tenant.organizationId,
         documentId: document.id,
         bullmqJobId: '',
         status: IngestionJobStatus.QUEUED,

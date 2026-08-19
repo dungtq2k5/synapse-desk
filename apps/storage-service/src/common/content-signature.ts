@@ -34,6 +34,8 @@ export const VALIDATED_MIME_TYPES = [
   'image/jpeg',
   'image/webp',
   'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   'text/plain',
   'text/markdown',
   // Analytics exports. Text with no signature of their own, so
@@ -95,6 +97,21 @@ const MATCHERS: Record<ValidatedMimeType, (head: Buffer) => boolean> = {
     head.subarray(8, 12).toString('latin1') === 'WEBP',
 
   'application/pdf': (head) => startsWith(head, [0x25, 0x50, 0x44, 0x46, 0x2d]),
+
+  // OLE2 Compound File — the container Word 97-2003 writes. Shared with legacy
+  // `.xls` and `.ppt`, which this check cannot tell apart; the allowlist is
+  // what keeps those out, and this stops a PNG renamed to `.doc`.
+  'application/msword': (head) =>
+    startsWith(head, [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]),
+
+  // OOXML is a ZIP, so this is `PK\x03\x04` and nothing narrower is possible
+  // from a 4KB head: `.docx`, `.xlsx` and a plain `.zip` are byte-identical
+  // here. Distinguishing them means reading the archive's `[Content_Types].xml`,
+  // which is a parse rather than a signature check — the allowlist bounds the
+  // set, and this rejects the renamed-binary case it is meant to.
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': (
+    head,
+  ) => startsWith(head, [0x50, 0x4b, 0x03, 0x04]),
 
   'text/plain': looksLikeText,
   'text/markdown': looksLikeText,

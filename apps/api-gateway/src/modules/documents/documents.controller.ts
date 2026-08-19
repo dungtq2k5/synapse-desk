@@ -23,6 +23,8 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ResponseMessage } from '../../common/decorators/response-message.decorator';
 import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
 import { DocumentsService } from './documents.service';
+import { IngestionJobsService } from '../ingestion-jobs/ingestion-jobs.service';
+import { IngestionJobResponseDto } from '../ingestion-jobs/dto/rest/ingestion-job-response.dto';
 import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AUTH_SCHEMES } from '../../common/config/swagger.config';
 import {
@@ -63,7 +65,10 @@ import {
 @Controller('documents')
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class DocumentsController {
-  constructor(private readonly documents: DocumentsService) {}
+  constructor(
+    private readonly documents: DocumentsService,
+    private readonly ingestionJobs: IngestionJobsService,
+  ) {}
 
   @ApiOperation({
     summary:
@@ -226,6 +231,18 @@ export class DocumentsController {
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<DownloadDocumentResponseDto> {
     return this.documents.download(id, context);
+  }
+
+  @ApiOperation({ summary: 'Ingestion history for this document' })
+  @ApiWrappedResponse(Paginated(IngestionJobResponseDto))
+  @ApiFilterErrors(['400', '401', '403', '404'])
+  @Get(':id/ingestion-jobs')
+  @RequirePermission('document.read')
+  listIngestionJobs(
+    @CurrentUser() context: RequestContext,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<PaginationResponseDto<IngestionJobResponseDto>> {
+    return this.ingestionJobs.listForDocument(id, context);
   }
 
   @ApiOperation({ summary: 'Departments scoped to this document' })

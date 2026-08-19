@@ -1068,6 +1068,38 @@ describe('Documents (e2e)', () => {
       expect(items).toHaveLength(0);
     });
 
+    it('**8b. shows nothing from a document outside the caller’s departments**', async () => {
+      // The worklist follows the SAME boundary as `GET /documents`. Without it
+      // a flag row hands `document.title` to a caller the by-id read refuses,
+      // and `document.read` reaches SUPPORT_AGENT, not only KNOWLEDGE_MANAGER.
+      const document = await createScopedDocument(fx.prisma, tenant, [
+        tenant.departmentId,
+      ]);
+      await createFlag(fx.prisma, document);
+
+      const { items, meta } = await documents.listDocumentFlags(
+        flagsRequest(),
+        outsider(),
+      );
+
+      expect(items).toHaveLength(0);
+      expect(meta!.totalItems).toBe(0);
+    });
+
+    it('8c. still shows one to a member of the document’s department', async () => {
+      const document = await createScopedDocument(fx.prisma, tenant, [
+        tenant.departmentId,
+      ]);
+      await createFlag(fx.prisma, document);
+
+      const { items } = await documents.listDocumentFlags(
+        flagsRequest(),
+        manager(),
+      );
+
+      expect(items).toHaveLength(1);
+    });
+
     it('9. drops a DELETED document’s flags from the worklist', async () => {
       // Otherwise the list keeps asking a reviewer to act on a document that no
       // longer exists, and the join would still surface its title.

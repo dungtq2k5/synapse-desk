@@ -3,6 +3,7 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { AuthClientModule } from '../auth-client/auth-client.module';
 import { StorageClientModule } from '../storage-client/storage-client.module';
 import { IngestionModule } from '../ingestion/ingestion.module';
+import { IngestionJobsModule } from '../ingestion-jobs/ingestion-jobs.module';
 import { DocumentsService } from './documents.service';
 import { DocumentsGrpcController } from './documents-grpc.controller';
 
@@ -12,6 +13,9 @@ import { DocumentsGrpcController } from './documents-grpc.controller';
     // is what TRIGGERS a scope change; the ingestion module owns how it is
     // applied, so the ordering rule lives in one place rather than two.
     IngestionModule,
+    // The job RPCs are declared on `DocumentService`, so this module's
+    // controller adapts them — see `IngestionJobsModule`.
+    IngestionJobsModule,
     PrismaModule,
     AuthClientModule,
     StorageClientModule,

@@ -66,6 +66,7 @@ import { DocumentEventPublisher } from '../events/document-event.publisher';
 import { ScopeWriterService } from '../ingestion/scope-writer.service';
 import { ScopeFanoutQueueService } from '../ingestion/scope-fanout-queue.service';
 import { Prisma } from '../../generated/prisma/client';
+import { documentVisibility } from '../../common/document-visibility';
 import {
   DOCUMENT_INCLUDE,
   DocumentWithScope,
@@ -259,6 +260,9 @@ export class DocumentsService {
         // the document would sit "pending" forever with no job to look at.
         const job = await tx.ingestionJob.create({
           data: {
+            // Denormalized; the document it copies is written in this same
+            // transaction.
+            organizationId,
             documentId: created.id,
             // Filled in by the worker when BullMQ actually accepts it. Empty
             // rather than a fake id: a made-up job id in Redis-shaped format is
@@ -493,8 +497,10 @@ export class DocumentsService {
     const where: Prisma.DocumentFlagWhereInput = {
       organizationId,
       // The scope boundary. A flag names a document, so an unscoped list would
-      // leak another tenant's document titles through the join below.
-      document: { deletedAt: null },
+      // leak another tenant's document titles through the join below — and
+      // `documentVisibility` is what keeps a department-scoped document out of
+      // a worklist for a caller `GET /documents/:id` would answer NOT_FOUND.
+      document: { deletedAt: null, ...documentVisibility(context) },
       ...(requested.length > 0 ? { flagType: { in: requested } } : {}),
       ...(request.includeResolved ? {} : { resolvedAt: null }),
     };
@@ -975,36 +981,9 @@ export class DocumentsService {
     });
   }
 
-  /**
-   * What this caller may see: org-wide ∪ their departments — RDM §1.2 —
-   * and everything for a super admin, which returns `{}` so callers can spread
-   * it unconditionally.
-   *
-   * **The SAME predicate `rag-service` enforces in retrieval**, and the two must
-   * agree: a document invisible in this list but retrievable by the RAG pipeline
-   * is a disclosure, and one visible here but not retrievable is a user
-   * reporting that search is broken.
-   *
-   * **The gateway caches `GET /documents` keyed on a digest of exactly these two
-   * inputs** — `visibilityDigest` in `cacheable.interceptor.ts`.
-   * Widening this filter without widening that digest serves one audience's rows
-   * to another, because two callers the new filter separates would still share a
-   * cache entry. The pair is easy to miss: only one of the two files looks like
-   * it is about security.
-   */
+  /** {@link documentVisibility}, as a method so the call sites read unchanged. */
   private visibilityScope(context: CallerContext): Prisma.DocumentWhereInput {
-    if (context.isSuperAdmin) return {};
-
-    return {
-      OR: [
-        { isOrganizationWide: true },
-        {
-          departmentLinks: {
-            some: { departmentId: { in: context.departmentIds } },
-          },
-        },
-      ],
-    };
+    return documentVisibility(context);
   }
 
   /** `SUM(file_size_bytes)` over the tenant's LIVE documents. */

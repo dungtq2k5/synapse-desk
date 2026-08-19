@@ -1,7 +1,4 @@
-import {
-  MAX_AVATAR_BYTES,
-  MAX_UPLOAD_FILE_NAME_LENGTH,
-} from '../../../../common/config/dto.config';
+import { MAX_UPLOAD_FILE_NAME_LENGTH } from '../../../../common/config/dto.config';
 import { Transform, Type } from 'class-transformer';
 import {
   IsIn,
@@ -14,9 +11,10 @@ import {
 } from 'class-validator';
 import {
   AVATAR_MIME_TYPES,
+  MAX_AVATAR_BYTES,
+  MAX_OBJECT_PATH_LENGTH,
   trimIfString,
   type AvatarMimeType,
-  MAX_OBJECT_PATH_LENGTH,
 } from '@synapsedesk/common';
 
 // The allowlist and cap are duplicated from storage-service's

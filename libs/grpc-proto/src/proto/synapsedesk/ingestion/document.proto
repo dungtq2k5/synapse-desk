@@ -37,6 +37,24 @@ enum DocumentStatus {
   DOCUMENT_STATUS_FAILED = 4;
 }
 
+// Where one ingestion attempt got to. Mirrors `IngestionJobStatus` in
+// `document.config.ts`.
+//
+// **`CANCELLED` is deliberately absent from `DocumentStatus` above.** A
+// cancelled job leaves its document `FAILED`, because that enum's own
+// documentation delegates the reason here — the document says "not indexed",
+// the job says why. `AiGenerationStatus` draws the same line.
+enum IngestionJobStatus {
+  INGESTION_JOB_STATUS_UNSPECIFIED = 0;
+  INGESTION_JOB_STATUS_QUEUED = 1;
+  INGESTION_JOB_STATUS_PARSING = 2;
+  INGESTION_JOB_STATUS_CHUNKING = 3;
+  INGESTION_JOB_STATUS_EMBEDDING = 4;
+  INGESTION_JOB_STATUS_COMPLETED = 5;
+  INGESTION_JOB_STATUS_FAILED = 6;
+  INGESTION_JOB_STATUS_CANCELLED = 7;
+}
+
 // The EXTENSION a document is filed under, not its MIME type — the distinction
 // the `DocumentFileType` doc comment exists to make. The column holds `pdf`; a
 // filter naming `application/pdf` matches no row and reports no error.
@@ -50,6 +68,8 @@ enum DocumentFileType {
   DOCUMENT_FILE_TYPE_TXT = 2;
   DOCUMENT_FILE_TYPE_MD = 3;
   DOCUMENT_FILE_TYPE_BIN = 4;
+  DOCUMENT_FILE_TYPE_DOC = 5;
+  DOCUMENT_FILE_TYPE_DOCX = 6;
 }
 
 enum DocumentFlagType {
@@ -270,6 +290,40 @@ message ListDocumentChunksByIdsResponse {
   repeated DocumentChunkSummary items = 1;
 }
 
+// One ingestion attempt, as the pipeline dashboard reads it.
+message IngestionJobResponse {
+  string id = 1;
+  string document_id = 2;
+  // Empty until the worker records it — the row is created in the same
+  // transaction as the document, before BullMQ has accepted anything, so an
+  // empty value here is a job that has not been queued yet rather than a bug.
+  string bullmq_job_id = 3;
+  IngestionJobStatus status = 4;
+  string error_log = 5;
+  // Set when the attempt reached a terminal state. Absent while it is still
+  // running, which is why this one is `optional` and `created_at` is not.
+  optional google.protobuf.Timestamp processed_at = 6;
+  google.protobuf.Timestamp created_at = 7;
+}
+
+message ListIngestionJobsRequest {
+  synapsedesk.auth.PageRequest page = 1;
+  // UNSPECIFIED and "" mean "no filter", which is what proto3's zero value is
+  // for — and why neither is `optional`. Same convention as
+  // `ListDocumentsRequest`.
+  IngestionJobStatus status = 2;
+  string document_id = 3;
+}
+
+message ListIngestionJobsResponse {
+  repeated IngestionJobResponse items = 1;
+  synapsedesk.auth.PageMeta meta = 2;
+}
+
+message IngestionJobIdRequest { string id = 1; }
+
+message CancelIngestionJobResponse { bool cancelled = 1; }
+
 service DocumentService {
   rpc ListDocumentsByIds(ListDocumentsByIdsRequest) returns (ListDocumentsByIdsResponse);
   rpc ListDocumentChunksByIds(ListDocumentChunksByIdsRequest) returns (ListDocumentChunksByIdsResponse);
@@ -292,4 +346,16 @@ service DocumentService {
   rpc ListDocumentFlags(ListDocumentFlagsRequest) returns (ListDocumentFlagsResponse);
 
   rpc GetStorageUsage(DocumentIdRequest) returns (StorageUsageResponse);
+
+  // On this service rather than its own: a second service would need a second
+  // client, a second health entry and a second registration for five methods
+  // that share a database and a permission family.
+  rpc ListIngestionJobs(ListIngestionJobsRequest) returns (ListIngestionJobsResponse);
+  rpc GetIngestionJob(IngestionJobIdRequest) returns (IngestionJobResponse);
+  rpc RetryIngestionJob(IngestionJobIdRequest) returns (IngestionJobResponse);
+  rpc CancelIngestionJob(IngestionJobIdRequest) returns (CancelIngestionJobResponse);
+  // Unpaginated, and reusing `DocumentIdRequest`: retries are rare, and a
+  // document with enough jobs to need a page is a document with a problem a
+  // page boundary would hide.
+  rpc ListDocumentIngestionJobs(DocumentIdRequest) returns (ListIngestionJobsResponse);
 }

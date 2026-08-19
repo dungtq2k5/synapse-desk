@@ -23,6 +23,7 @@ export * from './contracts/audit.contract';
 export * from './contracts/ticket.contract';
 export * from './contracts/storage.contract';
 export * from './configs/document.config';
+export * from './configs/export.config';
 export * from './contracts/document.contract';
 export * from './configs/ai-models.config';
 export * from './configs/ai-pricing.config';

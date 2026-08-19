@@ -10,7 +10,12 @@ import {
   DocumentChunkResponse,
   DocumentIdRequest,
   DocumentResponse,
+  CancelIngestionJobResponse,
   DocumentServiceController,
+  IngestionJobIdRequest,
+  IngestionJobResponse,
+  ListIngestionJobsRequest,
+  ListIngestionJobsResponse,
   DocumentServiceControllerMethods,
   DownloadDocumentResponse,
   GetDocumentChunkRequest,
@@ -29,6 +34,7 @@ import {
   UpdateDocumentRequest,
 } from '@synapsedesk/grpc-proto';
 import { DocumentsService } from './documents.service';
+import { IngestionJobsService } from '../ingestion-jobs/ingestion-jobs.service';
 
 /**
  * Every method unpacks the caller context, because every query is scoped by it
@@ -39,7 +45,10 @@ import { DocumentsService } from './documents.service';
 @Controller()
 @DocumentServiceControllerMethods()
 export class DocumentsGrpcController implements DocumentServiceController {
-  constructor(private readonly documents: DocumentsService) {}
+  constructor(
+    private readonly documents: DocumentsService,
+    private readonly jobs: IngestionJobsService,
+  ) {}
 
   presignDocument(
     request: PresignDocumentRequest,
@@ -195,5 +204,49 @@ export class DocumentsGrpcController implements DocumentServiceController {
     metadata?: Metadata,
   ): Promise<StorageUsageResponse> {
     return this.documents.getStorageUsage(unpackCallerContext(metadata));
+  }
+
+  // ---------------------------------------------------------------- jobs
+  //
+  // The one place this controller delegates elsewhere: the RPCs are declared on
+  // `DocumentService`, and ts-proto's generated decorator covers a whole
+  // service at once, so their adapter has to live here.
+
+  listIngestionJobs(
+    request: ListIngestionJobsRequest,
+    metadata?: Metadata,
+  ): Promise<ListIngestionJobsResponse> {
+    return this.jobs.listIngestionJobs(request, unpackCallerContext(metadata));
+  }
+
+  getIngestionJob(
+    request: IngestionJobIdRequest,
+    metadata?: Metadata,
+  ): Promise<IngestionJobResponse> {
+    return this.jobs.getIngestionJob(request, unpackCallerContext(metadata));
+  }
+
+  retryIngestionJob(
+    request: IngestionJobIdRequest,
+    metadata?: Metadata,
+  ): Promise<IngestionJobResponse> {
+    return this.jobs.retryIngestionJob(request, unpackCallerContext(metadata));
+  }
+
+  cancelIngestionJob(
+    request: IngestionJobIdRequest,
+    metadata?: Metadata,
+  ): Promise<CancelIngestionJobResponse> {
+    return this.jobs.cancelIngestionJob(request, unpackCallerContext(metadata));
+  }
+
+  listDocumentIngestionJobs(
+    request: DocumentIdRequest,
+    metadata?: Metadata,
+  ): Promise<ListIngestionJobsResponse> {
+    return this.jobs.listDocumentIngestionJobs(
+      request,
+      unpackCallerContext(metadata),
+    );
   }
 }

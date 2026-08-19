@@ -1,6 +1,6 @@
 import { InjectQueue } from '@nestjs/bullmq';
 import { Injectable, Logger } from '@nestjs/common';
-import { Queue } from 'bullmq';
+import { FinishedStatus, Queue } from 'bullmq';
 import {
   formatErrorMsg,
   INGESTION_QUEUE,
@@ -8,6 +8,17 @@ import {
 } from '@synapsedesk/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { IngestionJobData } from './ingestion.processor';
+
+/**
+ * The states BullMQ never leaves, as a lookup.
+ *
+ * An exhaustive `Record` over `FinishedStatus`, so a member added upstream
+ * fails to compile here rather than silently joining the runnable set.
+ */
+const FINISHED_JOB_STATES: Record<FinishedStatus, true> = {
+  completed: true,
+  failed: true,
+};
 
 /**
  * Puts work on the queue and records the BullMQ id against the row.
@@ -57,6 +68,41 @@ export class IngestionQueueService {
           `Queued ${data.documentId} but could not record the job id: ${formatErrorMsg(error)}`,
         );
       });
+  }
+
+  /**
+   * Whether BullMQ still holds the job in a state it will run from.
+   *
+   * @returns `false` when BullMQ has no record of the id, or holds it in a
+   * state it never leaves — which is what a cap-deferred job looks like, since
+   * a deferral COMPLETES rather than failing.
+   */
+  async isRunnable(ingestionJobId: string): Promise<boolean> {
+    const job = await this.queue.getJob(ingestionJobId);
+    const state = await job?.getState();
+
+    // Naming the FINISHED states rather than the runnable ones: an unlisted
+    // state then reads as runnable, and the two mistakes are not equal —
+    // "runnable" only refuses a retry, while "stranded" enqueues a second
+    // worker onto a document one is already parsing. `'unknown'` lands on the
+    // safe side of that asymmetry for free.
+    return state !== undefined && !(state in FINISHED_JOB_STATES);
+  }
+
+  /**
+   * Drops a job from the queue if it is still there.
+   *
+   * Best effort by design: the id may be long gone under `removeOnComplete`,
+   * and an ACTIVE job is not stopped by this at all — BullMQ has no way to
+   * interrupt a worker. Cancellation is the database write; this only spares
+   * the queue a run that would refuse itself at the first stage boundary.
+   */
+  async discard(ingestionJobId: string): Promise<void> {
+    await this.queue.remove(ingestionJobId).catch((error: unknown) => {
+      this.logger.warn(
+        `Could not remove job ${ingestionJobId} from the queue: ${formatErrorMsg(error)}`,
+      );
+    });
   }
 
   /**

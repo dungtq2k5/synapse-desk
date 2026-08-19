@@ -50,7 +50,7 @@ A global interceptor checks `organizations.status` (RDM §1.8) before dispatch:
 | :---- | :---- |
 | `POST /users/invitations`, `POST /users` | `organizations.max_agent_seats` vs **active agents + outstanding `PENDING` invitations**. Counting only active agents would let an admin issue 50 invites against 10 seats and blow the quota on acceptance. Re-checked at `POST /users/invitations/:token/accept` — **409** if the tenant filled up in the interim. Expired invitations release their reservation automatically (RDM §1.8, Table 28). |
 | `POST /documents` | `organizations.max_storage_bytes` vs `SUM(documents.file_size_bytes)` |
-| **Every AI surface** — `POST /chat/conversations/:id/messages`, `POST /tickets/:id/ai/*`, greeting Layer 2, query reformulation, ingestion embeddings | `monthly_ai_token_budget` vs spend summed from **`ai_generations` (RDM Table 29)** since `billing_cycle_start` — **not** `ticket_messages`, which only sees chat answers and is blind to drafts, summaries, classifications and embeddings. Runtime check is a Redis counter (`quota:{org}:{cycle}`), reconciled against the ledger; the `SUM` is the definition, not the hot-path query. **The counter increment is synchronous and awaited; only the durable ledger row is fire-and-forget** — an asynchronous increment lets a burst of concurrent requests all read the same stale value and all pass the gate (RDM §1.14). See RDM §1.14 for the per-surface behaviour at cap, which differs by surface and is summarised below. |
+| **Every AI surface** — `POST /chat/conversations/:id/messages`, `POST /tickets/:id/ai/*`, greeting Layer 2, query reformulation, ingestion embeddings | `monthly_ai_token_budget` vs spend summed from **`ai_generations` (RDM Table 29)** since `billing_cycle_start` — **not** `ticket_messages`, which only sees chat answers and is blind to drafts, summaries, classifications and embeddings. Runtime check is a Redis counter (`quota:{org}:{cycle}`), reconciled against the ledger; the `SUM` is the definition, not the hot-path query. **The counter increment is synchronous and awaited; only the durable ledger row is fire-and-forget** — an asynchronous increment lets a burst of concurrent requests all read the same stale value and all pass the gate (RDM §1.14). See RDM §1.14 for the per-surface behaviour at cap, which differs by surface and is summarized below. |
 
 **At the cap, surfaces behave differently — and one of them is a product decision, not an error code:**
 
@@ -439,9 +439,9 @@ Knowledge Manager dashboard for content quality signals and conflict detection (
 
 | Method | Path | Description | Auth |
 | :---- | :---- | :---- | :---- |
-| GET | `/ingestion-jobs` | Pipeline dashboard. Filter `?status=&documentId=` over `QUEUED\|PARSING\|CHUNKING\|EMBEDDING\|COMPLETED\|FAILED`. | perm:`document.read` |
+| GET | `/ingestion-jobs` | Pipeline dashboard. Filter `?status=&documentId=` over `QUEUED\|PARSING\|CHUNKING\|EMBEDDING\|COMPLETED\|FAILED\|CANCELLED`. | perm:`document.read` |
 | GET | `/ingestion-jobs/:id` | Job detail + `error_log` + `bullmq_job_id`. | perm:`document.read` |
-| POST | `/ingestion-jobs/:id/retry` ✎ | Re-enqueue a `FAILED` job. | perm:`document.reindex` |
+| POST | `/ingestion-jobs/:id/retry` ✎ | Queue a fresh attempt as a NEW job. Accepts `FAILED`, `CANCELLED`, and a `QUEUED` job the queue no longer holds. | perm:`document.reindex` |
 | DELETE | `/ingestion-jobs/:id` | Cancel a queued/running job. | perm:`document.reindex` |
 | GET | `/documents/:id/ingestion-jobs` | Job history for one document. | perm:`document.read` |
 

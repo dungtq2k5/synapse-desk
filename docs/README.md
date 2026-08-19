@@ -54,6 +54,7 @@ Append-only. A decision is never edited; superseding one means writing a new one
 | [0034](./decisions/0034-read-repopulate-race-is-accepted.md) | The cache read-repopulate race is accepted, not fixed |
 | [0035](./decisions/0035-ocr-language-cap-is-a-cpu-bound.md) | The OCR language cap is four, and it is a CPU bound |
 | [0036](./decisions/0036-scope-fanout-order-is-asymmetric.md) | Scope fan-out order is asymmetric, and restrictions are synchronous |
+| [0037](./decisions/0037-worklists-follow-the-document-boundary.md) | Operational worklists follow the document boundary |
 
 ## `reference/` — what is true today
 

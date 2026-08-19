@@ -12,9 +12,14 @@ import {
   estimateCostMicros,
   formatErrorMsg,
   IngestionJobStatus,
+  TERMINAL_INGESTION_STATUSES,
   QDRANT_UPSERT_BATCH,
   systemContext,
 } from '@synapsedesk/common';
+import {
+  INGESTION_OUTCOMES,
+  type IngestionOutcome,
+} from '../../common/configs/ingestion.config';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageReferenceService } from '../storage-client/storage-reference.service';
 import { AiLedgerService } from '../ai-ledger/ai-ledger.service';
@@ -50,6 +55,18 @@ export type IngestionJobData = {
 
 /** Raised when the tenant is out of AI budget. Not a failure — a deferral. */
 class BudgetExhausted extends Error {}
+
+/**
+ * Raised when the job row reached a terminal status underneath the worker.
+ *
+ * Handled by `process()`, which returns `'CANCELLED'`. It must never reach
+ * `fail()` or escape the processor.
+ */
+export class JobNoLongerRunnableError extends Error {
+  constructor(ingestionJobId: string) {
+    super(`Ingestion job ${ingestionJobId} is no longer runnable`);
+  }
+}
 
 /**
  * Raised when a document parses to no text at all.
@@ -124,7 +141,7 @@ export class IngestionProcessor {
    * can leave the job alone rather than retrying it into a failure. A thrown
    * error means a genuine failure and is recorded as one.
    */
-  async process(data: IngestionJobData): Promise<'INDEXED' | 'DEFERRED'> {
+  async process(data: IngestionJobData): Promise<IngestionOutcome> {
     const { documentId, ingestionJobId, organizationId } = data;
 
     try {
@@ -182,17 +199,44 @@ export class IngestionProcessor {
       await this.embedAndUpsert(data, scope);
 
       await this.complete(data, chunks.length);
-      return 'INDEXED';
+      return INGESTION_OUTCOMES.INDEXED;
     } catch (error) {
+      if (error instanceof JobNoLongerRunnableError) {
+        // Returned, not rethrown: `attempts: 3` means a throw here is two more
+        // re-runs and a failed-set entry that reads like a genuine failure.
+        this.logger.log(
+          `Ingestion of ${documentId} stopped: job ${ingestionJobId} is no longer runnable`,
+        );
+
+        return INGESTION_OUTCOMES.CANCELLED;
+      }
+
       if (error instanceof BudgetExhausted) {
         // Back to QUEUED, and the document back to PENDING. Both are honest:
         // nothing is wrong, the work is simply waiting for the cycle to roll.
-        await this.setJobStatus(ingestionJobId, IngestionJobStatus.QUEUED);
+        //
+        // `setJobStatus` can refuse, and a throw raised inside a catch block
+        // escapes the handler — which is the retried-job outcome the CANCELLED
+        // arm above exists to avoid.
+        try {
+          await this.setJobStatus(ingestionJobId, IngestionJobStatus.QUEUED);
+        } catch (deferralError) {
+          if (deferralError instanceof JobNoLongerRunnableError) {
+            this.logger.log(
+              `Ingestion of ${documentId} was cancelled while deferring at the AI cap`,
+            );
+
+            return INGESTION_OUTCOMES.CANCELLED;
+          }
+
+          throw deferralError;
+        }
+
         await this.setDocumentStatus(documentId, DocumentStatus.PENDING);
         this.logger.log(
           `Deferred ingestion of ${documentId}: organization ${organizationId} is at the AI cap`,
         );
-        return 'DEFERRED';
+        return INGESTION_OUTCOMES.DEFERRED;
       }
 
       await this.fail(data, error);
@@ -536,14 +580,43 @@ export class IngestionProcessor {
     });
   }
 
+  /**
+   * Moves the job to its next stage, and refuses if it is no longer runnable.
+   *
+   * **This is the whole cancellation mechanism.** BullMQ cannot kill an active
+   * job — `Queue.remove()` on one a worker holds does not stop it — so the only
+   * way to end work in progress is for the worker to notice. It already writes
+   * the status at every stage boundary; making that write conditional turns the
+   * four writes it was already doing into four checkpoints, with no new column,
+   * no polling and no second concept.
+   *
+   * **The predicate is what a person or a success made final, not what is
+   * currently in flight.** `FAILED` is deliberately not in it: BullMQ retries a
+   * failed job (`attempts: 3`), and that retry has to be allowed to move the row
+   * back through the stages — refusing it would turn a transient embedding
+   * outage into a permanent failure. `TERMINAL_INGESTION_STATUSES` says so at
+   * its declaration.
+   *
+   * The cost is one wasted stage: a cancel issued mid-embed still pays for that
+   * embed. That is the honest price of not being able to interrupt a running
+   * process, rather than a gap in the design.
+   */
   private async setJobStatus(
     ingestionJobId: string,
     status: IngestionJobStatus,
   ): Promise<void> {
-    await this.prisma.ingestionJob.update({
-      where: { id: ingestionJobId },
+    const { count } = await this.prisma.ingestionJob.updateMany({
+      // `notIn`, not `in RESUMABLE_*`: a FAILED row is what BullMQ retries, and
+      // refusing it would make a transient outage permanent. Spread because the
+      // constant is `as const`.
+      where: {
+        id: ingestionJobId,
+        status: { notIn: [...TERMINAL_INGESTION_STATUSES] },
+      },
       data: { status },
     });
+
+    if (count === 0) throw new JobNoLongerRunnableError(ingestionJobId);
   }
 
   private async setDocumentStatus(

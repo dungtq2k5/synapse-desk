@@ -56,9 +56,6 @@ export const MAX_DOCUMENT_DEPARTMENTS = 50;
 /** Longest file name a presign DTO accepts. */
 export const MAX_UPLOAD_FILE_NAME_LENGTH = 255;
 
-/** Largest avatar a presign DTO accepts, in bytes (2 MiB). */
-export const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
-
 // ------------------------------------------------------------- free text
 
 /** Longest reason accepted when changing a ticket's status. */

@@ -3,6 +3,7 @@ import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { INGESTION_QUEUE, INGESTION_JOB_NAME } from '@synapsedesk/common';
 import { IngestionJobData, IngestionProcessor } from './ingestion.processor';
+import { INGESTION_OUTCOMES } from '../../common/configs/ingestion.config';
 
 /**
  * The BullMQ half — retries, concurrency and nothing else.
@@ -39,7 +40,7 @@ export class IngestionWorker extends WorkerHost {
     // failed, which is exactly the outcome RDM §1.14 forbids — a tenant who
     // overspent on chat must not also lose document onboarding. The requeue is
     // the cycle-roll drain, not a retry.
-    if (outcome === 'DEFERRED') {
+    if (outcome === INGESTION_OUTCOMES.DEFERRED) {
       this.logger.debug(`Job ${job.id} deferred; awaiting the cycle roll`);
     }
   }

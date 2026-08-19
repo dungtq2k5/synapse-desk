@@ -41,12 +41,18 @@ export enum IngestionJobStatus {
   EMBEDDING = 'EMBEDDING',
   COMPLETED = 'COMPLETED',
   FAILED = 'FAILED',
+  /** Stopped on request, or superseded by a retry. A job status only — a
+   *  cancelled job's document is `DocumentStatus.FAILED`. */
+  CANCELLED = 'CANCELLED',
 }
 
 export const INGESTION_JOB_STATUSES = Object.values(IngestionJobStatus);
 
 /**
- * The stages a job may still make progress from.
+ * The statuses a job can still be CANCELLED from — its one consumer's question.
+ *
+ * Not what the worker checks: that is {@link TERMINAL_INGESTION_STATUSES} with
+ * `notIn`, because a `FAILED` job is one BullMQ will retry.
  *
  * `QUEUED` is in here on purpose and it is the interesting entry: a job parked
  * because the tenant is over AI budget stays `QUEUED` and resumes at cycle roll.
@@ -58,6 +64,17 @@ export const RESUMABLE_INGESTION_STATUSES = [
   IngestionJobStatus.PARSING,
   IngestionJobStatus.CHUNKING,
   IngestionJobStatus.EMBEDDING,
+] as const;
+
+/**
+ * The statuses a worker must refuse to move a job out of.
+ *
+ * Not the complement of {@link RESUMABLE_INGESTION_STATUSES}: `FAILED` is in
+ * neither, because a failed job is what BullMQ retries.
+ */
+export const TERMINAL_INGESTION_STATUSES = [
+  IngestionJobStatus.COMPLETED,
+  IngestionJobStatus.CANCELLED,
 ] as const;
 
 export enum DocumentFlagType {
@@ -192,6 +209,8 @@ export const MAX_DOCUMENT_TITLE_LENGTH = 255;
  */
 export const ALLOWED_DOCUMENT_MIME_TYPES = [
   'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   'text/plain',
   'text/markdown',
 ] as const satisfies readonly MimeType[];
@@ -283,6 +302,21 @@ export const NON_LATIN_OCR_LANGUAGES: readonly OcrLanguage[] = ['ja', 'zh'];
 /** Used when the uploader specified nothing, which is almost every upload. */
 export const DEFAULT_OCR_LANGUAGE: OcrLanguage = 'en';
 
+/**
+ * The largest a document may be, in bytes — 25 MB.
+ *
+ * **The whole FILE at presign, and nothing else.** Three layers read this ONE
+ * constant: the gateway's `@Max` before a network hop, ingestion-service when it
+ * issues the upload, and `PURPOSE_POLICY[DOCUMENT].maxSizeBytes`, which bounds
+ * the object itself. Change it here and all three move.
+ *
+ * It is NOT a page cap and NOT a timeout. Those are separate bounds with their
+ * own reasons: {@link MAX_OCR_PAGES_PER_DOCUMENT} caps how many image pages one
+ * document may be OCR'd for (a CPU bound), and the parser's own limits govern
+ * how long a parse may run. A 25 MB PDF of text and a 25 MB PDF of scans are
+ * the same size and cost very different amounts to ingest, which is exactly why
+ * one number cannot express both.
+ */
 export const MAX_DOCUMENT_BYTES = 25 * 1024 * 1024;
 
 /**

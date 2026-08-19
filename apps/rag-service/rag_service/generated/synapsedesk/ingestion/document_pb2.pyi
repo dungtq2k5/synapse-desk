@@ -19,6 +19,17 @@ class DocumentStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     DOCUMENT_STATUS_INDEXED: _ClassVar[DocumentStatus]
     DOCUMENT_STATUS_FAILED: _ClassVar[DocumentStatus]
 
+class IngestionJobStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    INGESTION_JOB_STATUS_UNSPECIFIED: _ClassVar[IngestionJobStatus]
+    INGESTION_JOB_STATUS_QUEUED: _ClassVar[IngestionJobStatus]
+    INGESTION_JOB_STATUS_PARSING: _ClassVar[IngestionJobStatus]
+    INGESTION_JOB_STATUS_CHUNKING: _ClassVar[IngestionJobStatus]
+    INGESTION_JOB_STATUS_EMBEDDING: _ClassVar[IngestionJobStatus]
+    INGESTION_JOB_STATUS_COMPLETED: _ClassVar[IngestionJobStatus]
+    INGESTION_JOB_STATUS_FAILED: _ClassVar[IngestionJobStatus]
+    INGESTION_JOB_STATUS_CANCELLED: _ClassVar[IngestionJobStatus]
+
 class DocumentFileType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
     DOCUMENT_FILE_TYPE_UNSPECIFIED: _ClassVar[DocumentFileType]
@@ -26,6 +37,8 @@ class DocumentFileType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     DOCUMENT_FILE_TYPE_TXT: _ClassVar[DocumentFileType]
     DOCUMENT_FILE_TYPE_MD: _ClassVar[DocumentFileType]
     DOCUMENT_FILE_TYPE_BIN: _ClassVar[DocumentFileType]
+    DOCUMENT_FILE_TYPE_DOC: _ClassVar[DocumentFileType]
+    DOCUMENT_FILE_TYPE_DOCX: _ClassVar[DocumentFileType]
 
 class DocumentFlagType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -49,11 +62,21 @@ DOCUMENT_STATUS_PENDING: DocumentStatus
 DOCUMENT_STATUS_PROCESSING: DocumentStatus
 DOCUMENT_STATUS_INDEXED: DocumentStatus
 DOCUMENT_STATUS_FAILED: DocumentStatus
+INGESTION_JOB_STATUS_UNSPECIFIED: IngestionJobStatus
+INGESTION_JOB_STATUS_QUEUED: IngestionJobStatus
+INGESTION_JOB_STATUS_PARSING: IngestionJobStatus
+INGESTION_JOB_STATUS_CHUNKING: IngestionJobStatus
+INGESTION_JOB_STATUS_EMBEDDING: IngestionJobStatus
+INGESTION_JOB_STATUS_COMPLETED: IngestionJobStatus
+INGESTION_JOB_STATUS_FAILED: IngestionJobStatus
+INGESTION_JOB_STATUS_CANCELLED: IngestionJobStatus
 DOCUMENT_FILE_TYPE_UNSPECIFIED: DocumentFileType
 DOCUMENT_FILE_TYPE_PDF: DocumentFileType
 DOCUMENT_FILE_TYPE_TXT: DocumentFileType
 DOCUMENT_FILE_TYPE_MD: DocumentFileType
 DOCUMENT_FILE_TYPE_BIN: DocumentFileType
+DOCUMENT_FILE_TYPE_DOC: DocumentFileType
+DOCUMENT_FILE_TYPE_DOCX: DocumentFileType
 DOCUMENT_FLAG_TYPE_UNSPECIFIED: DocumentFlagType
 DOCUMENT_FLAG_TYPE_OUTDATED: DocumentFlagType
 DOCUMENT_FLAG_TYPE_UNRETRIEVED: DocumentFlagType
@@ -334,3 +357,51 @@ class ListDocumentChunksByIdsResponse(_message.Message):
     ITEMS_FIELD_NUMBER: _ClassVar[int]
     items: _containers.RepeatedCompositeFieldContainer[DocumentChunkSummary]
     def __init__(self, items: _Optional[_Iterable[_Union[DocumentChunkSummary, _Mapping]]] = ...) -> None: ...
+
+class IngestionJobResponse(_message.Message):
+    __slots__ = ("id", "document_id", "bullmq_job_id", "status", "error_log", "processed_at", "created_at")
+    ID_FIELD_NUMBER: _ClassVar[int]
+    DOCUMENT_ID_FIELD_NUMBER: _ClassVar[int]
+    BULLMQ_JOB_ID_FIELD_NUMBER: _ClassVar[int]
+    STATUS_FIELD_NUMBER: _ClassVar[int]
+    ERROR_LOG_FIELD_NUMBER: _ClassVar[int]
+    PROCESSED_AT_FIELD_NUMBER: _ClassVar[int]
+    CREATED_AT_FIELD_NUMBER: _ClassVar[int]
+    id: str
+    document_id: str
+    bullmq_job_id: str
+    status: IngestionJobStatus
+    error_log: str
+    processed_at: _timestamp_pb2.Timestamp
+    created_at: _timestamp_pb2.Timestamp
+    def __init__(self, id: _Optional[str] = ..., document_id: _Optional[str] = ..., bullmq_job_id: _Optional[str] = ..., status: _Optional[_Union[IngestionJobStatus, str]] = ..., error_log: _Optional[str] = ..., processed_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+
+class ListIngestionJobsRequest(_message.Message):
+    __slots__ = ("page", "status", "document_id")
+    PAGE_FIELD_NUMBER: _ClassVar[int]
+    STATUS_FIELD_NUMBER: _ClassVar[int]
+    DOCUMENT_ID_FIELD_NUMBER: _ClassVar[int]
+    page: _common_pb2.PageRequest
+    status: IngestionJobStatus
+    document_id: str
+    def __init__(self, page: _Optional[_Union[_common_pb2.PageRequest, _Mapping]] = ..., status: _Optional[_Union[IngestionJobStatus, str]] = ..., document_id: _Optional[str] = ...) -> None: ...
+
+class ListIngestionJobsResponse(_message.Message):
+    __slots__ = ("items", "meta")
+    ITEMS_FIELD_NUMBER: _ClassVar[int]
+    META_FIELD_NUMBER: _ClassVar[int]
+    items: _containers.RepeatedCompositeFieldContainer[IngestionJobResponse]
+    meta: _common_pb2.PageMeta
+    def __init__(self, items: _Optional[_Iterable[_Union[IngestionJobResponse, _Mapping]]] = ..., meta: _Optional[_Union[_common_pb2.PageMeta, _Mapping]] = ...) -> None: ...
+
+class IngestionJobIdRequest(_message.Message):
+    __slots__ = ("id",)
+    ID_FIELD_NUMBER: _ClassVar[int]
+    id: str
+    def __init__(self, id: _Optional[str] = ...) -> None: ...
+
+class CancelIngestionJobResponse(_message.Message):
+    __slots__ = ("cancelled",)
+    CANCELLED_FIELD_NUMBER: _ClassVar[int]
+    cancelled: bool
+    def __init__(self, cancelled: _Optional[bool] = ...) -> None: ...
