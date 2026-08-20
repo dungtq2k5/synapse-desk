@@ -41,6 +41,7 @@ export function toPermissionResponseDto(
     code: permission.code as PermissionCode,
     name: permission.name,
     group: permission.group,
+    isRetired: permission.isRetired,
   };
 }
 

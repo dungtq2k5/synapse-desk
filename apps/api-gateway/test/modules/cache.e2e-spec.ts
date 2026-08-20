@@ -136,7 +136,13 @@ describe('The shared cache (e2e)', () => {
 
     const wirePermissions = (name: string) => ({
       items: [
-        { id: faker.string.uuid(), code: 'role.read', name, group: 'role' },
+        {
+          id: faker.string.uuid(),
+          code: 'role.read',
+          name,
+          group: 'role',
+          isRetired: false,
+        },
       ],
     });
 

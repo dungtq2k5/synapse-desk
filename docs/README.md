@@ -55,6 +55,7 @@ Append-only. A decision is never edited; superseding one means writing a new one
 | [0035](./decisions/0035-ocr-language-cap-is-a-cpu-bound.md) | The OCR language cap is four, and it is a CPU bound |
 | [0036](./decisions/0036-scope-fanout-order-is-asymmetric.md) | Scope fan-out order is asymmetric, and restrictions are synchronous |
 | [0037](./decisions/0037-worklists-follow-the-document-boundary.md) | Operational worklists follow the document boundary |
+| [0038](./decisions/0038-permissions-are-a-compile-time-artifact.md) | Permissions are a compile-time artifact, not data |
 
 ## `reference/` — what is true today
 

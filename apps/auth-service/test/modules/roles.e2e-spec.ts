@@ -330,6 +330,31 @@ describe('Roles & Permissions (e2e)', () => {
   });
 
   describe('listPermissions', () => {
+    /**
+     * A row in the table that is not in `PERMISSION_CODES`.
+     *
+     * Manufactured because nothing to fixture against exists: the table mirrors
+     * the array exactly, so no retired row is reachable until a code is
+     * removed. Removed again after each test — `reset()` preserves seeded
+     * reference data, so this row would otherwise leak into every later
+     * assertion about the catalogue.
+     */
+    const manufactured: string[] = [];
+    const retire = async (code: string, name: string) => {
+      const row = await fx.prisma.permission.create({ data: { code, name } });
+      manufactured.push(row.id);
+
+      return row;
+    };
+
+    afterEach(async () => {
+      if (manufactured.length === 0) return;
+
+      await fx.prisma.permission.deleteMany({
+        where: { id: { in: manufactured.splice(0) } },
+      });
+    });
+
     it('7. every permission carries a group derived from its code prefix', async () => {
       // Derived, not stored — which is what lets the role editor render sections
       // without a column that could disagree with the code it is grouping.
@@ -348,6 +373,53 @@ describe('Roles & Permissions (e2e)', () => {
       const groups = new Set(result.items.map((p) => p.group));
       expect(groups.size).toBeLessThan(result.items.length);
       expect(groups).toContain('ticket');
+    });
+
+    it('**7c. a code in the TABLE and not in the array comes back retired**', async () => {
+      // Manufactured, because there is nothing to fixture against: the table
+      // mirrors PERMISSION_CODES exactly today, so no retired row exists until
+      // the first removal. That is what makes this latent rather than broken —
+      // and the seeder's retirement path is the deliberate one, so the first
+      // removal is when it starts mattering.
+      const retired = await retire('ticket.teleport', 'Teleport Tickets');
+
+      const result = await roles.listPermissions();
+
+      const row = result.items.find((item) => item.id === retired.id);
+      expect(row?.isRetired).toBe(true);
+    });
+
+    it('**7d. every SEEDED code comes back NOT retired**', async () => {
+      // Not padding: `!includes` inverted passes 7c on a fixture that contains
+      // only the manufactured row, and would mark the entire catalogue dead —
+      // an editor with no grantable permission in it.
+      await retire('ticket.levitate', 'Levitate Tickets');
+
+      const result = await roles.listPermissions();
+
+      const live = result.items.filter((item) => !item.isRetired);
+      expect(live.map((item) => item.code).sort(compareAlphabetically)).toEqual(
+        [...PERMISSION_CODES].sort(compareAlphabetically),
+      );
+    });
+
+    it('7e. granting a retired code is refused, as the catalogue now advertises', async () => {
+      // Existing behaviour, pinned now that the catalogue distinguishes them:
+      // the editor can stop offering it, and the API refuses it either way.
+      const t = await seedTenantWithUser(fx.prisma);
+      await retire('ticket.vanish', 'Vanish Tickets');
+      const role = await createRole(fx.prisma, {
+        organizationId: t.org.id,
+        createdById: t.user.id,
+      });
+
+      await expectRpc(
+        roles.setRolePermissions(
+          { id: role.id, permissionCodes: ['ticket.vanish'] as never },
+          superuser(t),
+        ),
+        status.INVALID_ARGUMENT,
+      );
     });
 
     it('7b. there is no tenant-facing way to mint a permission', async () => {

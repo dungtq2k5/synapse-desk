@@ -303,9 +303,12 @@ export class RolesService {
   /**
    * The seeded catalogue, grouped by the `target` prefix of the code.
    *
-   * There is no tenant-facing write path, by design: PERMISSION_CODES in
-   * libs/common is the source of truth, the table is seeded from it, and a new
-   * permission ships with a deploy rather than an API call.
+   * No write path at any level — see
+   * [ADR 0038](../../../../../docs/decisions/0038-permissions-are-a-compile-time-artifact.md).
+   *
+   * Takes no `CallerContext` on purpose: the catalogue is global, so there is
+   * no tenant to filter by and a Super Admin with `organizationId: null` reads
+   * it like anyone else.
    */
   async listPermissions(): Promise<ListPermissionsResponse> {
     const permissions = await this.prisma.permission.findMany({
@@ -320,6 +323,14 @@ export class RolesService {
         // Derived, not stored — which is what lets the role editor group rows
         // without a column that could disagree with the code.
         group: permission.code.split('.')[0],
+        // **The table can legitimately hold rows the union does not.** A code
+        // removed from `PERMISSION_CODES` is left here on purpose — custom
+        // roles may still reference it — so the catalogue has to say which are
+        // still grantable, or the editor offers one `assertGrantable` will
+        // refuse (ADR 0038).
+        isRetired: !PERMISSION_CODES.includes(
+          permission.code as PermissionCode,
+        ),
       })),
     };
   }

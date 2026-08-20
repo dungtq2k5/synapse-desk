@@ -18,9 +18,9 @@ import {
 /**
  * The seeded permission catalogue (api-endpoints-plan).
  *
- * Read-only by design: `PERMISSION_CODES` in libs/common is the source of
- * truth, the table is seeded from it, and a new permission ships with a deploy
- * rather than an API call. There is deliberately no write path.
+ * **Read-only by design, at every level** — see
+ * [ADR 0038](../../../../../docs/decisions/0038-permissions-are-a-compile-time-artifact.md).
+ * There is deliberately no write path here and none on the platform side.
  *
  * Its own controller rather than a route on `RolesController` because the path
  * is `/permissions`, not `/roles/...` — Nest would otherwise need a second
@@ -43,6 +43,13 @@ export class PermissionsController {
   })
   @ApiWrappedResponse(PermissionResponseDto, { isArray: true })
   @ApiFilterErrors(['401', '403'])
+  // **The hour is accepted, knowingly.** This payload is now a function of the
+  // DEPLOY as well as the tenant — `isRetired` changes when `PERMISSION_CODES`
+  // does — and nothing invalidates this scope, so a deploy that retires a code
+  // leaves up to an hour of editors offering it. Accepted because the API
+  // refuses the grant regardless: the cost is a confusing option, not a wrong
+  // permission. `varyBy` cannot help — `buildKey` puts the tenant in
+  // unconditionally, so there is no cross-tenant flush to reach for.
   @Cacheable({
     scope: CACHE_SCOPES.permissions,
     ttlSeconds: 60 * 60,

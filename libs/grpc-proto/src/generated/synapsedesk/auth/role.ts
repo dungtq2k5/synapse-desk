@@ -28,6 +28,16 @@ export interface RoleResponse {
    * to gate deletion, not authoritative enough to be the only copy.
    */
   userAssigned: number;
+  /**
+   * Deliberately a bare `string[]`, with NO retired marker.
+   *
+   * A role can hold a retired code, and this is the other half of the editor
+   * that would show it indistinguishably. Left as codes because the editor's
+   * other request is `GET /permissions`, which now carries `is_retired` — so
+   * marking a role's codes is a set lookup on data the client already has,
+   * rather than a second derivation that could disagree with the first
+   * (ADR 0038).
+   */
   permissionCodes: string[];
   createdAt: Timestamp | undefined;
   updatedAt: Timestamp | undefined;
@@ -91,6 +101,21 @@ export interface PermissionResponse {
    * stored -- it is what makes the role editor groupable without a new column.
    */
   group: string;
+  /**
+   * True when this row is in the TABLE and not in `PERMISSION_CODES`.
+   *
+   * Codes never mutate but they do RETIRE: one removed from the array is left
+   * in the table on purpose, because tenant custom roles may still reference it
+   * and dropping the row would cascade that grant away silently (ADR 0038). So
+   * the catalogue can legitimately hold rows the union does not, and without
+   * this the role editor offers them beside live ones -- `assertGrantable` then
+   * refuses the write, correctly, and it reads as a bug because the UI offered
+   * it.
+   *
+   * Derived at read time, never stored: the same shape as `group` above, and
+   * for the same reason -- a column could disagree with the array.
+   */
+  isRetired: boolean;
 }
 
 export interface ListPermissionsRequest {
