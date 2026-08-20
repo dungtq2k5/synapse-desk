@@ -8,6 +8,8 @@ import {
   ListPermissionsResponse,
   ListRolesResponse,
   RoleResponse,
+  AssignRoleUsersRequest,
+  RevokeRoleUserRequest,
   SetRolePermissionsRequest,
   ListRolesRequest,
   UpdateRoleRequest,
@@ -80,6 +82,26 @@ export class RolesGrpcClient extends BaseGrpcClient implements OnModuleInit {
   ): Promise<RoleResponse> {
     return this.call(
       (metadata) => this.roleGrpcService.setRolePermissions(request, metadata),
+      context,
+    );
+  }
+
+  assignUsers(
+    request: AssignRoleUsersRequest,
+    context: RequestContext,
+  ): Promise<RoleResponse> {
+    return this.call(
+      (metadata) => this.roleGrpcService.assignRoleUsers(request, metadata),
+      context,
+    );
+  }
+
+  revokeUser(
+    request: RevokeRoleUserRequest,
+    context: RequestContext,
+  ): Promise<RoleResponse> {
+    return this.call(
+      (metadata) => this.roleGrpcService.revokeRoleUser(request, metadata),
       context,
     );
   }

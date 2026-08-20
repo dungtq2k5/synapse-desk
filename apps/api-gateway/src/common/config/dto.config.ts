@@ -51,6 +51,33 @@ export const MAX_ROLE_NAME_LENGTH = 100;
 /** A document belongs to a handful of departments, not hundreds. */
 export const MAX_DOCUMENT_DEPARTMENTS = 50;
 
+/**
+ * Users per bulk role assignment.
+ *
+ * **The bound and the transaction budget are one decision**, so the arithmetic
+ * lives here. The service applies the change through `setUserRoles` PER USER,
+ * inside a single interactive transaction: a role load, a current-set read, a
+ * `user.update`, up to two counter updates, and a `user.count` when `ORG_ADMIN`
+ * is leaving — five to six serialized round trips each.
+ *
+ * ```
+ *  | Users | Round trips | @2ms (local) | @10ms (managed Postgres) |
+ *  | :---- | :---- | :---- | :---- |
+ *  | 100 | 500–600 | ~1.1 s | **5–6 s** |
+ *  | 50 | 250–300 | ~0.6 s | ~3 s |
+ * ```
+ *
+ * Prisma's default interactive-transaction timeout is **5 seconds**, so 100 is
+ * at or over it the moment the database is a network hop away — which is
+ * exactly the shape that passes in testing and fails on the one tenant with 100
+ * people to add. 50 halves the worst case and is still 2.5× the plan's
+ * motivating "add 20 people to this role".
+ *
+ * The service also passes an explicit `timeout`; this cap is the other half of
+ * that pair, not a substitute for it.
+ */
+export const MAX_ROLE_ASSIGNMENT_USERS = 50;
+
 // ------------------------------------------------------------ uploads
 
 /** Longest file name a presign DTO accepts. */

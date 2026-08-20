@@ -11,6 +11,7 @@ import {
 import {
   CreateRoleDto,
   ListRolesQueryDto,
+  AssignRoleUsersDto,
   SetRolePermissionsDto,
   UpdateRoleDto,
 } from './dto/rest/role.dto';
@@ -80,6 +81,29 @@ export class RolesService {
         { id, permissionCodes: dto.permissionCodes },
         context,
       ),
+    );
+  }
+
+  async assignUsers(
+    roleId: string,
+    dto: AssignRoleUsersDto,
+    context: RequestContext,
+  ): Promise<RoleResponseDto> {
+    return toRoleResponseDto(
+      await this.rolesGrpcClient.assignUsers(
+        { roleId, userIds: dto.userIds },
+        context,
+      ),
+    );
+  }
+
+  async revokeUser(
+    roleId: string,
+    userId: string,
+    context: RequestContext,
+  ): Promise<RoleResponseDto> {
+    return toRoleResponseDto(
+      await this.rolesGrpcClient.revokeUser({ roleId, userId }, context),
     );
   }
 

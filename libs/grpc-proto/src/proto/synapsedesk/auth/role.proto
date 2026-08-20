@@ -91,6 +91,18 @@ message ListPermissionsResponse {
   repeated PermissionResponse items = 1;
 }
 
+// Bulk-assign one role, leaving each user's other roles alone. The inverse
+// direction of SetUserRoles, which replaces a whole set for one user.
+message AssignRoleUsersRequest {
+  string role_id = 1;
+  repeated string user_ids = 2;
+}
+
+message RevokeRoleUserRequest {
+  string role_id = 1;
+  string user_id = 2;
+}
+
 service RoleService {
   rpc ListRoles(ListRolesRequest) returns (ListRolesResponse);
   rpc GetRole(RoleIdRequest) returns (RoleResponse);
@@ -99,4 +111,12 @@ service RoleService {
   rpc DeleteRole(RoleIdRequest) returns (DeleteRoleResponse);
   rpc SetRolePermissions(SetRolePermissionsRequest) returns (RoleResponse);
   rpc ListPermissions(ListPermissionsRequest) returns (ListPermissionsResponse);
+
+  // Both return the ROLE rather than a count: `user_assigned` is the number the
+  // caller's screen is showing and the one this just changed. A bare
+  // `{ assigned: n }` would leave the client guessing whether its total is
+  // still right — and for a bulk that partially no-ops, comparing the returned
+  // counter is the only way to learn how many were actually new.
+  rpc AssignRoleUsers(AssignRoleUsersRequest) returns (RoleResponse);
+  rpc RevokeRoleUser(RevokeRoleUserRequest) returns (RoleResponse);
 }

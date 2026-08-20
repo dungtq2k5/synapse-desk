@@ -212,6 +212,13 @@ export class InvitationsController {
   })
   @ApiWrappedResponse(LoginResponseDto)
   @ApiFilterErrors(['400', '401'])
+  // **No `@InvalidateCache`, and it would not work here.** Acceptance grants
+  // roles, which moves `roles.user_assigned` — a field `GET /roles` caches. But
+  // `CacheInvalidationInterceptor` derives the tenant from the request context
+  // and returns early without one, and this route is unauthenticated by design.
+  // The decorator would read as handled and evict nothing; the staleness is
+  // covered by the 5-minute TTL instead, the same trade that class already
+  // accepts for a platform Super Admin writing into a tenant.
   @Post('accept')
   @HttpCode(HttpStatus.OK)
   @UseGuards(GuestGuard)

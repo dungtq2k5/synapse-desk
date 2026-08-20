@@ -1,12 +1,14 @@
 import { Transform } from 'class-transformer';
-import { OmitType, ApiPropertyOptional } from '@nestjs/swagger';
+import { OmitType, ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   ArrayMaxSize,
+  ArrayNotEmpty,
   IsArray,
   IsBoolean,
   IsIn,
   IsOptional,
   IsString,
+  IsUUID,
   MaxLength,
   MinLength,
 } from 'class-validator';
@@ -21,6 +23,7 @@ import {
 import { SearchPaginationDto } from '../../../../common/dto/rest/search-pagination.dto';
 import { ToBoolean } from '../../../../common/decorators/to-boolean.decorator';
 import {
+  MAX_ROLE_ASSIGNMENT_USERS,
   MAX_ROLE_DESCRIPTION_LENGTH,
   MAX_ROLE_NAME_LENGTH,
   MIN_ROLE_NAME_LENGTH,
@@ -98,3 +101,16 @@ export class UpdateRoleDto {
 
 /** REPLACE semantics — the submitted set becomes the role's permissions. */
 export class SetRolePermissionsDto extends PermissionCodesDto {}
+
+/**
+ * ADD semantics, unlike `PUT /users/:id/roles` — each user keeps their other
+ * roles, and one who already holds this one is a no-op rather than an error.
+ */
+export class AssignRoleUsersDto {
+  @IsArray()
+  @ArrayNotEmpty()
+  @ArrayMaxSize(MAX_ROLE_ASSIGNMENT_USERS)
+  @IsUUID('4', { each: true })
+  @ApiProperty({ maxItems: MAX_ROLE_ASSIGNMENT_USERS })
+  readonly userIds!: string[];
+}

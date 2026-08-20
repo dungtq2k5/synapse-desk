@@ -100,6 +100,20 @@ export interface ListPermissionsResponse {
   items: PermissionResponse[];
 }
 
+/**
+ * Bulk-assign one role, leaving each user's other roles alone. The inverse
+ * direction of SetUserRoles, which replaces a whole set for one user.
+ */
+export interface AssignRoleUsersRequest {
+  roleId: string;
+  userIds: string[];
+}
+
+export interface RevokeRoleUserRequest {
+  roleId: string;
+  userId: string;
+}
+
 export interface RoleServiceClient {
   listRoles(request: ListRolesRequest, metadata?: Metadata): Observable<ListRolesResponse>;
 
@@ -114,6 +128,18 @@ export interface RoleServiceClient {
   setRolePermissions(request: SetRolePermissionsRequest, metadata?: Metadata): Observable<RoleResponse>;
 
   listPermissions(request: ListPermissionsRequest, metadata?: Metadata): Observable<ListPermissionsResponse>;
+
+  /**
+   * Both return the ROLE rather than a count: `user_assigned` is the number the
+   * caller's screen is showing and the one this just changed. A bare
+   * `{ assigned: n }` would leave the client guessing whether its total is
+   * still right — and for a bulk that partially no-ops, comparing the returned
+   * counter is the only way to learn how many were actually new.
+   */
+
+  assignRoleUsers(request: AssignRoleUsersRequest, metadata?: Metadata): Observable<RoleResponse>;
+
+  revokeRoleUser(request: RevokeRoleUserRequest, metadata?: Metadata): Observable<RoleResponse>;
 }
 
 export interface RoleServiceController {
@@ -148,6 +174,24 @@ export interface RoleServiceController {
     request: ListPermissionsRequest,
     metadata?: Metadata,
   ): Promise<ListPermissionsResponse> | Observable<ListPermissionsResponse> | ListPermissionsResponse;
+
+  /**
+   * Both return the ROLE rather than a count: `user_assigned` is the number the
+   * caller's screen is showing and the one this just changed. A bare
+   * `{ assigned: n }` would leave the client guessing whether its total is
+   * still right — and for a bulk that partially no-ops, comparing the returned
+   * counter is the only way to learn how many were actually new.
+   */
+
+  assignRoleUsers(
+    request: AssignRoleUsersRequest,
+    metadata?: Metadata,
+  ): Promise<RoleResponse> | Observable<RoleResponse> | RoleResponse;
+
+  revokeRoleUser(
+    request: RevokeRoleUserRequest,
+    metadata?: Metadata,
+  ): Promise<RoleResponse> | Observable<RoleResponse> | RoleResponse;
 }
 
 export function RoleServiceControllerMethods() {
@@ -160,6 +204,8 @@ export function RoleServiceControllerMethods() {
       "deleteRole",
       "setRolePermissions",
       "listPermissions",
+      "assignRoleUsers",
+      "revokeRoleUser",
     ];
     for (const method of grpcMethods) {
       const descriptor: any = Reflect.getOwnPropertyDescriptor(constructor.prototype, method);

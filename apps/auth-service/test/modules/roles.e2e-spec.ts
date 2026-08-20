@@ -72,9 +72,9 @@ describe('Roles & Permissions (e2e)', () => {
 
       expect(list.items.map((r) => r.name)).toEqual([t.role.name]);
     });
-
-    // ----------------------------------------------------------------- creation
   });
+
+  // ----------------------------------------------------------------- creation
 
   describe('createRole', () => {
     it('3. a tenant-created role is always tenant-scoped and never a system role', async () => {
@@ -150,9 +150,9 @@ describe('Roles & Permissions (e2e)', () => {
         status.INVALID_ARGUMENT,
       );
     });
-
-    // ---------------------------------------------------------- system roles
   });
+
+  // ---------------------------------------------------------- system roles
 
   describe('updateRole / deleteRole — system roles', () => {
     it('2. a system role cannot be renamed or deleted, enforced in the SERVICE', async () => {
@@ -185,9 +185,9 @@ describe('Roles & Permissions (e2e)', () => {
       });
       expect(unchanged.name).toBe(SystemRoleName.ORG_ADMIN);
     });
-
-    // ----------------------------------------------------------------- deletion
   });
+
+  // ----------------------------------------------------------------- deletion
 
   describe('deleteRole', () => {
     it('5. deleting a role with holders is a 409 — no silent cascade', async () => {
@@ -244,9 +244,9 @@ describe('Roles & Permissions (e2e)', () => {
         status.NOT_FOUND,
       );
     });
-
-    // ------------------------------------------------------------- permissions
   });
+
+  // ------------------------------------------------------------- permissions
 
   describe('setRolePermissions', () => {
     it('setRolePermissions REPLACES rather than adds', async () => {
@@ -358,8 +358,329 @@ describe('Roles & Permissions (e2e)', () => {
       expect(await fx.prisma.permission.count()).toBe(PERMISSION_CODES.length);
       expect('createPermission' in roles).toBe(false);
     });
+  });
 
-    // ---------------------------------------------------- user role assignment
+  // ---------------------------------------------------- user role assignment
+
+  describe('assignRoleUsers / revokeRoleUser', () => {
+    it('**1. assigning a role a user ALREADY holds does not move the counter**', async () => {
+      // `connect` is idempotent and `increment` is not, so counting the request
+      // rather than the delta is how `user_assigned` drifts high — and a high
+      // counter blocks `DELETE /roles/:id` forever, with no UI that can explain
+      // why.
+      const t = await seedTenantWithUser(fx.prisma);
+      const role = await createRole(fx.prisma, {
+        organizationId: t.org.id,
+        createdById: t.user.id,
+      });
+      const member = await addMember(fx.prisma, t.org.id);
+
+      await roles.assignRoleUsers(
+        { roleId: role.id, userIds: [member.id] },
+        superuser(t),
+      );
+      const once = await fx.prisma.role.findUniqueOrThrow({
+        where: { id: role.id },
+      });
+
+      // Again, same user.
+      const twice = await roles.assignRoleUsers(
+        { roleId: role.id, userIds: [member.id] },
+        superuser(t),
+      );
+
+      expect(once.userAssigned).toBe(1);
+      expect(twice.userAssigned).toBe(1);
+    });
+
+    it('**2. three users where one already holds it increments by exactly two**', async () => {
+      const t = await seedTenantWithUser(fx.prisma);
+      const role = await createRole(fx.prisma, {
+        organizationId: t.org.id,
+        createdById: t.user.id,
+      });
+      const [a, b, c] = await Promise.all([
+        addMember(fx.prisma, t.org.id),
+        addMember(fx.prisma, t.org.id),
+        addMember(fx.prisma, t.org.id),
+      ]);
+      await roles.assignRoleUsers(
+        { roleId: role.id, userIds: [a.id] },
+        superuser(t),
+      );
+
+      const after = await roles.assignRoleUsers(
+        { roleId: role.id, userIds: [a.id, b.id, c.id] },
+        superuser(t),
+      );
+
+      expect(after.userAssigned).toBe(3);
+    });
+
+    it('**3. a batch containing another tenant’s user fails WHOLE**', async () => {
+      // The check reuse does not supply: `setUserRoles` takes a userId and
+      // never validates it. A partial bulk cannot be diagnosed without
+      // re-reading, and the obvious retry re-applies the half that worked.
+      const t = await seedTenantWithUser(fx.prisma);
+      const stranger = await seedForeignTenant(fx.prisma);
+      const role = await createRole(fx.prisma, {
+        organizationId: t.org.id,
+        createdById: t.user.id,
+      });
+      const mine = await addMember(fx.prisma, t.org.id);
+
+      await expectRpc(
+        roles.assignRoleUsers(
+          { roleId: role.id, userIds: [mine.id, stranger.user.id] },
+          superuser(t),
+        ),
+        status.NOT_FOUND,
+      );
+
+      // Nothing written — not even the half that was legitimate.
+      const after = await fx.prisma.role.findUniqueOrThrow({
+        where: { id: role.id },
+      });
+      expect(after.userAssigned).toBe(0);
+    });
+
+    it('4. revoking decrements, and the role comes back with the new count', async () => {
+      const t = await seedTenantWithUser(fx.prisma);
+      const role = await createRole(fx.prisma, {
+        organizationId: t.org.id,
+        createdById: t.user.id,
+      });
+      const member = await addMember(fx.prisma, t.org.id);
+      await roles.assignRoleUsers(
+        { roleId: role.id, userIds: [member.id] },
+        superuser(t),
+      );
+
+      const after = await roles.revokeRoleUser(
+        { roleId: role.id, userId: member.id },
+        superuser(t),
+      );
+
+      expect(after.userAssigned).toBe(0);
+    });
+
+    it('**5. revoking a role the user does not hold is NOT_FOUND**', async () => {
+      // "It was already gone" and "I removed it" must not look the same to an
+      // audit reader.
+      const t = await seedTenantWithUser(fx.prisma);
+      const role = await createRole(fx.prisma, {
+        organizationId: t.org.id,
+        createdById: t.user.id,
+      });
+      const member = await addMember(fx.prisma, t.org.id);
+
+      await expectRpc(
+        roles.revokeRoleUser(
+          { roleId: role.id, userId: member.id },
+          superuser(t),
+        ),
+        status.NOT_FOUND,
+      );
+    });
+
+    it('**6. revoking ORG_ADMIN from the last admin is refused**', async () => {
+      // The route that NAMES the operation. It inherits the guard because the
+      // write goes through `setUserRoles`, which is where the guard lives —
+      // walking around that primitive would have left this path unguarded.
+      const t = await seedTenantWithUser(fx.prisma);
+      const onlyAdmin = await addMember(fx.prisma, t.org.id, {
+        grantSystemRole: SystemRoleName.ORG_ADMIN,
+      });
+      const orgAdmin = await findSystemRole(
+        fx.prisma,
+        SystemRoleName.ORG_ADMIN,
+      );
+
+      await expectRpc(
+        roles.revokeRoleUser(
+          { roleId: orgAdmin.id, userId: onlyAdmin.id },
+          superuser(t),
+        ),
+        status.ABORTED,
+      );
+
+      const after = await fx.prisma.user.findUniqueOrThrow({
+        where: { id: onlyAdmin.id },
+        include: { roles: { select: { name: true } } },
+      });
+      expect(after.roles.map((role) => role.name)).toContain(
+        String(SystemRoleName.ORG_ADMIN),
+      );
+    });
+
+    it('**7. a bulk assign writes one audit row PER USER, with before/after**', async () => {
+      // A row whose resource is the ROLE and whose metadata is twenty user ids
+      // cannot answer "when did this user get this role".
+      const t = await seedTenantWithUser(fx.prisma);
+      const role = await createRole(fx.prisma, {
+        organizationId: t.org.id,
+        createdById: t.user.id,
+      });
+      const [a, b] = await Promise.all([
+        addMember(fx.prisma, t.org.id),
+        addMember(fx.prisma, t.org.id),
+      ]);
+      fx.audit.record.mockClear();
+
+      await roles.assignRoleUsers(
+        { roleId: role.id, userIds: [a.id, b.id] },
+        superuser(t),
+      );
+
+      const events = fx.audit.record.mock.calls.map(
+        ([, event]: [unknown, { action: string; resourceId: string }]) => event,
+      );
+      expect(events).toHaveLength(2);
+      expect(
+        events.map((event) => event.resourceId).sort(compareAlphabetically),
+      ).toEqual([a.id, b.id].sort(compareAlphabetically));
+      expect(events[0].action).toBe('USER_ROLES_UPDATED');
+    });
+
+    it('**7b. `before` is the set the transaction actually replaced**', async () => {
+      // The testable half of "read inside the transaction". The concurrent
+      // interleave itself is NOT deterministically testable here — there is no
+      // seam to suspend between the read and the write inside
+      // `assignRoleUsers`, and a timing race would be flaky and deleted. What a
+      // regression DOES show up as is a `before` that disagrees with the row
+      // state the write replaced.
+      const t = await seedTenantWithUser(fx.prisma);
+      const role = await createRole(fx.prisma, {
+        organizationId: t.org.id,
+        createdById: t.user.id,
+      });
+      const other = await createRole(fx.prisma, {
+        organizationId: t.org.id,
+        createdById: t.user.id,
+      });
+      const member = await addMember(fx.prisma, t.org.id);
+      // Give them a role first, so `before` is non-empty and an omission shows.
+      await roles.assignRoleUsers(
+        { roleId: other.id, userIds: [member.id] },
+        superuser(t),
+      );
+      fx.audit.record.mockClear();
+
+      await roles.assignRoleUsers(
+        { roleId: role.id, userIds: [member.id] },
+        superuser(t),
+      );
+
+      const [[, event]] = fx.audit.record.mock.calls as [
+        [unknown, { metadata: { before: string[]; after: string[] } }],
+      ];
+      expect(event.metadata.before).toEqual([other.id]);
+      expect([...event.metadata.after].sort(compareAlphabetically)).toEqual(
+        [other.id, role.id].sort(compareAlphabetically),
+      );
+
+      // And the row agrees: the pre-existing role SURVIVED the replacement.
+      const after = await fx.prisma.user.findUniqueOrThrow({
+        where: { id: member.id },
+        include: { roles: { select: { id: true } } },
+      });
+      expect(
+        after.roles.map((held) => held.id).sort(compareAlphabetically),
+      ).toEqual([other.id, role.id].sort(compareAlphabetically));
+    });
+
+    it('**7c. revoking leaves the user’s OTHER roles alone**', async () => {
+      // Subtractive, not replace: the caller named one role and said nothing
+      // about the rest.
+      const t = await seedTenantWithUser(fx.prisma);
+      const going = await createRole(fx.prisma, {
+        organizationId: t.org.id,
+        createdById: t.user.id,
+      });
+      const staying = await createRole(fx.prisma, {
+        organizationId: t.org.id,
+        createdById: t.user.id,
+      });
+      const member = await addMember(fx.prisma, t.org.id);
+      await roles.assignRoleUsers(
+        { roleId: going.id, userIds: [member.id] },
+        superuser(t),
+      );
+      await roles.assignRoleUsers(
+        { roleId: staying.id, userIds: [member.id] },
+        superuser(t),
+      );
+
+      await roles.revokeRoleUser(
+        { roleId: going.id, userId: member.id },
+        superuser(t),
+      );
+
+      const after = await fx.prisma.user.findUniqueOrThrow({
+        where: { id: member.id },
+        include: { roles: { select: { id: true } } },
+      });
+      expect(after.roles.map((held) => held.id)).toEqual([staying.id]);
+      // And only the revoked role's counter moved.
+      const stayingRow = await fx.prisma.role.findUniqueOrThrow({
+        where: { id: staying.id },
+      });
+      expect(stayingRow.userAssigned).toBe(1);
+    });
+
+    it('**7d. no-escalation applies, and the refusal NAMES the user**', async () => {
+      // `assertGrantable` runs over each user's WHOLE resulting set, not the
+      // delta — so one existing holder of a wider role can refuse a batch about
+      // users the caller was not trying to change. The primitive's message
+      // lists permission codes only, which reads as a bug unless it says WHO.
+      const t = await seedTenantWithUser(fx.prisma);
+      const wide = await createRole(fx.prisma, {
+        organizationId: t.org.id,
+        createdById: t.user.id,
+        permissionCodes: ['organization.update'],
+      });
+      const member = await addMember(fx.prisma, t.org.id);
+      const limitedActor = memberContext(t.user, ['user.role.assign']);
+
+      const refusal = roles.assignRoleUsers(
+        { roleId: wide.id, userIds: [member.id] },
+        limitedActor,
+      );
+
+      await expectRpc(refusal, status.PERMISSION_DENIED);
+      await expect(refusal).rejects.toMatchObject({
+        message: expect.stringContaining(member.id) as string,
+      });
+
+      // And nothing was written — the batch rolls back whole.
+      const after = await fx.prisma.role.findUniqueOrThrow({
+        where: { id: wide.id },
+      });
+      expect(after.userAssigned).toBe(0);
+    });
+
+    it('8. a user who already held the role gets NO audit row', async () => {
+      // Nothing changed, so there is nothing to record — a row saying "before
+      // and after are identical" is noise in a trail read for changes.
+      const t = await seedTenantWithUser(fx.prisma);
+      const role = await createRole(fx.prisma, {
+        organizationId: t.org.id,
+        createdById: t.user.id,
+      });
+      const member = await addMember(fx.prisma, t.org.id);
+      await roles.assignRoleUsers(
+        { roleId: role.id, userIds: [member.id] },
+        superuser(t),
+      );
+      fx.audit.record.mockClear();
+
+      await roles.assignRoleUsers(
+        { roleId: role.id, userIds: [member.id] },
+        superuser(t),
+      );
+
+      expect(fx.audit.record).not.toHaveBeenCalled();
+    });
   });
 
   describe('grantRoles / releaseUserRoles', () => {

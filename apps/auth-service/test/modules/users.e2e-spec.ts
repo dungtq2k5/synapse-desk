@@ -388,6 +388,105 @@ describe('Users (e2e)', () => {
       ).resolves.toBeDefined();
     });
 
+    it('**10c. DEMOTING the last Org Admin is refused**', async () => {
+      // The third way to remove an administrator, and the least dramatic
+      // looking. Delete and lock both refuse it; a role replacement that drops
+      // ORG_ADMIN reaches the same end state — a tenant with nobody who can
+      // administer it, and no in-product way back.
+      const t = await seedTenantWithUser(fx.prisma);
+      const onlyAdmin = await addMember(fx.prisma, t.org.id, {
+        grantSystemRole: SystemRoleName.ORG_ADMIN,
+      });
+      const agent = await findSystemRole(
+        fx.prisma,
+        SystemRoleName.SUPPORT_AGENT,
+      );
+
+      await expectRpc(
+        users.setUserRoles(
+          { id: onlyAdmin.id, roleIds: [agent.id] },
+          superuser(t),
+        ),
+        status.ABORTED,
+      );
+
+      // And nothing moved: the refusal must not leave a half-applied set.
+      const after = await fx.prisma.user.findUniqueOrThrow({
+        where: { id: onlyAdmin.id },
+        include: { roles: { select: { name: true } } },
+      });
+      expect(after.roles.map((role) => role.name)).toContain(
+        String(SystemRoleName.ORG_ADMIN),
+      );
+    });
+
+    it('10d. demoting a NON-last Org Admin succeeds', async () => {
+      // The guard counts; it does not make the role unremovable.
+      const t = await seedTenantWithUser(fx.prisma);
+      const first = await addMember(fx.prisma, t.org.id, {
+        grantSystemRole: SystemRoleName.ORG_ADMIN,
+      });
+      await addMember(fx.prisma, t.org.id, {
+        grantSystemRole: SystemRoleName.ORG_ADMIN,
+      });
+      const agent = await findSystemRole(
+        fx.prisma,
+        SystemRoleName.SUPPORT_AGENT,
+      );
+
+      await expect(
+        users.setUserRoles({ id: first.id, roleIds: [agent.id] }, superuser(t)),
+      ).resolves.toBeDefined();
+    });
+
+    it('**10e. a LOCKED Org Admin does not count as cover**', async () => {
+      // The same definition of "active" delete and lock use. Two guards that
+      // disagreed about who counts would be two rules wearing one name.
+      const t = await seedTenantWithUser(fx.prisma);
+      const active = await addMember(fx.prisma, t.org.id, {
+        grantSystemRole: SystemRoleName.ORG_ADMIN,
+      });
+      await addMember(fx.prisma, t.org.id, {
+        grantSystemRole: SystemRoleName.ORG_ADMIN,
+        user: { isLocked: true },
+      });
+      const agent = await findSystemRole(
+        fx.prisma,
+        SystemRoleName.SUPPORT_AGENT,
+      );
+
+      await expectRpc(
+        users.setUserRoles(
+          { id: active.id, roleIds: [agent.id] },
+          superuser(t),
+        ),
+        status.ABORTED,
+      );
+    });
+
+    it('10f. KEEPING ORG_ADMIN while adding another role is allowed', async () => {
+      // The guard fires on the role LEAVING the set, not on the set changing.
+      const t = await seedTenantWithUser(fx.prisma);
+      const onlyAdmin = await addMember(fx.prisma, t.org.id, {
+        grantSystemRole: SystemRoleName.ORG_ADMIN,
+      });
+      const orgAdmin = await findSystemRole(
+        fx.prisma,
+        SystemRoleName.ORG_ADMIN,
+      );
+      const agent = await findSystemRole(
+        fx.prisma,
+        SystemRoleName.SUPPORT_AGENT,
+      );
+
+      await expect(
+        users.setUserRoles(
+          { id: onlyAdmin.id, roleIds: [orgAdmin.id, agent.id] },
+          superuser(t),
+        ),
+      ).resolves.toBeDefined();
+    });
+
     it('11. the junction write and the counter move in ONE transaction', async () => {
       // Forced failure after the junction write: the counter must not be left
       // ahead of it. A duplicate role id in the list makes `setUserRoles` throw

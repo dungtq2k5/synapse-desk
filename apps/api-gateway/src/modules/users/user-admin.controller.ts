@@ -160,6 +160,16 @@ export class UserAdminController {
   @ApiOperation({ summary: 'Remove' })
   @ApiWrappedResponse(RevokedSessionCountResponseDto)
   @ApiFilterErrors(['400', '401', '403', '404'])
+  // `roles` as well as `users`, in ONE decorator: `@InvalidateCache` is
+  // `SetMetadata`, so a second one on the same handler replaces the first
+  // rather than adding to it. Deactivating releases every role the user held,
+  // which decrements `roles.user_assigned` — a field `GET /roles` caches for
+  // five minutes.
+  @InvalidateCache(
+    CACHE_SCOPES.users,
+    entityFromParam('user'),
+    CACHE_SCOPES.roles,
+  )
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   @RequirePermission('user.delete')
@@ -246,6 +256,11 @@ export class UserAdminController {
   @ApiOperation({ summary: 'Set roles' })
   @ApiWrappedResponse(UserSummaryResponseDto)
   @ApiFilterErrors(['400', '401', '403', '404'])
+  // **`roles`, not `users`.** `GET /users` is not cached; `GET /roles` is, for
+  // five minutes, and its payload carries the `user_assigned` this moves. The
+  // `/roles/:id/users` routes invalidate it and this one did not, so a role set
+  // from the user side left the roles screen showing a stale count.
+  @InvalidateCache(CACHE_SCOPES.roles)
   @Put(':id/roles')
   @HttpCode(HttpStatus.OK)
   @RequirePermission('user.role.assign')

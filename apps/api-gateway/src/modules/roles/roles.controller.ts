@@ -34,6 +34,7 @@ import {
 import {
   CreateRoleDto,
   ListRolesQueryDto,
+  AssignRoleUsersDto,
   SetRolePermissionsDto,
   UpdateRoleDto,
 } from './dto/rest/role.dto';
@@ -157,5 +158,63 @@ export class RolesController {
     @Body() setRolePermissionsDto: SetRolePermissionsDto,
   ): Promise<RoleResponseDto> {
     return this.roles.setPermissions(id, setRolePermissionsDto, context);
+  }
+
+  /**
+   * Bulk-assign this role, leaving each user's other roles alone.
+   *
+   * **ADD semantics, unlike `PUT /users/:id/roles`**, which replaces a whole
+   * set for one user. A user who already holds the role is a no-op rather than
+   * an error — a bulk over a selected list routinely includes them — and the
+   * `user_assigned` counter moves by the delta, never by the request size.
+   *
+   * All-or-nothing: an unknown or foreign user id fails the whole request. A
+   * partial bulk cannot be diagnosed without re-reading, and the obvious retry
+   * re-applies the half that worked.
+   *
+   * The response is the ROLE: `userAssigned` is the number the caller's screen
+   * is showing, and comparing it is how a caller learns how many of the batch
+   * were actually new.
+   */
+  @ApiOperation({ summary: 'Assign this role to users' })
+  @ApiWrappedResponse(RoleResponseDto)
+  @ApiFilterErrors(['400', '401', '403', '404'])
+  @InvalidateCache(CACHE_SCOPES.roles)
+  @Post(':id/users')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermission('user.role.assign')
+  @ResponseMessage('Role assigned')
+  assignUsers(
+    @CurrentUser() context: RequestContext,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() assignRoleUsersDto: AssignRoleUsersDto,
+  ): Promise<RoleResponseDto> {
+    return this.roles.assignUsers(id, assignRoleUsersDto, context);
+  }
+
+  /**
+   * Revoke this role from one user.
+   *
+   * **404 when they do not hold it**, rather than a silent success: "it was
+   * already gone" and "I removed it" must not look the same to an audit reader.
+   *
+   * Refused when it would demote the tenant's last active Org Admin — this is
+   * the route that NAMES that operation, so the guard has to reach it. It does,
+   * because the write goes through `setUserRoles`, where the guard lives.
+   */
+  @ApiOperation({ summary: 'Revoke this role from a user' })
+  @ApiWrappedResponse(RoleResponseDto)
+  @ApiFilterErrors(['400', '401', '403', '404', '409'])
+  @InvalidateCache(CACHE_SCOPES.roles)
+  @Delete(':id/users/:userId')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermission('user.role.assign')
+  @ResponseMessage('Role revoked')
+  revokeUser(
+    @CurrentUser() context: RequestContext,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('userId', ParseUUIDPipe) userId: string,
+  ): Promise<RoleResponseDto> {
+    return this.roles.revokeUser(id, userId, context);
   }
 }

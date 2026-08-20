@@ -10,6 +10,8 @@ import {
   RoleResponse,
   RoleServiceController,
   RoleServiceControllerMethods,
+  AssignRoleUsersRequest,
+  RevokeRoleUserRequest,
   SetRolePermissionsRequest,
   unpackCallerContext,
   UpdateRoleRequest,
@@ -58,6 +60,26 @@ export class RolesGrpcController implements RoleServiceController {
     metadata?: Metadata,
   ): Promise<RoleResponse> {
     return this.rolesService.setRolePermissions(
+      request,
+      unpackCallerContext(metadata),
+    );
+  }
+
+  assignRoleUsers(
+    request: AssignRoleUsersRequest,
+    metadata?: Metadata,
+  ): Promise<RoleResponse> {
+    return this.rolesService.assignRoleUsers(
+      request,
+      unpackCallerContext(metadata),
+    );
+  }
+
+  revokeRoleUser(
+    request: RevokeRoleUserRequest,
+    metadata?: Metadata,
+  ): Promise<RoleResponse> {
+    return this.rolesService.revokeRoleUser(
       request,
       unpackCallerContext(metadata),
     );
