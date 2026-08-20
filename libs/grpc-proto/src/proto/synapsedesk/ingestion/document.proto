@@ -258,6 +258,75 @@ message ListDocumentFlagsRequest {
 
 message DocumentFlagIdRequest { string id = 1; }
 
+// ---------------------------------------------------------------------------
+// Knowledge articles — the END-USER view of the same corpus.
+//
+// An article is a document that is VISIBLE to the caller, INDEXED, and not
+// soft-deleted. All three: `documentVisibility` is only the org-wide ∪
+// departments clause, and a soft-deleted document keeps `status = INDEXED`
+// forever, so the first two alone would list deleted documents by title.
+//
+// A NARROW type, not `DocumentResponse` behind a mapper that chooses not to
+// forward things. `DocumentResponse` carries `file_url`, `file_hash`,
+// `file_size_bytes`, `created_by_id` and the department links, and the next
+// field added to it would reach an end user by default (ADR 0031, ADR 0014).
+// ---------------------------------------------------------------------------
+
+message KnowledgeArticleResponse {
+  string id = 1;
+  string title = 2;
+  google.protobuf.Timestamp updated_at = 3;
+  // `chunk_count`, not a page count: `DocumentChunk.page_number` is nullable —
+  // a `.md` or `.txt` article has no pages — and it doubles as the only
+  // reading-length signal on a response that deliberately omits
+  // `file_size_bytes`.
+  int32 chunk_count = 4;
+}
+
+message ListKnowledgeArticlesRequest {
+  synapsedesk.auth.PageRequest page = 1;
+}
+
+message ListKnowledgeArticlesResponse {
+  repeated KnowledgeArticleResponse items = 1;
+  synapsedesk.auth.PageMeta meta = 2;
+}
+
+// One block of an article's extracted text.
+//
+// The chunks the pipeline already wrote, in `chunk_index` order — no second
+// copy of the document, and the only form that renders in a browser without a
+// download.
+message KnowledgeArticleBlockResponse {
+  int32 chunk_index = 1;
+  // Absent for formats with no pages. Never faked as 1.
+  optional int32 page_number = 2;
+  string content_text = 3;
+}
+
+// Carries a PAGE, because a whole document is unbounded: `CHUNK_TARGET_TOKENS`
+// bounds each block and a 200-page handbook is hundreds of them.
+message GetKnowledgeArticleRequest {
+  string id = 1;
+  synapsedesk.auth.PageRequest page = 2;
+}
+
+message KnowledgeArticleDetailResponse {
+  KnowledgeArticleResponse article = 1;
+  repeated KnowledgeArticleBlockResponse blocks = 2;
+  // Describes the BLOCK range, not a page of articles.
+  synapsedesk.auth.PageMeta meta = 3;
+  // True when some of the source could not be read, so the blocks are less
+  // than the document. `chunk_index` is contiguous over what SURVIVED, so
+  // there is no gap for a reader to notice.
+  //
+  // Sound only because a clean re-index now CLOSES `PAGES_NOT_INDEXED`
+  // (`DocumentFlagWriter.resolveSystem`). Read from an unresolved flag without
+  // that, it would stay true after the pages were fixed, and a warning that
+  // never clears teaches readers to ignore the true one.
+  bool has_unindexed_pages = 4;
+}
+
 // One RPC for three routes: dismiss, fixed and replaced differ only in the
 // value they carry.
 message ResolveDocumentFlagRequest {
@@ -380,6 +449,12 @@ service DocumentService {
 
   rpc ListDocumentFlags(ListDocumentFlagsRequest) returns (ListDocumentFlagsResponse);
   rpc GetDocumentFlag(DocumentFlagIdRequest) returns (DocumentFlagResponse);
+
+  // The end-user help centre over the same corpus. On this service for the
+  // reason the flag and job RPCs are: one database, one client, one health
+  // entry.
+  rpc ListKnowledgeArticles(ListKnowledgeArticlesRequest) returns (ListKnowledgeArticlesResponse);
+  rpc GetKnowledgeArticle(GetKnowledgeArticleRequest) returns (KnowledgeArticleDetailResponse);
   rpc ResolveDocumentFlag(ResolveDocumentFlagRequest) returns (DocumentFlagResponse);
   rpc DeleteDocumentFlag(DocumentFlagIdRequest) returns (DeleteDocumentFlagResponse);
 

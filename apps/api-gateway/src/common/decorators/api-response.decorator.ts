@@ -47,11 +47,17 @@ export const ERROR_ENVELOPE_PROPERTIES = {
 } as const satisfies Record<string, SchemaObject>;
 
 /** What a route may declare. `500` is always added; `429` unless opted out. */
-export type ApiErrorStatus = '400' | '401' | '403' | '404' | '409' | '422';
+export type ApiErrorStatus =
+  '400' | '401' | '402' | '403' | '404' | '409' | '422';
 
 const ERROR_DESCRIPTIONS: Record<ApiErrorStatus | '429' | '500', string> = {
   '400': 'Validation failed, or the request is malformed.',
   '401': 'No valid session cookie, or the session has expired.',
+  '402':
+    'The workspace has used its AI allowance. Reached only by routes that ' +
+    'GENERATE — it arrives as `PERMISSION_DENIED` carrying an `[http:402]` ' +
+    'marker precisely so it does not surface as 403 and send an admin ' +
+    'hunting role grants for a billing problem.',
   '403': 'Authenticated, but lacking the permission this route requires.',
   '404':
     'No such resource — or one the caller may not see. The two are ' +

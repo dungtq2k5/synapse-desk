@@ -214,6 +214,15 @@ export const MAX_LOCK_REASON_LENGTH = 500;
 /** One knowledge query. A 50,000-character "query" is one embedding call charged to the tenant. */
 export const MAX_KNOWLEDGE_QUERY_LENGTH = 1_000;
 
+/**
+ * One `/knowledge/ask` question.
+ *
+ * Wider than a search query because a question carries context a keyword search
+ * does not — but still bounded: this text is embedded AND fed to a generator,
+ * so an unbounded body is two costs, not one.
+ */
+export const MAX_KNOWLEDGE_QUESTION_LENGTH = 4_000;
+
 /** Stripe price ids are opaque; this only stops an unbounded string reaching the API. */
 export const MAX_BILLING_PRICE_ID_LENGTH = 255;
 

@@ -1,3 +1,5 @@
+import { AnswerStatus } from '@synapsedesk/common';
+
 export class RetrievedChunkResponseDto {
   chunkId!: string;
   documentId!: string;
@@ -23,4 +25,38 @@ export class KnowledgeSearchResponseDto {
    * `LEXICAL_ONLY` means the vector search was skipped.
    */
   degraded!: 'LEXICAL_ONLY' | null;
+}
+
+export class KnowledgeCitationResponseDto {
+  chunkId!: string;
+  documentId!: string;
+  documentTitle!: string;
+  /** NULL for formats with no pages — never faked as 1. */
+  pageNumber!: number | null;
+  /** The id a citation resolves through, and the two arms' fusion key. */
+  vectorPointId!: string;
+}
+
+/**
+ * One answer to a one-shot question.
+ *
+ * `status` is the same `AnswerStatus` a ticket answer carries, and
+ * `DOC_MISSING` is the one that matters here: it means nothing in the corpus
+ * covers the question, and the content says so explicitly rather than
+ * improvising. There is no conversation to escalate into on this surface, which
+ * is why the status is on the response rather than acted on for the caller.
+ */
+export class KnowledgeAskResponseDto {
+  content!: string;
+  /** `null` only if the peer sent a member this build does not know. */
+  status!: AnswerStatus | null;
+  citations!: KnowledgeCitationResponseDto[];
+  /**
+   * The `ai_generations` row this answer was billed to.
+   *
+   * Returned so the answer is identifiable after the fact. Nothing can rate it
+   * yet — `ai_response_feedbacks` is keyed on `ticket_message_id` and an ask
+   * produces no message.
+   */
+  generationId!: string;
 }

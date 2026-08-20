@@ -148,6 +148,22 @@ describe('AI route rate limiting (e2e)', () => {
           of({ chunks: [], degraded: 0 }),
         ),
     },
+    {
+      // Its OWN limit, tighter than search's: this generates as well as
+      // retrieves. Sharing search's would price a generation like a retrieval.
+      name: 'POST /knowledge/ask',
+      route: {
+        method: 'post' as const,
+        path: '/knowledge/ask',
+        body: { message: 'anything' },
+      },
+      limit: ROUTE_THROTTLE.knowledgeAsk.limit,
+      permissions: [],
+      stub: (fixture: E2eFixture) =>
+        fixture.stubs.rag.ask.mockReturnValue(
+          of({ content: 'a', status: 1, citations: [], generationId: 'g-1' }),
+        ),
+    },
   ];
 
   it.each(CASES)(

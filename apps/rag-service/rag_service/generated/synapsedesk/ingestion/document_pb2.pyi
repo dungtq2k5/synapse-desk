@@ -333,6 +333,62 @@ class DocumentFlagIdRequest(_message.Message):
     id: str
     def __init__(self, id: _Optional[str] = ...) -> None: ...
 
+class KnowledgeArticleResponse(_message.Message):
+    __slots__ = ("id", "title", "updated_at", "chunk_count")
+    ID_FIELD_NUMBER: _ClassVar[int]
+    TITLE_FIELD_NUMBER: _ClassVar[int]
+    UPDATED_AT_FIELD_NUMBER: _ClassVar[int]
+    CHUNK_COUNT_FIELD_NUMBER: _ClassVar[int]
+    id: str
+    title: str
+    updated_at: _timestamp_pb2.Timestamp
+    chunk_count: int
+    def __init__(self, id: _Optional[str] = ..., title: _Optional[str] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., chunk_count: _Optional[int] = ...) -> None: ...
+
+class ListKnowledgeArticlesRequest(_message.Message):
+    __slots__ = ("page",)
+    PAGE_FIELD_NUMBER: _ClassVar[int]
+    page: _common_pb2.PageRequest
+    def __init__(self, page: _Optional[_Union[_common_pb2.PageRequest, _Mapping]] = ...) -> None: ...
+
+class ListKnowledgeArticlesResponse(_message.Message):
+    __slots__ = ("items", "meta")
+    ITEMS_FIELD_NUMBER: _ClassVar[int]
+    META_FIELD_NUMBER: _ClassVar[int]
+    items: _containers.RepeatedCompositeFieldContainer[KnowledgeArticleResponse]
+    meta: _common_pb2.PageMeta
+    def __init__(self, items: _Optional[_Iterable[_Union[KnowledgeArticleResponse, _Mapping]]] = ..., meta: _Optional[_Union[_common_pb2.PageMeta, _Mapping]] = ...) -> None: ...
+
+class KnowledgeArticleBlockResponse(_message.Message):
+    __slots__ = ("chunk_index", "page_number", "content_text")
+    CHUNK_INDEX_FIELD_NUMBER: _ClassVar[int]
+    PAGE_NUMBER_FIELD_NUMBER: _ClassVar[int]
+    CONTENT_TEXT_FIELD_NUMBER: _ClassVar[int]
+    chunk_index: int
+    page_number: int
+    content_text: str
+    def __init__(self, chunk_index: _Optional[int] = ..., page_number: _Optional[int] = ..., content_text: _Optional[str] = ...) -> None: ...
+
+class GetKnowledgeArticleRequest(_message.Message):
+    __slots__ = ("id", "page")
+    ID_FIELD_NUMBER: _ClassVar[int]
+    PAGE_FIELD_NUMBER: _ClassVar[int]
+    id: str
+    page: _common_pb2.PageRequest
+    def __init__(self, id: _Optional[str] = ..., page: _Optional[_Union[_common_pb2.PageRequest, _Mapping]] = ...) -> None: ...
+
+class KnowledgeArticleDetailResponse(_message.Message):
+    __slots__ = ("article", "blocks", "meta", "has_unindexed_pages")
+    ARTICLE_FIELD_NUMBER: _ClassVar[int]
+    BLOCKS_FIELD_NUMBER: _ClassVar[int]
+    META_FIELD_NUMBER: _ClassVar[int]
+    HAS_UNINDEXED_PAGES_FIELD_NUMBER: _ClassVar[int]
+    article: KnowledgeArticleResponse
+    blocks: _containers.RepeatedCompositeFieldContainer[KnowledgeArticleBlockResponse]
+    meta: _common_pb2.PageMeta
+    has_unindexed_pages: bool
+    def __init__(self, article: _Optional[_Union[KnowledgeArticleResponse, _Mapping]] = ..., blocks: _Optional[_Iterable[_Union[KnowledgeArticleBlockResponse, _Mapping]]] = ..., meta: _Optional[_Union[_common_pb2.PageMeta, _Mapping]] = ..., has_unindexed_pages: _Optional[bool] = ...) -> None: ...
+
 class ResolveDocumentFlagRequest(_message.Message):
     __slots__ = ("id", "resolution", "comment")
     ID_FIELD_NUMBER: _ClassVar[int]

@@ -12,7 +12,7 @@
     "@apollo/server": "^5.5.1"
   },
   "scripts": {
-    "test": "jest --projects apps/*/jest.config.ts libs/*/jest.config.ts --passWithNoTests",
+    "test": "jest --projects apps/*/jest.config.ts libs/*/jest.config.ts --passWithNoTests --runInBand",
     "test:all": "jest --projects apps/*/jest.config.ts libs/*/jest.config.ts --passWithNoTests",
     "setup:py": "cd apps/rag-service && python3 -m venv .venv && .venv/bin/pip install -q -r requirements.txt -r requirements-dev.txt",
     "test:py": "cd apps/rag-service && .venv/bin/pytest -q",

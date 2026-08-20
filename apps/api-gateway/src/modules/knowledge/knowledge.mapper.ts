@@ -1,10 +1,16 @@
 import {
+  ChatRequest,
+  ChatResponse,
+  fromProtoRagAnswerStatus,
   SearchDegradation,
   SearchRequest,
   SearchResponse,
 } from '@synapsedesk/grpc-proto';
-import { KnowledgeSearchDto } from './dto/rest/knowledge.dto';
-import { KnowledgeSearchResponseDto } from './dto/rest/knowledge-response.dto';
+import { KnowledgeAskDto, KnowledgeSearchDto } from './dto/rest/knowledge.dto';
+import {
+  KnowledgeAskResponseDto,
+  KnowledgeSearchResponseDto,
+} from './dto/rest/knowledge-response.dto';
 
 /**
  * Builds a `SearchRequest` from the REST query.
@@ -44,5 +50,38 @@ export function toKnowledgeSearchResponseDto(
       response.degraded === SearchDegradation.SEARCH_DEGRADATION_LEXICAL_ONLY
         ? 'LEXICAL_ONLY'
         : null,
+  };
+}
+
+/**
+ * Builds the `ChatRequest` an ask sends.
+ *
+ * `history` and `ticketId` are BOTH omitted, and both matter: no history is
+ * what keeps this one-shot, and no ticket id is what makes the ledger row come
+ * out as `CHAT_ANSWER` with `ticket_id = NULL` — the attribution that
+ * distinguishes help-centre spend from ticket spend.
+ */
+export function toChatRequest(dto: KnowledgeAskDto): ChatRequest {
+  // `attachments` is empty and cannot be otherwise: an ask has no ticket and no
+  // message, so there is nothing to attach. `rag-service`'s `Ask` says the same
+  // — the field is on `ChatRequest` for the chat path.
+  return { message: dto.message, history: [], attachments: [] };
+}
+
+/** Converts a `ChatResponse` off the wire into its REST DTO. */
+export function toKnowledgeAskResponseDto(
+  response: ChatResponse,
+): KnowledgeAskResponseDto {
+  return {
+    content: response.content,
+    status: fromProtoRagAnswerStatus(response.status),
+    citations: response.citations.map((citation) => ({
+      chunkId: citation.chunkId,
+      documentId: citation.documentId,
+      documentTitle: citation.documentTitle,
+      pageNumber: citation.pageNumber ?? null,
+      vectorPointId: citation.vectorPointId,
+    })),
+    generationId: response.generationId,
   };
 }

@@ -113,7 +113,7 @@ enum SortOrder {
   SORT_ORDER_DESC = 2;
 }
 
-// Field names deliberately match PaginationMetaDataResponseBase at the REST
+// Field names deliberately match PaginationMetaDataResponseDto at the REST
 // edge, so the gateway mapper is a rename-free copy.
 message PageMeta {
   int32 total_items = 1;

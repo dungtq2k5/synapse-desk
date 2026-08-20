@@ -182,10 +182,12 @@ Order matters — Nest runs guards left to right.
 | `JwtAuthGuard` | Requires a valid access token | everything authenticated | `/auth/login`, `/auth/register`, `/auth/refresh` |
 | `Jwt2faGuard` | Authorizes the 2FA challenge leg only | `/auth/login/2fa` | anything else |
 | `GuestGuard` | Rejects callers who already hold a live session | `/auth/login`, `/auth/register` | any authenticated route — it would reject 100% of traffic |
-| `EmailVerifiedGuard` | Requires a proven email | business routes: tickets, documents, invitations, anything spending quota or sending mail | `/auth/*`, and **especially** `/auth/email/verify*` — that deadlocks the account permanently |
+| `EmailVerifiedGuard` | Requires a proven email | routes that **send mail on the tenant's behalf** — invitations today | `/auth/*`, and **especially** `/auth/email/verify*` — that deadlocks the account permanently. Also anything a new user needs before they are verified, e.g. `GET /knowledge/articles*` |
 | `PermissionGuard` | RBAC via `@RequirePermission` | after `JwtAuthGuard` | before it |
 
-- **Unverified is not unauthenticated.** An unverified user has a real session and a real identity; they are *limited*. That limit belongs on business routes, not on the verification endpoints.
+- **Unverified is not unauthenticated.** An unverified user has a real session and a real identity; they are *limited*. That limit belongs on the routes below, not on the verification endpoints.
+- **`EmailVerifiedGuard` guards OUTBOUND MAIL, not spend.** This row used to read *"anything spending quota or sending mail"*, and five controllers disagreed with it in silence — tickets, documents, chat, and both `/knowledge` AI routes all spend and none carries the guard. The narrow rule is the one the code already argues: `departments.controller.ts` says it is ungated because *"unlike invitations, nothing here sends mail on the tenant's behalf"*, and `otp.controller.ts` says the guard would deadlock the account. Spend is bounded by the AI cap per tenant and by `ROUTE_THROTTLE` per user; verification adds nothing those two do not already enforce, and it would lock a brand-new user out of the self-service path before they ever open a ticket.
+- **The help centre is explicitly ungated.** `GET /knowledge/articles*` spends nothing and is what someone reads *instead of* raising a ticket. Gating deflection behind a verification mail is the wrong end of the funnel.
 - `GuestGuard` checks **only the access token**, on purpose. It is a UX guard, not a security control — failing open is correct.
 
 ### 5.4 Permissions

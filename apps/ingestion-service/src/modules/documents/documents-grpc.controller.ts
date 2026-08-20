@@ -17,6 +17,10 @@ import {
   fromProtoDocumentFlagResolution,
   DocumentIdRequest,
   DocumentResponse,
+  GetKnowledgeArticleRequest,
+  KnowledgeArticleDetailResponse,
+  ListKnowledgeArticlesRequest,
+  ListKnowledgeArticlesResponse,
   CancelIngestionJobResponse,
   DocumentServiceController,
   IngestionJobIdRequest,
@@ -43,6 +47,7 @@ import {
 import { DocumentsService } from './documents.service';
 import { IngestionJobsService } from '../ingestion-jobs/ingestion-jobs.service';
 import { DocumentFlagsService } from '../document-flags/document-flags.service';
+import { KnowledgeArticlesService } from '../knowledge-articles/knowledge-articles.service';
 
 /**
  * Every method unpacks the caller context, because every query is scoped by it
@@ -57,6 +62,7 @@ export class DocumentsGrpcController implements DocumentServiceController {
     private readonly documents: DocumentsService,
     private readonly jobs: IngestionJobsService,
     private readonly flags: DocumentFlagsService,
+    private readonly articles: KnowledgeArticlesService,
   ) {}
 
   presignDocument(
@@ -264,6 +270,31 @@ export class DocumentsGrpcController implements DocumentServiceController {
   ): Promise<DeleteDocumentFlagResponse> {
     return this.flags.deleteDocumentFlag(
       request.id,
+      unpackCallerContext(metadata),
+    );
+  }
+
+  // ------------------------------------------------------------- articles
+  //
+  // Stubs so the tree compiles at this gate rather than staying red until the
+  // module lands — doc 40's shape, and doc 41's before it.
+
+  listKnowledgeArticles(
+    request: ListKnowledgeArticlesRequest,
+    metadata?: Metadata,
+  ): Promise<ListKnowledgeArticlesResponse> {
+    return this.articles.listKnowledgeArticles(
+      request,
+      unpackCallerContext(metadata),
+    );
+  }
+
+  getKnowledgeArticle(
+    request: GetKnowledgeArticleRequest,
+    metadata?: Metadata,
+  ): Promise<KnowledgeArticleDetailResponse> {
+    return this.articles.getKnowledgeArticle(
+      request,
       unpackCallerContext(metadata),
     );
   }

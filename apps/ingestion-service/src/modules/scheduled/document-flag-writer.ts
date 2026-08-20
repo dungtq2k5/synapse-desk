@@ -148,6 +148,51 @@ export class DocumentFlagWriter {
   }
 
   /**
+   * Closes an open flag because the condition that raised it is gone.
+   *
+   * **A SYSTEM resolution.** `resolved_by_id` is nullable precisely so an
+   * actor-less act is representable — the same shape `AuditPublisher`'s
+   * `recordSystem` uses — and `FIXED` is the honest resolution: the problem was
+   * real and no longer is.
+   *
+   * Conditional on `resolvedAt: null`, so it can never overwrite a human's
+   * decision or its comment.
+   *
+   * **Resolved, never deleted.** `FIXED` suppresses nothing, so if the same
+   * condition returns on a later run `raise()` raises it again — which is the
+   * behaviour wanted, and the reason deleting the row would be wrong.
+   *
+   * @returns how many flags were closed, which is 0 or 1 in practice.
+   */
+  async resolveSystem(
+    organizationId: string,
+    documentId: string,
+    flagType: DocumentFlagType,
+  ): Promise<number> {
+    const { count } = await this.prisma.documentFlag.updateMany({
+      where: { organizationId, documentId, flagType, resolvedAt: null },
+      data: {
+        resolvedAt: new Date(),
+        resolution: DocumentFlagResolution.FIXED,
+        // No actor: the pipeline closed this, not a person. Attributing it to
+        // anyone would put a name in a worklist beside a decision they did not
+        // make.
+        resolvedById: null,
+        resolutionComment:
+          'Resolved automatically: the condition no longer holds',
+      },
+    });
+
+    if (count > 0) {
+      this.logger.log(
+        `Resolved ${count} ${flagType} flag(s) for ${documentId}`,
+      );
+    }
+
+    return count;
+  }
+
+  /**
    * Raises flags that are not already open, and honours a recent dismissal.
    *
    * A human dismissing a flag is a decision, and a job that re-raised it on the

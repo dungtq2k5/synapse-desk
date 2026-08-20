@@ -297,6 +297,73 @@ export interface DocumentFlagIdRequest {
   id: string;
 }
 
+export interface KnowledgeArticleResponse {
+  id: string;
+  title: string;
+  updatedAt:
+    | Timestamp
+    | undefined;
+  /**
+   * `chunk_count`, not a page count: `DocumentChunk.page_number` is nullable —
+   * a `.md` or `.txt` article has no pages — and it doubles as the only
+   * reading-length signal on a response that deliberately omits
+   * `file_size_bytes`.
+   */
+  chunkCount: number;
+}
+
+export interface ListKnowledgeArticlesRequest {
+  page: PageRequest | undefined;
+}
+
+export interface ListKnowledgeArticlesResponse {
+  items: KnowledgeArticleResponse[];
+  meta: PageMeta | undefined;
+}
+
+/**
+ * One block of an article's extracted text.
+ *
+ * The chunks the pipeline already wrote, in `chunk_index` order — no second
+ * copy of the document, and the only form that renders in a browser without a
+ * download.
+ */
+export interface KnowledgeArticleBlockResponse {
+  chunkIndex: number;
+  /** Absent for formats with no pages. Never faked as 1. */
+  pageNumber?: number | undefined;
+  contentText: string;
+}
+
+/**
+ * Carries a PAGE, because a whole document is unbounded: `CHUNK_TARGET_TOKENS`
+ * bounds each block and a 200-page handbook is hundreds of them.
+ */
+export interface GetKnowledgeArticleRequest {
+  id: string;
+  page: PageRequest | undefined;
+}
+
+export interface KnowledgeArticleDetailResponse {
+  article: KnowledgeArticleResponse | undefined;
+  blocks: KnowledgeArticleBlockResponse[];
+  /** Describes the BLOCK range, not a page of articles. */
+  meta:
+    | PageMeta
+    | undefined;
+  /**
+   * True when some of the source could not be read, so the blocks are less
+   * than the document. `chunk_index` is contiguous over what SURVIVED, so
+   * there is no gap for a reader to notice.
+   *
+   * Sound only because a clean re-index now CLOSES `PAGES_NOT_INDEXED`
+   * (`DocumentFlagWriter.resolveSystem`). Read from an unresolved flag without
+   * that, it would stay true after the pages were fixed, and a warning that
+   * never clears teaches readers to ignore the true one.
+   */
+  hasUnindexedPages: boolean;
+}
+
 /**
  * One RPC for three routes: dismiss, fixed and replaced differ only in the
  * value they carry.
@@ -459,6 +526,22 @@ export interface DocumentServiceClient {
 
   getDocumentFlag(request: DocumentFlagIdRequest, metadata?: Metadata): Observable<DocumentFlagResponse>;
 
+  /**
+   * The end-user help centre over the same corpus. On this service for the
+   * reason the flag and job RPCs are: one database, one client, one health
+   * entry.
+   */
+
+  listKnowledgeArticles(
+    request: ListKnowledgeArticlesRequest,
+    metadata?: Metadata,
+  ): Observable<ListKnowledgeArticlesResponse>;
+
+  getKnowledgeArticle(
+    request: GetKnowledgeArticleRequest,
+    metadata?: Metadata,
+  ): Observable<KnowledgeArticleDetailResponse>;
+
   resolveDocumentFlag(request: ResolveDocumentFlagRequest, metadata?: Metadata): Observable<DocumentFlagResponse>;
 
   deleteDocumentFlag(request: DocumentFlagIdRequest, metadata?: Metadata): Observable<DeleteDocumentFlagResponse>;
@@ -575,6 +658,25 @@ export interface DocumentServiceController {
     metadata?: Metadata,
   ): Promise<DocumentFlagResponse> | Observable<DocumentFlagResponse> | DocumentFlagResponse;
 
+  /**
+   * The end-user help centre over the same corpus. On this service for the
+   * reason the flag and job RPCs are: one database, one client, one health
+   * entry.
+   */
+
+  listKnowledgeArticles(
+    request: ListKnowledgeArticlesRequest,
+    metadata?: Metadata,
+  ): Promise<ListKnowledgeArticlesResponse> | Observable<ListKnowledgeArticlesResponse> | ListKnowledgeArticlesResponse;
+
+  getKnowledgeArticle(
+    request: GetKnowledgeArticleRequest,
+    metadata?: Metadata,
+  ):
+    | Promise<KnowledgeArticleDetailResponse>
+    | Observable<KnowledgeArticleDetailResponse>
+    | KnowledgeArticleDetailResponse;
+
   resolveDocumentFlag(
     request: ResolveDocumentFlagRequest,
     metadata?: Metadata,
@@ -647,6 +749,8 @@ export function DocumentServiceControllerMethods() {
       "getDocumentChunk",
       "listDocumentFlags",
       "getDocumentFlag",
+      "listKnowledgeArticles",
+      "getKnowledgeArticle",
       "resolveDocumentFlag",
       "deleteDocumentFlag",
       "getStorageUsage",

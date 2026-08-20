@@ -425,6 +425,81 @@ describe('The ingestion pipeline (e2e)', () => {
       expect(flags.filter((flag) => flag.resolvedAt === null)).toHaveLength(1);
     });
 
+    it('**a clean re-index CLOSES the flag, as a system resolution**', async () => {
+      // Nothing else closes it. After doc 41 resolution is a human act, so an
+      // unresolved flag would mean "no human has looked" rather than "pages are
+      // still missing" — a worklist item nobody can action, and a warning that
+      // never clears for anything reader-facing derived from it.
+      downloadObject.mockResolvedValue(
+        await buildPdf([FULL_PAGE, THIN_PAGE], { repeat: 1 }),
+      );
+      const first = await queueDocument({ fileType: 'pdf' });
+      await processor.process(first);
+
+      const [raised] = await flagsFor(first.documentId);
+      expect(raised.resolvedAt).toBeNull();
+
+      // The fix: re-ingest with every page readable this time.
+      const retry = await fx.prisma.ingestionJob.create({
+        data: {
+          organizationId: tenant.organizationId,
+          documentId: first.documentId,
+          bullmqJobId: '',
+          status: IngestionJobStatus.QUEUED,
+        },
+      });
+      downloadObject.mockResolvedValue(
+        await buildPdf([FULL_PAGE, FULL_PAGE], { repeat: 1 }),
+      );
+      await processor.process({ ...first, ingestionJobId: retry.id });
+
+      const [after] = await flagsFor(first.documentId);
+      expect(after.resolvedAt).not.toBeNull();
+      expect(after.resolution).toBe(DocumentFlagResolution.FIXED);
+      // No actor: the pipeline closed it, not a person.
+      expect(after.resolvedById).toBeNull();
+    });
+
+    it('**does NOT overwrite a human’s resolution**', async () => {
+      // Conditional on `resolvedAt: null`. A Knowledge Manager who dismissed
+      // this — "the appendix really is a photograph" — keeps their decision and
+      // their reason.
+      downloadObject.mockResolvedValue(
+        await buildPdf([FULL_PAGE, THIN_PAGE], { repeat: 1 }),
+      );
+      const first = await queueDocument({ fileType: 'pdf' });
+      await processor.process(first);
+
+      const [raised] = await flagsFor(first.documentId);
+      await documentFlags.resolve(
+        raised.id,
+        DocumentFlagResolution.DISMISSED,
+        memberContext({
+          id: tenant.userId,
+          organizationId: tenant.organizationId,
+        }),
+        'the appendix is a photograph',
+      );
+
+      const retry = await fx.prisma.ingestionJob.create({
+        data: {
+          organizationId: tenant.organizationId,
+          documentId: first.documentId,
+          bullmqJobId: '',
+          status: IngestionJobStatus.QUEUED,
+        },
+      });
+      downloadObject.mockResolvedValue(
+        await buildPdf([FULL_PAGE, FULL_PAGE], { repeat: 1 }),
+      );
+      await processor.process({ ...first, ingestionJobId: retry.id });
+
+      const [after] = await flagsFor(first.documentId);
+      expect(after.resolution).toBe(DocumentFlagResolution.DISMISSED);
+      expect(after.resolutionComment).toBe('the appendix is a photograph');
+      expect(after.resolvedById).toBe(tenant.userId);
+    });
+
     it('and the document still INDEXES — 197 good pages beat discarding 200', async () => {
       downloadObject.mockResolvedValue(
         await buildPdf([FULL_PAGE, THIN_PAGE], { repeat: 1 }),

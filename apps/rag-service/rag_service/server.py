@@ -397,9 +397,12 @@ class RagServicer(rag_pb2_grpc.RagServiceServicer):
 
         One difference matters: there is no conversation to escalate into, so
         `DOC_MISSING` returns an explicit "nothing covers this" rather than
-        offering a handoff it cannot perform. And at the cap it returns
-        FAILED_PRECONDITION-with-402 rather than degrading — retrieval could
-        degrade, but there is no free version of an ANSWER.
+        offering a handoff it cannot perform. And at the cap it aborts
+        PERMISSION_DENIED carrying the `[http:402]` marker rather than
+        degrading — retrieval could degrade, but there is no free version of an
+        ANSWER. Not FAILED_PRECONDITION: that is the missing-tenant arm twelve
+        lines below, and one name for two failures is a wrong turn in the one
+        place a reader would check.
         """
         ctx = unpack_caller_context(context.invocation_metadata())
 

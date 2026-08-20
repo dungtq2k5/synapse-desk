@@ -135,7 +135,7 @@ export interface PageRequest {
 }
 
 /**
- * Field names deliberately match PaginationMetaDataResponseBase at the REST
+ * Field names deliberately match PaginationMetaDataResponseDto at the REST
  * edge, so the gateway mapper is a rename-free copy.
  */
 export interface PageMeta {

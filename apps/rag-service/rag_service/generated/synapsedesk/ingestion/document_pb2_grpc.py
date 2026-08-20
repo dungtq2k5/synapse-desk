@@ -114,6 +114,16 @@ class DocumentServiceStub:
                 request_serializer=synapsedesk_dot_ingestion_dot_document__pb2.DocumentFlagIdRequest.SerializeToString,
                 response_deserializer=synapsedesk_dot_ingestion_dot_document__pb2.DocumentFlagResponse.FromString,
                 _registered_method=True)
+        self.ListKnowledgeArticles = channel.unary_unary(
+                '/synapsedesk.ingestion.DocumentService/ListKnowledgeArticles',
+                request_serializer=synapsedesk_dot_ingestion_dot_document__pb2.ListKnowledgeArticlesRequest.SerializeToString,
+                response_deserializer=synapsedesk_dot_ingestion_dot_document__pb2.ListKnowledgeArticlesResponse.FromString,
+                _registered_method=True)
+        self.GetKnowledgeArticle = channel.unary_unary(
+                '/synapsedesk.ingestion.DocumentService/GetKnowledgeArticle',
+                request_serializer=synapsedesk_dot_ingestion_dot_document__pb2.GetKnowledgeArticleRequest.SerializeToString,
+                response_deserializer=synapsedesk_dot_ingestion_dot_document__pb2.KnowledgeArticleDetailResponse.FromString,
+                _registered_method=True)
         self.ResolveDocumentFlag = channel.unary_unary(
                 '/synapsedesk.ingestion.DocumentService/ResolveDocumentFlag',
                 request_serializer=synapsedesk_dot_ingestion_dot_document__pb2.ResolveDocumentFlagRequest.SerializeToString,
@@ -255,6 +265,21 @@ class DocumentServiceServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def ListKnowledgeArticles(self, request, context):
+        """The end-user help centre over the same corpus. On this service for the
+        reason the flag and job RPCs are: one database, one client, one health
+        entry.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetKnowledgeArticle(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def ResolveDocumentFlag(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -391,6 +416,16 @@ def add_DocumentServiceServicer_to_server(servicer, server):
                     servicer.GetDocumentFlag,
                     request_deserializer=synapsedesk_dot_ingestion_dot_document__pb2.DocumentFlagIdRequest.FromString,
                     response_serializer=synapsedesk_dot_ingestion_dot_document__pb2.DocumentFlagResponse.SerializeToString,
+            ),
+            'ListKnowledgeArticles': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListKnowledgeArticles,
+                    request_deserializer=synapsedesk_dot_ingestion_dot_document__pb2.ListKnowledgeArticlesRequest.FromString,
+                    response_serializer=synapsedesk_dot_ingestion_dot_document__pb2.ListKnowledgeArticlesResponse.SerializeToString,
+            ),
+            'GetKnowledgeArticle': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetKnowledgeArticle,
+                    request_deserializer=synapsedesk_dot_ingestion_dot_document__pb2.GetKnowledgeArticleRequest.FromString,
+                    response_serializer=synapsedesk_dot_ingestion_dot_document__pb2.KnowledgeArticleDetailResponse.SerializeToString,
             ),
             'ResolveDocumentFlag': grpc.unary_unary_rpc_method_handler(
                     servicer.ResolveDocumentFlag,
@@ -865,6 +900,60 @@ class DocumentService:
             '/synapsedesk.ingestion.DocumentService/GetDocumentFlag',
             synapsedesk_dot_ingestion_dot_document__pb2.DocumentFlagIdRequest.SerializeToString,
             synapsedesk_dot_ingestion_dot_document__pb2.DocumentFlagResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ListKnowledgeArticles(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/synapsedesk.ingestion.DocumentService/ListKnowledgeArticles',
+            synapsedesk_dot_ingestion_dot_document__pb2.ListKnowledgeArticlesRequest.SerializeToString,
+            synapsedesk_dot_ingestion_dot_document__pb2.ListKnowledgeArticlesResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetKnowledgeArticle(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/synapsedesk.ingestion.DocumentService/GetKnowledgeArticle',
+            synapsedesk_dot_ingestion_dot_document__pb2.GetKnowledgeArticleRequest.SerializeToString,
+            synapsedesk_dot_ingestion_dot_document__pb2.KnowledgeArticleDetailResponse.FromString,
             options,
             channel_credentials,
             insecure,
