@@ -2,6 +2,7 @@ import Stripe from 'stripe';
 import { expectRpc } from '@synapsedesk/common/testing/rpc';
 import { status } from '@grpc/grpc-js';
 import {
+  AuditPublisher,
   BillingEventStatus,
   DEFAULT_PLAN_CATALOG,
   OrgStatus,
@@ -20,7 +21,6 @@ import { StripeService } from '../../src/modules/billing/stripe.service';
 import { BillingEventPublisher } from '../../src/modules/billing/billing-event.publisher';
 import { PlatformService } from '../../src/modules/platform/platform.service';
 import { OrganizationsService } from '../../src/modules/organizations/organizations.service';
-import { AuditPublisher } from '../../src/modules/audit/audit-publisher.service';
 import { faultInjector } from '@synapsedesk/common/testing/fault';
 
 describe('Billing and entitlements (e2e)', () => {

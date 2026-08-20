@@ -1,7 +1,10 @@
 import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { ClientGrpc } from '@nestjs/microservices';
 import {
+  DeleteDocumentFlagResponse,
   DOCUMENT_SERVICE_NAME,
+  DocumentFlagResponse,
+  ResolveDocumentFlagRequest,
   DocumentServiceClient,
   INGESTION_GRPC_CLIENT,
   ConfirmDocumentRequest,
@@ -174,6 +177,35 @@ export class DocumentsGrpcClient
     return this.call(
       (metadata) =>
         this.documentGrpcService.listDocumentFlags(request, metadata),
+      context,
+    );
+  }
+
+  getFlag(id: string, context: RequestContext): Promise<DocumentFlagResponse> {
+    return this.call(
+      (metadata) => this.documentGrpcService.getDocumentFlag({ id }, metadata),
+      context,
+    );
+  }
+
+  deleteFlag(
+    id: string,
+    context: RequestContext,
+  ): Promise<DeleteDocumentFlagResponse> {
+    return this.call(
+      (metadata) =>
+        this.documentGrpcService.deleteDocumentFlag({ id }, metadata),
+      context,
+    );
+  }
+
+  resolveFlag(
+    request: ResolveDocumentFlagRequest,
+    context: RequestContext,
+  ): Promise<DocumentFlagResponse> {
+    return this.call(
+      (metadata) =>
+        this.documentGrpcService.resolveDocumentFlag(request, metadata),
       context,
     );
   }

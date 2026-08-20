@@ -109,6 +109,21 @@ class DocumentServiceStub:
                 request_serializer=synapsedesk_dot_ingestion_dot_document__pb2.ListDocumentFlagsRequest.SerializeToString,
                 response_deserializer=synapsedesk_dot_ingestion_dot_document__pb2.ListDocumentFlagsResponse.FromString,
                 _registered_method=True)
+        self.GetDocumentFlag = channel.unary_unary(
+                '/synapsedesk.ingestion.DocumentService/GetDocumentFlag',
+                request_serializer=synapsedesk_dot_ingestion_dot_document__pb2.DocumentFlagIdRequest.SerializeToString,
+                response_deserializer=synapsedesk_dot_ingestion_dot_document__pb2.DocumentFlagResponse.FromString,
+                _registered_method=True)
+        self.ResolveDocumentFlag = channel.unary_unary(
+                '/synapsedesk.ingestion.DocumentService/ResolveDocumentFlag',
+                request_serializer=synapsedesk_dot_ingestion_dot_document__pb2.ResolveDocumentFlagRequest.SerializeToString,
+                response_deserializer=synapsedesk_dot_ingestion_dot_document__pb2.DocumentFlagResponse.FromString,
+                _registered_method=True)
+        self.DeleteDocumentFlag = channel.unary_unary(
+                '/synapsedesk.ingestion.DocumentService/DeleteDocumentFlag',
+                request_serializer=synapsedesk_dot_ingestion_dot_document__pb2.DocumentFlagIdRequest.SerializeToString,
+                response_deserializer=synapsedesk_dot_ingestion_dot_document__pb2.DeleteDocumentFlagResponse.FromString,
+                _registered_method=True)
         self.GetStorageUsage = channel.unary_unary(
                 '/synapsedesk.ingestion.DocumentService/GetStorageUsage',
                 request_serializer=synapsedesk_dot_ingestion_dot_document__pb2.DocumentIdRequest.SerializeToString,
@@ -234,6 +249,24 @@ class DocumentServiceServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def GetDocumentFlag(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ResolveDocumentFlag(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DeleteDocumentFlag(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def GetStorageUsage(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -353,6 +386,21 @@ def add_DocumentServiceServicer_to_server(servicer, server):
                     servicer.ListDocumentFlags,
                     request_deserializer=synapsedesk_dot_ingestion_dot_document__pb2.ListDocumentFlagsRequest.FromString,
                     response_serializer=synapsedesk_dot_ingestion_dot_document__pb2.ListDocumentFlagsResponse.SerializeToString,
+            ),
+            'GetDocumentFlag': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetDocumentFlag,
+                    request_deserializer=synapsedesk_dot_ingestion_dot_document__pb2.DocumentFlagIdRequest.FromString,
+                    response_serializer=synapsedesk_dot_ingestion_dot_document__pb2.DocumentFlagResponse.SerializeToString,
+            ),
+            'ResolveDocumentFlag': grpc.unary_unary_rpc_method_handler(
+                    servicer.ResolveDocumentFlag,
+                    request_deserializer=synapsedesk_dot_ingestion_dot_document__pb2.ResolveDocumentFlagRequest.FromString,
+                    response_serializer=synapsedesk_dot_ingestion_dot_document__pb2.DocumentFlagResponse.SerializeToString,
+            ),
+            'DeleteDocumentFlag': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteDocumentFlag,
+                    request_deserializer=synapsedesk_dot_ingestion_dot_document__pb2.DocumentFlagIdRequest.FromString,
+                    response_serializer=synapsedesk_dot_ingestion_dot_document__pb2.DeleteDocumentFlagResponse.SerializeToString,
             ),
             'GetStorageUsage': grpc.unary_unary_rpc_method_handler(
                     servicer.GetStorageUsage,
@@ -790,6 +838,87 @@ class DocumentService:
             '/synapsedesk.ingestion.DocumentService/ListDocumentFlags',
             synapsedesk_dot_ingestion_dot_document__pb2.ListDocumentFlagsRequest.SerializeToString,
             synapsedesk_dot_ingestion_dot_document__pb2.ListDocumentFlagsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetDocumentFlag(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/synapsedesk.ingestion.DocumentService/GetDocumentFlag',
+            synapsedesk_dot_ingestion_dot_document__pb2.DocumentFlagIdRequest.SerializeToString,
+            synapsedesk_dot_ingestion_dot_document__pb2.DocumentFlagResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ResolveDocumentFlag(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/synapsedesk.ingestion.DocumentService/ResolveDocumentFlag',
+            synapsedesk_dot_ingestion_dot_document__pb2.ResolveDocumentFlagRequest.SerializeToString,
+            synapsedesk_dot_ingestion_dot_document__pb2.DocumentFlagResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeleteDocumentFlag(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/synapsedesk.ingestion.DocumentService/DeleteDocumentFlag',
+            synapsedesk_dot_ingestion_dot_document__pb2.DocumentFlagIdRequest.SerializeToString,
+            synapsedesk_dot_ingestion_dot_document__pb2.DeleteDocumentFlagResponse.FromString,
             options,
             channel_credentials,
             insecure,

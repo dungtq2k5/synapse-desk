@@ -14,7 +14,7 @@ import { SchedulerProcessor } from '../../src/modules/scheduler/scheduler.proces
 import { SchedulerRegistrar } from '../../src/modules/scheduler/scheduler.registrar';
 import { ChunkUsageProjection } from '../../src/modules/scheduled/chunk-usage.projection';
 import { DiscardedDraftSweep } from '../../src/modules/scheduled/discarded-draft.sweep';
-import { DocumentFlagService } from '../../src/modules/scheduled/document-flag.service';
+import { DocumentFlagWriter } from '../../src/modules/scheduled/document-flag-writer';
 import { QuotaReconciliationJob } from '../../src/modules/scheduled/quota-reconciliation.job';
 import { AiGenerationRollupJob } from '../../src/modules/analytics/ai-generation-rollup.job';
 
@@ -167,7 +167,7 @@ describe('The scheduler (e2e)', () => {
           return Promise.resolve({ tenants: 0, rows: 0 });
         });
       jest
-        .spyOn(fx.moduleRef.get(DocumentFlagService), 'detect')
+        .spyOn(fx.moduleRef.get(DocumentFlagWriter), 'detect')
         .mockImplementation(() => {
           order.push('flags');
 

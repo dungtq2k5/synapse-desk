@@ -3,14 +3,15 @@ import { RpcException } from '@nestjs/microservices';
 import { status } from '@grpc/grpc-js';
 import {
   AuditAction,
+  AuditPublisher,
   AuditResourceType,
+  isUniqueConstraintViolation,
   PERMISSION_CODES,
   PermissionCode,
-  ROLE_SORTABLE_FIELDS,
-  SystemRoleName,
-  isUniqueConstraintViolation,
   requireActor,
   requireTenant,
+  ROLE_SORTABLE_FIELDS,
+  SystemRoleName,
 } from '@synapsedesk/common';
 import {
   CallerContext,
@@ -29,7 +30,6 @@ import {
   toSearchFilter,
 } from '@synapsedesk/grpc-proto';
 import { PrismaService } from '../prisma/prisma.service';
-import { AuditPublisher } from '../audit/audit-publisher.service';
 import { ROLE_INCLUDE, RoleRow, toRoleResponse } from './role.mapper';
 import { Prisma } from '../../generated/prisma/client';
 

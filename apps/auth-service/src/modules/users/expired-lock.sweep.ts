@@ -1,12 +1,20 @@
 import { Injectable, Logger } from '@nestjs/common';
 import {
   AuditAction,
+  AuditPublisher,
   AuditResourceType,
   EmailTemplateName,
 } from '@synapsedesk/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { AuditPublisher } from '../audit/audit-publisher.service';
 import { NotificationPublisher } from '../notifications/notification-publisher.service';
+
+/**
+ * This service, as the audit trail and the notification both name it.
+ *
+ * One constant because the sweep writes the origin TWICE for one event, and
+ * two literals is how they came to disagree.
+ */
+const SCHEDULER_ORIGIN = 'auth-service/scheduler';
 
 /**
  * Clears locks whose expiry has passed — the second of two mechanisms.
@@ -77,6 +85,9 @@ export class ExpiredLockSweep {
       // again — an unlock with no actor and no row would read as a bug.
       this.audit.recordSystem({
         organizationId: null,
+        // Names THIS service. `recordSystem` has no default on purpose: the
+        // right value is one a shared class cannot know.
+        origin: SCHEDULER_ORIGIN,
         action: AuditAction.USER_UNLOCKED,
         resourceType: AuditResourceType.USER,
         resourceId: user.id,
@@ -94,7 +105,10 @@ export class ExpiredLockSweep {
           // No request produced this, so the origin names the SERVICE rather
           // than a fabricated IP — the same choice `recordSystem` makes, and
           // for the same reason: an invented `127.0.0.1` reads as a person.
-          origin: { ip: 'system', userAgent: 'auth-service/scheduler' },
+          //
+          // The SAME constant the audit row uses: two records of one event
+          // disagreeing about who produced it is the defect this replaced.
+          origin: { ip: 'system', userAgent: SCHEDULER_ORIGIN },
         },
       });
     }

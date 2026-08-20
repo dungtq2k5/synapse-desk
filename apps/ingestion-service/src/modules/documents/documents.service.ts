@@ -20,10 +20,7 @@ import {
   DocumentChunkResponse,
   ListDocumentChunksResponse,
   fromProtoDocumentFileType,
-  fromProtoDocumentFlagType,
   fromProtoDocumentStatus,
-  ListDocumentFlagsRequest,
-  ListDocumentFlagsResponse,
   ListDocumentDepartmentsResponse,
   ListDocumentsRequest,
   ListDocumentsResponse,
@@ -44,8 +41,6 @@ import {
   ALLOWED_DOCUMENT_MIME_TYPES,
   type AllowedDocumentMimeType,
   DOCUMENT_CHUNK_SORTABLE_FIELDS,
-  DOCUMENT_FLAG_SORTABLE_FIELDS,
-  DocumentFlagType,
   DOCUMENT_PATTERNS,
   DOCUMENT_SORTABLE_FIELDS,
   DocumentStatus,
@@ -71,7 +66,6 @@ import {
   DOCUMENT_INCLUDE,
   DocumentWithScope,
   toDocumentChunkResponse,
-  toDocumentFlagResponse,
   toDocumentResponse,
 } from './document.mapper';
 
@@ -440,84 +434,6 @@ export class DocumentsService {
 
     return {
       items: items.map(toDocumentChunkResponse),
-      meta: toPageMeta(page, totalItems, items.length),
-    };
-  }
-
-  /**
-   * The flag worklist.
-   *
-   * **Accepts EVERY flag type, and more than one at a time.** `UNRETRIEVED` and
-   * `UNCITED` were one flag under a name that fitted only `UNRETRIEVED`, and
-   * they were split because they are different findings with different fixes: a
-   * document nobody's question came near may simply be mis-titled, while one
-   * retrieved twenty times and cited never is actively displacing the sources
-   * that would have answered. A filter that accepted only one of them would
-   * quietly re-merge them, because a type nobody can select is a type nobody
-   * sees.
-   *
-   * Unresolved by default: a resolved flag is history, and mixing history into
-   * a worklist is how a worklist stops being read.
-   */
-  async listDocumentFlags(
-    request: ListDocumentFlagsRequest,
-    context: CallerContext,
-  ): Promise<ListDocumentFlagsResponse> {
-    const organizationId = requireTenant(context);
-    const page = request.page ?? emptyPage();
-    const { skip, take, orderBy } = toPrismaPage(
-      page,
-      DOCUMENT_FLAG_SORTABLE_FIELDS,
-    );
-
-    // **The membership check stays, and the enum did not make it redundant.**
-    // protoc refuses an unknown value from a peer that shares this contract, but
-    // ts-proto maps anything it cannot name to `UNRECOGNIZED` (-1) rather than
-    // failing — so a newer build's flag type arrives here as a legal value of
-    // the enum type that this build cannot act on. `fromProto*` answers null for
-    // exactly that case, and null is what this rejects.
-    //
-    // Refused rather than ignored. Silently dropping an unknown filter answers a
-    // DIFFERENT question than the one asked — and a caller reading "no OUTDATED
-    // flags" as "nothing is outdated" is the whole failure.
-    const requested: DocumentFlagType[] = [];
-    const unknown: number[] = [];
-    for (const flagType of request.flagTypes ?? []) {
-      const domain = fromProtoDocumentFlagType(flagType);
-      if (domain) requested.push(domain);
-      else unknown.push(flagType);
-    }
-    if (unknown.length > 0) {
-      throw new RpcException({
-        code: status.INVALID_ARGUMENT,
-        message: `Unknown flag type(s): ${unknown.join(', ')}`,
-      });
-    }
-
-    const where: Prisma.DocumentFlagWhereInput = {
-      organizationId,
-      // The scope boundary. A flag names a document, so an unscoped list would
-      // leak another tenant's document titles through the join below — and
-      // `documentVisibility` is what keeps a department-scoped document out of
-      // a worklist for a caller `GET /documents/:id` would answer NOT_FOUND.
-      document: { deletedAt: null, ...documentVisibility(context) },
-      ...(requested.length > 0 ? { flagType: { in: requested } } : {}),
-      ...(request.includeResolved ? {} : { resolvedAt: null }),
-    };
-
-    const [items, totalItems] = await Promise.all([
-      this.prisma.documentFlag.findMany({
-        where,
-        orderBy,
-        skip,
-        take,
-        include: { document: { select: { title: true } } },
-      }),
-      this.prisma.documentFlag.count({ where }),
-    ]);
-
-    return {
-      items: items.map(toDocumentFlagResponse),
       meta: toPageMeta(page, totalItems, items.length),
     };
   }

@@ -5,11 +5,11 @@ import {
   AUDIT_PATTERNS,
   AuditAction,
   AuditResourceType,
-  formatErrorMsg,
   RecordAuditCommand,
-  NATS_CLIENT,
-} from '@synapsedesk/common';
-import { CallerContext } from '@synapsedesk/grpc-proto';
+} from '../contracts/audit.contract';
+import { NATS_CLIENT } from '../configs/nats.config';
+import { CallerContext } from '../configs/identity.config';
+import { formatErrorMsg } from './format-error';
 
 /** Everything about an event except who did it and where from. */
 export type AuditEvent = {
@@ -45,12 +45,10 @@ export class AuditPublisher {
    * TEMPORARY local sink: mirrors every event to the log until `ticket-service`
    * owns `audit_logs` and subscribes.
    *
-   * A subscriber here was the obvious alternative and does not work —
-   * auth-service is a pure gRPC microservice, so a NATS `@EventPattern` would
-   * never be listened for without turning it into a hybrid app for the sake of
-   * a stopgap. Logging costs nothing and proves the publisher is being called.
-   *
-   * Set AUDIT_LOG_TO_CONSOLE=false once the real consumer exists.
+   * `ticket-service`'s `AuditConsumer` now owns `audit_logs` and subscribes, so
+   * this is no longer the only sink. It stays because a mirrored line is cheap
+   * and the trail is at-most-once — but it defaults ON, which is worth turning
+   * off per service via AUDIT_LOG_TO_CONSOLE now that the rows are durable.
    */
   private readonly logToConsole: boolean;
 
@@ -77,12 +75,26 @@ export class AuditPublisher {
    * The origin is the SERVICE rather than an IP, for the same reason: there was
    * no request, and a fabricated `127.0.0.1` reads as one.
    */
-  recordSystem(event: AuditEvent & { organizationId: string | null }): void {
+  recordSystem(
+    event: AuditEvent & {
+      organizationId: string | null;
+      /**
+       * Who scheduled this, e.g. `auth-service/scheduler`.
+       *
+       * REQUIRED, and deliberately without a default: the correct value names
+       * a service this class cannot see, so any default it could offer would be
+       * wrong for somebody — silently, since nothing about an audit row's
+       * origin fails loudly.
+       */
+      origin: string;
+    },
+  ): void {
     this.publish({
       action: event.action,
       organizationId: event.organizationId,
       userId: null,
-      origin: { ip: 'system', userAgent: 'auth-service/scheduler' },
+      // No request, so no IP. A fabricated `127.0.0.1` would read as one.
+      origin: { ip: 'system', userAgent: event.origin },
       resourceType: event.resourceType,
       resourceId: event.resourceId,
       metadata: event.metadata,
@@ -100,8 +112,18 @@ export class AuditPublisher {
       // `!== undefined` rather than `??`: null is a MEANINGFUL override here
       // (platform acts record no tenant), and `??` would discard it in favour
       // of the actor's own organization.
+      //
+      // **`??` would produce the same value today, and that is the danger.**
+      // Platform acts pass `null` and are performed by super admins, whose own
+      // `organizationId` is also `null` — so the two forms agree by
+      // coincidence. The invariant holding that coincidence up is
+      // `(organization_id IS NULL) = is_super_admin`, which `schema.prisma` and
+      // conventions §7 both describe as a CHECK constraint and which the
+      // database does not actually have (known-gaps #5). The day a platform act
+      // becomes performable by anyone with a tenant, `??` stamps the wrong
+      // organization on a platform audit row and the row looks right.
       organizationId:
-        event.organizationId !== undefined
+        event.organizationId !== undefined // NOSONAR — see above; `??` is not equivalent here
           ? event.organizationId
           : context.organizationId,
       userId: context.sub,

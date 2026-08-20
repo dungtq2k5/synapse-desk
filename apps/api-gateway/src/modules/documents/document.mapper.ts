@@ -5,6 +5,7 @@ import {
   DocumentResponse,
   DownloadDocumentResponse,
   fromProtoDocumentFileType,
+  fromProtoDocumentFlagResolution,
   fromProtoDocumentFlagSeverity,
   fromProtoDocumentFlagType,
   fromProtoDocumentStatus,
@@ -19,6 +20,7 @@ import {
   StorageUsageResponse,
   toPageRequest,
   toProtoDocumentFileType,
+  toProtoDocumentFlagSeverity,
   toProtoDocumentFlagType,
   toProtoDocumentStatus,
 } from '@synapsedesk/grpc-proto';
@@ -148,6 +150,14 @@ export function toDocumentFlagResponseDto(
     // that is different from a score of zero.
     confidenceScore: flag.confidenceScore ?? null,
     detectedAt: requireProtoTimestamp(flag.detectedAt, 'detectedAt'),
+    resolvedAt: fromProtoTimestamp(flag.resolvedAt) ?? null,
+    resolvedById: flag.resolvedById ?? null,
+    // UNSPECIFIED is what an OPEN flag sends, so null here means "not
+    // resolved" rather than "value this build does not know".
+    resolution: fromProtoDocumentFlagResolution(flag.resolution),
+    resolutionComment: flag.resolutionComment ?? null,
+    relatedDocumentId: flag.relatedDocumentId ?? null,
+    relatedChunkId: flag.relatedChunkId ?? null,
   };
 }
 
@@ -186,6 +196,9 @@ export function toListDocumentFlagsRequest(
     flagTypes: query.type.map(toProtoDocumentFlagType),
     includeResolved: query.includeResolved,
     page: toPageRequest(query),
+    // UNSPECIFIED and '' are what the service reads as "no filter".
+    severity: toProtoDocumentFlagSeverity(query.severity),
+    documentId: query.documentId ?? '',
   };
 }
 

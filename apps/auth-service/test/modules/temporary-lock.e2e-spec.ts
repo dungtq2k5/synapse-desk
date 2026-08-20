@@ -302,6 +302,51 @@ describe('Temporary locks (e2e)', () => {
       expect((await lockedRow(member.id)).isLocked).toBe(false);
     });
 
+    it('**9b. the sweep NAMES itself in the audit row**', async () => {
+      // The defect this replaced: `recordSystem`'s origin was optional with a
+      // default, this call site passed nothing, and every unlock row silently
+      // said `scheduler` instead of naming the service. Nothing failed, because
+      // nothing looked.
+      const member = await lockedMember(inHours(1));
+      await fx.prisma.user.update({
+        where: { id: member.id },
+        data: { lockedUntil: hoursAgo(1) },
+      });
+
+      // Cleared first: locking the member already sent its own notification
+      // and audit row, so call [0] is not the sweep's.
+      fx.audit.recordSystem.mockClear();
+      await sweep.sweep();
+
+      const [[event]] = fx.audit.recordSystem.mock.calls as [
+        [{ action: string; origin: string }],
+      ];
+      expect(event.action).toBe('USER_UNLOCKED');
+      expect(event.origin).toBe('auth-service/scheduler');
+    });
+
+    it('**9c. the audit row and the notification agree on WHO unlocked it**', async () => {
+      // Two records of one event, written nine lines apart. They disagreed for
+      // a step, and the only thing that would have caught it is comparing them.
+      const member = await lockedMember(inHours(1));
+      await fx.prisma.user.update({
+        where: { id: member.id },
+        data: { lockedUntil: hoursAgo(1) },
+      });
+
+      fx.audit.recordSystem.mockClear();
+      fx.notifications.sendEmail.mockClear();
+      await sweep.sweep();
+
+      const [[audited]] = fx.audit.recordSystem.mock.calls as [
+        [{ origin: string }],
+      ];
+      const [[emailed]] = fx.notifications.sendEmail.mock.calls as [
+        [{ data: { origin: { userAgent: string } } }],
+      ];
+      expect(emailed.data.origin.userAgent).toBe(audited.origin);
+    });
+
     it('10. runs on the HOURLY scheduled job, not on its own timer', async () => {
       // 's rule: a job is not done until something calls it. The sweep
       // being correct is worth nothing if nothing invokes it.

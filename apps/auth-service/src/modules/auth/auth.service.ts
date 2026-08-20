@@ -26,21 +26,22 @@ import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import {
   AuditAction,
+  AuditPublisher,
   AuditResourceType,
   EmailTemplateName,
-  JwtPayload,
-  OrgStatus,
-  RequestOrigin,
-  SystemRoleName,
-  TenantSelectionJwtPayload,
-  TwoFactorJwtPayload,
-  WEB_ROUTES,
   extractEmailDomain,
   extractEmailLocalPart,
   isUniqueConstraintViolation,
+  JwtPayload,
   normalizeEmail,
+  OrgStatus,
+  RequestOrigin,
   requireActor,
+  SystemRoleName,
   tenantScope,
+  TenantSelectionJwtPayload,
+  TwoFactorJwtPayload,
+  WEB_ROUTES,
 } from '@synapsedesk/common';
 import { JwtService, JwtSignOptions } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -64,7 +65,6 @@ import { NotificationPublisher } from '../notifications/notification-publisher.s
 import { OtpService } from '../otp/otp.service';
 import { RolesService } from '../roles/roles.service';
 import { SessionsService } from '../sessions/sessions.service';
-import { AuditPublisher } from '../audit/audit-publisher.service';
 import { StorageReferenceService } from '../storage-client/storage-reference.service';
 import {
   FirebaseService,

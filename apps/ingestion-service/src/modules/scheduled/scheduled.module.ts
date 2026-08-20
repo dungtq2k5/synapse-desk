@@ -5,7 +5,7 @@ import { AuthClientModule } from '../auth-client/auth-client.module';
 import { ChunkUsageProjection } from './chunk-usage.projection';
 import { DiscardedDraftSweep } from './discarded-draft.sweep';
 import { QuotaReconciliationJob } from './quota-reconciliation.job';
-import { DocumentFlagService } from './document-flag.service';
+import { DocumentFlagWriter } from './document-flag-writer';
 
 /**
  * The four jobs that each close a metric reporting a wrong number without them.
@@ -28,13 +28,13 @@ import { DocumentFlagService } from './document-flag.service';
     ChunkUsageProjection,
     DiscardedDraftSweep,
     QuotaReconciliationJob,
-    DocumentFlagService,
+    DocumentFlagWriter,
   ],
   exports: [
     ChunkUsageProjection,
     DiscardedDraftSweep,
     QuotaReconciliationJob,
-    DocumentFlagService,
+    DocumentFlagWriter,
   ],
 })
 export class ScheduledModule {}

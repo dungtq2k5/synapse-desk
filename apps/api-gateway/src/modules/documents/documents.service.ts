@@ -1,6 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { RequestContext } from '@synapsedesk/common';
-import { toPageRequest } from '@synapsedesk/grpc-proto';
+import { DocumentFlagResolution, RequestContext } from '@synapsedesk/common';
+import {
+  toPageRequest,
+  toProtoDocumentFlagResolution,
+} from '@synapsedesk/grpc-proto';
 import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
 import { DocumentsGrpcClient } from './documents-grpc.client';
 import {
@@ -8,6 +11,7 @@ import {
   toDocumentChunkPageDto,
   toDocumentChunkResponseDto,
   toDocumentFlagPageDto,
+  toDocumentFlagResponseDto,
   toDocumentPageDto,
   toDocumentResponseDto,
   toDownloadDocumentResponseDto,
@@ -23,6 +27,7 @@ import {
   PresignDocumentDto,
   SetDocumentDepartmentsDto,
   UpdateDocumentDto,
+  ResolveDocumentFlagDto,
 } from './dto/rest/document.dto';
 import {
   DocumentChunkResponseDto,
@@ -179,6 +184,49 @@ export class DocumentsService {
         context,
       ),
     );
+  }
+
+  async getFlag(
+    id: string,
+    context: RequestContext,
+  ): Promise<DocumentFlagResponseDto> {
+    return toDocumentFlagResponseDto(
+      await this.documentsGrpcClient.getFlag(id, context),
+    );
+  }
+
+  /**
+   * Resolves a flag as `resolution`.
+   *
+   * The resolution comes from the ROUTE, never the body: three endpoints, one
+   * RPC, and no way for a client to send a value the route did not mean.
+   */
+  async resolveFlag(
+    flagId: string,
+    resolution: DocumentFlagResolution,
+    dto: ResolveDocumentFlagDto,
+    context: RequestContext,
+  ): Promise<DocumentFlagResponseDto> {
+    return toDocumentFlagResponseDto(
+      await this.documentsGrpcClient.resolveFlag(
+        {
+          id: flagId,
+          resolution: toProtoDocumentFlagResolution(resolution),
+          comment: dto.comment,
+        },
+        context,
+      ),
+    );
+  }
+
+  /**
+   * Removes a flag row.
+   *
+   * The wire's `deleted` flag is discarded: the only false it could carry is a
+   * failure, and a failure arrives as an exception.
+   */
+  async deleteFlag(id: string, context: RequestContext): Promise<void> {
+    await this.documentsGrpcClient.deleteFlag(id, context);
   }
 
   async storageUsage(

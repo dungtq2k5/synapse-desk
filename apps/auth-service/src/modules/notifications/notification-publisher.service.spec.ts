@@ -5,13 +5,13 @@ import { Logger } from '@nestjs/common';
 import { throwError, of, Observable } from 'rxjs';
 import {
   AuditAction,
+  AuditPublisher,
   AuditResourceType,
   EmailTemplateName,
   NOTIFICATION_PATTERNS,
 } from '@synapsedesk/common';
 import { NATS_CLIENT } from '@synapsedesk/common';
 import { NotificationPublisher } from './notification-publisher.service';
-import { AuditPublisher } from '../audit/audit-publisher.service';
 
 /**
  * the NATS emit sweep.

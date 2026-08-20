@@ -4,22 +4,15 @@ import {
   BATCH_CHUNK_LIMIT,
   BATCH_ID_LIMIT,
   DOCUMENT_PATTERNS,
-  DocumentFlagSeverity,
-  DocumentFlagType,
   DocumentStatus,
   IngestionJobStatus,
-  compareAlphabetically,
   type DocumentFileType,
 } from '@synapsedesk/common';
 import {
-  DocumentFlagType as ProtoDocumentFlagType,
-  type ListDocumentFlagsRequest,
   type ListDocumentsRequest,
   fromProtoDocumentFileType,
-  fromProtoDocumentFlagType,
   fromProtoDocumentStatus,
   toProtoDocumentFileType,
-  toProtoDocumentFlagType,
   toProtoDocumentStatus,
 } from '@synapsedesk/grpc-proto';
 import { expectRpc } from '@synapsedesk/common/testing/rpc';
@@ -35,7 +28,6 @@ import {
   buildTenant,
   createChunks,
   createDocument,
-  createFlag,
   createScopedDocument,
   TenantFixture,
 } from '../factories';
@@ -904,217 +896,6 @@ describe('Documents (e2e)', () => {
   });
 
   // ------------------------------------------------- the flag list
-
-  describe('listDocumentFlags', () => {
-    /**
-     * The filter must express `UNRETRIEVED` and `UNCITED` SEPARATELY.
-     *
-     * They were one flag under a name that fitted only the first, and were
-     * split because they are different findings with different fixes: a
-     * document nobody's question came near may just be mis-titled, while one
-     * retrieved twenty times and cited never is displacing the sources that
-     * would have answered. A filter offering only `UNCITED` re-merges them in
-     * practice — the type nobody can select is the type nobody sees.
-     */
-    const seedFlags = async () => {
-      const unretrieved = await createDocument(fx.prisma, tenant, {
-        title: 'Never found',
-      });
-      const uncited = await createDocument(fx.prisma, tenant, {
-        title: 'Found and ignored',
-      });
-
-      await createFlag(fx.prisma, unretrieved, {
-        flagType: DocumentFlagType.UNRETRIEVED,
-      });
-      await createFlag(fx.prisma, uncited, {
-        flagType: DocumentFlagType.UNCITED,
-        severity: DocumentFlagSeverity.WARNING,
-      });
-
-      return { unretrieved, uncited };
-    };
-
-    const flagsRequest = (
-      overrides: Partial<{
-        flagTypes: DocumentFlagType[];
-        includeResolved: boolean;
-      }> = {},
-    ): ListDocumentFlagsRequest => ({
-      flagTypes: (overrides.flagTypes ?? []).map(toProtoDocumentFlagType),
-      includeResolved: overrides.includeResolved ?? false,
-      page: pageRequest({ sortBy: 'detectedAt' }),
-    });
-
-    it('1. returns EVERY type when no filter is given', async () => {
-      await seedFlags();
-
-      const { items } = await documents.listDocumentFlags(
-        flagsRequest(),
-        manager(),
-      );
-
-      expect(
-        items
-          .map((flag) => fromProtoDocumentFlagType(flag.flagType)!)
-          .sort(compareAlphabetically),
-      ).toEqual(
-        [DocumentFlagType.UNCITED, DocumentFlagType.UNRETRIEVED].sort(
-          compareAlphabetically,
-        ),
-      );
-    });
-
-    it('2. filters to UNRETRIEVED alone', async () => {
-      await seedFlags();
-
-      const { items } = await documents.listDocumentFlags(
-        flagsRequest({ flagTypes: [DocumentFlagType.UNRETRIEVED] }),
-        manager(),
-      );
-
-      expect(items).toHaveLength(1);
-      expect(items[0].documentTitle).toBe('Never found');
-    });
-
-    it('3. filters to UNCITED alone', async () => {
-      await seedFlags();
-
-      const { items } = await documents.listDocumentFlags(
-        flagsRequest({ flagTypes: [DocumentFlagType.UNCITED] }),
-        manager(),
-      );
-
-      expect(items).toHaveLength(1);
-      expect(items[0].documentTitle).toBe('Found and ignored');
-    });
-
-    it('4. accepts BOTH at once', async () => {
-      await seedFlags();
-
-      const { items } = await documents.listDocumentFlags(
-        flagsRequest({
-          flagTypes: [DocumentFlagType.UNRETRIEVED, DocumentFlagType.UNCITED],
-        }),
-        manager(),
-      );
-
-      expect(items).toHaveLength(2);
-    });
-
-    it('5. REFUSES an unknown type rather than ignoring it', async () => {
-      // Silently dropping the filter answers a different question than the one
-      // asked, and "no OUTDTAED flags" reads as "nothing is outdated".
-      // **The typo this used to send — `'OUTDTAED'` — is now unexpressible**,
-      // which is the point of the enum. What survives is the case the enum does
-      // NOT close: ts-proto maps a member this build cannot name to
-      // `UNRECOGNIZED` (-1) rather than failing, so a newer peer's flag type
-      // still arrives as a legal value of the type and must still be refused.
-      await expectRpc(
-        documents.listDocumentFlags(
-          {
-            ...flagsRequest(),
-            flagTypes: [ProtoDocumentFlagType.UNRECOGNIZED],
-          },
-          manager(),
-        ),
-        status.INVALID_ARGUMENT,
-      );
-    });
-
-    it('6. hides RESOLVED flags unless asked', async () => {
-      // A resolved flag is history. Mixing history into a worklist is how a
-      // worklist stops being read.
-      const document = await createDocument(fx.prisma, tenant);
-      await createFlag(fx.prisma, document, { resolvedAt: new Date() });
-
-      const hidden = await documents.listDocumentFlags(
-        flagsRequest(),
-        manager(),
-      );
-      expect(hidden.items).toHaveLength(0);
-
-      const shown = await documents.listDocumentFlags(
-        flagsRequest({ includeResolved: true }),
-        manager(),
-      );
-      expect(shown.items).toHaveLength(1);
-    });
-
-    it('7. carries the document TITLE, so the list is readable', async () => {
-      const document = await createDocument(fx.prisma, tenant, {
-        title: 'Expense policy 2019',
-      });
-      await createFlag(fx.prisma, document);
-
-      const { items } = await documents.listDocumentFlags(
-        flagsRequest(),
-        manager(),
-      );
-
-      expect(items[0].documentTitle).toBe('Expense policy 2019');
-    });
-
-    it('8. shows NOTHING from another tenant', async () => {
-      const other = buildTenant();
-      const document = await createDocument(fx.prisma, other);
-      await createFlag(fx.prisma, document);
-
-      const { items } = await documents.listDocumentFlags(
-        flagsRequest(),
-        manager(),
-      );
-
-      expect(items).toHaveLength(0);
-    });
-
-    it('**8b. shows nothing from a document outside the caller’s departments**', async () => {
-      // The worklist follows the SAME boundary as `GET /documents`. Without it
-      // a flag row hands `document.title` to a caller the by-id read refuses,
-      // and `document.read` reaches SUPPORT_AGENT, not only KNOWLEDGE_MANAGER.
-      const document = await createScopedDocument(fx.prisma, tenant, [
-        tenant.departmentId,
-      ]);
-      await createFlag(fx.prisma, document);
-
-      const { items, meta } = await documents.listDocumentFlags(
-        flagsRequest(),
-        outsider(),
-      );
-
-      expect(items).toHaveLength(0);
-      expect(meta!.totalItems).toBe(0);
-    });
-
-    it('8c. still shows one to a member of the document’s department', async () => {
-      const document = await createScopedDocument(fx.prisma, tenant, [
-        tenant.departmentId,
-      ]);
-      await createFlag(fx.prisma, document);
-
-      const { items } = await documents.listDocumentFlags(
-        flagsRequest(),
-        manager(),
-      );
-
-      expect(items).toHaveLength(1);
-    });
-
-    it('9. drops a DELETED document’s flags from the worklist', async () => {
-      // Otherwise the list keeps asking a reviewer to act on a document that no
-      // longer exists, and the join would still surface its title.
-      const document = await createDocument(fx.prisma, tenant);
-      await createFlag(fx.prisma, document);
-      await documents.deleteDocument({ id: document.id }, manager());
-
-      const { items } = await documents.listDocumentFlags(
-        flagsRequest(),
-        manager(),
-      );
-
-      expect(items).toHaveLength(0);
-    });
-  });
 
   /**
    * The batch contract

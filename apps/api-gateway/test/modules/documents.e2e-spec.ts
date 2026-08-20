@@ -1,6 +1,7 @@
 import {
   DocumentFileType as ProtoDocumentFileType,
   DocumentStatus as ProtoDocumentStatus,
+  DocumentFlagResolution as ProtoDocumentFlagResolution,
   DocumentFlagSeverity as ProtoDocumentFlagSeverity,
   DocumentFlagType as ProtoDocumentFlagType,
   toProtoDocumentFlagType,
@@ -14,6 +15,7 @@ import {
 import { of, throwError } from 'rxjs';
 import { faker } from '@faker-js/faker';
 import { status as GrpcStatus } from '@grpc/grpc-js';
+import { MAX_FLAG_RESOLUTION_COMMENT_LENGTH } from '@synapsedesk/common';
 import {
   API,
   E2eFixture,
@@ -650,19 +652,28 @@ describe('Documents at the HTTP boundary (e2e)', () => {
 
   // ------------------------------------------------- the flag list
 
-  describe('GET /documents/flags', () => {
-    const wireFlag = (overrides: Record<string, unknown> = {}) => ({
-      id: faker.string.uuid(),
-      documentId,
-      documentTitle: '2019 Expense Policy',
-      flagType: ProtoDocumentFlagType.DOCUMENT_FLAG_TYPE_UNRETRIEVED,
-      severity: ProtoDocumentFlagSeverity.DOCUMENT_FLAG_SEVERITY_INFO,
-      detail: 'Indexed and never retrieved.',
-      confidenceScore: undefined,
-      detectedAt: timestamp(),
-      ...overrides,
-    });
+  const wireFlag = (overrides: Record<string, unknown> = {}) => ({
+    id: faker.string.uuid(),
+    documentId,
+    documentTitle: '2019 Expense Policy',
+    flagType: ProtoDocumentFlagType.DOCUMENT_FLAG_TYPE_UNRETRIEVED,
+    severity: ProtoDocumentFlagSeverity.DOCUMENT_FLAG_SEVERITY_INFO,
+    detail: 'Indexed and never retrieved.',
+    confidenceScore: undefined,
+    detectedAt: timestamp(),
+    // An OPEN flag: unresolved, with UNSPECIFIED standing for "no resolution
+    // yet" rather than for a value this build cannot name.
+    resolvedAt: undefined,
+    resolvedById: undefined,
+    resolution:
+      ProtoDocumentFlagResolution.DOCUMENT_FLAG_RESOLUTION_UNSPECIFIED,
+    resolutionComment: undefined,
+    relatedDocumentId: undefined,
+    relatedChunkId: undefined,
+    ...overrides,
+  });
 
+  describe('GET /documents/flags', () => {
     const stubFlags = (items: ReturnType<typeof wireFlag>[]) =>
       fx.stubs.document.listDocumentFlags.mockReturnValue(
         of({ items, meta: wirePage([]).meta }),
@@ -776,6 +787,239 @@ describe('Documents at the HTTP boundary (e2e)', () => {
       expect(res.body.data.items[0].documentTitle).toBe('Expense policy 2019');
       // Absent on a rule-raised flag, and that is different from zero.
       expect(res.body.data.items[0].confidenceScore).toBeNull();
+    });
+
+    it('**8. an OPEN flag reports resolution fields as null, not missing**', async () => {
+      // The live defect this closed: before the resolution columns reached the
+      // wire, a resolved row and an open one were byte-identical.
+      stubFlags([wireFlag()]);
+
+      const res = await authenticatedAgent(fx.app, {
+        permissionCodes: ['document.read'],
+      }).get(`${API}/documents/flags`);
+
+      const flag = res.body.data.items[0];
+      expect(flag).toHaveProperty('resolvedAt', null);
+      expect(flag).toHaveProperty('resolvedById', null);
+      expect(flag).toHaveProperty('resolution', null);
+      expect(flag).toHaveProperty('resolutionComment', null);
+    });
+
+    it('9. a RESOLVED flag carries who, when and why', async () => {
+      const resolverId = faker.string.uuid();
+      stubFlags([
+        wireFlag({
+          resolvedAt: timestamp(),
+          resolvedById: resolverId,
+          resolution:
+            ProtoDocumentFlagResolution.DOCUMENT_FLAG_RESOLUTION_DISMISSED,
+          resolutionComment: 'seasonal, not stale',
+        }),
+      ]);
+
+      const res = await authenticatedAgent(fx.app, {
+        permissionCodes: ['document.read'],
+      }).get(`${API}/documents/flags`);
+
+      const flag = res.body.data.items[0];
+      expect(flag.resolution).toBe('DISMISSED');
+      expect(flag.resolvedById).toBe(resolverId);
+      expect(flag.resolutionComment).toBe('seasonal, not stale');
+      expect(flag.resolvedAt).not.toBeNull();
+    });
+
+    it('10. forwards ?severity= and ?documentId= as the service reads them', async () => {
+      stubFlags([]);
+      const target = faker.string.uuid();
+
+      await authenticatedAgent(fx.app, { permissionCodes: ['document.read'] })
+        .get(`${API}/documents/flags`)
+        .query({ severity: 'WARNING', documentId: target });
+
+      const [[request]] = fx.stubs.document.listDocumentFlags.mock.calls;
+      expect(request).toMatchObject({
+        severity: ProtoDocumentFlagSeverity.DOCUMENT_FLAG_SEVERITY_WARNING,
+        documentId: target,
+      });
+    });
+  });
+
+  describe('GET /documents/flags/:flagId', () => {
+    it('1. returns the flag, mapped', async () => {
+      fx.stubs.document.getDocumentFlag.mockReturnValue(
+        of(wireFlag({ resolutionComment: 'seasonal' })),
+      );
+
+      const res = await authenticatedAgent(fx.app, {
+        permissionCodes: ['document.read'],
+      }).get(`${API}/documents/flags/${faker.string.uuid()}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.documentTitle).toBe('2019 Expense Policy');
+      expect(res.body.data.resolutionComment).toBe('seasonal');
+    });
+
+    it('2. REJECTS a non-UUID flag id before reaching the peer', async () => {
+      const res = await authenticatedAgent(fx.app, {
+        permissionCodes: ['document.read'],
+      }).get(`${API}/documents/flags/not-a-uuid`);
+
+      expect(res.status).toBe(400);
+      expect(fx.stubs.document.getDocumentFlag).not.toHaveBeenCalled();
+    });
+
+    it('3. requires document.read', async () => {
+      const res = await authenticatedAgent(fx.app, {
+        permissionCodes: [],
+      }).get(`${API}/documents/flags/${faker.string.uuid()}`);
+
+      expect(res.status).toBe(403);
+    });
+  });
+
+  describe('POST /documents/flags/:flagId/{dismiss,fixed,replaced}', () => {
+    const stubResolve = () =>
+      fx.stubs.document.resolveDocumentFlag.mockReturnValue(
+        of(
+          wireFlag({
+            resolvedAt: timestamp(),
+            resolvedById: faker.string.uuid(),
+            resolution:
+              ProtoDocumentFlagResolution.DOCUMENT_FLAG_RESOLUTION_DISMISSED,
+          }),
+        ),
+      );
+
+    it.each([
+      [
+        'dismiss',
+        ProtoDocumentFlagResolution.DOCUMENT_FLAG_RESOLUTION_DISMISSED,
+      ],
+      ['fixed', ProtoDocumentFlagResolution.DOCUMENT_FLAG_RESOLUTION_FIXED],
+      [
+        'replaced',
+        ProtoDocumentFlagResolution.DOCUMENT_FLAG_RESOLUTION_DOCUMENT_REPLACED,
+      ],
+    ])(
+      '**1. /%s sends its OWN resolution — the route decides, not the body**',
+      async (route, expected) => {
+        // One RPC behind three routes, so the mapping from path to enum is the
+        // only thing keeping them apart.
+        stubResolve();
+        const flagId = faker.string.uuid();
+
+        const res = await authenticatedAgent(fx.app, {
+          permissionCodes: ['document.update'],
+        })
+          .post(`${API}/documents/flags/${flagId}/${route}`)
+          .send({ comment: 'a reason' });
+
+        expect(res.status).toBe(200);
+        const [[request]] = fx.stubs.document.resolveDocumentFlag.mock.calls;
+        expect(request).toMatchObject({
+          id: flagId,
+          resolution: expected,
+          comment: 'a reason',
+        });
+      },
+    );
+
+    it('**2. REJECTS a comment over the cap rather than truncating it**', async () => {
+      // The deliberate opposite of `error_log`, which is truncated on the way
+      // out. Silently keeping half a person's reason loses the half that
+      // mattered; refusing tells them to shorten it.
+      const res = await authenticatedAgent(fx.app, {
+        permissionCodes: ['document.update'],
+      })
+        .post(`${API}/documents/flags/${faker.string.uuid()}/dismiss`)
+        .send({ comment: 'x'.repeat(MAX_FLAG_RESOLUTION_COMMENT_LENGTH + 1) });
+
+      expect(res.status).toBe(400);
+      expect(fx.stubs.document.resolveDocumentFlag).not.toHaveBeenCalled();
+    });
+
+    it('3. accepts a comment exactly at the cap', async () => {
+      stubResolve();
+
+      const res = await authenticatedAgent(fx.app, {
+        permissionCodes: ['document.update'],
+      })
+        .post(`${API}/documents/flags/${faker.string.uuid()}/dismiss`)
+        .send({ comment: 'x'.repeat(MAX_FLAG_RESOLUTION_COMMENT_LENGTH) });
+
+      expect(res.status).toBe(200);
+    });
+
+    it('**3b. a comment at the cap with trailing whitespace is ACCEPTED**', async () => {
+      // `@MaxLength` measures what the transform produced, and transforms run
+      // first — so without `trimIfString` this is a 400 whose cause the caller
+      // cannot see: the comment they typed is exactly at the limit.
+      stubResolve();
+
+      const res = await authenticatedAgent(fx.app, {
+        permissionCodes: ['document.update'],
+      })
+        .post(`${API}/documents/flags/${faker.string.uuid()}/dismiss`)
+        .send({
+          comment: `${'x'.repeat(MAX_FLAG_RESOLUTION_COMMENT_LENGTH)}\n  `,
+        });
+
+      expect(res.status).toBe(200);
+      // Forwarded TRIMMED, so the stored reason has no stray whitespace.
+      const [[request]] = fx.stubs.document.resolveDocumentFlag.mock.calls;
+      expect(request.comment).toHaveLength(MAX_FLAG_RESOLUTION_COMMENT_LENGTH);
+    });
+
+    it('4. requires document.update, not document.read', async () => {
+      const res = await authenticatedAgent(fx.app, {
+        permissionCodes: ['document.read'],
+      })
+        .post(`${API}/documents/flags/${faker.string.uuid()}/fixed`)
+        .send({});
+
+      expect(res.status).toBe(403);
+      expect(fx.stubs.document.resolveDocumentFlag).not.toHaveBeenCalled();
+    });
+
+    it('5. a missing comment reaches the peer as undefined, not empty string', async () => {
+      // `fixed` needs no reason, and '' would be stored as a comment nobody
+      // wrote.
+      stubResolve();
+
+      await authenticatedAgent(fx.app, { permissionCodes: ['document.update'] })
+        .post(`${API}/documents/flags/${faker.string.uuid()}/fixed`)
+        .send({});
+
+      const [[request]] = fx.stubs.document.resolveDocumentFlag.mock.calls;
+      expect(request.comment).toBeUndefined();
+    });
+  });
+
+  describe('DELETE /documents/flags/:flagId', () => {
+    it('4. answers 204 with no body', async () => {
+      fx.stubs.document.deleteDocumentFlag.mockReturnValue(
+        of({ deleted: true }),
+      );
+      const flagId = faker.string.uuid();
+
+      const res = await authenticatedAgent(fx.app, {
+        permissionCodes: ['document.delete'],
+      }).delete(`${API}/documents/flags/${flagId}`);
+
+      expect(res.status).toBe(204);
+      expect(res.body).toEqual({});
+
+      const [[request]] = fx.stubs.document.deleteDocumentFlag.mock.calls;
+      expect(request).toMatchObject({ id: flagId });
+    });
+
+    it('**5. `document.read` is not enough to delete a flag**', async () => {
+      const res = await authenticatedAgent(fx.app, {
+        permissionCodes: ['document.read'],
+      }).delete(`${API}/documents/flags/${faker.string.uuid()}`);
+
+      expect(res.status).toBe(403);
+      expect(fx.stubs.document.deleteDocumentFlag).not.toHaveBeenCalled();
     });
   });
 });

@@ -4,8 +4,11 @@ import { SchedulerProcessor } from '../../src/modules/scheduler/scheduler.proces
 import { PrismaService } from '../../src/modules/prisma/prisma.service';
 import { DatabaseSeeder } from '../../src/modules/prisma/database.seeder';
 import { NotificationPublisher } from '../../src/modules/notifications/notification-publisher.service';
-import { AuditPublisher } from '../../src/modules/audit/audit-publisher.service';
-import { avatarObjectPath, SystemRoleName } from '@synapsedesk/common';
+import {
+  AuditPublisher,
+  avatarObjectPath,
+  SystemRoleName,
+} from '@synapsedesk/common';
 import { randomUUID } from 'node:crypto';
 import { StorageReferenceService } from '../../src/modules/storage-client/storage-reference.service';
 
@@ -35,7 +38,7 @@ export type E2eFixture = {
     sendEmail: jest.SpyInstance;
     sendSms: jest.SpyInstance;
   };
-  audit: { record: jest.SpyInstance };
+  audit: { record: jest.SpyInstance; recordSystem: jest.SpyInstance };
   /**
    * Spies on the storage-service boundary.
    *
@@ -45,7 +48,7 @@ export type E2eFixture = {
    * so an avatar assertion would pass or fail for reasons having nothing to do
    * with the code under test.
    *
-   * `resolveReadUrls` returns a recognisable fake signed URL per path, which is
+   * `resolveReadUrls` returns a recognizable fake signed URL per path, which is
    * what lets a test assert the response carries a URL rather than the raw
    * `organizations/...` object path.
    */
@@ -121,6 +124,12 @@ export async function bootstrapE2eTest(): Promise<E2eFixture> {
   };
   const audit = {
     record: jest.spyOn(auditPublisher, 'record').mockImplementation(() => {}),
+    // Stubbed for the same reason as `record`, and it was NOT before: the
+    // expired-lock sweep publishes through this one, so its events were
+    // reaching a real broker from the test suite.
+    recordSystem: jest
+      .spyOn(auditPublisher, 'recordSystem')
+      .mockImplementation(() => {}),
   };
 
   const storageReference = moduleRef.get(StorageReferenceService);
@@ -237,6 +246,7 @@ export async function bootstrapE2eTest(): Promise<E2eFixture> {
     notifications.sendEmail.mockClear();
     notifications.sendSms.mockClear();
     audit.record.mockClear();
+    audit.recordSystem.mockClear();
     storage.presignAvatar.mockClear();
     storage.confirmAvatar.mockClear();
     storage.resolveReadUrls.mockClear();

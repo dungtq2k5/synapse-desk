@@ -1,5 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import {
+  DISMISSAL_SUPPRESSION_DAYS,
+  DocumentFlagResolution,
   DocumentFlagType,
   DocumentFlagSeverity,
   DocumentStatus,
@@ -15,7 +17,26 @@ import { PrismaService } from '../prisma/prisma.service';
  */
 const UNCITED_MIN_RETRIEVALS = 20;
 
+/** The oldest dismissal that still suppresses a re-raise. */
+function dismissalCutoff(): Date {
+  return new Date(
+    Date.now() - DISMISSAL_SUPPRESSION_DAYS * 24 * 60 * 60 * 1000,
+  );
+}
+
 /**
+ * The only class that CREATES flag rows.
+ *
+ * Named for that rather than for detection, because `raise()` is deliberately
+ * public and its second caller detects nothing: `ingestion.processor` raises
+ * `PAGES_NOT_INDEXED` at index time. Both methods are writes and both callers
+ * are writers.
+ *
+ * Not to be confused with `DocumentFlagsService` in `modules/document-flags/`,
+ * which is the REQUEST side — it takes `CallerContext`, enforces
+ * `documentVisibility`, and never creates a row. The two were one letter apart
+ * until this was renamed.
+ *
  * Corpus quality flags.
  *
  * `UNRETRIEVED` and `UNCITED` are separate, and the distinction is the value:
@@ -30,8 +51,8 @@ const UNCITED_MIN_RETRIEVALS = 20;
  * `docs/decisions/0025-chunk-usage-is-a-projection.md`.
  */
 @Injectable()
-export class DocumentFlagService {
-  private readonly logger = new Logger(DocumentFlagService.name);
+export class DocumentFlagWriter {
+  private readonly logger = new Logger(DocumentFlagWriter.name);
 
   constructor(private readonly prisma: PrismaService) {}
 
@@ -127,12 +148,18 @@ export class DocumentFlagService {
   }
 
   /**
-   * Raises flags that are not already open, and NEVER re-raises a resolved one.
+   * Raises flags that are not already open, and honours a recent dismissal.
    *
    * A human dismissing a flag is a decision, and a job that re-raised it on the
    * next run would be arguing with them once a day until they stopped reading
-   * flags entirely. `resolvedAt IS NULL` in the exclusion set is what makes
-   * dismissal stick.
+   * flags entirely. So `DISMISSED` suppresses for
+   * {@link DISMISSAL_SUPPRESSION_DAYS} — long enough that nobody is argued
+   * with, bounded so one wrong click does not remove a document from a quality
+   * signal for the life of the tenant.
+   *
+   * `FIXED` and `DOCUMENT_REPLACED` suppress NOTHING. They say the problem is
+   * gone; a detector that finds it again is saying the fix did not work, which
+   * is the one message that must not be swallowed.
    *
    * **Public because ingestion writes a flag too** — `PAGES_NOT_INDEXED`,
    * And that one is not a sweep: it is raised at index time, and
@@ -153,14 +180,32 @@ export class DocumentFlagService {
   ): Promise<number> {
     if (documentIds.length === 0) return 0;
 
-    const existing = await this.prisma.documentFlag.findMany({
-      where: { organizationId, flagType, documentId: { in: documentIds } },
-      select: { documentId: true, resolvedAt: true },
+    // **The policy is IN the predicate, not applied to the result.** Reducing
+    // in JS would return every historical row and then decide — and a document
+    // whose only row is `FIXED` would still be filtered out, which is the bug
+    // this replaces. Only suppressing rows come back, so the `Set` is correct
+    // by construction and the `select` narrows to the one column it needs.
+    const suppressed = await this.prisma.documentFlag.findMany({
+      where: {
+        organizationId,
+        flagType,
+        documentId: { in: documentIds },
+        OR: [
+          // Already raised.
+          { resolvedAt: null },
+          // Dismissed recently. FIXED and DOCUMENT_REPLACED are absent ON
+          // PURPOSE: they assert the problem is GONE, so a detector that finds
+          // it again is reporting news rather than arguing with anyone.
+          {
+            resolution: DocumentFlagResolution.DISMISSED,
+            resolvedAt: { gte: dismissalCutoff() },
+          },
+        ],
+      },
+      select: { documentId: true },
     });
 
-    // Both open AND resolved flags are excluded, for different reasons: an
-    // open one is already raised, and a resolved one was dismissed on purpose.
-    const seen = new Set(existing.map((flag) => flag.documentId));
+    const seen = new Set(suppressed.map((flag) => flag.documentId));
     const fresh = documentIds.filter((id) => !seen.has(id));
 
     if (fresh.length === 0) return 0;
@@ -178,23 +223,5 @@ export class DocumentFlagService {
     this.logger.log(`Raised ${result.count} ${flagType} flag(s)`);
 
     return result.count;
-  }
-
-  /**
-   * Marks a flag handled, recording WHO.
-   *
-   * `resolved_by_id` is what turns "this flag is closed" into "a person closed
-   * this flag", which is the difference between a dismissal the job must
-   * respect and a state it could reasonably re-derive.
-   */
-  async resolve(
-    flagId: string,
-    resolvedById: string,
-    resolution: string,
-  ): Promise<void> {
-    await this.prisma.documentFlag.update({
-      where: { id: flagId },
-      data: { resolvedAt: new Date(), resolvedById, resolution },
-    });
   }
 }

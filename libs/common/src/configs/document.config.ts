@@ -123,11 +123,24 @@ export enum DocumentFlagSeverity {
   CRITICAL = 'CRITICAL',
 }
 
+export const DOCUMENT_FLAG_SEVERITIES = Object.values(DocumentFlagSeverity);
+
 export enum DocumentFlagResolution {
   FIXED = 'FIXED',
   DISMISSED = 'DISMISSED',
   DOCUMENT_REPLACED = 'DOCUMENT_REPLACED',
 }
+
+export const DOCUMENT_FLAG_RESOLUTIONS = Object.values(DocumentFlagResolution);
+
+/**
+ * How long a `DISMISSED` flag keeps its detector quiet.
+ *
+ * Applies to `DISMISSED` alone. `FIXED` and `DOCUMENT_REPLACED` suppress
+ * nothing — they assert the problem is gone, so a detector that finds it again
+ * is reporting news rather than repeating itself.
+ */
+export const DISMISSAL_SUPPRESSION_DAYS = 30;
 
 /**
  * `ai_generations.purpose` — every surface that spends.
@@ -197,6 +210,21 @@ export enum AiGenerationOutcome {
 // ---------------------------------------------------------------------------
 
 export const MAX_DOCUMENT_TITLE_LENGTH = 255;
+
+/**
+ * The longest reason a person may give when resolving a flag.
+ *
+ * **No column mirrors this** — `document_flags.resolution_comment` is
+ * `@db.Text`, so this bounds the input rather than matching a width, and it
+ * must NOT join `column-bounds.spec.ts`'s pairings for the reason that file
+ * gives about `MAX_OBJECT_PATH_LENGTH`.
+ *
+ * Rejected on the way in rather than truncated on the way out, which is the
+ * opposite of how `error_log` is handled: that is unbounded machine text with
+ * a reader, this is a person's reason and losing half of it silently loses the
+ * half that mattered.
+ */
+export const MAX_FLAG_RESOLUTION_COMMENT_LENGTH = 2_000;
 
 /**
  * The file types the DOCUMENT purpose accepts.

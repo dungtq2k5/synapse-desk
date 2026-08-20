@@ -5,6 +5,7 @@ import {
   EMBEDDING_MODEL,
   IngestionJobStatus,
   QDRANT_PAYLOAD_FIELDS,
+  DocumentFlagResolution,
   DocumentFlagSeverity,
   DocumentFlagType,
 } from '@synapsedesk/common';
@@ -18,7 +19,9 @@ import {
   buildPdf,
 } from '../utils';
 import { buildTenant, createDocument, TenantFixture } from '../factories';
+import { memberContext } from '../utils/context';
 import { IngestionProcessor } from '../../src/modules/ingestion/ingestion.processor';
+import { DocumentFlagsService } from '../../src/modules/document-flags/document-flags.service';
 import { QdrantService } from '../../src/modules/qdrant/qdrant.service';
 import { StorageReferenceService } from '../../src/modules/storage-client/storage-reference.service';
 import { AuthReferenceService } from '../../src/modules/auth-client/auth-reference.service';
@@ -32,6 +35,7 @@ describe('The ingestion pipeline (e2e)', () => {
 
   let fx: E2eFixture;
   let processor: IngestionProcessor;
+  let documentFlags: DocumentFlagsService;
   let qdrant: QdrantService;
   let redis: Redis;
 
@@ -91,6 +95,7 @@ describe('The ingestion pipeline (e2e)', () => {
   beforeAll(async () => {
     fx = await bootstrapE2eTest();
     processor = fx.moduleRef.get(IngestionProcessor);
+    documentFlags = fx.moduleRef.get(DocumentFlagsService);
     qdrant = fx.moduleRef.get(QdrantService);
     redis = fx.moduleRef.get<Redis>(QUOTA_REDIS);
 
@@ -379,6 +384,47 @@ describe('The ingestion pipeline (e2e)', () => {
       expect(flags[0].detail).toMatch(/page/i);
     });
 
+    it('**re-raises after a FIXED retry that still cannot read the pages**', async () => {
+      // The end-to-end case the policy exists for. Someone sees the flag,
+      // retries ingestion with different OCR languages, the parser still drops
+      // the page — and the flag that says "your fix did not work" is precisely
+      // the one the old rule silenced, because the earlier row was resolved.
+      downloadObject.mockResolvedValue(
+        await buildPdf([FULL_PAGE, THIN_PAGE], { repeat: 1 }),
+      );
+      const first = await queueDocument({ fileType: 'pdf' });
+      await processor.process(first);
+
+      const [raised] = await flagsFor(first.documentId);
+      await documentFlags.resolve(
+        raised.id,
+        DocumentFlagResolution.FIXED,
+        memberContext({
+          id: tenant.userId,
+          organizationId: tenant.organizationId,
+        }),
+      );
+
+      // The retry: same document, a new job, and a parse that fails the same
+      // way.
+      const retry = await fx.prisma.ingestionJob.create({
+        data: {
+          organizationId: tenant.organizationId,
+          documentId: first.documentId,
+          bullmqJobId: '',
+          status: IngestionJobStatus.QUEUED,
+        },
+      });
+      downloadObject.mockResolvedValue(
+        await buildPdf([FULL_PAGE, THIN_PAGE], { repeat: 1 }),
+      );
+      await processor.process({ ...first, ingestionJobId: retry.id });
+
+      const flags = await flagsFor(first.documentId);
+      expect(flags).toHaveLength(2);
+      expect(flags.filter((flag) => flag.resolvedAt === null)).toHaveLength(1);
+    });
+
     it('and the document still INDEXES — 197 good pages beat discarding 200', async () => {
       downloadObject.mockResolvedValue(
         await buildPdf([FULL_PAGE, THIN_PAGE], { repeat: 1 }),
@@ -432,7 +478,7 @@ describe('The ingestion pipeline (e2e)', () => {
     });
 
     it('**and a DISMISSED flag is never re-raised**', async () => {
-      // The rule `DocumentFlagService` spends a paragraph on: a human
+      // The rule `DocumentFlagWriter` spends a paragraph on: a human
       // dismissing a flag is a decision, and re-raising it is arguing with
       // them until they stop reading the worklist. A Knowledge Manager who
       // confirms the appendix really is a photograph must not be overruled by

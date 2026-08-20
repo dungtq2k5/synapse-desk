@@ -25,22 +25,22 @@ import {
   toSearchFilter,
 } from '@synapsedesk/grpc-proto';
 import {
-  BATCH_ID_LIMIT,
-  normalizeBatchIds,
   AuditAction,
+  AuditPublisher,
   AuditResourceType,
+  BATCH_ID_LIMIT,
   DEPARTMENT_MEMBER_SORTABLE_FIELDS,
   DEPARTMENT_SORTABLE_FIELDS,
   isUniqueConstraintViolation,
+  normalizeBatchIds,
   requireActor,
   requireTenant,
-  tenantScope,
   restoreData,
   restoreOrConflict,
   softDeleteData,
+  tenantScope,
 } from '@synapsedesk/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { AuditPublisher } from '../audit/audit-publisher.service';
 import { StorageReferenceService } from '../storage-client/storage-reference.service';
 import {
   DepartmentRow,

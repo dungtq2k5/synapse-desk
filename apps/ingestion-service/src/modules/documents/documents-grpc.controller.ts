@@ -1,4 +1,6 @@
 import { Controller } from '@nestjs/common';
+import { RpcException } from '@nestjs/microservices';
+import { status } from '@grpc/grpc-js';
 import type { Metadata } from '@grpc/grpc-js';
 import {
   ListDocumentChunksByIdsRequest,
@@ -8,6 +10,11 @@ import {
   ConfirmDocumentRequest,
   DeleteDocumentResponse,
   DocumentChunkResponse,
+  DeleteDocumentFlagResponse,
+  DocumentFlagIdRequest,
+  DocumentFlagResponse,
+  ResolveDocumentFlagRequest,
+  fromProtoDocumentFlagResolution,
   DocumentIdRequest,
   DocumentResponse,
   CancelIngestionJobResponse,
@@ -35,6 +42,7 @@ import {
 } from '@synapsedesk/grpc-proto';
 import { DocumentsService } from './documents.service';
 import { IngestionJobsService } from '../ingestion-jobs/ingestion-jobs.service';
+import { DocumentFlagsService } from '../document-flags/document-flags.service';
 
 /**
  * Every method unpacks the caller context, because every query is scoped by it
@@ -48,6 +56,7 @@ export class DocumentsGrpcController implements DocumentServiceController {
   constructor(
     private readonly documents: DocumentsService,
     private readonly jobs: IngestionJobsService,
+    private readonly flags: DocumentFlagsService,
   ) {}
 
   presignDocument(
@@ -178,10 +187,7 @@ export class DocumentsGrpcController implements DocumentServiceController {
     request: ListDocumentFlagsRequest,
     metadata?: Metadata,
   ): Promise<ListDocumentFlagsResponse> {
-    return this.documents.listDocumentFlags(
-      request,
-      unpackCallerContext(metadata),
-    );
+    return this.flags.listDocumentFlags(request, unpackCallerContext(metadata));
   }
 
   getDocumentChunk(
@@ -204,6 +210,62 @@ export class DocumentsGrpcController implements DocumentServiceController {
     metadata?: Metadata,
   ): Promise<StorageUsageResponse> {
     return this.documents.getStorageUsage(unpackCallerContext(metadata));
+  }
+
+  // ---------------------------------------------------------------- flags
+  //
+  // Stubs so the tree compiles at this gate rather than staying red until the
+  // module lands — the shape `listSimilarTickets` uses, and doc 40 before it.
+
+  getDocumentFlag(
+    request: DocumentFlagIdRequest,
+    metadata?: Metadata,
+  ): Promise<DocumentFlagResponse> {
+    return this.flags.getDocumentFlag(
+      request.id,
+      unpackCallerContext(metadata),
+    );
+  }
+
+  /**
+   * One RPC for three routes — they differ only in the value they carry.
+   *
+   * @throws RpcException INVALID_ARGUMENT when `resolution` is UNSPECIFIED,
+   * which is a legal value of the enum type and not a legal resolution. The
+   * check is here because the service takes the DOMAIN enum, where UNSPECIFIED
+   * is not representable at all.
+   */
+  resolveDocumentFlag(
+    request: ResolveDocumentFlagRequest,
+    metadata?: Metadata,
+  ): Promise<DocumentFlagResponse> {
+    const resolution = fromProtoDocumentFlagResolution(request.resolution);
+
+    if (!resolution) {
+      return Promise.reject(
+        new RpcException({
+          code: status.INVALID_ARGUMENT,
+          message: 'A resolution is required',
+        }),
+      );
+    }
+
+    return this.flags.resolve(
+      request.id,
+      resolution,
+      unpackCallerContext(metadata),
+      request.comment,
+    );
+  }
+
+  deleteDocumentFlag(
+    request: DocumentFlagIdRequest,
+    metadata?: Metadata,
+  ): Promise<DeleteDocumentFlagResponse> {
+    return this.flags.deleteDocumentFlag(
+      request.id,
+      unpackCallerContext(metadata),
+    );
   }
 
   // ---------------------------------------------------------------- jobs

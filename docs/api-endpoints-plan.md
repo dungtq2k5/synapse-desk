@@ -426,14 +426,14 @@ Knowledge Manager dashboard for content quality signals and conflict detection (
 
 | Method | Path | Description | Auth |
 | :---- | :---- | :---- | :---- |
-| GET | `/documents/flags` | List quality flags. Filters: `?type=&severity=&resolved=false&documentId=`. Type values: `OUTDATED\|UNRETRIEVED\|UNCITED\|LOW_CONFIDENCE\|NEGATIVE_FEEDBACK\|CONFLICTING`. | perm:`document.read` |
+| GET | `/documents/flags` | List quality flags. Filters: `?type=&severity=&includeResolved=false&documentId=`. Type values: `OUTDATED\|UNRETRIEVED\|UNCITED\|LOW_CONFIDENCE\|NEGATIVE_FEEDBACK\|CONFLICTING\|PAGES_NOT_INDEXED`. Only `UNRETRIEVED` and `UNCITED` have a detector today. | perm:`document.read` |
 | GET | `/documents/flags/:id` | Flag detail + related document/chunk + detection context. | perm:`document.read` |
-| POST | `/documents/flags/:id/dismiss` ✎ | Resolve as `DISMISSED`: marks the flag resolved and prevents re-flagging with the same type for 30 days. Requires a comment (reason). | perm:`document.update` |
-| POST | `/documents/flags/:id/fixed` ✎ | Resolve as `FIXED`: document has been corrected. | perm:`document.update` |
+| POST | `/documents/flags/:id/dismiss` ✎ | Resolve as `DISMISSED`: marks the flag resolved and prevents re-flagging with the same type for `DISMISSAL_SUPPRESSION_DAYS` (30). Requires a comment (reason). | perm:`document.update` |
+| POST | `/documents/flags/:id/fixed` ✎ | Resolve as `FIXED`: document has been corrected. Suppresses **nothing** — a detector that finds it again is reporting that the fix did not work. | perm:`document.update` |
 | POST | `/documents/flags/:id/replaced` ✎ | Resolve as `DOCUMENT_REPLACED`: old document removed, new version uploaded. | perm:`document.update` |
-| DELETE | `/documents/flags/:id` | **Only for mistaken flagging.** Hard-deletes the flag record (no `deleted_at`; it's genuinely gone). | perm:`document.delete` |
+| DELETE | `/documents/flags/:id` | **Only for a row that should not exist** — a bad detector run, a test artefact. Hard-deletes the record. For a swept type (`UNRETRIEVED`, `UNCITED`) the next detection cycle raises it again; **dismiss** is what suppresses a finding. | perm:`document.delete` |
 
-*Audit actions:* `DOCUMENT_FLAG_CREATED`, `DOCUMENT_FLAG_RESOLVED`, `DOCUMENT_FLAG_DISMISSED`.
+*Audit actions:* `DOCUMENT_FLAG_RESOLVED`, `DOCUMENT_FLAG_DISMISSED`, `DOCUMENT_FLAG_DELETED` — the acts a person takes. `DOCUMENT_FLAG_CREATED` is deliberately not emitted: raising is a sweep writing many rows per run, and `document_flags.detected_at` already records when it found something.
 
 ### 3.2 Ingestion Jobs — `/ingestion-jobs`
 

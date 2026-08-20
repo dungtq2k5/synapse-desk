@@ -12,7 +12,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { ChunkUsageProjection } from '../scheduled/chunk-usage.projection';
 import { DiscardedDraftSweep } from '../scheduled/discarded-draft.sweep';
-import { DocumentFlagService } from '../scheduled/document-flag.service';
+import { DocumentFlagWriter } from '../scheduled/document-flag-writer';
 import { QuotaReconciliationJob } from '../scheduled/quota-reconciliation.job';
 import { AiGenerationRollupJob } from '../analytics/ai-generation-rollup.job';
 
@@ -45,7 +45,7 @@ export class SchedulerProcessor extends WorkerHost {
     private readonly projection: ChunkUsageProjection,
     private readonly draftSweep: DiscardedDraftSweep,
     private readonly quota: QuotaReconciliationJob,
-    private readonly flags: DocumentFlagService,
+    private readonly flags: DocumentFlagWriter,
     private readonly aiRollup: AiGenerationRollupJob,
     private readonly runs: JobRunRecorder,
   ) {
@@ -113,7 +113,7 @@ export class SchedulerProcessor extends WorkerHost {
    *      drop — anything that runs after retention reads nothing, permanently.
    *   2. `AiGenerationRollupJob` second, for the same reason: it aggregates the
    *      same rows retention removes.
-   *   3. `DocumentFlagService` LAST, because `UNRETRIEVED` and `UNCITED` are
+   *   3. `DocumentFlagWriter` LAST, because `UNRETRIEVED` and `UNCITED` are
    *      computed from the counters step 1 writes. Flagging first means
    *      flagging against yesterday's numbers.
    *

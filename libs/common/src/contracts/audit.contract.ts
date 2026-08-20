@@ -71,6 +71,17 @@ export enum AuditAction {
   PLATFORM_ORGANIZATION_STATUS_CHANGED = 'PLATFORM_ORGANIZATION_STATUS_CHANGED',
   PLATFORM_BILLING_CYCLE_RESET = 'PLATFORM_BILLING_CYCLE_RESET',
   PLATFORM_ORGANIZATION_OFFBOARDED = 'PLATFORM_ORGANIZATION_OFFBOARDED',
+
+  // Document quality flags. Only the acts a PERSON takes: `raise()` is a sweep
+  // writing many rows per run, and `document_flags.detected_at` already records
+  // when it found something.
+  DOCUMENT_FLAG_RESOLVED = 'DOCUMENT_FLAG_RESOLVED',
+  // Separate from RESOLVED because a dismissal SUPPRESSES the detector for
+  // `DISMISSAL_SUPPRESSION_DAYS`, which the other two resolutions do not.
+  DOCUMENT_FLAG_DISMISSED = 'DOCUMENT_FLAG_DISMISSED',
+  // The row is hard-deleted and `document_flags` has no `deleted_at`, so this
+  // is the ONLY trace that it ever existed.
+  DOCUMENT_FLAG_DELETED = 'DOCUMENT_FLAG_DELETED',
   PLATFORM_ORGANIZATION_RESTORED = 'PLATFORM_ORGANIZATION_RESTORED',
   PLATFORM_GLOBAL_ROLE_CREATED = 'PLATFORM_GLOBAL_ROLE_CREATED',
 }
@@ -94,6 +105,7 @@ export enum AuditResourceType {
   DEPARTMENT = 'DEPARTMENT',
   ROLE = 'ROLE',
   ORGANIZATION = 'ORGANIZATION',
+  DOCUMENT_FLAG = 'DOCUMENT_FLAG',
 }
 
 /**

@@ -1,8 +1,11 @@
 import { Module } from '@nestjs/common';
 import { ClientsModule } from '@nestjs/microservices';
 import { ConfigService } from '@nestjs/config';
-import { AuditPublisher } from './audit-publisher.service';
-import { createNatsTransport, NATS_CLIENT } from '@synapsedesk/common';
+import {
+  AuditPublisher,
+  createNatsTransport,
+  NATS_CLIENT,
+} from '@synapsedesk/common';
 
 /**
  * Registers its own NATS client rather than importing NotificationsModule.

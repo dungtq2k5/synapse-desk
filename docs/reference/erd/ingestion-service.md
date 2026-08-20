@@ -75,6 +75,7 @@ erDiagram
     DateTime resolved_at "❓"
     String resolved_by_id "❓"
     String resolution "❓"
+    String resolution_comment "❓"
     DateTime created_at 
     }
   

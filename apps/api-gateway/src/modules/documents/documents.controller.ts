@@ -15,7 +15,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { RequestContext } from '@synapsedesk/common';
+import { DocumentFlagResolution, RequestContext } from '@synapsedesk/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionGuard } from '../../common/guards/permission.guard';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
@@ -35,6 +35,7 @@ import {
 import {
   ConfirmDocumentDto,
   ListDocumentFlagsQueryDto,
+  ResolveDocumentFlagDto,
   ListDocumentsQueryDto,
   PresignDocumentDto,
   SetDocumentDepartmentsDto,
@@ -121,6 +122,123 @@ export class DocumentsController {
     @Query() query: ListDocumentFlagsQueryDto,
   ): Promise<PaginationResponseDto<DocumentFlagResponseDto>> {
     return this.documents.listFlags(query, context);
+  }
+
+  /**
+   * One flag, in full.
+   *
+   * Grouped with `@Get('flags')`, but NOT for its reason: `:id` is a single
+   * segment and this path is two, so no ordering hazard exists here. The
+   * warning above applies to `flags` and `storage`, which are single-segment
+   * literals `:id` really can swallow.
+   */
+  @ApiOperation({ summary: 'Get one quality flag' })
+  @ApiWrappedResponse(DocumentFlagResponseDto)
+  @ApiFilterErrors(['400', '401', '403', '404'])
+  @Get('flags/:flagId')
+  @RequirePermission('document.read')
+  getFlag(
+    @CurrentUser() context: RequestContext,
+    @Param('flagId', ParseUUIDPipe) flagId: string,
+  ): Promise<DocumentFlagResponseDto> {
+    return this.documents.getFlag(flagId, context);
+  }
+
+  /**
+   * Resolves a flag as `DISMISSED` — "this is not a problem".
+   *
+   * **The only resolution that suppresses anything**, and only for
+   * `DISMISSAL_SUPPRESSION_DAYS`: a detector that re-raised it tomorrow would
+   * be arguing with the person who dismissed it. The comment is required for
+   * that reason — when the flag returns, the next person reads why it was
+   * waved off last time — and ingestion-service refuses the write without one.
+   */
+  @ApiOperation({ summary: 'Dismiss a quality flag' })
+  @ApiWrappedResponse(DocumentFlagResponseDto)
+  @ApiFilterErrors(['400', '401', '403', '404'])
+  @Post('flags/:flagId/dismiss')
+  @RequirePermission('document.update')
+  @HttpCode(HttpStatus.OK)
+  @ResponseMessage('Flag dismissed')
+  dismissFlag(
+    @CurrentUser() context: RequestContext,
+    @Param('flagId', ParseUUIDPipe) flagId: string,
+    @Body() dto: ResolveDocumentFlagDto,
+  ): Promise<DocumentFlagResponseDto> {
+    return this.documents.resolveFlag(
+      flagId,
+      DocumentFlagResolution.DISMISSED,
+      dto,
+      context,
+    );
+  }
+
+  /**
+   * Resolves a flag as `FIXED` — "the problem was real and I corrected it".
+   *
+   * Suppresses NOTHING. If the detector finds it again it is reporting that the
+   * fix did not work, which is the one message this must not swallow.
+   */
+  @ApiOperation({ summary: 'Mark a quality flag fixed' })
+  @ApiWrappedResponse(DocumentFlagResponseDto)
+  @ApiFilterErrors(['400', '401', '403', '404'])
+  @Post('flags/:flagId/fixed')
+  @RequirePermission('document.update')
+  @HttpCode(HttpStatus.OK)
+  @ResponseMessage('Flag marked fixed')
+  fixFlag(
+    @CurrentUser() context: RequestContext,
+    @Param('flagId', ParseUUIDPipe) flagId: string,
+    @Body() dto: ResolveDocumentFlagDto,
+  ): Promise<DocumentFlagResponseDto> {
+    return this.documents.resolveFlag(
+      flagId,
+      DocumentFlagResolution.FIXED,
+      dto,
+      context,
+    );
+  }
+
+  /** Resolves a flag as `DOCUMENT_REPLACED`. Suppresses nothing, like `fixed`. */
+  @ApiOperation({ summary: 'Mark a quality flag replaced' })
+  @ApiWrappedResponse(DocumentFlagResponseDto)
+  @ApiFilterErrors(['400', '401', '403', '404'])
+  @Post('flags/:flagId/replaced')
+  @RequirePermission('document.update')
+  @HttpCode(HttpStatus.OK)
+  @ResponseMessage('Flag marked replaced')
+  replaceFlag(
+    @CurrentUser() context: RequestContext,
+    @Param('flagId', ParseUUIDPipe) flagId: string,
+    @Body() dto: ResolveDocumentFlagDto,
+  ): Promise<DocumentFlagResponseDto> {
+    return this.documents.resolveFlag(
+      flagId,
+      DocumentFlagResolution.DOCUMENT_REPLACED,
+      dto,
+      context,
+    );
+  }
+
+  /**
+   * Removes a flag row.
+   *
+   * **Only for a row that should not exist** — a bad detector run, a test
+   * artefact. It is not how a finding is suppressed: for a swept type
+   * (`UNRETRIEVED`, `UNCITED`) the next detection cycle raises it again.
+   * Dismiss is what makes a finding go away.
+   */
+  @ApiOperation({ summary: 'Delete a quality flag' })
+  @ApiWrappedResponse(undefined, { status: HttpStatus.NO_CONTENT })
+  @ApiFilterErrors(['400', '401', '403', '404'])
+  @Delete('flags/:flagId')
+  @RequirePermission('document.delete')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  deleteFlag(
+    @CurrentUser() context: RequestContext,
+    @Param('flagId', ParseUUIDPipe) flagId: string,
+  ): Promise<void> {
+    return this.documents.deleteFlag(flagId, context);
   }
 
   // 200, not 201: nothing is created yet. The storage quota is checked in

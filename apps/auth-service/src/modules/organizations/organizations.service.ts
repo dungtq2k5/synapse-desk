@@ -32,17 +32,17 @@ import {
 } from '@synapsedesk/grpc-proto';
 import {
   AuditAction,
+  AuditPublisher,
   AuditResourceType,
   DEFAULT_PLAN_CATALOG,
   EmailTemplateName,
-  InvitationStatus,
-  OrgStatus,
-  isUniqueConstraintViolation,
-  requireTenant,
   generateInboundToken,
+  InvitationStatus,
+  isUniqueConstraintViolation,
+  OrgStatus,
+  requireTenant,
 } from '@synapsedesk/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { AuditPublisher } from '../audit/audit-publisher.service';
 import { SessionsService } from '../sessions/sessions.service';
 import { NotificationPublisher } from '../notifications/notification-publisher.service';
 import { Organization, Prisma } from '../../generated/prisma/client';

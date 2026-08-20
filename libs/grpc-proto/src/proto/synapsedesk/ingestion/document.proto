@@ -89,6 +89,16 @@ enum DocumentFlagType {
   DOCUMENT_FLAG_TYPE_PAGES_NOT_INDEXED = 7;
 }
 
+// How a human dealt with a flag. Only DISMISSED suppresses a later detection,
+// and only for a window — FIXED and DOCUMENT_REPLACED assert the problem is
+// gone, so a detector finding it again is reporting news.
+enum DocumentFlagResolution {
+  DOCUMENT_FLAG_RESOLUTION_UNSPECIFIED = 0;
+  DOCUMENT_FLAG_RESOLUTION_FIXED = 1;
+  DOCUMENT_FLAG_RESOLUTION_DISMISSED = 2;
+  DOCUMENT_FLAG_RESOLUTION_DOCUMENT_REPLACED = 3;
+}
+
 enum DocumentFlagSeverity {
   DOCUMENT_FLAG_SEVERITY_UNSPECIFIED = 0;
   DOCUMENT_FLAG_SEVERITY_INFO = 1;
@@ -218,6 +228,15 @@ message DocumentFlagResponse {
   string detail = 6;
   optional double confidence_score = 7;
   google.protobuf.Timestamp detected_at = 8;
+  optional google.protobuf.Timestamp resolved_at = 9;
+  // A bare id, never a hydrated user: it crosses a service boundary with no FK
+  // (ADR 0022), and resolving it here would make every flag list an N+1.
+  optional string resolved_by_id = 10;
+  // UNSPECIFIED when the flag is still open.
+  DocumentFlagResolution resolution = 11;
+  optional string resolution_comment = 12;
+  optional string related_document_id = 13;
+  optional string related_chunk_id = 14;
 }
 
 message ListDocumentFlagsRequest {
@@ -231,7 +250,23 @@ message ListDocumentFlagsRequest {
   // Unresolved only, by default — a resolved flag is history, not a task.
   bool include_resolved = 2;
   synapsedesk.auth.PageRequest page = 3;
+  // UNSPECIFIED means no filter.
+  DocumentFlagSeverity severity = 4;
+  // "" means no filter.
+  string document_id = 5;
 }
+
+message DocumentFlagIdRequest { string id = 1; }
+
+// One RPC for three routes: dismiss, fixed and replaced differ only in the
+// value they carry.
+message ResolveDocumentFlagRequest {
+  string id = 1;
+  DocumentFlagResolution resolution = 2;
+  optional string comment = 3;
+}
+
+message DeleteDocumentFlagResponse { bool deleted = 1; }
 
 message ListDocumentFlagsResponse {
   repeated DocumentFlagResponse items = 1;
@@ -344,6 +379,9 @@ service DocumentService {
   rpc GetDocumentChunk(GetDocumentChunkRequest) returns (DocumentChunkResponse);
 
   rpc ListDocumentFlags(ListDocumentFlagsRequest) returns (ListDocumentFlagsResponse);
+  rpc GetDocumentFlag(DocumentFlagIdRequest) returns (DocumentFlagResponse);
+  rpc ResolveDocumentFlag(ResolveDocumentFlagRequest) returns (DocumentFlagResponse);
+  rpc DeleteDocumentFlag(DocumentFlagIdRequest) returns (DeleteDocumentFlagResponse);
 
   rpc GetStorageUsage(DocumentIdRequest) returns (StorageUsageResponse);
 

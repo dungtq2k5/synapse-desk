@@ -17,7 +17,10 @@ import {
 import {
   ALLOWED_DOCUMENT_MIME_TYPES,
   OCR_LANGUAGES,
+  DOCUMENT_FLAG_SEVERITIES,
+  MAX_FLAG_RESOLUTION_COMMENT_LENGTH,
   DOCUMENT_FLAG_TYPES,
+  DocumentFlagSeverity,
   DocumentFlagType,
   DOCUMENT_STATUSES,
   DocumentStatus,
@@ -191,6 +194,28 @@ export class ListDocumentsQueryDto extends SearchPaginationDto {
 }
 
 /**
+ * The body all three resolve routes share.
+ *
+ * One DTO rather than three: `dismiss`, `fixed` and `replaced` differ in the
+ * resolution the ROUTE supplies, never in what the client sends. The rule that
+ * `dismiss` requires a comment is enforced in ingestion-service, where the
+ * write is — a `@IsNotEmpty` here could only express it by splitting this into
+ * two shapes.
+ */
+export class ResolveDocumentFlagDto {
+  @IsOptional()
+  @IsString()
+  // `@MaxLength` measures what this produced. Transformation is a separate
+  // pass — `plainToInstance` before the validators, whatever order the
+  // decorators sit in — so without this a comment exactly at the cap with a
+  // trailing newline is a 400 the caller cannot see the cause of.
+  @Transform(trimIfString)
+  @MaxLength(MAX_FLAG_RESOLUTION_COMMENT_LENGTH)
+  @ApiPropertyOptional({ maxLength: MAX_FLAG_RESOLUTION_COMMENT_LENGTH })
+  readonly comment?: string;
+}
+
+/**
  * The flag worklist filter.
  *
  * `type` accepts EVERY member of `DocumentFlagType` and any number of them.
@@ -222,4 +247,14 @@ export class ListDocumentFlagsQueryDto extends SearchPaginationDto {
   @ToBoolean()
   @ApiPropertyOptional()
   readonly includeResolved: boolean = false;
+
+  @IsOptional()
+  @IsIn(DOCUMENT_FLAG_SEVERITIES)
+  @ApiPropertyOptional()
+  readonly severity?: DocumentFlagSeverity;
+
+  @IsOptional()
+  @IsUUID('4')
+  @ApiPropertyOptional()
+  readonly documentId?: string;
 }

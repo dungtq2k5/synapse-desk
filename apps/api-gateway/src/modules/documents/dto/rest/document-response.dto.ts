@@ -1,4 +1,5 @@
 import {
+  DocumentFlagResolution,
   DocumentFlagSeverity,
   DocumentStatus,
   type DocumentFileType,
@@ -72,6 +73,15 @@ export class DocumentFlagResponseDto {
   detail!: string;
   confidenceScore!: number | null;
   detectedAt!: Date;
+  /** `null` while the flag is open. */
+  resolvedAt!: Date | null;
+  /** A bare id — the gateway does not hydrate it into a user. */
+  resolvedById!: string | null;
+  /** `null` while the flag is open, which is what an open flag sends. */
+  resolution!: DocumentFlagResolution | null;
+  resolutionComment!: string | null;
+  relatedDocumentId!: string | null;
+  relatedChunkId!: string | null;
 }
 
 export class PresignDocumentResponseDto {

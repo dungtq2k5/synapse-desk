@@ -97,6 +97,19 @@ export enum DocumentFlagType {
   UNRECOGNIZED = -1,
 }
 
+/**
+ * How a human dealt with a flag. Only DISMISSED suppresses a later detection,
+ * and only for a window — FIXED and DOCUMENT_REPLACED assert the problem is
+ * gone, so a detector finding it again is reporting news.
+ */
+export enum DocumentFlagResolution {
+  DOCUMENT_FLAG_RESOLUTION_UNSPECIFIED = 0,
+  DOCUMENT_FLAG_RESOLUTION_FIXED = 1,
+  DOCUMENT_FLAG_RESOLUTION_DISMISSED = 2,
+  DOCUMENT_FLAG_RESOLUTION_DOCUMENT_REPLACED = 3,
+  UNRECOGNIZED = -1,
+}
+
 export enum DocumentFlagSeverity {
   DOCUMENT_FLAG_SEVERITY_UNSPECIFIED = 0,
   DOCUMENT_FLAG_SEVERITY_INFO = 1,
@@ -242,6 +255,21 @@ export interface DocumentFlagResponse {
   detail: string;
   confidenceScore?: number | undefined;
   detectedAt: Timestamp | undefined;
+  resolvedAt?:
+    | Timestamp
+    | undefined;
+  /**
+   * A bare id, never a hydrated user: it crosses a service boundary with no FK
+   * (ADR 0022), and resolving it here would make every flag list an N+1.
+   */
+  resolvedById?:
+    | string
+    | undefined;
+  /** UNSPECIFIED when the flag is still open. */
+  resolution: DocumentFlagResolution;
+  resolutionComment?: string | undefined;
+  relatedDocumentId?: string | undefined;
+  relatedChunkId?: string | undefined;
 }
 
 export interface ListDocumentFlagsRequest {
@@ -256,7 +284,31 @@ export interface ListDocumentFlagsRequest {
   flagTypes: DocumentFlagType[];
   /** Unresolved only, by default — a resolved flag is history, not a task. */
   includeResolved: boolean;
-  page: PageRequest | undefined;
+  page:
+    | PageRequest
+    | undefined;
+  /** UNSPECIFIED means no filter. */
+  severity: DocumentFlagSeverity;
+  /** "" means no filter. */
+  documentId: string;
+}
+
+export interface DocumentFlagIdRequest {
+  id: string;
+}
+
+/**
+ * One RPC for three routes: dismiss, fixed and replaced differ only in the
+ * value they carry.
+ */
+export interface ResolveDocumentFlagRequest {
+  id: string;
+  resolution: DocumentFlagResolution;
+  comment?: string | undefined;
+}
+
+export interface DeleteDocumentFlagResponse {
+  deleted: boolean;
 }
 
 export interface ListDocumentFlagsResponse {
@@ -405,6 +457,12 @@ export interface DocumentServiceClient {
 
   listDocumentFlags(request: ListDocumentFlagsRequest, metadata?: Metadata): Observable<ListDocumentFlagsResponse>;
 
+  getDocumentFlag(request: DocumentFlagIdRequest, metadata?: Metadata): Observable<DocumentFlagResponse>;
+
+  resolveDocumentFlag(request: ResolveDocumentFlagRequest, metadata?: Metadata): Observable<DocumentFlagResponse>;
+
+  deleteDocumentFlag(request: DocumentFlagIdRequest, metadata?: Metadata): Observable<DeleteDocumentFlagResponse>;
+
   getStorageUsage(request: DocumentIdRequest, metadata?: Metadata): Observable<StorageUsageResponse>;
 
   /**
@@ -512,6 +570,21 @@ export interface DocumentServiceController {
     metadata?: Metadata,
   ): Promise<ListDocumentFlagsResponse> | Observable<ListDocumentFlagsResponse> | ListDocumentFlagsResponse;
 
+  getDocumentFlag(
+    request: DocumentFlagIdRequest,
+    metadata?: Metadata,
+  ): Promise<DocumentFlagResponse> | Observable<DocumentFlagResponse> | DocumentFlagResponse;
+
+  resolveDocumentFlag(
+    request: ResolveDocumentFlagRequest,
+    metadata?: Metadata,
+  ): Promise<DocumentFlagResponse> | Observable<DocumentFlagResponse> | DocumentFlagResponse;
+
+  deleteDocumentFlag(
+    request: DocumentFlagIdRequest,
+    metadata?: Metadata,
+  ): Promise<DeleteDocumentFlagResponse> | Observable<DeleteDocumentFlagResponse> | DeleteDocumentFlagResponse;
+
   getStorageUsage(
     request: DocumentIdRequest,
     metadata?: Metadata,
@@ -573,6 +646,9 @@ export function DocumentServiceControllerMethods() {
       "listDocumentChunks",
       "getDocumentChunk",
       "listDocumentFlags",
+      "getDocumentFlag",
+      "resolveDocumentFlag",
+      "deleteDocumentFlag",
       "getStorageUsage",
       "listIngestionJobs",
       "getIngestionJob",

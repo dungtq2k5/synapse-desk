@@ -41,26 +41,26 @@ import {
   toSearchFilter,
 } from '@synapsedesk/grpc-proto';
 import {
-  BATCH_ID_LIMIT,
-  normalizeBatchIds,
   AuditAction,
+  AuditPublisher,
   AuditResourceType,
+  BATCH_ID_LIMIT,
   EmailTemplateName,
-  SystemRoleName,
-  USER_SORTABLE_FIELDS,
-  isUniqueConstraintViolation,
   extractEmailDomain,
   extractEmailLocalPart,
+  isUniqueConstraintViolation,
+  normalizeBatchIds,
   normalizeEmail,
   requireActor,
   requireTenant,
-  tenantScope,
   restoreData,
   softDeleteData,
   SupersededReason,
+  SystemRoleName,
+  tenantScope,
+  USER_SORTABLE_FIELDS,
 } from '@synapsedesk/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { AuditPublisher } from '../audit/audit-publisher.service';
 import { NotificationPublisher } from '../notifications/notification-publisher.service';
 import { RolesService } from '../roles/roles.service';
 import { SessionsService } from '../sessions/sessions.service';

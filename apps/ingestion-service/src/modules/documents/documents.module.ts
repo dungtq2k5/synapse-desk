@@ -4,6 +4,7 @@ import { AuthClientModule } from '../auth-client/auth-client.module';
 import { StorageClientModule } from '../storage-client/storage-client.module';
 import { IngestionModule } from '../ingestion/ingestion.module';
 import { IngestionJobsModule } from '../ingestion-jobs/ingestion-jobs.module';
+import { DocumentFlagsModule } from '../document-flags/document-flags.module';
 import { DocumentsService } from './documents.service';
 import { DocumentsGrpcController } from './documents-grpc.controller';
 
@@ -16,6 +17,9 @@ import { DocumentsGrpcController } from './documents-grpc.controller';
     // The job RPCs are declared on `DocumentService`, so this module's
     // controller adapts them — see `IngestionJobsModule`.
     IngestionJobsModule,
+    // Same arrangement as the jobs module: the flag RPCs are declared on
+    // `DocumentService`, so this module's controller adapts them.
+    DocumentFlagsModule,
     PrismaModule,
     AuthClientModule,
     StorageClientModule,

@@ -35,7 +35,7 @@ import {
   ParsedDocument,
 } from './document-parser.service';
 import { Chunk, DocumentChunkerService } from './document-chunker.service';
-import { DocumentFlagService } from '../scheduled/document-flag.service';
+import { DocumentFlagWriter } from '../scheduled/document-flag-writer';
 
 export type IngestionJobData = {
   organizationId: string;
@@ -126,7 +126,7 @@ export class IngestionProcessor {
     private readonly storage: StorageReferenceService,
     private readonly parser: DocumentParserService,
     private readonly chunker: DocumentChunkerService,
-    private readonly flags: DocumentFlagService,
+    private readonly flags: DocumentFlagWriter,
     private readonly qdrant: QdrantService,
     private readonly ledger: AiLedgerService,
     private readonly aiSettings: AiSettingsService,
@@ -289,7 +289,7 @@ export class IngestionProcessor {
 
     if (missing.length === 0) return;
 
-    // **Through the shared policy, not a bare `create`** — `DocumentFlagService`
+    // **Through the shared policy, not a bare `create`** — `DocumentFlagWriter`
     // excludes documents that already have this flag open AND those where a
     // human resolved one. Both matter here and neither is hypothetical: BullMQ
     // retries this job, and the flag is written before the steps that can still

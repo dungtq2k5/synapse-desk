@@ -2,6 +2,8 @@ import { RpcException } from '@nestjs/microservices';
 import {
   AiGenerationOutcome,
   AiGenerationPurpose,
+  DISMISSAL_SUPPRESSION_DAYS,
+  DocumentFlagResolution,
   DocumentFlagType,
   DOCUMENT_PATTERNS,
   DocumentStatus,
@@ -11,11 +13,13 @@ import {
   QDRANT_PAYLOAD_FIELDS,
 } from '@synapsedesk/common';
 import { bootstrapE2eTest, CYCLE_START, E2eFixture } from '../utils';
+import { memberContext } from '../utils/context';
 import { buildTenant, createDocument, TenantFixture } from '../factories';
 import { ChunkUsageProjection } from '../../src/modules/scheduled/chunk-usage.projection';
 import { DiscardedDraftSweep } from '../../src/modules/scheduled/discarded-draft.sweep';
 import { QuotaReconciliationJob } from '../../src/modules/scheduled/quota-reconciliation.job';
-import { DocumentFlagService } from '../../src/modules/scheduled/document-flag.service';
+import { DocumentFlagWriter } from '../../src/modules/scheduled/document-flag-writer';
+import { DocumentFlagsService } from '../../src/modules/document-flags/document-flags.service';
 import { getQueueToken } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { ScopeWriterService } from '../../src/modules/ingestion/scope-writer.service';
@@ -34,7 +38,8 @@ describe('The fan-out and the scheduled jobs (e2e)', () => {
   let projection: ChunkUsageProjection;
   let sweep: DiscardedDraftSweep;
   let reconciliation: QuotaReconciliationJob;
-  let flags: DocumentFlagService;
+  let flags: DocumentFlagWriter;
+  let documentFlags: DocumentFlagsService;
   let scopeWriter: ScopeWriterService;
   let fanoutQueue: ScopeFanoutQueueService;
   let qdrant: QdrantService;
@@ -71,7 +76,8 @@ describe('The fan-out and the scheduled jobs (e2e)', () => {
     projection = fx.moduleRef.get(ChunkUsageProjection);
     sweep = fx.moduleRef.get(DiscardedDraftSweep);
     reconciliation = fx.moduleRef.get(QuotaReconciliationJob);
-    flags = fx.moduleRef.get(DocumentFlagService);
+    flags = fx.moduleRef.get(DocumentFlagWriter);
+    documentFlags = fx.moduleRef.get(DocumentFlagsService);
     scopeWriter = fx.moduleRef.get(ScopeWriterService);
     fanoutQueue = fx.moduleRef.get(ScopeFanoutQueueService);
     qdrant = fx.moduleRef.get(QdrantService);
@@ -452,7 +458,17 @@ describe('The fan-out and the scheduled jobs (e2e)', () => {
       const [flag] = await fx.prisma.documentFlag.findMany({
         where: { documentId: document.id },
       });
-      await flags.resolve(flag.id, tenant.userId, 'DISMISSED');
+      // Through the tenant-facing service, which is where `resolve` now lives:
+      // the sweep raises, a person resolves, and the two are different halves.
+      await documentFlags.resolve(
+        flag.id,
+        DocumentFlagResolution.DISMISSED,
+        memberContext({
+          id: tenant.userId,
+          organizationId: tenant.organizationId,
+        }),
+        'not a problem',
+      );
 
       await flags.detect(tenant.organizationId);
 
@@ -461,6 +477,108 @@ describe('The fan-out and the scheduled jobs (e2e)', () => {
       });
       expect(raised).toHaveLength(1);
       expect(raised[0].resolvedById).toBe(tenant.userId);
+    });
+
+    it('**11a. DOES re-raise one marked FIXED — the fix may not have worked**', async () => {
+      // The case that was wrong: FIXED asserted the problem was gone, and the
+      // detector finding it again is the one message that must not be
+      // swallowed. Under the old rule this document could never be flagged
+      // again for this type.
+      const document = await documentWithChunks(1);
+      await flags.detect(tenant.organizationId);
+
+      const [raised] = await fx.prisma.documentFlag.findMany({
+        where: { documentId: document.id },
+      });
+      await documentFlags.resolve(
+        raised.id,
+        DocumentFlagResolution.FIXED,
+        memberContext({
+          id: tenant.userId,
+          organizationId: tenant.organizationId,
+        }),
+      );
+
+      await flags.detect(tenant.organizationId);
+
+      const after = await fx.prisma.documentFlag.findMany({
+        where: { documentId: document.id },
+        orderBy: { detectedAt: 'asc' },
+      });
+      // A SECOND row. The first stays as the record that someone tried.
+      expect(after).toHaveLength(2);
+      expect(after[0].resolution).toBe(DocumentFlagResolution.FIXED);
+      expect(after[1].resolvedAt).toBeNull();
+    });
+
+    it('**11a2. re-raises a DISMISSED one once the window has passed**', async () => {
+      // A window, not a life sentence: permanent suppression makes one wrong
+      // click unappealable and invisible.
+      const document = await documentWithChunks(1);
+      await flags.detect(tenant.organizationId);
+
+      const [raised] = await fx.prisma.documentFlag.findMany({
+        where: { documentId: document.id },
+      });
+      await documentFlags.resolve(
+        raised.id,
+        DocumentFlagResolution.DISMISSED,
+        memberContext({
+          id: tenant.userId,
+          organizationId: tenant.organizationId,
+        }),
+        'seasonal',
+      );
+      // Backdated past the window rather than waiting thirty days for it.
+      await fx.prisma.documentFlag.update({
+        where: { id: raised.id },
+        data: {
+          resolvedAt: new Date(
+            Date.now() - (DISMISSAL_SUPPRESSION_DAYS + 1) * 24 * 60 * 60 * 1000,
+          ),
+        },
+      });
+
+      await flags.detect(tenant.organizationId);
+
+      const after = await fx.prisma.documentFlag.findMany({
+        where: { documentId: document.id },
+      });
+      expect(after).toHaveLength(2);
+      // And the dismissal's reason survives on the old row, so whoever sees the
+      // flag return can read why it was dismissed last time.
+      const dismissed = after.find((flag) => flag.id === raised.id);
+      expect(dismissed?.resolutionComment).toBe('seasonal');
+    });
+
+    it('**11b. DOES re-raise one that was deleted rather than resolved**', async () => {
+      // Documented behaviour, asserted so nobody "fixes" it. Delete removes the
+      // row AND the exclusion `raise()` reads, so for a swept type the finding
+      // returns next cycle. Dismiss is what makes a finding go away; delete is
+      // for a row that should not exist.
+      const document = await documentWithChunks(1);
+      await flags.detect(tenant.organizationId);
+
+      const [raised] = await fx.prisma.documentFlag.findMany({
+        where: { documentId: document.id },
+      });
+      await documentFlags.deleteDocumentFlag(
+        raised.id,
+        memberContext({
+          id: tenant.userId,
+          organizationId: tenant.organizationId,
+        }),
+      );
+
+      await flags.detect(tenant.organizationId);
+
+      const after = await fx.prisma.documentFlag.findMany({
+        where: { documentId: document.id },
+      });
+      expect(after).toHaveLength(1);
+      // A NEW row, not the one that was deleted.
+      expect(after[0].id).not.toBe(raised.id);
+      expect(after[0].resolvedAt).toBeNull();
     });
 
     it('12. Never flags a document that is still PROCESSING', async () => {

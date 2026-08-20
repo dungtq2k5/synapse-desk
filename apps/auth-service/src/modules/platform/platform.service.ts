@@ -30,21 +30,21 @@ import {
 } from '@synapsedesk/grpc-proto';
 import {
   AuditAction,
+  AuditPublisher,
   AuditResourceType,
   InvitationStatus,
-  ORGANIZATION_SORTABLE_FIELDS,
-  ORG_STATUS_TRANSITIONS,
-  OrgStatus,
-  SystemRoleName,
-  USER_SORTABLE_FIELDS,
   isUniqueConstraintViolation,
   normalizeEmail,
+  ORG_STATUS_TRANSITIONS,
+  ORGANIZATION_SORTABLE_FIELDS,
+  OrgStatus,
   requireActor,
   restoreData,
   softDeleteData,
+  SystemRoleName,
+  USER_SORTABLE_FIELDS,
 } from '@synapsedesk/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { AuditPublisher } from '../audit/audit-publisher.service';
 import { SessionsService } from '../sessions/sessions.service';
 import { RolesService } from '../roles/roles.service';
 import { toOrganizationResponse } from '../organizations/organization.mapper';

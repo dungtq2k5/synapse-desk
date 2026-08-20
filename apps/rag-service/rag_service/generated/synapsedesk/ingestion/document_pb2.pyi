@@ -51,6 +51,13 @@ class DocumentFlagType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     DOCUMENT_FLAG_TYPE_CONFLICTING: _ClassVar[DocumentFlagType]
     DOCUMENT_FLAG_TYPE_PAGES_NOT_INDEXED: _ClassVar[DocumentFlagType]
 
+class DocumentFlagResolution(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    DOCUMENT_FLAG_RESOLUTION_UNSPECIFIED: _ClassVar[DocumentFlagResolution]
+    DOCUMENT_FLAG_RESOLUTION_FIXED: _ClassVar[DocumentFlagResolution]
+    DOCUMENT_FLAG_RESOLUTION_DISMISSED: _ClassVar[DocumentFlagResolution]
+    DOCUMENT_FLAG_RESOLUTION_DOCUMENT_REPLACED: _ClassVar[DocumentFlagResolution]
+
 class DocumentFlagSeverity(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
     DOCUMENT_FLAG_SEVERITY_UNSPECIFIED: _ClassVar[DocumentFlagSeverity]
@@ -85,6 +92,10 @@ DOCUMENT_FLAG_TYPE_LOW_CONFIDENCE: DocumentFlagType
 DOCUMENT_FLAG_TYPE_NEGATIVE_FEEDBACK: DocumentFlagType
 DOCUMENT_FLAG_TYPE_CONFLICTING: DocumentFlagType
 DOCUMENT_FLAG_TYPE_PAGES_NOT_INDEXED: DocumentFlagType
+DOCUMENT_FLAG_RESOLUTION_UNSPECIFIED: DocumentFlagResolution
+DOCUMENT_FLAG_RESOLUTION_FIXED: DocumentFlagResolution
+DOCUMENT_FLAG_RESOLUTION_DISMISSED: DocumentFlagResolution
+DOCUMENT_FLAG_RESOLUTION_DOCUMENT_REPLACED: DocumentFlagResolution
 DOCUMENT_FLAG_SEVERITY_UNSPECIFIED: DocumentFlagSeverity
 DOCUMENT_FLAG_SEVERITY_INFO: DocumentFlagSeverity
 DOCUMENT_FLAG_SEVERITY_WARNING: DocumentFlagSeverity
@@ -271,7 +282,7 @@ class GetDocumentChunkRequest(_message.Message):
     def __init__(self, document_id: _Optional[str] = ..., chunk_id: _Optional[str] = ...) -> None: ...
 
 class DocumentFlagResponse(_message.Message):
-    __slots__ = ("id", "document_id", "document_title", "flag_type", "severity", "detail", "confidence_score", "detected_at")
+    __slots__ = ("id", "document_id", "document_title", "flag_type", "severity", "detail", "confidence_score", "detected_at", "resolved_at", "resolved_by_id", "resolution", "resolution_comment", "related_document_id", "related_chunk_id")
     ID_FIELD_NUMBER: _ClassVar[int]
     DOCUMENT_ID_FIELD_NUMBER: _ClassVar[int]
     DOCUMENT_TITLE_FIELD_NUMBER: _ClassVar[int]
@@ -280,6 +291,12 @@ class DocumentFlagResponse(_message.Message):
     DETAIL_FIELD_NUMBER: _ClassVar[int]
     CONFIDENCE_SCORE_FIELD_NUMBER: _ClassVar[int]
     DETECTED_AT_FIELD_NUMBER: _ClassVar[int]
+    RESOLVED_AT_FIELD_NUMBER: _ClassVar[int]
+    RESOLVED_BY_ID_FIELD_NUMBER: _ClassVar[int]
+    RESOLUTION_FIELD_NUMBER: _ClassVar[int]
+    RESOLUTION_COMMENT_FIELD_NUMBER: _ClassVar[int]
+    RELATED_DOCUMENT_ID_FIELD_NUMBER: _ClassVar[int]
+    RELATED_CHUNK_ID_FIELD_NUMBER: _ClassVar[int]
     id: str
     document_id: str
     document_title: str
@@ -288,17 +305,49 @@ class DocumentFlagResponse(_message.Message):
     detail: str
     confidence_score: float
     detected_at: _timestamp_pb2.Timestamp
-    def __init__(self, id: _Optional[str] = ..., document_id: _Optional[str] = ..., document_title: _Optional[str] = ..., flag_type: _Optional[_Union[DocumentFlagType, str]] = ..., severity: _Optional[_Union[DocumentFlagSeverity, str]] = ..., detail: _Optional[str] = ..., confidence_score: _Optional[float] = ..., detected_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    resolved_at: _timestamp_pb2.Timestamp
+    resolved_by_id: str
+    resolution: DocumentFlagResolution
+    resolution_comment: str
+    related_document_id: str
+    related_chunk_id: str
+    def __init__(self, id: _Optional[str] = ..., document_id: _Optional[str] = ..., document_title: _Optional[str] = ..., flag_type: _Optional[_Union[DocumentFlagType, str]] = ..., severity: _Optional[_Union[DocumentFlagSeverity, str]] = ..., detail: _Optional[str] = ..., confidence_score: _Optional[float] = ..., detected_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., resolved_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., resolved_by_id: _Optional[str] = ..., resolution: _Optional[_Union[DocumentFlagResolution, str]] = ..., resolution_comment: _Optional[str] = ..., related_document_id: _Optional[str] = ..., related_chunk_id: _Optional[str] = ...) -> None: ...
 
 class ListDocumentFlagsRequest(_message.Message):
-    __slots__ = ("flag_types", "include_resolved", "page")
+    __slots__ = ("flag_types", "include_resolved", "page", "severity", "document_id")
     FLAG_TYPES_FIELD_NUMBER: _ClassVar[int]
     INCLUDE_RESOLVED_FIELD_NUMBER: _ClassVar[int]
     PAGE_FIELD_NUMBER: _ClassVar[int]
+    SEVERITY_FIELD_NUMBER: _ClassVar[int]
+    DOCUMENT_ID_FIELD_NUMBER: _ClassVar[int]
     flag_types: _containers.RepeatedScalarFieldContainer[DocumentFlagType]
     include_resolved: bool
     page: _common_pb2.PageRequest
-    def __init__(self, flag_types: _Optional[_Iterable[_Union[DocumentFlagType, str]]] = ..., include_resolved: _Optional[bool] = ..., page: _Optional[_Union[_common_pb2.PageRequest, _Mapping]] = ...) -> None: ...
+    severity: DocumentFlagSeverity
+    document_id: str
+    def __init__(self, flag_types: _Optional[_Iterable[_Union[DocumentFlagType, str]]] = ..., include_resolved: _Optional[bool] = ..., page: _Optional[_Union[_common_pb2.PageRequest, _Mapping]] = ..., severity: _Optional[_Union[DocumentFlagSeverity, str]] = ..., document_id: _Optional[str] = ...) -> None: ...
+
+class DocumentFlagIdRequest(_message.Message):
+    __slots__ = ("id",)
+    ID_FIELD_NUMBER: _ClassVar[int]
+    id: str
+    def __init__(self, id: _Optional[str] = ...) -> None: ...
+
+class ResolveDocumentFlagRequest(_message.Message):
+    __slots__ = ("id", "resolution", "comment")
+    ID_FIELD_NUMBER: _ClassVar[int]
+    RESOLUTION_FIELD_NUMBER: _ClassVar[int]
+    COMMENT_FIELD_NUMBER: _ClassVar[int]
+    id: str
+    resolution: DocumentFlagResolution
+    comment: str
+    def __init__(self, id: _Optional[str] = ..., resolution: _Optional[_Union[DocumentFlagResolution, str]] = ..., comment: _Optional[str] = ...) -> None: ...
+
+class DeleteDocumentFlagResponse(_message.Message):
+    __slots__ = ("deleted",)
+    DELETED_FIELD_NUMBER: _ClassVar[int]
+    deleted: bool
+    def __init__(self, deleted: _Optional[bool] = ...) -> None: ...
 
 class ListDocumentFlagsResponse(_message.Message):
     __slots__ = ("items", "meta")

@@ -236,6 +236,14 @@ model DocumentFlag {
   /// DocumentFlagResolution.
   resolution String? @db.VarChar(30)
 
+  /// Why a human resolved it, in their own words.
+  ///
+  /// Required by the dismiss route and optional for the other two, which is a
+  /// rule at the write rather than a constraint here — `NOT NULL` would make
+  /// `FIXED` and `DOCUMENT_REPLACED` invent a string. Bounded at the DTO by
+  /// `MAX_FLAG_RESOLUTION_COMMENT_LENGTH`, never truncated on read.
+  resolutionComment String? @map("resolution_comment") @db.Text
+
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   document        Document       @relation("FlaggedDocument", fields: [documentId], references: [id], onDelete: Cascade)

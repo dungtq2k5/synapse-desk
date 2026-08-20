@@ -8,6 +8,7 @@ import {
   AuditResourceType,
   DigestMode,
   type DocumentFileType,
+  DocumentFlagResolution,
   DocumentFlagSeverity,
   DocumentFlagType,
   DocumentStatus,
@@ -40,6 +41,7 @@ import {
 } from '../generated/synapsedesk/notification/notification';
 import {
   DocumentFileType as ProtoDocumentFileType,
+  DocumentFlagResolution as ProtoDocumentFlagResolution,
   DocumentFlagSeverity as ProtoDocumentFlagSeverity,
   DocumentFlagType as ProtoDocumentFlagType,
   DocumentStatus as ProtoDocumentStatus,
@@ -538,6 +540,25 @@ const documentFlagSeverity = enumBridge<
 export const toProtoDocumentFlagSeverity = documentFlagSeverity.toProto;
 export const fromProtoDocumentFlagSeverity = documentFlagSeverity.fromProto;
 
+/** `document_flags.resolution` — null on the domain side while the flag is open. */
+const documentFlagResolution = enumBridge<
+  DocumentFlagResolution,
+  ProtoDocumentFlagResolution
+>(
+  {
+    [DocumentFlagResolution.FIXED]:
+      ProtoDocumentFlagResolution.DOCUMENT_FLAG_RESOLUTION_FIXED,
+    [DocumentFlagResolution.DISMISSED]:
+      ProtoDocumentFlagResolution.DOCUMENT_FLAG_RESOLUTION_DISMISSED,
+    [DocumentFlagResolution.DOCUMENT_REPLACED]:
+      ProtoDocumentFlagResolution.DOCUMENT_FLAG_RESOLUTION_DOCUMENT_REPLACED,
+  },
+  ProtoDocumentFlagResolution.DOCUMENT_FLAG_RESOLUTION_UNSPECIFIED,
+);
+
+export const toProtoDocumentFlagResolution = documentFlagResolution.toProto;
+export const fromProtoDocumentFlagResolution = documentFlagResolution.fromProto;
+
 /** `ai_generations.outcome` — drafts only. */
 const aiGenerationOutcome = enumBridge<
   AiGenerationOutcome,
@@ -623,6 +644,12 @@ const auditAction = enumBridge<AuditAction, ProtoAuditAction>(
       ProtoAuditAction.AUDIT_ACTION_PLATFORM_ORGANIZATION_RESTORED,
     [AuditAction.PLATFORM_GLOBAL_ROLE_CREATED]:
       ProtoAuditAction.AUDIT_ACTION_PLATFORM_GLOBAL_ROLE_CREATED,
+    [AuditAction.DOCUMENT_FLAG_RESOLVED]:
+      ProtoAuditAction.AUDIT_ACTION_DOCUMENT_FLAG_RESOLVED,
+    [AuditAction.DOCUMENT_FLAG_DISMISSED]:
+      ProtoAuditAction.AUDIT_ACTION_DOCUMENT_FLAG_DISMISSED,
+    [AuditAction.DOCUMENT_FLAG_DELETED]:
+      ProtoAuditAction.AUDIT_ACTION_DOCUMENT_FLAG_DELETED,
   },
   ProtoAuditAction.AUDIT_ACTION_UNSPECIFIED,
 );
@@ -638,6 +665,8 @@ const auditResourceType = enumBridge<AuditResourceType, ProtoAuditResourceType>(
     [AuditResourceType.ROLE]: ProtoAuditResourceType.AUDIT_RESOURCE_TYPE_ROLE,
     [AuditResourceType.ORGANIZATION]:
       ProtoAuditResourceType.AUDIT_RESOURCE_TYPE_ORGANIZATION,
+    [AuditResourceType.DOCUMENT_FLAG]:
+      ProtoAuditResourceType.AUDIT_RESOURCE_TYPE_DOCUMENT_FLAG,
   },
   ProtoAuditResourceType.AUDIT_RESOURCE_TYPE_UNSPECIFIED,
 );
