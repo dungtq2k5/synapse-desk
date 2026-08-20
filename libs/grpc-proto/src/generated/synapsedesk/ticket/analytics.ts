@@ -15,6 +15,9 @@ export enum AnalyticsExportKind {
   /** ANALYTICS_EXPORT_KIND_TICKET_DAILY - Daily ticket rollups: the numbers behind `overview`, `volume`, `deflection`. */
   ANALYTICS_EXPORT_KIND_TICKET_DAILY = 1,
   ANALYTICS_EXPORT_KIND_AGENT_DAILY = 2,
+  /** ANALYTICS_EXPORT_KIND_TICKET - One row per TICKET, not per day — the distinction the row cap exists for. */
+  ANALYTICS_EXPORT_KIND_TICKET = 3,
+  ANALYTICS_EXPORT_KIND_AUDIT_LOG = 4,
   UNRECOGNIZED = -1,
 }
 
@@ -266,7 +269,16 @@ export interface CreateExportRequest {
   kind: AnalyticsExportKind;
   from: string;
   to: string;
-  departmentId?: string | undefined;
+  departmentId?:
+    | string
+    | undefined;
+  /**
+   * Per-kind predicates the three kinds do not share — ticket status and
+   * priority, audit action and resource type. A JSON string rather than a
+   * `oneof`, because it is stored as one JSONB column and validated against a
+   * per-kind DTO at the service. Empty means no filter.
+   */
+  filters: string;
 }
 
 export interface ExportResponse {

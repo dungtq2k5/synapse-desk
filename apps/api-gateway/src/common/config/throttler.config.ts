@@ -102,6 +102,17 @@ export const ROUTE_THROTTLE = {
   knowledgeSearch: { ttl: 60_000, limit: 30 },
   /** Ask GENERATES, so it costs an order of magnitude more than search. */
   knowledgeAsk: { ttl: 60_000, limit: 10 },
+  /**
+   * An export writes a FILE, and nothing sweeps them.
+   *
+   * The tightest entry here, and the only one whose cost is storage rather than
+   * model spend: a ticket export can be tens of megabytes, `EXPORT_URL_TTL`
+   * expires the link and not the object, and there is no retention job. A
+   * held-down button is a bucket filling up. The PENDING dedupe in
+   * `AnalyticsExportService.request` is the other half — this bounds distinct
+   * requests, that one collapses identical ones.
+   */
+  export: { ttl: 60_000, limit: 5 },
 } as const;
 
 /**

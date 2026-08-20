@@ -1,7 +1,11 @@
 import { Global, Module } from '@nestjs/common';
 import { ClientsModule } from '@nestjs/microservices';
 import { ConfigService } from '@nestjs/config';
-import { createNatsTransport, NATS_CLIENT } from '@synapsedesk/common';
+import {
+  AuditPublisher,
+  createNatsTransport,
+  NATS_CLIENT,
+} from '@synapsedesk/common';
 import { TicketEventPublisher } from './ticket-event.publisher';
 
 /**
@@ -25,11 +29,15 @@ import { TicketEventPublisher } from './ticket-event.publisher';
       },
     ]),
   ],
-  providers: [TicketEventPublisher],
+  providers: [TicketEventPublisher, AuditPublisher],
   // `ClientsModule` is re-exported so NATS_CLIENT itself is injectable, not just
   // the publisher wrapping it. `StorageReferenceService` needs the raw client
   // to emit `storage.object.superseded`, and registering a SECOND client for
   // that would open a second connection to the same broker for one subject.
-  exports: [TicketEventPublisher, ClientsModule],
+  // `AuditPublisher` joins the same one broker connection. It publishes to
+  // `audit.record`, which THIS service also consumes — a round trip to itself,
+  // and deliberately so: one publish path means one place the emit-never-throw
+  // policy lives, and the consumer already owns the table.
+  exports: [TicketEventPublisher, AuditPublisher, ClientsModule],
 })
 export class EventsModule {}

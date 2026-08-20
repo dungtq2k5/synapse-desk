@@ -4,6 +4,7 @@ import {
   IsIn,
   IsInt,
   IsISO8601,
+  IsObject,
   IsOptional,
   IsUUID,
   Max,
@@ -92,4 +93,18 @@ export class CreateExportDto {
   @IsOptional()
   @IsUUID('4')
   readonly departmentId?: string;
+
+  /**
+   * Per-kind predicates the three kinds do not share.
+   *
+   * Validated at the SERVICE against `EXPORT_FILTER_KEYS`, not here: the
+   * allowed keys differ per kind, and a DTO cannot see which kind it carries
+   * without splitting into three. An unknown key is refused rather than stored
+   * and ignored — a filter the caller believes applied and that silently did
+   * not is the failure this shape is most exposed to.
+   */
+  @IsOptional()
+  @IsObject()
+  @ApiPropertyOptional({ type: 'object', additionalProperties: true })
+  readonly filters?: Record<string, string>;
 }

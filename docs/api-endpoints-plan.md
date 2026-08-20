@@ -315,7 +315,7 @@ RDM §1.7: `organization_id IS NULL`, `is_super_admin = true`; audit rows writte
 | GET | `/tickets/:id/history` | Audit trail for this ticket (status changes, reassignments) from `audit_logs`. | USER |
 | GET | `/tickets/:id/similar` | Past resolved tickets with similar content — agent co-pilot (product §6.3). Backed by `rag-service` over ticket embeddings. | perm:`ticket.read.all` |
 | POST | `/tickets/bulk` ✎ | Bulk status/assignee/priority update over `{ ticketIds[] }`. | perm:`ticket.update` |
-| GET | `/tickets/export` | CSV/XLSX export of a filtered queue. | perm:`ticket.export` |
+| POST | `/tickets/export` | **CSV only**, async: `202` with an export id, then `GET /tickets/export/:id` for the signed URL. `xlsx` is not a permitted `StoragePurpose.EXPORT` type and adding it means a library, a content-signature entry and a streaming story worse than CSV's — a spreadsheet opens a CSV. **POST, not GET**: a GET that writes is one a browser prefetch, a link preview or an automatic retry can trigger, each producing another file. Bounded by `MAX_EXPORT_SPAN_DAYS` and `MAX_EXPORT_ROWS`. | perm:`ticket.export` |
 
 ### 2.2 Ticket Messages — `/tickets/:id/messages`
 
@@ -392,7 +392,7 @@ Thin end-user surface over the same `tickets` + `ticket_messages` tables — a l
 | GET | `/audit-logs` | Tenant-scoped immutable trail. Filters `?action=&userId=&from=&to=`. | perm:`audit.read` |
 | GET | `/audit-logs/:id` | Single entry incl. the JSONB `metadata` snapshot. | perm:`audit.read` |
 | GET | `/audit-logs/actions` | Distinct `action` values, for filter dropdowns. | perm:`audit.read` |
-| GET | `/audit-logs/export` | Compliance export (CSV/JSONL). | perm:`audit.export` |
+| POST | `/audit-logs/export` | Compliance export, **CSV or `application/json`** — JSONL is not a permitted type, and a single JSON array costs one line's difference now that the whole file is built in memory. JSON is offered here and not for tickets because `audit_logs.metadata` is genuinely nested and CSV flattens it badly. **POST, not GET**, and `202` + poll, as above. | perm:`audit.export` |
 
 No `POST`/`PATCH`/`DELETE` — `audit_logs` is append-only and written internally via NATS.
 
@@ -477,7 +477,7 @@ Executive dashboard (product §6.6). Read-only, Redis-cached, `perm:analytics.re
 | GET | `/analytics/ai-usage` | Spend over time from `ai_generations`, broken down **by `purpose`** (chat answer vs draft vs summary vs embedding vs greeting classification) and by `model_name` and `ai_model_tier`, against `monthly_ai_token_budget`. The per-purpose split is what tells a tenant *where* their AI budget actually goes — often not where they assume. |
 | GET | `/analytics/documents` | Most-cited documents, **never-retrieved** vs **retrieved-but-never-cited** (RDM Table 27 — two different findings that were previously one flag), citation accuracy from `ai_response_feedbacks.citation_accurate`. Reads `document_chunks` usage counters, not the ledger, which is retention-rolled. |
 | GET | `/analytics/satisfaction` | Thumbs up/down trend from `ai_response_feedbacks`. |
-| GET | `/analytics/export` | Async report export → returns a job id, then a download URL. |
+| POST | `/analytics/export` | Async report export → `202` with an export id, then `GET /analytics/export/:id` for the signed URL. **Shipped.** |
 
 ---
 

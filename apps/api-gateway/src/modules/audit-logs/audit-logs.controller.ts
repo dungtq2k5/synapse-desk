@@ -1,4 +1,16 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { RequestContext } from '@synapsedesk/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionGuard } from '../../common/guards/permission.guard';
@@ -6,12 +18,20 @@ import { SuperAdminGuard } from '../../common/guards/super-admin.guard';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
+import {
+  AI_THROTTLER_TIER,
+  ROUTE_THROTTLE,
+} from '../../common/config/throttler.config';
+import { AnalyticsExportResponseDto } from '../analytics/dto/rest/analytics-response.dto';
 import { AuditLogsService } from './audit-logs.service';
 import {
   AuditActionsResponseDto,
   AuditLogResponseDto,
 } from './dto/rest/audit-log-response.dto';
-import { ListAuditLogsQueryDto } from './dto/rest/audit-log.dto';
+import {
+  CreateAuditLogExportDto,
+  ListAuditLogsQueryDto,
+} from './dto/rest/audit-log.dto';
 import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AUTH_SCHEMES } from '../../common/config/swagger.config';
 import {
@@ -51,6 +71,50 @@ export class AuditLogsController {
     @Query() query: ListAuditLogsQueryDto,
   ): Promise<PaginationResponseDto<AuditLogResponseDto>> {
     return this.auditLogs.list(query, context);
+  }
+
+  /**
+   * Request a compliance export. **POST, and `202`.**
+   *
+   * A GET that writes is one a browser prefetch, a link preview or an automatic
+   * retry can trigger, and each would produce another file against a tenant's
+   * storage. The plan named GET; the shipped analytics export settled this.
+   *
+   * CSV or `application/json` — `audit_logs.metadata` is genuinely nested and
+   * CSV flattens it into one quoted cell, which is the argument for offering
+   * JSON here and not on the ticket export.
+   *
+   * **The request itself is audited**, which closes a circularity: without it
+   * the one export whose purpose is compliance was the only act missing from
+   * the log it exports.
+   */
+  @ApiOperation({ summary: 'Request an audit-log export' })
+  @ApiWrappedResponse(AnalyticsExportResponseDto, {
+    status: HttpStatus.ACCEPTED,
+  })
+  @ApiFilterErrors(['400', '401', '403'])
+  @Throttle({ [AI_THROTTLER_TIER]: ROUTE_THROTTLE.export })
+  @Post('export')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @RequirePermission('audit.export')
+  createExport(
+    @CurrentUser() context: RequestContext,
+    @Body() dto: CreateAuditLogExportDto,
+  ): Promise<AnalyticsExportResponseDto> {
+    return this.auditLogs.createExport(dto, context);
+  }
+
+  /** Poll for the file. Another tenant's id answers 404, never 403. */
+  @ApiOperation({ summary: 'Get an audit-log export' })
+  @ApiWrappedResponse(AnalyticsExportResponseDto)
+  @ApiFilterErrors(['400', '401', '403', '404'])
+  @Get('export/:id')
+  @RequirePermission('audit.export')
+  getExport(
+    @CurrentUser() context: RequestContext,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<AnalyticsExportResponseDto> {
+    return this.auditLogs.getExport(id, context);
   }
 
   /**

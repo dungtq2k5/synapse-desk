@@ -13,6 +13,11 @@ import {
 import { RequestContext } from '@synapsedesk/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionGuard } from '../../common/guards/permission.guard';
+import { Throttle } from '@nestjs/throttler';
+import {
+  AI_THROTTLER_TIER,
+  ROUTE_THROTTLE,
+} from '../../common/config/throttler.config';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AnalyticsService } from './analytics.service';
@@ -181,6 +186,10 @@ export class AnalyticsController {
     status: HttpStatus.ACCEPTED,
   })
   @ApiFilterErrors(['400', '401', '403'])
+  // Its own limit, and the tightest in the file: this writes a file nothing
+  // sweeps. `AI_THROTTLER_TIER` because the tier's storage is already wired,
+  // not because an export spends model budget — it does not.
+  @Throttle({ [AI_THROTTLER_TIER]: ROUTE_THROTTLE.export })
   @Post('export')
   @HttpCode(HttpStatus.ACCEPTED)
   createExport(

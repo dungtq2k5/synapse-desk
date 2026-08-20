@@ -7,6 +7,8 @@ import {
   IsArray,
   IsBoolean,
   IsIn,
+  IsISO8601,
+  IsObject,
   IsOptional,
   IsString,
   IsUUID,
@@ -175,4 +177,30 @@ export class ListTicketsQueryDto extends OmitType(SearchPaginationDto, [
   @ToBoolean()
   @ApiPropertyOptional()
   readonly includeDeleted: boolean = false;
+}
+
+/**
+ * `POST /tickets/export`.
+ *
+ * The range is required and bounded (`MAX_EXPORT_SPAN_DAYS`), because the byte
+ * bound counts rows while a span counts days and neither alone holds the line —
+ * `MAX_EXPORT_ROWS` is the one that does, checked pre-flight by the renderer so
+ * the refusal can name the count.
+ */
+export class CreateTicketExportDto {
+  @IsISO8601({ strict: true })
+  readonly from!: string;
+
+  @IsISO8601({ strict: true })
+  readonly to!: string;
+
+  @IsOptional()
+  @IsUUID('4')
+  readonly departmentId?: string;
+
+  /** `status`, `priority`, `assigneeId` — refused per kind at the service. */
+  @IsOptional()
+  @IsObject()
+  @ApiPropertyOptional({ type: 'object', additionalProperties: true })
+  readonly filters?: Record<string, string>;
 }

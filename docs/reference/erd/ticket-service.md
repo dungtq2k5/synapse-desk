@@ -161,6 +161,9 @@ erDiagram
     DateTime from_day 
     DateTime to_day 
     String department_id "❓"
+    String timezone "❓"
+    Boolean unrestricted 
+    Json filters "❓"
     String status 
     String object_path "❓"
     Int row_count "❓"

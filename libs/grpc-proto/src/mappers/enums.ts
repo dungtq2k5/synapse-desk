@@ -650,6 +650,8 @@ const auditAction = enumBridge<AuditAction, ProtoAuditAction>(
       ProtoAuditAction.AUDIT_ACTION_DOCUMENT_FLAG_DISMISSED,
     [AuditAction.DOCUMENT_FLAG_DELETED]:
       ProtoAuditAction.AUDIT_ACTION_DOCUMENT_FLAG_DELETED,
+    [AuditAction.DATA_EXPORT_REQUESTED]:
+      ProtoAuditAction.AUDIT_ACTION_DATA_EXPORT_REQUESTED,
   },
   ProtoAuditAction.AUDIT_ACTION_UNSPECIFIED,
 );
@@ -667,6 +669,8 @@ const auditResourceType = enumBridge<AuditResourceType, ProtoAuditResourceType>(
       ProtoAuditResourceType.AUDIT_RESOURCE_TYPE_ORGANIZATION,
     [AuditResourceType.DOCUMENT_FLAG]:
       ProtoAuditResourceType.AUDIT_RESOURCE_TYPE_DOCUMENT_FLAG,
+    [AuditResourceType.EXPORT]:
+      ProtoAuditResourceType.AUDIT_RESOURCE_TYPE_EXPORT,
   },
   ProtoAuditResourceType.AUDIT_RESOURCE_TYPE_UNSPECIFIED,
 );
@@ -687,6 +691,10 @@ const analyticsExportKind = enumBridge<
       ProtoAnalyticsExportKind.ANALYTICS_EXPORT_KIND_TICKET_DAILY,
     [AnalyticsExportKind.AGENT_DAILY]:
       ProtoAnalyticsExportKind.ANALYTICS_EXPORT_KIND_AGENT_DAILY,
+    [AnalyticsExportKind.TICKET]:
+      ProtoAnalyticsExportKind.ANALYTICS_EXPORT_KIND_TICKET,
+    [AnalyticsExportKind.AUDIT_LOG]:
+      ProtoAnalyticsExportKind.ANALYTICS_EXPORT_KIND_AUDIT_LOG,
   },
   ProtoAnalyticsExportKind.ANALYTICS_EXPORT_KIND_UNSPECIFIED,
 );

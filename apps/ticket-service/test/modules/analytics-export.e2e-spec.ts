@@ -1,3 +1,4 @@
+import { faker } from '@faker-js/faker';
 import {
   AnalyticsExportKind as ProtoAnalyticsExportKind,
   fromProtoAnalyticsExportStatus,
@@ -8,6 +9,7 @@ import { expectRpc } from '@synapsedesk/common/testing/rpc';
 import {
   AnalyticsExportKind,
   AnalyticsExportStatus,
+  compareAlphabetically,
 } from '@synapsedesk/common';
 import { E2eFixture, bootstrapE2eTest, memberContext } from '../utils';
 import { buildTenant, createTicket, TenantFixture } from '../factories';
@@ -58,6 +60,7 @@ describe('The analytics export (e2e)', () => {
         kind: toProtoAnalyticsExportKind(AnalyticsExportKind.TICKET_DAILY),
         from: '2026-03-01',
         to: '2026-03-31',
+        filters: '',
         ...overrides,
       },
       caller(),
@@ -154,6 +157,189 @@ describe('The analytics export (e2e)', () => {
   });
 
   afterAll(() => fx.close());
+
+  describe('requesting', () => {
+    it('**0a. two callers with DIFFERENT visibility get different exports**', async () => {
+      // The dedupe matched on the range alone, so an agent asking for what an
+      // admin had just asked for was handed the ADMIN's export id — a file
+      // rendered under `unrestricted: true`, containing every ticket in the
+      // tenant. Latent today because `ticket.export` and `ticket.read.all` are
+      // held by the same role; live the first time a custom role grants one
+      // without the other, which is the caller `unrestricted` was built for.
+      const admin = memberContext(
+        { id: tenant.agentId, organizationId: tenant.organizationId },
+        ['analytics.read', 'ticket.read.all'],
+      );
+      const restricted = memberContext(
+        { id: tenant.agentId, organizationId: tenant.organizationId },
+        ['analytics.read'],
+      );
+
+      const wide = await facade.create(
+        {
+          kind: toProtoAnalyticsExportKind(AnalyticsExportKind.TICKET),
+          from: '2026-03-01',
+          to: '2026-03-31',
+          filters: '',
+        },
+        admin,
+      );
+      const narrow = await facade.create(
+        {
+          kind: toProtoAnalyticsExportKind(AnalyticsExportKind.TICKET),
+          from: '2026-03-01',
+          to: '2026-03-31',
+          filters: '',
+        },
+        restricted,
+      );
+
+      expect(narrow.id).not.toBe(wide.id);
+
+      const rows = await fx.prisma.analyticsExport.findMany({
+        orderBy: { createdAt: 'asc' },
+      });
+      expect(rows.map((row) => row.unrestricted)).toEqual([true, false]);
+    });
+
+    it('**0b. an export belongs to the person who asked for it**', async () => {
+      // The other half. Scoping the read closes the escalation; widening the
+      // dedupe is what stops a caller being handed an id their own poll would
+      // then refuse.
+      const mine = await request();
+      const somebodyElse = memberContext(
+        { id: faker.string.uuid(), organizationId: tenant.organizationId },
+        ['analytics.read'],
+      );
+
+      await expectRpc(facade.get(mine.id, somebodyElse), status.NOT_FOUND);
+    });
+
+    it('0c. a different FILTER set is a different export', async () => {
+      // `filters: undefined` in a Prisma `where` means "do not constrain", so
+      // an unfiltered request would otherwise match every filtered PENDING row.
+      const unfiltered = await facade.create(
+        {
+          kind: toProtoAnalyticsExportKind(AnalyticsExportKind.TICKET),
+          from: '2026-03-01',
+          to: '2026-03-31',
+          filters: '',
+        },
+        caller(),
+      );
+      const filtered = await facade.create(
+        {
+          kind: toProtoAnalyticsExportKind(AnalyticsExportKind.TICKET),
+          from: '2026-03-01',
+          to: '2026-03-31',
+          filters: JSON.stringify({ status: 'OPEN' }),
+        },
+        caller(),
+      );
+
+      expect(filtered.id).not.toBe(unfiltered.id);
+      expect(await fx.prisma.analyticsExport.count()).toBe(2);
+    });
+
+    it('**an identical PENDING request returns THAT export, not a second one**', async () => {
+      // A double-click otherwise writes two rows, two jobs and two objects —
+      // and nothing sweeps exports, so the second is a full copy of tenant data
+      // kept forever. `jobId` already makes a duplicated ENQUEUE a no-op; this
+      // is the same idea one layer up, where a duplicate costs a file.
+      const first = await request();
+      const second = await request();
+
+      expect(second.id).toBe(first.id);
+      expect(await fx.prisma.analyticsExport.count()).toBe(1);
+    });
+
+    it('2. a DIFFERENT range is a different export', async () => {
+      // Matched on the whole request: two ranges are two files.
+      const first = await request();
+      const second = await request({ to: '2026-04-30' });
+
+      expect(second.id).not.toBe(first.id);
+      expect(await fx.prisma.analyticsExport.count()).toBe(2);
+    });
+
+    it('**2b. a range longer than the span cap is refused, before any work**', async () => {
+      // The cheap guard. It bounds DAYS while the byte bound counts ROWS, so it
+      // guarantees nothing alone — but it refuses the common mistake instantly
+      // and names the limit instead of failing an hour later.
+      await expectRpc(
+        request({ from: '2026-01-01', to: '2026-12-31' }),
+        status.INVALID_ARGUMENT,
+      );
+
+      expect(await fx.prisma.analyticsExport.count()).toBe(0);
+    });
+
+    it('2c. an INVERTED range is refused too', async () => {
+      await expectRpc(
+        request({ from: '2026-03-31', to: '2026-03-01' }),
+        status.INVALID_ARGUMENT,
+      );
+    });
+
+    it('2d. exactly the cap is accepted', async () => {
+      // 92 days inclusive: 1 January to 2 April.
+      await expect(
+        request({ from: '2026-01-01', to: '2026-04-02' }),
+      ).resolves.toBeDefined();
+    });
+
+    it('**3. requesting one is audited, at REQUEST time**', async () => {
+      // The act is that a person asked for a copy of tenant data — true whether
+      // or not the file ever renders.
+      fx.audit.record.mockClear();
+
+      const created = await request();
+
+      const [[, event]] = fx.audit.record.mock.calls as [
+        [
+          unknown,
+          {
+            action: string;
+            resourceType: string;
+            resourceId: string;
+            metadata: Record<string, unknown>;
+          },
+        ],
+      ];
+      expect(event.action).toBe('DATA_EXPORT_REQUESTED');
+      expect(event.resourceType).toBe('EXPORT');
+      expect(event.resourceId).toBe(created.id);
+      expect(event.metadata).toMatchObject({
+        kind: AnalyticsExportKind.TICKET_DAILY,
+      });
+    });
+
+    it('4. the audit row carries the RANGE and no filters', async () => {
+      // A ticket filter can carry a search term, and an audit trail is not a
+      // second copy of tenant prose.
+      fx.audit.record.mockClear();
+
+      await request();
+
+      const [[, event]] = fx.audit.record.mock.calls as [
+        [unknown, { metadata: Record<string, unknown> }],
+      ];
+      expect(Object.keys(event.metadata).sort(compareAlphabetically)).toEqual(
+        ['fromDay', 'kind', 'toDay'].sort(compareAlphabetically),
+      );
+    });
+
+    it('5. a de-duplicated request is NOT audited twice', async () => {
+      // Nothing new was asked for — the caller was handed the export that
+      // already existed.
+      await request();
+      fx.audit.record.mockClear();
+
+      await request();
+
+      expect(fx.audit.record).not.toHaveBeenCalled();
+    });
+  });
 
   describe('the job', () => {
     it('1. Returns a job id IMMEDIATELY; the file appears later', async () => {
@@ -343,10 +529,224 @@ describe('The analytics export (e2e)', () => {
     });
   });
 
+  describe('the row exports', () => {
+    const ticketExport = (overrides = {}) =>
+      facade.create(
+        {
+          kind: toProtoAnalyticsExportKind(AnalyticsExportKind.TICKET),
+          from: '2026-03-01',
+          to: '2026-03-31',
+          filters: '',
+          ...overrides,
+        },
+        caller(),
+      );
+
+    it('**1. a ticket export contains only what the CALLER can see**', async () => {
+      // An export is a read, and a read that ignores the boundary its list
+      // respects is the widest possible leak of it. This caller holds
+      // `analytics.read` and NOT `ticket.read.all`, so the file is theirs.
+      const mine = await createTicket(fx.prisma, tenant, {
+        createdAt: at('2026-03-02T09:00:00.000Z'),
+        authorId: tenant.agentId,
+        title: 'Mine',
+      });
+      await createTicket(fx.prisma, tenant, {
+        createdAt: at('2026-03-03T09:00:00.000Z'),
+        title: 'Somebody elses',
+      });
+
+      const created = await ticketExport();
+      await runWorker(created.id);
+
+      const [csv] = uploadedBodies;
+      expect(csv).toContain(mine.id);
+      expect(csv).not.toContain('Somebody elses');
+    });
+
+    it('**2. a title containing a comma does not shift the columns**', async () => {
+      // Every rollup column is a date or an integer; a ticket title is free
+      // text, and one comma would move every field after it.
+      await createTicket(fx.prisma, tenant, {
+        createdAt: at('2026-03-02T09:00:00.000Z'),
+        authorId: tenant.agentId,
+        title: 'Login fails, sometimes',
+      });
+
+      const created = await ticketExport();
+      await runWorker(created.id);
+
+      const [csv] = uploadedBodies;
+      expect(csv).toContain('"Login fails, sometimes"');
+      expect(csv).toContain('ticket_id,ticket_number,title,');
+    });
+
+    it('**3. a range with more rows than the cap FAILS with the count**', async () => {
+      // The refusal has to name the number, or "your export failed" is all the
+      // caller gets from a limit they could have acted on.
+      await createTicket(fx.prisma, tenant, {
+        createdAt: at('2026-03-02T09:00:00.000Z'),
+        authorId: tenant.agentId,
+      });
+      jest.spyOn(fx.prisma.ticket, 'count').mockResolvedValueOnce(140_000);
+
+      const created = await ticketExport();
+      // **Does NOT reject.** The count is the same on every attempt, so a
+      // rethrow would spend the queue's one slot re-counting the same range
+      // twice more to reach the answer the caller already has. Tests 11 and 12
+      // assert the opposite for storage failures, which is the point.
+      await expect(runWorker(created.id)).resolves.toBeUndefined();
+
+      const row = await fx.prisma.analyticsExport.findUniqueOrThrow({
+        where: { id: created.id },
+      });
+      expect(row.status).toBe(AnalyticsExportStatus.FAILED);
+      expect(row.errorLog).toContain('140,000');
+      expect(row.errorLog).toContain('Narrow the range');
+    });
+
+    it('4. an audit-log export flattens `metadata` into one quoted cell', async () => {
+      // The nested column, and the argument for offering JSON on this export
+      // and not on the ticket one.
+      await fx.prisma.auditLog.create({
+        data: {
+          organizationId: tenant.organizationId,
+          action: 'USER_ROLES_UPDATED',
+          resourceType: 'USER',
+          resourceId: tenant.agentId,
+          userId: tenant.agentId,
+          metadata: { before: ['a'], after: ['a', 'b'] },
+          createdAt: at('2026-03-04T09:00:00.000Z'),
+        },
+      });
+
+      const created = await facade.create(
+        {
+          kind: toProtoAnalyticsExportKind(AnalyticsExportKind.AUDIT_LOG),
+          from: '2026-03-01',
+          to: '2026-03-31',
+          filters: '',
+        },
+        caller(),
+      );
+      await runWorker(created.id);
+
+      const [csv] = uploadedBodies;
+      expect(csv).toContain('USER_ROLES_UPDATED');
+      // Quoted, and every inner quote doubled — RFC 4180.
+      expect(csv).toContain('""before""');
+    });
+
+    it('**8. the range is the TENANT’S month, not the server’s**', async () => {
+      // `from_day`/`to_day` are local dates — the same domain the rollups bucket
+      // by. Comparing them against UTC midnight exports a different range than
+      // the rollup kinds do from the same request: at UTC+7 that is seven hours
+      // of July included and seven hours of 31 August dropped.
+      jest
+        .spyOn(
+          fx.moduleRef.get(AuthReferenceService),
+          'listOrganizationTimezones',
+        )
+        .mockResolvedValue(new Map([[tenant.organizationId, 'Asia/Bangkok']]));
+
+      // 17:10 UTC on 31 July is 00:10 on 1 August in Bangkok — INSIDE the
+      // tenant's August, outside UTC's.
+      const localAugust = await createTicket(fx.prisma, tenant, {
+        createdAt: at('2026-07-31T17:10:00.000Z'),
+        authorId: tenant.agentId,
+        title: 'Local August',
+      });
+      // 20:00 UTC on 31 August is 03:00 on 1 September in Bangkok — OUTSIDE the
+      // tenant's August, inside UTC's.
+      await createTicket(fx.prisma, tenant, {
+        createdAt: at('2026-08-31T20:00:00.000Z'),
+        authorId: tenant.agentId,
+        title: 'Local September',
+      });
+
+      const created = await facade.create(
+        {
+          kind: toProtoAnalyticsExportKind(AnalyticsExportKind.TICKET),
+          from: '2026-08-01',
+          to: '2026-08-31',
+          filters: '',
+        },
+        caller(),
+      );
+      await runWorker(created.id);
+
+      const [csv] = uploadedBodies;
+      expect(csv).toContain(localAugust.id);
+      expect(csv).not.toContain('Local September');
+    });
+
+    it('**5. an unknown filter key is REFUSED, not stored and ignored**', async () => {
+      // The JSON column is storage, not a contract. A filter the caller
+      // believes applied and that silently did not is the failure this shape is
+      // most exposed to.
+      await expectRpc(
+        ticketExport({ filters: JSON.stringify({ notAKey: 'x' }) }),
+        status.INVALID_ARGUMENT,
+      );
+
+      expect(await fx.prisma.analyticsExport.count()).toBe(0);
+    });
+
+    it('**9. an unknown filter VALUE is refused, not silently unmatched**', async () => {
+      // Keys were already refused; a value one level down produced a READY
+      // zero-row export — the same silently-dropped filter, wearing a different
+      // shape.
+      await expectRpc(
+        ticketExport({ filters: JSON.stringify({ status: 'NONSENSE' }) }),
+        status.INVALID_ARGUMENT,
+      );
+    });
+
+    it('10b. the value must be spelled as the enum spells it', async () => {
+      // Exact, deliberately: coercing `open` to `OPEN` would reintroduce the
+      // silent no-match for every other near-miss.
+      await expectRpc(
+        ticketExport({ filters: JSON.stringify({ status: 'open' }) }),
+        status.INVALID_ARGUMENT,
+      );
+
+      await expect(
+        ticketExport({ filters: JSON.stringify({ status: 'OPEN' }) }),
+      ).resolves.toBeDefined();
+    });
+
+    it('10c. an id-shaped filter takes any string', async () => {
+      // `assigneeId` names no enum: a wrong id is a legitimately empty result
+      // rather than a typo the system can catch.
+      await expect(
+        ticketExport({
+          filters: JSON.stringify({ assigneeId: faker.string.uuid() }),
+        }),
+      ).resolves.toBeDefined();
+    });
+
+    it('6. a filter legal for ANOTHER kind is still refused', async () => {
+      // `action` is an audit-log filter. Allowed keys are per kind, not global.
+      await expectRpc(
+        ticketExport({ filters: JSON.stringify({ action: 'USER_CREATED' }) }),
+        status.INVALID_ARGUMENT,
+      );
+    });
+
+    it('7. the rollup kinds take NO filters at all', async () => {
+      await expectRpc(
+        request({ filters: JSON.stringify({ status: 'OPEN' }) }),
+        status.INVALID_ARGUMENT,
+      );
+    });
+  });
+
   describe('failure', () => {
-    it('11. **Reports FAILURE rather than producing an empty file**', async () => {
-      // An empty CSV reads as "no data", which is a wrong answer rather than an
-      // error — and the reader has no way to tell the difference.
+    it('11. **Reports failure when PRESIGN is rejected**', async () => {
+      // A storage failure, not the empty-file rule — test 10 covers what an
+      // empty range does, and it is READY. This one exists for the other half:
+      // a failure must reach the poll route with its reason, and must not leave
+      // a file behind.
       await seedRollup();
       presignExport.mockRejectedValue(new Error('storage is down'));
 

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { RequestContext } from '@synapsedesk/common';
+import { AnalyticsExportKind, RequestContext } from '@synapsedesk/common';
 import {
   toProtoTicketPriority,
   toProtoTicketSource,
@@ -18,7 +18,10 @@ import {
   CreateTicketDto,
   ListTicketsQueryDto,
   UpdateTicketDto,
+  CreateTicketExportDto,
 } from './dto/rest/ticket.dto';
+import { AnalyticsService } from '../analytics/analytics.service';
+import { AnalyticsExportResponseDto } from '../analytics/dto/rest/analytics-response.dto';
 import {
   BulkTicketStatusResponseDto,
   TicketResponseDto,
@@ -27,7 +30,12 @@ import {
 /** The gateway's ticket surface. Returns REST DTOs; the wire stays in the client. */
 @Injectable()
 export class TicketsService {
-  constructor(private readonly ticketsGrpcClient: TicketsGrpcClient) {}
+  constructor(
+    private readonly ticketsGrpcClient: TicketsGrpcClient,
+    // The export lifecycle is shared with analytics and audit logs — one table,
+    // one queue, one processor. This module owns the ROUTE.
+    private readonly analytics: AnalyticsService,
+  ) {}
 
   async list(
     query: ListTicketsQueryDto,
@@ -156,5 +164,35 @@ export class TicketsService {
     return toTicketResponseDto(
       await this.ticketsGrpcClient.restore(id, context),
     );
+  }
+
+  /**
+   * Requests a ticket export through the shared export lifecycle.
+   *
+   * The visibility the file honours is resolved in ticket-service from the
+   * caller context this request carries — not here, and not later in the
+   * worker, which has no caller at all.
+   */
+  async createExport(
+    dto: CreateTicketExportDto,
+    context: RequestContext,
+  ): Promise<AnalyticsExportResponseDto> {
+    return this.analytics.createExport(
+      {
+        kind: AnalyticsExportKind.TICKET,
+        from: dto.from,
+        to: dto.to,
+        departmentId: dto.departmentId,
+        filters: dto.filters,
+      },
+      context,
+    );
+  }
+
+  async getExport(
+    id: string,
+    context: RequestContext,
+  ): Promise<AnalyticsExportResponseDto> {
+    return this.analytics.getExport(id, context);
   }
 }

@@ -350,7 +350,13 @@ export class AnalyticsService {
   ): Promise<AnalyticsExportResponseDto> {
     return toAnalyticsExportResponseDto(
       await this.client.createExport(
-        { ...dto, kind: toProtoAnalyticsExportKind(dto.kind) },
+        {
+          ...dto,
+          kind: toProtoAnalyticsExportKind(dto.kind),
+          // Serialized at the edge, validated per kind at the service. `''` is
+          // "no filters" — proto3 has no null for a scalar.
+          filters: dto.filters ? JSON.stringify(dto.filters) : '',
+        },
         context,
       ),
     );

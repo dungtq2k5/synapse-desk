@@ -15,6 +15,12 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { RequestContext } from '@synapsedesk/common';
+import { Throttle } from '@nestjs/throttler';
+import {
+  AI_THROTTLER_TIER,
+  ROUTE_THROTTLE,
+} from '../../common/config/throttler.config';
+import { AnalyticsExportResponseDto } from '../analytics/dto/rest/analytics-response.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionGuard } from '../../common/guards/permission.guard';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
@@ -30,6 +36,7 @@ import {
   CreateTicketDto,
   ListTicketsQueryDto,
   UpdateTicketDto,
+  CreateTicketExportDto,
 } from './dto/rest/ticket.dto';
 import {
   BulkTicketStatusResponseDto,
@@ -157,6 +164,50 @@ export class TicketsController {
   // -------------------------------------------------------------------------
   // The state machine. Five routes, one validator in the service.
   // -------------------------------------------------------------------------
+
+  /**
+   * Request a ticket export. **POST and `202`**, like every export here.
+   *
+   * **CSV only.** `xlsx` is not a permitted `StoragePurpose.EXPORT` type, and
+   * adding it means a library, a content-signature entry and a streaming story
+   * worse than CSV's — a spreadsheet opens a CSV.
+   *
+   * **Declared before `@Post(':id/status')`**, which would otherwise match
+   * `export` as an id and turn this into a 400 from `ParseUUIDPipe` — the same
+   * hazard `bulk/status` above carries, and the reason both sit here.
+   *
+   * The file contains what the CALLER can see, resolved when they ask: an
+   * export is a read, and a read that ignores the boundary its list respects is
+   * the widest possible leak of it.
+   */
+  @ApiOperation({ summary: 'Request a ticket export' })
+  @ApiWrappedResponse(AnalyticsExportResponseDto, {
+    status: HttpStatus.ACCEPTED,
+  })
+  @ApiFilterErrors(['400', '401', '403'])
+  @Throttle({ [AI_THROTTLER_TIER]: ROUTE_THROTTLE.export })
+  @Post('export')
+  @RequirePermission('ticket.export')
+  @HttpCode(HttpStatus.ACCEPTED)
+  createExport(
+    @CurrentUser() context: RequestContext,
+    @Body() dto: CreateTicketExportDto,
+  ): Promise<AnalyticsExportResponseDto> {
+    return this.tickets.createExport(dto, context);
+  }
+
+  /** Poll for the file. Another tenant's id answers 404, never 403. */
+  @ApiOperation({ summary: 'Get a ticket export' })
+  @ApiWrappedResponse(AnalyticsExportResponseDto)
+  @ApiFilterErrors(['400', '401', '403', '404'])
+  @Get('export/:id')
+  @RequirePermission('ticket.export')
+  getExport(
+    @CurrentUser() context: RequestContext,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<AnalyticsExportResponseDto> {
+    return this.tickets.getExport(id, context);
+  }
 
   /**
    * Declared BEFORE every `:id/...` route.

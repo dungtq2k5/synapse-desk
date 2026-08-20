@@ -1,6 +1,9 @@
 /** @file What an analytics export may be, and how large it may get. */
 
 import type { MimeType } from './mime.config';
+import { AnalyticsExportKind } from './analytics.config';
+import { TICKET_PRIORITIES, TicketStatus } from './ticket.config';
+import { AuditAction, AuditResourceType } from '../contracts/audit.contract';
 
 /**
  * The content types an analytics EXPORT may carry.
@@ -20,9 +23,85 @@ export type ExportMimeType = (typeof EXPORT_MIME_TYPES)[number];
 /**
  * The largest an export object may be.
  *
- * **A bug bound, not a product limit.** A quarter of one tenant's rollup rows is
- * kilobytes; this exists so a runaway query cannot write a gigabyte into the
- * bucket. It is deliberately the same figure as {@link MAX_DOCUMENT_BYTES} and
+ * **A bug bound, not a product limit** — still, and now because something else
+ * does the limiting: {@link MAX_EXPORT_ROWS} refuses an oversized row export
+ * before it renders, so a tenant meets a message naming their row count rather
+ * than this constant. A quarter of one tenant's rollup rows is kilobytes; this
+ * exists so a runaway query cannot write a gigabyte into the bucket. It is deliberately the same figure as {@link MAX_DOCUMENT_BYTES} and
  * for an unrelated reason — do not fold them together.
  */
 export const MAX_EXPORT_BYTES = 25 * 1024 * 1024;
+
+/**
+ * The longest range one export may cover.
+ *
+ * The **cheap** guard: a 400 at the gateway before any work happens. 92 days is
+ * a quarter, which is what an export is usually for; "last year" is four calls.
+ *
+ * It bounds DAYS, and the byte bound counts ROWS — so this alone guarantees
+ * nothing. At 300 tickets/day a 92-day export is ~28,000 rows and comfortable;
+ * at 1,000/day it is ~92,000 rows and over. {@link MAX_EXPORT_ROWS} is what
+ * actually holds the line; this exists so the common mistake is refused
+ * instantly rather than after a count.
+ */
+export const MAX_EXPORT_SPAN_DAYS = 92;
+
+/**
+ * The most rows one export may contain.
+ *
+ * The **real** guard, checked pre-flight by the renderer against its own
+ * `where` — so the refusal can say *"this range has 140,000 tickets; narrow
+ * it"* rather than "your export failed".
+ *
+ * Sized under {@link MAX_EXPORT_BYTES}: a ticket row is roughly 200–300 bytes
+ * of CSV, so 100,000 rows is 20–30 MB and the byte bound is the backstop rather
+ * than the thing a tenant meets. That keeps `MAX_EXPORT_BYTES` what its
+ * docblock says it is — a bug bound — because the row cap is what limits the
+ * product.
+ *
+ * Applies to {@link ROW_EXPORT_KINDS} only. A rollup export is one row per day
+ * per dimension and cannot approach it.
+ */
+export const MAX_EXPORT_ROWS = 100_000;
+
+/**
+ * The legal VALUES for each filter key, where the key names an enum.
+ *
+ * Keys are refused when unknown; values must be too, one level down. A
+ * `{ status: "NONSENSE" }` that passes validation reaches Prisma, matches
+ * nothing, and produces a READY zero-row export — which is the same failure
+ * refusing an unknown KEY exists to prevent: a filter the caller believes
+ * applied and that silently did not.
+ *
+ * **Exact spelling, deliberately.** These are the enum's own values, so
+ * `{ status: "open" }` is refused rather than coerced — a case-insensitive
+ * match would reintroduce the silent no-match for every other near-miss.
+ *
+ * A key absent here takes any string: `assigneeId` and `userId` are ids, not
+ * enums, and a wrong one is a legitimately empty result rather than a typo the
+ * system can catch.
+ */
+export const EXPORT_FILTER_VALUES: Partial<Record<string, readonly string[]>> =
+  {
+    status: Object.values(TicketStatus),
+    priority: TICKET_PRIORITIES,
+    action: Object.values(AuditAction),
+    resourceType: Object.values(AuditResourceType),
+  };
+
+/**
+ * The filter keys each export kind accepts, declared ONCE for both edges.
+ *
+ * Drives the gateway DTO's `@IsIn`-equivalent shape and the service's refusal
+ * of an unknown key — the same "declared once" rule the sortable-field arrays
+ * follow, and for the same reason: two lists that must agree eventually do not.
+ *
+ * The rollup kinds take none. Their whole predicate is the range and the
+ * department, both of which are typed columns rather than JSON.
+ */
+export const EXPORT_FILTER_KEYS = {
+  TICKET_DAILY: [],
+  AGENT_DAILY: [],
+  TICKET: ['status', 'priority', 'assigneeId'],
+  AUDIT_LOG: ['action', 'resourceType', 'userId'],
+} as const satisfies Record<AnalyticsExportKind, readonly string[]>;

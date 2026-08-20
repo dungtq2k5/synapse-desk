@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
+import { AnalyticsModule } from '../analytics/analytics.module';
 import { TicketsController } from './tickets.controller';
 import { TicketsGrpcClient } from './tickets-grpc.client';
 import { TicketsService } from './tickets.service';
@@ -25,7 +26,9 @@ import { TicketMessagesResolver } from './ticket-messages.resolver';
  * them must share the single channel to ticket-service.
  */
 @Module({
-  imports: [AuthModule],
+  // For `AnalyticsService`: the export lifecycle is shared across all three
+  // export routes, and this module owns one of them.
+  imports: [AuthModule, AnalyticsModule],
   controllers: [
     TicketsController,
     MessagesController,

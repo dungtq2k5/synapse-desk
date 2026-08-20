@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { AuditPublisher } from '@synapsedesk/common';
 import { AppModule } from '../../src/app.module';
 import { PrismaService } from '../../src/modules/prisma/prisma.service';
 import { DatabaseSeeder } from '../../src/modules/prisma/database.seeder';
@@ -7,6 +8,14 @@ import { stopWorkers } from './export-worker';
 export type E2eFixture = {
   moduleRef: TestingModule;
   prisma: PrismaService;
+  /**
+   * The audit publisher, STUBBED.
+   *
+   * Not merely observed: `record()` emits to NATS, and this service now
+   * publishes as well as consuming — an unstubbed suite would put test rows on
+   * a developer's broker and mirror every one to the log.
+   */
+  audit: { record: jest.SpyInstance };
   /** Empty every table, then re-apply the DDL. Call in `beforeEach`. */
   reset: () => Promise<void>;
   close: () => Promise<void>;
@@ -44,7 +53,16 @@ export async function bootstrapE2eTest(): Promise<E2eFixture> {
   // never created.
   await seeder.seed();
 
+  // Stubbed BEFORE anything can call it. `AuditPublisher` lives in
+  // `libs/common` and is provided by the @Global `EventsModule`, so one spy
+  // covers every caller in the service.
+  const auditPublisher = moduleRef.get(AuditPublisher);
+  const audit = {
+    record: jest.spyOn(auditPublisher, 'record').mockImplementation(() => {}),
+  };
+
   const reset = async (): Promise<void> => {
+    audit.record.mockClear();
     // TRUNCATE, unlike auth-service's careful DELETE-with-predicate, because
     // Domain B seeds no ROWS at all: there is no permission catalogue, no system
     // actor and no global role to preserve. Every row in this database belongs
@@ -87,5 +105,5 @@ export async function bootstrapE2eTest(): Promise<E2eFixture> {
     await moduleRef.close();
   };
 
-  return { moduleRef, prisma, reset, close };
+  return { moduleRef, prisma, audit, reset, close };
 }

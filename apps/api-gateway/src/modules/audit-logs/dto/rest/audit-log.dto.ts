@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
-import { IsIn, IsOptional, IsUUID } from 'class-validator';
+import { IsIn, IsISO8601, IsObject, IsOptional, IsUUID } from 'class-validator';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { AuditAction, AuditResourceType } from '@synapsedesk/common';
 import { SearchPaginationDto } from '../../../../common/dto/rest/search-pagination.dto';
 
@@ -34,4 +35,25 @@ export class ListAuditLogsQueryDto extends SearchPaginationDto {
   @IsOptional()
   @Type(() => Date)
   readonly to?: Date;
+}
+
+/**
+ * `POST /audit-logs/export`.
+ *
+ * The range is required and bounded — `MAX_EXPORT_SPAN_DAYS` at the service —
+ * because the byte bound counts rows while a span counts days, and neither
+ * alone holds the line.
+ */
+export class CreateAuditLogExportDto {
+  @IsISO8601({ strict: true })
+  readonly from!: string;
+
+  @IsISO8601({ strict: true })
+  readonly to!: string;
+
+  /** `action`, `resourceType`, `userId` — refused per kind at the service. */
+  @IsOptional()
+  @IsObject()
+  @ApiPropertyOptional({ type: 'object', additionalProperties: true })
+  readonly filters?: Record<string, string>;
 }

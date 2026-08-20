@@ -82,6 +82,16 @@ export enum AuditAction {
   // The row is hard-deleted and `document_flags` has no `deleted_at`, so this
   // is the ONLY trace that it ever existed.
   DOCUMENT_FLAG_DELETED = 'DOCUMENT_FLAG_DELETED',
+
+  /**
+   * Somebody asked for a copy of tenant data.
+   *
+   * Recorded at REQUEST time, not on completion: the act being audited is that
+   * a person asked, which is true whether or not the file ever renders. For the
+   * audit-log export it also closes a circularity — the one export whose
+   * purpose is compliance was the one act absent from the log it exports.
+   */
+  DATA_EXPORT_REQUESTED = 'DATA_EXPORT_REQUESTED',
   PLATFORM_ORGANIZATION_RESTORED = 'PLATFORM_ORGANIZATION_RESTORED',
   PLATFORM_GLOBAL_ROLE_CREATED = 'PLATFORM_GLOBAL_ROLE_CREATED',
 }
@@ -106,6 +116,8 @@ export enum AuditResourceType {
   ROLE = 'ROLE',
   ORGANIZATION = 'ORGANIZATION',
   DOCUMENT_FLAG = 'DOCUMENT_FLAG',
+  /** An export request — the row, not the file it produces. */
+  EXPORT = 'EXPORT',
 }
 
 /**

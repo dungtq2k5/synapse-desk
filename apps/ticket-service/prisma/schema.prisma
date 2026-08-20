@@ -584,6 +584,41 @@ model AnalyticsExport {
 
   departmentId String? @map("department_id") @db.Uuid
 
+  /// The tenant's timezone when the export was requested.
+  ///
+  /// `from_day`/`to_day` are DATES in the TENANT'S local terms — the same
+  /// domain the rollups bucket by — and the row exports compare them against a
+  /// `timestamptz`. Without the zone, a tenant at UTC+7 asking for August gets
+  /// rollup rows over local August and ticket rows over UTC August: seven hours
+  /// of skew at each end, in opposite directions, from one stated range.
+  ///
+  /// Stored rather than read in the worker for the same reason as
+  /// `unrestricted`: the renderer has no caller, and a cross-service read
+  /// inside the queue's one slot is the wrong place for it. NULL means UTC,
+  /// which is what `safeTimezone` already resolves an absent zone to.
+  timezone String? @db.VarChar(64)
+
+  /// Whether the requester could see EVERY ticket when they asked.
+  ///
+  /// Captured at request time and not re-derived: the renderer runs later, in a
+  /// worker with no `CallerContext`, and a permission can be revoked in
+  /// between. An export must contain what the person could see when they asked
+  /// — re-deriving would either widen it after a grant or fail it after a
+  /// revoke, and neither is what they requested.
+  ///
+  /// False means the renderer restricts to tickets they authored or are
+  /// assigned — the same predicate `TicketAccessService.visibilityScope`
+  /// applies to the list.
+  unrestricted Boolean @default(false)
+
+  /// The per-kind predicates that are NOT shared — ticket status and assignee,
+  /// audit action and resource type. `Json` because three kinds have three
+  /// shapes and a column per predicate would be mostly null.
+  ///
+  /// **Storage, never a contract.** Validated at the service against a per-kind
+  /// DTO on the way in and never read back as `any`.
+  filters Json? @db.JsonB
+
   /// AnalyticsExportStatus.
   status String @default("PENDING") @db.VarChar(20)
 

@@ -54,6 +54,7 @@ export class AnalyticsExportFacade {
         from: parseDay(request.from),
         to: parseDay(request.to),
         departmentId: request.departmentId,
+        filters: request.filters,
       },
       context,
     );
