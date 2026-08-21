@@ -5,6 +5,8 @@ import {
   ListTicketsByIdsRequest,
   ListTicketsByIdsResponse,
   BulkTicketFailure,
+  BulkTicketPriorityRequest,
+  BulkTicketPriorityResponse,
   BulkTicketStatusRequest,
   BulkTicketStatusResponse,
   CallerContext,
@@ -16,7 +18,9 @@ import {
   GetTicketRequest,
   ListTicketsRequest,
   ListTicketsResponse,
+  ListTicketStatusChangesResponse,
   TicketIdRequest,
+  TicketStatusActionRequest,
   TicketResponse,
   toPageMeta,
   toPrismaPage,
@@ -28,6 +32,7 @@ import {
   normalizeBatchIds,
   formatErrorMsg,
   MAX_BULK_TICKET_IDS,
+  MAX_STATUS_CHANGE_REASON_LENGTH,
   requireActor,
   requireTenant,
   restoreData,
@@ -36,6 +41,7 @@ import {
   TICKET_SORTABLE_FIELDS,
   TicketPriority,
   TicketSource,
+  TERMINAL_TICKET_STATUSES,
   TicketStatus,
   tenantScope,
 } from '@synapsedesk/common';
@@ -56,6 +62,7 @@ import {
   fromProtoTicketSource,
   fromProtoTicketStatus,
   toTicketResponse,
+  toTicketStatusChangeResponse,
 } from './ticket.mapper';
 
 @Injectable()
@@ -195,6 +202,65 @@ export class TicketsService {
     return { items: items.map(toTicketResponse) };
   }
 
+  /**
+   * A ticket's STATUS history, oldest first.
+   *
+   * Status only. Reassignments are at `ListTicketAssignments`, which carries
+   * `assignedById`, `departmentId` and a `ReassignmentReason` — more than this
+   * shape could, so merging the two would be one list with two meanings.
+   *
+   * **A non-agent sees every transition and only their own reasons.** The rest
+   * come back `null` — see ADR 0023, whose rule this is.
+   *
+   * Unpaginated, on the same bound the assignment history accepts: the length
+   * is set by agent action rather than by anything a customer can drive.
+   *
+   * @throws RpcException NOT_FOUND when the ticket is not visible to the
+   *   caller — the scoped `load` is what makes this a ticket sub-resource
+   *   rather than a second way into an admin log.
+   */
+  async listTicketStatusChanges(
+    request: TicketIdRequest,
+    context: CallerContext,
+  ): Promise<ListTicketStatusChangesResponse> {
+    const ticket = await this.load(request.id, context);
+
+    const rows = await this.prisma.ticketStatusChange.findMany({
+      where: { ticketId: ticket.id },
+      // Oldest first: this is a path, and a path reads forwards. Every other
+      // list in this system is newest-first because those are feeds.
+      orderBy: { changedAt: 'asc' },
+    });
+
+    // The reason is written BY an agent FOR agents — "duplicate of #4127,
+    // customer keeps reopening" is the shape it takes — and `visibilityScope`
+    // makes the ticket's AUTHOR a reader of this list. Internal notes exist
+    // because agents need somewhere the customer cannot see (ADR 0023); this
+    // column is that same need on a different table, and it had no equivalent.
+    //
+    // Their own survives: `/escalate` is the one transition an END_USER can
+    // reach, and reading back words they wrote is not a disclosure.
+    //
+    // A post-fetch map rather than the query fragment `internalNoteScope` uses,
+    // and the difference is what is being hidden. That one drops ROWS, so
+    // filtering afterwards would leak their existence through the count. This
+    // nulls a FIELD on rows the caller sees either way — nothing about the
+    // count or the timing changes.
+    if (this.access.isAgent(context)) {
+      return { items: rows.map(toTicketStatusChangeResponse) };
+    }
+
+    const actorId = requireActor(context);
+
+    return {
+      items: rows.map((row) =>
+        toTicketStatusChangeResponse(
+          row.changedById === actorId ? row : { ...row, reason: null },
+        ),
+      ),
+    };
+  }
+
   // -------------------------------------------------------------------------
   // Write
   // -------------------------------------------------------------------------
@@ -304,8 +370,11 @@ export class TicketsService {
         message: 'A target status is required',
       });
     }
+    assertNotTerminal(to);
 
-    return toTicketResponse(await this.transition(request.id, to, context));
+    return toTicketResponse(
+      await this.transition(request.id, to, context, request.reason),
+    );
   }
 
   /**
@@ -318,13 +387,14 @@ export class TicketsService {
    * cannot answer differently.
    */
   async escalateTicket(
-    request: TicketIdRequest,
+    request: TicketStatusActionRequest,
     context: CallerContext,
   ): Promise<TicketResponse> {
     const ticket = await this.transition(
-      request.id,
+      request.ticketId,
       TicketStatus.ESCALATED,
       context,
+      request.reason,
     );
 
     this.events.publish({
@@ -349,29 +419,44 @@ export class TicketsService {
   }
 
   async resolveTicket(
-    request: TicketIdRequest,
+    request: TicketStatusActionRequest,
     context: CallerContext,
   ): Promise<TicketResponse> {
     return toTicketResponse(
-      await this.transition(request.id, TicketStatus.RESOLVED, context),
+      await this.transition(
+        request.ticketId,
+        TicketStatus.RESOLVED,
+        context,
+        request.reason,
+      ),
     );
   }
 
   async reopenTicket(
-    request: TicketIdRequest,
+    request: TicketStatusActionRequest,
     context: CallerContext,
   ): Promise<TicketResponse> {
     return toTicketResponse(
-      await this.transition(request.id, TicketStatus.OPEN, context),
+      await this.transition(
+        request.ticketId,
+        TicketStatus.OPEN,
+        context,
+        request.reason,
+      ),
     );
   }
 
   async closeTicket(
-    request: TicketIdRequest,
+    request: TicketStatusActionRequest,
     context: CallerContext,
   ): Promise<TicketResponse> {
     return toTicketResponse(
-      await this.transition(request.id, TicketStatus.CLOSED, context),
+      await this.transition(
+        request.ticketId,
+        TicketStatus.CLOSED,
+        context,
+        request.reason,
+      ),
     );
   }
 
@@ -388,7 +473,63 @@ export class TicketsService {
     request: BulkTicketStatusRequest,
     context: CallerContext,
   ): Promise<BulkTicketStatusResponse> {
-    const ids = [...new Set(request.ticketIds)];
+    const ids = this.bulkIds(request.ticketIds);
+
+    const to = fromProtoTicketStatus(request.status);
+    if (!to) {
+      throw new RpcException({
+        code: status.INVALID_ARGUMENT,
+        message: 'A target status is required',
+      });
+    }
+    // BEFORE the loop, and thrown rather than recorded per item: the target is
+    // one value for the whole request, so it is the request that is refused
+    // and not fifty individual tickets.
+    assertNotTerminal(to);
+
+    return this.bulkApply(ids, (id) =>
+      this.transition(id, to, context, request.reason),
+    );
+  }
+
+  /**
+   * Applies `priority` to each id INDEPENDENTLY.
+   *
+   * Priority has no state machine — any value to any value — so every failure
+   * here is a ticket the caller cannot see or that no longer exists, never an
+   * illegal move.
+   *
+   * @throws RpcException INVALID_ARGUMENT for an empty list, a list over
+   *   {@link MAX_BULK_TICKET_IDS}, or an unset priority.
+   */
+  async bulkChangeTicketPriority(
+    request: BulkTicketPriorityRequest,
+    context: CallerContext,
+  ): Promise<BulkTicketPriorityResponse> {
+    const ids = this.bulkIds(request.ticketIds);
+
+    const priority = fromProtoTicketPriority(request.priority);
+    if (!priority) {
+      throw new RpcException({
+        code: status.INVALID_ARGUMENT,
+        message: 'A target priority is required',
+      });
+    }
+
+    return this.bulkApply(ids, async (id) => {
+      // Through the same scoped load every singular write uses, so an id the
+      // caller cannot see fails as NOT_FOUND rather than updating a row.
+      const existing = await this.load(id, context);
+      await this.prisma.ticket.update({
+        where: { id: existing.id },
+        data: { priority },
+      });
+    });
+  }
+
+  /** Deduplicated, and refused when empty or over the cap. */
+  private bulkIds(ticketIds: string[]): string[] {
+    const ids = [...new Set(ticketIds)];
 
     if (ids.length === 0) {
       throw new RpcException({
@@ -403,20 +544,26 @@ export class TicketsService {
       });
     }
 
-    const to = fromProtoTicketStatus(request.status);
-    if (!to) {
-      throw new RpcException({
-        code: status.INVALID_ARGUMENT,
-        message: 'A target status is required',
-      });
-    }
+    return ids;
+  }
 
+  /**
+   * Runs `apply` over each id, collecting successes and failures separately.
+   *
+   * Sequential rather than `Promise.all`, and that is a deliberate trade: fifty
+   * concurrent transactions against one table would contend, and the operation
+   * is an admin bulk action where a second of latency costs nothing.
+   */
+  private async bulkApply(
+    ids: string[],
+    apply: (id: string) => Promise<unknown>,
+  ): Promise<{ updated: string[]; failed: BulkTicketFailure[] }> {
     const updated: string[] = [];
     const failed: BulkTicketFailure[] = [];
 
     for (const id of ids) {
       try {
-        await this.transition(id, to, context);
+        await apply(id);
         updated.push(id);
       } catch (error) {
         // The REASON is carried through, not flattened to "failed": a caller
@@ -496,16 +643,40 @@ export class TicketsService {
     ticketId: string,
     to: TicketStatus,
     context: CallerContext,
+    reason?: string,
   ): Promise<Ticket> {
     const existing = await this.load(ticketId, context);
     const from = assertKnownStatus(existing.status);
 
     assertTransition(from, to);
 
-    const ticket = await this.prisma.ticket.update({
-      where: { id: existing.id },
-      data: { status: to, ...transitionSideEffects(to) },
-    });
+    const trimmedReason = assertReasonLength(reason);
+
+    // ONE transaction, and that is the difference between this history and the
+    // event below it. `ticket.status_changed` is fire-and-forget, so a history
+    // assembled from it loses a row whenever the broker is down — acceptable
+    // for an admin trail, not for a screen showing a customer what happened to
+    // their ticket.
+    const [ticket] = await this.prisma.$transaction([
+      this.prisma.ticket.update({
+        where: { id: existing.id },
+        data: { status: to, ...transitionSideEffects(to) },
+      }),
+      this.prisma.ticketStatusChange.create({
+        data: {
+          ticketId: existing.id,
+          organizationId: existing.organizationId,
+          fromStatus: from,
+          toStatus: to,
+          // `requireActor` rather than `context.sub ?? null`: `load` above has
+          // already been through `tenantScope`, which refuses a caller with no
+          // identity, so a null here would be unreachable defensive code that
+          // reads as a supported case.
+          changedById: requireActor(context),
+          reason: trimmedReason,
+        },
+      }),
+    ]);
 
     this.events.publish({
       pattern: TICKET_PATTERNS.statusChanged,
@@ -560,4 +731,54 @@ export class TicketsService {
       status: TicketStatus.NEW,
     };
   }
+}
+
+/**
+ * Refuses a terminal target on the GENERIC status entry points.
+ *
+ * @throws RpcException FAILED_PRECONDITION when `to` is `RESOLVED` or `CLOSED`.
+ */
+function assertNotTerminal(to: TicketStatus): void {
+  // `/resolve` and `/close` require `ticket.resolve`; the generic route and its
+  // bulk form require `ticket.update`. Without this, either reaches the same
+  // `transition()` behind the weaker gate — which is exactly what the comment
+  // above the four convenience routes says splitting them prevents.
+  //
+  // Refused rather than permission-checked: the permission lives on the
+  // decorator, and a service that resolved it per target would leave every
+  // decorator in this family describing something other than its route.
+  //
+  // Here and not in `transition()`: `/resolve` and `/close` call that directly
+  // and are the sanctioned way to reach these two states.
+  if (!TERMINAL_TICKET_STATUSES.includes(to)) return;
+
+  throw new RpcException({
+    code: status.FAILED_PRECONDITION,
+    message: `Use the ${to === TicketStatus.RESOLVED ? 'resolve' : 'close'} route to move a ticket to ${to}`,
+  });
+}
+
+/**
+ * Trims a status-change reason and refuses one over the bound.
+ *
+ * @returns the trimmed reason, or `undefined` when absent or blank.
+ * @throws RpcException INVALID_ARGUMENT when it exceeds
+ *   {@link MAX_STATUS_CHANGE_REASON_LENGTH}.
+ */
+function assertReasonLength(reason: string | undefined): string | undefined {
+  // Bounded HERE as well as on the DTO, for the reason `MAX_BULK_TICKET_IDS`
+  // gives: this service is reachable from other services over gRPC, where no
+  // `ValidationPipe` ever ran. The column is `Text`, so nothing below would
+  // refuse a megabyte.
+  const trimmed = reason?.trim();
+  if (!trimmed) return undefined;
+
+  if (trimmed.length > MAX_STATUS_CHANGE_REASON_LENGTH) {
+    throw new RpcException({
+      code: status.INVALID_ARGUMENT,
+      message: `A status-change reason cannot exceed ${MAX_STATUS_CHANGE_REASON_LENGTH} characters`,
+    });
+  }
+
+  return trimmed;
 }

@@ -5,8 +5,11 @@ import {
   canTransition,
   compareAlphabetically,
   TICKET_PATTERNS,
+  MAX_STATUS_CHANGE_REASON_LENGTH,
+  systemContext,
   TicketPriority,
   TicketSource,
+  TERMINAL_TICKET_STATUSES,
   TicketStatus,
 } from '@synapsedesk/common';
 import { expectRpc, rpcCode } from '@synapsedesk/common/testing/rpc';
@@ -28,7 +31,11 @@ import { buildTenant, createTicket, TenantFixture } from '../factories';
 import { TicketsService } from '../../src/modules/tickets/tickets.service';
 import { AuthReferenceService } from '../../src/modules/auth-client/auth-reference.service';
 import { TicketEventPublisher } from '../../src/modules/events/ticket-event.publisher';
-import { toProtoTicketStatus } from '../../src/modules/tickets/ticket.mapper';
+import {
+  fromProtoTicketStatus,
+  toProtoTicketPriority,
+  toProtoTicketStatus,
+} from '../../src/modules/tickets/ticket.mapper';
 
 describe('Tickets (e2e)', () => {
   let fx: E2eFixture;
@@ -393,19 +400,32 @@ describe('Tickets (e2e)', () => {
               (error: unknown) => ({ ok: false as const, error }),
             );
 
+          // `RESOLVED` and `CLOSED` are refused here on AUTHORIZATION, not
+          // legality: they need `ticket.resolve`, which this route's
+          // `ticket.update` decorator cannot express. Legal or not, the
+          // generic route answers FAILED_PRECONDITION and points at
+          // `/resolve` and `/close`.
+          const terminal = TERMINAL_TICKET_STATUSES.includes(to);
           const legal = canTransition(from, to);
+          const expected = terminal
+            ? status.FAILED_PRECONDITION
+            : legal // NOSONAR
+              ? null
+              : status.ABORTED;
 
-          if (legal && !result.ok) {
+          if (expected === null && !result.ok) {
             failures.push(`${from} -> ${to}: rejected, expected success`);
           }
-          if (!legal && result.ok) {
-            failures.push(`${from} -> ${to}: ACCEPTED, expected 409`);
+          if (expected !== null && result.ok) {
+            failures.push(
+              `${from} -> ${to}: ACCEPTED, expected ${status[expected]}`,
+            );
           }
-          if (!legal && !result.ok) {
+          if (expected !== null && !result.ok) {
             const code = rpcCode(result.error);
-            if (code !== status.ABORTED) {
+            if (code !== expected) {
               failures.push(
-                `${from} -> ${to}: got ${status[code ?? -1]}, expected ABORTED`,
+                `${from} -> ${to}: got ${status[code ?? -1]}, expected ${status[expected]}`,
               );
             }
           }
@@ -433,13 +453,21 @@ describe('Tickets (e2e)', () => {
 
     it('the 409 names the legal targets', async () => {
       // A caller must be able to act on the error without reading the source.
+      //
+      // `NEW -> ESCALATED` is legal and `NEW -> PENDING_AGENT` is not, so this
+      // reaches the transition table's own refusal. A terminal target would
+      // not: the route stops those before `assertTransition` runs, and the
+      // message names a ROUTE rather than a set of statuses.
       const ticket = await createTicket(fx.prisma, tenant, {
         status: TicketStatus.NEW,
       });
 
       const error = await tickets
         .changeTicketStatus(
-          { id: ticket.id, status: toProtoTicketStatus(TicketStatus.RESOLVED) },
+          {
+            id: ticket.id,
+            status: toProtoTicketStatus(TicketStatus.PENDING_AGENT),
+          },
           agent(),
         )
         .catch((e: unknown) => e);
@@ -454,8 +482,11 @@ describe('Tickets (e2e)', () => {
         status: TicketStatus.OPEN,
       });
 
+      // A NON-terminal edge: the generic route refuses `RESOLVED` and
+      // `CLOSED` outright now, so an edge ending at one would never reach the
+      // publish this asserts.
       await tickets.changeTicketStatus(
-        { id: ticket.id, status: toProtoTicketStatus(TicketStatus.RESOLVED) },
+        { id: ticket.id, status: toProtoTicketStatus(TicketStatus.ESCALATED) },
         agent(),
       );
 
@@ -463,7 +494,7 @@ describe('Tickets (e2e)', () => {
         expect.objectContaining({
           pattern: TICKET_PATTERNS.statusChanged,
           fromStatus: TicketStatus.OPEN,
-          toStatus: TicketStatus.RESOLVED,
+          toStatus: TicketStatus.ESCALATED,
           changedById: tenant.agentId,
         }),
       );
@@ -479,9 +510,15 @@ describe('Tickets (e2e)', () => {
         data: { status: 'NONSENSE' },
       });
 
+      // Target is non-terminal on purpose: the terminal refusal runs BEFORE
+      // the row is loaded, so `CLOSED` here would answer FAILED_PRECONDITION
+      // and never exercise `assertKnownStatus` at all.
       await expectRpc(
         tickets.changeTicketStatus(
-          { id: ticket.id, status: toProtoTicketStatus(TicketStatus.CLOSED) },
+          {
+            id: ticket.id,
+            status: toProtoTicketStatus(TicketStatus.ESCALATED),
+          },
           agent(),
         ),
         status.INVALID_ARGUMENT,
@@ -490,10 +527,12 @@ describe('Tickets (e2e)', () => {
   });
 
   describe('5. the convenience RPCs are the SAME validator', () => {
-    it('resolve and status→RESOLVED produce identical state', async () => {
-      // The "one validator, two entry points" rule. If each carried its own
-      // idea of what it may transition from, these two would diverge the first
-      // time one was updated.
+    it('**status→RESOLVED is refused where /resolve succeeds, from the same state**', async () => {
+      // These two USED to be interchangeable, and that was the bug: `/resolve`
+      // requires `ticket.resolve` while the generic route requires only
+      // `ticket.update`, so the generic route was a way around the stronger
+      // right. They still share one validator — `transition` — but only one of
+      // them may reach a terminal state.
       const viaAlias = await createTicket(fx.prisma, tenant, {
         status: TicketStatus.OPEN,
       });
@@ -501,8 +540,13 @@ describe('Tickets (e2e)', () => {
         status: TicketStatus.OPEN,
       });
 
-      const a = await tickets.resolveTicket({ id: viaAlias.id }, agent());
-      const b = await tickets.changeTicketStatus(
+      const resolved = await tickets.resolveTicket(
+        { ticketId: viaAlias.id },
+        agent(),
+      );
+      expect(resolved.resolvedAt).toBeDefined();
+
+      const refused = tickets.changeTicketStatus(
         {
           id: viaGeneric.id,
           status: toProtoTicketStatus(TicketStatus.RESOLVED),
@@ -510,9 +554,36 @@ describe('Tickets (e2e)', () => {
         agent(),
       );
 
-      expect(a.status).toBe(b.status);
-      expect(Boolean(a.resolvedAt)).toBe(Boolean(b.resolvedAt));
-      expect(a.resolvedAt).toBeDefined();
+      await expectRpc(refused, status.FAILED_PRECONDITION);
+      await expect(refused).rejects.toMatchObject({
+        // Names the route to use, not just the refusal — a caller cannot act
+        // on "no".
+        message: expect.stringContaining('resolve') as string,
+      });
+      // And nothing was written on the way to refusing.
+      expect(
+        (
+          await fx.prisma.ticket.findUniqueOrThrow({
+            where: { id: viaGeneric.id },
+          })
+        ).status,
+      ).toBe(TicketStatus.OPEN);
+    });
+
+    it('**and CLOSED is refused the same way, naming its own route**', async () => {
+      const ticket = await createTicket(fx.prisma, tenant, {
+        status: TicketStatus.OPEN,
+      });
+
+      const refused = tickets.changeTicketStatus(
+        { id: ticket.id, status: toProtoTicketStatus(TicketStatus.CLOSED) },
+        agent(),
+      );
+
+      await expectRpc(refused, status.FAILED_PRECONDITION);
+      await expect(refused).rejects.toMatchObject({
+        message: expect.stringContaining('close') as string,
+      });
     });
 
     it('every alias refuses an illegal edge exactly as the generic RPC does', async () => {
@@ -525,15 +596,15 @@ describe('Tickets (e2e)', () => {
       cases.push(
         [
           TicketStatus.CLOSED,
-          () => tickets.escalateTicket({ id: closed.id }, agent()),
+          () => tickets.escalateTicket({ ticketId: closed.id }, agent()),
         ],
         [
           TicketStatus.CLOSED,
-          () => tickets.resolveTicket({ id: closed.id }, agent()),
+          () => tickets.resolveTicket({ ticketId: closed.id }, agent()),
         ],
         [
           TicketStatus.CLOSED,
-          () => tickets.closeTicket({ id: closed.id }, agent()),
+          () => tickets.closeTicket({ ticketId: closed.id }, agent()),
         ],
       );
 
@@ -543,7 +614,7 @@ describe('Tickets (e2e)', () => {
 
       // ...and the one legal alias works.
       await expect(
-        tickets.reopenTicket({ id: closed.id }, agent()),
+        tickets.reopenTicket({ ticketId: closed.id }, agent()),
       ).resolves.toMatchObject({
         status: ProtoTicketStatus.TICKET_STATUS_OPEN,
       });
@@ -555,7 +626,7 @@ describe('Tickets (e2e)', () => {
       });
 
       const escalated = await tickets.escalateTicket(
-        { id: ticket.id },
+        { ticketId: ticket.id },
         agent(),
       );
 
@@ -572,9 +643,12 @@ describe('Tickets (e2e)', () => {
         status: TicketStatus.RESOLVED,
         resolvedAt: new Date(),
       });
-      await tickets.closeTicket({ id: ticket.id }, agent());
+      await tickets.closeTicket({ ticketId: ticket.id }, agent());
 
-      const reopened = await tickets.reopenTicket({ id: ticket.id }, agent());
+      const reopened = await tickets.reopenTicket(
+        { ticketId: ticket.id },
+        agent(),
+      );
 
       expect(reopened.status).toBe(ProtoTicketStatus.TICKET_STATUS_OPEN);
       expect(reopened.resolvedAt).toBeUndefined();
@@ -588,8 +662,11 @@ describe('Tickets (e2e)', () => {
         status: TicketStatus.ESCALATED,
         escalatedAt,
       });
-      await tickets.resolveTicket({ id: ticket.id }, agent());
-      const reopened = await tickets.reopenTicket({ id: ticket.id }, agent());
+      await tickets.resolveTicket({ ticketId: ticket.id }, agent());
+      const reopened = await tickets.reopenTicket(
+        { ticketId: ticket.id },
+        agent(),
+      );
 
       expect(reopened.escalatedAt).toBeDefined();
     });
@@ -604,15 +681,20 @@ describe('Tickets (e2e)', () => {
         createTicket(fx.prisma, tenant, { status: TicketStatus.OPEN }),
         createTicket(fx.prisma, tenant, { status: TicketStatus.OPEN }),
       ]);
-      // NEW cannot go straight to RESOLVED.
+      // NEW cannot go straight to PENDING_AGENT — it may only OPEN or ESCALATE.
       const illegal = await createTicket(fx.prisma, tenant, {
         status: TicketStatus.NEW,
       });
 
+      // A NON-terminal target throughout this block. Bulk is `ticket.update`
+      // like the singular generic route, so it refuses RESOLVED and CLOSED for
+      // the whole request — see the terminal test below. Per-item partial
+      // success is what these three are about, and it is orthogonal to which
+      // status is being set.
       const result = await tickets.bulkChangeTicketStatus(
         {
           ticketIds: [...ok.map((t) => t.id), illegal.id],
-          status: toProtoTicketStatus(TicketStatus.RESOLVED),
+          status: toProtoTicketStatus(TicketStatus.PENDING_AGENT),
         },
         agent(),
       );
@@ -630,10 +712,10 @@ describe('Tickets (e2e)', () => {
       expect(result.failed[0].reason).toMatch(/cannot move/i);
 
       // The three really did commit — no rollback of the successes.
-      const resolved = await fx.prisma.ticket.count({
-        where: { status: TicketStatus.RESOLVED },
+      const moved = await fx.prisma.ticket.count({
+        where: { status: TicketStatus.PENDING_AGENT },
       });
-      expect(resolved).toBe(3);
+      expect(moved).toBe(3);
     });
 
     it("another tenant's id lands in failed[], and its ticket is untouched", async () => {
@@ -648,7 +730,7 @@ describe('Tickets (e2e)', () => {
       const result = await tickets.bulkChangeTicketStatus(
         {
           ticketIds: [mine.id, theirs.id],
-          status: toProtoTicketStatus(TicketStatus.RESOLVED),
+          status: toProtoTicketStatus(TicketStatus.PENDING_AGENT),
         },
         agent(),
       );
@@ -681,15 +763,468 @@ describe('Tickets (e2e)', () => {
       const result = await tickets.bulkChangeTicketStatus(
         {
           ticketIds: [ticket.id, ticket.id, ticket.id],
-          status: toProtoTicketStatus(TicketStatus.RESOLVED),
+          status: toProtoTicketStatus(TicketStatus.PENDING_AGENT),
         },
         agent(),
       );
 
       // Without the dedupe the second pass would find the ticket already
-      // RESOLVED and report a spurious failure for a ticket that succeeded.
+      // PENDING_AGENT and report a spurious failure for a ticket that
+      // succeeded — no status is a legal edge to itself.
       expect(result.updated).toEqual([ticket.id]);
       expect(result.failed).toEqual([]);
+    });
+
+    it('**a terminal target is refused for the WHOLE batch, not per item**', async () => {
+      // The bulk half of the bypass: `bulk/status` is `ticket.update`, so
+      // without this one call closes fifty tickets behind a right that cannot
+      // close one.
+      //
+      // Thrown rather than fifty entries in `failed[]`: the target is one value
+      // for the whole request, so it is the request that is wrong. A per-item
+      // refusal would also report it as a state-machine failure, which it is
+      // not.
+      const tickets_ = await Promise.all([
+        createTicket(fx.prisma, tenant, { status: TicketStatus.OPEN }),
+        createTicket(fx.prisma, tenant, { status: TicketStatus.OPEN }),
+      ]);
+
+      const refused = tickets.bulkChangeTicketStatus(
+        {
+          ticketIds: tickets_.map((t) => t.id),
+          status: toProtoTicketStatus(TicketStatus.CLOSED),
+        },
+        agent(),
+      );
+
+      await expectRpc(refused, status.FAILED_PRECONDITION);
+      // Nothing was touched on the way to refusing.
+      expect(
+        await fx.prisma.ticket.count({ where: { status: TicketStatus.OPEN } }),
+      ).toBe(2);
+    });
+  });
+
+  describe('9b. bulk priority change', () => {
+    it('1. applies to every id and returns them', async () => {
+      const ok = await Promise.all([
+        createTicket(fx.prisma, tenant, { priority: TicketPriority.LOW }),
+        createTicket(fx.prisma, tenant, { priority: TicketPriority.MEDIUM }),
+      ]);
+
+      const result = await tickets.bulkChangeTicketPriority(
+        {
+          ticketIds: ok.map((t) => t.id),
+          priority: toProtoTicketPriority(TicketPriority.URGENT),
+        },
+        agent(),
+      );
+
+      expect([...result.updated].sort(compareAlphabetically)).toEqual(
+        ok.map((t) => t.id).sort(compareAlphabetically),
+      );
+      expect(result.failed).toEqual([]);
+      expect(
+        await fx.prisma.ticket.count({
+          where: { priority: TicketPriority.URGENT },
+        }),
+      ).toBe(2);
+    });
+
+    it('2. **a deleted ticket lands in failed[] and the rest still apply**', async () => {
+      // Priority has no state machine, so every failure here is a ticket the
+      // caller cannot see — which is the only failure mode this route has.
+      const kept = await createTicket(fx.prisma, tenant, {
+        priority: TicketPriority.LOW,
+      });
+      const gone = await createTicket(fx.prisma, tenant, {
+        priority: TicketPriority.LOW,
+        deletedAt: new Date(),
+      });
+
+      const result = await tickets.bulkChangeTicketPriority(
+        {
+          ticketIds: [kept.id, gone.id],
+          priority: toProtoTicketPriority(TicketPriority.HIGH),
+        },
+        agent(),
+      );
+
+      expect(result.updated).toEqual([kept.id]);
+      expect(result.failed).toHaveLength(1);
+      expect(result.failed[0].id).toBe(gone.id);
+      expect(
+        (await fx.prisma.ticket.findUniqueOrThrow({ where: { id: gone.id } }))
+          .priority,
+      ).toBe(TicketPriority.LOW);
+    });
+
+    it("3. another tenant's id lands in failed[], and its ticket is untouched", async () => {
+      const other = buildTenant();
+      const mine = await createTicket(fx.prisma, tenant, {
+        priority: TicketPriority.LOW,
+      });
+      const theirs = await createTicket(fx.prisma, other, {
+        priority: TicketPriority.LOW,
+      });
+
+      const result = await tickets.bulkChangeTicketPriority(
+        {
+          ticketIds: [mine.id, theirs.id],
+          priority: toProtoTicketPriority(TicketPriority.URGENT),
+        },
+        agent(),
+      );
+
+      expect(result.updated).toEqual([mine.id]);
+      expect(result.failed[0].id).toBe(theirs.id);
+      expect(
+        (await fx.prisma.ticket.findUniqueOrThrow({ where: { id: theirs.id } }))
+          .priority,
+      ).toBe(TicketPriority.LOW);
+    });
+
+    it('4. an oversized batch is refused before any write', async () => {
+      // The cap is shared with `bulk/status` through `bulkIds`, and this is
+      // what stops it being enforced on one route and not the other.
+      const ids = Array.from({ length: 51 }, () => faker.string.uuid());
+
+      await expectRpc(
+        tickets.bulkChangeTicketPriority(
+          {
+            ticketIds: ids,
+            priority: toProtoTicketPriority(TicketPriority.HIGH),
+          },
+          agent(),
+        ),
+        status.INVALID_ARGUMENT,
+      );
+    });
+
+    it('5. an unset priority is refused rather than defaulted', async () => {
+      // proto3's zero value is UNSPECIFIED, so an omitted field arrives as a
+      // real value. Defaulting it would silently rewrite every ticket in the
+      // batch to whatever the first enum member happens to be.
+      const ticket = await createTicket(fx.prisma, tenant, {
+        priority: TicketPriority.LOW,
+      });
+
+      await expectRpc(
+        tickets.bulkChangeTicketPriority(
+          { ticketIds: [ticket.id], priority: 0 },
+          agent(),
+        ),
+        status.INVALID_ARGUMENT,
+      );
+      expect(
+        (await fx.prisma.ticket.findUniqueOrThrow({ where: { id: ticket.id } }))
+          .priority,
+      ).toBe(TicketPriority.LOW);
+    });
+  });
+
+  describe('10. the status history', () => {
+    it('1. records a row per transition, oldest first, with both ends', async () => {
+      const ticket = await createTicket(fx.prisma, tenant, {
+        status: TicketStatus.NEW,
+      });
+
+      await tickets.changeTicketStatus(
+        { id: ticket.id, status: toProtoTicketStatus(TicketStatus.OPEN) },
+        agent(),
+      );
+      await tickets.escalateTicket({ ticketId: ticket.id }, agent());
+      await tickets.resolveTicket({ ticketId: ticket.id }, agent());
+
+      const { items } = await tickets.listTicketStatusChanges(
+        { id: ticket.id },
+        agent(),
+      );
+
+      expect(
+        items.map((row) => [
+          fromProtoTicketStatus(row.fromStatus),
+          fromProtoTicketStatus(row.toStatus),
+        ]),
+      ).toEqual([
+        [TicketStatus.NEW, TicketStatus.OPEN],
+        [TicketStatus.OPEN, TicketStatus.ESCALATED],
+        [TicketStatus.ESCALATED, TicketStatus.RESOLVED],
+      ]);
+      expect(items.every((row) => row.changedById === tenant.agentId)).toBe(
+        true,
+      );
+    });
+
+    it('2. **records the reason on RESOLVE and CLOSE, which the generic route cannot reach**', async () => {
+      // The whole argument for widening the four convenience RPCs. Before it,
+      // `reason` lived only on the generic route — which §0 then forbade from
+      // reaching these two transitions, so the rows a history is most read to
+      // explain were the rows that could never carry an explanation.
+      const ticket = await createTicket(fx.prisma, tenant, {
+        status: TicketStatus.OPEN,
+      });
+
+      await tickets.resolveTicket(
+        { ticketId: ticket.id, reason: 'Customer confirmed the fix' },
+        agent(),
+      );
+      await tickets.closeTicket(
+        { ticketId: ticket.id, reason: 'No reply for 14 days' },
+        agent(),
+      );
+
+      const { items } = await tickets.listTicketStatusChanges(
+        { id: ticket.id },
+        agent(),
+      );
+
+      expect(items.map((row) => row.reason)).toEqual([
+        'Customer confirmed the fix',
+        'No reply for 14 days',
+      ]);
+    });
+
+    it('3. a reason over the bound is refused HERE, not only at the DTO', async () => {
+      // The service is reachable over gRPC where no `ValidationPipe` ever ran,
+      // and the column is `Text` — nothing below this would refuse a megabyte.
+      const ticket = await createTicket(fx.prisma, tenant, {
+        status: TicketStatus.OPEN,
+      });
+
+      await expectRpc(
+        tickets.resolveTicket(
+          {
+            ticketId: ticket.id,
+            reason: 'x'.repeat(MAX_STATUS_CHANGE_REASON_LENGTH + 1),
+          },
+          agent(),
+        ),
+        status.INVALID_ARGUMENT,
+      );
+
+      // And nothing was written on the way to refusing — neither the ticket
+      // nor a history row.
+      expect(
+        (await fx.prisma.ticket.findUniqueOrThrow({ where: { id: ticket.id } }))
+          .status,
+      ).toBe(TicketStatus.OPEN);
+      expect(
+        await fx.prisma.ticketStatusChange.count({
+          where: { ticketId: ticket.id },
+        }),
+      ).toBe(0);
+    });
+
+    it('4. **a failed transition writes NO history row**', async () => {
+      // Both writes are in one transaction, so an illegal move must leave the
+      // path as clean as it leaves the status. A history that recorded attempts
+      // would read as a ticket that bounced off a state it never entered.
+      const ticket = await createTicket(fx.prisma, tenant, {
+        status: TicketStatus.NEW,
+      });
+
+      await expectRpc(
+        tickets.escalateTicket({ ticketId: ticket.id }, agent()),
+        status.ABORTED,
+      ).catch(() => undefined);
+      await tickets
+        .changeTicketStatus(
+          {
+            id: ticket.id,
+            status: toProtoTicketStatus(TicketStatus.PENDING_AGENT),
+          },
+          agent(),
+        )
+        .catch(() => undefined);
+
+      expect(
+        await fx.prisma.ticketStatusChange.count({
+          where: { ticketId: ticket.id },
+        }),
+      ).toBe(1);
+    });
+
+    it('5. **an ACTORLESS caller cannot transition at all, so no row can be authorless**', async () => {
+      // Why `changed_by_id` is NOT nullable. `transition` loads the ticket
+      // through `tenantScope`, which refuses a caller with no `sub` — so the
+      // "system moved it" row the column could have modelled has no way to be
+      // written, and a nullable column would have described a state the code
+      // cannot reach.
+      //
+      // A future auto-close sweep would enter somewhere other than
+      // `transition`. This test is what should fail when it does.
+      const ticket = await createTicket(fx.prisma, tenant, {
+        status: TicketStatus.OPEN,
+      });
+
+      await expectRpc(
+        tickets.escalateTicket(
+          { ticketId: ticket.id, reason: 'Auto-escalated at the cap' },
+          systemContext(tenant.organizationId),
+        ),
+        status.UNAUTHENTICATED,
+      );
+
+      expect(
+        await fx.prisma.ticketStatusChange.count({
+          where: { ticketId: ticket.id },
+        }),
+      ).toBe(0);
+    });
+
+    it("**8. the AUTHOR sees every transition and NONE of the agents' reasons**", async () => {
+      // The disclosure this column would otherwise be. `visibilityScope` makes
+      // a ticket's author a reader of their own history, and the reason is
+      // written by an agent for agents — the same need internal notes exist
+      // for (ADR 0023), on a different table.
+      const ticket = await createTicket(fx.prisma, tenant, {
+        status: TicketStatus.OPEN,
+        authorId: tenant.userId,
+      });
+
+      await tickets.resolveTicket(
+        {
+          ticketId: ticket.id,
+          reason: 'Duplicate of #4127 — flagging this account for review',
+        },
+        agent(),
+      );
+
+      const asAuthor = await tickets.listTicketStatusChanges(
+        { id: ticket.id },
+        member(),
+      );
+      const asAgent = await tickets.listTicketStatusChanges(
+        { id: ticket.id },
+        agent(),
+      );
+
+      // The TRANSITION is not hidden — only the note attached to it. A history
+      // missing the row would be a different and worse answer.
+      expect(asAuthor.items).toHaveLength(1);
+      expect(fromProtoTicketStatus(asAuthor.items[0].toStatus)).toBe(
+        TicketStatus.RESOLVED,
+      );
+      expect(asAuthor.items[0].reason).toBeUndefined();
+
+      expect(asAgent.items[0].reason).toBe(
+        'Duplicate of #4127 — flagging this account for review',
+      );
+    });
+
+    it('**9. but they keep the reasons they wrote themselves**', async () => {
+      // `/escalate` is the one transition an END_USER can reach, and reading
+      // back their own words is not a disclosure. Without this carve-out a
+      // customer would escalate with a description and never see it again.
+      const ticket = await createTicket(fx.prisma, tenant, {
+        status: TicketStatus.OPEN,
+        authorId: tenant.userId,
+      });
+
+      await tickets.escalateTicket(
+        { ticketId: ticket.id, reason: 'The app crashes when I click save' },
+        member(),
+      );
+      await tickets.resolveTicket(
+        { ticketId: ticket.id, reason: 'Known issue, tracked internally' },
+        agent(),
+      );
+
+      const { items } = await tickets.listTicketStatusChanges(
+        { id: ticket.id },
+        member(),
+      );
+
+      expect(items.map((row) => row.reason)).toEqual([
+        'The app crashes when I click save',
+        undefined,
+      ]);
+    });
+
+    it('**10. an agent scoped by ticket.message.moderate alone still reads them**', async () => {
+      // "Agent" is queue access, and the predicate is shared with internal
+      // notes rather than re-derived — two definitions would be two things to
+      // keep in step.
+      //
+      // Assigned to them, because `isAgent` and `visibilityScope` are NOT the
+      // same question: `ticket.message.moderate` makes you an agent for the
+      // purpose of reading notes, and does not by itself let you reach a ticket
+      // you neither raised nor hold. So this caller sees one ticket and reads
+      // the reasons on it.
+      // A DIFFERENT person from the one who wrote the reason, or the own-reason
+      // carve-out would carry this test and it would pass with `isAgent`
+      // narrowed to `ticket.read.all` — which is exactly what it exists to
+      // catch.
+      const moderatorId = faker.string.uuid();
+      const ticket = await createTicket(fx.prisma, tenant, {
+        status: TicketStatus.OPEN,
+        authorId: tenant.userId,
+        currentAssigneeId: moderatorId,
+      });
+      await tickets.resolveTicket(
+        { ticketId: ticket.id, reason: 'Internal justification' },
+        agent(),
+      );
+
+      const { items } = await tickets.listTicketStatusChanges(
+        { id: ticket.id },
+        memberContext(
+          { id: moderatorId, organizationId: tenant.organizationId },
+          ['ticket.message.moderate'],
+        ),
+      );
+
+      expect(items[0].changedById).not.toBe(moderatorId);
+      expect(items[0].reason).toBe('Internal justification');
+    });
+
+    it('6. is NOT_FOUND across the tenant boundary', async () => {
+      // Scoped by the same `load` the ticket read uses, which is what makes
+      // this a ticket sub-resource rather than a second way into a log.
+      const other = buildTenant();
+      const theirs = await createTicket(fx.prisma, other, {
+        status: TicketStatus.OPEN,
+      });
+      await tickets.escalateTicket(
+        { ticketId: theirs.id },
+        memberContext(
+          { id: other.agentId, organizationId: other.organizationId },
+          ['ticket.read.all', 'ticket.update'],
+        ),
+      );
+
+      await expectRpc(
+        tickets.listTicketStatusChanges({ id: theirs.id }, agent()),
+        status.NOT_FOUND,
+      );
+    });
+
+    it('7. **carries no reassignments — those have their own history**', async () => {
+      // The split doc 47 §1 draws. `ticket_assignments` is richer than this
+      // shape could be, and merging them would be one list with two meanings.
+      const ticket = await createTicket(fx.prisma, tenant, {
+        status: TicketStatus.OPEN,
+      });
+      await tickets.escalateTicket({ ticketId: ticket.id }, agent());
+
+      const { items } = await tickets.listTicketStatusChanges(
+        { id: ticket.id },
+        agent(),
+      );
+
+      expect(items).toHaveLength(1);
+      expect(Object.keys(items[0]).sort(compareAlphabetically)).toEqual(
+        [
+          'changedAt',
+          'changedById',
+          'fromStatus',
+          'id',
+          'reason',
+          'ticketId',
+          'toStatus',
+        ].sort(compareAlphabetically),
+      );
     });
   });
 

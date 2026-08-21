@@ -48,6 +48,7 @@ import { AiAttachmentService } from '../ai-attachments/ai-attachment.service';
 import { isDraftRefusal } from '../ai-client/refusal';
 import { recordInboundEmail, withInboundDedup } from '../tickets/inbound-dedup';
 import { TicketEventPublisher } from '../events/ticket-event.publisher';
+import { TicketAccessService } from '../ticket-access/ticket-access.service';
 import { TicketsService } from '../tickets/tickets.service';
 import { RagClientService } from '../ai-client/rag-client.service';
 import { LedgerClientService } from '../ai-client/ledger-client.service';
@@ -121,6 +122,7 @@ export class MessagesService {
     private readonly prisma: PrismaService,
     private readonly events: TicketEventPublisher,
     private readonly tickets: TicketsService,
+    private readonly access: TicketAccessService,
     private readonly rag: RagClientService,
     private readonly aiAttachments: AiAttachmentService,
     private readonly ledger: LedgerClientService,
@@ -1086,15 +1088,16 @@ export class MessagesService {
     return this.canSeeInternalNotes(context) ? {} : { isInternalNote: false };
   }
 
+  /**
+   * Queue access is what makes somebody an agent. A ticket's author holds none
+   * of it and must not see the notes written ABOUT their ticket.
+   *
+   * Delegates rather than re-deriving: the status-change reason follows the
+   * same rule, and two copies of "who is an agent" would be two things to keep
+   * in step.
+   */
   private canSeeInternalNotes(context: CallerContext): boolean {
-    if (context.isSuperAdmin) return true;
-
-    // Queue access is what makes somebody an agent. A ticket's author holds
-    // neither of these and must not see the notes written ABOUT their ticket.
-    return (
-      context.permissionCodes.includes('ticket.read.all') ||
-      context.permissionCodes.includes('ticket.message.moderate')
-    );
+    return this.access.isAgent(context);
   }
 
   private canModerate(context: CallerContext): boolean {

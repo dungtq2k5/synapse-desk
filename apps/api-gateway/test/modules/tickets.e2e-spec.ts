@@ -1,7 +1,11 @@
 import { of, throwError } from 'rxjs';
 import { faker } from '@faker-js/faker';
 import { status as GrpcStatus } from '@grpc/grpc-js';
-import { TicketPriority, TicketStatus } from '@synapsedesk/common';
+import {
+  MAX_STATUS_CHANGE_REASON_LENGTH,
+  TicketPriority,
+  TicketStatus,
+} from '@synapsedesk/common';
 import {
   TicketPriority as ProtoTicketPriority,
   TicketStatus as ProtoTicketStatus,
@@ -339,7 +343,35 @@ describe('Tickets at the HTTP boundary (e2e)', () => {
         throwError(() =>
           grpcError(
             GrpcStatus.ABORTED,
-            'Cannot move a ticket from NEW to RESOLVED',
+            'Cannot move a ticket from NEW to PENDING_AGENT',
+          ),
+        ),
+      );
+
+      const res = await authenticatedAgent(fx.app, {
+        permissionCodes: ['ticket.update'],
+      })
+        .post(`${API}/tickets/${faker.string.uuid()}/status`)
+        .send({ status: TicketStatus.PENDING_AGENT });
+
+      expect(res.status).toBe(409);
+      expect(res.body.error).toMatch(/cannot move/i);
+    });
+
+    it('**a terminal target on the generic route is 400, and names its route**', async () => {
+      // The bypass, from the HTTP side. `POST /:id/status` is `ticket.update`
+      // and `POST /:id/resolve` is `ticket.resolve`, so a caller holding only
+      // the former reached RESOLVED and CLOSED through the generic route until
+      // ticket-service started refusing them.
+      //
+      // 400 and not 403: the caller is not being told they lack a permission,
+      // they are being told to use the route that carries it. FAILED_PRECONDITION
+      // maps to 400 everywhere in this gateway.
+      fx.stubs.ticket.changeTicketStatus.mockReturnValue(
+        throwError(() =>
+          grpcError(
+            GrpcStatus.FAILED_PRECONDITION,
+            'Use the resolve route to move a ticket to RESOLVED',
           ),
         ),
       );
@@ -350,8 +382,30 @@ describe('Tickets at the HTTP boundary (e2e)', () => {
         .post(`${API}/tickets/${faker.string.uuid()}/status`)
         .send({ status: TicketStatus.RESOLVED });
 
-      expect(res.status).toBe(409);
-      expect(res.body.error).toMatch(/cannot move/i);
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/resolve route/i);
+    });
+
+    it('**and the generic route still cannot be given ticket.resolve as a shortcut**', async () => {
+      // The decorator is the description: holding the STRONGER right does not
+      // make the generic route a way to close a ticket either, because the
+      // refusal is in the service and is not a permission check.
+      fx.stubs.ticket.changeTicketStatus.mockReturnValue(
+        throwError(() =>
+          grpcError(
+            GrpcStatus.FAILED_PRECONDITION,
+            'Use the close route to move a ticket to CLOSED',
+          ),
+        ),
+      );
+
+      const res = await authenticatedAgent(fx.app, {
+        permissionCodes: ['ticket.update', 'ticket.resolve'],
+      })
+        .post(`${API}/tickets/${faker.string.uuid()}/status`)
+        .send({ status: TicketStatus.CLOSED });
+
+      expect(res.status).toBe(400);
     });
 
     it('rejects an unknown target status with 400', async () => {
@@ -419,6 +473,255 @@ describe('Tickets at the HTTP boundary (e2e)', () => {
         .send({ ticketIds: [], status: TicketStatus.CLOSED });
 
       expect(res.status).toBe(400);
+    });
+  });
+
+  describe('POST /tickets/bulk/priority', () => {
+    it('reaches its own handler, and no `:id` route can take it', async () => {
+      // NOT the trap that bit `bulk/status` and `by-number`, and the difference
+      // is worth stating because the obvious assumption is that it is.
+      //
+      // `bulk/status` collides because its second segment is literally
+      // `status`, so `@Post(':id/status')` matches it with `id = 'bulk'`.
+      // Nothing declares `@Post(':id/priority')` — doc 47 §3 struck that route
+      // as a duplicate of `PATCH /tickets/:id` — so `bulk/priority` has no
+      // parameterized route to be swallowed by, whatever the declaration order.
+      //
+      // Which makes declaring it early defensive rather than load-bearing, and
+      // makes THIS the test that would start failing if `:id/priority` were
+      // ever added back below it.
+      fx.stubs.ticket.bulkChangeTicketPriority.mockReturnValue(
+        of({ updated: [], failed: [] }),
+      );
+
+      const res = await authenticatedAgent(fx.app, {
+        permissionCodes: ['ticket.update'],
+      })
+        .post(`${API}/tickets/bulk/priority`)
+        .send({
+          ticketIds: [faker.string.uuid()],
+          priority: TicketPriority.HIGH,
+        });
+
+      expect(res.status).toBe(200);
+      expect(fx.stubs.ticket.bulkChangeTicketPriority).toHaveBeenCalledTimes(1);
+      expect(fx.stubs.ticket.changeTicketStatus).not.toHaveBeenCalled();
+      expect(fx.stubs.ticket.updateTicket).not.toHaveBeenCalled();
+    });
+
+    it('requires ticket.update, and returns the partial-success body', async () => {
+      const updated = [faker.string.uuid()];
+      const failedId = faker.string.uuid();
+      fx.stubs.ticket.bulkChangeTicketPriority.mockReturnValue(
+        of({ updated, failed: [{ id: failedId, reason: 'Ticket not found' }] }),
+      );
+
+      const refused = await authenticatedAgent(fx.app, {
+        permissionCodes: [],
+      })
+        .post(`${API}/tickets/bulk/priority`)
+        .send({
+          ticketIds: [...updated, failedId],
+          priority: TicketPriority.URGENT,
+        });
+      expect(refused.status).toBe(403);
+
+      const allowed = await authenticatedAgent(fx.app, {
+        permissionCodes: ['ticket.update'],
+      })
+        .post(`${API}/tickets/bulk/priority`)
+        .send({
+          ticketIds: [...updated, failedId],
+          priority: TicketPriority.URGENT,
+        });
+
+      expect(allowed.status).toBe(200);
+      expect(allowed.body.data.updated).toEqual(updated);
+      expect(allowed.body.data.failed[0].id).toBe(failedId);
+    });
+
+    it('caps the batch at the DTO edge, like bulk/status', async () => {
+      const res = await authenticatedAgent(fx.app, {
+        permissionCodes: ['ticket.update'],
+      })
+        .post(`${API}/tickets/bulk/priority`)
+        .send({
+          ticketIds: Array.from({ length: 51 }, () => faker.string.uuid()),
+          priority: TicketPriority.LOW,
+        });
+
+      expect(res.status).toBe(400);
+      expect(fx.stubs.ticket.bulkChangeTicketPriority).not.toHaveBeenCalled();
+    });
+
+    it('**does not accept a reason** — priority has nothing to justify', async () => {
+      // `forbidNonWhitelisted`, and worth pinning: `BulkTicketStatusDto` next
+      // door does take one, so copying that DTO is the obvious way to add a
+      // field here that means nothing.
+      const res = await authenticatedAgent(fx.app, {
+        permissionCodes: ['ticket.update'],
+      })
+        .post(`${API}/tickets/bulk/priority`)
+        .send({
+          ticketIds: [faker.string.uuid()],
+          priority: TicketPriority.LOW,
+          reason: 'because',
+        });
+
+      expect(res.status).toBe(400);
+      expect(fx.stubs.ticket.bulkChangeTicketPriority).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('the status reason and history', () => {
+    const ticketId = faker.string.uuid();
+
+    it('**all four convenience routes forward a reason**', async () => {
+      // The point of widening them. `POST /:id/status` is the only other route
+      // that takes a reason, and it is forbidden from reaching RESOLVED and
+      // CLOSED — so without these four, the transitions a history is most read
+      // to explain could never carry an explanation.
+      const cases: [string, keyof E2eFixture['stubs']['ticket'], string][] = [
+        ['escalate', 'escalateTicket', 'ticket.escalate'],
+        ['resolve', 'resolveTicket', 'ticket.resolve'],
+        ['reopen', 'reopenTicket', 'ticket.update'],
+        ['close', 'closeTicket', 'ticket.resolve'],
+      ];
+
+      for (const [path, method, permission] of cases) {
+        const stub = fx.stubs.ticket[method] as jest.Mock;
+        stub.mockClear();
+        stub.mockReturnValue(of(wireTicket()));
+
+        const id = faker.string.uuid();
+        const res = await authenticatedAgent(fx.app, {
+          permissionCodes: [permission as never],
+        })
+          .post(`${API}/tickets/${id}/${path}`)
+          .send({ reason: `because of ${path}` });
+
+        expect([path, res.status]).toEqual([path, 200]);
+        expect([path, stub.mock.calls[0][0]]).toEqual([
+          path,
+          { ticketId: id, reason: `because of ${path}` },
+        ]);
+      }
+    });
+
+    it('the body stays OPTIONAL — none of the four required one before', async () => {
+      fx.stubs.ticket.closeTicket.mockReturnValue(of(wireTicket()));
+
+      const res = await authenticatedAgent(fx.app, {
+        permissionCodes: ['ticket.resolve'],
+      }).post(`${API}/tickets/${faker.string.uuid()}/close`);
+
+      expect(res.status).toBe(200);
+      expect(
+        fx.stubs.ticket.closeTicket.mock.calls[0][0].reason,
+      ).toBeUndefined();
+    });
+
+    it('a reason over the bound is 400 and never reaches the service', async () => {
+      const res = await authenticatedAgent(fx.app, {
+        permissionCodes: ['ticket.resolve'],
+      })
+        .post(`${API}/tickets/${faker.string.uuid()}/resolve`)
+        .send({ reason: 'x'.repeat(MAX_STATUS_CHANGE_REASON_LENGTH + 1) });
+
+      expect(res.status).toBe(400);
+      expect(fx.stubs.ticket.resolveTicket).not.toHaveBeenCalled();
+    });
+
+    it('**GET /tickets/:id/history needs no permission beyond reading the ticket**', async () => {
+      // Same rule as `/assignments` beside it: "what happened to this ticket"
+      // is part of the ticket as far as the person who raised it is concerned,
+      // and the service applies the same visibility filter the ticket read
+      // does. This is also why it is NOT served from `audit_logs`, which is
+      // read behind an admin permission.
+      fx.stubs.ticket.listTicketStatusChanges.mockReturnValue(
+        of({
+          items: [
+            {
+              id: faker.string.uuid(),
+              ticketId,
+              fromStatus: ProtoTicketStatus.TICKET_STATUS_OPEN,
+              toStatus: ProtoTicketStatus.TICKET_STATUS_RESOLVED,
+              changedById: faker.string.uuid(),
+              reason: 'Customer confirmed the fix',
+              changedAt: timestamp(),
+            },
+          ],
+        }),
+      );
+
+      const res = await authenticatedAgent(fx.app, {
+        permissionCodes: [],
+      }).get(`${API}/tickets/${ticketId}/history`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data).toHaveLength(1);
+      expect(res.body.data[0].fromStatus).toBe(TicketStatus.OPEN);
+      expect(res.body.data[0].toStatus).toBe(TicketStatus.RESOLVED);
+      expect(res.body.data[0].reason).toBe('Customer confirmed the fix');
+    });
+
+    it('renders a STRIPPED reason as null rather than dropping the row', async () => {
+      // ticket-service nulls the reason for a caller without queue access, and
+      // the transition itself stays. The gateway must render that as an
+      // explicit `null` — a missing key reads as "no reason was given", which
+      // is a different statement from "not yours to read".
+      fx.stubs.ticket.listTicketStatusChanges.mockReturnValue(
+        of({
+          items: [
+            {
+              id: faker.string.uuid(),
+              ticketId,
+              fromStatus: ProtoTicketStatus.TICKET_STATUS_OPEN,
+              toStatus: ProtoTicketStatus.TICKET_STATUS_RESOLVED,
+              changedById: faker.string.uuid(),
+              reason: undefined,
+              changedAt: timestamp(),
+            },
+          ],
+        }),
+      );
+
+      const res = await authenticatedAgent(fx.app, {
+        permissionCodes: [],
+      }).get(`${API}/tickets/${ticketId}/history`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data).toHaveLength(1);
+      expect(res.body.data[0].toStatus).toBe(TicketStatus.RESOLVED);
+      expect(res.body.data[0]).toHaveProperty('reason', null);
+    });
+
+    it('a first-status row renders fromStatus as NULL, not as a status', async () => {
+      // `UNSPECIFIED` on the wire is "no prior status". Rendering it as a real
+      // member would put a transition in the history that never happened.
+      fx.stubs.ticket.listTicketStatusChanges.mockReturnValue(
+        of({
+          items: [
+            {
+              id: faker.string.uuid(),
+              ticketId,
+              fromStatus: ProtoTicketStatus.TICKET_STATUS_UNSPECIFIED,
+              toStatus: ProtoTicketStatus.TICKET_STATUS_OPEN,
+              changedById: faker.string.uuid(),
+              reason: undefined,
+              changedAt: timestamp(),
+            },
+          ],
+        }),
+      );
+
+      const res = await authenticatedAgent(fx.app, {
+        permissionCodes: [],
+      }).get(`${API}/tickets/${ticketId}/history`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data[0].fromStatus).toBeNull();
+      expect(res.body.data[0].reason).toBeNull();
     });
   });
 

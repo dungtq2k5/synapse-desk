@@ -1,5 +1,5 @@
 /**
- * Bounds for REQUEST DTOs, and nothing else.
+ * @file Bounds for REQUEST DTOs, and nothing else.
  *
  * Every constant here guards the shape of an incoming body or query, and
  * nothing here is a policy: `MAX_INVITATIONS_PER_BATCH` stops one call carrying
@@ -84,9 +84,6 @@ export const MAX_ROLE_ASSIGNMENT_USERS = 50;
 export const MAX_UPLOAD_FILE_NAME_LENGTH = 255;
 
 // ------------------------------------------------------------- free text
-
-/** Longest reason accepted when changing a ticket's status. */
-export const MAX_STATUS_CHANGE_REASON_LENGTH = 500;
 
 /** Longest instruction accepted when steering an AI draft. */
 export const MAX_DRAFT_INSTRUCTION_LENGTH = 500;

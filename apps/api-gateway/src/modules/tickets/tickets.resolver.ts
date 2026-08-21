@@ -299,7 +299,10 @@ export class TicketsResolver {
     // end user does when self-service has not helped, and requiring a grant
     // would make the handoff unreachable for exactly the person who needs it.
     return {
-      ticket: await this.ticketsService.escalate(id, context),
+      // No reason field on the GraphQL mutation: it mirrors the REST route,
+      // which takes an optional body, and adding an argument here would be the
+      // first place the two contracts diverged. Worth revisiting together.
+      ticket: await this.ticketsService.escalate(id, {}, context),
       message: 'Handed off to an agent',
     };
   }

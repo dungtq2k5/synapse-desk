@@ -32,6 +32,25 @@ export class TicketResponseDto {
   deletedById!: string | null;
 }
 
+/**
+ * One transition in a ticket's status history.
+ *
+ * Status only. Reassignments are `AssignmentResponseDto` at
+ * `GET /tickets/:id/assignments`, which carries the department and a
+ * `ReassignmentReason` this shape has no room for.
+ */
+export class TicketStatusChangeResponseDto {
+  id!: string;
+  ticketId!: string;
+  /** Null on a row with no prior status. */
+  fromStatus!: TicketStatus | null;
+  toStatus!: TicketStatus;
+  changedById!: string;
+  /** Null when the caller may not read it — see the route's docblock. */
+  reason!: string | null;
+  changedAt!: Date;
+}
+
 /** The partial-success shape a bulk operation returns. */
 export class BulkTicketFailureResponseDto {
   id!: string;
@@ -39,6 +58,16 @@ export class BulkTicketFailureResponseDto {
 }
 
 export class BulkTicketStatusResponseDto {
+  updated!: string[];
+  failed!: BulkTicketFailureResponseDto[];
+}
+
+/**
+ * The same two fields as {@link BulkTicketStatusResponseDto}, declared
+ * separately so the two routes' contracts can diverge without one silently
+ * changing the other.
+ */
+export class BulkTicketPriorityResponseDto {
   updated!: string[];
   failed!: BulkTicketFailureResponseDto[];
 }

@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package synapsedesk.ticket;
 
+import "google/protobuf/timestamp.proto";
 import "synapsedesk/auth/common.proto";
 import "synapsedesk/ticket/common.proto";
 
@@ -76,6 +77,24 @@ message TicketIdRequest {
   string id = 1;
 }
 
+// The four convenience transitions — escalate, resolve, reopen, close.
+//
+// Separate from `TicketIdRequest` so they can carry a reason, and NOT applied
+// to `DeleteTicket`/`RestoreTicket`, which keep it: deletion provenance is a
+// different question from a status reason, and answering both with one field
+// would put two meanings in one column.
+//
+// It exists because `POST /tickets/:id/status` is now the only route that
+// takes a reason AND is forbidden from reaching RESOLVED and CLOSED — so
+// without this, the two transitions a history is most often read to explain
+// are the two that could never carry an explanation.
+message TicketStatusActionRequest {
+  string ticket_id = 1;
+  // Same shape and same bound as `ChangeTicketStatusRequest.reason`
+  // (`MAX_STATUS_CHANGE_REASON_LENGTH`), enforced at both edges.
+  optional string reason = 2;
+}
+
 message DeleteTicketResponse {}
 
 // Each id is processed INDEPENDENTLY: one failing transition must not abort the
@@ -84,6 +103,47 @@ message BulkTicketStatusRequest {
   repeated string ticket_ids = 1;
   TicketStatus status = 2;
   optional string reason = 3;
+}
+
+// Priority has no state machine — any value to any value — which is why it is a
+// plain field on `UpdateTicket` and why this needs no `reason`. Status is the
+// asymmetric one, and `BulkTicketStatusRequest` above carries the reason it
+// needs.
+message BulkTicketPriorityRequest {
+  repeated string ticket_ids = 1;
+  TicketPriority priority = 2;
+}
+
+// The SAME shape as `BulkTicketStatusResponse`, and named separately rather
+// than shared so the two can diverge without one silently changing the other.
+message BulkTicketPriorityResponse {
+  repeated string updated = 1;
+  repeated BulkTicketFailure failed = 2;
+}
+
+// One row of a ticket's STATUS history.
+//
+// Reassignments are not here: they have a first-class history of their own in
+// `ticket_assignments`, exposed at `ListTicketAssignments`, and it carries more
+// than this shape could. Merging them would be one list with two shapes.
+message TicketStatusChangeResponse {
+  string id = 1;
+  string ticket_id = 2;
+  // Absent on the FIRST row of a ticket's life, which has no prior status.
+  optional TicketStatus from_status = 3;
+  TicketStatus to_status = 4;
+  // Never empty: a transition loads its ticket through `tenantScope`, which
+  // refuses a caller with no identity, so every row has an actor.
+  string changed_by_id = 5;
+  optional string reason = 6;
+  google.protobuf.Timestamp changed_at = 7;
+}
+
+// Unpaginated, and reusing `TicketIdRequest`: a ticket's status history is
+// bounded by the transition table walked a handful of times, not by anything a
+// user can grow. Same call the assignment history makes.
+message ListTicketStatusChangesResponse {
+  repeated TicketStatusChangeResponse items = 1;
 }
 
 message BulkTicketFailure {
@@ -134,11 +194,14 @@ service TicketService {
   rpc UpdateTicket(UpdateTicketRequest) returns (TicketResponse);
 
   rpc ChangeTicketStatus(ChangeTicketStatusRequest) returns (TicketResponse);
-  rpc EscalateTicket(TicketIdRequest) returns (TicketResponse);
-  rpc ResolveTicket(TicketIdRequest) returns (TicketResponse);
-  rpc ReopenTicket(TicketIdRequest) returns (TicketResponse);
-  rpc CloseTicket(TicketIdRequest) returns (TicketResponse);
+  rpc EscalateTicket(TicketStatusActionRequest) returns (TicketResponse);
+  rpc ResolveTicket(TicketStatusActionRequest) returns (TicketResponse);
+  rpc ReopenTicket(TicketStatusActionRequest) returns (TicketResponse);
+  rpc CloseTicket(TicketStatusActionRequest) returns (TicketResponse);
   rpc BulkChangeTicketStatus(BulkTicketStatusRequest) returns (BulkTicketStatusResponse);
+  rpc BulkChangeTicketPriority(BulkTicketPriorityRequest) returns (BulkTicketPriorityResponse);
+
+  rpc ListTicketStatusChanges(TicketIdRequest) returns (ListTicketStatusChangesResponse);
 
   rpc DeleteTicket(TicketIdRequest) returns (DeleteTicketResponse);
   rpc RestoreTicket(TicketIdRequest) returns (TicketResponse);

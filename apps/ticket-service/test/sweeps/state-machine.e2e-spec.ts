@@ -62,7 +62,23 @@ describe('State machine sweep (e2e)', () => {
     '%s behaves exactly as canTransition says',
     async (_label, from, to) => {
       const ticket = await createTicket(fx.prisma, tenant, { status: from });
+
+      // TWO rules decide this route's answer, and they are different kinds of
+      // rule. `canTransition` is LEGALITY. The terminal refusal is
+      // AUTHORIZATION: `RESOLVED` and `CLOSED` require `ticket.resolve`, which
+      // this route's `ticket.update` decorator cannot express, so they are
+      // reachable only through `/resolve` and `/close`.
+      //
+      // Encoded separately rather than folded into one expectation, and the
+      // CODES are distinguished, because collapsing them is what would let an
+      // authorization refusal pass as a state-machine one.
+      const terminal = TERMINAL_TICKET_STATUSES.includes(to);
       const legal = canTransition(from, to);
+      const expected = terminal
+        ? 'refused:authorization'
+        : legal // NOSONAR
+          ? 'accepted'
+          : 'refused:legality';
 
       const result = await tickets
         .changeTicketStatus(
@@ -70,17 +86,19 @@ describe('State machine sweep (e2e)', () => {
           agent(),
         )
         .then(() => 'accepted' as const)
-        .catch((error: unknown) =>
-          rpcCode(error) === status.ABORTED
-            ? ('rejected' as const)
-            : (`unexpected:${String(rpcCode(error))}` as const),
-        );
+        .catch((error: unknown) => {
+          if (rpcCode(error) === status.ABORTED) return 'refused:legality';
+          if (rpcCode(error) === status.FAILED_PRECONDITION) {
+            return 'refused:authorization';
+          }
+          return `unexpected:${String(rpcCode(error))}`;
+        });
 
       // Asserted as a TUPLE so a failure names the pair rather than just
       // reporting `true !== false` from somewhere in a 36-case loop.
       expect([`${from} -> ${to}`, result]).toEqual([
         `${from} -> ${to}`,
-        legal ? 'accepted' : 'rejected',
+        expected,
       ]);
 
       // And the row agrees with the answer — an "accepted" that did not write,
@@ -90,16 +108,21 @@ describe('State machine sweep (e2e)', () => {
       });
       expect([`${from} -> ${to}`, row.status]).toEqual([
         `${from} -> ${to}`,
-        legal ? to : from,
+        result === 'accepted' ? to : from,
       ]);
     },
   );
 
   describe('the convenience routes obey the SAME table', () => {
-    // Five routes, one validator. `POST /tickets/:id/resolve` and
-    // `POST /tickets/:id/status {RESOLVED}` must not be able to answer
-    // differently — if they can, the table has stopped being the single
-    // definition of legality.
+    // Five routes, one validator: each convenience route's answer must equal
+    // `canTransition`, or the table has stopped being the single definition of
+    // legality.
+    //
+    // Compared against `canTransition` DIRECTLY rather than against the generic
+    // route, which is the shape this used to have. The generic route now
+    // refuses `RESOLVED` and `CLOSED` on authorization grounds, so two of these
+    // four have no generic counterpart to be compared with — and comparing them
+    // anyway would assert that `/resolve` is broken.
     const ROUTES = [
       ['escalate', TicketStatus.ESCALATED],
       ['resolve', TicketStatus.RESOLVED],
@@ -113,41 +136,33 @@ describe('State machine sweep (e2e)', () => {
           ([route, to]) => [`${route} from ${from}`, from, route, to] as const,
         ),
       ),
-    )(
-      '%s matches the generic status change',
-      async (_label, from, route, to) => {
-        const viaRoute = await createTicket(fx.prisma, tenant, {
-          status: from,
-        });
-        const viaGeneric = await createTicket(fx.prisma, tenant, {
-          status: from,
-        });
+    )('%s matches canTransition', async (_label, from, route, to) => {
+      const viaRoute = await createTicket(fx.prisma, tenant, {
+        status: from,
+      });
 
-        const attempt = (promise: Promise<unknown>) =>
-          promise
-            .then(() => 'accepted' as const)
-            .catch((error: unknown) => `rejected:${String(rpcCode(error))}`);
+      const attempt = (promise: Promise<unknown>) =>
+        promise
+          .then(() => 'accepted' as const)
+          .catch((error: unknown) => `rejected:${String(rpcCode(error))}`);
 
-        const routeResult = await attempt(
-          route === 'escalate'
-            ? tickets.escalateTicket({ id: viaRoute.id }, agent())
-            : route === 'resolve' // NOSONAR
-              ? tickets.resolveTicket({ id: viaRoute.id }, agent())
-              : route === 'reopen' // NOSONAR
-                ? tickets.reopenTicket({ id: viaRoute.id }, agent())
-                : tickets.closeTicket({ id: viaRoute.id }, agent()),
-        );
+      const routeResult = await attempt(
+        route === 'escalate'
+          ? tickets.escalateTicket({ ticketId: viaRoute.id }, agent())
+          : route === 'resolve' // NOSONAR
+            ? tickets.resolveTicket({ ticketId: viaRoute.id }, agent())
+            : route === 'reopen' // NOSONAR
+              ? tickets.reopenTicket({ ticketId: viaRoute.id }, agent())
+              : tickets.closeTicket({ ticketId: viaRoute.id }, agent()),
+      );
 
-        const genericResult = await attempt(
-          tickets.changeTicketStatus(
-            { id: viaGeneric.id, status: toProtoTicketStatus(to), reason: '' },
-            agent(),
-          ),
-        );
-
-        expect([route, routeResult]).toEqual([route, genericResult]);
-      },
-    );
+      expect([route, routeResult]).toEqual([
+        route,
+        canTransition(from, to)
+          ? 'accepted'
+          : `rejected:${String(status.ABORTED)}`,
+      ]);
+    });
   });
 
   describe('the side effects the table implies', () => {
@@ -156,7 +171,7 @@ describe('State machine sweep (e2e)', () => {
         status: TicketStatus.OPEN,
       });
 
-      await tickets.resolveTicket({ id: ticket.id }, agent());
+      await tickets.resolveTicket({ ticketId: ticket.id }, agent());
 
       const row = await fx.prisma.ticket.findUniqueOrThrow({
         where: { id: ticket.id },
@@ -169,7 +184,7 @@ describe('State machine sweep (e2e)', () => {
         status: TicketStatus.OPEN,
       });
 
-      await tickets.escalateTicket({ id: ticket.id }, agent());
+      await tickets.escalateTicket({ ticketId: ticket.id }, agent());
 
       const row = await fx.prisma.ticket.findUniqueOrThrow({
         where: { id: ticket.id },
@@ -185,10 +200,10 @@ describe('State machine sweep (e2e)', () => {
       const ticket = await createTicket(fx.prisma, tenant, {
         status: TicketStatus.OPEN,
       });
-      await tickets.escalateTicket({ id: ticket.id }, agent());
-      await tickets.resolveTicket({ id: ticket.id }, agent());
+      await tickets.escalateTicket({ ticketId: ticket.id }, agent());
+      await tickets.resolveTicket({ ticketId: ticket.id }, agent());
 
-      await tickets.reopenTicket({ id: ticket.id }, agent());
+      await tickets.reopenTicket({ ticketId: ticket.id }, agent());
 
       const row = await fx.prisma.ticket.findUniqueOrThrow({
         where: { id: ticket.id },
@@ -207,7 +222,10 @@ describe('State machine sweep (e2e)', () => {
         status: terminal,
       });
 
-      const reopened = await tickets.reopenTicket({ id: ticket.id }, agent());
+      const reopened = await tickets.reopenTicket(
+        { ticketId: ticket.id },
+        agent(),
+      );
 
       expect([terminal, reopened.status]).toEqual([
         terminal,
@@ -227,7 +245,7 @@ describe('State machine sweep (e2e)', () => {
     );
 
     await tickets
-      .closeTicket({ id: ticket.id }, agent())
+      .closeTicket({ ticketId: ticket.id }, agent())
       .then(() => {
         throw new Error('an unknown status must not permit a transition');
       })

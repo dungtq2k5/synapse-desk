@@ -1,6 +1,9 @@
 import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { ClientGrpc } from '@nestjs/microservices';
 import {
+  BulkTicketPriorityRequest,
+  ListTicketStatusChangesResponse,
+  BulkTicketPriorityResponse,
   BulkTicketStatusRequest,
   BulkTicketStatusResponse,
   ChangeTicketStatusRequest,
@@ -105,30 +108,56 @@ export class TicketsGrpcClient extends BaseGrpcClient implements OnModuleInit {
    * permission them separately — escalating and closing are different rights —
    * while the SERVICE routes all four through one transition validator.
    */
-  escalate(id: string, context: RequestContext): Promise<TicketResponse> {
+  escalate(
+    id: string,
+    reason: string | undefined,
+    context: RequestContext,
+  ): Promise<TicketResponse> {
     return this.call(
-      (metadata) => this.ticketGrpcService.escalateTicket({ id }, metadata),
+      (metadata) =>
+        this.ticketGrpcService.escalateTicket(
+          { ticketId: id, reason },
+          metadata,
+        ),
       context,
     );
   }
 
-  resolve(id: string, context: RequestContext): Promise<TicketResponse> {
+  resolve(
+    id: string,
+    reason: string | undefined,
+    context: RequestContext,
+  ): Promise<TicketResponse> {
     return this.call(
-      (metadata) => this.ticketGrpcService.resolveTicket({ id }, metadata),
+      (metadata) =>
+        this.ticketGrpcService.resolveTicket(
+          { ticketId: id, reason },
+          metadata,
+        ),
       context,
     );
   }
 
-  reopen(id: string, context: RequestContext): Promise<TicketResponse> {
+  reopen(
+    id: string,
+    reason: string | undefined,
+    context: RequestContext,
+  ): Promise<TicketResponse> {
     return this.call(
-      (metadata) => this.ticketGrpcService.reopenTicket({ id }, metadata),
+      (metadata) =>
+        this.ticketGrpcService.reopenTicket({ ticketId: id, reason }, metadata),
       context,
     );
   }
 
-  close(id: string, context: RequestContext): Promise<TicketResponse> {
+  close(
+    id: string,
+    reason: string | undefined,
+    context: RequestContext,
+  ): Promise<TicketResponse> {
     return this.call(
-      (metadata) => this.ticketGrpcService.closeTicket({ id }, metadata),
+      (metadata) =>
+        this.ticketGrpcService.closeTicket({ ticketId: id, reason }, metadata),
       context,
     );
   }
@@ -140,6 +169,28 @@ export class TicketsGrpcClient extends BaseGrpcClient implements OnModuleInit {
     return this.call(
       (metadata) =>
         this.ticketGrpcService.bulkChangeTicketStatus(request, metadata),
+      context,
+    );
+  }
+
+  listStatusChanges(
+    id: string,
+    context: RequestContext,
+  ): Promise<ListTicketStatusChangesResponse> {
+    return this.call(
+      (metadata) =>
+        this.ticketGrpcService.listTicketStatusChanges({ id }, metadata),
+      context,
+    );
+  }
+
+  bulkChangePriority(
+    request: BulkTicketPriorityRequest,
+    context: RequestContext,
+  ): Promise<BulkTicketPriorityResponse> {
+    return this.call(
+      (metadata) =>
+        this.ticketGrpcService.bulkChangeTicketPriority(request, metadata),
       context,
     );
   }

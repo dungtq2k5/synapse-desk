@@ -141,7 +141,7 @@ describe('Tenant isolation sweep (e2e)', () => {
         ).id,
       }),
       run: (ids) =>
-        tickets.closeTicket({ id: ids.id }, fullyPermissioned(stranger)),
+        tickets.closeTicket({ ticketId: ids.id }, fullyPermissioned(stranger)),
     },
     {
       module: 'tickets',

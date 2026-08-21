@@ -579,7 +579,17 @@ export class InboundEmailService implements OnModuleInit {
   ): Promise<boolean> {
     if (ticket.status === ProtoTicketStatus.TICKET_STATUS_CLOSED) {
       await this.ticketPeer.run(
-        (md) => this.tickets.reopenTicket({ id: ticket.id }, md),
+        (md) =>
+          this.tickets.reopenTicket(
+            {
+              ticketId: ticket.id,
+              // The first system-supplied reason in the tree, and the case the
+              // field is most needed for: this transition has no actor, so
+              // without it the history shows a closed ticket reopening itself.
+              reason: 'Reopened by an inbound email reply',
+            },
+            md,
+          ),
         context,
       );
     }

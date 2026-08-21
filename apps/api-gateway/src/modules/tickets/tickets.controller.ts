@@ -31,7 +31,9 @@ import { TicketsService } from './tickets.service';
 import { AssignmentsService } from './assignments.service';
 import { AiService } from './ai.service';
 import {
+  BulkTicketPriorityDto,
   BulkTicketStatusDto,
+  TicketStatusActionDto,
   ChangeTicketStatusDto,
   CreateTicketDto,
   ListTicketsQueryDto,
@@ -39,6 +41,8 @@ import {
   CreateTicketExportDto,
 } from './dto/rest/ticket.dto';
 import {
+  BulkTicketPriorityResponseDto,
+  TicketStatusChangeResponseDto,
   BulkTicketStatusResponseDto,
   TicketResponseDto,
 } from './dto/rest/ticket-response.dto';
@@ -210,12 +214,44 @@ export class TicketsController {
   }
 
   /**
+   * Declared beside `bulk/status`, though it does not share its hazard: that
+   * one collides because its second segment is literally `status`, and nothing
+   * declares `@Post(':id/priority')` — §3 struck it as a duplicate of `PATCH
+   * /tickets/:id`. Kept up here so the two bulk routes read together, and so
+   * adding `:id/priority` back would not silently capture this one.
+   *
+   * No terminal-target problem here, and no `reason`: priority has no state
+   * machine, so every value is reachable from every other and there is nothing
+   * for a change to be justified against. That is also why there is no singular
+   * `POST /tickets/:id/priority` — `PATCH /tickets/:id` already carries it.
+   *
+   * Partial success, always 200, same as `bulk/status`.
+   */
+  @ApiOperation({ summary: 'Bulk change priority' })
+  @ApiWrappedResponse(BulkTicketPriorityResponseDto)
+  @ApiFilterErrors(['400', '401', '403'])
+  @Post('bulk/priority')
+  @RequirePermission('ticket.update')
+  @HttpCode(HttpStatus.OK)
+  @ResponseMessage('Bulk priority change processed')
+  bulkChangePriority(
+    @CurrentUser() context: RequestContext,
+    @Body() dto: BulkTicketPriorityDto,
+  ): Promise<BulkTicketPriorityResponseDto> {
+    return this.tickets.bulkChangePriority(dto, context);
+  }
+
+  /**
    * Declared BEFORE every `:id/...` route.
    *
    * `@Post(':id/status')` matches `bulk/status` — `bulk` is a perfectly good
    * `:id` as far as the router is concerned — and `ParseUUIDPipe` then turns it
    * into a 400 that reads as a malformed request rather than a routing
    * mistake. Same hazard as `by-number` above, and it was made here first.
+   *
+   * `RESOLVED` and `CLOSED` are refused for the whole request, exactly as on
+   * `POST /:id/status` and for the same reason — this is `ticket.update`, and
+   * closing fifty tickets is fifty times the right it lacks.
    *
    * Partial success, always 200.
    *
@@ -224,7 +260,7 @@ export class TicketsController {
    * cannot express "3 of 4", so the BODY does, and a client reads `failed[]`
    * rather than branching on the status.
    */
-  @ApiOperation({ summary: 'Bulk change status' })
+  @ApiOperation({ summary: 'Bulk change status (non-terminal targets)' })
   @ApiWrappedResponse(BulkTicketStatusResponseDto)
   @ApiFilterErrors(['400', '401', '403'])
   @Post('bulk/status')
@@ -238,7 +274,17 @@ export class TicketsController {
     return this.tickets.bulkChangeStatus(dto, context);
   }
 
-  @ApiOperation({ summary: 'Change status' })
+  /**
+   * The non-terminal transitions. `RESOLVED` and `CLOSED` are refused here.
+   *
+   * They carry `ticket.resolve` on `/resolve` and `/close`, and this route
+   * carries `ticket.update` — so accepting them here would be a way around the
+   * stronger right for anyone holding the weaker one. ticket-service refuses
+   * them (400, naming the route to use) rather than this route resolving a
+   * permission per target, which would leave the decorator below describing
+   * something other than what the route does.
+   */
+  @ApiOperation({ summary: 'Change status (non-terminal targets)' })
   @ApiWrappedResponse(TicketResponseDto)
   @ApiFilterErrors(['400', '401', '403', '404'])
   @Post(':id/status')
@@ -281,8 +327,9 @@ export class TicketsController {
   escalate(
     @CurrentUser() context: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: TicketStatusActionDto,
   ): Promise<TicketResponseDto> {
-    return this.tickets.escalate(id, context);
+    return this.tickets.escalate(id, dto, context);
   }
 
   @ApiOperation({ summary: 'Resolve' })
@@ -295,8 +342,9 @@ export class TicketsController {
   resolve(
     @CurrentUser() context: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: TicketStatusActionDto,
   ): Promise<TicketResponseDto> {
-    return this.tickets.resolve(id, context);
+    return this.tickets.resolve(id, dto, context);
   }
 
   @ApiOperation({ summary: 'Reopen' })
@@ -309,8 +357,9 @@ export class TicketsController {
   reopen(
     @CurrentUser() context: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: TicketStatusActionDto,
   ): Promise<TicketResponseDto> {
-    return this.tickets.reopen(id, context);
+    return this.tickets.reopen(id, dto, context);
   }
 
   @ApiOperation({ summary: 'Close' })
@@ -323,8 +372,9 @@ export class TicketsController {
   close(
     @CurrentUser() context: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: TicketStatusActionDto,
   ): Promise<TicketResponseDto> {
-    return this.tickets.close(id, context);
+    return this.tickets.close(id, dto, context);
   }
 
   /**
@@ -457,6 +507,41 @@ export class TicketsController {
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<AssignmentResponseDto[]> {
     return this.assignments.list(id, context);
+  }
+
+  /**
+   * The STATUS path this ticket took, oldest first.
+   *
+   * Status only, and that is the split worth knowing: reassignments have their
+   * own history at `GET /tickets/:id/assignments`, carrying the department and
+   * a `ReassignmentReason` this shape has no room for. One list with two shapes
+   * would serve neither.
+   *
+   * **Not `audit_logs`.** That table has no `TICKET` resource type to filter
+   * on, is at-most-once by design, and is read behind an admin permission —
+   * while this row is readable by anyone who can read the ticket. A
+   * `ticket_status_changes` row is ticket data by construction, scoped by the
+   * same visibility filter as the ticket itself.
+   *
+   * **Reasons are agent-facing.** A caller without queue access sees every
+   * transition and only the reasons they wrote themselves — the same rule
+   * internal notes follow (ADR 0023), because an agent's justification for a
+   * transition is written for other agents.
+   *
+   * Unpaginated, on the same bound `/assignments` accepts: the length is set by
+   * agent action, not by anything the ticket's author can drive.
+   */
+  @ApiOperation({
+    summary: 'Status history: every transition, who made it, and why',
+  })
+  @ApiWrappedResponse(TicketStatusChangeResponseDto, { isArray: true })
+  @ApiFilterErrors(['400', '401', '404'])
+  @Get(':id/history')
+  listStatusChanges(
+    @CurrentUser() context: RequestContext,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<TicketStatusChangeResponseDto[]> {
+    return this.tickets.listStatusChanges(id, context);
   }
 
   // -------------------------------------------------------------------------

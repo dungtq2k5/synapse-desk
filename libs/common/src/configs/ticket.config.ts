@@ -328,6 +328,16 @@ export const REDACTED_MESSAGE_PLACEHOLDER = '[message removed]';
 /** Bulk operations process each id independently; this caps one request. */
 export const MAX_BULK_TICKET_IDS = 50;
 
+/**
+ * Longest reason accepted with a status change.
+ *
+ * In `libs/common` rather than the gateway's `dto.config.ts` because BOTH edges
+ * bound it: the DTO so a caller gets a 400 naming the field, and ticket-service
+ * because it is reachable over gRPC where no `ValidationPipe` ever ran. Two
+ * copies of the number would be two places for it to drift.
+ */
+export const MAX_STATUS_CHANGE_REASON_LENGTH = 500;
+
 /** `ai_response_feedbacks.rating` is a thumb, not a scale. */
 export const FEEDBACK_RATINGS = [1, -1] as const;
 export type FeedbackRating = (typeof FEEDBACK_RATINGS)[number];

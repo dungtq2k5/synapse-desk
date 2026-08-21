@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { TicketAccessModule } from '../ticket-access/ticket-access.module';
 import { TicketsModule } from '../tickets/tickets.module';
 import { AiClientModule } from '../ai-client/ai-client.module';
 import { StorageClientModule } from '../storage-client/storage-client.module';
@@ -13,6 +14,7 @@ import { MessagesGrpcController } from './messages-grpc.controller';
 @Module({
   imports: [
     TicketsModule,
+    TicketAccessModule,
     AiClientModule,
     StorageClientModule,
     AiAttachmentsModule,

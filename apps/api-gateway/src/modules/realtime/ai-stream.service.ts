@@ -321,7 +321,17 @@ export class AiStreamService implements OnModuleInit {
       // distinction to the client, which is the entire reason the proto gained
       // a value rather than reusing `GREETING`.
       if (completion.status === AnswerStatus.ANSWER_STATUS_AT_CAP) {
-        const ticket = await this.tickets.escalate(ticketId, context);
+        // The clearest case for a reason in the system: nothing a person did
+        // moved this ticket, and without it the history shows a ticket that
+        // escalated itself.
+        const ticket = await this.tickets.escalate(
+          ticketId,
+          {
+            reason:
+              'Escalated automatically: the workspace is at its AI budget cap',
+          },
+          context,
+        );
 
         this.done(client, streamId, ticketId, {
           messageId: null,

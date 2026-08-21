@@ -3,6 +3,8 @@ import type { Metadata } from '@grpc/grpc-js';
 import {
   ListTicketsByIdsRequest,
   ListTicketsByIdsResponse,
+  BulkTicketPriorityRequest,
+  BulkTicketPriorityResponse,
   BulkTicketStatusRequest,
   BulkTicketStatusResponse,
   ChangeTicketStatusRequest,
@@ -12,7 +14,9 @@ import {
   GetTicketRequest,
   ListTicketsRequest,
   ListTicketsResponse,
+  ListTicketStatusChangesResponse,
   TicketIdRequest,
+  TicketStatusActionRequest,
   TicketResponse,
   TicketServiceController,
   TicketServiceControllerMethods,
@@ -103,7 +107,7 @@ export class TicketsGrpcController implements TicketServiceController {
   }
 
   escalateTicket(
-    request: TicketIdRequest,
+    request: TicketStatusActionRequest,
     metadata?: Metadata,
   ): Promise<TicketResponse> {
     return this.ticketsService.escalateTicket(
@@ -113,7 +117,7 @@ export class TicketsGrpcController implements TicketServiceController {
   }
 
   resolveTicket(
-    request: TicketIdRequest,
+    request: TicketStatusActionRequest,
     metadata?: Metadata,
   ): Promise<TicketResponse> {
     return this.ticketsService.resolveTicket(
@@ -123,7 +127,7 @@ export class TicketsGrpcController implements TicketServiceController {
   }
 
   reopenTicket(
-    request: TicketIdRequest,
+    request: TicketStatusActionRequest,
     metadata?: Metadata,
   ): Promise<TicketResponse> {
     return this.ticketsService.reopenTicket(
@@ -133,7 +137,7 @@ export class TicketsGrpcController implements TicketServiceController {
   }
 
   closeTicket(
-    request: TicketIdRequest,
+    request: TicketStatusActionRequest,
     metadata?: Metadata,
   ): Promise<TicketResponse> {
     return this.ticketsService.closeTicket(
@@ -147,6 +151,26 @@ export class TicketsGrpcController implements TicketServiceController {
     metadata?: Metadata,
   ): Promise<BulkTicketStatusResponse> {
     return this.ticketsService.bulkChangeTicketStatus(
+      request,
+      unpackCallerContext(metadata),
+    );
+  }
+
+  bulkChangeTicketPriority(
+    request: BulkTicketPriorityRequest,
+    metadata?: Metadata,
+  ): Promise<BulkTicketPriorityResponse> {
+    return this.ticketsService.bulkChangeTicketPriority(
+      request,
+      unpackCallerContext(metadata),
+    );
+  }
+
+  listTicketStatusChanges(
+    request: TicketIdRequest,
+    metadata?: Metadata,
+  ): Promise<ListTicketStatusChangesResponse> {
+    return this.ticketsService.listTicketStatusChanges(
       request,
       unpackCallerContext(metadata),
     );

@@ -75,8 +75,9 @@ model Ticket {
   deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
   deletedById String?   @map("deleted_by_id") @db.Uuid
 
-  assignments   TicketAssignment[]
-  messages      TicketMessage[]
+  assignments    TicketAssignment[]
+  statusChanges  TicketStatusChange[]
+  messages       TicketMessage[]
   aiSummary     AiSummary?
   inboundEmails InboundEmail[]
 
@@ -153,6 +154,73 @@ model InboundEmail {
   @@map("inbound_emails")
 }
 
+/// The status path a ticket took, one row per transition.
+///
+/// Written INSIDE the transaction that moves the status, which is the whole
+/// point: `ticket.status_changed` is on NATS and is fire-and-forget, so a
+/// history built from it would have holes whenever the broker was down. An
+/// admin trail is allowed those (`AuditPublisher` says so); a screen showing a
+/// customer what happened to their ticket is not.
+///
+/// Reassignments are NOT here — `ticket_assignments` is their history and
+/// carries more than this shape could. `GET /tickets/:id/history` is status
+/// only, and says so.
+model TicketStatusChange {
+  id       String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ticketId String @map("ticket_id") @db.Uuid
+
+  /// Denormalized from the parent, like every other table here: the tenant
+  /// filter must not need a join to apply.
+  organizationId String @map("organization_id") @db.Uuid
+
+  /// TicketStatus. NULL only on a row recording a ticket's first status, which
+  /// nothing writes today — every row comes from a transition, which has a
+  /// `from`. Nullable so the column does not have to lie if creation ever
+  /// records one.
+  ///
+  /// Nullable while `changed_by_id` beside it is not, and that is not an
+  /// inconsistency: both describe a row nothing writes today, but a creation
+  /// row would genuinely have no prior status AND would still have an author.
+  fromStatus String? @map("from_status") @db.VarChar(20)
+
+  /// TicketStatus.
+  toStatus String @map("to_status") @db.VarChar(20)
+
+  /// No FK: postgres_auth. NOT nullable, and that is a fact about the write
+  /// path rather than a preference: `transition` loads the ticket through
+  /// `tenantScope`, which refuses a caller with no `sub`, so no transition can
+  /// happen without an actor. A system-driven one — a future auto-close sweep —
+  /// would have to enter somewhere other than `transition`, and this column
+  /// should be revisited then rather than pre-emptively made to lie.
+  changedById String @map("changed_by_id") @db.Uuid
+
+  /// Free text, bounded by `MAX_STATUS_CHANGE_REASON_LENGTH` at BOTH edges.
+  ///
+  /// Not the same shape as `ticket_assignments.reason`, which is a closed
+  /// `ReassignmentReason` enum. A reassignment answers "which of six reasons";
+  /// a status change answers "what happened", which no enum this system could
+  /// write would cover.
+  ///
+  /// **Agent-facing.** It is stripped for a caller without queue access on the
+  /// way out, exactly as an internal note is (ADR 0023) — the ticket's author
+  /// is a reader of their own history, and "duplicate of #4127, customer keeps
+  /// reopening" is the shape this field takes. Their OWN reasons survive.
+  ///
+  /// Being tenant prose, it also never travels into an audit row or onto
+  /// `ticket.status_changed`. Two different boundaries, both load-bearing: one
+  /// keeps it out of an operator's log, the other keeps it away from the person
+  /// it is about.
+  reason String? @db.Text
+
+  changedAt DateTime @default(now()) @map("changed_at") @db.Timestamptz
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  /// The history read, which is always one ticket oldest-first.
+  @@index([ticketId, changedAt])
+  @@map("ticket_status_changes")
+}
+
 /// Every assignment a ticket has ever had, not just the live one.
 ///
 /// The history is the point: "who was working this when it went wrong?" is not
@@ -176,8 +244,11 @@ model TicketAssignment {
   /// No FK: postgres_auth. Validated at write time.
   assignedToId String @map("assigned_to_id") @db.Uuid
 
-  /// null when the system assigned it — auto-routing, escalation rules — rather
-  /// than a person.
+  /// Nullable, and nothing writes a null: `writeAssignment` is the only writer
+  /// and takes `requireActor(context)`. It was meant for a system assignment —
+  /// auto-routing, escalation rules — which does not exist yet and would need
+  /// an entry point that is not this one, since `load` refuses a caller with no
+  /// identity. known-gaps #12.
   assignedById String? @map("assigned_by_id") @db.Uuid
 
   /// No FK: `departments` lives in postgres_auth.

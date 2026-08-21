@@ -123,7 +123,7 @@ const PAGINATION_META: SchemaObject = {
  * ＠ApiWrappedResponse(TicketResponseDto)            // data: { $ref: … }
  * ＠ApiWrappedResponse([TicketDto, DraftDto])        // data: { oneOf: [ … ] }
  * ＠ApiWrappedResponse()                             // data: null, for void
- * ＠ApiWrappedResponse(TicketResponseDto, { isArray: true })
+ * ＠ApiWrappedResponse(TicketResponseDto, { isArray: true })  // data: [ … ]
  * ```
  *
  * **The status is derived, not hardcoded.** Reaching for `ApiOkResponse` makes

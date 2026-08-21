@@ -1,13 +1,14 @@
 /** @file Prisma row -> wire for a ticket. */
 
 import {
+  TicketStatusChangeResponse,
   TicketResponse,
   toProtoTicketPriority,
   toProtoTicketSource,
   toProtoTicketStatus,
   toProtoTimestamp,
 } from '@synapsedesk/grpc-proto';
-import { Ticket } from '../../generated/prisma/client';
+import { Ticket, TicketStatusChange } from '../../generated/prisma/client';
 
 // The enum bridges are NOT declared here. `libs/grpc-proto` already exports one
 // per enum, built with `enumBridge`: the forward map is exhaustive over the
@@ -46,5 +47,26 @@ export function toTicketResponse(ticket: Ticket): TicketResponse {
     updatedAt: toProtoTimestamp(ticket.updatedAt),
     deletedAt: toProtoTimestamp(ticket.deletedAt),
     deletedById: ticket.deletedById ?? undefined,
+  };
+}
+
+/**
+ * A `ticket_status_changes` row on the wire.
+ *
+ * `fromStatus` maps through `toProtoTicketStatus` like every other status, so a
+ * NULL — a row with no prior status — arrives as `UNSPECIFIED` rather than as
+ * an absent field the reader must special-case.
+ */
+export function toTicketStatusChangeResponse(
+  row: TicketStatusChange,
+): TicketStatusChangeResponse {
+  return {
+    id: row.id,
+    ticketId: row.ticketId,
+    fromStatus: toProtoTicketStatus(row.fromStatus),
+    toStatus: toProtoTicketStatus(row.toStatus),
+    changedById: row.changedById,
+    reason: row.reason ?? undefined,
+    changedAt: toProtoTimestamp(row.changedAt),
   };
 }

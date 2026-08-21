@@ -57,6 +57,7 @@ Append-only. A decision is never edited; superseding one means writing a new one
 | [0037](./decisions/0037-worklists-follow-the-document-boundary.md) | Operational worklists follow the document boundary |
 | [0038](./decisions/0038-permissions-are-a-compile-time-artifact.md) | Permissions are a compile-time artifact, not data |
 | [0039](./decisions/0039-the-seeder-ddl-block-is-the-list.md) | The seeder's DDL block is the list of hand-written SQL |
+| [0040](./decisions/0040-ticket-status-history-is-a-table-not-a-trail.md) | A ticket's status history is a table, not an audit trail |
 
 ## `reference/` — what is true today
 

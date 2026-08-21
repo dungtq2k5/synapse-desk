@@ -1,4 +1,3 @@
-import { MAX_STATUS_CHANGE_REASON_LENGTH } from '../../../../common/config/dto.config';
 import { OmitType, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
@@ -18,6 +17,7 @@ import {
 import {
   DEFAULT_SEARCH,
   MAX_BULK_TICKET_IDS,
+  MAX_STATUS_CHANGE_REASON_LENGTH,
   MAX_TICKET_DESCRIPTION_LENGTH,
   MIN_TICKET_TITLE_LENGTH,
   MAX_TICKET_TITLE_LENGTH,
@@ -104,6 +104,37 @@ export class ChangeTicketStatusDto {
   readonly reason?: string;
 }
 
+/**
+ * The optional body on `/escalate`, `/resolve`, `/reopen` and `/close`.
+ *
+ * The same two validators `ChangeTicketStatusDto` puts on its own `reason`,
+ * and it exists because those four are now the ONLY way to reach their
+ * transitions — `POST /:id/status` refuses `RESOLVED` and `CLOSED`, so without
+ * this the two transitions a history is most read to explain would be the two
+ * that could never carry an explanation.
+ *
+ * The whole body is optional: none of the four required one before.
+ */
+export class TicketStatusActionDto {
+  /**
+   * Why the ticket moved, recorded on its status history.
+   *
+   * **Agent-facing**: a caller without queue access sees every transition and
+   * only the reasons they wrote themselves, the same rule internal notes
+   * follow. Not a message to the customer — `POST /tickets/:id/messages` is
+   * that.
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(MAX_STATUS_CHANGE_REASON_LENGTH)
+  @Transform(trimIfString)
+  @ApiPropertyOptional({
+    description:
+      'Why the ticket moved. Recorded on the status history and visible to agents; the ticket author sees only reasons they wrote themselves.',
+  })
+  readonly reason?: string;
+}
+
 export class BulkTicketStatusDto {
   @IsArray()
   @ArrayMinSize(1)
@@ -122,6 +153,26 @@ export class BulkTicketStatusDto {
   @MaxLength(MAX_STATUS_CHANGE_REASON_LENGTH)
   @Transform(trimIfString)
   readonly reason?: string;
+}
+
+/**
+ * No `reason`, unlike {@link BulkTicketStatusDto}.
+ *
+ * Priority has no state machine and no terminal states — any value to any
+ * value — so there is nothing a change here needs to be justified against.
+ */
+export class BulkTicketPriorityDto {
+  @IsArray()
+  @ArrayMinSize(1)
+  // Capped at the DTO edge as well as in the service, for the reason given on
+  // `BulkTicketStatusDto`: the service is reachable over gRPC where no
+  // ValidationPipe ever ran.
+  @ArrayMaxSize(MAX_BULK_TICKET_IDS)
+  @IsUUID('4', { each: true })
+  readonly ticketIds!: string[];
+
+  @IsIn(Object.values(TicketPriority))
+  readonly priority!: TicketPriority;
 }
 
 export class ListTicketsQueryDto extends OmitType(SearchPaginationDto, [

@@ -53,6 +53,27 @@ export class TicketAccessService {
   }
 
   /**
+   * Whether this caller works the queue, rather than merely owning a ticket.
+   *
+   * The one definition of "agent" in this service. `MessagesService` reads it
+   * to decide who may see internal notes (ADR 0023) and `TicketsService` reads
+   * it to decide who may see a status-change reason — two features that must
+   * not be able to disagree about who an agent is.
+   *
+   * `ticket.message.moderate` counts alongside `ticket.read.all`: an agent
+   * scoped to their own queue still works tickets, and holding neither is what
+   * makes somebody a customer.
+   */
+  isAgent(context: CallerContext): boolean {
+    if (context.isSuperAdmin) return true;
+
+    return (
+      context.permissionCodes.includes('ticket.read.all') ||
+      context.permissionCodes.includes('ticket.message.moderate')
+    );
+  }
+
+  /**
    * The tenant filter, plus a NARROWER one for anyone without the queue.
    *
    * `tenantScope` alone is not enough, and this is the easiest thing in the

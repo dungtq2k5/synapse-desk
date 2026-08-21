@@ -195,7 +195,7 @@ describe('REST and GraphQL DTOs are independent but not divergent', () => {
   /**
    * REST response shapes with **no GraphQL twin, on purpose**.
    *
-   * **The sweep is organised by PAIRS, so a shape with no twin is invisible to
+   * **The sweep is organized by PAIRS, so a shape with no twin is invisible to
    * it.** That is not a small hole: `AiDraftResponseDto` sat outside every
    * assertion in this file while two of its fields were silently dropped by the
    * mapper, and the one mechanism built to flag a field nobody decided about
@@ -225,6 +225,9 @@ describe('REST and GraphQL DTOs are independent but not divergent', () => {
     PresignAttachmentResponseDto: 'a short-lived credential, never a query',
     DownloadAttachmentResponseDto: 'a short-lived credential, never a query',
     BulkTicketStatusResponseDto: 'a write RESULT, not an entity',
+    BulkTicketPriorityResponseDto: 'a write RESULT, not an entity',
+    TicketStatusChangeResponseDto:
+      'reached through Ticket, like AssignmentResponseDto beside it',
     AssignmentResponseDto: 'reached through Ticket, not queried alone',
     // departments
     DepartmentResponseDto: 'schema exposes departments through User and Ticket',

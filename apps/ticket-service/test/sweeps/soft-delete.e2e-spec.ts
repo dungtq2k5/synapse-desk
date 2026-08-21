@@ -173,7 +173,7 @@ describe('Soft-delete sweep (e2e)', () => {
               admin(),
             ),
         ],
-        ['close', () => tickets.closeTicket({ id: deleted.id }, admin())],
+        ['close', () => tickets.closeTicket({ ticketId: deleted.id }, admin())],
         [
           'assign',
           () =>

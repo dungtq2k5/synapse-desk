@@ -11,8 +11,11 @@ import {
   toListTicketsRequest,
   toTicketPageDto,
   toTicketResponseDto,
+  toTicketStatusChangeResponseDto,
 } from './ticket.mapper';
 import {
+  BulkTicketPriorityDto,
+  TicketStatusActionDto,
   BulkTicketStatusDto,
   ChangeTicketStatusDto,
   CreateTicketDto,
@@ -23,6 +26,8 @@ import {
 import { AnalyticsService } from '../analytics/analytics.service';
 import { AnalyticsExportResponseDto } from '../analytics/dto/rest/analytics-response.dto';
 import {
+  BulkTicketPriorityResponseDto,
+  TicketStatusChangeResponseDto,
   BulkTicketStatusResponseDto,
   TicketResponseDto,
 } from './dto/rest/ticket-response.dto';
@@ -110,33 +115,54 @@ export class TicketsService {
 
   async escalate(
     id: string,
+    dto: TicketStatusActionDto,
     context: RequestContext,
   ): Promise<TicketResponseDto> {
     return toTicketResponseDto(
-      await this.ticketsGrpcClient.escalate(id, context),
+      await this.ticketsGrpcClient.escalate(id, dto.reason, context),
     );
   }
 
   async resolve(
     id: string,
+    dto: TicketStatusActionDto,
     context: RequestContext,
   ): Promise<TicketResponseDto> {
     return toTicketResponseDto(
-      await this.ticketsGrpcClient.resolve(id, context),
+      await this.ticketsGrpcClient.resolve(id, dto.reason, context),
     );
   }
 
   async reopen(
     id: string,
+    dto: TicketStatusActionDto,
     context: RequestContext,
   ): Promise<TicketResponseDto> {
     return toTicketResponseDto(
-      await this.ticketsGrpcClient.reopen(id, context),
+      await this.ticketsGrpcClient.reopen(id, dto.reason, context),
     );
   }
 
-  async close(id: string, context: RequestContext): Promise<TicketResponseDto> {
-    return toTicketResponseDto(await this.ticketsGrpcClient.close(id, context));
+  async close(
+    id: string,
+    dto: TicketStatusActionDto,
+    context: RequestContext,
+  ): Promise<TicketResponseDto> {
+    return toTicketResponseDto(
+      await this.ticketsGrpcClient.close(id, dto.reason, context),
+    );
+  }
+
+  async listStatusChanges(
+    id: string,
+    context: RequestContext,
+  ): Promise<TicketStatusChangeResponseDto[]> {
+    const { items } = await this.ticketsGrpcClient.listStatusChanges(
+      id,
+      context,
+    );
+
+    return items.map(toTicketStatusChangeResponseDto);
   }
 
   bulkChangeStatus(
@@ -148,6 +174,19 @@ export class TicketsService {
         ticketIds: dto.ticketIds,
         status: toProtoTicketStatus(dto.status),
         reason: dto.reason,
+      },
+      context,
+    );
+  }
+
+  bulkChangePriority(
+    dto: BulkTicketPriorityDto,
+    context: RequestContext,
+  ): Promise<BulkTicketPriorityResponseDto> {
+    return this.ticketsGrpcClient.bulkChangePriority(
+      {
+        ticketIds: dto.ticketIds,
+        priority: toProtoTicketPriority(dto.priority),
       },
       context,
     );

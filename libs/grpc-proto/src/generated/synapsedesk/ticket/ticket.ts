@@ -8,6 +8,7 @@
 import type { Metadata } from "@grpc/grpc-js";
 import { GrpcMethod, GrpcStreamMethod } from "@nestjs/microservices";
 import { Observable } from "rxjs";
+import { Timestamp } from "../../google/protobuf/timestamp";
 import { PageMeta, PageRequest } from "../auth/common";
 import { TicketPriority, TicketResponse, TicketSource, TicketStatus } from "./common";
 
@@ -90,6 +91,28 @@ export interface TicketIdRequest {
   id: string;
 }
 
+/**
+ * The four convenience transitions — escalate, resolve, reopen, close.
+ *
+ * Separate from `TicketIdRequest` so they can carry a reason, and NOT applied
+ * to `DeleteTicket`/`RestoreTicket`, which keep it: deletion provenance is a
+ * different question from a status reason, and answering both with one field
+ * would put two meanings in one column.
+ *
+ * It exists because `POST /tickets/:id/status` is now the only route that
+ * takes a reason AND is forbidden from reaching RESOLVED and CLOSED — so
+ * without this, the two transitions a history is most often read to explain
+ * are the two that could never carry an explanation.
+ */
+export interface TicketStatusActionRequest {
+  ticketId: string;
+  /**
+   * Same shape and same bound as `ChangeTicketStatusRequest.reason`
+   * (`MAX_STATUS_CHANGE_REASON_LENGTH`), enforced at both edges.
+   */
+  reason?: string | undefined;
+}
+
 export interface DeleteTicketResponse {
 }
 
@@ -101,6 +124,57 @@ export interface BulkTicketStatusRequest {
   ticketIds: string[];
   status: TicketStatus;
   reason?: string | undefined;
+}
+
+/**
+ * Priority has no state machine — any value to any value — which is why it is a
+ * plain field on `UpdateTicket` and why this needs no `reason`. Status is the
+ * asymmetric one, and `BulkTicketStatusRequest` above carries the reason it
+ * needs.
+ */
+export interface BulkTicketPriorityRequest {
+  ticketIds: string[];
+  priority: TicketPriority;
+}
+
+/**
+ * The SAME shape as `BulkTicketStatusResponse`, and named separately rather
+ * than shared so the two can diverge without one silently changing the other.
+ */
+export interface BulkTicketPriorityResponse {
+  updated: string[];
+  failed: BulkTicketFailure[];
+}
+
+/**
+ * One row of a ticket's STATUS history.
+ *
+ * Reassignments are not here: they have a first-class history of their own in
+ * `ticket_assignments`, exposed at `ListTicketAssignments`, and it carries more
+ * than this shape could. Merging them would be one list with two shapes.
+ */
+export interface TicketStatusChangeResponse {
+  id: string;
+  ticketId: string;
+  /** Absent on the FIRST row of a ticket's life, which has no prior status. */
+  fromStatus?: TicketStatus | undefined;
+  toStatus: TicketStatus;
+  /**
+   * Never empty: a transition loads its ticket through `tenantScope`, which
+   * refuses a caller with no identity, so every row has an actor.
+   */
+  changedById: string;
+  reason?: string | undefined;
+  changedAt: Timestamp | undefined;
+}
+
+/**
+ * Unpaginated, and reusing `TicketIdRequest`: a ticket's status history is
+ * bounded by the transition table walked a handful of times, not by anything a
+ * user can grow. Same call the assignment history makes.
+ */
+export interface ListTicketStatusChangesResponse {
+  items: TicketStatusChangeResponse[];
 }
 
 export interface BulkTicketFailure {
@@ -162,15 +236,22 @@ export interface TicketServiceClient {
 
   changeTicketStatus(request: ChangeTicketStatusRequest, metadata?: Metadata): Observable<TicketResponse>;
 
-  escalateTicket(request: TicketIdRequest, metadata?: Metadata): Observable<TicketResponse>;
+  escalateTicket(request: TicketStatusActionRequest, metadata?: Metadata): Observable<TicketResponse>;
 
-  resolveTicket(request: TicketIdRequest, metadata?: Metadata): Observable<TicketResponse>;
+  resolveTicket(request: TicketStatusActionRequest, metadata?: Metadata): Observable<TicketResponse>;
 
-  reopenTicket(request: TicketIdRequest, metadata?: Metadata): Observable<TicketResponse>;
+  reopenTicket(request: TicketStatusActionRequest, metadata?: Metadata): Observable<TicketResponse>;
 
-  closeTicket(request: TicketIdRequest, metadata?: Metadata): Observable<TicketResponse>;
+  closeTicket(request: TicketStatusActionRequest, metadata?: Metadata): Observable<TicketResponse>;
 
   bulkChangeTicketStatus(request: BulkTicketStatusRequest, metadata?: Metadata): Observable<BulkTicketStatusResponse>;
+
+  bulkChangeTicketPriority(
+    request: BulkTicketPriorityRequest,
+    metadata?: Metadata,
+  ): Observable<BulkTicketPriorityResponse>;
+
+  listTicketStatusChanges(request: TicketIdRequest, metadata?: Metadata): Observable<ListTicketStatusChangesResponse>;
 
   deleteTicket(request: TicketIdRequest, metadata?: Metadata): Observable<DeleteTicketResponse>;
 
@@ -214,22 +295,22 @@ export interface TicketServiceController {
   ): Promise<TicketResponse> | Observable<TicketResponse> | TicketResponse;
 
   escalateTicket(
-    request: TicketIdRequest,
+    request: TicketStatusActionRequest,
     metadata?: Metadata,
   ): Promise<TicketResponse> | Observable<TicketResponse> | TicketResponse;
 
   resolveTicket(
-    request: TicketIdRequest,
+    request: TicketStatusActionRequest,
     metadata?: Metadata,
   ): Promise<TicketResponse> | Observable<TicketResponse> | TicketResponse;
 
   reopenTicket(
-    request: TicketIdRequest,
+    request: TicketStatusActionRequest,
     metadata?: Metadata,
   ): Promise<TicketResponse> | Observable<TicketResponse> | TicketResponse;
 
   closeTicket(
-    request: TicketIdRequest,
+    request: TicketStatusActionRequest,
     metadata?: Metadata,
   ): Promise<TicketResponse> | Observable<TicketResponse> | TicketResponse;
 
@@ -237,6 +318,19 @@ export interface TicketServiceController {
     request: BulkTicketStatusRequest,
     metadata?: Metadata,
   ): Promise<BulkTicketStatusResponse> | Observable<BulkTicketStatusResponse> | BulkTicketStatusResponse;
+
+  bulkChangeTicketPriority(
+    request: BulkTicketPriorityRequest,
+    metadata?: Metadata,
+  ): Promise<BulkTicketPriorityResponse> | Observable<BulkTicketPriorityResponse> | BulkTicketPriorityResponse;
+
+  listTicketStatusChanges(
+    request: TicketIdRequest,
+    metadata?: Metadata,
+  ):
+    | Promise<ListTicketStatusChangesResponse>
+    | Observable<ListTicketStatusChangesResponse>
+    | ListTicketStatusChangesResponse;
 
   deleteTicket(
     request: TicketIdRequest,
@@ -264,6 +358,8 @@ export function TicketServiceControllerMethods() {
       "reopenTicket",
       "closeTicket",
       "bulkChangeTicketStatus",
+      "bulkChangeTicketPriority",
+      "listTicketStatusChanges",
       "deleteTicket",
       "restoreTicket",
     ];

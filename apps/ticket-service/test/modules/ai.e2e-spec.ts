@@ -384,7 +384,7 @@ describe('AI Co-Pilot (e2e)', () => {
       });
 
       const escalated = await tickets.escalateTicket(
-        { id: ticket.id },
+        { ticketId: ticket.id },
         agent(),
       );
 
@@ -404,7 +404,7 @@ describe('AI Co-Pilot (e2e)', () => {
         status: TicketStatus.OPEN,
       });
 
-      await tickets.escalateTicket({ id: ticket.id }, agent());
+      await tickets.escalateTicket({ ticketId: ticket.id }, agent());
       await waitFor(() => generateSummary.mock.calls.length > 0);
 
       expect(generateSummary).toHaveBeenCalled();
@@ -416,7 +416,7 @@ describe('AI Co-Pilot (e2e)', () => {
         status: TicketStatus.OPEN,
       });
 
-      await tickets.escalateTicket({ id: ticket.id }, agent());
+      await tickets.escalateTicket({ ticketId: ticket.id }, agent());
       // The spy firing only proves the model was ASKED; the row is written
       // after it answers, so that is what this actually waits on.
       await waitFor(
@@ -440,7 +440,7 @@ describe('AI Co-Pilot (e2e)', () => {
         status: TicketStatus.OPEN,
       });
 
-      await tickets.escalateTicket({ id: ticket.id }, agent());
+      await tickets.escalateTicket({ ticketId: ticket.id }, agent());
       // An absence cannot be polled for, so give the background call a real
       // chance to happen before asserting it did not.
       await new Promise((resolve) => setTimeout(resolve, 150));
@@ -461,7 +461,7 @@ describe('AI Co-Pilot (e2e)', () => {
       });
 
       await expect(
-        tickets.escalateTicket({ id: ticket.id }, agent()),
+        tickets.escalateTicket({ ticketId: ticket.id }, agent()),
       ).resolves.toBeDefined();
     });
   });

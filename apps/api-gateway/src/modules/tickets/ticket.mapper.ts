@@ -1,4 +1,5 @@
 import {
+  TicketStatusChangeResponse,
   fromProtoTicketPriority,
   fromProtoTicketSource,
   fromProtoTicketStatus,
@@ -15,7 +16,10 @@ import {
 import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
 import { toPaginationMetaDataResponseDto } from '../../common/mappers/pagination.mapper';
 import { ListTicketsQueryDto } from './dto/rest/ticket.dto';
-import { TicketResponseDto } from './dto/rest/ticket-response.dto';
+import {
+  TicketResponseDto,
+  TicketStatusChangeResponseDto,
+} from './dto/rest/ticket-response.dto';
 
 /**
  * Converts a `TicketResponse` off the wire into its REST DTO.
@@ -83,5 +87,26 @@ export function toTicketPageDto(
   return {
     items: response.items.map(toTicketResponseDto),
     meta: toPaginationMetaDataResponseDto(response.meta),
+  };
+}
+
+/**
+ * A status-history row on the way out.
+ *
+ * `fromStatus` is null on a row with no prior status — `fromProtoTicketStatus`
+ * answers `null` for `UNSPECIFIED`, and that null is the honest rendering
+ * rather than an omitted key the client has to guess about.
+ */
+export function toTicketStatusChangeResponseDto(
+  row: TicketStatusChangeResponse,
+): TicketStatusChangeResponseDto {
+  return {
+    id: row.id,
+    ticketId: row.ticketId,
+    fromStatus: fromProtoTicketStatus(row.fromStatus),
+    toStatus: fromProtoTicketStatus(row.toStatus)!,
+    changedById: row.changedById,
+    reason: row.reason ?? null,
+    changedAt: fromProtoTimestamp(row.changedAt)!,
   };
 }

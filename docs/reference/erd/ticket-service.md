@@ -31,6 +31,18 @@ erDiagram
     }
   
 
+  "ticket_status_changes" {
+    String id "🗝️"
+    String ticket_id 
+    String organization_id 
+    String from_status "❓"
+    String to_status 
+    String changed_by_id 
+    String reason "❓"
+    DateTime changed_at 
+    }
+  
+
   "ticket_assignments" {
     String id "🗝️"
     String ticket_id 
@@ -185,6 +197,7 @@ erDiagram
     }
   
     "inbound_emails" }o--|o tickets : "ticket"
+    "ticket_status_changes" }o--|| tickets : "ticket"
     "ticket_assignments" }o--|| tickets : "ticket"
     "ticket_messages" }o--|| tickets : "ticket"
     "message_attachments" }o--|| ticket_messages : "message"

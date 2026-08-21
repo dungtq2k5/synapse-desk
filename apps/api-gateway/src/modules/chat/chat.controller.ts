@@ -211,6 +211,11 @@ export class ChatController {
     @CurrentUser() context: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<TicketResponseDto> {
-    return this.tickets.escalate(id, context);
+    // `{}` and NOT a chat-specific reason, though one was tempting: this route
+    // is a literal alias, asserted as one, and giving it its own request is the
+    // first divergence. If chat ever needs to say WHERE a hand-off came from,
+    // that belongs on both routes as a caller-supplied reason, not on one of
+    // them as a constant.
+    return this.tickets.escalate(id, {}, context);
   }
 }
