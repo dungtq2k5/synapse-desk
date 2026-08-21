@@ -33,6 +33,7 @@ import { AiService } from './ai.service';
 import {
   BulkTicketPriorityDto,
   BulkTicketStatusDto,
+  MarkTicketReadDto,
   TicketStatusActionDto,
   ChangeTicketStatusDto,
   CreateTicketDto,
@@ -42,6 +43,7 @@ import {
 } from './dto/rest/ticket.dto';
 import {
   BulkTicketPriorityResponseDto,
+  MarkTicketReadResponseDto,
   TicketStatusChangeResponseDto,
   BulkTicketStatusResponseDto,
   TicketResponseDto,
@@ -507,6 +509,33 @@ export class TicketsController {
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<AssignmentResponseDto[]> {
     return this.assignments.list(id, context);
+  }
+
+  /**
+   * Marks this thread read, for the unread badge on `GET /tickets`.
+   *
+   * **Send `readAt`** — the `createdAt` of the newest message you actually
+   * rendered. Omitting it lets the server stamp its own clock, which marks read
+   * every message that arrived between your render and this request: on a live
+   * ticket with an agent typing, that is a message the user never saw. The
+   * value is clamped to the server's clock, and the response says what was
+   * stored.
+   *
+   * No permission beyond reading the ticket: it is a fact about what THIS
+   * caller has seen, and there is no version of it that touches anyone else.
+   */
+  @ApiOperation({ summary: 'Mark the thread read up to a message' })
+  @ApiWrappedResponse(MarkTicketReadResponseDto)
+  @ApiFilterErrors(['400', '401', '404'])
+  @Post(':id/read')
+  @HttpCode(HttpStatus.OK)
+  @ResponseMessage('Marked read')
+  markRead(
+    @CurrentUser() context: RequestContext,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: MarkTicketReadDto,
+  ): Promise<MarkTicketReadResponseDto> {
+    return this.tickets.markRead(id, dto, context);
   }
 
   /**

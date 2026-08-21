@@ -146,6 +146,24 @@ message ListTicketStatusChangesResponse {
   repeated TicketStatusChangeResponse items = 1;
 }
 
+// Marking a thread read UP TO a point the client names.
+//
+// `read_at` is the `created_at` of the newest message the client actually
+// rendered — not `now()`. Stamping the server clock marks read every message
+// inserted between the render and this request landing, which on a live ticket
+// with an agent typing is a message the user never saw. Absent falls back to
+// `now()`, which is correct for a client with nothing rendered.
+message MarkTicketReadRequest {
+  string ticket_id = 1;
+  optional google.protobuf.Timestamp read_at = 2;
+}
+
+message MarkTicketReadResponse {
+  // What was actually stored — clamped to `now()`, so a client with a fast
+  // clock can see that it was.
+  google.protobuf.Timestamp last_read_at = 1;
+}
+
 message BulkTicketFailure {
   string id = 1;
   string reason = 2;
@@ -202,6 +220,7 @@ service TicketService {
   rpc BulkChangeTicketPriority(BulkTicketPriorityRequest) returns (BulkTicketPriorityResponse);
 
   rpc ListTicketStatusChanges(TicketIdRequest) returns (ListTicketStatusChangesResponse);
+  rpc MarkTicketRead(MarkTicketReadRequest) returns (MarkTicketReadResponse);
 
   rpc DeleteTicket(TicketIdRequest) returns (DeleteTicketResponse);
   rpc RestoreTicket(TicketIdRequest) returns (TicketResponse);

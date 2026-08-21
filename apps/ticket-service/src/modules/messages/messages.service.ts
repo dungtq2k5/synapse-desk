@@ -151,7 +151,7 @@ export class MessagesService {
 
     const where: Prisma.TicketMessageWhereInput = {
       ticketId: ticket.id,
-      ...this.internalNoteScope(context),
+      ...this.access.internalNoteScope(context),
     };
 
     const [items, totalItems] = await Promise.all([
@@ -845,51 +845,6 @@ export class MessagesService {
     return {};
   }
 
-  /**
-   * An attachment on a ticket the caller may see, or NOT_FOUND.
-   *
-   * NOT_FOUND for both "no such attachment" and "not yours" — telling the two
-   * apart turns id enumeration into a tenant-membership oracle.
-   */
-  private async loadAttachment(
-    attachmentId: string,
-    context: CallerContext,
-  ): Promise<MessageAttachment> {
-    const attachment = await this.prisma.messageAttachment.findUnique({
-      where: { id: attachmentId },
-      include: {
-        message: { select: { ticketId: true, isInternalNote: true } },
-      },
-    });
-
-    if (
-      !attachment ||
-      (attachment.message.isInternalNote && !this.canSeeInternalNotes(context))
-    ) {
-      throw new RpcException({
-        code: status.NOT_FOUND,
-        message: 'No attachment with that id',
-      });
-    }
-
-    // Throws NOT_FOUND if the caller may not see the ticket it hangs off.
-    await this.tickets.load(attachment.message.ticketId, context);
-
-    return attachment;
-  }
-
-  private requireFileName(fileName: string): string {
-    const trimmed = fileName?.trim() ?? '';
-    if (!trimmed) {
-      throw new RpcException({
-        code: status.INVALID_ARGUMENT,
-        message: 'A file name is required',
-      });
-    }
-
-    return trimmed.slice(0, 255);
-  }
-
   // -------------------------------------------------------------------------
 
   /**
@@ -1073,22 +1028,6 @@ export class MessagesService {
   }
 
   /**
-   * The internal-note filter, as a WHERE fragment.
-   *
-   * A fragment rather than a post-fetch `.filter()` on purpose, and that is what it calls
-   * this out specifically: filtering after the query leaks the notes' EXISTENCE
-   * through the row count and the response timing, and leaves one forgotten
-   * call site away from leaking the content itself.
-   *
-   * Returns `{}` for an agent so the caller can spread it unconditionally.
-   */
-  private internalNoteScope(
-    context: CallerContext,
-  ): Prisma.TicketMessageWhereInput {
-    return this.canSeeInternalNotes(context) ? {} : { isInternalNote: false };
-  }
-
-  /**
    * Queue access is what makes somebody an agent. A ticket's author holds none
    * of it and must not see the notes written ABOUT their ticket.
    *
@@ -1162,7 +1101,7 @@ export class MessagesService {
       where: {
         id: messageId,
         ticketId: ticket.id,
-        ...this.internalNoteScope(context),
+        ...this.access.internalNoteScope(context),
       },
     });
     if (!message) {
@@ -1177,5 +1116,50 @@ export class MessagesService {
     // through its ticket — and the edit and redaction events both need one. The
     // alternative is a second read of a row already in memory.
     return { ...message, organizationId: ticket.organizationId };
+  }
+
+  /**
+   * An attachment on a ticket the caller may see, or NOT_FOUND.
+   *
+   * NOT_FOUND for both "no such attachment" and "not yours" — telling the two
+   * apart turns id enumeration into a tenant-membership oracle.
+   */
+  private async loadAttachment(
+    attachmentId: string,
+    context: CallerContext,
+  ): Promise<MessageAttachment> {
+    const attachment = await this.prisma.messageAttachment.findUnique({
+      where: { id: attachmentId },
+      include: {
+        message: { select: { ticketId: true, isInternalNote: true } },
+      },
+    });
+
+    if (
+      !attachment ||
+      (attachment.message.isInternalNote && !this.canSeeInternalNotes(context))
+    ) {
+      throw new RpcException({
+        code: status.NOT_FOUND,
+        message: 'No attachment with that id',
+      });
+    }
+
+    // Throws NOT_FOUND if the caller may not see the ticket it hangs off.
+    await this.tickets.load(attachment.message.ticketId, context);
+
+    return attachment;
+  }
+
+  private requireFileName(fileName: string): string {
+    const trimmed = fileName?.trim() ?? '';
+    if (!trimmed) {
+      throw new RpcException({
+        code: status.INVALID_ARGUMENT,
+        message: 'A file name is required',
+      });
+    }
+
+    return trimmed.slice(0, 255);
   }
 }

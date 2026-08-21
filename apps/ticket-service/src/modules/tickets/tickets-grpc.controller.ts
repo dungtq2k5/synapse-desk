@@ -15,6 +15,8 @@ import {
   ListTicketsRequest,
   ListTicketsResponse,
   ListTicketStatusChangesResponse,
+  MarkTicketReadRequest,
+  MarkTicketReadResponse,
   TicketIdRequest,
   TicketStatusActionRequest,
   TicketResponse,
@@ -171,6 +173,16 @@ export class TicketsGrpcController implements TicketServiceController {
     metadata?: Metadata,
   ): Promise<ListTicketStatusChangesResponse> {
     return this.ticketsService.listTicketStatusChanges(
+      request,
+      unpackCallerContext(metadata),
+    );
+  }
+
+  markTicketRead(
+    request: MarkTicketReadRequest,
+    metadata?: Metadata,
+  ): Promise<MarkTicketReadResponse> {
+    return this.ticketsService.markTicketRead(
       request,
       unpackCallerContext(metadata),
     );

@@ -36,6 +36,24 @@ export class FeedbackService {
     );
   }
 
+  /**
+   * The caller's own rating, or `null` when they have not rated the message.
+   *
+   * `null` rather than a 404: a client renders a thumb control on every AI
+   * message and asks this for each one, so "not rated" is the ordinary answer.
+   */
+  async get(
+    ticketMessageId: string,
+    context: RequestContext,
+  ): Promise<FeedbackResponseDto | null> {
+    const { feedback } = await this.feedbackGrpcClient.get(
+      ticketMessageId,
+      context,
+    );
+
+    return feedback ? toFeedbackResponseDto(feedback) : null;
+  }
+
   withdraw(ticketMessageId: string, context: RequestContext): Promise<void> {
     return this.feedbackGrpcClient.withdraw(ticketMessageId, context);
   }

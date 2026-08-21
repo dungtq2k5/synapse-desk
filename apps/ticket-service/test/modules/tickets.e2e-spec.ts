@@ -19,6 +19,8 @@ import {
   TicketPriority as ProtoTicketPriority,
   TicketSource as ProtoTicketSource,
   TicketStatus as ProtoTicketStatus,
+  fromProtoTimestamp,
+  toProtoTimestamp,
 } from '@synapsedesk/grpc-proto';
 import {
   E2eFixture,
@@ -27,7 +29,12 @@ import {
   pageRequest,
   superAdminContext,
 } from '../utils';
-import { buildTenant, createTicket, TenantFixture } from '../factories';
+import {
+  buildTenant,
+  createMessage,
+  createTicket,
+  TenantFixture,
+} from '../factories';
 import { TicketsService } from '../../src/modules/tickets/tickets.service';
 import { AuthReferenceService } from '../../src/modules/auth-client/auth-reference.service';
 import { TicketEventPublisher } from '../../src/modules/events/ticket-event.publisher';
@@ -1225,6 +1232,226 @@ describe('Tickets (e2e)', () => {
           'toStatus',
         ].sort(compareAlphabetically),
       );
+    });
+  });
+
+  describe('11. the read cursor and the unread count', () => {
+    /**
+     * A ticket the member authored, with `count` replies from a THIRD party.
+     *
+     * Not from `tenant.agentId`: own messages never count, so an agent reading
+     * their own replies back would see zero and every assertion below would
+     * pass for the wrong reason.
+     */
+    const senderId = faker.string.uuid();
+    const seedThread = async (count: number, overrides = {}) => {
+      const ticket = await createTicket(fx.prisma, tenant, {
+        authorId: tenant.userId,
+      });
+      for (let index = 0; index < count; index += 1) {
+        await createMessage(fx.prisma, ticket.id, {
+          senderId,
+          content: `Reply ${index}`,
+          ...overrides,
+        });
+      }
+      return ticket;
+    };
+
+    const listFor = async (context = member()) => {
+      const { items } = await tickets.listTickets(
+        { page: pageRequest(), includeDeleted: false } as never,
+        context,
+      );
+      return new Map(items.map((item) => [item.id, item.unreadCount]));
+    };
+
+    it('1. **a ticket never opened counts EVERYTHING, not zero**', async () => {
+      // The arm that decides whether a badge works at all. No read-state row
+      // means "read nothing", and treating it as "read everything" makes every
+      // untouched ticket look caught-up.
+      const ticket = await seedThread(3);
+
+      expect((await listFor()).get(ticket.id)).toBe(3);
+    });
+
+    it('2. marking read clears it, and a later message brings it back', async () => {
+      const ticket = await seedThread(2);
+
+      await tickets.markTicketRead({ ticketId: ticket.id }, member());
+      expect((await listFor()).get(ticket.id)).toBe(0);
+
+      await createMessage(fx.prisma, ticket.id, {
+        senderId,
+        content: 'One more',
+      });
+      expect((await listFor()).get(ticket.id)).toBe(1);
+    });
+
+    it("3. **the caller's OWN messages never count**", async () => {
+      // Or sending a message would make your own ticket unread.
+      const ticket = await createTicket(fx.prisma, tenant, {
+        authorId: tenant.userId,
+      });
+      await createMessage(fx.prisma, ticket.id, {
+        senderId: tenant.userId,
+        content: 'Mine',
+      });
+
+      expect((await listFor()).get(ticket.id)).toBe(0);
+    });
+
+    it('4. **internal notes do not count for a non-agent, and do for an agent**', async () => {
+      // A badge counting notes the caller cannot open is an unread count they
+      // can never clear. Same fragment as the thread read, not a second copy.
+      const ticket = await seedThread(1, { isInternalNote: true });
+
+      expect((await listFor(member())).get(ticket.id)).toBe(0);
+      expect((await listFor(agent())).get(ticket.id)).toBe(1);
+    });
+
+    it('**4b. a REDACTED message does not count**', async () => {
+      // The asymmetry that decides it: `redactedAt` leaves `createdAt` alone,
+      // so a message redacted after someone read it stays under their watermark
+      // forever. The badge could only ever rise for one redacted BEFORE it was
+      // read — the exact case where the redaction was protecting that reader.
+      const ticket = await seedThread(2);
+      const [first] = await fx.prisma.ticketMessage.findMany({
+        where: { ticketId: ticket.id },
+        orderBy: { createdAt: 'asc' },
+      });
+      await fx.prisma.ticketMessage.update({
+        where: { id: first.id },
+        data: { redactedAt: new Date(), redactedById: tenant.agentId },
+      });
+
+      expect((await listFor()).get(ticket.id)).toBe(1);
+    });
+
+    it('4c. and redacting the ONLY unread message clears the badge', async () => {
+      // The whole-badge version, so 4b cannot pass on an off-by-one.
+      const ticket = await seedThread(1);
+      const [only] = await fx.prisma.ticketMessage.findMany({
+        where: { ticketId: ticket.id },
+      });
+
+      expect((await listFor()).get(ticket.id)).toBe(1);
+
+      await fx.prisma.ticketMessage.update({
+        where: { id: only.id },
+        data: { redactedAt: new Date(), redactedById: tenant.agentId },
+      });
+
+      expect((await listFor()).get(ticket.id) ?? 0).toBe(0);
+    });
+
+    it('5. **the CLIENT names the point, so a message that arrived mid-render stays unread**', async () => {
+      // The `now()` race, which is why this takes a body. The client renders
+      // two messages, a third lands, and the mark-read must not clear it.
+      const ticket = await seedThread(2);
+      const rendered = await fx.prisma.ticketMessage.findFirstOrThrow({
+        where: { ticketId: ticket.id },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      await createMessage(fx.prisma, ticket.id, {
+        senderId,
+        content: 'Arrived while you were reading',
+      });
+
+      await tickets.markTicketRead(
+        { ticketId: ticket.id, readAt: toProtoTimestamp(rendered.createdAt) },
+        member(),
+      );
+
+      expect((await listFor()).get(ticket.id)).toBe(1);
+    });
+
+    it('6. and stamping NOW would have cleared it — the difference, asserted', async () => {
+      // The other half of test 5: without a client stamp the message is gone
+      // from the badge, and this is what that looks like.
+      const ticket = await seedThread(2);
+      await createMessage(fx.prisma, ticket.id, {
+        senderId,
+        content: 'Arrived while you were reading',
+      });
+
+      await tickets.markTicketRead({ ticketId: ticket.id }, member());
+
+      expect((await listFor()).get(ticket.id)).toBe(0);
+    });
+
+    it('7. **a client clock running fast is CLAMPED to the server**', async () => {
+      // Otherwise one skewed client marks messages read before they are
+      // written, and its badge stays at zero through a whole conversation.
+      const ticket = await seedThread(1);
+      const future = new Date(Date.now() + 60 * 60 * 1000);
+
+      const result = await tickets.markTicketRead(
+        { ticketId: ticket.id, readAt: toProtoTimestamp(future) },
+        member(),
+      );
+
+      const stored = fromProtoTimestamp(result.lastReadAt)!;
+      expect(stored.getTime()).toBeLessThan(future.getTime());
+
+      await createMessage(fx.prisma, ticket.id, {
+        senderId,
+        content: 'After the fake future',
+      });
+      expect((await listFor()).get(ticket.id)).toBe(1);
+    });
+
+    it('**7b. an OLDER stamp is declined — the write is monotonic**', async () => {
+      // Last-write-wins does not need two tabs to go wrong: a thread view that
+      // fires this on render has two requests in flight whenever a message
+      // lands mid-render, and if they reorder the earlier stamp wins and the
+      // badge reappears. `GREATEST` in the ON CONFLICT is what refuses it.
+      const ticket = await seedThread(2);
+      const [older, newer] = await fx.prisma.ticketMessage.findMany({
+        where: { ticketId: ticket.id },
+        orderBy: { createdAt: 'asc' },
+      });
+
+      await tickets.markTicketRead(
+        { ticketId: ticket.id, readAt: toProtoTimestamp(newer.createdAt) },
+        member(),
+      );
+      expect((await listFor()).get(ticket.id) ?? 0).toBe(0);
+
+      // The late-arriving earlier render.
+      const result = await tickets.markTicketRead(
+        { ticketId: ticket.id, readAt: toProtoTimestamp(older.createdAt) },
+        member(),
+      );
+
+      // The badge does NOT come back...
+      expect((await listFor()).get(ticket.id) ?? 0).toBe(0);
+      // ...and the response reports what is STORED, not what was claimed —
+      // which is the whole reason it uses RETURNING.
+      expect(fromProtoTimestamp(result.lastReadAt)!.getTime()).toBe(
+        newer.createdAt.getTime(),
+      );
+    });
+
+    it('8. is scoped per USER — one reader clearing does not clear the other', async () => {
+      const ticket = await seedThread(2);
+
+      await tickets.markTicketRead({ ticketId: ticket.id }, member());
+
+      expect((await listFor(member())).get(ticket.id)).toBe(0);
+      expect((await listFor(agent())).get(ticket.id)).toBe(2);
+    });
+
+    it('9. is NOT_FOUND for a ticket the caller cannot see', async () => {
+      const other = buildTenant();
+      const theirs = await createTicket(fx.prisma, other);
+
+      await expectRpc(
+        tickets.markTicketRead({ ticketId: theirs.id }, member()),
+        status.NOT_FOUND,
+      );
+      expect(await fx.prisma.ticketReadState.count()).toBe(0);
     });
   });
 

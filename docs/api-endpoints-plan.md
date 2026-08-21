@@ -181,7 +181,7 @@ Tenant admins only ever address their **own** org; the tenant comes from the JWT
 | GET | `/departments/:id/members` | Members (via `user_departments`), flagging `is_primary`. | perm:`department.read` |
 | POST | `/departments/:id/members` ✎ | Bulk add users (`{ userIds[], isPrimary? }`) → `user_departments`, stamps `assigned_by_id`. | perm:`department.member.assign` |
 | DELETE | `/departments/:id/members/:userId` ✎ | Remove a user from the department. | perm:`department.member.assign` |
-| GET | `/departments/:id/agents/availability` | Agent presence + current load, for routing/assignment UI. **NOT BUILT — Domain B**: presence lives in the WebSocket layer (§5) and "current load" counts open tickets, neither of which exists yet. | perm:`ticket.assign` |
+| GET | `/departments/:id/agents/availability` | Agent presence + current load, for routing/assignment UI. **NOT BUILT, and the note that said "neither exists yet" is half stale**: `PresenceService` ships, Redis-backed with a TTL. What is missing is a BATCH presence read (`read()` is per-user, so a thirty-agent department is thirty round trips — `MGET` over the same key function is one) and a grouped open-ticket count, which nothing exposes. The shape is a **gateway-side join**: presence is connection state and lives in api-gateway, so this is gRPC to auth-service for the agent list, `MGET` against the gateway's own Redis, then gRPC to ticket-service for the counts, assembled in a controller — three hops on a routing screen, with a caching decision in it. | perm:`ticket.assign` |
 
 ### 1.6 Users — `/users`
 
@@ -211,7 +211,7 @@ Tenant admins only ever address their **own** org; the tenant comes from the JWT
 | POST | `/users/me/avatar/upload-url` | Presign a direct-to-Firebase-Storage upload: `{ contentType, sizeBytes }` → `{ uploadUrl, objectPath, expiresAt }`. Image mime allowlist + 2MB cap enforced before signing. See [ADR 0024](./decisions/0024-one-upload-mechanism.md). | SELF |
 | POST | `/users/me/avatar/confirm` | `{ objectPath }` — confirms the upload landed, writes `users.avatar_url` (an object path, not a URL — RDM Table 3), audits, and emits the async delete of the **previous** avatar if one existed. | SELF |
 | DELETE | `/users/me/avatar` | Clear `avatar_url` to `null`; emits the async delete of the object that was there. | SELF |
-| GET | `/users/me/tickets` | Own tickets (end-user "my requests" view). **Domain B** — listed here because it hangs off `/users/me`, but owned by `ticket-service`. | SELF |
+| ~~GET~~ | ~~`/users/me/tickets`~~ | **Not built — `GET /tickets` already is this.** Reads are not gated on `ticket.read.all`; ticket-service narrows to what the caller authored or is assigned, so an end user calling `GET /tickets` gets exactly their own. `?authorId=` — on the REST query DTO and the GraphQL args both — narrows it for an agent, who would otherwise see the queue. There is no caller this route serves and that one does not. | ~~SELF~~ |
 
 > **Notifications moved.** The `/me/notifications*` endpoints previously listed here are **Domain E**, owned by `notification-service`, not `auth-service` — see **§4b**. They were relocated because the §8 ownership map routes by path prefix, so anything under `/users/*` resolves to `auth-service`; leaving them here silently assigned a whole domain's endpoints to the wrong service.
 >
@@ -335,7 +335,7 @@ The unified Tier 1 + Tier 2 timeline (RDM §1.3).
 | GET | `/tickets/:ticketId/messages/:messageId/attachments` | List attachments. | USER |
 | GET | `/attachments/:id/download` | Short-lived pre-signed Firebase Storage URL (302 or `{ url, expiresAt }`). Tenant + ticket ACL re-checked **before** the signing call, not delegated to it. | USER |
 | DELETE | `/attachments/:id` | Remove an attachment (hard delete — no independent soft-delete story for attachments) and emit the async delete of its object. | SELF / perm:`ticket.message.moderate` |
-| POST | `/tickets/:ticketId/read` | Mark the thread read up to a message (unread badges). **NOT BUILT** — no proto RPC and no read-cursor column; needs a schema decision (per-user watermark vs. per-message receipts) before it can be specified. | USER |
+| POST | `/tickets/:ticketId/read` | Mark the thread read up to a message. Body `{ readAt? }` — the `createdAt` of the newest message the client RENDERED, clamped server-side to `now()`. Omitting it lets the server stamp its own clock, which marks read anything that arrived between the render and the request. Writes `ticket_read_states`, a per-user watermark. The badge itself is `unreadCount` on `GET /tickets`, so a queue screen costs no extra request. | USER |
 
 ### 2.3 AI Co-Pilot — `/tickets/:id/ai`
 
@@ -376,14 +376,16 @@ Thin end-user surface over the same `tickets` + `ticket_messages` tables — a l
 | GET | `/chat/conversations/:id` | Thread + citations per AI message. | USER |
 | POST | `/chat/conversations/:id/messages` | Ask a question. Streams the RAG answer over WebSocket; falls back to a buffered JSON response when the client sets `Accept: application/json`. The answer is **Markdown by contract** (§2.3). | USER |
 | POST | `/chat/conversations/:id/escalate` | One-click hand-off to a human — alias of `POST /tickets/:id/escalate`. | USER |
-| GET | `/chat/suggestions` | Suggested/popular starter questions for the empty state. | USER |
+| ~~GET~~ | ~~`/chat/suggestions`~~ | **Not built — one row conflating two features.** Split below. Naming them together implied the harder one was a `GET` away. | ~~USER~~ |
+| GET | `/chat/suggestions` (suggested) | A CURATED starter list for the empty state — a `String[]` on organization settings, edited where the rest of the tenant's AI settings are. Cheap, and waiting on a screen that renders it. | USER |
+| GET | `/chat/suggestions` (popular) | **A project, not a route.** A conversation IS a ticket, so the questions are `ticket_messages` rows, and "popular" over free text is not an aggregate: two people asking the same thing write two strings and `GROUP BY content` returns one row each. It needs normalisation and clustering with its own storage. The precedent is `/analytics/knowledge-gaps`, which counts EMPTY RETRIEVALS rather than question text for exactly this reason. Deriving them from document titles is rejected separately: a title is not a question, and an empty state offering *"Q4 Expense Policy v3 (final).pdf"* teaches users that the assistant wants filenames. | USER |
 
 ### 2.5 AI Feedback — `/feedback`
 
 | Method | Path | Description | Auth |
 | :---- | :---- | :---- | :---- |
 | POST | `/messages/:messageId/feedback` | Thumbs up/down on an AI answer → `ai_response_feedbacks` (`rating ∈ {1,-1}`, `feedback_text?`, `citation_accurate?`). One row per (message, user) — upsert. | USER |
-| GET | `/messages/:messageId/feedback` | Own feedback on that message. | USER |
+| GET | `/messages/:messageId/feedback` | Own feedback on that message, or `null` — 200 either way, because a client asks this per rendered AI message and "not rated" is the ordinary answer. **Not redundant with `GET /feedback`**, which filters only on `rating`/`citationAccurate`/date and is gated on `analytics.read`: the caller who wants this cannot reach it there. | USER |
 | DELETE | `/messages/:messageId/feedback` | Withdraw feedback. | SELF |
 | GET | `/feedback` | Tenant feedback stream for quality review; filters `?rating=&citationAccurate=&from=&to=`. | perm:`analytics.read` |
 
@@ -392,7 +394,7 @@ Thin end-user surface over the same `tickets` + `ticket_messages` tables — a l
 | Method | Path | Description | Auth |
 | :---- | :---- | :---- | :---- |
 | GET | `/audit-logs` | Tenant-scoped immutable trail. Filters `?action=&userId=&from=&to=`. | perm:`audit.read` |
-| GET | `/audit-logs/:id` | Single entry incl. the JSONB `metadata` snapshot. | perm:`audit.read` |
+| ~~GET~~ | ~~`/audit-logs/:id`~~ | **Not built.** The justification was "single entry **incl. the JSONB `metadata` snapshot**", which implies the list omits it — it does not: ticket-service sends `metadata: JSON.stringify(log.metadata ?? {})` on every row and the gateway parses it whole through `parseAuditMetadata`, with no truncation anywhere. So this would return one row of exactly what `GET /audit-logs` already returns, behind the same permission. The clause is kept rather than deleted because it is what made the route look necessary. | ~~perm:`audit.read`~~ |
 | GET | `/audit-logs/actions` | Distinct `action` values, for filter dropdowns. | perm:`audit.read` |
 | POST | `/audit-logs/export` | Compliance export, **CSV or `application/json`** — JSONL is not a permitted type, and a single JSON array costs one line's difference now that the whole file is built in memory. JSON is offered here and not for tickets because `audit_logs.metadata` is genuinely nested and CSV flattens it badly. **POST, not GET**, and `202` + poll, as above. | perm:`audit.export` |
 

@@ -77,6 +77,7 @@ describe('Inbound email attachments — the reply half (e2e)', () => {
     title: 'The printer is on fire',
     description: 'It really is',
     currentDepartmentId: faker.string.uuid(),
+    unreadCount: 0,
     createdAt: timestamp(),
     updatedAt: timestamp(),
   });

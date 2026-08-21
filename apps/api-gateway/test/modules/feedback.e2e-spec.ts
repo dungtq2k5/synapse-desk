@@ -132,6 +132,50 @@ describe('AI feedback at the HTTP boundary (e2e)', () => {
     });
   });
 
+  describe('GET /messages/:messageId/feedback', () => {
+    it("1. is ungated and returns the caller's own rating", async () => {
+      // Same rule as the POST beside it: anyone who can read a message may say
+      // whether it helped, and may read back what they said.
+      fx.stubs.feedback.getFeedback.mockReturnValue(
+        of({ feedback: wireFeedback({ rating: 1 }) }),
+      );
+
+      const res = await authenticatedAgent(fx.app, {
+        permissionCodes: [],
+      }).get(`${API}/messages/${messageId}/feedback`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.rating).toBe(1);
+      expect(fx.stubs.feedback.getFeedback.mock.calls[0][0]).toEqual({
+        ticketMessageId: messageId,
+      });
+    });
+
+    it('2. **an unrated message is 200 with null, not 404**', async () => {
+      // The ordinary answer. A client asks this per AI message it renders, so a
+      // 404 here would fill the console with errors for the normal case.
+      fx.stubs.feedback.getFeedback.mockReturnValue(of({}));
+
+      const res = await authenticatedAgent(fx.app, {
+        permissionCodes: [],
+      }).get(`${API}/messages/${messageId}/feedback`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data).toBeNull();
+    });
+
+    it('3. **the caller is never a parameter** — no user reaches the wire', async () => {
+      fx.stubs.feedback.getFeedback.mockReturnValue(of({}));
+
+      await authenticatedAgent(fx.app, { permissionCodes: [] }).get(
+        `${API}/messages/${messageId}/feedback?userId=${faker.string.uuid()}`,
+      );
+
+      const [request] = fx.stubs.feedback.getFeedback.mock.calls[0];
+      expect(Object.keys(request)).toEqual(['ticketMessageId']);
+    });
+  });
+
   describe('DELETE /messages/:messageId/feedback', () => {
     it('1. answers 204 with no body', async () => {
       fx.stubs.feedback.withdrawFeedback.mockReturnValue(of({}));

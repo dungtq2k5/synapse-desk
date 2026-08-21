@@ -177,6 +177,28 @@ export interface ListTicketStatusChangesResponse {
   items: TicketStatusChangeResponse[];
 }
 
+/**
+ * Marking a thread read UP TO a point the client names.
+ *
+ * `read_at` is the `created_at` of the newest message the client actually
+ * rendered — not `now()`. Stamping the server clock marks read every message
+ * inserted between the render and this request landing, which on a live ticket
+ * with an agent typing is a message the user never saw. Absent falls back to
+ * `now()`, which is correct for a client with nothing rendered.
+ */
+export interface MarkTicketReadRequest {
+  ticketId: string;
+  readAt?: Timestamp | undefined;
+}
+
+export interface MarkTicketReadResponse {
+  /**
+   * What was actually stored — clamped to `now()`, so a client with a fast
+   * clock can see that it was.
+   */
+  lastReadAt: Timestamp | undefined;
+}
+
 export interface BulkTicketFailure {
   id: string;
   reason: string;
@@ -252,6 +274,8 @@ export interface TicketServiceClient {
   ): Observable<BulkTicketPriorityResponse>;
 
   listTicketStatusChanges(request: TicketIdRequest, metadata?: Metadata): Observable<ListTicketStatusChangesResponse>;
+
+  markTicketRead(request: MarkTicketReadRequest, metadata?: Metadata): Observable<MarkTicketReadResponse>;
 
   deleteTicket(request: TicketIdRequest, metadata?: Metadata): Observable<DeleteTicketResponse>;
 
@@ -332,6 +356,11 @@ export interface TicketServiceController {
     | Observable<ListTicketStatusChangesResponse>
     | ListTicketStatusChangesResponse;
 
+  markTicketRead(
+    request: MarkTicketReadRequest,
+    metadata?: Metadata,
+  ): Promise<MarkTicketReadResponse> | Observable<MarkTicketReadResponse> | MarkTicketReadResponse;
+
   deleteTicket(
     request: TicketIdRequest,
     metadata?: Metadata,
@@ -360,6 +389,7 @@ export function TicketServiceControllerMethods() {
       "bulkChangeTicketStatus",
       "bulkChangeTicketPriority",
       "listTicketStatusChanges",
+      "markTicketRead",
       "deleteTicket",
       "restoreTicket",
     ];

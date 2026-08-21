@@ -78,6 +78,21 @@ export class TicketResponseGqlDto {
   @Field(() => Date, { nullable: true })
   resolvedAt!: Date | null;
 
+  /**
+   * Messages the caller has not read here — theirs excluded, notes they cannot
+   * see excluded, a ticket never opened counting as ALL unread.
+   *
+   * **Always 0 on `ticket(id:)`** — only the list fills it in, because a badge
+   * is a list affordance and a caller who fetched one ticket is reading it.
+   * Querying it on a single ticket returns a constant, not a stale number.
+   *
+   * On the schema rather than REST-only: a badge is what a client renders on a
+   * queue, and a GraphQL client renders queues too. `Int` because the count is
+   * bounded by one ticket's thread.
+   */
+  @Field(() => Int)
+  unreadCount!: number;
+
   @Field(() => Date)
   createdAt!: Date;
 

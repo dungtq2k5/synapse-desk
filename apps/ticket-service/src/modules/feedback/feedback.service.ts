@@ -12,6 +12,8 @@ import {
   toPageMeta,
   toPrismaPage,
   toProtoTimestamp,
+  GetFeedbackRequest,
+  GetFeedbackResponse,
   WithdrawFeedbackRequest,
   WithdrawFeedbackResponse,
 } from '@synapsedesk/grpc-proto';
@@ -103,6 +105,48 @@ export class FeedbackService {
     });
 
     return toFeedbackResponse(feedback);
+  }
+
+  /**
+   * The CALLER's rating on one message, or nothing.
+   *
+   * The client asks this for every AI message it renders, so "not rated" is the
+   * common answer and comes back as an absent field rather than `NOT_FOUND` —
+   * a 404 per unrated message would turn the ordinary state into an error log.
+   *
+   * Read through the MESSAGE, not by feedback id: the row is reachable through
+   * a message, and a read that started at `ai_response_feedbacks` would inherit
+   * none of the ticket's visibility filter.
+   *
+   * @throws RpcException NOT_FOUND when the message is not visible to the
+   *   caller — which is the same answer as "no such message", deliberately.
+   */
+  async getFeedback(
+    request: GetFeedbackRequest,
+    context: CallerContext,
+  ): Promise<GetFeedbackResponse> {
+    const userId = requireActor(context);
+
+    await this.assertMessageVisible(request.ticketMessageId, context);
+
+    const feedback = await this.prisma.aiResponseFeedback.findUnique({
+      where: {
+        ticketMessageId_userId: {
+          ticketMessageId: request.ticketMessageId,
+          userId,
+        },
+      },
+    });
+
+    // The tenant check that `assertMessageVisible` cannot make: it proved the
+    // MESSAGE is the caller's to see, and this row is keyed on (message, user).
+    // Both are already theirs, so a mismatch here would mean the row was
+    // re-homed — which `submitFeedback`'s update deliberately cannot do.
+    if (feedback?.organizationId !== requireTenant(context)) {
+      return {};
+    }
+
+    return { feedback: toFeedbackResponse(feedback) };
   }
 
   /**
@@ -249,7 +293,7 @@ export class FeedbackService {
       select: { ticketId: true, isInternalNote: true },
     });
 
-    if (!message || (message.isInternalNote && !this.isAgent(context))) {
+    if (!message || (message.isInternalNote && !this.access.isAgent(context))) {
       throw new RpcException({
         code: status.NOT_FOUND,
         message: 'No message with that id',
@@ -258,13 +302,5 @@ export class FeedbackService {
 
     // Throws NOT_FOUND if the ticket is another tenant's or not theirs to see.
     await this.access.load(message.ticketId, context);
-  }
-
-  private isAgent(context: CallerContext): boolean {
-    return (
-      context.isSuperAdmin ||
-      context.permissionCodes.includes('ticket.read.all') ||
-      context.permissionCodes.includes('ticket.message.moderate')
-    );
   }
 }

@@ -74,6 +74,7 @@ describe('The entity cache (e2e)', () => {
     description: 'Again',
     currentAssigneeId: assigneeId,
     currentDepartmentId: faker.string.uuid(),
+    unreadCount: 0,
     createdAt: timestamp(),
     updatedAt: timestamp(),
   });

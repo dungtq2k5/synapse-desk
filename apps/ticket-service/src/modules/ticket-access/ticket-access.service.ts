@@ -74,6 +74,25 @@ export class TicketAccessService {
   }
 
   /**
+   * The internal-note filter, as a WHERE fragment.
+   *
+   * A fragment rather than a post-fetch `.filter()`: filtering afterwards leaks
+   * the notes' EXISTENCE through the row count and the response timing, and
+   * leaves one forgotten call site away from leaking the content itself.
+   *
+   * Lives here rather than on `MessagesService` because the unread-count query
+   * on the TICKETS list needs it too, and the alternative a reader reaches for
+   * is `is_internal_note = false` inlined in raw SQL — a second copy of the
+   * rule as a string, which no sweep catches and no compiler checks, in the one
+   * query where getting it wrong changes a number rather than a page.
+   *
+   * Returns `{}` for an agent so the caller can spread it unconditionally.
+   */
+  internalNoteScope(context: CallerContext): Prisma.TicketMessageWhereInput {
+    return this.isAgent(context) ? {} : { isInternalNote: false };
+  }
+
+  /**
    * The tenant filter, plus a NARROWER one for anyone without the queue.
    *
    * `tenantScope` alone is not enough, and this is the easiest thing in the

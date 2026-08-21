@@ -79,5 +79,24 @@ export interface TicketResponse {
   createdAt: Timestamp | undefined;
   updatedAt: Timestamp | undefined;
   deletedAt?: Timestamp | undefined;
-  deletedById?: string | undefined;
+  deletedById?:
+    | string
+    | undefined;
+  /**
+   * Messages on this ticket the CALLER has not read: not their own, not
+   * internal notes they cannot see, not redacted, newer than their watermark.
+   *
+   * Zero for a ticket with nothing new, and the FULL count for one never
+   * opened — a caller with no `ticket_read_states` row has read nothing, not
+   * everything.
+   *
+   * **Always 0 on a SINGLE-ticket read**, and that is not a bug: a badge is a
+   * list affordance, and a caller who fetched one ticket is reading it. Only
+   * `ListTickets` fills this in. Both DTOs derive from here, so the rule lives
+   * here — the REST one repeats it and the GraphQL one does not.
+   *
+   * On the list rather than a route of its own: a queue screen showing 25 rows
+   * cannot mean 25 count requests.
+   */
+  unreadCount: number;
 }

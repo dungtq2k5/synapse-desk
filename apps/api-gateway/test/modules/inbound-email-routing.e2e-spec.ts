@@ -70,6 +70,7 @@ describe('Inbound email routing (e2e)', () => {
     title: 'The printer is on fire',
     description: 'It really is',
     currentDepartmentId: faker.string.uuid(),
+    unreadCount: 0,
     createdAt: timestamp(),
     updatedAt: timestamp(),
     ...overrides,

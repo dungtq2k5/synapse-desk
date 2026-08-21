@@ -725,6 +725,70 @@ describe('Tickets at the HTTP boundary (e2e)', () => {
     });
   });
 
+  describe('POST /tickets/:id/read', () => {
+    const ticketId = faker.string.uuid();
+
+    it("**forwards the client's readAt, and needs no permission**", async () => {
+      // The body is the point: without it the server stamps its own clock and
+      // marks read everything that arrived between the render and this request.
+      const readAt = new Date('2026-08-21T10:00:00.000Z');
+      fx.stubs.ticket.markTicketRead.mockReturnValue(
+        of({ lastReadAt: timestamp() }),
+      );
+
+      const res = await authenticatedAgent(fx.app, { permissionCodes: [] })
+        .post(`${API}/tickets/${ticketId}/read`)
+        .send({ readAt: readAt.toISOString() });
+
+      expect(res.status).toBe(200);
+      const [request] = fx.stubs.ticket.markTicketRead.mock.calls[0];
+      expect(request.ticketId).toBe(ticketId);
+      expect(request.readAt?.seconds).toBe(Math.floor(readAt.getTime() / 1000));
+    });
+
+    it('accepts no body at all — a client with nothing rendered', async () => {
+      fx.stubs.ticket.markTicketRead.mockReturnValue(
+        of({ lastReadAt: timestamp() }),
+      );
+
+      const res = await authenticatedAgent(fx.app, {
+        permissionCodes: [],
+      }).post(`${API}/tickets/${ticketId}/read`);
+
+      expect(res.status).toBe(200);
+      expect(
+        fx.stubs.ticket.markTicketRead.mock.calls[0][0].readAt,
+      ).toBeUndefined();
+    });
+
+    it('rejects a readAt that is not a date, rather than passing it on', async () => {
+      const res = await authenticatedAgent(fx.app, { permissionCodes: [] })
+        .post(`${API}/tickets/${ticketId}/read`)
+        .send({ readAt: 'yesterday' });
+
+      expect(res.status).toBe(400);
+      expect(fx.stubs.ticket.markTicketRead).not.toHaveBeenCalled();
+    });
+
+    it('**the unread count reaches the list response**', async () => {
+      // The field that makes this a feature rather than a table: a queue screen
+      // reads the badge off the list it already fetched.
+      fx.stubs.ticket.listTickets.mockReturnValue(
+        of({
+          items: [wireTicket({ unreadCount: 4 })],
+          meta: wirePage([]).meta,
+        }),
+      );
+
+      const res = await authenticatedAgent(fx.app, {
+        permissionCodes: [],
+      }).get(`${API}/tickets`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.items[0].unreadCount).toBe(4);
+    });
+  });
+
   describe('DELETE /tickets/:id', () => {
     it('requires ticket.delete and answers 204', async () => {
       fx.stubs.ticket.deleteTicket.mockReturnValue(of({}));

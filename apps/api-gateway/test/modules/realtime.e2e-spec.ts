@@ -75,6 +75,7 @@ describe('the real-time relay (e2e)', () => {
       description: 'It really is',
       currentAssigneeId: agentId,
       currentDepartmentId: faker.string.uuid(),
+      unreadCount: 0,
       createdAt: timestamp(),
       updatedAt: timestamp(),
       ...overrides,
@@ -507,8 +508,8 @@ describe('the real-time relay (e2e)', () => {
 
     it('3. **a `ticket.read.all` holder who is neither author nor assignee is DENIED**', async () => {
       // The first row of the matrix, and the one a read-predicate reuse gets wrong. Read-all
-      // is an oversight permission, not a licence to reply as the support
-      // organisation — and the failure is silent: the message posts, attributed
+      // is an oversight permission, not a license to reply as the support
+      // organization — and the failure is silent: the message posts, attributed
       // to someone who never took the ticket.
       const overseer = await fx.connectClient({
         sub: faker.string.uuid(),

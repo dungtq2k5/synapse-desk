@@ -317,6 +317,7 @@ type Ticket {
   status: TicketStatus
   ticketNumber: Int!
   title: String!
+  unreadCount: Int!
   updatedAt: DateTime!
 }
 

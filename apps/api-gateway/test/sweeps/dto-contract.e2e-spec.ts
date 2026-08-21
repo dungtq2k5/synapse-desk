@@ -226,6 +226,7 @@ describe('REST and GraphQL DTOs are independent but not divergent', () => {
     DownloadAttachmentResponseDto: 'a short-lived credential, never a query',
     BulkTicketStatusResponseDto: 'a write RESULT, not an entity',
     BulkTicketPriorityResponseDto: 'a write RESULT, not an entity',
+    MarkTicketReadResponseDto: 'a write RESULT, not an entity',
     TicketStatusChangeResponseDto:
       'reached through Ticket, like AssignmentResponseDto beside it',
     AssignmentResponseDto: 'reached through Ticket, not queried alone',

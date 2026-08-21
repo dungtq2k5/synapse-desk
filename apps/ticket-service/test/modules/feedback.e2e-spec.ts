@@ -273,6 +273,83 @@ describe('AI feedback (e2e)', () => {
 
   // ------------------------------------------------------------ withdraw
 
+  describe('getFeedback', () => {
+    it("1. returns the caller's own row", async () => {
+      const { reply } = await seedAiReply();
+      await feedback.submitFeedback(
+        { ticketMessageId: reply.id, rating: 1, feedbackText: 'Helpful' },
+        author(),
+      );
+
+      const result = await feedback.getFeedback(
+        { ticketMessageId: reply.id },
+        author(),
+      );
+
+      expect(result.feedback?.rating).toBe(1);
+      expect(result.feedback?.feedbackText).toBe('Helpful');
+    });
+
+    it('2. **an unrated message is ABSENT, not NOT_FOUND**', async () => {
+      // The common answer. A client renders a thumb control on every AI message
+      // and asks this per message, so a NOT_FOUND here would make the ordinary
+      // state an error log.
+      const { reply } = await seedAiReply();
+
+      const result = await feedback.getFeedback(
+        { ticketMessageId: reply.id },
+        author(),
+      );
+
+      expect(result.feedback).toBeUndefined();
+    });
+
+    it("3. **one user cannot read another's rating**", async () => {
+      // The user is never a parameter — it comes from the verified context, so
+      // there is nothing to pass. This asserts the consequence: the analyst can
+      // see the MESSAGE and still gets nothing for somebody else\'s row.
+      const { reply } = await seedAiReply();
+      await feedback.submitFeedback(
+        { ticketMessageId: reply.id, rating: -1, feedbackText: 'Wrong' },
+        author(),
+      );
+
+      const result = await feedback.getFeedback(
+        { ticketMessageId: reply.id },
+        analyst(),
+      );
+
+      expect(result.feedback).toBeUndefined();
+    });
+
+    it('4. **a message the caller cannot see is NOT_FOUND**', async () => {
+      // Read through the MESSAGE, not by feedback id — a read starting at
+      // `ai_response_feedbacks` would inherit none of the ticket\'s visibility.
+      const other = buildTenant();
+      const { reply } = await seedAiReply(other);
+
+      await expectRpc(
+        feedback.getFeedback({ ticketMessageId: reply.id }, author()),
+        status.NOT_FOUND,
+      );
+    });
+
+    it('5. an internal note is NOT_FOUND for a non-agent, and readable by one', async () => {
+      const ticket = await createTicket(fx.prisma, tenant);
+      const note = await createAiMessage(fx.prisma, ticket.id, {
+        isInternalNote: true,
+      });
+
+      await expectRpc(
+        feedback.getFeedback({ ticketMessageId: note.id }, author()),
+        status.NOT_FOUND,
+      );
+      await expect(
+        feedback.getFeedback({ ticketMessageId: note.id }, analyst()),
+      ).resolves.toEqual({});
+    });
+  });
+
   describe('withdrawFeedback', () => {
     it('1. removes only the CALLER’S own row', async () => {
       // Two users rate the same message; one withdraws.

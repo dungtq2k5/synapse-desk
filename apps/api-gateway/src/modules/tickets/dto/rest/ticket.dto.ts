@@ -1,6 +1,7 @@
 import { OmitType, ApiPropertyOptional } from '@nestjs/swagger';
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
+  IsDate,
   ArrayMaxSize,
   ArrayMinSize,
   IsArray,
@@ -133,6 +134,26 @@ export class TicketStatusActionDto {
       'Why the ticket moved. Recorded on the status history and visible to agents; the ticket author sees only reasons they wrote themselves.',
   })
   readonly reason?: string;
+}
+
+/**
+ * The body of `POST /tickets/:ticketId/read`.
+ *
+ * `readAt` is the `createdAt` of the newest message the client actually
+ * rendered — not "now". Letting the server stamp its own clock marks read every
+ * message inserted between the render and this request landing, which on a live
+ * ticket with an agent typing is a message the user never saw.
+ *
+ * Optional: a client with nothing rendered has nothing to name, and the server
+ * falls back to its own clock. Clamped there too, so a fast client clock cannot
+ * mark the future read.
+ */
+export class MarkTicketReadDto {
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  @ApiPropertyOptional()
+  readonly readAt?: Date;
 }
 
 export class BulkTicketStatusDto {

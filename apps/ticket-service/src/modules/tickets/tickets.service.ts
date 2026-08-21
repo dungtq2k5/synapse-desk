@@ -18,7 +18,11 @@ import {
   GetTicketRequest,
   ListTicketsRequest,
   ListTicketsResponse,
+  fromProtoTimestamp,
+  toProtoTimestamp,
   ListTicketStatusChangesResponse,
+  MarkTicketReadRequest,
+  MarkTicketReadResponse,
   TicketIdRequest,
   TicketStatusActionRequest,
   TicketResponse,
@@ -152,8 +156,15 @@ export class TicketsService {
       this.prisma.ticket.count({ where }),
     ]);
 
+    const unread = await this.unreadCounts(
+      items.map((ticket) => ticket.id),
+      context,
+    );
+
     return {
-      items: items.map(toTicketResponse),
+      items: items.map((ticket) =>
+        toTicketResponse(ticket, unread.get(ticket.id) ?? 0),
+      ),
       meta: toPageMeta(page, totalItems, items.length),
     };
   }
@@ -199,7 +210,7 @@ export class TicketsService {
     });
 
     // A SET, in the database's order. The caller aligns it to its keys.
-    return { items: items.map(toTicketResponse) };
+    return { items: items.map((item) => toTicketResponse(item)) };
   }
 
   /**
@@ -527,53 +538,57 @@ export class TicketsService {
     });
   }
 
-  /** Deduplicated, and refused when empty or over the cap. */
-  private bulkIds(ticketIds: string[]): string[] {
-    const ids = [...new Set(ticketIds)];
-
-    if (ids.length === 0) {
-      throw new RpcException({
-        code: status.INVALID_ARGUMENT,
-        message: 'No ticket ids given',
-      });
-    }
-    if (ids.length > MAX_BULK_TICKET_IDS) {
-      throw new RpcException({
-        code: status.INVALID_ARGUMENT,
-        message: `At most ${MAX_BULK_TICKET_IDS} tickets can be updated at once; received ${ids.length}`,
-      });
-    }
-
-    return ids;
-  }
-
   /**
-   * Runs `apply` over each id, collecting successes and failures separately.
+   * Marks this ticket's thread read up to the point the caller names.
    *
-   * Sequential rather than `Promise.all`, and that is a deliberate trade: fifty
-   * concurrent transactions against one table would contend, and the operation
-   * is an admin bulk action where a second of latency costs nothing.
+   * `readAt` is the `created_at` of the newest message the client rendered.
+   * Absent falls back to `now()`, which is right for a client with nothing on
+   * screen.
+   *
+   * @throws RpcException NOT_FOUND when the ticket is not visible to the caller.
    */
-  private async bulkApply(
-    ids: string[],
-    apply: (id: string) => Promise<unknown>,
-  ): Promise<{ updated: string[]; failed: BulkTicketFailure[] }> {
-    const updated: string[] = [];
-    const failed: BulkTicketFailure[] = [];
+  async markTicketRead(
+    request: MarkTicketReadRequest,
+    context: CallerContext,
+  ): Promise<MarkTicketReadResponse> {
+    const ticket = await this.load(request.ticketId, context);
+    const userId = requireActor(context);
 
-    for (const id of ids) {
-      try {
-        await apply(id);
-        updated.push(id);
-      } catch (error) {
-        // The REASON is carried through, not flattened to "failed": a caller
-        // looking at four failures needs to know that three were already closed
-        // and one belongs to another tenant.
-        failed.push({ id, reason: formatErrorMsg(error) });
-      }
-    }
+    // CLAMPED, never trusted past `now()`: a client with a clock running fast
+    // would otherwise mark messages read before they were written, and the
+    // badge would stay at zero through a whole conversation. `Math.min` on the
+    // epoch rather than a comparison, so the fallback and the clamp are one
+    // expression.
+    const claimed = fromProtoTimestamp(request.readAt) ?? new Date();
+    const lastReadAt = new Date(Math.min(claimed.getTime(), Date.now()));
 
-    return { updated, failed };
+    // MONOTONIC, and raw because Prisma cannot put `GREATEST` in an `upsert`.
+    // ticket-service already writes SQL for this reason — `ticket-rollup.job.ts`
+    // does it "rather than as a read-modify-write loop", which is the same
+    // trade: one statement that cannot race with itself.
+    //
+    // Last-write-wins was the alternative and it does not need two tabs to go
+    // wrong. A thread view that fires this on render has two requests in flight
+    // whenever a message lands mid-render; if they reorder, the earlier stamp
+    // wins and the badge reappears on the most ordinary client there is.
+    //
+    // `$queryRaw` and `RETURNING`, never `$executeRaw`: `GREATEST` can decline
+    // the input, so the stored value and the claimed one diverge — which is the
+    // whole point — and `last_read_at` on the response exists to disclose
+    // exactly that. A row count would leave it reporting the claim.
+    //
+    // The cost, stated: raw SQL puts these table and column names outside the
+    // compiler's reach, so a Prisma rename breaks this at runtime rather than
+    // at build. The rollup accepts that trade and so does this.
+    const [stored] = await this.prisma.$queryRaw<[{ last_read_at: Date }]>`
+      INSERT INTO ticket_read_states (ticket_id, user_id, organization_id, last_read_at)
+      VALUES (${ticket.id}::uuid, ${userId}::uuid, ${ticket.organizationId}::uuid, ${lastReadAt})
+      ON CONFLICT (ticket_id, user_id) DO UPDATE
+        SET last_read_at = GREATEST(EXCLUDED.last_read_at, ticket_read_states.last_read_at)
+      RETURNING last_read_at
+    `;
+
+    return { lastReadAt: toProtoTimestamp(stored.last_read_at) };
   }
 
   // -------------------------------------------------------------------------
@@ -730,6 +745,133 @@ export class TicketsService {
       // letting a client choose the initial status would let it skip triage.
       status: TicketStatus.NEW,
     };
+  }
+
+  /** Deduplicated, and refused when empty or over the cap. */
+  private bulkIds(ticketIds: string[]): string[] {
+    const ids = [...new Set(ticketIds)];
+
+    if (ids.length === 0) {
+      throw new RpcException({
+        code: status.INVALID_ARGUMENT,
+        message: 'No ticket ids given',
+      });
+    }
+    if (ids.length > MAX_BULK_TICKET_IDS) {
+      throw new RpcException({
+        code: status.INVALID_ARGUMENT,
+        message: `At most ${MAX_BULK_TICKET_IDS} tickets can be updated at once; received ${ids.length}`,
+      });
+    }
+
+    return ids;
+  }
+
+  /**
+   * Runs `apply` over each id, collecting successes and failures separately.
+   *
+   * Sequential rather than `Promise.all`, and that is a deliberate trade: fifty
+   * concurrent transactions against one table would contend, and the operation
+   * is an admin bulk action where a second of latency costs nothing.
+   */
+  private async bulkApply(
+    ids: string[],
+    apply: (id: string) => Promise<unknown>,
+  ): Promise<{ updated: string[]; failed: BulkTicketFailure[] }> {
+    const updated: string[] = [];
+    const failed: BulkTicketFailure[] = [];
+
+    for (const id of ids) {
+      try {
+        await apply(id);
+        updated.push(id);
+      } catch (error) {
+        // The REASON is carried through, not flattened to "failed": a caller
+        // looking at four failures needs to know that three were already closed
+        // and one belongs to another tenant.
+        failed.push({ id, reason: formatErrorMsg(error) });
+      }
+    }
+
+    return { updated, failed };
+  }
+
+  /**
+   * Unread message counts for a PAGE of tickets, in one query.
+   *
+   * The reason the read cursor is a feature rather than a table: a queue screen
+   * showing 25 rows cannot mean 25 count requests, so this is one grouped count
+   * over the page's ids rather than a per-ticket lookup.
+   *
+   * A ticket the caller never opened has no `ticket_read_states` row, and its
+   * unread count is EVERYTHING — hence `lastReadAt: null` being a match rather
+   * than a skip. Getting that backwards makes every untouched ticket read as
+   * caught-up, which is the failure a badge exists to prevent.
+   *
+   * @returns ticket id -> count, with absent meaning zero.
+   */
+  private async unreadCounts(
+    ticketIds: string[],
+    context: CallerContext,
+  ): Promise<Map<string, number>> {
+    const userId = context.sub;
+    // A caller with no identity cannot have read anything, and `tenantScope`
+    // has already refused them upstream — this is the type narrowing, not a
+    // second check.
+    if (ticketIds.length === 0 || !userId) return new Map();
+
+    const readStates = await this.prisma.ticketReadState.findMany({
+      where: { userId, ticketId: { in: ticketIds } },
+      select: { ticketId: true, lastReadAt: true },
+    });
+    const watermark = new Map(
+      readStates.map((row) => [row.ticketId, row.lastReadAt]),
+    );
+
+    const grouped = await this.prisma.ticketMessage.groupBy({
+      by: ['ticketId'],
+      where: {
+        ticketId: { in: ticketIds },
+        // Their own messages never count, or sending one would make the
+        // sender's own ticket unread.
+        NOT: { senderId: userId },
+        // The SAME fragment the thread read uses, not `isInternalNote: false`
+        // spelled again: a badge counting notes the caller cannot open shows an
+        // unread count they can never clear, and a second copy of the rule is
+        // how the two drift.
+        ...this.access.internalNoteScope(context),
+        // Redacted messages never count, and the ASYMMETRY is why this is a
+        // decision rather than a preference. `redactedAt` does not touch
+        // `createdAt`, so a message redacted AFTER someone read it stays under
+        // their watermark and never returns. The badge could therefore only
+        // rise for a message redacted BEFORE it was read — which is exactly the
+        // case where the redaction was protecting that reader.
+        //
+        // Counting them would not "sometimes surface a redaction". It would
+        // surface precisely the ones meant to reach nobody, to the one person
+        // they were kept from, and never the harmless ones. The badge promises
+        // unread CONTENT, and a placeholder is not content.
+        redactedAt: null,
+        // One branch per ticket ON THIS PAGE, so the count is the page size and
+        // nothing else — `toPrismaPage` runs `clampLimit`, which caps it at
+        // `DEFAULT_SEARCH.MAX_LIMIT` (100). It does not grow with the tenant,
+        // which is the thing a reader seeing a generated `OR` will wonder.
+        //
+        // The alternative is one raw query with a LEFT JOIN on the read states,
+        // trading two round trips for one — declined because it needs
+        // `internalNoteScope` as a string, which is the copy this whole design
+        // avoids.
+        OR: ticketIds.map((ticketId) => {
+          const lastReadAt = watermark.get(ticketId);
+          return lastReadAt
+            ? { ticketId, createdAt: { gt: lastReadAt } }
+            : { ticketId };
+        }),
+      },
+      _count: { _all: true },
+    });
+
+    return new Map(grouped.map((row) => [row.ticketId, row._count._all]));
   }
 }
 

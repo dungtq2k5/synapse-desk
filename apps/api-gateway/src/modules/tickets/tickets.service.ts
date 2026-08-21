@@ -4,6 +4,7 @@ import {
   toProtoTicketPriority,
   toProtoTicketSource,
   toProtoTicketStatus,
+  fromProtoTimestamp,
 } from '@synapsedesk/grpc-proto';
 import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
 import { TicketsGrpcClient } from './tickets-grpc.client';
@@ -15,6 +16,7 @@ import {
 } from './ticket.mapper';
 import {
   BulkTicketPriorityDto,
+  MarkTicketReadDto,
   TicketStatusActionDto,
   BulkTicketStatusDto,
   ChangeTicketStatusDto,
@@ -27,6 +29,7 @@ import { AnalyticsService } from '../analytics/analytics.service';
 import { AnalyticsExportResponseDto } from '../analytics/dto/rest/analytics-response.dto';
 import {
   BulkTicketPriorityResponseDto,
+  MarkTicketReadResponseDto,
   TicketStatusChangeResponseDto,
   BulkTicketStatusResponseDto,
   TicketResponseDto,
@@ -151,6 +154,26 @@ export class TicketsService {
     return toTicketResponseDto(
       await this.ticketsGrpcClient.close(id, dto.reason, context),
     );
+  }
+
+  /**
+   * Marks the thread read up to the newest message the client rendered.
+   *
+   * @returns what was actually stored — clamped to the server's clock, so a
+   *   client with a fast one can see that it was.
+   */
+  async markRead(
+    id: string,
+    dto: MarkTicketReadDto,
+    context: RequestContext,
+  ): Promise<MarkTicketReadResponseDto> {
+    const { lastReadAt } = await this.ticketsGrpcClient.markRead(
+      id,
+      dto.readAt,
+      context,
+    );
+
+    return { lastReadAt: fromProtoTimestamp(lastReadAt)! };
   }
 
   async listStatusChanges(

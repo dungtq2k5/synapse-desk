@@ -43,6 +43,14 @@ erDiagram
     }
   
 
+  "ticket_read_states" {
+    String ticket_id 
+    String user_id 
+    String organization_id 
+    DateTime last_read_at 
+    }
+  
+
   "ticket_assignments" {
     String id "🗝️"
     String ticket_id 
@@ -198,6 +206,7 @@ erDiagram
   
     "inbound_emails" }o--|o tickets : "ticket"
     "ticket_status_changes" }o--|| tickets : "ticket"
+    "ticket_read_states" }o--|| tickets : "ticket"
     "ticket_assignments" }o--|| tickets : "ticket"
     "ticket_messages" }o--|| tickets : "ticket"
     "message_attachments" }o--|| ticket_messages : "message"

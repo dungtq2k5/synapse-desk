@@ -67,6 +67,29 @@ export class MessageFeedbackController {
     return this.feedback.submit(messageId, dto, context);
   }
 
+  /**
+   * The caller's own rating on this message, or `null`.
+   *
+   * **The one case a subset route is not redundant.** `GET /feedback` returns a
+   * superset in principle, but it filters only on `rating`, `citationAccurate`
+   * and a date range — no message, no user — and it is gated on
+   * `analytics.read`. So the caller who wants this cannot reach it there, which
+   * is the difference between this route and the ones doc 43 §1 struck.
+   *
+   * `null` and 200, never 404: a client asks this for every AI message it
+   * renders, and "not rated" is the ordinary answer rather than an error.
+   */
+  @ApiOperation({ summary: 'Own feedback on that message' })
+  @ApiWrappedResponse(FeedbackResponseDto)
+  @ApiFilterErrors(['400', '401', '404'])
+  @Get()
+  own(
+    @CurrentUser() context: RequestContext,
+    @Param('messageId', ParseUUIDPipe) messageId: string,
+  ): Promise<FeedbackResponseDto | null> {
+    return this.feedback.get(messageId, context);
+  }
+
   // SELF only, and structurally so: the service keys the delete on
   // `(messageId, callerId)`, so there is no parameter through which one user
   // could withdraw another's opinion.
@@ -96,7 +119,13 @@ export class MessageFeedbackController {
 export class FeedbackController {
   constructor(private readonly feedback: FeedbackService) {}
 
-  @ApiOperation({ summary: 'Own feedback on that message' })
+  // NOT "own feedback on that message" — that is
+  // `GET /messages/:messageId/feedback`, and this summary was a copy of its
+  // plan row sitting on the tenant-wide stream.
+  @ApiOperation({
+    summary:
+      'Tenant feedback stream for quality review; filters ?rating=&citationAccurate=&from=&to=',
+  })
   @ApiWrappedResponse(Paginated(FeedbackResponseDto))
   @ApiFilterErrors(['401', '403'])
   @Get()

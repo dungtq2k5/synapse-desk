@@ -51,6 +51,7 @@ export function toTicketResponseDto(ticket: TicketResponse): TicketResponseDto {
     currentDepartmentId: ticket.currentDepartmentId ?? null,
     escalatedAt: fromProtoTimestamp(ticket.escalatedAt) ?? null,
     resolvedAt: fromProtoTimestamp(ticket.resolvedAt) ?? null,
+    unreadCount: ticket.unreadCount,
     // Non-optional in the proto, so a missing value is a contract violation
     // rather than something to paper over with a fallback date.
     createdAt: requireProtoTimestamp(ticket.createdAt, 'createdAt'),

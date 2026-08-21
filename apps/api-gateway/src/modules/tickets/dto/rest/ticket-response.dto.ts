@@ -26,6 +26,15 @@ export class TicketResponseDto {
   currentDepartmentId!: string | null;
   escalatedAt!: Date | null;
   resolvedAt!: Date | null;
+  /**
+   * Messages the caller has not read on this ticket.
+   *
+   * Excludes their own and any internal note they cannot see. A ticket never
+   * opened counts as ALL unread, not zero. Always `0` on a single-ticket read —
+   * a badge is a list affordance, and a caller looking at one ticket is reading
+   * it.
+   */
+  unreadCount!: number;
   createdAt!: Date;
   updatedAt!: Date;
   deletedAt!: Date | null;
@@ -70,4 +79,9 @@ export class BulkTicketStatusResponseDto {
 export class BulkTicketPriorityResponseDto {
   updated!: string[];
   failed!: BulkTicketFailureResponseDto[];
+}
+
+/** What `POST /tickets/:ticketId/read` stored. */
+export class MarkTicketReadResponseDto {
+  lastReadAt!: Date;
 }

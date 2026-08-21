@@ -7,6 +7,7 @@ import {
   FeedbackResponse,
   ListFeedbackRequest,
   ListFeedbackResponse,
+  GetFeedbackResponse,
   SubmitFeedbackRequest,
 } from '@synapsedesk/grpc-proto';
 import { RequestContext } from '@synapsedesk/common';
@@ -34,6 +35,17 @@ export class FeedbackGrpcClient extends BaseGrpcClient implements OnModuleInit {
   ): Promise<FeedbackResponse> {
     return this.call(
       (metadata) => this.feedbackGrpcService.submitFeedback(request, metadata),
+      context,
+    );
+  }
+
+  get(
+    ticketMessageId: string,
+    context: RequestContext,
+  ): Promise<GetFeedbackResponse> {
+    return this.call(
+      (metadata) =>
+        this.feedbackGrpcService.getFeedback({ ticketMessageId }, metadata),
       context,
     );
   }

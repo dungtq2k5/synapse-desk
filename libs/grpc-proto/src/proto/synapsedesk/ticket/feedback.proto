@@ -47,6 +47,19 @@ message ListFeedbackResponse {
   synapsedesk.auth.PageMeta meta = 2;
 }
 
+message GetFeedbackRequest {
+  string ticket_message_id = 1;
+}
+
+// `optional`, and absent is NOT an error.
+//
+// "I have not rated this" is the overwhelmingly common answer. A client
+// rendering a thumb control asks this for every AI message it displays, so a
+// NOT_FOUND per unrated message would turn the ordinary state into an error log.
+message GetFeedbackResponse {
+  optional FeedbackResponse feedback = 1;
+}
+
 message WithdrawFeedbackRequest {
   string ticket_message_id = 1;
 }
@@ -56,5 +69,9 @@ message WithdrawFeedbackResponse {}
 service FeedbackService {
   rpc SubmitFeedback(SubmitFeedbackRequest) returns (FeedbackResponse);
   rpc ListFeedback(ListFeedbackRequest) returns (ListFeedbackResponse);
+  // Returns the CALLER's row. The user is never a parameter — it comes from the
+  // verified context, so one user cannot read another's rating by id. The same
+  // reason `WithdrawFeedback` takes only a message id.
+  rpc GetFeedback(GetFeedbackRequest) returns (GetFeedbackResponse);
   rpc WithdrawFeedback(WithdrawFeedbackRequest) returns (WithdrawFeedbackResponse);
 }

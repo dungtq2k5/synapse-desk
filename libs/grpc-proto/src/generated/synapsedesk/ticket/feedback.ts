@@ -58,6 +58,21 @@ export interface ListFeedbackResponse {
   meta: PageMeta | undefined;
 }
 
+export interface GetFeedbackRequest {
+  ticketMessageId: string;
+}
+
+/**
+ * `optional`, and absent is NOT an error.
+ *
+ * "I have not rated this" is the overwhelmingly common answer. A client
+ * rendering a thumb control asks this for every AI message it displays, so a
+ * NOT_FOUND per unrated message would turn the ordinary state into an error log.
+ */
+export interface GetFeedbackResponse {
+  feedback?: FeedbackResponse | undefined;
+}
+
 export interface WithdrawFeedbackRequest {
   ticketMessageId: string;
 }
@@ -69,6 +84,14 @@ export interface FeedbackServiceClient {
   submitFeedback(request: SubmitFeedbackRequest, metadata?: Metadata): Observable<FeedbackResponse>;
 
   listFeedback(request: ListFeedbackRequest, metadata?: Metadata): Observable<ListFeedbackResponse>;
+
+  /**
+   * Returns the CALLER's row. The user is never a parameter — it comes from the
+   * verified context, so one user cannot read another's rating by id. The same
+   * reason `WithdrawFeedback` takes only a message id.
+   */
+
+  getFeedback(request: GetFeedbackRequest, metadata?: Metadata): Observable<GetFeedbackResponse>;
 
   withdrawFeedback(request: WithdrawFeedbackRequest, metadata?: Metadata): Observable<WithdrawFeedbackResponse>;
 }
@@ -84,6 +107,17 @@ export interface FeedbackServiceController {
     metadata?: Metadata,
   ): Promise<ListFeedbackResponse> | Observable<ListFeedbackResponse> | ListFeedbackResponse;
 
+  /**
+   * Returns the CALLER's row. The user is never a parameter — it comes from the
+   * verified context, so one user cannot read another's rating by id. The same
+   * reason `WithdrawFeedback` takes only a message id.
+   */
+
+  getFeedback(
+    request: GetFeedbackRequest,
+    metadata?: Metadata,
+  ): Promise<GetFeedbackResponse> | Observable<GetFeedbackResponse> | GetFeedbackResponse;
+
   withdrawFeedback(
     request: WithdrawFeedbackRequest,
     metadata?: Metadata,
@@ -92,7 +126,7 @@ export interface FeedbackServiceController {
 
 export function FeedbackServiceControllerMethods() {
   return function (constructor: Function) {
-    const grpcMethods: string[] = ["submitFeedback", "listFeedback", "withdrawFeedback"];
+    const grpcMethods: string[] = ["submitFeedback", "listFeedback", "getFeedback", "withdrawFeedback"];
     for (const method of grpcMethods) {
       const descriptor: any = Reflect.getOwnPropertyDescriptor(constructor.prototype, method);
       GrpcMethod("FeedbackService", method)(constructor.prototype[method], method, descriptor);

@@ -226,6 +226,7 @@ export function wireTicket(
     currentDepartmentId: undefined,
     escalatedAt: undefined,
     resolvedAt: undefined,
+    unreadCount: 0,
     createdAt: timestamp(),
     updatedAt: timestamp(),
     deletedAt: undefined,

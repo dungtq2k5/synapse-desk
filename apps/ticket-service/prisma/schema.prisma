@@ -77,6 +77,7 @@ model Ticket {
 
   assignments    TicketAssignment[]
   statusChanges  TicketStatusChange[]
+  readStates     TicketReadState[]
   messages       TicketMessage[]
   aiSummary     AiSummary?
   inboundEmails InboundEmail[]
@@ -219,6 +220,52 @@ model TicketStatusChange {
   /// The history read, which is always one ticket oldest-first.
   @@index([ticketId, changedAt])
   @@map("ticket_status_changes")
+}
+
+/// How far one user has read one ticket's thread.
+///
+/// A per-user WATERMARK, not per-message receipts: the product wants unread
+/// badges, and receipts would be one row per participant per message to answer
+/// a question nobody asked.
+model TicketReadState {
+  ticketId String @map("ticket_id") @db.Uuid
+  /// No FK: postgres_auth.
+  userId   String @map("user_id") @db.Uuid
+
+  /// Denormalized, like every other table here: the tenant filter must not need
+  /// a join to apply.
+  organizationId String @map("organization_id") @db.Uuid
+
+  /// A TIMESTAMP, not a message id, and the reasons are NOT the ones first
+  /// given for it. Redaction is soft — the row and its `created_at` survive —
+  /// and both write paths order by insert time, so an id cursor would resolve
+  /// fine on both counts. What actually decides it:
+  ///
+  ///   - An id cursor costs a subquery per ticket (`created_at > (SELECT … WHERE
+  ///     id = $cursor)`), and the list-level count runs that across a page.
+  ///   - An id cursor can lose its referent: flag a message internal after
+  ///     somebody read past it and a non-agent's cursor points at a row they
+  ///     cannot see, so the subquery matches nothing and their unread count
+  ///     silently becomes everything. A timestamp has no referent to lose.
+  ///
+  /// Compares directly against `ticket_messages.created_at`, which is already
+  /// indexed for the thread read.
+  ///
+  /// **Only ever moves forward.** The write is a raw `ON CONFLICT … GREATEST`
+  /// rather than a Prisma upsert, because last-write-wins does not need two
+  /// tabs to go wrong: a thread view firing `POST .../read` on render has two
+  /// requests in flight whenever a message lands mid-render, and if they
+  /// reorder the earlier stamp would win and the badge would reappear.
+  lastReadAt DateTime @map("last_read_at") @db.Timestamptz
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  /// Composite rather than a surrogate: there is exactly one row per
+  /// (ticket, user), and the upsert wants that key.
+  @@id([ticketId, userId])
+  /// For the list-level unread count, which reads by USER across many tickets.
+  @@index([userId, ticketId])
+  @@map("ticket_read_states")
 }
 
 /// Every assignment a ticket has ever had, not just the live one.

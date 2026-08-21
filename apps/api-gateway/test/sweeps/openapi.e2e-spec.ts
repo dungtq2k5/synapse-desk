@@ -54,6 +54,7 @@ describe('The OpenAPI document', () => {
     title: 'Printer is on fire',
     description: 'It really is',
     currentDepartmentId: faker.string.uuid(),
+    unreadCount: 0,
     createdAt: timestamp(),
     updatedAt: timestamp(),
   });

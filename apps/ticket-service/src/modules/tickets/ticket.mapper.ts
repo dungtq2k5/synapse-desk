@@ -25,7 +25,15 @@ export {
   toProtoTicketStatus,
 } from '@synapsedesk/grpc-proto';
 
-export function toTicketResponse(ticket: Ticket): TicketResponse {
+/**
+ * @param unreadCount Messages the caller has not read. Defaults to 0 — every
+ *   single-ticket read passes nothing, because a badge is a LIST affordance and
+ *   a caller looking at one ticket is reading it.
+ */
+export function toTicketResponse(
+  ticket: Ticket,
+  unreadCount: number = 0,
+): TicketResponse {
   return {
     id: ticket.id,
     // BigInt -> number. `longs: Number` in GRPC_LOADER_OPTIONS makes int64 a
@@ -43,6 +51,7 @@ export function toTicketResponse(ticket: Ticket): TicketResponse {
     currentDepartmentId: ticket.currentDepartmentId ?? undefined,
     escalatedAt: toProtoTimestamp(ticket.escalatedAt),
     resolvedAt: toProtoTimestamp(ticket.resolvedAt),
+    unreadCount,
     createdAt: toProtoTimestamp(ticket.createdAt),
     updatedAt: toProtoTimestamp(ticket.updatedAt),
     deletedAt: toProtoTimestamp(ticket.deletedAt),

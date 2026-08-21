@@ -3,6 +3,8 @@ import { ClientGrpc } from '@nestjs/microservices';
 import {
   BulkTicketPriorityRequest,
   ListTicketStatusChangesResponse,
+  MarkTicketReadResponse,
+  toProtoTimestamp,
   BulkTicketPriorityResponse,
   BulkTicketStatusRequest,
   BulkTicketStatusResponse,
@@ -169,6 +171,24 @@ export class TicketsGrpcClient extends BaseGrpcClient implements OnModuleInit {
     return this.call(
       (metadata) =>
         this.ticketGrpcService.bulkChangeTicketStatus(request, metadata),
+      context,
+    );
+  }
+
+  markRead(
+    id: string,
+    readAt: Date | undefined,
+    context: RequestContext,
+  ): Promise<MarkTicketReadResponse> {
+    return this.call(
+      (metadata) =>
+        this.ticketGrpcService.markTicketRead(
+          {
+            ticketId: id,
+            readAt: readAt ? toProtoTimestamp(readAt) : undefined,
+          },
+          metadata,
+        ),
       context,
     );
   }
