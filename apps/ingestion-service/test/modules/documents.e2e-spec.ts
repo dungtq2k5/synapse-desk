@@ -4,8 +4,10 @@ import {
   BATCH_CHUNK_LIMIT,
   BATCH_ID_LIMIT,
   DOCUMENT_PATTERNS,
+  DocumentFlagResolution,
   DocumentStatus,
   IngestionJobStatus,
+  SupersededReason,
   type DocumentFileType,
 } from '@synapsedesk/common';
 import {
@@ -14,8 +16,9 @@ import {
   fromProtoDocumentStatus,
   toProtoDocumentFileType,
   toProtoDocumentStatus,
+  toProtoIngestionJobStatus,
 } from '@synapsedesk/grpc-proto';
-import { expectRpc } from '@synapsedesk/common/testing/rpc';
+import { expectRpc, rpcCode } from '@synapsedesk/common/testing/rpc';
 import { status } from '@grpc/grpc-js';
 import { faker } from '@faker-js/faker';
 import {
@@ -28,6 +31,8 @@ import {
   buildTenant,
   createChunks,
   createDocument,
+  createFlag,
+  createIngestionJob,
   createScopedDocument,
   TenantFixture,
 } from '../factories';
@@ -54,6 +59,7 @@ describe('Documents (e2e)', () => {
   let assertDepartmentsExist: jest.SpyInstance;
   let presignDocument: jest.SpyInstance;
   let confirmUpload: jest.SpyInstance;
+  let emitSuperseded: jest.SpyInstance;
   let resolveReadUrls: jest.SpyInstance;
   let publish: jest.SpyInstance;
 
@@ -141,6 +147,11 @@ describe('Documents (e2e)', () => {
     presignDocument = jest.spyOn(storage, 'presignDocument');
     confirmUpload = jest.spyOn(storage, 'confirmUpload');
     resolveReadUrls = jest.spyOn(storage, 'resolveReadUrls');
+    // Fire-and-forget into NATS, which is not running here — and the ARGUMENT
+    // is the assertion, so it must be observed rather than merely silenced.
+    emitSuperseded = jest
+      .spyOn(storage, 'emitSuperseded')
+      .mockImplementation(() => {});
     publish = jest.spyOn(events, 'publish').mockImplementation(() => {});
   });
 
@@ -892,6 +903,340 @@ describe('Documents (e2e)', () => {
       expect(usage.usedBytes).toBe(3000);
       expect(usage.limitBytes).toBe(DEFAULT_STORAGE_LIMIT);
       expect(usage.documentCount).toBe(2);
+    });
+  });
+
+  // --------------------------------------------------------- lifecycle
+
+  describe('reindex', () => {
+    const indexed = () =>
+      createDocument(fx.prisma, tenant, { status: DocumentStatus.INDEXED });
+
+    it('1. queues a NEW job and puts the document back to PENDING', async () => {
+      const document = await indexed();
+      const first = await createIngestionJob(fx.prisma, tenant, document.id, {
+        status: IngestionJobStatus.COMPLETED,
+      });
+
+      const job = await documents.reindexDocument(
+        { id: document.id },
+        manager(),
+      );
+
+      expect(job.id).not.toBe(first.id);
+      expect(job.status).toBe(
+        toProtoIngestionJobStatus(IngestionJobStatus.QUEUED),
+      );
+      const reloaded = await fx.prisma.document.findUniqueOrThrow({
+        where: { id: document.id },
+      });
+      expect(reloaded.status).toBe(DocumentStatus.PENDING);
+      // The file is untouched — that is the whole difference from replace.
+      expect(reloaded.fileUrl).toBe(document.fileUrl);
+    });
+
+    it('2. supersedes the job it replaces, so the history reads in one direction', async () => {
+      const document = await indexed();
+      const first = await createIngestionJob(fx.prisma, tenant, document.id, {
+        status: IngestionJobStatus.COMPLETED,
+      });
+
+      const job = await documents.reindexDocument(
+        { id: document.id },
+        manager(),
+      );
+
+      const source = await fx.prisma.ingestionJob.findUniqueOrThrow({
+        where: { id: first.id },
+      });
+      expect(source.supersededById).toBe(job.id);
+      // And its own status is left alone: COMPLETED is what happened.
+      expect(source.status).toBe(IngestionJobStatus.COMPLETED);
+    });
+
+    it('3. **refuses a document that is not INDEXED, and names retry**', async () => {
+      const failed = await createDocument(fx.prisma, tenant, {
+        status: DocumentStatus.FAILED,
+      });
+
+      const refused = documents.reindexDocument({ id: failed.id }, manager());
+
+      await expectRpc(refused, status.FAILED_PRECONDITION);
+      await expect(refused).rejects.toMatchObject({
+        message: expect.stringContaining('retry') as string,
+      });
+      expect(await fx.prisma.ingestionJob.count()).toBe(0);
+    });
+
+    it('4. refuses one still PROCESSING', async () => {
+      const running = await createDocument(fx.prisma, tenant, {
+        status: DocumentStatus.PROCESSING,
+      });
+
+      await expectRpc(
+        documents.reindexDocument({ id: running.id }, manager()),
+        status.FAILED_PRECONDITION,
+      );
+    });
+
+    it('5. **two CONCURRENT reindexes produce one job**', async () => {
+      // Neither the precondition nor the supersede claim can close this: both
+      // are per-row, and this is two new rows for one document.
+      const document = await indexed();
+      await createIngestionJob(fx.prisma, tenant, document.id, {
+        status: IngestionJobStatus.COMPLETED,
+      });
+
+      const outcomes = await Promise.allSettled([
+        documents.reindexDocument({ id: document.id }, manager()),
+        documents.reindexDocument({ id: document.id }, manager()),
+      ]);
+
+      expect(outcomes.filter((o) => o.status === 'fulfilled')).toHaveLength(1);
+      const lost = outcomes.filter(
+        (o): o is PromiseRejectedResult => o.status === 'rejected',
+      );
+      expect(lost).toHaveLength(1);
+      expect(rpcCode(lost[0].reason)).toBe(status.FAILED_PRECONDITION);
+      // Two rows: the completed source and one successor.
+      expect(await fx.prisma.ingestionJob.count()).toBe(2);
+    });
+
+    it('6. **leaves open flags alone — the file has not changed**', async () => {
+      const document = await indexed();
+      await createIngestionJob(fx.prisma, tenant, document.id, {
+        status: IngestionJobStatus.COMPLETED,
+      });
+      const flag = await createFlag(fx.prisma, document);
+
+      await documents.reindexDocument({ id: document.id }, manager());
+
+      const reloaded = await fx.prisma.documentFlag.findUniqueOrThrow({
+        where: { id: flag.id },
+      });
+      expect(reloaded.resolvedAt).toBeNull();
+      expect(reloaded.resolution).toBeNull();
+    });
+
+    it('7. is NOT_FOUND for a soft-deleted document', async () => {
+      const deleted = await createDocument(fx.prisma, tenant, {
+        status: DocumentStatus.INDEXED,
+        deletedAt: new Date(),
+      });
+
+      await expectRpc(
+        documents.reindexDocument({ id: deleted.id }, manager()),
+        status.NOT_FOUND,
+      );
+    });
+
+    it('8. is NOT_FOUND across the department boundary', async () => {
+      const scoped = await createScopedDocument(fx.prisma, tenant, [
+        tenant.departmentId,
+      ]);
+      await fx.prisma.document.update({
+        where: { id: scoped.id },
+        data: { status: DocumentStatus.INDEXED },
+      });
+
+      await expectRpc(
+        documents.reindexDocument({ id: scoped.id }, outsider()),
+        status.NOT_FOUND,
+      );
+    });
+  });
+
+  describe('replace', () => {
+    const replacement = (documentId: string) =>
+      `organizations/${tenant.organizationId}/documents/${documentId}/${faker.string.uuid()}.pdf`;
+
+    it('1. swaps the file and re-queues, leaving identity alone', async () => {
+      const document = await createDocument(fx.prisma, tenant, {
+        status: DocumentStatus.INDEXED,
+        isOrganizationWide: true,
+      });
+      const objectPath = replacement(document.id);
+      confirmUpload.mockResolvedValue({
+        sizeBytes: 4096,
+        contentType: 'text/markdown',
+      });
+
+      const result = await documents.replaceDocument(
+        { id: document.id, objectPath, ocrLanguages: ['vi'] },
+        manager(),
+      );
+
+      expect(result.title).toBe(document.title);
+      const reloaded = await fx.prisma.document.findUniqueOrThrow({
+        where: { id: document.id },
+      });
+      expect(reloaded.fileUrl).toBe(objectPath);
+      expect(reloaded.fileType).toBe('md');
+      expect(reloaded.fileSizeBytes).toBe(BigInt(4096));
+      expect(reloaded.ocrLanguages).toEqual(['vi']);
+      expect(reloaded.status).toBe(DocumentStatus.PENDING);
+      expect(await fx.prisma.ingestionJob.count()).toBe(1);
+    });
+
+    it('2. **supersedes the OLD path, never the new one**', async () => {
+      // The single-character mistake this guards deletes the file the user
+      // just uploaded, and it deletes it asynchronously, from another service.
+      const document = await createDocument(fx.prisma, tenant, {
+        status: DocumentStatus.INDEXED,
+      });
+      const objectPath = replacement(document.id);
+
+      await documents.replaceDocument(
+        { id: document.id, objectPath, ocrLanguages: [] },
+        manager(),
+      );
+
+      expect(emitSuperseded).toHaveBeenCalledTimes(1);
+      expect(emitSuperseded).toHaveBeenCalledWith(
+        document.fileUrl,
+        SupersededReason.REPLACED,
+      );
+    });
+
+    it('3. **resolves open flags as DOCUMENT_REPLACED**', async () => {
+      const document = await createDocument(fx.prisma, tenant, {
+        status: DocumentStatus.INDEXED,
+      });
+      const flag = await createFlag(fx.prisma, document);
+
+      await documents.replaceDocument(
+        {
+          id: document.id,
+          objectPath: replacement(document.id),
+          ocrLanguages: [],
+        },
+        manager(),
+      );
+
+      const reloaded = await fx.prisma.documentFlag.findUniqueOrThrow({
+        where: { id: flag.id },
+      });
+      expect(reloaded.resolution).toBe(
+        DocumentFlagResolution.DOCUMENT_REPLACED,
+      );
+      expect(reloaded.resolvedAt).not.toBeNull();
+      // Nobody decided this one individually, so no human is named for it.
+      expect(reloaded.resolvedById).toBeNull();
+    });
+
+    it('4. does NOT overwrite a flag a human already closed', async () => {
+      const document = await createDocument(fx.prisma, tenant, {
+        status: DocumentStatus.INDEXED,
+      });
+      const resolvedAt = new Date('2026-01-01T00:00:00.000Z');
+      const flag = await createFlag(fx.prisma, document, {
+        resolvedAt,
+        resolution: DocumentFlagResolution.DISMISSED,
+        resolvedById: tenant.userId,
+        resolutionComment: 'Checked the source, the pages are blank.',
+      });
+
+      await documents.replaceDocument(
+        {
+          id: document.id,
+          objectPath: replacement(document.id),
+          ocrLanguages: [],
+        },
+        manager(),
+      );
+
+      const reloaded = await fx.prisma.documentFlag.findUniqueOrThrow({
+        where: { id: flag.id },
+      });
+      expect(reloaded.resolution).toBe(DocumentFlagResolution.DISMISSED);
+      expect(reloaded.resolutionComment).toBe(
+        'Checked the source, the pages are blank.',
+      );
+      expect(reloaded.resolvedAt).toEqual(resolvedAt);
+    });
+
+    it('5. refuses a type the parser has no reader for, from STORAGE not the request', async () => {
+      // `ReplaceDocumentRequest` carries no content type, so the only way to
+      // reach this branch is storage reporting what it actually accepted.
+      const document = await createDocument(fx.prisma, tenant, {
+        status: DocumentStatus.INDEXED,
+      });
+      confirmUpload.mockResolvedValue({
+        sizeBytes: 2048,
+        contentType: 'application/x-msdownload',
+      });
+
+      await expectRpc(
+        documents.replaceDocument(
+          {
+            id: document.id,
+            objectPath: replacement(document.id),
+            ocrLanguages: [],
+          },
+          manager(),
+        ),
+        status.INVALID_ARGUMENT,
+      );
+
+      const reloaded = await fx.prisma.document.findUniqueOrThrow({
+        where: { id: document.id },
+      });
+      expect(reloaded.fileUrl).toBe(document.fileUrl);
+      expect(emitSuperseded).not.toHaveBeenCalled();
+    });
+
+    it('6. **a path storage will not confirm twice never reaches the row**', async () => {
+      // The reason no "does this path belong to this document" check exists:
+      // `confirmUpload` consumes the `PendingUpload`, so a path already used —
+      // by another document's confirm, or by an earlier replace — is NOT_FOUND
+      // at storage and the transaction never opens.
+      const document = await createDocument(fx.prisma, tenant, {
+        status: DocumentStatus.INDEXED,
+      });
+      confirmUpload.mockRejectedValue(
+        new RpcException({
+          code: status.NOT_FOUND,
+          message: 'No pending upload for that object path',
+        }),
+      );
+
+      await expectRpc(
+        documents.replaceDocument(
+          {
+            id: document.id,
+            objectPath: replacement(document.id),
+            ocrLanguages: [],
+          },
+          manager(),
+        ),
+        status.NOT_FOUND,
+      );
+
+      expect(await fx.prisma.ingestionJob.count()).toBe(0);
+      expect(emitSuperseded).not.toHaveBeenCalled();
+    });
+
+    it('7. is NOT_FOUND for a soft-deleted document, and calls STORAGE for nothing', async () => {
+      const deleted = await createDocument(fx.prisma, tenant, {
+        status: DocumentStatus.INDEXED,
+        deletedAt: new Date(),
+      });
+
+      await expectRpc(
+        documents.replaceDocument(
+          {
+            id: deleted.id,
+            objectPath: replacement(deleted.id),
+            ocrLanguages: [],
+          },
+          manager(),
+        ),
+        status.NOT_FOUND,
+      );
+
+      // The scope check precedes the storage call, so a caller cannot use this
+      // route to consume a presign against a document they cannot see.
+      expect(confirmUpload).not.toHaveBeenCalled();
     });
   });
 

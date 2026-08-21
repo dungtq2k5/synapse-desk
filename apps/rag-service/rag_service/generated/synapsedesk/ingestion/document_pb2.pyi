@@ -173,6 +173,16 @@ class ConfirmDocumentRequest(_message.Message):
     ocr_languages: _containers.RepeatedScalarFieldContainer[str]
     def __init__(self, object_path: _Optional[str] = ..., title: _Optional[str] = ..., is_organization_wide: _Optional[bool] = ..., department_ids: _Optional[_Iterable[str]] = ..., file_name: _Optional[str] = ..., ocr_languages: _Optional[_Iterable[str]] = ...) -> None: ...
 
+class ReplaceDocumentRequest(_message.Message):
+    __slots__ = ("id", "object_path", "ocr_languages")
+    ID_FIELD_NUMBER: _ClassVar[int]
+    OBJECT_PATH_FIELD_NUMBER: _ClassVar[int]
+    OCR_LANGUAGES_FIELD_NUMBER: _ClassVar[int]
+    id: str
+    object_path: str
+    ocr_languages: _containers.RepeatedScalarFieldContainer[str]
+    def __init__(self, id: _Optional[str] = ..., object_path: _Optional[str] = ..., ocr_languages: _Optional[_Iterable[str]] = ...) -> None: ...
+
 class ListDocumentsRequest(_message.Message):
     __slots__ = ("page", "status", "department_id", "file_type", "include_deleted")
     PAGE_FIELD_NUMBER: _ClassVar[int]

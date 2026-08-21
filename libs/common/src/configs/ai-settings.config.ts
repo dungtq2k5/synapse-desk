@@ -29,11 +29,11 @@ export const DEFAULT_AI_MODEL_TIER: AiModelTier = 'FAST';
  */
 export type AiSettings = {
   /** Resolved from the tier. The only tier-varying value. */
-  generationModel: string;
+  generationModel: AiModel;
   /** Greeting classification and reformulation. Deliberately tier-INdependent. */
-  cheapModel: string;
+  cheapModel: AiModel;
   /** Never tenant-varying: a Qdrant collection fixes dimension at creation. */
-  embeddingModel: string;
+  embeddingModel: AiModel;
   /** RRF weight on the semantic arm. */
   semanticWeight: number;
   /** RRF weight on the lexical arm. */
@@ -76,7 +76,7 @@ export const CHEAP_MODEL: AiModel = 'gemini-3.5-flash-lite';
 export const EMBEDDING_MODEL: AiModel = 'gemini-embedding-2';
 
 /** Every model the system can be configured to use — for the boot-time price check. */
-export const ALL_CONFIGURED_MODELS: AiModel[] = [
+export const ALL_CONFIGURED_MODELS: readonly AiModel[] = [
   ...Object.values(GENERATION_MODEL_BY_TIER),
   CHEAP_MODEL,
   EMBEDDING_MODEL,

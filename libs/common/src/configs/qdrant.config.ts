@@ -1,5 +1,5 @@
 /**
- * The shape of a Qdrant point, shared by the two services that disagree about
+ * @file The shape of a Qdrant point, shared by the two services that disagree about
  * it at their peril.
  *
  * `ingestion-service` (TypeScript) writes points; `rag-service` (Python) filters

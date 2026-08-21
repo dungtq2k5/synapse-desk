@@ -87,7 +87,11 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
   }
 
   /**
-   * The five indexes Prisma cannot express.2 discipline.
+   * The indexes and constraints Prisma cannot express.
+   *
+   * This block IS the list — see `development-conventions.md` §7. Nothing here
+   * is enumerated anywhere else, because an enumeration kept in prose goes
+   * stale silently and a `CREATE ... IF NOT EXISTS` cannot.
    *
    * `pg_trgm` is deliberately absent: the lexical arm is full-text search, not
    * fuzzy matching, and adding an extension nothing queries would be one more
@@ -143,6 +147,24 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
     await this.prisma.$executeRawUnsafe(`
       CREATE INDEX IF NOT EXISTS "ai_generations_cited_idx"
         ON "ai_generations" USING GIN ("cited_chunk_ids");
+    `);
+
+    // At most one LIVE ingestion job per document.
+    //
+    // `superseded_by_id` closes the double-click on ONE row and leaves the
+    // per-document case open: two clicks on two different terminal rows of the
+    // same document both succeed, and so does any second re-enqueue path.
+    // Retry, reindex and replace are three such paths, which is the point at
+    // which one database rule beats three service-layer guards.
+    //
+    // The predicate lists the RUNNING statuses rather than negating the
+    // terminal ones: a status added later is excluded until someone decides it
+    // belongs here, and the failure mode of that default is a permitted
+    // duplicate rather than a document nothing can ever re-run.
+    await this.prisma.$executeRawUnsafe(`
+      CREATE UNIQUE INDEX IF NOT EXISTS "ingestion_jobs_one_live_per_document"
+        ON "ingestion_jobs" ("document_id")
+        WHERE "status" IN ('QUEUED', 'PARSING', 'CHUNKING', 'EMBEDDING');
     `);
   }
 }

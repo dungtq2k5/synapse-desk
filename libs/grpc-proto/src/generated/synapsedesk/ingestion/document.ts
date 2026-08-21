@@ -170,6 +170,42 @@ export interface ConfirmDocumentRequest {
    *
    * NOT tesseract's own codes: the engine wants `vie`/`chi_sim`, and storing
    * those would put the engine's alphabet in the API contract and in every row.
+   *
+   * `string` and not an enum, deliberately, and the safety lives elsewhere. A
+   * proto3 enum would need a SCREAMING_SNAKE member per code
+   * (`OCR_LANGUAGE_ZH`), which is a third alphabet for the same value beside
+   * ISO 639-1 and tesseract's — the exact multiplication the comment above
+   * refuses. It also cannot round-trip: an unknown number decodes to the zero
+   * value, so a client sending a code this build does not know would silently
+   * OCR in whatever `_UNSPECIFIED` maps to.
+   *
+   * The type is recovered once, on the way in, by `parseOcrLanguages` — which
+   * REFUSES an unrecognized code instead of dropping it. Everything past that
+   * point is `OcrLanguage[]`.
+   */
+  ocrLanguages: string[];
+}
+
+/**
+ * `ConfirmDocumentRequest` minus the fields a replacement does not set.
+ *
+ * No title, no scope, no department ids: replace swaps the FILE and leaves the
+ * document's identity alone. Changing those is `UpdateDocument` and
+ * `SetDocumentDepartments`.
+ *
+ * No content_type and no size_bytes either, and `ConfirmDocumentRequest`
+ * carries neither for the same reason: both come back from storage's confirm
+ * and go into `assertUploadable`. On the wire they would be numbers the caller
+ * invented about a file the caller uploaded.
+ */
+export interface ReplaceDocumentRequest {
+  id: string;
+  objectPath: string;
+  /**
+   * A replacement may legitimately change these — re-reading a scanned
+   * document in the right language is a common reason to replace it.
+   *
+   * `string` for the reason given on `ConfirmDocumentRequest.ocr_languages`.
    */
   ocrLanguages: string[];
 }
@@ -514,6 +550,17 @@ export interface DocumentServiceClient {
 
   downloadDocument(request: DocumentIdRequest, metadata?: Metadata): Observable<DownloadDocumentResponse>;
 
+  /**
+   * Returns the JOB, so the caller polls `GetIngestionJob` — the surface it
+   * already has. `ReplaceDocument` returns the DOCUMENT instead, because the
+   * caller's screen is showing one and the job is reachable from
+   * `ListDocumentIngestionJobs`.
+   */
+
+  reindexDocument(request: DocumentIdRequest, metadata?: Metadata): Observable<IngestionJobResponse>;
+
+  replaceDocument(request: ReplaceDocumentRequest, metadata?: Metadata): Observable<DocumentResponse>;
+
   listDocumentDepartments(request: DocumentIdRequest, metadata?: Metadata): Observable<ListDocumentDepartmentsResponse>;
 
   setDocumentDepartments(request: SetDocumentDepartmentsRequest, metadata?: Metadata): Observable<DocumentResponse>;
@@ -624,6 +671,23 @@ export interface DocumentServiceController {
     request: DocumentIdRequest,
     metadata?: Metadata,
   ): Promise<DownloadDocumentResponse> | Observable<DownloadDocumentResponse> | DownloadDocumentResponse;
+
+  /**
+   * Returns the JOB, so the caller polls `GetIngestionJob` — the surface it
+   * already has. `ReplaceDocument` returns the DOCUMENT instead, because the
+   * caller's screen is showing one and the job is reachable from
+   * `ListDocumentIngestionJobs`.
+   */
+
+  reindexDocument(
+    request: DocumentIdRequest,
+    metadata?: Metadata,
+  ): Promise<IngestionJobResponse> | Observable<IngestionJobResponse> | IngestionJobResponse;
+
+  replaceDocument(
+    request: ReplaceDocumentRequest,
+    metadata?: Metadata,
+  ): Promise<DocumentResponse> | Observable<DocumentResponse> | DocumentResponse;
 
   listDocumentDepartments(
     request: DocumentIdRequest,
@@ -743,6 +807,8 @@ export function DocumentServiceControllerMethods() {
       "deleteDocument",
       "restoreDocument",
       "downloadDocument",
+      "reindexDocument",
+      "replaceDocument",
       "listDocumentDepartments",
       "setDocumentDepartments",
       "listDocumentChunks",

@@ -1,5 +1,5 @@
 /**
- * The NATS contract between any service and notification-service (Domain E).
+ * @file The NATS contract between any service and notification-service (Domain E).
  *
  * Import these on both ends of a subject: NATS is untyped on the wire, so a
  * renamed field is a compile error here and a silent `undefined` without it.

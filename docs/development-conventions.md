@@ -93,6 +93,20 @@ import { toTimestamp, GRPC_DEADLINE_MS } from '@synapsedesk/grpc-proto';
 2. Add it to the owning module and export from the entry point (`main.ts` / `index.ts`).
 3. Document *why it is shared* in the docblock, not what it does.
 
+### 3.2 `as const` or an explicit element type — decided by which one is the source
+
+A constant array is one of two things, and the shape follows from which:
+
+| The array is | Shape | Because |
+| :---- | :---- | :---- |
+| The **source** of a union type | `as const` | `(typeof X)[number]` only narrows if the literals are preserved — `PERMISSION_CODES`, `OCR_LANGUAGES` |
+| A **subset** of a union that already exists | `readonly T[]` | The union is the source; annotating with it is what makes a wrong member a compile error — `NON_LATIN_OCR_LANGUAGES: readonly OcrLanguage[]` |
+| Both — a subset whose members must also stay literal | `as const satisfies readonly T[]` | `ALLOWED_DOCUMENT_MIME_TYPES` |
+
+Same rule for a scalar: `const CHEAP_MODEL: AiModel = '…'` when the union exists, so a typo is caught where it is written rather than where it is used.
+
+**A field typed `string` where a union exists is a bug, not a style choice** — it is the shape that lets a value be filtered out or silently defaulted downstream. Narrow at the boundary by *parsing*, never by casting at the point of use: a cast moves the failure, a parse removes it (`parseOcrLanguages`).
+
 ---
 
 ## 4. Multi-Tenancy, Identity & Request Scoping
@@ -291,10 +305,11 @@ Mappers live in `libs/grpc-proto/src/mappers/`, named per §12.1.
 
 ## 7. Prisma & Data Access
 
-Schema is source of truth; reset freely. Do **not** hand-write migration SQL for ordinary changes. Two things need it because Prisma cannot express them:
+Schema is source of truth; reset freely. Do **not** hand-write migration SQL for ordinary changes.
 
-- `users`: `CHECK ((organization_id IS NULL) = is_super_admin)`
-- `roles`: `CREATE UNIQUE INDEX … ON roles (name) WHERE organization_id IS NULL`
+What Prisma cannot express — partial indexes, `CHECK` constraints, composite GIN over a `tsvector`, extensions — goes in the owning service's seeder DDL block (`apps/*/src/modules/prisma/database.seeder.ts`, `applyIndexes`), as `CREATE … IF NOT EXISTS`, with a comment saying what invariant it holds.
+
+**That block is the list.** This section deliberately names none of them: it used to name two, and the seeders had grown to twenty-one — one of the two having never been applied at all (known-gaps row 5). A prose enumeration of database objects has nothing that fails when it drifts. See [ADR 0039](./decisions/0039-the-seeder-ddl-block-is-the-list.md).
 
 ### 7.1 Soft deletes
 

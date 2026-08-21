@@ -1,3 +1,4 @@
+import { faker } from '@faker-js/faker';
 import { RpcException } from '@nestjs/microservices';
 import {
   AiGenerationOutcome,
@@ -102,6 +103,7 @@ describe('The fan-out and the scheduled jobs (e2e)', () => {
 
       await scopeWriter.apply(
         document.id,
+        tenant.organizationId,
         {
           isOrganizationWide: false,
           departmentIds: [tenant.departmentId],
@@ -137,6 +139,7 @@ describe('The fan-out and the scheduled jobs (e2e)', () => {
 
       await scopeWriter.apply(
         document.id,
+        tenant.organizationId,
         {
           isOrganizationWide: false,
           departmentIds: [tenant.departmentId],
@@ -164,7 +167,49 @@ describe('The fan-out and the scheduled jobs (e2e)', () => {
         expect(point.payload?.[QDRANT_PAYLOAD_FIELDS.chunkId]).toBeDefined();
       }
 
-      await qdrant.deleteDocumentPoints(document.id);
+      await qdrant.deleteDocumentPoints(document.id, tenant.organizationId);
+    });
+
+    it('**2b. a re-scope carrying the WRONG tenant touches nothing**', async () => {
+      // The reason all three document-scoped Qdrant operations carry the
+      // tenant. A wrong `documentId` on a delete costs the other tenant their
+      // vectors, which a reindex restores. The same mistake here flips
+      // `is_deleted` and overwrites `department_ids` — a deleted or
+      // department-scoped document becomes retrievable to people the boundary
+      // excluded, with no failing query anywhere.
+      const document = await documentWithChunks(1);
+      const chunks = await fx.prisma.documentChunk.findMany({
+        where: { documentId: document.id },
+      });
+      const pointId = '00000000-0000-4000-8000-0000000000ff';
+
+      await qdrant.upsertChunks([
+        {
+          vectorPointId: pointId,
+          vector: Array.from({ length: 768 }, () => 0.1),
+          chunkId: chunks[0].id,
+          documentId: document.id,
+          organizationId: tenant.organizationId,
+          departmentIds: [],
+          isOrganizationWide: false,
+          isDeleted: true,
+        },
+      ]);
+
+      await qdrant.setDocumentScope(document.id, faker.string.uuid(), {
+        isOrganizationWide: true,
+        departmentIds: [faker.string.uuid()],
+        isDeleted: false,
+      });
+
+      const [point] = await qdrant.retrieve([pointId]);
+      expect(point.payload?.[QDRANT_PAYLOAD_FIELDS.isDeleted]).toBe(true);
+      expect(point.payload?.[QDRANT_PAYLOAD_FIELDS.isOrganizationWide]).toBe(
+        false,
+      );
+      expect(point.payload?.[QDRANT_PAYLOAD_FIELDS.departmentIds]).toEqual([]);
+
+      await qdrant.deleteDocumentPoints(document.id, tenant.organizationId);
     });
 
     it('3. REFUSES the restriction outright when Qdrant is unreachable', async () => {
@@ -182,6 +227,7 @@ describe('The fan-out and the scheduled jobs (e2e)', () => {
       await expect(
         scopeWriter.apply(
           document.id,
+          tenant.organizationId,
           {
             isOrganizationWide: false,
             departmentIds: [tenant.departmentId],
@@ -213,6 +259,7 @@ describe('The fan-out and the scheduled jobs (e2e)', () => {
       await expect(
         scopeWriter.apply(
           document.id,
+          tenant.organizationId,
           { isOrganizationWide: true, departmentIds: [], isDeleted: false },
           { isOrganizationWide: false, departmentIds: [], isDeleted: false },
         ),
@@ -248,6 +295,7 @@ describe('The fan-out and the scheduled jobs (e2e)', () => {
 
       await scopeWriter.apply(
         document.id,
+        tenant.organizationId,
         { isOrganizationWide: false, departmentIds: [], isDeleted: false },
         { isOrganizationWide: true, departmentIds: [], isDeleted: false },
       );

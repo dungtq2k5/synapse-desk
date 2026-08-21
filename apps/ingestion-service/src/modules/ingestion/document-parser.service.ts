@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { MIN_PAGE_CHARACTERS } from '@synapsedesk/common';
+import { MIN_PAGE_CHARACTERS, type OcrLanguage } from '@synapsedesk/common';
 import { MAX_OCR_PAGES, OcrService } from './ocr.service';
 
 /** One page of extracted text. PDFs have many; everything else has one. */
@@ -80,7 +80,7 @@ export class DocumentParserService {
    *
    * The type came from `FILE_TYPE_BY_MIME` at confirm time, which itself came
    * from storage-service reading the object's real content type rather than the
-   * client's claim — so by here it is trustworthy, and anything unrecognised is
+   * client's claim — so by here it is trustworthy, and anything unrecognized is
    * a gap in the allowlist rather than a hostile upload.
    */
   async parse(
@@ -93,7 +93,7 @@ export class DocumentParserService {
      * document row, so the worker still needs no lookup to start. Empty is
      * "not specified", which is almost every document.
      */
-    ocrLanguages: string[] = [],
+    ocrLanguages: OcrLanguage[] = [],
   ): Promise<ParsedDocument> {
     // The hash is of the BYTES, which is the honest fingerprint and could not
     // be computed at confirm time: the bytes never pass through this service on
@@ -164,7 +164,7 @@ export class DocumentParserService {
    */
   private async parsePdf(
     bytes: Buffer,
-    ocrLanguages: string[],
+    ocrLanguages: OcrLanguage[],
   ): Promise<{
     pages: ParsedPage[];
     pageCount: number;
@@ -258,7 +258,7 @@ export class DocumentParserService {
   private async ocrThinPages(
     bytes: Buffer,
     thin: number[],
-    ocrLanguages: string[],
+    ocrLanguages: OcrLanguage[],
     into: ParsedPage[],
   ): Promise<number[]> {
     if (thin.length === 0) return [];

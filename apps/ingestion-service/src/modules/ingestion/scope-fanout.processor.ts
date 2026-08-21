@@ -80,11 +80,25 @@ export class ScopeFanoutProcessor extends WorkerHost {
     // must leave the document over- or under-exposed. A retry of a restriction
     // must not be the moment the system briefly widens access again.
     if (event.restricting) {
-      await this.writer.writeQdrant(event.documentId, scope, { fatal: true });
+      await this.writer.writeQdrant(
+        event.documentId,
+        event.organizationId,
+        scope,
+        {
+          fatal: true,
+        },
+      );
       await this.writer.writeChunks(event.documentId, scope);
     } else {
       await this.writer.writeChunks(event.documentId, scope);
-      await this.writer.writeQdrant(event.documentId, scope, { fatal: true });
+      await this.writer.writeQdrant(
+        event.documentId,
+        event.organizationId,
+        scope,
+        {
+          fatal: true,
+        },
+      );
     }
 
     // `fatal: true` on BOTH paths here, unlike the endpoint: a throw is what

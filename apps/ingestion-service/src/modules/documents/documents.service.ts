@@ -12,6 +12,8 @@ import {
   ConfirmDocumentRequest,
   DeleteDocumentResponse,
   DocumentIdRequest,
+  IngestionJobResponse,
+  ReplaceDocumentRequest,
   DocumentResponse,
   DownloadDocumentResponse,
   emptyPage,
@@ -46,6 +48,8 @@ import {
   DocumentStatus,
   extensionFor,
   IngestionJobStatus,
+  DocumentFlagResolution,
+  SupersededReason,
   isUniqueConstraintViolation,
   MAX_DOCUMENT_BYTES,
   MAX_DOCUMENT_TITLE_LENGTH,
@@ -60,6 +64,9 @@ import { StorageReferenceService } from '../storage-client/storage-reference.ser
 import { DocumentEventPublisher } from '../events/document-event.publisher';
 import { ScopeWriterService } from '../ingestion/scope-writer.service';
 import { ScopeFanoutQueueService } from '../ingestion/scope-fanout-queue.service';
+import { IngestionQueueService } from '../ingestion/ingestion-queue.service';
+import { toIngestionJobResponse } from '../ingestion-jobs/ingestion-job.mapper';
+import { asConcurrentIngestion } from '../../common/live-ingestion-job';
 import { Prisma } from '../../generated/prisma/client';
 import { documentVisibility } from '../../common/document-visibility';
 import {
@@ -107,6 +114,7 @@ export class DocumentsService {
     private readonly events: DocumentEventPublisher,
     private readonly scopeWriter: ScopeWriterService,
     private readonly fanoutQueue: ScopeFanoutQueueService,
+    private readonly ingestionQueue: IngestionQueueService,
     configService: ConfigService,
   ) {
     this.downloadUrlTtlMs =
@@ -149,9 +157,13 @@ export class DocumentsService {
       });
     }
 
-    // The id the ROW will have. There is no row yet — it is created at confirm
-    // — so the path carries the future id, which is what lets confirm tie the
-    // object back to the request that authorized it.
+    // A per-upload NONCE, and not the id the row will have — `confirmDocument`
+    // lets Postgres generate that, so the two never match. Tempting to read it
+    // as the future id because the path ends up `documents/<this>/<file>`, but
+    // nothing may depend on that: storage authorizes by the `PendingUpload`
+    // record it consumes, never by the path (`purpose-registry.ts`). What this
+    // buys is a unique path per presign, which is what lets `file_hash` — a
+    // hash of the PATH — identify one upload.
     const documentId = randomUUID();
 
     const presigned = await this.storage.presignDocument(
@@ -240,7 +252,7 @@ export class DocumentsService {
             // Validated at the gateway against `OCR_LANGUAGES`.
             // Stored as given: `[]` is "not specified", which is almost every
             // upload, and the parser is what turns that into the `eng` default.
-            ocrLanguages: request.ocrLanguages ?? [],
+            ocrLanguages: request.ocrLanguages,
             departmentLinks: {
               create: departmentIds.map((departmentId) => ({ departmentId })),
             },
@@ -610,7 +622,7 @@ export class DocumentsService {
       isDeleted: true,
     };
 
-    await this.scopeWriter.apply(existing.id, scope, {
+    await this.scopeWriter.apply(existing.id, existing.organizationId, scope, {
       isOrganizationWide: existing.isOrganizationWide,
       departmentIds,
       isDeleted: false,
@@ -694,7 +706,7 @@ export class DocumentsService {
       isDeleted: false,
     };
 
-    await this.scopeWriter.apply(existing.id, scope, {
+    await this.scopeWriter.apply(existing.id, existing.organizationId, scope, {
       isOrganizationWide: existing.isOrganizationWide,
       departmentIds,
       isDeleted: true,
@@ -820,6 +832,253 @@ export class DocumentsService {
   // -------------------------------------------------------------------------
 
   /**
+   * Re-runs the pipeline over a document whose file has not changed.
+   *
+   * Accepts `INDEXED` and nothing else; `retryIngestionJob` takes the
+   * terminal-failure states, so the two are complements.
+   *
+   * Creates a new `ingestion_jobs` row and returns it — poll it at
+   * `GetIngestionJob`. The document goes back to `PENDING` and is unsearchable
+   * until the run finishes. Open flags are left open, unlike
+   * {@link replaceDocument}.
+   *
+   * @throws RpcException NOT_FOUND when the document is not in scope or is
+   *   soft-deleted.
+   * @throws RpcException FAILED_PRECONDITION when the document is not
+   *   `INDEXED`, or when a job is already live for it.
+   */
+  async reindexDocument(
+    request: DocumentIdRequest,
+    context: CallerContext,
+  ): Promise<IngestionJobResponse> {
+    const document = await this.load(request.id, context);
+
+    // `documents.status` is a `VarChar` rather than a Postgres enum
+    // (conventions §7.3), so Prisma types it `string` and nothing narrows it.
+    const documentStatus = document.status as DocumentStatus;
+
+    if (documentStatus !== DocumentStatus.INDEXED) {
+      throw new RpcException({
+        code: status.FAILED_PRECONDITION,
+        message:
+          documentStatus === DocumentStatus.FAILED
+            ? 'This document has not been indexed; retry its ingestion job instead'
+            : `This document is ${documentStatus.toLowerCase()}`,
+      });
+    }
+
+    // A NEW row rather than reusing the old one: the row is the record, and
+    // `@@index([documentId, createdAt desc])` exists because a document has a
+    // job history worth reading in order.
+    const job = await this.prisma
+      .$transaction(async (tx) => {
+        // The row this re-run replaces, for lineage. Claimed with a
+        // `supersededById: null` guard, which is the same lock-free claim
+        // retry makes.
+        //
+        // It is NOT what makes the route safe to double-click — that is
+        // `ingestion_jobs_one_live_per_document`, which refuses the second
+        // INSERT. A per-row claim cannot see a second row, and reindex is the
+        // route that makes a second row easy to produce.
+        const previous = await tx.ingestionJob.findFirst({
+          where: { documentId: document.id, supersededById: null },
+          orderBy: { createdAt: 'desc' },
+          select: { id: true },
+        });
+
+        const created = await tx.ingestionJob.create({
+          data: {
+            organizationId: document.organizationId,
+            documentId: document.id,
+            // `enqueue` fills this in; the column is not nullable.
+            bullmqJobId: '',
+            status: IngestionJobStatus.QUEUED,
+          },
+        });
+
+        if (previous) {
+          await tx.ingestionJob.updateMany({
+            where: { id: previous.id, supersededById: null },
+            data: { supersededById: created.id },
+          });
+        }
+
+        // PENDING, and honestly so: the processor purges this document's
+        // vectors before it writes new ones, so from the moment that job runs
+        // until it finishes the document really is not indexed.
+        await tx.document.update({
+          where: { id: document.id },
+          data: { status: DocumentStatus.PENDING },
+        });
+
+        return created;
+      })
+      .catch((error: unknown) => {
+        throw asConcurrentIngestion(error);
+      });
+
+    // AFTER the commit: a worker that picked the job up mid-transaction would
+    // find no row to advance.
+    await this.ingestionQueue.enqueue({
+      organizationId: document.organizationId,
+      documentId: document.id,
+      ingestionJobId: job.id,
+      objectPath: document.fileUrl,
+      fileType: document.fileType,
+      ocrLanguages: document.ocrLanguages,
+    });
+
+    // Re-read rather than returning the row above: `enqueue` records
+    // `bullmqJobId` on it, and that id is how someone finds the job in Redis.
+    return toIngestionJobResponse(
+      await this.prisma.ingestionJob.findUniqueOrThrow({
+        where: { id: job.id },
+      }),
+    );
+  }
+
+  /**
+   * Swaps the FILE behind a document and re-runs the pipeline over it.
+   *
+   * Identity is untouched — title, scope and departments stay as they are, and
+   * `updateDocument` / `setDocumentDepartments` are the routes for those.
+   * `ocrLanguages` DOES change, and is often the reason to call this.
+   *
+   * Open flags are resolved as `DOCUMENT_REPLACED`: the file they describe is
+   * gone. {@link reindexDocument} leaves them, because it re-runs the same file.
+   *
+   * `objectPath` must come from a presign that has not been confirmed yet —
+   * the same one-shot pair as `confirmDocument`.
+   *
+   * @throws RpcException NOT_FOUND when the document is not in scope, is
+   *   soft-deleted, or the object path has no unconsumed presign.
+   * @throws RpcException INVALID_ARGUMENT when storage reports a type or size
+   *   the parser will not take.
+   * @throws RpcException FAILED_PRECONDITION when a job is already live for
+   *   this document.
+   * @throws RpcException ALREADY_EXISTS when this presign was already
+   *   confirmed for this same document.
+   */
+  async replaceDocument(
+    request: ReplaceDocumentRequest,
+    context: CallerContext,
+  ): Promise<DocumentResponse> {
+    requireActor(context);
+    const document = await this.load(request.id, context);
+
+    // BEFORE the update, and this is the ordering trap the plan names: the
+    // column is about to hold the NEW path, and the supersede event must carry
+    // the OLD one. Emitting the new path deletes the file just uploaded.
+    const supersededPath = document.fileUrl;
+
+    // No "does this path belong to THIS document" check, and none is possible
+    // or needed. `confirmUpload` consumes the `PendingUpload`, and its absence
+    // covers "never presigned, expired, and already confirmed once"
+    // indistinguishably — so a path already belonging to a document answers
+    // NOT_FOUND, and a path that does not belong to one belongs to nobody. No
+    // object is both another document's and confirmable, which is what
+    // attaching B's object to A would require.
+    const confirmed = await this.storage.confirmUpload(
+      request.objectPath,
+      context,
+    );
+
+    // From storage's record of what it ACCEPTED, never from the request —
+    // `ReplaceDocumentRequest` carries no type or size for exactly this reason.
+    this.assertUploadable(confirmed.contentType, confirmed.sizeBytes);
+
+    const fileHash = createHash('sha256')
+      .update(request.objectPath)
+      .digest('hex');
+
+    try {
+      const replaced = await this.prisma.$transaction(async (tx) => {
+        const previous = await tx.ingestionJob.findFirst({
+          where: { documentId: document.id, supersededById: null },
+          orderBy: { createdAt: 'desc' },
+          select: { id: true },
+        });
+
+        const job = await tx.ingestionJob.create({
+          data: {
+            organizationId: document.organizationId,
+            documentId: document.id,
+            bullmqJobId: '',
+            status: IngestionJobStatus.QUEUED,
+          },
+        });
+
+        if (previous) {
+          await tx.ingestionJob.updateMany({
+            where: { id: previous.id, supersededById: null },
+            data: { supersededById: job.id },
+          });
+        }
+
+        // `resolvedAt: null` guards it: a flag a human already closed keeps
+        // their resolution and their comment, which is the one record of why.
+        await tx.documentFlag.updateMany({
+          where: { documentId: document.id, resolvedAt: null },
+          data: {
+            resolvedAt: new Date(),
+            resolution: DocumentFlagResolution.DOCUMENT_REPLACED,
+            // NULL, not the actor: `resolved_by_id` means "a human decided
+            // this", and nobody decided these individually. The resolution
+            // value already says what closed them.
+            resolvedById: null,
+          },
+        });
+
+        const updated = await tx.document.update({
+          where: { id: document.id },
+          data: {
+            fileUrl: request.objectPath,
+            fileType: extensionFor(confirmed.contentType),
+            fileSizeBytes: BigInt(confirmed.sizeBytes),
+            fileHash,
+            ocrLanguages: request.ocrLanguages,
+            status: DocumentStatus.PENDING,
+          },
+          include: DOCUMENT_INCLUDE,
+        });
+
+        return { updated, job };
+      });
+
+      // AFTER the commit, both of them. An event announcing a change a
+      // rollback erases is one no consumer can un-handle — and here it would
+      // delete the file the document still points at.
+      this.storage.emitSuperseded(supersededPath, SupersededReason.REPLACED);
+
+      await this.ingestionQueue.enqueue({
+        organizationId: document.organizationId,
+        documentId: document.id,
+        ingestionJobId: replaced.job.id,
+        objectPath: request.objectPath,
+        fileType: replaced.updated.fileType,
+        ocrLanguages: replaced.updated.ocrLanguages,
+      });
+
+      return toDocumentResponse(
+        replaced.updated,
+        replaced.updated.departmentLinks.map((link) => link.departmentId),
+        0,
+      );
+    } catch (error) {
+      if (isUniqueConstraintViolation(error, DOCUMENT_HASH_INDEX)) {
+        // The hash is of the PATH, so this is a replayed confirm of one
+        // presign and never "another document has this content" — nothing in
+        // this system hashes bytes.
+        throw new RpcException({
+          code: status.ALREADY_EXISTS,
+          message: 'That upload has already been confirmed',
+        });
+      }
+      throw asConcurrentIngestion(error);
+    }
+  }
+
+  /**
    * The visibility fan-out — BOTH retrievable stores, then the reconciler.
    *
    * The ordering is `ScopeWriterService`'s and is stated there: a restriction
@@ -849,6 +1108,7 @@ export class DocumentsService {
 
     const { restricting } = await this.scopeWriter.apply(
       document.id,
+      document.organizationId,
       after,
       before,
     );

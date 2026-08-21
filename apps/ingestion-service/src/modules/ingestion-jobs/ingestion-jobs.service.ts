@@ -24,6 +24,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { IngestionQueueService } from '../ingestion/ingestion-queue.service';
 import { IngestionJob, Prisma } from '../../generated/prisma/client';
 import { documentVisibility } from '../../common/document-visibility';
+import { asConcurrentIngestion } from '../../common/live-ingestion-job';
 import { toIngestionJobResponse } from './ingestion-job.mapper';
 
 /** What the tenant may sort a job worklist by. */
@@ -173,53 +174,68 @@ export class IngestionJobsService {
       select: { fileUrl: true, fileType: true, ocrLanguages: true },
     });
 
-    const retry = await this.prisma.$transaction(async (tx) => {
-      const created = await tx.ingestionJob.create({
-        data: {
-          organizationId: source.organizationId,
-          documentId: source.documentId,
-          // `enqueue` fills this in; the column is not nullable.
-          bullmqJobId: '',
-          status: IngestionJobStatus.QUEUED,
-        },
-      });
+    const retry = await this.prisma
+      .$transaction(async (tx) => {
+        // BEFORE the insert, and that ordering is load-bearing.
+        //
+        // Only the stranded row needs its STATUS ended: it is the one still
+        // QUEUED, and a QUEUED row nothing will ever run is what the dashboard
+        // shows forever. A `FAILED` or `CANCELLED` row is terminal already, and
+        // its `error_log` is the one copy of why this retry is happening.
+        //
+        // It has to come first because `ingestion_jobs_one_live_per_document`
+        // counts a `QUEUED` row as live: inserting the successor while the
+        // stranded source still holds that status is the index's own violation,
+        // and it would make the stranded case — the one this route exists for —
+        // the one case retry could not serve.
+        if (statusOf(source) === IngestionJobStatus.QUEUED) {
+          await tx.ingestionJob.update({
+            where: { id: source.id },
+            data: {
+              status: IngestionJobStatus.CANCELLED,
+              processedAt: new Date(),
+            },
+          });
+        }
 
-      // Claimed on EVERY source status, because the race is not
-      // status-specific: two clicks on one FAILED row are as fatal as two on a
-      // stranded one.
-      //
-      // Depends on READ COMMITTED — the loser blocks on the row lock,
-      // re-evaluates this qual against the committed row and matches nothing.
-      // Passing `isolationLevel` to this transaction would make it raise a
-      // serialization error instead, and the branch below would never run.
-      const { count } = await tx.ingestionJob.updateMany({
-        where: { id: source.id, supersededById: null },
-        data: { supersededById: created.id },
-      });
-
-      if (count === 0) await this.refuseSuperseded(tx, source.id);
-
-      // Only the stranded row needs its STATUS ended: it is the one still
-      // QUEUED, and a QUEUED row nothing will ever run is what the dashboard
-      // shows forever. A `FAILED` or `CANCELLED` row is terminal already, and
-      // its `error_log` is the one copy of why this retry is happening.
-      if (statusOf(source) === IngestionJobStatus.QUEUED) {
-        await tx.ingestionJob.update({
-          where: { id: source.id },
+        const created = await tx.ingestionJob.create({
           data: {
-            status: IngestionJobStatus.CANCELLED,
-            processedAt: new Date(),
+            organizationId: source.organizationId,
+            documentId: source.documentId,
+            // `enqueue` fills this in; the column is not nullable.
+            bullmqJobId: '',
+            status: IngestionJobStatus.QUEUED,
           },
         });
-      }
 
-      await tx.document.update({
-        where: { id: source.documentId },
-        data: { status: DocumentStatus.PENDING },
+        // Claimed on EVERY source status, because the race is not
+        // status-specific: two clicks on one FAILED row are as fatal as two on a
+        // stranded one.
+        //
+        // Depends on READ COMMITTED — the loser blocks on the row lock,
+        // re-evaluates this qual against the committed row and matches nothing.
+        // Passing `isolationLevel` to this transaction would make it raise a
+        // serialization error instead, and the branch below would never run.
+        const { count } = await tx.ingestionJob.updateMany({
+          where: { id: source.id, supersededById: null },
+          data: { supersededById: created.id },
+        });
+
+        if (count === 0) await this.refuseSuperseded(tx, source.id);
+
+        await tx.document.update({
+          where: { id: source.documentId },
+          data: { status: DocumentStatus.PENDING },
+        });
+
+        return created;
+      })
+      .catch((error: unknown) => {
+        // A live job for this document that is NOT the source row — a second
+        // route re-ran it while this retry was in flight. The refusal comes from
+        // the index rather than from a read, because a read cannot hold.
+        throw asConcurrentIngestion(error);
       });
-
-      return created;
-    });
 
     // AFTER the commit: a worker that picked the job up mid-transaction would
     // find no row to advance.

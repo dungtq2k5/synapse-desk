@@ -92,6 +92,29 @@ describe('The ingestion pipeline (e2e)', () => {
     };
   };
 
+  /**
+   * A SECOND attempt at the same document — the row `retry` and `reindex`
+   * create.
+   *
+   * Re-running `process()` with the original job id proves nothing once that
+   * job is `COMPLETED`: `setJobStatus` refuses a terminal row and the run
+   * returns `CANCELLED` before touching anything. Every "runs twice" assertion
+   * in this file needs a runnable job, and a fresh row is what the two routes
+   * that re-run a document actually produce.
+   */
+  const requeue = async (data: Awaited<ReturnType<typeof queueDocument>>) => {
+    const job = await fx.prisma.ingestionJob.create({
+      data: {
+        organizationId: data.organizationId,
+        documentId: data.documentId,
+        bullmqJobId: '',
+        status: IngestionJobStatus.QUEUED,
+      },
+    });
+
+    return { ...data, ingestionJobId: job.id };
+  };
+
   beforeAll(async () => {
     fx = await bootstrapE2eTest();
     processor = fx.moduleRef.get(IngestionProcessor);
@@ -140,10 +163,10 @@ describe('The ingestion pipeline (e2e)', () => {
     // Left behind, they accumulate across runs and eventually make a count
     // assertion fail for reasons that have nothing to do with the test.
     const documents = await fx.prisma.document.findMany({
-      select: { id: true },
+      select: { id: true, organizationId: true },
     });
     for (const document of documents) {
-      await qdrant.deleteDocumentPoints(document.id);
+      await qdrant.deleteDocumentPoints(document.id, document.organizationId);
     }
   });
 
@@ -800,8 +823,10 @@ describe('The ingestion pipeline (e2e)', () => {
     });
 
     it('11. KEEPS the parsing work, so a cycle roll resumes at the embedding step', async () => {
-      // The reason the deferral is not a failure. Chunk rows survive with no
-      // vector_point_id, which is exactly the state a re-run picks up.
+      // The reason the deferral is not a failure: the parse and chunk work
+      // survives, so the cycle roll costs CPU rather than a re-parse. It is
+      // NOT a resume — a re-run recreates these rows and re-embeds all of
+      // them (test 19); what is kept is everything before the embedding step.
       getAiEntitlement.mockResolvedValue({
         budgetMicros: 0n,
         billingCycleStart: CYCLE_START,
@@ -879,8 +904,10 @@ describe('The ingestion pipeline (e2e)', () => {
     });
 
     it('15. COMPLETES the leftovers on a re-run', async () => {
-      // The recovery the nullable column exists for: a re-run embeds exactly
-      // the chunks that still have no vector, rather than starting over.
+      // Recovery, and the reason the column is nullable: WITHIN a run, a chunk
+      // with no `vector_point_id` is one whose upsert never happened, so
+      // Postgres never claims a vector that is not there. The re-run here
+      // starts over rather than resuming — see test 19.
       fx.embeddings.failNext = new Error('transient');
       const data = await queueDocument();
       await processor.process(data).catch(() => undefined);
@@ -891,15 +918,20 @@ describe('The ingestion pipeline (e2e)', () => {
         where: { documentId: data.documentId },
       });
       expect(chunks.every((chunk) => chunk.vectorPointId !== null)).toBe(true);
-      await expect(qdrant.countPoints(data.documentId)).resolves.toBe(
-        chunks.length,
-      );
+      await expect(
+        qdrant.countPoints(data.documentId, tenant.organizationId),
+      ).resolves.toBe(chunks.length);
     });
 
-    it('16. Is IDEMPOTENT: two clean runs leave one set of chunks', async () => {
-      // NATS core redelivers routinely, so a second run of the same document
-      // is the ordinary case. Appending would double every chunk and orphan
-      // the first set in Qdrant with no row pointing at it.
+    it('16. REFUSES a redelivery of a completed job, rather than re-running it', async () => {
+      // NATS core redelivers routinely. The guard is the terminal-status check
+      // in `setJobStatus`, and it fires before the download — so the protection
+      // against a doubled document is "the job is spent", not anything in the
+      // chunk or point writes.
+      //
+      // Asserting the outcome matters: without it this reads as "two clean runs
+      // are idempotent" while the second run never starts, which makes every
+      // store assertion after it true for the wrong reason.
       const data = await queueDocument();
 
       await processor.process(data);
@@ -907,12 +939,110 @@ describe('The ingestion pipeline (e2e)', () => {
         where: { documentId: data.documentId },
       });
 
-      await processor.process(data);
+      await expect(processor.process(data)).resolves.toBe('CANCELLED');
+
       const second = await fx.prisma.documentChunk.count({
         where: { documentId: data.documentId },
       });
-
       expect(second).toBe(first);
+      expect(fx.embeddings.calls).toHaveLength(1);
+    });
+
+    it('16b. Leaves ONE set of points when a second job re-runs the document', async () => {
+      // The real "runs twice" path: a new job row, which is what retry and
+      // reindex create. Chunk rows are deleted and recreated, their point ids
+      // go with them, and without the purge the first run's points stay in the
+      // collection addressable by nothing.
+      const data = await queueDocument();
+      await processor.process(data);
+
+      const first = await qdrant.countPoints(
+        data.documentId,
+        tenant.organizationId,
+      );
+      expect(first).toBeGreaterThan(0);
+
+      await expect(processor.process(await requeue(data))).resolves.toBe(
+        'INDEXED',
+      );
+
+      const chunks = await fx.prisma.documentChunk.count({
+        where: { documentId: data.documentId },
+      });
+      expect(chunks).toBe(first);
+      await expect(
+        qdrant.countPoints(data.documentId, tenant.organizationId),
+      ).resolves.toBe(chunks);
+    });
+
+    it('18. Leaves no points from the batches a PARTIAL failure had already upserted', async () => {
+      // The shape the defect actually occurs in, and the one a single-batch
+      // document cannot produce: batch 1 reaches Qdrant, batch 2 throws, and
+      // the re-run deletes the rows holding batch 1's point ids. Without the
+      // purge those points stay addressable by nothing.
+      const sections = 40;
+      downloadObject.mockResolvedValue(markdownFixture(sections));
+
+      const real = fx.embeddings.embedBatch.bind(fx.embeddings);
+      let call = 0;
+      faults.replace(
+        fx.embeddings,
+        'embedBatch',
+        async (texts: string[], model: string) => {
+          call += 1;
+          if (call === 2) throw new Error('embedding provider is down');
+          return real(texts, model);
+        },
+      );
+
+      const data = await queueDocument();
+      await processor.process(data).catch(() => undefined);
+
+      // The arrangement is only worth anything if the first batch really did
+      // reach Qdrant — a document that fits in one batch would make the rest
+      // of this test vacuous.
+      expect(call).toBeGreaterThan(1);
+      const stranded = await qdrant.countPoints(
+        data.documentId,
+        tenant.organizationId,
+      );
+      expect(stranded).toBe(EMBEDDING_BATCH_SIZE);
+
+      await expect(processor.process(data)).resolves.toBe('INDEXED');
+
+      const chunks = await fx.prisma.documentChunk.count({
+        where: { documentId: data.documentId },
+      });
+      await expect(
+        qdrant.countPoints(data.documentId, tenant.organizationId),
+      ).resolves.toBe(chunks);
+    });
+
+    it('19. Re-embeds the WHOLE document on a re-run, and is billed for it', async () => {
+      // Pinning what the code does, not what two docblocks used to say it did.
+      // `vector_point_id IS NULL` reads as "resume", and `writeChunkRows` has
+      // already recreated every row by the time it is evaluated — so the
+      // filter matches everything and the tenant pays twice.
+      //
+      // Change this test when the resume is built (known-gaps #11); until then
+      // it is the record that the cost is known rather than overlooked.
+      const data = await queueDocument();
+
+      await processor.process(data);
+      const firstRun = fx.embeddings.calls.flatMap(
+        (batch) => batch.texts,
+      ).length;
+
+      fx.embeddings.reset();
+      await expect(processor.process(await requeue(data))).resolves.toBe(
+        'INDEXED',
+      );
+      const secondRun = fx.embeddings.calls.flatMap(
+        (batch) => batch.texts,
+      ).length;
+
+      expect(firstRun).toBeGreaterThan(0);
+      expect(secondRun).toBe(firstRun);
     });
 
     it('17. FAILS a file type it has no parser for', async () => {

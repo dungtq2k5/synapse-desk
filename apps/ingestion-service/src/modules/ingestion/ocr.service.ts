@@ -134,10 +134,8 @@ export class OcrService implements OnModuleInit {
    * Empty falls back to English, which is almost every document: an uploader
    * cannot know a PDF is scanned until it is parsed.
    */
-  languageArgument(languages: string[]): string {
-    const codes = languages
-      .map((code) => TESSERACT_CODE_BY_LANGUAGE[code as OcrLanguage])
-      .filter(Boolean);
+  languageArgument(languages: OcrLanguage[]): string {
+    const codes = languages.map((code) => TESSERACT_CODE_BY_LANGUAGE[code]);
 
     return codes.length > 0
       ? codes.join('+')
@@ -145,7 +143,7 @@ export class OcrService implements OnModuleInit {
   }
 
   /**
-   * One page: rasterise, recognise, return the text.
+   * One page: rasterize, recognise, return the text.
    *
    * Returns a result rather than throwing, because every caller has something
    * better to do than fail the document's whole argument is that 197 good
@@ -154,7 +152,7 @@ export class OcrService implements OnModuleInit {
   async recognisePage(
     pdf: Buffer,
     pageNumber: number,
-    languages: string[],
+    languages: OcrLanguage[],
   ): Promise<OcrResult> {
     if (!(await this.checkAvailability())) {
       return { ok: false, reason: 'binary_missing' };

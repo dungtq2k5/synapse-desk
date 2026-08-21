@@ -1,5 +1,5 @@
 /**
- * The permission registry and the system roles built from it.
+ * @file The permission registry and the system roles built from it.
  *
  * `PERMISSION_CODES` is the single source of truth twice over: it derives the
  * `PermissionCode` union used by `@RequirePermission`, and it is the seed input

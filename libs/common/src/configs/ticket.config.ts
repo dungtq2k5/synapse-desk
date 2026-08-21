@@ -1,5 +1,5 @@
 /**
- * Domain B's shared vocabulary — the enums, the state machine and the sortable
+ * @file Domain B's shared vocabulary — the enums, the state machine and the sortable
  * columns that `ticket-service` and `api-gateway` must agree on exactly.
  *
  * Separate file from `app.config.ts` because that one is already Domain A's
@@ -149,6 +149,10 @@ export const ANSWER_STATUSES = Object.values(AnswerStatus);
 
 // ---------------------------------------------------------------------------
 // Sortable columns — same four-way contract as Domain A's, see app.config.ts
+//
+// The arrays live HERE and the rule lives in `pagination.config.ts`, which is
+// the split that keeps working: sortable columns are a fact about tickets, and
+// all four things each array drives are in this domain's own module.
 // ---------------------------------------------------------------------------
 
 export const TICKET_SORTABLE_FIELDS = [

@@ -414,8 +414,8 @@ No `POST`/`PATCH`/`DELETE` — `audit_logs` is append-only and written internall
 | DELETE | `/documents/:id` ✎ | Soft delete — drops it from RAG context while preserving historical citations (RDM §1.6). | perm:`document.delete` |
 | POST | `/documents/:id/restore` ✎ | Restore + re-add to the retrievable set. | perm:`document.delete` |
 | GET | `/documents/:id/download` | Short-lived signed URL via `GetSignedReadUrls`. Visibility (org-wide ∪ caller's departments) re-checked **before** the storage call, never delegated to it — same discipline as `GET /attachments/:id/download`. | USER |
-| POST | `/documents/:id/replace` ✎ | Same presign/confirm pair against the existing document id → re-chunk, re-embed, swap vectors atomically, then emit `storage.object.superseded` (`REPLACED`) for the **old** `file_url`. Read the old path before overwriting it — the ordering trap that applies to avatars applies identically. | perm:`document.update` |
-| POST | `/documents/:id/reindex` ✎ | Re-run ingestion without a new file (model or chunking-strategy change). **Not built.** Unnecessary in development, where a parsing change is handled by resetting and re-uploading — and **required before the first real tenant**, because from then on a chunking change with no re-index path means the improvement reaches only documents uploaded after it. | perm:`document.reindex` |
+| POST | `/documents/:id/replace` | Same presign/confirm pair against the existing document id → re-chunk, re-embed, swap vectors, then emit `storage.object.superseded` (`REPLACED`) for the **old** `file_url`. Read the old path before overwriting it — the ordering trap that applies to avatars applies identically. Not atomic and deliberately so: the document is `PENDING` and unsearchable from the purge to the last upsert, which is the same window `retry` has. Open flags resolve as `DOCUMENT_REPLACED`. 202. | perm:`document.update` |
+| POST | `/documents/:id/reindex` | Re-run ingestion without a new file (model or chunking-strategy change). `INDEXED` only — a document whose ingestion FAILED goes through `POST /ingestion-jobs/:id/retry`, so the two preconditions are complements. Creates a new job row and returns it; 202. Open flags are LEFT OPEN, because the file has not changed. | perm:`document.reindex` |
 | GET | `/documents/:id/departments` | Departments scoped to this document. | perm:`document.read` |
 | PUT | `/documents/:id/departments` ✎ | Replace `department_documents` links. Ignored while `is_organization_wide = true` (**409** to make the conflict explicit). | perm:`document.share` |
 | GET | `/documents/:id/chunks` | Paginated `document_chunks`: `chunk_index`, `content_text`, `page_number`, `token_count`. Powers citation preview. | perm:`document.read` |
@@ -606,7 +606,7 @@ Per the todo note: **gRPC for synchronous cross-service reads, NATS for backgrou
 | `user.invited` · `user.locked` · `user.deleted` | auth-service | notifications (create delivery rows), session revocation |
 | `notification.created` | notification-consumer | delivery-worker (fan to `notification_deliveries`, enqueue `email/sms` BullMQ jobs), WS fan-out to `user:{id}` |
 | `audit.record` | any service (via `AuditPublisher`, `libs/common/src/contracts/audit.contract.ts`) | ticket-service (`AuditConsumer`) |
-| `storage.object.superseded` | auth-service (avatar replace/clear), ticket-service (attachment delete) | storage-service (async object delete) |
+| `storage.object.superseded` | auth-service (avatar replace/clear), ticket-service (attachment delete), ingestion-service (document replace) | storage-service (async object delete) |
 | `quota.exceeded` | any | notifications (CRITICAL priority, bypass quiet hours), platform alerting |
 | `billing.entitlements_changed` | auth-service (Stripe webhook) | ingestion-service (invalidate the cached settings/tier for that tenant — a stale cache keeps a downgraded tenant on the premium model), analytics, audit |
 

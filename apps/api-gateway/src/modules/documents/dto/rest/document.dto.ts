@@ -142,6 +142,47 @@ export class ConfirmDocumentDto {
   readonly ocrLanguages: OcrLanguage[] = [];
 }
 
+/**
+ * The body of `POST /documents/:id/replace` — `ConfirmDocumentDto` minus the
+ * fields a replacement does not set.
+ *
+ * No title, scope or department ids: replace swaps the FILE and leaves the
+ * document's identity alone. `PATCH /documents/:id` and
+ * `PUT /documents/:id/departments` are the routes for those.
+ */
+export class ReplaceDocumentDto {
+  // No `contentType` and no `sizeBytes`, here or on `ConfirmDocumentDto`: both
+  // are read back from the object's own metadata at confirm. On the wire they
+  // would be numbers the caller invented about a file the caller uploaded.
+
+  // Deliberately not shape-validated, exactly as on `ConfirmDocumentDto`:
+  // storage-service checks it against the `PendingUpload` it recorded, which is
+  // an authorization check rather than a syntactic one.
+  /** The object path, echoed back from the presign response. */
+  @IsString()
+  @MinLength(1)
+  @MaxLength(MAX_OBJECT_PATH_LENGTH)
+  readonly objectPath!: string;
+
+  /**
+   * ISO 639-1 codes for OCR, if the uploader knows them.
+   *
+   * Re-declared rather than inherited, and NOT carried over from the document
+   * being replaced: reading a scan in the wrong language is one of the main
+   * reasons to replace one, so the previous value is exactly what a caller may
+   * be here to change. Absent means `[]`, which is the `eng` fallback — the
+   * same meaning it has on confirm.
+   */
+  @IsOptional()
+  @Transform(normalizeStringArray)
+  @IsArray()
+  @ArrayMaxSize(MAX_OCR_LANGUAGES)
+  @IsIn(OCR_LANGUAGES, { each: true })
+  @AtMostOneNonLatinScript()
+  @ApiPropertyOptional()
+  readonly ocrLanguages: OcrLanguage[] = [];
+}
+
 export class UpdateDocumentDto {
   @IsOptional()
   @IsString()

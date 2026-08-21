@@ -56,6 +56,7 @@ Append-only. A decision is never edited; superseding one means writing a new one
 | [0036](./decisions/0036-scope-fanout-order-is-asymmetric.md) | Scope fan-out order is asymmetric, and restrictions are synchronous |
 | [0037](./decisions/0037-worklists-follow-the-document-boundary.md) | Operational worklists follow the document boundary |
 | [0038](./decisions/0038-permissions-are-a-compile-time-artifact.md) | Permissions are a compile-time artifact, not data |
+| [0039](./decisions/0039-the-seeder-ddl-block-is-the-list.md) | The seeder's DDL block is the list of hand-written SQL |
 
 ## `reference/` — what is true today
 

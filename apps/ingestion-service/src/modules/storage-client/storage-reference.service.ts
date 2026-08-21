@@ -80,10 +80,11 @@ export class StorageReferenceService implements OnModuleInit {
    * The DOCUMENT purpose — reserved in `PURPOSE_POLICY` since storage-service
    * was built, and given its first caller here.
    *
-   * `documentId` is a freshly minted uuid rather than an existing row's: the
-   * `documents` row is created at CONFIRM, not at presign, so there is no id to
-   * use yet. The path therefore carries the id the row WILL have, which is what
-   * lets confirm tie the object back to the request that authorized it.
+   * `documentId` is a per-upload nonce, not an existing row's id and not the id
+   * the row will get — the `documents` row is created at confirm and mints its
+   * own. What ties an object to the request that authorized it is storage's
+   * `PendingUpload` record, which confirm consumes; the path is not an
+   * authorization input anywhere.
    */
   async presignDocument(
     input: {
@@ -224,11 +225,13 @@ export class StorageReferenceService implements OnModuleInit {
   }
 
   /**
-   * Fire-and-forget, exactly like `AuditPublisher`.
+   * Announces that an object is no longer referenced, so storage can delete it.
    *
-   * A delete that fails must never roll back or block the document removal the
-   * user actually asked for. The worst case is an orphaned object, which costs
-   * storage; the alternative costs the user their action.
+   * Fire-and-forget, exactly like `AuditPublisher` — never awaited, never
+   * throws. A lost event leaks one object and nothing else; the caller's write
+   * has already committed either way.
+   *
+   * @param objectPath the OLD path being replaced or removed, never the new one
    */
   emitSuperseded(objectPath: string, reason: SupersededReason): void {
     if (!objectPath) return;
@@ -236,7 +239,7 @@ export class StorageReferenceService implements OnModuleInit {
     // The same refusal auth-service makes, for the same reason: this is the
     // last point before a stored value becomes a delete call, so anything that
     // is not one of our paths stops here. Logged and dropped, never thrown —
-    // the row is already gone by the time this runs.
+    // the caller's write has already committed by the time this runs.
     if (!isStorageObjectPath(objectPath)) {
       this.logger.error(
         `Refusing to supersede '${objectPath}': not a storage object path`,

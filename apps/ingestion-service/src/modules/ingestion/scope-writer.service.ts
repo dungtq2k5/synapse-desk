@@ -55,13 +55,16 @@ export class ScopeWriterService {
    */
   async apply(
     documentId: string,
+    organizationId: string,
     after: DocumentScope,
     before: DocumentScope,
   ): Promise<{ restricting: boolean }> {
     const restricting = this.isRestriction(before, after);
 
     if (restricting) {
-      await this.writeQdrant(documentId, after, { fatal: true });
+      await this.writeQdrant(documentId, organizationId, after, {
+        fatal: true,
+      });
       await this.writeChunks(documentId, after);
     } else {
       // A grant. `documents` has already been written by the caller — it is
@@ -69,7 +72,9 @@ export class ScopeWriterService {
       // Qdrant last. A failure here leaves the document listed but not yet
       // retrievable: someone waits, which is the safe direction.
       await this.writeChunks(documentId, after);
-      await this.writeQdrant(documentId, after, { fatal: false });
+      await this.writeQdrant(documentId, organizationId, after, {
+        fatal: false,
+      });
     }
 
     return { restricting };
@@ -106,11 +111,12 @@ export class ScopeWriterService {
    */
   async writeQdrant(
     documentId: string,
+    organizationId: string,
     scope: DocumentScope,
     { fatal }: { fatal: boolean },
   ): Promise<void> {
     try {
-      await this.qdrant.setDocumentScope(documentId, scope);
+      await this.qdrant.setDocumentScope(documentId, organizationId, scope);
     } catch (error) {
       const message = formatErrorMsg(error);
 

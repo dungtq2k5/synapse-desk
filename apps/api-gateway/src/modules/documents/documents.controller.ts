@@ -39,6 +39,7 @@ import {
   ListDocumentsQueryDto,
   PresignDocumentDto,
   SetDocumentDepartmentsDto,
+  ReplaceDocumentDto,
   UpdateDocumentDto,
 } from './dto/rest/document.dto';
 import {
@@ -331,6 +332,60 @@ export class DocumentsController {
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<DocumentResponseDto> {
     return this.documents.restore(id, context);
+  }
+
+  /**
+   * Re-runs ingestion over the file already attached — a chunking or model
+   * change, not a new upload.
+   *
+   * `INDEXED` only; a document whose ingestion FAILED goes through
+   * `POST /ingestion-jobs/:id/retry` instead. Returns the JOB rather than the
+   * document, because the work is asynchronous — poll it at
+   * `GET /ingestion-jobs/:id`.
+   *
+   * 400 means the document is not indexed, or a run is already in flight.
+   */
+  @ApiOperation({ summary: 'Reindex' })
+  @ApiWrappedResponse(IngestionJobResponseDto, { status: HttpStatus.ACCEPTED })
+  @ApiFilterErrors(['400', '401', '403', '404'])
+  @Post(':id/reindex')
+  @RequirePermission('document.reindex')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ResponseMessage('Reindex queued')
+  reindex(
+    @CurrentUser() context: RequestContext,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<IngestionJobResponseDto> {
+    return this.documents.reindex(id, context);
+  }
+
+  /**
+   * Swaps the FILE behind an existing document, then re-runs ingestion.
+   *
+   * The same presign/confirm pair as an upload, against an id that already
+   * exists: `POST /documents/presign`, PUT the bytes, then this.
+   *
+   * Identity is untouched — title, visibility and departments stay put. Open
+   * flags resolve as `DOCUMENT_REPLACED`; `reindex` leaves them.
+   *
+   * Returns the DOCUMENT, whose jobs are at
+   * `GET /documents/:id/ingestion-jobs`.
+   *
+   * 409 means that presign was already confirmed.
+   */
+  @ApiOperation({ summary: 'Replace the file' })
+  @ApiWrappedResponse(DocumentResponseDto, { status: HttpStatus.ACCEPTED })
+  @ApiFilterErrors(['400', '401', '403', '404', '409'])
+  @Post(':id/replace')
+  @RequirePermission('document.update')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ResponseMessage('Replacement queued')
+  replace(
+    @CurrentUser() context: RequestContext,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: ReplaceDocumentDto,
+  ): Promise<DocumentResponseDto> {
+    return this.documents.replace(id, dto, context);
   }
 
   /**

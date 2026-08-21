@@ -1,5 +1,5 @@
 /**
- * The storage contract: the object path scheme and the async delete.
+ * @file The storage contract: the object path scheme and the async delete.
  *
  * Lives in `libs/common` rather than in `storage-service` because BOTH ends
  * need it: the owning services build/consume object paths and emit the delete

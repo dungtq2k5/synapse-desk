@@ -8,6 +8,8 @@ import {
   DocumentServiceClient,
   INGESTION_GRPC_CLIENT,
   ConfirmDocumentRequest,
+  IngestionJobResponse,
+  ReplaceDocumentRequest,
   DocumentChunkResponse,
   DocumentResponse,
   DownloadDocumentResponse,
@@ -63,6 +65,23 @@ export class DocumentsGrpcClient
   ): Promise<DocumentResponse> {
     return this.call(
       (metadata) => this.documentGrpcService.confirmDocument(request, metadata),
+      context,
+    );
+  }
+
+  reindex(id: string, context: RequestContext): Promise<IngestionJobResponse> {
+    return this.call(
+      (metadata) => this.documentGrpcService.reindexDocument({ id }, metadata),
+      context,
+    );
+  }
+
+  replace(
+    request: ReplaceDocumentRequest,
+    context: RequestContext,
+  ): Promise<DocumentResponse> {
+    return this.call(
+      (metadata) => this.documentGrpcService.replaceDocument(request, metadata),
       context,
     );
   }

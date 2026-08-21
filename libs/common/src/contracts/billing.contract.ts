@@ -1,5 +1,5 @@
 /**
- * The one billing event Domain C already has to care about.
+ * @file The one billing event Domain C already has to care about.
  *
  * **The publisher is the Stripe webhook** — see
  * `docs/decisions/0026-stripe-webhook-idempotency.md`.
@@ -12,6 +12,7 @@
  * Defined here rather than in the billing service so the webhook emits against
  * a subject and payload that already have a reader.
  */
+
 export const BILLING_PATTERNS = {
   /**
    * A tenant's plan, tier or quotas changed.

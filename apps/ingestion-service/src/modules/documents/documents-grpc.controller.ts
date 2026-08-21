@@ -25,6 +25,7 @@ import {
   DocumentServiceController,
   IngestionJobIdRequest,
   IngestionJobResponse,
+  ReplaceDocumentRequest,
   ListIngestionJobsRequest,
   ListIngestionJobsResponse,
   DocumentServiceControllerMethods,
@@ -144,6 +145,26 @@ export class DocumentsGrpcController implements DocumentServiceController {
     metadata?: Metadata,
   ): Promise<DocumentResponse> {
     return this.documents.restoreDocument(
+      request,
+      unpackCallerContext(metadata),
+    );
+  }
+
+  reindexDocument(
+    request: DocumentIdRequest,
+    metadata?: Metadata,
+  ): Promise<IngestionJobResponse> {
+    return this.documents.reindexDocument(
+      request,
+      unpackCallerContext(metadata),
+    );
+  }
+
+  replaceDocument(
+    request: ReplaceDocumentRequest,
+    metadata?: Metadata,
+  ): Promise<DocumentResponse> {
+    return this.documents.replaceDocument(
       request,
       unpackCallerContext(metadata),
     );

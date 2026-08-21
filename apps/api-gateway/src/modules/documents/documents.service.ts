@@ -28,6 +28,7 @@ import {
   SetDocumentDepartmentsDto,
   UpdateDocumentDto,
   ResolveDocumentFlagDto,
+  ReplaceDocumentDto,
 } from './dto/rest/document.dto';
 import {
   DocumentChunkResponseDto,
@@ -38,6 +39,8 @@ import {
   PresignDocumentResponseDto,
   StorageUsageResponseDto,
 } from './dto/rest/document-response.dto';
+import { IngestionJobResponseDto } from '../ingestion-jobs/dto/rest/ingestion-job-response.dto';
+import { toIngestionJobResponseDto } from '../ingestion-jobs/ingestion-job.mapper';
 
 /** The gateway's document surface. Returns REST DTOs; the wire stays in the client. */
 @Injectable()
@@ -113,6 +116,28 @@ export class DocumentsService {
   ): Promise<DocumentResponseDto> {
     return toDocumentResponseDto(
       await this.documentsGrpcClient.restore(id, context),
+    );
+  }
+
+  async reindex(
+    id: string,
+    context: RequestContext,
+  ): Promise<IngestionJobResponseDto> {
+    return toIngestionJobResponseDto(
+      await this.documentsGrpcClient.reindex(id, context),
+    );
+  }
+
+  async replace(
+    id: string,
+    dto: ReplaceDocumentDto,
+    context: RequestContext,
+  ): Promise<DocumentResponseDto> {
+    return toDocumentResponseDto(
+      await this.documentsGrpcClient.replace(
+        { id, objectPath: dto.objectPath, ocrLanguages: dto.ocrLanguages },
+        context,
+      ),
     );
   }
 

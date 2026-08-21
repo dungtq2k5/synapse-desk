@@ -25,6 +25,7 @@ import {
   flushTestRedis,
 } from '../utils';
 import { grpcError, timestamp, wirePage } from '../fixtures/wire';
+import { IngestionJobStatus as ProtoIngestionJobStatus } from '@synapsedesk/grpc-proto';
 
 /**
  * Domain C's document surface at the HTTP boundary.
@@ -550,6 +551,148 @@ describe('Documents at the HTTP boundary (e2e)', () => {
       const res = await authenticatedAgent(fx.app, {
         permissionCodes: ['document.delete'],
       }).post(`${API}/documents/${documentId}/restore`);
+
+      expect(res.status).toBe(409);
+    });
+  });
+
+  describe('lifecycle', () => {
+    const wireJob = (overrides: Record<string, unknown> = {}) => ({
+      id: faker.string.uuid(),
+      documentId,
+      bullmqJobId: 'bull-1',
+      status: ProtoIngestionJobStatus.INGESTION_JOB_STATUS_QUEUED,
+      errorLog: '',
+      processedAt: undefined,
+      createdAt: timestamp(),
+      ...overrides,
+    });
+
+    it('1. reindex requires document.reindex and answers 202 with the JOB', async () => {
+      // 202 and not 200: the work has been accepted, not done, and the body is
+      // the handle to watch it with.
+      fx.stubs.document.reindexDocument.mockReturnValue(of(wireJob()));
+
+      const refused = await authenticatedAgent(fx.app, {
+        permissionCodes: ['document.update'],
+      }).post(`${API}/documents/${documentId}/reindex`);
+      const allowed = await authenticatedAgent(fx.app, {
+        permissionCodes: ['document.reindex'],
+      }).post(`${API}/documents/${documentId}/reindex`);
+
+      expect(refused.status).toBe(403);
+      expect(allowed.status).toBe(202);
+      expect(allowed.body.data.documentId).toBe(documentId);
+      expect(allowed.body.data.status).toBe('QUEUED');
+    });
+
+    it('2. maps "already running" to 400, not 409', async () => {
+      // FAILED_PRECONDITION is 400 everywhere in this gateway. 409 would read
+      // as a duplicate, and nothing here is a duplicate.
+      fx.stubs.document.reindexDocument.mockReturnValue(
+        throwError(() =>
+          grpcError(
+            GrpcStatus.FAILED_PRECONDITION,
+            'This document is already being processed',
+          ),
+        ),
+      );
+
+      const res = await authenticatedAgent(fx.app, {
+        permissionCodes: ['document.reindex'],
+      }).post(`${API}/documents/${documentId}/reindex`);
+
+      expect(res.status).toBe(400);
+    });
+
+    it('3. replace requires document.update and answers 202 with the DOCUMENT', async () => {
+      fx.stubs.document.replaceDocument.mockReturnValue(of(wireDocument()));
+
+      const refused = await authenticatedAgent(fx.app, {
+        permissionCodes: ['document.reindex'],
+      })
+        .post(`${API}/documents/${documentId}/replace`)
+        .send({ objectPath: 'organizations/o/documents/d/new.pdf' });
+      const allowed = await authenticatedAgent(fx.app, {
+        permissionCodes: ['document.update'],
+      })
+        .post(`${API}/documents/${documentId}/replace`)
+        .send({ objectPath: 'organizations/o/documents/d/new.pdf' });
+
+      expect(refused.status).toBe(403);
+      expect(allowed.status).toBe(202);
+      expect(allowed.body.data.id).toBe(documentId);
+    });
+
+    it('4. **replace does not accept a contentType or sizeBytes**', async () => {
+      // `forbidNonWhitelisted` is what makes this a 400 rather than a silent
+      // strip — and a silent strip is the failure that matters, because the
+      // caller would believe they had declared something.
+      fx.stubs.document.replaceDocument.mockReturnValue(of(wireDocument()));
+
+      // ONE extra field per request. Sending both at once cannot tell which
+      // one is refused, so it would keep passing after either was quietly
+      // allowed back in — which is the whole thing being guarded here.
+      const agent = () =>
+        authenticatedAgent(fx.app, { permissionCodes: ['document.update'] });
+
+      const withType = await agent()
+        .post(`${API}/documents/${documentId}/replace`)
+        .send({
+          objectPath: 'organizations/o/documents/d/new.pdf',
+          contentType: 'application/pdf',
+        });
+      const withSize = await agent()
+        .post(`${API}/documents/${documentId}/replace`)
+        .send({
+          objectPath: 'organizations/o/documents/d/new.pdf',
+          sizeBytes: 2048,
+        });
+
+      expect(withType.status).toBe(400);
+      expect(withSize.status).toBe(400);
+      expect(fx.stubs.document.replaceDocument).not.toHaveBeenCalled();
+    });
+
+    it('5. replace forwards ocrLanguages, lower-cased and de-duplicated', async () => {
+      // The reason the field is on this route at all: re-reading a scan in the
+      // right language is a common reason to replace one.
+      fx.stubs.document.replaceDocument.mockReturnValue(of(wireDocument()));
+
+      const res = await authenticatedAgent(fx.app, {
+        permissionCodes: ['document.update'],
+      })
+        .post(`${API}/documents/${documentId}/replace`)
+        .send({
+          objectPath: 'organizations/o/documents/d/new.pdf',
+          ocrLanguages: ['VI', 'vi', 'en'],
+        });
+
+      expect(res.status).toBe(202);
+      expect(fx.stubs.document.replaceDocument).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: documentId,
+          ocrLanguages: ['vi', 'en'],
+        }),
+        expect.anything(),
+      );
+    });
+
+    it('6. maps a replayed confirm to 409', async () => {
+      fx.stubs.document.replaceDocument.mockReturnValue(
+        throwError(() =>
+          grpcError(
+            GrpcStatus.ALREADY_EXISTS,
+            'That upload has already been confirmed',
+          ),
+        ),
+      );
+
+      const res = await authenticatedAgent(fx.app, {
+        permissionCodes: ['document.update'],
+      })
+        .post(`${API}/documents/${documentId}/replace`)
+        .send({ objectPath: 'organizations/o/documents/d/new.pdf' });
 
       expect(res.status).toBe(409);
     });

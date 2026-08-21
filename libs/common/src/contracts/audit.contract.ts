@@ -1,5 +1,5 @@
 /**
- * The NATS contract between any service and whoever owns `audit_logs`.
+ * @file The NATS contract between any service and whoever owns `audit_logs`.
  *
  * That table belongs to Domain D (`ticket-service`), which does not exist yet.
  * Publishing over NATS now — rather than waiting, or adding a second

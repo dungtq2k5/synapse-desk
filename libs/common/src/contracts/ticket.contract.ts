@@ -1,5 +1,5 @@
 /**
- * Domain B's NATS contract — the events `ticket-service` publishes and every
+ * @file Domain B's NATS contract — the events `ticket-service` publishes and every
  * consumer reads.
  *
  * Same reasoning as `audit.contract.ts` and `notification.contract.ts`: NATS is

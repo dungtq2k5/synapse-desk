@@ -1,4 +1,5 @@
 import { DocumentParserService } from './document-parser.service';
+import { parseOcrLanguages } from '@synapsedesk/common';
 import { OcrService } from './ocr.service';
 import {
   buildMixedPdf,
@@ -75,7 +76,7 @@ describe('Scanned PDFs', () => {
     }, 120_000);
 
     it('4. **page numbers survive OCR**, which is what citations resolve to', async () => {
-      // Rasterisation is per page, so the number is carried rather
+      // Rasterization is per page, so the number is carried rather
       // than inferred — and OCR'd pages are appended as they complete, so the
       // list is sorted before it leaves the parser. A citation resolving to
       // "page 4" from a list where 4 followed 7 would be confidently wrong.
@@ -142,14 +143,14 @@ describe('The OCR pipeline', () => {
     // image. The floor is 32, measured — see `MIN_PAGE_CHARACTERS`.
     const parser = new DocumentParserService(ocr);
     const spy = jest.spyOn(ocr, 'recognisePage');
-    spy.mockResolvedValue({ ok: true, text: 'the recognised body text' });
+    spy.mockResolvedValue({ ok: true, text: 'the recognized body text' });
 
     const stamped = await buildStampedPdf('Scanned by CamScanner');
     const parsed = await parser.parse(stamped, 'pdf');
 
     expect(spy).toHaveBeenCalledTimes(1);
     expect(parsed.pages[0].source).toBe('ocr');
-    expect(parsed.pages[0].markdown).toBe('the recognised body text');
+    expect(parsed.pages[0].markdown).toBe('the recognized body text');
 
     spy.mockRestore();
   }, 120_000);
@@ -220,15 +221,22 @@ describe('The OCR pipeline', () => {
     }
   }, 120_000);
 
-  it('4. a filename with shell metacharacters cannot become a command', () => {
+  it('4. a language code with shell metacharacters is REFUSED, not dropped', () => {
     // `spawn` without a shell is the guarantee; this asserts it rather than
     // assuming it. If this ever ran through a shell, the `;` would execute.
-    const hostile = 'eng; touch /tmp/pwned';
+    //
+    // The refusal moved to `parseOcrLanguages`, and moved for a reason:
+    // `languageArgument` used to take `string[]` and map through the table
+    // with a cast, so a hostile code fell out of `-l` and the document was
+    // OCR'd in English with nothing reporting it. Falling back is the right
+    // answer to "no languages given" and the wrong one to "this code is not a
+    // language" — the two look identical once the code has been dropped.
+    expect(() => parseOcrLanguages(['eng; touch /tmp/pwned'])).toThrow(
+      'eng; touch /tmp/pwned',
+    );
 
-    // The language argument is the only caller-influenced string that reaches
-    // the argv, and it is mapped through a fixed table first — an unknown code
-    // maps to nothing and falls back to the default.
-    expect(ocr.languageArgument([hostile])).toBe('eng');
+    // Which leaves `languageArgument` with a total mapping over a type that
+    // cannot carry an unknown code, and one genuine fallback.
     expect(ocr.languageArgument(['vi', 'en'])).toBe('vie+eng');
     expect(ocr.languageArgument([])).toBe('eng');
   });

@@ -412,9 +412,16 @@ describe('Ingestion jobs (e2e)', () => {
 
     it('**14b. two CONCURRENT retries of one row produce one job**', async () => {
       // Both calls pass the precondition — it is a read — and both insert.
-      // Only the claim decides, and the loser's insert rolls back with it.
-      // Without it: two ids, two workers, and `writeChunkRows` deleting each
-      // other's chunks.
+      // Without a guard: two ids, two workers, and `writeChunkRows` deleting
+      // each other's chunks.
+      //
+      // TWO guards now stand here, and the message says which one fired.
+      // `ingestion_jobs_one_live_per_document` blocks the loser's INSERT
+      // against the winner's uncommitted row, so it answers first and the
+      // supersede claim below it never evaluates `count === 0` on this path.
+      // The claim stays because it is the only thing that WRITES the successor
+      // id, and because a source superseded by a retry that has since finished
+      // reaches it with no live row for the index to catch.
       const document = await createDocument(fx.prisma, tenant);
       const failed = await createIngestionJob(fx.prisma, tenant, document.id, {
         status: IngestionJobStatus.FAILED,
@@ -438,6 +445,9 @@ describe('Ingestion jobs (e2e)', () => {
       expect(won).toHaveLength(1);
       expect(lost).toHaveLength(1);
       expect(rpcCode(lost[0].reason)).toBe(status.FAILED_PRECONDITION);
+      expect(lost[0].reason).toMatchObject({
+        message: expect.stringContaining('already being processed') as string,
+      });
 
       // The source, plus exactly ONE new row — the loser's insert is gone.
       expect(await fx.prisma.ingestionJob.count()).toBe(2);
@@ -490,6 +500,40 @@ describe('Ingestion jobs (e2e)', () => {
       expect(source.errorLog).toBe('Cancelled');
       expect(source.status).toBe(IngestionJobStatus.CANCELLED);
       expect(source.supersededById).toBe(retry.id);
+    });
+
+    it('**14e. a retry is refused while ANOTHER live job holds the document**', async () => {
+      // The per-document invariant, which `superseded_by_id` cannot reach: it
+      // claims one ROW, and this is a second row. Retry and reindex are two
+      // routes into the same document, and the arrangement below is what a
+      // reindex in flight looks like from retry's side.
+      //
+      // Nothing in the service reads for this. The refusal comes from
+      // `ingestion_jobs_one_live_per_document`, because a read cannot hold
+      // between its own SELECT and the INSERT that follows it.
+      const document = await createDocument(fx.prisma, tenant);
+      const failed = await createIngestionJob(fx.prisma, tenant, document.id, {
+        status: IngestionJobStatus.FAILED,
+      });
+      await createIngestionJob(fx.prisma, tenant, document.id, {
+        status: IngestionJobStatus.EMBEDDING,
+      });
+
+      const refused = jobs.retryIngestionJob({ id: failed.id }, caller());
+
+      await expectRpc(refused, status.FAILED_PRECONDITION);
+      await expect(refused).rejects.toMatchObject({
+        message: expect.stringContaining('already being processed') as string,
+      });
+
+      // The insert rolled back with the transaction: two rows, not three, and
+      // the source is untouched — no supersede claim, no status change.
+      expect(await fx.prisma.ingestionJob.count()).toBe(2);
+      const source = await fx.prisma.ingestionJob.findUniqueOrThrow({
+        where: { id: failed.id },
+      });
+      expect(source.supersededById).toBeNull();
+      expect(source.status).toBe(IngestionJobStatus.FAILED);
     });
 
     it('15. **a QUEUED job the queue still HOLDS is refused**', async () => {

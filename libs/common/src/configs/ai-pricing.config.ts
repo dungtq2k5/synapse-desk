@@ -106,7 +106,7 @@ export function estimateCostMicros(
  * unpriced model discovered at first use has already been billed as free at
  * least once, and the whole point is that it never is.
  */
-export function assertPricingTableCovers(modelNames: string[]): void {
+export function assertPricingTableCovers(modelNames: readonly string[]): void {
   const missing = modelNames.filter((name) => !MODEL_PRICING[name]);
 
   if (missing.length > 0) {

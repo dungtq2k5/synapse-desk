@@ -12,6 +12,7 @@ import {
   estimateCostMicros,
   formatErrorMsg,
   IngestionJobStatus,
+  parseOcrLanguages,
   TERMINAL_INGESTION_STATUSES,
   QDRANT_UPSERT_BATCH,
   systemContext,
@@ -159,7 +160,19 @@ export class IngestionProcessor {
         // `fileType` are there for the same reason: the worker needs no lookup
         // to start, and this service's only document read happens later,
         // inside `writeChunkRows`.
-        data.ocrLanguages ?? [],
+        //
+        // Narrowed HERE, once, and by parsing rather than casting. The column
+        // and the wire are both `string[]` and cannot be otherwise; a cast at
+        // the tesseract lookup instead would let an unrecognized code drop out
+        // of `-l` and OCR the document in English with nothing reporting it.
+        // A throw here is a FAILED job carrying the bad code, which is the
+        // same trade `NoExtractableText` makes for the neighbouring case.
+        //
+        // `?? []` is load-bearing on THIS type and dead on the proto message:
+        // `IngestionJobData.ocrLanguages` is optional for the pre-field jobs
+        // still sitting in Redis, while ts-proto emits `repeated string` as a
+        // non-optional `string[]`.
+        parseOcrLanguages(data.ocrLanguages ?? []),
       );
 
       await this.setJobStatus(ingestionJobId, IngestionJobStatus.CHUNKING);
@@ -189,10 +202,21 @@ export class IngestionProcessor {
       // output alone would have reported that document as complete.
       await this.reportMissingPages(data, parsed, chunks);
 
-      // Written BEFORE the budget gate on purpose: parsing and chunking cost
-      // nothing but CPU, and a tenant at the cap who later gets more budget
-      // should resume at the embedding step rather than re-parse a 200-page
-      // PDF. This is the same reasoning that keeps the job QUEUED.
+      // The previous run's points, removed on EVERY run — retry, reindex and
+      // replace all arrive here, and a purge per route would be three copies of
+      // one rule with three chances to omit it.
+      //
+      // HERE, below the parse, and that is the whole placement: a parse failure
+      // or `NoExtractableText` above leaves the old chunk rows and their points
+      // intact and consistent, so a reindex of a file that turns out to be
+      // unreadable does not destroy a working index. From this line to the last
+      // upsert the document has neither, which is the window `writeChunkRows`
+      // already opens by deleting the rows.
+      //
+      // By document, not by point id: the ids live on the rows the next
+      // statement deletes, and nothing captures them first.
+      await this.qdrant.deleteDocumentPoints(documentId, organizationId);
+
       const scope = await this.writeChunkRows(documentId, chunks);
 
       await this.setJobStatus(ingestionJobId, IngestionJobStatus.EMBEDDING);
@@ -341,9 +365,9 @@ export class IngestionProcessor {
    * — the lexical arm's half of the boundary is these four columns, so writing
    * them is not bookkeeping, it is the security precondition.
    *
-   * `deleteMany` first makes a re-run idempotent. A retried job that appended
-   * would double every chunk and, worse, leave the first set orphaned in
-   * Qdrant with no row pointing at them.
+   * `deleteMany` first makes a re-run idempotent: a retried job that appended
+   * would double every chunk. The matching Qdrant purge is the caller's, one
+   * statement above.
    */
   private async writeChunkRows(
     documentId: string,
@@ -393,9 +417,11 @@ export class IngestionProcessor {
    *
    * The gate is checked ONCE per batch rather than once per document, so a
    * tenant who crosses the cap halfway through a large document stops there
-   * with half its chunks indexed — and the rows already written keep their
-   * vectors. Re-running picks up exactly the chunks that still have no
-   * `vector_point_id`, which is why that column being nullable is a feature.
+   * with half its chunks indexed.
+   *
+   * `vector_point_id` is nullable so that, WITHIN a run, a chunk without one is
+   * a chunk whose upsert never happened — which is what keeps Postgres from
+   * claiming vectors that are not there. It does not carry work across runs.
    */
   private async embedAndUpsert(
     data: IngestionJobData,
@@ -408,6 +434,11 @@ export class IngestionProcessor {
   ): Promise<void> {
     const settings = await this.aiSettings.settingsFor(data.organizationId);
 
+    // Reads as "resume the chunks not yet embedded" and never does: every entry
+    // into `process()` runs `writeChunkRows` first, which deletes and recreates
+    // every row, so this matches the whole document on every run and the tenant
+    // is billed for the repeat (known-gaps #11 — NOT #3, which is a deferred
+    // job never being re-enqueued at all).
     const pending = await this.prisma.documentChunk.findMany({
       where: { documentId: data.documentId, vectorPointId: null },
       orderBy: { chunkIndex: 'asc' },

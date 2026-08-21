@@ -138,6 +138,30 @@ export class QdrantService implements OnApplicationBootstrap {
   }
 
   /**
+   * One document, one tenant — the filter shared by `setDocumentScope`,
+   * `countPoints` and `deleteDocumentPoints`.
+   */
+  private documentFilter(documentId: string, organizationId: string) {
+    return {
+      must: [
+        {
+          key: QDRANT_PAYLOAD_FIELDS.documentId,
+          match: { value: documentId },
+        },
+        // Defence in depth, NOT a second authorization: every caller has
+        // already passed a tenant-scoped Postgres load, and `documentId` is an
+        // unguessable primary key. Present because a wrong id is survivable on
+        // two of these three and not on `setDocumentScope`, which would flip
+        // `is_deleted` and overwrite `department_ids` on someone else's points.
+        {
+          key: QDRANT_PAYLOAD_FIELDS.organizationId,
+          match: { value: organizationId },
+        },
+      ],
+    };
+  }
+
+  /**
    * Re-scopes every point of one document — the Qdrant half of the fan-out.
    *
    * A filtered `setPayload` rather than a read-then-write over point ids, which
@@ -151,6 +175,7 @@ export class QdrantService implements OnApplicationBootstrap {
    */
   async setDocumentScope(
     documentId: string,
+    organizationId: string,
     scope: {
       departmentIds?: string[];
       isOrganizationWide?: boolean;
@@ -174,29 +199,18 @@ export class QdrantService implements OnApplicationBootstrap {
     await this.client.setPayload(QDRANT_COLLECTION, {
       wait: true,
       payload,
-      filter: {
-        must: [
-          {
-            key: QDRANT_PAYLOAD_FIELDS.documentId,
-            match: { value: documentId },
-          },
-        ],
-      },
+      filter: this.documentFilter(documentId, organizationId),
     });
   }
 
   /** The points of one document, for tests and for the fan-out's verification. */
-  async countPoints(documentId: string): Promise<number> {
+  async countPoints(
+    documentId: string,
+    organizationId: string,
+  ): Promise<number> {
     const result = await this.client.count(QDRANT_COLLECTION, {
       exact: true,
-      filter: {
-        must: [
-          {
-            key: QDRANT_PAYLOAD_FIELDS.documentId,
-            match: { value: documentId },
-          },
-        ],
-      },
+      filter: this.documentFilter(documentId, organizationId),
     });
 
     return result.count;
@@ -219,17 +233,13 @@ export class QdrantService implements OnApplicationBootstrap {
    * messages still resolve (RDM §1.4). This exists for RE-INDEXING, where the
    * old vectors are genuinely obsolete rather than historical, and for tests.
    */
-  async deleteDocumentPoints(documentId: string): Promise<void> {
+  async deleteDocumentPoints(
+    documentId: string,
+    organizationId: string,
+  ): Promise<void> {
     await this.client.delete(QDRANT_COLLECTION, {
       wait: true,
-      filter: {
-        must: [
-          {
-            key: QDRANT_PAYLOAD_FIELDS.documentId,
-            match: { value: documentId },
-          },
-        ],
-      },
+      filter: this.documentFilter(documentId, organizationId),
     });
   }
 

@@ -278,6 +278,34 @@ export const OCR_LANGUAGES = [
 export type OcrLanguage = (typeof OCR_LANGUAGES)[number];
 
 /**
+ * Narrows stored / on-the-wire language codes to {@link OcrLanguage}.
+ *
+ * @param codes ISO 639-1 codes as they arrive from a `String[]` column or a
+ *   proto `repeated string`, neither of which can carry a narrower type.
+ * @returns the same codes, in the same order, typed.
+ * @throws Error naming every unrecognized code.
+ *
+ * @example
+ * parseOcrLanguages(['vi', 'en']); // ['vi', 'en'], typed
+ * parseOcrLanguages(['VI']);       // throws: 'VI'
+ */
+export function parseOcrLanguages(codes: string[]): OcrLanguage[] {
+  // REFUSES rather than filters, and that is the whole point of the function.
+  // Dropping an unrecognized code is silent: `-l` ends up empty, tesseract
+  // falls back to English, and a Vietnamese scan comes back as noise with
+  // nothing anywhere reporting why.
+  const unknown = codes.filter(
+    (code) => !OCR_LANGUAGES.includes(code as OcrLanguage),
+  );
+
+  if (unknown.length > 0) {
+    throw new Error(`Unsupported OCR language(s): ${unknown.join(', ')}`);
+  }
+
+  return codes as OcrLanguage[];
+}
+
+/**
  * ISO 639-1 -> tesseract's `-l` code.
  *
  * **Exported once so the parser never spells a code itself.** Three alphabets

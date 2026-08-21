@@ -1,5 +1,5 @@
 /**
- * The scheduler
+ * @file The scheduler
  *
  * Background jobs run as BullMQ repeatable jobs rather than `@Cron`, so a
  * service with three replicas fires each schedule once rather than three times.

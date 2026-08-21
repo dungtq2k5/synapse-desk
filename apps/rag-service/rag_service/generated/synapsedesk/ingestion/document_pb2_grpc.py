@@ -84,6 +84,16 @@ class DocumentServiceStub:
                 request_serializer=synapsedesk_dot_ingestion_dot_document__pb2.DocumentIdRequest.SerializeToString,
                 response_deserializer=synapsedesk_dot_ingestion_dot_document__pb2.DownloadDocumentResponse.FromString,
                 _registered_method=True)
+        self.ReindexDocument = channel.unary_unary(
+                '/synapsedesk.ingestion.DocumentService/ReindexDocument',
+                request_serializer=synapsedesk_dot_ingestion_dot_document__pb2.DocumentIdRequest.SerializeToString,
+                response_deserializer=synapsedesk_dot_ingestion_dot_document__pb2.IngestionJobResponse.FromString,
+                _registered_method=True)
+        self.ReplaceDocument = channel.unary_unary(
+                '/synapsedesk.ingestion.DocumentService/ReplaceDocument',
+                request_serializer=synapsedesk_dot_ingestion_dot_document__pb2.ReplaceDocumentRequest.SerializeToString,
+                response_deserializer=synapsedesk_dot_ingestion_dot_document__pb2.DocumentResponse.FromString,
+                _registered_method=True)
         self.ListDocumentDepartments = channel.unary_unary(
                 '/synapsedesk.ingestion.DocumentService/ListDocumentDepartments',
                 request_serializer=synapsedesk_dot_ingestion_dot_document__pb2.DocumentIdRequest.SerializeToString,
@@ -224,6 +234,22 @@ class DocumentServiceServicer:
         raise NotImplementedError('Method not implemented!')
 
     def DownloadDocument(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ReindexDocument(self, request, context):
+        """Returns the JOB, so the caller polls `GetIngestionJob` — the surface it
+        already has. `ReplaceDocument` returns the DOCUMENT instead, because the
+        caller's screen is showing one and the job is reachable from
+        `ListDocumentIngestionJobs`.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ReplaceDocument(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -386,6 +412,16 @@ def add_DocumentServiceServicer_to_server(servicer, server):
                     servicer.DownloadDocument,
                     request_deserializer=synapsedesk_dot_ingestion_dot_document__pb2.DocumentIdRequest.FromString,
                     response_serializer=synapsedesk_dot_ingestion_dot_document__pb2.DownloadDocumentResponse.SerializeToString,
+            ),
+            'ReindexDocument': grpc.unary_unary_rpc_method_handler(
+                    servicer.ReindexDocument,
+                    request_deserializer=synapsedesk_dot_ingestion_dot_document__pb2.DocumentIdRequest.FromString,
+                    response_serializer=synapsedesk_dot_ingestion_dot_document__pb2.IngestionJobResponse.SerializeToString,
+            ),
+            'ReplaceDocument': grpc.unary_unary_rpc_method_handler(
+                    servicer.ReplaceDocument,
+                    request_deserializer=synapsedesk_dot_ingestion_dot_document__pb2.ReplaceDocumentRequest.FromString,
+                    response_serializer=synapsedesk_dot_ingestion_dot_document__pb2.DocumentResponse.SerializeToString,
             ),
             'ListDocumentDepartments': grpc.unary_unary_rpc_method_handler(
                     servicer.ListDocumentDepartments,
@@ -738,6 +774,60 @@ class DocumentService:
             '/synapsedesk.ingestion.DocumentService/DownloadDocument',
             synapsedesk_dot_ingestion_dot_document__pb2.DocumentIdRequest.SerializeToString,
             synapsedesk_dot_ingestion_dot_document__pb2.DownloadDocumentResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ReindexDocument(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/synapsedesk.ingestion.DocumentService/ReindexDocument',
+            synapsedesk_dot_ingestion_dot_document__pb2.DocumentIdRequest.SerializeToString,
+            synapsedesk_dot_ingestion_dot_document__pb2.IngestionJobResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ReplaceDocument(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/synapsedesk.ingestion.DocumentService/ReplaceDocument',
+            synapsedesk_dot_ingestion_dot_document__pb2.ReplaceDocumentRequest.SerializeToString,
+            synapsedesk_dot_ingestion_dot_document__pb2.DocumentResponse.FromString,
             options,
             channel_credentials,
             insecure,
