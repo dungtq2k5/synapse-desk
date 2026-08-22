@@ -26,18 +26,29 @@ export type StalenessVerdict = {
  */
 const STALENESS_FACTOR = 2;
 
-/** Rough interval per cron pattern, in ms. Only the ones this system uses. */
-const INTERVAL_MS: Record<string, number> = {
+/**
+ * Interval per cron pattern, in ms.
+ *
+ * **Exhaustive over the patterns `SCHEDULE_CRON` actually uses**, and that is
+ * load-bearing rather than tidy. This was `Record<string, number>` with a
+ * one-day fallback, so a job on a pattern nobody had added here was measured
+ * against 24 hours — and `STALENESS_FACTOR` doubles it. A ten-minute sweep
+ * could have stopped dead and reported healthy for two days, which is the
+ * monitor hiding the exact failure it exists to surface.
+ *
+ * The key type is the literal union of `SCHEDULE_CRON`'s values, so a new
+ * pattern fails to compile until it is given an interval. There is no fallback
+ * to be silent with.
+ */
+const INTERVAL_MS: Record<(typeof SCHEDULE_CRON)[ScheduledJobName], number> = {
+  '*/10 * * * *': 10 * 60 * 1000,
   '0 * * * *': 60 * 60 * 1000,
   '0 2 * * *': 24 * 60 * 60 * 1000,
   '0 3 * * *': 24 * 60 * 60 * 1000,
 };
 
-/** The fallback when a pattern is not in the table above — a day. */
-const DEFAULT_INTERVAL_MS = 24 * 60 * 60 * 1000;
-
 export function expectedIntervalMs(name: ScheduledJobName): number {
-  return INTERVAL_MS[SCHEDULE_CRON[name]] ?? DEFAULT_INTERVAL_MS;
+  return INTERVAL_MS[SCHEDULE_CRON[name]];
 }
 
 /**

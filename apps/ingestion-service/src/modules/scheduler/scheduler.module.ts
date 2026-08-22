@@ -4,6 +4,7 @@ import { SCHEDULER_QUEUE } from '@synapsedesk/common';
 import { PrismaModule } from '../prisma/prisma.module';
 import { AiAnalyticsModule } from '../analytics/analytics.module';
 import { ScheduledModule } from '../scheduled/scheduled.module';
+import { IngestionModule } from '../ingestion/ingestion.module';
 import { JobRunsModule } from '../job-runs/job-runs.module';
 import { SchedulerProcessor } from './scheduler.processor';
 import { SchedulerRegistrar } from './scheduler.registrar';
@@ -33,6 +34,9 @@ import { SchedulerRegistrar } from './scheduler.registrar';
     JobRunsModule,
     // Where the jobs live. This module supplies only the clock.
     ScheduledModule,
+    // For `IngestionReconcileSweep` — the queue's reconciler lives with the
+    // queue it reconciles.
+    IngestionModule,
     AiAnalyticsModule,
   ],
   providers: [SchedulerProcessor, SchedulerRegistrar],

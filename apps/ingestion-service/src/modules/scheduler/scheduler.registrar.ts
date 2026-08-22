@@ -3,9 +3,9 @@ import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { Queue } from 'bullmq';
 import {
   formatErrorMsg,
+  jobsOwnedBy,
   repeatJobId,
   SCHEDULE_CRON,
-  SCHEDULED_JOBS,
   ScheduledJobName,
   SCHEDULER_QUEUE,
 } from '@synapsedesk/common';
@@ -32,9 +32,17 @@ export class SchedulerRegistrar implements OnApplicationBootstrap {
     @InjectQueue(SCHEDULER_QUEUE.ingestion) private readonly queue: Queue,
   ) {}
 
+  /**
+   * Every job this service owns, from {@link JOB_SERVICE}.
+   *
+   * Iterated rather than listed: naming them here made adding a job a
+   * four-place edit with only three places checked, and the unchecked one
+   * produced a job `/platform/jobs` expected and BullMQ had never heard of.
+   */
   async onApplicationBootstrap(): Promise<void> {
-    await this.register(SCHEDULED_JOBS.LEDGER_HOURLY);
-    await this.register(SCHEDULED_JOBS.LEDGER_DAILY);
+    for (const name of jobsOwnedBy('ingestion')) {
+      await this.register(name);
+    }
   }
 
   /**

@@ -29,6 +29,9 @@ describe('Platform job health (e2e)', () => {
   const hoursAgo = (hours: number) =>
     timestamp(new Date(Date.now() - hours * 60 * 60 * 1000));
 
+  const minutesAgo = (minutes: number) =>
+    timestamp(new Date(Date.now() - minutes * 60 * 1000));
+
   const superAdmin = () =>
     authenticatedAgent(fx.app, { isSuperAdmin: true, organizationId: null });
 
@@ -42,6 +45,19 @@ describe('Platform job health (e2e)', () => {
   });
 
   const healthyIngestionRows = () => [
+    {
+      // MINUTES, not hours. `ingestion-reconcile` runs `*/10`, so the staleness
+      // threshold is twenty minutes — an hour-old success is healthy for the
+      // ledger jobs beside it and stale for this one. That the two need
+      // different freshness is the whole point of keying `INTERVAL_MS` by cron
+      // rather than defaulting to a day.
+      jobName: SCHEDULED_JOBS.INGESTION_RECONCILE,
+      lastStartedAt: minutesAgo(4),
+      lastSucceededAt: minutesAgo(4),
+      lastDurationMs: 40,
+      lastError: undefined,
+      consecutiveFailures: 0,
+    },
     {
       jobName: SCHEDULED_JOBS.LEDGER_DAILY,
       lastStartedAt: hoursAgo(2),

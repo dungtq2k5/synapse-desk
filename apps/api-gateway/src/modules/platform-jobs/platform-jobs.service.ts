@@ -5,7 +5,9 @@ import {
   JobHeartbeat,
   RequestContext,
   RequestOrigin,
+  JOB_SERVICE,
   SCHEDULED_JOBS,
+  SchedulerService,
   ScheduledJobName,
 } from '@synapsedesk/common';
 import { PlatformJobsClient } from './platform-jobs.client';
@@ -17,22 +19,34 @@ import {
 } from './dto/platform-jobs-response.dto';
 
 /**
+ * The gRPC peer for each scheduler-owning service.
+ *
+ * Three entries, and it exists because the two vocabularies differ:
+ * `SCHEDULER_QUEUE` is keyed `'ingestion'` and a `GrpcPeer` is
+ * `'ingestion-service'`. Derived rather than string-built, so a peer that stops
+ * matching is a compile error instead of a call to a name nothing answers.
+ */
+const SERVICE_PEER: Record<SchedulerService, GrpcPeer> = {
+  auth: 'auth-service',
+  ticket: 'ticket-service',
+  ingestion: 'ingestion-service',
+};
+
+/**
  * Which service owns each schedule.
  *
- * **An exhaustive `Record`, deliberately.** Adding a job to `SCHEDULED_JOBS`
- * without deciding where it lives is a compile error rather than a job that
- * silently never appears on this page — which is the same class of omission
- * that started the scheduler work. It has already earned its keep once: migrating
- * auth-service off `@Cron` failed to build here until its two jobs were given
- * a leg to be read from.
+ * **Derived from `JOB_SERVICE`, not repeated here.** This used to be its own
+ * exhaustive `Record<ScheduledJobName, GrpcPeer>`, which was compile-checked
+ * and correct — and was a SECOND answer to "which service owns this job",
+ * with the registrars holding the first. Two exhaustive tables cannot disagree
+ * about coverage; they can absolutely disagree about content.
+ *
+ * `JOB_SERVICE` is now the one answer, and the registrars iterate it, so a job
+ * that appears on this page is a job some service registered.
  */
-const JOB_OWNER: Record<ScheduledJobName, GrpcPeer> = {
-  [SCHEDULED_JOBS.ANALYTICS_DAILY]: 'ticket-service',
-  [SCHEDULED_JOBS.LEDGER_DAILY]: 'ingestion-service',
-  [SCHEDULED_JOBS.LEDGER_HOURLY]: 'ingestion-service',
-  [SCHEDULED_JOBS.AUTH_HOURLY]: 'auth-service',
-  [SCHEDULED_JOBS.AUTH_DAILY]: 'auth-service',
-};
+function jobOwner(name: ScheduledJobName): GrpcPeer {
+  return SERVICE_PEER[JOB_SERVICE[name]];
+}
 
 /**
  * The platform job surface
@@ -107,7 +121,7 @@ export class PlatformJobsService {
     // says so. Reporting it as never-ran would page somebody about a wiring bug
     // that does not exist.
     const reachable = Object.values(SCHEDULED_JOBS).filter(
-      (name) => !unavailable.includes(JOB_OWNER[name]),
+      (name) => !unavailable.includes(jobOwner(name)),
     );
 
     const verdicts = new Map(
@@ -118,7 +132,7 @@ export class PlatformJobsService {
       const row = rows.find((candidate) => candidate.jobName === name);
 
       return {
-        service: JOB_OWNER[name],
+        service: jobOwner(name),
         jobName: name,
         lastStartedAt: row?.lastStartedAt ?? null,
         lastSucceededAt: row?.lastSucceededAt ?? null,

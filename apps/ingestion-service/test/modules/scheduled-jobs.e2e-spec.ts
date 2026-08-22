@@ -8,10 +8,13 @@ import {
   DocumentFlagType,
   DOCUMENT_PATTERNS,
   DocumentStatus,
+  IngestionJobStatus,
+  INGESTION_QUEUE,
   EMBEDDING_MODEL,
   SCOPE_FANOUT_QUEUE,
   GENERATION_MODEL_BY_TIER,
   QDRANT_PAYLOAD_FIELDS,
+  compareAlphabetically,
 } from '@synapsedesk/common';
 import { bootstrapE2eTest, CYCLE_START, E2eFixture } from '../utils';
 import { memberContext } from '../utils/context';
@@ -26,6 +29,12 @@ import { Queue } from 'bullmq';
 import { ScopeWriterService } from '../../src/modules/ingestion/scope-writer.service';
 import { ScopeFanoutQueueService } from '../../src/modules/ingestion/scope-fanout-queue.service';
 import { QdrantService } from '../../src/modules/qdrant/qdrant.service';
+import {
+  IngestionReconcileSweep,
+  MAX_ORGANIZATIONS_PER_RUN,
+  MAX_RECONCILED_PER_RUN,
+} from '../../src/modules/ingestion/ingestion-reconcile.sweep';
+import { IngestionQueueService } from '../../src/modules/ingestion/ingestion-queue.service';
 import { QuotaCounterService } from '../../src/modules/ai-ledger/quota-counter.service';
 import { AuthReferenceService } from '../../src/modules/auth-client/auth-reference.service';
 import { faultInjector } from '@synapsedesk/common/testing/fault';
@@ -916,6 +925,330 @@ describe('The fan-out and the scheduled jobs (e2e)', () => {
         await expect(
           counter.spentMicros(tenant.organizationId, CYCLE_START),
         ).resolves.toBe(999n);
+      });
+    });
+  });
+
+  // ------------------------------------------------- the reconciliation sweep
+
+  describe('The ingestion reconciliation sweep', () => {
+    let sweep: IngestionReconcileSweep;
+    let ingestionQueue: Queue;
+    let getAiEntitlement: jest.SpyInstance;
+
+    beforeAll(() => {
+      sweep = fx.moduleRef.get(IngestionReconcileSweep);
+      ingestionQueue = fx.moduleRef.get<Queue>(getQueueToken(INGESTION_QUEUE));
+      // auth-service is not running for this suite. The entitlement is the
+      // variable every test here wants to control anyway.
+      getAiEntitlement = jest.spyOn(
+        fx.moduleRef.get(AuthReferenceService),
+        'getAiEntitlement',
+      );
+    });
+
+    afterAll(() => getAiEntitlement.mockRestore());
+
+    beforeEach(async () => {
+      await ingestionQueue.obliterate({ force: true });
+      // Under budget unless a test says otherwise.
+      getAiEntitlement.mockResolvedValue({
+        budgetMicros: 100_000_000n,
+        billingCycleStart: CYCLE_START,
+      });
+    });
+
+    afterEach(async () => {
+      await ingestionQueue.obliterate({ force: true });
+    });
+
+    /** A stuck job: QUEUED, and nothing in the queue holds it. */
+    const stuck = async (
+      overrides: Record<string, unknown> = {},
+      t = tenant,
+    ) => {
+      const document = await createDocument(fx.prisma, t);
+      return fx.prisma.ingestionJob.create({
+        data: {
+          organizationId: t.organizationId,
+          documentId: document.id,
+          bullmqJobId: '',
+          status: IngestionJobStatus.QUEUED,
+          ...overrides,
+        },
+      });
+    };
+
+    const queuedIds = async () =>
+      (await ingestionQueue.getJobs(['waiting', 'delayed', 'active']))
+        .map((job) => job.id)
+        .filter((id): id is string => id !== undefined);
+
+    it('1. **re-queues a job the event never reached**', async () => {
+      // Arm A. The row looks healthy forever: QUEUED, `bullmqJobId: \'\'`, a
+      // PENDING document, and nothing scheduled to change either.
+      const job = await stuck();
+
+      const result = await sweep.sweep();
+
+      expect(result.enqueued).toBe(1);
+      expect(await queuedIds()).toEqual([job.id]);
+    });
+
+    it('2. **leaves a job the queue still holds alone**', async () => {
+      // The sweep must not fight a job about to run — `isRunnable` is what
+      // tells a stranded QUEUED row from one waiting its turn.
+      const job = await stuck();
+      await ingestionQueue.add(
+        'ingest-document',
+        { ingestionJobId: job.id },
+        { jobId: job.id },
+      );
+
+      const result = await sweep.sweep();
+
+      expect(result.skippedRunnable).toBe(1);
+      expect(result.enqueued + result.drained).toBe(0);
+    });
+
+    it('3. **re-queues nothing for a capped tenant — arm A included**', async () => {
+      // The finding that made this one gate rather than two. The budget check
+      // lives at the EMBEDDING step, so a re-enqueue that will defer still pays
+      // for the download, the parse and the chunking first. Ten stuck documents
+      // in a capped tenant is ten full parses every ten minutes, forever — and
+      // that is as true of a never-enqueued job as of a deferred one.
+      getAiEntitlement.mockResolvedValue({
+        budgetMicros: 0n,
+        billingCycleStart: CYCLE_START,
+      });
+      await stuck();
+      await stuck({ bullmqJobId: faker.string.uuid() });
+
+      const result = await sweep.sweep();
+
+      // ORGANIZATIONS, not jobs: two stuck documents in one capped tenant is
+      // one skip. "100 at cap" and "100 across 40 tenants" are different
+      // operational situations and the counter has to be able to say which.
+      expect(result.skippedAtCap).toBe(1);
+      expect(result.enqueued + result.drained).toBe(0);
+      expect(await queuedIds()).toEqual([]);
+    });
+
+    it('4. and re-queues both once the budget allows', async () => {
+      // Arm B working at all is what closed known-gaps #3: `drainDeferred`
+      // existed from the day the pipeline was built and had no caller until
+      // this sweep.
+      const lost = await stuck();
+      const deferred = await stuck({ bullmqJobId: faker.string.uuid() });
+
+      const result = await sweep.sweep();
+
+      expect(result.enqueued).toBe(1);
+      expect(result.drained).toBe(1);
+      expect((await queuedIds()).sort(compareAlphabetically)).toEqual(
+        [lost.id, deferred.id].sort(compareAlphabetically),
+      );
+    });
+
+    it('5. **many stuck jobs in one tenant cost ONE entitlement read**', async () => {
+      // Grouped per organization, not per job. Without it a backlog of forty
+      // documents is forty cross-service reads every ten minutes.
+      for (let index = 0; index < 6; index += 1) await stuck();
+      getAiEntitlement.mockClear();
+
+      await sweep.sweep();
+
+      expect(getAiEntitlement).toHaveBeenCalledTimes(1);
+    });
+
+    it('6. **a capped tenant does not block a healthy one**', async () => {
+      // Grouping must not become a single decision for everybody: the check is
+      // per organization and so is the skip.
+      const other = buildTenant();
+      await stuck({}, tenant);
+      const healthy = await stuck({}, other);
+
+      getAiEntitlement.mockImplementation(
+        (context: { organizationId: string }) =>
+          Promise.resolve({
+            budgetMicros:
+              context.organizationId === tenant.organizationId
+                ? 0n
+                : 100_000_000n,
+            billingCycleStart: CYCLE_START,
+          }),
+      );
+
+      const result = await sweep.sweep();
+
+      expect(result.skippedAtCap).toBe(1);
+      expect(result.enqueued).toBe(1);
+      expect(await queuedIds()).toEqual([healthy.id]);
+    });
+
+    it('7. never touches a job that is mid-flight', async () => {
+      // PARSING/CHUNKING/EMBEDDING is a worker already writing chunks for that
+      // document. A second worker on it is what `writeChunkRows` cannot survive.
+      await stuck({ status: IngestionJobStatus.PARSING });
+      await stuck({ status: IngestionJobStatus.EMBEDDING });
+
+      const result = await sweep.sweep();
+
+      expect(result.enqueued + result.drained).toBe(0);
+      expect(await queuedIds()).toEqual([]);
+    });
+
+    it('8. **takes the OLDEST first**', async () => {
+      // The document stuck longest belongs to the person who has been waiting
+      // longest, and a backlog over the cap should drain in that order rather
+      // than in whatever order the planner returns.
+      //
+      // Asserted on the ENQUEUE order, not on `getJobs()`: BullMQ makes no
+      // promise about the order it returns a set in, so reading the queue back
+      // would be testing Redis rather than the sweep. The first version of this
+      // test did exactly that and failed for it.
+      const older = await stuck();
+      await stuck();
+      await fx.prisma.ingestionJob.update({
+        where: { id: older.id },
+        data: { createdAt: new Date('2026-01-01T00:00:00.000Z') },
+      });
+
+      const enqueue = jest.spyOn(
+        fx.moduleRef.get(IngestionQueueService),
+        'enqueue',
+      );
+
+      const result = await sweep.sweep();
+
+      expect(result.enqueued).toBe(2);
+      expect(enqueue.mock.calls[0][0].ingestionJobId).toBe(older.id);
+      enqueue.mockRestore();
+    });
+
+    it('8b. **and is bounded, so one tick cannot become an unbounded sweep**', async () => {
+      // The candidate query carries a `take`. Without it a backlog after an
+      // outage turns one tick into a scan-and-enqueue over every stuck row in
+      // the tenant — the sweep becoming the thing that overwhelms the queue it
+      // exists to top up.
+      const findMany = jest.spyOn(fx.prisma.ingestionJob, 'findMany');
+      await stuck();
+
+      await sweep.sweep();
+
+      expect(findMany.mock.calls[0][0]).toMatchObject({
+        take: MAX_RECONCILED_PER_RUN,
+        orderBy: { createdAt: 'asc' },
+      });
+      findMany.mockRestore();
+    });
+
+    it('**10. a capped tenant at the head of the queue does not starve the rest**', async () => {
+      // The starvation, and it was silent from every surface: the take was
+      // applied BEFORE anything knew which tenants were over budget, so a
+      // capped tenant holding the oldest rows owned every tick forever while
+      // the heartbeat reported healthy.
+      //
+      // The capped tenant's jobs are made older than the healthy one's, so
+      // `createdAt asc` would hand them the whole budget under the old shape.
+      const other = buildTenant();
+      const capped = [await stuck({}, tenant), await stuck({}, tenant)];
+      await fx.prisma.ingestionJob.updateMany({
+        where: { id: { in: capped.map((job) => job.id) } },
+        data: { createdAt: new Date('2026-01-01T00:00:00.000Z') },
+      });
+      const healthy = await stuck({}, other);
+
+      getAiEntitlement.mockImplementation(
+        (context: { organizationId: string }) =>
+          Promise.resolve({
+            budgetMicros:
+              context.organizationId === tenant.organizationId
+                ? 0n
+                : 100_000_000n,
+            billingCycleStart: CYCLE_START,
+          }),
+      );
+
+      const result = await sweep.sweep();
+
+      expect(result.skippedAtCap).toBe(1);
+      expect(await queuedIds()).toEqual([healthy.id]);
+    });
+
+    it('**11. one unparseable row does not block the queue behind it**', async () => {
+      // `parseOcrLanguages` refuses rather than filters, so a row carrying a
+      // code this build no longer knows throws inside the loop. Uncaught, it
+      // aborted the sweep — and `createdAt asc` meant the same row was hit
+      // first again on the next tick, forever.
+      //
+      // Written directly to the column: `confirmDocument` now refuses this on
+      // the way in, which is the other half of the fix. What remains reachable
+      // is a legacy row or a future `OCR_LANGUAGES` retirement.
+      const poison = await stuck();
+      await fx.prisma.document.update({
+        where: { id: poison.documentId },
+        data: { ocrLanguages: ['kl'] },
+      });
+      const healthy = await stuck();
+      await fx.prisma.ingestionJob.update({
+        where: { id: poison.id },
+        data: { createdAt: new Date('2026-01-01T00:00:00.000Z') },
+      });
+
+      const result = await sweep.sweep();
+
+      expect(result.unreconcilable).toBe(1);
+      expect(result.enqueued).toBe(1);
+      expect(await queuedIds()).toEqual([healthy.id]);
+    });
+
+    it('**12. a job whose document was DELETED is not re-ingested**', async () => {
+      // `deleteDocument` soft-deletes the document and never touches
+      // `ingestion_jobs`, so a document deleted while its job was stranded
+      // still has a QUEUED row. Re-queueing it parses, chunks and EMBEDS it —
+      // metered against the tenant — before `writeChunkRows` marks the chunks
+      // deleted. No disclosure, and a full ingestion nobody asked for.
+      const job = await stuck();
+      await fx.prisma.document.update({
+        where: { id: job.documentId },
+        data: { deletedAt: new Date() },
+      });
+
+      const result = await sweep.sweep();
+
+      expect(result.enqueued).toBe(0);
+      expect(await queuedIds()).toEqual([]);
+    });
+
+    it('**13. the number of ENTITLEMENT READS is bounded too**', async () => {
+      // Fixing the starvation moved the read count from rows to tenants, which
+      // is a second unbounded axis: a hundred tenants with one stranded
+      // document each would be a hundred cross-service reads per tick.
+      const tenants = Array.from(
+        { length: MAX_ORGANIZATIONS_PER_RUN + 3 },
+        () => buildTenant(),
+      );
+      for (const t of tenants) await stuck({}, t);
+      getAiEntitlement.mockClear();
+
+      await sweep.sweep();
+
+      expect(getAiEntitlement).toHaveBeenCalledTimes(MAX_ORGANIZATIONS_PER_RUN);
+    });
+
+    it('9. a sweep with nothing to do enqueues nothing and does not throw', async () => {
+      // The ordinary tick. `/platform/jobs` needs the heartbeat either way: a
+      // sweep that only records a run when it finds work reports `never-ran` on
+      // a healthy system.
+      const result = await sweep.sweep();
+
+      expect(result).toEqual({
+        enqueued: 0,
+        drained: 0,
+        skippedAtCap: 0,
+        skippedRunnable: 0,
+        unreconcilable: 0,
       });
     });
   });

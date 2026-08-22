@@ -345,7 +345,8 @@ export class IngestionJobsService {
 
     // A `QUEUED` row means nothing on its own — it is both what a job about to
     // run looks like and what one deferred at the AI cap was left as. BullMQ
-    // is the only thing that can tell them apart (known-gaps #3).
+    // is the only thing that can tell them apart — which is also what
+    // `IngestionReconcileSweep` reads to find a stranded row.
     if (
       jobStatus === IngestionJobStatus.QUEUED &&
       !(await this.queue.isRunnable(job.id))

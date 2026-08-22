@@ -108,9 +108,19 @@ export class IngestionQueueService {
   /**
    * Re-queues every job left `QUEUED` by the AI cap.
    *
-   * Called when a billing cycle rolls. Deferred jobs are not retried by BullMQ
-   * — a deferral completes successfully, precisely so it does not burn the
-   * retry budget — so something has to put them back, and this is it.
+   * Deferred jobs are not retried by BullMQ — a deferral completes
+   * successfully, precisely so it does not burn the retry budget — so something
+   * has to put them back, and this is it.
+   *
+   * **Called by `IngestionReconcileSweep`, every ten minutes.** It was written
+   * for a billing-cycle roll and had no caller for exactly as long, because
+   * nothing rolls a cycle on a schedule: the cycle advances on the Stripe path
+   * (`entitlement-writer.service.ts`), so a hook there would have covered this
+   * and never covered a lost `document.uploaded`. A poll covers both.
+   *
+   * A cycle-roll hook remains a reasonable addition — it would drain within
+   * seconds of a payment rather than within ten minutes — but it is an
+   * optimisation on top of the sweep rather than a replacement for it.
    */
   async drainDeferred(data: IngestionJobData[]): Promise<number> {
     for (const job of data) {

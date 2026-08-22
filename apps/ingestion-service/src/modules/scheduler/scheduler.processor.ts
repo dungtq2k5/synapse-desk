@@ -15,6 +15,7 @@ import { DiscardedDraftSweep } from '../scheduled/discarded-draft.sweep';
 import { DocumentFlagWriter } from '../scheduled/document-flag-writer';
 import { QuotaReconciliationJob } from '../scheduled/quota-reconciliation.job';
 import { AiGenerationRollupJob } from '../analytics/ai-generation-rollup.job';
+import { IngestionReconcileSweep } from '../ingestion/ingestion-reconcile.sweep';
 
 /**
  * The thing that was missing
@@ -47,6 +48,7 @@ export class SchedulerProcessor extends WorkerHost {
     private readonly quota: QuotaReconciliationJob,
     private readonly flags: DocumentFlagWriter,
     private readonly aiRollup: AiGenerationRollupJob,
+    private readonly reconcile: IngestionReconcileSweep,
     private readonly runs: JobRunRecorder,
   ) {
     super();
@@ -58,6 +60,14 @@ export class SchedulerProcessor extends WorkerHost {
         return this.runs.track(job.name, () => this.hourly());
       case SCHEDULED_JOBS.LEDGER_DAILY:
         return this.runs.track(job.name, () => this.daily());
+      case SCHEDULED_JOBS.INGESTION_RECONCILE:
+        // Tracked like the others even though it usually finds nothing: a
+        // sweep that only writes a heartbeat when it has work reports
+        // `never-ran` on a healthy system, which is the one thing
+        // `/platform/jobs` exists to distinguish.
+        return this.runs.track(job.name, async () => {
+          await this.reconcile.sweep();
+        });
       default:
         // **A defect, not routine cross-talk** — and the difference is what
         // makes throwing correct now.

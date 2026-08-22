@@ -6,6 +6,7 @@ import {
   JobHealthService,
   JobRunRecorder,
   repeatJobId,
+  jobsOwnedBy,
   SCHEDULE_CRON,
   SCHEDULED_JOBS,
   SCHEDULER_QUEUE,
@@ -83,7 +84,7 @@ describe('The scheduler (e2e)', () => {
 
       const repeats = await queue.getJobSchedulers();
 
-      expect(repeats).toHaveLength(2);
+      expect(repeats).toHaveLength(jobsOwnedBy('auth').length);
       expect(repeats.map((r) => r.key).sort(compareAlphabetically)).toEqual(
         [
           repeatJobId(SCHEDULED_JOBS.AUTH_DAILY),

@@ -5,6 +5,7 @@ import {
   JobHealthService,
   JobRunRecorder,
   repeatJobId,
+  jobsOwnedBy,
   SCHEDULE_CRON,
   SCHEDULED_JOBS,
   SCHEDULER_QUEUE,
@@ -56,18 +57,41 @@ describe('The scheduler (e2e)', () => {
   afterAll(() => fx.close());
 
   describe('registration', () => {
-    it('1. registers both repeat entries on boot, with their cron patterns', async () => {
+    it('**1. registers EVERY job this service owns, with its cron pattern**', async () => {
+      // Derived from `jobsOwnedBy`, not a list repeated here — which is the
+      // property under test. The registrar used to name its jobs literally, so
+      // adding one to `SCHEDULED_JOBS` gave you a name `/platform/jobs`
+      // expected, `checkStaleness` monitored, and BullMQ had never heard of:
+      // a job that never runs, from the one edit nothing checked.
+      //
+      // A test that also listed them would have had the same blind spot.
       await registrar.onApplicationBootstrap();
 
       const repeats = await queue.getJobSchedulers();
       const byName = new Map(repeats.map((r) => [r.name, r]));
+      const owned = jobsOwnedBy('ingestion');
 
-      expect(byName.get(SCHEDULED_JOBS.LEDGER_HOURLY)?.pattern).toBe(
-        SCHEDULE_CRON[SCHEDULED_JOBS.LEDGER_HOURLY],
+      expect(owned.length).toBeGreaterThan(0);
+      expect(owned.map((name) => [name, byName.get(name)?.pattern])).toEqual(
+        owned.map((name) => [name, SCHEDULE_CRON[name]]),
       );
-      expect(byName.get(SCHEDULED_JOBS.LEDGER_DAILY)?.pattern).toBe(
-        SCHEDULE_CRON[SCHEDULED_JOBS.LEDGER_DAILY],
+    });
+
+    it('1b. and registers NOTHING another service owns', async () => {
+      // The other half: iterating the whole table rather than this service's
+      // slice would put auth's and ticket's schedules on ingestion's queue,
+      // where their processor throws for every tick.
+      await registrar.onApplicationBootstrap();
+
+      const registered = (await queue.getJobSchedulers()).map((r) => r.name);
+      const foreign = Object.values(SCHEDULED_JOBS).filter(
+        (name) => !jobsOwnedBy('ingestion').includes(name),
       );
+
+      expect(foreign.length).toBeGreaterThan(0);
+      expect(
+        registered.filter((name) => foreign.includes(name as never)),
+      ).toEqual([]);
     });
 
     it('2. **restarting does not create a duplicate schedule**', async () => {
@@ -80,15 +104,17 @@ describe('The scheduler (e2e)', () => {
       await registrar.onApplicationBootstrap();
 
       const repeats = await queue.getJobSchedulers();
+      const owned = jobsOwnedBy('ingestion');
 
-      expect(repeats).toHaveLength(2);
+      expect(repeats).toHaveLength(owned.length);
       // Keyed by the id we chose, not by a hash of the options — which is what
       // makes a CHANGED cron an update rather than a second schedule.
+      //
+      // Derived from `jobsOwnedBy` rather than listed: a literal list here
+      // would keep passing while a newly added job went unregistered, which is
+      // the failure this whole file is about.
       expect(repeats.map((r) => r.key).sort(compareAlphabetically)).toEqual(
-        [
-          repeatJobId(SCHEDULED_JOBS.LEDGER_DAILY),
-          repeatJobId(SCHEDULED_JOBS.LEDGER_HOURLY),
-        ].sort(compareAlphabetically),
+        owned.map(repeatJobId).sort(compareAlphabetically),
       );
     });
 
@@ -109,7 +135,7 @@ describe('The scheduler (e2e)', () => {
         (r) => r.key === repeatJobId(SCHEDULED_JOBS.LEDGER_DAILY),
       );
 
-      expect(repeats).toHaveLength(2);
+      expect(repeats).toHaveLength(jobsOwnedBy('ingestion').length);
       expect(daily).toHaveLength(1);
       expect(daily[0].pattern).toBe('30 5 * * *');
     });

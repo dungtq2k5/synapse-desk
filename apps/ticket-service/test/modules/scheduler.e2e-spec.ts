@@ -4,6 +4,7 @@ import {
   JobHealthService,
   JobRunRecorder,
   repeatJobId,
+  jobsOwnedBy,
   SCHEDULE_CRON,
   SCHEDULED_JOBS,
   SCHEDULER_QUEUE,
@@ -71,7 +72,9 @@ describe('The scheduler (e2e)', () => {
     await registrar.onApplicationBootstrap();
     await registrar.onApplicationBootstrap();
 
-    expect(await queue.getJobSchedulers()).toHaveLength(1);
+    expect(await queue.getJobSchedulers()).toHaveLength(
+      jobsOwnedBy('ticket').length,
+    );
   });
 
   it('3. **the tick actually calls the rollup** — the whole point', async () => {

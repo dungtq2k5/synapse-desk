@@ -50,7 +50,9 @@ import {
   IngestionJobStatus,
   DocumentFlagResolution,
   SupersededReason,
+  formatErrorMsg,
   isUniqueConstraintViolation,
+  parseOcrLanguages,
   MAX_DOCUMENT_BYTES,
   MAX_DOCUMENT_TITLE_LENGTH,
   requireActor,
@@ -249,10 +251,10 @@ export class DocumentsService {
             fileHash,
             isOrganizationWide: request.isOrganizationWide,
             status: DocumentStatus.PENDING,
-            // Validated at the gateway against `OCR_LANGUAGES`.
-            // Stored as given: `[]` is "not specified", which is almost every
-            // upload, and the parser is what turns that into the `eng` default.
-            ocrLanguages: request.ocrLanguages,
+            // Stored as given once checked: `[]` is "not specified", which is
+            // almost every upload, and the parser is what turns that into the
+            // `eng` default.
+            ocrLanguages: assertOcrLanguages(request.ocrLanguages),
             departmentLinks: {
               create: departmentIds.map((departmentId) => ({ departmentId })),
             },
@@ -1036,7 +1038,7 @@ export class DocumentsService {
             fileType: extensionFor(confirmed.contentType),
             fileSizeBytes: BigInt(confirmed.sizeBytes),
             fileHash,
-            ocrLanguages: request.ocrLanguages,
+            ocrLanguages: assertOcrLanguages(request.ocrLanguages),
             status: DocumentStatus.PENDING,
           },
           include: DOCUMENT_INCLUDE,
@@ -1242,5 +1244,36 @@ export class DocumentsService {
     }
 
     return document;
+  }
+}
+
+/**
+ * The OCR languages a request may store, refused rather than filtered.
+ *
+ * Bounded HERE as well as at the gateway DTO, for the reason
+ * `MAX_BULK_TICKET_IDS` gives and `assertReasonLength` repeats: this service is
+ * reachable from other services over gRPC, where no `ValidationPipe` ever ran.
+ * The column used to carry a comment saying validation happened at the gateway,
+ * which is a description of one caller rather than a check.
+ *
+ * What it prevents is a row the PIPELINE will refuse: `process()` narrows the
+ * same value by parsing, so an unsupported code stored here fails the
+ * document's first ingestion — and then stalls the reconciliation sweep, which
+ * meets the same row first on every tick.
+ *
+ * @throws RpcException INVALID_ARGUMENT naming every unsupported code.
+ */
+// ASK Why don't declare `OcrLanguage[]` instead of `string[]`?
+function assertOcrLanguages(codes: string[]): string[] {
+  try {
+    return parseOcrLanguages(codes);
+  } catch (error) {
+    // Re-thrown as INVALID_ARGUMENT — 400 at the gateway — rather than escaping
+    // as the plain `Error` the parser raises, which would surface as a 500 for
+    // what is a caller mistake.
+    throw new RpcException({
+      code: status.INVALID_ARGUMENT,
+      message: formatErrorMsg(error),
+    });
   }
 }

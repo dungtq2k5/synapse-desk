@@ -815,6 +815,7 @@ One suite, run in CI, that boots the **real** auth-service gRPC server (in-proce
 - [ ] Ordering constraints encoded as **one job calling several in sequence**, never two cron entries minutes apart.
 - [ ] An **end-to-end test drives the scheduler and reads the endpoint.**
 - [ ] Anything derived from the job carries a freshness field (`dataThrough`).
+- [ ] **Something ALERTS when it stops.** Adding a member to `SCHEDULED_JOBS` leaves `docker/prometheus/job-alerts.yml` a job short until it is regenerated — `npm run build -w @synapsedesk/common && node scripts/generate-job-alerts.mjs`. The build comes first because the generator reads the BUILT lib, and a stale one silently emits the old job list.
 
 ### Surface
 

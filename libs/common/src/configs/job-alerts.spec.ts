@@ -45,26 +45,56 @@ describe('Job staleness alerts', () => {
     }
   });
 
-  it('3. **the committed file has not DRIFTED from the job list**', () => {
+  it('3. **the BUILT lib the generator reads is in step with this source**', () => {
+    // Guards the guard, and it is not hypothetical — it is how this suite came
+    // to be red.
+    //
+    // Tests 1, 2 and 4 read `SCHEDULED_JOBS` through ts-jest, from SOURCE. The
+    // generator imports `libs/common/dist/main.js`, which is a BUILD. When a job
+    // is added and the lib is not rebuilt, the generator cannot see it — so test
+    // 4 below regenerates stale content, finds it equal to the stale committed
+    // file, and PASSES while the file is missing a job's alerts entirely.
+    //
+    // Asserted here rather than left to the reader: a vacuous guard is worse
+    // than none, because it is evidence of a check that did not happen.
+    // Read OUT OF PROCESS: importing the built `.js` from here would hand it to
+    // ts-jest, which warns on every file and compiles a bundle this suite has no
+    // reason to typecheck. Node reads its own output.
+    const printed = execFileSync(
+      process.execPath,
+      [
+        '-e',
+        "import('./libs/common/dist/main.js').then((m) => " +
+          'console.log(JSON.stringify(Object.values(m.SCHEDULED_JOBS))))',
+      ],
+      { cwd: REPO_ROOT, encoding: 'utf8' },
+    );
+
+    expect((JSON.parse(printed) as string[]).sort()).toEqual(
+      Object.values(SCHEDULED_JOBS).sort(),
+    );
+  });
+
+  it('4. **the committed file has not DRIFTED from the job list**', () => {
     // Regenerating and comparing, rather than spot-checking the contents. A
     // test that only asserts "every job appears" passes for a file that also
     // contains rules for three jobs that were deleted last quarter — and stale
     // alerts are how a team learns to ignore the channel.
-    execFileSync(
-      process.execPath,
-      [join(REPO_ROOT, 'scripts/generate-job-alerts.mjs')],
-      { encoding: 'utf8' },
-    );
-
-    // The script rewrites in place; if the committed content was already
-    // correct, git sees no change. Compared by content rather than by git
-    // status so the test works in a dirty tree.
-    const regenerated = readFileSync(ALERTS, 'utf8');
-
-    expect(regenerated).toBe(committed());
+    //
+    // `--check`, so this WRITES NOTHING. Regenerating in place repaired the very
+    // drift it exists to report: the suite went green on a second run, and a
+    // stale `dist/` would have overwritten a correct file with fewer alerts.
+    // A test must not edit the tree it is judging.
+    expect(() =>
+      execFileSync(
+        process.execPath,
+        [join(REPO_ROOT, 'scripts/generate-job-alerts.mjs'), '--check'],
+        { encoding: 'utf8', stdio: 'pipe' },
+      ),
+    ).not.toThrow();
   });
 
-  it('4. the threshold is TWICE the interval, matching the in-app verdict', () => {
+  it('5. the threshold is TWICE the interval, matching the in-app verdict', () => {
     // The Prometheus rule and `checkStaleness()` must agree, or the dashboard
     // and the pager tell an operator different stories about the same job. Two
     // days for a daily job, two hours for an hourly one.

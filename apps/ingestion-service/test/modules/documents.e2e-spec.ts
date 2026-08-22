@@ -430,6 +430,72 @@ describe('Documents (e2e)', () => {
     });
   });
 
+  describe('the ocrLanguages bound', () => {
+    it('**1. confirm REFUSES an unsupported code rather than storing it**', async () => {
+      // Bounded here as well as at the gateway DTO, for the reason
+      // `MAX_BULK_TICKET_IDS` gives: this service is reachable from other
+      // services over gRPC, where no `ValidationPipe` ever ran. The column
+      // carried a comment saying validation happened at the gateway, which is a
+      // description of one caller rather than a check.
+      await expectRpc(
+        documents.confirmDocument(
+          confirmRequest({ ocrLanguages: ['kl'] }),
+          manager(),
+        ),
+        status.INVALID_ARGUMENT,
+      );
+
+      expect(await fx.prisma.document.count()).toBe(0);
+    });
+
+    it('2. and names the offending code, so the caller can act on it', async () => {
+      const refused = documents.confirmDocument(
+        confirmRequest({ ocrLanguages: ['en', 'kl'] }),
+        manager(),
+      );
+
+      await expect(refused).rejects.toMatchObject({
+        message: expect.stringContaining('kl') as string,
+      });
+    });
+
+    it('**3. replace refuses it too — the same column, the same way in**', async () => {
+      const document = await createDocument(fx.prisma, tenant, {
+        status: DocumentStatus.INDEXED,
+      });
+
+      await expectRpc(
+        documents.replaceDocument(
+          {
+            id: document.id,
+            objectPath: `organizations/${tenant.organizationId}/documents/${document.id}/new.pdf`,
+            ocrLanguages: ['kl'],
+          },
+          manager(),
+        ),
+        status.INVALID_ARGUMENT,
+      );
+
+      const reloaded = await fx.prisma.document.findUniqueOrThrow({
+        where: { id: document.id },
+      });
+      expect(reloaded.fileUrl).toBe(document.fileUrl);
+    });
+
+    it('4. a supported code still stores, so the check is not refusing everything', async () => {
+      // Otherwise 1-3 pass against a bound that rejects unconditionally.
+      const result = await documents.confirmDocument(
+        confirmRequest({ ocrLanguages: ['vi', 'en'] }),
+        manager(),
+      );
+
+      const stored = await fx.prisma.document.findUniqueOrThrow({
+        where: { id: result.id },
+      });
+      expect(stored.ocrLanguages).toEqual(['vi', 'en']);
+    });
+  });
+
   // --------------------------------------------------------- visibility
 
   describe('visibility — org-wide ∪ the caller’s departments', () => {

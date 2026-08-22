@@ -29,6 +29,9 @@ export const SCHEDULER_QUEUE = {
 export type SchedulerQueueName =
   (typeof SCHEDULER_QUEUE)[keyof typeof SCHEDULER_QUEUE];
 
+/** Which service owns a queue — the key side of {@link SCHEDULER_QUEUE}. */
+export type SchedulerService = keyof typeof SCHEDULER_QUEUE;
+
 /**
  * Job names — the string a repeat entry is registered under and the worker
  * switches on.
@@ -55,6 +58,17 @@ export const SCHEDULED_JOBS = {
 
   /** auth-service, daily. Prunes expired sessions, OTPs and reset tokens. */
   AUTH_DAILY: 'auth-daily',
+
+  /**
+   * ingestion-service, every ten minutes. Re-queues jobs the queue lost or
+   * deferred.
+   *
+   * Not a step on `LEDGER_HOURLY`, and cadence is what decides it: the symptom
+   * is "I uploaded a document and nothing happened", normal ingestion is
+   * seconds to minutes, and an hour of `PENDING` is indistinguishable from
+   * broken.
+   */
+  INGESTION_RECONCILE: 'ingestion-reconcile',
 } as const;
 
 export type ScheduledJobName =
@@ -70,6 +84,7 @@ export const SCHEDULE_CRON = {
   [SCHEDULED_JOBS.ANALYTICS_DAILY]: '0 2 * * *',
   [SCHEDULED_JOBS.AUTH_HOURLY]: '0 * * * *',
   [SCHEDULED_JOBS.AUTH_DAILY]: '0 3 * * *',
+  [SCHEDULED_JOBS.INGESTION_RECONCILE]: '*/10 * * * *',
 } as const satisfies Record<ScheduledJobName, string>;
 
 /**
@@ -94,7 +109,8 @@ export const JOB_SEQUENCES = {
   [SCHEDULED_JOBS.ANALYTICS_DAILY]: ['ticket-rollup'],
   [SCHEDULED_JOBS.AUTH_HOURLY]: ['invitations-expiry'],
   [SCHEDULED_JOBS.AUTH_DAILY]: ['expired-records'],
-} as const;
+  [SCHEDULED_JOBS.INGESTION_RECONCILE]: ['ingestion-reconcile'],
+} as const satisfies Record<ScheduledJobName, readonly string[]>;
 
 /**
  * How many days each daily rollup recomputes.
@@ -103,6 +119,42 @@ export const JOB_SEQUENCES = {
  * tenant whose local day closes after 02:00 UTC is still covered.
  */
 export const ROLLUP_TRAILING_DAYS = 3;
+
+/**
+ * Which service registers and runs each schedule.
+ *
+ * **Exhaustive, and the registrars iterate it** — that pairing is the point.
+ * Registering used to be two literal `register()` calls per service, so adding
+ * a job to `SCHEDULED_JOBS` gave you a name that `/platform/jobs` expected,
+ * that `checkStaleness` monitored, and that BullMQ had never heard of. A job
+ * that never runs, produced by the one edit nothing checked — the same shape as
+ * the seven uncalled jobs the scheduler work started from.
+ *
+ * The gateway's `JOB_OWNER` derives from this rather than repeating it, so
+ * "which service" is decided once.
+ */
+export const JOB_SERVICE = {
+  [SCHEDULED_JOBS.LEDGER_HOURLY]: 'ingestion',
+  [SCHEDULED_JOBS.LEDGER_DAILY]: 'ingestion',
+  [SCHEDULED_JOBS.ANALYTICS_DAILY]: 'ticket',
+  [SCHEDULED_JOBS.AUTH_HOURLY]: 'auth',
+  [SCHEDULED_JOBS.AUTH_DAILY]: 'auth',
+  [SCHEDULED_JOBS.INGESTION_RECONCILE]: 'ingestion',
+} as const satisfies Record<ScheduledJobName, SchedulerService>;
+
+/**
+ * Every job one service owns, for its registrar to walk.
+ *
+ * @example
+ * for (const name of jobsOwnedBy('ingestion')) await this.register(name);
+ */
+export function jobsOwnedBy(
+  service: SchedulerService,
+): readonly ScheduledJobName[] {
+  return Object.values(SCHEDULED_JOBS).filter(
+    (name) => JOB_SERVICE[name] === service,
+  );
+}
 
 /**
  * A repeat entry's stable `jobId`.

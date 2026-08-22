@@ -9,13 +9,19 @@
  * the rules is unmonitored, and it looks fine, because an alert that does not
  * exist never fires.
  *
- *   node scripts/generate-job-alerts.mjs
+ *   node scripts/generate-job-alerts.mjs            # rewrite the file
+ *   node scripts/generate-job-alerts.mjs --check    # verify, writing nothing
+ *
+ * **`--check` exists because the verifying TEST must not write.** A test that
+ * regenerates in place repairs the drift it is meant to report: it passes on the
+ * second run, and — if the built lib it reads is stale — it overwrites a correct
+ * file with stale content and passes on the first.
  *
  * The output is committed so a Prometheus deployment needs no Node toolchain,
  * and `job-alerts.spec.ts` fails if the committed file has drifted from the
  * source of truth.
  */
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -86,5 +92,20 @@ ${rules}
 `;
 
 const target = join(ROOT, 'docker/prometheus/job-alerts.yml');
-writeFileSync(target, output);
-console.log(`Wrote ${target}`);
+
+if (process.argv.includes('--check')) {
+  const committed = readFileSync(target, 'utf8');
+
+  if (committed !== output) {
+    console.error(
+      `${target} has drifted from SCHEDULED_JOBS.\n` +
+        'Run: npm run build -w @synapsedesk/common && node scripts/generate-job-alerts.mjs',
+    );
+    process.exit(1);
+  }
+
+  console.log(`${target} is up to date`);
+} else {
+  writeFileSync(target, output);
+  console.log(`Wrote ${target}`);
+}
