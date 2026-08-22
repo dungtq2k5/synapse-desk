@@ -25,6 +25,7 @@ export const envValidationSchema = Joi.object({
   REDIS_URL: Joi.string().required(),
 
   NATS_URL: Joi.string().required(),
+  NATS_MONITOR_URL: Joi.string().uri().required(),
 
   GRPC_HOST: Joi.string().required(),
   GRPC_PORT: Joi.number().required(),

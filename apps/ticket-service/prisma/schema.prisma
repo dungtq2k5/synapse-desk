@@ -522,6 +522,18 @@ model AiResponseFeedback {
 model AuditLog {
   id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
 
+  /// The publisher's id for the ACT, and the reason a redelivery is a no-op.
+  ///
+  /// `@unique` rather than an index: at-least-once delivery means the consumer
+  /// WILL see the same message twice, and duplicates here are worse than in
+  /// most places — they inflate "how many times did X happen", which is the
+  /// question the trail exists to answer.
+  ///
+  /// Nullable for the rows written before it existed. A NULL is not deduped,
+  /// which is correct: those rows predate the guarantee and inventing ids for
+  /// them would claim a property they never had.
+  eventId String? @map("event_id") @unique @db.Uuid
+
   /// NULL for a platform-level act (RDM §1.7) — the event belongs to the
   /// platform, not to the customer it touched. That is why this is nullable and
   /// why the consumer must never coerce it to the actor's own tenant.

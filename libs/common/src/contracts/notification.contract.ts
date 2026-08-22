@@ -294,7 +294,7 @@ export type CreateInAppNotificationCommand = {
    * Never the transport subject: `?type=` filtering and preference resolution
    * both key on this, and a constant value makes both useless.
    */
-  type: string;
+  type: NotificationType;
 
   audience: NotificationAudience;
 
@@ -358,7 +358,8 @@ export type NotificationRealtimePayload = {
   organizationId: string;
   recipientId: string;
   notificationId: string;
-  type: string;
+  /** The originating event, as {@link CreateInAppNotificationCommand.type} carried it. */
+  type: NotificationType;
   priority: NotificationPriority;
   title: string;
   body: string | null;

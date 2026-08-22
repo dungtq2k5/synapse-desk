@@ -35,6 +35,18 @@ type Recipient = {
 };
 
 /**
+ * How many recent group event ids a notification remembers.
+ *
+ * The guard it powers has to survive NON-consecutive redelivery: a nak'd
+ * message comes back after later messages have already advanced the group, so
+ * comparing against a single "last" id misses exactly the case a pull consumer
+ * produces (ADR 0041). Twenty is the number of increments a redelivery can be
+ * displaced by and still be caught, and a displacement wider than that means
+ * something is far more wrong than a group count.
+ */
+const GROUP_EVENT_WINDOW = 20;
+
+/**
  * `notification.in_app.create` → rows a user can actually see
  *
  * **This consumer is the fix for a subject that had no subscriber.** The AI
@@ -186,7 +198,7 @@ export class InAppNotificationService {
   }
 
   /**
-   * One row per recipient — inserted, GROUPED, or recognised as a duplicate.
+   * One row per recipient — inserted, GROUPED, or recognized as a duplicate.
    *
    * Three outcomes rather than two, and the middle one is what stops this
    * being a spam machine: `ticket.message_created` fires on every message, so
@@ -218,7 +230,7 @@ export class InAppNotificationService {
           resourceType: command.resourceType,
           resourceId: command.resourceId,
           groupKey: command.groupKey,
-          lastGroupEventId: command.groupKey ? command.eventId : null,
+          groupEventIds: command.groupKey ? [command.eventId] : [],
         },
       });
 
@@ -227,8 +239,8 @@ export class InAppNotificationService {
       // A duplicate is SUCCESS, not an error. `UNIQUE (recipient_id, event_id)`
       // is the idempotency mechanism and the producer DERIVES `event_id` from
       // the thing that happened, so a redelivered event is a duplicate-key
-      // violation rather than a second notification. Core NATS redelivers, so
-      // this is the normal path.
+      // violation rather than a second notification. The stream redelivers
+      // (ADR 0041), so this is the normal path.
       if (isUniqueConstraintViolation(error)) {
         return { kind: 'duplicate', notificationId: null };
       }
@@ -253,46 +265,58 @@ export class InAppNotificationService {
     command: CreateInAppNotificationCommand,
     recipientId: string,
   ): Promise<PersistOutcome | null> {
-    const existing = await this.prisma.notification.findFirst({
+    // One statement, not a read-then-update, and the reason is the same one
+    // `markTicketRead` gives: two deliveries racing would both read the row,
+    // both find their id absent, and both increment. The `NOT (... = ANY(...))`
+    // has to be part of the UPDATE for the database to decide it.
+    //
+    // `[1:GROUP_EVENT_WINDOW]` after the prepend keeps the newest ids and drops
+    // the rest, so a thread with ten thousand replies does not carry ten
+    // thousand ids on every increment.
+    const [updated] = await this.prisma.$queryRaw<{ id: string }[]>`
+      UPDATE notifications
+      SET group_count = group_count + 1,
+          -- Back to the top of the feed. A collapsed notification that stayed
+          -- where it was would be indistinguishable from one nothing happened to.
+          created_at = NOW(),
+          group_event_ids =
+            (ARRAY[${command.eventId}::varchar(100)] || group_event_ids)[1:${GROUP_EVENT_WINDOW}],
+          -- The newest event's wording wins: "12 new messages" should name the
+          -- most recent sender, not the one from an hour ago.
+          title = ${command.title},
+          body = ${command.body}
+      WHERE id = (
+        SELECT id FROM notifications
+        WHERE recipient_id = ${recipientId}
+          AND group_key = ${command.groupKey}
+          AND read_at IS NULL
+          AND archived_at IS NULL
+        ORDER BY created_at DESC
+        LIMIT 1
+      )
+      AND NOT (${command.eventId} = ANY(group_event_ids))
+      RETURNING id
+    `;
+
+    if (updated) return { kind: 'grouped', notificationId: updated.id };
+
+    // No row came back for one of two reasons, and they need telling apart:
+    // either there was no open group to collapse onto — in which case the
+    // caller must INSERT — or there was one and this event had already been
+    // counted into it.
+    const open = await this.prisma.notification.findFirst({
       where: {
         recipientId,
         groupKey: command.groupKey,
         readAt: null,
         archivedAt: null,
       },
-      orderBy: { createdAt: 'desc' },
+      select: { id: true },
     });
 
-    if (!existing) return null;
+    if (!open) return null;
 
-    // **The honest limit of this guard**. The INSERT is deduped
-    // by the unique index; an increment has no such protection, so a NATS
-    // redelivery could double-count. Comparing against the last triggering
-    // event id covers CONSECUTIVE redelivery — which is the case NATS actually
-    // produces — and not arbitrary reordering.
-    //
-    // A count reading "4 new replies" instead of "3" is a cosmetic error, so
-    // the cheap guard is the proportionate one; a full event log to make it
-    // exact would cost more than the defect.
-    if (existing.lastGroupEventId === command.eventId) {
-      return { kind: 'duplicate', notificationId: null };
-    }
-
-    await this.prisma.notification.update({
-      where: { id: existing.id },
-      data: {
-        groupCount: { increment: 1 },
-        // Back to the top of the feed.
-        createdAt: new Date(),
-        lastGroupEventId: command.eventId,
-        // The newest event's wording wins: "12 new messages" should name the
-        // most recent sender, not the one from an hour ago.
-        title: command.title,
-        body: command.body,
-      },
-    });
-
-    return { kind: 'grouped', notificationId: existing.id };
+    return { kind: 'duplicate', notificationId: null };
   }
 
   /**

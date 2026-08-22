@@ -17,7 +17,7 @@ erDiagram
     String group_key "❓"
     Int group_count 
     String event_id "❓"
-    String last_group_event_id "❓"
+    String group_event_ids 
     DateTime read_at "❓"
     DateTime archived_at "❓"
     DateTime expires_at "❓"

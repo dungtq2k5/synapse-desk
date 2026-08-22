@@ -7,6 +7,8 @@
  * consumers `switch` on `pattern` rather than on a raw subject string.
  */
 
+import type { OcrLanguage } from '../configs/document.config';
+
 export const DOCUMENT_PATTERNS = {
   /** A confirmed upload is ready to be parsed. The worker's trigger. */
   uploaded: 'document.uploaded',
@@ -50,8 +52,13 @@ export type DocumentUploadedEvent = DocumentEventBase & {
    *
    * The cost is a field on a broadcast contract that one consumer reads, for a
    * case most documents never hit. The no-lookup rule is what it buys.
+   *
+   * Typed rather than `string[]` because the publisher has already parsed it —
+   * `confirmUpload` narrows before it writes the row, so the event repeats a
+   * value that was checked rather than making a claim about one it never was.
+   * The wire stays untyped, and the processor parses again on the way in.
    */
-  ocrLanguages: string[];
+  ocrLanguages: OcrLanguage[];
 };
 
 export type DocumentIndexedEvent = DocumentEventBase & {

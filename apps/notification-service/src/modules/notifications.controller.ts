@@ -1,24 +1,30 @@
-import { Controller, Logger } from '@nestjs/common';
-import { Ctx, EventPattern, NatsContext, Payload } from '@nestjs/microservices';
+import { Injectable, Logger } from '@nestjs/common';
 import {
   CreateInAppNotificationCommand,
   IN_APP_NOTIFICATION_PATTERN,
   NOTIFICATION_PATTERNS,
   SendEmailCommand,
   SendSmsCommand,
+  UnprocessableMessage,
 } from '@synapsedesk/common';
 import { InAppNotificationService } from './in-app/in-app-notification.service';
 import { EmailService } from './email/email.service';
 import { SmsService } from './sms/sms.service';
 
 /**
- * NATS entry point for Domain E.
+ * JetStream entry point for Domain E.
  *
- * `@EventPattern`, not `@MessagePattern`: the publisher fires and forgets. A
- * registration must not fail because SMTP is slow, and no caller has anything
- * useful to do with a delivery receipt.
+ * Fire-and-forget from the publisher's side: a registration must not fail
+ * because SMTP is slow, and no caller has anything useful to do with a delivery
+ * receipt.
+ *
+ * **Plain methods, not `@EventPattern` handlers** (ADR 0041). Nest's NATS
+ * transport is core-only, so a decorated handler never receives a durable
+ * message; `main.ts` runs a `PullConsumerRunner` per subject and calls these
+ * directly. What was lost is Nest's routing, which for three subjects is three
+ * runners. What was gained is that the ack is explicit and local.
  */
-@Controller()
+@Injectable()
 export class NotificationsController {
   private readonly logger = new Logger(NotificationsController.name);
 
@@ -28,11 +34,7 @@ export class NotificationsController {
     private readonly inApp: InAppNotificationService,
   ) {}
 
-  @EventPattern(NOTIFICATION_PATTERNS.sendEmail)
-  async handleSendEmail(
-    @Payload() command: SendEmailCommand,
-    @Ctx() context: NatsContext,
-  ): Promise<void> {
+  async handleSendEmail(command: SendEmailCommand): Promise<void> {
     await this.dispatch(
       async () => {
         // The message id is discarded on THIS path deliberately: a bare
@@ -43,19 +45,15 @@ export class NotificationsController {
         await this.emailService.send(command);
       },
       `${command.template} email`,
-      context,
+      NOTIFICATION_PATTERNS.sendEmail,
     );
   }
 
-  @EventPattern(NOTIFICATION_PATTERNS.sendSms)
-  async handleSendSms(
-    @Payload() command: SendSmsCommand,
-    @Ctx() context: NatsContext,
-  ): Promise<void> {
+  async handleSendSms(command: SendSmsCommand): Promise<void> {
     await this.dispatch(
       () => this.smsService.send(command),
       `${command.template} SMS`,
-      context,
+      NOTIFICATION_PATTERNS.sendSms,
     );
   }
 
@@ -70,20 +68,22 @@ export class NotificationsController {
    * quota alert is what made it urgent, because a cap nobody is warned about
    * arrives as a 3-5x queue spike rather than as a billing notice.
    */
-  @EventPattern(IN_APP_NOTIFICATION_PATTERN)
   async handleInAppNotification(
-    @Payload() command: CreateInAppNotificationCommand,
-    @Ctx() context: NatsContext,
+    command: CreateInAppNotificationCommand,
   ): Promise<void> {
     if (!command?.organizationId || !command.audience || !command.type) {
-      // Dropped rather than guessed at. An audience of "everyone" is the one
-      // interpretation a malformed command must never receive — and a missing
-      // `type` would produce a row no preference can ever silence (
-      // Which is worse than no row at all.
-      this.logger.error(
+      // Never guessed at. An audience of "everyone" is the one interpretation a
+      // malformed command must not receive, and a missing `type` would produce a
+      // row no preference can ever silence — worse than no row at all.
+      //
+      // `UnprocessableMessage` rather than a log and a return: returning ACKS
+      // the message, so a malformed command was destroyed with only a log line
+      // left. This parks it in the DLQ without spending a retry, which is what
+      // that error exists for — `audit.consumer.ts` guards its `eventId` the
+      // same way.
+      throw new UnprocessableMessage(
         `${IN_APP_NOTIFICATION_PATTERN} arrived without a tenant, a type or an audience`,
       );
-      return;
     }
 
     await this.dispatch(
@@ -91,36 +91,80 @@ export class NotificationsController {
         await this.inApp.deliver(command);
       },
       `in-app '${command.title}'`,
-      context,
+      IN_APP_NOTIFICATION_PATTERN,
     );
   }
 
   /**
-   * Swallows the error after logging it.
+   * Runs one delivery, naming the failure in the log before letting it out.
    *
-   * An event handler that throws gives core NATS nowhere to put the failure —
-   * there is no reply channel and, without JetStream ack semantics wired up, no
-   * redelivery either. Rethrowing would surface as an unhandled rejection and
-   * take the process down, losing every other queued notification. Logging and
-   * continuing keeps one bad message from becoming an outage.
+   * **Rethrows deliberately — that is how a handler asks to be retried.**
+   * `PullConsumerRunner` catches, `nak()`s with the backoff delay while
+   * deliveries remain, and parks the message in its DLQ subject after
+   * `MAX_DELIVER`. Swallowing here would ack a delivery that never happened.
    *
-   * TODO Once JetStream is in use (the broker already runs with `-js`), replace
-   * this with an explicit nak() so failed sends are redelivered with backoff and
-   * land in a DLQ after N attempts.
+   * @param send - the delivery to attempt
+   * @param description - names the message in the log line, e.g. `welcome email`
+   * @param subject - the durable subject it arrived on
    */
   private async dispatch(
     send: () => Promise<void>,
     description: string,
-    context: NatsContext,
+    subject: string,
   ): Promise<void> {
     try {
       await send();
     } catch (error) {
       this.logger.error(
-        `Failed to deliver ${description} (subject: ${context.getSubject()}): ${
+        `Failed to deliver ${description} (subject: ${subject}): ${
           error instanceof Error ? error.message : String(error)
         }`,
       );
+      throw error;
     }
   }
+}
+
+/**
+ * Every durable subject this service consumes, paired with what handles it.
+ *
+ * **One list, read by both `main.ts` and the bootstrap test.** The decorators
+ * these replaced were self-describing — a handler that lost its `@EventPattern`
+ * could be caught by reflecting over the class — and a hand-maintained list in
+ * `main.ts` would give that property up silently. This keeps it: the test
+ * asserts these subjects are exactly the non-audit durable ones, so a subject
+ * added to the contract without a runner fails rather than going unconsumed.
+ */
+export type SubjectSubscription = {
+  subject: string;
+  /**
+   * **`never` is doing real work.** The three handlers take three different
+   * command types, and function parameters are contravariant — so a parameter of
+   * `never` accepts every handler, while `(command: SendEmailCommand) => …`
+   * would accept exactly one. It is what makes them one array.
+   *
+   * The runner supplies the decoded payload and reasserts the type there.
+   */
+  handle: (command: never) => Promise<void>;
+};
+
+export function notificationSubscriptions(
+  controller: NotificationsController,
+): SubjectSubscription[] {
+  return [
+    {
+      subject: NOTIFICATION_PATTERNS.sendEmail,
+      handle: (command: SendEmailCommand) =>
+        controller.handleSendEmail(command),
+    },
+    {
+      subject: NOTIFICATION_PATTERNS.sendSms,
+      handle: (command: SendSmsCommand) => controller.handleSendSms(command),
+    },
+    {
+      subject: IN_APP_NOTIFICATION_PATTERN,
+      handle: (command: CreateInAppNotificationCommand) =>
+        controller.handleInAppNotification(command),
+    },
+  ] as SubjectSubscription[];
 }

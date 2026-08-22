@@ -1,11 +1,10 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { ClientProxy } from '@nestjs/microservices';
 import Redis from 'ioredis';
 import {
   CreateInAppNotificationCommand,
   formatErrorMsg,
   IN_APP_NOTIFICATION_PATTERN,
-  NATS_CLIENT,
+  JetStreamPublisher,
   NOTIFICATION_TYPES,
   NotificationPriority,
   NotificationResourceType,
@@ -13,6 +12,9 @@ import {
   quotaThresholdEventId,
 } from '@synapsedesk/common';
 import { QUOTA_REDIS } from './quota-counter.service';
+
+/** 70 days — long enough to outlive any cycle, short enough not to accumulate. */
+const ALERT_GUARD_TTL_SECONDS = 70 * 24 * 60 * 60;
 
 /**
  * The 80 / 95 / 100 ladder — RDM §1.14.
@@ -33,7 +35,7 @@ export class QuotaAlertService {
   private readonly logger = new Logger(QuotaAlertService.name);
 
   constructor(
-    @Inject(NATS_CLIENT) private readonly client: ClientProxy,
+    private readonly jetstream: JetStreamPublisher,
     @Inject(QUOTA_REDIS) private readonly redis: Redis,
   ) {}
 
@@ -132,14 +134,15 @@ export class QuotaAlertService {
         data: { threshold },
       };
 
-      // `.subscribe()` is mandatory: `emit()` is COLD and nothing is published
-      // without it. The classic silent failure with this API.
-      this.client.emit(IN_APP_NOTIFICATION_PATTERN, command).subscribe({
-        error: (error: unknown) =>
-          this.logger.error(
-            `Could not publish quota alert ${eventId}: ${formatErrorMsg(error)}`,
-          ),
-      });
+      // `eventId` is derived from the threshold crossing, so a re-publish of
+      // the same crossing is collapsed by the stream's window and a redelivery
+      // is caught by `UNIQUE (recipient_id, event_id)`. Both halves keyed on one
+      // field, which is what makes the alert safe to emit more than once.
+      this.jetstream.publish(
+        IN_APP_NOTIFICATION_PATTERN,
+        command,
+        command.eventId,
+      );
     }
   }
 
@@ -174,6 +177,3 @@ export class QuotaAlertService {
     ].join(' ');
   }
 }
-
-/** 70 days — long enough to outlive any cycle, short enough not to accumulate. */
-const ALERT_GUARD_TTL_SECONDS = 70 * 24 * 60 * 60;

@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { JetStreamModule } from '@synapsedesk/common';
 import { ConfigModule } from '@nestjs/config';
 import { envValidationSchema } from './common/configs/env.validation';
 import { PrismaModule } from './modules/prisma/prisma.module';
@@ -23,6 +24,7 @@ import { OpsModule } from './modules/ops/ops.module';
         allowUnknown: true, // Ignore env vars not declared in the schema
       },
     }),
+    JetStreamModule,
     PrismaModule,
     EventsModule,
     AuthClientModule,

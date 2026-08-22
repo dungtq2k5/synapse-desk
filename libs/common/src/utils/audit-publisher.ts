@@ -1,15 +1,14 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { ClientProxy } from '@nestjs/microservices';
 import {
   AUDIT_PATTERNS,
   AuditAction,
   AuditResourceType,
   RecordAuditCommand,
 } from '../contracts/audit.contract';
-import { NATS_CLIENT } from '../configs/nats.config';
 import { CallerContext } from '../configs/identity.config';
-import { formatErrorMsg } from './format-error';
+import { JetStreamPublisher } from '../jetstream/jetstream.module';
 
 /** Everything about an event except who did it and where from. */
 export type AuditEvent = {
@@ -53,7 +52,7 @@ export class AuditPublisher {
   private readonly logToConsole: boolean;
 
   constructor(
-    @Inject(NATS_CLIENT) private readonly client: ClientProxy,
+    private readonly jetstream: JetStreamPublisher,
     configService: ConfigService,
   ) {
     this.logToConsole = configService.get<boolean>(
@@ -98,6 +97,7 @@ export class AuditPublisher {
       resourceType: event.resourceType,
       resourceId: event.resourceId,
       metadata: event.metadata,
+      eventId: randomUUID(),
       occurredAt: new Date().toISOString(),
     });
   }
@@ -131,6 +131,10 @@ export class AuditPublisher {
       resourceType: event.resourceType,
       resourceId: event.resourceId,
       metadata: event.metadata,
+      // Minted at the PUBLISHER, like `occurredAt` and for the same reason: it
+      // identifies this act, so a retry of the whole request is a new act and a
+      // redelivery of this message is not.
+      eventId: randomUUID(),
       // Stamped here, not by the consumer: a consumer restart must not backdate
       // a backlog of events to the moment it caught up.
       occurredAt: new Date().toISOString(),
@@ -147,14 +151,9 @@ export class AuditPublisher {
       this.logger.log(JSON.stringify(command));
     }
 
-    // `emit()` returns a COLD observable — nothing is published until something
-    // subscribes. Omitting `.subscribe()` is the classic silent failure with
-    // this API: no error, no message, no clue.
-    this.client.emit(AUDIT_PATTERNS.record, command).subscribe({
-      error: (error: unknown) =>
-        this.logger.error(
-          `Failed to publish ${command.action} to ${AUDIT_PATTERNS.record}: ${formatErrorMsg(error)}`,
-        ),
-    });
+    // Durable since ADR 0041. `eventId` is the `Nats-Msg-Id`, so the stream
+    // collapses a repeated PUBLISH of one act; the consumer's unique index
+    // absorbs a repeated DELIVERY. Two mechanisms, two failures.
+    this.jetstream.publish(AUDIT_PATTERNS.record, command, command.eventId);
   }
 }

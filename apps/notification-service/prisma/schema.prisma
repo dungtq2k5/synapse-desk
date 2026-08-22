@@ -98,17 +98,15 @@ model Notification {
   /// alert is exactly the producer that retries.
   eventId String? @map("event_id") @db.VarChar(100)
 
-  /// The event id that last INCREMENTED this group.
+  /// The recent event ids that INCREMENTED this group, newest first.
   ///
   /// Grouping and `event_id` idempotency pull in opposite directions: the
   /// INSERT is deduped by the unique index, but an increment has no such
-  /// protection, so a NATS redelivery can double-count. Storing the last
-  /// triggering id and skipping a repeat covers consecutive redelivery, which
-  /// is the case NATS actually produces.
+  /// protection, so a redelivery can double-count.
   ///
-  /// Deliberately not a full event log: "4 new replies" instead of "3" is a
-  /// cosmetic error, and exactness would cost more than the defect.
-  lastGroupEventId String? @map("last_group_event_id") @db.VarChar(100)
+  /// Bounded to the newest `GROUP_EVENT_WINDOW` entries by the `UPDATE` that
+  /// writes it, so a busy group does not grow an unbounded array.
+  groupEventIds String[] @map("group_event_ids") @db.VarChar(100)
 
   readAt     DateTime? @map("read_at") @db.Timestamptz
   archivedAt DateTime? @map("archived_at") @db.Timestamptz

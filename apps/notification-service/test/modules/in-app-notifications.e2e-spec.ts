@@ -9,11 +9,13 @@ import {
   NotificationResourceType,
   compareAlphabetically,
   quotaThresholdEventId,
+  UnprocessableMessage,
 } from '@synapsedesk/common';
 import { bootstrapE2eTest, E2eFixture } from '../utils/bootstrap';
 import { InAppNotificationService } from '../../src/modules/in-app/in-app-notification.service';
 import { AuthReferenceService } from '../../src/modules/auth-client/auth-reference.service';
 import { EmailService } from '../../src/modules/email/email.service';
+import { NotificationsController } from '../../src/modules/notifications.controller';
 
 /**
  * Domain E's write path.
@@ -224,9 +226,9 @@ describe('In-app notification delivery (e2e)', () => {
 
   describe('redelivery', () => {
     it('9. Delivering the SAME event twice leaves one row per recipient', async () => {
-      // Core NATS redelivers and has no dedup of its own, so this is the normal
-      // path rather than a rare one. The partial UNIQUE index is the mechanism
-      // — and it only works because the producer DERIVES the id.
+      // The stream redelivers (ADR 0041), so this is the normal path rather
+      // than a rare one. The partial UNIQUE index is the mechanism — and it only
+      // works because the producer DERIVES the id.
       const command = quotaAlert(80);
 
       const first = await inApp.deliver(command);
@@ -550,6 +552,27 @@ describe('In-app notification delivery (e2e)', () => {
       } finally {
         create.mockRestore();
       }
+    });
+
+    it('**29. A malformed command is PARKED, not acked away**', async () => {
+      // The failure this guards is silent by construction: returning from the
+      // handler acks the message, so a command missing its tenant, type or
+      // audience used to be destroyed with a log line as the only trace.
+      // `UnprocessableMessage` is what tells the runner to park it in the DLQ
+      // WITHOUT spending a retry — it can never become valid.
+      const controller = fx.moduleRef.get(NotificationsController);
+      const malformed = {
+        ...quotaAlert(80),
+        audience: undefined,
+      } as unknown as Parameters<
+        NotificationsController['handleInAppNotification']
+      >[0];
+
+      await expect(
+        controller.handleInAppNotification(malformed),
+      ).rejects.toBeInstanceOf(UnprocessableMessage);
+
+      await expect(fx.prisma.notification.count()).resolves.toBe(0);
     });
   });
 });

@@ -17,7 +17,7 @@ import {
   quotaCounterKey,
   quotaThresholdEventId,
   readHttpStatusHint,
-  NATS_CLIENT,
+  JetStreamPublisher,
 } from '@synapsedesk/common';
 import {
   BUDGET_MICROS,
@@ -89,15 +89,15 @@ describe('The AI ledger and quota gate (e2e)', () => {
     // return is the one variable every test here wants to control anyway.
     getAiEntitlement = jest.spyOn(authReference, 'getAiEntitlement');
 
-    // NATS is not running either. The alert path is fire-and-forget, so a real
-    // publish would fail silently and prove nothing.
-    const client = fx.moduleRef.get<{ emit: (...args: unknown[]) => unknown }>(
-      NATS_CLIENT,
-      { strict: false },
-    );
+    // The alert path is fire-and-forget, so a real publish would fail silently
+    // and prove nothing — and since ADR 0041 it goes through JetStream rather
+    // than the core client, so this spies on the publisher that actually
+    // carries it. Spying on the old one still "worked": it recorded nothing and
+    // every assertion below would have compared against an empty list.
+    const client = fx.moduleRef.get(JetStreamPublisher, { strict: false });
     natsEmit = jest
-      .spyOn(client, 'emit')
-      .mockReturnValue({ subscribe: () => undefined });
+      .spyOn(client, 'publish')
+      .mockImplementation(() => undefined);
   });
 
   beforeEach(async () => {
@@ -372,7 +372,7 @@ describe('The AI ledger and quota gate (e2e)', () => {
       // is gone.
       //
       // Each request charges a fifth of the budget and re-checks, so exactly
-      // one can find room if the increment is truly serialised.
+      // one can find room if the increment is truly serialized.
       await setSpend(BUDGET_MICROS - 200_000n);
       const cost = 200_000n;
 

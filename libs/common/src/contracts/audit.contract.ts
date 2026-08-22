@@ -158,6 +158,23 @@ export type RecordAuditCommand = {
 
   metadata?: Record<string, unknown>;
 
+  /**
+   * Stamped by the publisher, and it does two jobs with one field.
+   *
+   * As `Nats-Msg-Id` it is the stream's PUBLISH dedupe — one act published
+   * twice inside `DUPLICATE_WINDOW_MS` becomes one message. As a UNIQUE column
+   * on `audit_logs` it makes a REDELIVERY a no-op. Those defend different
+   * failures and neither substitutes for the other: the window cannot see a
+   * redelivery, and the column cannot see a republish that never reached the
+   * consumer.
+   *
+   * Generated rather than derived from the event's contents. Two genuinely
+   * distinct acts can be identical in every other field — the same admin
+   * locking the same user twice in one second is two events, and a content
+   * hash would silently record one.
+   */
+  eventId: string;
+
   /** ISO 8601, from the publisher's clock. */
   occurredAt: string;
 };

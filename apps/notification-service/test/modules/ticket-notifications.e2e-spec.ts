@@ -1,3 +1,4 @@
+import { faker } from '@faker-js/faker';
 import {
   ReassignmentReason,
   TICKET_PATTERNS,
@@ -68,7 +69,7 @@ describe('Ticket notifications (e2e)', () => {
     ({
       ...base,
       pattern: TICKET_PATTERNS.messageCreated,
-      messageId: `msg-${Math.random().toString(36).slice(2)}`,
+      messageId: `msg-${faker.string.uuid()}`,
       senderId: AGENT,
       requesterId: REQUESTER,
       assigneeId: AGENT,
@@ -357,16 +358,37 @@ describe('Ticket notifications (e2e)', () => {
     });
 
     it('17. Redelivering the SAME message does not increment twice', async () => {
-      // The grouping guard, at exactly the limit of what it claims: the insert is
-      // deduped by the unique index, an INCREMENT is not, and comparing the
-      // last triggering event id covers CONSECUTIVE redelivery — which is the
-      // case NATS actually produces.
+      // The grouping guard: the insert is deduped by the unique index and an
+      // INCREMENT is not, so the update carries its own check. This is the
+      // CONSECUTIVE case — 17b is the one that used to be uncovered.
       const event = messageEvent({ messageId: 'msg-1' });
       const second = messageEvent({ messageId: 'msg-2' });
 
       await consumer.messageCreated(event);
       await consumer.messageCreated(second);
       await consumer.messageCreated(second);
+
+      const [row] = await fx.prisma.notification.findMany();
+      expect(row.groupCount).toBe(2);
+    });
+
+    it('**17b. and redelivering an OLDER message does not increment either**', async () => {
+      // The case a pull consumer actually produces, and the one the guard used
+      // to miss. A nak'd message comes back AFTER later messages have already
+      // advanced the group, so a guard comparing against a single "last" id sees
+      // a mismatch and counts the same event a second time.
+      //
+      // Before ADR 0041 this was unreachable — core NATS only ever redelivered
+      // consecutively, because only a publisher emitting twice in a row could
+      // produce a duplicate at all. It is now the normal shape, which is why the
+      // guard remembers a window rather than one id.
+      const first = messageEvent({ messageId: 'msg-1' });
+      const second = messageEvent({ messageId: 'msg-2' });
+
+      await consumer.messageCreated(first);
+      await consumer.messageCreated(second);
+      // `first` comes back late, out of order.
+      await consumer.messageCreated(first);
 
       const [row] = await fx.prisma.notification.findMany();
       expect(row.groupCount).toBe(2);

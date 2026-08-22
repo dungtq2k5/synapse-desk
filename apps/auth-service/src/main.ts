@@ -4,6 +4,12 @@ import 'dotenv/config';
 
 import { NestFactory } from '@nestjs/core';
 import { Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import {
+  ensureStream,
+  JETSTREAM_CONNECTION,
+  JETSTREAM_STREAMS,
+} from '@synapsedesk/common';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import {
   AUTH_PACKAGE_NAME,
@@ -13,6 +19,7 @@ import {
   OPS_PACKAGE_NAMES,
   OPS_PROTO_PATHS,
 } from '@synapsedesk/grpc-proto';
+import type { NatsConnection } from 'nats';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
@@ -35,6 +42,26 @@ async function bootstrap() {
         loader: GRPC_LOADER_OPTIONS,
       },
     },
+  );
+
+  // **A PUBLISHER declares the streams it publishes to, not just the consumer.**
+  // A publish to a subject no stream captures fails with a 503, so if this
+  // service booted before the one that owns the stream, every audit act in that
+  // window would be logged as a failure and lost — the exact hole ADR 0041
+  // exists to close. `ensureStream` is idempotent, so both ends declaring is
+  // cheaper than a boot ordering nothing enforces.
+  const natsConnection = app.get<NatsConnection>(JETSTREAM_CONNECTION);
+  const monitorUrl = app
+    .get<ConfigService>(ConfigService)
+    .getOrThrow<string>('NATS_MONITOR_URL');
+
+  await ensureStream(natsConnection, JETSTREAM_STREAMS.AUDIT, monitorUrl);
+
+  // NOTIFICATIONS too: transactional mail is published from here.
+  await ensureStream(
+    natsConnection,
+    JETSTREAM_STREAMS.NOTIFICATIONS,
+    monitorUrl,
   );
 
   // Lets Prisma disconnect cleanly on SIGINT/SIGTERM.

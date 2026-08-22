@@ -16,6 +16,11 @@ export const envValidationSchema = Joi.object({
   BUILD_TIME: Joi.string().isoDate().required(),
 
   NATS_URL: Joi.string().required(),
+  // The HTTP monitoring root, read once at boot to prove JetStream's store
+  // survives a container recreate. Required rather than optional: this
+  // service declares a durable stream, and one it cannot verify is worse
+  // than none — see ADR 0041.
+  NATS_MONITOR_URL: Joi.string().uri().required(),
 
   APP_NAME: Joi.string().required(),
   // Base URL of the SPA, used to build links in outbound mail. Wrong value =

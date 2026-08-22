@@ -25,6 +25,11 @@ export const envValidationSchema = Joi.object({
   // events AND subscribes to audit.record — it is the first service in this
   // repo to be a NATS consumer, not just a publisher.
   NATS_URL: Joi.string().required(),
+  // The HTTP monitoring root, read once at boot to prove JetStream's store
+  // survives a container recreate. Required rather than optional: this
+  // service declares a durable stream, and one it cannot verify is worse
+  // than none — see ADR 0041.
+  NATS_MONITOR_URL: Joi.string().uri().required(),
 
   // The gRPC server this service exposes to the gateway.
   GRPC_HOST: Joi.string().required(),

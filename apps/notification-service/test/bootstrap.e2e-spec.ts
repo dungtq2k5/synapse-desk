@@ -1,14 +1,17 @@
 import {
-  IN_APP_NOTIFICATION_PATTERN,
   NOTIFICATION_REALTIME_PATTERNS,
-  NOTIFICATION_PATTERNS,
   NOTIFICATION_TYPES,
   NotificationPriority,
   TICKET_PATTERNS,
+  AUDIT_PATTERNS,
+  DURABLE_SUBJECTS,
   compareAlphabetically,
 } from '@synapsedesk/common';
 import { bootstrapE2eTest, E2eFixture } from './utils/bootstrap';
-import { NotificationsController } from '../src/modules/notifications.controller';
+import {
+  NotificationsController,
+  notificationSubscriptions,
+} from '../src/modules/notifications.controller';
 import { TicketNotificationConsumer } from '../src/modules/in-app/ticket-notification.consumer';
 import { NotificationsGrpcController } from '../src/modules/feed/notifications-grpc.controller';
 import { AuthReferenceService } from '../src/modules/auth-client/auth-reference.service';
@@ -31,10 +34,6 @@ describe('Notification-service foundations (e2e)', () => {
 
   const ORG = '11111111-1111-4111-8111-111111111111';
   const RECIPIENT = '22222222-2222-4222-8222-222222222222';
-
-  const natsContext = {
-    getSubject: () => IN_APP_NOTIFICATION_PATTERN,
-  } as never;
 
   beforeAll(async () => {
     fx = await bootstrapE2eTest();
@@ -72,55 +71,50 @@ describe('Notification-service foundations (e2e)', () => {
     // was never registered at all.
     const controller = fx.moduleRef.get(NotificationsController);
 
-    await controller.handleInAppNotification(
-      {
-        organizationId: ORG,
-        type: NOTIFICATION_TYPES.quotaThreshold,
-        audience: { kind: 'permission', permission: 'organization.update' },
-        eventId: 'boot-check',
-        title: 'AI budget 80% used',
-        body: 'At 100%, questions route to your agents.',
-        priority: NotificationPriority.NORMAL,
-        occurredAt: new Date().toISOString(),
-      },
-      natsContext,
-    );
+    await controller.handleInAppNotification({
+      organizationId: ORG,
+      type: NOTIFICATION_TYPES.quotaThreshold,
+      audience: { kind: 'permission', permission: 'organization.update' },
+      eventId: 'boot-check',
+      title: 'AI budget 80% used',
+      body: 'At 100%, questions route to your agents.',
+      priority: NotificationPriority.NORMAL,
+      occurredAt: new Date().toISOString(),
+    });
 
     await expect(fx.prisma.notification.count()).resolves.toBe(1);
   });
 
-  it('3. Subscribes to every subject Domain E owns AND to `ticket.*`', () => {
-    // Reflected from the decorators rather than trusted to a comment: a
-    // handler that lost its `@EventPattern` is a subject that silently stops
-    // being consumed, which is precisely the bug hardening was about.
+  it('3. Subscribes to every `ticket.*` subject it consumes over CORE', () => {
+    // Reflected from the decorators rather than trusted to a comment: a handler
+    // that lost its `@EventPattern` is a subject that silently stops being
+    // consumed, which is precisely the bug hardening was about.
+    //
+    // `ticket.*` only, now. Domain E's own three moved to JetStream (ADR 0041)
+    // and have no decorators to reflect over — 3b covers those, and the split is
+    // the point: two transports, two ways to stop consuming.
     const patterns = new Set<string>();
+    const prototype = TicketNotificationConsumer.prototype as unknown as Record<
+      string,
+      unknown
+    >;
 
-    for (const target of [
-      NotificationsController,
-      TicketNotificationConsumer,
-    ]) {
-      const prototype = target.prototype as unknown as Record<string, unknown>;
+    for (const name of Object.getOwnPropertyNames(prototype)) {
+      const handler = prototype[name];
+      if (typeof handler !== 'function') continue;
 
-      for (const name of Object.getOwnPropertyNames(prototype)) {
-        const handler = prototype[name];
-        if (typeof handler !== 'function') continue;
-
-        const pattern: unknown = Reflect.getMetadata(
-          'microservices:pattern',
-          handler,
-        );
-        // Nest stores it as an array when a handler carries several.
-        for (const value of Array.isArray(pattern) ? pattern : [pattern]) {
-          if (typeof value === 'string') patterns.add(value);
-        }
+      const pattern: unknown = Reflect.getMetadata(
+        'microservices:pattern',
+        handler,
+      );
+      // Nest stores it as an array when a handler carries several.
+      for (const value of Array.isArray(pattern) ? pattern : [pattern]) {
+        if (typeof value === 'string') patterns.add(value);
       }
     }
 
     expect([...patterns].sort(compareAlphabetically)).toEqual(
       [
-        IN_APP_NOTIFICATION_PATTERN,
-        NOTIFICATION_PATTERNS.sendEmail,
-        NOTIFICATION_PATTERNS.sendSms,
         TICKET_PATTERNS.assigned,
         TICKET_PATTERNS.reassigned,
         TICKET_PATTERNS.unassigned,
@@ -128,6 +122,27 @@ describe('Notification-service foundations (e2e)', () => {
         TICKET_PATTERNS.messageCreated,
         TICKET_PATTERNS.statusChanged,
       ].sort(compareAlphabetically),
+    );
+  });
+
+  it('**3b. and has a runner for every DURABLE subject that is not audit**', () => {
+    // The replacement for what the decorators used to guarantee. A subject added
+    // to `DURABLE_SUBJECTS` with no runner would be published to, persisted by
+    // the stream, and consumed by nobody — which is worse than the core version
+    // of the same bug, because the messages pile up in a WorkQueue instead of
+    // being dropped.
+    //
+    // Derived from the contract on BOTH sides rather than compared against a
+    // literal, so this cannot be satisfied by editing the expectation.
+    const expected = DURABLE_SUBJECTS.filter(
+      (subject) => subject !== AUDIT_PATTERNS.record,
+    );
+    const wired = notificationSubscriptions(
+      fx.moduleRef.get(NotificationsController),
+    ).map(({ subject }) => subject);
+
+    expect([...wired].sort(compareAlphabetically)).toEqual(
+      [...expected].sort(compareAlphabetically),
     );
   });
 

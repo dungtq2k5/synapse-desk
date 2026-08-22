@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { JetStreamModule } from '@synapsedesk/common';
 import { ConfigModule } from '@nestjs/config';
 import { envValidationSchema } from './common/configs/env.validation';
 import { PrismaModule } from './modules/prisma/prisma.module';
@@ -22,6 +23,7 @@ import { InboundRejectionConsumer } from './modules/inbound-email/inbound-reject
       validationSchema: envValidationSchema,
       validationOptions: { allowUnknown: true },
     }),
+    JetStreamModule,
     // Domain E gained a database when in-app notifications landed.
     // Email and SMS carry their recipient in the command and need no storage;
     // an in-app feed is storage by definition.
@@ -40,9 +42,8 @@ import { InboundRejectionConsumer } from './modules/inbound-email/inbound-reject
     OpsModule,
   ],
   controllers: [
-    NotificationsController,
-    // `ticket.*` → notifications. A separate controller rather than
-    // more handlers on the one above, because the two answer to different
+    // `ticket.*` → notifications. A separate class rather than more handlers on
+    // `NotificationsController`, because the two answer to different
     // producers: one is Domain E's own command subject, this one subscribes to
     // another domain's events and translates them.
     TicketNotificationConsumer,
@@ -52,6 +53,14 @@ import { InboundRejectionConsumer } from './modules/inbound-email/inbound-reject
     // a wrapper around one class with nothing else in it.
     InboundRejectionConsumer,
   ],
-  providers: [EmailService, SmsService, InAppNotificationService],
+  providers: [
+    // A provider, not a controller: ADR 0041 moved its three subjects to
+    // JetStream, which Nest's core-only transport cannot route to. `main.ts`
+    // runs a `PullConsumerRunner` per subject and calls it directly.
+    NotificationsController,
+    EmailService,
+    SmsService,
+    InAppNotificationService,
+  ],
 })
 export class AppModule {}

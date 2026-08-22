@@ -1,12 +1,15 @@
-import { Controller, Logger } from '@nestjs/common';
-import { EventPattern, Payload } from '@nestjs/microservices';
+import { Injectable, Logger } from '@nestjs/common';
 import {
-  AUDIT_PATTERNS,
   formatErrorMsg,
+  isUniqueConstraintViolation,
   RecordAuditCommand,
+  UnprocessableMessage,
 } from '@synapsedesk/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '../../generated/prisma/client';
+
+/** The unique that makes a redelivered audit event a no-op. */
+const AUDIT_EVENT_ID_INDEX = 'audit_logs_event_id_key';
 
 /**
  * The consumer Domain A has been publishing into since it was built.
@@ -16,28 +19,27 @@ import { Prisma } from '../../generated/prisma/client';
  * events now land in `audit_logs`, which `ticket-service` owns per the
  * ownership map even though every producer so far is auth-service.
  *
- * **At-most-once, deliberately, and matching the publisher.** NATS core has no
- * redelivery, and `AuditPublisher`'s own docblock already accepts that the
- * trail can have holes when the broker is down. Matching that here keeps this
- * handler simple: it catches, logs and drops. It never rethrows.
+ * **At-least-once over JetStream** since ADR 0041, which is why `eventId` and
+ * the unique index below exist: the stream will deliver the same message twice
+ * and an audit trail that counted it twice would inflate the one question it
+ * exists to answer.
  *
- * That last part is the load-bearing one. A handler that throws on a malformed
- * payload does not "fail safely" — with a durable subscription it produces a
- * poison-message loop that redelivers the same bad event forever and buries
- * every good one behind it. Dropping one row is strictly better than losing the
- * stream.
+ * **A malformed payload is still dropped rather than rethrown**, and that is
+ * now load-bearing rather than merely simple. `PullConsumerRunner` naks what
+ * throws, so a handler that threw on an unparseable event would redeliver it
+ * `MAX_DELIVER` times and park it — spending the whole retry budget on an event
+ * that cannot succeed. Dropping one unusable row is strictly better.
  *
- * If the trail is ever REQUIRED to be gap-free, the fix is JetStream plus a
- * durable consumer, applied to both ends — not a retry bolted onto this one.
+ * A write that fails for a TRANSIENT reason does rethrow, because that is
+ * exactly what redelivery is for.
  */
-@Controller()
+@Injectable()
 export class AuditConsumer {
   private readonly logger = new Logger(AuditConsumer.name);
 
   constructor(private readonly prisma: PrismaService) {}
 
-  @EventPattern(AUDIT_PATTERNS.record)
-  async record(@Payload() command: RecordAuditCommand): Promise<void> {
+  async record(command: RecordAuditCommand): Promise<void> {
     try {
       if (!this.isUsable(command)) {
         // Logged at WARN rather than ERROR: a malformed event is a bug in a
@@ -49,8 +51,26 @@ export class AuditConsumer {
         return;
       }
 
+      // **Not `?? null` any more, and this is where the type stops being a
+      // guarantee.** `RecordAuditCommand.eventId` is `string`, but this subject
+      // has no `@EventPattern` and therefore no deserializer in front of it —
+      // the runner hands over whatever JSON reached the stream. A NULL here does
+      // not conflict in the unique index, so the row and every redelivery of it
+      // would be written again: the dedupe guard bypassed rather than absent.
+      //
+      // Parked rather than retried, because no redelivery adds a missing field.
+      if (!command.eventId) {
+        throw new UnprocessableMessage(
+          `${command.action} arrived with no eventId, so it cannot be deduplicated`,
+        );
+      }
+
       await this.prisma.auditLog.create({
         data: {
+          // The publisher's id for the act, and what makes a redelivery a no-op
+          // rather than a second row. Non-null by the guard above; the COLUMN
+          // stays nullable for rows written before the field existed.
+          eventId: command.eventId,
           // `?? null`, never `?? someTenant`. A platform-level act belongs to
           // the platform (RDM §1.7), and coercing it into a tenant would file
           // an operator's action inside a customer's own audit trail — which
@@ -74,10 +94,37 @@ export class AuditConsumer {
         },
       });
     } catch (error) {
+      // Straight back out to the runner, which parks it. Falling through would
+      // hand a permanent failure to the arm that logs and rethrows as transient,
+      // and it would be retried five times on the way to the same place.
+      if (error instanceof UnprocessableMessage) throw error;
+
+      // **A duplicate is SUCCESS, not a failure**, and this is the half that
+      // makes at-least-once delivery safe here: the stream WILL deliver the
+      // same message twice, and an audit trail that counted it twice would
+      // inflate "how many times did X happen" — the question it exists to
+      // answer.
+      //
+      // The same shape `InAppNotificationService` already uses, and it is
+      // deliberately NOT a read-then-write: two deliveries racing would both
+      // read "absent" and both insert. The unique index is the only thing that
+      // can decide this, so the insert asks it.
+      if (isUniqueConstraintViolation(error, AUDIT_EVENT_ID_INDEX)) {
+        this.logger.debug(
+          `Audit event ${command.eventId} already recorded; redelivery ignored`,
+        );
+        return;
+      }
+
       this.logger.error(
         `Failed to persist audit event ${command?.action}: ${formatErrorMsg(error)}`,
       );
-      // Deliberately swallowed. See the class docblock.
+      // Rethrown, unlike every other arm above. This is the transient case — a
+      // dropped connection, a database mid-failover — and rethrowing is what
+      // asks the runner to nak so the stream delivers it again. Swallowing here
+      // would ack a message whose row was never written, which is the one
+      // outcome durability was bought to prevent.
+      throw error;
     }
   }
 

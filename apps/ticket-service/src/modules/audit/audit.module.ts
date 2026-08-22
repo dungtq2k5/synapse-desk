@@ -11,14 +11,16 @@ import { AuditReadService } from './audit-read.service';
  * and keeping them adjacent makes the asymmetry visible. One subscribes; the
  * other has no write method at all.
  *
- * `AuditConsumer` is a `@Controller` with no HTTP routes — `@EventPattern`
- * handlers are registered by the NATS transport, and Nest discovers them the
- * same way it discovers route handlers. Declaring it under `controllers` rather
- * than `providers` is what makes that discovery happen.
+ * `AuditConsumer` is a plain provider, not a `@Controller`. It was one while
+ * `audit.record` was a core `@EventPattern` subject; ADR 0041 moved it to a
+ * JetStream pull consumer, which Nest's NATS transport cannot drive — its
+ * transport is core-only, so a decorated handler would never receive a durable
+ * message. `main.ts` starts the runner and calls `record()` directly, which is
+ * why the class is exported.
  */
 @Module({
-  controllers: [AuditConsumer, AuditGrpcController],
-  providers: [AuditReadService],
-  exports: [AuditReadService],
+  controllers: [AuditGrpcController],
+  providers: [AuditConsumer, AuditReadService],
+  exports: [AuditConsumer, AuditReadService],
 })
 export class AuditModule {}

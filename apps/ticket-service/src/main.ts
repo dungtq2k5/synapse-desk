@@ -14,8 +14,19 @@ import {
   TICKET_PACKAGE_NAME,
   TICKET_PROTO_PATHS,
 } from '@synapsedesk/grpc-proto';
-import { createNatsTransport } from '@synapsedesk/common';
+import {
+  ensureStream,
+  JETSTREAM_CONNECTION,
+  PullConsumerRunner,
+  streamFor,
+  AUDIT_PATTERNS,
+  RecordAuditCommand,
+  JETSTREAM_STREAMS,
+  createNatsTransport,
+} from '@synapsedesk/common';
+import type { NatsConnection } from 'nats';
 import { AppModule } from './app.module';
+import { AuditConsumer } from './modules/audit/audit.consumer';
 
 /**
  * A HYBRID microservice — gRPC server AND NATS consumer in one process.
@@ -64,6 +75,33 @@ async function bootstrap() {
   app.connectMicroservice<MicroserviceOptions>(
     createNatsTransport(configService),
   );
+
+  // **Before any microservice starts.** The AUDIT stream is this service's to
+  // declare, and `ensureStream` refuses a broker whose JetStream store would
+  // not survive a restart — which is the one failure a durable subject must
+  // never boot into, because the publisher is told it succeeded.
+  const natsConnection = app.get<NatsConnection>(JETSTREAM_CONNECTION);
+  const monitorUrl = configService.getOrThrow<string>('NATS_MONITOR_URL');
+
+  await ensureStream(natsConnection, JETSTREAM_STREAMS.AUDIT, monitorUrl);
+  // The DLQ is declared by whoever parks messages into it. Both services do,
+  // and `ensureStream` is add-then-update, so declaring it twice is the normal
+  // path rather than a conflict.
+  await ensureStream(natsConnection, JETSTREAM_STREAMS.DLQ, monitorUrl);
+
+  // The durable name is stable across restarts — that is what makes the
+  // consumer durable, and what lets a redeploy resume rather than replay.
+  const auditRunner = new PullConsumerRunner<RecordAuditCommand>({
+    connection: natsConnection,
+    // Derived from the subject rather than named here: the stream's `subjects`,
+    // `DURABLE_SUBJECTS` and this line were three statements of one fact, and
+    // `streamFor` throws at boot if they disagree.
+    stream: streamFor(AUDIT_PATTERNS.record),
+    durable: 'ticket-service-audit-writer',
+    filterSubject: AUDIT_PATTERNS.record,
+    handler: (command) => app.get(AuditConsumer).record(command),
+  });
+  await auditRunner.start();
 
   // Lets Prisma disconnect cleanly on SIGINT/SIGTERM.
   app.enableShutdownHooks();

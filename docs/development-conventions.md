@@ -444,10 +444,20 @@ It belongs here rather than in a RAG document because it is the input-validation
 
 Subjects and payloads live in `libs/common/src/contracts/*.contract.ts` as **discriminated unions**. NATS is untyped on the wire: a publisher that renames a field fails *silently* — the message is delivered, the consumer reads `undefined`, and the email goes out saying "Hello undefined". Both ends importing the same declaration turns that into a compile error.
 
-- `emit()` (fire-and-forget), not `send()` (request/response), for side effects.
+- Fire-and-forget for side effects, never request/response: `emit()` on the core transport, `JetStreamPublisher.publish()` on the durable subjects.
 - **MUST NOT** `await` a notification publish in a request path.
 - A new template means a new arm of `SendEmailCommand` with its own required `data` fields — **not** a `Record<string, unknown>` bag.
 - Publishing services hold **no** SMTP/Twilio credentials. Those belong to `notification-service` alone.
+
+**Two transports, and which one a subject uses is a decision, not a default.** `DURABLE_SUBJECTS` in `jetstream.config.ts` is the list; everything else is core NATS at-most-once. The rule for adding to it is [ADR 0041](./decisions/0041-durable-subjects-are-the-ones-with-nothing-to-reconcile-against.md): *prefer reconciliation where state exists, redelivery where it does not.*
+
+- A durable subject **MUST** have a duplicate-safe consumer before it is made durable. At-least-once converts "lost" into "possibly twice", so promoting a subject in front of a consumer that cannot absorb a duplicate is a downgrade, not an upgrade.
+- Publish dedupe (`Nats-Msg-Id` inside `duplicate_window`) and consumer idempotency (a unique index) defend **different** failures. A test of one does not cover the other, and they are easy to conflate — a test publishing the same body twice passes either way.
+- A durable handler has **three** outcomes, not two. Rethrow a *transient* failure so the runner naks it; return for a malformed payload worth dropping; throw `UnprocessableMessage` for one that is unrecoverable but worth keeping, which parks it immediately. Retrying a failure that cannot succeed is the poison loop `MAX_DELIVER` exists to bound, entered deliberately.
+- Redelivery needs **both** pacing mechanisms configured, because they cover different failures: `nak(ms)` for a handler that failed and said so, the consumer's `backoff[]` for one that died without answering. Setting only `backoff` leaves an explicit nak firing every retry in milliseconds — and it is accepted into the config and reported by `nats consumer info` while doing nothing, so it looks configured.
+- No `backoff` entry may be shorter than a handler's slowest legitimate run: **each one replaces `ack_wait` for that attempt**, so a short entry redelivers a message still being processed.
+- Nest's NATS transport is **core-only**. `@EventPattern` never sees a JetStream message; durable subjects are consumed by a `PullConsumerRunner` started in `main.ts`.
+- Both **publishers and consumers** call `ensureStream`. A publish to a subject no stream captures fails with a 503, so a publisher that assumes someone else declared it loses everything published before that service boots.
 
 ---
 

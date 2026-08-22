@@ -14,7 +14,13 @@ import {
   INGESTION_PACKAGE_NAME,
   INGESTION_PROTO_PATHS,
 } from '@synapsedesk/grpc-proto';
-import { createNatsTransport } from '@synapsedesk/common';
+import {
+  createNatsTransport,
+  ensureStream,
+  JETSTREAM_CONNECTION,
+  JETSTREAM_STREAMS,
+} from '@synapsedesk/common';
+import type { NatsConnection } from 'nats';
 import { AppModule } from './app.module';
 
 /**
@@ -60,6 +66,24 @@ async function bootstrap() {
   // with a different name.
   app.connectMicroservice<MicroserviceOptions>(
     createNatsTransport(configService),
+  );
+
+  // **A PUBLISHER declares the streams it publishes to, not just the consumer.**
+  // A publish to a subject no stream captures fails with a 503, so if this
+  // service booted before the one that owns the stream, every audit act in that
+  // window would be logged as a failure and lost — the exact hole ADR 0041
+  // exists to close. `ensureStream` is idempotent, so both ends declaring is
+  // cheaper than a boot ordering nothing enforces.
+  const natsConnection = app.get<NatsConnection>(JETSTREAM_CONNECTION);
+  const monitorUrl = configService.getOrThrow<string>('NATS_MONITOR_URL');
+
+  await ensureStream(natsConnection, JETSTREAM_STREAMS.AUDIT, monitorUrl);
+
+  // NOTIFICATIONS too: the quota alert publishes onto it.
+  await ensureStream(
+    natsConnection,
+    JETSTREAM_STREAMS.NOTIFICATIONS,
+    monitorUrl,
   );
 
   // Lets Prisma disconnect cleanly on SIGINT/SIGTERM.

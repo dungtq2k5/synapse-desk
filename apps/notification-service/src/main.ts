@@ -14,8 +14,20 @@ import {
   NOTIFICATION_PACKAGE_NAME,
   NOTIFICATION_PROTO_PATHS,
 } from '@synapsedesk/grpc-proto';
-import { createNatsTransport } from '@synapsedesk/common';
+import {
+  ensureStream,
+  JETSTREAM_CONNECTION,
+  JETSTREAM_STREAMS,
+  PullConsumerRunner,
+  streamFor,
+  createNatsTransport,
+} from '@synapsedesk/common';
+import type { NatsConnection } from 'nats';
 import { AppModule } from './app.module';
+import {
+  NotificationsController,
+  notificationSubscriptions,
+} from './modules/notifications.controller';
 
 /**
  * A HYBRID microservice — gRPC server AND NATS consumer.
@@ -75,6 +87,43 @@ async function bootstrap() {
       queue: 'notification_service_queue',
     },
   });
+
+  // **Before any microservice starts.** The NOTIFICATIONS stream is this
+  // service's to declare, and `ensureStream` refuses a broker whose JetStream
+  // store would not survive a restart — a password-reset email that JetStream
+  // accepted and then lost is the failure this whole change exists to remove,
+  // and booting against an ephemeral store would create it rather than close it.
+  const natsConnection = app.get<NatsConnection>(JETSTREAM_CONNECTION);
+  const monitorUrl = configService.getOrThrow<string>('NATS_MONITOR_URL');
+
+  await ensureStream(
+    natsConnection,
+    JETSTREAM_STREAMS.NOTIFICATIONS,
+    monitorUrl,
+  );
+  // Declared by whoever parks into it; `ensureStream` is add-then-update, so
+  // both services declaring it is the normal path rather than a conflict.
+  await ensureStream(natsConnection, JETSTREAM_STREAMS.DLQ, monitorUrl);
+
+  // One runner per subject, from the same list the bootstrap test asserts
+  // against — so a subject that gains a handler but no runner fails a test
+  // rather than filling a WorkQueue nobody drains.
+  const runners = notificationSubscriptions(
+    app.get(NotificationsController),
+  ).map(
+    ({ subject, handle }) =>
+      new PullConsumerRunner({
+        connection: natsConnection,
+        // Derived, not named — see the note in ticket-service's main.ts.
+        stream: streamFor(subject),
+        // Durable names are per-SUBJECT: one consumer over `notification.>`
+        // would make a slow SMTP send hold up an in-app write behind it.
+        durable: `notification-service-${subject.replaceAll('.', '-')}`,
+        filterSubject: subject,
+        handler: handle,
+      }),
+  );
+  await Promise.all(runners.map((runner) => runner.start()));
 
   // Lets Prisma disconnect cleanly on SIGINT/SIGTERM.
   app.enableShutdownHooks();

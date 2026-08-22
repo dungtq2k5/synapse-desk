@@ -152,7 +152,14 @@ services:
   nats:
     image: nats:2.10-alpine
     container_name: synapsedesk-nats
-    command: ['-js', '-m', '${NATS_DASHBOARD_PORT}'] # Enable JetStream (-js) and Monitoring Dashboard (-m 8222)
+    # `-sd /data` is NOT optional and NOT a tuning choice. Without it JetStream
+    # defaults its store into /tmp, inside the container's writable layer — so
+    # the volume below sits mounted, named and empty, and every persisted
+    # message dies with the next `compose up`. A durable subject on that broker
+    # is worse than a core one: core loses the message visibly, JetStream acks
+    # the publisher first. `assertDurableStore` refuses to boot against it.
+    command:
+      ['-js', '-sd', '/data', '-m', '${NATS_DASHBOARD_PORT}'] # JetStream with a PERSISTENT store, + monitoring on 8222
     ports:
       - '${NATS_PORT}:4222' # NATS Client Port
       - '${NATS_DASHBOARD_PORT}:8222' # HTTP Management/Monitoring UI

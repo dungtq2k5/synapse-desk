@@ -123,6 +123,7 @@ erDiagram
 
   "audit_logs" {
     String id "🗝️"
+    String event_id "❓"
     String organization_id "❓"
     String user_id "❓"
     String action 

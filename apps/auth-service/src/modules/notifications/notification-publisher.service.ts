@@ -1,11 +1,10 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
-import { ClientProxy } from '@nestjs/microservices';
+import { Injectable, Logger } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import {
-  formatErrorMsg,
   NOTIFICATION_PATTERNS,
   SendEmailCommand,
   SendSmsCommand,
-  NATS_CLIENT,
+  JetStreamPublisher,
 } from '@synapsedesk/common';
 
 /**
@@ -21,7 +20,7 @@ import {
 export class NotificationPublisher {
   private readonly logger = new Logger(NotificationPublisher.name);
 
-  constructor(@Inject(NATS_CLIENT) private readonly client: ClientProxy) {}
+  constructor(private readonly jetstream: JetStreamPublisher) {}
 
   sendEmail(command: SendEmailCommand): void {
     this.publish(NOTIFICATION_PATTERNS.sendEmail, command, command.template);
@@ -32,24 +31,22 @@ export class NotificationPublisher {
   }
 
   /**
-   * `emit()` returns a COLD observable — nothing is published until something
-   * subscribes. Omitting the `.subscribe()` is the classic silent failure with
-   * this API: no error, no message, no clue.
+   * Durable since ADR 0041, and not awaited — a slow broker must add no latency
+   * to the request that triggered it.
    *
-   * Not awaited, so a slow broker adds no latency to the request that triggered
-   * it.
+   * **The `Nats-Msg-Id` is fresh per call, which means these two subjects get
+   * no publish dedupe.** That is the documented trade rather than an oversight:
+   * a `SendEmailCommand` carries no id of the act that caused it, so there is
+   * nothing for the window to collapse against. ADR 0041 prices it — a password
+   * reset that never arrives locks a user out, while one that arrives twice
+   * carries the same token and is a nuisance.
    */
   private publish(
     pattern: string,
     payload: unknown,
     description: string,
   ): void {
-    this.client.emit(pattern, payload).subscribe({
-      error: (error: unknown) =>
-        this.logger.error(
-          `Failed to publish ${description} to ${pattern}: ${formatErrorMsg(error)}
-          }`,
-        ),
-    });
+    this.logger.debug(`Publishing ${description} to ${pattern}`);
+    this.jetstream.publish(pattern, payload, randomUUID());
   }
 }

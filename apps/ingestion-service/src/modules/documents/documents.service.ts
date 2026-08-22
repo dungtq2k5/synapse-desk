@@ -53,6 +53,7 @@ import {
   formatErrorMsg,
   isUniqueConstraintViolation,
   parseOcrLanguages,
+  OcrLanguage,
   MAX_DOCUMENT_BYTES,
   MAX_DOCUMENT_TITLE_LENGTH,
   requireActor,
@@ -238,6 +239,13 @@ export class DocumentsService {
       .update(request.objectPath)
       .digest('hex');
 
+    // Narrowed BEFORE the transaction, and reused by the event below. The
+    // parse has to happen somewhere, and the publish is the wrong somewhere:
+    // it runs after the commit, so a throw there would 500 a confirm whose row
+    // is already written. Validating once, up front, means the event carries a
+    // typed value without a second parse that could fail too late to matter.
+    const ocrLanguages = assertOcrLanguages(request.ocrLanguages);
+
     try {
       const document = await this.prisma.$transaction(async (tx) => {
         const created = await tx.document.create({
@@ -254,7 +262,7 @@ export class DocumentsService {
             // Stored as given once checked: `[]` is "not specified", which is
             // almost every upload, and the parser is what turns that into the
             // `eng` default.
-            ocrLanguages: assertOcrLanguages(request.ocrLanguages),
+            ocrLanguages,
             departmentLinks: {
               create: departmentIds.map((departmentId) => ({ departmentId })),
             },
@@ -297,7 +305,7 @@ export class DocumentsService {
         // The processor's only document read happens after the parse, so
         // carrying this here is what keeps the "no lookup to start" property
         // that `objectPath` and `fileType` are already there for.
-        ocrLanguages: document.created.ocrLanguages,
+        ocrLanguages,
       });
 
       return toDocumentResponse(document.created, departmentIds, 0);
@@ -1263,8 +1271,7 @@ export class DocumentsService {
  *
  * @throws RpcException INVALID_ARGUMENT naming every unsupported code.
  */
-// ASK Why don't declare `OcrLanguage[]` instead of `string[]`?
-function assertOcrLanguages(codes: string[]): string[] {
+function assertOcrLanguages(codes: string[]): OcrLanguage[] {
   try {
     return parseOcrLanguages(codes);
   } catch (error) {
