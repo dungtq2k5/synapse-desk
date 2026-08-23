@@ -55,6 +55,33 @@ describe('REST and GraphQL DTOs are independent but not divergent', () => {
       restOnly: ['attachments', 'excludedFromAiContext'],
     },
     {
+      name: 'IngestionJob',
+      restPath: join(
+        SRC,
+        'ingestion-jobs/dto/rest/ingestion-job-response.dto.ts',
+      ),
+      restClass: 'IngestionJobResponseDto',
+      gqlPath: join(
+        SRC,
+        'ingestion-jobs/dto/graphql/ingestion-job-response.gql-dto.ts',
+      ),
+      gqlClass: 'IngestionJobResponseGqlDto',
+    },
+    {
+      name: 'Role',
+      restPath: join(SRC, 'roles/dto/rest/role-response.dto.ts'),
+      restClass: 'RoleResponseDto',
+      gqlPath: join(SRC, 'roles/dto/graphql/role-response.gql-dto.ts'),
+      gqlClass: 'RoleResponseGqlDto',
+    },
+    {
+      name: 'Permission',
+      restPath: join(SRC, 'roles/dto/rest/role-response.dto.ts'),
+      restClass: 'PermissionResponseDto',
+      gqlPath: join(SRC, 'roles/dto/graphql/role-response.gql-dto.ts'),
+      gqlClass: 'PermissionResponseGqlDto',
+    },
+    {
       name: 'User',
       restPath: join(SRC, 'users/dto/rest/user-response.dto.ts'),
       restClass: 'UserResponseDto',
@@ -293,6 +320,9 @@ describe('REST and GraphQL DTOs are independent but not divergent', () => {
     expect(CONTRACTS.map(({ name }) => name)).toEqual([
       'Ticket',
       'TicketMessage',
+      'IngestionJob',
+      'Role',
+      'Permission',
       'User',
       'Document',
       'Notification',

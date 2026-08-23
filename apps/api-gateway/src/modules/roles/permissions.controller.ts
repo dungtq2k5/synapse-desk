@@ -50,6 +50,15 @@ export class PermissionsController {
   // refuses the grant regardless: the cost is a confusing option, not a wrong
   // permission. `varyBy` cannot help — `buildKey` puts the tenant in
   // unconditionally, so there is no cross-tenant flush to reach for.
+  // **A GraphQL loader writes this same key.**
+  // `common/graphql/loaders/permission-catalogue.loader.ts` builds
+  // `{organizationId, scope, params: {}}`, which `buildKey` renders identically
+  // to this route's — so the two surfaces share one entry rather than holding
+  // two copies with different ages.
+  //
+  // That alignment is what `varyBy` would break: switching to `'caller'` adds a
+  // `__visibility` segment here and not there, and the GraphQL read would
+  // silently start missing and refetching. Change the loader in the same commit.
   @Cacheable({
     scope: CACHE_SCOPES.permissions,
     ttlSeconds: 60 * 60,

@@ -1,5 +1,5 @@
 /**
- * The domain enums, registered with the GraphQL schema.
+ * @file The domain enums, registered with the GraphQL schema.
  *
  * **Registered once, here, rather than beside each type.** `registerEnumType`
  * is a side effect: calling it twice for the same enum throws at boot, and
@@ -18,6 +18,7 @@ import { registerEnumType } from '@nestjs/graphql';
 import {
   DocumentStatus,
   Gender,
+  IngestionJobStatus,
   TicketPriority,
   TicketSource,
   TicketStatus,
@@ -45,6 +46,14 @@ registerEnumType(TicketSource, {
 registerEnumType(DocumentStatus, {
   name: 'DocumentStatus',
   description: 'Where a document sits in the ingestion pipeline.',
+});
+
+registerEnumType(IngestionJobStatus, {
+  name: 'IngestionJobStatus',
+  description:
+    'Where one ingestion ATTEMPT sits. Distinct from `DocumentStatus`, which ' +
+    'describes the document: a document can be READY while a later re-ingest ' +
+    'attempt is FAILED.',
 });
 
 registerEnumType(Gender, { name: 'Gender' });

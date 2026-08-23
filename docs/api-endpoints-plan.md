@@ -566,13 +566,23 @@ Namespace `/ws`, JWT-authenticated on handshake, rate-limited via `ThrottlerStor
 
 REST stays the contract for uploads, webhooks, and streaming; GraphQL serves the dashboard's nested reads (tech-stack §3), with `DataLoader` batching to avoid N+1 across the service boundary.
 
-**Queries:** `me`, `organization`, `departments`, `users(filter, page)`, `user(id)`, `roles`, `permissions`, `tickets(filter, page)`, `ticket(id)`, `ticketMessages(ticketId, cursor)`, `documents(filter, page)`, `document(id)`, `analyticsOverview(range)`, `auditLogs(filter, page)`.
+**Queries:** `me`, `organization`, `departments`, `users(filter, page)`, `user(id)`, `roles`, `role(id)`, `permissions`, `tickets(filter, page)`, `ticket(id)`, `ticketMessages(ticketId, cursor)`, `documents(filter, page)`, `document(id)`, `ingestionJobs(filter, page)`, `ingestionJob(id)`, `analyticsOverview(range)`, `auditLogs(filter, page)`.
+
+**Not built, and each for a stated reason**:
+
+| Candidate | Why not |
+| :---- | :---- |
+| `chatConversations` | It is `tickets(source: CHAT, authorId: <caller>)`. **Both arguments** — `source` alone is the tenant-wide chat queue for an agent holding `ticket.read.all`, which is what `GET /chat/conversations` pins `authorId` to prevent. The `source` argument's schema description carries that, because the REST route's NAME used to |
+| `knowledgeArticles` | Four scalar fields and no edges. GraphQL would buy field selection on a payload whose largest field is a title, and cost `GET` caching on a help centre's most cacheable read |
+| `Role.users` | A reverse one-to-many with no `ListUsersByRoleIds` rpc. `userAssigned` is the count and `GET /users?roleId=` is the list; the batch RPC is not worth inventing for a screen that loads one role |
+| `auth`, `otp`, `sessions` | Credential flows and commands. A GraphQL twin puts a reset token in a query document, and commands stay REST |
+| `platform/*` | Super-Admin operator surfaces with no SPA behind them. Nothing composes them into a screen, which is the whole test |
 
 **Mutations:** `createTicket`, `updateTicket`, `transitionTicketStatus`, `assignTicket`, `escalateTicket`, `sendTicketMessage`, `submitAiFeedback`, `createDepartment`, `assignUserRoles`, `assignUserDepartments`, `updateDocumentScoping`.
 
 **Subscriptions:** `ticketUpdated(ticketId)`, `messageAdded(ticketId)`, `notificationReceived`.
 
-**Field resolvers:** `Ticket.author`, `Ticket.assignee`, `Ticket.department` (resolved cross-service to `auth-service` via gRPC + DataLoader), `Ticket.aiSummary`, `TicketMessage.attachments`, `TicketMessage.citations` → `DocumentChunk`.
+**Field resolvers:** `Ticket.author`, `Ticket.assignee`, `Ticket.department` (resolved cross-service to `auth-service` via gRPC + DataLoader), `Ticket.aiSummary`, `TicketMessage.attachments`, `TicketMessage.citations` → `DocumentChunk`, `IngestionJob.document`, `Role.permissions`.
 
 ---
 
@@ -649,8 +659,6 @@ analytics.read         audit.read             audit.export
 ---
 
 ## 10. Build Order
-
-Aligned with `docs/todo.txt` §8.
 
 | Phase | Endpoints |
 | :---- | :---- |

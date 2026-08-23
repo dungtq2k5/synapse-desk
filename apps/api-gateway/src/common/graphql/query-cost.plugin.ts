@@ -16,17 +16,28 @@ import {
 } from '../config/graphql-limits.config';
 
 /**
- * Field names resolved by a call to ANOTHER SERVICE.
+ * Field names whose cost SCALES WITH THE NUMBER OF PARENTS.
+ *
+ * **Not "resolved by another service"**, which is what this used to say and is
+ * the wrong test. `Role.permissions` is a cross-service call and belongs at
+ * cost 1: its loader is keyed by TENANT, so fifty roles on a page make one
+ * request, not fifty. What earns a 10 is per-parent fan-out — `assignee` costs
+ * a lookup for every ticket, `permissions` costs one for the page.
+ *
+ * Applying the old wording to a tenant-keyed loader overcharges a 100-row page
+ * tenfold; see `PER_PAGE_LOADER_EXEMPTIONS` for the fields that read as
+ * cross-service and are deliberately not here.
  *
  * A hand-maintained list, and deliberately so: the alternative is reading a
  * custom directive or an extension off the schema, which means the weighting
  * lives in the same file as the field and is therefore invisible when someone
- * reviews the limit. Kept honest by a test that every name here exists in the
- * schema, so a renamed edge fails rather than silently reverting to scalar cost.
+ * reviews the limit.
  *
- * Empty until the first edge lands. The scorer is built now because
- * The limits come before the resolvers — a limit added afterwards is a
- * restriction on working clients rather than a constraint on a new surface.
+ * **Keyed by NAME, with no type context.** The scorer sees `field.name.value`
+ * and nothing else, so an entry cannot say `IngestionJob.document` — only
+ * `document`, which covers `Query.document` too. Harmless today. It stops being
+ * harmless the first time one name is fan-out on one type and tenant-keyed on
+ * another, and the answer then is a type qualifier rather than another entry.
  */
 export const CROSS_SERVICE_FIELDS = new Set<string>([
   'assignee',
@@ -36,7 +47,41 @@ export const CROSS_SERVICE_FIELDS = new Set<string>([
   'departments',
   'createdBy',
   'actor',
+  // `AgentStat.agent`, through `loaders.users`. Found by the scan in
+  // `query-cost.spec.ts` rather than by review — it was the fourth field
+  // resolving per-parent through a loader and scored as a memory read, and
+  // nobody had noticed in two passes over this set.
+  'agent',
+  // Three schema fields, one entry: `DocumentUsage.document`,
+  // `KnowledgeGapFlag.document` and `IngestionJob.document` all load through
+  // `loaders.documents`, one request per distinct id. The first two shipped
+  // before this line existed and were priced as scalar reads the whole time —
+  // the scorer has never charged a `document` edge correctly until now.
+  //
+  // Also prices the root `Query.document(id:)` at 10. Unmultiplied, so ten
+  // points of a 2 000 budget, and arguably right: it is a cross-service call.
+  'document',
 ]);
+
+/**
+ * Fields that read as cross-service and are deliberately cheap.
+ *
+ * The list exists to be READ, not consulted at runtime — nothing looks anything
+ * up here. An omission and a decision are indistinguishable in a set, so the
+ * fields somebody will reasonably try to add are named here with the reason they
+ * are wrong to add.
+ *
+ * `permissions` — both schema fields with that name, `Query.permissions` and
+ * `Role.permissions`, resolve through `loaders.permissions`, which is keyed by
+ * TENANT. A page of a hundred roles makes ONE request, usually a Redis hit
+ * against an hour-old entry shared with `GET /permissions`. At 10 it would be
+ * priced at 1 000 for one cached read.
+ *
+ * That one entry covers both fields correctly, and that is luck rather than
+ * design: the set is keyed by name, so it could not have separated them if their
+ * costs differed.
+ */
+export const PER_PAGE_LOADER_EXEMPTIONS = new Set<string>(['permissions']);
 
 /**
  * The plugin type, taken from `ApolloDriverConfig` rather than from

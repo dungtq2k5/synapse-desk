@@ -67,7 +67,24 @@ export class TicketsArgsGqlDto {
   @IsIn(Object.values(TicketPriority))
   priority?: TicketPriority;
 
-  @Field(() => TicketSource, { nullable: true })
+  /**
+   * How the ticket arrived.
+   *
+   * **`CHAT` alone is not "my conversations".** `GET /chat/conversations` pins
+   * `authorId` to the caller as well, because the visibility filter by itself
+   * shows an agent holding `ticket.read.all` every chat in the tenant — correct
+   * for a queue, wrong for the screen that route names. That route's NAME
+   * carried the second half of the meaning; this argument cannot, so it says so
+   * here.
+   *
+   * The equivalent is `tickets(source: CHAT, authorId: <caller>)`.
+   */
+  @Field(() => TicketSource, {
+    nullable: true,
+    description:
+      'How the ticket arrived. `CHAT` alone is the tenant-wide chat queue for ' +
+      'a caller who can see it — pair it with `authorId` for "my conversations".',
+  })
   @IsOptional()
   @IsIn(Object.values(TicketSource))
   source?: TicketSource;

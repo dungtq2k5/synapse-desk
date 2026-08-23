@@ -68,7 +68,9 @@ describe('Field resolvers never inject a gRPC client', () => {
       'analytics.resolver.ts',
       'departments.resolver.ts',
       'documents.resolver.ts',
+      'ingestion-jobs.resolver.ts',
       'notifications.resolver.ts',
+      'roles.resolver.ts',
       'ticket-messages.resolver.ts',
       'tickets.resolver.ts',
       'users.resolver.ts',
@@ -149,6 +151,24 @@ describe('Field resolvers never inject a gRPC client', () => {
     expect(offenders).toEqual([]);
   });
 
+  /**
+   * Source with comments removed, so the scan judges CODE.
+   *
+   * Without this the rule cannot be explained anywhere it applies: a file that
+   * says "constructed through `createLoader`, not `new DataLoader`" is flagged
+   * for the sentence describing what it does not do. That happened, and the
+   * tempting fix — reword the comment — leaves the next person to rediscover
+   * the trap with no note to warn them.
+   *
+   * **Naive about string literals, deliberately.** `'https://x'` truncates at
+   * the `//`, taking the rest of the line with it. The only thing that can hide
+   * is a `new DataLoader(` sharing a line with a string containing `//`, which
+   * does not happen by accident — so this is a two-line regex rather than a
+   * TypeScript parser, and it should stay one.
+   */
+  const withoutComments = (source: string): string =>
+    source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+
   it('4. the loader factory is the ONLY place a DataLoader is constructed', () => {
     // The other half of rule 2, from the opposite direction: a `new DataLoader`
     // anywhere else is a loader whose lifetime nobody decided.
@@ -170,7 +190,9 @@ describe('Field resolvers never inject a gRPC client', () => {
           !path.endsWith('.spec.ts') &&
           path !== factory,
       )
-      .filter((path) => /new DataLoader\b/.test(readFileSync(path, 'utf8')))
+      .filter((path) =>
+        /new DataLoader\b/.test(withoutComments(readFileSync(path, 'utf8'))),
+      )
       .map((path) => path.replace(SRC_DIR, ''));
 
     expect(offenders).toEqual([]);

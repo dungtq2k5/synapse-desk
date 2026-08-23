@@ -9,6 +9,27 @@
  */
 export const CACHE_SCOPES = {
   permissions: 'permissions',
+  /**
+   * The catalogue as GRAPHQL stores it — deliberately not `permissions`.
+   *
+   * The two surfaces cache different SHAPES of the same data. `CacheableInterceptor`
+   * runs outside `TransformInterceptor`, so `GET /permissions` stores the whole
+   * response envelope — `{ success, statusCode, message, warning, data }` — while
+   * a resolver stores the bare list. Sharing one key means whichever surface
+   * writes first decides the shape and the other misreads it: GraphQL hands an
+   * envelope to a list field, or REST returns a bare array where a client
+   * expects the envelope.
+   *
+   * A second entry per tenant is the price, and it is the right one — the
+   * alternative couples a loader to the response envelope's layout.
+   *
+   * **TTL-only, like its twin.** Nothing invalidates `permissions` either: the
+   * catalogue is a function of the deploy as much as the tenant, and the route
+   * accepts up to an hour of editors offering a just-retired code because the
+   * API refuses the grant regardless. This scope inherits that, so the two age
+   * out together rather than one going stale against the other.
+   */
+  permissionsGraphql: 'permissions-graphql',
   roles: 'roles',
   departments: 'departments',
   organizations: 'organizations',

@@ -21,6 +21,7 @@ import {
   INGESTION_OUTCOMES,
   type IngestionOutcome,
 } from '../../common/configs/ingestion.config';
+import { Prisma } from '../../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageReferenceService } from '../storage-client/storage-reference.service';
 import { AiLedgerService } from '../ai-ledger/ai-ledger.service';
@@ -146,8 +147,12 @@ export class IngestionProcessor {
     const { documentId, ingestionJobId, organizationId } = data;
 
     try {
-      await this.setJobStatus(ingestionJobId, IngestionJobStatus.PARSING);
-      await this.setDocumentStatus(documentId, DocumentStatus.PROCESSING);
+      await this.setPhase(
+        ingestionJobId,
+        IngestionJobStatus.PARSING,
+        documentId,
+        DocumentStatus.PROCESSING,
+      );
 
       const bytes = await this.storage.downloadObject(
         data.objectPath,
@@ -243,7 +248,12 @@ export class IngestionProcessor {
         // escapes the handler — which is the retried-job outcome the CANCELLED
         // arm above exists to avoid.
         try {
-          await this.setJobStatus(ingestionJobId, IngestionJobStatus.QUEUED);
+          await this.setPhase(
+            ingestionJobId,
+            IngestionJobStatus.QUEUED,
+            documentId,
+            DocumentStatus.PENDING,
+          );
         } catch (deferralError) {
           if (deferralError instanceof JobNoLongerRunnableError) {
             this.logger.log(
@@ -256,7 +266,6 @@ export class IngestionProcessor {
           throw deferralError;
         }
 
-        await this.setDocumentStatus(documentId, DocumentStatus.PENDING);
         this.logger.log(
           `Deferred ingestion of ${documentId}: organization ${organizationId} is at the AI cap`,
         );
@@ -625,31 +634,46 @@ export class IngestionProcessor {
   }
 
   /**
-   * Moves the job to its next stage, and refuses if it is no longer runnable.
+   * Moves the job and its document to the phase they represent TOGETHER.
    *
-   * **This is the whole cancellation mechanism.** BullMQ cannot kill an active
-   * job — `Queue.remove()` on one a worker holds does not stop it — so the only
-   * way to end work in progress is for the worker to notice. It already writes
-   * the status at every stage boundary; making that write conditional turns the
-   * four writes it was already doing into four checkpoints, with no new column,
-   * no polling and no second concept.
+   * One transaction, because the two rows are one fact stated twice and an
+   * observer must never catch them disagreeing. Written separately, there is a
+   * window where the job says `PARSING` and the document still says `PENDING` —
+   * which is the exact state RDM Table 20 exists to make impossible, a document
+   * that looks untouched while its job is mid-flight. The window is normally a
+   * round-trip wide; on a crash between the two writes it is permanent, and
+   * only the reconciliation sweep would ever untangle it.
    *
-   * **The predicate is what a person or a success made final, not what is
-   * currently in flight.** `FAILED` is deliberately not in it: BullMQ retries a
-   * failed job (`attempts: 3`), and that retry has to be allowed to move the row
-   * back through the stages — refusing it would turn a transient embedding
-   * outage into a permanent failure. `TERMINAL_INGESTION_STATUSES` says so at
-   * its declaration.
-   *
-   * The cost is one wasted stage: a cancel issued mid-embed still pays for that
-   * embed. That is the honest price of not being able to interrupt a running
-   * process, rather than a gap in the design.
+   * A refusal from {@link setJobStatus} rolls the document write back with it,
+   * so a job that is no longer runnable cannot leave a document claiming to be
+   * processing.
+   */
+  private async setPhase(
+    ingestionJobId: string,
+    jobStatus: IngestionJobStatus,
+    documentId: string,
+    documentStatus: DocumentStatus,
+  ): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      await this.setJobStatus(ingestionJobId, jobStatus, tx);
+      await tx.document.update({
+        where: { id: documentId },
+        data: { status: documentStatus },
+      });
+    });
+  }
+
+  /**
+   * @param client The transaction to run in. Defaults to the unwrapped client
+   *   for the phases that move the job alone — CHUNKING and EMBEDDING leave the
+   *   document at PROCESSING throughout.
    */
   private async setJobStatus(
     ingestionJobId: string,
     status: IngestionJobStatus,
+    client: Prisma.TransactionClient | PrismaService = this.prisma,
   ): Promise<void> {
-    const { count } = await this.prisma.ingestionJob.updateMany({
+    const { count } = await client.ingestionJob.updateMany({
       // `notIn`, not `in RESUMABLE_*`: a FAILED row is what BullMQ retries, and
       // refusing it would make a transient outage permanent. Spread because the
       // constant is `as const`.
@@ -661,16 +685,6 @@ export class IngestionProcessor {
     });
 
     if (count === 0) throw new JobNoLongerRunnableError(ingestionJobId);
-  }
-
-  private async setDocumentStatus(
-    documentId: string,
-    status: DocumentStatus,
-  ): Promise<void> {
-    await this.prisma.document.update({
-      where: { id: documentId },
-      data: { status },
-    });
   }
 }
 

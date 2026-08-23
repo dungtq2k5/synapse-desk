@@ -7,6 +7,8 @@ import type { DocumentResponseGqlDto } from '../../../modules/documents/dto/grap
 import { createUserSummaryLoader } from './user-summary.loader';
 import { createDepartmentLoader } from './department.loader';
 import { createDocumentLoader } from './document.loader';
+import { createPermissionCatalogueLoader } from './permission-catalogue.loader';
+import type { PermissionResponseGqlDto } from '../../../modules/roles/dto/graphql/role-response.gql-dto';
 import type { RequestContext } from '@synapsedesk/common';
 import { RequestContextService } from '../../../common/contexts/request.context';
 import type { CacheService } from '../../cache/cache.service';
@@ -24,8 +26,16 @@ export type RequestLoaders = {
   users: DataLoader<string, UserSummaryResponseGqlDto | null, string>;
   /** `Ticket.department`, `Document.departments`, `User.departments`. */
   departments: DataLoader<string, DepartmentResponseGqlDto | null, string>;
-  /** `DocumentUsage.document`, `KnowledgeGapFlag.document`. */
+  /** `DocumentUsage.document`, `KnowledgeGapFlag.document`, `IngestionJob.document`. */
   documents: DataLoader<string, DocumentResponseGqlDto | null, string>;
+  /**
+   * `Role.permissions` — the whole catalogue, keyed by TENANT.
+   *
+   * The odd one out: every other loader maps ids to entities, and this maps one
+   * tenant to one list. It is here for DataLoader's per-request memo, so a page
+   * of roles fetches the catalogue once.
+   */
+  permissions: DataLoader<string, PermissionResponseGqlDto[] | null, string>;
 };
 
 /**
@@ -112,6 +122,13 @@ export function createLoaders(
     // two analytics edges — cold reads where a hit would save one batched RPC
     // on a query nobody runs in a loop.
     documents: createDocumentLoader(clients.ingestion, context),
+    // Keyed by tenant and always a batch of one — a per-request memo, not a
+    // batcher. Without it `Role.permissions` is one catalogue fetch per role.
+    permissions: createPermissionCatalogueLoader(
+      clients.auth,
+      context,
+      clients.cache,
+    ),
   };
 }
 

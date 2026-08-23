@@ -26,13 +26,24 @@ import {
  * default key is the request URL, which carries no tenant: `GET /roles` would
  * be one entry for every tenant on the platform. Overriding `trackBy` fixes
  * that and leaves `cache-manager` supplying a `get`/`set` wrapper over a Redis
- * client this gateway already has's reasoning, and the same
- * conclusion from the other direction.
+ * client this gateway already has.
  *
- * **It caches the handler's RETURN VALUE, not the HTTP response.** So the
- * envelope, the status code and any `warning` are produced fresh by
- * `TransformInterceptor` on every request, hit or miss — a cached envelope
- * would freeze whichever advisory happened to be attached to the miss.
+ * **It caches the RESPONSE ENVELOPE, not the handler's return value**, because
+ * it is registered as an `APP_INTERCEPTOR` and `TransformInterceptor` is bound
+ * with `useGlobalInterceptors` — so this one sits OUTSIDE it and its
+ * `next.handle()` yields the already-wrapped
+ * `{ success, statusCode, message, warning, data }`.
+ *
+ * This docblock said the opposite until a test read an entry back and found an
+ * envelope. The claim mattered: a GraphQL loader was built to share one of
+ * these keys on the strength of it, and would have handed an envelope to a list
+ * field. **Anything reading a `@Cacheable` key from outside the HTTP path must
+ * expect the envelope, or use a scope of its own** — see
+ * `CACHE_SCOPES.permissionsGraphql`.
+ *
+ * One consequence to know: `statusCode`, `message` and `warning` are frozen
+ * into the entry, so an advisory attached to the MISS is replayed to every hit
+ * for the rest of the TTL.
  */
 @Injectable()
 export class CacheableInterceptor implements NestInterceptor {

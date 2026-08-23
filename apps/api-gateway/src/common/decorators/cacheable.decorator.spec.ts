@@ -196,3 +196,60 @@ describe('What is cached', () => {
     }
   });
 });
+
+describe('A cached route carries no per-request advisory', () => {
+  /**
+   * The hazard, and why it is worth a scan rather than a comment.
+   *
+   * `CacheableInterceptor` is an `APP_INTERCEPTOR` and `TransformInterceptor`
+   * is bound with `useGlobalInterceptors`, so the cache sits OUTSIDE the
+   * envelope and stores `{ success, statusCode, message, warning, data }`
+   * whole. Anything the envelope carries is frozen into the entry for the rest
+   * of the TTL.
+   *
+   * For `data` that is the point. For `message` and `warning` it is a defect:
+   * an advisory attached to the ONE caller who missed the cache is then replayed
+   * to every other caller in the tenant for an hour — and nothing reports it,
+   * because serving a cached response is the decorator working.
+   *
+   * **Latent today, deliberately pinned anyway.** None of the five `@Cacheable`
+   * handlers sets a message or a warning, so nothing is being replayed. The
+   * combination is one decorator away, and the interceptor's own docblock
+   * asserted the opposite behaviour for long enough that a GraphQL loader was
+   * built on the wrong sentence — which is the argument for checking rather
+   * than describing.
+   */
+  const cacheableHandlers = () =>
+    sources()
+      .filter(({ text }) => text.includes('@Cacheable('))
+      .flatMap(({ path, text }) =>
+        // Split on BLANK LINES, not on decorators. Splitting at every `@` puts
+        // each decorator in its own block, so `@ResponseMessage` sitting above
+        // `@Cacheable` on the same method lands in a different one and the pair
+        // is invisible — which is exactly what this scan exists to see, and how
+        // its first version passed a sabotage that added the advisory.
+        //
+        // Per member rather than per FILE, because a controller that caches one
+        // route and sets a message on another is legal and common.
+        text
+          .split(/\n\s*\n(?= {2}\S)/)
+          .filter((member) => member.includes('@Cacheable('))
+          .map((member) => ({ path, member })),
+      );
+
+  it('**1. the scan finds the cached handlers at all**', () => {
+    // Guards the guard: a regex matching nothing passes the assertion below
+    // over an empty list, which is the failure this whole file is about.
+    expect(cacheableHandlers()).toHaveLength(5);
+  });
+
+  it('**2. and none of them sets a message or a warning**', () => {
+    const offenders = cacheableHandlers()
+      .filter(({ member }) =>
+        /@ResponseMessage\(|locals\.(?:warning|message)\s*=/.test(member),
+      )
+      .map(({ path }) => path);
+
+    expect(offenders).toEqual([]);
+  });
+});

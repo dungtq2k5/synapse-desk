@@ -4,6 +4,7 @@ import { RolesController } from './roles.controller';
 import { PermissionsController } from './permissions.controller';
 import { RolesGrpcClient } from './roles-grpc.client';
 import { RolesService } from './roles.service';
+import { RolesResolver } from './roles.resolver';
 
 /**
  * Owns `/permissions` as well as `/roles`: the catalogue is served by the same
@@ -13,6 +14,6 @@ import { RolesService } from './roles.service';
 @Module({
   imports: [AuthModule],
   controllers: [RolesController, PermissionsController],
-  providers: [RolesGrpcClient, RolesService],
+  providers: [RolesResolver, RolesGrpcClient, RolesService],
 })
 export class RolesModule {}

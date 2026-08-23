@@ -3,6 +3,8 @@ import {
   DocumentFileType as ProtoDocumentFileType,
   DocumentFlagType as ProtoDocumentFlagType,
   DocumentStatus as ProtoDocumentStatus,
+  IngestionJobStatus as ProtoIngestionJobStatus,
+  TicketSource as ProtoTicketSource,
 } from '@synapsedesk/grpc-proto';
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
@@ -32,6 +34,8 @@ import {
 } from '../../src/common/config/graphql-limits.config';
 import { SCHEMA_PATH } from '../../src/common/config/graphql.config';
 import { compareAlphabetically } from '@synapsedesk/common';
+import { CacheService } from '../../src/common/cache/cache.service';
+import { CACHE_SCOPES } from '../../src/common/config/cache.config';
 
 /**
  * The GraphQL surface.
@@ -1208,6 +1212,492 @@ describe('The GraphQL surface (e2e)', () => {
       expect(response.body.data.user.departmentCount).toBe(2);
     });
   });
+
+  describe('Ingestion jobs compose onto their document', () => {
+    const agent = () =>
+      authenticatedAgent(fx.app, { permissionCodes: ['document.read'] });
+
+    const wireDocument = (id: string, title: string) => ({
+      id,
+      organizationId: faker.string.uuid(),
+      createdById: faker.string.uuid(),
+      title,
+      fileUrl: `documents/org/${title}.pdf`,
+      fileType: ProtoDocumentFileType.DOCUMENT_FILE_TYPE_PDF,
+      fileSizeBytes: 1024,
+      isOrganizationWide: true,
+      status: ProtoDocumentStatus.DOCUMENT_STATUS_INDEXED,
+      departmentIds: [],
+      chunkCount: 4,
+      ocrLanguages: [],
+      createdAt: timestamp(),
+      updatedAt: timestamp(),
+    });
+
+    const wireJob = (documentId: string) => ({
+      id: faker.string.uuid(),
+      documentId,
+      bullmqJobId: 'bull-1',
+      status: ProtoIngestionJobStatus.INGESTION_JOB_STATUS_COMPLETED,
+      // `''`, not `undefined`: `error_log` is a plain proto3 string, so the
+      // zero value is the empty one and the field is never absent on the wire.
+      errorLog: '',
+      processedAt: timestamp(),
+      createdAt: timestamp(),
+    });
+
+    beforeEach(() => jest.clearAllMocks());
+
+    it('**1. 25 jobs resolving `document` make ONE batched call**', async () => {
+      // The reason this resolver exists, and the reason it goes through the
+      // loader: an N+1 returns byte-identical JSON, so the call count is the
+      // only thing that can tell them apart.
+      const documentIds = Array.from({ length: 25 }, () => faker.string.uuid());
+
+      fx.stubs.document.listIngestionJobs.mockReturnValue(
+        of({
+          items: documentIds.map((id) => wireJob(id)),
+          meta: {
+            totalItems: 25,
+            itemCount: 25,
+            itemsPerPage: 25,
+            totalPages: 1,
+            currentPage: 1,
+          },
+        }),
+      );
+      fx.stubs.document.listDocumentsByIds.mockReturnValue(
+        of({
+          items: documentIds.map((id, index) =>
+            wireDocument(id, `Doc ${index}`),
+          ),
+        }),
+      );
+
+      const response = await agent()
+        .post('/graphql')
+        .send({
+          query:
+            '{ ingestionJobs(first: 25) { items { id documentId document { title } } } }',
+        })
+        .expect(200);
+
+      expect(response.body.errors).toBeUndefined();
+      expect(response.body.data.ingestionJobs.items).toHaveLength(25);
+      expect(fx.stubs.document.listDocumentsByIds).toHaveBeenCalledTimes(1);
+    });
+
+    it('**2. a job whose document is gone resolves `document: null`**', async () => {
+      // The job row outlives the document, so the edge has to survive the
+      // absence rather than fail the query. `documentId` stays populated —
+      // that is the field an operator needs to go looking.
+      const documentId = faker.string.uuid();
+
+      fx.stubs.document.listIngestionJobs.mockReturnValue(
+        of({
+          items: [wireJob(documentId)],
+          meta: {
+            totalItems: 1,
+            itemCount: 1,
+            itemsPerPage: 10,
+            totalPages: 1,
+            currentPage: 1,
+          },
+        }),
+      );
+      // The loader's batch answers with nothing for that id, which is what a
+      // soft-deleted document looks like from here.
+      fx.stubs.document.listDocumentsByIds.mockReturnValue(of({ items: [] }));
+
+      const response = await agent()
+        .post('/graphql')
+        .send({
+          query:
+            '{ ingestionJobs { items { documentId document { title } } } }',
+        })
+        .expect(200);
+
+      expect(response.body.errors).toBeUndefined();
+
+      const [job] = response.body.data.ingestionJobs.items;
+      expect(job.documentId).toBe(documentId);
+      expect(job.document).toBeNull();
+    });
+
+    it('**3. `ingestionJob(id)` for an unreachable id is null, not an error**', async () => {
+      // Indistinguishable from absent, deliberately: telling "no such job" from
+      // "a job on a document in a department you are not in" answers a question
+      // about another department's contents (ADR 0037).
+      fx.stubs.document.getIngestionJob.mockReturnValue(
+        throwError(() => ({ code: GrpcStatus.NOT_FOUND, details: 'nope' })),
+      );
+
+      const response = await agent()
+        .post('/graphql')
+        .send({
+          query: `{ ingestionJob(id: "${faker.string.uuid()}") { id } }`,
+        })
+        .expect(200);
+
+      expect(response.body.errors).toBeUndefined();
+      expect(response.body.data.ingestionJob).toBeNull();
+    });
+  });
+
+  describe('The permission catalogue is cached, in its own shape', () => {
+    // This test was written to prove the two surfaces SHARE one Redis entry,
+    // and it failed — which is the whole reason it was worth writing. The REST
+    // route stores `{ success, statusCode, message, warning, data }`, because
+    // `CacheableInterceptor` runs outside `TransformInterceptor` and caches the
+    // envelope rather than the handler's return value. A shared key handed
+    // GraphQL an envelope where a list belongs.
+    //
+    // So the loader now has its own scope, and what is asserted is what is
+    // actually true: the GraphQL read is cached, and it does not collide with
+    // the REST entry.
+    const catalogue = [
+      {
+        id: faker.string.uuid(),
+        code: 'ticket.read',
+        name: 'Read tickets',
+        group: 'ticket',
+        isRetired: false,
+      },
+    ];
+
+    beforeEach(() => jest.clearAllMocks());
+
+    it('**1. a second GraphQL request is served from Redis, not from gRPC**', async () => {
+      // Across two REQUESTS, so the per-request DataLoader memo cannot be what
+      // makes it pass — that is the vacuity the roles-block test has and this
+      // one must not.
+      const organizationId = faker.string.uuid();
+      const caller = authenticatedAgent(fx.app, {
+        organizationId,
+        permissionCodes: ['role.read'],
+      });
+      const cache = fx.app.get(CacheService);
+      await cache.invalidateScope(
+        organizationId,
+        CACHE_SCOPES.permissionsGraphql,
+      );
+
+      fx.stubs.role.listPermissions.mockReturnValue(of({ items: catalogue }));
+      await caller
+        .post('/graphql')
+        .send({ query: '{ permissions { code } }' })
+        .expect(200);
+
+      // Asserted before the second leg: `cache.wrap` falls through to the
+      // producer when Redis is unavailable, so without this a red result below
+      // cannot be told from "there is no Redis here".
+      const [warmed] = await cache.mget([
+        {
+          organizationId,
+          scope: CACHE_SCOPES.permissionsGraphql,
+          params: {},
+        },
+      ]);
+      expect(warmed).not.toBeNull();
+
+      fx.stubs.role.listPermissions.mockImplementation(() => {
+        throw new Error('the catalogue must come from Redis, not from here');
+      });
+
+      const second = await caller
+        .post('/graphql')
+        .send({ query: '{ permissions { code isRetired } }' })
+        .expect(200);
+
+      expect(second.body.errors).toBeUndefined();
+      expect(second.body.data.permissions).toEqual([
+        { code: 'ticket.read', isRetired: false },
+      ]);
+    });
+
+    it('**2. and the REST entry is a different shape under a different key**', async () => {
+      // The collision this separation prevents, pinned so nobody merges the two
+      // scopes back together for the tidiness of one entry.
+      const organizationId = faker.string.uuid();
+      const caller = authenticatedAgent(fx.app, {
+        organizationId,
+        permissionCodes: ['role.read'],
+      });
+      const cache = fx.app.get(CacheService);
+      const prefix = fx.app
+        .get(ConfigService)
+        .getOrThrow<string>('GLOBAL_PREFIX');
+
+      fx.stubs.role.listPermissions.mockReturnValue(of({ items: catalogue }));
+      await caller.get(`${prefix}/permissions`).expect(200);
+
+      const [restEntry] = await cache.mget<Record<string, unknown>>([
+        { organizationId, scope: CACHE_SCOPES.permissions, params: {} },
+      ]);
+
+      // The envelope, not the list — which is exactly why a loader must not
+      // read this key.
+      expect(Array.isArray(restEntry)).toBe(false);
+      expect(restEntry).toHaveProperty('data');
+      expect(CACHE_SCOPES.permissions).not.toBe(
+        CACHE_SCOPES.permissionsGraphql,
+      );
+    });
+  });
+
+  describe('The chat conversation list is a ticket query, not a second field', () => {
+    // Doc 51 §3 strikes `chatConversations` from the plan. This is the
+    // executable form of that strike — and it has to be run as an AGENT.
+    //
+    // As a requester it passes either way: a requester sees only their own
+    // tickets whatever the filter says, so the assertion would hold against a
+    // resolver that ignored `authorId` entirely. The pin is only observable to
+    // a caller who would otherwise see more.
+    const requesterId = faker.string.uuid();
+
+    const wireChatTicket = (authorId: string, title: string) => ({
+      id: faker.string.uuid(),
+      ticketNumber: 1,
+      organizationId: faker.string.uuid(),
+      authorId,
+      source: ProtoTicketSource.TICKET_SOURCE_CHAT,
+      status: 2,
+      priority: 2,
+      title,
+      description: 'x',
+      currentAssigneeId: undefined,
+      currentDepartmentId: undefined,
+      unreadCount: 0,
+      createdAt: timestamp(),
+      updatedAt: timestamp(),
+    });
+
+    beforeEach(() => jest.clearAllMocks());
+
+    it('**`source` and `authorId` together are what `/chat/conversations` means**', async () => {
+      // `ticket.read.all` is the permission that makes the two queries differ:
+      // with it, `source: CHAT` alone is the whole tenant's chats.
+      const agentId = faker.string.uuid();
+      const agent = authenticatedAgent(fx.app, {
+        sub: agentId,
+        permissionCodes: ['ticket.read.all'],
+      });
+
+      fx.stubs.ticket.listTickets.mockReturnValue(
+        of({
+          items: [wireChatTicket(agentId, 'Mine')],
+          meta: {
+            totalItems: 1,
+            itemCount: 1,
+            itemsPerPage: 10,
+            totalPages: 1,
+            currentPage: 1,
+          },
+        }),
+      );
+
+      await agent
+        .post('/graphql')
+        .send({
+          query: `{ tickets(source: CHAT, authorId: "${agentId}") { items { title } } }`,
+        })
+        .expect(200);
+
+      // Asserted on the REQUEST, not the response: the stub answers whatever it
+      // is asked, so the only proof the pin reached ticket-service is what the
+      // gateway sent.
+      const [request] = fx.stubs.ticket.listTickets.mock.calls[0];
+      expect(request.authorId).toBe(agentId);
+      // Against the proto member, not the number: the wire value for CHAT is 2
+      // and the literal reads like a typo either way.
+      expect(request.source).toBe(ProtoTicketSource.TICKET_SOURCE_CHAT);
+    });
+
+    it('and without `authorId` the same field is the tenant-wide queue', async () => {
+      // The other half, and the reason the strike needed writing down: this is
+      // a different result set for an agent, not a second name for one query.
+      const agentId = faker.string.uuid();
+      const agent = authenticatedAgent(fx.app, {
+        sub: agentId,
+        permissionCodes: ['ticket.read.all'],
+      });
+
+      fx.stubs.ticket.listTickets.mockReturnValue(
+        of({
+          items: [
+            wireChatTicket(agentId, 'Mine'),
+            wireChatTicket(requesterId, "Somebody else's"),
+          ],
+          meta: {
+            totalItems: 2,
+            itemCount: 2,
+            itemsPerPage: 10,
+            totalPages: 1,
+            currentPage: 1,
+          },
+        }),
+      );
+
+      const response = await agent
+        .post('/graphql')
+        .send({ query: '{ tickets(source: CHAT) { items { title } } }' })
+        .expect(200);
+
+      const [request] = fx.stubs.ticket.listTickets.mock.calls[0];
+      expect(request.authorId).toBeFalsy();
+      expect(response.body.data.tickets.items).toHaveLength(2);
+    });
+  });
+
+  describe('Roles resolve their permissions against the catalogue', () => {
+    const agent = () =>
+      authenticatedAgent(fx.app, { permissionCodes: ['role.read'] });
+
+    const wireRole = (id: string, codes: string[]) => ({
+      id,
+      name: `Role ${id.slice(0, 4)}`,
+      description: undefined,
+      isSystemRole: false,
+      userAssigned: 3,
+      permissionCodes: codes,
+      createdAt: timestamp(),
+      updatedAt: timestamp(),
+    });
+
+    beforeEach(() => jest.clearAllMocks());
+
+    it('**1. a RETIRED code is marked, which `permissionCodes` cannot say**', async () => {
+      // The whole reason the edge exists. Doc 45 §2 named this panel as the one
+      // its own fix did not reach: with only codes, a role holding a retired
+      // permission renders identically to one holding a live permission, and an
+      // editor offers it as an option the API will refuse.
+      const roleId = faker.string.uuid();
+
+      fx.stubs.role.getRole.mockReturnValue(
+        of(wireRole(roleId, ['ticket.read', 'legacy.thing'])),
+      );
+      fx.stubs.role.listPermissions.mockReturnValue(
+        of({
+          items: [
+            {
+              id: faker.string.uuid(),
+              code: 'ticket.read',
+              name: 'Read tickets',
+              group: 'ticket',
+              isRetired: false,
+            },
+            {
+              id: faker.string.uuid(),
+              code: 'legacy.thing',
+              name: 'Legacy thing',
+              group: 'legacy',
+              isRetired: true,
+            },
+          ],
+        }),
+      );
+
+      const response = await agent()
+        .post('/graphql')
+        .send({
+          query: `{ role(id: "${roleId}") { permissionCodes permissions { code isRetired } } }`,
+        })
+        .expect(200);
+
+      expect(response.body.errors).toBeUndefined();
+
+      const { permissionCodes, permissions } = response.body.data.role;
+      // The flat list says nothing about retirement — that is the gap.
+      expect(permissionCodes).toEqual(['ticket.read', 'legacy.thing']);
+      expect(permissions).toEqual([
+        { code: 'ticket.read', isRetired: false },
+        { code: 'legacy.thing', isRetired: true },
+      ]);
+    });
+
+    it('**2. a page of roles fetches the catalogue ONCE**', async () => {
+      // `Role.permissions` looks like it can call the service per role, and
+      // `resolvers.spec.ts` would permit it — a service is not a gRPC client.
+      // It would still be one catalogue fetch per row.
+      //
+      // The hour-long HTTP cache does NOT save it: `CacheableInterceptor` reads
+      // `switchToHttp().getRequest()`, which is empty under GraphQL, so it
+      // returns early on every resolver. The loader is what makes this one call.
+      const roleIds = Array.from({ length: 10 }, () => faker.string.uuid());
+
+      fx.stubs.role.listRoles.mockReturnValue(
+        of({
+          items: roleIds.map((id) => wireRole(id, ['ticket.read'])),
+          meta: {
+            totalItems: 10,
+            itemCount: 10,
+            itemsPerPage: 10,
+            totalPages: 1,
+            currentPage: 1,
+          },
+        }),
+      );
+      fx.stubs.role.listPermissions.mockReturnValue(
+        of({
+          items: [
+            {
+              id: faker.string.uuid(),
+              code: 'ticket.read',
+              name: 'Read tickets',
+              group: 'ticket',
+              isRetired: false,
+            },
+          ],
+        }),
+      );
+
+      const response = await agent()
+        .post('/graphql')
+        .send({
+          query: '{ roles(first: 10) { items { id permissions { code } } } }',
+        })
+        .expect(200);
+
+      expect(response.body.errors).toBeUndefined();
+      expect(response.body.data.roles.items).toHaveLength(10);
+      expect(fx.stubs.role.listPermissions).toHaveBeenCalledTimes(1);
+    });
+
+    it('3. and `permissions` alongside `role` shares that one fetch', async () => {
+      // The composition the doc justifies this resolver with: the editor needs
+      // the role AND the catalogue, and asking for both must not cost two
+      // catalogue reads.
+      const roleId = faker.string.uuid();
+
+      fx.stubs.role.getRole.mockReturnValue(
+        of(wireRole(roleId, ['ticket.read'])),
+      );
+      fx.stubs.role.listPermissions.mockReturnValue(
+        of({
+          items: [
+            {
+              id: faker.string.uuid(),
+              code: 'ticket.read',
+              name: 'Read tickets',
+              group: 'ticket',
+              isRetired: false,
+            },
+          ],
+        }),
+      );
+
+      const response = await agent()
+        .post('/graphql')
+        .send({
+          query: `{ role(id: "${roleId}") { permissions { code } } permissions { code isRetired } }`,
+        })
+        .expect(200);
+
+      expect(response.body.errors).toBeUndefined();
+      expect(fx.stubs.role.listPermissions).toHaveBeenCalledTimes(1);
+    });
+  });
+
   /**
    * The analytics reads that earned a GraphQL query.
    *

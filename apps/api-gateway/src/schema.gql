@@ -123,6 +123,39 @@ enum Gender {
   UNSPECIFIED
 }
 
+type IngestionJob {
+  bullmqJobId: String!
+  createdAt: DateTime!
+
+  """
+  The document being ingested, as it stands now. Null when it has been deleted since the attempt ran — the job row outlives the document.
+  """
+  document: Document
+  documentId: ID!
+  errorLog: String
+  id: ID!
+  processedAt: DateTime
+  status: IngestionJobStatus
+}
+
+type IngestionJobPage {
+  items: [IngestionJob!]!
+  meta: PageMeta!
+}
+
+"""
+Where one ingestion ATTEMPT sits. Distinct from `DocumentStatus`, which describes the document: a document can be READY while a later re-ingest attempt is FAILED.
+"""
+enum IngestionJobStatus {
+  CANCELLED
+  CHUNKING
+  COMPLETED
+  EMBEDDING
+  FAILED
+  PARSING
+  QUEUED
+}
+
 type KnowledgeGapFlag {
   detail: String!
 
@@ -207,6 +240,14 @@ type PageMeta {
   totalPages: Int!
 }
 
+type Permission {
+  code: String!
+  group: String!
+  id: ID!
+  isRetired: Boolean!
+  name: String!
+}
+
 type Query {
   """
   Per-agent throughput. Ask for `agent { … }` to resolve names through the users loader; a query that only wants the numbers costs no call to auth-service at all.
@@ -239,11 +280,32 @@ type Query {
   """Documents visible to the caller."""
   documents(first: Int! = 10, page: Int! = 1, searchTerm: String): DocumentPage!
 
+  """
+  One ingestion attempt. Null when it does not exist, or belongs to a document the caller cannot see — deliberately indistinguishable.
+  """
+  ingestionJob(id: ID!): IngestionJob
+
+  """Ingestion attempts for documents visible to the caller."""
+  ingestionJobs(documentId: String, first: Int! = 10, page: Int! = 1, searchTerm: String, status: IngestionJobStatus): IngestionJobPage!
+
   """The authenticated caller. Requires no permission."""
   me: User
 
   """The caller's own notification feed, newest first."""
   notifications(cursor: String, first: Int! = 20): NotificationFeed!
+
+  """
+  The full permission catalogue, including retired codes. Retired ones are still held by roles and can never be granted again (ADR 0038).
+  """
+  permissions: [Permission!]!
+
+  """
+  One role. Null when it does not exist in the caller’s tenant — deliberately indistinguishable from a role they cannot see.
+  """
+  role(id: ID!): Role
+
+  """Roles in the caller’s tenant."""
+  roles(first: Int! = 10, page: Int! = 1, searchTerm: String): RolePage!
 
   """
   A single ticket by id. Null when it does not exist, or belongs to another tenant, or is not visible to this caller — the three are deliberately indistinguishable.
@@ -253,7 +315,21 @@ type Query {
   """
   A page of tickets visible to the caller. `first` is clamped to 100; asking for more returns that many rather than an error.
   """
-  tickets(assigneeId: String, authorId: String, departmentId: String, first: Int! = 10, page: Int! = 1, priority: TicketPriority, sortBy: String, source: TicketSource, status: TicketStatus): TicketPage!
+  tickets(
+    assigneeId: String
+    authorId: String
+    departmentId: String
+    first: Int! = 10
+    page: Int! = 1
+    priority: TicketPriority
+    sortBy: String
+
+    """
+    How the ticket arrived. `CHAT` alone is the tenant-wide chat queue for a caller who can see it — pair it with `authorId` for "my conversations".
+    """
+    source: TicketSource
+    status: TicketStatus
+  ): TicketPage!
 
   """
   How many unread notifications the caller has. A number, not a list — counting by fetching is the thing this exists to avoid.
@@ -280,6 +356,27 @@ type Rate {
   denominator: Int!
   numerator: Int!
   rate: Float
+}
+
+type Role {
+  createdAt: DateTime!
+  description: String
+  id: ID!
+  isSystemRole: Boolean!
+  name: String!
+  permissionCodes: [String!]!
+
+  """
+  This role’s permissions, resolved against the catalogue so a retired code can be told from a live one. `permissionCodes` is the same set, flat.
+  """
+  permissions: [Permission!]!
+  updatedAt: DateTime!
+  userAssigned: Int!
+}
+
+type RolePage {
+  items: [Role!]!
+  meta: PageMeta!
 }
 
 """
