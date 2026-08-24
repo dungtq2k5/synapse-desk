@@ -79,8 +79,14 @@ export class AiAttachmentService {
       const size = Number(row.fileSizeBytes);
 
       if (!this.isEligible(row.mimeType)) {
-        // A zip is storable, downloadable and unreadable to the model. Sending
-        // it would spend tokens to produce nothing.
+        // A `.docx` is storable, downloadable and unreadable to the model:
+        // nothing here extracts its text, so sending the bytes would spend
+        // tokens to produce nothing.
+        //
+        // **This branch used to be unreachable.** It said "a zip", and a zip has
+        // never been storable — the old invariant required every storable type
+        // to be AI-eligible, so nothing could arrive here at all. Doc 52 flipped
+        // that, and the office formats are the first attachments to take it.
         skipped.push(row.fileName);
         continue;
       }

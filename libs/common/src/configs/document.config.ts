@@ -229,11 +229,15 @@ export const MAX_FLAG_RESOLUTION_COMMENT_LENGTH = 2_000;
 /**
  * The file types the DOCUMENT purpose accepts.
  *
- * Mirrors `PURPOSE_POLICY[DOCUMENT]` in storage-service, and the duplication is
- * the same two-layer guard every other upload has: this one refuses a bad type
- * before it costs a network hop and documents the limit in the API contract,
- * that one holds no matter which service is asking. Widen BOTH when the real
- * parser lands.
+ * **Not mirrored — IMPORTED.** `PURPOSE_POLICY[DOCUMENT]` in storage-service
+ * takes this exact list, so there is no second copy to widen and no drift to
+ * guard against. This docblock described a duplication that no longer exists,
+ * and said to "widen BOTH", which would send the next reader looking for a
+ * second list.
+ *
+ * What the two layers still buy is unchanged: the gateway refuses a bad type
+ * before it costs a network hop, and storage-service holds regardless of which
+ * service is asking.
  */
 export const ALLOWED_DOCUMENT_MIME_TYPES = [
   'application/pdf',

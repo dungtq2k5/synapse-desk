@@ -6,7 +6,7 @@ multimodal could have been a parallel `generate_multimodal()`. That doubles the
 surface the ledger and the injection guard have to cover, and the two drift the
 first time somebody fixes a bug in one.
 
-So `Prompt` is `str | list[str | Attachment]`, and a bare `str` normalises to a
+So `Prompt` is `str | list[str | Attachment]`, and a bare `str` normalizes to a
 single text part at the provider boundary. Every existing caller and every
 existing test fake stays valid, and the only file that knows what a part turns
 into is the provider adapter.

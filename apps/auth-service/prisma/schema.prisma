@@ -47,7 +47,7 @@ model Organization {
   ///
   /// **32 hex characters, not `generateSecureToken()`**. That
   /// helper is `base64url`, which is 43 characters (too long for this column)
-  /// and CASE-SENSITIVE. Mail systems normalise local-part case in practice, so
+  /// and CASE-SENSITIVE. Mail systems normalize local-part case in practice, so
   /// one hop lowercasing the address would silently unroute the tenant, and
   /// nothing here could tell that apart from nobody having written in.
   inboundToken String? @unique @map("inbound_token") @db.VarChar(32)

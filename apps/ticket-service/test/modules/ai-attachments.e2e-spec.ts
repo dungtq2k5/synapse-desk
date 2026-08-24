@@ -1,9 +1,6 @@
 import { faker } from '@faker-js/faker';
 import { requireField } from '@synapsedesk/grpc-proto';
-import {
-  AI_ELIGIBLE_MIME_TYPES,
-  MAX_AI_ATTACHMENT_BYTES,
-} from '@synapsedesk/common';
+import { MAX_AI_ATTACHMENT_BYTES } from '@synapsedesk/common';
 import { E2eFixture, bootstrapE2eTest } from '../utils';
 import {
   buildTenant,
@@ -111,6 +108,55 @@ describe('Attachments as model input (e2e)', () => {
     expect(result.skipped).toEqual(['huge.pdf']);
     // And the oversized one cost nothing to reject.
     expect(download).toHaveBeenCalledTimes(1);
+  });
+
+  it('**3a. a `.docx` is STORED and skipped, never sent as a part**', async () => {
+    // Doc 52's whole premise. `.docx` became storable and stayed out of
+    // `AI_ELIGIBLE_MIME_TYPES`, so the user gets an attachment that reaches the
+    // agent and is reported back rather than silently ignored — which is what
+    // made flipping the invariant safe.
+    //
+    // **The size is deliberately tiny, and that is what makes the sabotage
+    // valid.** Force `isEligible` to return true and this must go red because
+    // the MIME check stopped catching it. At a size over
+    // `MAX_AI_ATTACHMENT_BYTES` the byte check would catch it instead, the file
+    // would land in `skipped` for a different reason, and the sabotage would
+    // pass while the rule it guards was gone.
+    const ticket = await createTicket(fx.prisma, tenant);
+    const message = await createMessage(fx.prisma, ticket.id);
+    await attach(
+      message.id,
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      2048,
+      'quote.docx',
+    );
+
+    const result = await service.forMessage(message.id, caller());
+
+    expect(result.parts).toEqual([]);
+    expect(result.skipped).toEqual(['quote.docx']);
+    // Never fetched: refusing on the row costs no bytes off storage.
+    expect(download).not.toHaveBeenCalled();
+  });
+
+  it('**3b. and a `.heic` IS sent, so 3a is a decision and not a drought**', async () => {
+    // The other half of the pair. Test 3a alone passes if attachments are being
+    // dropped for the wrong reason — a missing fixture, a failed download, the
+    // size budget — all of which also land in `skipped`. This is what proves the
+    // pipeline delivers anything at all.
+    //
+    // `.heic` specifically: the iPhone camera default, and the format a customer
+    // photographing a broken device actually sends.
+    const ticket = await createTicket(fx.prisma, tenant);
+    const message = await createMessage(fx.prisma, ticket.id);
+    await attach(message.id, 'image/heic', 2048, 'device.heic');
+
+    const result = await service.forMessage(message.id, caller());
+
+    expect(result.skipped).toEqual([]);
+    expect(result.parts).toHaveLength(1);
+    expect(result.parts[0].fileName).toBe('device.heic');
+    expect(result.parts[0].mimeType).toBe('image/heic');
   });
 
   it('3. the skipped list names the files, for telling the user', async () => {
@@ -494,23 +540,5 @@ describe('Attachments as model input (e2e)', () => {
         refused.id,
       );
     });
-  });
-
-  it('every UPLOADABLE type can reach the model', async () => {
-    // **The direction was backwards, and the narrowing exposed it.** This used
-    // to assert `AI_ELIGIBLE ⊆ ALLOWED_ATTACHMENT`, which fails the moment the
-    // capability list is legitimately wider — `image/gif` and `text/csv` are
-    // pre-approved for a storage policy that has not widened yet.
-    //
-    // The invariant that matters runs the other way: a type a user can upload
-    // and the model cannot read is a file that arrives and is silently ignored.
-    // `mime.spec.ts` owns the full set of these relationships; this one stays
-    // because it is the one this service's behaviour depends on.
-    const { ALLOWED_ATTACHMENT_MIME_TYPES } =
-      await import('@synapsedesk/common');
-
-    for (const mime of ALLOWED_ATTACHMENT_MIME_TYPES) {
-      expect(AI_ELIGIBLE_MIME_TYPES).toContain(mime);
-    }
   });
 });

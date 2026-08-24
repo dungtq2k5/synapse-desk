@@ -194,24 +194,45 @@ export type FeedbackSortableField = (typeof FEEDBACK_SORTABLE_FIELDS)[number];
  * An allowlist, never a denylist: a denylist is a promise to have thought of
  * every dangerous type, which is not a promise anyone can keep.
  *
- * **Narrowed from twelve to five, and the twelve were never real.** This list
- * had drifted from `PURPOSE_POLICY[TICKET_ATTACHMENT]` in storage-service,
- * which accepts exactly these five and throws `INVALID_ARGUMENT` for anything
- * else. So `.docx`, `.xlsx`, `.zip`, `gif` and `csv` passed the gateway's
- * validation and were then refused at presign — a 400 from the second hop for a
- * type the API contract had just accepted. Narrowing does not remove a
- * capability; it moves an existing refusal to where the caller can understand
- * it.
+ * **Deliberately WIDER than {@link AI_ELIGIBLE_MIME_TYPES}.** What a customer
+ * may send an agent is a different question from what a model can read, and this
+ * one answers the first. Office formats are here and absent there; a `.docx`
+ * arrives, is stored, is downloadable, and is reported to the sender through
+ * `skippedAttachments` rather than becoming a prompt part.
  *
- * **Widen BOTH together**, or the drift returns. `mime.spec.ts` fails when they
- * disagree, which is the half that makes "both" enforceable.
+ * **What is excluded is anything a BROWSER EXECUTES** — no `html`, no `svg`, no
+ * `zip`. That bound is load-bearing rather than cautious: read URLs are signed
+ * with no `responseDisposition` (`storage.service.ts`), so an object comes back
+ * with the `Content-Type` pinned at upload and renders INLINE in the agent's
+ * browser. An `svg` here would run the uploader's script in the reader's
+ * session. Adding any such type means adding
+ * `responseDisposition: 'attachment; filename="…"'` first, and this list is not
+ * the place that decision gets made quietly.
+ *
+ * **This list is the one storage-service enforces**, not a copy of it —
+ * `PURPOSE_POLICY[TICKET_ATTACHMENT]` imports it, so the two cannot drift. It is
+ * also what the inbound-email webhook validates against
+ * (`inbound-attachment.dto.ts`), so widening here widens a path reachable by
+ * anyone who can email the tenant's address.
  */
 export const ALLOWED_ATTACHMENT_MIME_TYPES = [
   'image/png',
   'image/jpeg',
   'image/webp',
+  // The iPhone camera default. Without these a customer photographing a broken
+  // device is refused, which is the single most likely attachment in a helpdesk.
+  'image/heic',
+  'image/heif',
   'application/pdf',
   'text/plain',
+  'text/markdown',
+  'text/csv',
+  // Agent-only: stored and downloadable, never sent to the model. See
+  // `AI_ELIGIBLE_MIME_TYPES` for why that is a decision about this system rather
+  // than about the model.
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
 ] as const satisfies readonly MimeType[];
 export type AllowedAttachmentMimeType =
   (typeof ALLOWED_ATTACHMENT_MIME_TYPES)[number];
@@ -219,30 +240,49 @@ export type AllowedAttachmentMimeType =
 /**
  * Which attachments may reach the MODEL.
  *
- * **A different question from `ALLOWED_ATTACHMENT_MIME_TYPES`, and the two must
- * not be merged.** That list is a security allowlist — "may a user store this?"
- * — while this is a capability allowlist — "may this reach the model?". Tying
- * what a customer may send to what one vendor's model can read would make a
+ * **A different question from {@link ALLOWED_ATTACHMENT_MIME_TYPES}, and the two
+ * must not be merged.** That list is a security allowlist — "may a user store
+ * this?" — while this is a capability allowlist — "may this reach the model?".
+ * Tying what a customer may send to what one vendor's model reads would make a
  * model-capability change into a storage-policy change.
  *
- * **The invariant is one-directional: every STORABLE type must be AI-eligible.**
- * Not the reverse. This list may be wider — `image/gif` and `text/csv` are here
- * and storable nowhere — but never NARROWER, which is the state that produces a
- * file the user uploaded and the model silently ignores. `mime.spec.ts` pins it.
+ * **The invariant runs one way: this is a SUBSET of what is storable.** Enforced
+ * by the `satisfies` below rather than by a test, so it fails at the keystroke
+ * and cannot be forgotten. The direction used to be the reverse, which made
+ * office formats unreachable by construction — a type that is AI-eligible and
+ * not storable can never arrive, because reaching the model requires being
+ * stored first.
  *
  * Everything absent stays storable, downloadable and human-readable; it simply
- * never becomes a prompt part, and the user is told through
+ * never becomes a prompt part, and the sender is told through
  * `skippedAttachments`.
+ *
+ * **Why the office formats are absent, precisely: this system does not extract
+ * their text before sending them.** Not "the model refuses them" — that was the
+ * first explanation and it is false. Probed live, the three do not even behave
+ * alike: `.docx` is rejected, `.xlsx` errors, and `application/msword` is
+ * accepted outright. Nothing validates the string on either side of the hop, so
+ * what reaches the API is whatever this list allows.
+ *
+ * The reason that survives a model upgrade is the one about this system:
+ * `document-parser.service.ts` already reads `.doc`/`.docx` via mammoth for the
+ * ingestion pipeline, and promoting them here means calling that at send time.
+ * Until then a `.docx` part would be bytes the model receives and cannot parse.
  */
 export const AI_ELIGIBLE_MIME_TYPES = [
   'image/png',
   'image/jpeg',
-  'image/gif',
   'image/webp',
+  'image/heic',
+  'image/heif',
   'application/pdf',
   'text/plain',
+  'text/markdown',
   'text/csv',
-] as const satisfies readonly MimeType[];
+  // `satisfies readonly AllowedAttachmentMimeType[]`, not `MimeType[]`: this is
+  // where the subset rule lives now. The constraint is transitive — the storable
+  // list already satisfies `MimeType[]` — so nothing is lost by narrowing it.
+] as const satisfies readonly AllowedAttachmentMimeType[];
 export type AiEligibleMimeType = (typeof AI_ELIGIBLE_MIME_TYPES)[number];
 
 /**

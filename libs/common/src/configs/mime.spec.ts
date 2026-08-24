@@ -35,19 +35,6 @@ describe('the MIME lists agree with each other', () => {
     ALLOWED_DOCUMENT_MIME_TYPES,
   ];
 
-  it('**every STORABLE attachment type can reach the model**', () => {
-    // The one-directional invariant, and the direction is the point.
-    // `AI_ELIGIBLE` may be WIDER — `image/gif` and `text/csv` are pre-approved
-    // for a storage policy that has not widened yet. It must never be
-    // NARROWER, because that is the state where a user uploads a file and the
-    // model silently ignores it.
-    expect(
-      (ALLOWED_ATTACHMENT_MIME_TYPES as readonly string[]).filter(
-        (mime) => !(AI_ELIGIBLE_MIME_TYPES as readonly string[]).includes(mime),
-      ),
-    ).toEqual([]);
-  });
-
   it('every type any policy names is in the vocabulary', () => {
     // Catches a policy widened with a literal that never reached `MIME_TYPES` —
     // the direction `satisfies` cannot check, because the policy file is read
