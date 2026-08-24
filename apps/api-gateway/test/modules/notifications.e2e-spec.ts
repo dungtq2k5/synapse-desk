@@ -6,11 +6,14 @@ import {
   NotificationChannel,
   NotificationPriority,
   NotificationResourceType,
+  PreferenceSource,
 } from '@synapsedesk/common';
 import {
   DigestMode as ProtoDigestMode,
   NotificationChannel as ProtoNotificationChannel,
   NotificationPriority as ProtoNotificationPriority,
+  NotificationResourceType as ProtoNotificationResourceType,
+  NotificationType as ProtoNotificationType,
   PreferenceSource as ProtoPreferenceSource,
 } from '@synapsedesk/grpc-proto';
 import {
@@ -42,7 +45,7 @@ describe('B Notifications at the HTTP boundary (e2e)', () => {
   const wireNotification = (overrides: Record<string, unknown> = {}) => ({
     id: notificationId,
     organizationId: faker.string.uuid(),
-    type: NOTIFICATION_TYPES.ticketAssigned,
+    type: ProtoNotificationType.NOTIFICATION_TYPE_TICKET_ASSIGNED,
     // The WIRE value. The REST assertions read domain strings, so the gap
     // between the two is the mapping under test.
     priority: ProtoNotificationPriority.NOTIFICATION_PRIORITY_NORMAL,
@@ -52,7 +55,8 @@ describe('B Notifications at the HTTP boundary (e2e)', () => {
     data: JSON.stringify({ ticketId, ticketNumber: 1042 }),
     actionUrl: '/tickets/1042',
     actorId: faker.string.uuid(),
-    resourceType: NotificationResourceType.TICKET,
+    resourceType:
+      ProtoNotificationResourceType.NOTIFICATION_RESOURCE_TYPE_TICKET,
     resourceId: ticketId,
     groupKey: undefined,
     groupCount: 1,
@@ -145,7 +149,9 @@ describe('B Notifications at the HTTP boundary (e2e)', () => {
       expect(fx.stubs.notification.listNotifications).toHaveBeenCalledWith(
         expect.objectContaining({
           unreadOnly: true,
-          type: NOTIFICATION_TYPES.quotaThreshold,
+          // The REST query names the domain value; the WIRE carries the proto
+          // enum. That gap is the mapping this test exists to pin.
+          type: ProtoNotificationType.NOTIFICATION_TYPE_QUOTA_THRESHOLD,
           limit: 5,
         }),
         expect.anything(),
@@ -308,7 +314,7 @@ describe('B Notifications at the HTTP boundary (e2e)', () => {
         `${API}/notifications/preferences`,
       );
 
-      expect(res.body.data[0].source).toBe('default');
+      expect(res.body.data[0].source).toBe(PreferenceSource.DEFAULT);
     });
 
     it('18. Upserts a preference', async () => {
@@ -331,7 +337,7 @@ describe('B Notifications at the HTTP boundary (e2e)', () => {
         });
 
       expect(res.status).toBe(200);
-      expect(res.body.data.source).toBe('explicit');
+      expect(res.body.data.source).toBe(PreferenceSource.EXPLICIT);
     });
 
     it('19. Rejects the WEBHOOK channel at the boundary', async () => {

@@ -1,6 +1,8 @@
 import {
   NotificationResponse,
   toProtoNotificationPriority,
+  toProtoNotificationResourceType,
+  toProtoNotificationType,
   toProtoTimestamp,
 } from '@synapsedesk/grpc-proto';
 import { Notification } from '../../generated/prisma/client';
@@ -19,9 +21,11 @@ export function toNotificationResponse(
   return {
     id: notification.id,
     organizationId: notification.organizationId,
-    type: notification.type,
-    // A `VarChar` column, so this is a plain string out of Prisma and
-    // the mapper takes it as one.
+    // `type`, `priority` and `resource_type` are all `VarChar` columns, so each
+    // arrives as a plain string and each crosses through its bridge. An
+    // unrecognized value answers `UNSPECIFIED` rather than throwing: a single
+    // malformed row must not take the whole page down.
+    type: toProtoNotificationType(notification.type),
     priority: toProtoNotificationPriority(notification.priority),
     title: notification.title,
     // `?? undefined`, never `?? ''`: these fields are `optional` on the wire,
@@ -30,7 +34,7 @@ export function toNotificationResponse(
     data: JSON.stringify(notification.data ?? {}),
     actionUrl: notification.actionUrl ?? undefined,
     actorId: notification.actorId ?? undefined,
-    resourceType: notification.resourceType ?? undefined,
+    resourceType: toProtoNotificationResourceType(notification.resourceType),
     resourceId: notification.resourceId ?? undefined,
     groupKey: notification.groupKey ?? undefined,
     groupCount: notification.groupCount,

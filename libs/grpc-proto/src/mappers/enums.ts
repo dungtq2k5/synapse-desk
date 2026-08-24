@@ -15,8 +15,11 @@ import {
   IngestionJobStatus,
   Gender,
   InvitationStatus,
+  NOTIFICATION_TYPES,
   NotificationChannel,
   NotificationPriority,
+  NotificationResourceType,
+  type NotificationType,
   OrgStatus,
   OtpPurpose,
   PreferenceSource,
@@ -37,6 +40,8 @@ import {
   DigestMode as ProtoDigestMode,
   NotificationChannel as ProtoNotificationChannel,
   NotificationPriority as ProtoNotificationPriority,
+  NotificationResourceType as ProtoNotificationResourceType,
+  NotificationType as ProtoNotificationType,
   PreferenceSource as ProtoPreferenceSource,
 } from '../generated/synapsedesk/notification/notification';
 import {
@@ -428,6 +433,60 @@ export function toProtoPreferenceSource(source: string): ProtoPreferenceSource {
     ProtoPreferenceSource.PREFERENCE_SOURCE_UNSPECIFIED
   );
 }
+
+/**
+ * `notifications.type` — the ORIGINATING event.
+ *
+ * Keyed off {@link NOTIFICATION_TYPES} rather than a TS `enum`, because the
+ * domain side is an `as const` map whose values are dotted subjects
+ * (`ticket.assigned`). `Record<NotificationType, …>` is still exhaustive over
+ * that union, so a seventh type fails to compile here until it is mapped.
+ *
+ * **Not for a PREFERENCE's type**, which may be the `'*'` wildcard and is
+ * therefore still a string on the wire — see `notification.proto`.
+ */
+const notificationType = enumBridge<NotificationType, ProtoNotificationType>(
+  {
+    [NOTIFICATION_TYPES.ticketAssigned]:
+      ProtoNotificationType.NOTIFICATION_TYPE_TICKET_ASSIGNED,
+    [NOTIFICATION_TYPES.ticketReassigned]:
+      ProtoNotificationType.NOTIFICATION_TYPE_TICKET_REASSIGNED,
+    [NOTIFICATION_TYPES.ticketEscalated]:
+      ProtoNotificationType.NOTIFICATION_TYPE_TICKET_ESCALATED,
+    [NOTIFICATION_TYPES.ticketMessageCreated]:
+      ProtoNotificationType.NOTIFICATION_TYPE_TICKET_MESSAGE_CREATED,
+    [NOTIFICATION_TYPES.ticketStatusChanged]:
+      ProtoNotificationType.NOTIFICATION_TYPE_TICKET_STATUS_CHANGED,
+    [NOTIFICATION_TYPES.quotaThreshold]:
+      ProtoNotificationType.NOTIFICATION_TYPE_QUOTA_THRESHOLD,
+  },
+  ProtoNotificationType.NOTIFICATION_TYPE_UNSPECIFIED,
+);
+
+export const toProtoNotificationType = notificationType.toProto;
+export const fromProtoNotificationType = notificationType.fromProto;
+
+/** `notifications.resource_type` — what the notification is ABOUT. */
+const notificationResourceType = enumBridge<
+  NotificationResourceType,
+  ProtoNotificationResourceType
+>(
+  {
+    [NotificationResourceType.TICKET]:
+      ProtoNotificationResourceType.NOTIFICATION_RESOURCE_TYPE_TICKET,
+    [NotificationResourceType.DOCUMENT]:
+      ProtoNotificationResourceType.NOTIFICATION_RESOURCE_TYPE_DOCUMENT,
+    [NotificationResourceType.USER]:
+      ProtoNotificationResourceType.NOTIFICATION_RESOURCE_TYPE_USER,
+    [NotificationResourceType.ORGANIZATION]:
+      ProtoNotificationResourceType.NOTIFICATION_RESOURCE_TYPE_ORGANIZATION,
+  },
+  ProtoNotificationResourceType.NOTIFICATION_RESOURCE_TYPE_UNSPECIFIED,
+);
+
+export const toProtoNotificationResourceType = notificationResourceType.toProto;
+export const fromProtoNotificationResourceType =
+  notificationResourceType.fromProto;
 
 // ---------------------------------------------------------------------------
 // Pagination

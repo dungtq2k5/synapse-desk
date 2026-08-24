@@ -19,7 +19,7 @@ Per RDM §1.1, every authenticated request carries a JWT with `user_id`, `organi
 | `PUBLIC` | No token required |
 | `USER` | Any authenticated tenant user |
 | `SELF` | Authenticated user acting on their own record |
-| `perm:code` | Requires the `permissions.code` shown (RBAC via `_user_roles` ➔ `_role_permissions`) |
+| `perm:code` | Requires the `permissions.code` shown (RBAC via `user_roles` ➔ `role_permissions`, RDM Tables 7–8) |
 | `SUPER` | `users.is_super_admin = true` (`organization_id IS NULL`) |
 
 ### 0.3 Standard shapes
@@ -164,17 +164,19 @@ Tenant admins only ever address their **own** org; the tenant comes from the JWT
 | GET | `/organizations/current/settings` | Security governance: `enforce_two_factor`, `allowed_email_domains`. | perm:`organization.read` |
 | PATCH | `/organizations/current/settings` ✎ | Update the above. Enabling `enforce_two_factor` flags all users for enrollment. | perm:`organization.update` |
 | GET | `/organizations/current/usage` | Live meters: seats used/max, storage used/max, AI tokens used/budget, `billing_cycle_start`. | perm:`organization.read` |
-| GET | `/organizations/current/onboarding` | Onboarding checklist state (departments created, first doc indexed, agents invited). | USER |
+| GET | `/organizations/current/onboarding` | Onboarding checklist state (departments created, first doc indexed, agents invited). | perm:`organization.read` |
 | POST | `/organizations/current/onboarding/complete` ✎ | `PENDING_ONBOARDING` → `ACTIVE`. | perm:`organization.update` |
+| POST | `/organizations/current/inbound-token` ✎ | Issue the tenant's inbound support address, **or rotate it** — the same route for both, because "enable" and "rotate" differ only in whether a token already exists, and a separate rotate endpoint would make a client decide which to call. `organization.update` rather than self-service: the token is a **routing key**, so rotating it stops the old address delivering immediately and an end user able to call this could take down their own tenant's support address. No id in the path — the tenant comes from the verified caller. **[ADR 0018](./decisions/0018-inbound-email-routing-and-threading.md).** | perm:`organization.update` |
+| DELETE | `/organizations/current/inbound-token` ✎ | Switch inbound email off, returning the tenant to the state one that never enabled it is already in. Idempotent — the caller's intent is satisfied either way. | perm:`organization.update` |
 | DELETE | `/organizations/current` ✎ | Request tenant offboarding (soft delete; may require Super Admin confirmation). | perm:`organization.delete` |
 
 ### 1.5 Departments — `/departments`
 
 | Method | Path | Description | Auth |
 | :---- | :---- | :---- | :---- |
-| GET | `/departments` | List departments in tenant (+ member counts, open-ticket counts). | USER |
+| GET | `/departments` | List departments in tenant (+ member counts, open-ticket counts). | perm:`department.read` |
 | POST | `/departments` ✎ | Create. | perm:`department.create` |
-| GET | `/departments/:id` | Detail. | USER |
+| GET | `/departments/:id` | Detail. | perm:`department.read` |
 | PATCH | `/departments/:id` ✎ | Update `name`, `description`. | perm:`department.update` |
 | DELETE | `/departments/:id` ✎ | Soft delete. **409** if it still owns open tickets — require reassignment first. | perm:`department.delete` |
 | POST | `/departments/:id/restore` ✎ | Undo soft delete. | perm:`department.delete` |
@@ -197,7 +199,7 @@ Tenant admins only ever address their **own** org; the tenant comes from the JWT
 | POST | `/users/:id/unlock` ✎ | `is_locked = false` **and `locked_until = NULL`** — clearing only the boolean would leave a stale expiry for a later re-lock to inherit. Grants no sessions back: unlocking permits signing in, it does not sign in. | perm:`user.lock` |
 | POST | `/users/:id/2fa/reset` ✎ | Admin clears `two_factor_secret` + backup codes (lost-device recovery). | perm:`user.2fa.reset` |
 | PUT | `/users/:id/departments` ✎ | Replace the full membership set; exactly one `is_primary` enforced (partial unique index, RDM Table 4). | perm:`department.member.assign` |
-| PUT | `/users/:id/roles` ✎ | Replace the role set and recompute `roles.user_assigned` **in the same transaction** as the junction write. **Refused when it would demote the tenant's last active Org Admin** — demotion is the third way to remove an administrator, alongside delete and lock. Grant provenance goes to `audit_logs` (`USER_ROLES_UPDATED`, resource = the USER, metadata `{ before, after }` — grant and revoke are distinguishable from the diff, so there is no separate `ROLE_ASSIGNED`/`ROLE_REVOKED` pair), **not** to the join row — `_user_roles` is an implicit m2m and carries no columns beyond the two ids (RDM Tables 7–8). Rejects a role from another tenant; admits global system roles. | perm:`user.role.assign` |
+| PUT | `/users/:id/roles` ✎ | Replace the role set and recompute `roles.user_assigned` **in the same transaction** as the junction write. **Refused when it would demote the tenant's last active Org Admin** — demotion is the third way to remove an administrator, alongside delete and lock. Grant provenance goes to `audit_logs` (`USER_ROLES_UPDATED`, resource = the USER, metadata `{ before, after }` — grant and revoke are distinguishable from the diff, so there is no separate `ROLE_ASSIGNED`/`ROLE_REVOKED` pair), **not** to the join row — `user_roles` carries no columns beyond the two ids (RDM Tables 7–8), because a join row records the current state and an audit row records the act. Rejects a role from another tenant; admits global system roles. | perm:`user.role.assign` |
 | GET | `/users/:id/permissions` | Flattened effective permission codes (role union). Same computation as the JWT claim — one shared function, or the two disagree the first time either changes. | perm:`user.read` |
 
 > **No `GET /users/:id/roles` or `/departments` sub-resources.** `GET /users/:id` already returns `roleIds`, `roleNames` and `departmentIds` on `UserSummaryResponse`, so a separate round trip would return a strict subset of what the caller just fetched. The `PUT` counterparts exist because replacing a set is a genuinely different operation from reading one.
@@ -226,7 +228,7 @@ Tenant admins only ever address their **own** org; the tenant comes from the JWT
 | GET | `/roles/:id` | Detail + attached permissions + `user_assigned`. | perm:`role.read` |
 | PATCH | `/roles/:id` ✎ | Update `name`/`description`. **403** when `is_system_role = true`. | perm:`role.update` |
 | DELETE | `/roles/:id` ✎ | Delete. **403** on system roles; **409** if `user_assigned > 0`. | perm:`role.delete` |
-| PUT | `/roles/:id/permissions` ✎ | Replace the permission set in one transaction. Provenance to `audit_logs` (`ROLE_PERMISSIONS_UPDATED`); `_role_permissions` holds no payload columns (RDM Tables 7–8). Subject to the same no-escalation rule as role assignment: an actor may not grant a permission they do not themselves hold. | perm:`role.permission.assign` |
+| PUT | `/roles/:id/permissions` ✎ | Replace the permission set in one transaction. Provenance to `audit_logs` (`ROLE_PERMISSIONS_UPDATED`); `role_permissions` holds no payload columns (RDM Tables 7–8). Subject to the same no-escalation rule as role assignment: an actor may not grant a permission they do not themselves hold. | perm:`role.permission.assign` |
 | GET | `/permissions` | Full permission catalogue, grouped by `target` prefix — drives the role editor UI. | perm:`role.read` |
 | ~~GET~~ | ~~`/roles/:id/users`~~ | **Not built, and will not be** — this is `GET /users?roleId=<id>`, which already has pagination, `?searchTerm=`, sorting and soft-delete handling. A second URL over the same query serves nobody: `role.read` is held by `ORG_ADMIN` alone, and `ORG_ADMIN` is `PERMISSION_CODES`, so every caller who could use this route already holds `user.read`. Revisit only if a custom role ever grants `role.read` without it. | — |
 | POST | `/roles/:id/users` ✎ | Bulk-assign the role, leaving each user's other roles alone. **ADD semantics**, unlike `PUT /users/:id/roles`: a user who already holds it is a no-op, and `user_assigned` moves by the delta rather than the request size. All-or-nothing — an unknown or foreign user id fails the whole request. Applied through `setUserRoles` per user, so it inherits the tenant check, the no-escalation rule and the last-Org-Admin guard. Bounded by `MAX_ROLE_ASSIGNMENT_USERS`. | perm:`user.role.assign` |
@@ -258,6 +260,7 @@ RDM §1.7: `organization_id IS NULL`, `is_super_admin = true`; audit rows writte
 | ~~GET~~ | ~~`/platform/permissions`~~ | **Not built, and will not be.** `GET /permissions` already serves the catalogue to every caller who could want it — `listPermissions()` takes no tenant context, and `PermissionGuard` returns early for a Super Admin, so `role.read` is not a barrier to one. The single thing a platform view could have shown is drift between `PERMISSION_CODES` and the table, and `is_retired` on the existing route shows it to the tenant admin who is actually looking at the editor. [ADR 0038](./decisions/0038-permissions-are-a-compile-time-artifact.md). | — |
 | ~~POST~~ | ~~`/platform/permissions`~~ | **Not built, and never should be** — not a deferral. A permission is a union member, not a row: `@RequirePermission('x')` is a compile error unless `x` is in `PERMISSION_CODES`, so a runtime-created code could be required by no route, enforced by no guard, and granted by nothing — `assertGrantable` refuses it. It would appear in the role editor and do nothing, which is worse than absent. A new permission ships with a deploy. [ADR 0038](./decisions/0038-permissions-are-a-compile-time-artifact.md). | — |
 | GET | `/platform/audit-logs` | Cross-tenant audit trail, incl. `organization_id IS NULL` rows. **Blocked on Domain D** — `audit_logs` lives in `ticket-service`, which is a scaffold. Domain A already *publishes* audit events over NATS (§8.1); this endpoint appears when the sink does. | SUPER |
+| GET | `/platform/audit-logs/actions` | Distinct `action` values across every tenant, for the filter dropdown — the cross-tenant sibling of `GET /audit-logs/actions`. | SUPER |
 | GET | `/platform/metrics` | Platform-wide health: tenant count, MRR-ish usage, AI spend. | SUPER |
 | GET | `/platform/jobs` | **Scheduled-job health.** Every job this build EXPECTS, with `lastSucceededAt`, duration, consecutive failures and a verdict of `healthy` / `stale` / `failing` / `never-ran`. Judged against the expected list rather than the rows returned, because a job that has never run has no row — which is exactly how seven uncalled jobs stayed invisible for two domains. Three-leg fan-out: the heartbeat table lives in each owning service's database. | SUPER |
 | POST | `/platform/jobs/:name/run` | Runs a rollup now. A POST rather than a GET because it does work, and a GET is something a browser prefetch or an automatic retry can trigger with nobody asking. | SUPER |
@@ -297,7 +300,7 @@ RDM §1.7: `organization_id IS NULL`, `is_super_admin = true`; audit rows writte
 | Method | Path | Description | Auth |
 | :---- | :---- | :---- | :---- |
 | GET | `/tickets` | Queue view. Filters: `?status=&priority=&departmentId=&assigneeId=&authorId=&createdFrom=&createdTo=&q=`. Non-agents see only their own. | USER |
-| POST | `/tickets` ✎ | Create a ticket directly (form submission path). Sets `source = WEB`. Emits `ticket.created`. | USER |
+| POST | `/tickets` ✎ | Create a ticket directly (form submission path). Sets `source = WEB`. Emits `ticket.created`. | perm:`ticket.create` |
 | GET | `/tickets/:id` | Full detail: ticket + author + current_assignee + current_department + status + `ai_summaries` + attachment counts. | USER / perm:`ticket.read.all` |
 | PATCH | `/tickets/:id` | Update `title`, `description`, `priority`. **Never `status`** — that moves through the state machine and nowhere else. Priority is here rather than on a route of its own precisely because it has no machine: any value to any value, so there is no transition to validate and no 409 to raise. | perm:`ticket.update` |
 | DELETE | `/tickets/:id` ✎ | Soft delete. | perm:`ticket.delete` |
@@ -310,7 +313,7 @@ RDM §1.7: `organization_id IS NULL`, `is_super_admin = true`; audit rows writte
 | DELETE | `/tickets/:id/assign` ✎ | Unassign back to the department queue. | perm:`ticket.assign` |
 | POST | `/tickets/:id/escalate` ✎ | Tier 1 → Tier 2. Sets `status = ESCALATED` + `escalated_at`, routes to a department, and triggers AI summary generation (RDM §1.3). One-click escalation from chat. Optional body `{ reason? }`, recorded on the status history — the `/chat` alias sends none, and stays a literal alias. | USER |
 | POST | `/tickets/:id/resolve` | Mark resolved. Stamps `resolved_at`. **The only route to `RESOLVED`** — `POST /:id/status` refuses it, because this permission is stronger than that route's. Optional body `{ reason? }`, recorded on the status history. | perm:`ticket.resolve` |
-| POST | `/tickets/:id/reopen` | `RESOLVED`/`CLOSED` → `OPEN`, clears `resolved_at` and KEEPS `escalated_at`. Optional body `{ reason? }`, recorded on the status history. | USER |
+| POST | `/tickets/:id/reopen` | `RESOLVED`/`CLOSED` → `OPEN`, clears `resolved_at` and KEEPS `escalated_at`. Optional body `{ reason? }`, recorded on the status history. | perm:`ticket.update` |
 | POST | `/tickets/:id/close` | Final close. **The only route to `CLOSED`**, same reason as `/resolve`. Optional body `{ reason? }`. Permission corrected from `ticket.update` to match the code, which has required `ticket.resolve` since the route was built — closing and resolving are one right. | perm:`ticket.resolve` |
 | GET | `/tickets/:id/history` | **STATUS history**, oldest first, from `ticket_status_changes` — written inside the status transaction, so it has no holes. Not from `audit_logs`, which is read behind an admin permission ([ADR 0040](./decisions/0040-ticket-status-history-is-a-table-not-a-trail.md)). ADR 0040's other argument — that the trail was at-most-once — was overtaken by [ADR 0041](./decisions/0041-durable-subjects-are-the-ones-with-nothing-to-reconcile-against.md), which made `audit.record` durable; the permission boundary settled it independently and still does. Reassignments are at `GET /tickets/:id/assignments`; merging the two would be one list with two shapes. Unpaginated. | USER |
 | GET | `/tickets/:id/similar` | Past resolved tickets with similar content — agent co-pilot (product §6.3). Backed by `rag-service` over ticket embeddings. | perm:`ticket.read.all` |
@@ -318,6 +321,7 @@ RDM §1.7: `organization_id IS NULL`, `is_super_admin = true`; audit rows writte
 | POST | `/tickets/bulk/priority` | Bulk priority change over `{ ticketIds[], priority }`. Per-item result, same cap. No `reason`: priority has no state machine, so there is nothing to justify against. | perm:`ticket.update` |
 | ~~POST~~ | ~~`/tickets/bulk/assignee`~~ | **Not built, and not a fourth row of this shape.** Which permission applies is decided per ticket — assigning a held ticket is a *reassignment* (`ticket.reassign`), an unheld one is `ticket.assign`, and a self-claim is `ticket.assign.self` — so no static guard is correct for a mixed list. And `AssignTicketRequest.department_id` is required while `{ ticketIds[] }` carries one department for the batch: sending the caller's own would move tickets between departments as a side effect of assigning them. Use `POST /tickets/:id/assign` per ticket. | — |
 | POST | `/tickets/export` | **CSV only**, async: `202` with an export id, then `GET /tickets/export/:id` for the signed URL. `xlsx` is not a permitted `StoragePurpose.EXPORT` type and adding it means a library, a content-signature entry and a streaming story worse than CSV's — a spreadsheet opens a CSV. **POST, not GET**: a GET that writes is one a browser prefetch, a link preview or an automatic retry can trigger, each producing another file. Bounded by `MAX_EXPORT_SPAN_DAYS` and `MAX_EXPORT_ROWS`. | perm:`ticket.export` |
+| GET | `/tickets/export/:id` | Poll for the file. Another tenant's id answers **404, never 403** — a 403 confirms the id exists. | perm:`ticket.export` |
 
 ### 2.2 Ticket Messages — `/tickets/:id/messages`
 
@@ -330,6 +334,7 @@ The unified Tier 1 + Tier 2 timeline (RDM §1.3).
 | ~~GET~~ | ~~`/tickets/:ticketId/messages/:messageId`~~ | **Not built, deliberately.** `GET .../messages` already returns attachments and citations, so this is a strict subset of what the caller has. The deep-link case is a client concern: it must fetch the page containing the message to render the surrounding thread anyway, and a single message with no context is not a screen. Revisit if a notification ever deep-links into a thread too large to page to. | ~~USER~~ |
 | PATCH | `/tickets/:ticketId/messages/:messageId` | Edit own message inside a short window; internal notes editable by agents. | SELF / perm:`ticket.message.moderate` |
 | DELETE | `/tickets/:ticketId/messages/:messageId` | Redact a message (content replaced, row retained for the audit timeline). | perm:`ticket.message.moderate` |
+| POST | `/tickets/:ticketId/messages/attachments/upload-url` | **The same presign, for a message that does not exist yet** — this is what makes a *first-turn* attachment readable. Its `:messageId` sibling below can only be called after posting, while `invokeAi` runs *during* the post, so the screenshot landed a moment after the answer that needed it. The object paths returned here are handed to `POST /tickets/:id/messages` in `attachments`, which confirms each one and binds it as the message is written. No cap is checked here because there is no message to count against — create enforces it over the list it is given. | USER |
 | POST | `/tickets/:ticketId/messages/:messageId/attachments/upload-url` | Presign a direct-to-Firebase-Storage upload: `{ contentType, sizeBytes }` → `{ uploadUrl, objectPath, expiresAt }`. Enforces the per-message attachment count cap (todo note: "set maximum file (image) attachments") **before** signing — a caller already at the cap never receives a usable URL. See [ADR 0024](./decisions/0024-one-upload-mechanism.md). | USER |
 | POST | `/tickets/:ticketId/messages/:messageId/attachments/confirm` | `{ objectPath }` — confirms, writes the `message_attachments` row. | USER |
 | GET | `/tickets/:ticketId/messages/:messageId/attachments` | List attachments. | USER |
@@ -374,6 +379,7 @@ Thin end-user surface over the same `tickets` + `ticket_messages` tables — a l
 | POST | `/chat/conversations` | Start a Tier 1 conversation → creates a `NEW` ticket. | USER |
 | GET | `/chat/conversations` | List own conversations. | USER |
 | GET | `/chat/conversations/:id` | Thread + citations per AI message. | USER |
+| GET | `/chat/conversations/:id/messages` | The caller's **own** messages in the conversation. `source=CHAT` is forced and `authorId` is pinned to the caller rather than left to ticket-service's visibility filter — the filter alone would show an agent holding `ticket.read.all` every chat in the tenant, which is correct for the queue view at `/tickets` and wrong for "my conversations", which is what this path means. | USER |
 | POST | `/chat/conversations/:id/messages` | Ask a question. Streams the RAG answer over WebSocket; falls back to a buffered JSON response when the client sets `Accept: application/json`. The answer is **Markdown by contract** (§2.3). | USER |
 | POST | `/chat/conversations/:id/escalate` | One-click hand-off to a human — alias of `POST /tickets/:id/escalate`. | USER |
 | ~~GET~~ | ~~`/chat/suggestions`~~ | **Not built — one row conflating two features.** Split below. Naming them together implied the harder one was a `GET` away. | ~~USER~~ |
@@ -397,6 +403,7 @@ Thin end-user surface over the same `tickets` + `ticket_messages` tables — a l
 | ~~GET~~ | ~~`/audit-logs/:id`~~ | **Not built.** The justification was "single entry **incl. the JSONB `metadata` snapshot**", which implies the list omits it — it does not: ticket-service sends `metadata: JSON.stringify(log.metadata ?? {})` on every row and the gateway parses it whole through `parseAuditMetadata`, with no truncation anywhere. So this would return one row of exactly what `GET /audit-logs` already returns, behind the same permission. The clause is kept rather than deleted because it is what made the route look necessary. | ~~perm:`audit.read`~~ |
 | GET | `/audit-logs/actions` | Distinct `action` values, for filter dropdowns. | perm:`audit.read` |
 | POST | `/audit-logs/export` | Compliance export, **CSV or `application/json`** — JSONL is not a permitted type, and a single JSON array costs one line's difference now that the whole file is built in memory. JSON is offered here and not for tickets because `audit_logs.metadata` is genuinely nested and CSV flattens it badly. **POST, not GET**, and `202` + poll, as above. | perm:`audit.export` |
+| GET | `/audit-logs/export/:id` | Poll for the file. Another tenant's id answers **404, never 403** — a 403 confirms the id exists. | perm:`audit.export` |
 
 No `POST`/`PATCH`/`DELETE` — `audit_logs` is append-only and written internally via NATS.
 
@@ -466,7 +473,7 @@ Direct RAG surface, independent of a ticket thread.
 
 ## 4. Analytics & Dashboards (cross-domain read layer)
 
-> **Not a domain.** Analytics owns no tables — it reads across Domains B, C and D. **RDM Domain D is *Audit & Feedback*** (`ai_response_feedbacks`, `audit_logs`), whose endpoints are §2.5 and §2.6, owned by `ticket-service`. This section previously carried the "Domain D" label, which made "Domain D" mean one thing here and another in [rdm-specs.md](./rdm-specs.md).
+> **Not a domain.** Analytics owns no tables — it reads across Domains B, C and D. **RDM Domain D is *Analytics, Feedback & Compliance Audit***, which owns both the trail this section does not touch (`ai_response_feedbacks`, `audit_logs` — endpoints in §2.5 and §2.6, owned by `ticket-service`) and the rollup tables these endpoints read (`ticket_daily_stats`, `agent_daily_stats`, `ai_generation_daily_stats`, `analytics_exports`, RDM Tables 34–37). This section previously carried the "Domain D" label, which made "Domain D" mean one thing here and another in [rdm-specs.md](./rdm-specs.md).
 
 Executive dashboard (product §6.6). Read-only, Redis-cached, `perm:analytics.read` throughout. These read daily rollup tables rather than the raw OLTP tables, and there is deliberately no `analytics-service` — [ADR 0009](./decisions/0009-rollups-are-plain-tables.md).
 
@@ -481,7 +488,8 @@ Executive dashboard (product §6.6). Read-only, Redis-cached, `perm:analytics.re
 | GET | `/analytics/ai-usage` | Spend over time from `ai_generations`, broken down **by `purpose`** (chat answer vs draft vs summary vs embedding vs greeting classification) and by `model_name` and `ai_model_tier`, against `monthly_ai_token_budget`. The per-purpose split is what tells a tenant *where* their AI budget actually goes — often not where they assume. |
 | GET | `/analytics/documents` | Most-cited documents, **never-retrieved** vs **retrieved-but-never-cited** (RDM Table 27 — two different findings that were previously one flag), citation accuracy from `ai_response_feedbacks.citation_accurate`. Reads `document_chunks` usage counters, not the ledger, which is retention-rolled. |
 | GET | `/analytics/satisfaction` | Thumbs up/down trend from `ai_response_feedbacks`. |
-| POST | `/analytics/export` | Async report export → `202` with an export id, then `GET /analytics/export/:id` for the signed URL. **Shipped.** |
+| POST | `/analytics/export` | Async report export → `202` with an export id, then `GET /analytics/export/:id` for the signed URL. The job records the tenant timezone, the caller's visibility at request time and the newest rollup `computed_at` it read (RDM Table 37) — an export is a **snapshot**, and two people exporting "last quarter" a week apart must be able to tell why their numbers differ. |
+| GET | `/analytics/export/:id` | Poll for the file. Another tenant's id answers **404, never 403** — a 403 confirms the id exists. |
 
 ---
 
@@ -518,7 +526,7 @@ Numbered `4b` rather than `5` — the same convention §2.3b and §3.1b already 
 
 Namespace `/ws`, JWT-authenticated on handshake, rate-limited via `ThrottlerStorageRedisService`, fanned out across instances by `@socket.io/redis-adapter`. Rooms: `org:{organizationId}`, `ticket:{ticketId}`, `user:{userId}`, `dept:{departmentId}`, and `ticket:{ticketId}:internal` for agent-only fan-out.
 
-**[ADR 0011](./decisions/0011-websocket-is-a-transport.md).** The transport, `ticket:join`/`leave` and every notification event are built; `message:send`, typing, presence and the AI stream relay are not. There was a **live disclosure in the shipped `message:new` fan-out** — the ticket room contains the requester, so internal notes reach them — which is why the `:internal` room above exists.
+**[ADR 0011](./decisions/0011-websocket-is-a-transport.md).** All seven client→server events now have handlers — `ticket:join`/`leave`, `message:send`, `typing:start`/`stop`, `presence:update` and `ai:stream:cancel` — alongside the AI stream relay and every notification event. The decision came out of a **live disclosure in the shipped `message:new` fan-out**: the ticket room contains the requester, so internal notes reached them, which is why the `:internal` room above exists.
 
 | Direction | Event | Payload / purpose |
 | :---- | :---- | :---- |
@@ -527,11 +535,15 @@ Namespace `/ws`, JWT-authenticated on handshake, rate-limited via `ThrottlerStor
 | C→S | `typing:start` / `typing:stop` | Typing indicators (product §6.5). |
 | C→S | `presence:update` | Agent availability (`online \| away \| busy`). |
 | C→S | `ai:stream:cancel` | Abort an in-flight generation. |
+| S→C | `connection:ready` | **The "you may start talking" signal, and not cosmetic.** Socket.IO fires `connect` on the client as soon as the transport is up — *before* the server has verified the token and populated the socket's identity rooms — so a client that emits `ticket:join` on `connect` races the server and is told it is unauthorized, intermittently and unreproducibly. Clients must wait for this frame. |
+| S→C | `ticket:joined` | Confirms a `ticket:join`, **to the joining socket alone**. |
 | S→C | `message:new` | New message in a joined thread. |
 | S→C | `message:updated` / `message:deleted` | Edit / redaction. |
 | S→C | `ai:stream:chunk` | Token-by-token LLM output. **Markdown arrives incomplete by construction** — mid-stream the client holds an unclosed code fence or half a list ([ai-output-contract.md](./reference/ai-output-contract.md)). The renderer must tolerate unterminated constructs, or the answer flickers between raw and formatted on every chunk. |
+| S→C | `ai:stream:attachments-skipped` | Files that were **not** sent to the model. Its own event rather than a field on `ai:stream:done` because it fires *before* the answer — a user watching a reply stream in about a screenshot they attached should learn it was skipped while still reading, not in the frame that closes the stream. Carries file **names** only; the contents are the thing that could not be sent. |
 | S→C | `ai:stream:done` | Final message id, citations, token counts. |
 | S→C | `ai:stream:error` | Generation failure or quota exhaustion. |
+| S→C | `ticket:created` | A ticket was created. Room `org:{id}`. |
 | S→C | `ticket:updated` | Status / priority / assignee change. |
 | S→C | `ticket:assigned` | Agent's queue got a new ticket. |
 | S→C | `typing` | Peer typing state. |
@@ -547,17 +559,18 @@ Namespace `/ws`, JWT-authenticated on handshake, rate-limited via `ThrottlerStor
 
 ## 6. Ops & Infrastructure Endpoints
 
-**[ADR 0010](./decisions/0010-readiness-probes-do-not-cascade.md)** — `/health` exists, `/version` and `/metrics` do not, and no backing service has a probe of any kind. There was a live availability bug: gateway readiness gated on gRPC peer health, so one service being down removes every gateway instance from rotation.
+**[ADR 0010](./decisions/0010-readiness-probes-do-not-cascade.md)** — the decision came out of a live availability bug: gateway readiness gated on gRPC peer health, so one service being down removed every gateway instance from rotation. All three gaps it recorded are now closed: `/version` and `/metrics` ship, and every backing service serves `grpc.health.v1.Health` from its `ops` module — on the port it already listens on, so there is no second listener and the kubelet can probe it natively.
 
 | Method | Path | Description | Auth |
 | :---- | :---- | :---- | :---- |
 | GET | `/health` | Liveness. | PUBLIC |
 | GET | `/health/ready` | Readiness — Postgres, Redis, NATS, gRPC peers, Qdrant. | PUBLIC |
 | GET | `/version` | Build SHA + semver. | PUBLIC |
-| GET | `/metrics` | Prometheus scrape (bound to the internal interface, not via Nginx). | internal |
+| GET | `/metrics` | Prometheus scrape. **Its own listener on a separate internal port, not a route on the public app** — that is what makes "unreachable from the internet" a property of this process rather than of an Nginx config in another repository. Started *before* the public listener, so a scraper never finds the app serving traffic while the metrics port still refuses. | internal |
 | GET | `/docs` · `/docs-json` | Swagger UI / OpenAPI spec. **[ADR 0028](./decisions/0028-swagger-envelope-is-a-per-route-decorator.md)** — the CLI plugin (which turns 50 files of hand annotation into one config block), the two envelope decorators, and the four cookie auth schemes this API actually uses. Gate exposure on validated config, never on an inline `NODE_ENV` check. | PUBLIC in non-prod |
 | GET | `/graphql` | Apollo endpoint + Playground (non-prod). **[ADR 0014](./decisions/0014-narrow-graphql-edge-types.md) and [ADR 0013](./decisions/0013-batch-rpcs-map-from-keys.md).** REST and GraphQL are permanent peers, not a migration — GraphQL is the SPA's read surface, REST keeps commands, files and machine callers. | USER |
-| POST | `/webhooks/email/inbound` | Email-to-ticket ingestion. HMAC-signature verified. **[ADR 0018](./decisions/0018-inbound-email-routing-and-threading.md).** The address is `support+{inbound_token}@…`, so the tenant comes from the recipient rather than from the sender's domain; unknown senders are auto-provisioned only when their domain is already in `allowed_email_domains`, reusing the self-signup rule. Attachments and non-user senders are out of v1 scope, declared rather than discovered. | signature |
+| POST | `/webhooks/email/inbound` | Email-to-ticket ingestion. HMAC-signature verified. **[ADR 0018](./decisions/0018-inbound-email-routing-and-threading.md).** The address is `support+{inbound_token}@…`, so the tenant comes from the recipient rather than from the sender's domain; unknown senders are auto-provisioned only when their domain is already in `allowed_email_domains`, reusing the self-signup rule. Non-user senders remain out of scope, declared rather than discovered; **attachments now ship** via the presign route below. | signature |
+| POST | `/webhooks/email/attachments` | Presign uploads for an inbound mail's attachments — the **reply half**, called *before* the webhook by the same Worker over the same signature. The Worker parses the MIME, asks here which files it may store and where, PUTs the bytes to storage directly, then posts the webhook carrying only object paths. The bytes never reach an application server, which is the property presign exists to hold and the one an inbound mail most threatens, because the Worker is handed them whether anyone wanted them or not. **200, not 201** — nothing has been created until the bytes land and the webhook binds them. | signature |
 | ~~POST~~ | ~~`/webhooks/storage/s3`~~ | **Removed.** A storage-side upload-complete callback is redundant under presign/confirm: `POST /documents/confirm` *is* the completion signal, and it is the one that carries the caller's identity, the `PendingUpload` authorization and the ingestion trigger. GCS can emit equivalent Pub/Sub notifications, but wiring them would create a **second, racing completion path** — one authenticated and authorized, one not — for the same event. If object-side notification is ever genuinely needed (detecting an upload that was presigned and never confirmed), it belongs as a reconciliation job, not a webhook that competes with confirm. | — |
 
 ---
@@ -602,7 +615,7 @@ REST stays the contract for uploads, webhooks, and streaming; GraphQL serves the
 
 ### 8.1 NATS domain events
 
-Per the todo note: **gRPC for synchronous cross-service reads, NATS for background triggers** (notifications, sends, side effects).
+**gRPC for synchronous cross-service reads, NATS for background triggers** (notifications, sends, side effects). Every subject below is declared in a `*_PATTERNS` constant under `libs/common/src/contracts/` — that file is the registry, and a subject that is not in one does not exist. Durability differs per subject: see [ADR 0041](./decisions/0041-durable-subjects-are-the-ones-with-nothing-to-reconcile-against.md).
 
 | Subject | Publisher | Consumers |
 | :---- | :---- | :---- |
@@ -613,15 +626,21 @@ Per the todo note: **gRPC for synchronous cross-service reads, NATS for backgrou
 | `ticket.unassigned` | ticket-service | notifications (if department queue needs attention), audit |
 | `ticket.status_changed` | ticket-service | analytics, notifications |
 | `ticket.message_created` | ticket-service | notifications (upsert grouped), WS fan-out, token metering |
+| `ticket.message_updated` | ticket-service | WS fan-out (`message:updated`), same room split as the message itself |
+| `ticket.message_redacted` | ticket-service | WS fan-out (`message:deleted`), audit. **Named for what happened, not for the frame it produces** — the row survives with its content replaced, and calling it `deleted` would invite a consumer to remove it from a timeline whose gaps are the point |
 | `document.uploaded` | ingestion-service | ingestion workers (BullMQ enqueue) |
 | `document.indexed` | rag-service | ingestion-service (`status = INDEXED`), notifications, WS |
 | `document.ingestion_failed` | rag-service | ingestion-service (`FAILED` + `error_log`), notifications, alerting |
-| `document.deleted` | ingestion-service | rag-service (purge Qdrant points), notifications |
-| `user.invited` · `user.locked` · `user.deleted` | auth-service | notifications (create delivery rows), session revocation |
-| `notification.created` | notification-consumer | delivery-worker (fan to `notification_deliveries`, enqueue `email/sms` BullMQ jobs), WS fan-out to `user:{id}` |
+| `document.scope_changed` | ingestion-service | rag-service (the fan-out job's trigger). **A separate subject from `uploaded`** because it is a re-write of existing points rather than a first index — conflating them would make a re-scope re-embed the whole document |
+| `email.inbound_rejected` | api-gateway (inbound webhook) | notification-service (bounce the sender). **An event, not an RPC**: the webhook must answer 200 whatever happens, so the drop path must not be able to fail because a mailbox was slow — and the drop path is precisely the one that must never throw |
+| `notification.in_app.create` | any service | notification-service — the subject Domain E subscribes to for in-app notifications |
+| `notification.email.send` · `notification.sms.send` | any service | notification-service delivery workers. Notifications travel over NATS rather than gRPC because they are background side effects — a caller never waits for an SMTP round trip. `emit`; nothing replies |
+| `notification.created` | notification-service | WS fan-out to `user:{id}` (`notification:new`). Written first, emitted fire-and-forget, so a disconnected user still finds the row on next load |
+| `notification.updated` | notification-service | WS fan-out (`notification:updated`) — an existing row was **coalesced**, same group key, higher count |
+| `notification.read` | notification-service | WS fan-out (`notification:read`) — read/archive state changed, so a dismissal on one device clears the badge on another |
 | `audit.record` | any service (via `AuditPublisher`, `libs/common/src/contracts/audit.contract.ts`) | ticket-service (`AuditConsumer`) |
 | `storage.object.superseded` | auth-service (avatar replace/clear), ticket-service (attachment delete), ingestion-service (document replace) | storage-service (async object delete) |
-| `quota.exceeded` | any | notifications (CRITICAL priority, bypass quiet hours), platform alerting |
+| ~~`quota.exceeded`~~ | — | **Not a subject.** The quota signal is a notification *type* (`quota.threshold` in `NOTIFICATION_TYPES`, RDM Table 23), delivered through `notification.in_app.create` like any other. There is no publisher and no `*_PATTERNS` entry — it was specified here and never built |
 | `billing.entitlements_changed` | auth-service (Stripe webhook) | ingestion-service (invalidate the cached settings/tier for that tenant — a stale cache keeps a downgraded tenant on the premium model), analytics, audit |
 
 ---

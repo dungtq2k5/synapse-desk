@@ -61,15 +61,21 @@ import { toStoredBody } from './quoted-reply';
  * cannot act on it.
  */
 export enum InboundOutcome {
-  CREATED = 'ticket_created',
-  APPENDED = 'message_appended',
-  DUPLICATE = 'duplicate',
-  UNROUTABLE = 'unroutable_address',
+  CREATED = 'TICKET_CREATED',
+  APPENDED = 'MESSAGE_APPENDED',
+  DUPLICATE = 'DUPLICATE',
+  UNROUTABLE = 'UNROUTABLE_ADDRESS',
   /** A real tenant, but not one currently accepting anything. */
-  TENANT_INACTIVE = 'tenant_inactive',
-  SENDER_REFUSED = 'sender_not_permitted',
+  TENANT_INACTIVE = 'TENANT_INACTIVE',
+  /**
+   * Deliberately the same spelling as
+   * {@link InboundRejectionReason.SENDER_NOT_PERMITTED}, which `drop` maps this
+   * to: two enums describing one refusal, and lower-case here was the reason
+   * they did not look like it.
+   */
+  SENDER_REFUSED = 'SENDER_NOT_PERMITTED',
   /** Our own notification came back to us. */
-  SELF_LOOP = 'self_addressed',
+  SELF_LOOP = 'SELF_ADDRESSED',
 }
 
 /**

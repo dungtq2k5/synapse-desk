@@ -41,16 +41,50 @@ enum NotificationPriority {
   NOTIFICATION_PRIORITY_CRITICAL = 4;
 }
 
+// Mirrors `NOTIFICATION_TYPES` in `@synapsedesk/common` — RDM Table 23.
+//
+// **This was a `string`, on the reasoning that the set was OPEN** — that every
+// producer emitting a new event adds a type, so an enum would mean a proto
+// change per notification. That reasoning no longer holds. `NOTIFICATION_TYPES`
+// is a closed `as const` in one library, and the in-app COMMAND is typed
+// `NotificationType`, so a producer already cannot invent one without editing
+// that declaration. The proto change is the same edit, in the same library.
+//
+// What it buys is what `AuditAction` next door already bought at forty values:
+// the wire rejects an unknown before a handler runs, and `enumBridge`'s
+// `Record<D, P>` makes a newly added type a COMPILE error until it is mapped —
+// rather than a string that flows through and is quietly narrowed to `null` by
+// a hand-written check somebody has to remember to write.
+enum NotificationType {
+  NOTIFICATION_TYPE_UNSPECIFIED = 0;
+  NOTIFICATION_TYPE_TICKET_ASSIGNED = 1;
+  NOTIFICATION_TYPE_TICKET_REASSIGNED = 2;
+  NOTIFICATION_TYPE_TICKET_ESCALATED = 3;
+  NOTIFICATION_TYPE_TICKET_MESSAGE_CREATED = 4;
+  NOTIFICATION_TYPE_TICKET_STATUS_CHANGED = 5;
+  NOTIFICATION_TYPE_QUOTA_THRESHOLD = 6;
+}
+
+// What a notification is ABOUT — mirrors `NotificationResourceType` in
+// `@synapsedesk/common`, RDM Table 23's `resource_type`.
+//
+// The same crossing `audit.proto` already enumerates, and for the same reason
+// recorded there: a resource type left as a string is one each caller narrows
+// by hand, and the copies cannot disagree at compile time.
+enum NotificationResourceType {
+  NOTIFICATION_RESOURCE_TYPE_UNSPECIFIED = 0;
+  NOTIFICATION_RESOURCE_TYPE_TICKET = 1;
+  NOTIFICATION_RESOURCE_TYPE_DOCUMENT = 2;
+  NOTIFICATION_RESOURCE_TYPE_USER = 3;
+  NOTIFICATION_RESOURCE_TYPE_ORGANIZATION = 4;
+}
+
 message NotificationResponse {
   string id = 1;
   string organization_id = 2;
   // The ORIGINATING event — `ticket.assigned`, `quota.threshold`. Never the
   // transport subject.
-  //
-  // Stays a `string` where `priority` below became an enum, and the difference
-  // is open set versus closed: every producer that emits a new event adds a
-  // type, so an enum here would mean a proto change per notification.
-  string type = 3;
+  NotificationType type = 3;
   NotificationPriority priority = 4;
   string title = 5;
   optional string body = 6;
@@ -60,7 +94,9 @@ message NotificationResponse {
   string data = 7;
   optional string action_url = 8;
   optional string actor_id = 9;
-  optional string resource_type = 10;
+  // No `optional`: `UNSPECIFIED` already means "this notification is not about
+  // a resource", which is the same distinction the absent string carried.
+  NotificationResourceType resource_type = 10;
   optional string resource_id = 11;
   optional string group_key = 12;
   int32 group_count = 13;
@@ -76,7 +112,10 @@ message NotificationResponse {
 // visible to the client. The cursor is the last row's id, and `created_at` is
 // carried with it because two rows can share a millisecond.
 message ListNotificationsRequest {
-  optional string type = 1;
+  // `optional`, unlike `UpdatePreferenceRequest.digest` below: this is a FILTER,
+  // where absent and "no filter" are the same statement, so there is no third
+  // meaning for the zero value to collide with.
+  optional NotificationType type = 1;
   bool unread_only = 2;
   bool include_archived = 3;
   // Opaque to the caller. Encodes (created_at, id) — see `feed.cursor.ts`.
@@ -103,7 +142,7 @@ message NotificationIdRequest { string id = 1; }
 // notifications in one call.
 message MarkReadRequest {
   repeated string ids = 1;
-  optional string resource_type = 2;
+  optional NotificationResourceType resource_type = 2;
   optional string resource_id = 3;
 }
 
@@ -124,10 +163,17 @@ message MarkReadResponse {
 // scoping: they are SIBLINGS of their type, so a bare `UNSPECIFIED` in two
 // enums of one package is a compile error.
 //
-// Note `type` stays a `string` deliberately. It is an OPEN set — every producer
-// that emits a new event adds one — so an enum there would mean a proto change
-// on every new notification, and an unknown type must degrade to "no
-// preference row" rather than being refused at the transport.
+// Note the `type` on the PREFERENCE messages below stays a `string`, while the
+// `type` on a notification is a `NotificationType`. That is not an
+// inconsistency — they are different sets. A notification's type is a member of
+// `NOTIFICATION_TYPES`; a preference's type is a KEY, whose domain is that set
+// plus the `'*'` wildcard that Table 25's resolution order depends on. The
+// gateway has narrowed them with two separate functions from the beginning
+// (`asNotificationType` and `asPreferenceType`) for exactly this reason.
+//
+// Folding the wildcard in as a seventh enum member would put a value on
+// `NotificationResponse.type` that no notification can ever legally carry,
+// which trades a real distinction for a cosmetic one.
 
 // Mirrors `NotificationChannel` in `@synapsedesk/common` — RDM Table 24.
 //
@@ -175,6 +221,15 @@ enum PreferenceSource {
 // value was chosen. A settings screen that renders a default as a choice is one
 // the user cannot reason about.
 message PreferenceResponse {
+  // **Related to `NotificationType`, but deliberately WIDER than it.** A
+  // preference is keyed by a notification type OR the `'*'` wildcard, and Table
+  // 25's resolution order — exact `(type, channel)`, then `('*', channel)`,
+  // then the permissive default — is the whole reason the wildcard exists. No
+  // proto enum can say "these six values plus one that means all of them"
+  // without putting that seventh value within reach of
+  // `NotificationResponse.type`, where no notification could ever legally carry
+  // it. So this stays a string, and the gateway narrows it with
+  // `asPreferenceType`.
   string type = 1;
   NotificationChannel channel = 2;
   bool is_enabled = 3;
@@ -192,6 +247,9 @@ message ListPreferencesResponse { repeated PreferenceResponse items = 1; }
 // enum would be one field with two wire formats, and the mapping between them
 // would live in whichever caller remembered to write it.
 message UpdatePreferenceRequest {
+  // A preference KEY, as {@link PreferenceResponse.type} — a notification type
+  // or `'*'`. String for the reason recorded there, and a string on BOTH sides
+  // for the reason recorded above: one concept must not have two wire formats.
   string type = 1;
   NotificationChannel channel = 2;
   optional bool is_enabled = 3;

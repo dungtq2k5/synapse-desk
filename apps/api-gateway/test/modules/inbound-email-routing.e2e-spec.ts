@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import request from 'supertest';
 import { of, throwError } from 'rxjs';
+import { InboundOutcome } from '../../src/modules/inbound-email/inbound-email.service';
 import { faker } from '@faker-js/faker';
 import { status as GrpcStatus } from '@grpc/grpc-js';
 import { ConfigService } from '@nestjs/config';
@@ -99,7 +100,7 @@ describe('Inbound email routing (e2e)', () => {
         plainEmail({ to: buildInboundAddress(INBOUND_DOMAIN, tenantToken) }),
       ).expect(200);
 
-      expect(response.body.data.outcome).toBe('unroutable_address');
+      expect(response.body.data.outcome).toBe(InboundOutcome.UNROUTABLE);
       // **The order is the security property**. Resolving the
       // sender first would mean querying it unscoped.
       expect(fx.stubs.user.resolveInboundSender).not.toHaveBeenCalled();
@@ -122,7 +123,7 @@ describe('Inbound email routing (e2e)', () => {
         plainEmail({ to: buildInboundAddress(INBOUND_DOMAIN, tenantToken) }),
       ).expect(200);
 
-      expect(response.body.data.outcome).toBe('tenant_inactive');
+      expect(response.body.data.outcome).toBe(InboundOutcome.TENANT_INACTIVE);
       expect(fx.stubs.user.resolveInboundSender).not.toHaveBeenCalled();
       expect(fx.stubs.ticket.createTicket).not.toHaveBeenCalled();
     });
@@ -132,7 +133,7 @@ describe('Inbound email routing (e2e)', () => {
         plainEmail({ to: `hello@${INBOUND_DOMAIN}` }),
       ).expect(200);
 
-      expect(response.body.data.outcome).toBe('unroutable_address');
+      expect(response.body.data.outcome).toBe(InboundOutcome.UNROUTABLE);
       expect(
         fx.stubs.organization.resolveOrgByInboundToken,
       ).not.toHaveBeenCalled();
@@ -154,7 +155,7 @@ describe('Inbound email routing (e2e)', () => {
         plainEmail({ to: buildInboundAddress(INBOUND_DOMAIN, tenantToken) }),
       ).expect(200);
 
-      expect(response.body.data.outcome).toBe('sender_not_permitted');
+      expect(response.body.data.outcome).toBe(InboundOutcome.SENDER_REFUSED);
       expect(fx.stubs.ticket.createTicket).not.toHaveBeenCalled();
     });
 
@@ -185,7 +186,7 @@ describe('Inbound email routing (e2e)', () => {
         plainEmail({ to: buildInboundAddress(INBOUND_DOMAIN, tenantToken) }),
       ).expect(200);
 
-      expect(response.body.data.outcome).toBe('ticket_created');
+      expect(response.body.data.outcome).toBe(InboundOutcome.CREATED);
 
       const [[sent]] = fx.stubs.ticket.createTicket.mock.calls;
 
@@ -208,7 +209,7 @@ describe('Inbound email routing (e2e)', () => {
         }),
       ).expect(200);
 
-      expect(response.body.data.outcome).toBe('message_appended');
+      expect(response.body.data.outcome).toBe(InboundOutcome.APPENDED);
       expect(fx.stubs.ticket.createTicket).not.toHaveBeenCalled();
 
       const [[sent]] = fx.stubs.message.createMessage.mock.calls;
@@ -233,7 +234,7 @@ describe('Inbound email routing (e2e)', () => {
         }),
       ).expect(200);
 
-      expect(response.body.data.outcome).toBe('ticket_created');
+      expect(response.body.data.outcome).toBe(InboundOutcome.CREATED);
       expect(fx.stubs.ticket.getTicketByNumber).not.toHaveBeenCalled();
       expect(fx.stubs.message.createMessage).not.toHaveBeenCalled();
     });
@@ -252,7 +253,7 @@ describe('Inbound email routing (e2e)', () => {
         }),
       ).expect(200);
 
-      expect(response.body.data.outcome).toBe('ticket_created');
+      expect(response.body.data.outcome).toBe(InboundOutcome.CREATED);
       expect(fx.stubs.message.createMessage).not.toHaveBeenCalled();
     });
 
@@ -298,7 +299,7 @@ describe('Inbound email routing (e2e)', () => {
         }),
       ).expect(200);
 
-      expect(response.body.data.outcome).toBe('ticket_created');
+      expect(response.body.data.outcome).toBe(InboundOutcome.CREATED);
     });
   });
 
@@ -325,7 +326,7 @@ describe('Inbound email routing (e2e)', () => {
         }),
       ).expect(200);
 
-      expect(response.body.data.outcome).toBe('message_appended');
+      expect(response.body.data.outcome).toBe(InboundOutcome.APPENDED);
       expect(fx.stubs.ticket.createTicket).not.toHaveBeenCalled();
 
       // **Scoped by the ADDRESSED tenant**, not by the header alone. A
@@ -379,7 +380,7 @@ describe('Inbound email routing (e2e)', () => {
         }),
       ).expect(200);
 
-      expect(response.body.data.outcome).toBe('ticket_created');
+      expect(response.body.data.outcome).toBe(InboundOutcome.CREATED);
       expect(
         fx.stubs.notification.resolveTicketByMessageId,
       ).not.toHaveBeenCalled();
@@ -399,7 +400,7 @@ describe('Inbound email routing (e2e)', () => {
         }),
       ).expect(200);
 
-      expect(response.body.data.outcome).toBe('ticket_created');
+      expect(response.body.data.outcome).toBe(InboundOutcome.CREATED);
     });
   });
 
@@ -416,7 +417,7 @@ describe('Inbound email routing (e2e)', () => {
         plainEmail({ to: buildInboundAddress(INBOUND_DOMAIN, tenantToken) }),
       ).expect(200);
 
-      expect(response.body.data.outcome).toBe('duplicate');
+      expect(response.body.data.outcome).toBe(InboundOutcome.DUPLICATE);
     });
 
     it('5. **a message with no `Message-ID` dedups across a REAL retry**', async () => {
@@ -519,7 +520,7 @@ describe('Inbound email routing (e2e)', () => {
         200,
       );
 
-      expect(response.body.data.outcome).toBe('ticket_created');
+      expect(response.body.data.outcome).toBe(InboundOutcome.CREATED);
     });
 
     it('an HTML-only message is stored as readable text', async () => {
@@ -547,7 +548,7 @@ describe('Inbound email routing (e2e)', () => {
         200,
       );
 
-      expect(response.body.data.outcome).toBe('unroutable_address');
+      expect(response.body.data.outcome).toBe(InboundOutcome.UNROUTABLE);
     });
 
     it('a Gmail-quoted reply threads and keeps only the new text', async () => {
@@ -561,7 +562,7 @@ describe('Inbound email routing (e2e)', () => {
         addressedHere('quoted-gmail.json', token),
       ).expect(200);
 
-      expect(response.body.data.outcome).toBe('message_appended');
+      expect(response.body.data.outcome).toBe(InboundOutcome.APPENDED);
 
       const [[sent]] = fx.stubs.message.createMessage.mock.calls;
 

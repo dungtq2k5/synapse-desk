@@ -1,5 +1,6 @@
 import { faker } from '@faker-js/faker';
 import {
+  NotificationResourceType,
   ReassignmentReason,
   TICKET_PATTERNS,
   TicketEventOf,
@@ -506,7 +507,7 @@ describe('Ticket notifications (e2e)', () => {
 
       expect(row.actionUrl).toBe(`/tickets/${TICKET_NUMBER}`);
       // The pair that makes bulk-read-by-ticket possible.
-      expect(row.resourceType).toBe('ticket');
+      expect(row.resourceType).toBe(NotificationResourceType.TICKET);
       expect(row.resourceId).toBe(TICKET_ID);
     });
   });

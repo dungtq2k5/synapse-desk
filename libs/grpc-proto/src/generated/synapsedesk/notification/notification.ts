@@ -34,6 +34,50 @@ export enum NotificationPriority {
 }
 
 /**
+ * Mirrors `NOTIFICATION_TYPES` in `@synapsedesk/common` — RDM Table 23.
+ *
+ * **This was a `string`, on the reasoning that the set was OPEN** — that every
+ * producer emitting a new event adds a type, so an enum would mean a proto
+ * change per notification. That reasoning no longer holds. `NOTIFICATION_TYPES`
+ * is a closed `as const` in one library, and the in-app COMMAND is typed
+ * `NotificationType`, so a producer already cannot invent one without editing
+ * that declaration. The proto change is the same edit, in the same library.
+ *
+ * What it buys is what `AuditAction` next door already bought at forty values:
+ * the wire rejects an unknown before a handler runs, and `enumBridge`'s
+ * `Record<D, P>` makes a newly added type a COMPILE error until it is mapped —
+ * rather than a string that flows through and is quietly narrowed to `null` by
+ * a hand-written check somebody has to remember to write.
+ */
+export enum NotificationType {
+  NOTIFICATION_TYPE_UNSPECIFIED = 0,
+  NOTIFICATION_TYPE_TICKET_ASSIGNED = 1,
+  NOTIFICATION_TYPE_TICKET_REASSIGNED = 2,
+  NOTIFICATION_TYPE_TICKET_ESCALATED = 3,
+  NOTIFICATION_TYPE_TICKET_MESSAGE_CREATED = 4,
+  NOTIFICATION_TYPE_TICKET_STATUS_CHANGED = 5,
+  NOTIFICATION_TYPE_QUOTA_THRESHOLD = 6,
+  UNRECOGNIZED = -1,
+}
+
+/**
+ * What a notification is ABOUT — mirrors `NotificationResourceType` in
+ * `@synapsedesk/common`, RDM Table 23's `resource_type`.
+ *
+ * The same crossing `audit.proto` already enumerates, and for the same reason
+ * recorded there: a resource type left as a string is one each caller narrows
+ * by hand, and the copies cannot disagree at compile time.
+ */
+export enum NotificationResourceType {
+  NOTIFICATION_RESOURCE_TYPE_UNSPECIFIED = 0,
+  NOTIFICATION_RESOURCE_TYPE_TICKET = 1,
+  NOTIFICATION_RESOURCE_TYPE_DOCUMENT = 2,
+  NOTIFICATION_RESOURCE_TYPE_USER = 3,
+  NOTIFICATION_RESOURCE_TYPE_ORGANIZATION = 4,
+  UNRECOGNIZED = -1,
+}
+
+/**
  * Mirrors `NotificationChannel` in `@synapsedesk/common` — RDM Table 24.
  *
  * `WEBHOOK` is present for completeness and is NOT a valid preference: it has
@@ -88,12 +132,8 @@ export interface NotificationResponse {
   /**
    * The ORIGINATING event — `ticket.assigned`, `quota.threshold`. Never the
    * transport subject.
-   *
-   * Stays a `string` where `priority` below became an enum, and the difference
-   * is open set versus closed: every producer that emits a new event adds a
-   * type, so an enum here would mean a proto change per notification.
    */
-  type: string;
+  type: NotificationType;
   priority: NotificationPriority;
   title: string;
   body?:
@@ -106,8 +146,14 @@ export interface NotificationResponse {
    */
   data: string;
   actionUrl?: string | undefined;
-  actorId?: string | undefined;
-  resourceType?: string | undefined;
+  actorId?:
+    | string
+    | undefined;
+  /**
+   * No `optional`: `UNSPECIFIED` already means "this notification is not about
+   * a resource", which is the same distinction the absent string carried.
+   */
+  resourceType: NotificationResourceType;
   resourceId?: string | undefined;
   groupKey?: string | undefined;
   groupCount: number;
@@ -125,7 +171,12 @@ export interface NotificationResponse {
  * carried with it because two rows can share a millisecond.
  */
 export interface ListNotificationsRequest {
-  type?: string | undefined;
+  /**
+   * `optional`, unlike `UpdatePreferenceRequest.digest` below: this is a FILTER,
+   * where absent and "no filter" are the same statement, so there is no third
+   * meaning for the zero value to collide with.
+   */
+  type?: NotificationType | undefined;
   unreadOnly: boolean;
   includeArchived: boolean;
   /** Opaque to the caller. Encodes (created_at, id) — see `feed.cursor.ts`. */
@@ -160,7 +211,7 @@ export interface NotificationIdRequest {
  */
 export interface MarkReadRequest {
   ids: string[];
-  resourceType?: string | undefined;
+  resourceType?: NotificationResourceType | undefined;
   resourceId?: string | undefined;
 }
 
@@ -178,6 +229,17 @@ export interface MarkReadResponse {
  * the user cannot reason about.
  */
 export interface PreferenceResponse {
+  /**
+   * *Related to `NotificationType`, but deliberately WIDER than it.** A
+   * preference is keyed by a notification type OR the `'*'` wildcard, and Table
+   * 25's resolution order — exact `(type, channel)`, then `('*', channel)`,
+   * then the permissive default — is the whole reason the wildcard exists. No
+   * proto enum can say "these six values plus one that means all of them"
+   * without putting that seventh value within reach of
+   * `NotificationResponse.type`, where no notification could ever legally carry
+   * it. So this stays a string, and the gateway narrows it with
+   * `asPreferenceType`.
+   */
   type: string;
   channel: NotificationChannel;
   isEnabled: boolean;
@@ -200,6 +262,11 @@ export interface ListPreferencesResponse {
  * would live in whichever caller remembered to write it.
  */
 export interface UpdatePreferenceRequest {
+  /**
+   * A preference KEY, as {@link PreferenceResponse.type} — a notification type
+   * or `'*'`. String for the reason recorded there, and a string on BOTH sides
+   * for the reason recorded above: one concept must not have two wire formats.
+   */
   type: string;
   channel: NotificationChannel;
   isEnabled?:

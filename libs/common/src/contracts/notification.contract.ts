@@ -227,11 +227,11 @@ export enum DeliveryStatus {
 
 /** Why a delivery did not happen — RDM Table 24. Read back to answer "why didn't I get an email?". */
 export enum DeliverySkipReason {
-  USER_PREFERENCE = 'user_preference',
-  QUIET_HOURS = 'quiet_hours',
-  UNVERIFIED_ADDRESS = 'unverified_address',
-  ALREADY_SEEN_IN_APP = 'already_seen_in_app',
-  RATE_LIMITED = 'rate_limited',
+  USER_PREFERENCE = 'USER_PREFERENCE',
+  QUIET_HOURS = 'QUIET_HOURS',
+  UNVERIFIED_ADDRESS = 'UNVERIFIED_ADDRESS',
+  ALREADY_SEEN_IN_APP = 'ALREADY_SEEN_IN_APP',
+  RATE_LIMITED = 'RATE_LIMITED',
 }
 
 /** RDM Table 25 — batching mode. Only `IMMEDIATE` and `OFF` act today. */
@@ -247,23 +247,23 @@ export enum DigestMode {
  * Where a resolved preference came from.
  *
  * The UI renders `DEFAULT` and `WILDCARD` as "inherited" rather than as a
- * choice the user made. Values are lower-case, matching what is stored.
+ * choice the user made.
  */
 export enum PreferenceSource {
   /** A row for this exact (type, channel). */
-  EXPLICIT = 'explicit',
+  EXPLICIT = 'EXPLICIT',
   /** A row for `'*'` on this channel — "stop emailing me about anything". */
-  WILDCARD = 'wildcard',
+  WILDCARD = 'WILDCARD',
   /** No row at all. Permissive by design: a new account receives everything. */
-  DEFAULT = 'default',
+  DEFAULT = 'DEFAULT',
 }
 
 /** What a notification is ABOUT — RDM Table 23's `resource_type`. */
 export enum NotificationResourceType {
-  TICKET = 'ticket',
-  DOCUMENT = 'document',
-  USER = 'user',
-  ORGANIZATION = 'organization',
+  TICKET = 'TICKET',
+  DOCUMENT = 'DOCUMENT',
+  USER = 'USER',
+  ORGANIZATION = 'ORGANIZATION',
 }
 
 /**

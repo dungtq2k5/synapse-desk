@@ -2,6 +2,10 @@ import {
   fromProtoDigestMode,
   fromProtoNotificationChannel,
   fromProtoNotificationPriority,
+  fromProtoNotificationResourceType,
+  fromProtoNotificationType,
+  toProtoNotificationResourceType,
+  toProtoNotificationType,
   fromProtoPreferenceSource,
   fromProtoTimestamp,
   ListNotificationsResponse,
@@ -17,7 +21,6 @@ import {
 } from '@synapsedesk/grpc-proto';
 import {
   NOTIFICATION_TYPE_VALUES,
-  NotificationResourceType,
   NotificationType,
   PREFERENCE_WILDCARD_TYPE,
 } from '@synapsedesk/common';
@@ -46,7 +49,7 @@ export function toNotificationResponseDto(
   return {
     id: notification.id,
     organizationId: notification.organizationId,
-    type: asNotificationType(notification.type),
+    type: fromProtoNotificationType(notification.type),
     // `?? null`, never `?? ''`: an empty string is neither a member of the enum
     // nor an absence, so a client switching on it falls through every arm.
     priority: fromProtoNotificationPriority(notification.priority) ?? null,
@@ -55,7 +58,7 @@ export function toNotificationResponseDto(
     data: parseData(notification.data),
     actionUrl: notification.actionUrl ?? null,
     actorId: notification.actorId ?? null,
-    resourceType: asResourceType(notification.resourceType),
+    resourceType: fromProtoNotificationResourceType(notification.resourceType),
     resourceId: notification.resourceId ?? null,
     groupKey: notification.groupKey ?? null,
     groupCount: notification.groupCount,
@@ -91,32 +94,20 @@ export function toPreferenceResponseDto(
 }
 
 /**
- * Narrows the wire's `string` `type` to the domain union.
+ * Narrows a PREFERENCE's `type`, which the wire still carries as a string.
  *
- * The proto declares `string` here, so the value is only checked at this
- * boundary: a type this build cannot name becomes `null` rather than reaching a
- * client as a member its own union does not contain.
+ * A notification's own `type` is a proto enum and crosses through
+ * `fromProtoNotificationType`; this one cannot, because `'*'` is a legal
+ * preference key and no notification may carry it — see `notification.proto`.
+ * So the string check survives here and only here.
  */
-function asNotificationType(value: string): NotificationType | null {
-  return NOTIFICATION_TYPE_VALUES.includes(value as NotificationType)
-    ? (value as NotificationType)
-    : null;
-}
-
-/** As {@link asNotificationType}, but `'*'` is a legal preference row. */
 function asPreferenceType(
   value: string,
 ): NotificationType | typeof PREFERENCE_WILDCARD_TYPE | null {
-  return value === PREFERENCE_WILDCARD_TYPE
-    ? PREFERENCE_WILDCARD_TYPE
-    : asNotificationType(value);
-}
+  if (value === PREFERENCE_WILDCARD_TYPE) return PREFERENCE_WILDCARD_TYPE;
 
-/** Narrows the wire's `string` `resource_type`; unset and unknown both answer `null`. */
-function asResourceType(value?: string): NotificationResourceType | null {
-  return value &&
-    (Object.values(NotificationResourceType) as string[]).includes(value)
-    ? (value as NotificationResourceType)
+  return NOTIFICATION_TYPE_VALUES.includes(value as NotificationType)
+    ? (value as NotificationType)
     : null;
 }
 
@@ -159,7 +150,7 @@ export function toListNotificationsRequest(
   query: ListNotificationsQueryDto,
 ): ListNotificationsRequest {
   return {
-    type: query.type,
+    type: toProtoNotificationType(query.type),
     unreadOnly: query.unreadOnly,
     includeArchived: query.includeArchived,
     cursor: query.cursor,
@@ -171,7 +162,7 @@ export function toListNotificationsRequest(
 export function toMarkReadRequest(dto: MarkManyReadDto): MarkReadRequest {
   return {
     ids: dto.ids,
-    resourceType: dto.resourceType,
+    resourceType: toProtoNotificationResourceType(dto.resourceType),
     resourceId: dto.resourceId,
   };
 }

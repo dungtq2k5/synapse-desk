@@ -72,7 +72,7 @@ model Notification {
   /// notices by hand.
   actorId String? @map("actor_id") @db.Uuid
 
-  /// `ticket | document | user | organization`.
+  /// NotificationResourceType — TICKET | DOCUMENT | USER | ORGANIZATION.
   resourceType String? @map("resource_type") @db.VarChar(50)
 
   /// What the notification is ABOUT, so opening ticket #1042 can clear all
@@ -182,9 +182,9 @@ model NotificationDelivery {
   /// DeliveryStatus. Distinct from `notifications.read_at`: sent is not read.
   status String @default("PENDING") @db.VarChar(20)
 
-  /// Why it was skipped — `user_preference`, `quiet_hours`, `unverified_address`,
-  /// `already_seen_in_app`, `rate_limited`. The auditable alternative to a
-  /// silent drop.
+  /// DeliverySkipReason — `USER_PREFERENCE`, `QUIET_HOURS`,
+  /// `UNVERIFIED_ADDRESS`, `ALREADY_SEEN_IN_APP`, `RATE_LIMITED`. The auditable
+  /// alternative to a silent drop.
   skipReason String? @map("skip_reason") @db.VarChar(100)
 
   /// The address AT SEND TIME, snapshotted like `otps.target`. Preserved when

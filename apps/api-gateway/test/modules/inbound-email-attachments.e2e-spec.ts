@@ -1,5 +1,6 @@
 import request from 'supertest';
 import { of, throwError } from 'rxjs';
+import { InboundOutcome } from '../../src/modules/inbound-email/inbound-email.service';
 import { faker } from '@faker-js/faker';
 import { ConfigService } from '@nestjs/config';
 import {
@@ -298,7 +299,7 @@ describe('Inbound email attachments — the reply half (e2e)', () => {
         }),
       ).expect(200);
 
-      expect(response.body.data.outcome).toBe('message_appended');
+      expect(response.body.data.outcome).toBe(InboundOutcome.APPENDED);
 
       const [[sent]] = fx.stubs.message.createMessage.mock.calls;
       expect(sent).toMatchObject({

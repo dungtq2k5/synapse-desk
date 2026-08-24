@@ -1,6 +1,7 @@
 import { Logger } from '@nestjs/common';
 import {
   AckPolicy,
+  type JetStreamManager,
   type JsMsg,
   type NatsConnection,
   type ConsumerMessages,
@@ -48,6 +49,57 @@ function isConsumerNameInUse(error: unknown): boolean {
   return (
     (error as { api_error?: { err_code?: number } })?.api_error?.err_code ===
     CONSUMER_NAME_IN_USE
+  );
+}
+
+/**
+ * Names the consumer already holding this filter, when that is why `add` failed.
+ *
+ * **A WorkQueue stream permits exactly ONE consumer per filter subject**, so a
+ * durable left behind by a process that is no longer running blocks every later
+ * one — and the server says only `filtered consumer not unique on workqueue
+ * stream`, naming neither the filter nor the consumer that holds it. That
+ * sentence costs an afternoon: nothing in it says the obstacle is a leftover,
+ * that it survives a service restart, or where to look.
+ *
+ * Matched by ASKING the server what exists rather than by error code. The code
+ * for this case is the server's and undocumented in the client, and the
+ * question "who already has this filter?" has a better answer than a lookup
+ * table: the list itself. When nothing holds it, the original error was about
+ * something else and is rethrown untouched.
+ *
+ * @returns the error to throw — enriched when a conflict explains it, the
+ *   original otherwise.
+ */
+async function describeFilterConflict(
+  manager: JetStreamManager,
+  stream: string,
+  filterSubject: string,
+  error: unknown,
+): Promise<unknown> {
+  let holders: string[];
+
+  try {
+    holders = [];
+    for await (const consumer of manager.consumers.list(stream)) {
+      if (consumer.config.filter_subject === filterSubject) {
+        holders.push(consumer.name);
+      }
+    }
+  } catch {
+    // The diagnostic must never replace the real failure with its own.
+    return error;
+  }
+
+  if (holders.length === 0) return error;
+
+  return new Error(
+    `Cannot consume '${filterSubject}' on stream '${stream}': ` +
+      `${holders.join(', ')} already holds that filter, and a WorkQueue stream ` +
+      'allows only one consumer per subject. It is a durable left by a process ' +
+      'that is no longer running — restarting will not clear it. Run ' +
+      `'npm run nats:reset' to drop the durable streams and their consumers. ` +
+      `(server said: ${formatErrorMsg(error)})`,
   );
 }
 
@@ -133,7 +185,14 @@ export class PullConsumerRunner<T> {
       // Narrow, for the reason `ensureStream` is: catching everything here means
       // a rejected CONFIG is reported as whatever `update` says about it rather
       // than what `add` said, one layer further from the mistake.
-      if (!isConsumerNameInUse(error)) throw error;
+      if (!isConsumerNameInUse(error)) {
+        throw await describeFilterConflict(
+          manager,
+          stream,
+          filterSubject,
+          error,
+        );
+      }
 
       // Already declared by a previous boot. Durable names are stable by
       // design, so this is the normal path on every restart after the first.

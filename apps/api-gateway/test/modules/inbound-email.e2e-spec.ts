@@ -1,6 +1,7 @@
 import { createHmac } from 'node:crypto';
 import request from 'supertest';
 import { of } from 'rxjs';
+import { InboundOutcome } from '../../src/modules/inbound-email/inbound-email.service';
 import { ConfigService } from '@nestjs/config';
 import { E2eFixture, bootstrapE2eTest } from '../utils';
 import { plainEmail, signPayload } from '../fixtures/inbound-email';
@@ -60,7 +61,7 @@ describe('The inbound email webhook (e2e)', () => {
       // tell the provider to retry an address that will never resolve.
       expect(response.body.data).toEqual({
         received: true,
-        outcome: 'unroutable_address',
+        outcome: InboundOutcome.UNROUTABLE,
       });
     });
 
@@ -83,17 +84,17 @@ describe('The inbound email webhook (e2e)', () => {
       const overExactBytes = createHmac('sha256', secret)
         .update(spaced)
         .digest('hex');
-      const overReserialised = createHmac('sha256', secret)
+      const overReserialized = createHmac('sha256', secret)
         .update(JSON.stringify(JSON.parse(spaced)))
         .digest('hex');
 
-      expect(overExactBytes).not.toBe(overReserialised);
+      expect(overExactBytes).not.toBe(overReserialized);
 
       // The digest over the bytes as sent is the one that verifies …
       await post(spaced, overExactBytes).expect(200);
-      // … and the re-serialised one is rejected, which is the failure mode a
+      // … and the re-serialized one is rejected, which is the failure mode a
       // body parser in front of the guard would produce for every request.
-      await post(spaced, overReserialised).expect(401);
+      await post(spaced, overReserialized).expect(401);
     });
   });
 

@@ -9,6 +9,7 @@ import {
   NotificationChannel,
   NotificationPriority,
   PREFERENCE_WILDCARD_TYPE,
+  PreferenceSource,
 } from '@synapsedesk/common';
 import {
   DigestMode as ProtoDigestMode,
@@ -130,7 +131,7 @@ describe('Preferences and quiet hours (e2e)', () => {
       expect(resolved).toMatchObject({
         isEnabled: true,
         digest: DigestMode.IMMEDIATE,
-        source: 'default',
+        source: PreferenceSource.DEFAULT,
       });
     });
 
@@ -145,7 +146,10 @@ describe('Preferences and quiet hours (e2e)', () => {
         NotificationChannel.EMAIL,
       );
 
-      expect(resolved).toMatchObject({ isEnabled: false, source: 'wildcard' });
+      expect(resolved).toMatchObject({
+        isEnabled: false,
+        source: PreferenceSource.WILDCARD,
+      });
     });
 
     it('3. An EXACT row beats the wildcard', async () => {
@@ -171,8 +175,14 @@ describe('Preferences and quiet hours (e2e)', () => {
         NotificationChannel.EMAIL,
       );
 
-      expect(specific).toMatchObject({ isEnabled: true, source: 'explicit' });
-      expect(other).toMatchObject({ isEnabled: false, source: 'wildcard' });
+      expect(specific).toMatchObject({
+        isEnabled: true,
+        source: PreferenceSource.EXPLICIT,
+      });
+      expect(other).toMatchObject({
+        isEnabled: false,
+        source: PreferenceSource.WILDCARD,
+      });
     });
 
     it('4. A preference on ONE channel does not affect another', async () => {
@@ -188,7 +198,7 @@ describe('Preferences and quiet hours (e2e)', () => {
 
       expect(inAppChannel).toMatchObject({
         isEnabled: true,
-        source: 'default',
+        source: PreferenceSource.DEFAULT,
       });
     });
   });

@@ -12,6 +12,8 @@ import {
   MarkReadRequest,
   MarkReadResponse,
   NotificationIdRequest,
+  fromProtoNotificationResourceType,
+  fromProtoNotificationType,
 } from '@synapsedesk/grpc-proto';
 import { Prisma } from '../../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -147,7 +149,22 @@ export class FeedService {
   ): Promise<MarkReadResponse> {
     const recipientId = requireActor(context);
     const ids = request.ids ?? [];
-    const byResource = Boolean(request.resourceType && request.resourceId);
+    const resourceType = fromProtoNotificationResourceType(
+      request.resourceType,
+    );
+
+    // Set but unmappable is a REFUSAL, not an absent filter. Falling through to
+    // `undefined` would turn "clear the notifications for this resource" into
+    // "clear them for every resource", which is the one reading of a bad
+    // request that must never be guessed at.
+    if (request.resourceType && !resourceType) {
+      throw new RpcException({
+        code: status.INVALID_ARGUMENT,
+        message: 'Unrecognized resourceType',
+      });
+    }
+
+    const byResource = Boolean(resourceType && request.resourceId);
 
     if (ids.length === 0 && !byResource) {
       throw new RpcException({
@@ -162,7 +179,7 @@ export class FeedService {
       ...(ids.length > 0 ? { id: { in: ids } } : {}),
       ...(byResource
         ? {
-            resourceType: request.resourceType,
+            resourceType,
             resourceId: request.resourceId,
           }
         : {}),
@@ -250,9 +267,21 @@ export class FeedService {
     recipientId: string,
     request: ListNotificationsRequest,
   ): Prisma.NotificationWhereInput {
+    const type = fromProtoNotificationType(request.type);
+
+    // Same rule as `markMany`, in the opposite direction: an unrecognized
+    // filter that degraded to "no filter" would answer a narrow question with
+    // the whole feed.
+    if (request.type && !type) {
+      throw new RpcException({
+        code: status.INVALID_ARGUMENT,
+        message: 'Unrecognized type filter',
+      });
+    }
+
     return {
       recipientId,
-      ...(request.type ? { type: request.type } : {}),
+      ...(type ? { type } : {}),
       ...(request.unreadOnly ? { readAt: null } : {}),
       // Archived rows are excluded BY DEFAULT and included with the flag —
       // the feed is a worklist, and a dismissed notification reappearing in it

@@ -453,7 +453,7 @@ model MessageAttachment {
 // ==========================================
 /// 1:1 with a ticket — `@unique` on ticket_id is what makes re-generation an
 /// UPSERT rather than an append. A ticket has one current summary; the old one
-/// is not history worth keeping, because it summarised a thread that has since
+/// is not history worth keeping, because it summarized a thread that has since
 /// moved on.
 model AiSummary {
   id       String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid

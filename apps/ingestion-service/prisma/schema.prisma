@@ -322,7 +322,7 @@ model AiGeneration {
 
 /// The daily AI-generation rollup.
 ///
-/// **This one is not an optimisation, it is the only durable record.**
+/// **This one is not an optimization, it is the only durable record.**
 /// `ai_generations` is retention-rolled (RDM Table 29): raw rows aggregate away
 /// after ~90 days. Any analytics query written against raw rows silently loses
 /// history the moment retention ships — the same trap that made `UNCITED` a

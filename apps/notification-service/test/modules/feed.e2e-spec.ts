@@ -9,6 +9,11 @@ import {
   NOTIFICATION_TYPES,
   NotificationResourceType,
 } from '@synapsedesk/common';
+import {
+  ListNotificationsRequest,
+  NotificationResourceType as ProtoNotificationResourceType,
+  NotificationType as ProtoNotificationType,
+} from '@synapsedesk/grpc-proto';
 import { bootstrapE2eTest, E2eFixture } from '../utils/bootstrap';
 import { FeedService } from '../../src/modules/feed/feed.service';
 
@@ -75,7 +80,9 @@ describe('The notification feed (e2e)', () => {
     }
   }
 
-  const listRequest = (overrides = {}) => ({
+  const listRequest = (
+    overrides: Partial<ListNotificationsRequest> = {},
+  ): ListNotificationsRequest => ({
     unreadOnly: false,
     includeArchived: false,
     limit: 20,
@@ -150,7 +157,9 @@ describe('The notification feed (e2e)', () => {
       await seed(1, { type: NOTIFICATION_TYPES.quotaThreshold });
 
       const { items } = await feed.list(
-        listRequest({ type: NOTIFICATION_TYPES.quotaThreshold }),
+        listRequest({
+          type: ProtoNotificationType.NOTIFICATION_TYPE_QUOTA_THRESHOLD,
+        }),
         me(),
       );
 
@@ -367,7 +376,8 @@ describe('The notification feed (e2e)', () => {
       const result = await feed.markManyRead(
         {
           ids: [],
-          resourceType: NotificationResourceType.TICKET,
+          resourceType:
+            ProtoNotificationResourceType.NOTIFICATION_RESOURCE_TYPE_TICKET,
           resourceId: TICKET_ID,
         },
         me(),

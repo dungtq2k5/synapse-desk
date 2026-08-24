@@ -152,7 +152,7 @@ PENDING invitations **reserve seats** against `organizations.max_agent_seats` (�
 Domain E turns a domain event into (a) a durable per-recipient feed row and (b) a live push to whatever sockets that user has open. The three tables split by *what changes independently*:
 
 * **`notifications`** — one row **per recipient**, not per event. A ticket assigned to an agent and watched by three others is four rows. Fan-out at write time makes the feed query a single indexed `WHERE recipient_id = $1`, which is the query that runs on every page load; the alternative (one event row + a join to compute visibility) makes the hot path the expensive one.
-* **`notification_deliveries`** — one row per (notification, channel). Separate because *sent* and *read* are different facts on different clocks: an email can be `DELIVERED` while the notification stays unread for a week, and a `SKIPPED` row with `skip_reason = 'quiet_hours'` is an auditable decision rather than a silent drop.
+* **`notification_deliveries`** — one row per (notification, channel). Separate because *sent* and *read* are different facts on different clocks: an email can be `DELIVERED` while the notification stays unread for a week, and a `SKIPPED` row with `skip_reason = 'QUIET_HOURS'` is an auditable decision rather than a silent drop.
 * **`notification_preferences`** — resolved per (type, channel) with fallback: exact match → `('*', channel)` → hard-coded default. Storing only explicit overrides keeps a new user's preference set empty rather than pre-populated with dozens of rows that then drift from the defaults they were copied from.
 
 **Idempotency is not optional.** NATS JetStream is at-least-once, so the same `ticket.assigned` can arrive twice. `notifications.event_id` carries the producer's event id under `UNIQUE (recipient_id, event_id) WHERE event_id IS NOT NULL` — the consumer upserts on it. Without this, every redelivery is a duplicate toast.
@@ -264,14 +264,24 @@ customer.subscription.created | updated | deleted
 ```txt
 | SYNAPSEDESK DOMAINS |
 
-[ Domain A: Tenant & User ] ---> organizations, departments, users, user_departments, roles, permissions, user_roles, role_permissions, device_sessions, two_factor_backup_codes, otps, password_reset_tokens, user_invitations
-[ Domain B: Support Engine ] ---> tickets, ticket_assignments, ticket_messages, message_attachments, ai_summaries
-[ Domain C: Knowledge & RAG] ---> documents, document_flags, department_documents, document_chunks, ingestion_jobs
-[ Domain D: Audit & Feedback] ---> ai_response_feedbacks, audit_logs, ai_generations, billing_events
-[ Domain E: Notifications ] ---> notifications, notification_deliveries, notification_preferences
+[ Domain A: Tenant & User ]  ---> organizations, departments, users, user_departments, roles, permissions,
+                                  user_roles, role_permissions, device_sessions, two_factor_backup_codes,
+                                  otps, password_reset_tokens, user_invitations
+[ Domain B: Support Engine ] ---> tickets, ticket_messages, message_attachments, ai_summaries,
+                                  ticket_assignments, ticket_status_changes, ticket_read_states,
+                                  inbound_emails
+[ Domain C: Knowledge & RAG] ---> documents, department_documents, document_chunks, ingestion_jobs,
+                                  document_flags
+[ Domain D: Analytics,      ---> ai_response_feedbacks, audit_logs, ai_generations, billing_events,
+    Feedback & Compliance  ]      ticket_daily_stats, agent_daily_stats, ai_generation_daily_stats,
+                                  analytics_exports, job_runs
+[ Domain E: Notifications ] ---> notifications, notification_deliveries, notification_preferences,
+                                  inbound_auto_replies
 ```
 
-**30 tables.** Table numbers are **stable identifiers, not reading order** — they are cited from other documents (`api-endpoints-plan` §0.5, §1.1, §1.6, §9, §11) and from code docblocks, so a table keeps its number for life. Five were added after the original 1–25 were assigned and are placed in their *domain's* section rather than at the end, which is why the sequence reads 1–12, **28**, 13–16, **26**, 17–20, **27**, 21–25, **29–30**:
+**39 tables**, across four Postgres databases — one per owning service, with no cross-database foreign keys (§1.13). `job_runs` is the one table that exists **three times**, identically, in `postgres_auth`, `postgres_ticket` and `postgres_ingestion`: a service records its own liveness without a cross-service write.
+
+Table numbers are **stable identifiers, not reading order** — they are cited from other documents (`api-endpoints-plan` §0.5, §1.1, §1.6, §9, §11) and from code docblocks, so a table keeps its number for life. Tables added after the original 1–25 were assigned are placed in their *domain's* section rather than at the end, which is why the sequence reads **1–12, 28, 13–16, 26, 31–33, 17–20, 27, 21–22, 29–30, 34–38, 23–25, 39**:
 
 | Late addition | Sits in | Why it was added |
 | :---- | :---- | :---- |
@@ -280,8 +290,23 @@ customer.subscription.created | updated | deleted
 | **Table 28** `user_invitations` | Domain A | Invitations had endpoints but no table |
 | **Table 29** `ai_generations` | Domain D | Every LLM call except chat answers was unmetered spend, and draft acceptance was uncomputable |
 | **Table 30** `billing_events` | Domain D | Stripe webhooks are at-least-once and unordered; entitlement writes need idempotency and a monotonic guard (§1.15) |
+| **Table 31** `ticket_status_changes` | Domain B | A status history built from a fire-and-forget NATS subject has holes whenever the broker is down ([ADR 0040](./decisions/0040-ticket-status-history-is-a-table-not-a-trail.md)) |
+| **Table 32** `ticket_read_states` | Domain B | Unread badges need a per-user watermark; per-message receipts answer a question nobody asked |
+| **Table 33** `inbound_emails` | Domain B | Providers retry, so a redelivery must be a duplicate-key violation rather than a second ticket |
+| **Table 34** `ticket_daily_stats` | Domain D | A quarter-wide dashboard aggregation ran on the table serving ticket creation ([ADR 0009](./decisions/0009-rollups-are-plain-tables.md)) |
+| **Table 35** `agent_daily_stats` | Domain D | Per-agent figures, kept out of Table 34 so agent count does not multiply every unrelated metric |
+| **Table 36** `ai_generation_daily_stats` | Domain D | Not an optimisation — Table 29 is retention-rolled, so this is the only durable record of AI spend |
+| **Table 37** `analytics_exports` | Domain D | `GET /analytics/export` creates a job and produces a file; an export is a snapshot and needs somewhere to record what it was taken from |
+| **Table 38** `job_runs` | Domain D | A failed job at least logs; a job that never runs logs nothing at all |
+| **Table 39** `inbound_auto_replies` | Domain E | A mail-loop guard in Redis is a guard a flush removes, re-opening the exchange it exists to close |
 
 Domain membership, not the number, is what tells you where a table belongs.
+
+#### **A note on array columns**
+
+Eight columns are Postgres arrays. A Prisma scalar list **cannot be null**, so every one of them is `NOT NULL` and `{}` is the absent value — there is no third state, and a description that says "empty means not specified" is describing that, not a nullable column.
+
+Three of them (`ai_generations.retrieved_chunk_ids`, `ai_generations.cited_chunk_ids`, `document_chunks.department_ids`) carry an explicit `@default([])` and are documented with a default. The other five do not, and are documented as **no column default**: through Prisma the behaviour is identical, because the client sends `{}` for a list you omit on create. The difference is only visible to **raw SQL** — an `INSERT` that names neither the column nor a value fails the `NOT NULL` on those five and succeeds on the three. Worth knowing before hand-writing an insert or a seeder.
 
 ### **Domain A: Tenants, Identity & Access Control (RBAC)**
 
@@ -295,7 +320,7 @@ Domain membership, not the number, is what tells you where a table belongs.
 | **name** | VARCHAR(255) | NOT NULL | Legal name of the company (e.g., "Acme Corp"). |
 | **slug** | VARCHAR(100) | NOT NULL, UNIQUE, Indexed | URL-friendly identifier (e.g., acme-corp). |
 | **domain** | VARCHAR(255) | UNIQUE, Nullable | Corporate email domain for auto-joining (e.g., acme.com). |
-| **status** | ENUM | NOT NULL, Default: 'PENDING_ONBOARDING' | Tenant lifecycle state: PENDING_ONBOARDING, ACTIVE, SUSPENDED_PAST_DUE, FROZEN. Controls tenant-wide access during payment failure or platform maintenance. |
+| **status** | ENUM | NOT NULL, **no database default** | Set to `PENDING_ONBOARDING` by every creation path in the application, never by the column — a tenant row with no status is a bug in the caller rather than a state the database will invent. Tenant lifecycle state: PENDING_ONBOARDING, ACTIVE, SUSPENDED_PAST_DUE, FROZEN. Controls tenant-wide access during payment failure or platform maintenance. |
 | **max_agent_seats** | INT | NOT NULL, Default: 10 | Seat quota enforced when an Org Admin invites new support agents. |
 | **max_storage_bytes** | BIGINT | NOT NULL, Default: 5368709120 (5GB) | Storage quota for documents uploaded for RAG ingestion. |
 | **monthly_ai_token_budget** | BIGINT | NOT NULL, Default: 1000000 | Hard cap on AI spend per billing cycle. Denominated internally in **micros of currency**, not tokens — the name is kept for continuity (§1.14). Written by the Stripe entitlement webhook (§1.15), not by hand. |
@@ -304,8 +329,9 @@ Domain membership, not the number, is what tells you where a table belongs.
 | **stripe_customer_id** | VARCHAR(255) | Nullable, UNIQUE | Stripe `Customer`. NULL before the tenant ever reaches checkout. |
 | **stripe_subscription_id** | VARCHAR(255) | Nullable, UNIQUE | Stripe `Subscription`. Plan *definitions* live in Stripe and are deliberately not mirrored here — see §1.15. |
 | **enforce_two_factor** | BOOLEAN | NOT NULL, Default: false | Forces 2FA setup for every user in the tenant during login. |
-| **allowed_email_domains** | VARCHAR(255)[] | NOT NULL, Default: '{}' | Array of domains (e.g., {acme.com, acme.org}) validated during signup auto-join. |
-| **default_department_id** | UUID | Nullable | Fallback routing target for a ticket nobody has classified. Needed because the AI classifier that normally picks a department (`POST /tickets/:id/ai/classify`) is **itself disabled** when `monthly_ai_token_budget` is exhausted — precisely when auto-escalation volume spikes. NULL falls back to the tenant's oldest active department; a tenant with no departments at all leaves the ticket unassigned in the org-wide queue rather than failing the escalation. Logical reference only (§1.13 does not apply — `departments` is in the same database — but a hard FK would block deleting a department that happens to be the default, so this is enforced in the service layer instead: clearing the default is part of `DELETE /departments/:id`). |
+| **inbound_token** | VARCHAR(32) | UNIQUE, Nullable | The tenant's inbound-mail address token. The support address is `support+{inbound_token}@<domain>`, delivered by one catch-all route. **Not the slug** — a slug is guessable, which would make every tenant's inbound address derivable from any other and the tenant list enumerable. Not a secret (customers email it), but unguessable and rotatable. NULL disables inbound email for the tenant. |
+| **timezone** | VARCHAR(64) | Nullable | The tenant's **business** timezone, an IANA name. Distinct from `users.timezone`, which is a person's quiet hours; this one answers "when does this tenant's Monday start", and every daily analytics figure is bucketed by it. A tenant at UTC+7 would otherwise see each daily number split across two rows. NULL is treated as UTC. |
+| **allowed_email_domains** | VARCHAR(255)[] | NOT NULL, **no column default** | Array of domains (e.g., {acme.com, acme.org}) validated during signup auto-join. |
 | **created_at** | TIMESTAMPTZ | NOT NULL, NOW() | Timestamp when the organization was onboarded. |
 | **updated_at** | TIMESTAMPTZ | NOT NULL, NOW() | Timestamp when tenant settings were last modified. |
 | **deleted_at** | TIMESTAMPTZ | Nullable, Indexed | Timestamp if tenant was soft-deleted/offboarded. |
@@ -349,7 +375,11 @@ Domain membership, not the number, is what tells you where a table belongs.
 | **gender** | VARCHAR(20) | Nullable | Gender identity (optional profile/HR metric). |
 | **is_two_factor_enabled** | BOOLEAN | NOT NULL, false | True if TOTP/Authenticator app is enabled for login. |
 | **two_factor_secret** | VARCHAR(255) | Nullable | Encrypted TOTP secret key. |
+| **locked_until** | TIMESTAMPTZ | Nullable | When a temporary lock lapses. NULL means the lock is INDEFINITE. **`is_locked` remains authoritative** — this column answers only "when should it stop", which is why adding it touched three call sites rather than 22. A CHECK makes `locked_until` without `is_locked` unrepresentable (ADR 0027). |
 | **is_locked** | BOOLEAN | NOT NULL, false | True if account is suspended due to security violations. |
+| **quiet_hours_start** | VARCHAR(5) | Nullable | Quiet hours, as `"HH:mm"`. **Global per user, not per notification type** — "do not disturb me between 22:00 and 07:00" is a fact about the person, and per-type quiet hours would be a setting nobody could reason about. Read by notification-service on the same gRPC call that resolves recipients. |
+| **quiet_hours_end** | VARCHAR(5) | Nullable | The other end of the window. Interpreted in `users.timezone`. |
+| **timezone** | VARCHAR(64) | Nullable | An IANA name (`Asia/Ho_Chi_Minh`), used to interpret quiet hours. NULL is treated as UTC — wrong for the user but deterministic, unlike the server's own zone, which changes when the service is redeployed. |
 | **last_login_at** | TIMESTAMPTZ | Nullable | Timestamp of user's most recent successful authentication. |
 | **created_at** | TIMESTAMPTZ | NOT NULL, NOW() | Account creation timestamp. |
 | **updated_at** | TIMESTAMPTZ | NOT NULL, NOW() | Profile update timestamp. |
@@ -419,38 +449,46 @@ Domain membership, not the number, is what tells you where a table belongs.
 
 #### **Table 7: user_roles (Junction Table)**
 
-*Maps users to their assigned roles (Many-to-Many).*
-
-> ⚠️ **Implemented as a Prisma *implicit* many-to-many, so this table carries no extra columns.** `User.roles Role[] @relation("user_roles")` ↔ `Role.users User[] @relation("user_roles")` generates a relation table Prisma names **`_user_roles`** with exactly two columns, `A` and `B`. Implicit relation tables **cannot** hold payload columns — see the note below Table 8 for why this was accepted and where the provenance actually lives.
+*Maps users to their assigned roles (many-to-many).*
 
 | Field Name | Data Type | Constraints / Default | Description & Business Logic |
 | :---- | :---- | :---- | :---- |
-| **A** (`user_id`) | UUID | FK ➔ users.id, On Delete CASCADE | User entity being assigned a role. |
-| **B** (`role_id`) | UUID | FK ➔ roles.id, On Delete CASCADE | Role assigned to the user. |
+| **user_id** | UUID | NOT NULL, FK ➔ users.id, ON DELETE CASCADE | User entity being assigned a role. |
+| **role_id** | UUID | NOT NULL, FK ➔ roles.id, ON DELETE CASCADE | Role assigned to the user. |
 
-* **Unique index on `(A, B)`** plus a lookup index on `(B)` — generated by Prisma, not declared.
+* **Primary key:** composite `(user_id, role_id)` — one row per pair.
+* **Indexes:** `(role_id)` for the reverse read, "who holds this role".
 * **Denormalized counter:** `roles.user_assigned` tracks membership size and **must** be maintained in the same transaction as every insert/delete here (see Table 5).
 
 #### **Table 8: role_permissions (Junction Table)**
 
-*Maps permissions to roles to establish Role-Based Access Control (Many-to-Many).*
-
-> ⚠️ **Also an implicit many-to-many** — Prisma table **`_role_permissions`**, columns `A`/`B` only.
+*Maps permissions to roles to establish role-based access control (many-to-many).*
 
 | Field Name | Data Type | Constraints / Default | Description & Business Logic |
 | :---- | :---- | :---- | :---- |
-| **A** (`role_id`) | UUID | FK ➔ roles.id, On Delete CASCADE | Target role. |
-| **B** (`permission_id`) | UUID | FK ➔ permissions.id, On Delete CASCADE | Permission capability linked to the role. |
+| **role_id** | UUID | NOT NULL, FK ➔ roles.id, ON DELETE CASCADE | Target role. |
+| **permission_id** | UUID | NOT NULL, FK ➔ permissions.id, ON DELETE CASCADE | Permission capability linked to the role. |
+
+* **Primary key:** composite `(role_id, permission_id)`.
+* **Indexes:** `(permission_id)` for the reverse read, "which roles grant this".
+* The row exists to be joined, not to be authoritative — the permission *list* is a compile-time artifact and this table is what it points at. See [ADR 0038](./decisions/0038-permissions-are-a-compile-time-artifact.md).
+
+##### **A note on how Tables 7–8 are generated**
+
+**This document is always explicit; `schema.prisma` is not, and the difference is deliberate.** This is the layer people *read* — it exists to visualize the model, and a junction is a table, so it is specified as one with named columns. A reader should not have to know which ORM feature produced a table before they can understand it.
+
+The schema optimizes for something else. Tables 7–8 are declared there as Prisma **implicit** m-n relations, which is the more robust choice where a junction carries no payload: Prisma owns the join table, so the two foreign keys, their cascades and the pair uniqueness cannot drift apart, and there is no hand-written model to keep in step. The cost is only in naming — the physical table is `_user_roles` / `_role_permissions` and its columns are `A` and `B`.
+
+**That naming is an implementation detail, not the specification.** Anything reading these tables through Prisma uses the relation and never sees those names; only raw SQL needs them. Table 4 (`user_departments`) and Table 18 (`department_documents`) are explicit models instead — not because explicit is better, but because they carry payload columns (`is_primary`) that an implicit relation cannot hold.
 
 ##### **Why Tables 7–8 have no `assigned_by_id` / `assigned_at`**
 
-Earlier revisions of this document specified both columns on both tables. **They were never implementable as written**, and the schema does not have them:
+Earlier revisions of this document specified both columns on both tables. The schema does not have them, and that is deliberate rather than pending:
 
-* A Prisma **implicit** m2m relation (`Role[]` ↔ `User[]`) produces a two-column join table. Adding a payload column requires converting to an **explicit** junction model — a `model UserRole { … }` with its own `@@id([userId, roleId])`, exactly the way [Table 4 `user_departments`](#table-4-user_departments-junction-table) is written. That conversion was made for `user_departments` because it genuinely needs `is_primary`; it was **not** made here.
-* **The provenance is not lost — it moved.** "Who granted this role, and when" is recorded as an `audit_logs` row (Domain D) with `action = ROLE_ASSIGNED`, the actor in `user_id`, the target in `metadata`, and `created_at` as the timestamp. That is a *better* home for it: the audit trail is immutable and append-only, whereas a junction column is silently overwritten when a role is removed and re-granted, losing the earlier grant entirely.
+* **The provenance is not lost — it moved.** "Who granted this role, and when" is an `audit_logs` row (Table 22) with `action = USER_ROLES_UPDATED`, the actor in `user_id`, the target and a `{ before, after }` diff in `metadata`, and `created_at` as the timestamp. Grant and revoke are distinguishable from that diff, which is why there is no separate `ROLE_ASSIGNED`/`ROLE_REVOKED` pair. That is a *better* home for it: the audit trail is immutable and append-only, whereas a junction column is silently overwritten when a role is removed and re-granted, losing the earlier grant entirely.
 * **Consequence to respect:** because the join row carries no timestamp, questions like *"show every role granted last Tuesday"* must be answered from `audit_logs`, never by querying the junction. Any endpoint that promises grant provenance reads Domain D.
 
-**If a future requirement genuinely needs per-row payload here** (grant expiry, "temporary elevation until X"), convert to an explicit model at that point and add the columns then — do not add them back to this spec speculatively.
+**If a future requirement genuinely needs per-row payload here** (grant expiry, "temporary elevation until X"), add the columns at that point — do not add them back to this spec speculatively.
 
 #### **Table 9: device_sessions**
 
@@ -545,8 +583,8 @@ Conceptually a sibling of Tables 11–12 (§1.9) — a hashed, expiring, single-
 | **email** | VARCHAR(255) | NOT NULL | Address the invitation was sent to, stored lower-cased. Becomes `users.email` on acceptance. |
 | **token_hash** | VARCHAR(64) | NOT NULL, UNIQUE, Indexed | **SHA-256 hex** of a 32-byte URL-safe token embedded in the emailed link. Same by-value-lookup rationale as `password_reset_tokens.token_hash` (§1.9); the raw token exists only in the email. |
 | **status** | ENUM | NOT NULL, Default: 'PENDING' | `PENDING`, `ACCEPTED`, `REVOKED`, `EXPIRED`. A deliberate departure from the `is_used` boolean of Tables 11–12: an invitation has four terminal states an admin must be able to tell apart, and "never accepted" is a real onboarding-funnel metric. |
-| **role_ids** | UUID[] | NOT NULL, Default: '{}' | Roles to grant on acceptance. Validated at redemption, not by FK — see the Proposal vs. Fact note below. |
-| **department_ids** | UUID[] | NOT NULL, Default: '{}' | Departments to join on acceptance. |
+| **role_ids** | UUID[] | NOT NULL, **no column default** | Roles to grant on acceptance. Validated at redemption, not by FK — see the Proposal vs. Fact note below. |
+| **department_ids** | UUID[] | NOT NULL, **no column default** | Departments to join on acceptance. |
 | **primary_department_id** | UUID | Nullable | Which membership receives `is_primary = true`, satisfying the partial unique index on user_departments (Table 4). Must appear in department_ids. |
 | **invited_by_id** | UUID | Nullable, FK ➔ users.id, On Delete SET NULL | Admin who issued the invitation. Rendered in the public preview ("Jane Doe invited you to Acme Corp") — the single strongest signal that the email is not phishing. NULL when issued by a Super Admin during tenant onboarding. |
 | **batch_id** | UUID | Nullable, Indexed | Groups invitations created by one bulk call, so the UI can report "Import 2026-07-30: 47 sent, 31 accepted, 16 pending". |
@@ -618,6 +656,9 @@ Conceptually a sibling of Tables 11–12 (§1.9) — a hashed, expiring, single-
 | **model_name** | VARCHAR(100) | Nullable | Explicit model string if AI-generated (e.g., gemini-1.5-pro). |
 | **prompt_tokens** | INT | Nullable | Input tokens reported by the AI provider. Populated only when is_ai_generated = true. |
 | **completion_tokens** | INT | Nullable | Output tokens reported by the AI provider. Populated only when is_ai_generated = true. |
+| **excluded_from_ai_context** | BOOLEAN | NOT NULL, Default: false | Set when this message was REFUSED as prompt injection. **A filter, not a label** — the transcript builders drop these rows, so a refused question cannot reach a later reformulation. Instructing a model to ignore an injection already in its context is the reliance Layer A exists because you cannot make. |
+| **answer_status** | VARCHAR(30) | Nullable | `AnswerStatus` for an AI message; NULL for a human one. **For reading a thread, not for analytics** — an agent scrolling a conversation must be able to tell a refusal from an escalation from a real answer. The knowledge-gap question is a ledger query, not this column. |
+| **client_message_id** | UUID | Nullable | The SENDER's own id. **Exists because WebSocket clients retry in a way HTTP clients do not**: a socket reconnects and a client holding an unacked message re-emits it — correct client behaviour that double-posts. Deduped on `(ticket_id, client_message_id)` by a PARTIAL unique index. |
 | **edited_at** | TIMESTAMPTZ | Nullable | Set when the sender edits their own message inside the edit window. Lets the thread show "edited" with no separate revision table. |
 | **redacted_at** | TIMESTAMPTZ | Nullable | Set when a message is redacted. The row is **not deleted** — `content` is replaced with a fixed placeholder and the row keeps its position in the timeline, the same choice `notifications` makes with `archived_at` over `deleted_at` (§1.12). |
 | **redacted_by_id** | UUID | Nullable | Who redacted it (an agent via `ticket.message.moderate`, or the sender within the edit window). Logical reference only — see §1.13. |
@@ -677,6 +718,58 @@ Conceptually a sibling of Tables 11–12 (§1.9) — a hashed, expiring, single-
 * **Business logic:** When a ticket is escalated or assigned, a row is inserted with `is_current=true`. When reassigned, the prior row's `unassigned_at` is set and `is_current` flipped to false, then a new row inserted with the new assignee. This gives a complete timeline of who handled the ticket and why it changed hands.
 * **Denormalization:** `tickets.current_assignee_id` and `tickets.current_department_id` cache the latest `assigned_to_id` and `department_id` for fast query access without joins.
 
+#### **Table 31: ticket_status_changes**
+
+*The status path a ticket took, one row per transition.*
+
+| Field Name | Data Type | Constraints / Default | Description & Business Logic |
+| :---- | :---- | :---- | :---- |
+| **id** | UUID | Primary Key, gen_random_uuid() | Unique transition record ID. |
+| **ticket_id** | UUID | NOT NULL, FK ➔ tickets.id, ON DELETE CASCADE | The ticket that moved. |
+| **organization_id** | UUID | NOT NULL | Denormalized from the parent, like every other table here: the tenant filter must not need a join to apply. |
+| **from_status** | VARCHAR(20) | Nullable | `TicketStatus`. NULL only on a row recording a ticket's first status, which nothing writes today — every row comes from a transition, which has a `from`. Nullable while `changed_by_id` beside it is not, and that is not an inconsistency: a creation row would genuinely have no prior status and would still have an author. |
+| **to_status** | VARCHAR(20) | NOT NULL | `TicketStatus`. |
+| **changed_by_id** | UUID | NOT NULL | Who moved it. No FK (§1.13). NOT nullable as a fact about the write path rather than a preference: `transition` loads the ticket through `tenantScope`, which refuses a caller with no `sub`, so no transition can happen without an actor. |
+| **reason** | TEXT | Nullable | Free text, bounded at both edges. Not the closed enum `ticket_assignments.reason` uses — a reassignment answers "which of six reasons", a status change answers "what happened". **Agent-facing**: stripped for a caller without queue access on the way out, exactly as an internal note is ([ADR 0023](./decisions/0023-internal-notes-are-stripped-before-serialization.md)); the author's own reasons survive. Being tenant prose it never travels into an audit row or onto `ticket.status_changed`. |
+| **changed_at** | TIMESTAMPTZ | NOT NULL, NOW() | When the transition happened. |
+
+* **Indexes:** `(ticket_id, changed_at)` — the history read, which is always one ticket oldest-first.
+* **Why a table and not the audit trail:** the row is written **inside** the transaction that moves the status. `ticket.status_changed` is on NATS and fire-and-forget, so a history built from it would have holes whenever the broker was down. See [ADR 0040](./decisions/0040-ticket-status-history-is-a-table-not-a-trail.md).
+
+#### **Table 32: ticket_read_states**
+
+*How far one user has read one ticket's thread.*
+
+A per-user **watermark**, not per-message receipts: the product wants unread badges, and receipts would be one row per participant per message to answer a question nobody asked.
+
+| Field Name | Data Type | Constraints / Default | Description & Business Logic |
+| :---- | :---- | :---- | :---- |
+| **ticket_id** | UUID | NOT NULL, FK ➔ tickets.id, ON DELETE CASCADE | The thread. |
+| **user_id** | UUID | NOT NULL | The reader. No FK (§1.13). |
+| **organization_id** | UUID | NOT NULL | Denormalized so the tenant filter needs no join. |
+| **last_read_at** | TIMESTAMPTZ | NOT NULL | A **timestamp, not a message id**. An id cursor costs a subquery per ticket and the list-level count runs that across a page; worse, it can lose its referent — flag a message internal after somebody read past it and a non-agent's cursor points at a row they cannot see, so their unread count silently becomes everything. A timestamp has no referent to lose, and compares directly against `ticket_messages.created_at`, which is already indexed. **Only ever moves forward**: the write is a raw `ON CONFLICT … GREATEST` rather than a Prisma upsert, because a thread view firing `POST …/read` on render has two requests in flight whenever a message lands mid-render, and last-write-wins would let the earlier stamp win and the badge reappear. |
+
+* **Primary key:** composite `(ticket_id, user_id)` — exactly one row per pair, which is the key the upsert wants.
+* **Indexes:** `(user_id, ticket_id)` — for the list-level unread count, which reads by user across many tickets.
+
+#### **Table 33: inbound_emails**
+
+*Inbound email idempotency: one row per accepted message.*
+
+Written in the **same transaction** as the ticket or message it produced. Providers retry, and Cloudflare re-runs a Worker that errored, so a redelivery must be a duplicate-key violation rather than a second ticket.
+
+| Field Name | Data Type | Constraints / Default | Description & Business Logic |
+| :---- | :---- | :---- | :---- |
+| **id** | UUID | Primary Key, gen_random_uuid() | Unique record ID. |
+| **organization_id** | UUID | NOT NULL | The receiving tenant. |
+| **message_id** | VARCHAR(255) | NOT NULL | The message's `Message-ID` header, or a synthesized digest when it had none. **255, not 998, and the unit is why**: this column is half of the unique index and Postgres refuses a btree tuple over ~2704 **bytes**, while a length validator counts **characters**. At 998 a multibyte header passes validation and then fails the insert with `index row size exceeds maximum` — not a duplicate-key error, so it surfaces as a 5xx and the provider retries it forever. The endpoint constrains the field to printable ASCII (RFC 5322 `msg-id`), which is what makes characters and bytes the same number. |
+| **ticket_id** | UUID | Nullable, FK ➔ tickets.id, **ON DELETE SET NULL** | What the message became. `SetNull`, **never** `Cascade`: this row is the idempotency record for a delivery and has to outlive what it produced — cascade it away with the ticket and the provider's next retry is no longer a duplicate, so the deleted ticket comes straight back. |
+| **created_at** | TIMESTAMPTZ | NOT NULL, NOW() | When the delivery was accepted. |
+
+* **Unique:** `(organization_id, message_id)` — **tenant-scoped, not global**. Two tenants can legitimately receive the same `Message-ID` (a customer CCs both, a mailing list fans out) and a global constraint would drop the second silently.
+* **Indexes:** `(ticket_id)`.
+* See [ADR 0018](./decisions/0018-inbound-email-routing-and-threading.md) for routing and threading.
+
 ### **Domain C: Knowledge Base, Ingestion & RAG Metadata**
 
 #### **Table 17: documents**
@@ -690,8 +783,10 @@ Conceptually a sibling of Tables 11–12 (§1.9) — a hashed, expiring, single-
 | **created_by_id** | UUID | NOT NULL, FK ➔ users.id | Knowledge Manager or Admin who uploaded the document. |
 | **title** | VARCHAR(255) | NOT NULL | Document title (e.g., "2026 Employee Handbook"). |
 | **file_url** | TEXT | NOT NULL | An internal Firebase Storage object path (`documents` purpose — reserved, not yet wired), same discipline as `users.avatar_url` and `message_attachments.file_url`. Not a URL despite the name. |
+| **file_hash** | VARCHAR(64) | NOT NULL | SHA-256 of the uploaded bytes. **Dedup is PER TENANT** (`documents_org_hash_key`) — global dedup would leak the existence of one tenant's upload to another. |
 | **file_type** | VARCHAR(50) | NOT NULL | File extension (pdf, docx, md, txt). |
 | **file_size_bytes** | BIGINT | NOT NULL | File size in bytes. |
+| **ocr_languages** | VarChar[] | NOT NULL, **no column default** | ISO 639-1 codes the uploader declared for OCR. **`[]` means "not specified", not NULL** — Prisma scalar lists cannot be null, so absent and empty are one value and the parser falls back to `eng`. ISO 639-1 (`vi`, `ja`) rather than tesseract's codes (`vie`, `jpn`); capped at four, ordered (ADR 0035). |
 | **is_organization_wide** | BOOLEAN | NOT NULL, Default: true | If true, document is accessible across all departments in the org. |
 | **status** | ENUM | NOT NULL, Default: 'PENDING' | Pipeline status: PENDING, PROCESSING, INDEXED, FAILED. |
 | **created_at** | TIMESTAMPTZ | NOT NULL, NOW() | Upload timestamp. |
@@ -724,7 +819,7 @@ Conceptually a sibling of Tables 11–12 (§1.9) — a hashed, expiring, single-
 | **content_text** | TEXT | NOT NULL | Full raw text extracted for this chunk. |
 | **page_number** | INT | Nullable | Source page number (for PDF citation highlighting). |
 | **token_count** | INT | NOT NULL | Total tokens in chunk (used for prompt budget calculation). |
-| **vector_point_id** | UUID | NOT NULL, UNIQUE, Indexed | Exact Point ID corresponding to vector in Qdrant Vector DB. |
+| **vector_point_id** | UUID | **Nullable**, UNIQUE, Indexed | The Postgres ⟷ Qdrant bridge — the exact point id of this chunk's vector. **Nullable deliberately**: the pipeline writes chunk rows *before* the Qdrant upsert and fills this in after. `NOT NULL` would force the reverse order, which leaves Postgres claiming vectors that were never stored — the exact failure the write-back ordering exists to prevent. |
 | **organization_id** | UUID | NOT NULL, Indexed | **Denormalized from `documents`.** Tenant isolation for the lexical retrieval arm — see below. |
 | **is_organization_wide** | BOOLEAN | NOT NULL, Default: true | **Denormalized from `documents`.** Department-scoping clause 1. |
 | **department_ids** | UUID[] | NOT NULL, Default: '{}' | **Denormalized from `department_documents`.** Department-scoping clause 2. GIN-indexed for `&&` (array overlap). |
@@ -748,9 +843,11 @@ Conceptually a sibling of Tables 11–12 (§1.9) — a hashed, expiring, single-
 | :---- | :---- | :---- | :---- |
 | **id** | UUID | Primary Key, gen_random_uuid() | Primary Key. |
 | **document_id** | UUID | NOT NULL, FK ➔ documents.id | Target document being processed. |
+| **organization_id** | UUID | NOT NULL | The tenant, denormalized from the parent document so a scoped worklist is one index seek rather than a join. |
 | **bullmq_job_id** | VARCHAR(100) | NOT NULL, Indexed | Task ID tracked inside Redis / BullMQ queue. |
 | **status** | ENUM | NOT NULL, Default: 'QUEUED' | Steps: QUEUED, PARSING, CHUNKING, EMBEDDING, COMPLETED, FAILED. |
 | **error_log** | TEXT | Nullable | Detailed stack trace if parsing or vector embedding failed. |
+| **superseded_by_id** | UUID | Nullable | The retry that replaced this attempt. Claimed under `where: { supersededById: null }`, which is what makes two concurrent retries of one row produce a single new job — a row holding a value can never be retried again. No relation field: the target is always in this table and dies with it under the document cascade. |
 | **processed_at** | TIMESTAMPTZ | Nullable | Completion timestamp. |
 | **created_at** | TIMESTAMPTZ | NOT NULL, NOW() | Job registration timestamp. |
 
@@ -772,6 +869,7 @@ Conceptually a sibling of Tables 11–12 (§1.9) — a hashed, expiring, single-
 | **detected_at** | TIMESTAMPTZ | NOT NULL, NOW() | When the flag was auto-detected by a scheduled job or on-demand analysis. |
 | **resolved_at** | TIMESTAMPTZ | Nullable | Timestamp when Knowledge Manager actioned the flag. |
 | **resolved_by_id** | UUID | Nullable, FK ➔ users.id, ON DELETE SET NULL | User who resolved the flag. |
+| **resolution_comment** | TEXT | Nullable | Why a human resolved it, in their own words. Required by the dismiss route and optional for the other two — a rule at the write rather than a constraint here, because `NOT NULL` would make `FIXED` and `DOCUMENT_REPLACED` invent a string. Bounded at the DTO, never truncated on read. |
 | **resolution** | ENUM | Nullable | Action taken: `FIXED` (document was updated), `DISMISSED` (finding is invalid, will not resurface), `DOCUMENT_REPLACED` (the document was removed and a newer version uploaded). |
 | **created_at** | TIMESTAMPTZ | NOT NULL, NOW() | Flag creation. |
 
@@ -814,7 +912,8 @@ Conceptually a sibling of Tables 11–12 (§1.9) — a hashed, expiring, single-
 | **resource_id** | UUID | Nullable, Indexed | The specific instance the action happened to. Logical reference only (§1.13) — its owning table depends on `resource_type` and may not even be in this database. |
 | **ip_address** | VARCHAR(45) | Nullable | Client IP the action originated from, as observed by the gateway — never claimed by the caller. Nullable, not `NOT NULL` as an earlier revision of this table specified: a system/cron-triggered action has no request to observe an IP from. |
 | **user_agent** | TEXT | Nullable | Client user-agent string, same observed-not-claimed discipline as `ip_address`. Added alongside it because `RecordAuditCommand.origin` (the actual NATS payload every publisher sends) is `{ ip, userAgent }` as one unit — splitting it into "one column now, add the other later" would have been the same mistake this table already avoided by defining the contract before the consumer. |
-| **metadata** | JSONB | Nullable, Default `'{}'` | A **redacted** before/after diff. Never a password hash, a 2FA secret, or any `*_token_hash`/`code_hash` — the publisher whitelists what it records per resource type; a blacklist forgets the next secret someone adds to a model. |
+| **metadata** | JSONB | NOT NULL, Default `'{}'` | A **redacted** before/after diff. Never a password hash, a 2FA secret, or any `*_token_hash`/`code_hash` — the publisher whitelists what it records per resource type; a blacklist forgets the next secret someone adds to a model. |
+| **event_id** | UUID | UNIQUE, Nullable | The publisher's id for the ACT, and the reason a redelivery is a no-op. `@unique` rather than an index: at-least-once delivery means the consumer WILL see a message twice, and duplicates here inflate "how many times did X happen" — the question the trail exists to answer. Nullable for rows written before it existed; a NULL is not deduped. |
 | **created_at** | TIMESTAMPTZ | NOT NULL, NOW(), Indexed | Event occurrence timestamp, stamped by the **publisher's** clock, not the consumer's — a consumer restart must not backdate a backlog of events to the moment it caught up. |
 
 * **Populated only by the NATS consumer in `ticket-service`, never by an RPC.** The proto for this module declares no `CreateAuditLog` message — a write path that doesn't exist in the contract cannot be added by accident, and the trail's value depends entirely on nobody being able to write to it directly.
@@ -874,6 +973,137 @@ Conceptually a sibling of Tables 11–12 (§1.9) — a hashed, expiring, single-
 * **Signature verification happens before this table.** An event that fails Stripe's signature check is not recorded — it is rejected at the edge. This table holds events the system accepted as genuine, so a row here means "we believed this and acted on it," which is what makes it useful during an incident.
 * **Not soft-deleted, never edited.** §1.6's audit-field policy does not apply: this is an event log, and the closest thing to it in the system is `audit_logs` (Table 22), which is also append-only for the same reason.
 
+#### **Table 34: ticket_daily_stats**
+
+*The daily ticket rollup.*
+
+**Why a table and not a query.** `/analytics/overview` over a quarter is an aggregation across every ticket in a tenant, **on the table serving ticket creation**. A Monday-morning dashboard load competing with the hot path is the failure mode, and no amount of endpoint design fixes it. Not a materialized view either: those cannot be expressed in Prisma, refresh whole rather than incrementally, and a `REFRESH` over a quarter is the same competition moved to a different hour. A plain table written by an idempotent daily job is testable, backfillable and incremental — see [ADR 0009](./decisions/0009-rollups-are-plain-tables.md).
+
+| Field Name | Data Type | Constraints / Default | Description & Business Logic |
+| :---- | :---- | :---- | :---- |
+| **id** | UUID | Primary Key, gen_random_uuid() | Unique rollup row ID. |
+| **organization_id** | UUID | NOT NULL | The tenant. |
+| **day** | DATE | NOT NULL | A date in the **tenant's** timezone, not UTC. A tenant at UTC+7 whose Monday starts at 17:00 Sunday UTC would otherwise see every daily figure split across two rows, and no consumer could reassemble them. |
+| **department_id** | UUID | Nullable | NULL is the tenant-wide row for tickets with no department. Kept as a real dimension rather than summed away, because `?departmentId=` has to agree with `GET /tickets?departmentId=` and a tenant-only rollup could not answer it. |
+| **tickets_created** | INT | NOT NULL, Default 0 | Tickets opened that day. |
+| **tickets_resolved** | INT | NOT NULL, Default 0 | Tickets resolved that day. |
+| **tickets_escalated** | INT | NOT NULL, Default 0 | Tickets escalated to a human that day. |
+| **chat_conversations** | INT | NOT NULL, Default 0 | The deflection **pair**, and both are bucketed on the *conversation's* day — a cohort rather than two independent event counts. A conversation started Sunday and deflected Monday counts on Sunday for both, so the ratio is "of conversations started that day, how many needed no human" and cannot exceed 1. Bucketing the numerator on its own resolution day would produce deflection rates above 100% on any day following a busy one. The cost is that today's figure is **provisional** until its conversations close, which is why the job is re-runnable and ranges including today cache briefly. |
+| **chat_resolved_without_escalation** | INT | NOT NULL, Default 0 | The numerator of that pair. |
+| **first_response_seconds_sum** | INT | NOT NULL, Default 0 | Sum/count pair rather than a stored average, so ranges are summable. |
+| **first_response_count** | INT | NOT NULL, Default 0 | Denominator for the human first-response average. |
+| **ai_first_response_seconds_sum** | INT | NOT NULL, Default 0 | Split from the human figures **deliberately**. An AI reply in 2 seconds genuinely *is* a first response, and blending it with human response time produces a headline that improves whenever AI usage rises — the metric measuring itself. |
+| **ai_first_response_count** | INT | NOT NULL, Default 0 | Denominator for the AI first-response average. |
+| **resolution_seconds_sum** | INT | NOT NULL, Default 0 | Sum of time-to-resolution. |
+| **resolution_count** | INT | NOT NULL, Default 0 | Denominator for the resolution average. |
+| **feedback_positive** | INT | NOT NULL, Default 0 | Thumbs-up on AI answers (Table 21). |
+| **feedback_negative** | INT | NOT NULL, Default 0 | Thumbs-down on AI answers. |
+| **citation_accurate_count** | INT | NOT NULL, Default 0 | Citations a rater marked accurate. |
+| **citation_rated_count** | INT | NOT NULL, Default 0 | Citations rated at all — the denominator. |
+| **computed_at** | TIMESTAMPTZ | NOT NULL, NOW() | When the job that wrote this row ran. **Load-bearing rather than decorative**: it goes into the analytics cache key for closed ranges, so a backfill correction invalidates the affected entries automatically instead of serving known-wrong numbers for a day. It is also what an export records (Table 37) so two people exporting "last quarter" a week apart can tell why their numbers differ. |
+
+* **Indexes:** `(organization_id, day)`.
+* **Unique:** a **partial pair** applied by the seeder, not `@@unique` in the schema. Prisma cannot express a unique index over a nullable column that treats NULLs as equal, and `department_id` is NULL for unassigned tickets — declaring `@@unique` here would silently permit duplicate tenant-wide rows. See [ADR 0039](./decisions/0039-the-seeder-ddl-block-is-the-list.md).
+
+#### **Table 35: agent_daily_stats**
+
+*The daily per-agent rollup.*
+
+Separate from Table 34 rather than a wider dimension on it: an agent is a person and a department is a queue, and one row per `(day, department, agent)` would multiply the table by agent count for every metric that has nothing to do with agents.
+
+| Field Name | Data Type | Constraints / Default | Description & Business Logic |
+| :---- | :---- | :---- | :---- |
+| **id** | UUID | Primary Key, gen_random_uuid() | Unique rollup row ID. |
+| **organization_id** | UUID | NOT NULL | The tenant. |
+| **day** | DATE | NOT NULL | A date in the tenant's timezone, as in Table 34. |
+| **agent_id** | UUID | NOT NULL | The agent. No FK (§1.13) — the display name is hydrated at read time by the gateway. |
+| **assigned** | INT | NOT NULL, Default 0 | Tickets assigned to them that day. |
+| **resolved** | INT | NOT NULL, Default 0 | Tickets they resolved that day. |
+| **messages_sent** | INT | NOT NULL, Default 0 | Messages they sent that day. |
+| **resolution_seconds_sum** | INT | NOT NULL, Default 0 | Sum of their time-to-resolution. |
+| **resolution_count** | INT | NOT NULL, Default 0 | Denominator for that average. |
+| **computed_at** | TIMESTAMPTZ | NOT NULL, NOW() | When the job ran; feeds the cache key exactly as in Table 34. |
+
+* **Unique:** `(organization_id, day, agent_id)` — expressible as `@@unique` here, unlike Table 34, because `agent_id` is NOT NULL.
+* **Indexes:** `(organization_id, day)`.
+
+#### **Table 36: ai_generation_daily_stats**
+
+*The daily AI-generation rollup.*
+
+**This one is not an optimisation, it is the only durable record.** `ai_generations` (Table 29) is retention-rolled: raw rows aggregate away after ~90 days, so any analytics query written against raw rows silently loses history the moment retention ships. Which makes the **ordering constraint** real — this job must run *before* ledger retention over the same window. Reversed, retention deletes rows this has not read, and every historical figure under-reports forever with nothing to recompute it from.
+
+| Field Name | Data Type | Constraints / Default | Description & Business Logic |
+| :---- | :---- | :---- | :---- |
+| **id** | UUID | Primary Key, gen_random_uuid() | Unique rollup row ID. |
+| **organization_id** | UUID | NOT NULL | The tenant. |
+| **day** | DATE | NOT NULL | A date in the tenant's timezone, not UTC. |
+| **purpose** | VARCHAR(30) | NOT NULL | `AiGenerationPurpose`. **The per-purpose split is the point**: it shows a tenant where their AI budget actually goes, which is rarely where they assume. |
+| **model_name** | VARCHAR(100) | NOT NULL | Carried as a dimension so a tier change is visible as a cost change rather than as an unexplained jump. |
+| **generations** | INT | NOT NULL, Default 0 | Generation count. |
+| **prompt_tokens** | BIGINT | NOT NULL, Default 0 | Prompt tokens consumed. |
+| **completion_tokens** | BIGINT | NOT NULL, Default 0 | Completion tokens produced. |
+| **cost_micros** | BIGINT | NOT NULL, Default 0 | Micros, and BIGINT, for the same reason the ledger uses them: a tenant's quarterly spend in micros overflows a 32-bit int, and float dollars accumulate rounding error across a million rows. See [ADR 0005](./decisions/0005-meter-cost-not-tokens.md). |
+| **latency_ms_sum** | BIGINT | NOT NULL, Default 0 | Sum of generation latency. |
+| **latency_count** | INT | NOT NULL, Default 0 | Denominator for the latency average. |
+| **failures** | INT | NOT NULL, Default 0 | Generations that failed. |
+| **empty_retrievals** | INT | NOT NULL, Default 0 | **The knowledge-gap signal.** A generation that retrieved nothing is a question the corpus could not answer — a content backlog item, not an error, and invisible in every other counter here. |
+| **drafts_accepted** | INT | NOT NULL, Default 0 | The acceptance-rate numerator. |
+| **drafts_edited** | INT | NOT NULL, Default 0 | Drafts an agent changed before sending. |
+| **drafts_discarded** | INT | NOT NULL, Default 0 | Depends on the sweep: without it the denominator only ever contains drafts that were **used**, and acceptance reports ~100% regardless of quality. |
+| **computed_at** | TIMESTAMPTZ | NOT NULL, NOW() | In the analytics cache key for closed ranges, so a backfill correction invalidates instead of serving known-wrong numbers for a day. |
+
+* **Unique:** `(organization_id, day, purpose, model_name)`.
+* **Indexes:** `(organization_id, day)`.
+
+#### **Table 37: analytics_exports**
+
+*An async analytics export.*
+
+`GET /analytics/export` is **not a read**: it creates a job, produces a file and returns a download URL — so it needs an owner, and ticket-service owns most of the source data. An export is a **snapshot with a timestamp in it**: two people exporting "last quarter" a week apart get different numbers if a backfill ran between, so the file records when it was generated and from which rollup run, or it becomes a disputed number in a meeting with nothing to settle it.
+
+| Field Name | Data Type | Constraints / Default | Description & Business Logic |
+| :---- | :---- | :---- | :---- |
+| **id** | UUID | Primary Key, gen_random_uuid() | Unique export job ID. |
+| **organization_id** | UUID | NOT NULL | The tenant. |
+| **requested_by_id** | UUID | NOT NULL | Who asked, so an operator can answer "who exported our ticket history". No FK (§1.13). |
+| **kind** | VARCHAR(30) | NOT NULL | `AnalyticsExportKind`. |
+| **from_day** | DATE | NOT NULL | The range, as the tenant's local dates — the same domain the rollups use. |
+| **to_day** | DATE | NOT NULL | Inclusive end of the range. |
+| **department_id** | UUID | Nullable | Optional department filter. |
+| **timezone** | VARCHAR(64) | Nullable | The tenant's timezone when the export was **requested**. `from_day`/`to_day` are dates in local terms and the row exports compare them against a `timestamptz`; without the zone, a tenant at UTC+7 asking for August gets rollup rows over local August and ticket rows over UTC August — seven hours of skew at each end, in opposite directions, from one stated range. Stored rather than read in the worker for the same reason as `unrestricted`. NULL means UTC. |
+| **unrestricted** | BOOLEAN | NOT NULL, Default false | Whether the requester could see **every** ticket when they asked. Captured at request time and not re-derived: the renderer runs later, in a worker with no `CallerContext`, and a permission can be revoked in between. An export must contain what the person could see when they asked — re-deriving would either widen it after a grant or fail it after a revoke, and neither is what they requested. False means the renderer restricts to tickets they authored or are assigned, the same predicate the list applies. |
+| **filters** | JSONB | Nullable | The per-kind predicates that are *not* shared — ticket status and assignee, audit action and resource type. JSON because three kinds have three shapes and a column per predicate would be mostly null. **Storage, never a contract**: validated at the service against a per-kind DTO on the way in and never read back as `any`. |
+| **status** | VARCHAR(20) | NOT NULL, Default `PENDING` | `AnalyticsExportStatus`. |
+| **object_path** | TEXT | Nullable | The object in storage. Absent until the file exists. |
+| **row_count** | INT | Nullable | Rows written to the file. |
+| **rollup_computed_at** | TIMESTAMPTZ | Nullable | **The disputed-number guard.** The newest `computed_at` across the rollup rows this file was built from, recorded here *and* written into the file, so a reader comparing two exports can see whether the data was recomputed between them rather than guessing. |
+| **error_log** | TEXT | Nullable | Why it failed. Present exactly when `status = FAILED`. |
+| **created_at** | TIMESTAMPTZ | NOT NULL, NOW() | When the export was requested. |
+| **completed_at** | TIMESTAMPTZ | Nullable | When the file became available. |
+
+* **Indexes:** `(organization_id, created_at DESC)`.
+
+#### **Table 38: job_runs**
+
+*The scheduled-job heartbeat. One row per job name.*
+
+Present **identically in `postgres_auth`, `postgres_ticket` and `postgres_ingestion`** — a per-service operational table, not a shared one, because a service must be able to record its own liveness without a cross-service write.
+
+The jobs not running was never the real problem; the real problem was that nothing anywhere could tell you they were not running. A failed job at least logs. A job that never runs logs nothing at all.
+
+| Field Name | Data Type | Constraints / Default | Description & Business Logic |
+| :---- | :---- | :---- | :---- |
+| **job_name** | TEXT | **Primary Key** | The job name from `SCHEDULED_JOBS`, or a step within one. The PK, so recording a run is a single upsert with no read first. |
+| **last_started_at** | TIMESTAMPTZ | NOT NULL | When the most recent attempt began. |
+| **last_succeeded_at** | TIMESTAMPTZ | Nullable | **Preserved across a failure, deliberately.** This is what the staleness alert reads, and clearing it on failure would turn "broken since Tuesday" into "never ran", losing the one piece of information worth having. Nullable because it is null until the *first* success — which is how `checkStaleness` tells "never ran" from "stale". |
+| **last_duration_ms** | INT | Nullable | Duration of the last run. |
+| **last_error** | TEXT | Nullable | Truncated by `JobRunRecorder` — a driver stack trace is kilobytes and the first line is what anybody reads. |
+| **consecutive_failures** | INT | NOT NULL, Default 0 | **Reset to 0 on success.** A count that only ever grows is how a job failing every night for a month reads as one failure. |
+| **updated_at** | TIMESTAMPTZ | NOT NULL, auto-updated | Last write to this row. |
+
+* See [ADR 0003](./decisions/0003-bullmq-over-nest-cron.md) for why the jobs run on BullMQ repeats.
+
 ### **Domain E: Notifications & Messaging**
 
 #### **Table 23: notifications**
@@ -896,6 +1126,7 @@ Conceptually a sibling of Tables 11–12 (§1.9) — a hashed, expiring, single-
 | **resource_id** | UUID | Nullable, Indexed | Resource instance ID. Enables bulk-read when a resource is opened (e.g., all notifications for a ticket marked read). |
 | **group_key** | VARCHAR(200) | Nullable, Indexed | Grouping identifier (e.g., `ticket:123:message`). Multiple notifications with the same key collapse into one row with an incremented `group_count`. |
 | **group_count** | INT | NOT NULL, Default 1 | Number of events coalesced into this notification. Displayed as "12 new messages on #1042" rather than 12 separate rows. |
+| **group_event_ids** | VARCHAR(100)[] | NOT NULL, **no column default** | The recent event ids that INCREMENTED this group, newest first. Grouping and `event_id` idempotency pull in opposite directions: the INSERT is deduped by the unique index, but an increment has no such protection, so a redelivery can double-count. Bounded to the newest `GROUP_EVENT_WINDOW` entries by the `UPDATE` that writes it. |
 | **event_id** | VARCHAR(100) | Nullable | Producer-side idempotency key from NATS event metadata. Prevents duplicate notifications on NATS at-least-once redelivery. |
 | **read_at** | TIMESTAMPTZ | Nullable | Timestamp when user marked read. NULL = unread. |
 | **archived_at** | TIMESTAMPTZ | Nullable | Timestamp when user dismissed the notification. Hidden from default feed. |
@@ -915,7 +1146,7 @@ Conceptually a sibling of Tables 11–12 (§1.9) — a hashed, expiring, single-
 | **notification_id** | UUID | NOT NULL, FK ➔ notifications.id, ON DELETE CASCADE | Parent notification. Cascading delete cleans up delivery records. |
 | **channel** | ENUM | NOT NULL | `IN_APP \| EMAIL \| SMS \| WEBHOOK`. Transport mechanism. |
 | **status** | ENUM | NOT NULL, Default `PENDING` | Delivery state: `PENDING \| SENT \| DELIVERED \| FAILED \| SKIPPED \| BOUNCED`. Distinct from notification.read_at; sent ≠ read. |
-| **skip_reason** | VARCHAR(100) | Nullable | Why delivery was skipped if status = SKIPPED (e.g., `user_preference`, `quiet_hours`, `unverified_address`, `already_seen_in_app`, `rate_limited`). Auditable alternative to silent drops. |
+| **skip_reason** | VARCHAR(100) | Nullable | Why delivery was skipped if status = SKIPPED (e.g., `USER_PREFERENCE`, `QUIET_HOURS`, `UNVERIFIED_ADDRESS`, `ALREADY_SEEN_IN_APP`, `RATE_LIMITED`). Auditable alternative to silent drops. |
 | **target** | VARCHAR(255) | Nullable | Snapshot of recipient's email/phone address at send time (same pattern as `otps.target`). Preserved if the user later changes their contact info. |
 | **provider_message_id** | VARCHAR(255) | Nullable, Indexed | The delivery provider's own id — an SMTP `Message-ID` (nodemailer) or a Twilio SID, matching what `notification-service` actually uses. Correlates a provider delivery webhook back to this row. |
 | **attempts** | INT | NOT NULL, Default 0 | Retry counter. Incremented on each retry attempt. |
@@ -947,15 +1178,32 @@ Conceptually a sibling of Tables 11–12 (§1.9) — a hashed, expiring, single-
 * **Unique constraint:** `(user_id, type, channel)` — one row per (type, channel) pair per user.
 * **Resolution order:** Lookup exact `(type, channel)` preference. If missing, fall back to `('*', channel)`. If missing, use hard-coded default (`is_enabled = true`, `digest = IMMEDIATE`). Quiet hours (`quiet_hours_start`, `quiet_hours_end`, `timezone`) live on the `users` table as global settings, not here.
 
+#### **Table 39: inbound_auto_replies**
+
+*One auto-reply per address per tenant per day.*
+
+**A table rather than Redis, and the reason is not convenience.** This service has no Redis client, and adding one for a counter would put the loop guard in a store a flush empties. A flushed limit re-opens the exchange it exists to close — and a mail loop with an auto-responder on the other end is the failure that does not stop on its own.
+
+| Field Name | Data Type | Constraints / Default | Description & Business Logic |
+| :---- | :---- | :---- | :---- |
+| **organization_id** | UUID | NOT NULL | The tenant. Part of the primary key: the guard is **per tenant**, so one tenant's auto-reply cannot suppress another's to the same address. |
+| **email** | VARCHAR(320) | NOT NULL | The address that was replied to. |
+| **last_sent_at** | TIMESTAMPTZ | NOT NULL | When the last auto-reply went out. Compared against the window to decide whether to send again. |
+
+* **Primary key:** composite `(organization_id, email)`.
+* **Indexes:** `(last_sent_at)` — for the daily prune. Rows older than the window are dead weight, and without a sweep this grows by one row per distinct stranger, forever.
+
 ## **3. Recommended Foreign Key Cascade Rules**
 
 To prevent accidental database corruption or orphaned child records:
 
 1. **ON DELETE CASCADE:**
    * user_departments ➔ users & departments.
-   * `_user_roles` ➔ users & roles (implicit m2m; Prisma generates the CASCADE).
-   * `_role_permissions` ➔ roles & permissions (implicit m2m; Prisma generates the CASCADE).
+   * user_roles ➔ users & roles (physically `_user_roles`; Prisma generates the CASCADE).
+   * role_permissions ➔ roles & permissions (physically `_role_permissions`; Prisma generates the CASCADE).
    * department_documents ➔ documents & departments.
+   * ticket_status_changes ➔ tickets (the history dies with the ticket).
+   * ticket_read_states ➔ tickets (a watermark into a thread that no longer exists is dead weight).
    * ticket_messages ➔ tickets (If a ticket is hard-deleted, drop its messages).
    * ticket_assignments ➔ tickets (If a ticket is hard-deleted, drop its assignment history).
    * message_attachments ➔ ticket_messages.
@@ -975,6 +1223,7 @@ To prevent accidental database corruption or orphaned child records:
    * created_by_id ➔ users.id (If creator is deleted, retain the created entity).
    * related_document_id ➔ documents.id (in document_flags; if a related conflicting document is deleted, retain the flag as informational).
    * resolved_by_id ➔ users.id (in document_flags; if a Knowledge Manager is hard-deleted, retain the resolution record).
+   * ticket_id ➔ tickets.id (in inbound_emails; **never CASCADE** — the row is the idempotency record for a delivery and must outlive what it produced, or the provider's next retry stops being a duplicate and the deleted ticket comes straight back).
    * actor_id ➔ users.id (in notifications; if the user who triggered the notification is deleted, retain the notification).
    * invited_by_id, accepted_user_id, revoked_by_id ➔ users.id (in user_invitations; the invitation record outlives any of the accounts referenced by it).
 3. **ON DELETE RESTRICT / NO ACTION (Default):**

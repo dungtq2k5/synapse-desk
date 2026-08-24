@@ -253,7 +253,24 @@ model User {
   otps                 Otp[]
   passwordResetTokens  PasswordResetToken[]
 
-  // IMPLICIT Many-to-Many: user_roles
+  // The `user_roles` junction (RDM Table 7). IMPLICIT on purpose.
+  //
+  // Where a junction carries no payload, letting Prisma own the join table is
+  // the more robust option: the two foreign keys, their cascades and the pair
+  // uniqueness are generated together and cannot drift apart, and there is no
+  // hand-written model to keep in step with this relation. `user_departments`
+  // next door is explicit for the opposite reason -- it carries `is_primary`,
+  // which an implicit relation cannot hold.
+  //
+  // The cost is naming: the physical table is `_user_roles` with `A`/`B`
+  // columns, so RAW SQL needs those while everything going through Prisma uses
+  // the relation. RDM Table 7 specifies it explicitly as `user_roles(user_id,
+  // role_id)` because that document is what people read the model FROM -- the
+  // spec is always explicit, the schema is not, and neither is wrong.
+  //
+  // No payload here is itself deliberate: grant provenance lives in
+  // `audit_logs` (`USER_ROLES_UPDATED`), because a join row records the
+  // current state and an audit row records the act.
   roles Role[] @relation("user_roles")
 
   // Invitations this user sent, accepted and revoked
@@ -306,7 +323,9 @@ model Role {
   organization Organization? @relation("RoleOrganization", fields: [organizationId], references: [id])
   createdBy    User          @relation("RoleCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
 
-  // IMPLICIT Many-to-Many Relations
+  // The `user_roles` and `role_permissions` junctions (RDM Tables 7-8),
+  // implicit by design -- physically `_user_roles` and `_role_permissions`,
+  // with `A`/`B` columns. See the note on `User.roles`.
   users       User[]       @relation("user_roles")
   permissions Permission[] @relation("role_permissions")
 
@@ -327,7 +346,11 @@ model Permission {
   code      String   @unique @db.VarChar(100)
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  // IMPLICIT Many-to-Many: role_permissions
+  // The `role_permissions` junction (RDM Table 8), implicit by design and
+  // physically `_role_permissions`. The row exists to be joined, not to be
+  // authoritative:
+  // the permission LIST is a compile-time artifact and this is what it points
+  // at -- docs/decisions/0038-permissions-are-a-compile-time-artifact.md.
   roles Role[] @relation("role_permissions")
 
   @@map("permissions")
