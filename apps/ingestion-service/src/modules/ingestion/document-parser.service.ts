@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { MIN_PAGE_CHARACTERS, type OcrLanguage } from '@synapsedesk/common';
-import { MAX_OCR_PAGES, OcrService } from './ocr.service';
+import { MAX_OCR_PAGES, OcrService, type OcrFailure } from './ocr.service';
 
 /** One page of extracted text. PDFs have many; everything else has one. */
 export type ParsedPage = {
@@ -19,6 +19,29 @@ export type ParsedPage = {
   source?: 'text' | 'ocr';
 };
 
+/**
+ * Why one page produced no indexable text.
+ *
+ * **Wider than `OcrFailure`, and it has to be.** `OcrFailure` is the return type
+ * of `recognisePage` — it describes what happened to a page that REACHED OCR,
+ * and all four members are outcomes of an attempt. Pages past
+ * `MAX_OCR_PAGES` never reach it, so borrowing a member for them would be a
+ * lie in the one direction that matters: `binary_missing` is what the processor
+ * keys on to report a deployment fault, and a merely-capped document on a
+ * healthy deployment would then tell its tenant to contact an administrator.
+ *
+ * `OcrFailure` is unchanged. It was already honest about being one function's
+ * return type; what was missing is a vocabulary for the page that never got
+ * there.
+ */
+export type PageFailure = OcrFailure | 'page_cap';
+
+/** One page that produced nothing, and why. */
+export type FailedPage = {
+  pageNumber: number;
+  reason: PageFailure;
+};
+
 export type ParsedDocument = {
   pages: ParsedPage[];
   /** sha256 of the actual BYTES — see the note in `parse`. */
@@ -35,8 +58,16 @@ export type ParsedDocument = {
    * Zero for formats with no pages.
    */
   pageCount: number;
-  /** Page numbers OCR was tried on and did not produce usable text for. */
-  failedPages: number[];
+  /**
+   * Pages that produced no usable text, each with its reason.
+   *
+   * **Not every gap in a document is in here**, which is the thing to know
+   * before reading it as a complete account. A page that OCR'd successfully into
+   * eight tokens is `ok: true`, never enters this list, and then vanishes at the
+   * chunker's `MIN_CHUNK_TOKENS`. `reportMissingPages` derives its own missing
+   * set for exactly that reason and PARTITIONS it against this one.
+   */
+  failedPages: FailedPage[];
 };
 
 /**
@@ -168,7 +199,7 @@ export class DocumentParserService {
   ): Promise<{
     pages: ParsedPage[];
     pageCount: number;
-    failedPages: number[];
+    failedPages: FailedPage[];
   }> {
     const pdfjs = loadPdfjs();
 
@@ -260,15 +291,24 @@ export class DocumentParserService {
     thin: number[],
     ocrLanguages: OcrLanguage[],
     into: ParsedPage[],
-  ): Promise<number[]> {
+  ): Promise<FailedPage[]> {
     if (thin.length === 0) return [];
 
-    const failed: number[] = [];
-    // Past the cap, pages are RECORDED as failures rather than dropped — "we
-    // stopped after fifty" and "page fifty-one could not be read" are the same
-    // fact to whoever reads the flag: part of this document is not searchable.
+    const failed: FailedPage[] = [];
+    // Past the cap, pages are RECORDED as failures rather than dropped. This
+    // used to say that "we stopped after fifty" and "page fifty-one could not be
+    // read" are the same fact to whoever reads the flag — true while this list
+    // carried only WHICH pages, and false the moment it carries WHY, because
+    // those are precisely the two facts the reader now has to tell apart.
+    //
+    // `page_cap`, never an `OcrFailure` member: these pages never reached OCR,
+    // and the processor keys on `binary_missing` to report a server fault.
     const attempt = thin.slice(0, MAX_OCR_PAGES);
-    failed.push(...thin.slice(MAX_OCR_PAGES));
+    failed.push(
+      ...thin
+        .slice(MAX_OCR_PAGES)
+        .map((pageNumber) => ({ pageNumber, reason: 'page_cap' as const })),
+    );
 
     if (failed.length > 0) {
       this.logger.warn(
@@ -290,11 +330,14 @@ export class DocumentParserService {
           source: 'ocr',
         });
       } else {
-        failed.push(pageNumber);
+        // The reason stops dying here. It was already typed by `recognisePage`
+        // and its docblock already said it was "carried upward so the page-count
+        // check can report it" — this is the hop that makes that true.
+        failed.push({ pageNumber, reason: result.reason });
       }
     }
 
-    return failed.sort((a, b) => a - b);
+    return failed.sort((a, b) => a.pageNumber - b.pageNumber);
   }
 
   /**

@@ -180,9 +180,10 @@ describe('The OCR pipeline', () => {
       'pdf',
     );
 
-    // The good page survives, the bad one is RECORDED rather than dropped.
+    // The good page survives, the bad one is RECORDED rather than dropped —
+    // and it carries the reason it was mocked with, not a generic one.
     expect(parsed.pages.map((page) => page.pageNumber)).toEqual([1]);
-    expect(parsed.failedPages).toEqual([2]);
+    expect(parsed.failedPages).toEqual([{ pageNumber: 2, reason: 'timeout' }]);
     expect(parsed.pageCount).toBe(2);
 
     spy.mockRestore();
@@ -285,7 +286,9 @@ describe('When the binaries are missing', () => {
     );
 
     expect(parsed.pages.map((page) => page.pageNumber)).toEqual([1]);
-    expect(parsed.failedPages).toEqual([2]);
+    expect(parsed.failedPages).toEqual([
+      { pageNumber: 2, reason: 'binary_missing' },
+    ]);
     expect(parsed.pageCount).toBe(2);
   }, 120_000);
 });

@@ -10,7 +10,19 @@ import {
   TESSERACT_CODE_BY_LANGUAGE,
 } from '@synapsedesk/common';
 
-/** Why a page has no text after OCR. Carried upward so the page-count check can report it. */
+/**
+ * Why a page has no text after OCR.
+ *
+ * Carried upward, and read in two places that treat it differently.
+ * `reportMissingPages` partitions its flag detail by it, so a page in the wrong
+ * language and a page nobody could OCR give different advice. And
+ * `binary_missing` alone decides `OcrUnavailable` over `NoExtractableText`,
+ * which is the difference between blaming the file and blaming the server.
+ *
+ * `PageFailure` in `document-parser.service.ts` widens this by one member for
+ * pages that never reached OCR at all. This type stays what it is: the outcome
+ * of an ATTEMPT.
+ */
 export type OcrFailure =
   'timeout' | 'binary_missing' | 'engine_error' | 'no_text';
 
@@ -88,7 +100,12 @@ export class OcrService implements OnModuleInit {
    * take ingestion down for every tenant because a minority feature is
    * unavailable.
    *
-   * So: a loud warning once, and a named failure per document.
+   * So: a loud warning once, and a named failure per document. The second half
+   * is `OcrUnavailable` in `ingestion.processor.ts` — a fully scanned document
+   * refuses with "OCR is not available on this deployment", and a partly
+   * scanned one indexes with a `PAGES_NOT_INDEXED` flag saying the same about
+   * the pages it lost. Neither tells the uploader to try another language,
+   * which is what the generic no-text failure says and which cannot help here.
    */
   async checkAvailability(): Promise<boolean> {
     if (this.available !== null) return this.available;

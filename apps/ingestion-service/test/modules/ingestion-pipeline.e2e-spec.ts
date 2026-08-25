@@ -10,6 +10,7 @@ import {
   MAX_CHUNKS_PER_DOCUMENT,
   QDRANT_PAYLOAD_FIELDS,
 } from '@synapsedesk/common';
+import { Logger } from '@nestjs/common';
 import Redis from 'ioredis';
 import { waitFor } from '@synapsedesk/common/testing/wait';
 import {
@@ -25,6 +26,7 @@ import { INGESTION_OUTCOMES } from '../../src/common/configs/ingestion.config';
 import { DocumentChunkerService } from '../../src/modules/ingestion/document-chunker.service';
 import { IngestionProcessor } from '../../src/modules/ingestion/ingestion.processor';
 import { DocumentFlagsService } from '../../src/modules/document-flags/document-flags.service';
+import { OcrService } from '../../src/modules/ingestion/ocr.service';
 import { QdrantService } from '../../src/modules/qdrant/qdrant.service';
 import { StorageReferenceService } from '../../src/modules/storage-client/storage-reference.service';
 import { AuthReferenceService } from '../../src/modules/auth-client/auth-reference.service';
@@ -309,8 +311,13 @@ describe('The ingestion pipeline (e2e)', () => {
       downloadObject.mockResolvedValue(Buffer.from('tiny', 'utf8'));
       const data = await queueDocument();
 
-      await expect(processor.process(data)).rejects.toThrow(
-        /no extractable text/i,
+      // **REFUSED, not a throw**, and the distinction is the point: the verdict
+      // is decided by the document's own bytes, so `attempts: 3` would re-run
+      // the parse and OCR twice more to reach it again. The tenant-visible
+      // outcome below is identical either way — which is exactly why nothing
+      // caught the waste until someone read the arm.
+      await expect(processor.process(data)).resolves.toBe(
+        INGESTION_OUTCOMES.REFUSED,
       );
 
       const job = await fx.prisma.ingestionJob.findUniqueOrThrow({
@@ -340,7 +347,9 @@ describe('The ingestion pipeline (e2e)', () => {
       downloadObject.mockResolvedValue(await buildPdf([' ']));
       const data = await queueDocument({ fileType: 'pdf' });
 
-      await expect(processor.process(data)).rejects.toThrow(/language/i);
+      await expect(processor.process(data)).resolves.toBe(
+        INGESTION_OUTCOMES.REFUSED,
+      );
 
       const job = await fx.prisma.ingestionJob.findUniqueOrThrow({
         where: { id: data.ingestionJobId },
@@ -359,7 +368,9 @@ describe('The ingestion pipeline (e2e)', () => {
       );
       const data = await queueDocument({ fileType: 'pdf' });
 
-      await expect(processor.process(data)).rejects.toThrow();
+      await expect(processor.process(data)).resolves.toBe(
+        INGESTION_OUTCOMES.REFUSED,
+      );
 
       const job = await fx.prisma.ingestionJob.findUniqueOrThrow({
         where: { id: data.ingestionJobId },
@@ -638,6 +649,251 @@ describe('The ingestion pipeline (e2e)', () => {
       await processor.process(data);
 
       expect(await flagsFor(data.documentId)).toEqual([]);
+    });
+  });
+
+  /**
+   * **A missing OCR binary is a SERVER fault, and has to read like one.**
+   *
+   * Every one of these pages fails for a reason the uploader cannot act on, and
+   * the generic no-text failure tells them to re-upload in another language —
+   * advice that cannot work, and that points the only person looking away from
+   * the actual fault.
+   */
+  describe('When OCR is unavailable on this deployment', () => {
+    const flagsFor = (documentId: string) =>
+      fx.prisma.documentFlag.findMany({ where: { documentId } });
+
+    const jobFor = (ingestionJobId: string) =>
+      fx.prisma.ingestionJob.findUniqueOrThrow({
+        where: { id: ingestionJobId },
+      });
+
+    /**
+     * Under `MIN_PAGE_CHARACTERS` (32), so the parser sends it to OCR.
+     *
+     * A TEXT page rather than a rasterised one, and deliberately: what is under
+     * test is the reason a page carries out of `ocrThinPages`, and `thin` is
+     * decided on character count alone. Fifty rasterised pages would spend
+     * minutes proving the same thing about the same code path.
+     */
+    const SHORT_PAGE = 'Figure 1.';
+
+    /** Survives both floors, so the document has something to index. */
+    const FULL_PAGE =
+      'The annual leave policy grants twelve paid days each year and permits ' +
+      'five of them to carry over into the following year, provided they are ' +
+      'used before the thirty-first of March.';
+
+    /**
+     * 61 characters and 13 tokens — over the parser's floor, under the
+     * chunker's.
+     *
+     * The third origin, and the one `failedPages` structurally cannot see: this
+     * page is never thin, never reaches OCR, and vanishes at `MIN_CHUNK_TOKENS`
+     * having been counted a success.
+     */
+    const THIN_PAGE =
+      'Appendix C — Signature page, retained for the records office.';
+
+    /** Forces the memoised probe to report this deployment cannot OCR. */
+    const withoutOcr = () =>
+      faults.replace(
+        fx.moduleRef.get(OcrService),
+        'checkAvailability',
+        // eslint-disable-next-line @typescript-eslint/require-await
+        async () => false,
+      );
+
+    it('1. **a fully scanned PDF is REFUSED, naming the DEPLOYMENT**', async () => {
+      // Every page needed OCR, none got it, so there is nothing to index — and
+      // the reason a Knowledge Manager finds in `error_log` has to be the one
+      // that is true.
+      withoutOcr();
+      downloadObject.mockResolvedValue(
+        await buildPdf([SHORT_PAGE, SHORT_PAGE], { repeat: 1 }),
+      );
+
+      const data = await queueDocument({ fileType: 'pdf' });
+      const outcome = await processor.process(data);
+
+      expect(outcome).toBe(INGESTION_OUTCOMES.REFUSED);
+
+      const job = await jobFor(data.ingestionJobId);
+      expect(job.status).toBe(IngestionJobStatus.FAILED);
+      expect(job.errorLog).toMatch(/not available on this deployment/i);
+      expect(job.errorLog).toMatch(/server configuration/i);
+    });
+
+    it('2. **…and that message never mentions LANGUAGE**', async () => {
+      // The half that matters, and the half test 1 would pass without: the
+      // generic no-text failure says "if it is not in English, re-upload it
+      // specifying its language", which sends someone to re-upload a file that
+      // will fail identically while the server stays broken.
+      withoutOcr();
+      downloadObject.mockResolvedValue(
+        await buildPdf([SHORT_PAGE, SHORT_PAGE], { repeat: 1 }),
+      );
+
+      const data = await queueDocument({ fileType: 'pdf' });
+      await processor.process(data);
+
+      const job = await jobFor(data.ingestionJobId);
+      expect(job.errorLog).not.toMatch(/language/i);
+      expect(job.errorLog).not.toMatch(/English/i);
+    });
+
+    it('3. **but a HEALTHY deployment that cannot read the scan still names language**', async () => {
+      // The other direction, and the reason this is a branch rather than a
+      // rewording. OCR ran and got nothing usable — which really is most often
+      // the wrong language, and really is something the uploader can fix.
+      const ocr = fx.moduleRef.get(OcrService);
+      faults.replace(ocr, 'recognisePage', () =>
+        Promise.resolve({ ok: false, reason: 'no_text' } as never),
+      );
+      downloadObject.mockResolvedValue(
+        await buildPdf([SHORT_PAGE, SHORT_PAGE], { repeat: 1 }),
+      );
+
+      const data = await queueDocument({ fileType: 'pdf' });
+      const outcome = await processor.process(data);
+
+      expect(outcome).toBe(INGESTION_OUTCOMES.REFUSED);
+
+      const job = await jobFor(data.ingestionJobId);
+      expect(job.errorLog).toMatch(/language/i);
+      expect(job.errorLog).not.toMatch(/deployment/i);
+    });
+
+    it('4. **a PARTLY scanned PDF indexes, and the flag names the deployment**', async () => {
+      // 197 good pages beat discarding 200, so this is a flag rather than a
+      // failure — but the flag is the only place the server fault is said, and
+      // saying "re-upload it in another language" here is the same wrong advice
+      // with a smaller audience.
+      withoutOcr();
+      downloadObject.mockResolvedValue(
+        await buildPdf([FULL_PAGE, SHORT_PAGE], { repeat: 1 }),
+      );
+      // The OPERATOR channel, and this case needs it more than the refusal
+      // does: the document reports INDEXED, so the only other trace of the
+      // server fault is a flag on a tenant's worklist no operator reads.
+      const logged = faults.spy(
+        (processor as unknown as { logger: Logger }).logger,
+        'error',
+      );
+
+      const data = await queueDocument({ fileType: 'pdf' });
+      const outcome = await processor.process(data);
+
+      expect(outcome).toBe(INGESTION_OUTCOMES.INDEXED);
+
+      const [flag] = await flagsFor(data.documentId);
+      expect(flag.flagType).toBe(DocumentFlagType.PAGES_NOT_INDEXED);
+      expect(flag.detail).toMatch(
+        /2: OCR is not available on this deployment/i,
+      );
+      expect(logged).toHaveBeenCalledWith(
+        expect.stringMatching(/OCR is unavailable on this deployment/i),
+      );
+    });
+
+    it('5. **three causes at once are PARTITIONED, not labelled**', async () => {
+      // The failure this exists to prevent: one `binary_missing` page
+      // relabelling every other gap in the document as a server fault, so the
+      // page that really is in the wrong language never gets that advice.
+      //
+      // Page 1 indexes. Page 2 clears the parser's floor and dies at the
+      // chunker's — the origin `failedPages` cannot see. Pages 3-53 are 51 thin
+      // pages: the first 50 reach OCR and get `binary_missing`, and page 53 is
+      // past `MAX_OCR_PAGES` and never reaches it at all.
+      withoutOcr();
+      downloadObject.mockResolvedValue(
+        await buildPdf(
+          [
+            FULL_PAGE,
+            THIN_PAGE,
+            ...Array.from({ length: 51 }, () => SHORT_PAGE),
+          ],
+          { repeat: 1 },
+        ),
+      );
+
+      const data = await queueDocument({ fileType: 'pdf' });
+      const outcome = await processor.process(data);
+
+      expect(outcome).toBe(INGESTION_OUTCOMES.INDEXED);
+
+      const [flag] = await flagsFor(data.documentId);
+      // Each cause speaks for its OWN pages and no others. Page 2 is the whole
+      // assertion: it is in `missing`, absent from `failedPages`, and belongs
+      // to neither of the two causes the reason map can name.
+      expect(flag.detail).toMatch(
+        /\b3-52: OCR is not available on this deployment/i,
+      );
+      expect(flag.detail).toMatch(
+        /\b53: this document exceeds the 50-page OCR limit/i,
+      );
+      expect(flag.detail).toMatch(/\b2: scanned pages are read with OCR/i);
+    });
+
+    it('6. **a page lost at the CHUNKER alone is never attributed to OCR**', async () => {
+      // No page in this document ever reached OCR, so neither OCR sentence may
+      // appear — and the missing set still has to be derived from the page
+      // count, because `failedPages` is empty here and always will be.
+      downloadObject.mockResolvedValue(
+        await buildPdf([FULL_PAGE, THIN_PAGE], { repeat: 1 }),
+      );
+
+      const data = await queueDocument({ fileType: 'pdf' });
+      await processor.process(data);
+
+      const [flag] = await flagsFor(data.documentId);
+      expect(flag.detail).toMatch(/2: scanned pages are read with OCR/i);
+      expect(flag.detail).not.toMatch(/deployment/i);
+      expect(flag.detail).not.toMatch(/OCR limit/i);
+    });
+
+    it('7. **a CAPPED document on a healthy deployment is not a server fault**', async () => {
+      // `page_cap` exists because of this test. Borrowing `binary_missing` for
+      // pages past the cap would cost nothing here except telling a tenant with
+      // a perfectly working deployment to go and contact an administrator.
+      const ocr = fx.moduleRef.get(OcrService);
+      faults.replace(ocr, 'recognisePage', () =>
+        Promise.resolve({ ok: false, reason: 'no_text' } as never),
+      );
+      downloadObject.mockResolvedValue(
+        await buildPdf(
+          [FULL_PAGE, ...Array.from({ length: 51 }, () => SHORT_PAGE)],
+          { repeat: 1 },
+        ),
+      );
+
+      const data = await queueDocument({ fileType: 'pdf' });
+      await processor.process(data);
+
+      const [flag] = await flagsFor(data.documentId);
+      expect(flag.detail).toMatch(
+        /\b52: this document exceeds the 50-page OCR limit/i,
+      );
+      expect(flag.detail).not.toMatch(/deployment/i);
+      expect(flag.detail).not.toMatch(/administrator/i);
+    });
+
+    it('8. **the refusal costs ONE attempt, not three**', async () => {
+      // Returned, not thrown. `attempts: 3` on a deterministic failure re-parses
+      // and re-rasterises every image page twice more to reach a conclusion
+      // that cannot change — and installing tesseract is a deploy, which
+      // replaces the process this probe is memoised in anyway.
+      withoutOcr();
+      downloadObject.mockResolvedValue(
+        await buildPdf([SHORT_PAGE, SHORT_PAGE], { repeat: 1 }),
+      );
+
+      const data = await queueDocument({ fileType: 'pdf' });
+
+      await expect(processor.process(data)).resolves.toBe(
+        INGESTION_OUTCOMES.REFUSED,
+      );
     });
   });
 

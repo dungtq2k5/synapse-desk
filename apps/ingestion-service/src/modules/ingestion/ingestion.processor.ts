@@ -37,6 +37,7 @@ import {
   DocumentParserService,
   ParsedDocument,
 } from './document-parser.service';
+import { MAX_OCR_PAGES } from './ocr.service';
 import { Chunk, DocumentChunkerService } from './document-chunker.service';
 import { DocumentFlagWriter } from '../scheduled/document-flag-writer';
 
@@ -122,6 +123,28 @@ class NoExtractableText extends Error {
           'OCR found no readable text in this document. If it is not in ' +
             'English, re-upload it specifying its language.'
         : `No extractable text was found in this ${fileType} document.`,
+    );
+  }
+}
+
+/**
+ * Raised when a document needed OCR and OCR is not installed on this deployment.
+ *
+ * **Separate from `NoExtractableText` because the reader is different.** That
+ * error tells an uploader their file might be in the wrong language, which is
+ * advice they can act on. Here the file is fine and the server is not, so the
+ * same advice sends a Knowledge Manager to re-upload a document that will fail
+ * again identically — and, worse, leaves nobody looking at the actual fault.
+ *
+ * @param pageCount how many pages needed OCR and could not get it.
+ */
+class OcrUnavailable extends Error {
+  constructor(pageCount: number) {
+    super(
+      `This document needs OCR for ${pageCount} page(s) and OCR is not ` +
+        'available on this deployment. This is a server configuration ' +
+        'problem, not a problem with the file — no re-upload will change it. ' +
+        'Contact your administrator.',
     );
   }
 }
@@ -228,6 +251,26 @@ export class IngestionProcessor {
         // argues for before OCR exists: a document that parses to no text at
         // all is almost certainly an image, and saying so converts a silent
         // wrong answer into an actionable one.
+        //
+        // Unless the reason is the deployment. A page that reached OCR and
+        // failed on `binary_missing` did not fail because of its language, and
+        // telling the uploader to re-upload in another language is advice that
+        // cannot work and points away from the real fault.
+        const unreadable = parsed.failedPages.filter(
+          (page) => page.reason === 'binary_missing',
+        );
+        if (unreadable.length > 0) {
+          // At `error`, per document, and not only once at boot. The boot
+          // warning reaches whoever deployed the service — but it is one line
+          // in a stream nobody re-reads, and by the time tenants are failing it
+          // has scrolled away. This one lives as long as the fault does.
+          this.logger.error(
+            `Document ${data.documentId}: OCR is unavailable on this ` +
+              `deployment; ${unreadable.length} page(s) could not be read`,
+          );
+          throw new OcrUnavailable(unreadable.length);
+        }
+
         throw new NoExtractableText(data.fileType);
       }
 
@@ -271,10 +314,32 @@ export class IngestionProcessor {
         return INGESTION_OUTCOMES.CANCELLED;
       }
 
-      if (error instanceof DocumentTooComplex) {
+      if (
+        error instanceof DocumentTooComplex ||
+        error instanceof NoExtractableText ||
+        error instanceof OcrUnavailable
+      ) {
+        // **One arm because it is one rule: a DETERMINISTIC refusal does not
+        // retry.** Both are decided by the document's own bytes against fixed
+        // settings — the same file, the same chunker and the same OCR languages
+        // reach the same verdict on attempt three.
+        //
         // `fail()` so the reason lands in `ingestion_jobs.error_log` where a
         // Knowledge Manager will find it — then RETURN, so BullMQ records one
         // failure rather than three.
+        //
+        // What each retry would waste differs, and neither is free.
+        // `DocumentTooComplex` is raised before any embedding call, so a rethrow
+        // re-chunks. `NoExtractableText` is raised AFTER the parse, so a rethrow
+        // re-rasterizes and re-OCRs every image page — up to
+        // `MAX_OCR_PAGES_PER_DOCUMENT` of them — which is the most expensive
+        // path in the pipeline, spent to reach a conclusion that cannot change.
+        //
+        // `OcrUnavailable` is deterministic for a different reason: not the
+        // bytes but the deployment. `OcrService` memoises its probe for the life
+        // of the process, so attempts two and three re-read the same cached
+        // `false` — and installing tesseract is a deploy, which replaces the
+        // process anyway. A retry cannot observe the fix even after it lands.
         await this.fail(data, error);
         this.logger.warn(`Refused ${documentId}: ${formatErrorMsg(error)}`);
 
@@ -399,13 +464,27 @@ export class IngestionProcessor {
       // later. "page 7 read as: …" is exactly the improvement somebody ships
       // without noticing they have put tenant content on an operator's screen.
       `${missing.length} of ${parsed.pageCount} page(s) could not be indexed: ` +
-        `${summarizePages(missing)}. Scanned pages are read with OCR; if this ` +
-        'document is not in English, re-upload it specifying its language.',
+        `${summarizePages(missing)}. ${explainMissingPages(missing, parsed)}`,
     );
 
     this.logger.warn(
       `Document ${data.documentId}: ${missing.length}/${parsed.pageCount} pages not indexed`,
     );
+
+    // **The mixed document needs the error line MORE than the refused one.** A
+    // fully scanned upload fails loudly and someone comes looking; this one
+    // reports INDEXED, and the only other trace of the server fault is a flag
+    // on a tenant's worklist that no operator reads. `warn` above is about the
+    // pages; this is about the deployment.
+    const unavailable = parsed.failedPages.filter(
+      (page) => page.reason === 'binary_missing',
+    );
+    if (unavailable.length > 0) {
+      this.logger.error(
+        `Document ${data.documentId}: OCR is unavailable on this deployment; ` +
+          `${unavailable.length} page(s) could not be read`,
+      );
+    }
   }
 
   /**
@@ -727,6 +806,71 @@ export class IngestionProcessor {
 
     if (count === 0) throw new JobNoLongerRunnableError(ingestionJobId);
   }
+}
+
+/**
+ * The sentence a Knowledge Manager reads under a `PAGES_NOT_INDEXED` flag.
+ *
+ * **Partitions `missing`, never labels it.** Pages go missing for three reasons
+ * and `failedPages` explains only two of them — a page that OCR'd successfully
+ * into eight tokens is `ok: true`, never enters that list, and vanishes at the
+ * chunker's `MIN_CHUNK_TOKENS`. So a page in `missing` and absent from
+ * `failedPages` falls to the third cause by elimination.
+ *
+ * Partitioning is also what stops ONE `binary_missing` page from relabelling a
+ * document whose other gaps have nothing to do with the deployment: each cause
+ * speaks only for the pages that are actually its own.
+ *
+ * @param missing every page number with no surviving chunk.
+ * @param parsed the parse result, for `failedPages` and its reasons.
+ */
+function explainMissingPages(
+  missing: number[],
+  parsed: ParsedDocument,
+): string {
+  const reasons = new Map(
+    parsed.failedPages.map((page) => [page.pageNumber, page.reason]),
+  );
+
+  const unavailable = missing.filter(
+    (page) => reasons.get(page) === 'binary_missing',
+  );
+  const capped = missing.filter((page) => reasons.get(page) === 'page_cap');
+  // By elimination, and that sweeps up the three OCR failures that ARE the
+  // file's own problem — `timeout`, `engine_error` and `no_text` all mean OCR
+  // ran and got nothing usable, which is the same advice as the thin-chunk
+  // case. Keyed on the reason rather than on membership of the two arrays
+  // above, which would be quadratic in the page count.
+  const unreadable = missing.filter((page) => {
+    const reason = reasons.get(page);
+
+    return reason !== 'binary_missing' && reason !== 'page_cap';
+  });
+
+  const parts: string[] = [];
+  if (unavailable.length > 0) {
+    parts.push(
+      `${summarizePages(unavailable)}: OCR is not available on this ` +
+        'deployment, so scanned pages cannot be read — this is a server ' +
+        'configuration problem and re-uploading will not change it.',
+    );
+  }
+  if (capped.length > 0) {
+    parts.push(
+      `${summarizePages(capped)}: this document exceeds the ` +
+        `${MAX_OCR_PAGES}-page OCR limit, so pages past it were not read. ` +
+        'Split it into smaller documents.',
+    );
+  }
+  if (unreadable.length > 0) {
+    parts.push(
+      `${summarizePages(unreadable)}: scanned pages are read with OCR and ` +
+        'these produced no usable text; if this document is not in English, ' +
+        're-upload it specifying its language.',
+    );
+  }
+
+  return parts.join(' ');
 }
 
 /**

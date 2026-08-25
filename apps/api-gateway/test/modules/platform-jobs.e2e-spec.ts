@@ -74,6 +74,19 @@ describe('Platform job health (e2e)', () => {
       lastError: undefined,
       consecutiveFailures: 0,
     },
+    {
+      // Hourly like the ledger job above, so an hour-old success is healthy and
+      // two hours is stale. **Every name in `SCHEDULED_JOBS` needs a row here**
+      // — test 2 asserts that all of them report healthy, so a job added to the
+      // registry without one arrives as never-ran and fails a test about
+      // something else entirely.
+      jobName: SCHEDULED_JOBS.SCOPE_RECONCILE,
+      lastStartedAt: hoursAgo(1),
+      lastSucceededAt: hoursAgo(1),
+      lastDurationMs: 800,
+      lastError: undefined,
+      consecutiveFailures: 0,
+    },
   ];
 
   const healthyAuthRows = () =>
