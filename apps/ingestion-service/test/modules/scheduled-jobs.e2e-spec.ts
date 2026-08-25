@@ -28,6 +28,7 @@ import { getQueueToken } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { ScopeWriterService } from '../../src/modules/ingestion/scope-writer.service';
 import { ScopeFanoutQueueService } from '../../src/modules/ingestion/scope-fanout-queue.service';
+import { ScopeReconcileSweep } from '../../src/modules/ingestion/scope-reconcile.sweep';
 import { QdrantService } from '../../src/modules/qdrant/qdrant.service';
 import {
   IngestionReconcileSweep,
@@ -312,6 +313,200 @@ describe('The fan-out and the scheduled jobs (e2e)', () => {
       await expect(scopeWriter.findScopeDrift(document.id)).resolves.toEqual(
         [],
       );
+    });
+  });
+
+  describe('The scope reconciliation sweep', () => {
+    let sweep: ScopeReconcileSweep;
+
+    beforeEach(() => {
+      sweep = fx.moduleRef.get(ScopeReconcileSweep);
+    });
+
+    it('**1. repairs chunks WIDER than truth, and counts them separately**', async () => {
+      // The exposure case. A restriction whose chunk write failed leaves the
+      // lexical arm answering with the old, wider scope — someone retrieves a
+      // document they were removed from, and nothing reports it.
+      const document = await documentWithChunks(3, {
+        isOrganizationWide: false,
+      });
+      await fx.prisma.documentChunk.updateMany({
+        where: { documentId: document.id },
+        data: { isOrganizationWide: true },
+      });
+
+      const result = await sweep.sweep();
+
+      expect(result.repairedWider).toBe(1);
+      // **Separately, not summed.** Averaging an access-control failure into a
+      // maintenance number is how it gets read as one.
+      expect(result.repairedNarrower).toBe(0);
+      await expect(scopeWriter.findScopeDrift(document.id)).resolves.toEqual(
+        [],
+      );
+    });
+
+    it('**2. and a NARROWER document repairs into the other counter**', async () => {
+      // The availability case: findable nowhere rather than findable by too
+      // many. Both want repairing; only the first wants alerting.
+      const document = await documentWithChunks(2, {
+        isOrganizationWide: true,
+      });
+      await fx.prisma.documentChunk.updateMany({
+        where: { documentId: document.id },
+        data: { isOrganizationWide: false },
+      });
+
+      const result = await sweep.sweep();
+
+      expect(result.repairedNarrower).toBe(1);
+      expect(result.repairedWider).toBe(0);
+    });
+
+    it('**3. department ids in a DIFFERENT ORDER are not drift**', async () => {
+      // The false-positive generator. Postgres array equality is
+      // order-sensitive, `department_ids` is written from a JavaScript array,
+      // and `array_agg` has no defined order — so `=` in the candidate query
+      // nominates most multi-department documents on every run.
+      //
+      // Nothing would be repaired: `findScopeDrift` compares sets. What it
+      // costs is the candidate budget, with real drift queued behind documents
+      // that were always fine.
+      const other = faker.string.uuid();
+      const document = await createDocument(fx.prisma, tenant, {
+        status: DocumentStatus.INDEXED,
+        isOrganizationWide: false,
+      });
+      await fx.prisma.departmentDocument.createMany({
+        data: [
+          { documentId: document.id, departmentId: tenant.departmentId },
+          { documentId: document.id, departmentId: other },
+        ],
+      });
+      await fx.prisma.documentChunk.create({
+        data: {
+          documentId: document.id,
+          chunkIndex: 0,
+          contentText: 'text',
+          tokenCount: 20,
+          organizationId: tenant.organizationId,
+          isOrganizationWide: false,
+          // Same SET, reversed order.
+          departmentIds: [other, tenant.departmentId],
+        },
+      });
+
+      // **Asserted on the CANDIDATE set, not on the repair count.** Nothing is
+      // repaired either way — `findScopeDrift` compares sets and rejects a
+      // reversed-order match — so a test that only checked `repaired === 0`
+      // passes with `=` in the SQL and guards nothing. Sabotage proved exactly
+      // that: swapping the containment operators for `<>` left all 49 green.
+      //
+      // What `=` actually costs is the candidate budget, so the observable is
+      // whether this document was NOMINATED at all.
+      const verdict = jest.spyOn(scopeWriter, 'findScopeDrift');
+      const result = await sweep.sweep();
+
+      const considered = verdict.mock.calls.map(([id]) => id);
+      expect(considered).not.toContain(document.id);
+      expect(result.repairedWider + result.repairedNarrower).toBe(0);
+      verdict.mockRestore();
+
+      await expect(scopeWriter.findScopeDrift(document.id)).resolves.toEqual(
+        [],
+      );
+    });
+
+    it('**4. but a REMOVED department link is caught**', async () => {
+      // Test 3 alone passes for a sweep that detects nothing at all, which is
+      // also the sweep that reports no false positives. This is what proves 3
+      // is a decision.
+      const document = await createDocument(fx.prisma, tenant, {
+        status: DocumentStatus.INDEXED,
+        isOrganizationWide: false,
+      });
+      await fx.prisma.documentChunk.create({
+        data: {
+          documentId: document.id,
+          chunkIndex: 0,
+          contentText: 'text',
+          tokenCount: 20,
+          organizationId: tenant.organizationId,
+          isOrganizationWide: false,
+          // Claims a department the document is not linked to.
+          departmentIds: [tenant.departmentId],
+        },
+      });
+
+      const result = await sweep.sweep();
+
+      expect(result.repairedWider).toBe(1);
+      await expect(scopeWriter.findScopeDrift(document.id)).resolves.toEqual(
+        [],
+      );
+    });
+
+    it('**5. passes the CURRENT scope as `before`, not the truth twice**', async () => {
+      // The mistake this sweep can actually make, and it is invisible at the
+      // call site: `apply(…, truth, truth)` type-checks, runs, and makes
+      // `isRestriction` false — routing a NARROWING repair down the grant path,
+      // chunks first with Qdrant non-fatal, which is the one ordering §1 says
+      // must never happen.
+      //
+      // Asserted on the ARGUMENT rather than on the write ordering, which
+      // `scope-writer`'s own suite already owns. Duplicating that would cover
+      // the same code twice and leave this uncovered.
+      const document = await documentWithChunks(2, {
+        isOrganizationWide: false,
+      });
+      await fx.prisma.documentChunk.updateMany({
+        where: { documentId: document.id },
+        data: { isOrganizationWide: true },
+      });
+
+      const apply = jest.spyOn(scopeWriter, 'apply');
+      await sweep.sweep();
+
+      const [, , after, before] = apply.mock.calls[0];
+      expect(after.isOrganizationWide).toBe(false);
+      // The drifted value, which is what makes this a restriction.
+      expect(before.isOrganizationWide).toBe(true);
+      apply.mockRestore();
+    });
+
+    it('**6. reports an organization_id mismatch and does NOT repair it**', async () => {
+      // Not drift: nothing updates this column after ingestion, so a mismatch
+      // means something wrote the wrong tenant into the field the lexical arm
+      // filters on. Repairing would move rows between tenants and erase the
+      // evidence.
+      const document = await documentWithChunks(2);
+      const foreign = faker.string.uuid();
+      await fx.prisma.documentChunk.updateMany({
+        where: { documentId: document.id },
+        data: { organizationId: foreign },
+      });
+
+      const result = await sweep.sweep();
+
+      expect(result.tenantMismatches).toBe(2);
+      const after = await fx.prisma.documentChunk.findFirst({
+        where: { documentId: document.id },
+      });
+      expect(after?.organizationId).toBe(foreign);
+    });
+
+    it('7. records a run even when it finds nothing', async () => {
+      // `/platform/jobs` exists to tell a healthy sweep from one that is not
+      // running, and a heartbeat written only on work makes those identical.
+      const result = await sweep.sweep();
+
+      expect(result).toEqual({
+        repairedWider: 0,
+        repairedNarrower: 0,
+        deferred: 0,
+        failed: 0,
+        tenantMismatches: 0,
+      });
     });
   });
 

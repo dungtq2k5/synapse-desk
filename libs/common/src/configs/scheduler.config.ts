@@ -69,6 +69,29 @@ export const SCHEDULED_JOBS = {
    * broken.
    */
   INGESTION_RECONCILE: 'ingestion-reconcile',
+
+  /**
+   * ingestion-service, hourly. Detects and repairs chunk scope drift.
+   *
+   * `ScopeWriterService.apply()` writes two stores that cannot share a
+   * transaction. Its ordering makes a partial failure safe in the direction
+   * that matters, and nothing has ever checked that the second write landed —
+   * so every failure mode ends at a durable, silent inconsistency.
+   *
+   * **Not a step on `LEDGER_HOURLY`**, on the same test `INGESTION_RECONCILE`
+   * applies above: `JOB_SEQUENCES` is for steps whose ORDER is a correctness
+   * constraint, and scope reconciliation has no ordering relationship to draft
+   * outcomes or quota drift.
+   *
+   * **Hourly rather than every ten minutes**, and cadence is again what decides
+   * it — the cron literal is spelled out rather than quoted here because a
+   * `*` followed by `/` ends this comment block. Drift
+   * has no user reporting it — that is the whole problem — and the repair is a
+   * Qdrant write per affected document. Hourly bounds the exposure window
+   * without running a write-heavy sweep 144 times a day to usually find
+   * nothing.
+   */
+  SCOPE_RECONCILE: 'scope-reconcile',
 } as const;
 
 export type ScheduledJobName =
@@ -85,6 +108,7 @@ export const SCHEDULE_CRON = {
   [SCHEDULED_JOBS.AUTH_HOURLY]: '0 * * * *',
   [SCHEDULED_JOBS.AUTH_DAILY]: '0 3 * * *',
   [SCHEDULED_JOBS.INGESTION_RECONCILE]: '*/10 * * * *',
+  [SCHEDULED_JOBS.SCOPE_RECONCILE]: '0 * * * *',
 } as const satisfies Record<ScheduledJobName, string>;
 
 /**
@@ -110,6 +134,7 @@ export const JOB_SEQUENCES = {
   [SCHEDULED_JOBS.AUTH_HOURLY]: ['invitations-expiry'],
   [SCHEDULED_JOBS.AUTH_DAILY]: ['expired-records'],
   [SCHEDULED_JOBS.INGESTION_RECONCILE]: ['ingestion-reconcile'],
+  [SCHEDULED_JOBS.SCOPE_RECONCILE]: ['scope-reconcile'],
 } as const satisfies Record<ScheduledJobName, readonly string[]>;
 
 /**
@@ -140,6 +165,7 @@ export const JOB_SERVICE = {
   [SCHEDULED_JOBS.AUTH_HOURLY]: 'auth',
   [SCHEDULED_JOBS.AUTH_DAILY]: 'auth',
   [SCHEDULED_JOBS.INGESTION_RECONCILE]: 'ingestion',
+  [SCHEDULED_JOBS.SCOPE_RECONCILE]: 'ingestion',
 } as const satisfies Record<ScheduledJobName, SchedulerService>;
 
 /**

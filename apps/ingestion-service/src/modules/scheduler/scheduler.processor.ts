@@ -15,6 +15,7 @@ import { DiscardedDraftSweep } from '../scheduled/discarded-draft.sweep';
 import { DocumentFlagWriter } from '../scheduled/document-flag-writer';
 import { QuotaReconciliationJob } from '../scheduled/quota-reconciliation.job';
 import { AiGenerationRollupJob } from '../analytics/ai-generation-rollup.job';
+import { ScopeReconcileSweep } from '../ingestion/scope-reconcile.sweep';
 import { IngestionReconcileSweep } from '../ingestion/ingestion-reconcile.sweep';
 
 /**
@@ -50,6 +51,7 @@ export class SchedulerProcessor extends WorkerHost {
     private readonly aiRollup: AiGenerationRollupJob,
     private readonly reconcile: IngestionReconcileSweep,
     private readonly runs: JobRunRecorder,
+    private readonly scopeReconcile: ScopeReconcileSweep,
   ) {
     super();
   }
@@ -68,6 +70,14 @@ export class SchedulerProcessor extends WorkerHost {
         return this.runs.track(job.name, async () => {
           await this.reconcile.sweep();
         });
+      case SCHEDULED_JOBS.SCOPE_RECONCILE:
+        // Tracked unconditionally, same reason as the reconcile above: a sweep
+        // that heartbeats only when it finds drift reports `never-ran` on a
+        // healthy system.
+        return this.runs.track(job.name, async () => {
+          await this.scopeReconcile.sweep();
+        });
+
       default:
         // **A defect, not routine cross-talk** — and the difference is what
         // makes throwing correct now.

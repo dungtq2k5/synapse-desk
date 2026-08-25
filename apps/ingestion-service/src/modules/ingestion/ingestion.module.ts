@@ -13,6 +13,7 @@ import { OcrService } from './ocr.service';
 import { DocumentChunkerService } from './document-chunker.service';
 import { IngestionProcessor } from './ingestion.processor';
 import { IngestionReconcileSweep } from './ingestion-reconcile.sweep';
+import { ScopeReconcileSweep } from './scope-reconcile.sweep';
 import { IngestionQueueService } from './ingestion-queue.service';
 import { IngestionWorker } from './ingestion.worker';
 import { DocumentUploadedConsumer } from './document-uploaded.consumer';
@@ -79,6 +80,7 @@ import { ScopeChangedConsumer } from './scope-changed.consumer';
     // so the reverse edge would be a cycle — and the sweep is about THIS
     // queue, which this module owns.
     IngestionReconcileSweep,
+    ScopeReconcileSweep,
   ],
   exports: [
     IngestionQueueService,
@@ -86,6 +88,7 @@ import { ScopeChangedConsumer } from './scope-changed.consumer';
     ScopeWriterService,
     ScopeFanoutQueueService,
     IngestionReconcileSweep,
+    ScopeReconcileSweep,
   ],
 })
 export class IngestionModule {}

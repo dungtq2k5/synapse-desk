@@ -162,3 +162,29 @@ groups:
           description: >-
             No heartbeat exists for this job. Either the scheduler was never
             registered, or the owning service has never been scraped.
+
+      # cron: 0 * * * *
+      - alert: ScheduledJobStale
+        expr: time() - job_last_success_timestamp_seconds{job="scope-reconcile"} > 7200
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: '{{ $labels.job }} has not succeeded in over 7200s'
+          description: >-
+            The job last succeeded at {{ $value | humanizeTimestamp }}. This
+            fires for "it broke" and for "the schedule was never wired" alike —
+            the two cases that are indistinguishable from outside and equally bad.
+
+      # **A job with NO SERIES at all**, which the gauge exports as ABSENT rather
+      # than as zero. Zero would be 1970 and would satisfy the rule above, so
+      # without this the never-wired case would look like the broken case; with
+      # it, the two alert separately and get different responses.
+      - alert: ScheduledJobMissing
+        expr: absent(job_last_success_timestamp_seconds{job="scope-reconcile"})
+        for: 30m
+        labels: { severity: critical }
+        annotations:
+          summary: 'scope-reconcile has never reported a successful run'
+          description: >-
+            No heartbeat exists for this job. Either the scheduler was never
+            registered, or the owning service has never been scraped.
