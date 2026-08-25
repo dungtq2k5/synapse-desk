@@ -218,6 +218,55 @@ describe('The OpenAPI document', () => {
 
   // ------------------------------------------------------------------
 
+  describe('The markdown contract reaches the client', () => {
+    /**
+     * Doc 53 §A's whole deliverable.
+     *
+     * The task is a CONTRACT, not code: these fields already round-trip
+     * markdown byte for byte and always have. What was missing is the promise —
+     * and specifically its second half, that renderers must disable raw HTML,
+     * because nothing on this side strips it and a renderer with passthrough
+     * enabled turns every one of these into stored XSS.
+     *
+     * Asserted on the published document rather than on the constant: a
+     * docblock the frontend never sees is not a contract with the frontend, and
+     * `@ApiProperty` reaching the schema is the only part a client can act on.
+     */
+    const PAIRS: readonly (readonly [string, string])[] = [
+      ['CreateTicketDto', 'description'],
+      ['UpdateTicketDto', 'description'],
+      ['CreateDepartmentDto', 'description'],
+      ['UpdateDepartmentDto', 'description'],
+      ['CreateRoleDto', 'description'],
+      ['UpdateRoleDto', 'description'],
+      ['CreateMessageDto', 'content'],
+    ];
+
+    it('**1. every markdown field publishes the contract**', () => {
+      const missing = PAIRS.filter(([dto, field]) => {
+        const property = schema(dto)?.properties?.[field] as
+          SchemaObject | undefined;
+
+        return !property?.description?.includes('Renderers MUST disable');
+      }).map(([dto, field]) => `${dto}.${field}`);
+
+      expect(missing).toEqual([]);
+    });
+
+    it('**2. and the schemas this names all exist**', () => {
+      // Guards the guard. A renamed DTO makes `schema()` return undefined, and
+      // a filter over undefined properties would report nothing missing while
+      // checking nothing — the same shape as an empty source scan.
+      const unresolved = PAIRS.filter(([dto]) => !schema(dto)).map(
+        ([dto]) => dto,
+      );
+
+      expect(unresolved).toEqual([]);
+    });
+  });
+
+  // ------------------------------------------------------------------
+
   describe('The response envelope', () => {
     /** A representative documented success response. */
     const success = (path: string, method: 'get' | 'post' = 'get') =>

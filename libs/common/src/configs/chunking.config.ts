@@ -91,3 +91,34 @@ export const EMBEDDING_BATCH_SIZE = 32;
  * document says it is a unit.
  */
 export const CHUNK_HEADING_LEVELS = [1, 2, 3] as const;
+
+/**
+ * The most chunks one document may produce before it is refused.
+ *
+ * **The bound that was missing at every size.** `MAX_OCR_PAGES_PER_DOCUMENT`
+ * caps the path that LOOKS expensive — scanned pages — while a text-dense PDF
+ * generates the embedding calls and had no ceiling at all. Raising
+ * `MAX_DOCUMENT_BYTES` to 100 MB made that visible rather than creating it.
+ *
+ * **Derived, because there is no corpus to measure.** Both ingestion databases
+ * are empty, so this comes from the arithmetic rather than from a percentile —
+ * and the arithmetic is written down so the number can be re-derived when there
+ * is data. At a stride of {@link CHUNK_TARGET_TOKENS} − {@link CHUNK_OVERLAP_TOKENS}
+ * = 448 tokens, and roughly four characters per token for Latin script:
+ *
+ * | Document | Chunks | Embedding calls |
+ * | :---- | :---- | :---- |
+ * | 500-page manual (~250k words) | ~840 | ~27 |
+ * | 100 MB PDF, ~15% extractable text | ~8,800 | ~275 |
+ * | 100 MB of pure text | ~58,500 | ~1,830 |
+ *
+ * 20,000 sits between the third row and the second: it admits a 100 MB PDF at
+ * realistic text density with room to spare, admits a manual twenty times
+ * longer than any this product has seen, and refuses the pathological case that
+ * would spend ~1,800 embedding calls on one upload.
+ *
+ * **Breaching it is TERMINAL, not a retry.** A document too large to chunk is
+ * exactly as too large on attempt three, and `attempts: 3` would spend the
+ * budget twice more before giving up.
+ */
+export const MAX_CHUNKS_PER_DOCUMENT = 20_000;

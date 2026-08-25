@@ -1,3 +1,4 @@
+import { NoEmoji } from '../../../../common/decorators/no-emoji.decorator';
 import { Type } from 'class-transformer';
 import { OmitType, ApiPropertyOptional } from '@nestjs/swagger';
 import {
@@ -77,6 +78,7 @@ export class CreateUserDto {
   @IsString()
   @MinLength(MIN_FULL_NAME_LENGTH)
   @MaxLength(MAX_FULL_NAME_LENGTH)
+  @NoEmoji()
   readonly fullName!: string;
 
   @IsOptional()

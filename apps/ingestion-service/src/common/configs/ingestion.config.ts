@@ -25,6 +25,14 @@ export const INGESTION_OUTCOMES = {
   DEFERRED: 'DEFERRED',
   /** The row reached a terminal status underneath the worker. */
   CANCELLED: 'CANCELLED',
+  /**
+   * The document cannot be ingested and never will be.
+   *
+   * Distinct from a thrown failure: the job is marked FAILED with a reason, and
+   * the worker does NOT rethrow — `attempts: 3` on a deterministic refusal
+   * spends the embedding budget twice more to reach the same answer.
+   */
+  REFUSED: 'REFUSED',
 } as const;
 
 export type IngestionOutcome =

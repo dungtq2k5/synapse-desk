@@ -1,3 +1,5 @@
+import { NoEmoji } from '../../../../common/decorators/no-emoji.decorator';
+import { MARKDOWN_FIELD_CONTRACT } from '../../../../common/config/markdown-contract.config';
 import {
   MAX_ADMIN_REASON_LENGTH,
   MAX_ALLOWED_EMAIL_DOMAINS,
@@ -5,6 +7,7 @@ import {
   MAX_ORGANIZATION_DOMAIN_LENGTH,
   MAX_ORGANIZATION_NAME_LENGTH,
   MAX_ORGANIZATION_SLUG_LENGTH,
+  ORGANIZATION_SLUG_PATTERN,
   MAX_ROLE_DESCRIPTION_LENGTH,
   MAX_ROLE_NAME_LENGTH,
   MIN_AGENT_SEATS,
@@ -26,19 +29,21 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Matches,
   MaxLength,
   Min,
   MinLength,
 } from 'class-validator';
-import { OmitType, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiPropertyOptional, OmitType } from '@nestjs/swagger';
 import {
   DEFAULT_SEARCH,
   ORGANIZATION_SORTABLE_FIELDS,
   OrgStatus,
   PERMISSION_CODES,
   PermissionCode,
-  trimIfString,
   USER_SORTABLE_FIELDS,
+  lowerIfString,
+  trimIfString,
   type OrganizationSortableField,
   type UserSortableField,
 } from '@synapsedesk/common';
@@ -101,11 +106,22 @@ export class CreatePlatformOrganizationDto {
   @MinLength(MIN_ORGANIZATION_NAME_LENGTH)
   @MaxLength(MAX_ORGANIZATION_NAME_LENGTH)
   @Transform(trimIfString)
+  @NoEmoji()
   readonly name!: string;
 
   @IsString()
   @MinLength(MIN_ORGANIZATION_SLUG_LENGTH)
   @MaxLength(MAX_ORGANIZATION_SLUG_LENGTH)
+  @Matches(ORGANIZATION_SLUG_PATTERN)
+  // **Lowercased BEFORE the pattern, and that is a compatibility fix.**
+  // class-transformer runs ahead of class-validator regardless of decorator
+  // order, so `ACME-CORP` becomes `acme-corp` and passes. Without it the
+  // pattern turned a request that used to succeed into a 400: the service has
+  // done `.trim().toLowerCase()` on this field all along
+  // (`platform.service.ts`), so uppercase was accepted and canonicalized, not
+  // rejected. Moving the refusal earlier is right for `acme corp` and
+  // `acme/corp`, which nothing ever fixed — it is not right for case.
+  @Transform(lowerIfString)
   @Transform(trimIfString)
   readonly slug!: string;
 
@@ -166,12 +182,23 @@ export class UpdatePlatformOrganizationDto {
   @MinLength(MIN_ORGANIZATION_NAME_LENGTH)
   @MaxLength(MAX_ORGANIZATION_NAME_LENGTH)
   @Transform(trimIfString)
+  @NoEmoji()
   readonly name?: string;
 
   @IsOptional()
   @IsString()
   @MinLength(MIN_ORGANIZATION_SLUG_LENGTH)
   @MaxLength(MAX_ORGANIZATION_SLUG_LENGTH)
+  @Matches(ORGANIZATION_SLUG_PATTERN)
+  // **Lowercased BEFORE the pattern, and that is a compatibility fix.**
+  // class-transformer runs ahead of class-validator regardless of decorator
+  // order, so `ACME-CORP` becomes `acme-corp` and passes. Without it the
+  // pattern turned a request that used to succeed into a 400: the service has
+  // done `.trim().toLowerCase()` on this field all along
+  // (`platform.service.ts`), so uppercase was accepted and canonicalized, not
+  // rejected. Moving the refusal earlier is right for `acme corp` and
+  // `acme/corp`, which nothing ever fixed — it is not right for case.
+  @Transform(lowerIfString)
   @Transform(trimIfString)
   readonly slug?: string;
 
@@ -249,11 +276,13 @@ export class CreateGlobalRoleDto {
   @MinLength(MIN_ORGANIZATION_NAME_LENGTH)
   @MaxLength(MAX_ROLE_NAME_LENGTH)
   @Transform(trimIfString)
+  @NoEmoji()
   readonly name!: string;
 
   @IsOptional()
   @IsString()
   @MaxLength(MAX_ROLE_DESCRIPTION_LENGTH)
+  @ApiPropertyOptional({ description: MARKDOWN_FIELD_CONTRACT })
   readonly description?: string;
 
   @IsArray()

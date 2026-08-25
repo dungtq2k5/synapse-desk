@@ -561,6 +561,8 @@ Two independent classes, paired by a contract spec (`<name>.contract.spec.ts`) t
 
 **SHOULD** — put a genuine trap at the line it applies to, as a `//` comment, short enough to read in one pass.
 
+**MUST NOT** — put a `/** */` block BETWEEN a DTO property's decorators and its name. It reads exactly like a docblock and is not one: the Swagger plugin runs with `introspectComments` and takes the LEADING comment, so a block below the decorators never reaches the published spec. `AcceptInvitationDto.deviceName` shipped with no description at all this way, while the file looked thoroughly documented. A note about why a decorator is present or absent is a trap, so it belongs at that decorator as `//`; what the FIELD is belongs above them all. `dto-docblock.spec.ts` enforces this.
+
 **Keep it proportional.** A one-line constant gets one line. A function with a subtle contract gets a paragraph and an `@example`. Length is earned by the caller's need to know, not by how interesting the implementation was.
 
 ```ts

@@ -7,6 +7,7 @@ import {
   DocumentFlagResolution,
   DocumentStatus,
   IngestionJobStatus,
+  MAX_DOCUMENT_BYTES,
   SupersededReason,
   type DocumentFileType,
 } from '@synapsedesk/common';
@@ -250,7 +251,11 @@ describe('Documents (e2e)', () => {
     it('5. REFUSES a file over the per-file cap', async () => {
       await expectRpc(
         documents.presignDocument(
-          presignRequest({ sizeBytes: 26 * 1024 * 1024 }),
+          // DERIVED, not a second magic number. This read `26 * 1024 * 1024`
+          // against a 25MB cap, so raising the cap to 100MB left the test
+          // asserting a refusal for a size now comfortably UNDER it — passing
+          // the request and failing the assertion.
+          presignRequest({ sizeBytes: MAX_DOCUMENT_BYTES + 1 }),
           manager(),
         ),
         status.INVALID_ARGUMENT,

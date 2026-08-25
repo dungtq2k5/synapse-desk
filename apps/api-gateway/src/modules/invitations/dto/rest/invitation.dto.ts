@@ -1,3 +1,4 @@
+import { NoEmoji } from '../../../../common/decorators/no-emoji.decorator';
 import { Type } from 'class-transformer';
 import { OmitType, ApiPropertyOptional } from '@nestjs/swagger';
 import {
@@ -92,15 +93,33 @@ export class AcceptInvitationDto {
 
   @IsString()
   @MinLength(1)
+  @NoEmoji()
   readonly fullName!: string;
 
   @IsString()
   @MinLength(MIN_PASSWORD_LENGTH)
   readonly password!: string;
 
+  /**
+   * Labels the session this call creates, in the user's active-device list.
+   *
+   * Optional: the client sends what it can identify itself as, and a session
+   * with no label is still a session.
+   */
   @IsOptional()
   @IsString()
   @MaxLength(MAX_DEVICE_NAME_LENGTH)
+  // Deliberately WITHOUT `@NoEmoji`: an emoji here is cosmetic, since unlike
+  // `fullName` this is not a tenant-wide identifier other people read out of a
+  // list they must trust.
+  //
+  // The class that WOULD matter is a different one, and an emoji rule does not
+  // touch it. This is display text in a security surface — the active-session
+  // list a user scans to spot an intruder — where bidi and format controls
+  // (U+202E, zero-width characters) let one session's label rearrange or
+  // impersonate another's on screen. That rule belongs on every user-supplied
+  // string landing in such a list, `fullName` included, so it is a separate
+  // task rather than a decorator added here.
   readonly deviceName?: string;
 }
 

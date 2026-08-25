@@ -1,4 +1,5 @@
-import { ApiPropertyOptional } from '@nestjs/swagger';
+import { MARKDOWN_FIELD_CONTRACT } from '../../../../common/config/markdown-contract.config';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
@@ -35,6 +36,7 @@ export class CreateMessageDto {
   @MinLength(1)
   @MaxLength(MAX_MESSAGE_CONTENT_LENGTH)
   @Transform(trimIfString)
+  @ApiProperty({ description: MARKDOWN_FIELD_CONTRACT })
   readonly content!: string;
 
   /**
@@ -121,6 +123,7 @@ export class UpdateMessageDto {
   @MinLength(1)
   @MaxLength(MAX_MESSAGE_CONTENT_LENGTH)
   @Transform(trimIfString)
+  @ApiProperty({ description: MARKDOWN_FIELD_CONTRACT })
   readonly content!: string;
 }
 

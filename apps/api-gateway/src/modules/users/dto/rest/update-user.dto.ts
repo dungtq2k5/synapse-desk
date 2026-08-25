@@ -1,3 +1,4 @@
+import { NoEmoji } from '../../../../common/decorators/no-emoji.decorator';
 import {
   IsEnum,
   IsISO8601,
@@ -32,6 +33,7 @@ export class UpdateUserDto {
   @MinLength(MIN_FULL_NAME_LENGTH)
   @MaxLength(MAX_FULL_NAME_LENGTH)
   @Transform(trimIfString)
+  @NoEmoji()
   readonly fullName?: string;
 
   @IsOptional()
@@ -67,6 +69,7 @@ export class UpdateOwnProfileDto {
   @MinLength(MIN_FULL_NAME_LENGTH)
   @MaxLength(MAX_FULL_NAME_LENGTH)
   @Transform(trimIfString)
+  @NoEmoji()
   readonly fullName?: string;
 
   @IsOptional()

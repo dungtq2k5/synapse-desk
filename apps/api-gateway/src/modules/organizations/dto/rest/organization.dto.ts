@@ -1,9 +1,12 @@
+import { NoEmoji } from '../../../../common/decorators/no-emoji.decorator';
 import {
   MAX_ADMIN_REASON_LENGTH,
   MAX_ALLOWED_EMAIL_DOMAINS,
   MAX_ORGANIZATION_DOMAIN_LENGTH,
   MAX_ORGANIZATION_NAME_LENGTH,
   MAX_ORGANIZATION_SLUG_LENGTH,
+  ORGANIZATION_DOMAIN_PATTERN,
+  ORGANIZATION_SLUG_PATTERN,
 } from '../../../../common/config/dto.config';
 import { Type, Transform } from 'class-transformer';
 import {
@@ -13,10 +16,11 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  Matches,
   MaxLength,
   MinLength,
 } from 'class-validator';
-import { trimIfString } from '@synapsedesk/common';
+import { lowerIfString, trimIfString } from '@synapsedesk/common';
 
 /**
  * Profile only. Quotas (`maxAgentSeats`, storage, token budget) and `status`
@@ -30,6 +34,7 @@ export class UpdateOrganizationDto {
   @MinLength(2)
   @MaxLength(MAX_ORGANIZATION_NAME_LENGTH)
   @Transform(trimIfString)
+  @NoEmoji()
   readonly name?: string;
 
   /**
@@ -41,6 +46,16 @@ export class UpdateOrganizationDto {
   @IsString()
   @MinLength(2)
   @MaxLength(MAX_ORGANIZATION_SLUG_LENGTH)
+  @Matches(ORGANIZATION_SLUG_PATTERN)
+  // **Lowercased BEFORE the pattern, and that is a compatibility fix.**
+  // class-transformer runs ahead of class-validator regardless of decorator
+  // order, so `ACME-CORP` becomes `acme-corp` and passes. Without it the
+  // pattern turned a request that used to succeed into a 400: the service has
+  // done `.trim().toLowerCase()` on this field all along
+  // (`platform.service.ts`), so uppercase was accepted and canonicalized, not
+  // rejected. Moving the refusal earlier is right for `acme corp` and
+  // `acme/corp`, which nothing ever fixed — it is not right for case.
+  @Transform(lowerIfString)
   @Transform(trimIfString)
   readonly slug?: string;
 
@@ -48,6 +63,10 @@ export class UpdateOrganizationDto {
   @IsOptional()
   @IsString()
   @MaxLength(MAX_ORGANIZATION_DOMAIN_LENGTH)
+  @Matches(ORGANIZATION_DOMAIN_PATTERN)
+  // Lowercased first, same reason as `slug`: auth-service already does it, so
+  // refusing `ACME.COM` would break a request that used to work.
+  @Transform(lowerIfString)
   @Transform(trimIfString)
   readonly domain?: string;
 }
@@ -79,6 +98,14 @@ export class UpdateOrganizationSettingsDto {
   // would set that flag on EVERY settings update and wipe the tenant's
   // self-signup allowlist -- a security setting -- whenever the field is
   // simply not being edited.
+  //
+  // And NO `@Matches`, unlike `domain` above — the symmetry is wrong here.
+  // `organizations.service.ts` warns rather than rejects (`normalizeDomains`
+  // populates `publicDomainWarnings`), because putting `gmail.com` on a
+  // self-signup allowlist is a questionable decision, not a malformed request.
+  // A pattern here would turn that considered warning into a 400. Matching is
+  // exact at both readers, so a malformed entry cannot over-match — it simply
+  // never matches anything.
   readonly allowedEmailDomains?: string[];
 }
 

@@ -8,8 +8,8 @@ import {
   MAX_DOCUMENT_BYTES,
   MAX_EXPORT_BYTES,
   StoragePurpose,
-  type MimeType,
 } from '@synapsedesk/common';
+import type { ValidatedMimeType } from './content-signature';
 
 /**
  * What each purpose allows.
@@ -24,7 +24,17 @@ import {
  * anyone is thinking about it.
  */
 export type PurposePolicy = {
-  mimeAllowlist: readonly MimeType[];
+  /**
+   * **`ValidatedMimeType`, not `MimeType`** — narrower on purpose.
+   *
+   * `matchesDeclaredType` fails closed, so a type allowlisted here without a
+   * matcher in `content-signature.ts` is accepted at presign and REJECTED at
+   * confirm, once the bytes are already in the bucket. This type is what turns
+   * that into a compile error at the assignment below, where the two lists
+   * meet: the constants stay `MimeType[]` in `libs/`, which cannot know about
+   * this service's validator.
+   */
+  mimeAllowlist: readonly ValidatedMimeType[];
   maxSizeBytes: number;
   /** The path segment under `organizations/{orgId}/`. */
   prefix: string;

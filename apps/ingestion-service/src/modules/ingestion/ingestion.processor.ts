@@ -9,12 +9,13 @@ import {
   DocumentFlagType,
   DocumentStatus,
   EMBEDDING_BATCH_SIZE,
+  IngestionJobStatus,
+  MAX_CHUNKS_PER_DOCUMENT,
+  QDRANT_UPSERT_BATCH,
+  TERMINAL_INGESTION_STATUSES,
   estimateCostMicros,
   formatErrorMsg,
-  IngestionJobStatus,
   parseOcrLanguages,
-  TERMINAL_INGESTION_STATUSES,
-  QDRANT_UPSERT_BATCH,
   systemContext,
 } from '@synapsedesk/common';
 import {
@@ -67,6 +68,29 @@ class BudgetExhausted extends Error {}
 export class JobNoLongerRunnableError extends Error {
   constructor(ingestionJobId: string) {
     super(`Ingestion job ${ingestionJobId} is no longer runnable`);
+  }
+}
+
+/**
+ * Raised when a document would produce more chunks than the ceiling allows.
+ *
+ * **Terminal by construction, and that is the whole point of the type.** It is
+ * caught above the generic arm and returns rather than rethrows, because
+ * `attempts: 3` on a deterministic failure spends the embedding budget twice
+ * more on a document that cannot succeed. `MAX_CHUNKS_PER_DOCUMENT`'s docblock
+ * carries the arithmetic; this carries the retry decision.
+ *
+ * Same shape as `BudgetExhausted`, `JobNoLongerRunnableError`, `ExportTooLarge`
+ * and `UnprocessableMessage` — a typed error caught above the retrying arm,
+ * which is now the fourth time this codebase has wanted one.
+ */
+class DocumentTooComplex extends Error {
+  constructor(chunks: number) {
+    super(
+      `Document produces ${chunks.toLocaleString()} chunks, over the ` +
+        `${MAX_CHUNKS_PER_DOCUMENT.toLocaleString()} ceiling. Split it into ` +
+        `smaller documents — retrying will not change the outcome.`,
+    );
   }
 }
 
@@ -183,6 +207,13 @@ export class IngestionProcessor {
       await this.setJobStatus(ingestionJobId, IngestionJobStatus.CHUNKING);
       const chunks = await this.chunker.chunk(parsed.pages);
 
+      // Before `writeChunkRows` and before any embedding call: the ceiling
+      // exists to stop the spend, so checking it after paying is checking
+      // nothing.
+      if (chunks.length > MAX_CHUNKS_PER_DOCUMENT) {
+        throw new DocumentTooComplex(chunks.length);
+      }
+
       if (chunks.length === 0) {
         // **FAILED, with a reason a human can act on.**
         //
@@ -238,6 +269,16 @@ export class IngestionProcessor {
         );
 
         return INGESTION_OUTCOMES.CANCELLED;
+      }
+
+      if (error instanceof DocumentTooComplex) {
+        // `fail()` so the reason lands in `ingestion_jobs.error_log` where a
+        // Knowledge Manager will find it — then RETURN, so BullMQ records one
+        // failure rather than three.
+        await this.fail(data, error);
+        this.logger.warn(`Refused ${documentId}: ${formatErrorMsg(error)}`);
+
+        return INGESTION_OUTCOMES.REFUSED;
       }
 
       if (error instanceof BudgetExhausted) {

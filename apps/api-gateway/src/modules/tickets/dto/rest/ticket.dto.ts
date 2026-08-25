@@ -1,4 +1,5 @@
-import { OmitType, ApiPropertyOptional } from '@nestjs/swagger';
+import { MARKDOWN_FIELD_CONTRACT } from '../../../../common/config/markdown-contract.config';
+import { ApiProperty, ApiPropertyOptional, OmitType } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
   IsDate,
@@ -43,6 +44,7 @@ export class CreateTicketDto {
   @MinLength(1)
   @MaxLength(MAX_TICKET_DESCRIPTION_LENGTH)
   @Transform(trimIfString)
+  @ApiProperty({ description: MARKDOWN_FIELD_CONTRACT })
   readonly description!: string;
 
   @IsOptional()
@@ -87,6 +89,7 @@ export class UpdateTicketDto {
   @MinLength(1)
   @MaxLength(MAX_TICKET_DESCRIPTION_LENGTH)
   @Transform(trimIfString)
+  @ApiPropertyOptional({ description: MARKDOWN_FIELD_CONTRACT })
   readonly description?: string;
 
   @IsOptional()
@@ -199,18 +202,15 @@ export class BulkTicketPriorityDto {
 export class ListTicketsQueryDto extends OmitType(SearchPaginationDto, [
   'sortBy',
 ] as const) {
+  /** Which column the list is ordered by. Defaults to the search default. */
   @IsOptional()
   @IsString()
   @IsIn(TICKET_SORTABLE_FIELDS)
-  /**
-   * Optional in the API and, without this, REQUIRED in the docs.
-   *
-   * The plugin derives `required` from TYPESCRIPT optionality, not from
-   * `@IsOptional()`. A field declared `page: number = 1` is non-optional to the
-   * compiler even though the validator lets a caller omit it, so the generated
-   * spec demanded it — and a generated client would refuse to send a request
-   * without one.
-   */
+  // `@ApiPropertyOptional()` is required here: the Swagger plugin derives
+  // `required` from TYPESCRIPT optionality, not from `@IsOptional()`. A field
+  // declared `sortBy: T = default` is non-optional to the compiler even though
+  // the validator lets a caller omit it, so the spec would demand it and a
+  // generated client would refuse to send a request without one.
   @ApiPropertyOptional()
   readonly sortBy: TicketSortableField = DEFAULT_SEARCH.SORT_BY;
 

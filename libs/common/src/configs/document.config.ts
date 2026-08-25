@@ -376,8 +376,23 @@ export const DEFAULT_OCR_LANGUAGE: OcrLanguage = 'en';
  * how long a parse may run. A 25 MB PDF of text and a 25 MB PDF of scans are
  * the same size and cost very different amounts to ingest, which is exactly why
  * one number cannot express both.
+ *
+ * **Raised 25 MB → 100 MB, and the size was never what protected the system.**
+ * Two bounds do the real work and neither is this one:
+ *
+ * - {@link MAX_CHUNKS_PER_DOCUMENT} bounds the embedding spend a single
+ *   document can cause. Before it existed nothing did — the OCR page cap bounds
+ *   the expensive-LOOKING path while a text-dense PDF, which is the one that
+ *   actually generates embedding calls, had no ceiling at any size.
+ * - The ingestion container's `mem_limit`, because the parser holds the whole
+ *   file as a `Buffer` at `concurrency: 2`. Without a limit "does a 100 MB
+ *   document OOM the worker" has no answer that does not start with "depends
+ *   which host it lands on".
+ *
+ * Raising this without both is what makes an unbounded cost visible rather than
+ * creating one — the gap was there at 25 MB too.
  */
-export const MAX_DOCUMENT_BYTES = 25 * 1024 * 1024;
+export const MAX_DOCUMENT_BYTES = 100 * 1024 * 1024;
 
 /**
  * Every value `documents.file_type` can hold.

@@ -1,13 +1,14 @@
 import {
   AiGenerationPurpose,
+  DocumentFlagResolution,
+  DocumentFlagSeverity,
+  DocumentFlagType,
   DocumentStatus,
   EMBEDDING_BATCH_SIZE,
   EMBEDDING_MODEL,
   IngestionJobStatus,
+  MAX_CHUNKS_PER_DOCUMENT,
   QDRANT_PAYLOAD_FIELDS,
-  DocumentFlagResolution,
-  DocumentFlagSeverity,
-  DocumentFlagType,
 } from '@synapsedesk/common';
 import Redis from 'ioredis';
 import { waitFor } from '@synapsedesk/common/testing/wait';
@@ -20,6 +21,8 @@ import {
 } from '../utils';
 import { buildTenant, createDocument, TenantFixture } from '../factories';
 import { memberContext } from '../utils/context';
+import { INGESTION_OUTCOMES } from '../../src/common/configs/ingestion.config';
+import { DocumentChunkerService } from '../../src/modules/ingestion/document-chunker.service';
 import { IngestionProcessor } from '../../src/modules/ingestion/ingestion.processor';
 import { DocumentFlagsService } from '../../src/modules/document-flags/document-flags.service';
 import { QdrantService } from '../../src/modules/qdrant/qdrant.service';
@@ -43,6 +46,17 @@ describe('The ingestion pipeline (e2e)', () => {
   let getAiEntitlement: jest.SpyInstance;
 
   let tenant: TenantFixture;
+  let chunker: DocumentChunkerService;
+
+  /** One chunk past the ceiling — the smallest input that breaches it. */
+  const oversizedChunks = () =>
+    Array.from({ length: MAX_CHUNKS_PER_DOCUMENT + 1 }, (_, index) => ({
+      content: `chunk ${index}`,
+      chunkIndex: index,
+      pageNumber: 1,
+      headingPath: [],
+      tokenCount: 20,
+    }));
 
   /**
    * A markdown document with real headings, so the chunker's structure pass has
@@ -118,6 +132,7 @@ describe('The ingestion pipeline (e2e)', () => {
   beforeAll(async () => {
     fx = await bootstrapE2eTest();
     processor = fx.moduleRef.get(IngestionProcessor);
+    chunker = fx.moduleRef.get(DocumentChunkerService);
     documentFlags = fx.moduleRef.get(DocumentFlagsService);
     qdrant = fx.moduleRef.get(QdrantService);
     redis = fx.moduleRef.get<Redis>(QUOTA_REDIS);
@@ -885,6 +900,49 @@ describe('The ingestion pipeline (e2e)', () => {
       expect(job.status).toBe(IngestionJobStatus.FAILED);
       expect(job.errorLog).toContain('embedding provider is down');
       expect(document.status).toBe(DocumentStatus.FAILED);
+    });
+
+    it('**13a. A document over the chunk ceiling is REFUSED, not retried**', async () => {
+      // The bound that was missing at every document size. `MAX_OCR_PAGES_PER_DOCUMENT`
+      // caps the path that looks expensive; a text-dense document generates the
+      // embedding calls and had no ceiling at all.
+      //
+      // The CHUNKER is faked, not the constant. A document big enough to
+      // breach 20,000 chunks honestly would be ~9M tokens and the slowest test
+      // in the repo; mocking the constant would test a number production never
+      // uses. Returning an oversized array exercises the real guard against the
+      // real ceiling.
+      // eslint-disable-next-line @typescript-eslint/require-await
+      faults.replace(chunker, 'chunk', async () => oversizedChunks() as never);
+
+      const data = await queueDocument();
+      const outcome = await processor.process(data);
+
+      // **Returned, not thrown** — this is the assertion the typed error exists
+      // for. A throw here is `attempts: 3`, which spends the embedding budget
+      // twice more on a document that cannot succeed on any attempt.
+      expect(outcome).toBe(INGESTION_OUTCOMES.REFUSED);
+
+      const job = await fx.prisma.ingestionJob.findUniqueOrThrow({
+        where: { id: data.ingestionJobId },
+      });
+      expect(job.status).toBe(IngestionJobStatus.FAILED);
+      // The reason names the ceiling, so a Knowledge Manager reading the row
+      // knows to split the document rather than to re-upload it.
+      expect(job.errorLog).toContain('ceiling');
+    });
+
+    it('**13b. …and it costs no embedding call at all**', async () => {
+      // The refusal has to happen BEFORE the spend, or the ceiling is a report
+      // rather than a bound. 13a would pass either way — the job is FAILED and
+      // the outcome REFUSED whether the check runs before or after embedding.
+      // eslint-disable-next-line @typescript-eslint/require-await
+      faults.replace(chunker, 'chunk', async () => oversizedChunks() as never);
+
+      const before = fx.embeddings.calls.length;
+      await processor.process(await queueDocument());
+
+      expect(fx.embeddings.calls.length).toBe(before);
     });
 
     it('14. Leaves chunks WITHOUT a vector_point_id when embedding fails', async () => {

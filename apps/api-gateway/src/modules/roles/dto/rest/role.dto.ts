@@ -1,5 +1,7 @@
+import { NoEmoji } from '../../../../common/decorators/no-emoji.decorator';
+import { MARKDOWN_FIELD_CONTRACT } from '../../../../common/config/markdown-contract.config';
 import { Transform } from 'class-transformer';
-import { OmitType, ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, OmitType } from '@nestjs/swagger';
 import {
   ArrayMaxSize,
   ArrayNotEmpty,
@@ -77,11 +79,13 @@ export class CreateRoleDto extends PermissionCodesDto {
   @MinLength(MIN_ROLE_NAME_LENGTH)
   @MaxLength(MAX_ROLE_NAME_LENGTH)
   @Transform(trimIfString)
+  @NoEmoji()
   readonly name!: string;
 
   @IsOptional()
   @IsString()
   @MaxLength(MAX_ROLE_DESCRIPTION_LENGTH)
+  @ApiPropertyOptional({ description: MARKDOWN_FIELD_CONTRACT })
   readonly description?: string;
 }
 
@@ -91,11 +95,13 @@ export class UpdateRoleDto {
   @MinLength(MIN_ROLE_NAME_LENGTH)
   @MaxLength(MAX_ROLE_NAME_LENGTH)
   @Transform(trimIfString)
+  @NoEmoji()
   readonly name?: string;
 
   @IsOptional()
   @IsString()
   @MaxLength(MAX_ROLE_DESCRIPTION_LENGTH)
+  @ApiPropertyOptional({ description: MARKDOWN_FIELD_CONTRACT })
   readonly description?: string;
 }
 

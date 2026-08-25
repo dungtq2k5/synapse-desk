@@ -15,7 +15,7 @@ import {
 } from '../utils';
 import { StorageService } from '../../src/modules/storage/storage.service';
 import { PURPOSE_POLICY } from '../../src/common/purpose-registry';
-import { VALIDATED_MIME_TYPES } from '../../src/common/content-signature';
+import { isValidatedMimeType } from '../../src/common/content-signature';
 
 /**
  * The cross-cutting storage sweeps.
@@ -294,11 +294,13 @@ describe('Storage boundary sweeps (e2e)', () => {
         Object.values(PURPOSE_POLICY).flatMap((p) => p.mimeAllowlist),
       );
 
-      expect(
-        [...allowed].filter(
-          (mime) => !(VALIDATED_MIME_TYPES as readonly string[]).includes(mime),
-        ),
-      ).toEqual([]);
+      // Now also a COMPILE error — `mimeAllowlist` is typed
+      // `ValidatedMimeType[]`, and that union is the allowlists themselves — so
+      // this runs the same question through the RUNTIME predicate, which is
+      // what a cast or a hand-widened `MATCHERS` would slip past.
+      expect([...allowed].filter((mime) => !isValidatedMimeType(mime))).toEqual(
+        [],
+      );
     });
 
     it('gives every purpose a DISTINCT prefix', () => {

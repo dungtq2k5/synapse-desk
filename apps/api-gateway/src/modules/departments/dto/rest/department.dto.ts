@@ -1,3 +1,5 @@
+import { NoEmoji } from '../../../../common/decorators/no-emoji.decorator';
+import { MARKDOWN_FIELD_CONTRACT } from '../../../../common/config/markdown-contract.config';
 import { Transform } from 'class-transformer';
 import {
   ArrayMaxSize,
@@ -11,7 +13,7 @@ import {
   MaxLength,
   MinLength,
 } from 'class-validator';
-import { OmitType, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiPropertyOptional, OmitType } from '@nestjs/swagger';
 import {
   DEFAULT_SEARCH,
   DEPARTMENT_MEMBER_SORTABLE_FIELDS,
@@ -78,11 +80,13 @@ export class CreateDepartmentDto {
   @MinLength(MIN_DEPARTMENT_NAME_LENGTH)
   @MaxLength(MAX_DEPARTMENT_NAME_LENGTH)
   @Transform(trimIfString)
+  @NoEmoji()
   readonly name!: string;
 
   @IsOptional()
   @IsString()
   @MaxLength(MAX_DEPARTMENT_DESCRIPTION_LENGTH)
+  @ApiPropertyOptional({ description: MARKDOWN_FIELD_CONTRACT })
   readonly description?: string;
 }
 
@@ -98,11 +102,13 @@ export class UpdateDepartmentDto {
   @MinLength(MIN_DEPARTMENT_NAME_LENGTH)
   @MaxLength(MAX_DEPARTMENT_NAME_LENGTH)
   @Transform(trimIfString)
+  @NoEmoji()
   readonly name?: string;
 
   @IsOptional()
   @IsString()
   @MaxLength(MAX_DEPARTMENT_DESCRIPTION_LENGTH)
+  @ApiPropertyOptional({ description: MARKDOWN_FIELD_CONTRACT })
   readonly description?: string;
 }
 

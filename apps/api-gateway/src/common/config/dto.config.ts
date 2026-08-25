@@ -173,8 +173,53 @@ export const MIN_ORGANIZATION_NAME_LENGTH = 2;
 export const MAX_ORGANIZATION_SLUG_LENGTH = 100;
 export const MIN_ORGANIZATION_SLUG_LENGTH = 2;
 
-/** Matches `organizations.domain` — `@db.VarChar(255)`. */
+/**
+ * The shape a slug must have: lowercase alphanumerics and hyphens.
+ *
+ * **A format rule, not a character exclusion.** Until this existed a slug had
+ * only a length bound, so a space, a `/`, an `@` or an emoji all passed — in a
+ * field that is `@unique` and reads like a URL segment.
+ *
+ * **Strict lowercase is safe because BOTH producers already lowercase.** A slug
+ * comes from a user through a DTO, or from `generateUniqueOrganizationSlug` at
+ * registration; the latter takes whatever `extractEmailDomain` returns, which
+ * does no lowercasing of its own — but every caller normalizes first
+ * (`normalizeEmail` in `auth.service.register`, `.toLowerCase()` in
+ * `firebase.service.verifyGoogleIdToken`). So `Bob@ACME.COM` yields `acme-com`,
+ * not `ACME-COM`.
+ *
+ * That safety lives in the CALL SITES rather than in the generator, which is
+ * the thing to know before adding a third one: a caller that forgets would
+ * write a slug this rule then rejects on the tenant's next `PATCH` — an account
+ * that cannot be edited without changing a field its admin never chose.
+ */
+export const ORGANIZATION_SLUG_PATTERN = /^[a-z0-9-]+$/;
+
+/** Matches `organizations.allowed_email_domains` — `@db.VarChar(255)`. */
 export const MAX_ORGANIZATION_DOMAIN_LENGTH = 255;
+
+/**
+ * The shape a domain must have: ASCII hostname labels, at least one dot.
+ *
+ * **A format rule, so emoji fall out as a side effect rather than as the
+ * target.** An emoji rule alone would be the same category error as putting one
+ * on `slug`: it refuses one bad class and leaves spaces, `@`, `/` and `..`
+ * accepted in a field compared against the domain half of an email address.
+ *
+ * **This is the only layer that validates.** auth-service normalizes —
+ * `.trim().toLowerCase()` in `platform.service.ts` and
+ * `organizations.service.ts` — but none of those sites is reachable by a
+ * `ValidationPipe`, so without this rule `🎉.COM ` was tidied and stored,
+ * leaving the field neat and meaningless.
+ *
+ * **ASCII only, which means punycode.** `münchen.de` is refused rather than
+ * accepted-and-mangled: nothing in the stack punycodes, so accepting the
+ * Unicode form would let one domain be stored two ways and match neither
+ * reliably. IDN needs the conversion to happen BEFORE the comparison, not a
+ * wider pattern here.
+ */
+export const ORGANIZATION_DOMAIN_PATTERN =
+  /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/;
 
 /**
  * How many domains one tenant may allow for self-signup.
