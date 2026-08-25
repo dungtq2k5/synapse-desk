@@ -40,6 +40,13 @@ graph LR
 
 Dashed edges are unenforced references. Solid edges are stores with no schema at all, so nothing there cascades either — a deleted `Document` row leaves its vectors and its object behind unless the deleting code removes them.
 
+**Two of those solid edges have a detector.** `document_chunks` carries four denormalized scope columns that the lexical retrieval arm filters on, and `ScopeWriterService.apply()` keeps them in step by writing Postgres *and* Qdrant — two stores that cannot share a transaction. Its ordering makes each partial failure fail safely in one direction, but nothing checked that the second write landed, so every failure mode left a durable, silent inconsistency. The hourly `scope-reconcile` job is that check:
+
+- **Repair goes through `apply()`, never a second writer.** A second implementation of the comparison is a second thing that can disagree with the first, and a sweep that repaired what the fan-out considers fine would fight it forever. The SQL is only a *candidate filter* — a false candidate costs one verdict call and is dropped; what it must never do is **miss** a drifting document, because nothing downstream would look at it again.
+- **Chunks wider than the truth are reported separately**, not averaged into a maintenance number. A restriction whose chunk write failed leaves the lexical arm answering with the old, wider scope — someone retrieves a document they were removed from. That is an access-control failure that was being served, and it reads as a statistic if you total it with the rest.
+- **`organization_id` mismatches are reported and never repaired.** A chunk disagreeing with its document about which tenant it belongs to is not drift to smooth over.
+- **The run is capped and says so.** Repair is a Qdrant write plus a chunk `updateMany` per document, so an unbounded run over a large drift set is the sweep becoming the incident. Anything past the cap is reported and picked up next hour — never silently truncated.
+
 **The corpus is documents-only.** No ticket text is ever embedded into Qdrant; `Chunk` rows carry the `document_id` that vectors point back to. A ticket becomes retrievable only by being written up as a knowledge document.
 
 ---
@@ -70,7 +77,7 @@ flowchart TD
   RETR -->|"no · Summarize, Classify"| ATT
   DOCS -->|"Search stops here"| OUT
   DOCS --> ATT{Attachments<br/>on this surface?}
-  ATT -->|yes| PARTS[Eligible parts fetched<br/>after row-level filtering]
+  ATT -->|yes| PARTS[Eligible parts<br/>bytes fetched, or extracted_text<br/>sent as a text part]
   ATT -->|no| PROMPT
   PARTS --> PROMPT[Prompt assembly<br/>every untrusted span<br/>inside a per-request nonce]
   PROMPT --> GEN[Generate · book to the ledger<br/>estimated_cost_micros]
@@ -134,6 +141,24 @@ Three surfaces take attachments and each selects a different message, because ea
 `Classify` is the deliberate exception: a refused opening message is still the opening message, and routing a ticket is not answering its author. The other two follow [ADR 0030](../decisions/0030-refused-turns-exclude-their-attachments.md) — exclusion is **per turn, not per file**, and it reaches the files and not only the text. A user who sends injection text plus a screenshot has both dropped.
 
 Eligibility is decided from the row — mime type and `fileSizeBytes` — before any download. A caller that fetched first and filtered after would pay for every zip anyone ever attached.
+
+### Three ways an attachment reaches the model
+
+Of the **12 storable** MIME types, 9 are natively AI-eligible and 2 more are *parse-eligible*. That is three branches, not two:
+
+| Attachment | What is sent |
+| :---- | :---- |
+| Natively AI-eligible (`png`, `jpeg`, `webp`, `heic`, `heif`, `pdf`, `plain`, `markdown`, `csv`) | the bytes, downloaded per turn |
+| Parse-eligible (`docx`, `xlsx`) **with** `extracted_text` | the **text**, as a part — no download at all |
+| Anything else, or `extracted_text` NULL/empty | **skipped**, reported to the user by name |
+
+The middle row removes a runtime dependency: those attachments stop being fetched from storage on every AI turn, so "the object is missing from Firebase" disappears for them rather than being handled. Extraction runs **once**, at `POST .../attachments/confirm`, into `message_attachments.extracted_text` (RDM Table 15) — a workbook's sheets live inside that markdown as `## Sheet: …` headings, so nothing downstream branches on format.
+
+**It is sent as a part, never concatenated into the message content**, and that is a security property rather than a style choice. Inlining would change what `MAX_MESSAGE_CONTENT_LENGTH` bounds, pollute the transcript later reformulations read, and — the one that matters — make the injection classifier see file content as *user-typed text*, losing the exact distinction the attachment note draws: an instruction written **inside** a file is an injection attempt just as much as one typed in the message. Kept as a part, the existing Layer A/B defence applies unchanged.
+
+Parsing does widen the attack surface: a `.docx` could not reach the model at all before, so a docx-borne injection had no path. Not a new class — PDF and txt already carry it — but a quieter carrier, in white footer text, a hidden column, a comment. Nobody glancing at the file sees it.
+
+**`.doc` is deliberately not in either eligible list.** It is storable as an attachment and nothing parses it, and it was *removed* from the document pipeline entirely — a real `.doc` is an OLE compound file, not a zip, so the parser fails with a bare error that costs three retries. `image/gif` is not storable at all: Gemini does not support it, so it was removed rather than demoted.
 
 ---
 
