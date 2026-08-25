@@ -213,6 +213,86 @@ class TestOrdering:
             "REFORMULATION",
         ]
 
+    async def test_a_message_that_CARRIED_a_file_is_never_a_greeting(
+        self, generator, ledger, settings, budget
+    ):
+        """The case doc 56 makes common, and the one nobody writes.
+
+        `parts` is what SURVIVED — eligibility, the size budget, and now text
+        extraction. Keying the greeting short-circuit on it means the rule
+        "a message carrying an attachment is not a greeting, whatever its text"
+        holds only while skips are rare. A failed `.docx` extraction sends zero
+        parts, so "hi" plus an unreadable file took the short-circuit and got a
+        canned reply for a message that carried a file.
+
+        `attachment_count=1` with NO parts is exactly that state, and it is one
+        a happy-path fixture never produces.
+        """
+        generator.answers = ["FACTUAL", "hi"]
+        pipeline = PreprocessPipeline(generator, ledger, NullQuota())
+
+        result = await pipeline.run(
+            "hi",
+            [],
+            settings,
+            budget=budget,
+            attachments=[],
+            attachment_count=1,
+        )
+
+        assert result.reply is None, "a canned greeting ignored the attached file"
+        # And it cost the classification, which is the deliberate price: one
+        # cheap-tier call for the rare "thanks!" + file.
+        assert [entry.purpose for entry in ledger.entries] != []
+
+    async def test_a_bare_greeting_with_NO_file_still_costs_nothing(
+        self, generator, ledger, settings, budget
+    ):
+        """The other half of the pair, and what stops the fix overreaching.
+
+        Suppressing on presence must not become suppressing always: a greeting
+        with no attachment is still free, still answered at the cap, and still
+        short-circuits before any model call. Without this, a change that simply
+        deleted the short-circuit would pass the test above.
+        """
+        pipeline = PreprocessPipeline(generator, ledger, NullQuota())
+
+        result = await pipeline.run(
+            "hi",
+            [],
+            settings,
+            budget=budget,
+            attachments=[],
+            attachment_count=0,
+        )
+
+        assert result.reply is not None
+        assert ledger.entries == []
+        assert generator.prompts == []
+
+    async def test_parts_without_a_count_still_suppress_the_greeting(
+        self, generator, ledger, settings, budget
+    ):
+        """A caller that sends parts and forgets the count.
+
+        `attachment_count` defaults to 0 so `Ask` — which has no files and wants
+        the short-circuit — needs no change. That default is also how a caller
+        could re-open the exact hole this closes, so the floor is
+        `len(parts)` rather than the parameter alone.
+        """
+        generator.answers = ["FACTUAL", "hi"]
+        pipeline = PreprocessPipeline(generator, ledger, NullQuota())
+
+        result = await pipeline.run(
+            "hi",
+            [],
+            settings,
+            budget=budget,
+            attachments=[SCREENSHOT],
+        )
+
+        assert result.reply is None
+
     async def test_only_the_CURRENT_message_attachments_are_ever_sent(
         self, generator, ledger, settings, budget
     ):

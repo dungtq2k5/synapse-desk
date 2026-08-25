@@ -142,6 +142,21 @@ export interface ChatRequest {
    * it?" without seeing a pixel.
    */
   attachments: AttachmentPart[];
+  /**
+   * How many attachments the message CARRIED, including ones that did not
+   * become parts.
+   *
+   * **`attachments` answers "what survived"; this answers "was there a file".**
+   * The greeting check needs the second: a user who attaches an unreadable
+   * spreadsheet and types "hi" sends zero parts, and a rule keyed on parts
+   * calls that a greeting and never looks at what they sent. `pipeline.py`
+   * states the rule as "a message carrying an attachment is not a greeting,
+   * WHATEVER its text" -- this is what makes that true when extraction failed,
+   * which doc 56 makes the common case.
+   *
+   * Always >= the length of `attachments`. Zero means no file at all.
+   */
+  attachmentCount: number;
 }
 
 export interface Citation {

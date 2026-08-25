@@ -150,6 +150,8 @@ export type AiStatSums = {
   latencyCount: number;
   failures: number;
   emptyRetrievals: number;
+  attachmentGenerations: number;
+  attachmentEmptyRetrievals: number;
   draftsAccepted: number;
   draftsEdited: number;
   draftsDiscarded: number;
@@ -174,13 +176,42 @@ export function draftAcceptanceRate(stats: AiStatSums): Rate {
 }
 
 /**
- * The share of answering generations that retrieved NOTHING.
+ * The share of ATTACHMENT-FREE answering generations that retrieved nothing.
  *
  * The knowledge-gap headline: a question the corpus could not answer is a
  * content backlog item, not an error, and it appears in no other counter.
+ *
+ * **The attachment-grounded slice is subtracted out, and the reason is the
+ * INFERENCE rather than the count.** Those rows are not factually wrong —
+ * retrieval ran and returned nothing. What is wrong is what the rate is read to
+ * mean: "the corpus is failing to answer questions it should answer". A
+ * customer asking about their own invoice is asking something the corpus was
+ * never expected to answer, so counting it conflates *the corpus had nothing*
+ * with *the corpus should have had something*.
+ *
+ * Those rows are not discarded — {@link attachmentGroundedRate} reports them —
+ * because "how many answers came from user files" is the signal that says a
+ * corpus is being routed around, and excluding it silently makes that
+ * invisible.
  */
 export function emptyRetrievalRate(stats: AiStatSums): Rate {
-  return rateOf(stats.emptyRetrievals, stats.generations);
+  return rateOf(
+    stats.emptyRetrievals - stats.attachmentEmptyRetrievals,
+    stats.generations - stats.attachmentGenerations,
+  );
+}
+
+/**
+ * The share of answering generations that were given an attachment.
+ *
+ * **The half that would otherwise be thrown away.** Excluding attachment-
+ * grounded answers from the gap rate fixes the rate and loses a real number: a
+ * corpus being routed around looks identical to a corpus nobody is asking
+ * about. Reported beside the rate rather than folded into it, because they
+ * answer different questions.
+ */
+export function attachmentGroundedRate(stats: AiStatSums): Rate {
+  return rateOf(stats.attachmentGenerations, stats.generations);
 }
 
 export function failureRate(stats: AiStatSums): Rate {
@@ -224,6 +255,8 @@ export const EMPTY_AI_STATS: AiStatSums = {
   latencyCount: 0,
   failures: 0,
   emptyRetrievals: 0,
+  attachmentGenerations: 0,
+  attachmentEmptyRetrievals: 0,
   draftsAccepted: 0,
   draftsEdited: 0,
   draftsDiscarded: 0,
@@ -269,6 +302,10 @@ export function addAiStats(left: AiStatSums, right: AiStatSums): AiStatSums {
     latencyCount: left.latencyCount + right.latencyCount,
     failures: left.failures + right.failures,
     emptyRetrievals: left.emptyRetrievals + right.emptyRetrievals,
+    attachmentGenerations:
+      left.attachmentGenerations + right.attachmentGenerations,
+    attachmentEmptyRetrievals:
+      left.attachmentEmptyRetrievals + right.attachmentEmptyRetrievals,
     draftsAccepted: left.draftsAccepted + right.draftsAccepted,
     draftsEdited: left.draftsEdited + right.draftsEdited,
     draftsDiscarded: left.draftsDiscarded + right.draftsDiscarded,

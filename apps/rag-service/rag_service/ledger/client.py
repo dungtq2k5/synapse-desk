@@ -43,6 +43,15 @@ class GenerationEntry:
     content: str | None = None
     retrieved_chunk_ids: list[str] = field(default_factory=list)
     cited_chunk_ids: list[str] = field(default_factory=list)
+    #: How many attachment PARTS the generation was given.
+    #:
+    #: The axis `empty_retrieval_rate` was missing. An answer grounded in a
+    #: user's own file retrieves nothing correctly -- the corpus was never the
+    #: intended source -- and without this the row is indistinguishable from one
+    #: where the corpus should have answered and did not.
+    #:
+    #: Parts, not files attached: a skipped attachment did not ground anything.
+    attachment_count: int = 0
 
 
 class LedgerClient:
@@ -86,6 +95,7 @@ class LedgerClient:
             status=entry.status,
             retrieved_chunk_ids=entry.retrieved_chunk_ids,
             cited_chunk_ids=entry.cited_chunk_ids,
+            attachment_count=entry.attachment_count,
         )
         if entry.user_id:
             request.user_id = entry.user_id

@@ -30,19 +30,18 @@ message CurrentUserResponse {
 // `is_locked` / roles / departments are administrative. A field added here is a
 // field a user can set about themselves -- which is the whole security question
 // this message answers.
+//
+// **`avatar_url` is absent and must stay absent.** A settable string here would
+// bypass presign -> upload -> confirm entirely: it proves nothing about whether
+// the object exists or belongs to the caller, emits no USER_AVATAR_UPDATED, and
+// supersedes no previous object, which then leaks in the bucket forever.
+// `ConfirmAvatarUpload` and `DeleteAvatar` are the only writers of
+// `users.avatar_url`, and `users.service.ts` has exactly those two.
 message UpdateOwnProfileRequest {
   optional string full_name = 1;
   // ISO 'YYYY-MM-DD'. Empty string clears it; absent leaves it unchanged.
   optional string dob = 2;
   optional Gender gender = 3;
-
-  // 4 was `avatar_url`. A writable avatar_url here bypassed the whole
-  // presign -> upload -> confirm flow: it accepted any string, so it never
-  // proved the object existed or belonged to the caller, never emitted
-  // USER_AVATAR_UPDATED, and never superseded the previous object (which then
-  // leaked in the bucket forever). ConfirmAvatarUpload is the only writer.
-  reserved 4;
-  reserved "avatar_url";
 }
 
 // ---------------------------------------------------------------------------
@@ -215,18 +214,17 @@ message CreateUserResponse {
 // `email` is tenant-unique and needs re-verification, `is_email_verified` is
 // what OTP is for, and `is_super_admin` is paired with organization_id by a
 // CHECK constraint that flipping it here would violate.
+//
+// **`avatar_url` is absent here too**, and the argument on
+// UpdateOwnProfileRequest applies with a wider blast radius: an administrator
+// setting another user's avatar to an arbitrary string is the same bypass aimed
+// at somebody else's profile.
 message UpdateUserRequest {
   string id = 1;
   optional string full_name = 2;
   optional string phone_number = 3;
   optional string dob = 4;
   optional Gender gender = 5;
-
-  // 6 was `avatar_url` — removed for the reason given on
-  // UpdateOwnProfileRequest. An administrator setting another user's avatar to
-  // an arbitrary string was the same hole with a wider blast radius.
-  reserved 6;
-  reserved "avatar_url";
 }
 
 message DeleteUserResponse {

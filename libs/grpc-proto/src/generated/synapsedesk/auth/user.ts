@@ -34,6 +34,13 @@ export interface CurrentUserResponse {
  * `is_locked` / roles / departments are administrative. A field added here is a
  * field a user can set about themselves -- which is the whole security question
  * this message answers.
+ *
+ * **`avatar_url` is absent and must stay absent.** A settable string here would
+ * bypass presign -> upload -> confirm entirely: it proves nothing about whether
+ * the object exists or belongs to the caller, emits no USER_AVATAR_UPDATED, and
+ * supersedes no previous object, which then leaks in the bucket forever.
+ * `ConfirmAvatarUpload` and `DeleteAvatar` are the only writers of
+ * `users.avatar_url`, and `users.service.ts` has exactly those two.
  */
 export interface UpdateOwnProfileRequest {
   fullName?:
@@ -231,6 +238,11 @@ export interface CreateUserResponse {
  * `email` is tenant-unique and needs re-verification, `is_email_verified` is
  * what OTP is for, and `is_super_admin` is paired with organization_id by a
  * CHECK constraint that flipping it here would violate.
+ *
+ * **`avatar_url` is absent here too**, and the argument on
+ * UpdateOwnProfileRequest applies with a wider blast radius: an administrator
+ * setting another user's avatar to an arbitrary string is the same bypass aimed
+ * at somebody else's profile.
  */
 export interface UpdateUserRequest {
   id: string;

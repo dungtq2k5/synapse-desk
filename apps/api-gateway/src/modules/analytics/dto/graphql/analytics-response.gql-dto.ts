@@ -270,9 +270,27 @@ export class KnowledgeGapsResponseGqlDto {
    * `emptyRetrievals` alone is a number nobody can act on: fifty empty
    * retrievals out of sixty is a broken knowledge base and out of fifty
    * thousand is noise.
+   *
+   * Over ATTACHMENT-FREE answering generations only: a question about a user's
+   * own file retrieved nothing correctly, and is not a gap in the corpus.
    */
   @Field(() => RateResponseGqlDto)
   emptyRetrievalRate!: RateResponseGqlDto;
+
+  /**
+   * How many answering generations were given a file.
+   *
+   * **Reported rather than hidden.** Excluding attachment-grounded answers from
+   * the rate above fixes the rate and would throw away the signal that says a
+   * corpus is being routed around — which is a content-strategy finding, not a
+   * rounding error.
+   */
+  @Field(() => RateResponseGqlDto)
+  attachmentGroundedRate!: RateResponseGqlDto;
+
+  /** The part of `emptyRetrievals` the rate above excludes. */
+  @Field(() => Int)
+  attachmentEmptyRetrievals!: number;
 
   @Field(() => [KnowledgeGapFlagResponseGqlDto])
   flags!: KnowledgeGapFlagResponseGqlDto[];

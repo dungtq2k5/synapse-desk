@@ -65,7 +65,16 @@ export function toChatRequest(dto: KnowledgeAskDto): ChatRequest {
   // `attachments` is empty and cannot be otherwise: an ask has no ticket and no
   // message, so there is nothing to attach. `rag-service`'s `Ask` says the same
   // — the field is on `ChatRequest` for the chat path.
-  return { message: dto.message, history: [], attachments: [] };
+  //
+  // `attachmentCount: 0` for the same reason, and it is not a placeholder: the
+  // greeting short-circuit is CORRECT here. "hi" typed into the help centre
+  // carries no file and should cost nothing.
+  return {
+    message: dto.message,
+    history: [],
+    attachments: [],
+    attachmentCount: 0,
+  };
 }
 
 /** Converts a `ChatResponse` off the wire into its REST DTO. */

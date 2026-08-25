@@ -241,7 +241,16 @@ export const MAX_FLAG_RESOLUTION_COMMENT_LENGTH = 2_000;
  */
 export const ALLOWED_DOCUMENT_MIME_TYPES = [
   'application/pdf',
-  'application/msword',
+  // **No `application/msword`, and it is not an omission.** Legacy `.doc` is an
+  // OLE2 compound binary; mammoth reads OOXML and throws `Can't find end of
+  // central directory : is this a zip file ?` on a genuine Word 97-2003 file.
+  // That is a bare `Error`, so it misses the deterministic-refusal arm and
+  // costs `attempts: 3` — three download-and-parse cycles to reach a message
+  // about zip files in a tenant's `error_log`.
+  //
+  // It stays in `ALLOWED_ATTACHMENT_MIME_TYPES`: storable, downloadable, never
+  // parsed. Refusing at presign is the honest answer, and it is the one place
+  // the refusal can carry a message a person can act on.
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   'text/plain',
   'text/markdown',

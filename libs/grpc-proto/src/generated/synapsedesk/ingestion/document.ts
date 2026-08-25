@@ -70,8 +70,20 @@ export enum DocumentFileType {
   DOCUMENT_FILE_TYPE_TXT = 2,
   DOCUMENT_FILE_TYPE_MD = 3,
   DOCUMENT_FILE_TYPE_BIN = 4,
-  DOCUMENT_FILE_TYPE_DOC = 5,
-  DOCUMENT_FILE_TYPE_DOCX = 6,
+  /**
+   * DOCUMENT_FILE_TYPE_DOCX - `.doc` held 5 and was removed: `application/msword` left
+   * `ALLOWED_DOCUMENT_MIME_TYPES` because mammoth reads OOXML and a Word
+   * 97-2003 file is an OLE2 compound binary, so no document can be filed under
+   * it. It stays ATTACHABLE, which is a different list entirely.
+   *
+   * The number was reused rather than reserved. `reserved` protects a deployed
+   * client that still encodes the old value; nothing is deployed, and the
+   * column this maps to stores the EXTENSION as text — `documents.file_type` is
+   * a `VarChar` holding `docx`, never the wire number — so no stored row moves
+   * either. A gap here would be a monument to a compatibility problem that
+   * cannot occur.
+   */
+  DOCUMENT_FILE_TYPE_DOCX = 5,
   UNRECOGNIZED = -1,
 }
 
@@ -522,6 +534,45 @@ export interface IngestionJobIdRequest {
   id: string;
 }
 
+/**
+ * Extract the markdown from ONE stored object, for a caller that owns the file
+ * but not a parser.
+ *
+ * ticket-service's attachments, and it is the only caller. The parser lives
+ * here; lifting mammoth and a spreadsheet library into a shared package would
+ * put them in every service that imports it, to serve one.
+ *
+ * The OBJECT PATH, never the bytes. storage-service already streams to whoever
+ * asks and checks the tenant against the path while doing it, so re-sending up
+ * to 10 MB through this hop would buy nothing and cost a second copy of the
+ * tenant check.
+ */
+export interface ExtractAttachmentTextRequest {
+  objectPath: string;
+  /**
+   * What to parse it AS. Read back from the object at confirm, never declared
+   * by the client.
+   */
+  mimeType: string;
+}
+
+export interface ExtractAttachmentTextResponse {
+  /**
+   * Markdown, already truncated to `MAX_EXTRACTED_TEXT_CHARS`.
+   *
+   * **Empty is a real answer, not a failure**: a file that parsed to nothing is
+   * a different fact from one nobody tried to parse, and only the caller's
+   * column can hold the second. A failure is an RPC error.
+   */
+  markdown: string;
+  /**
+   * True when the cap trimmed something. The caller does not act on it — the
+   * marker is already IN `markdown`, where the model reads it — but a count of
+   * truncated attachments is the kind of thing an operator asks for later.
+   */
+  truncated: boolean;
+}
+
 export interface CancelIngestionJobResponse {
   cancelled: boolean;
 }
@@ -594,6 +645,17 @@ export interface DocumentServiceClient {
   deleteDocumentFlag(request: DocumentFlagIdRequest, metadata?: Metadata): Observable<DeleteDocumentFlagResponse>;
 
   getStorageUsage(request: DocumentIdRequest, metadata?: Metadata): Observable<StorageUsageResponse>;
+
+  /**
+   * Parse-as-a-service for ticket attachments. On this service because the
+   * parser is, and because the alternative is mammoth in every service that
+   * imports `@synapsedesk/common`.
+   */
+
+  extractAttachmentText(
+    request: ExtractAttachmentTextRequest,
+    metadata?: Metadata,
+  ): Observable<ExtractAttachmentTextResponse>;
 
   /**
    * On this service rather than its own: a second service would need a second
@@ -757,6 +819,17 @@ export interface DocumentServiceController {
   ): Promise<StorageUsageResponse> | Observable<StorageUsageResponse> | StorageUsageResponse;
 
   /**
+   * Parse-as-a-service for ticket attachments. On this service because the
+   * parser is, and because the alternative is mammoth in every service that
+   * imports `@synapsedesk/common`.
+   */
+
+  extractAttachmentText(
+    request: ExtractAttachmentTextRequest,
+    metadata?: Metadata,
+  ): Promise<ExtractAttachmentTextResponse> | Observable<ExtractAttachmentTextResponse> | ExtractAttachmentTextResponse;
+
+  /**
    * On this service rather than its own: a second service would need a second
    * client, a second health entry and a second registration for five methods
    * that share a database and a permission family.
@@ -820,6 +893,7 @@ export function DocumentServiceControllerMethods() {
       "resolveDocumentFlag",
       "deleteDocumentFlag",
       "getStorageUsage",
+      "extractAttachmentText",
       "listIngestionJobs",
       "getIngestionJob",
       "retryIngestionJob",

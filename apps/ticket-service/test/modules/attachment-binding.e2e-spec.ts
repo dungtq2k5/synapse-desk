@@ -12,6 +12,7 @@ import {
 } from '../factories';
 import { memberContext } from '../utils/context';
 import { MessagesService } from '../../src/modules/messages/messages.service';
+import { AttachmentExtractorClient } from '../../src/modules/ai-client/attachment-extractor.client';
 import { StorageReferenceService } from '../../src/modules/storage-client/storage-reference.service';
 
 /**
@@ -35,7 +36,9 @@ describe('Attachments bound at message create (e2e)', () => {
   let storage: StorageReferenceService;
   let confirmUpload: jest.SpyInstance;
   let presign: jest.SpyInstance;
+  let extract: jest.SpyInstance;
   let tenant: TenantFixture;
+  let extractor: AttachmentExtractorClient;
 
   const caller = () =>
     memberContext({ id: tenant.userId, organizationId: tenant.organizationId });
@@ -49,6 +52,7 @@ describe('Attachments bound at message create (e2e)', () => {
     fx = await bootstrapE2eTest();
     messages = fx.moduleRef.get(MessagesService);
     storage = fx.moduleRef.get(StorageReferenceService);
+    extractor = fx.moduleRef.get(AttachmentExtractorClient);
   }, 30_000);
 
   beforeEach(async () => {
@@ -67,6 +71,10 @@ describe('Attachments bound at message create (e2e)', () => {
       objectPath: 'organizations/o/tickets/t/attachments/f.png',
       expiresAt: new Date(),
     });
+    // ingestion-service is a peer and is not running for this suite. The
+    // default confirms `image/png`, which is not parse-eligible, so this stays
+    // uncalled unless a test asks for a `.docx`.
+    extract = jest.spyOn(extractor, 'extract');
   });
 
   afterEach(() => jest.restoreAllMocks());
@@ -228,6 +236,151 @@ describe('Attachments bound at message create (e2e)', () => {
 
     expect(message?.attachments.map((a) => a.fileName)).toEqual(['good.png']);
     expect(skippedAttachments).toEqual(['stale.png']);
+  });
+
+  describe('text extraction at confirm', () => {
+    const DOCX =
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+    const asDocx = () =>
+      confirmUpload.mockResolvedValue({
+        objectPath: 'organizations/o/tickets/t/attachments/committed.docx',
+        sizeBytes: 2048,
+        contentType: DOCX,
+      });
+
+    it('**6. a parse-eligible attachment is extracted through THIS path**', async () => {
+      // The hook is in `confirmNewAttachments`, which both attachment routes
+      // reach — and this is the nested one, which is what INBOUND EMAIL uses:
+      // the Worker presigns, PUTs the bytes and sends paths, and they are
+      // confirmed here as the message is written.
+      //
+      // Hooking `confirmAttachment` alone would have left every emailed office
+      // attachment unextracted, permanently and silently, on the surface with
+      // the least authentication behind it.
+      asDocx();
+      extract.mockResolvedValue('## Quote\n\nTotal: 42');
+      const ticket = await createTicket(fx.prisma, tenant);
+
+      const { message } = await messages.createMessage(
+        {
+          ticketId: ticket.id,
+          content: 'see attached',
+          isInternalNote: false,
+          invokeAi: false,
+          attachments: [uploaded('quote.docx')],
+        },
+        caller(),
+      );
+
+      const [row] = await fx.prisma.messageAttachment.findMany({
+        where: { messageId: message?.id },
+      });
+      expect(row.extractedText).toBe('## Quote\n\nTotal: 42');
+      // The CONFIRMED path and the CONFIRMED type — never what the client
+      // declared, which is the same rule the columns beside it follow.
+      expect(extract).toHaveBeenCalledWith(
+        'organizations/o/tickets/t/attachments/committed.docx',
+        DOCX,
+        expect.anything(),
+      );
+    });
+
+    it('**7. a failed extraction stores NULL and the confirm still succeeds**', async () => {
+      // The trade the optional client already documents: an unset URL "makes
+      // the outcome write fail and be logged, which costs a metric — not a
+      // reply." An attachment the model cannot read is still a perfectly good
+      // attachment for a human, and refusing the upload over it would be the
+      // wrong direction.
+      //
+      // NULL rather than `''`: nothing was successfully extracted, and `''`
+      // means a parser ran and the file genuinely had no text. Only a nullable
+      // column can hold both.
+      asDocx();
+      extract.mockResolvedValue(null);
+      const ticket = await createTicket(fx.prisma, tenant);
+
+      const { message, skippedAttachments } = await messages.createMessage(
+        {
+          ticketId: ticket.id,
+          content: 'see attached',
+          isInternalNote: false,
+          invokeAi: false,
+          attachments: [uploaded('broken.docx')],
+        },
+        caller(),
+      );
+
+      // The file is NOT skipped — it stored fine, it is downloadable, and only
+      // the model's view of it was lost.
+      expect(skippedAttachments).toEqual([]);
+      expect(message?.attachments).toHaveLength(1);
+
+      const [row] = await fx.prisma.messageAttachment.findMany({
+        where: { messageId: message?.id },
+      });
+      expect(row.extractedText).toBeNull();
+    });
+
+    it('**7. a corrupt workbook stores NULL and the confirm still succeeds**', async () => {
+      // Doc 57's second format through doc 56 §B2's rule, and the chain matters:
+      // exceljs THROWS on a file that is not a zip rather than yielding zero
+      // sheets. Zero sheets would produce `''`, which means "a parser ran and
+      // the file had no text" — the one state that must stay distinct from
+      // "nothing was extracted".
+      //
+      // The throw becomes an `INTERNAL` rpc error, which the client swallows
+      // into `null`. The attachment still stores, still downloads, and the user
+      // loses only the model's view of it.
+      confirmUpload.mockResolvedValue({
+        objectPath: 'organizations/o/tickets/t/attachments/committed.xlsx',
+        sizeBytes: 4096,
+        contentType:
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
+      extract.mockResolvedValue(null);
+      const ticket = await createTicket(fx.prisma, tenant);
+
+      const { message, skippedAttachments } = await messages.createMessage(
+        {
+          ticketId: ticket.id,
+          content: 'the numbers',
+          isInternalNote: false,
+          invokeAi: false,
+          attachments: [uploaded('corrupt.xlsx')],
+        },
+        caller(),
+      );
+
+      expect(skippedAttachments).toEqual([]);
+      expect(message?.attachments).toHaveLength(1);
+
+      const [row] = await fx.prisma.messageAttachment.findMany({
+        where: { messageId: message?.id },
+      });
+      expect(row.extractedText).toBeNull();
+    });
+
+    it('**8. a type with no parser never costs a round trip**', async () => {
+      // The eligibility check is on THIS side. Asking ingestion-service about a
+      // `.png` would be a network hop to be told what
+      // `PARSE_ELIGIBLE_MIME_TYPES` already says — the same filter-then-fetch
+      // ordering the feed path is built on.
+      const ticket = await createTicket(fx.prisma, tenant);
+
+      await messages.createMessage(
+        {
+          ticketId: ticket.id,
+          content: 'a screenshot',
+          isInternalNote: false,
+          invokeAi: false,
+          attachments: [uploaded('error.png')],
+        },
+        caller(),
+      );
+
+      expect(extract).not.toHaveBeenCalled();
+    });
   });
 
   it('4. **no transaction is OPEN while a confirm is in flight**', async () => {

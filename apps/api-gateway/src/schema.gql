@@ -170,6 +170,8 @@ type KnowledgeGapFlag {
 
 type KnowledgeGaps {
   answeringGenerations: Int!
+  attachmentEmptyRetrievals: Int!
+  attachmentGroundedRate: Rate!
   dataThrough: String
   emptyRetrievalRate: Rate!
   emptyRetrievals: Int!

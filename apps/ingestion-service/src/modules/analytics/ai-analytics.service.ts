@@ -11,6 +11,7 @@ import {
   ANALYTICS_TOP_N,
   draftAcceptanceRate,
   EMPTY_AI_STATS,
+  attachmentGroundedRate,
   emptyRetrievalRate,
   failureRate,
   MAX_ANALYTICS_RANGE_DAYS,
@@ -170,7 +171,14 @@ export class AiAnalyticsService {
     return {
       emptyRetrievals: totals.emptyRetrievals,
       answeringGenerations: totals.generations,
+      // Attachment-free only. `emptyRetrievals` above stays the TOTAL, so the
+      // two numbers are readable together rather than one silently redefining
+      // the other.
       emptyRetrievalRate: toAiRateValue(emptyRetrievalRate(totals)),
+      // **Reported, not excluded.** Dropping these rows would fix the rate and
+      // lose the number that says a corpus is being routed around.
+      attachmentGroundedRate: toAiRateValue(attachmentGroundedRate(totals)),
+      attachmentEmptyRetrievals: totals.attachmentEmptyRetrievals,
       flags: flags.map((flag) => ({
         documentId: flag.documentId,
         documentTitle: flag.document.title,
@@ -299,6 +307,8 @@ export class AiAnalyticsService {
       latencyCount: row.latencyCount,
       failures: row.failures,
       emptyRetrievals: row.emptyRetrievals,
+      attachmentGenerations: row.attachmentGenerations,
+      attachmentEmptyRetrievals: row.attachmentEmptyRetrievals,
       draftsAccepted: row.draftsAccepted,
       draftsEdited: row.draftsEdited,
       draftsDiscarded: row.draftsDiscarded,

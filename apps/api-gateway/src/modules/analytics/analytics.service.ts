@@ -269,6 +269,12 @@ export class AnalyticsService {
           numerator: gaps?.emptyRetrievalRate?.numerator ?? 0,
           denominator: gaps?.emptyRetrievalRate?.denominator ?? 0,
         },
+        attachmentGroundedRate: {
+          rate: gaps?.attachmentGroundedRate?.rate ?? null,
+          numerator: gaps?.attachmentGroundedRate?.numerator ?? 0,
+          denominator: gaps?.attachmentGroundedRate?.denominator ?? 0,
+        },
+        attachmentEmptyRetrievals: gaps?.attachmentEmptyRetrievals ?? 0,
         // Mapped rather than passed through: `flags` is the raw wire shape,
         // and its `flagType` is a numeric proto enum that would otherwise reach
         // a JSON response as an integer.

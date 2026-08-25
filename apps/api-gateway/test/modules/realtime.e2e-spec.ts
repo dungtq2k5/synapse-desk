@@ -931,6 +931,42 @@ describe('the real-time relay (e2e)', () => {
       await done;
     });
 
+    it('**…and `chat()` is told a file was CARRIED, not just what survived**', async () => {
+      // The half the test above cannot see. It asserts the USER is told; this
+      // asserts the MODEL SERVICE is, and they are different channels with
+      // different consequences.
+      //
+      // `pipeline.py` short-circuits a greeting before any model call, and it
+      // used to key that on the parts it received — so "hi" plus a file nothing
+      // could read arrived as zero parts, matched the greeting patterns, and
+      // returned a canned "Hi!" for a message that carried an attachment. The
+      // count is what tells it the difference, and it has been in hand here
+      // since `getAiAttachments` returned.
+      //
+      // Zero parts and one skip is exactly the state doc 56 makes routine: a
+      // `.docx` whose extraction failed.
+      const author = await fx.connectClient({ sub: authorId, organizationId });
+      const { subject } = controllable();
+      fx.stubs.message.getAiAttachments.mockReturnValue(
+        of({ parts: [], skipped: ['quote.docx'] }),
+      );
+
+      const done = waitForEvent(author, REALTIME_EVENTS.aiStreamDone);
+      await askFrom(author);
+      subject.next(completion());
+      subject.complete();
+      await done;
+
+      const [[request]] = fx.stubs.rag.chat.mock.calls;
+      const sent = request as {
+        attachments: unknown[];
+        attachmentCount: number;
+      };
+
+      expect(sent.attachments).toEqual([]);
+      expect(sent.attachmentCount).toBe(1);
+    });
+
     it('3. **chunks reach ONLY the requesting socket**', async () => {
       // The room gets the message; the socket gets the stream. An agent
       // watching the thread has no use for another user's answer assembling

@@ -120,9 +120,22 @@ class PreprocessPipeline:
         budget: BudgetState,
         user_id: str | None = None,
         attachments: list[Attachment] | None = None,
+        attachment_count: int = 0,
     ) -> Preprocessed:
-        """Layer A → greeting Layer 1 → the FUSED Layer 2 → reformulation."""
+        """Layer A → greeting Layer 1 → the FUSED Layer 2 → reformulation.
+
+        `attachment_count` is what the message CARRIED; `attachments` is what
+        survived filtering. They differ whenever a file was ineligible, oversize
+        or failed extraction, and the greeting check is the one decision that
+        needs the first rather than the second.
+
+        It defaults to 0 for callers with no files at all — `Ask` — where the
+        greeting short-circuit is correct.
+        """
         parts = attachments or []
+        # Never below what actually arrived. A caller that sends parts and
+        # forgets the count would otherwise re-open the exact hole this closes.
+        carried = max(attachment_count, len(parts))
         # LAYER A — free, and before the greeting check rather than after it.
         #
         # `MAX_GREETING_WORDS` is 4 and the greeting patterns are prefix
@@ -152,11 +165,19 @@ class PreprocessPipeline:
         # text.** The cost is one cheap-tier call for the rare "thanks!" + file,
         # and the fused Layer 2 below decides that one with the image in view.
         #
+        # **Keyed on `carried`, not on `parts`, and that is the whole
+        # correction.** `parts` is what survived — eligibility, the size budget,
+        # and now extraction. Keying on it means the rule above holds only while
+        # skips are rare, and doc 56 makes a failed extraction a routine skip:
+        # "hi" plus an unreadable spreadsheet would send zero parts, take this
+        # short-circuit, and answer a message that carried a file with a canned
+        # "Hi!". The rule is about what the user SENT.
+        #
         # Otherwise unchanged: a greeting still costs nothing at all, is still
         # answered at the cap, and still short-circuits before the
         # classification — which is what makes Layer B free on this path
         #.
-        if not parts:
+        if not carried:
             match = detect_greeting_layer_one(message)
             if match is not None:
                 return self._greeting(match)
@@ -239,6 +260,14 @@ class PreprocessPipeline:
         # unread. Reformulation is where the image becomes searchable text, so
         # skipping it here is the difference between the feature working and the
         # feature appearing to work.
+        #
+        # **`parts`, NOT `carried`, and the asymmetry with the greeting check is
+        # deliberate.** That one asks "did the user send a file", because the
+        # answer decides whether a canned reply is honest. This one asks "is
+        # there a file to reformulate FROM" — and with nothing extracted there
+        # is nothing for the model to see, so keying it on presence would spend
+        # a cheap-tier call with the attachment out of view. Same word, two
+        # questions.
         if history or parts:
             query = await self._reformulate(
                 message, history, settings, budget, user_id, attachments=parts

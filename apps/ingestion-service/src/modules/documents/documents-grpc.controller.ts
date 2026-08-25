@@ -17,6 +17,8 @@ import {
   fromProtoDocumentFlagResolution,
   DocumentIdRequest,
   DocumentResponse,
+  ExtractAttachmentTextRequest,
+  ExtractAttachmentTextResponse,
   GetKnowledgeArticleRequest,
   KnowledgeArticleDetailResponse,
   ListKnowledgeArticlesRequest,
@@ -45,10 +47,12 @@ import {
   unpackCallerContext,
   UpdateDocumentRequest,
 } from '@synapsedesk/grpc-proto';
+import { requireTenant } from '@synapsedesk/common';
 import { DocumentsService } from './documents.service';
 import { IngestionJobsService } from '../ingestion-jobs/ingestion-jobs.service';
 import { DocumentFlagsService } from '../document-flags/document-flags.service';
 import { KnowledgeArticlesService } from '../knowledge-articles/knowledge-articles.service';
+import { AttachmentExtractorService } from '../ingestion/attachment-extractor.service';
 
 /**
  * Every method unpacks the caller context, because every query is scoped by it
@@ -64,6 +68,7 @@ export class DocumentsGrpcController implements DocumentServiceController {
     private readonly jobs: IngestionJobsService,
     private readonly flags: DocumentFlagsService,
     private readonly articles: KnowledgeArticlesService,
+    private readonly extractor: AttachmentExtractorService,
   ) {}
 
   presignDocument(
@@ -237,6 +242,33 @@ export class DocumentsGrpcController implements DocumentServiceController {
     metadata?: Metadata,
   ): Promise<StorageUsageResponse> {
     return this.documents.getStorageUsage(unpackCallerContext(metadata));
+  }
+
+  /**
+   * ONE ticket attachment to markdown — the only method here that is not about
+   * a document.
+   *
+   * It is on `DocumentService` because ticket-service already holds a client
+   * for it (`INGESTION_GRPC_CLIENT`), and a second service for one method would
+   * need a second client, a second health entry and a second registration.
+   *
+   * **`requireTenant`, not the document scope.** Every other read here filters
+   * by org-wide ∪ departments; an attachment has no department scoping at all,
+   * and storage-service checks the tenant against the object path anyway. So
+   * the boundary this owns is the coarse one, and pretending otherwise would
+   * mean inventing a scope the row does not have.
+   */
+  extractAttachmentText(
+    request: ExtractAttachmentTextRequest,
+    metadata?: Metadata,
+  ): Promise<ExtractAttachmentTextResponse> {
+    const context = unpackCallerContext(metadata);
+
+    return this.extractor.extract(
+      request.objectPath,
+      request.mimeType,
+      requireTenant(context),
+    );
   }
 
   // ---------------------------------------------------------------- flags

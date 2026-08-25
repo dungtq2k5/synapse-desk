@@ -92,6 +92,7 @@ erDiagram
     String fileUrl 
     BigInt file_size_bytes 
     String mime_type 
+    String extracted_text "❓"
     DateTime created_at 
     }
   

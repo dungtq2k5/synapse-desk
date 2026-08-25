@@ -9,6 +9,7 @@ import { AiLedgerModule } from '../ai-ledger/ai-ledger.module';
 import { QdrantModule } from '../qdrant/qdrant.module';
 import { EmbeddingsModule } from '../embeddings/embeddings.module';
 import { DocumentParserService } from './document-parser.service';
+import { AttachmentExtractorService } from './attachment-extractor.service';
 import { OcrService } from './ocr.service';
 import { DocumentChunkerService } from './document-chunker.service';
 import { IngestionProcessor } from './ingestion.processor';
@@ -67,6 +68,7 @@ import { ScopeChangedConsumer } from './scope-changed.consumer';
   controllers: [DocumentUploadedConsumer, ScopeChangedConsumer],
   providers: [
     DocumentParserService,
+    AttachmentExtractorService,
     OcrService,
     DocumentChunkerService,
     IngestionProcessor,
@@ -85,6 +87,10 @@ import { ScopeChangedConsumer } from './scope-changed.consumer';
   exports: [
     IngestionQueueService,
     IngestionProcessor,
+    // Exported for the DOCUMENTS controller, which owns `DocumentService`'s
+    // surface — the rpc belongs to the service ticket-service already has a
+    // client for, and the parser lives here.
+    AttachmentExtractorService,
     ScopeWriterService,
     ScopeFanoutQueueService,
     IngestionReconcileSweep,

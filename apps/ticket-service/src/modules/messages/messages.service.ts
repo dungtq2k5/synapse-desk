@@ -42,6 +42,7 @@ import {
   TICKET_PATTERNS,
   SupersededReason,
   ticketMessageGroupKey,
+  PARSE_ELIGIBLE_MIME_TYPES,
 } from '@synapsedesk/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AiAttachmentService } from '../ai-attachments/ai-attachment.service';
@@ -52,6 +53,7 @@ import { TicketAccessService } from '../ticket-access/ticket-access.service';
 import { TicketsService } from '../tickets/tickets.service';
 import { RagClientService } from '../ai-client/rag-client.service';
 import { LedgerClientService } from '../ai-client/ledger-client.service';
+import { AttachmentExtractorClient } from '../ai-client/attachment-extractor.client';
 import { StorageReferenceService } from '../storage-client/storage-reference.service';
 import {
   MessageAttachment,
@@ -126,6 +128,7 @@ export class MessagesService {
     private readonly rag: RagClientService,
     private readonly aiAttachments: AiAttachmentService,
     private readonly ledger: LedgerClientService,
+    private readonly extractor: AttachmentExtractorClient,
     private readonly storage: StorageReferenceService,
     private readonly configService: ConfigService,
   ) {
@@ -394,6 +397,25 @@ export class MessagesService {
           // claims would record whatever they felt like claiming.
           fileSizeBytes: BigInt(object.sizeBytes),
           mimeType: object.contentType,
+          // **The single extraction hook, and it has to be this one.** Both
+          // attachment routes reach here — a client confirming its own upload,
+          // and `createMessage` writing a message that arrived with files
+          // already in storage. That second one is INBOUND EMAIL: the Worker
+          // presigns, PUTs the bytes and sends paths, and this is where they
+          // are confirmed.
+          //
+          // Hooking `confirmAttachment` alone would have left every emailed
+          // office attachment unextracted, permanently and silently — on the
+          // surface `injection.py` calls the highest-trust position an
+          // untrusted file reaches in this system, because nobody sending it
+          // ever authenticated.
+          //
+          // `object.contentType` for the same reason the column above uses it.
+          extractedText: await this.extractIfParseable(
+            object.objectPath,
+            object.contentType,
+            context,
+          ),
         });
       } catch (error) {
         // **Named, not thrown.** An expired presign, a forged path and an
@@ -408,6 +430,35 @@ export class MessagesService {
     }
 
     return { confirmed, skippedAttachments };
+  }
+
+  /**
+   * The markdown for a parse-eligible attachment, or `null` for everything else.
+   *
+   * **Three outcomes, and the column holds all three.** `null` when nothing was
+   * attempted — a `.png`, a `.doc`, a type with no parser — or when the attempt
+   * failed. `''` when a parser ran and the file genuinely had no text. Text
+   * when it worked. The feed path treats the first two identically and the
+   * DIFFERENCE is for whoever debugs it later, which is why a `String[]` would
+   * not do: Prisma scalar lists cannot be null.
+   *
+   * **Never throws**, because every caller is inside a confirm. `AttachmentExtractorClient`
+   * already swallows its own failures; the eligibility check here is what stops
+   * a `.png` costing a pointless round trip to ingestion-service.
+   *
+   * @param objectPath the CONFIRMED path, after the object left `pending/`.
+   * @param mimeType read back from the object, never client-declared.
+   */
+  private async extractIfParseable(
+    objectPath: string,
+    mimeType: string,
+    context: CallerContext,
+  ): Promise<string | null> {
+    if (!(PARSE_ELIGIBLE_MIME_TYPES as readonly string[]).includes(mimeType)) {
+      return null;
+    }
+
+    return this.extractor.extract(objectPath, mimeType, context);
   }
 
   /**
@@ -748,6 +799,14 @@ export class MessagesService {
         fileUrl: confirmed.objectPath,
         fileSizeBytes: BigInt(confirmed.sizeBytes),
         mimeType: confirmed.contentType,
+        // The same rule as the nested route, through the same helper — the
+        // eligibility decision exists once, so the two paths cannot disagree
+        // about which types get text.
+        extractedText: await this.extractIfParseable(
+          confirmed.objectPath,
+          confirmed.contentType,
+          context,
+        ),
       },
     });
 

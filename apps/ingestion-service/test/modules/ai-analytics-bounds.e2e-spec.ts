@@ -1,4 +1,4 @@
-import { ANALYTICS_TOP_N } from '@synapsedesk/common';
+import { ANALYTICS_TOP_N, AiGenerationPurpose } from '@synapsedesk/common';
 import { E2eFixture, bootstrapE2eTest, memberContext } from '../utils';
 import {
   buildTenant,
@@ -7,6 +7,7 @@ import {
   TenantFixture,
 } from '../factories';
 import { AiAnalyticsService } from '../../src/modules/analytics/ai-analytics.service';
+import { AuthReferenceService } from '../../src/modules/auth-client/auth-reference.service';
 
 /**
  * The top-N bound on the gRPC side.
@@ -25,6 +26,7 @@ import { AiAnalyticsService } from '../../src/modules/analytics/ai-analytics.ser
 describe('The AI analytics top-N bound (e2e)', () => {
   let fx: E2eFixture;
   let analytics: AiAnalyticsService;
+  let getAiEntitlement: jest.SpyInstance;
 
   let tenant: TenantFixture;
 
@@ -59,11 +61,23 @@ describe('The AI analytics top-N bound (e2e)', () => {
   beforeAll(async () => {
     fx = await bootstrapE2eTest();
     analytics = fx.moduleRef.get(AiAnalyticsService);
+
+    // auth-service is not running for this suite, and `getAiUsage` reads the
+    // entitlement to report the budget alongside the spend. It FAILS CLOSED
+    // without one, which is correct and is asserted elsewhere.
+    getAiEntitlement = jest.spyOn(
+      fx.moduleRef.get(AuthReferenceService),
+      'getAiEntitlement',
+    );
   });
 
   beforeEach(async () => {
     await fx.reset();
     tenant = buildTenant();
+    getAiEntitlement.mockResolvedValue({
+      budgetMicros: 10_000_000n,
+      billingCycleStart: new Date('2026-01-01T00:00:00.000Z'),
+    });
   });
 
   afterAll(() => fx.close());
@@ -72,7 +86,7 @@ describe('The AI analytics top-N bound (e2e)', () => {
     it('1. CAPS a limit above the ceiling instead of running an unbounded take', async () => {
       // The failure this prevents is not a wrong number, it is a query: a
       // caller asking for 10 000 over a tenant with a large flag backlog holds
-      // a connection while Postgres serialises every row of it.
+      // a connection while Postgres serializes every row of it.
       await seedFlags(ANALYTICS_TOP_N.MAX + 5);
 
       const response = await analytics.getKnowledgeGaps(
@@ -127,6 +141,124 @@ describe('The AI analytics top-N bound (e2e)', () => {
       expect(
         response.flags.filter((flag) => flag.documentId === theirDocument.id),
       ).toEqual([]);
+    });
+
+    /**
+     * Doc 56 §E — the rate, not the flags.
+     *
+     * Written against `ai_generation_daily_stats` directly rather than through
+     * the rollup, because what is under test is the READ: which population the
+     * phrase "empty retrieval rate" is computed over. The rollup's own split is
+     * asserted in `ai-rollup.e2e-spec`.
+     */
+    describe('attachment-grounded answers', () => {
+      const stats = (overrides: Record<string, unknown>) =>
+        fx.prisma.aiGenerationDailyStat.create({
+          data: {
+            organizationId: tenant.organizationId,
+            day: new Date('2026-02-01T00:00:00.000Z'),
+            purpose: AiGenerationPurpose.CHAT_ANSWER,
+            // Not a real model name: `check-model-literals` refuses one outside
+            // the settings layer, and this row's model is a dimension the test
+            // says nothing about. `ai-rollup.e2e-spec` uses the same stand-in.
+            modelName: 'model-under-test',
+            generations: 10,
+            emptyRetrievals: 0,
+            attachmentGenerations: 0,
+            attachmentEmptyRetrievals: 0,
+            ...overrides,
+          },
+        });
+
+      it('**6. an attachment-grounded answer does NOT raise the empty-retrieval rate**', async () => {
+        // Ten answering generations. Four retrieved nothing, and all four were
+        // answering a question about a file the user attached — which the
+        // corpus was never expected to answer.
+        //
+        // The old rate said 40% and was read as "the knowledge base is failing
+        // two questions in five". The population the phrase describes is the
+        // six attachment-free ones, none of which came up empty.
+        await stats({
+          generations: 10,
+          emptyRetrievals: 4,
+          attachmentGenerations: 4,
+          attachmentEmptyRetrievals: 4,
+        });
+
+        const response = await analytics.getKnowledgeGaps(
+          { ...RANGE, limit: ANALYTICS_TOP_N.DEFAULT },
+          caller(),
+        );
+
+        expect(response.emptyRetrievalRate?.rate).toBe(0);
+        expect(response.emptyRetrievalRate?.numerator).toBe(0);
+        expect(response.emptyRetrievalRate?.denominator).toBe(6);
+        // The TOTAL is unchanged, so the exclusion is visible rather than
+        // silently rewriting a number somebody was already watching.
+        expect(response.emptyRetrievals).toBe(4);
+      });
+
+      it('**7. …and IS counted in the attachment-grounded slice**', async () => {
+        // The pair, and the reason 6 alone is not enough. A change that simply
+        // DROPPED attachment-grounded generations from this report would pass
+        // test 6 and pass silently — nothing else counts them, so "the corpus
+        // is being routed around" would become invisible at exactly the moment
+        // it started happening.
+        await stats({
+          generations: 10,
+          emptyRetrievals: 4,
+          attachmentGenerations: 4,
+          attachmentEmptyRetrievals: 4,
+        });
+
+        const response = await analytics.getKnowledgeGaps(
+          { ...RANGE, limit: ANALYTICS_TOP_N.DEFAULT },
+          caller(),
+        );
+
+        expect(response.attachmentGroundedRate?.numerator).toBe(4);
+        expect(response.attachmentGroundedRate?.denominator).toBe(10);
+        expect(response.attachmentEmptyRetrievals).toBe(4);
+      });
+
+      it('**8. a corpus gap with no attachment still reads as a gap**', async () => {
+        // The other direction, and what stops the fix erasing the metric. If
+        // the empty retrieval had nothing to do with an attachment, the rate
+        // must still report it — otherwise §E would have replaced a metric that
+        // over-counted with one that counts nothing.
+        await stats({
+          generations: 10,
+          emptyRetrievals: 4,
+          attachmentGenerations: 0,
+          attachmentEmptyRetrievals: 0,
+        });
+
+        const response = await analytics.getKnowledgeGaps(
+          { ...RANGE, limit: ANALYTICS_TOP_N.DEFAULT },
+          caller(),
+        );
+
+        expect(response.emptyRetrievalRate?.numerator).toBe(4);
+        expect(response.emptyRetrievalRate?.denominator).toBe(10);
+      });
+
+      it('**9. `getAiUsage` publishes the SAME population under the same name**', async () => {
+        // Two endpoints publish `emptyRetrievalRate`. Fixing one and not the
+        // other leaves two dashboards disagreeing under one field name, which
+        // reads as broken data rather than as two definitions — and is worse
+        // than not fixing it at all.
+        await stats({
+          generations: 10,
+          emptyRetrievals: 4,
+          attachmentGenerations: 4,
+          attachmentEmptyRetrievals: 4,
+        });
+
+        const usage = await analytics.getAiUsage({ ...RANGE }, caller());
+
+        expect(usage.emptyRetrievalRate?.numerator).toBe(0);
+        expect(usage.emptyRetrievalRate?.denominator).toBe(6);
+      });
     });
   });
 

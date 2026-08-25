@@ -13,6 +13,7 @@ import {
 } from '@synapsedesk/grpc-proto';
 import { RagClientService } from './rag-client.service';
 import { LedgerClientService } from './ledger-client.service';
+import { AttachmentExtractorClient } from './attachment-extractor.client';
 
 /**
  * The `rag-service` seam, in its own module so both the message thread
@@ -62,7 +63,7 @@ import { LedgerClientService } from './ledger-client.service';
       },
     ]),
   ],
-  providers: [RagClientService, LedgerClientService],
-  exports: [RagClientService, LedgerClientService],
+  providers: [RagClientService, LedgerClientService, AttachmentExtractorClient],
+  exports: [RagClientService, LedgerClientService, AttachmentExtractorClient],
 })
 export class AiClientModule {}

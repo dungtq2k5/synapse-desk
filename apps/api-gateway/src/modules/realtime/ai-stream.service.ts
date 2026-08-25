@@ -158,6 +158,13 @@ export class AiStreamService implements OnModuleInit {
           history,
           ticketId,
           attachments: attachments.parts,
+          // **Presence, not survival.** `parts` is what survived eligibility,
+          // size and extraction; this is what the user actually attached, and
+          // the greeting short-circuit in `pipeline.py` needs the second. The
+          // number has been in hand since `:137` — `notifySkipped` above reads
+          // the same object — and simply was not sent on.
+          attachmentCount:
+            attachments.parts.length + attachments.skipped.length,
         },
         packRequestContext(context),
       )

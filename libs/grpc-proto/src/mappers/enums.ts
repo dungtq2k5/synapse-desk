@@ -544,7 +544,10 @@ export const fromProtoIngestionJobStatus = ingestionJobStatus.fromProto;
 const documentFileType = enumBridge<DocumentFileType, ProtoDocumentFileType>(
   {
     pdf: ProtoDocumentFileType.DOCUMENT_FILE_TYPE_PDF,
-    doc: ProtoDocumentFileType.DOCUMENT_FILE_TYPE_DOC,
+    // No `doc`. `DOCUMENT_FILE_TYPE_DOC` is reserved in the proto and
+    // `application/msword` is no longer an accepted document type, so there is
+    // no extension to bridge. An old client's `5` now falls to UNSPECIFIED,
+    // which is what `enumBridge`'s fallback is for.
     docx: ProtoDocumentFileType.DOCUMENT_FILE_TYPE_DOCX,
     txt: ProtoDocumentFileType.DOCUMENT_FILE_TYPE_TXT,
     md: ProtoDocumentFileType.DOCUMENT_FILE_TYPE_MD,

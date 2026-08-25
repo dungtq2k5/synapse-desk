@@ -2,6 +2,7 @@ import { AVATAR_MIME_TYPES } from './auth.config';
 import {
   AI_ELIGIBLE_MIME_TYPES,
   ALLOWED_ATTACHMENT_MIME_TYPES,
+  PARSE_ELIGIBLE_MIME_TYPES,
 } from './ticket.config';
 import { ALLOWED_DOCUMENT_MIME_TYPES } from './document.config';
 import { EXPORT_MIME_TYPES } from './export.config';
@@ -68,5 +69,53 @@ describe('the MIME lists agree with each other', () => {
     ]);
 
     expect(MIME_TYPES.filter((mime: MimeType) => !used.has(mime))).toEqual([]);
+  });
+
+  it('**a type is fed as BYTES or as extracted TEXT, never eligible for both**', () => {
+    // `ticket.config.ts` calls this disjointness "by construction". There is no
+    // construction: both lists are `satisfies readonly
+    // AllowedAttachmentMimeType[]`, which compile-checks each as a SUBSET of
+    // storable and says nothing about their intersection.
+    //
+    // **What an overlap would do is worse than ambiguous.**
+    // `AiAttachmentService` decides the branch on `AI_ELIGIBLE` alone, so a type
+    // in both lists takes the bytes path and the stored markdown is never read
+    // — confirm pays for the parse, Postgres keeps the result, and the model
+    // receives bytes it cannot parse. For `.docx` that is a silent return to
+    // pre-extraction behaviour.
+    //
+    // Empty today. This is the mechanism the docblock claims to have.
+    const overlap = (PARSE_ELIGIBLE_MIME_TYPES as readonly string[]).filter(
+      (mime) => (AI_ELIGIBLE_MIME_TYPES as readonly string[]).includes(mime),
+    );
+
+    expect(overlap).toEqual([]);
+  });
+
+  it('**`.doc` is storable, never parsed, and never fed**', async () => {
+    // Doc 56 §A, and all three clauses are load-bearing in different
+    // directions.
+    //
+    // Mammoth reads OOXML. A genuine Word 97-2003 file is an OLE2 compound
+    // binary and throws `Can't find end of central directory : is this a zip
+    // file ?` — a bare `Error`, so it misses the deterministic-refusal arm and
+    // costs `attempts: 3` before failing with a message about zip files.
+    //
+    // **Storable is the half that would go quietly.** Dropping it everywhere
+    // reads as tidier and takes away a format an agent can legitimately be
+    // sent; the decision is that it stays attachable and stops pretending to
+    // be parseable.
+    const DOC = 'application/msword';
+
+    expect(ALLOWED_ATTACHMENT_MIME_TYPES as readonly string[]).toContain(DOC);
+    expect(ALLOWED_DOCUMENT_MIME_TYPES as readonly string[]).not.toContain(DOC);
+    expect(AI_ELIGIBLE_MIME_TYPES as readonly string[]).not.toContain(DOC);
+
+    // And the derived list follows, which is the thing a filter is built from:
+    // a `documents` row can no longer be filed under `doc` at all.
+    const { DOCUMENT_FILE_TYPES } = await import('./document.config');
+    expect(DOCUMENT_FILE_TYPES as readonly string[]).not.toContain('doc');
+    // The mapping itself STAYS — an attachment still needs its extension.
+    expect(EXTENSION_BY_MIME[DOC]).toBe('doc');
   });
 });

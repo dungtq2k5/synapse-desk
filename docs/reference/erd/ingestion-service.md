@@ -95,6 +95,7 @@ erDiagram
     String content "❓"
     String retrieved_chunk_ids 
     String cited_chunk_ids 
+    Int attachment_count 
     String outcome "❓"
     String resulting_message_id "❓"
     DateTime created_at 
@@ -115,6 +116,8 @@ erDiagram
     Int latency_count 
     Int failures 
     Int empty_retrievals 
+    Int attachment_generations 
+    Int attachment_empty_retrievals 
     Int drafts_accepted 
     Int drafts_edited 
     Int drafts_discarded 

@@ -438,6 +438,27 @@ model MessageAttachment {
   fileSizeBytes BigInt @map("file_size_bytes")
   mimeType      String @map("mime_type") @db.VarChar(100)
 
+  /// Markdown extracted from a parse-eligible attachment, for the model.
+  ///
+  /// Written once by `confirmNewAttachments`, which is the single hook both
+  /// attachment routes reach; read by `AiAttachmentService`, which sends it as
+  /// a text part instead of downloading the file.
+  ///
+  /// **Three states, and only a nullable scalar carries them.** NULL means no
+  /// extraction was attempted or it failed — a `.png`, a `.doc`, an
+  /// ingestion-service that was down. `''` means extraction ran and produced
+  /// nothing. Text means usable. A `String[]` would collapse the first two,
+  /// because Prisma scalar lists cannot be null — the same trap
+  /// `Document.ocrLanguages` documents on the other side of the wire.
+  ///
+  /// **Not a second object in storage.** A Postgres value has no second path,
+  /// no second lifecycle and nothing to garbage-collect; `document_chunks`
+  /// stores its text the same way.
+  ///
+  /// A workbook's sheets live INSIDE this markdown as `## Sheet: Q1 Revenue`
+  /// headings, so the feed path never branches on format.
+  extractedText String? @map("extracted_text") @db.Text
+
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   /// Cascade: an attachment has no meaning without its message, and a redacted

@@ -149,6 +149,11 @@ class DocumentServiceStub:
                 request_serializer=synapsedesk_dot_ingestion_dot_document__pb2.DocumentIdRequest.SerializeToString,
                 response_deserializer=synapsedesk_dot_ingestion_dot_document__pb2.StorageUsageResponse.FromString,
                 _registered_method=True)
+        self.ExtractAttachmentText = channel.unary_unary(
+                '/synapsedesk.ingestion.DocumentService/ExtractAttachmentText',
+                request_serializer=synapsedesk_dot_ingestion_dot_document__pb2.ExtractAttachmentTextRequest.SerializeToString,
+                response_deserializer=synapsedesk_dot_ingestion_dot_document__pb2.ExtractAttachmentTextResponse.FromString,
+                _registered_method=True)
         self.ListIngestionJobs = channel.unary_unary(
                 '/synapsedesk.ingestion.DocumentService/ListIngestionJobs',
                 request_serializer=synapsedesk_dot_ingestion_dot_document__pb2.ListIngestionJobsRequest.SerializeToString,
@@ -324,6 +329,15 @@ class DocumentServiceServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def ExtractAttachmentText(self, request, context):
+        """Parse-as-a-service for ticket attachments. On this service because the
+        parser is, and because the alternative is mammoth in every service that
+        imports `@synapsedesk/common`.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def ListIngestionJobs(self, request, context):
         """On this service rather than its own: a second service would need a second
         client, a second health entry and a second registration for five methods
@@ -477,6 +491,11 @@ def add_DocumentServiceServicer_to_server(servicer, server):
                     servicer.GetStorageUsage,
                     request_deserializer=synapsedesk_dot_ingestion_dot_document__pb2.DocumentIdRequest.FromString,
                     response_serializer=synapsedesk_dot_ingestion_dot_document__pb2.StorageUsageResponse.SerializeToString,
+            ),
+            'ExtractAttachmentText': grpc.unary_unary_rpc_method_handler(
+                    servicer.ExtractAttachmentText,
+                    request_deserializer=synapsedesk_dot_ingestion_dot_document__pb2.ExtractAttachmentTextRequest.FromString,
+                    response_serializer=synapsedesk_dot_ingestion_dot_document__pb2.ExtractAttachmentTextResponse.SerializeToString,
             ),
             'ListIngestionJobs': grpc.unary_unary_rpc_method_handler(
                     servicer.ListIngestionJobs,
@@ -1125,6 +1144,33 @@ class DocumentService:
             '/synapsedesk.ingestion.DocumentService/GetStorageUsage',
             synapsedesk_dot_ingestion_dot_document__pb2.DocumentIdRequest.SerializeToString,
             synapsedesk_dot_ingestion_dot_document__pb2.StorageUsageResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ExtractAttachmentText(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/synapsedesk.ingestion.DocumentService/ExtractAttachmentText',
+            synapsedesk_dot_ingestion_dot_document__pb2.ExtractAttachmentTextRequest.SerializeToString,
+            synapsedesk_dot_ingestion_dot_document__pb2.ExtractAttachmentTextResponse.FromString,
             options,
             channel_credentials,
             insecure,

@@ -332,6 +332,13 @@ class RagServicer(rag_pb2_grpc.RagServiceServicer):
             budget=budget,
             user_id=ctx.sub,
             attachments=attachments,
+            # **What the message CARRIED, not what survived.** `attachments` is
+            # already filtered — ineligible types, oversize files and failed
+            # extractions are all gone by here — so a message that arrived with
+            # a file the caller could not turn into a part looks identical to
+            # one with no file at all. The greeting rule needs to tell them
+            # apart; nothing else here does.
+            attachment_count=request.attachment_count,
         )
 
         if preprocessed.reply is not None:

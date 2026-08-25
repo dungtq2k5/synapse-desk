@@ -11,3 +11,4 @@ export * from './context';
 export * from './fake-embedding.client';
 export * from './pdf-fixture';
 export * from './quota';
+export * from './xlsx-fixture';

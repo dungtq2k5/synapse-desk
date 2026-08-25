@@ -1,5 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { MIN_PAGE_CHARACTERS, type OcrLanguage } from '@synapsedesk/common';
+import {
+  MAX_SHEET_ROWS,
+  MIN_PAGE_CHARACTERS,
+  rowTruncationMarker,
+  type OcrLanguage,
+} from '@synapsedesk/common';
 import { MAX_OCR_PAGES, OcrService, type OcrFailure } from './ocr.service';
 
 /** One page of extracted text. PDFs have many; everything else has one. */
@@ -109,10 +114,12 @@ export class DocumentParserService {
    * `fileType` decides the parser, and an unknown one is refused rather than
    * guessed at.
    *
-   * The type came from `FILE_TYPE_BY_MIME` at confirm time, which itself came
-   * from storage-service reading the object's real content type rather than the
-   * client's claim — so by here it is trustworthy, and anything unrecognized is
-   * a gap in the allowlist rather than a hostile upload.
+   * The type is an EXTENSION, translated from the object's MIME type by
+   * `extensionFor` — `FILE_TYPE_BY_MIME` appeared here for a long time and has
+   * never existed. Either caller reaches it the same way, and in both cases the
+   * MIME type came from storage-service reading the object's real content type
+   * rather than the client's claim. So by here it is trustworthy, and anything
+   * unrecognized is a gap in the allowlist rather than a hostile upload.
    */
   async parse(
     bytes: Buffer,
@@ -134,6 +141,10 @@ export class DocumentParserService {
     const { createHash } = await import('node:crypto');
     const contentHash = createHash('sha256').update(bytes).digest('hex');
 
+    // **PDF returns here and never reaches `extract()`**, which is why that
+    // switch has no `pdf` arm. It is the one format with a page count, failed
+    // pages and OCR languages to thread — three values the paginationless
+    // formats below have nothing to say about.
     if (fileType === 'pdf') {
       const { pages, pageCount, failedPages } = await this.parsePdf(
         bytes,
@@ -145,9 +156,10 @@ export class DocumentParserService {
 
     const pages = await this.extract(bytes, fileType);
 
-    // One "page" that is not a page — DOCX, TXT and MD have no pagination, so
-    // there is nothing for the page-count check to count and nothing that could go missing
-    // page-wise.
+    // One "page" that is not a page — DOCX, XLSX, TXT and MD have no pagination,
+    // so there is nothing for the page-count check to count and nothing that
+    // could go missing page-wise. A workbook's SHEETS are pages here, and a
+    // sheet is not something that can go missing.
     return { pages, contentHash, pageCount: 0, failedPages: [] };
   }
 
@@ -156,11 +168,25 @@ export class DocumentParserService {
     fileType: string,
   ): Promise<ParsedPage[]> {
     switch (fileType) {
-      case 'pdf':
-        return (await this.parsePdf(bytes, [])).pages;
+      // No `pdf` arm: `parse()` returns above before reaching this. There was
+      // one, and it was unreachable AND wrong — it called
+      // `parsePdf(bytes, [])`, dropping the uploader's declared OCR languages,
+      // so the day something did reach it a scanned Vietnamese document would
+      // have been read as English with no error anywhere.
       case 'docx':
-      case 'doc':
+        // `docx` alone. `doc` used to fall through to here and could never have
+        // worked — mammoth reads OOXML, and a Word 97-2003 file is OLE2. It is
+        // no longer an accepted document type, so this switch cannot see one.
         return this.parseDocx(bytes);
+      case 'xlsx':
+        // ATTACHMENTS only today — `.xlsx` is not in
+        // `ALLOWED_DOCUMENT_MIME_TYPES`, so it arrives here from
+        // `AttachmentExtractorService` and never from an ingestion job. Here
+        // rather than in that service because this class is the one owner of
+        // "bytes → markdown", and because promoting spreadsheets to knowledge
+        // base content later should be a list edit rather than moving code
+        // between services.
+        return this.parseXlsx(bytes);
       case 'md':
       case 'txt':
         // Already text. Markdown passes through untouched, and plain text is
@@ -341,24 +367,102 @@ export class DocumentParserService {
   }
 
   /**
-   * DOCX -> markdown, via **mammoth then turndown**.
+   * XLSX -> markdown, one `ParsedPage` per WORKSHEET.
    *
-   * Mammoth was always the working half; the 80-line hand-written
-   * `htmlToMarkdown` after it was the liability. `turndown-plugin-gfm` emits
-   * correct tables, delimiter row included.
+   * Each page opens with its own `## Sheet: <name>` heading, so
+   * `AttachmentExtractorService`'s existing `pages.map(…).join('\n\n')` produces
+   * the whole workbook with no format-specific assembly anywhere.
    *
-   * **`@aidalinfo/office-to-markdown` was removed.** It is a thin wrapper around
-   * these same packages plus a layer that damages both of turndown's relevant
-   * outputs — tables without a GFM delimiter row, and OMML converted to
-   * double-escaped LaTeX rendering as a literal `\frac`. Repairing that meant
-   * depending on a package *and* maintaining patches for it.
+   * **`load()`, not the streaming `WorkbookReader` — and doc 57 §2 argued the
+   * opposite.** The streaming reader was the stated reason for choosing exceljs
+   * over SheetJS: `MAX_SHEET_ROWS` as an early exit, so row 501 is never built
+   * and peak memory tracks the cap rather than the file. Measured against
+   * 4.4.0, it also crashes:
    *
-   * **Math is dropped, and that is the trade.** Mammoth ignores OMML, so a
-   * formula becomes absent rather than wrong — and the chunk text is
-   * *embedded*, where `$\frac{1}{2}$` reads as a string that tokenizes worse
-   * than `1/2`. If a tenant ever needs formulas, mammoth's `transformDocument`
-   * hook is where an OMML step goes.
+   * | input | runs | crashes |
+   * | :--- | :--- | :--- |
+   * | 1 sheet | 60 | **0** |
+   * | 3 sheets | 200 | **103** |
+   *
+   * `TypeError: Cannot read properties of undefined (reading 'sheets')` at
+   * `workbook-reader.js:303`, which reads `this.model.sheets` with no guard on
+   * `this.model`. Reproduced under every option combination the reader accepts.
+   * `load()` over the same 3-sheet workbook: 200 runs, 0 crashes, sheet order
+   * correct every time.
+   *
+   * **So the cap here is a post-hoc slice, which is what §2 wanted to avoid.**
+   * The whole workbook is materialized before a row is dropped, putting `.xlsx`
+   * exactly where `.docx` already sits — mammoth's `convertToHtml({ buffer })`
+   * reads the whole document too. Recorded as known-gaps #17 rather than
+   * papered over: adding this format did not widen that gap, but it no longer
+   * narrows it either.
+   *
+   * The library choice still stands. SheetJS's npm channel carries fixes that
+   * cannot be installed from it; this one has a bug with a working path around
+   * it.
+   *
+   * **`pageNumber` carries a SHEET INDEX, and that is latent wrongness rather
+   * than a bug.** Nothing reads it: `pageCount` is 0 for this format and the
+   * attachment path never chunks. It would become wrong the day `.xlsx` joins
+   * `ALLOWED_DOCUMENT_MIME_TYPES`, because the citation surface would render
+   * sheet 3 as "page 3". That fix belongs with whoever adds the list entry.
+   *
+   * Formulas are not extracted. exceljs exposes the formula and its cached
+   * RESULT, and the result is what a reader wants; a workbook whose values were
+   * never calculated extracts as empty, which is correct and indistinguishable
+   * from an empty sheet.
    */
+  private async parseXlsx(bytes: Buffer): Promise<ParsedPage[]> {
+    const ExcelJS = await import('exceljs');
+
+    const workbook = new ExcelJS.Workbook();
+    // The cast bridges two `Buffer` declarations, not two runtime shapes:
+    // exceljs's `load(buffer: Buffer)` resolves against its own bundled type,
+    // whose `slice` disagrees with Node's on `Symbol.toStringTag`. The value is
+    // a Node `Buffer` either way.
+    await workbook.xlsx.load(bytes as unknown as ArrayBuffer);
+
+    const pages: ParsedPage[] = [];
+    let sheetIndex = 0;
+
+    workbook.eachSheet((worksheet) => {
+      sheetIndex += 1;
+
+      const rows: string[] = [];
+      let seen = 0;
+
+      worksheet.eachRow((row) => {
+        seen += 1;
+        if (rows.length < MAX_SHEET_ROWS) rows.push(toMarkdownRow(row));
+        // Counted past the cap rather than stopped at it: the marker has to
+        // name the sheet's REAL height, and stopping would report
+        // "500 of 500" — a truncation notice saying nothing was truncated.
+        //
+        // **So this guard bounds the OUTPUT, not the work.** `eachRow` has no
+        // early exit — the only overload option is `includeEmpty` — and
+        // `load()` has already materialized every row before this runs. A
+        // 50,000-row sheet is still 50,000 callbacks; what the cap saves is the
+        // markdown, not the parse.
+      });
+
+      if (rows.length === 0) return;
+
+      pages.push({
+        pageNumber: sheetIndex,
+        markdown: [
+          `## Sheet: ${worksheet.name}`,
+          '',
+          ...withHeaderDelimiter(rows),
+          ...(seen > rows.length
+            ? ['', rowTruncationMarker(rows.length, seen)]
+            : []),
+        ].join('\n'),
+      });
+    });
+
+    return pages;
+  }
+
   private async parseDocx(bytes: Buffer): Promise<ParsedPage[]> {
     const mammoth = await import('mammoth');
 
@@ -506,6 +610,104 @@ function htmlToMarkdown(html: string): string {
 }
 
 /**
+ * The two exceljs shapes this file touches, named locally.
+ *
+ * Imported as TYPES from a package loaded with a dynamic `import()` — the value
+ * side stays lazy, which is what keeps `exceljs` off the startup path for every
+ * document that is not a workbook.
+ */
+type ExcelRow = import('exceljs').Row;
+type ExcelCell = import('exceljs').Cell;
+
+/**
+ * One spreadsheet row as a markdown table row.
+ *
+ * **`eachCell` with `includeEmpty`, not `row.values`.** Two things force this
+ * pairing and each is a bug on its own:
+ *
+ * `row.values` hands back the RAW cell value, and for a cell with mixed inline
+ * formatting that is `{ richText: [...] }` — an object with no `text`, no
+ * `result` and no `Date` to unwrap, which the old hand-rolled formatter
+ * rendered as an empty string. Rich text is what exceljs returns for any styled
+ * cell, routinely the header row, and the table still rendered: the column was
+ * simply blank and nothing reported it. `cell.text` is the library's own
+ * rendering and handles rich text, errors, hyperlinks and formula results
+ * alike.
+ *
+ * `includeEmpty` is what stops that fix introducing a worse one. Bare
+ * `eachCell` SKIPS blank cells, so a row with A and C filled yields two values
+ * against a three-column header and every column after the gap shifts by one —
+ * the table still parses and one row silently disagrees with its header. With
+ * the option it yields `['left', '', 'right']`, which is what `row.values` was
+ * already giving.
+ *
+ * Pipes are escaped: an unescaped one inside a cell ends the cell early and
+ * shifts the columns after it, for that row only.
+ */
+function toMarkdownRow(row: ExcelRow): string {
+  const cells: string[] = [];
+
+  row.eachCell({ includeEmpty: true }, (cell) => {
+    cells.push(escapeCell(cellText(cell)));
+  });
+
+  return `| ${cells.join(' | ')} |`;
+}
+
+/**
+ * One cell as text, with DATES taken from the value rather than from `text`.
+ *
+ * `cell.text` renders a date through the host's locale and timezone —
+ * `Mon Mar 02 2026 07:00:00 GMT+0700 (Indochina Time)` — so the same workbook
+ * extracts differently on two machines, and the result is noise for the model
+ * besides. ISO is stable and shorter.
+ *
+ * Everything else defers to `cell.text`, which is exactly the point of using it.
+ */
+function cellText(cell: ExcelCell): string {
+  if (cell.value instanceof Date) return cell.value.toISOString();
+
+  return cell.text ?? '';
+}
+
+/**
+ * The two substitutions a markdown table cell needs.
+ *
+ * `String.raw` rather than `'\\|'`: this function's whole job is escaping, and a
+ * doubled backslash inside an escaping function is where a reader miscounts.
+ * The newline replace keeps its regex, because `\r?\n` is a real alternation
+ * rather than a literal being spelled the long way.
+ */
+function escapeCell(text: string): string {
+  return text.replaceAll('|', String.raw`\|`).replaceAll(/\r?\n/g, ' ');
+}
+
+/**
+ * The GFM delimiter row, inserted after the first row.
+ *
+ * Without it the whole block is paragraph text rather than a table — the same
+ * failure `markFirstTableRowAsHeader` exists to prevent on the DOCX path, and
+ * the reason that hook is called out in `parseDocx`'s docblock.
+ */
+function withHeaderDelimiter(rows: string[]): string[] {
+  const [header, ...rest] = rows;
+  const columns = header.split('|').length - 2;
+
+  return [
+    header,
+    `| ${Array.from({ length: columns }, () => '---').join(' | ')} |`,
+    ...rest,
+  ];
+}
+
+/** The shape of mammoth's document model this walk touches, and no more. */
+type MammothElement = {
+  type?: string;
+  isHeader?: boolean;
+  children?: MammothElement[];
+};
+
+/**
  * Marks the first row of every table as a header row.
  *
  * Walks mammoth's document model rather than its HTML output — see the call
@@ -529,13 +731,6 @@ function markFirstTableRowAsHeader(node: MammothElement): MammothElement {
     ? { ...next, children: next.children.map(markFirstTableRowAsHeader) }
     : next;
 }
-
-/** The shape of mammoth's document model this walk touches, and no more. */
-type MammothElement = {
-  type?: string;
-  isHeader?: boolean;
-  children?: MammothElement[];
-};
 
 function createTurndown(): import('turndown') {
   const nodeRequire = process

@@ -1814,6 +1814,8 @@ describe('The GraphQL surface (e2e)', () => {
           emptyRetrievals: 12,
           answeringGenerations: 40,
           emptyRetrievalRate: { rate: 0.3, numerator: 12, denominator: 40 },
+          attachmentGroundedRate: { rate: 0, numerator: 0, denominator: 40 },
+          attachmentEmptyRetrievals: 0,
           flags: [
             {
               documentId,

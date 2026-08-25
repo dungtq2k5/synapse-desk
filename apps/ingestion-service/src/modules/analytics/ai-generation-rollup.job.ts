@@ -143,6 +143,7 @@ export class AiGenerationRollupJob {
           generations, prompt_tokens, completion_tokens, cost_micros,
           latency_ms_sum, latency_count,
           failures, empty_retrievals,
+          attachment_generations, attachment_empty_retrievals,
           drafts_accepted, drafts_edited, drafts_discarded,
           computed_at
         )
@@ -166,6 +167,25 @@ export class AiGenerationRollupJob {
                -- other counter here.
                COUNT(*) FILTER (
                  WHERE g.purpose IN ('CHAT_ANSWER', 'DRAFT')
+                   AND COALESCE(array_length(g.retrieved_chunk_ids, 1), 0) = 0
+               )::int,
+               -- **The attachment-grounded SLICE, not an exclusion.** The
+               -- counter above stays the TOTAL: a question about a user's own
+               -- invoice retrieves nothing correctly, and is a knowledge gap
+               -- only if the corpus was the intended source. Splitting keeps
+               -- both readings; subtracting one from the other at read time
+               -- gives the attachment-free rate the phrase actually describes.
+               --
+               -- The same ANSWERING_PURPOSES filter, because an embedding
+               -- with an attachment count would be as meaningless here as it is
+               -- in the total.
+               COUNT(*) FILTER (
+                 WHERE g.purpose IN ('CHAT_ANSWER', 'DRAFT')
+                   AND g.attachment_count > 0
+               )::int,
+               COUNT(*) FILTER (
+                 WHERE g.purpose IN ('CHAT_ANSWER', 'DRAFT')
+                   AND g.attachment_count > 0
                    AND COALESCE(array_length(g.retrieved_chunk_ids, 1), 0) = 0
                )::int,
                COUNT(*) FILTER (WHERE g.outcome = 'ACCEPTED')::int,

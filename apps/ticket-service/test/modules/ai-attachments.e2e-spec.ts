@@ -1,6 +1,12 @@
 import { faker } from '@faker-js/faker';
 import { requireField } from '@synapsedesk/grpc-proto';
-import { MAX_AI_ATTACHMENT_BYTES } from '@synapsedesk/common';
+import {
+  CHARACTER_TRUNCATION_MARKER,
+  EXTRACTED_TEXT_MIME_TYPE,
+  MAX_AI_ATTACHMENT_BYTES,
+  MAX_EXTRACTED_TEXT_PER_MESSAGE,
+  type ParseEligibleMimeType,
+} from '@synapsedesk/common';
 import { E2eFixture, bootstrapE2eTest } from '../utils';
 import {
   buildTenant,
@@ -43,6 +49,9 @@ describe('Attachments as model input (e2e)', () => {
     mimeType: string,
     sizeBytes: number,
     fileName = `${faker.string.alpha(6)}.bin`,
+    // `undefined` writes NULL, which is the state a `.png` and a failed
+    // extraction share — and the one a happy-path fixture never produces.
+    extractedText?: string,
   ) =>
     fx.prisma.messageAttachment.create({
       data: {
@@ -51,8 +60,14 @@ describe('Attachments as model input (e2e)', () => {
         fileUrl: `organizations/${tenant.organizationId}/messages/${messageId}/${fileName}`,
         fileSizeBytes: BigInt(sizeBytes),
         mimeType,
+        extractedText,
       },
     });
+
+  const DOCX =
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document' satisfies ParseEligibleMimeType;
+  const XLSX =
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' satisfies ParseEligibleMimeType;
 
   beforeAll(async () => {
     fx = await bootstrapE2eTest();
@@ -110,11 +125,13 @@ describe('Attachments as model input (e2e)', () => {
     expect(download).toHaveBeenCalledTimes(1);
   });
 
-  it('**3a. a `.docx` is STORED and skipped, never sent as a part**', async () => {
-    // Doc 52's whole premise. `.docx` became storable and stayed out of
-    // `AI_ELIGIBLE_MIME_TYPES`, so the user gets an attachment that reaches the
-    // agent and is reported back rather than silently ignored — which is what
-    // made flipping the invariant safe.
+  it('**3a. a `.docx` with NO extracted text is skipped, never sent as a part**', async () => {
+    // Doc 52's premise, narrowed by doc 56. `.docx` is still out of
+    // `AI_ELIGIBLE_MIME_TYPES` — the BYTES never reach the model — and now it
+    // has a second chance through `extractedText`. This fixture leaves that
+    // NULL, which is what a failed extraction or an ingestion-service that was
+    // down produces, and the file is reported back rather than silently
+    // ignored.
     //
     // **The size is deliberately tiny, and that is what makes the sabotage
     // valid.** Force `isEligible` to return true and this must go red because
@@ -137,6 +154,188 @@ describe('Attachments as model input (e2e)', () => {
     expect(result.skipped).toEqual(['quote.docx']);
     // Never fetched: refusing on the row costs no bytes off storage.
     expect(download).not.toHaveBeenCalled();
+  });
+
+  it('**3c. …and WITH extracted text it is sent as a part, still with no download**', async () => {
+    // Doc 56 §C row 2, and the pair that makes 3a a decision rather than a
+    // drought: 3a alone stays green for a change that never sends a `.docx`
+    // under any circumstances, which is the feature not working.
+    //
+    // **No download is the half that would go unnoticed.** The text is a
+    // Postgres value, so a parse-eligible attachment stops touching storage on
+    // every AI turn — the "object is missing from Firebase" failure disappears
+    // for these rather than being handled. Asserting only on the returned part
+    // would pass for an implementation that fetched the bytes and threw them
+    // away.
+    const ticket = await createTicket(fx.prisma, tenant);
+    const message = await createMessage(fx.prisma, ticket.id);
+    await attach(message.id, DOCX, 2048, 'quote.docx', '# Quote\n\nTotal: 42');
+
+    const result = await service.forMessage(message.id, caller());
+
+    expect(result.skipped).toEqual([]);
+    expect(result.parts).toHaveLength(1);
+    expect(result.parts[0].fileName).toBe('quote.docx');
+    // `Buffer.from` because ts-proto types `data` as `Uint8Array`, whose
+    // `toString` takes no encoding.
+    expect(Buffer.from(result.parts[0].data).toString('utf8')).toBe(
+      '# Quote\n\nTotal: 42',
+    );
+    expect(download).not.toHaveBeenCalled();
+  });
+
+  it('**6. an `.xlsx` reaches the model the same way — a second format on one path**', async () => {
+    // Doc 57 §1's claim, asserted rather than assumed: the plumbing doc 56 built
+    // is format-agnostic, so `.xlsx` needs one list entry and one parser and
+    // nothing else. This is the test that would go red if any of it had grown a
+    // `.docx` assumption — the feed branch keys on `extractedText`, not on the
+    // MIME type.
+    const ticket = await createTicket(fx.prisma, tenant);
+    const message = await createMessage(fx.prisma, ticket.id);
+    await attach(
+      message.id,
+      XLSX,
+      4096,
+      'q1.xlsx',
+      '## Sheet: Q1 Revenue\n\n| Region | Actual |\n| --- | --- |\n| APAC | 1240 |',
+    );
+
+    const result = await service.forMessage(message.id, caller());
+
+    expect(result.skipped).toEqual([]);
+    expect(result.parts).toHaveLength(1);
+    // The PARSE's type, not the workbook's — the part carries markdown.
+    expect(result.parts[0].mimeType).toBe(EXTRACTED_TEXT_MIME_TYPE);
+    expect(Buffer.from(result.parts[0].data).toString('utf8')).toContain(
+      '## Sheet: Q1 Revenue',
+    );
+    // And no download, for the same reason a `.docx` needs none: the text is a
+    // Postgres value.
+    expect(download).not.toHaveBeenCalled();
+  });
+
+  it('**6c. an OVERLAPPING type is fed as TEXT, not as bytes**', async () => {
+    // The behaviour behind `mime.spec.ts`'s disjointness assertion, and it needs
+    // the very thing that assertion forbids: a type in BOTH lists. So the
+    // overlap is manufactured — `isEligible` is forced true for the `.docx`
+    // row, which is exactly the state the two lists must never reach on their
+    // own.
+    //
+    // **The two tests are not in tension.** One says the overlap must not
+    // exist; this one says that if it ever did — a list widened for some
+    // unrelated reason — the feed path resolves toward the extraction rather
+    // than away from it. Keyed on `!isEligible`, as it was before this pass,
+    // this file would be sent as bytes the model cannot parse while its
+    // markdown sat unread in Postgres.
+    const ticket = await createTicket(fx.prisma, tenant);
+    const message = await createMessage(fx.prisma, ticket.id);
+    await attach(message.id, DOCX, 2048, 'both.docx', '## Quote\n\nTotal: 42');
+
+    jest
+      .spyOn(
+        service as unknown as { isEligible: (mime: string) => boolean },
+        'isEligible',
+      )
+      .mockReturnValue(true);
+
+    const result = await service.forMessage(message.id, caller());
+
+    expect(result.parts).toHaveLength(1);
+    expect(result.parts[0].mimeType).toBe(EXTRACTED_TEXT_MIME_TYPE);
+    // The decisive assertion: bytes were never fetched, so the text won.
+    expect(download).not.toHaveBeenCalled();
+  });
+
+  it('**6b. …and an `.xlsx` with no extracted text is still skipped by name**', async () => {
+    // The pair. Test 6 alone stays green for a change that sends a part for any
+    // spreadsheet whatsoever, including one nothing could parse — which would
+    // hand the model an empty attachment and report success.
+    const ticket = await createTicket(fx.prisma, tenant);
+    const message = await createMessage(fx.prisma, ticket.id);
+    await attach(message.id, XLSX, 4096, 'broken.xlsx');
+
+    const result = await service.forMessage(message.id, caller());
+
+    expect(result.parts).toEqual([]);
+    expect(result.skipped).toEqual(['broken.xlsx']);
+  });
+
+  it('**3d. the part is TEXT, and the text never touches message content**', async () => {
+    // The injection distinction, which is the reason this is a part at all.
+    // Concatenating the extraction into the message would put file contents
+    // where the classifier reads USER-TYPED text, losing exactly what
+    // `ATTACHMENT_NOTE` exists to say: an instruction written INSIDE a file is
+    // an injection attempt just as much as one typed in the message.
+    //
+    // The mime type is the observable half of that decision on this side of the
+    // wire — a part labelled `...wordprocessingml.document` carrying markdown
+    // would be the same mismatch that made office attachments unreadable to
+    // begin with.
+    const ticket = await createTicket(fx.prisma, tenant);
+    const message = await createMessage(fx.prisma, ticket.id);
+    await attach(message.id, DOCX, 2048, 'policy.docx', '## Leave policy');
+
+    const result = await service.forMessage(message.id, caller());
+
+    expect(result.parts[0].mimeType).toBe(EXTRACTED_TEXT_MIME_TYPE);
+    // Not the file's own type. The part carries the PARSE, not the file.
+    expect(result.parts[0].mimeType).not.toBe(DOCX);
+  });
+
+  it('**3e. a truncated extraction carries its MARKER into the part**', async () => {
+    // A markdown document that simply stops is indistinguishable from one that
+    // ended, and the model answers confidently from the part it can see. The
+    // marker rides in as content, which is the only place the model can read
+    // it — it needs this more than the user does.
+    const ticket = await createTicket(fx.prisma, tenant);
+    const message = await createMessage(fx.prisma, ticket.id);
+    await attach(
+      message.id,
+      DOCX,
+      2048,
+      'handbook.docx',
+      `## Handbook${CHARACTER_TRUNCATION_MARKER}`,
+    );
+
+    const result = await service.forMessage(message.id, caller());
+
+    expect(Buffer.from(result.parts[0].data).toString('utf8')).toContain(
+      'Truncated',
+    );
+  });
+
+  it('**3f. five extractions cannot exceed the per-MESSAGE text budget**', async () => {
+    // The trap this cap exists for, and the reason it is enforced HERE. Each
+    // attachment is confirmed on its own — `confirmAttachment` is one call per
+    // file — so extraction cannot know what its siblings spent. A per-file cap
+    // alone lets five attachments at the per-file limit through together, which
+    // is the same failure `MAX_AI_ATTACHMENT_BYTES` was written to prevent.
+    //
+    // Three at 45% of the budget: the first two fit, the third cannot, and the
+    // sizes are chosen so no single one is over any per-file limit — otherwise
+    // a per-file check would catch it and this would pass with the message cap
+    // gone.
+    const ticket = await createTicket(fx.prisma, tenant);
+    const message = await createMessage(fx.prisma, ticket.id);
+    const chunk = 'x'.repeat(Math.floor(MAX_EXTRACTED_TEXT_PER_MESSAGE * 0.45));
+
+    await attach(message.id, DOCX, 2048, 'one.docx', chunk);
+    await attach(message.id, DOCX, 2048, 'two.docx', chunk);
+    await attach(message.id, DOCX, 2048, 'three.docx', chunk);
+
+    const result = await service.forMessage(message.id, caller());
+
+    expect(result.parts.map((part) => part.fileName)).toEqual([
+      'one.docx',
+      'two.docx',
+    ]);
+    expect(result.skipped).toEqual(['three.docx']);
+
+    const sent = result.parts.reduce(
+      (total, part) => total + part.data.length,
+      0,
+    );
+    expect(sent).toBeLessThanOrEqual(MAX_EXTRACTED_TEXT_PER_MESSAGE);
   });
 
   it('**3b. and a `.heic` IS sent, so 3a is a decision and not a drought**', async () => {

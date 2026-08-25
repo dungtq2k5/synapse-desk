@@ -209,6 +209,64 @@ describe('The AI generation rollup (e2e)', () => {
       expect(row.emptyRetrievals).toBe(0);
     });
 
+    it('**8b. An attachment-grounded empty retrieval is SPLIT OUT, not dropped**', async () => {
+      // Doc 56 §E. The count is not factually wrong — retrieval ran and
+      // returned nothing — but the INFERENCE is: `emptyRetrievalRate` is read
+      // as "the corpus is failing to answer questions it should answer", and a
+      // customer asking about their own invoice is asking something the corpus
+      // was never expected to answer.
+      //
+      // **`emptyRetrievals` stays the TOTAL**, so the two numbers read
+      // together. Reporting only the attachment-free count here would make the
+      // slice invisible in the one table that could show it.
+      await generation({ retrievedChunkIds: [], attachmentCount: 1 });
+      await generation({ retrievedChunkIds: [], attachmentCount: 0 });
+
+      await runOver('2026-03-01', '2026-03-04');
+
+      const [row] = await statsFor('2026-03-02');
+      expect(row.emptyRetrievals).toBe(2);
+      expect(row.attachmentEmptyRetrievals).toBe(1);
+      expect(row.attachmentGenerations).toBe(1);
+    });
+
+    it('**8c. …and an attachment that RETRIEVED something is still counted as grounded**', async () => {
+      // The pair that stops 8b passing for a change which simply copied
+      // `emptyRetrievals` into both columns. `attachmentGenerations` is the
+      // POPULATION — every answering generation that was given a file — and
+      // `attachmentEmptyRetrievals` is the subset of it that retrieved nothing.
+      // Conflating them makes the attachment-free rate wrong in the other
+      // direction.
+      await generation({
+        retrievedChunkIds: ['11111111-1111-4111-8111-111111111111'],
+        attachmentCount: 2,
+      });
+
+      await runOver('2026-03-01', '2026-03-04');
+
+      const [row] = await statsFor('2026-03-02');
+      expect(row.attachmentGenerations).toBe(1);
+      expect(row.attachmentEmptyRetrievals).toBe(0);
+      expect(row.emptyRetrievals).toBe(0);
+    });
+
+    it('**8d. An EMBEDDING with attachments is in neither attachment column**', async () => {
+      // The same purpose filter as the total above, for the same reason: an
+      // embedding retrieves nothing by definition, and letting it into either
+      // attachment column would make the split track ingestion volume.
+      await generation({
+        purpose: AiGenerationPurpose.EMBEDDING,
+        retrievedChunkIds: [],
+        attachmentCount: 3,
+      });
+
+      await runOver('2026-03-01', '2026-03-04');
+
+      const [row] = await statsFor('2026-03-02');
+      expect(row.attachmentGenerations).toBe(0);
+      expect(row.attachmentEmptyRetrievals).toBe(0);
+    });
+
     it('9. Counts every draft OUTCOME, including DISCARDED', async () => {
       // The denominator's third term, and the one that depends on the sweep.
       // Without it acceptance divides by drafts that were USED

@@ -163,6 +163,8 @@ describe('Analytics at the HTTP boundary (e2e)', () => {
           emptyRetrievals: 0,
           answeringGenerations: 0,
           emptyRetrievalRate: wireRate(0, 0),
+          attachmentGroundedRate: wireRate(0, 0),
+          attachmentEmptyRetrievals: 0,
           flags: [],
         }),
       );

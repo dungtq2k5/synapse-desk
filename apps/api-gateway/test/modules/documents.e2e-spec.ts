@@ -187,6 +187,31 @@ describe('Documents at the HTTP boundary (e2e)', () => {
       expect(fx.stubs.document.presignDocument).not.toHaveBeenCalled();
     });
 
+    it('**3b. and `.doc` is refused HERE rather than failing in the parser**', async () => {
+      // Doc 56 §A. `application/msword` was an accepted document type and could
+      // never have worked: mammoth reads OOXML, and a Word 97-2003 file is an
+      // OLE2 compound binary that throws `Can't find end of central directory :
+      // is this a zip file ?`.
+      //
+      // **A bare `Error`, so it missed the deterministic-refusal arm** and cost
+      // `attempts: 3` — three download-and-parse cycles to reach an `error_log`
+      // that asked a tenant whether their Word document was a zip file.
+      // Refusing at presign is the same verdict delivered once, in the one
+      // place it can carry a message the uploader can act on.
+      //
+      // Separate from test 3 because the type is not arbitrary: `.php` was never
+      // accepted, while this one was, and a regression re-adding it would leave
+      // 3 green.
+      const res = await authenticatedAgent(fx.app, {
+        permissionCodes: ['document.create'],
+      })
+        .post(`${API}/documents/presign`)
+        .send({ ...presign, contentType: 'application/msword' });
+
+      expect(res.status).toBe(400);
+      expect(fx.stubs.document.presignDocument).not.toHaveBeenCalled();
+    });
+
     it('4. REJECTS a file over the cap and ACCEPTS one exactly at it', async () => {
       fx.stubs.document.presignDocument.mockReturnValue(
         of({

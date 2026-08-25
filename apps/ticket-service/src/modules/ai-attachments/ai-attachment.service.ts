@@ -1,7 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import {
   AI_ELIGIBLE_MIME_TYPES,
+  EXTRACTED_TEXT_MIME_TYPE,
   MAX_AI_ATTACHMENT_BYTES,
+  MAX_EXTRACTED_TEXT_PER_MESSAGE,
+  PARSE_ELIGIBLE_MIME_TYPES,
   formatErrorMsg,
 } from '@synapsedesk/common';
 import { AttachmentPart, CallerContext } from '@synapsedesk/grpc-proto';
@@ -74,19 +77,72 @@ export class AiAttachmentService {
     const parts: AttachmentPart[] = [];
     const skipped: string[] = [];
     let budget = MAX_AI_ATTACHMENT_BYTES;
+    // **The per-message TEXT budget, and this is the only place it can live.**
+    // Extraction sees one attachment at a time — `confirmAttachment` is one
+    // call per file — so nothing at confirm knows what the siblings spent.
+    // Spent down exactly like `budget` above, which is the precedent for WHERE
+    // as much as for what.
+    let textBudget = MAX_EXTRACTED_TEXT_PER_MESSAGE;
 
     for (const row of rows) {
       const size = Number(row.fileSizeBytes);
 
-      if (!this.isEligible(row.mimeType)) {
-        // A `.docx` is storable, downloadable and unreadable to the model:
-        // nothing here extracts its text, so sending the bytes would spend
-        // tokens to produce nothing.
+      // **Keyed on PARSE-eligibility, not on the absence of AI-eligibility.**
+      // This used to read `if (!this.isEligible(...))`, which was the rule
+      // stated as its own complement and happened to be equivalent only because
+      // the two lists are disjoint. Nothing enforces that disjointness beyond
+      // one assertion in `mime.spec.ts`, and the complement form resolved an
+      // overlap the WRONG way: a type in both lists took the bytes path while
+      // its extracted markdown sat unread.
+      //
+      // Asked directly, an overlap resolves toward the text — which is the safe
+      // direction, because the text is the thing the model can actually read.
+      if (this.isParseEligible(row.mimeType)) {
+        // **The extracted-text branch.** A `.docx` used to end here
+        // unconditionally: storable, downloadable, and unreadable to the model
+        // because nothing turned it into text. Doc 56 §B turns it into text at
+        // confirm, so the bytes are no longer the only thing on offer.
         //
-        // **This branch used to be unreachable.** It said "a zip", and a zip has
-        // never been storable — the old invariant required every storable type
-        // to be AI-eligible, so nothing could arrive here at all. Doc 52 flipped
-        // that, and the office formats are the first attachments to take it.
+        // Note what does NOT happen: no download. The text is a Postgres value,
+        // so a parse-eligible attachment stops touching storage on every AI
+        // turn — the "object is missing from Firebase" failure disappears for
+        // these rather than being handled.
+        const text = row.extractedText;
+
+        if (text) {
+          if (text.length > textBudget) {
+            // Skip and keep going, exactly like the byte budget: a later small
+            // attachment should not lose its place because an earlier large one
+            // filled the message.
+            skipped.push(row.fileName);
+            continue;
+          }
+
+          parts.push({
+            // A TEXT mime type, and the bytes are the markdown. What must not
+            // happen is concatenation into the message content: that would put
+            // file contents where the injection classifier reads USER-TYPED
+            // text, losing the distinction `ATTACHMENT_NOTE` exists to draw.
+            mimeType: EXTRACTED_TEXT_MIME_TYPE,
+            data: Buffer.from(text, 'utf8'),
+            fileName: row.fileName,
+          });
+          textBudget -= text.length;
+          continue;
+        }
+
+        // `null` (nothing was attempted, or the parser failed) and `''` (it ran
+        // and the file had no text) both land here, and both are honestly a
+        // skip: there is nothing to send. The DIFFERENCE between them is for
+        // whoever debugs it, which is why the column is nullable.
+        skipped.push(row.fileName);
+        continue;
+      }
+
+      if (!this.isEligible(row.mimeType)) {
+        // Neither parse-eligible nor AI-eligible: storable, downloadable, and
+        // nothing here can turn it into something the model reads. A zip, a
+        // `.doc`. Reported by name rather than dropped.
         skipped.push(row.fileName);
         continue;
       }
@@ -230,7 +286,7 @@ export class AiAttachmentService {
    *
    * **One query, two questions, and the flag says which.** *"What is the draft
    * replying to"* and *"what was just refused"* are different questions about
-   * the same table, and answering both from one unparameterised method is how
+   * the same table, and answering both from one unparameterized method is how
    * the refusal write-back and the attachment selector would silently agree to
    * be wrong in opposite directions.
    */
@@ -253,5 +309,10 @@ export class AiAttachmentService {
 
   private isEligible(mimeType: string): boolean {
     return (AI_ELIGIBLE_MIME_TYPES as readonly string[]).includes(mimeType);
+  }
+
+  /** Whether confirm would have extracted text for this type. */
+  private isParseEligible(mimeType: string): boolean {
+    return (PARSE_ELIGIBLE_MIME_TYPES as readonly string[]).includes(mimeType);
   }
 }

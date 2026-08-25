@@ -222,6 +222,10 @@ describe('DocumentParserService (unit)', () => {
       // And the two it wrapped are now DIRECT, rather than reached through it.
       expect(manifest.dependencies).toHaveProperty('mammoth');
       expect(manifest.dependencies).toHaveProperty('turndown');
+      // Here rather than in a new test because this assertion exists to
+      // describe what the PARSER depends on, and leaving it at two of three
+      // makes it quietly stop doing that.
+      expect(manifest.dependencies).toHaveProperty('exceljs');
     });
   });
 

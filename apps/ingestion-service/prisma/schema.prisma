@@ -307,6 +307,25 @@ model AiGeneration {
   /// computable and degrades into `UNRETRIEVED` under a misleading name.
   citedChunkIds String[] @default([]) @map("cited_chunk_ids") @db.Uuid
 
+  /// How many attachment parts this generation was GIVEN.
+  ///
+  /// **The axis `empty_retrieval_rate` was missing.** That rate counts
+  /// generations whose `retrieved_chunk_ids` is empty, and is read as "the
+  /// corpus is failing to answer questions it should answer". A customer who
+  /// attaches an invoice and asks "what is my Q1 total?" retrieves nothing
+  /// CORRECTLY — the corpus was never the intended source — and lands in the
+  /// numerator of a metric named for knowledge gaps. The existing
+  /// `ANSWERING_PURPOSES` filter is about purpose; this is about whether the
+  /// corpus was the intended source at all.
+  ///
+  /// Counts PARTS, not files the user attached: a skipped attachment grounded
+  /// nothing.
+  ///
+  /// **`@default(0)` makes this forward-only.** Rows written before it existed
+  /// read as attachment-free and stay in that denominator, so the rate changes
+  /// definition at the cutover rather than being retroactively corrected.
+  attachmentCount Int @default(0) @map("attachment_count")
+
   /// AiGenerationOutcome — drafts only, set later. NULL until the agent acts.
   outcome String? @db.VarChar(20)
 
@@ -369,6 +388,22 @@ model AiGenerationDailyStat {
   /// question the corpus could not answer — which is a content backlog item,
   /// not an error, and is invisible in every other counter here.
   emptyRetrievals Int @default(0) @map("empty_retrievals")
+
+  /// The attachment-grounded slice, rolled up beside the totals above.
+  ///
+  /// **Two numbers because the report SPLITS rather than excludes.** Dropping
+  /// attachment-grounded generations from the knowledge-gap report would fix
+  /// the rate and throw away a real signal: "how many answers came from user
+  /// files" is worth knowing on its own, and it is what tells a Knowledge
+  /// Manager their corpus is being routed around. Excluding makes that
+  /// invisible; splitting keeps both readings.
+  ///
+  /// `attachmentGenerations` is the population; `attachmentEmptyRetrievals` is
+  /// how many of those retrieved nothing. `emptyRetrievals` above stays the
+  /// TOTAL, so the attachment-free rate is a subtraction rather than a third
+  /// column that could disagree with the other two.
+  attachmentGenerations     Int @default(0) @map("attachment_generations")
+  attachmentEmptyRetrievals Int @default(0) @map("attachment_empty_retrievals")
 
   /// The acceptance-rate numerator and its denominator's other two terms.
   ///

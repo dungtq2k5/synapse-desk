@@ -121,6 +121,26 @@ export interface RecordGenerationRequest {
    * given and chose not to use, and without it `UNCITED` is not computable.
    */
   citedChunkIds: string[];
+  /**
+   * How many attachment parts the generation was GIVEN.
+   *
+   * **The missing axis on `empty_retrieval_rate`.** That rate is read as "the
+   * corpus is failing to answer questions it should answer", and it is computed
+   * over generations whose `retrieved_chunk_ids` is empty. A customer who
+   * attaches an invoice and asks "what is my Q1 total?" retrieves nothing --
+   * correctly, because the corpus was never the intended source -- and lands in
+   * the numerator of a metric named for knowledge gaps.
+   *
+   * The existing filter is about PURPOSE and says so; this is about whether the
+   * corpus was the intended source at all. Recorded rather than inferred,
+   * because nothing else on this row can tell the two apart afterwards.
+   *
+   * Counts PARTS, not files the user attached: an attachment that was skipped
+   * did not ground the answer, so it must not move this number. That makes it a
+   * different question from `ChatRequest.attachment_count`, which asks what was
+   * sent.
+   */
+  attachmentCount: number;
 }
 
 export interface RecordGenerationResponse {
@@ -223,7 +243,15 @@ export interface AiUsageResponse {
   draftAcceptance:
     | AiRateValue
     | undefined;
-  /** *The knowledge-gap signal**: answering generations that retrieved nothing. */
+  /**
+   * *The knowledge-gap signal**: ATTACHMENT-FREE answering generations that
+   * retrieved nothing.
+   *
+   * Both this and `KnowledgeGapsResponse.empty_retrieval_rate` publish the same
+   * field name and must be computed over the same population -- two dashboards
+   * disagreeing under one name reads as broken data rather than as two
+   * definitions.
+   */
   emptyRetrievalRate: AiRateValue | undefined;
   computedAt?:
     | Timestamp
@@ -256,9 +284,32 @@ export interface KnowledgeGapDocumentFlag {
 export interface KnowledgeGapsResponse {
   emptyRetrievals: number;
   answeringGenerations: number;
+  /**
+   * Over ATTACHMENT-FREE answering generations only -- the population the
+   * phrase describes. A question about a user's own file is one the corpus was
+   * never expected to answer, so counting it conflates "the corpus had nothing"
+   * with "the corpus should have had something".
+   */
   emptyRetrievalRate: AiRateValue | undefined;
   flags: KnowledgeGapDocumentFlag[];
-  dataThrough?: string | undefined;
+  dataThrough?:
+    | string
+    | undefined;
+  /**
+   * The attachment-grounded slice, REPORTED rather than excluded.
+   *
+   * Dropping those rows would fix the rate and lose the signal that says a
+   * corpus is being routed around: "how many answers came from user files" is
+   * worth knowing on its own, and nothing else counts it.
+   */
+  attachmentGroundedRate:
+    | AiRateValue
+    | undefined;
+  /**
+   * How many of the attachment-grounded ones retrieved nothing -- the number
+   * subtracted out of `empty_retrievals` above to get the rate.
+   */
+  attachmentEmptyRetrievals: number;
 }
 
 /** Corpus health — which documents earn their place. */

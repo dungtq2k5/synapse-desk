@@ -8,6 +8,7 @@ import {
   EMBEDDING_MODEL,
   IngestionJobStatus,
   MAX_CHUNKS_PER_DOCUMENT,
+  UNKNOWN_EXTENSION,
   QDRANT_PAYLOAD_FIELDS,
 } from '@synapsedesk/common';
 import { Logger } from '@nestjs/common';
@@ -1360,9 +1361,19 @@ describe('The ingestion pipeline (e2e)', () => {
     });
 
     it('17. FAILS a file type it has no parser for', async () => {
-      const data = await queueDocument({ fileType: 'xlsx' });
+      // **`bin`, and NOT a format name.** This used to say `xlsx`, which was a
+      // fixture with an expiry date: doc 57 gave `.xlsx` a parser and the test
+      // started asserting that a working parser fails.
+      //
+      // `UNKNOWN_EXTENSION` cannot expire the same way. It is what confirm
+      // writes for an accepted MIME type with no entry in `EXTENSION_BY_MIME`
+      // — a real stored value, and one that by definition names no format, so
+      // no parser can ever claim it.
+      const data = await queueDocument({ fileType: UNKNOWN_EXTENSION });
 
-      await expect(processor.process(data)).rejects.toThrow(/xlsx/);
+      await expect(processor.process(data)).rejects.toThrow(
+        /No parser for file type/,
+      );
 
       const job = await fx.prisma.ingestionJob.findUniqueOrThrow({
         where: { id: data.ingestionJobId },

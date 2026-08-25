@@ -265,9 +265,14 @@ export type AllowedAttachmentMimeType =
  * what reaches the API is whatever this list allows.
  *
  * The reason that survives a model upgrade is the one about this system:
- * `document-parser.service.ts` already reads `.doc`/`.docx` via mammoth for the
- * ingestion pipeline, and promoting them here means calling that at send time.
+ * `document-parser.service.ts` already reads `.docx` via mammoth for the
+ * ingestion pipeline, and promoting it here means calling that at send time.
  * Until then a `.docx` part would be bytes the model receives and cannot parse.
+ *
+ * **`.doc` is not in that sentence, and never should have been.** Mammoth reads
+ * OOXML, so a Word 97-2003 file — an OLE2 compound binary — throws in the
+ * parser rather than converting. It is storable and downloadable and there is
+ * no parser to promote it with; see `MIME_TYPES` for the measured error.
  */
 export const AI_ELIGIBLE_MIME_TYPES = [
   'image/png',
@@ -381,3 +386,123 @@ export const MAX_STATUS_CHANGE_REASON_LENGTH = 500;
 /** `ai_response_feedbacks.rating` is a thumb, not a scale. */
 export const FEEDBACK_RATINGS = [1, -1] as const;
 export type FeedbackRating = (typeof FEEDBACK_RATINGS)[number];
+
+// ---------------------------------------------------------------------------
+// Attachment text extraction
+// ---------------------------------------------------------------------------
+
+/**
+ * Which stored attachments have their text extracted at confirm.
+ *
+ * **A third list, and it is neither of the other two.**
+ * {@link ALLOWED_ATTACHMENT_MIME_TYPES} answers "may a user store this?" and
+ * {@link AI_ELIGIBLE_MIME_TYPES} answers "may these bytes reach the model?".
+ * This one answers "does a parser turn this into text?" — and the three
+ * genuinely differ: a `.png` is storable and AI-eligible and has no text; a
+ * `.doc` is storable and neither of the others, because mammoth cannot read an
+ * OLE2 compound binary.
+ *
+ * **Disjoint from `AI_ELIGIBLE_MIME_TYPES` by construction**, and the feed path
+ * depends on it: an attachment is sent as bytes OR as extracted text, never
+ * both. A type in both lists would make that an ordering question, which is the
+ * kind of ambiguity that gets decided differently in two places.
+ */
+export const PARSE_ELIGIBLE_MIME_TYPES = [
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+] as const satisfies readonly AllowedAttachmentMimeType[];
+export type ParseEligibleMimeType = (typeof PARSE_ELIGIBLE_MIME_TYPES)[number];
+
+/**
+ * Rows kept from ONE sheet of a workbook.
+ *
+ * **Per sheet, so every sheet is represented.** A character cap alone lets one
+ * 50,000-row sheet consume the whole budget and sheets two onward never appear.
+ *
+ * Applied AFTER the workbook is built, not during — see `parseXlsx`, which is
+ * where the reason lives.
+ */
+export const MAX_SHEET_ROWS = 500;
+
+/**
+ * The longest extraction stored for ONE attachment (~25k tokens).
+ *
+ * **Enforced at EXTRACTION, not at feed.** Storing the whole thing and trimming
+ * on the way out leaves a 50 MB workbook as tens of MB of markdown in Postgres
+ * forever, for text nothing will ever send.
+ */
+export const MAX_EXTRACTED_TEXT_CHARS = 100_000;
+
+/**
+ * The longest extracted text ONE message may send to the model.
+ *
+ * **Enforced at FEED, and it cannot be anywhere else.** Extraction sees one
+ * attachment at a time — `confirmNewAttachments` loops, but `confirmAttachment`
+ * is one call per file — so nothing at confirm knows what an attachment's
+ * siblings already spent, and asking would be racy under the concurrent uploads
+ * the route is built for.
+ *
+ * {@link MAX_AI_ATTACHMENT_BYTES} is the precedent for WHERE as much as for
+ * what: it is spent down attachment by attachment in `AiAttachmentService`, and
+ * this drops into the same loop. Five attachments at
+ * {@link MAX_EXTRACTED_TEXT_CHARS} each would otherwise be 500k characters for
+ * one helpdesk reply.
+ */
+export const MAX_EXTRACTED_TEXT_PER_MESSAGE = 200_000;
+
+/**
+ * The MIME type an extracted-text part is SENT as.
+ *
+ * **`text/markdown`, because that is what the extraction is** — mammoth through
+ * turndown emits GFM, tables included. Labelling it `text/plain` would be a
+ * small lie the model reads: a pipe table announced as plain text is a wall of
+ * punctuation rather than a structure.
+ *
+ * Deliberately NOT the attachment's own MIME type. The part carries the parse
+ * result, not the file, and saying `...wordprocessingml.document` over a
+ * markdown payload is exactly the mismatch that made office attachments
+ * unreadable in the first place.
+ */
+export const EXTRACTED_TEXT_MIME_TYPE = 'text/markdown';
+
+/** What a character-capped extraction says about itself. */
+export const CHARACTER_TRUNCATION_MARKER =
+  '\n\n> [Truncated: this attachment exceeded the extraction size limit]';
+
+/**
+ * What a ROW-capped sheet says about itself, inside the markdown.
+ *
+ * **The model is the reader that needs this**, which is why it rides in as
+ * content rather than being reported to the caller. A markdown table that simply
+ * stops is indistinguishable from one that ended, and the model will answer
+ * confidently from the part it can see.
+ *
+ * Distinct from {@link CHARACTER_TRUNCATION_MARKER}: that one is appended once,
+ * at the very end, and says the whole attachment was too big. This is per-sheet,
+ * sits between the rows and whatever follows, and names the numbers.
+ *
+ * @param shown how many rows survived the cap.
+ * @param total how many the sheet actually had.
+ * @example
+ * rowTruncationMarker(500, 12_431)
+ * // '> [Truncated: 500 of 12,431 rows shown]'
+ */
+export function rowTruncationMarker(shown: number, total: number): string {
+  return `> [Truncated: ${shown.toLocaleString('en-US')} of ${total.toLocaleString('en-US')} rows shown]`;
+}
+
+/**
+ * What a PAGE-capped extraction says about itself.
+ *
+ * **"sections", not "sheets".** The cap is enforced in
+ * `AttachmentExtractorService`, which receives `ParsedPage[]` and is deliberately
+ * blind to what produced them — a rule phrased on sheets would need
+ * `if (mimeType === xlsx)` inside the one service that must not become half a
+ * parser. On pages it is correct for `.docx` and every later format for free.
+ *
+ * @param shown how many pages fitted inside the character budget.
+ * @param total how many the document had.
+ */
+export function sectionTruncationMarker(shown: number, total: number): string {
+  return `\n\n> [Truncated: ${shown} of ${total} sections shown — size limit reached]`;
+}

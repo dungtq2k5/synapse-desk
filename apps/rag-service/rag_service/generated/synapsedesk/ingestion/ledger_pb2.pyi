@@ -60,7 +60,7 @@ AI_GENERATION_OUTCOME_EDITED: AiGenerationOutcome
 AI_GENERATION_OUTCOME_DISCARDED: AiGenerationOutcome
 
 class RecordGenerationRequest(_message.Message):
-    __slots__ = ("organization_id", "user_id", "ticket_id", "purpose", "model_name", "prompt_tokens", "completion_tokens", "latency_ms", "status", "content", "retrieved_chunk_ids", "cited_chunk_ids")
+    __slots__ = ("organization_id", "user_id", "ticket_id", "purpose", "model_name", "prompt_tokens", "completion_tokens", "latency_ms", "status", "content", "retrieved_chunk_ids", "cited_chunk_ids", "attachment_count")
     ORGANIZATION_ID_FIELD_NUMBER: _ClassVar[int]
     USER_ID_FIELD_NUMBER: _ClassVar[int]
     TICKET_ID_FIELD_NUMBER: _ClassVar[int]
@@ -73,6 +73,7 @@ class RecordGenerationRequest(_message.Message):
     CONTENT_FIELD_NUMBER: _ClassVar[int]
     RETRIEVED_CHUNK_IDS_FIELD_NUMBER: _ClassVar[int]
     CITED_CHUNK_IDS_FIELD_NUMBER: _ClassVar[int]
+    ATTACHMENT_COUNT_FIELD_NUMBER: _ClassVar[int]
     organization_id: str
     user_id: str
     ticket_id: str
@@ -85,7 +86,8 @@ class RecordGenerationRequest(_message.Message):
     content: str
     retrieved_chunk_ids: _containers.RepeatedScalarFieldContainer[str]
     cited_chunk_ids: _containers.RepeatedScalarFieldContainer[str]
-    def __init__(self, organization_id: _Optional[str] = ..., user_id: _Optional[str] = ..., ticket_id: _Optional[str] = ..., purpose: _Optional[str] = ..., model_name: _Optional[str] = ..., prompt_tokens: _Optional[int] = ..., completion_tokens: _Optional[int] = ..., latency_ms: _Optional[int] = ..., status: _Optional[str] = ..., content: _Optional[str] = ..., retrieved_chunk_ids: _Optional[_Iterable[str]] = ..., cited_chunk_ids: _Optional[_Iterable[str]] = ...) -> None: ...
+    attachment_count: int
+    def __init__(self, organization_id: _Optional[str] = ..., user_id: _Optional[str] = ..., ticket_id: _Optional[str] = ..., purpose: _Optional[str] = ..., model_name: _Optional[str] = ..., prompt_tokens: _Optional[int] = ..., completion_tokens: _Optional[int] = ..., latency_ms: _Optional[int] = ..., status: _Optional[str] = ..., content: _Optional[str] = ..., retrieved_chunk_ids: _Optional[_Iterable[str]] = ..., cited_chunk_ids: _Optional[_Iterable[str]] = ..., attachment_count: _Optional[int] = ...) -> None: ...
 
 class RecordGenerationResponse(_message.Message):
     __slots__ = ("generation_id",)
@@ -196,18 +198,22 @@ class KnowledgeGapDocumentFlag(_message.Message):
     def __init__(self, document_id: _Optional[str] = ..., document_title: _Optional[str] = ..., flag_type: _Optional[_Union[_document_pb2.DocumentFlagType, str]] = ..., detail: _Optional[str] = ...) -> None: ...
 
 class KnowledgeGapsResponse(_message.Message):
-    __slots__ = ("empty_retrievals", "answering_generations", "empty_retrieval_rate", "flags", "data_through")
+    __slots__ = ("empty_retrievals", "answering_generations", "empty_retrieval_rate", "flags", "data_through", "attachment_grounded_rate", "attachment_empty_retrievals")
     EMPTY_RETRIEVALS_FIELD_NUMBER: _ClassVar[int]
     ANSWERING_GENERATIONS_FIELD_NUMBER: _ClassVar[int]
     EMPTY_RETRIEVAL_RATE_FIELD_NUMBER: _ClassVar[int]
     FLAGS_FIELD_NUMBER: _ClassVar[int]
     DATA_THROUGH_FIELD_NUMBER: _ClassVar[int]
+    ATTACHMENT_GROUNDED_RATE_FIELD_NUMBER: _ClassVar[int]
+    ATTACHMENT_EMPTY_RETRIEVALS_FIELD_NUMBER: _ClassVar[int]
     empty_retrievals: int
     answering_generations: int
     empty_retrieval_rate: AiRateValue
     flags: _containers.RepeatedCompositeFieldContainer[KnowledgeGapDocumentFlag]
     data_through: str
-    def __init__(self, empty_retrievals: _Optional[int] = ..., answering_generations: _Optional[int] = ..., empty_retrieval_rate: _Optional[_Union[AiRateValue, _Mapping]] = ..., flags: _Optional[_Iterable[_Union[KnowledgeGapDocumentFlag, _Mapping]]] = ..., data_through: _Optional[str] = ...) -> None: ...
+    attachment_grounded_rate: AiRateValue
+    attachment_empty_retrievals: int
+    def __init__(self, empty_retrievals: _Optional[int] = ..., answering_generations: _Optional[int] = ..., empty_retrieval_rate: _Optional[_Union[AiRateValue, _Mapping]] = ..., flags: _Optional[_Iterable[_Union[KnowledgeGapDocumentFlag, _Mapping]]] = ..., data_through: _Optional[str] = ..., attachment_grounded_rate: _Optional[_Union[AiRateValue, _Mapping]] = ..., attachment_empty_retrievals: _Optional[int] = ...) -> None: ...
 
 class DocumentAnalyticsRequest(_message.Message):
     __slots__ = ("limit",)

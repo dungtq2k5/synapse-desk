@@ -32,7 +32,7 @@ from rag_service.generation.boundary import (
     wrap_question,
     wrap_sources,
 )
-from rag_service.generation.parts import Attachment, Prompt
+from rag_service.generation.parts import Attachment, Prompt, attachments_of
 from rag_service.generation.review import (
     REFINE_MAX_TOKENS,
     REVIEW_MAX_TOKENS,
@@ -507,6 +507,11 @@ class CoRagGenerator:
                 retrieved_chunk_ids=[],
                 user_id=user_id,
                 ticket_id=ticket_id,
+                # **The row doc 56 E exists for.** Empty retrieval plus an
+                # attachment is a question the corpus was never expected to
+                # answer, and without this it is indistinguishable from one it
+                # should have answered and did not.
+                attachment_count=len(attachments or []),
                 # No model call happened, so no tokens were consumed. Recorded
                 # anyway: the row IS the gap signal, and a gap that costs
                 # nothing still needs to be findable.
@@ -565,6 +570,7 @@ class CoRagGenerator:
                 retrieved_chunk_ids=retrieved_chunk_ids,
                 user_id=user_id,
                 ticket_id=ticket_id,
+                attachment_count=len(attachments or []),
                 latency_ms=int((time.monotonic() - started_at) * 1000),
             )
             raise
@@ -585,6 +591,7 @@ class CoRagGenerator:
             retrieved_chunk_ids=retrieved_chunk_ids,
             user_id=user_id,
             ticket_id=ticket_id,
+            attachment_count=len(attachments or []),
             latency_ms=int((time.monotonic() - started_at) * 1000),
         )
 
@@ -841,6 +848,12 @@ class CoRagGenerator:
                 if content_is_draft
                 else []
             ),
+            # **Counted off the PROMPT, not off a parameter.** The prompt is
+            # literally what the model was given, so this cannot drift from
+            # reality the way a threaded count can -- and the review and refine
+            # passes deliberately get no attachments, which means they record 0
+            # here without anyone remembering to say so.
+            attachment_count=len(attachments_of(prompt)),
         )
         task = self._ledger.record(entry)
 
@@ -890,8 +903,17 @@ class CoRagGenerator:
         latency_ms: int | None = None,
         status: str = AiGenerationStatus.SUCCESS,
         charge: bool = True,
+        attachment_count: int = 0,
     ) -> str:
-        """CHARGE, then RECORD. Awaited, then fire-and-forget."""
+        """CHARGE, then RECORD. Awaited, then fire-and-forget.
+
+        `attachment_count` is the axis `empty_retrieval_rate` was missing. A row
+        with empty `retrieved_chunk_ids` means the corpus returned nothing; only
+        this says whether the corpus was ever the intended source. The
+        DOC_MISSING row below is exactly that case -- a customer asking about
+        their own invoice -- and it is the one that lands in the numerator of a
+        metric named for knowledge gaps.
+        """
         from rag_service.pricing import estimate_cost_micros
 
         if charge:
@@ -921,6 +943,7 @@ class CoRagGenerator:
                 # ALWAYS a subset of what was retrieved. The difference is what
                 # the model was given and chose not to use.
                 cited_chunk_ids=[citation.chunk_id for citation in answer.citations],
+                attachment_count=attachment_count,
             )
         )
 

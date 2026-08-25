@@ -86,16 +86,18 @@ class AttachmentPart(_message.Message):
     def __init__(self, mime_type: _Optional[str] = ..., data: _Optional[bytes] = ..., file_name: _Optional[str] = ...) -> None: ...
 
 class ChatRequest(_message.Message):
-    __slots__ = ("message", "history", "ticket_id", "attachments")
+    __slots__ = ("message", "history", "ticket_id", "attachments", "attachment_count")
     MESSAGE_FIELD_NUMBER: _ClassVar[int]
     HISTORY_FIELD_NUMBER: _ClassVar[int]
     TICKET_ID_FIELD_NUMBER: _ClassVar[int]
     ATTACHMENTS_FIELD_NUMBER: _ClassVar[int]
+    ATTACHMENT_COUNT_FIELD_NUMBER: _ClassVar[int]
     message: str
     history: _containers.RepeatedCompositeFieldContainer[ConversationTurn]
     ticket_id: str
     attachments: _containers.RepeatedCompositeFieldContainer[AttachmentPart]
-    def __init__(self, message: _Optional[str] = ..., history: _Optional[_Iterable[_Union[ConversationTurn, _Mapping]]] = ..., ticket_id: _Optional[str] = ..., attachments: _Optional[_Iterable[_Union[AttachmentPart, _Mapping]]] = ...) -> None: ...
+    attachment_count: int
+    def __init__(self, message: _Optional[str] = ..., history: _Optional[_Iterable[_Union[ConversationTurn, _Mapping]]] = ..., ticket_id: _Optional[str] = ..., attachments: _Optional[_Iterable[_Union[AttachmentPart, _Mapping]]] = ..., attachment_count: _Optional[int] = ...) -> None: ...
 
 class Citation(_message.Message):
     __slots__ = ("chunk_id", "document_id", "document_title", "page_number", "vector_point_id")

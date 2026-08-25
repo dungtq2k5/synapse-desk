@@ -96,6 +96,19 @@ message ChatRequest {
   // means...", turn 2's reformulation reads that and resolves "how do I fix
   // it?" without seeing a pixel.
   repeated AttachmentPart attachments = 4;
+  // How many attachments the message CARRIED, including ones that did not
+  // become parts.
+  //
+  // **`attachments` answers "what survived"; this answers "was there a file".**
+  // The greeting check needs the second: a user who attaches an unreadable
+  // spreadsheet and types "hi" sends zero parts, and a rule keyed on parts
+  // calls that a greeting and never looks at what they sent. `pipeline.py`
+  // states the rule as "a message carrying an attachment is not a greeting,
+  // WHATEVER its text" -- this is what makes that true when extraction failed,
+  // which doc 56 makes the common case.
+  //
+  // Always >= the length of `attachments`. Zero means no file at all.
+  int32 attachment_count = 5;
 }
 
 // What a generation concluded, kept from Self-RAG's taxonomy even though

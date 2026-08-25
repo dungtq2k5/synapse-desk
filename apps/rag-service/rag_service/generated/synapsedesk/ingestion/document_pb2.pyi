@@ -37,7 +37,6 @@ class DocumentFileType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     DOCUMENT_FILE_TYPE_TXT: _ClassVar[DocumentFileType]
     DOCUMENT_FILE_TYPE_MD: _ClassVar[DocumentFileType]
     DOCUMENT_FILE_TYPE_BIN: _ClassVar[DocumentFileType]
-    DOCUMENT_FILE_TYPE_DOC: _ClassVar[DocumentFileType]
     DOCUMENT_FILE_TYPE_DOCX: _ClassVar[DocumentFileType]
 
 class DocumentFlagType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
@@ -82,7 +81,6 @@ DOCUMENT_FILE_TYPE_PDF: DocumentFileType
 DOCUMENT_FILE_TYPE_TXT: DocumentFileType
 DOCUMENT_FILE_TYPE_MD: DocumentFileType
 DOCUMENT_FILE_TYPE_BIN: DocumentFileType
-DOCUMENT_FILE_TYPE_DOC: DocumentFileType
 DOCUMENT_FILE_TYPE_DOCX: DocumentFileType
 DOCUMENT_FLAG_TYPE_UNSPECIFIED: DocumentFlagType
 DOCUMENT_FLAG_TYPE_OUTDATED: DocumentFlagType
@@ -514,6 +512,22 @@ class IngestionJobIdRequest(_message.Message):
     ID_FIELD_NUMBER: _ClassVar[int]
     id: str
     def __init__(self, id: _Optional[str] = ...) -> None: ...
+
+class ExtractAttachmentTextRequest(_message.Message):
+    __slots__ = ("object_path", "mime_type")
+    OBJECT_PATH_FIELD_NUMBER: _ClassVar[int]
+    MIME_TYPE_FIELD_NUMBER: _ClassVar[int]
+    object_path: str
+    mime_type: str
+    def __init__(self, object_path: _Optional[str] = ..., mime_type: _Optional[str] = ...) -> None: ...
+
+class ExtractAttachmentTextResponse(_message.Message):
+    __slots__ = ("markdown", "truncated")
+    MARKDOWN_FIELD_NUMBER: _ClassVar[int]
+    TRUNCATED_FIELD_NUMBER: _ClassVar[int]
+    markdown: str
+    truncated: bool
+    def __init__(self, markdown: _Optional[str] = ..., truncated: _Optional[bool] = ...) -> None: ...
 
 class CancelIngestionJobResponse(_message.Message):
     __slots__ = ("cancelled",)

@@ -228,7 +228,18 @@ export class KnowledgeGapFlagResponseDto {
 export class KnowledgeGapsResponseDto {
   emptyRetrievals!: number;
   answeringGenerations!: number;
+  /**
+   * Over ATTACHMENT-FREE answering generations only.
+   *
+   * `emptyRetrievals` above stays the total, so the two read together: a
+   * question about a user's own file retrieved nothing correctly, and is not a
+   * gap in the corpus.
+   */
   emptyRetrievalRate!: RateResponseDto;
+  /** How many answering generations were given a file — reported, not hidden. */
+  attachmentGroundedRate!: RateResponseDto;
+  /** The part of `emptyRetrievals` the rate above excludes. */
+  attachmentEmptyRetrievals!: number;
   flags!: KnowledgeGapFlagResponseDto[];
   /** See `AgentAnalyticsResponseDto.dataThrough`. */
   dataThrough!: string | null;
