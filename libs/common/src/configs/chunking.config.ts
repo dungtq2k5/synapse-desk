@@ -1,5 +1,5 @@
 /**
- * How a document becomes chunks — the shape of every citation in the product.
+ * @file How a document becomes chunks — the shape of every citation in the product.
  *
  * These numbers are not tuning knobs in the settings-layer sense: they are
  * baked into the vectors the moment a document is ingested, so changing one

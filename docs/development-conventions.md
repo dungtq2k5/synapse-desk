@@ -535,6 +535,9 @@ modules/<module>/
 - **The suffix carries the protocol, not just the folder.** Two files with one name in two folders are ambiguous in an import line and in editor search.
 - **Both protocols' mappers live in one `<entity>.mapper.ts`** — putting the wire→REST and wire→GraphQL conversions side by side is what makes a divergence between them visible.
 - **`to<ReturnTypeName>` / `from<InputTypeName>` always name the FOREIGN side.** `toUser` is the version this rule exists to prevent. Full reasoning: [ADR 0004](./decisions/0004-mappers-name-the-foreign-side.md).
+- **A GENERIC wrapper return type does not resolve, and `to<Entity>PageDto` is the convention that grew in its place.** `PaginationResponseDto<DocumentResponseDto>` has no single name to carry verbatim, so the rule above has no answer for it — and thirteen files independently reached the same one. Written down because a scan applying the rule literally reports every one of them, and a guard that reports thirteen false positives is a guard somebody switches off. `mapper-naming.spec.ts` exempts a return type containing `<` for exactly this reason.
+- **An ARRAY return pluralizes the type's name, not the suffix**: `SimilarTicketResponseDto[]` is `toSimilarTicketResponseDtos`, never `toSimilarTicketDtos`. Dropping `Response` is the common way this rule fails, because the shorter name reads perfectly well and stops identifying what it returns.
+- **`mapper-naming.spec.ts` enforces all of this**, scanning `*.mapper.ts` from the CODE toward the rule. Six violations reached `main` before it existed and every one was found by somebody happening to open the file — a reviewer sees the mapper in their diff and nothing reads the rest.
 
 ### 12.2 REST and GraphQL DTOs share nothing
 

@@ -1,5 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { AuditPublisher } from '@synapsedesk/common';
+import {
+  AuditPublisher,
+  MAX_ATTACHMENT_BYTES,
+  MAX_ATTACHMENTS_PER_MESSAGE,
+} from '@synapsedesk/common';
+import { AuthReferenceService } from '../../src/modules/auth-client/auth-reference.service';
 import { AppModule } from '../../src/app.module';
 import { PrismaService } from '../../src/modules/prisma/prisma.service';
 import { DatabaseSeeder } from '../../src/modules/prisma/database.seeder';
@@ -61,8 +66,33 @@ export async function bootstrapE2eTest(): Promise<E2eFixture> {
     record: jest.spyOn(auditPublisher, 'record').mockImplementation(() => {}),
   };
 
+  // **The tenant attachment ceilings, defaulted to the platform ones.**
+  //
+  // `getAttachmentLimits` calls auth-service, which is not running for these
+  // suites, and it FAILS CLOSED — so without this every message-create and
+  // every attachment presign in the service answers UNAVAILABLE.
+  //
+  // Defaulted here rather than per suite because "no override configured" is
+  // the state almost every test means, and it is what the constants alone used
+  // to express. A suite testing a NARROWED tenant overrides this spy; the
+  // failure mode itself is covered by `limit-composition.spec.ts` on the
+  // ingestion side, where the composition lives.
+  // **Re-armed in `reset()`, not just here.** Several suites call
+  // `jest.restoreAllMocks()` in `afterEach`, which removes a spy installed at
+  // bootstrap — so a one-time install works for exactly the first test in those
+  // files and then every later one answers UNAVAILABLE.
+  const authReference = moduleRef.get(AuthReferenceService);
+  const armAttachmentLimits = () =>
+    jest.spyOn(authReference, 'getAttachmentLimits').mockResolvedValue({
+      maxBytes: MAX_ATTACHMENT_BYTES,
+      maxPerMessage: MAX_ATTACHMENTS_PER_MESSAGE,
+    });
+
+  armAttachmentLimits();
+
   const reset = async (): Promise<void> => {
     audit.record.mockClear();
+    armAttachmentLimits();
     // TRUNCATE, unlike auth-service's careful DELETE-with-predicate, because
     // Domain B seeds no ROWS at all: there is no permission catalogue, no system
     // actor and no global role to preserve. Every row in this database belongs

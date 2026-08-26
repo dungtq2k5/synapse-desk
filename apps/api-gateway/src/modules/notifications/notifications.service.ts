@@ -4,7 +4,7 @@ import { NotificationsGrpcClient } from './notifications-grpc.client';
 import {
   toListNotificationsRequest,
   toMarkReadRequest,
-  toNotificationFeedDto,
+  toNotificationFeedResponseDto,
   toPreferenceResponseDto,
   toPreferenceResponseDtos,
   toUpdatePreferenceRequest,
@@ -32,7 +32,7 @@ export class NotificationsService {
     query: ListNotificationsQueryDto,
     context: RequestContext,
   ): Promise<NotificationFeedResponseDto> {
-    return toNotificationFeedDto(
+    return toNotificationFeedResponseDto(
       await this.notificationsGrpcClient.list(
         toListNotificationsRequest(query),
         context,

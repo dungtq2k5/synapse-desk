@@ -21,6 +21,19 @@ export class OrganizationSettingsResponseDto {
   readonly allowedEmailDomains!: string[];
   /** Accepted free-mail domains worth a second look. Never an error. */
   readonly publicDomainWarnings!: string[];
+
+  /**
+   * What this workspace has configured, or `null` where it has configured
+   * nothing.
+   *
+   * `null` rather than the platform number: a screen that renders the ceiling
+   * as if the tenant had chosen it cannot show the difference between an
+   * inherited limit and a deliberate one, and the tenant would have no way to
+   * tell whether clearing the field changes anything.
+   */
+  readonly maxDocumentBytesOverride!: number | null;
+  readonly maxAttachmentBytesOverride!: number | null;
+  readonly maxAttachmentsPerMessageOverride!: number | null;
 }
 
 /**

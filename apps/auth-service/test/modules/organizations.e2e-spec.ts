@@ -1,3 +1,4 @@
+import type { UpdateOrganizationSettingsRequest } from '@synapsedesk/grpc-proto';
 import { expectRpc } from '@synapsedesk/common/testing/rpc';
 import { status } from '@grpc/grpc-js';
 import { toProtoOrgStatus } from '@synapsedesk/grpc-proto';
@@ -26,6 +27,25 @@ describe('Organizations (e2e)', () => {
       'organization.update',
       'organization.delete',
     ]);
+
+  /**
+   * A settings request with the CLEAR flags defaulted off.
+   *
+   * Three tenant-limit fields each carry a `clear_*` boolean, so a literal that
+   * omits them no longer type-checks. Defaulting them here keeps every existing
+   * case saying what it is about; a test that means to clear an override passes
+   * the flag explicitly.
+   */
+  const settingsRequest = (
+    overrides: Partial<UpdateOrganizationSettingsRequest> = {},
+  ): UpdateOrganizationSettingsRequest => ({
+    allowedEmailDomains: [],
+    replaceAllowedEmailDomains: false,
+    clearMaxDocumentBytesOverride: false,
+    clearMaxAttachmentBytesOverride: false,
+    clearMaxAttachmentsPerMessageOverride: false,
+    ...overrides,
+  });
 
   beforeAll(async () => {
     fx = await bootstrapE2eTest();
@@ -74,11 +94,11 @@ describe('Organizations (e2e)', () => {
       const t = await seedTenantWithUser(fx.prisma);
 
       const result = await organizations.updateOrganizationSettings(
-        {
+        settingsRequest({
           enforceTwoFactor: true,
           allowedEmailDomains: [],
           replaceAllowedEmailDomains: false,
-        },
+        }),
         ctx(t),
       );
 
@@ -101,11 +121,11 @@ describe('Organizations (e2e)', () => {
       });
 
       await organizations.updateOrganizationSettings(
-        {
+        settingsRequest({
           enforceTwoFactor: true,
           allowedEmailDomains: [],
           replaceAllowedEmailDomains: false,
-        },
+        }),
         ctx(t),
       );
 
@@ -120,10 +140,10 @@ describe('Organizations (e2e)', () => {
       const t = await seedTenantWithUser(fx.prisma);
 
       const result = await organizations.updateOrganizationSettings(
-        {
+        settingsRequest({
           allowedEmailDomains: ['gmail.com'],
           replaceAllowedEmailDomains: true,
-        },
+        }),
         ctx(t),
       );
 
@@ -136,10 +156,10 @@ describe('Organizations (e2e)', () => {
 
       await expectRpc(
         organizations.updateOrganizationSettings(
-          {
+          settingsRequest({
             allowedEmailDomains: ['not a domain'],
             replaceAllowedEmailDomains: true,
-          },
+          }),
           ctx(t),
         ),
         status.INVALID_ARGUMENT,
@@ -155,11 +175,11 @@ describe('Organizations (e2e)', () => {
       });
 
       const result = await organizations.updateOrganizationSettings(
-        {
+        settingsRequest({
           enforceTwoFactor: true,
           allowedEmailDomains: [],
           replaceAllowedEmailDomains: false,
-        },
+        }),
         ctx(t),
       );
 

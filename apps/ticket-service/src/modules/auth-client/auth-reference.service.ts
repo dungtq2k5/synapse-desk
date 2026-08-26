@@ -15,7 +15,27 @@ import {
   USER_SERVICE_NAME,
   UserServiceClient,
 } from '@synapsedesk/grpc-proto';
-import { formatErrorMsg } from '@synapsedesk/common';
+import {
+  formatErrorMsg,
+  MAX_ATTACHMENT_BYTES,
+  MAX_ATTACHMENTS_PER_MESSAGE,
+  requireTenant,
+} from '@synapsedesk/common';
+
+/** What a tenant will accept on one message, platform ceilings already applied. */
+export type AttachmentLimits = {
+  maxBytes: number;
+  maxPerMessage: number;
+};
+
+/**
+ * How long a tenant's attachment ceilings are held.
+ *
+ * Short enough that an admin who narrows a limit sees it take effect while they
+ * are still on the page, long enough that a burst of attachments on one message
+ * costs one auth call rather than five.
+ */
+const ATTACHMENT_LIMIT_TTL_MS = 30_000;
 
 /**
  * Validates the ids this service stores but does not own.
@@ -45,6 +65,51 @@ export class AuthReferenceService implements OnModuleInit {
   private departmentService!: DepartmentServiceClient;
   private organizationService!: OrganizationServiceClient;
 
+  /**
+   * Tenant attachment ceilings, by organization id.
+   *
+   * **Cached, and the precedent deliberately does NOT transfer.**
+   * ingestion-service's `getStorageLimitBytes` refuses to cache, and its
+   * docblock gives the reason: a plan grant *"goes stale the moment Stripe
+   * writes a new plan — which is precisely when a customer expects their new
+   * quota to work."*
+   *
+   * This value is the opposite kind. It changes when an admin submits a
+   * settings form, nobody is waiting on it, and a few seconds of staleness on a
+   * self-imposed safety limit costs nothing. What it buys is real: without a
+   * cache this puts a synchronous cross-service call on every attachment
+   * presign and every confirm, which is the highest-volume path here.
+   *
+   * **Nothing invalidates this, and 30 seconds is the flat cost.**
+   * `ORGANIZATION_SETTINGS_UPDATED` is an `AuditAction`, not a subject, and
+   * this service consumes no organization event — so a tenant that tightens its
+   * limit keeps the looser one for the whole window every time, rather than
+   * usually being rescued by an event. That is the right trade for a
+   * self-imposed safety setting and the wrong one for an entitlement.
+   *
+   * **A PLAN grant must not reuse this, and the fix is a SUBSCRIPTION rather
+   * than a shorter TTL.** Thirty seconds of a stale grant is thirty seconds of
+   * a tenant spending an entitlement Stripe has already taken away, and no TTL
+   * short enough to fix that is long enough to be worth having.
+   * `billing.entitlements_changed` already exists and
+   * `ai-settings/entitlements.consumer.ts` already consumes it exactly this way
+   * — so `getStorageLimitBytes` refuses to cache because it has no consumer,
+   * not because entitlements are uncacheable. Phase 2 can have the safe
+   * version.
+   *
+   * **Entries are never evicted, and that is deliberate.** An expired one falls
+   * through to the peer and is overwritten by the `set` below, so the only
+   * entries that accumulate belong to tenants that stop making requests —
+   * which no read-triggered delete can ever reach. Reclaiming them needs a
+   * sweep or an LRU, and growth is bounded by tenant count rather than by
+   * traffic: one small object per tenant this process has served is not worth
+   * a timer.
+   */
+  private readonly limits = new Map<
+    string,
+    { value: AttachmentLimits; expiresAt: number }
+  >();
+
   constructor(@Inject(AUTH_GRPC_CLIENT) private readonly client: ClientGrpc) {}
 
   onModuleInit(): void {
@@ -61,6 +126,72 @@ export class AuthReferenceService implements OnModuleInit {
       this.client.getService<OrganizationServiceClient>(
         ORGANIZATION_SERVICE_NAME,
       );
+  }
+
+  /**
+   * The tenant's attachment ceilings, already composed with the platform ones.
+   *
+   * `min()` per field, so every layer narrows and none widens. A tenant that
+   * configured nothing gets exactly today's constants.
+   *
+   * @throws RpcException `UNAVAILABLE` when the organization cannot be read.
+   * A stale entry is never served in its place — an unreadable limit must not
+   * resolve to the wide one, and a cached one is exactly the wide one a tenant
+   * has just narrowed.
+   */
+  async getAttachmentLimits(context: CallerContext): Promise<AttachmentLimits> {
+    const organizationId = requireTenant(context);
+
+    const cached = this.limits.get(organizationId);
+    if (cached && cached.expiresAt > Date.now()) return cached.value;
+
+    try {
+      const organization = await firstValueFrom(
+        this.organizationService
+          .getCurrentOrganization({}, packRequestContext(context))
+          .pipe(timeout(GRPC_DEADLINE_MS)),
+      );
+
+      const value: AttachmentLimits = {
+        // **The `??` is the guard, and removing it fails OPEN.** Absent means
+        // the tenant configured nothing — the normal state. Without the
+        // fallback the operand is `undefined`, `Math.min` returns `NaN`, and
+        // `size > NaN` is FALSE — so every size check passes and the limit is
+        // gone. It reads like a redundant default and it is the only thing
+        // standing between an unset override and an unlimited attachment.
+        //
+        // `?? 0` fails the other way and is louder: it refuses every
+        // attachment for every tenant that never opened the settings page.
+        maxBytes: Math.min(
+          MAX_ATTACHMENT_BYTES,
+          organization.maxAttachmentBytesOverride ?? MAX_ATTACHMENT_BYTES,
+        ),
+        maxPerMessage: Math.min(
+          MAX_ATTACHMENTS_PER_MESSAGE,
+          organization.maxAttachmentsPerMessageOverride ??
+            MAX_ATTACHMENTS_PER_MESSAGE,
+        ),
+      };
+
+      this.limits.set(organizationId, {
+        value,
+        expiresAt: Date.now() + ATTACHMENT_LIMIT_TTL_MS,
+      });
+
+      return value;
+    } catch (error) {
+      this.logger.error(
+        `Could not read the attachment limits: ${formatErrorMsg(error)}`,
+      );
+
+      // FAILS CLOSED. Falling back to the platform ceiling looks like the safe
+      // middle and is not: it hands a tenant that narrowed its limit the wide
+      // one at exactly the moment the check could not run.
+      throw new RpcException({
+        code: status.UNAVAILABLE,
+        message: 'Could not verify the attachment limits',
+      });
+    }
   }
 
   /**

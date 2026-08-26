@@ -3,7 +3,7 @@ import { AnalyticsExportKind, RequestContext } from '@synapsedesk/common';
 import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
 import { AuditLogsGrpcClient } from './audit-logs-grpc.client';
 import {
-  toAuditActionList,
+  toAuditActions,
   toAuditLogPageDto,
   toListAuditLogsRequest,
 } from './audit-log.mapper';
@@ -48,7 +48,7 @@ export class AuditLogsService {
     platformScope = false,
   ): Promise<AuditActionsResponseDto> {
     return {
-      actions: toAuditActionList(
+      actions: toAuditActions(
         await this.auditLogsGrpcClient.listActions(context, platformScope),
       ),
     };

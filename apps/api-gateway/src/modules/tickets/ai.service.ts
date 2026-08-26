@@ -2,11 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { RequestContext } from '@synapsedesk/common';
 import { AiGrpcClient } from './ai-grpc.client';
 import {
-  toAiClassificationDto,
+  toAiClassificationResponseDto,
   toAiDraftResponseDto,
   toAiSuggestionsResponseDto,
   toAiSummaryResponseDto,
-  toSimilarTicketDtos,
+  toSimilarTicketResponseDtos,
 } from './ai.mapper';
 import { GenerateDraftDto } from './dto/rest/ai.dto';
 import {
@@ -66,7 +66,7 @@ export class AiService {
     ticketId: string,
     context: RequestContext,
   ): Promise<AiClassificationResponseDto> {
-    return toAiClassificationDto(
+    return toAiClassificationResponseDto(
       await this.aiGrpcClient.classifyTicket(ticketId, context),
     );
   }
@@ -75,7 +75,7 @@ export class AiService {
     ticketId: string,
     context: RequestContext,
   ): Promise<SimilarTicketResponseDto[]> {
-    return toSimilarTicketDtos(
+    return toSimilarTicketResponseDtos(
       await this.aiGrpcClient.listSimilarTickets(ticketId, context),
     );
   }

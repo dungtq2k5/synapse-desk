@@ -1,12 +1,13 @@
 import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { buildInboundAddress, RequestContext } from '@synapsedesk/common';
-import { OrganizationsGrpcClient } from './organizations-grpc.client';
 import {
+  toOrganizationSettingsResponseDto,
   toOnboardingResponseDto,
   toOrganizationResponseDto,
   toOrganizationUsageResponseDto,
 } from './organization.mapper';
+import { ConfigService } from '@nestjs/config';
+import { buildInboundAddress, RequestContext } from '@synapsedesk/common';
+import { OrganizationsGrpcClient } from './organizations-grpc.client';
 import { InboundAddressResponseDto } from './dto/rest/inbound-address-response.dto';
 import {
   DeleteOrganizationDto,
@@ -73,27 +74,44 @@ export class OrganizationsService {
     );
   }
 
-  getSettings(
+  async getSettings(
     context: RequestContext,
   ): Promise<OrganizationSettingsResponseDto> {
-    return this.organizationsGrpcClient.getSettings(context);
+    return this.organizationsGrpcClient
+      .getSettings(context)
+      .then(toOrganizationSettingsResponseDto);
   }
 
-  updateSettings(
+  async updateSettings(
     dto: UpdateOrganizationSettingsDto,
     context: RequestContext,
   ): Promise<OrganizationSettingsResponseDto> {
-    return this.organizationsGrpcClient.updateSettings(
-      {
-        enforceTwoFactor: dto.enforceTwoFactor,
-        allowedEmailDomains: dto.allowedEmailDomains ?? [],
-        // protobuf cannot distinguish an omitted repeated field from an empty
-        // one, so presence at the REST edge is carried explicitly. Without it,
-        // an update touching only `enforceTwoFactor` wipes the allowlist.
-        replaceAllowedEmailDomains: dto.allowedEmailDomains !== undefined,
-      },
-      context,
-    );
+    return this.organizationsGrpcClient
+      .updateSettings(
+        {
+          enforceTwoFactor: dto.enforceTwoFactor,
+          allowedEmailDomains: dto.allowedEmailDomains ?? [],
+          // protobuf cannot distinguish an omitted repeated field from an empty
+          // one, so presence at the REST edge is carried explicitly. Without it,
+          // an update touching only `enforceTwoFactor` wipes the allowlist.
+          replaceAllowedEmailDomains: dto.allowedEmailDomains !== undefined,
+          // Three states across a wire that carries two. `null` at the edge means
+          // "clear it" and travels as a flag; a value travels as a value; absent
+          // travels as neither. See the request message.
+          maxDocumentBytesOverride: dto.maxDocumentBytesOverride ?? undefined,
+          clearMaxDocumentBytesOverride: dto.maxDocumentBytesOverride === null,
+          maxAttachmentBytesOverride:
+            dto.maxAttachmentBytesOverride ?? undefined,
+          clearMaxAttachmentBytesOverride:
+            dto.maxAttachmentBytesOverride === null,
+          maxAttachmentsPerMessageOverride:
+            dto.maxAttachmentsPerMessageOverride ?? undefined,
+          clearMaxAttachmentsPerMessageOverride:
+            dto.maxAttachmentsPerMessageOverride === null,
+        },
+        context,
+      )
+      .then(toOrganizationSettingsResponseDto);
   }
 
   async getUsage(

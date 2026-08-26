@@ -41,6 +41,9 @@ import {
   isUniqueConstraintViolation,
   OrgStatus,
   requireTenant,
+  MAX_ATTACHMENT_BYTES,
+  MAX_ATTACHMENTS_PER_MESSAGE,
+  MAX_DOCUMENT_BYTES,
 } from '@synapsedesk/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { SessionsService } from '../sessions/sessions.service';
@@ -101,7 +104,15 @@ export class OrganizationsService {
 
     const organization = await this.prisma.organization.findFirst({
       where: { inboundToken: token, deletedAt: null },
-      select: { id: true, status: true },
+      select: {
+        id: true,
+        status: true,
+        // The attachment ceilings RIDE this lookup rather than costing the mail
+        // path a second call. It already resolves the tenant, and inbound mail
+        // is the one attachment surface anyone who knows the address can reach.
+        maxAttachmentBytesOverride: true,
+        maxAttachmentsPerMessageOverride: true,
+      },
     });
 
     if (!organization) {
@@ -117,6 +128,14 @@ export class OrganizationsService {
     return {
       organizationId: organization.id,
       status: toProtoOrgStatus(organization.status),
+      // `?? undefined`, never `?? 0` — absent means the tenant configured
+      // nothing and the caller falls through to the platform ceiling.
+      maxAttachmentBytesOverride:
+        organization.maxAttachmentBytesOverride === null
+          ? undefined
+          : Number(organization.maxAttachmentBytesOverride),
+      maxAttachmentsPerMessageOverride:
+        organization.maxAttachmentsPerMessageOverride ?? undefined,
     };
   }
 
@@ -322,6 +341,7 @@ export class OrganizationsService {
       allowedEmailDomains: organization.allowedEmailDomains,
       // Only a WRITE can introduce a questionable domain, so a read reports none.
       publicDomainWarnings: [],
+      ...toLimitOverrides(organization),
     };
   }
 
@@ -360,6 +380,13 @@ export class OrganizationsService {
       );
     }
 
+    // **Re-checked here, not only at the gateway.** The DTO refuses a widening
+    // value with a field-named 400 before a network hop, which is what that
+    // layer is for — but this RPC is reachable without it, and a tenant
+    // granting itself a bigger allowance is the one outcome the whole layering
+    // rule exists to make impossible. Two layers, one number.
+    this.applyLimitOverrides(request, data);
+
     const organization = await this.prisma.organization.update({
       where: { id: existing.id },
       data,
@@ -396,6 +423,7 @@ export class OrganizationsService {
       enforceTwoFactor: organization.enforceTwoFactor,
       allowedEmailDomains: organization.allowedEmailDomains,
       publicDomainWarnings: warnings,
+      ...toLimitOverrides(organization),
     };
   }
 
@@ -734,6 +762,72 @@ export class OrganizationsService {
   }
 
   /**
+   * The three tenant ceilings, validated and written.
+   *
+   * **Every layer narrows and no layer widens.** A value above the platform
+   * constant is REFUSED rather than clamped: a clamp accepts a request whose
+   * intent it did not honour, and the caller has no way to learn its 50 MB
+   * became 25. The refusal names the field.
+   *
+   * Absence and an explicit clear are different instructions, which is why each
+   * field carries a flag beside it — see the request message.
+   *
+   * @throws RpcException `INVALID_ARGUMENT` when a value exceeds its platform
+   * ceiling.
+   */
+  private applyLimitOverrides(
+    request: UpdateOrganizationSettingsRequest,
+    data: Prisma.OrganizationUpdateInput,
+  ): void {
+    const rules = [
+      {
+        field: 'maxDocumentBytesOverride',
+        ceiling: BigInt(MAX_DOCUMENT_BYTES),
+        value: request.maxDocumentBytesOverride,
+        clear: request.clearMaxDocumentBytesOverride,
+        asBigInt: true,
+      },
+      {
+        field: 'maxAttachmentBytesOverride',
+        ceiling: BigInt(MAX_ATTACHMENT_BYTES),
+        value: request.maxAttachmentBytesOverride,
+        clear: request.clearMaxAttachmentBytesOverride,
+        asBigInt: true,
+      },
+      {
+        field: 'maxAttachmentsPerMessageOverride',
+        ceiling: BigInt(MAX_ATTACHMENTS_PER_MESSAGE),
+        value: request.maxAttachmentsPerMessageOverride,
+        clear: request.clearMaxAttachmentsPerMessageOverride,
+        asBigInt: false,
+      },
+    ] as const;
+
+    for (const rule of rules) {
+      if (rule.clear) {
+        // NULL, never 0. Zero is a limit that refuses everything; NULL is the
+        // absence of a tenant opinion, and the layer above applies.
+        (data as Record<string, unknown>)[rule.field] = null;
+        continue;
+      }
+
+      if (rule.value === undefined) continue;
+
+      const value = BigInt(rule.value);
+      if (value < 1n || value > rule.ceiling) {
+        throw new RpcException({
+          code: status.INVALID_ARGUMENT,
+          message: `${rule.field} must be between 1 and ${rule.ceiling}`,
+        });
+      }
+
+      (data as Record<string, unknown>)[rule.field] = rule.asBigInt
+        ? value
+        : Number(value);
+    }
+  }
+
+  /**
    * Free-mail domains are flagged, not rejected.
    *
    * The list can never be exhaustive, so treating it as authoritative would
@@ -844,4 +938,29 @@ function planLabelFor(organization: {
   );
 
   return match?.displayName ?? organization.aiModelTier;
+}
+
+/**
+ * The tenant's own ceilings, as the settings screen reads them back.
+ *
+ * `undefined` for a NULL column — absent means "configured nothing", and a zero
+ * would read as a limit that refuses everything.
+ */
+function toLimitOverrides(organization: {
+  maxDocumentBytesOverride: bigint | null;
+  maxAttachmentBytesOverride: bigint | null;
+  maxAttachmentsPerMessageOverride: number | null;
+}) {
+  return {
+    maxDocumentBytesOverride:
+      organization.maxDocumentBytesOverride === null
+        ? undefined
+        : Number(organization.maxDocumentBytesOverride),
+    maxAttachmentBytesOverride:
+      organization.maxAttachmentBytesOverride === null
+        ? undefined
+        : Number(organization.maxAttachmentBytesOverride),
+    maxAttachmentsPerMessageOverride:
+      organization.maxAttachmentsPerMessageOverride ?? undefined,
+  };
 }

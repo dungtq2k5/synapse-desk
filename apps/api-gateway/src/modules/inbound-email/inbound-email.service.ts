@@ -142,6 +142,16 @@ type RoutingResolution =
       organizationId: string;
       context: RequestContext;
       /**
+       * The tenant's attachment ceilings, platform ceilings already applied.
+       *
+       * Carried on the routing result because the lookup that resolves the
+       * tenant returns them — inbound mail is the one attachment surface
+       * reachable by anyone who can email the address, and a tenant that
+       * narrowed its limit for safety reasons has not got the control it asked
+       * for if the limit applies only to authenticated uploads.
+       */
+      limits: { maxBytes: number; maxPerMessage: number };
+      /**
        * Whether the address itself named a ticket.
        *
        * Distinguishes "a reply whose ticket vanished" from "a fresh mail" — the
@@ -356,22 +366,26 @@ export class InboundEmailService implements OnModuleInit {
       };
     }
 
-    const { context, ticket } = routing;
+    // `min(platform, tenant)`, resolved when the tenant was — this path is
+    // reachable by anyone who can email the address, so a workspace that
+    // narrowed its attachment limit has not got the control it asked for if
+    // these two numbers stay constants.
+    const { context, ticket, limits } = routing;
 
     for (const file of request.files) {
       // **The per-message ceiling, applied HERE.** `createMessage` throws when
       // the list is over the cap rather than trimming it — so a mail with eight
       // attachments would lose the MESSAGE, not the extra files. Declining the
       // sixth here keeps that a partial loss with a name on it.
-      if (uploads.length >= MAX_ATTACHMENTS_PER_MESSAGE) {
+      if (uploads.length >= limits.maxPerMessage) {
         declined.push({
           fileName: file.fileName,
-          reason: `only ${MAX_ATTACHMENTS_PER_MESSAGE} attachments per message`,
+          reason: `only ${limits.maxPerMessage} attachments per message`,
         });
         continue;
       }
 
-      if (file.sizeBytes > MAX_ATTACHMENT_BYTES) {
+      if (file.sizeBytes > limits.maxBytes) {
         declined.push({ fileName: file.fileName, reason: 'too large' });
         continue;
       }
@@ -444,7 +458,12 @@ export class InboundEmailService implements OnModuleInit {
       return { ok: false, outcome: InboundOutcome.UNROUTABLE };
     }
 
-    const { organizationId, status: tenantStatus } = await this.authPeer.run(
+    const {
+      organizationId,
+      status: tenantStatus,
+      maxAttachmentBytesOverride,
+      maxAttachmentsPerMessageOverride,
+    } = await this.authPeer.run(
       (metadata) =>
         this.organizations.resolveOrgByInboundToken(
           { inboundToken: address.tenantToken },
@@ -456,6 +475,20 @@ export class InboundEmailService implements OnModuleInit {
     if (!organizationId) {
       return { ok: false, outcome: InboundOutcome.UNROUTABLE };
     }
+
+    // `min(platform, tenant)`, composed once for this mail. Absent means the
+    // tenant configured nothing, which is the normal state and today's
+    // behaviour.
+    const limits = {
+      maxBytes: Math.min(
+        MAX_ATTACHMENT_BYTES,
+        maxAttachmentBytesOverride ?? MAX_ATTACHMENT_BYTES,
+      ),
+      maxPerMessage: Math.min(
+        MAX_ATTACHMENTS_PER_MESSAGE,
+        maxAttachmentsPerMessageOverride ?? MAX_ATTACHMENTS_PER_MESSAGE,
+      ),
+    };
 
     const status = fromProtoOrgStatus(tenantStatus);
     if (status !== OrgStatus.ACTIVE) {
@@ -507,6 +540,7 @@ export class InboundEmailService implements OnModuleInit {
     if (ticketNumber !== null) {
       return {
         ok: true,
+        limits,
         organizationId,
         context,
         // **A reply token naming a ticket that does not resolve stays a
@@ -532,6 +566,7 @@ export class InboundEmailService implements OnModuleInit {
         if (ticket) {
           return {
             ok: true,
+            limits,
             organizationId,
             context,
             addressedToTicket: false,
@@ -544,6 +579,7 @@ export class InboundEmailService implements OnModuleInit {
     // Routable, and it would CREATE a ticket rather than thread onto one.
     return {
       ok: true,
+      limits,
       organizationId,
       context,
       addressedToTicket: false,

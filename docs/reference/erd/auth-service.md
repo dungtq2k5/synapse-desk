@@ -15,6 +15,9 @@ erDiagram
     BigInt monthly_ai_token_budget 
     DateTime billing_cycle_start 
     String ai_model_tier 
+    BigInt max_document_bytes_override "❓"
+    BigInt max_attachment_bytes_override "❓"
+    Int max_attachments_per_message_override "❓"
     String timezone "❓"
     String stripe_customer_id "❓"
     String stripe_subscription_id "❓"

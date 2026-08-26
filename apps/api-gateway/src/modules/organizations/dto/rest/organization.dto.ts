@@ -13,14 +13,23 @@ import {
   ArrayMaxSize,
   IsArray,
   IsBoolean,
+  IsInt,
   IsNotEmpty,
   IsOptional,
   IsString,
   Matches,
+  Max,
   MaxLength,
+  Min,
   MinLength,
 } from 'class-validator';
-import { lowerIfString, trimIfString } from '@synapsedesk/common';
+import {
+  lowerIfString,
+  MAX_ATTACHMENT_BYTES,
+  MAX_ATTACHMENTS_PER_MESSAGE,
+  MAX_DOCUMENT_BYTES,
+  trimIfString,
+} from '@synapsedesk/common';
 
 /**
  * Profile only. Quotas (`maxAgentSeats`, storage, token budget) and `status`
@@ -107,6 +116,43 @@ export class UpdateOrganizationSettingsDto {
   // exact at both readers, so a malformed entry cannot over-match — it simply
   // never matches anything.
   readonly allowedEmailDomains?: string[];
+
+  /**
+   * The largest document this workspace will accept, at or below the platform
+   * ceiling. `null` clears it; an absent key leaves it unchanged.
+   */
+  // Three states have to survive this DTO and `@IsOptional` is the only
+  // decorator that lets them: it skips validation for BOTH absences, and the
+  // distinction is recovered in `organizations.service.ts`, which reads
+  // `=== null` off the instance. `@IsNullable` is for RESPONSE DTOs — it skips
+  // only `undefined`, so `null` reaches `@IsInt()` and 400s.
+  // `@IsPresentButNullable` has the opposite half of the problem.
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  // REFUSES rather than clamps. A value above the platform constant is a
+  // self-service entitlement grant — the outcome the layering rule exists to
+  // prevent — and a clamp would accept a request whose intent it did not
+  // honour, with no way for the caller to learn its 500 MB became 100.
+  @Max(MAX_DOCUMENT_BYTES)
+  readonly maxDocumentBytesOverride?: number | null;
+
+  /** See {@link UpdateOrganizationSettingsDto.maxDocumentBytesOverride}. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(MAX_ATTACHMENT_BYTES)
+  readonly maxAttachmentBytesOverride?: number | null;
+
+  /** See {@link UpdateOrganizationSettingsDto.maxDocumentBytesOverride}. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(MAX_ATTACHMENTS_PER_MESSAGE)
+  readonly maxAttachmentsPerMessageOverride?: number | null;
 }
 
 export class DeleteOrganizationDto {

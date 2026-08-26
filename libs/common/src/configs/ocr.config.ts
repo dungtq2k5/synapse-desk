@@ -1,5 +1,5 @@
 /**
- * Engine tuning for scanned-page OCR.
+ * @file Engine tuning for scanned-page OCR.
  *
  * Read by the ingestion worker only; none of it reaches the API. The OCR values
  * that ARE API contract — `OCR_LANGUAGES`, `TESSERACT_CODE_BY_LANGUAGE`,

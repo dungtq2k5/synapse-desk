@@ -29,7 +29,22 @@ export interface OrganizationResponse {
    * `billing.entitlements_changed`
    */
   aiModelTier: AiModelTier;
-  billingCycleStart: Timestamp | undefined;
+  billingCycleStart:
+    | Timestamp
+    | undefined;
+  /**
+   * Tenant-imposed ceilings, NARROWING only.
+   *
+   * **`optional` carries the meaning**: absent is "this tenant configured
+   * nothing", which is the normal state, and a reader must fall through to the
+   * layer above rather than to zero. The entitlement fields above are not
+   * optional because a subscription always grants a value; these are the
+   * opposite, and proto3's zero value would make "configured nothing" and
+   * "configured zero" the same wire state.
+   */
+  maxDocumentBytesOverride?: number | undefined;
+  maxAttachmentBytesOverride?: number | undefined;
+  maxAttachmentsPerMessageOverride?: number | undefined;
   createdAt: Timestamp | undefined;
   updatedAt: Timestamp | undefined;
 }
@@ -79,6 +94,14 @@ export interface OrganizationSettingsResponse {
    * useful thing is to tell the admin, not to pretend we caught them all.
    */
   publicDomainWarnings: string[];
+  /**
+   * What the tenant has configured, so a settings screen can render its own
+   * state. Absent means "nothing configured" and the platform ceiling applies
+   * — a reader must not substitute zero.
+   */
+  maxDocumentBytesOverride?: number | undefined;
+  maxAttachmentBytesOverride?: number | undefined;
+  maxAttachmentsPerMessageOverride?: number | undefined;
 }
 
 export interface GetOrganizationSettingsRequest {
@@ -100,6 +123,25 @@ export interface UpdateOrganizationSettingsRequest {
    * touches enforce_two_factor would wipe the domains.
    */
   replaceAllowedEmailDomains: boolean;
+  /**
+   * Tenant-imposed ceilings. Each carries a value AND a clear flag, for the
+   * reason `replace_allowed_email_domains` exists: three states have to cross
+   * this wire and proto3 gives two.
+   *
+   *   absent + clear=false  -> leave it alone
+   *   value  + clear=false  -> set it
+   *   clear=true            -> back to the platform ceiling
+   *
+   * A sentinel would be cheaper and wrong: `0` is the one value that must not
+   * mean "clear", because a limit of zero and no limit at all are opposite
+   * instructions and the gateway's `@Min(1)` is what keeps them apart.
+   */
+  maxDocumentBytesOverride?: number | undefined;
+  clearMaxDocumentBytesOverride: boolean;
+  maxAttachmentBytesOverride?: number | undefined;
+  clearMaxAttachmentBytesOverride: boolean;
+  maxAttachmentsPerMessageOverride?: number | undefined;
+  clearMaxAttachmentsPerMessageOverride: boolean;
 }
 
 /**
@@ -295,6 +337,21 @@ export interface ResolveOrgByInboundTokenResponse {
    * tenant" from "suspended" in its logs rather than reporting both as a drop.
    */
   status: OrgStatus;
+  /**
+   * The tenant's attachment ceilings, RIDING this call.
+   *
+   * The inbound-mail path already resolves the tenant here, and it is the one
+   * attachment surface reachable by anyone who can email the address. A tenant
+   * that narrowed its attachment limit for safety reasons and found the limit
+   * applied only to authenticated uploads has not got the control it asked
+   * for.
+   *
+   * Absent means the tenant configured nothing, so the caller uses the
+   * platform ceiling — the same meaning these fields carry on
+   * `OrganizationResponse`.
+   */
+  maxAttachmentBytesOverride?: number | undefined;
+  maxAttachmentsPerMessageOverride?: number | undefined;
 }
 
 /**

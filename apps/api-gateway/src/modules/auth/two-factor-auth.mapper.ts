@@ -24,7 +24,7 @@ export type TwoFactorAuthenticateResult = {
 };
 
 /** Converts a `BackupCodesStatusResponse` off the wire into its REST DTO. */
-export function toBackupCodesStatusDto(
+export function toBackupCodesStatusResponseDto(
   response: BackupCodesStatusResponse,
 ): BackupCodesStatusResponseDto {
   return {

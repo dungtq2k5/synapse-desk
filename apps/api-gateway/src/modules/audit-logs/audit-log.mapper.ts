@@ -84,7 +84,7 @@ export function toAuditLogPageDto(
  * Drops any action this build cannot name rather than rendering it as
  * `UNSPECIFIED`, which would be an option that selects nothing.
  */
-export function toAuditActionList(
+export function toAuditActions(
   response: ListAuditActionsResponse,
 ): AuditAction[] {
   return response.actions

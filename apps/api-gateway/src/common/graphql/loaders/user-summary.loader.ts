@@ -8,7 +8,7 @@ import {
 import { BATCH_ID_LIMIT, type RequestContext } from '@synapsedesk/common';
 import { firstValueFrom } from 'rxjs';
 import { createCachedLoader } from './loaders.factory';
-import { toUserSummaryGqlDto } from '../../../modules/users/user.mapper';
+import { toUserSummaryResponseGqlDto } from '../../../modules/users/user.mapper';
 import type { UserSummaryResponseGqlDto } from '../../../modules/users/dto/graphql/user-response.gql-dto';
 import type { CacheService } from '../../cache/cache.service';
 import { ENTITY_TTL_SECONDS, entityScope } from '../../config/cache.config';
@@ -75,7 +75,9 @@ export function createUserSummaryLoader(
       // Mapped HERE rather than in the resolvers: a loader that answers
       // proto forces all six `@ResolveField`s to map, and a routing layer
       // that maps is how two edges over one RPC drift apart.
-      return response.summaries.map((summary) => toUserSummaryGqlDto(summary));
+      return response.summaries.map((summary) =>
+        toUserSummaryResponseGqlDto(summary),
+      );
     },
   });
 }

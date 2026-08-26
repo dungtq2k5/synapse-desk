@@ -1,5 +1,5 @@
 /**
- * The metric DEFINITIONS, and **step 2 of its build order is not
+ * @file The metric DEFINITIONS, and **step 2 of its build order is not
  * documentation, it is this file.**
  *
  * Every metric below has a plausible alternative reading, and two endpoints

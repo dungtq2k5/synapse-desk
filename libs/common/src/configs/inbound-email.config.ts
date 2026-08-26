@@ -1,5 +1,5 @@
 /**
- * Inbound email addressing
+ * @file Inbound email addressing
  *
  * **One definition, three readers.** The Cloudflare Worker builds nothing but
  * forwards the recipient verbatim; the gateway parses it to find the tenant and

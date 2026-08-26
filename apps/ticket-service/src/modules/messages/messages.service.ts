@@ -33,7 +33,6 @@ import {
 } from '@synapsedesk/grpc-proto';
 import {
   formatErrorMsg,
-  MAX_ATTACHMENTS_PER_MESSAGE,
   MAX_MESSAGE_CONTENT_LENGTH,
   REDACTED_MESSAGE_PLACEHOLDER,
   isUniqueConstraintViolation,
@@ -54,6 +53,7 @@ import { TicketsService } from '../tickets/tickets.service';
 import { RagClientService } from '../ai-client/rag-client.service';
 import { LedgerClientService } from '../ai-client/ledger-client.service';
 import { AttachmentExtractorClient } from '../ai-client/attachment-extractor.client';
+import { AuthReferenceService } from '../auth-client/auth-reference.service';
 import { StorageReferenceService } from '../storage-client/storage-reference.service';
 import {
   MessageAttachment,
@@ -129,6 +129,7 @@ export class MessagesService {
     private readonly aiAttachments: AiAttachmentService,
     private readonly ledger: LedgerClientService,
     private readonly extractor: AttachmentExtractorClient,
+    private readonly authReference: AuthReferenceService,
     private readonly storage: StorageReferenceService,
     private readonly configService: ConfigService,
   ) {
@@ -244,13 +245,18 @@ export class MessagesService {
         return { message: toMessageResponse(existing), skippedAttachments: [] };
     }
 
-    if (request.attachments.length > MAX_ATTACHMENTS_PER_MESSAGE) {
+    // `min(platform, tenant)`, resolved once for this message. The constant
+    // alone was the cap until a tenant could narrow it; `MAX_ATTACHMENTS_PER_MESSAGE`
+    // is still the ceiling this can never exceed.
+    const limits = await this.authReference.getAttachmentLimits(context);
+
+    if (request.attachments.length > limits.maxPerMessage) {
       // The per-message cap, enforced where the count is now known. Presign
       // used to carry it, and cannot any more: without a message there is
       // nothing to count against.
       throw new RpcException({
         code: status.FAILED_PRECONDITION,
-        message: `A message can carry at most ${MAX_ATTACHMENTS_PER_MESSAGE} attachments`,
+        message: `A message can carry at most ${limits.maxPerMessage} attachments`,
       });
     }
 
@@ -358,7 +364,7 @@ export class MessagesService {
    * Confirms every uploaded path, and reports the ones that did not.
    *
    * Sequential rather than `Promise.all`: these are writes against a peer, the
-   * count is capped at {@link MAX_ATTACHMENTS_PER_MESSAGE}, and a burst of
+   * count is capped at the tenant's per-message limit, and a burst of
    * parallel confirms buys milliseconds while making the failure modes harder
    * to reason about.
    */
@@ -722,14 +728,28 @@ export class MessagesService {
       ? await this.loadMessage(request.ticketId, request.messageId, context)
       : null;
 
+    const limits = await this.authReference.getAttachmentLimits(context);
+
+    if (request.fileSizeBytes > limits.maxBytes) {
+      // The tenant's own ceiling, refused BEFORE a URL is signed. The DTO's
+      // `@Max` already rejected anything over the platform constant; this is
+      // the narrower number, and it has to be checked here because a decorator
+      // argument is evaluated once at class-definition time and can never carry
+      // a per-tenant value.
+      throw new RpcException({
+        code: status.FAILED_PRECONDITION,
+        message: `This workspace does not accept attachments over ${limits.maxBytes} bytes`,
+      });
+    }
+
     if (message) {
       const existing = await this.prisma.messageAttachment.count({
         where: { messageId: message.id },
       });
-      if (existing >= MAX_ATTACHMENTS_PER_MESSAGE) {
+      if (existing >= limits.maxPerMessage) {
         throw new RpcException({
           code: status.FAILED_PRECONDITION,
-          message: `A message can carry at most ${MAX_ATTACHMENTS_PER_MESSAGE} attachments`,
+          message: `A message can carry at most ${limits.maxPerMessage} attachments`,
         });
       }
     }

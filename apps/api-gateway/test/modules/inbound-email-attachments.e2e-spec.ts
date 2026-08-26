@@ -226,6 +226,94 @@ describe('Inbound email attachments — the reply half (e2e)', () => {
       expect(fx.stubs.message.uploadAttachment).not.toHaveBeenCalled();
     });
 
+    it('**5. an EMAILED attachment obeys the tenant override**', async () => {
+      // The test most likely to be skipped: the happy path for a tenant-facing
+      // setting is an authenticated upload, and the mail path looks like
+      // somebody else's feature.
+      //
+      // **It is the one that matters most.** This route is reachable by anyone
+      // who can email the tenant's address, and a workspace that narrowed its
+      // attachment limit for safety reasons has not got the control it asked
+      // for if the limit applies only to signed-in users.
+      //
+      // The override rides `resolveOrgByInboundToken`, which this path already
+      // calls to resolve the tenant — no second auth hop on inbound mail.
+      fx.stubs.organization.resolveOrgByInboundToken.mockReturnValue(
+        of({
+          organizationId,
+          status: ProtoOrgStatus.ORG_STATUS_ACTIVE,
+          maxAttachmentBytesOverride: 1_000_000,
+        }),
+      );
+      fx.stubs.user.resolveInboundSender.mockReturnValue(
+        of({ userId: senderId, created: false }),
+      );
+      fx.stubs.ticket.getTicketByNumber.mockReturnValue(of(wireTicket()));
+
+      const response = await presign(
+        routing({ files: [file({ sizeBytes: 2_000_000 })] }),
+      ).expect(200);
+
+      // Well under the PLATFORM ceiling, and over this tenant's own.
+      expect(response.body.data.declined).toEqual([
+        { fileName: 'error.png', reason: 'too large' },
+      ]);
+      expect(fx.stubs.message.uploadAttachment).not.toHaveBeenCalled();
+    });
+
+    it('**5b. …and the same file is accepted when the tenant set no override**', async () => {
+      // The pair. Test 5 alone passes for a path that declines every emailed
+      // attachment, which is a worse bug and would look like the feature
+      // working.
+      resolvable();
+      fx.stubs.ticket.getTicketByNumber.mockReturnValue(of(wireTicket()));
+      fx.stubs.message.uploadAttachment.mockReturnValue(
+        of(
+          wirePresigned('organizations/o/tickets/t/attachments/pending/a.png'),
+        ),
+      );
+
+      const response = await presign(
+        routing({ files: [file({ sizeBytes: 2_000_000 })] }),
+      ).expect(200);
+
+      expect(response.body.data.declined).toEqual([]);
+    });
+
+    it('**5c. the per-message COUNT override is honoured on this path too**', async () => {
+      // Two numbers cross on that response and only one of them is bytes. The
+      // count is the one likelier to be dropped in the mapping — it is a small
+      // integer beside a byte count, and nothing else on the path reads it.
+      fx.stubs.organization.resolveOrgByInboundToken.mockReturnValue(
+        of({
+          organizationId,
+          status: ProtoOrgStatus.ORG_STATUS_ACTIVE,
+          maxAttachmentsPerMessageOverride: 1,
+        }),
+      );
+      fx.stubs.user.resolveInboundSender.mockReturnValue(
+        of({ userId: senderId, created: false }),
+      );
+      fx.stubs.ticket.getTicketByNumber.mockReturnValue(of(wireTicket()));
+      fx.stubs.message.uploadAttachment.mockReturnValue(
+        of(
+          wirePresigned('organizations/o/tickets/t/attachments/pending/a.png'),
+        ),
+      );
+
+      const response = await presign(
+        routing({
+          files: [file({ fileName: 'a.png' }), file({ fileName: 'b.png' })],
+        }),
+      ).expect(200);
+
+      expect(
+        response.body.data.declined.map(
+          (d: { fileName: string }) => d.fileName,
+        ),
+      ).toEqual(['b.png']);
+    });
+
     it('**refuses a MIME type outside the upload allowlist** at the DTO', async () => {
       // The allowlist lives here, not in the Worker — a second copy in a
       // Cloudflare Worker is a copy that drifts from the one storage-service

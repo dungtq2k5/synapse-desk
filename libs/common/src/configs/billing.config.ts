@@ -1,5 +1,5 @@
 /**
- * Price id → entitlements. **The whole integration is this table plus one
+ * @file Price id → entitlements. **The whole integration is this table plus one
  * function**; everything else is plumbing around it.
  *
  * **What is deliberately NOT here: plan names, price points, feature lists.**

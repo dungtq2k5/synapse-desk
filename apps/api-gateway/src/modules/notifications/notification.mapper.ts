@@ -126,7 +126,7 @@ function parseData(raw: string): Record<string, unknown> {
 }
 
 /** Converts a `ListNotificationsResponse` into the cursor-paginated feed DTO. */
-export function toNotificationFeedDto(
+export function toNotificationFeedResponseDto(
   response: ListNotificationsResponse,
 ): NotificationFeedResponseDto {
   return {

@@ -6,10 +6,12 @@ import {
   fromProtoAiModelTier,
   OnboardingResponse,
   OrganizationUsageResponse,
+  OrganizationSettingsResponse,
 } from '@synapsedesk/grpc-proto';
 import {
   OnboardingResponseDto,
   OrganizationResponseDto,
+  OrganizationSettingsResponseDto,
   OrganizationUsageResponseDto,
   UsageMeterResponseDto,
 } from './dto/rest/organization-response.dto';
@@ -51,7 +53,7 @@ export function toOrganizationResponseDto(
  * whose domain does not exist yet cannot make that claim, and the difference
  * matters to anyone reading a usage page before deciding to upgrade.
  */
-export function toUsageMeterDto(
+export function toUsageMeterResponseDto(
   meter: UsageMeter | undefined,
 ): UsageMeterResponseDto {
   if (!meter) {
@@ -78,9 +80,9 @@ export function toOrganizationUsageResponseDto(
   response: OrganizationUsageResponse,
 ): OrganizationUsageResponseDto {
   return {
-    seats: toUsageMeterDto(response.seats),
-    storage: toUsageMeterDto(response.storage),
-    aiTokens: toUsageMeterDto(response.aiTokens),
+    seats: toUsageMeterResponseDto(response.seats),
+    storage: toUsageMeterResponseDto(response.storage),
+    aiTokens: toUsageMeterResponseDto(response.aiTokens),
     aiModelTier: fromProtoAiModelTier(response.aiModelTier),
     planName: response.planName,
     currentPeriodEnd: response.currentPeriodEnd
@@ -98,4 +100,26 @@ export function toOnboardingResponseDto(
   response: OnboardingResponse,
 ): OnboardingResponseDto {
   return { ...response, status: fromProtoOrgStatus(response.status) ?? '' };
+}
+
+/**
+ * A settings response, with the wire's absence rendered as `null`.
+ *
+ * proto3 says "not set" by omitting the field; JSON says it with `null`, and a
+ * key that vanishes from a response body is not the same contract as one that
+ * is present and empty. A screen rendering the platform ceiling in place of a
+ * missing value could not tell an inherited limit from a chosen one.
+ *
+ * Translated once, here, rather than left for each consumer to guess at.
+ */
+export function toOrganizationSettingsResponseDto(
+  settings: OrganizationSettingsResponse,
+): OrganizationSettingsResponseDto {
+  return {
+    ...settings,
+    maxDocumentBytesOverride: settings.maxDocumentBytesOverride ?? null,
+    maxAttachmentBytesOverride: settings.maxAttachmentBytesOverride ?? null,
+    maxAttachmentsPerMessageOverride:
+      settings.maxAttachmentsPerMessageOverride ?? null,
+  };
 }

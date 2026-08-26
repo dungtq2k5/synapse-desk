@@ -31,6 +31,18 @@ message OrganizationResponse {
   AiModelTier ai_model_tier = 14;
   google.protobuf.Timestamp billing_cycle_start = 11;
 
+  // Tenant-imposed ceilings, NARROWING only.
+  //
+  // **`optional` carries the meaning**: absent is "this tenant configured
+  // nothing", which is the normal state, and a reader must fall through to the
+  // layer above rather than to zero. The entitlement fields above are not
+  // optional because a subscription always grants a value; these are the
+  // opposite, and proto3's zero value would make "configured nothing" and
+  // "configured zero" the same wire state.
+  optional int64 max_document_bytes_override = 15;
+  optional int64 max_attachment_bytes_override = 16;
+  optional int32 max_attachments_per_message_override = 17;
+
   google.protobuf.Timestamp created_at = 12;
   google.protobuf.Timestamp updated_at = 13;
 }
@@ -74,6 +86,13 @@ message OrganizationSettingsResponse {
   // than rejected, because no blocklist of these can be exhaustive -- so the
   // useful thing is to tell the admin, not to pretend we caught them all.
   repeated string public_domain_warnings = 3;
+
+  // What the tenant has configured, so a settings screen can render its own
+  // state. Absent means "nothing configured" and the platform ceiling applies
+  // — a reader must not substitute zero.
+  optional int64 max_document_bytes_override = 4;
+  optional int64 max_attachment_bytes_override = 5;
+  optional int32 max_attachments_per_message_override = 6;
 }
 
 message GetOrganizationSettingsRequest {}
@@ -89,6 +108,26 @@ message UpdateOrganizationSettingsRequest {
   // cannot express absence on its own, so without this an update that only
   // touches enforce_two_factor would wipe the domains.
   bool replace_allowed_email_domains = 3;
+
+  // Tenant-imposed ceilings. Each carries a value AND a clear flag, for the
+  // reason `replace_allowed_email_domains` exists: three states have to cross
+  // this wire and proto3 gives two.
+  //
+  //   absent + clear=false  -> leave it alone
+  //   value  + clear=false  -> set it
+  //   clear=true            -> back to the platform ceiling
+  //
+  // A sentinel would be cheaper and wrong: `0` is the one value that must not
+  // mean "clear", because a limit of zero and no limit at all are opposite
+  // instructions and the gateway's `@Min(1)` is what keeps them apart.
+  optional int64 max_document_bytes_override = 4;
+  bool clear_max_document_bytes_override = 5;
+
+  optional int64 max_attachment_bytes_override = 6;
+  bool clear_max_attachment_bytes_override = 7;
+
+  optional int32 max_attachments_per_message_override = 8;
+  bool clear_max_attachments_per_message_override = 9;
 }
 
 // ---------------------------------------------------------------------------
@@ -260,6 +299,19 @@ message ResolveOrgByInboundTokenResponse {
   // The tenant's lifecycle state, so the caller can distinguish "no such
   // tenant" from "suspended" in its logs rather than reporting both as a drop.
   OrgStatus status = 2;
+  // The tenant's attachment ceilings, RIDING this call.
+  //
+  // The inbound-mail path already resolves the tenant here, and it is the one
+  // attachment surface reachable by anyone who can email the address. A tenant
+  // that narrowed its attachment limit for safety reasons and found the limit
+  // applied only to authenticated uploads has not got the control it asked
+  // for.
+  //
+  // Absent means the tenant configured nothing, so the caller uses the
+  // platform ceiling — the same meaning these fields carry on
+  // `OrganizationResponse`.
+  optional int64 max_attachment_bytes_override = 3;
+  optional int32 max_attachments_per_message_override = 4;
 }
 
 // The tenant's inbound token, BY tenant — the reverse of the lookup above.

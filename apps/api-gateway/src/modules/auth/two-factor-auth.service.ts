@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { RequestOrigin } from '@synapsedesk/common';
 import { TwoFactorAuthGrpcClient } from './two-factor-auth-grpc.client';
 import {
-  toBackupCodesStatusDto,
+  toBackupCodesStatusResponseDto,
   toTwoFactorAuthenticateResult,
   TwoFactorAuthenticateResult,
 } from './two-factor-auth.mapper';
@@ -84,7 +84,7 @@ export class TwoFactorAuthService {
     userId: string,
     origin: RequestOrigin,
   ): Promise<BackupCodesStatusResponseDto> {
-    return toBackupCodesStatusDto(
+    return toBackupCodesStatusResponseDto(
       await this.twoFactorGrpcClient.getBackupCodesStatus(userId, origin),
     );
   }

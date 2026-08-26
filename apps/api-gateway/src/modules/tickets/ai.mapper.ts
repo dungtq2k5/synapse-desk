@@ -85,7 +85,7 @@ export function toAiSuggestionsResponseDto(
  * `suggestedPriority` is null when the model named something that is not a
  * `TicketPriority`.
  */
-export function toAiClassificationDto(
+export function toAiClassificationResponseDto(
   response: ClassifyTicketResponse,
 ): AiClassificationResponseDto {
   return {
@@ -96,7 +96,7 @@ export function toAiClassificationDto(
 }
 
 /** Converts a `ListSimilarTicketsResponse` off the wire into its REST DTOs. */
-export function toSimilarTicketDtos(
+export function toSimilarTicketResponseDtos(
   response: ListSimilarTicketsResponse,
 ): SimilarTicketResponseDto[] {
   return response.items.map((item) => ({

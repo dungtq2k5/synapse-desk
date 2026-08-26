@@ -13,7 +13,11 @@ import {
   packRequestContext,
   fromProtoAiModelTier,
 } from '@synapsedesk/grpc-proto';
-import { DEFAULT_AI_MODEL_TIER, formatErrorMsg } from '@synapsedesk/common';
+import {
+  DEFAULT_AI_MODEL_TIER,
+  formatErrorMsg,
+  MAX_DOCUMENT_BYTES,
+} from '@synapsedesk/common';
 
 /**
  * Validates the ids this service stores but does not own, and reads the one
@@ -106,6 +110,58 @@ export class AuthReferenceService implements OnModuleInit {
       throw new RpcException({
         code: status.UNAVAILABLE,
         message: 'Could not verify the storage quota',
+      });
+    }
+  }
+
+  /**
+   * The largest document this tenant will accept.
+   *
+   * `min(platform ceiling, tenant override)` — every layer narrows and no layer
+   * widens, so a tenant that has configured nothing gets exactly today's
+   * behaviour. The plan grant slots in as a third argument to the same `min`
+   * without moving this call.
+   *
+   * **Rides the same call as the storage quota** and is therefore free: the
+   * override travels on `OrganizationResponse`, which the presign path was
+   * already fetching.
+   *
+   * @throws RpcException `UNAVAILABLE` when the organization cannot be read.
+   */
+  async getDocumentSizeLimitBytes(context: CallerContext): Promise<number> {
+    try {
+      const organization = await firstValueFrom(
+        this.organizationService
+          .getCurrentOrganization({}, packRequestContext(context))
+          .pipe(timeout(GRPC_DEADLINE_MS)),
+      );
+
+      // **The `??` is the guard, and removing it fails OPEN.** Absent means the
+      // tenant configured nothing — the normal state. Without the fallback the
+      // operand is `undefined`, `Math.min` returns `NaN`, and `sizeBytes > NaN`
+      // is FALSE — so every size check passes and the limit is gone. It reads
+      // like a redundant default; it is the only thing between an unset
+      // override and an unlimited upload.
+      //
+      // `?? 0` fails the other way and is louder: it refuses every upload for
+      // every tenant that never touched the setting.
+      return Math.min(
+        MAX_DOCUMENT_BYTES,
+        organization.maxDocumentBytesOverride ?? MAX_DOCUMENT_BYTES,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Could not read the document size limit: ${formatErrorMsg(error)}`,
+      );
+
+      // FAILS CLOSED, for the reason the storage quota does: an unreadable
+      // limit must not mean "unlimited". Resolving to the platform ceiling
+      // would be the tempting middle ground and is still wrong — it hands a
+      // tenant that narrowed its limit the wide one precisely when the check
+      // could not run.
+      throw new RpcException({
+        code: status.UNAVAILABLE,
+        message: 'Could not verify the document size limit',
       });
     }
   }

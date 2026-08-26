@@ -29,6 +29,19 @@ export function toOrganizationResponse(
     monthlyAiTokenBudget: Number(organization.monthlyAiTokenBudget),
     aiModelTier: toProtoAiModelTier(organization.aiModelTier),
     billingCycleStart: toProtoTimestamp(organization.billingCycleStart),
+    // `?? undefined`, never `?? 0`. NULL means the tenant configured nothing
+    // and the layer above applies; zero would be a limit that refuses
+    // everything, and the two must not collapse on the way out.
+    maxDocumentBytesOverride:
+      organization.maxDocumentBytesOverride === null
+        ? undefined
+        : Number(organization.maxDocumentBytesOverride),
+    maxAttachmentBytesOverride:
+      organization.maxAttachmentBytesOverride === null
+        ? undefined
+        : Number(organization.maxAttachmentBytesOverride),
+    maxAttachmentsPerMessageOverride:
+      organization.maxAttachmentsPerMessageOverride ?? undefined,
     createdAt: toProtoTimestamp(organization.createdAt),
     updatedAt: toProtoTimestamp(organization.updatedAt),
   };

@@ -1,5 +1,5 @@
 /**
- * Domain C's enumerated columns and bounds.
+ * @file Domain C's enumerated columns and bounds.
  *
  * Every one of these is a `String` in `schema.prisma` per
  * `development-conventions.md §7.3` — Prisma enums are a migration liability and

@@ -94,12 +94,12 @@ export function toUserSummaryResponseDto(
  * ADMIN summary — a user plus their roles and departments.
  *
  * @example
- * const rows = response.summaries.map((s) => toUserSummaryGqlDto(s));
+ * const rows = response.summaries.map((s) => toUserSummaryResponseGqlDto(s));
  *
  * @param user - one summary row off the wire
  * @returns the edge type the GraphQL schema declares
  */
-export function toUserSummaryGqlDto(
+export function toUserSummaryResponseGqlDto(
   user: UserSummary,
 ): UserSummaryResponseGqlDto {
   return {

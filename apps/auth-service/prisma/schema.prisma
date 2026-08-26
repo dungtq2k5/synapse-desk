@@ -73,6 +73,34 @@ model Organization {
   /// the settings layer would be an unresolvable model name at request time.
   aiModelTier String @default("FAST") @map("ai_model_tier") @db.VarChar(20)
 
+  // Tenant-imposed ceilings — NARROWING only
+  //
+  /// The largest document this tenant will accept, at or below the platform
+  /// ceiling.
+  ///
+  /// **A safety control, not a billing one.** An organization that knows its
+  /// staff should never upload a 100 MB file sets 5 MB, and a mis-click or a
+  /// compromised account cannot burn its storage grant. Every layer narrows and
+  /// no layer widens: a value above `MAX_DOCUMENT_BYTES` would be a
+  /// self-service entitlement grant, so the edge refuses it rather than
+  /// clamping.
+  ///
+  /// **NULL means the tenant has configured nothing**, and that is the normal
+  /// state. The entitlement columns above are NOT NULL with defaults because a
+  /// subscription always grants a value; these are the opposite, and a default
+  /// would make "chose the platform maximum" indistinguishable from "chose
+  /// nothing" — which is exactly the distinction the plan layer needs so it can
+  /// rewrite a grant without clobbering a tenant's own setting.
+  maxDocumentBytesOverride BigInt? @map("max_document_bytes_override")
+
+  /// The largest ATTACHMENT this tenant will accept. See
+  /// `maxDocumentBytesOverride`; the same rule and the same NULL meaning.
+  maxAttachmentBytesOverride BigInt? @map("max_attachment_bytes_override")
+
+  /// How many attachments one message may carry, at or below the platform
+  /// ceiling. See `maxDocumentBytesOverride`.
+  maxAttachmentsPerMessageOverride Int? @map("max_attachments_per_message_override")
+
   /// The tenant's business timezone.
   ///
   /// Distinct from `users.timezone`, which is a person's quiet hours. This one

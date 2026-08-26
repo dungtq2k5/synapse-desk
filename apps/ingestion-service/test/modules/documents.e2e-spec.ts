@@ -57,6 +57,7 @@ describe('Documents (e2e)', () => {
   let events: DocumentEventPublisher;
 
   let getStorageLimitBytes: jest.SpyInstance;
+  let getDocumentSizeLimitBytes: jest.SpyInstance;
   let assertDepartmentsExist: jest.SpyInstance;
   let presignDocument: jest.SpyInstance;
   let confirmUpload: jest.SpyInstance;
@@ -141,6 +142,10 @@ describe('Documents (e2e)', () => {
     // Each has its own coverage — the storage suite for presign/confirm, and
     // the validation failures below for the auth boundary.
     getStorageLimitBytes = jest.spyOn(authReference, 'getStorageLimitBytes');
+    getDocumentSizeLimitBytes = jest.spyOn(
+      authReference,
+      'getDocumentSizeLimitBytes',
+    );
     assertDepartmentsExist = jest.spyOn(
       authReference,
       'assertDepartmentsExist',
@@ -163,6 +168,8 @@ describe('Documents (e2e)', () => {
     // Re-stated every test: `clearAllMocks` resets call records but keeps
     // implementations, so one test's override would leak into every later one.
     getStorageLimitBytes.mockResolvedValue(DEFAULT_STORAGE_LIMIT);
+    // Nothing configured is the normal state, so the platform ceiling applies.
+    getDocumentSizeLimitBytes.mockResolvedValue(MAX_DOCUMENT_BYTES);
     assertDepartmentsExist.mockResolvedValue(undefined);
     presignDocument.mockImplementation(
       (input: { documentId: string; contentType: string }) =>
@@ -201,6 +208,61 @@ describe('Documents (e2e)', () => {
       expect(result.uploadUrl).toBeTruthy();
       expect(result.objectPath).toContain(tenant.organizationId);
       expect(result.expiresAt).toBeDefined();
+    });
+
+    it('**1b. a TENANT-NARROWED size limit is enforced, and names the workspace**', async () => {
+      // `min(platform, tenant)` — the platform constant still bounds it, and
+      // the tenant's own number is the one that bites here.
+      //
+      // **The message says "this workspace"**, not the platform figure. An
+      // uploader told their 3 MB file exceeds a 100 MB limit goes looking for a
+      // bug; told their workspace does not accept files that large, they ask
+      // their admin.
+      getDocumentSizeLimitBytes.mockResolvedValue(2_000_000);
+
+      await expectRpc(
+        documents.presignDocument(
+          { ...presignRequest(), sizeBytes: 3_000_000 },
+          manager(),
+        ),
+        status.INVALID_ARGUMENT,
+      );
+
+      // Never signed. A tenant that narrowed its limit must not receive a URL
+      // that would have worked.
+      expect(presignDocument).not.toHaveBeenCalled();
+    });
+
+    it('**1c. …and a file UNDER the tenant limit still goes through**', async () => {
+      // The pair. Test 1b alone passes for an implementation that refuses every
+      // upload once an override exists.
+      getDocumentSizeLimitBytes.mockResolvedValue(2_000_000);
+
+      const result = await documents.presignDocument(
+        { ...presignRequest(), sizeBytes: 1_000_000 },
+        manager(),
+      );
+
+      expect(result.uploadUrl).toBeTruthy();
+    });
+
+    it('**1d. an UNREADABLE limit refuses the upload — it never means "unlimited"**', async () => {
+      // Fails closed, matching the storage quota beside it. Resolving to the
+      // platform ceiling is the tempting middle ground and is still wrong: it
+      // hands a tenant that narrowed its limit the wide one at exactly the
+      // moment the check could not run.
+      getDocumentSizeLimitBytes.mockRejectedValue(
+        new RpcException({
+          code: status.UNAVAILABLE,
+          message: 'Could not verify the document size limit',
+        }),
+      );
+
+      await expectRpc(
+        documents.presignDocument(presignRequest(), manager()),
+        status.UNAVAILABLE,
+      );
+      expect(presignDocument).not.toHaveBeenCalled();
     });
 
     it('2. REFUSES over quota, and storage-service is never called', async () => {

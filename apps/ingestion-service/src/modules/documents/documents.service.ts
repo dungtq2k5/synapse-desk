@@ -143,14 +143,29 @@ export class DocumentsService {
     const organizationId = requireTenant(context);
     requireActor(context);
 
-    this.assertUploadable(request.contentType, Number(request.sizeBytes));
+    // The PLATFORM ceiling, checked before any network call — an absurd size is
+    // refused for the cost of a comparison.
+    this.assertUploadable(request.contentType, request.sizeBytes);
 
-    const [limitBytes, usedBytes] = await Promise.all([
+    const [limitBytes, usedBytes, sizeLimitBytes] = await Promise.all([
       this.authReference.getStorageLimitBytes(context),
       this.usedBytes(organizationId),
+      this.authReference.getDocumentSizeLimitBytes(context),
     ]);
 
-    if (usedBytes + Number(request.sizeBytes) > limitBytes) {
+    // The TENANT ceiling, which needed a read. Separate from the storage quota
+    // beside it and separate from the platform check above: this one is "your
+    // organization does not accept files this large", and saying so is what
+    // makes it actionable — an uploader who sees the platform number would go
+    // looking for a bug.
+    if (request.sizeBytes > sizeLimitBytes) {
+      throw new RpcException({
+        code: status.INVALID_ARGUMENT,
+        message: `This workspace does not accept documents over ${sizeLimitBytes} bytes`,
+      });
+    }
+
+    if (usedBytes + request.sizeBytes > limitBytes) {
       // RESOURCE_EXHAUSTED -> 429 at the gateway. Not PERMISSION_DENIED: the
       // caller is allowed to upload documents, they have simply run out of
       // room, and 403 would send an admin looking at role grants.
@@ -173,7 +188,7 @@ export class DocumentsService {
       {
         documentId,
         contentType: request.contentType,
-        sizeBytes: Number(request.sizeBytes),
+        sizeBytes: request.sizeBytes,
         fileName: request.fileName,
       },
       context,

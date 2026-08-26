@@ -84,6 +84,6 @@ The system is designed as a **Polyglot Hybrid Microservices Architecture**:
 ## **8. Development, Testing & CI/CD Tooling**
 
 * **Monorepo Manager:** Turborepo / NestJS CLI Workspace.
-* **Testing:** **Jest** configured with @swc/jest for high-speed serial unit and integration testing.
+* **Testing:** **Jest** configured with `@swc/jest` for high-speed serial unit and integration testing.
 * **Code Formatting & Linting:** ESLint, Prettier, and Husky Git hooks for pre-commit checks.
 * **Continuous Integration:** GitHub Actions executing automated Docker multi-stage builds, unit/integration testing, license validation, and semantic tag release generation (CHANGELOG.md).
