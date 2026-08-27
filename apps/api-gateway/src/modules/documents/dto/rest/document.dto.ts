@@ -45,9 +45,9 @@ import {
 } from '../../../../common/config/dto.config';
 
 export class PresignDocumentDto {
+  /** The document's MIME type. Must be one the parser accepts. */
   // Mirrored from storage-service's `PURPOSE_POLICY[DOCUMENT]`. Widen BOTH:
   // this one only saves a network hop, that one is the real check.
-  /** The document's MIME type. Must be one the parser accepts. */
   @IsIn(ALLOWED_DOCUMENT_MIME_TYPES)
   readonly contentType!: AllowedDocumentMimeType;
 
@@ -65,10 +65,10 @@ export class PresignDocumentDto {
 }
 
 export class ConfirmDocumentDto {
+  /** The object path, echoed back from the presign response. */
   // Deliberately not shape-validated: storage-service checks it against the
   // `PendingUpload` it recorded, which is an authorization check, not a
   // syntactic one. A regex here would only reject well-formed paths.
-  /** The object path, echoed back from the presign response. */
   @IsString()
   @MinLength(1)
   @MaxLength(MAX_OBJECT_PATH_LENGTH)
@@ -150,15 +150,14 @@ export class ConfirmDocumentDto {
  * document's identity alone. `PATCH /documents/:id` and
  * `PUT /documents/:id/departments` are the routes for those.
  */
+// No `contentType` and no `sizeBytes`, here or on `ConfirmDocumentDto`: both
+// are read back from the object's own metadata at confirm. On the wire they
+// would be numbers the caller invented about a file the caller uploaded.
 export class ReplaceDocumentDto {
-  // No `contentType` and no `sizeBytes`, here or on `ConfirmDocumentDto`: both
-  // are read back from the object's own metadata at confirm. On the wire they
-  // would be numbers the caller invented about a file the caller uploaded.
-
+  /** The object path, echoed back from the presign response. */
   // Deliberately not shape-validated, exactly as on `ConfirmDocumentDto`:
   // storage-service checks it against the `PendingUpload` it recorded, which is
   // an authorization check rather than a syntactic one.
-  /** The object path, echoed back from the presign response. */
   @IsString()
   @MinLength(1)
   @MaxLength(MAX_OBJECT_PATH_LENGTH)

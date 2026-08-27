@@ -94,6 +94,27 @@ export enum AuditAction {
   DATA_EXPORT_REQUESTED = 'DATA_EXPORT_REQUESTED',
   PLATFORM_ORGANIZATION_RESTORED = 'PLATFORM_ORGANIZATION_RESTORED',
   PLATFORM_GLOBAL_ROLE_CREATED = 'PLATFORM_GLOBAL_ROLE_CREATED',
+
+  // The plan catalogue. A `//` and not a docblock: this text is about the GROUP
+  // below it, and a `/** */` here would attach on hover to `PLAN_CREATED` alone
+  // — silently claiming to cover four members while documenting one.
+  //
+  // These live here and NOT in `billing_events`, which is a Stripe webhook
+  // ledger whose `stripeEventId` is NOT NULL and unique: the unique constraint
+  // IS its idempotency mechanism. A Super Admin edit has no `evt_…` id, and
+  // writing a synthetic one would poison idempotency for real webhooks.
+  PLATFORM_PLAN_CREATED = 'PLATFORM_PLAN_CREATED',
+  PLATFORM_PLAN_UPDATED = 'PLATFORM_PLAN_UPDATED',
+  PLATFORM_PLAN_DELETED = 'PLATFORM_PLAN_DELETED',
+  /**
+   * A plan APPLIED to its subscribers — the fan-out, not the edit.
+   *
+   * Separate from `PLATFORM_PLAN_UPDATED` because they answer different
+   * questions: the update says what the catalogue now sells, the apply says
+   * whose entitlements were rewritten and when. An edit that was never applied
+   * changed nobody, and one row cannot say both.
+   */
+  PLATFORM_PLAN_APPLIED = 'PLATFORM_PLAN_APPLIED',
 }
 
 /**
@@ -118,6 +139,8 @@ export enum AuditResourceType {
   DOCUMENT_FLAG = 'DOCUMENT_FLAG',
   /** An export request — the row, not the file it produces. */
   EXPORT = 'EXPORT',
+  /** A row in the plan catalogue. Owned by no tenant, which is the point. */
+  SUBSCRIPTION_PLAN = 'SUBSCRIPTION_PLAN',
 }
 
 /**

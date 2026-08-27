@@ -372,7 +372,7 @@ export const NON_LATIN_OCR_LANGUAGES: readonly OcrLanguage[] = ['ja', 'zh'];
 export const DEFAULT_OCR_LANGUAGE: OcrLanguage = 'en';
 
 /**
- * The largest a document may be, in bytes — 25 MB.
+ * The largest a document may be, in bytes — 100 MB.
  *
  * **The whole FILE at presign, and nothing else.** Three layers read this ONE
  * constant: the gateway's `@Max` before a network hop, ingestion-service when it

@@ -11,22 +11,36 @@ import {
   requireField,
   requireProtoTimestamp,
   toPageRequest,
+  toProtoAiModelTier,
   toProtoOrgStatus,
+  fromProtoAiModelTier,
+  type ApplyPlanResponse,
+  type CreatePlanRequest,
+  type ListPlansRequest,
+  type ListPlansResponse,
+  type SubscriptionPlanResponse,
+  type UpdatePlanRequest,
 } from '@synapsedesk/grpc-proto';
+import { DEFAULT_AI_MODEL_TIER } from '@synapsedesk/common';
 import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
 import { toPaginationMetaDataResponseDto } from '../../common/mappers/pagination.mapper';
 import { toUserResponseDto } from '../users/user.mapper';
 import { toRoleResponseDto } from '../roles/role.mapper';
 import {
+  CreatePlanDto,
+  ListPlansQueryDto,
   ListPlatformOrganizationsQueryDto,
   ListPlatformUsersQueryDto,
   RoleResponseDto,
+  UpdatePlanDto,
 } from './dto/rest/platform.dto';
 import {
+  ApplyPlanResponseDto,
   CreatePlatformOrganizationResponseDto,
   PlatformMetricsResponseDto,
   PlatformOrganizationResponseDto,
   PlatformUserResponseDto,
+  SubscriptionPlanResponseDto,
 } from './dto/rest/platform-response.dto';
 import { toOrganizationResponseDto } from '../organizations/organization.mapper';
 
@@ -135,5 +149,130 @@ export function toPlatformMetricsResponseDto(
     seatsAllocated: response.seatsAllocated,
     seatsInUse: response.seatsInUse,
     generatedAt: requireProtoTimestamp(response.generatedAt, 'generatedAt'),
+  };
+}
+
+export function toSubscriptionPlanResponseDto(
+  plan: SubscriptionPlanResponse,
+): SubscriptionPlanResponseDto {
+  return {
+    id: plan.id,
+    name: plan.name,
+    stripeProductId: plan.stripeProductId ?? null,
+    maxAgentSeats: plan.maxAgentSeats,
+    maxStorageBytes: plan.maxStorageBytes,
+    monthlyAiTokenBudget: plan.monthlyAiTokenBudget,
+    aiModelTier:
+      fromProtoAiModelTier(plan.aiModelTier) ?? DEFAULT_AI_MODEL_TIER,
+    maxDocumentBytes: plan.maxDocumentBytes,
+    maxAttachmentBytes: plan.maxAttachmentBytes,
+    isActive: plan.isActive,
+    // **Yes, the `map` is needed** — not for the shape, which is identical
+    // today, but as the projection boundary. `prices: plan.prices` would pass
+    // wire objects straight into the public response, so the next field added
+    // to `SubscriptionPlanPriceResponse` would appear in the REST API with
+    // nobody deciding it should. Naming each field is what makes that a
+    // decision rather than a default.
+    prices: plan.prices.map((price) => ({
+      id: price.id,
+      stripePriceId: price.stripePriceId,
+      interval: price.interval,
+    })),
+    subscriberCount: plan.subscriberCount,
+    createdAt: requireProtoTimestamp(plan.createdAt, 'createdAt'),
+    updatedAt: requireProtoTimestamp(plan.updatedAt, 'updatedAt'),
+    deletedAt: fromProtoTimestamp(plan.deletedAt) ?? null,
+  };
+}
+
+export function toSubscriptionPlanPageDto(
+  response: ListPlansResponse,
+): PaginationResponseDto<SubscriptionPlanResponseDto> {
+  return {
+    items: response.items.map(toSubscriptionPlanResponseDto),
+    meta: toPaginationMetaDataResponseDto(response.meta),
+  };
+}
+
+export function toApplyPlanResponseDto(
+  response: ApplyPlanResponse,
+): ApplyPlanResponseDto {
+  return {
+    // The same projection boundary as `prices` above: the shapes match today,
+    // and copying field by field is what stops a new wire field becoming a
+    // public one by accident.
+    subscribers: response.subscribers.map((row) => ({
+      organizationId: row.organizationId,
+      organizationName: row.organizationName,
+      changes: row.changes,
+      overLimit: row.overLimit,
+      skippedPinned: row.skippedPinned,
+      budgetDeferred: row.budgetDeferred,
+    })),
+    dryRun: response.dryRun,
+    changedCount: response.changedCount,
+    skippedPinnedCount: response.skippedPinnedCount,
+    overLimitCount: response.overLimitCount,
+    evaluatedDimensions: response.evaluatedDimensions,
+  };
+}
+
+export function toCreatePlanRequest(dto: CreatePlanDto): CreatePlanRequest {
+  return {
+    name: dto.name,
+    stripeProductId: dto.stripeProductId,
+    maxAgentSeats: dto.maxAgentSeats,
+    maxStorageBytes: dto.maxStorageBytes,
+    monthlyAiTokenBudget: dto.monthlyAiTokenBudget,
+    aiModelTier: toProtoAiModelTier(dto.aiModelTier),
+    maxDocumentBytes: dto.maxDocumentBytes,
+    maxAttachmentBytes: dto.maxAttachmentBytes,
+    // No `?? true` here, and that is the point of the DTO default: the `?` on
+    // an implicit-presence field costs every layer below it a branch, so the
+    // default is written once at the edge and this layer reads a boolean.
+    isActive: dto.isActive,
+    prices: dto.prices.map((price) => ({
+      stripePriceId: price.stripePriceId,
+      interval: price.interval,
+    })),
+  };
+}
+
+export function toUpdatePlanRequest(
+  planId: string,
+  dto: UpdatePlanDto,
+): UpdatePlanRequest {
+  return {
+    planId,
+    name: dto.name,
+    stripeProductId: dto.stripeProductId,
+    // The `??` STAYS here, and the asymmetry is the whole of §5.2: this DTO
+    // feeds an `optional` proto message where a default would clear the product
+    // id on every PATCH that never mentioned it. The absent case is handled at
+    // the mapper precisely because it must not be handled at the DTO.
+    clearStripeProductId: dto.clearStripeProductId ?? false,
+    maxAgentSeats: dto.maxAgentSeats,
+    maxStorageBytes: dto.maxStorageBytes,
+    monthlyAiTokenBudget: dto.monthlyAiTokenBudget,
+    // `undefined` stays undefined — the proto field is `optional` and absent
+    // means "leave it". Mapping it through the enum bridge unconditionally
+    // would send UNSPECIFIED, which the service refuses.
+    aiModelTier:
+      dto.aiModelTier === undefined
+        ? undefined
+        : toProtoAiModelTier(dto.aiModelTier),
+    maxDocumentBytes: dto.maxDocumentBytes,
+    maxAttachmentBytes: dto.maxAttachmentBytes,
+    isActive: dto.isActive,
+  };
+}
+
+export function toListPlansRequest(dto: ListPlansQueryDto): ListPlansRequest {
+  return {
+    // `toPageRequest` fills sort and search, which this endpoint does not
+    // expose: the catalogue is a short list read in creation order.
+    page: toPageRequest(dto),
+    includeInactive: dto.includeInactive,
+    includeDeleted: dto.includeDeleted,
   };
 }

@@ -25,8 +25,18 @@ import {
   SetOrganizationStatusRequest,
   unpackCallerContext,
   UpdatePlatformOrganizationRequest,
+  ApplyPlanRequest,
+  ApplyPlanResponse,
+  CreatePlanRequest,
+  DeletePlanResponse,
+  ListPlansRequest,
+  ListPlansResponse,
+  PlanIdRequest,
+  SubscriptionPlanResponse,
+  UpdatePlanRequest,
 } from '@synapsedesk/grpc-proto';
 import { PlatformService } from './platform.service';
+import { PlanAdminService } from '../billing/plan-admin.service';
 
 /**
  * Authorization for this whole surface lives at the GATEWAY, in
@@ -39,6 +49,7 @@ import { PlatformService } from './platform.service';
 export class PlatformGrpcController implements PlatformServiceController {
   constructor(
     private readonly platformService: PlatformService,
+    private readonly planAdmin: PlanAdminService,
     private readonly jobHealth: JobHealthService,
   ) {}
 
@@ -134,6 +145,60 @@ export class PlatformGrpcController implements PlatformServiceController {
       request,
       unpackCallerContext(metadata),
     );
+  }
+
+  // ---------------------------------------------------------------- The plan catalogue
+  // Delegates to `PlanAdminService` rather than `PlatformService`: a plan is
+  // not a tenant, and the two services already differ in what they own.
+
+  listPlans(
+    request: ListPlansRequest,
+    metadata?: Metadata,
+  ): Promise<ListPlansResponse> {
+    return this.planAdmin.listPlans(request, unpackCallerContext(metadata));
+  }
+
+  createPlan(
+    request: CreatePlanRequest,
+    metadata?: Metadata,
+  ): Promise<SubscriptionPlanResponse> {
+    return this.planAdmin.createPlan(request, unpackCallerContext(metadata));
+  }
+
+  getPlan(
+    request: PlanIdRequest,
+    metadata?: Metadata,
+  ): Promise<SubscriptionPlanResponse> {
+    return this.planAdmin.getPlan(
+      request.planId,
+      unpackCallerContext(metadata),
+    );
+  }
+
+  updatePlan(
+    request: UpdatePlanRequest,
+    metadata?: Metadata,
+  ): Promise<SubscriptionPlanResponse> {
+    return this.planAdmin.updatePlan(request, unpackCallerContext(metadata));
+  }
+
+  async deletePlan(
+    request: PlanIdRequest,
+    metadata?: Metadata,
+  ): Promise<DeletePlanResponse> {
+    return {
+      deleted: await this.planAdmin.deletePlan(
+        request.planId,
+        unpackCallerContext(metadata),
+      ),
+    };
+  }
+
+  applyPlan(
+    request: ApplyPlanRequest,
+    metadata?: Metadata,
+  ): Promise<ApplyPlanResponse> {
+    return this.planAdmin.applyPlan(request, unpackCallerContext(metadata));
   }
 
   getMetrics(): Promise<PlatformMetricsResponse> {

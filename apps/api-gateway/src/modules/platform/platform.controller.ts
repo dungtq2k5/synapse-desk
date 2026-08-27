@@ -37,6 +37,10 @@ import {
   RoleResponseDto,
   SetOrganizationStatusDto,
   UpdatePlatformOrganizationDto,
+  ApplyPlanQueryDto,
+  CreatePlanDto,
+  ListPlansQueryDto,
+  UpdatePlanDto,
 } from './dto/rest/platform.dto';
 import {
   CreatePlatformOrganizationResponseDto,
@@ -44,6 +48,9 @@ import {
   PlatformMetricsResponseDto,
   PlatformOrganizationResponseDto,
   PlatformUserResponseDto,
+  ApplyPlanResponseDto,
+  DeletePlanResponseDto,
+  SubscriptionPlanResponseDto,
 } from './dto/rest/platform-response.dto';
 
 /**
@@ -67,9 +74,7 @@ export class PlatformController {
     private readonly organizationStatus: OrganizationStatusService,
   ) {}
 
-  // -------------------------------------------------------------------------
-  // Tenants
-  // -------------------------------------------------------------------------
+  // ---------------------------------------------------------------- Tenants
 
   @ApiOperation({ summary: 'All tenants, filter by status' })
   @ApiWrappedResponse(Paginated(PlatformOrganizationResponseDto))
@@ -226,9 +231,7 @@ export class PlatformController {
     return result;
   }
 
-  // -------------------------------------------------------------------------
-  // Cross-tenant
-  // -------------------------------------------------------------------------
+  // ---------------------------------------------------------------- Cross-tenant
 
   /** Every row carries its tenant — a bare address list is how support acts on
    * the wrong account, since one address may legitimately exist in several. */
@@ -264,6 +267,96 @@ export class PlatformController {
     @Body() createGlobalRoleDto: CreateGlobalRoleDto,
   ): Promise<RoleResponseDto> {
     return this.platform.createGlobalRole(createGlobalRoleDto, context);
+  }
+
+  // ---------------------------------------------------------------- The plan catalogue
+
+  @ApiOperation({ summary: 'The plan catalogue' })
+  @ApiWrappedResponse(Paginated(SubscriptionPlanResponseDto))
+  @ApiFilterErrors(['401'])
+  @Get('plans')
+  listPlans(
+    @CurrentUser() context: RequestContext,
+    @Query() query: ListPlansQueryDto,
+  ): Promise<PaginationResponseDto<SubscriptionPlanResponseDto>> {
+    return this.platform.listPlans(query, context);
+  }
+
+  @ApiOperation({ summary: 'Create a plan' })
+  @ApiWrappedResponse(SubscriptionPlanResponseDto, {
+    status: HttpStatus.CREATED,
+  })
+  @ApiFilterErrors(['400', '401'])
+  @Post('plans')
+  createPlan(
+    @CurrentUser() context: RequestContext,
+    @Body() createPlanDto: CreatePlanDto,
+  ): Promise<SubscriptionPlanResponseDto> {
+    return this.platform.createPlan(createPlanDto, context);
+  }
+
+  @ApiOperation({
+    summary: 'Plan detail, with its prices and subscriber count',
+  })
+  @ApiWrappedResponse(SubscriptionPlanResponseDto)
+  @ApiFilterErrors(['400', '401', '404'])
+  @Get('plans/:id')
+  getPlan(
+    @CurrentUser() context: RequestContext,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<SubscriptionPlanResponseDto> {
+    return this.platform.getPlan(id, context);
+  }
+
+  /**
+   * Edits the catalogue row and NOTHING else.
+   *
+   * Existing subscribers keep what they have until `POST plans/:id/apply`. A
+   * silent fan-out on save would rewrite two hundred tenants' entitlements from
+   * a form submit.
+   */
+  @ApiOperation({ summary: 'Update a plan (does NOT change subscribers)' })
+  @ApiWrappedResponse(SubscriptionPlanResponseDto)
+  @ApiFilterErrors(['400', '401', '404'])
+  @Patch('plans/:id')
+  updatePlan(
+    @CurrentUser() context: RequestContext,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() updatePlanDto: UpdatePlanDto,
+  ): Promise<SubscriptionPlanResponseDto> {
+    return this.platform.updatePlan(id, updatePlanDto, context);
+  }
+
+  /** Refused while anyone is on it — deactivate instead. */
+  @ApiOperation({ summary: 'Retire a plan' })
+  @ApiWrappedResponse(DeletePlanResponseDto)
+  @ApiFilterErrors(['400', '401', '404', '409'])
+  @Delete('plans/:id')
+  deletePlan(
+    @CurrentUser() context: RequestContext,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<DeletePlanResponseDto> {
+    return this.platform.deletePlan(id, context);
+  }
+
+  /**
+   * Writes the plan's grants onto every subscriber — or projects it.
+   *
+   * `?dryRun=true` writes nothing and returns the same per-subscriber
+   * projection the apply would act on, computed by the same pass. That is the
+   * blast radius, and seeing it is the point of making this a separate call.
+   */
+  @ApiOperation({ summary: 'Apply a plan to its subscribers (or dry-run it)' })
+  @ApiWrappedResponse(ApplyPlanResponseDto)
+  @ApiFilterErrors(['400', '401', '404'])
+  @Post('plans/:id/apply')
+  @HttpCode(HttpStatus.OK)
+  applyPlan(
+    @CurrentUser() context: RequestContext,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: ApplyPlanQueryDto,
+  ): Promise<ApplyPlanResponseDto> {
+    return this.platform.applyPlan(id, query.dryRun ?? false, context);
   }
 
   /** Full-table counts — cached by the client, never joined into a hot path. */

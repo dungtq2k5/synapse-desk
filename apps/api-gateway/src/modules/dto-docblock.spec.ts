@@ -70,6 +70,61 @@ describe('A DTO docblock sits above the decorators, not below them', () => {
     expect(dtoFiles.length).toBeGreaterThan(20);
   });
 
+  /**
+   * Every property docblock whose nearest preceding line is a `//` comment.
+   *
+   * A SECOND way to lose the same description, and the opposite arrangement to
+   * the one above: the plugin takes the FIRST leading comment, so a `//` above
+   * the docblock wins and the docblock is dropped. A blank line between them
+   * does not help — measured, not assumed.
+   *
+   * Class docblocks are excluded because they never become schema descriptions
+   * at all: `UpdateOrganizationSettingsDto` has a clean one and still reports
+   * `undefined`, so flagging them would report a loss that cannot happen.
+   */
+  const suppressed = (source: string): number[] => {
+    const lines = source.split('\n');
+    const found: number[] = [];
+
+    lines.forEach((line, index) => {
+      if (!line.trim().startsWith('/**')) return;
+
+      let precededByComment = false;
+      for (let back = index - 1; back >= 0; back--) {
+        const previous = lines[back].trim();
+        if (previous === '') continue;
+        precededByComment = previous.startsWith('//');
+        break;
+      }
+      if (!precededByComment) return;
+
+      let end = index;
+      while (end < lines.length && !lines[end].includes('*/')) end++;
+
+      for (let forward = end + 1; forward < lines.length; forward++) {
+        const next = lines[forward].trim();
+        if (next === '' || next.startsWith('//') || next.startsWith('@'))
+          continue;
+        if (!/^(export )?class /.test(next)) found.push(index + 1);
+        break;
+      }
+    });
+
+    return found;
+  };
+
+  it('**no `//` comment sits above a property docblock**', () => {
+    const offenders = dtoFiles.flatMap((path) => {
+      const lines = suppressed(readFileSync(path, 'utf8'));
+
+      return lines.map(
+        (line) => `${path.replace(`${MODULES_DIR}/`, '')}:${line}`,
+      );
+    });
+
+    expect(offenders).toEqual([]);
+  });
+
   it('**no docblock is stranded below a decorator**', () => {
     const offenders = dtoFiles.flatMap((path) => {
       const lines = misplaced(readFileSync(path, 'utf8'));

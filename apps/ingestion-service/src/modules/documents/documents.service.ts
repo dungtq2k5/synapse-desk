@@ -60,6 +60,7 @@ import {
   requireTenant,
   restoreData,
   softDeleteData,
+  exceedsLimit,
 } from '@synapsedesk/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthReferenceService } from '../auth-client/auth-reference.service';
@@ -158,14 +159,14 @@ export class DocumentsService {
     // organization does not accept files this large", and saying so is what
     // makes it actionable — an uploader who sees the platform number would go
     // looking for a bug.
-    if (request.sizeBytes > sizeLimitBytes) {
+    if (exceedsLimit(request.sizeBytes, sizeLimitBytes)) {
       throw new RpcException({
         code: status.INVALID_ARGUMENT,
         message: `This workspace does not accept documents over ${sizeLimitBytes} bytes`,
       });
     }
 
-    if (usedBytes + request.sizeBytes > limitBytes) {
+    if (exceedsLimit(usedBytes + request.sizeBytes, limitBytes)) {
       // RESOURCE_EXHAUSTED -> 429 at the gateway. Not PERMISSION_DENIED: the
       // caller is allowed to upload documents, they have simply run out of
       // room, and 403 would send an admin looking at role grants.

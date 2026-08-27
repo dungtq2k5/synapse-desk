@@ -3,7 +3,7 @@ import { of, throwError } from 'rxjs';
 import { AuthReferenceService } from './auth-reference.service';
 
 /**
- * `min(platform, tenant)` — the read half of the layering rule.
+ * `min(platform, plan, tenant)` — the read half of the layering rule.
  *
  * A unit spec against a stubbed client, because what is under test is the
  * COMPOSITION and its three edge values. The write half refuses a widening
@@ -19,7 +19,10 @@ describe('The document size limit composition (unit)', () => {
         getCurrentOrganization: () =>
           organization instanceof Error
             ? throwError(() => organization)
-            : of(organization),
+            : // The plan grant defaults to the ceiling so a case that says
+              // nothing about the plan is testing the OTHER two layers. A case
+              // about the plan states its own value and wins the spread.
+              of({ maxDocumentBytes: MAX_DOCUMENT_BYTES, ...organization }),
       }),
     } as never);
     service.onModuleInit();
@@ -93,6 +96,65 @@ describe('The document size limit composition (unit)', () => {
 
     expect(limit).not.toBeNaN();
     expect(5_000_000).toBeGreaterThan(limit);
+  });
+
+  it('5. **the PLAN narrows, and it narrows a tenant that configured nothing**', async () => {
+    // The PLAN layer. A Starter tenant that never opened the settings page is
+    // still bounded by what its plan sells, not by the platform.
+    const service = serviceWith({
+      maxDocumentBytes: 25 * 1024 * 1024,
+      maxDocumentBytesOverride: undefined,
+    });
+
+    await expect(service.getDocumentSizeLimitBytes(context)).resolves.toBe(
+      25 * 1024 * 1024,
+    );
+  });
+
+  it('6. **the NARROWER of plan and override wins, in both directions**', async () => {
+    // Neither layer is privileged: whichever is smaller is the answer. The two
+    // orderings are one test because a `min` that got the order wrong would
+    // pass either of them alone.
+    const planNarrower = serviceWith({
+      maxDocumentBytes: 10_000_000,
+      maxDocumentBytesOverride: 50_000_000,
+    });
+    const overrideNarrower = serviceWith({
+      maxDocumentBytes: 50_000_000,
+      maxDocumentBytesOverride: 10_000_000,
+    });
+
+    await expect(planNarrower.getDocumentSizeLimitBytes(context)).resolves.toBe(
+      10_000_000,
+    );
+    await expect(
+      overrideNarrower.getDocumentSizeLimitBytes(context),
+    ).resolves.toBe(10_000_000);
+  });
+
+  it('7. **a plan grant ABOVE the platform ceiling does NOT widen it**', async () => {
+    // `MAX_DOCUMENT_BYTES` protects the parser and is not sellable. A
+    // catalogue row that tries to sell past it is bounded here, so the
+    // mistake costs nothing at the enforcement point.
+    const service = serviceWith({ maxDocumentBytes: MAX_DOCUMENT_BYTES * 4 });
+
+    await expect(service.getDocumentSizeLimitBytes(context)).resolves.toBe(
+      MAX_DOCUMENT_BYTES,
+    );
+  });
+
+  it('8. **a MISSING plan grant refuses, where a missing override does not**', async () => {
+    // The asymmetry that justifies two different `??` fallbacks one line
+    // apart. The column is NOT NULL, so absent here is a broken wire and not a
+    // tenant's choice — and the alternative, falling through to the ceiling,
+    // would hand out the widest limit on the platform exactly when the
+    // narrowing layer went missing.
+    const service = serviceWith({
+      maxDocumentBytes: undefined,
+      maxDocumentBytesOverride: undefined,
+    });
+
+    await expect(service.getDocumentSizeLimitBytes(context)).resolves.toBe(0);
   });
 
   it('4. **an UNREADABLE organization refuses — it never means "unlimited"**', async () => {

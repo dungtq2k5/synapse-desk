@@ -16,6 +16,32 @@
 
 import { AiModelTier } from './ai-settings.config';
 
+/**
+ * The limits a plan apply can put a tenant over.
+ *
+ * The whole vocabulary, including the ones no pass evaluates yet — which is the
+ * point: `ApplyPlanResponse.evaluated_dimensions` names what a run DID check,
+ * and that is only meaningful against a list of what there is to check.
+ *
+ * `storage` is presently never evaluated; counting it needs a platform-scoped
+ * usage read in `ingestion-service` that does not exist (known-gaps #18).
+ */
+export const PLAN_LIMIT_DIMENSIONS = ['seats', 'storage'] as const;
+export type PlanLimitDimension = (typeof PLAN_LIMIT_DIMENSIONS)[number];
+
+/**
+ * The Stripe API version every caller in this repo pins to.
+ *
+ * Shared so the service and `scripts/provision-stripe.mjs` cannot drift: the
+ * script CREATES the Products, Prices and portal configuration that the service
+ * then reads, and two versions across that boundary is a shape mismatch nobody
+ * sees until a field is missing.
+ *
+ * Bumping it is a deliberate act with a changelog to read, not a default to
+ * inherit from whatever the account happens to be set to.
+ */
+export const STRIPE_API_VERSION = '2026-07-29.dahlia';
+
 /** What a plan grants. Exactly the five entitlement columns, and no more. */
 export type PlanEntitlements = {
   maxAgentSeats: number;
@@ -24,109 +50,28 @@ export type PlanEntitlements = {
   monthlyAiTokenBudget: bigint;
   /** `FAST | QUALITY`. The sellable AI entitlement. */
   aiModelTier: AiModelTier;
+  /**
+   * The largest document this plan admits.
+   *
+   * A plan can only NARROW: an argument to `min()` against the platform
+   * ceiling, never a replacement for it. `MAX_DOCUMENT_BYTES` protects the
+   * parser and is not sellable.
+   */
+  maxDocumentBytes: bigint;
+  /**
+   * The largest attachment this plan admits — the same narrow-only rule as
+   * {@link PlanEntitlements.maxDocumentBytes}.
+   *
+   * Bounded by `MAX_ATTACHMENT_BYTES`, which is a TRANSPORT limit rather than a
+   * policy one: it sits where the gRPC message size binds, so there is very
+   * little room to differentiate plans on this number.
+   */
+  maxAttachmentBytes: bigint;
   /** For logs and the billing page. NEVER an authorization input. */
   displayName: string;
 };
 
-const GIB = 1024n * 1024n * 1024n;
-
-/**
- * The mapping, keyed by Stripe price id.
- *
- * Read from the environment in a real deployment — the ids differ between
- * Stripe's test and live modes, and hardcoding either means the integration
- * works in exactly one of them. The defaults below are the test-mode ids so a
- * fresh clone can run the suite; `loadPlanCatalog` is what production uses.
- */
-export const DEFAULT_PLAN_CATALOG: Record<string, PlanEntitlements> = {
-  price_starter_monthly: {
-    maxAgentSeats: 5,
-    maxStorageBytes: 5n * GIB,
-    monthlyAiTokenBudget: 1_000_000n,
-    aiModelTier: 'FAST',
-    displayName: 'Starter',
-  },
-  price_pro_monthly: {
-    maxAgentSeats: 25,
-    maxStorageBytes: 50n * GIB,
-    monthlyAiTokenBudget: 10_000_000n,
-    // The tier is what makes Pro sellable as more than a bigger number —
-    // The tier a tenant buys.
-    aiModelTier: 'QUALITY',
-    displayName: 'Pro',
-  },
-  price_enterprise_monthly: {
-    maxAgentSeats: 200,
-    maxStorageBytes: 500n * GIB,
-    monthlyAiTokenBudget: 100_000_000n,
-    aiModelTier: 'QUALITY',
-    displayName: 'Enterprise',
-  },
-};
-
-/**
- * Reads a catalog override from the environment, falling back to the defaults.
- *
- * The override is JSON keyed by price id. It exists because Stripe price ids
- * are environment-specific: `price_1Ox…` in test mode and a different opaque
- * string in live mode, so a table baked into the build works in exactly one of
- * them and fails closed in the other — which, thanks to `entitlementsForPrice`
- * below, means a paying customer's webhook lands as FAILED rather than
- * downgrading them.
- */
-export function loadPlanCatalog(
-  raw: string | undefined,
-): Record<string, PlanEntitlements> {
-  if (!raw) return DEFAULT_PLAN_CATALOG;
-
-  const parsed = JSON.parse(raw) as Record<
-    string,
-    Omit<PlanEntitlements, 'maxStorageBytes' | 'monthlyAiTokenBudget'> & {
-      maxStorageBytes: string | number;
-      monthlyAiTokenBudget: string | number;
-    }
-  >;
-
-  return Object.fromEntries(
-    Object.entries(parsed).map(([priceId, plan]) => [
-      priceId,
-      {
-        ...plan,
-        // Through BigInt because JSON has no integer type large enough for a
-        // byte count in the hundreds of gigabytes — `JSON.parse` would hand
-        // back a float and the value would be quietly approximate.
-        maxStorageBytes: BigInt(plan.maxStorageBytes),
-        monthlyAiTokenBudget: BigInt(plan.monthlyAiTokenBudget),
-      },
-    ]),
-  );
-}
-
-/**
- * The entitlements a price grants, or **null**.
- *
- * Null rather than a default, and this is the single most consequential line in
- * the file. Defaulting an unknown price id to the free tier means one typo in
- * the catalog — or one price created in the Stripe dashboard and not added here
- * — **downgrades a paying customer** on their next `subscription.updated`.
- * Nothing errors; their seat limit simply drops, and they find out days later.
- *
- * The caller records `FAILED`, alerts, and changes nothing.
- * Failing closed here means a human fixes a config line; failing open means a
- * customer discovers it.
- */
-export function entitlementsForPrice(
-  catalog: Record<string, PlanEntitlements>,
-  priceId: string | null | undefined,
-): PlanEntitlements | null {
-  if (!priceId) return null;
-
-  return catalog[priceId] ?? null;
-}
-
-// ---------------------------------------------------------------------------
-// Webhook bookkeeping — RDM §1.15, Table 30
-// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------- Webhook bookkeeping — RDM §1.15, Table 30
 
 /**
  * What happened to a Stripe webhook the system accepted.
@@ -142,6 +87,16 @@ export enum BillingEventStatus {
   SKIPPED_STALE = 'SKIPPED_STALE',
   /** The idempotency guard: Stripe redelivered something already applied. */
   SKIPPED_DUPLICATE = 'SKIPPED_DUPLICATE',
+  /**
+   * Recorded and NOT applied — the tenant's entitlements are PINNED.
+   *
+   * A Super Admin granted this workspace something off-catalogue, so the
+   * writer must not re-derive its columns from the price on the next routine
+   * webhook. Distinct from `SKIPPED_STALE`: that one is an ordering fact about
+   * the transport, this one is a deliberate policy about one tenant, and
+   * conflating them would make a pin look like a delivery quirk.
+   */
+  SKIPPED_PINNED = 'SKIPPED_PINNED',
   /** Recorded and NOT applied — an unknown price id, most likely. */
   FAILED = 'FAILED',
 }

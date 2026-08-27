@@ -255,7 +255,7 @@ export function fromProtoAiModelTier(
  * Takes a plain `string`, not `AiModelTier | string` — that union collapses to
  * `string` and the linter is right to say so. The parameter is wide ON PURPOSE:
  * the caller is usually handing over a Prisma `VarChar` column, and an
- * unrecognised value maps to UNSPECIFIED rather than throwing, for the same
+ * unrecognized value maps to UNSPECIFIED rather than throwing, for the same
  * reason `toProtoOrgStatus` does.
  */
 export function toProtoAiModelTier(tier: string): ProtoAiModelTier {
@@ -706,6 +706,14 @@ const auditAction = enumBridge<AuditAction, ProtoAuditAction>(
       ProtoAuditAction.AUDIT_ACTION_PLATFORM_ORGANIZATION_RESTORED,
     [AuditAction.PLATFORM_GLOBAL_ROLE_CREATED]:
       ProtoAuditAction.AUDIT_ACTION_PLATFORM_GLOBAL_ROLE_CREATED,
+    [AuditAction.PLATFORM_PLAN_CREATED]:
+      ProtoAuditAction.AUDIT_ACTION_PLATFORM_PLAN_CREATED,
+    [AuditAction.PLATFORM_PLAN_UPDATED]:
+      ProtoAuditAction.AUDIT_ACTION_PLATFORM_PLAN_UPDATED,
+    [AuditAction.PLATFORM_PLAN_DELETED]:
+      ProtoAuditAction.AUDIT_ACTION_PLATFORM_PLAN_DELETED,
+    [AuditAction.PLATFORM_PLAN_APPLIED]:
+      ProtoAuditAction.AUDIT_ACTION_PLATFORM_PLAN_APPLIED,
     [AuditAction.DOCUMENT_FLAG_RESOLVED]:
       ProtoAuditAction.AUDIT_ACTION_DOCUMENT_FLAG_RESOLVED,
     [AuditAction.DOCUMENT_FLAG_DISMISSED]:
@@ -733,6 +741,8 @@ const auditResourceType = enumBridge<AuditResourceType, ProtoAuditResourceType>(
       ProtoAuditResourceType.AUDIT_RESOURCE_TYPE_DOCUMENT_FLAG,
     [AuditResourceType.EXPORT]:
       ProtoAuditResourceType.AUDIT_RESOURCE_TYPE_EXPORT,
+    [AuditResourceType.SUBSCRIPTION_PLAN]:
+      ProtoAuditResourceType.AUDIT_RESOURCE_TYPE_SUBSCRIPTION_PLAN,
   },
   ProtoAuditResourceType.AUDIT_RESOURCE_TYPE_UNSPECIFIED,
 );

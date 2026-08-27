@@ -112,9 +112,7 @@ message OffboardOrganizationResponse {
   int32 revoked_session_count = 1;
 }
 
-// ---------------------------------------------------------------------------
-// Cross-tenant search
-// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------- Cross-tenant search
 
 message PlatformUserResponse {
   UserResponse user = 1;
@@ -137,9 +135,7 @@ message ListPlatformUsersResponse {
   PageMeta meta = 2;
 }
 
-// ---------------------------------------------------------------------------
-// Global roles
-// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------- Global roles
 
 message ListGlobalRolesRequest {
   PageRequest page = 1;
@@ -196,6 +192,161 @@ message PlatformMetricsResponse {
   google.protobuf.Timestamp generated_at = 9;
 }
 
+// ---------------------------------------------------------------- The plan catalogue
+// Cross-tenant by nature: a plan is not owned by any tenant, and applying one
+// writes across all of its subscribers. That is why it lives HERE rather than
+// beside the tenant-facing billing RPCs.
+
+message SubscriptionPlanPriceResponse {
+  string id = 1;
+  string stripe_price_id = 2;
+  // `month` | `year`. A string, not an enum -- Stripe's own vocabulary, and a
+  // new interval must not need a proto change.
+  string interval = 3;
+}
+
+message SubscriptionPlanResponse {
+  string id = 1;
+  string name = 2;
+
+  // Absent for a plan ASSIGNED rather than sold: the negotiated agreement,
+  // invisible to self-service and legal on purpose. A UI must show which kind
+  // a plan is, or Super Admins create catalogue entries nobody can buy.
+  optional string stripe_product_id = 3;
+
+  int32 max_agent_seats = 4;
+  int64 max_storage_bytes = 5;
+  int64 monthly_ai_token_budget = 6;
+  AiModelTier ai_model_tier = 7;
+  int64 max_document_bytes = 8;
+  int64 max_attachment_bytes = 9;
+
+  bool is_active = 10;
+  repeated SubscriptionPlanPriceResponse prices = 11;
+
+  // How many live tenants hold this plan. The number that decides whether a
+  // delete is allowed and how large an apply's blast radius is.
+  int32 subscriber_count = 12;
+
+  google.protobuf.Timestamp created_at = 13;
+  google.protobuf.Timestamp updated_at = 14;
+  optional google.protobuf.Timestamp deleted_at = 15;
+}
+
+message ListPlansRequest {
+  PageRequest page = 1;
+  bool include_inactive = 2;
+  bool include_deleted = 3;
+}
+
+message ListPlansResponse {
+  repeated SubscriptionPlanResponse items = 1;
+  PageMeta meta = 2;
+}
+
+message PlanIdRequest { string plan_id = 1; }
+
+// Every grant is REQUIRED on create: a plan states every limit it grants, with
+// no blanks. A plan that does not differentiate on a dimension states the
+// platform ceiling explicitly, which is a decision recorded rather than
+// inferred.
+message CreatePlanRequest {
+  string name = 1;
+  optional string stripe_product_id = 2;
+
+  int32 max_agent_seats = 3;
+  int64 max_storage_bytes = 4;
+  int64 monthly_ai_token_budget = 5;
+  AiModelTier ai_model_tier = 6;
+  int64 max_document_bytes = 7;
+  int64 max_attachment_bytes = 8;
+
+  bool is_active = 9;
+  repeated CreatePlanPriceInput prices = 10;
+}
+
+message CreatePlanPriceInput {
+  string stripe_price_id = 1;
+  string interval = 2;
+}
+
+// Every field OPTIONAL on update, and absent means "leave it": a PATCH that
+// silently reset unmentioned grants to a proto zero would empty a catalogue row
+// from a form that touched one field.
+message UpdatePlanRequest {
+  string plan_id = 1;
+
+  optional string name = 2;
+  optional string stripe_product_id = 3;
+  bool clear_stripe_product_id = 4;
+
+  optional int32 max_agent_seats = 5;
+  optional int64 max_storage_bytes = 6;
+  optional int64 monthly_ai_token_budget = 7;
+  optional AiModelTier ai_model_tier = 8;
+  optional int64 max_document_bytes = 9;
+  optional int64 max_attachment_bytes = 10;
+
+  optional bool is_active = 11;
+}
+
+// What ONE subscriber would get, and what that would mean for them.
+message PlanSubscriberProjection {
+  string organization_id = 1;
+  string organization_name = 2;
+
+  // Field name -> "before -> after", for the columns this apply would change.
+  // A map keyed by field name so a new grant needs no new field here.
+  map<string, string> changes = 3;
+
+  // **Already over a limit the new plan sets.** Not a blocker: D1's rule is
+  // that a limit gates ADMISSION, never TENURE, so these tenants keep
+  // everything they have and are refused their NEXT addition. It is reported
+  // so a Super Admin sees the blast radius rather than learning it from a
+  // support ticket.
+  repeated string over_limit = 4;
+
+  // Skipped entirely: the tenant is off-catalogue by deliberate policy (D3).
+  bool skipped_pinned = 5;
+
+  // Held back to the next cycle roll rather than applied now (D1): lowering a
+  // part-spent budget mid-cycle is retroactive in effect.
+  bool budget_deferred = 6;
+}
+
+message ApplyPlanRequest {
+  string plan_id = 1;
+  // TRUE projects and writes NOTHING. The projection is computed by the same
+  // code either way -- a dry run that answered differently from the apply it
+  // predicts would be worse than no dry run.
+  bool dry_run = 2;
+}
+
+message ApplyPlanResponse {
+  repeated PlanSubscriberProjection subscribers = 1;
+  bool dry_run = 2;
+
+  int32 changed_count = 3;
+  int32 skipped_pinned_count = 4;
+  int32 over_limit_count = 5;
+
+  // Which limits the projection actually CHECKED.
+  //
+  // **A dimension absent from this list was not evaluated, and the counts above
+  // say nothing about it.** Without it a zero `over_limit_count` is
+  // indistinguishable from a working check that found nobody — which is a
+  // stronger claim than "we did not look", and the one a Super Admin would act
+  // on. Storage is the live case: counting it needs a platform-scoped usage
+  // read that does not exist yet.
+  //
+  // A property of the RUN, not of each subscriber: repeating "storage unknown"
+  // on all 47 rows says it 47 times and invites skimming, while one list at the
+  // top is the claim the caller needs.
+  repeated string evaluated_dimensions = 6;
+}
+
+message DeletePlanResponse { bool deleted = 1; }
+
 service PlatformService {
   rpc ListOrganizations(ListPlatformOrganizationsRequest) returns (ListPlatformOrganizationsResponse);
   rpc CreateOrganization(CreatePlatformOrganizationRequest) returns (CreatePlatformOrganizationResponse);
@@ -210,6 +361,16 @@ service PlatformService {
 
   rpc ListGlobalRoles(ListGlobalRolesRequest) returns (ListGlobalRolesResponse);
   rpc CreateGlobalRole(CreateGlobalRoleRequest) returns (RoleResponse);
+
+  rpc ListPlans(ListPlansRequest) returns (ListPlansResponse);
+  rpc CreatePlan(CreatePlanRequest) returns (SubscriptionPlanResponse);
+  rpc GetPlan(PlanIdRequest) returns (SubscriptionPlanResponse);
+  rpc UpdatePlan(UpdatePlanRequest) returns (SubscriptionPlanResponse);
+  rpc DeletePlan(PlanIdRequest) returns (DeletePlanResponse);
+  // Explicit, never implicit: editing a plan changes no subscriber until this
+  // is called. A silent fan-out on save would rewrite two hundred tenants'
+  // entitlements from a form submit.
+  rpc ApplyPlan(ApplyPlanRequest) returns (ApplyPlanResponse);
 
   rpc GetMetrics(GetPlatformMetricsRequest) returns (PlatformMetricsResponse);
   rpc GetAuthJobHealth(AuthJobHealthRequest) returns (AuthJobHealthResponse);

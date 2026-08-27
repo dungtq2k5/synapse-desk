@@ -57,6 +57,33 @@ model Organization {
   maxStorageBytes      BigInt @default(5368709120) @map("max_storage_bytes")
   monthlyAiTokenBudget BigInt @default(1000000) @map("monthly_ai_token_budget")
 
+  /// The largest document this tenant's PLAN admits, copied here like every
+  /// other entitlement.
+  ///
+  /// Denormalized onto the tenant for the reason `maxAgentSeats` is: the
+  /// enforcement paths read ONE row, and a join to `subscription_plans` on
+  /// every presign would put the catalogue in the hot path of the highest
+  /// volume route in the system.
+  ///
+  /// **Defaulted to the platform ceiling, which is what makes the migration
+  /// safe.** Every existing row gets today's behaviour with no backfill, and a
+  /// grandfathered tenant — `plan_id` NULL, no subscription — keeps it forever.
+  ///
+  /// Distinct from `max_document_bytes_override` below: this is what the plan
+  /// GRANTS, that is what the tenant chose to NARROW to. Readers take the
+  /// `min()` of both and the platform ceiling, so neither can widen the other.
+  maxDocumentBytes BigInt @default(104857600) @map("max_document_bytes")
+
+  /// The largest attachment this tenant's PLAN admits — the same denormalization
+  /// and the same default-to-the-ceiling migration as `maxDocumentBytes` above.
+  ///
+  /// **The ceiling it defaults to is a TRANSPORT bound, not a policy one.**
+  /// `MAX_ATTACHMENT_BYTES` is 10 MB because the gRPC message limit binds
+  /// there, with `MAX_AI_ATTACHMENT_BYTES` at 8 MB beneath it. A plan has very
+  /// little room to differentiate on this column, which is worth knowing before
+  /// it reaches a pricing page.
+  maxAttachmentBytes BigInt @default(10485760) @map("max_attachment_bytes")
+
   /// Follows Stripe's `current_period_start` once billing is live.
   ///
   /// **Load-bearing beyond its own column:** its epoch is inside the Redis
@@ -72,6 +99,31 @@ model Organization {
   /// existing row gets a usable tier without a backfill, and a NULL reaching
   /// the settings layer would be an unresolvable model name at request time.
   aiModelTier String @default("FAST") @map("ai_model_tier") @db.VarChar(20)
+
+  /// The catalogue plan this workspace is on.
+  ///
+  /// **NULL means "no plan; the entitlement columns are authoritative"** —
+  /// which is every tenant today and stays true for any tenant that never
+  /// subscribes. There is no backfill: a workspace acquires a plan by
+  /// subscribing or by direct assignment, and until then behaves exactly as it
+  /// does now. Same state `stripe.service.ts` names when the API key is absent,
+  /// where "every tenant stays grandfathered".
+  planId String?           @map("plan_id") @db.Uuid
+  plan   SubscriptionPlan? @relation(fields: [planId], references: [id])
+
+  /// Whether a Stripe webhook may rewrite this workspace's entitlements.
+  ///
+  /// **Set when a Super Admin grants something off-catalogue.** Without it the
+  /// writer re-derives all five columns from the price on the next routine
+  /// event — a renewal, a card update — and a negotiated seat count silently
+  /// reverts. The monotonic guard cannot help: it compares Stripe's `created`
+  /// timestamps and a manual edit has none.
+  ///
+  /// A FLAG rather than a parallel set of override columns, so "this tenant is
+  /// off-catalogue" is a state one query can list rather than something
+  /// inferred by diffing columns against a plan. The event is still recorded
+  /// and still ordered; only the write is skipped, as `SKIPPED_PINNED`.
+  entitlementsPinned Boolean @default(false) @map("entitlements_pinned")
 
   // Tenant-imposed ceilings — NARROWING only
   //
@@ -270,10 +322,11 @@ model User {
   assignedUserDepartments UserDepartment[] @relation("UserDepartmentAssignedBy")
 
   // Audit and self-referential relations
-  deletedUsers         User[]         @relation("UserDeletedBy")
-  deletedOrganizations Organization[] @relation("OrganizationDeletedBy")
-  deletedDepartments   Department[]   @relation("DepartmentDeletedBy")
-  createdRoles         Role[]         @relation("RoleCreatedBy")
+  deletedUsers         User[]             @relation("UserDeletedBy")
+  deletedOrganizations Organization[]     @relation("OrganizationDeletedBy")
+  deletedPlans         SubscriptionPlan[] @relation("SubscriptionPlanDeletedBy")
+  deletedDepartments   Department[]       @relation("DepartmentDeletedBy")
+  createdRoles         Role[]             @relation("RoleCreatedBy")
 
   // Child Session & Security Relations
   deviceSessions       DeviceSession[]
@@ -694,4 +747,114 @@ model JobRun {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("job_runs")
+}
+
+/// A sellable plan: what it GRANTS, joined to Stripe by an opaque id.
+///
+/// **Keyed on Stripe PRODUCT, not price.** Stripe's model is one Product per
+/// plan with multiple Prices only for billing variants — monthly versus annual,
+/// or currencies — because Checkout and invoices render the PRODUCT name on
+/// every line item, so tiers sharing a Product are indistinguishable on a
+/// customer's receipt. Keying this table by price id would make "Pro monthly"
+/// and "Pro annual" two rows carrying duplicated entitlements that drift.
+///
+/// **What a plan COSTS is Stripe's and is deliberately absent here.** Mirroring
+/// an amount is the two-sources-of-truth problem `billing.config.ts` was
+/// written to prevent, and the divergence is silent because both sides keep
+/// answering confidently.
+model SubscriptionPlan {
+  id   String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name String @db.VarChar(100)
+
+  /// NULL for a plan ASSIGNED rather than sold — the negotiated agreement,
+  /// invisible to self-service and legal on purpose.
+  stripeProductId String? @unique @map("stripe_product_id") @db.VarChar(255)
+
+  maxAgentSeats        Int    @map("max_agent_seats")
+  maxStorageBytes      BigInt @map("max_storage_bytes")
+  monthlyAiTokenBudget BigInt @map("monthly_ai_token_budget")
+
+  /// `FAST | QUALITY`. A string, not a Prisma enum — §7.3, ADR 0001.
+  aiModelTier String @map("ai_model_tier") @db.VarChar(20)
+
+  /// The largest document this plan admits.
+  ///
+  /// **NOT NULL like every other grant: a plan states every limit it grants,
+  /// with no blanks.** A plan that does not differentiate on file size states
+  /// the platform ceiling explicitly, which is a decision recorded rather than
+  /// inferred — and it keeps a CRUD form six required fields rather than four
+  /// plus two whose emptiness carries meaning.
+  ///
+  /// **A plan can only NARROW.** `MAX_DOCUMENT_BYTES` protects the parser
+  /// (known-gaps #15, #17) and is not sellable, so this is an argument to
+  /// `min()` and never a replacement for it — selling a larger file than the
+  /// platform admits is not expressible, which is correct.
+  ///
+  /// **The cost of NOT NULL is paid at apply time.** A row holding today's
+  /// ceiling goes stale when the constant moves. Downward is harmless — `min()`
+  /// keeps the smaller number — but UPWARD is silent: raising
+  /// `MAX_DOCUMENT_BYTES` leaves every tenant gated at whatever their plan row
+  /// says, top tier included, with no error anywhere. A change to the constant
+  /// is a catalogue edit plus an apply, not a code change on its own.
+  ///
+  /// 100 MB of headroom makes a 5/25/100 MB ladder a visible one.
+  maxDocumentBytes BigInt @map("max_document_bytes")
+
+  /// The largest attachment this plan admits — the same NOT NULL rule, the same
+  /// narrow-only composition, and the same staleness cost as `maxDocumentBytes`
+  /// above.
+  ///
+  /// **Almost no room to differentiate, and it is worth knowing before pricing
+  /// on it.** `MAX_ATTACHMENT_BYTES` is 10 MB because the gRPC message limit
+  /// binds there, with `MAX_AI_ATTACHMENT_BYTES` at 8 MB beneath it — so no
+  /// plan can offer more than 10 MB, and creating headroom means moving a
+  /// transport limit rather than a policy one. A 2/5/10 MB ladder is
+  /// expressible; it is just a narrow one.
+  maxAttachmentBytes BigInt @map("max_attachment_bytes")
+
+  isActive  Boolean   @default(true) @map("is_active")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz
+
+  /// WHO retired the plan, on a `Restrict` relation like every other
+  /// soft-deletable table in this service.
+  ///
+  /// Retiring a plan is a catalogue decision with a blast radius, and the Super
+  /// Admin who made it stays resolvable for as long as the row does rather than
+  /// the decision going anonymous. `Restrict` is what enforces that: the
+  /// deleter's own user row cannot be hard-deleted out from under it.
+  deletedById String? @map("deleted_by_id") @db.Uuid
+
+  deletedBy     User?                   @relation("SubscriptionPlanDeletedBy", fields: [deletedById], references: [id], onDelete: Restrict)
+  prices        SubscriptionPlanPrice[]
+  organizations Organization[]
+
+  @@map("subscription_plans")
+}
+
+/// One Stripe Price, and the plan it grants.
+model SubscriptionPlanPrice {
+  id     String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  planId String @map("plan_id") @db.Uuid
+
+  /// The lookup the webhook performs. UNIQUE because one price belongs to
+  /// exactly one plan — and because the uniqueness is what makes an unmapped
+  /// price a `FAILED` event rather than an ambiguous one.
+  stripePriceId String @unique @map("stripe_price_id") @db.VarChar(255)
+
+  /// `month` | `year`. Display and ordering only — NEVER an entitlement input.
+  ///
+  /// **Lowercase because it is STRIPE's literal, stored as it arrives**, and
+  /// `development-conventions.md` §7.3's *"values are SCREAMING_SNAKE_CASE,
+  /// with no exceptions"* is about values this repo DEFINES. Upper-casing a
+  /// foreign literal breaks the comparison the moment anything matches it
+  /// against a webhook payload — and Stripe's vocabulary is wider than these
+  /// two, so this is not an enum of ours waiting to be written.
+  interval String @db.VarChar(20)
+
+  plan SubscriptionPlan @relation(fields: [planId], references: [id])
+
+  @@index([planId])
+  @@map("subscription_plan_prices")
 }

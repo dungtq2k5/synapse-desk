@@ -19,6 +19,14 @@ import {
   RoleResponse,
   SetOrganizationStatusRequest,
   UpdatePlatformOrganizationRequest,
+  ApplyPlanRequest,
+  ApplyPlanResponse,
+  CreatePlanRequest,
+  DeletePlanResponse,
+  ListPlansRequest,
+  ListPlansResponse,
+  SubscriptionPlanResponse,
+  UpdatePlanRequest,
 } from '@synapsedesk/grpc-proto';
 import { RequestContext } from '@synapsedesk/common';
 import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
@@ -172,6 +180,69 @@ export class PlatformGrpcClient extends BaseGrpcClient implements OnModuleInit {
   getMetrics(context: RequestContext): Promise<PlatformMetricsResponse> {
     return this.call(
       (metadata) => this.platformGrpcService.getMetrics({}, metadata),
+      context,
+    );
+  }
+  // -------------------------------------------------------------------------
+  // The plan catalogue
+  // -------------------------------------------------------------------------
+
+  listPlans(
+    request: ListPlansRequest,
+    context: RequestContext,
+  ): Promise<ListPlansResponse> {
+    return this.call(
+      (metadata) => this.platformGrpcService.listPlans(request, metadata),
+      context,
+    );
+  }
+
+  getPlan(
+    planId: string,
+    context: RequestContext,
+  ): Promise<SubscriptionPlanResponse> {
+    return this.call(
+      (metadata) => this.platformGrpcService.getPlan({ planId }, metadata),
+      context,
+    );
+  }
+
+  createPlan(
+    request: CreatePlanRequest,
+    context: RequestContext,
+  ): Promise<SubscriptionPlanResponse> {
+    return this.call(
+      (metadata) => this.platformGrpcService.createPlan(request, metadata),
+      context,
+    );
+  }
+
+  updatePlan(
+    request: UpdatePlanRequest,
+    context: RequestContext,
+  ): Promise<SubscriptionPlanResponse> {
+    return this.call(
+      (metadata) => this.platformGrpcService.updatePlan(request, metadata),
+      context,
+    );
+  }
+
+  deletePlan(
+    planId: string,
+    context: RequestContext,
+  ): Promise<DeletePlanResponse> {
+    return this.call(
+      (metadata) => this.platformGrpcService.deletePlan({ planId }, metadata),
+      context,
+    );
+  }
+
+  applyPlan(
+    request: ApplyPlanRequest,
+    context: RequestContext,
+  ): Promise<ApplyPlanResponse> {
+    return this.call(
+      (metadata) => this.platformGrpcService.applyPlan(request, metadata),
       context,
     );
   }

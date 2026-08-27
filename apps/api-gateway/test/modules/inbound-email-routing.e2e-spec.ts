@@ -14,6 +14,7 @@ import {
   buildInboundAddress,
   buildTicketReplyToken,
   generateInboundToken,
+  MAX_ATTACHMENT_BYTES,
 } from '@synapsedesk/common';
 import { E2eFixture, bootstrapE2eTest } from '../utils';
 import { timestamp, wireCreatedMessage } from '../fixtures/wire';
@@ -53,7 +54,11 @@ describe('Inbound email routing (e2e)', () => {
   /** The happy path: a known tenant and a permitted sender. */
   const resolvable = () => {
     fx.stubs.organization.resolveOrgByInboundToken.mockReturnValue(
-      of({ organizationId, status: ProtoOrgStatus.ORG_STATUS_ACTIVE }),
+      of({
+        organizationId,
+        status: ProtoOrgStatus.ORG_STATUS_ACTIVE,
+        maxAttachmentBytes: MAX_ATTACHMENT_BYTES,
+      }),
     );
     fx.stubs.user.resolveInboundSender.mockReturnValue(
       of({ userId: senderId, created: false }),
@@ -93,7 +98,7 @@ describe('Inbound email routing (e2e)', () => {
   describe('the tenant comes from the address, never the sender', () => {
     it('an unknown token is dropped with a 200 and no sender lookup', async () => {
       fx.stubs.organization.resolveOrgByInboundToken.mockReturnValue(
-        of({ organizationId: undefined, status: 0 }),
+        of({ organizationId: undefined, status: 0, maxAttachmentBytes: 0 }),
       );
 
       const response = await post(
@@ -116,6 +121,7 @@ describe('Inbound email routing (e2e)', () => {
         of({
           organizationId,
           status: ProtoOrgStatus.ORG_STATUS_SUSPENDED_PAST_DUE,
+          maxAttachmentBytes: MAX_ATTACHMENT_BYTES,
         }),
       );
 
@@ -145,7 +151,11 @@ describe('Inbound email routing (e2e)', () => {
   describe('the sender is resolved within that tenant', () => {
     it('5. **a refused sender creates no ticket**', async () => {
       fx.stubs.organization.resolveOrgByInboundToken.mockReturnValue(
-        of({ organizationId, status: ProtoOrgStatus.ORG_STATUS_ACTIVE }),
+        of({
+          organizationId,
+          status: ProtoOrgStatus.ORG_STATUS_ACTIVE,
+          maxAttachmentBytes: MAX_ATTACHMENT_BYTES,
+        }),
       );
       fx.stubs.user.resolveInboundSender.mockReturnValue(
         of({ userId: undefined, created: false }),
@@ -541,7 +551,7 @@ describe('Inbound email routing (e2e)', () => {
       // Both guards at once: an unroutable address AND the headers that say a
       // machine sent it. The drop is logged; no reply is published.
       fx.stubs.organization.resolveOrgByInboundToken.mockReturnValue(
-        of({ organizationId: undefined, status: 0 }),
+        of({ organizationId: undefined, status: 0, maxAttachmentBytes: 0 }),
       );
 
       const response = await post(addressedHere('auto-responder.json')).expect(

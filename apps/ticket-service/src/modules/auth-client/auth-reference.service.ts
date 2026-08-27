@@ -131,8 +131,9 @@ export class AuthReferenceService implements OnModuleInit {
   /**
    * The tenant's attachment ceilings, already composed with the platform ones.
    *
-   * `min()` per field, so every layer narrows and none widens. A tenant that
-   * configured nothing gets exactly today's constants.
+   * `min()` per field over the platform ceiling, the plan grant and the
+   * tenant's own override, so every layer narrows and none widens. A tenant
+   * that configured nothing gets whatever its plan grants.
    *
    * @throws RpcException `UNAVAILABLE` when the organization cannot be read.
    * A stale entry is never served in its place — an unreadable limit must not
@@ -162,9 +163,22 @@ export class AuthReferenceService implements OnModuleInit {
         //
         // `?? 0` fails the other way and is louder: it refuses every
         // attachment for every tenant that never opened the settings page.
+        //
+        // The PLAN grant is a third argument to the same `min`, and its `?? 0`
+        // means the OPPOSITE of the override's fallback above. The column is
+        // NOT NULL and the proto field is not `optional`, so absent is never a
+        // tenant's choice here — it is a wire that lost a field.
+        //
+        // Under the shipped loader options (`defaults: true`) an absent
+        // non-optional int64 arrives as `0` and this `??` never fires; under
+        // `defaults: false` it arrives as `undefined` and, unguarded, the whole
+        // `min` is `NaN` — every attachment passes. Measured in
+        // `loader-defaults.spec.ts`. Refusing is loud and matches what this
+        // method already does when it cannot read the row at all.
         maxBytes: Math.min(
           MAX_ATTACHMENT_BYTES,
           organization.maxAttachmentBytesOverride ?? MAX_ATTACHMENT_BYTES,
+          organization.maxAttachmentBytes ?? 0,
         ),
         maxPerMessage: Math.min(
           MAX_ATTACHMENTS_PER_MESSAGE,

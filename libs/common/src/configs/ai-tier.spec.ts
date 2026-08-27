@@ -2,10 +2,9 @@ import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { readFileSync } from 'node:fs';
 import {
-  DEFAULT_PLAN_CATALOG,
   GENERATION_MODEL_BY_TIER,
+  AI_MODEL_TIERS,
   MODEL_PRICING,
-  entitlementsForPrice,
   estimateCostMicros,
 } from '../main';
 
@@ -47,36 +46,36 @@ describe('The AI tier (unit)', () => {
     });
   });
 
-  describe('the plan catalog', () => {
-    it('3. Grants a tier on every plan, and QUALITY on at least one', () => {
-      // A catalog where nothing grants QUALITY is a tier nobody can buy — the
-      // feature would ship, pass every other test, and be unsellable.
-      const tiers = Object.values(DEFAULT_PLAN_CATALOG).map(
-        (plan) => plan.aiModelTier,
-      );
-
-      expect(tiers.every(Boolean)).toBe(true);
-      expect(tiers).toContain('QUALITY');
-      expect(tiers).toContain('FAST');
-    });
-
-    it('4. Prices every model a plan can grant', () => {
-      // A plan granting an unpriced model meters as free for whoever buys it —
-      // the most expensive possible version of the pricing-table hole.
-      for (const plan of Object.values(DEFAULT_PLAN_CATALOG)) {
-        expect(
-          MODEL_PRICING[GENERATION_MODEL_BY_TIER[plan.aiModelTier]],
-        ).toBeDefined();
+  describe('the tier vocabulary', () => {
+    // The plan catalogue is a TABLE now (`subscription_plans`), so these can no
+    // longer be asserted against a constant. Phrasing them on the TIER
+    // vocabulary is stronger anyway: it holds for every plan anyone will ever
+    // create, not for the three that happened to be hardcoded.
+    it('3. Maps every tier to a generation model', () => {
+      // A tier with no model is a plan somebody can buy and nothing can serve.
+      for (const tier of AI_MODEL_TIERS) {
+        expect(GENERATION_MODEL_BY_TIER[tier]).toBeTruthy();
       }
     });
 
-    it('5. Returns NULL for an unknown price rather than a default plan', () => {
-      // Fail closed. Defaulting to the free tier means one dashboard typo
-      // downgrades a paying customer with no error anywhere.
-      expect(
-        entitlementsForPrice(DEFAULT_PLAN_CATALOG, 'price_typo'),
-      ).toBeNull();
-      expect(entitlementsForPrice(DEFAULT_PLAN_CATALOG, undefined)).toBeNull();
+    it('4. **Prices every model a tier can grant**', () => {
+      // The most expensive version of the pricing-table hole: a plan granting
+      // an unpriced model meters as FREE for whoever buys it.
+      //
+      // Against the vocabulary rather than against rows, so a Super Admin
+      // creating a fourth plan tomorrow cannot reach an unpriced model — the
+      // only tiers a row may hold are the ones checked here.
+      for (const tier of AI_MODEL_TIERS) {
+        expect(MODEL_PRICING[GENERATION_MODEL_BY_TIER[tier]]).toBeDefined();
+      }
+    });
+
+    it('**5. and the tier column can hold nothing else**', () => {
+      // What makes test 4 exhaustive rather than a sample. `aiModelTier` is a
+      // `VarChar(20)` on both `subscription_plans` and `organizations`, so the
+      // database will accept any string — this vocabulary is the only thing
+      // that says which are real, and every writer narrows through it.
+      expect([...AI_MODEL_TIERS].sort()).toEqual(['FAST', 'QUALITY']);
     });
   });
 

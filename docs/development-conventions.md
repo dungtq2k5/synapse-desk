@@ -185,6 +185,22 @@ A `?` costs every layer below a branch on `undefined`. Prefer a real default plu
 
 Where absent and empty are indistinguishable on the wire — every `repeated` field, and any implicit-presence scalar — the `?` buys nothing and the default is strictly better.
 
+**A default is only a DEFAULT once the downstream branch is deleted.** Adding
+`= []` to the DTO while `dto.field ?? []` survives in the mapper gets the
+ceremony and none of the benefit: the value is supplied twice, and nothing says
+which one is doing the work. Removing the `?` is half the change — the other
+half is deleting every `??` the `?` was paying for, which is the cost the rule
+above is written to recover.
+
+**No runtime test can see the difference**, because both arrangements put the
+same bytes on the wire. Measured: with the DTO default removed AND the mapper
+branch restored, every assertion about the outgoing message still passes. The
+guard is therefore a scan — `default-branch-pairing.spec.ts` fails when a mapper
+branches on a field its DTO already defaults. A field whose DTO carries NO
+default is none of that check's business: `clearStripeProductId` resolves its
+absent case at the mapper precisely because a default at the DTO would clear the
+column on every unrelated PATCH.
+
 **A default is VALIDATED, so it must satisfy the field's own bounds.** `@IsOptional()` skips only `undefined` and `null`; a defaulted field always holds a value, so the validators run on it. `limit: number = 0` beside `@Min(1)` rejects every request that omits the field — a 400 on the default path, which no test that always sends the field will catch.
 
 ### 5.3 Guard matrix
@@ -531,7 +547,7 @@ modules/<module>/
 ```
 
 - **In `dto/graphql/`, the DECORATOR decides the name.** An `@ObjectType` is an output shape: it ends `ResponseGqlDto` and lives in `<entity>-response.gql-dto.ts`. An `@InputType` or `@ArgsType` is an input: it never carries `Response` and never lives in a `-response` file. The decorator is the only reliable signal — a class named `…Page` or `…Payload` is still an output, and GraphQL will not let one class be both.
-- **Requests and responses live in different files.** `<entity>.dto.ts` holds what a route ACCEPTS; `<entity>-response.dto.ts` holds what it RETURNS, and every class in it ends `ResponseDto`. The split is what makes "does this class get validated?" answerable from the import line: a `ValidationPipe` runs on request DTOs and never on response ones, so the two need opposite things from their decorators (§5.2), and a response class sitting in the request file invites both mistakes — validators nobody runs, and a request field nobody validates.
+- **Requests and responses live in different files.** `<entity>.dto.ts` holds what a route ACCEPTS; `<entity>-response.dto.ts` holds what it RETURNS, and every class in it ends `ResponseDto`. The split is what makes "does this class get validated?" answerable from the import line: a `ValidationPipe` runs on request DTOs and never on response ones, so the two need opposite things from their decorators (§5.2), and a response class sitting in the request file invites both mistakes — validators nobody runs, and a request field nobody validates. `dto-naming.spec.ts` enforces BOTH halves — the suffix, and the file a response class is filed in.
 - **The suffix carries the protocol, not just the folder.** Two files with one name in two folders are ambiguous in an import line and in editor search.
 - **Both protocols' mappers live in one `<entity>.mapper.ts`** — putting the wire→REST and wire→GraphQL conversions side by side is what makes a divergence between them visible.
 - **`to<ReturnTypeName>` / `from<InputTypeName>` always name the FOREIGN side.** `toUser` is the version this rule exists to prevent. Full reasoning: [ADR 0004](./decisions/0004-mappers-name-the-foreign-side.md).
@@ -564,7 +580,13 @@ Two independent classes, paired by a contract spec (`<name>.contract.spec.ts`) t
 
 **SHOULD** — put a genuine trap at the line it applies to, as a `//` comment, short enough to read in one pass.
 
-**MUST NOT** — put a `/** */` block BETWEEN a DTO property's decorators and its name. It reads exactly like a docblock and is not one: the Swagger plugin runs with `introspectComments` and takes the LEADING comment, so a block below the decorators never reaches the published spec. `AcceptInvitationDto.deviceName` shipped with no description at all this way, while the file looked thoroughly documented. A note about why a decorator is present or absent is a trap, so it belongs at that decorator as `//`; what the FIELD is belongs above them all. `dto-docblock.spec.ts` enforces this.
+**MUST NOT** — write a `/** */` where POSITION makes it attach to something other than what it describes. A docblock binds to whatever declaration follows it, and the failure is always the same shape: the text looks attached, is not, and the file reads as thoroughly documented while the symbol has nothing. Three instances, one rule:
+
+- **Between a DTO property's decorators and its name.** The Swagger plugin runs with `introspectComments` and takes the LEADING comment, so a block below the decorators never reaches the published spec. `AcceptInvitationDto.deviceName` shipped with no description at all this way. A note about why a decorator is present or absent is a trap, so it belongs at that decorator as `//`; what the FIELD is belongs above them all. `dto-docblock.spec.ts` enforces this one.
+- **Above a GROUP of enum members.** It attaches on hover to the first member alone — quietly documenting one while claiming four. Describe the group in `//`, and give any member that needs its own contract its own block.
+- **Above a section banner rather than the declaration below it.** Inserting a `// ---- Section ----` header between a docblock and its method orphans the block and leaves the method undocumented; both halves still look right in the diff. Put the banner above the docblock, never between it and what it documents.
+
+The test in all three: read what comes IMMEDIATELY after the closing `*/`. If it is not the thing the text describes, the block is misplaced.
 
 **Keep it proportional.** A one-line constant gets one line. A function with a subtle contract gets a paragraph and an `@example`. Length is earned by the caller's need to know, not by how interesting the implementation was.
 

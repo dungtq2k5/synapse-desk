@@ -38,16 +38,17 @@ import {
   type RequestContext,
   type RequestOrigin,
   InboundRejectionReason,
+  exceedsLimit,
 } from '@synapsedesk/common';
 import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
 import { InboundEmailDto } from './dto/rest/inbound-email.dto';
 import type { InboundUploadedAttachmentDto } from './dto/rest/inbound-email.dto';
+import { InboundAttachmentUploadRequestDto } from './dto/rest/inbound-attachment.dto';
 import {
-  InboundAttachmentDeclinedDto,
-  InboundAttachmentUploadDto,
-  InboundAttachmentUploadRequestDto,
+  InboundAttachmentDeclinedResponseDto,
+  InboundAttachmentPresignResponseDto,
   InboundAttachmentUploadResponseDto,
-} from './dto/rest/inbound-attachment.dto';
+} from './dto/rest/inbound-attachment-response.dto';
 import { InboundEmailPublisher } from './inbound-email.publisher';
 import { toStoredBody } from './quoted-reply';
 
@@ -342,8 +343,8 @@ export class InboundEmailService implements OnModuleInit {
   async presignAttachments(
     request: InboundAttachmentUploadRequestDto,
   ): Promise<InboundAttachmentUploadResponseDto> {
-    const uploads: InboundAttachmentUploadDto[] = [];
-    const declined: InboundAttachmentDeclinedDto[] = [];
+    const uploads: InboundAttachmentPresignResponseDto[] = [];
+    const declined: InboundAttachmentDeclinedResponseDto[] = [];
 
     const routing = await this.resolveRouting({
       to: request.to,
@@ -377,7 +378,7 @@ export class InboundEmailService implements OnModuleInit {
       // the list is over the cap rather than trimming it — so a mail with eight
       // attachments would lose the MESSAGE, not the extra files. Declining the
       // sixth here keeps that a partial loss with a name on it.
-      if (uploads.length >= limits.maxPerMessage) {
+      if (exceedsLimit(uploads.length + 1, limits.maxPerMessage)) {
         declined.push({
           fileName: file.fileName,
           reason: `only ${limits.maxPerMessage} attachments per message`,
@@ -385,7 +386,7 @@ export class InboundEmailService implements OnModuleInit {
         continue;
       }
 
-      if (file.sizeBytes > limits.maxBytes) {
+      if (exceedsLimit(file.sizeBytes, limits.maxBytes)) {
         declined.push({ fileName: file.fileName, reason: 'too large' });
         continue;
       }
@@ -463,6 +464,7 @@ export class InboundEmailService implements OnModuleInit {
       status: tenantStatus,
       maxAttachmentBytesOverride,
       maxAttachmentsPerMessageOverride,
+      maxAttachmentBytes,
     } = await this.authPeer.run(
       (metadata) =>
         this.organizations.resolveOrgByInboundToken(
@@ -476,13 +478,19 @@ export class InboundEmailService implements OnModuleInit {
       return { ok: false, outcome: InboundOutcome.UNROUTABLE };
     }
 
-    // `min(platform, tenant)`, composed once for this mail. Absent means the
-    // tenant configured nothing, which is the normal state and today's
-    // behaviour.
+    // `min(platform, plan, tenant)`, composed once for this mail. An absent
+    // OVERRIDE means the tenant configured nothing, which is the normal state
+    // and falls through to the layer above; an absent PLAN GRANT is a wire that
+    // lost a non-optional field, and refuses rather than widens. See
+    // `loader-defaults.spec.ts` for why the two differ.
+    //
+    // This runs only after the `organizationId` check above, so the zero the
+    // unresolved-tenant branches report never reaches here.
     const limits = {
       maxBytes: Math.min(
         MAX_ATTACHMENT_BYTES,
         maxAttachmentBytesOverride ?? MAX_ATTACHMENT_BYTES,
+        maxAttachmentBytes ?? 0,
       ),
       maxPerMessage: Math.min(
         MAX_ATTACHMENTS_PER_MESSAGE,

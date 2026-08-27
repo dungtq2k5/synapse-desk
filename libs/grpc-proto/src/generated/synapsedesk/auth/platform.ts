@@ -9,7 +9,7 @@ import type { Metadata } from "@grpc/grpc-js";
 import { GrpcMethod, GrpcStreamMethod } from "@nestjs/microservices";
 import { Observable } from "rxjs";
 import { Timestamp } from "../../google/protobuf/timestamp";
-import { OrgStatus, PageMeta, PageRequest, UserResponse } from "./common";
+import { AiModelTier, OrgStatus, PageMeta, PageRequest, UserResponse } from "./common";
 import { OrganizationResponse } from "./organization";
 import { RoleResponse } from "./role";
 
@@ -209,6 +209,169 @@ export interface PlatformMetricsResponse_OrganizationsByStatusEntry {
   value: number;
 }
 
+export interface SubscriptionPlanPriceResponse {
+  id: string;
+  stripePriceId: string;
+  /**
+   * `month` | `year`. A string, not an enum -- Stripe's own vocabulary, and a
+   * new interval must not need a proto change.
+   */
+  interval: string;
+}
+
+export interface SubscriptionPlanResponse {
+  id: string;
+  name: string;
+  /**
+   * Absent for a plan ASSIGNED rather than sold: the negotiated agreement,
+   * invisible to self-service and legal on purpose. A UI must show which kind
+   * a plan is, or Super Admins create catalogue entries nobody can buy.
+   */
+  stripeProductId?: string | undefined;
+  maxAgentSeats: number;
+  maxStorageBytes: number;
+  monthlyAiTokenBudget: number;
+  aiModelTier: AiModelTier;
+  maxDocumentBytes: number;
+  maxAttachmentBytes: number;
+  isActive: boolean;
+  prices: SubscriptionPlanPriceResponse[];
+  /**
+   * How many live tenants hold this plan. The number that decides whether a
+   * delete is allowed and how large an apply's blast radius is.
+   */
+  subscriberCount: number;
+  createdAt: Timestamp | undefined;
+  updatedAt: Timestamp | undefined;
+  deletedAt?: Timestamp | undefined;
+}
+
+export interface ListPlansRequest {
+  page: PageRequest | undefined;
+  includeInactive: boolean;
+  includeDeleted: boolean;
+}
+
+export interface ListPlansResponse {
+  items: SubscriptionPlanResponse[];
+  meta: PageMeta | undefined;
+}
+
+export interface PlanIdRequest {
+  planId: string;
+}
+
+/**
+ * Every grant is REQUIRED on create: a plan states every limit it grants, with
+ * no blanks. A plan that does not differentiate on a dimension states the
+ * platform ceiling explicitly, which is a decision recorded rather than
+ * inferred.
+ */
+export interface CreatePlanRequest {
+  name: string;
+  stripeProductId?: string | undefined;
+  maxAgentSeats: number;
+  maxStorageBytes: number;
+  monthlyAiTokenBudget: number;
+  aiModelTier: AiModelTier;
+  maxDocumentBytes: number;
+  maxAttachmentBytes: number;
+  isActive: boolean;
+  prices: CreatePlanPriceInput[];
+}
+
+export interface CreatePlanPriceInput {
+  stripePriceId: string;
+  interval: string;
+}
+
+/**
+ * Every field OPTIONAL on update, and absent means "leave it": a PATCH that
+ * silently reset unmentioned grants to a proto zero would empty a catalogue row
+ * from a form that touched one field.
+ */
+export interface UpdatePlanRequest {
+  planId: string;
+  name?: string | undefined;
+  stripeProductId?: string | undefined;
+  clearStripeProductId: boolean;
+  maxAgentSeats?: number | undefined;
+  maxStorageBytes?: number | undefined;
+  monthlyAiTokenBudget?: number | undefined;
+  aiModelTier?: AiModelTier | undefined;
+  maxDocumentBytes?: number | undefined;
+  maxAttachmentBytes?: number | undefined;
+  isActive?: boolean | undefined;
+}
+
+/** What ONE subscriber would get, and what that would mean for them. */
+export interface PlanSubscriberProjection {
+  organizationId: string;
+  organizationName: string;
+  /**
+   * Field name -> "before -> after", for the columns this apply would change.
+   * A map keyed by field name so a new grant needs no new field here.
+   */
+  changes: { [key: string]: string };
+  /**
+   * *Already over a limit the new plan sets.** Not a blocker: D1's rule is
+   * that a limit gates ADMISSION, never TENURE, so these tenants keep
+   * everything they have and are refused their NEXT addition. It is reported
+   * so a Super Admin sees the blast radius rather than learning it from a
+   * support ticket.
+   */
+  overLimit: string[];
+  /** Skipped entirely: the tenant is off-catalogue by deliberate policy (D3). */
+  skippedPinned: boolean;
+  /**
+   * Held back to the next cycle roll rather than applied now (D1): lowering a
+   * part-spent budget mid-cycle is retroactive in effect.
+   */
+  budgetDeferred: boolean;
+}
+
+export interface PlanSubscriberProjection_ChangesEntry {
+  key: string;
+  value: string;
+}
+
+export interface ApplyPlanRequest {
+  planId: string;
+  /**
+   * TRUE projects and writes NOTHING. The projection is computed by the same
+   * code either way -- a dry run that answered differently from the apply it
+   * predicts would be worse than no dry run.
+   */
+  dryRun: boolean;
+}
+
+export interface ApplyPlanResponse {
+  subscribers: PlanSubscriberProjection[];
+  dryRun: boolean;
+  changedCount: number;
+  skippedPinnedCount: number;
+  overLimitCount: number;
+  /**
+   * Which limits the projection actually CHECKED.
+   *
+   * **A dimension absent from this list was not evaluated, and the counts above
+   * say nothing about it.** Without it a zero `over_limit_count` is
+   * indistinguishable from a working check that found nobody — which is a
+   * stronger claim than "we did not look", and the one a Super Admin would act
+   * on. Storage is the live case: counting it needs a platform-scoped usage
+   * read that does not exist yet.
+   *
+   * A property of the RUN, not of each subscriber: repeating "storage unknown"
+   * on all 47 rows says it 47 times and invites skimming, while one list at the
+   * top is the claim the caller needs.
+   */
+  evaluatedDimensions: string[];
+}
+
+export interface DeletePlanResponse {
+  deleted: boolean;
+}
+
 export interface PlatformServiceClient {
   listOrganizations(
     request: ListPlatformOrganizationsRequest,
@@ -252,6 +415,24 @@ export interface PlatformServiceClient {
   listGlobalRoles(request: ListGlobalRolesRequest, metadata?: Metadata): Observable<ListGlobalRolesResponse>;
 
   createGlobalRole(request: CreateGlobalRoleRequest, metadata?: Metadata): Observable<RoleResponse>;
+
+  listPlans(request: ListPlansRequest, metadata?: Metadata): Observable<ListPlansResponse>;
+
+  createPlan(request: CreatePlanRequest, metadata?: Metadata): Observable<SubscriptionPlanResponse>;
+
+  getPlan(request: PlanIdRequest, metadata?: Metadata): Observable<SubscriptionPlanResponse>;
+
+  updatePlan(request: UpdatePlanRequest, metadata?: Metadata): Observable<SubscriptionPlanResponse>;
+
+  deletePlan(request: PlanIdRequest, metadata?: Metadata): Observable<DeletePlanResponse>;
+
+  /**
+   * Explicit, never implicit: editing a plan changes no subscriber until this
+   * is called. A silent fan-out on save would rewrite two hundred tenants'
+   * entitlements from a form submit.
+   */
+
+  applyPlan(request: ApplyPlanRequest, metadata?: Metadata): Observable<ApplyPlanResponse>;
 
   getMetrics(request: GetPlatformMetricsRequest, metadata?: Metadata): Observable<PlatformMetricsResponse>;
 
@@ -320,6 +501,42 @@ export interface PlatformServiceController {
     metadata?: Metadata,
   ): Promise<RoleResponse> | Observable<RoleResponse> | RoleResponse;
 
+  listPlans(
+    request: ListPlansRequest,
+    metadata?: Metadata,
+  ): Promise<ListPlansResponse> | Observable<ListPlansResponse> | ListPlansResponse;
+
+  createPlan(
+    request: CreatePlanRequest,
+    metadata?: Metadata,
+  ): Promise<SubscriptionPlanResponse> | Observable<SubscriptionPlanResponse> | SubscriptionPlanResponse;
+
+  getPlan(
+    request: PlanIdRequest,
+    metadata?: Metadata,
+  ): Promise<SubscriptionPlanResponse> | Observable<SubscriptionPlanResponse> | SubscriptionPlanResponse;
+
+  updatePlan(
+    request: UpdatePlanRequest,
+    metadata?: Metadata,
+  ): Promise<SubscriptionPlanResponse> | Observable<SubscriptionPlanResponse> | SubscriptionPlanResponse;
+
+  deletePlan(
+    request: PlanIdRequest,
+    metadata?: Metadata,
+  ): Promise<DeletePlanResponse> | Observable<DeletePlanResponse> | DeletePlanResponse;
+
+  /**
+   * Explicit, never implicit: editing a plan changes no subscriber until this
+   * is called. A silent fan-out on save would rewrite two hundred tenants'
+   * entitlements from a form submit.
+   */
+
+  applyPlan(
+    request: ApplyPlanRequest,
+    metadata?: Metadata,
+  ): Promise<ApplyPlanResponse> | Observable<ApplyPlanResponse> | ApplyPlanResponse;
+
   getMetrics(
     request: GetPlatformMetricsRequest,
     metadata?: Metadata,
@@ -345,6 +562,12 @@ export function PlatformServiceControllerMethods() {
       "listUsers",
       "listGlobalRoles",
       "createGlobalRole",
+      "listPlans",
+      "createPlan",
+      "getPlan",
+      "updatePlan",
+      "deletePlan",
+      "applyPlan",
       "getMetrics",
       "getAuthJobHealth",
     ];

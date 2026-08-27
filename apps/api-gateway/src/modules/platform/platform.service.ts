@@ -12,6 +12,12 @@ import {
   toPlatformOrganizationPageDto,
   toPlatformOrganizationResponseDto,
   toPlatformUserPageDto,
+  toApplyPlanResponseDto,
+  toCreatePlanRequest,
+  toListPlansRequest,
+  toSubscriptionPlanPageDto,
+  toSubscriptionPlanResponseDto,
+  toUpdatePlanRequest,
 } from './platform.mapper';
 import { toRoleResponseDto } from '../roles/role.mapper';
 import {
@@ -23,6 +29,9 @@ import {
   RoleResponseDto,
   SetOrganizationStatusDto,
   UpdatePlatformOrganizationDto,
+  CreatePlanDto,
+  ListPlansQueryDto,
+  UpdatePlanDto,
 } from './dto/rest/platform.dto';
 import {
   CreatePlatformOrganizationResponseDto,
@@ -30,6 +39,9 @@ import {
   PlatformMetricsResponseDto,
   PlatformOrganizationResponseDto,
   PlatformUserResponseDto,
+  ApplyPlanResponseDto,
+  DeletePlanResponseDto,
+  SubscriptionPlanResponseDto,
 } from './dto/rest/platform-response.dto';
 
 /** The platform-admin surface. Returns REST DTOs; the wire stays in the client. */
@@ -190,6 +202,75 @@ export class PlatformService {
   ): Promise<PlatformMetricsResponseDto> {
     return toPlatformMetricsResponseDto(
       await this.platformGrpcClient.getMetrics(context),
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // The plan catalogue
+  // -------------------------------------------------------------------------
+
+  async listPlans(
+    query: ListPlansQueryDto,
+    context: RequestContext,
+  ): Promise<PaginationResponseDto<SubscriptionPlanResponseDto>> {
+    return toSubscriptionPlanPageDto(
+      await this.platformGrpcClient.listPlans(
+        toListPlansRequest(query),
+        context,
+      ),
+    );
+  }
+
+  async getPlan(
+    planId: string,
+    context: RequestContext,
+  ): Promise<SubscriptionPlanResponseDto> {
+    return toSubscriptionPlanResponseDto(
+      await this.platformGrpcClient.getPlan(planId, context),
+    );
+  }
+
+  async createPlan(
+    dto: CreatePlanDto,
+    context: RequestContext,
+  ): Promise<SubscriptionPlanResponseDto> {
+    return toSubscriptionPlanResponseDto(
+      await this.platformGrpcClient.createPlan(
+        toCreatePlanRequest(dto),
+        context,
+      ),
+    );
+  }
+
+  async updatePlan(
+    planId: string,
+    dto: UpdatePlanDto,
+    context: RequestContext,
+  ): Promise<SubscriptionPlanResponseDto> {
+    return toSubscriptionPlanResponseDto(
+      await this.platformGrpcClient.updatePlan(
+        toUpdatePlanRequest(planId, dto),
+        context,
+      ),
+    );
+  }
+
+  async deletePlan(
+    planId: string,
+    context: RequestContext,
+  ): Promise<DeletePlanResponseDto> {
+    const response = await this.platformGrpcClient.deletePlan(planId, context);
+
+    return { deleted: response.deleted };
+  }
+
+  async applyPlan(
+    planId: string,
+    dryRun: boolean,
+    context: RequestContext,
+  ): Promise<ApplyPlanResponseDto> {
+    return toApplyPlanResponseDto(
+      await this.platformGrpcClient.applyPlan({ planId, dryRun }, context),
     );
   }
 }

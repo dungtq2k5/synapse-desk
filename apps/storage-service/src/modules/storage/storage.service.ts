@@ -24,6 +24,7 @@ import {
   requireActor,
   requireTenant,
   StoragePurpose,
+  exceedsLimit,
 } from '@synapsedesk/common';
 import { FirebaseStorageService } from '../firebase/firebase-storage.service';
 import { extensionFor, PURPOSE_POLICY } from '../../common/purpose-registry';
@@ -113,7 +114,10 @@ export class StorageService {
         message: `'${request.contentType}' is not an allowed type for ${purpose}`,
       });
     }
-    if (request.sizeBytes <= 0 || request.sizeBytes > policy.maxSizeBytes) {
+    if (
+      request.sizeBytes <= 0 ||
+      exceedsLimit(request.sizeBytes, policy.maxSizeBytes)
+    ) {
       throw new RpcException({
         code: status.INVALID_ARGUMENT,
         message: `${purpose} uploads must be between 1 and ${policy.maxSizeBytes} bytes`,

@@ -4,7 +4,6 @@ import { status } from '@grpc/grpc-js';
 import {
   AuditPublisher,
   BillingEventStatus,
-  DEFAULT_PLAN_CATALOG,
   OrgStatus,
 } from '@synapsedesk/common';
 import { fromProtoAiModelTier } from '@synapsedesk/grpc-proto';
@@ -14,7 +13,7 @@ import {
   memberContext,
   superAdminContext,
 } from '../utils';
-import { createOrganization } from '../factories';
+import { createOrganization, planForPrice, seedPlans } from '../factories';
 import { EntitlementWriterService } from '../../src/modules/billing/entitlement-writer.service';
 import { BillingService } from '../../src/modules/billing/billing.service';
 import { StripeService } from '../../src/modules/billing/stripe.service';
@@ -146,6 +145,11 @@ describe('Billing and entitlements (e2e)', () => {
 
   beforeEach(async () => {
     await fx.reset();
+    // The catalogue is a TABLE now, so every test needs it written. `reset`
+    // truncates, which is what makes the seed a per-test step rather than a
+    // one-off — and what makes "an unmapped price" a state a test can create
+    // by simply not seeding one.
+    await seedPlans(fx.prisma);
     jest.clearAllMocks();
     publishEntitlementsChanged.mockImplementation(() => undefined);
     auditRecord.mockImplementation(() => undefined);
@@ -213,13 +217,96 @@ describe('Billing and entitlements (e2e)', () => {
       const updated = await fx.prisma.organization.findUniqueOrThrow({
         where: { id: organization.id },
       });
-      const plan = DEFAULT_PLAN_CATALOG[PRO];
+      const plan = planForPrice(PRO);
 
       expect(updated.maxAgentSeats).toBe(plan.maxAgentSeats);
       expect(updated.maxStorageBytes).toBe(plan.maxStorageBytes);
       expect(updated.monthlyAiTokenBudget).toBe(plan.monthlyAiTokenBudget);
       expect(updated.aiModelTier).toBe(plan.aiModelTier);
+      expect(updated.maxDocumentBytes).toBe(plan.maxDocumentBytes);
+      expect(updated.maxAttachmentBytes).toBe(plan.maxAttachmentBytes);
       expect(updated.stripeSubscriptionId).toBe('sub_test_1');
+    });
+
+    it('1b. **Applies a plan that NARROWS the file-size grants**', async () => {
+      // Pro sits at the platform ceiling on both, so test 1 cannot tell an
+      // applied grant from an untouched default — the numbers are the same.
+      // Starter narrows both, which is the only shape that proves the write.
+      const organization = await subscribedOrganization('cus_narrow');
+      const plan = planForPrice(STARTER);
+
+      // The tenant starts at the platform ceiling, by column default.
+      const before = await fx.prisma.organization.findUniqueOrThrow({
+        where: { id: organization.id },
+      });
+      expect(before.maxDocumentBytes).toBeGreaterThan(plan.maxDocumentBytes);
+      expect(before.maxAttachmentBytes).toBeGreaterThan(
+        plan.maxAttachmentBytes,
+      );
+
+      await deliver(
+        subscriptionEvent({ customerId: 'cus_narrow', priceId: STARTER }),
+      );
+
+      const updated = await fx.prisma.organization.findUniqueOrThrow({
+        where: { id: organization.id },
+      });
+
+      expect(updated.maxDocumentBytes).toBe(plan.maxDocumentBytes);
+      expect(updated.maxAttachmentBytes).toBe(plan.maxAttachmentBytes);
+    });
+
+    it('1c. **Monthly and ANNUAL prices of one plan grant the SAME entitlements**', async () => {
+      // The reason the catalogue is keyed on Stripe PRODUCT rather than price.
+      // Keying by price makes "Pro monthly" and "Pro annual" two rows carrying
+      // duplicated entitlements, and the failure is not a crash — it is drift:
+      // someone raises a seat count on one row, and half the Pro customers
+      // silently keep the old one. Checkout and invoices render the PRODUCT
+      // name, so the two are indistinguishable on the customer's receipt while
+      // granting different things.
+      const monthly = await subscribedOrganization('cus_pro_monthly');
+      const annual = await subscribedOrganization('cus_pro_annual');
+
+      // Distinct subscription ids: `stripe_subscription_id` is UNIQUE, and two
+      // tenants genuinely have two subscriptions. Reusing the fixture default
+      // would fail on the constraint rather than on anything this test is about.
+      await deliver(
+        subscriptionEvent({
+          customerId: 'cus_pro_monthly',
+          priceId: PRO,
+          subscriptionId: 'sub_pro_monthly',
+        }),
+      );
+      await deliver(
+        subscriptionEvent({
+          customerId: 'cus_pro_annual',
+          priceId: 'price_pro_annual',
+          subscriptionId: 'sub_pro_annual',
+        }),
+      );
+
+      const [onMonthly, onAnnual] = await Promise.all([
+        fx.prisma.organization.findUniqueOrThrow({ where: { id: monthly.id } }),
+        fx.prisma.organization.findUniqueOrThrow({ where: { id: annual.id } }),
+      ]);
+
+      const grants = (row: typeof onMonthly) => ({
+        planId: row.planId,
+        maxAgentSeats: row.maxAgentSeats,
+        maxStorageBytes: row.maxStorageBytes,
+        monthlyAiTokenBudget: row.monthlyAiTokenBudget,
+        aiModelTier: row.aiModelTier,
+        maxDocumentBytes: row.maxDocumentBytes,
+        maxAttachmentBytes: row.maxAttachmentBytes,
+      });
+
+      // Every grant, not a sample — a drift bug shows up in whichever column
+      // nobody thought to assert.
+      expect(grants(onAnnual)).toEqual(grants(onMonthly));
+      // And they are the SAME plan row, which is what makes that true by
+      // construction rather than by two fixtures happening to agree.
+      expect(onAnnual.planId).toBe(onMonthly.planId);
+      expect(onAnnual.planId).not.toBeNull();
     });
 
     it('2. Applies the SAME event delivered twice exactly ONCE', async () => {
@@ -281,10 +368,8 @@ describe('Billing and entitlements (e2e)', () => {
         where: { id: organization.id },
       });
       // Still Pro. The paying customer keeps what they paid for.
-      expect(updated.aiModelTier).toBe(DEFAULT_PLAN_CATALOG[PRO].aiModelTier);
-      expect(updated.maxAgentSeats).toBe(
-        DEFAULT_PLAN_CATALOG[PRO].maxAgentSeats,
-      );
+      expect(updated.aiModelTier).toBe(planForPrice(PRO).aiModelTier);
+      expect(updated.maxAgentSeats).toBe(planForPrice(PRO).maxAgentSeats);
     });
 
     it('3b. Still applies a NEWER event after an older one was skipped', async () => {
@@ -322,9 +407,80 @@ describe('Billing and entitlements (e2e)', () => {
       const updated = await fx.prisma.organization.findUniqueOrThrow({
         where: { id: organization.id },
       });
-      expect(updated.maxAgentSeats).toBe(
-        DEFAULT_PLAN_CATALOG[STARTER].maxAgentSeats,
+      expect(updated.maxAgentSeats).toBe(planForPrice(STARTER).maxAgentSeats);
+    });
+
+    it('5. **A PINNED organization records the event and writes NOTHING**', async () => {
+      // D3's live gap. `PATCH /platform/organizations/:id` already grants a
+      // negotiated `maxAgentSeats` today, and the next routine webhook — a
+      // renewal, a card update — silently reverts it by re-deriving from the
+      // price. The monotonic guard cannot help: it compares Stripe's `created`
+      // timestamps and a manual edit has none.
+      const organization = await subscribedOrganization('cus_pinned');
+      const negotiated = 999;
+
+      await fx.prisma.organization.update({
+        where: { id: organization.id },
+        data: { maxAgentSeats: negotiated, entitlementsPinned: true },
+      });
+
+      const outcome = await deliver(
+        subscriptionEvent({ customerId: 'cus_pinned', priceId: PRO }),
       );
+
+      const updated = await fx.prisma.organization.findUniqueOrThrow({
+        where: { id: organization.id },
+      });
+
+      // The negotiated grant survives a webhook that would have overwritten it.
+      expect(updated.maxAgentSeats).toBe(negotiated);
+      expect(updated.maxAgentSeats).not.toBe(planForPrice(PRO).maxAgentSeats);
+      expect(outcome.status).toBe(BillingEventStatus.SKIPPED_PINNED);
+    });
+
+    it('5b. **…and SKIPPED_PINNED is distinguishable from SKIPPED_STALE**', async () => {
+      // Two skips that mean opposite things. Stale is a transport artefact and
+      // self-correcting; pinned is a deliberate policy about one tenant that
+      // will skip EVERY future event until someone unpins it. Collapsing them
+      // makes an operator reading the ledger unable to tell a delayed delivery
+      // from a tenant deliberately held off-catalogue.
+      const pinned = await subscribedOrganization('cus_pin_status');
+      await fx.prisma.organization.update({
+        where: { id: pinned.id },
+        data: { entitlementsPinned: true },
+      });
+
+      await deliver(
+        subscriptionEvent({ customerId: 'cus_pin_status', priceId: PRO }),
+      );
+
+      const row = await fx.prisma.billingEvent.findFirstOrThrow({
+        where: { organizationId: pinned.id },
+        orderBy: { processedAt: 'desc' },
+      });
+
+      expect(row.status).toBe(BillingEventStatus.SKIPPED_PINNED);
+      expect(row.status).not.toBe(BillingEventStatus.SKIPPED_STALE);
+    });
+
+    it('5c. **The pin skips the write but NOT the recording**', async () => {
+      // The half that makes a pin auditable rather than a black hole: the event
+      // is still stored, still ordered, still answerable. Only the UPDATE is
+      // skipped. A pin that dropped events would leave no trace that Stripe had
+      // been trying to tell us something for six months.
+      const pinned = await subscribedOrganization('cus_pin_ledger');
+      await fx.prisma.organization.update({
+        where: { id: pinned.id },
+        data: { entitlementsPinned: true },
+      });
+
+      await deliver(
+        subscriptionEvent({ customerId: 'cus_pin_ledger', priceId: PRO }),
+      );
+
+      await expect(
+        fx.prisma.billingEvent.count({ where: { organizationId: pinned.id } }),
+      ).resolves.toBe(1);
     });
 
     it('4. Records NOTHING for a tampered payload', async () => {
@@ -776,7 +932,7 @@ describe('Billing and entitlements (e2e)', () => {
         fx.prisma.organization
           .findUniqueOrThrow({ where: { id: organization.id } })
           .then((row) => row.maxAgentSeats),
-      ).resolves.toBe(DEFAULT_PLAN_CATALOG[PRO].maxAgentSeats);
+      ).resolves.toBe(planForPrice(PRO).maxAgentSeats);
     });
   });
 
@@ -796,7 +952,7 @@ describe('Billing and entitlements (e2e)', () => {
         memberContext({ id: 'u', organizationId: organization.id }),
       );
 
-      const plan = DEFAULT_PLAN_CATALOG[PRO];
+      const plan = planForPrice(PRO);
       expect(entitlements.maxAgentSeats).toBe(plan.maxAgentSeats);
       expect(Number(entitlements.monthlyAiTokenBudget)).toBe(
         Number(plan.monthlyAiTokenBudget),
@@ -853,7 +1009,7 @@ describe('Billing and entitlements (e2e)', () => {
       );
 
       expect(fromProtoAiModelTier(usage.aiModelTier)).toBe('QUALITY');
-      expect(usage.planName).toBe(DEFAULT_PLAN_CATALOG[PRO].displayName);
+      expect(usage.planName).toBe(planForPrice(PRO).name);
     });
 
     it('4b. Labels a grandfathered tenant "Free" rather than by its tier', async () => {

@@ -60,7 +60,11 @@ describe('Inbound email attachments — the reply half (e2e)', () => {
 
   const resolvable = () => {
     fx.stubs.organization.resolveOrgByInboundToken.mockReturnValue(
-      of({ organizationId, status: ProtoOrgStatus.ORG_STATUS_ACTIVE }),
+      of({
+        organizationId,
+        status: ProtoOrgStatus.ORG_STATUS_ACTIVE,
+        maxAttachmentBytes: MAX_ATTACHMENT_BYTES,
+      }),
     );
     fx.stubs.user.resolveInboundSender.mockReturnValue(
       of({ userId: senderId, created: false }),
@@ -170,7 +174,11 @@ describe('Inbound email attachments — the reply half (e2e)', () => {
 
     it('declines an unroutable mail without asking storage anything', async () => {
       fx.stubs.organization.resolveOrgByInboundToken.mockReturnValue(
-        of({ organizationId: '', status: ProtoOrgStatus.ORG_STATUS_ACTIVE }),
+        of({
+          organizationId: '',
+          status: ProtoOrgStatus.ORG_STATUS_ACTIVE,
+          maxAttachmentBytes: MAX_ATTACHMENT_BYTES,
+        }),
       );
 
       const response = await presign(routing({ files: [file()] })).expect(200);
@@ -242,6 +250,7 @@ describe('Inbound email attachments — the reply half (e2e)', () => {
         of({
           organizationId,
           status: ProtoOrgStatus.ORG_STATUS_ACTIVE,
+          maxAttachmentBytes: MAX_ATTACHMENT_BYTES,
           maxAttachmentBytesOverride: 1_000_000,
         }),
       );
@@ -280,6 +289,36 @@ describe('Inbound email attachments — the reply half (e2e)', () => {
       expect(response.body.data.declined).toEqual([]);
     });
 
+    it('**5d. an EMAILED attachment obeys the PLAN grant, with no override set**', async () => {
+      // The layer above the tenant's own, on the path least likely to be
+      // wired for it. A tenant on a plan that sells 1 MB attachments and who
+      // never opened the settings page must still be held to 1 MB here —
+      // otherwise the cheapest plan gets the widest attachment surface on the
+      // platform, reachable by anyone who knows the address.
+      fx.stubs.organization.resolveOrgByInboundToken.mockReturnValue(
+        of({
+          organizationId,
+          status: ProtoOrgStatus.ORG_STATUS_ACTIVE,
+          maxAttachmentBytes: 1_000_000,
+        }),
+      );
+      fx.stubs.user.resolveInboundSender.mockReturnValue(
+        of({ userId: senderId, created: false }),
+      );
+      fx.stubs.ticket.getTicketByNumber.mockReturnValue(of(wireTicket()));
+
+      const response = await presign(
+        routing({ files: [file({ sizeBytes: 2_000_000 })] }),
+      ).expect(200);
+
+      // Test 5b accepts this exact file at the platform ceiling, so the
+      // decline can only be the plan layer.
+      expect(response.body.data.declined).toEqual([
+        { fileName: 'error.png', reason: 'too large' },
+      ]);
+      expect(fx.stubs.message.uploadAttachment).not.toHaveBeenCalled();
+    });
+
     it('**5c. the per-message COUNT override is honoured on this path too**', async () => {
       // Two numbers cross on that response and only one of them is bytes. The
       // count is the one likelier to be dropped in the mapping — it is a small
@@ -288,6 +327,7 @@ describe('Inbound email attachments — the reply half (e2e)', () => {
         of({
           organizationId,
           status: ProtoOrgStatus.ORG_STATUS_ACTIVE,
+          maxAttachmentBytes: MAX_ATTACHMENT_BYTES,
           maxAttachmentsPerMessageOverride: 1,
         }),
       );

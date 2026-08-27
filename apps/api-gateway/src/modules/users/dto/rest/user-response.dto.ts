@@ -1,5 +1,5 @@
 /**
- * A user as the REST API returns it.
+ * @file A user as the REST API returns it.
  *
  * **REST only — it shares nothing with the GraphQL surface.** The schema's
  * `type User` is `UserResponseGqlDto`, declared separately in `./graphql/`. The
@@ -130,10 +130,10 @@ export class CurrentUserResponseDto {
   @ValidateNested()
   readonly user!: UserResponseDto;
 
+  /** Every permission code the caller holds, granted through their roles. */
   // `@IsIn`, not `@IsEnum`: `IsEnum` expects an enum object and matches a
   // readonly array only by accident. On a response DTO these are Swagger
   // metadata -- the narrowing to `PermissionCode[]` happens in the client.
-  /** Every permission code the caller holds, granted through their roles. */
   @IsArray()
   @IsIn(PERMISSION_CODES, { each: true })
   readonly permissionCodes!: PermissionCode[];

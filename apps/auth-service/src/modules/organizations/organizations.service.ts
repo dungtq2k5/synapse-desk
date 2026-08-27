@@ -34,7 +34,6 @@ import {
   AuditAction,
   AuditPublisher,
   AuditResourceType,
-  DEFAULT_PLAN_CATALOG,
   EmailTemplateName,
   generateInboundToken,
   InvitationStatus,
@@ -99,6 +98,11 @@ export class OrganizationsService {
       return {
         organizationId: undefined,
         status: ProtoOrgStatus.ORG_STATUS_UNSPECIFIED,
+        // ZERO, not the platform ceiling. No tenant resolved, so there is no
+        // grant to report; a caller that reads this field without checking
+        // `organizationId` first refuses every attachment rather than
+        // admitting one at the widest limit on the platform.
+        maxAttachmentBytes: 0,
       };
     }
 
@@ -112,6 +116,10 @@ export class OrganizationsService {
         // is the one attachment surface anyone who knows the address can reach.
         maxAttachmentBytesOverride: true,
         maxAttachmentsPerMessageOverride: true,
+        // The plan grant rides too. A tenant on a plan that narrows
+        // attachments must see that narrowing on the mail path as well —
+        // otherwise the cheapest plan gets the widest surface.
+        maxAttachmentBytes: true,
       },
     });
 
@@ -119,6 +127,11 @@ export class OrganizationsService {
       return {
         organizationId: undefined,
         status: ProtoOrgStatus.ORG_STATUS_UNSPECIFIED,
+        // ZERO, not the platform ceiling. No tenant resolved, so there is no
+        // grant to report; a caller that reads this field without checking
+        // `organizationId` first refuses every attachment rather than
+        // admitting one at the widest limit on the platform.
+        maxAttachmentBytes: 0,
       };
     }
 
@@ -128,6 +141,7 @@ export class OrganizationsService {
     return {
       organizationId: organization.id,
       status: toProtoOrgStatus(organization.status),
+      maxAttachmentBytes: Number(organization.maxAttachmentBytes),
       // `?? undefined`, never `?? 0` — absent means the tenant configured
       // nothing and the caller falls through to the platform ceiling.
       maxAttachmentBytesOverride:
@@ -440,11 +454,11 @@ export class OrganizationsService {
     const seatsUsed = await this.seatsInUse(this.prisma, organization.id);
 
     return {
-      // The PLAN, alongside the meters This is the page a
-      // customer opens when they hit a limit, and a limit with no plan beside
-      // it is a number they cannot act on: the next question is always "what
-      // would I get if I upgraded", and answering it on a different page means
-      // a second load at the moment someone is already blocked.
+      // The PLAN, alongside the meters. This is the page a customer opens
+      // when they hit a limit, and a limit with no plan beside it is a number
+      // they cannot act on: the next question is always "what would I get if I
+      // upgraded", and answering it on a different page means a second load at
+      // the moment someone is already blocked.
       aiModelTier: toProtoAiModelTier(organization.aiModelTier),
       planName: planLabelFor(organization),
       currentPeriodEnd: undefined,
@@ -887,11 +901,17 @@ export class OrganizationsService {
   }
 
   /** Always the caller's own tenant, resolved from the verified context. */
-  private async load(context: CallerContext): Promise<Organization> {
+  private async load(
+    context: CallerContext,
+  ): Promise<Organization & { plan: { name: string } | null }> {
     const organizationId = requireTenant(context);
 
     const organization = await this.prisma.organization.findFirst({
       where: { id: organizationId, deletedAt: null },
+      // The plan's name rides along for `planLabelFor`. One join, and it
+      // replaces a reverse-lookup by tier that could not tell two plans on the
+      // same tier apart.
+      include: { plan: { select: { name: true } } },
     });
     if (!organization) {
       throw new RpcException({
@@ -930,14 +950,15 @@ export class OrganizationsService {
 function planLabelFor(organization: {
   aiModelTier: string;
   stripeSubscriptionId: string | null;
+  plan?: { name: string } | null;
 }): string {
   if (!organization.stripeSubscriptionId) return 'Free';
 
-  const match = Object.values(DEFAULT_PLAN_CATALOG).find(
-    (plan) => plan.aiModelTier === organization.aiModelTier,
-  );
-
-  return match?.displayName ?? organization.aiModelTier;
+  // The plan's OWN name, not a guess from the tier. The code catalogue had to
+  // reverse the label out of `aiModelTier`, which collapsed every QUALITY plan
+  // into whichever one it found first — so two tenants on different plans could
+  // read the same label. The row knows.
+  return organization.plan?.name ?? organization.aiModelTier;
 }
 
 /**

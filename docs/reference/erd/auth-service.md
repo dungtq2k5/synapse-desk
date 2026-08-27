@@ -13,8 +13,12 @@ erDiagram
     Int max_agent_seats 
     BigInt max_storage_bytes 
     BigInt monthly_ai_token_budget 
+    BigInt max_document_bytes 
+    BigInt max_attachment_bytes 
     DateTime billing_cycle_start 
     String ai_model_tier 
+    String plan_id "❓"
+    Boolean entitlements_pinned 
     BigInt max_document_bytes_override "❓"
     BigInt max_attachment_bytes_override "❓"
     Int max_attachments_per_message_override "❓"
@@ -200,6 +204,33 @@ erDiagram
     DateTime updated_at 
     }
   
+
+  "subscription_plans" {
+    String id "🗝️"
+    String name 
+    String stripe_product_id "❓"
+    Int max_agent_seats 
+    BigInt max_storage_bytes 
+    BigInt monthly_ai_token_budget 
+    String ai_model_tier 
+    BigInt max_document_bytes 
+    BigInt max_attachment_bytes 
+    Boolean is_active 
+    DateTime created_at 
+    DateTime updated_at 
+    DateTime deleted_at "❓"
+    String deleted_by_id "❓"
+    }
+  
+
+  "subscription_plan_prices" {
+    String id "🗝️"
+    String plan_id 
+    String stripe_price_id 
+    String interval 
+    }
+  
+    "organizations" }o--|o subscription_plans : "plan"
     "organizations" }o--|o users : "deletedBy"
     "departments" }o--|| organizations : "organization"
     "departments" }o--|o users : "deletedBy"
@@ -221,4 +252,6 @@ erDiagram
     "user_invitations" }o--|o users : "acceptedUser"
     "user_invitations" }o--|o users : "revokedBy"
     "billing_events" }o--|o organizations : "organization"
+    "subscription_plans" }o--|o users : "deletedBy"
+    "subscription_plan_prices" }o--|| subscription_plans : "plan"
 ```

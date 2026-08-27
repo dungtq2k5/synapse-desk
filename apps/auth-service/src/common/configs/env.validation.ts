@@ -155,7 +155,4 @@ export const envValidationSchema = Joi.object({
   // ---------------------------------------------------------------------
   STRIPE_SECRET_KEY: Joi.string().optional(),
   STRIPE_WEBHOOK_SECRET: Joi.string().optional(),
-  // JSON keyed by price id. Absent means the built-in test-mode catalog, which
-  // is what lets a fresh clone run the suite.
-  STRIPE_PLAN_CATALOG: Joi.string().optional(),
 });

@@ -17,10 +17,8 @@ import {
   InboundSignatureGuard,
 } from '../../common/guards/inbound-signature.guard';
 import { InboundEmailDto } from './dto/rest/inbound-email.dto';
-import {
-  InboundAttachmentUploadRequestDto,
-  InboundAttachmentUploadResponseDto,
-} from './dto/rest/inbound-attachment.dto';
+import { InboundAttachmentUploadRequestDto } from './dto/rest/inbound-attachment.dto';
+import { InboundAttachmentUploadResponseDto } from './dto/rest/inbound-attachment-response.dto';
 import { InboundEmailService } from './inbound-email.service';
 
 /**

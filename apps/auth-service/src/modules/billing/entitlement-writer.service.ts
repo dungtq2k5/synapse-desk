@@ -2,7 +2,6 @@ import { Injectable, Logger } from '@nestjs/common';
 import type Stripe from 'stripe';
 import {
   BillingEventStatus,
-  entitlementsForPrice,
   formatErrorMsg,
   isUniqueConstraintViolation,
   OrgStatus,
@@ -13,6 +12,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '../../generated/prisma/client';
 import { BillingEventPublisher } from './billing-event.publisher';
 import { StripeService } from './stripe.service';
+import { PlanCatalogService } from './plan-catalog.service';
 
 /** What the writer decided, for the response and for the tests. */
 export type WriteOutcome = {
@@ -47,6 +47,7 @@ export class EntitlementWriterService {
     private readonly prisma: PrismaService,
     private readonly stripe: StripeService,
     private readonly events: BillingEventPublisher,
+    private readonly planCatalog: PlanCatalogService,
   ) {}
 
   /**
@@ -93,7 +94,7 @@ export class EntitlementWriterService {
     const organization = customerId
       ? await this.prisma.organization.findUnique({
           where: { stripeCustomerId: customerId },
-          select: { id: true },
+          select: { id: true, entitlementsPinned: true },
         })
       : null;
 
@@ -125,8 +126,30 @@ export class EntitlementWriterService {
       );
     }
 
-    const entitlements = entitlementsForPrice(
-      this.stripe.planCatalog,
+    if (organization.entitlementsPinned) {
+      // **A deliberate policy about one tenant, not an ordering fact about the
+      // transport** — which is why it is its own status rather than another
+      // `SKIPPED_STALE`. A Super Admin granted this workspace something
+      // off-catalogue; re-deriving from the price on the next renewal would
+      // revert it silently, and the monotonic guard cannot see the difference
+      // because a manual edit carries no Stripe `created` timestamp.
+      //
+      // The event is still RECORDED and still ordered. Only the write is
+      // skipped, so a pinned tenant's history stays as auditable as anyone
+      // else's — and a run of these is information, the same way a run of
+      // `SKIPPED_STALE` is.
+      this.logger.log(
+        `Entitlements pinned for organization ${organization.id}; recording Stripe event ${event.id} without applying it`,
+      );
+
+      return this.settle(
+        claim,
+        organization.id,
+        BillingEventStatus.SKIPPED_PINNED,
+      );
+    }
+
+    const entitlements = await this.planCatalog.entitlementsForPrice(
       priceIdOf(subscription),
     );
 
@@ -174,7 +197,7 @@ export class EntitlementWriterService {
   private async apply(
     organizationId: string,
     subscription: Stripe.Subscription,
-    entitlements: PlanEntitlements,
+    entitlements: PlanEntitlements & { planId: string },
     eventType: string,
   ): Promise<void> {
     const cycleStart = periodStartOf(subscription);
@@ -187,6 +210,17 @@ export class EntitlementWriterService {
         maxStorageBytes: entitlements.maxStorageBytes,
         monthlyAiTokenBudget: entitlements.monthlyAiTokenBudget,
         aiModelTier: entitlements.aiModelTier,
+        // **Which plan, not just what it granted.** The columns above are the
+        // authoritative grant and stay so — this records the plan they came
+        // from, which is what lets a plan edit find its subscribers and what
+        // gives the billing page an exact label instead of a reverse-lookup by
+        // tier that cannot tell two QUALITY plans apart.
+        planId: entitlements.planId,
+        // The plan's file-size grants, applied with the rest. They compose by
+        // `min()` at the enforcement points against the platform ceiling and
+        // the tenant's own override, so a plan can narrow and never widen.
+        maxDocumentBytes: entitlements.maxDocumentBytes,
+        maxAttachmentBytes: entitlements.maxAttachmentBytes,
         stripeSubscriptionId: subscription.id,
         // **The cycle follows Stripe**, and its epoch is inside the Redis
         // quota key — so this line also re-arms every threshold alert and

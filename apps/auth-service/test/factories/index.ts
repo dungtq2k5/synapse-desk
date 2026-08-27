@@ -15,3 +15,4 @@ export * from './session.factory';
 export * from './security.factory';
 export * from './invitation.factory';
 export * from './tenant.factory';
+export * from './plan.factory';

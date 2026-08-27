@@ -15,13 +15,13 @@ import {
   toProtoOrgStatus,
 } from '@synapsedesk/grpc-proto';
 import {
-  entitlementsForPrice,
   formatErrorMsg,
   requireActor,
   requireTenant,
 } from '@synapsedesk/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { StripeService } from './stripe.service';
+import { PlanCatalogService } from './plan-catalog.service';
 
 /** How many invoices a page shows. Stripe's own default is 10. */
 const DEFAULT_INVOICE_LIMIT = 12;
@@ -47,6 +47,7 @@ export class BillingService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly stripe: StripeService,
+    private readonly planCatalog: PlanCatalogService,
   ) {}
 
   /**
@@ -60,12 +61,19 @@ export class BillingService {
   async getSubscription(context: CallerContext): Promise<SubscriptionResponse> {
     const organization = await this.load(context);
 
-    // The plan LABEL is resolved from the catalog by tier for display only.
-    // Deriving it from a stored plan name would be the mirroring this design
-    // refuses; deriving it from Stripe would be the fan-out this method exists
-    // to avoid.
+    // **The plan's OWN name, from the row it is on.**
+    //
+    // This used to reverse a label out of `aiModelTier` against the code
+    // catalogue, which was approximate by construction: two plans sharing a
+    // tier collapsed into whichever the search found first, so tenants on
+    // different plans could read the same label. Now that a plan is a row, the
+    // exact answer costs nothing.
+    //
+    // Still a LABEL and never an authorization input — nothing decides on it,
+    // which is what keeps Stripe owning the price and this table owning the
+    // grant.
     const planName = organization.stripeSubscriptionId
-      ? this.planLabelFor(organization.aiModelTier)
+      ? (organization.plan?.name ?? organization.aiModelTier)
       : 'Free';
 
     return {
@@ -100,7 +108,7 @@ export class BillingService {
     // Validated against the catalog BEFORE Stripe is called. A price the
     // webhook could not map is a price that would take payment and then fail
     // to grant anything — the customer pays and stays on the old plan.
-    if (!entitlementsForPrice(this.stripe.planCatalog, request.priceId)) {
+    if (!(await this.planCatalog.priceExists(request.priceId))) {
       throw new RpcException({
         code: status.INVALID_ARGUMENT,
         message: `'${request.priceId}' is not a plan this workspace can subscribe to`,
@@ -248,22 +256,6 @@ export class BillingService {
     }
   }
 
-  /**
-   * A display label, derived from the TIER rather than stored.
-   *
-   * Storing a plan name would be the mirroring RDM §1.15 refuses — it diverges
-   * the first time someone renames a product in the dashboard. Deriving it is
-   * approximate (two plans could share a tier) and that is acceptable for a
-   * label; it would not be acceptable for anything that made a decision.
-   */
-  private planLabelFor(tier: string): string {
-    const match = Object.values(this.stripe.planCatalog).find(
-      (plan) => plan.aiModelTier === tier,
-    );
-
-    return match?.displayName ?? tier;
-  }
-
   private async load(context: CallerContext) {
     const organizationId = requireTenant(context);
 
@@ -282,6 +274,9 @@ export class BillingService {
         billingCycleStart: true,
         stripeCustomerId: true,
         stripeSubscriptionId: true,
+        // The plan's own name, for the label above. One join rather than a
+        // reverse-lookup by tier that could not tell two QUALITY plans apart.
+        plan: { select: { name: true } },
       },
     });
 

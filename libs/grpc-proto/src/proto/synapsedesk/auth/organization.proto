@@ -40,8 +40,29 @@ message OrganizationResponse {
   // opposite, and proto3's zero value would make "configured nothing" and
   // "configured zero" the same wire state.
   optional int64 max_document_bytes_override = 15;
+  // The same rule and the same absent-means-nothing-configured meaning as
+  // `max_document_bytes_override` above. Composed against `MAX_ATTACHMENT_BYTES`
+  // rather than the document ceiling.
   optional int64 max_attachment_bytes_override = 16;
+  // Likewise, and a COUNT rather than a byte size — the one field on this
+  // message where zero is a plausible thing to configure deliberately, which is
+  // exactly why `optional` is carrying the distinction.
   optional int32 max_attachments_per_message_override = 17;
+
+  // The PLAN's file-size grants, as applied to this tenant.
+  //
+  // NOT optional, and not overrides: every plan states both, so every tenant
+  // carries both. They are a third argument to the same `min()` the overrides
+  // above feed — plan narrows the platform ceiling, tenant narrows the plan.
+  //
+  // They are read off `organizations` rather than joined from the catalogue
+  // because the enforcement paths read this one row on every presign, and a
+  // join would put the catalogue in that hot path for a value that only
+  // changes when a subscription does.
+  int64 max_document_bytes = 18;
+  // The attachment half of the same grant, with the same NOT-optional meaning:
+  // every plan states it, so every tenant carries it.
+  int64 max_attachment_bytes = 19;
 
   google.protobuf.Timestamp created_at = 12;
   google.protobuf.Timestamp updated_at = 13;
@@ -130,9 +151,7 @@ message UpdateOrganizationSettingsRequest {
   bool clear_max_attachments_per_message_override = 9;
 }
 
-// ---------------------------------------------------------------------------
-// Usage
-// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------- Usage
 
 /**
  * One meter. `available` is false for meters whose owning domain does not exist
@@ -246,9 +265,8 @@ message OrganizationUsageResponse {
   optional google.protobuf.Timestamp current_period_end = 7;
 }
 
-// ---------------------------------------------------------------------------
-// Onboarding & offboarding
-// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------- Onboarding & offboarding
 
 message OnboardingStep {
   string key = 1;
@@ -270,7 +288,7 @@ message CompleteOnboardingRequest {}
 
 message DeleteOrganizationRequest {
   // Recorded in the audit trail. Offboarding is not self-service-final: a
-  // Super Admin finalises it, and they will want to know why.
+  // Super Admin finalizes it, and they will want to know why.
   string reason = 1;
 }
 
@@ -311,7 +329,15 @@ message ResolveOrgByInboundTokenResponse {
   // platform ceiling — the same meaning these fields carry on
   // `OrganizationResponse`.
   optional int64 max_attachment_bytes_override = 3;
+  // Rides for the same reason and carries the same absent meaning as
+  // `max_attachment_bytes_override` above — a mail with twenty attachments is
+  // as much a tenant's business as one with a large attachment.
   optional int32 max_attachments_per_message_override = 4;
+
+  // The plan grant, riding the same call for the same reason the override
+  // does: the inbound-mail path must see every narrowing layer, not just the
+  // tenant's own.
+  int64 max_attachment_bytes = 5;
 }
 
 // The tenant's inbound token, BY tenant — the reverse of the lookup above.

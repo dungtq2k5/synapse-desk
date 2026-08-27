@@ -76,6 +76,16 @@ export enum AuditAction {
   AUDIT_ACTION_DOCUMENT_FLAG_DELETED = 37,
   /** AUDIT_ACTION_DATA_EXPORT_REQUESTED - Somebody asked for a copy of tenant data. Recorded at REQUEST time. */
   AUDIT_ACTION_DATA_EXPORT_REQUESTED = 38,
+  /**
+   * AUDIT_ACTION_PLATFORM_PLAN_CREATED - The plan catalogue. These are NOT `billing_events`: that table is a Stripe
+   * webhook ledger keyed on a unique `evt_…` id, and a Super Admin edit has
+   * none — writing a synthetic one would poison idempotency for real webhooks.
+   */
+  AUDIT_ACTION_PLATFORM_PLAN_CREATED = 39,
+  AUDIT_ACTION_PLATFORM_PLAN_UPDATED = 40,
+  AUDIT_ACTION_PLATFORM_PLAN_DELETED = 41,
+  /** AUDIT_ACTION_PLATFORM_PLAN_APPLIED - The fan-out, not the edit: whose entitlements were rewritten and when. */
+  AUDIT_ACTION_PLATFORM_PLAN_APPLIED = 42,
   UNRECOGNIZED = -1,
 }
 
@@ -87,6 +97,8 @@ export enum AuditResourceType {
   AUDIT_RESOURCE_TYPE_ORGANIZATION = 4,
   AUDIT_RESOURCE_TYPE_DOCUMENT_FLAG = 5,
   AUDIT_RESOURCE_TYPE_EXPORT = 6,
+  /** AUDIT_RESOURCE_TYPE_SUBSCRIPTION_PLAN - Owned by no tenant, which is the point. */
+  AUDIT_RESOURCE_TYPE_SUBSCRIPTION_PLAN = 7,
   UNRECOGNIZED = -1,
 }
 

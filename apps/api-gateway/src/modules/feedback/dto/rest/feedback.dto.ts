@@ -1,3 +1,4 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
   IsBoolean,
@@ -18,9 +19,24 @@ import { SearchPaginationDto } from '../../../../common/dto/rest/search-paginati
 import { ToBoolean } from '../../../../common/decorators/to-boolean.decorator';
 
 export class SubmitFeedbackDto {
+  /** A thumb: `1` for up, `-1` for down. */
   // `@IsIn`, not `@Min(-1) @Max(1)`: a range would also admit 0, and 0 is the
   // proto zero value the LIST request reads as "no filter".
-  /** A thumb: `1` for up, `-1` for down. */
+  //
+  // `@ApiProperty()` is not decoration here: `FeedbackRating` is the numeric
+  // literal union `1 | -1`, which the Swagger plugin cannot map — so it dropped
+  // the property from the schema entirely. A REQUIRED field absent from the
+  // published contract is worse than an undocumented one: a generated client
+  // does not send it, and every call 400s.
+  //
+  // The description is repeated here because an explicit `@ApiProperty()`
+  // REPLACES the introspected comment rather than merging with it — without it
+  // the property returns to the spec with no description at all.
+  @ApiProperty({
+    type: Number,
+    enum: FEEDBACK_RATINGS,
+    description: 'A thumb: `1` for up, `-1` for down.',
+  })
   @Type(() => Number)
   @IsInt()
   @IsIn(FEEDBACK_RATINGS)

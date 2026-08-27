@@ -45,7 +45,7 @@ describe('The inbound email webhook (e2e)', () => {
     // an address nobody issued is the cheapest well-defined outcome behind it —
     // it also happens to be the one that must still answer 200.
     fx.stubs.organization.resolveOrgByInboundToken.mockReturnValue(
-      of({ organizationId: undefined, status: 0 }),
+      of({ organizationId: undefined, status: 0, maxAttachmentBytes: 0 }),
     );
   });
 

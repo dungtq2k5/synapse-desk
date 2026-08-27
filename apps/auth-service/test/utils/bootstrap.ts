@@ -202,6 +202,24 @@ export async function bootstrapE2eTest(): Promise<E2eFixture> {
       prisma.$executeRawUnsafe('DELETE FROM job_runs'),
       prisma.$executeRawUnsafe('DELETE FROM billing_events'),
 
+      // The plan catalogue, child-to-parent. Not tenant data, but it IS test
+      // data now that the catalogue is a table rather than a constant — and a
+      // surviving row collides on `stripe_product_id` the moment the next test
+      // seeds it. `organizations.plan_id` is cleared by the organization sweep
+      // below, which runs after these.
+      //
+      // **`subscription_plans.deleted_by_id` needs NO clearing step above**,
+      // unlike the three RESTRICT pointers there, and the reason is ORDER: this
+      // delete runs before the users sweep, and nothing in `users` points back
+      // at a plan. Organizations and users reference each other, so no ordering
+      // satisfies both and the pointers must be nulled; plans are a DAG and are
+      // simply deleted first. Measured against the test database — a plan
+      // soft-deleted by a user sweeps clean with these three statements alone.
+      // **Keep this block above the users delete** or that stops being true.
+      prisma.$executeRawUnsafe('DELETE FROM subscription_plan_prices'),
+      prisma.$executeRawUnsafe('UPDATE organizations SET plan_id = NULL'),
+      prisma.$executeRawUnsafe('DELETE FROM subscription_plans'),
+
       prisma.$executeRawUnsafe('DELETE FROM user_departments'),
       prisma.$executeRawUnsafe('DELETE FROM user_invitations'),
       prisma.$executeRawUnsafe('DELETE FROM device_sessions'),

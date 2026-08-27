@@ -3,11 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { RpcException } from '@nestjs/microservices';
 import { status } from '@grpc/grpc-js';
 import Stripe from 'stripe';
-import {
-  formatErrorMsg,
-  loadPlanCatalog,
-  PlanEntitlements,
-} from '@synapsedesk/common';
+import { formatErrorMsg, STRIPE_API_VERSION } from '@synapsedesk/common';
 
 /**
  * The Stripe SDK, and the ONE place the secret keys live.
@@ -27,15 +23,14 @@ export class StripeService implements OnModuleInit {
   private readonly logger = new Logger(StripeService.name);
 
   private client: Stripe | null = null;
+  // `''` rather than `undefined`, and it is FAIL-CLOSED by construction: the
+  // type stays non-nullable so no call site needs a guard, and an empty secret
+  // makes `constructEvent` reject EVERY signature — so "not configured" behaves
+  // as "no webhook is authentic". `undefined` would either widen the type or
+  // throw further in, where it reads as a crash rather than a refusal.
   private webhookSecret = '';
 
-  readonly planCatalog: Record<string, PlanEntitlements>;
-
-  constructor(private readonly configService: ConfigService) {
-    this.planCatalog = loadPlanCatalog(
-      this.configService.get<string>('STRIPE_PLAN_CATALOG'),
-    );
-  }
+  constructor(private readonly configService: ConfigService) {}
 
   onModuleInit(): void {
     const secretKey = this.configService.get<string>('STRIPE_SECRET_KEY');
@@ -49,7 +44,12 @@ export class StripeService implements OnModuleInit {
       return;
     }
 
-    this.client = new Stripe(secretKey);
+    // **Pinned, not inherited.** Without an `apiVersion` the SDK follows
+    // whatever the ACCOUNT default happens to be, so the same build talks two
+    // different APIs across two environments — and a Stripe-side version bump
+    // changes this service's behaviour with no deploy and no diff. The
+    // provisioning script pins the same version for the same reason.
+    this.client = new Stripe(secretKey, { apiVersion: STRIPE_API_VERSION });
   }
 
   get isConfigured(): boolean {

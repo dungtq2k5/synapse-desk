@@ -22,7 +22,10 @@ describe('The attachment limit cache (unit)', () => {
 
           return answer instanceof Error
             ? throwError(() => answer)
-            : of(answer);
+            : // The plan grant defaults to the ceiling so a case that says
+              // nothing about the plan is testing the other layers. A case
+              // about the plan states its own value and wins the spread.
+              of({ maxAttachmentBytes: MAX_ATTACHMENT_BYTES, ...answer });
         },
       }),
     } as never);
@@ -114,6 +117,37 @@ describe('The attachment limit cache (unit)', () => {
     ]);
 
     await expect(service.getAttachmentLimits(context)).resolves.toEqual({
+      maxBytes: MAX_ATTACHMENT_BYTES,
+      maxPerMessage: MAX_ATTACHMENTS_PER_MESSAGE,
+    });
+  });
+
+  it('6. **the PLAN narrows, and a MISSING grant refuses**', async () => {
+    // Two states of the PLAN layer, in one case because they share a single
+    // `??`. A plan that sells 5 MB bounds a tenant who configured
+    // nothing; an absent grant is a broken wire — the column is NOT NULL — and
+    // resolves to zero rather than to the widest limit on the platform.
+    const { service: narrowed } = serviceWith([
+      { maxAttachmentBytes: 5 * 1024 * 1024 },
+    ]);
+    const { service: missing } = serviceWith([
+      { maxAttachmentBytes: undefined },
+    ]);
+
+    await expect(narrowed.getAttachmentLimits(context)).resolves.toMatchObject({
+      maxBytes: 5 * 1024 * 1024,
+    });
+    await expect(missing.getAttachmentLimits(context)).resolves.toMatchObject({
+      maxBytes: 0,
+    });
+  });
+
+  it('7. **a plan grant ABOVE the platform ceiling does NOT widen it**', async () => {
+    const { service } = serviceWith([
+      { maxAttachmentBytes: MAX_ATTACHMENT_BYTES * 4 },
+    ]);
+
+    await expect(service.getAttachmentLimits(context)).resolves.toMatchObject({
       maxBytes: MAX_ATTACHMENT_BYTES,
       maxPerMessage: MAX_ATTACHMENTS_PER_MESSAGE,
     });

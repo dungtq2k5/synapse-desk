@@ -1,4 +1,4 @@
-/** What the invitation routes return. */
+/** @file What the invitation routes return. */
 
 import { InvitationStatus } from '@synapsedesk/common';
 
@@ -16,7 +16,7 @@ export class InvitationResponseDto {
   readonly createdAt!: Date;
 }
 
-export class FailedInvitationDto {
+export class FailedInvitationResponseDto {
   readonly email!: string;
   readonly reason!: string;
 }
@@ -27,7 +27,7 @@ export class FailedInvitationDto {
  */
 export class CreateInvitationsResponseDto {
   readonly created!: InvitationResponseDto[];
-  readonly failed!: FailedInvitationDto[];
+  readonly failed!: FailedInvitationResponseDto[];
   readonly batchId!: string | null;
 }
 
@@ -47,7 +47,7 @@ export class AcceptInvitationResponseDto {
   readonly skipped!: string[];
 }
 
-export class InvitationPreviewRowDto {
+export class InvitationPreviewRowResponseDto {
   readonly email!: string;
   readonly ok!: boolean;
   readonly reason!: string | null;
@@ -57,7 +57,7 @@ export class InvitationPreviewRowDto {
 }
 
 export class PreviewInvitationsResponseDto {
-  readonly rows!: InvitationPreviewRowDto[];
+  readonly rows!: InvitationPreviewRowResponseDto[];
   readonly seatsInUse!: number;
   readonly maxAgentSeats!: number;
   /** Non-zero means the batch would be partially rejected at commit time. */

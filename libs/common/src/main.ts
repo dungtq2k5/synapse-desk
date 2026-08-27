@@ -18,6 +18,7 @@ export * from './utils/masking';
 export * from './utils/format-error';
 export * from './utils/class-transformer';
 export * from './utils/sorting';
+export * from './utils/limits';
 export * from './utils/tenant-scope';
 export * from './utils/soft-delete';
 export * from './utils/rollup-window';

@@ -117,10 +117,9 @@ export class AuthReferenceService implements OnModuleInit {
   /**
    * The largest document this tenant will accept.
    *
-   * `min(platform ceiling, tenant override)` — every layer narrows and no layer
-   * widens, so a tenant that has configured nothing gets exactly today's
-   * behaviour. The plan grant slots in as a third argument to the same `min`
-   * without moving this call.
+   * `min(platform ceiling, tenant override, plan grant)` — every layer narrows
+   * and no layer widens, so a tenant that has configured nothing gets whatever
+   * its plan grants, bounded by the platform.
    *
    * **Rides the same call as the storage quota** and is therefore free: the
    * override travels on `OrganizationResponse`, which the presign path was
@@ -145,9 +144,24 @@ export class AuthReferenceService implements OnModuleInit {
       //
       // `?? 0` fails the other way and is louder: it refuses every upload for
       // every tenant that never touched the setting.
+      //
+      // The PLAN grant is a third argument, and its `?? 0` means the OPPOSITE
+      // of the override's fallback one line up. The column is NOT NULL and the
+      // proto field is not `optional`, so absent is never a tenant's choice
+      // here — it is a wire that lost a field.
+      //
+      // Measured, because the two fallbacks look interchangeable and are not.
+      // Under the shipped loader options (`defaults: true`) an absent
+      // non-optional int64 arrives as `0` and this `??` never fires; under
+      // `defaults: false` it arrives as `undefined`, and without the fallback
+      // the whole `min` is `NaN` and every size check passes. See
+      // `loader-defaults.spec.ts`. `?? MAX_DOCUMENT_BYTES` would be the
+      // tempting symmetry and would hand out the widest limit on the platform
+      // exactly when the narrowing layer went missing.
       return Math.min(
         MAX_DOCUMENT_BYTES,
         organization.maxDocumentBytesOverride ?? MAX_DOCUMENT_BYTES,
+        organization.maxDocumentBytes ?? 0,
       );
     } catch (error) {
       this.logger.error(

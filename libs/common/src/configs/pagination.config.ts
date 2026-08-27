@@ -91,6 +91,19 @@ export const ORGANIZATION_SORTABLE_FIELDS = [
 export type OrganizationSortableField =
   (typeof ORGANIZATION_SORTABLE_FIELDS)[number];
 
+/**
+ * The plan catalogue.
+ *
+ * No price field, and that is not an omission: what a plan COSTS lives in
+ * Stripe on purpose, so there is nothing here to sort by it.
+ */
+export const PLAN_SORTABLE_FIELDS = [
+  'createdAt',
+  'name',
+  'maxAgentSeats',
+] as const;
+export type PlanSortableField = (typeof PLAN_SORTABLE_FIELDS)[number];
+
 export const INVITATION_SORTABLE_FIELDS = [
   'createdAt',
   'expiresAt',

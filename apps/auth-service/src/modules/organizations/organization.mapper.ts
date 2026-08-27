@@ -28,6 +28,10 @@ export function toOrganizationResponse(
     maxStorageBytes: Number(organization.maxStorageBytes),
     monthlyAiTokenBudget: Number(organization.monthlyAiTokenBudget),
     aiModelTier: toProtoAiModelTier(organization.aiModelTier),
+    // The plan grants, NOT overrides: both columns are NOT NULL, so there is
+    // no absent case to translate and no `?? undefined` below applies to them.
+    maxDocumentBytes: Number(organization.maxDocumentBytes),
+    maxAttachmentBytes: Number(organization.maxAttachmentBytes),
     billingCycleStart: toProtoTimestamp(organization.billingCycleStart),
     // `?? undefined`, never `?? 0`. NULL means the tenant configured nothing
     // and the layer above applies; zero would be a limit that refuses

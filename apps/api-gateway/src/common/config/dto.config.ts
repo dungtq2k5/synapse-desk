@@ -322,3 +322,41 @@ export const STRIPE_REDIRECT_URL = {
  * generator's byte count changes.
  */
 export const MAX_RESET_TOKEN_LENGTH = 256;
+
+// ------------------------------------------------------------- The plan catalogue
+
+export const MIN_PLAN_NAME_LENGTH = 2;
+export const MAX_PLAN_NAME_LENGTH = 100;
+
+/**
+ * Stripe ids (`prod_…`, `price_1Ox…`).
+ *
+ * Matches the column, which is `VarChar(255)`: a DTO that admitted more would
+ * turn a typo into a Prisma error at write time instead of a 400 at the edge.
+ */
+export const MAX_STRIPE_ID_LENGTH = 255;
+
+/**
+ * Stripe's own vocabulary, not ours.
+ *
+ * Kept as strings rather than an enum for the reason the column is a `VarChar`:
+ * a new interval Stripe supports must not need a proto change to express.
+ */
+export const PLAN_BILLING_INTERVALS = ['month', 'year'] as const;
+export type PlanBillingInterval = (typeof PLAN_BILLING_INTERVALS)[number];
+
+/** Billing variants of ONE plan. Two is the real case; the cap is a sanity bound. */
+export const MAX_PLAN_PRICES = 12;
+
+/**
+ * The character class a Stripe object id may use.
+ *
+ * NOT a `^price_` / `^prod_` prefix check: Stripe's id format is a convention
+ * rather than a documented contract, and an id that is locally well-formed but
+ * does not exist fails on the next API call exactly as a malformed one does. A
+ * prefix rule would be this repo maintaining a third party's naming scheme.
+ *
+ * What this refuses is an absurd string being carried into an API call —
+ * whitespace, punctuation, anything that could only be a paste accident.
+ */
+export const STRIPE_ID_PATTERN = /^[A-Za-z0-9_-]+$/;

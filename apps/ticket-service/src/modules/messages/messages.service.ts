@@ -42,6 +42,7 @@ import {
   SupersededReason,
   ticketMessageGroupKey,
   PARSE_ELIGIBLE_MIME_TYPES,
+  exceedsLimit,
 } from '@synapsedesk/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AiAttachmentService } from '../ai-attachments/ai-attachment.service';
@@ -250,7 +251,7 @@ export class MessagesService {
     // is still the ceiling this can never exceed.
     const limits = await this.authReference.getAttachmentLimits(context);
 
-    if (request.attachments.length > limits.maxPerMessage) {
+    if (exceedsLimit(request.attachments.length, limits.maxPerMessage)) {
       // The per-message cap, enforced where the count is now known. Presign
       // used to carry it, and cannot any more: without a message there is
       // nothing to count against.
@@ -730,7 +731,7 @@ export class MessagesService {
 
     const limits = await this.authReference.getAttachmentLimits(context);
 
-    if (request.fileSizeBytes > limits.maxBytes) {
+    if (exceedsLimit(request.fileSizeBytes, limits.maxBytes)) {
       // The tenant's own ceiling, refused BEFORE a URL is signed. The DTO's
       // `@Max` already rejected anything over the platform constant; this is
       // the narrower number, and it has to be checked here because a decorator

@@ -31,9 +31,9 @@ export class InboundAttachmentDto {
   @MaxLength(MAX_ATTACHMENT_FILE_NAME_LENGTH)
   readonly fileName!: string;
 
+  /** The attachment's declared MIME type. */
   // Checked HERE so the Worker holds no copy of the allowlist: it reports what
   // the MIME part declared, this route decides whether it may be stored.
-  /** The attachment's declared MIME type. */
   @IsIn([...ALLOWED_ATTACHMENT_MIME_TYPES])
   readonly mimeType!: AllowedAttachmentMimeType;
 
@@ -87,37 +87,4 @@ export class InboundAttachmentUploadRequestDto {
   @ValidateNested({ each: true })
   @Type(() => InboundAttachmentDto)
   readonly files!: InboundAttachmentDto[];
-}
-
-/**
- * A file the Worker may now PUT to storage.
- *
- * A RESPONSE shape, nested in {@link InboundAttachmentUploadResponseDto} — it is
- * never bound from a request body, which is why it carries no validators.
- */
-export class InboundAttachmentUploadDto {
-  fileName!: string;
-  uploadUrl!: string;
-  /** Handed back on the webhook as `attachments[].objectPath`. */
-  objectPath!: string;
-}
-
-/**
- * Why one file will not be uploaded.
- *
- * **Named rather than silently omitted**, so the Worker can put it in
- * `droppedAttachments` and the ticket can still say what was left out. "My
- * attachment vanished" is something a customer discovers before you do — the
- * same rule set when attachments were dropped wholesale.
- *
- * A RESPONSE shape, like {@link InboundAttachmentUploadDto} above.
- */
-export class InboundAttachmentDeclinedDto {
-  fileName!: string;
-  reason!: string;
-}
-
-export class InboundAttachmentUploadResponseDto {
-  uploads!: InboundAttachmentUploadDto[];
-  declined!: InboundAttachmentDeclinedDto[];
 }

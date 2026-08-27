@@ -42,9 +42,43 @@ export interface OrganizationResponse {
    * opposite, and proto3's zero value would make "configured nothing" and
    * "configured zero" the same wire state.
    */
-  maxDocumentBytesOverride?: number | undefined;
-  maxAttachmentBytesOverride?: number | undefined;
-  maxAttachmentsPerMessageOverride?: number | undefined;
+  maxDocumentBytesOverride?:
+    | number
+    | undefined;
+  /**
+   * The same rule and the same absent-means-nothing-configured meaning as
+   * `max_document_bytes_override` above. Composed against `MAX_ATTACHMENT_BYTES`
+   * rather than the document ceiling.
+   */
+  maxAttachmentBytesOverride?:
+    | number
+    | undefined;
+  /**
+   * Likewise, and a COUNT rather than a byte size — the one field on this
+   * message where zero is a plausible thing to configure deliberately, which is
+   * exactly why `optional` is carrying the distinction.
+   */
+  maxAttachmentsPerMessageOverride?:
+    | number
+    | undefined;
+  /**
+   * The PLAN's file-size grants, as applied to this tenant.
+   *
+   * NOT optional, and not overrides: every plan states both, so every tenant
+   * carries both. They are a third argument to the same `min()` the overrides
+   * above feed — plan narrows the platform ceiling, tenant narrows the plan.
+   *
+   * They are read off `organizations` rather than joined from the catalogue
+   * because the enforcement paths read this one row on every presign, and a
+   * join would put the catalogue in that hot path for a value that only
+   * changes when a subscription does.
+   */
+  maxDocumentBytes: number;
+  /**
+   * The attachment half of the same grant, with the same NOT-optional meaning:
+   * every plan states it, so every tenant carries it.
+   */
+  maxAttachmentBytes: number;
   createdAt: Timestamp | undefined;
   updatedAt: Timestamp | undefined;
 }
@@ -304,7 +338,7 @@ export interface CompleteOnboardingRequest {
 export interface DeleteOrganizationRequest {
   /**
    * Recorded in the audit trail. Offboarding is not self-service-final: a
-   * Super Admin finalises it, and they will want to know why.
+   * Super Admin finalizes it, and they will want to know why.
    */
   reason: string;
 }
@@ -350,8 +384,23 @@ export interface ResolveOrgByInboundTokenResponse {
    * platform ceiling — the same meaning these fields carry on
    * `OrganizationResponse`.
    */
-  maxAttachmentBytesOverride?: number | undefined;
-  maxAttachmentsPerMessageOverride?: number | undefined;
+  maxAttachmentBytesOverride?:
+    | number
+    | undefined;
+  /**
+   * Rides for the same reason and carries the same absent meaning as
+   * `max_attachment_bytes_override` above — a mail with twenty attachments is
+   * as much a tenant's business as one with a large attachment.
+   */
+  maxAttachmentsPerMessageOverride?:
+    | number
+    | undefined;
+  /**
+   * The plan grant, riding the same call for the same reason the override
+   * does: the inbound-mail path must see every narrowing layer, not just the
+   * tenant's own.
+   */
+  maxAttachmentBytes: number;
 }
 
 /**
