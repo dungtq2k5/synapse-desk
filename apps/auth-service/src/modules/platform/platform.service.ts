@@ -43,6 +43,7 @@ import {
   softDeleteData,
   SystemRoleName,
   USER_SORTABLE_FIELDS,
+  FREE_TIER_ORGANIZATION_GRANTS,
 } from '@synapsedesk/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { SessionsService } from '../sessions/sessions.service';
@@ -153,6 +154,18 @@ export class PlatformService {
       const created = await this.prisma.$transaction(async (tx) => {
         const organization = await tx.organization.create({
           data: {
+            // **The base, and every override below it wins.** Order is the
+            // whole of it: `{ ...overrides, ...FREE_TIER_ENTITLEMENTS }` would
+            // compile, look identical, and silently discard every number a
+            // Super Admin typed.
+            //
+            // That a platform-created tenant starts on the FREE tier unless
+            // overridden is now a stated choice rather than an inherited one.
+            // It is what the schema defaults did, so nothing changes today —
+            // but a route whose purpose is provisioning a customer arguably
+            // wants a plan required instead, and that is a decision somebody
+            // can now see to make.
+            ...FREE_TIER_ORGANIZATION_GRANTS,
             name: request.name.trim(),
             slug,
             domain: request.domain?.trim().toLowerCase() || null,
@@ -160,7 +173,7 @@ export class PlatformService {
             allowedEmailDomains: request.allowedEmailDomains.map((domain) =>
               domain.trim().toLowerCase(),
             ),
-            // Absent takes the schema default rather than 0 — a tenant created
+            // Absent keeps the free-tier value rather than 0 — a tenant created
             // with zero seats could never be used.
             ...(request.maxAgentSeats !== undefined
               ? { maxAgentSeats: request.maxAgentSeats }

@@ -24,12 +24,13 @@ import { InvitationsService } from '../../src/modules/invitations/invitations.se
 import { AuthService } from '../../src/modules/auth/auth.service';
 
 /**
- * The catalogue as a Super Admin drives it, and D1's rule as behaviour.
+ * The catalogue as a Super Admin drives it, and the admission rule as behaviour.
  *
- * D1 is the reason this file exists: *"a limit gates ADMISSION, never TENURE."*
- * Lowering a plan limit under tenants who are already over it must refuse their
- * next addition and take away nothing they have — and the only way to know that
- * holds is to lower a limit under a tenant who is over it and look.
+ * **A limit gates ADMISSION, never TENURE**, and that is the reason this file
+ * exists. Lowering a plan limit under tenants who are already over it must
+ * refuse their next addition and take away nothing they have — and the only way
+ * to know that holds is to lower a limit under a tenant who is over it and
+ * look.
  */
 describe('The plan catalogue (e2e)', () => {
   let fx: E2eFixture;
@@ -42,7 +43,8 @@ describe('The plan catalogue (e2e)', () => {
   const SUPER_ADMIN_ID = '00000000-0000-4000-8000-00000000beef';
   const context = () => superAdminContext(SUPER_ADMIN_ID);
 
-  // Module-scoped and monotonic, per §13.3: increments across the whole suite
+  // Module-scoped and monotonic, per `development-conventions.md` §13.3:
+  // increments across the whole suite
   // run, so two calls in one test never collide on a `@unique` column. A
   // counter is collision-FREE where six random base-36 characters are merely
   // unlikely — and it removes the question rather than answering it.
@@ -62,6 +64,8 @@ describe('The plan catalogue (e2e)', () => {
         aiModelTier: ProtoAiModelTier.AI_MODEL_TIER_QUALITY,
         maxDocumentBytes: 25 * 1024 * 1024,
         maxAttachmentBytes: 5 * 1024 * 1024,
+        maxDocumentUploads: 10_000,
+        maxAnalyticsRangeDays: 180,
         isActive: true,
         prices: [],
         ...overrides,
@@ -136,9 +140,9 @@ describe('The plan catalogue (e2e)', () => {
 
   afterAll(() => fx.close());
 
-  // ---------------------------------------------------------------- D1 — a limit gates admission, never tenure
+  // ---------------------------------------------------------------- A limit gates admission, never tenure
 
-  describe("D1's rule", () => {
+  describe('The admission rule', () => {
     it('1. **Lowering a limit DELETES, DEACTIVATES and UNINDEXES nothing**', async () => {
       // The rule the whole decision rests on, stated as the thing that must not
       // happen. Ten users on a plan that drops to three seats: an enforcement
@@ -231,8 +235,8 @@ describe('The plan catalogue (e2e)', () => {
 
       // **Logging in, not merely "the row still looks fine".** An account can
       // be unlocked and undeleted and still be refused at the door by a seat
-      // check somebody added to the login path, which is exactly the shape D1
-      // forbids — and only an actual login proves it did not happen.
+      // check somebody added to the login path, which is exactly the shape the
+      // admission rule forbids — and only an actual login proves it did not happen.
       const session = await auth.login(
         { email: agent.email, password: TEST_PASSWORD },
         requestOrigin(),
@@ -242,7 +246,7 @@ describe('The plan catalogue (e2e)', () => {
     });
 
     it('4. **A budget REDUCTION is not applied; an increase is**', async () => {
-      // D1's one exception, and the reason it is an exception: a budget is
+      // The one exception to that rule, and the reason it is one: a budget is
       // periodic by definition, so lowering a part-spent one mid-cycle takes
       // away allowance the tenant has already been spending against. It waits
       // for the cycle roll, where the next subscription event re-derives every
@@ -296,7 +300,7 @@ describe('The plan catalogue (e2e)', () => {
     });
   });
 
-  // ---------------------------------------------------------------- §4 — explicit, never implicit
+  // ---------------------------------------------------------------- Explicit, never implicit
 
   describe('Applying an edit', () => {
     it('8. **An EDIT alone changes no subscriber; APPLY is what changes them**', async () => {
@@ -392,7 +396,12 @@ describe('The plan catalogue (e2e)', () => {
       );
 
       expect(projected.evaluatedDimensions).toContain('seats');
+      // Neither of ingestion's dimensions, and permanently so at THIS layer:
+      // both are counted from `ingestion-service`'s tables, and auth cannot ask
+      // — ingestion dials auth on every presign, so the reverse edge would close
+      // a cycle. The gateway composes them and unions its own coverage in.
       expect(projected.evaluatedDimensions).not.toContain('storage');
+      expect(projected.evaluatedDimensions).not.toContain('documents');
 
       // **Stated against the whole vocabulary, not as a hardcoded pair.** The
       // list is only meaningful against what there IS to check, so this asserts
@@ -401,7 +410,7 @@ describe('The plan catalogue (e2e)', () => {
       const unevaluated = PLAN_LIMIT_DIMENSIONS.filter(
         (dimension) => !projected.evaluatedDimensions.includes(dimension),
       );
-      expect(unevaluated).toEqual(['storage']);
+      expect(unevaluated).toEqual(['storage', 'documents']);
     });
 
     it('2b. …and the apply reports the same coverage as its dry run', async () => {
@@ -449,7 +458,7 @@ describe('The plan catalogue (e2e)', () => {
     });
 
     it('**An apply audits, and a DRY RUN does not**', async () => {
-      // §5: plan administration writes to `audit_logs`, never to
+      // Plan administration writes to `audit_logs`, never to
       // `billing_events` — that table is a Stripe webhook ledger whose unique
       // `evt_…` id IS its idempotency mechanism, and a Super Admin edit has
       // none. A dry run changed nothing and has nothing to record.
@@ -479,7 +488,7 @@ describe('The plan catalogue (e2e)', () => {
     });
   });
 
-  // ---------------------------------------------------------------- §2 — the table
+  // ---------------------------------------------------------------- The catalogue row
 
   describe('The catalogue row', () => {
     it('11. **A plan with live subscribers cannot be DELETED**', async () => {

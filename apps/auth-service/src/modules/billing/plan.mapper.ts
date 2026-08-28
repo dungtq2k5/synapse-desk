@@ -42,6 +42,8 @@ export function toSubscriptionPlanResponse(
     aiModelTier: toProtoAiModelTier(plan.aiModelTier),
     maxDocumentBytes: Number(plan.maxDocumentBytes),
     maxAttachmentBytes: Number(plan.maxAttachmentBytes),
+    maxDocumentUploads: plan.maxDocumentUploads,
+    maxAnalyticsRangeDays: plan.maxAnalyticsRangeDays,
     isActive: plan.isActive,
     prices: plan.prices.map((price) => ({
       id: price.id,

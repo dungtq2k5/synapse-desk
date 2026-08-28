@@ -1,6 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { RpcException } from '@nestjs/microservices';
-import { status } from '@grpc/grpc-js';
 import {
   addTicketStats,
   AnalyticsGranularity,
@@ -11,10 +9,14 @@ import {
   aiFirstResponseSeconds,
   EMPTY_TICKET_STATS,
   humanFirstResponseSeconds,
-  MAX_ANALYTICS_RANGE_DAYS,
-  Mean,
-  Rate,
+  bucketKey,
+  granularityOf,
+  newestComputedAt,
+  parseAnalyticsRange,
   requireTenant,
+  toIsoDay,
+  toMeanWire,
+  toRateWire,
   resolutionSeconds,
   TicketStatSums,
   TicketStatus,
@@ -23,15 +25,14 @@ import {
   AgentStatsResponse,
   AnalyticsRangeRequest,
   DeflectionResponse,
-  MeanValue,
   OverviewResponse,
-  RateValue,
   ResponseTimesResponse,
   SatisfactionResponse,
   toProtoTimestamp,
   VolumeResponse,
 } from '@synapsedesk/grpc-proto';
 import { PrismaService } from '../prisma/prisma.service';
+import { AuthReferenceService } from '../auth-client/auth-reference.service';
 
 /** A rollup row plus the day it belongs to. */
 type DailyRow = TicketStatSums & { day: Date; computedAt: Date };
@@ -52,14 +53,21 @@ type DailyRow = TicketStatSums & { day: Date; computedAt: Date };
  */
 @Injectable()
 export class AnalyticsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly authReference: AuthReferenceService,
+  ) {}
 
   async getOverview(
     request: AnalyticsRangeRequest,
     context: CallerContext,
   ): Promise<OverviewResponse> {
     const organizationId = requireTenant(context);
-    const range = parseRange(request);
+    const range = parseAnalyticsRange(
+      request.from,
+      request.to,
+      await this.authReference.getAnalyticsRangeDays(context),
+    );
 
     const [rows, openTickets, openMedianAge, dataThrough] = await Promise.all([
       this.dailyRows(organizationId, request, range),
@@ -78,11 +86,11 @@ export class AnalyticsService {
       ticketsResolved: totals.ticketsResolved,
       ticketsEscalated: totals.ticketsEscalated,
       openTickets,
-      deflection: toRate(deflectionRate(totals)),
-      csat: toRate(csat(totals)),
-      humanFirstResponseSeconds: toMean(humanFirstResponseSeconds(totals)),
-      aiFirstResponseSeconds: toMean(aiFirstResponseSeconds(totals)),
-      resolutionSeconds: toMean(resolutionSeconds(totals)),
+      deflection: toRateWire(deflectionRate(totals)),
+      csat: toRateWire(csat(totals)),
+      humanFirstResponseSeconds: toMeanWire(humanFirstResponseSeconds(totals)),
+      aiFirstResponseSeconds: toMeanWire(aiFirstResponseSeconds(totals)),
+      resolutionSeconds: toMeanWire(resolutionSeconds(totals)),
       // The counterweight. `resolution_seconds` can only see tickets that
       // closed, so it is biased optimistic — a ticket open for 40 days is
       // invisible to it, and reporting the mean alone would let a queue rot
@@ -100,16 +108,23 @@ export class AnalyticsService {
     context: CallerContext,
   ): Promise<DeflectionResponse> {
     const organizationId = requireTenant(context);
+    // Resolved BEFORE the composition rather than inside it: `parseRange` stays
+    // synchronous, so the two reads below remain concurrent.
+    const range = parseAnalyticsRange(
+      request.from,
+      request.to,
+      await this.authReference.getAnalyticsRangeDays(context),
+    );
     const [rows, dataThrough] = await Promise.all([
-      this.dailyRows(organizationId, request, parseRange(request)),
+      this.dailyRows(organizationId, request, range),
       this.dataThrough(organizationId),
     ]);
-    const buckets = bucketBy(rows, granularityOf(request));
+    const buckets = bucketBy(rows, granularityOf(request.granularity));
 
     return {
       points: [...buckets].map(([day, stats]) => ({
         day,
-        deflection: toRate(deflectionRate(stats)),
+        deflection: toRateWire(deflectionRate(stats)),
         chatConversations: stats.chatConversations,
         chatResolvedWithoutEscalation: stats.chatResolvedWithoutEscalation,
       })),
@@ -117,7 +132,7 @@ export class AnalyticsService {
       // points. An average of daily rates weights a Tuesday with 3
       // conversations equally with a Monday with 300 — the same mistake the
       // rollup schema exists to prevent, arriving one layer up.
-      total: toRate(deflectionRate(sumAll(rows))),
+      total: toRateWire(deflectionRate(sumAll(rows))),
       dataThrough,
     };
   }
@@ -127,23 +142,30 @@ export class AnalyticsService {
     context: CallerContext,
   ): Promise<ResponseTimesResponse> {
     const organizationId = requireTenant(context);
+    // Resolved BEFORE the composition rather than inside it: `parseRange` stays
+    // synchronous, so the two reads below remain concurrent.
+    const range = parseAnalyticsRange(
+      request.from,
+      request.to,
+      await this.authReference.getAnalyticsRangeDays(context),
+    );
     const [rows, dataThrough] = await Promise.all([
-      this.dailyRows(organizationId, request, parseRange(request)),
+      this.dailyRows(organizationId, request, range),
       this.dataThrough(organizationId),
     ]);
-    const buckets = bucketBy(rows, granularityOf(request));
+    const buckets = bucketBy(rows, granularityOf(request.granularity));
     const totals = sumAll(rows);
 
     return {
       points: [...buckets].map(([day, stats]) => ({
         day,
-        humanFirstResponseSeconds: toMean(humanFirstResponseSeconds(stats)),
-        aiFirstResponseSeconds: toMean(aiFirstResponseSeconds(stats)),
-        resolutionSeconds: toMean(resolutionSeconds(stats)),
+        humanFirstResponseSeconds: toMeanWire(humanFirstResponseSeconds(stats)),
+        aiFirstResponseSeconds: toMeanWire(aiFirstResponseSeconds(stats)),
+        resolutionSeconds: toMeanWire(resolutionSeconds(stats)),
       })),
-      humanTotal: toMean(humanFirstResponseSeconds(totals)),
-      aiTotal: toMean(aiFirstResponseSeconds(totals)),
-      resolutionTotal: toMean(resolutionSeconds(totals)),
+      humanTotal: toMeanWire(humanFirstResponseSeconds(totals)),
+      aiTotal: toMeanWire(aiFirstResponseSeconds(totals)),
+      resolutionTotal: toMeanWire(resolutionSeconds(totals)),
       dataThrough,
     };
   }
@@ -153,11 +175,18 @@ export class AnalyticsService {
     context: CallerContext,
   ): Promise<VolumeResponse> {
     const organizationId = requireTenant(context);
+    // Resolved BEFORE the composition rather than inside it: `parseRange` stays
+    // synchronous, so the two reads below remain concurrent.
+    const range = parseAnalyticsRange(
+      request.from,
+      request.to,
+      await this.authReference.getAnalyticsRangeDays(context),
+    );
     const [rows, dataThrough] = await Promise.all([
-      this.dailyRows(organizationId, request, parseRange(request)),
+      this.dailyRows(organizationId, request, range),
       this.dataThrough(organizationId),
     ]);
-    const buckets = bucketBy(rows, granularityOf(request));
+    const buckets = bucketBy(rows, granularityOf(request.granularity));
 
     // **The one place this reads `tickets` rather than the rollup**, and it is
     // deliberate: "how many are OPEN right now" is not a question a daily
@@ -183,21 +212,28 @@ export class AnalyticsService {
     context: CallerContext,
   ): Promise<SatisfactionResponse> {
     const organizationId = requireTenant(context);
+    // Resolved BEFORE the composition rather than inside it: `parseRange` stays
+    // synchronous, so the two reads below remain concurrent.
+    const range = parseAnalyticsRange(
+      request.from,
+      request.to,
+      await this.authReference.getAnalyticsRangeDays(context),
+    );
     const [rows, dataThrough] = await Promise.all([
-      this.dailyRows(organizationId, request, parseRange(request)),
+      this.dailyRows(organizationId, request, range),
       this.dataThrough(organizationId),
     ]);
-    const buckets = bucketBy(rows, granularityOf(request));
+    const buckets = bucketBy(rows, granularityOf(request.granularity));
     const totals = sumAll(rows);
 
     return {
       points: [...buckets].map(([day, stats]) => ({
         day,
-        csat: toRate(csat(stats)),
-        citationAccuracy: toRate(citationAccuracy(stats)),
+        csat: toRateWire(csat(stats)),
+        citationAccuracy: toRateWire(citationAccuracy(stats)),
       })),
-      csatTotal: toRate(csat(totals)),
-      citationAccuracyTotal: toRate(citationAccuracy(totals)),
+      csatTotal: toRateWire(csat(totals)),
+      citationAccuracyTotal: toRateWire(citationAccuracy(totals)),
       dataThrough,
     };
   }
@@ -215,7 +251,11 @@ export class AnalyticsService {
     context: CallerContext,
   ): Promise<AgentStatsResponse> {
     const organizationId = requireTenant(context);
-    const range = parseRange(request);
+    const range = parseAnalyticsRange(
+      request.from,
+      request.to,
+      await this.authReference.getAnalyticsRangeDays(context),
+    );
 
     const [grouped, dataThrough] = await Promise.all([
       this.prisma.agentDailyStat.groupBy({
@@ -241,7 +281,7 @@ export class AnalyticsService {
         assigned: row._sum.assigned ?? 0,
         resolved: row._sum.resolved ?? 0,
         messagesSent: row._sum.messagesSent ?? 0,
-        resolutionSeconds: toMean({
+        resolutionSeconds: toMeanWire({
           mean:
             (row._sum.resolutionCount ?? 0) > 0
               ? (row._sum.resolutionSecondsSum ?? 0) /
@@ -424,64 +464,6 @@ export class AnalyticsService {
 }
 
 /**
- * `YYYY-MM-DD` → the `date` column's domain.
- *
- * Parsed as UTC midnight deliberately: the column is a `date`, which has no
- * timezone at all, and constructing it from the SERVER's zone would shift the
- * boundary by an hour for half the year in half the world.
- */
-function parseRange(request: AnalyticsRangeRequest): { from: Date; to: Date } {
-  const from = parseDay(request.from, 'from');
-  const to = parseDay(request.to, 'to');
-
-  if (from > to) {
-    throw new RpcException({
-      code: status.INVALID_ARGUMENT,
-      message: '`from` must not be after `to`',
-    });
-  }
-
-  const days = Math.round((to.getTime() - from.getTime()) / 86_400_000) + 1;
-  if (days > MAX_ANALYTICS_RANGE_DAYS) {
-    // Refused rather than silently truncated. A dashboard that quietly answered
-    // a narrower question than it was asked is worse than one that says no.
-    throw new RpcException({
-      code: status.INVALID_ARGUMENT,
-      message: `Range is ${days} days; the maximum is ${MAX_ANALYTICS_RANGE_DAYS}`,
-    });
-  }
-
-  return { from, to };
-}
-
-function parseDay(value: string, field: string): Date {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value ?? '')) {
-    throw new RpcException({
-      code: status.INVALID_ARGUMENT,
-      message: `\`${field}\` must be a YYYY-MM-DD date`,
-    });
-  }
-
-  const parsed = new Date(`${value}T00:00:00.000Z`);
-  if (Number.isNaN(parsed.getTime())) {
-    throw new RpcException({
-      code: status.INVALID_ARGUMENT,
-      message: `\`${field}\` is not a real date`,
-    });
-  }
-
-  return parsed;
-}
-
-function granularityOf(request: AnalyticsRangeRequest): AnalyticsGranularity {
-  const value = request.granularity as AnalyticsGranularity | undefined;
-
-  return value && Object.values(AnalyticsGranularity).includes(value)
-    ? value
-    : AnalyticsGranularity.DAY;
-}
-
-/**
  * Groups daily rows into the requested bucket, SUMMING counters.
  *
  * Summing rather than averaging is the whole reason the rollup stores sums:
@@ -510,22 +492,6 @@ function bucketBy(
   return buckets;
 }
 
-function bucketKey(day: Date, granularity: AnalyticsGranularity): string {
-  const iso = day.toISOString().slice(0, 10);
-
-  if (granularity === AnalyticsGranularity.DAY) return iso;
-  if (granularity === AnalyticsGranularity.MONTH)
-    return `${iso.slice(0, 7)}-01`;
-
-  // ISO weeks start Monday. Labelled by the week's Monday rather than by a week
-  // number, because "2026-W14" is a label almost nobody can place on a calendar.
-  const monday = new Date(day);
-  const weekday = (monday.getUTCDay() + 6) % 7;
-  monday.setUTCDate(monday.getUTCDate() - weekday);
-
-  return monday.toISOString().slice(0, 10);
-}
-
 function sumAll(rows: TicketStatSums[]): TicketStatSums {
   return rows.reduce(
     (accumulator, row) => addTicketStats(accumulator, row),
@@ -533,32 +499,14 @@ function sumAll(rows: TicketStatSums[]): TicketStatSums {
   );
 }
 
-/** The newest rollup run behind an answer — the cache key's freshness input. */
-/** A `date` column as `YYYY-MM-DD` — never a locale-formatted string. */
-function toIsoDay(day: Date): string {
-  return day.toISOString().slice(0, 10);
-}
-
+/**
+ * How fresh this dashboard is, on the wire.
+ *
+ * The fold is shared; the proto conversion stays here because `libs/` cannot
+ * import `libs/grpc-proto`.
+ */
 function latestComputedAt(rows: DailyRow[]) {
-  if (rows.length === 0) return undefined;
+  const newest = newestComputedAt(rows);
 
-  const newest = rows.reduce(
-    (latest, row) => (row.computedAt > latest ? row.computedAt : latest),
-    rows[0].computedAt,
-  );
-
-  return toProtoTimestamp(newest);
-}
-
-/** Domain → wire. `null` becomes an absent field, never a zero. */
-function toRate(value: Rate): RateValue {
-  return {
-    rate: value.rate ?? undefined,
-    numerator: value.numerator,
-    denominator: value.denominator,
-  };
-}
-
-function toMean(value: Mean): MeanValue {
-  return { mean: value.mean ?? undefined, count: value.count };
+  return newest ? toProtoTimestamp(newest) : undefined;
 }

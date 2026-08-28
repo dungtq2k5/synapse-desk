@@ -24,6 +24,16 @@ datasource db {
 model Organization {
   id     String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name   String  @db.VarChar(255)
+  // FULL `@unique`, not the partial `WHERE deleted_at IS NULL` index every
+  // other soft-deletable name in this file uses — and the difference is
+  // RESTORE. `restoreOrganization` un-deletes a tenant in place and keeps its
+  // slug, so these two must stay reserved while it is offboarded: a partial
+  // index would let a new tenant claim `acme` in the meantime and leave the
+  // restore to fail, or to produce two live tenants answering the same URL.
+  //
+  // `subscription_plans.name` goes the other way for the same reason read
+  // backwards — a retired plan is never restored, so reuse is wanted there and
+  // its index is partial.
   slug   String  @unique @db.VarChar(100)
   domain String? @unique @db.VarChar(255)
 
@@ -53,9 +63,20 @@ model Organization {
   inboundToken String? @unique @map("inbound_token") @db.VarChar(32)
 
   // Quotas & metering
-  maxAgentSeats        Int    @default(10) @map("max_agent_seats")
-  maxStorageBytes      BigInt @default(5368709120) @map("max_storage_bytes")
-  monthlyAiTokenBudget BigInt @default(1000000) @map("monthly_ai_token_budget")
+  //
+  // **No `@default()` on any of them, deliberately.** A NOT NULL column with no
+  // default is required in Prisma's create type, so every organization create
+  // has to answer "what does this tenant get" at COMPILE time rather than
+  // inheriting a number from a file its author never opened. The answer is
+  // `FREE_TIER_ENTITLEMENTS`, which is also what the Free plan row is seeded
+  // from — one definition, not two.
+  //
+  // Four of these defaults were literal copies of platform constants, and had
+  // the staleness hazard the plan grants document: raise the constant and every
+  // new tenant stays at the old number, with no error anywhere.
+  maxAgentSeats        Int    @map("max_agent_seats")
+  maxStorageBytes      BigInt @map("max_storage_bytes")
+  monthlyAiTokenBudget BigInt @map("monthly_ai_token_budget")
 
   /// The largest document this tenant's PLAN admits, copied here like every
   /// other entitlement.
@@ -65,24 +86,46 @@ model Organization {
   /// every presign would put the catalogue in the hot path of the highest
   /// volume route in the system.
   ///
-  /// **Defaulted to the platform ceiling, which is what makes the migration
-  /// safe.** Every existing row gets today's behaviour with no backfill, and a
-  /// grandfathered tenant — `plan_id` NULL, no subscription — keeps it forever.
-  ///
   /// Distinct from `max_document_bytes_override` below: this is what the plan
   /// GRANTS, that is what the tenant chose to NARROW to. Readers take the
   /// `min()` of both and the platform ceiling, so neither can widen the other.
-  maxDocumentBytes BigInt @default(104857600) @map("max_document_bytes")
+  maxDocumentBytes BigInt @map("max_document_bytes")
 
-  /// The largest attachment this tenant's PLAN admits — the same denormalization
-  /// and the same default-to-the-ceiling migration as `maxDocumentBytes` above.
+  /// The largest attachment this tenant's PLAN admits — denormalized for the
+  /// same reason as `maxDocumentBytes` above.
   ///
-  /// **The ceiling it defaults to is a TRANSPORT bound, not a policy one.**
+  /// **The ceiling above it is a TRANSPORT bound, not a policy one.**
   /// `MAX_ATTACHMENT_BYTES` is 10 MB because the gRPC message limit binds
   /// there, with `MAX_AI_ATTACHMENT_BYTES` at 8 MB beneath it. A plan has very
   /// little room to differentiate on this column, which is worth knowing before
   /// it reaches a pricing page.
-  maxAttachmentBytes BigInt @default(10485760) @map("max_attachment_bytes")
+  maxAttachmentBytes BigInt @map("max_attachment_bytes")
+
+  /// The most documents this tenant's PLAN admits.
+  ///
+  /// Denormalized like the grants above, and bounded by
+  /// `MAX_DOCUMENTS_PER_TENANT` at every enforcement point.
+  ///
+  /// Counting a tenant's documents is `ingestion-service`'s job; this column is
+  /// only the LIMIT. The two meet at the gateway, never inside auth.
+  maxDocumentUploads Int @map("max_document_uploads")
+
+  /// How far back this tenant's PLAN lets analytics look, in days.
+  ///
+  /// **The one grant the admission rule does not cover.** Every other limit is
+  /// checked
+  /// when something is CREATED, so lowering it can only refuse the next thing.
+  /// A lookback window has no creation event: it restricts a read over data that
+  /// already exists, so narrowing it takes away history the tenant could see
+  /// yesterday. That is accepted deliberately rather than grandfathered — a
+  /// per-subscriber window would make a plan's stated grant not be what its
+  /// subscribers have, which is the property the catalogue is built on.
+  ///
+  /// Read by BOTH analytics surfaces — `ai-analytics.service.ts` in ingestion
+  /// and `analytics.service.ts` in ticket. A window honoured by one and not the
+  /// other is worse than no window, because the answer depends on which page
+  /// the tenant opened.
+  maxAnalyticsRangeDays Int @map("max_analytics_range_days")
 
   /// Follows Stripe's `current_period_start` once billing is live.
   ///
@@ -764,6 +807,7 @@ model JobRun {
 /// answering confidently.
 model SubscriptionPlan {
   id   String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  // Uniqueness will be handled by code because `deletedAt`
   name String @db.VarChar(100)
 
   /// NULL for a plan ASSIGNED rather than sold — the negotiated agreement,
@@ -774,7 +818,8 @@ model SubscriptionPlan {
   maxStorageBytes      BigInt @map("max_storage_bytes")
   monthlyAiTokenBudget BigInt @map("monthly_ai_token_budget")
 
-  /// `FAST | QUALITY`. A string, not a Prisma enum — §7.3, ADR 0001.
+  /// `FAST | QUALITY`. A string, not a Prisma enum —
+  /// `development-conventions.md` §7.3, ADR 0001.
   aiModelTier String @map("ai_model_tier") @db.VarChar(20)
 
   /// The largest document this plan admits.
@@ -811,6 +856,22 @@ model SubscriptionPlan {
   /// transport limit rather than a policy one. A 2/5/10 MB ladder is
   /// expressible; it is just a narrow one.
   maxAttachmentBytes BigInt @map("max_attachment_bytes")
+
+  /// The most documents this plan admits, NOT NULL like every other grant.
+  ///
+  /// Bounded by `MAX_DOCUMENTS_PER_TENANT`, which is the first cap on the
+  /// CORPUS rather than on any single upload: `maxStorageBytes` bounds the
+  /// bytes, and this bounds the vector points behind retrieval.
+  maxDocumentUploads Int @map("max_document_uploads")
+
+  /// How far back this plan lets analytics look, in days.
+  ///
+  /// **The only grant whose narrowing is retroactive**, so it is the only one a
+  /// plan edit can take something away with. `applyPlan` reports no over-limit
+  /// subset for it — there is none, because lowering it affects every
+  /// subscriber equally and at once — which is why `PLAN_LIMIT_DIMENSIONS` does
+  /// not list it.
+  maxAnalyticsRangeDays Int @map("max_analytics_range_days")
 
   isActive  Boolean   @default(true) @map("is_active")
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz

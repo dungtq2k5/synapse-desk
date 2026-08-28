@@ -32,6 +32,8 @@ export function toOrganizationResponse(
     // no absent case to translate and no `?? undefined` below applies to them.
     maxDocumentBytes: Number(organization.maxDocumentBytes),
     maxAttachmentBytes: Number(organization.maxAttachmentBytes),
+    maxDocumentUploads: organization.maxDocumentUploads,
+    maxAnalyticsRangeDays: organization.maxAnalyticsRangeDays,
     billingCycleStart: toProtoTimestamp(organization.billingCycleStart),
     // `?? undefined`, never `?? 0`. NULL means the tenant configured nothing
     // and the layer above applies; zero would be a limit that refuses

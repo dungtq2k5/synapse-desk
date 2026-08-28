@@ -166,6 +166,8 @@ export function toSubscriptionPlanResponseDto(
       fromProtoAiModelTier(plan.aiModelTier) ?? DEFAULT_AI_MODEL_TIER,
     maxDocumentBytes: plan.maxDocumentBytes,
     maxAttachmentBytes: plan.maxAttachmentBytes,
+    maxDocumentUploads: plan.maxDocumentUploads,
+    maxAnalyticsRangeDays: plan.maxAnalyticsRangeDays,
     isActive: plan.isActive,
     // **Yes, the `map` is needed** — not for the shape, which is identical
     // today, but as the projection boundary. `prices: plan.prices` would pass
@@ -227,6 +229,8 @@ export function toCreatePlanRequest(dto: CreatePlanDto): CreatePlanRequest {
     aiModelTier: toProtoAiModelTier(dto.aiModelTier),
     maxDocumentBytes: dto.maxDocumentBytes,
     maxAttachmentBytes: dto.maxAttachmentBytes,
+    maxDocumentUploads: dto.maxDocumentUploads,
+    maxAnalyticsRangeDays: dto.maxAnalyticsRangeDays,
     // No `?? true` here, and that is the point of the DTO default: the `?` on
     // an implicit-presence field costs every layer below it a branch, so the
     // default is written once at the edge and this layer reads a boolean.
@@ -246,7 +250,8 @@ export function toUpdatePlanRequest(
     planId,
     name: dto.name,
     stripeProductId: dto.stripeProductId,
-    // The `??` STAYS here, and the asymmetry is the whole of §5.2: this DTO
+    // The `??` STAYS here, and the asymmetry is the whole of
+    // `development-conventions.md` §5.2: this DTO
     // feeds an `optional` proto message where a default would clear the product
     // id on every PATCH that never mentioned it. The absent case is handled at
     // the mapper precisely because it must not be handled at the DTO.
@@ -263,6 +268,8 @@ export function toUpdatePlanRequest(
         : toProtoAiModelTier(dto.aiModelTier),
     maxDocumentBytes: dto.maxDocumentBytes,
     maxAttachmentBytes: dto.maxAttachmentBytes,
+    maxDocumentUploads: dto.maxDocumentUploads,
+    maxAnalyticsRangeDays: dto.maxAnalyticsRangeDays,
     isActive: dto.isActive,
   };
 }

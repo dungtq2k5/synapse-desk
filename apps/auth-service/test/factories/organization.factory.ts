@@ -1,5 +1,5 @@
 import { faker } from '@faker-js/faker';
-import { OrgStatus } from '@synapsedesk/common';
+import { FREE_TIER_ORGANIZATION_GRANTS, OrgStatus } from '@synapsedesk/common';
 import { Prisma } from '../../src/generated/prisma/client';
 import { PrismaService } from '../../src/modules/prisma/prisma.service';
 
@@ -21,6 +21,10 @@ export function buildOrganization(
   const slug = `org-${orgIdx}-${faker.string.alphanumeric(6).toLowerCase()}`;
 
   return {
+    // The free tier, so a test that cares about none of the seven quota columns
+    // says nothing about them — which is every test but a handful. ONE edit
+    // here covers the whole suite, which is what the factory rule buys.
+    ...FREE_TIER_ORGANIZATION_GRANTS,
     name: `${faker.company.name()} ${orgIdx}`,
     slug,
     // ACTIVE rather than the real registration default of PENDING_ONBOARDING:

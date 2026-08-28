@@ -1,4 +1,7 @@
-import { MAX_DOCUMENT_BYTES } from '@synapsedesk/common';
+import {
+  MAX_DOCUMENT_BYTES,
+  MAX_DOCUMENTS_PER_TENANT,
+} from '@synapsedesk/common';
 import { of, throwError } from 'rxjs';
 import { AuthReferenceService } from './auth-reference.service';
 
@@ -155,6 +158,28 @@ describe('The document size limit composition (unit)', () => {
     });
 
     await expect(service.getDocumentSizeLimitBytes(context)).resolves.toBe(0);
+  });
+
+  it('9. **the COUNT guard refuses on an absent grant, as the byte guard does**', async () => {
+    // The gap the byte limits already covered and the count limit did not. Same
+    // `??`, same reason, and the reason is about HOW it fails rather than
+    // whether: the column is NOT NULL and the proto field is not `optional`, so
+    // absent is a wire that lost a field — and `?? 0` makes that a refusal the
+    // caller can read instead of `exceedsLimit` rejecting a `NaN` ceiling and
+    // surfacing as a 500.
+    const service = serviceWith({ maxDocumentUploads: undefined });
+
+    await expect(service.getDocumentCountLimit(context)).resolves.toBe(0);
+  });
+
+  it('9b. …and a plan count ABOVE the platform cap does not widen it', async () => {
+    const service = serviceWith({
+      maxDocumentUploads: MAX_DOCUMENTS_PER_TENANT * 10,
+    });
+
+    await expect(service.getDocumentCountLimit(context)).resolves.toBe(
+      MAX_DOCUMENTS_PER_TENANT,
+    );
   });
 
   it('4. **an UNREADABLE organization refuses — it never means "unlimited"**', async () => {

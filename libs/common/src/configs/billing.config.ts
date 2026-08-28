@@ -15,6 +15,12 @@
  */
 
 import { AiModelTier } from './ai-settings.config';
+import {
+  MAX_DOCUMENT_BYTES,
+  MAX_DOCUMENTS_PER_TENANT,
+} from './document.config';
+import { MAX_ATTACHMENT_BYTES } from './ticket.config';
+import { MAX_ANALYTICS_RANGE_DAYS } from './analytics.config';
 
 /**
  * The limits a plan apply can put a tenant over.
@@ -23,10 +29,17 @@ import { AiModelTier } from './ai-settings.config';
  * point: `ApplyPlanResponse.evaluated_dimensions` names what a run DID check,
  * and that is only meaningful against a list of what there is to check.
  *
- * `storage` is presently never evaluated; counting it needs a platform-scoped
- * usage read in `ingestion-service` that does not exist (known-gaps #18).
+ * **`analytics` is deliberately absent.** This list means "dimensions where a
+ * subscriber can be OVER", and a lookback window has no over-limit subset:
+ * narrowing it affects every subscriber equally and immediately. Adding it for
+ * symmetry would make the list mean two different things.
+ *
+ * Which of these a given run actually checked is reported per response, because
+ * the answer is dynamic: `storage` and `documents` are answered by
+ * `ingestion-service`, so a leg that does not respond drops them from that run's
+ * coverage rather than silently reporting nobody affected.
  */
-export const PLAN_LIMIT_DIMENSIONS = ['seats', 'storage'] as const;
+export const PLAN_LIMIT_DIMENSIONS = ['seats', 'storage', 'documents'] as const;
 export type PlanLimitDimension = (typeof PLAN_LIMIT_DIMENSIONS)[number];
 
 /**
@@ -67,9 +80,161 @@ export type PlanEntitlements = {
    * little room to differentiate plans on this number.
    */
   maxAttachmentBytes: bigint;
+  /**
+   * The most documents this plan admits.
+   *
+   * A COUNT, not a size — `maxStorageBytes` bounds the bytes and this bounds
+   * the corpus behind retrieval. Composed by `min()` against
+   * `MAX_DOCUMENTS_PER_TENANT` like every other grant.
+   */
+  maxDocumentUploads: number;
+  /**
+   * How far back analytics may look, in days.
+   *
+   * The one grant whose narrowing is RETROACTIVE: it restricts a read over data
+   * that already exists, so there is no "next thing" to refuse and no
+   * over-limit subset to report.
+   */
+  maxAnalyticsRangeDays: number;
   /** For logs and the billing page. NEVER an authorization input. */
   displayName: string;
 };
+
+/**
+ * What a workspace gets with no subscription.
+ *
+ * **The single definition of the free tier.** It used to be seven `@default()`s
+ * on `organizations`, which put the product's free plan in a Prisma file where
+ * nothing that reasons about plans could read it — including the catalogue,
+ * which could not seed a Free row from a number it could not see.
+ *
+ * Four of those defaults were literal copies of platform constants. They are
+ * REFERENCED here rather than repeated, so the pair cannot drift: raising
+ * `MAX_DOCUMENT_BYTES` used to leave every new tenant at the old number with no
+ * error anywhere.
+ *
+ * **The `satisfies` is why this lives beside `PlanEntitlements`.** The free tier
+ * becomes a value of the same type a plan grants, so a field added there cannot
+ * be forgotten on the free path — which is how the free tier fell out of the
+ * catalogue to begin with.
+ *
+ * **Organization creates spread {@link FREE_TIER_ORGANIZATION_GRANTS}**, not
+ * this — `displayName` is a plan's label and `organizations` has no column for
+ * it.
+ *
+ * @example
+ * // Overrides AFTER the base, so a Super Admin's value wins:
+ * data: { ...FREE_TIER_ORGANIZATION_GRANTS, ...explicitOverrides }
+ */
+export const FREE_TIER_ENTITLEMENTS = {
+  // The three that copied nothing. These numbers ARE the free tier, and until
+  // now `schema.prisma` was the only place they were written down.
+  maxAgentSeats: 10,
+  maxStorageBytes: 5_368_709_120n,
+  monthlyAiTokenBudget: 1_000_000n,
+  aiModelTier: 'FAST',
+
+  // The ninth field of `PlanEntitlements`, and the one that lets the catalogue
+  // carry a Free row: `plan.name` is what it renders.
+  displayName: 'Free',
+
+  // **These four EQUAL the platform ceiling, and that is inherited rather than
+  // chosen.** They were `@default()`s copied from the constants beside them, so
+  // naming the free tier changed no behaviour — which was the point of the
+  // change, and leaves the question it exposed still open: "the most the system
+  // permits" and "what someone gets for free" are different numbers that
+  // currently have the same value.
+  //
+  // Narrowing any of them is a PRODUCT decision, not a refactor. `free-tier.spec.ts`
+  // pins the equality so that decision is an edit somebody makes on purpose
+  // rather than a drift nobody notices.
+
+  // The four that were literal copies of the constants beside them.
+  maxDocumentBytes: BigInt(MAX_DOCUMENT_BYTES),
+  maxAttachmentBytes: BigInt(MAX_ATTACHMENT_BYTES),
+  maxDocumentUploads: MAX_DOCUMENTS_PER_TENANT,
+  maxAnalyticsRangeDays: MAX_ANALYTICS_RANGE_DAYS,
+} as const satisfies PlanEntitlements;
+
+/**
+ * The free tier as an ORGANIZATION's columns — every grant, minus the label.
+ *
+ * **`displayName` is a PLAN's field, not a tenant's**, and `organizations` has
+ * no such column. Spreading the full entitlement set into an organization
+ * create passes an unknown field, which TypeScript cannot see — a spread
+ * suppresses excess-property checking — so it compiles and fails at runtime.
+ *
+ * The two shapes overlap and are not equal, which is the cost of the
+ * `satisfies` in `FREE_TIER_ENTITLEMENTS` rather than an argument against it:
+ * `Omit<PlanEntitlements, 'displayName'>` keeps the same guarantee here, so a
+ * field added to the plan type still has to be answered on the tenant path.
+ *
+ * Every value is READ from `FREE_TIER_ENTITLEMENTS` rather than repeated, so
+ * the two cannot drift.
+ */
+// Two things worth knowing before these numbers reach a pricing page, moved
+// here from the columns they used to sit on:
+//
+// - `maxAttachmentBytes`' ceiling is a TRANSPORT bound, not a policy one.
+//   `MAX_ATTACHMENT_BYTES` is 10 MB because the gRPC message limit binds there,
+//   with `MAX_AI_ATTACHMENT_BYTES` at 8 MB beneath it. There is very little
+//   room to differentiate a plan on that column.
+// - `maxDocumentUploads` was a NARROWING when it arrived. The count was
+//   unlimited before the column existed, so a tenant already above it was over
+//   on the day it landed. Safe, because a limit gates ADMISSION and never
+//   TENURE — they keep every document and are refused the next upload — and the
+//   reason the constant sits well above anything reached in practice.
+export const FREE_TIER_ORGANIZATION_GRANTS = {
+  maxAgentSeats: FREE_TIER_ENTITLEMENTS.maxAgentSeats,
+  maxStorageBytes: FREE_TIER_ENTITLEMENTS.maxStorageBytes,
+  monthlyAiTokenBudget: FREE_TIER_ENTITLEMENTS.monthlyAiTokenBudget,
+  aiModelTier: FREE_TIER_ENTITLEMENTS.aiModelTier,
+  maxDocumentBytes: FREE_TIER_ENTITLEMENTS.maxDocumentBytes,
+  maxAttachmentBytes: FREE_TIER_ENTITLEMENTS.maxAttachmentBytes,
+  maxDocumentUploads: FREE_TIER_ENTITLEMENTS.maxDocumentUploads,
+  maxAnalyticsRangeDays: FREE_TIER_ENTITLEMENTS.maxAnalyticsRangeDays,
+} as const satisfies Omit<PlanEntitlements, 'displayName'>;
+
+/**
+ * The shape a plan row is seeded in.
+ *
+ * `PlanEntitlements` is NOT it, and the difference is exactly two fields: the
+ * plan spells its label `name` rather than `displayName`, and it carries
+ * `stripeProductId` — NULL for a plan assigned rather than sold, which is the
+ * field that makes the free tier unbuyable by construction.
+ *
+ * `Prisma.SubscriptionPlanCreateInput` would be the natural type and is
+ * unreachable: `libs/` MUST NOT import from `apps/`. So the shape is declared
+ * here, derived from `PlanEntitlements` rather than written out — a field added
+ * there still has to be answered on all three constants, which is the guarantee
+ * the whole arrangement exists for.
+ */
+type FreePlanSeed = Omit<PlanEntitlements, 'displayName'> & {
+  name: string;
+  stripeProductId: string | null;
+};
+
+/**
+ * The free tier as a `SubscriptionPlan`'s columns.
+ *
+ * `displayName` is the plan's `name`, and everything else maps one-to-one — so
+ * the Free row is seeded from the same constant every create path uses, rather
+ * than from a second copy of the same numbers.
+ */
+export const FREE_PLAN_SEED = {
+  name: FREE_TIER_ENTITLEMENTS.displayName,
+  // NULL, because the Free plan is assigned rather than sold. It is invisible
+  // to Checkout by construction, which is correct: nobody buys it.
+  stripeProductId: null,
+  maxAgentSeats: FREE_TIER_ENTITLEMENTS.maxAgentSeats,
+  maxStorageBytes: FREE_TIER_ENTITLEMENTS.maxStorageBytes,
+  monthlyAiTokenBudget: FREE_TIER_ENTITLEMENTS.monthlyAiTokenBudget,
+  aiModelTier: FREE_TIER_ENTITLEMENTS.aiModelTier,
+  maxDocumentBytes: FREE_TIER_ENTITLEMENTS.maxDocumentBytes,
+  maxAttachmentBytes: FREE_TIER_ENTITLEMENTS.maxAttachmentBytes,
+  maxDocumentUploads: FREE_TIER_ENTITLEMENTS.maxDocumentUploads,
+  maxAnalyticsRangeDays: FREE_TIER_ENTITLEMENTS.maxAnalyticsRangeDays,
+} as const satisfies FreePlanSeed;
 
 // ---------------------------------------------------------------- Webhook bookkeeping — RDM §1.15, Table 30
 

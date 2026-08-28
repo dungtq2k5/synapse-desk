@@ -48,8 +48,10 @@ import {
   AI_MODEL_TIERS,
   DEFAULT_SEARCH,
   type AiModelTier,
+  MAX_ANALYTICS_RANGE_DAYS,
   MAX_ATTACHMENT_BYTES,
   MAX_DOCUMENT_BYTES,
+  MAX_DOCUMENTS_PER_TENANT,
   ORGANIZATION_SORTABLE_FIELDS,
   PLAN_SORTABLE_FIELDS,
   OrgStatus,
@@ -410,6 +412,21 @@ export class CreatePlanDto {
   @Max(MAX_ATTACHMENT_BYTES)
   readonly maxAttachmentBytes!: number;
 
+  // A COUNT, bounded by the platform's own cap on the corpus. Refused rather
+  // than clamped, for the reason the byte ceilings are: a plan that tries to
+  // sell past the platform is a mistake worth an error.
+  @IsInt()
+  @Min(1)
+  @Max(MAX_DOCUMENTS_PER_TENANT)
+  readonly maxDocumentUploads!: number;
+
+  // The one grant whose narrowing takes something away. Bounded by
+  // `MAX_ANALYTICS_RANGE_DAYS`, which is what the rollup tables can answer.
+  @IsInt()
+  @Min(1)
+  @Max(MAX_ANALYTICS_RANGE_DAYS)
+  readonly maxAnalyticsRangeDays!: number;
+
   // Defaults to ACTIVE, and the default belongs HERE rather than in the mapper:
   // `bool is_active = 9` has implicit presence, so the DTO is the last layer
   // that can tell "unstated" from `false`. A plan created without the flag is
@@ -508,6 +525,18 @@ export class UpdatePlanDto {
   @Min(1)
   @Max(MAX_ATTACHMENT_BYTES)
   readonly maxAttachmentBytes?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(MAX_DOCUMENTS_PER_TENANT)
+  readonly maxDocumentUploads?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(MAX_ANALYTICS_RANGE_DAYS)
+  readonly maxAnalyticsRangeDays?: number;
 
   @IsOptional()
   @IsBoolean()

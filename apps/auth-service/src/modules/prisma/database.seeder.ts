@@ -10,6 +10,7 @@ import {
   SYSTEM_ROLE_PERMISSIONS,
   SystemRoleName,
   formatErrorMsg,
+  FREE_PLAN_SEED,
 } from '@synapsedesk/common';
 import { PrismaService } from './prisma.service';
 import { Prisma } from '../../generated/prisma/client';
@@ -34,6 +35,7 @@ type SeedSummary = {
   systemUserCreated: boolean;
   superAdminCreated: boolean;
   rolesCreated: string[];
+  freePlanCreated: boolean;
 };
 
 /**
@@ -123,12 +125,14 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
           superAdminPasswordHash,
         );
         const rolesCreated = await this.seedSystemRoles(tx, systemUser.id);
+        const freePlan = await this.seedFreePlan(tx);
 
         return {
           ...permissions,
           systemUserCreated: systemUser.created,
           superAdminCreated: superAdmin.created,
           rolesCreated,
+          freePlanCreated: freePlan.created,
         } satisfies SeedSummary;
       },
       {
@@ -169,6 +173,12 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
     if (summary.rolesCreated.length) {
       this.logger.log(
         `Created system role(s): ${summary.rolesCreated.join(', ')}`,
+      );
+    }
+    if (summary.freePlanCreated) {
+      this.logger.log(
+        `Created the '${FREE_PLAN_SEED.name}' plan — an unsubscribed workspace ` +
+          'is now on a plan rather than on nothing',
       );
     }
 
@@ -242,6 +252,16 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
       -- never be re-used.
       CREATE UNIQUE INDEX IF NOT EXISTS "departments_org_name_key"
         ON departments (organization_id, name)
+        WHERE deleted_at IS NULL;
+
+      -- Plan names are unique among LIVE rows only, and NOT via @unique on the
+      -- column. A database-wide constraint knows nothing about \`deleted_at\`, so
+      -- retiring a plan called "Pro" would block ever creating another "Pro" —
+      -- permanently, for a row nothing reads. Two live plans with one name is
+      -- the real hazard: the catalogue is picked from by name in the seeder and
+      -- read by name by an operator.
+      CREATE UNIQUE INDEX IF NOT EXISTS "subscription_plans_name_key"
+        ON subscription_plans (name)
         WHERE deleted_at IS NULL;
 
       -- At most ONE primary department per user. The service also demotes the
@@ -322,6 +342,47 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
          ON roles (name)
          WHERE organization_id IS NULL`,
     );
+  }
+
+  /**
+   * The Free plan, so an unsubscribed workspace is on a plan like everyone else.
+   *
+   * **It collapses a state that carried two meanings.** `planId IS NULL` meant
+   * both "free" and "grandfathered with numbers nobody chose", and nothing
+   * could tell them apart — the numbers came from schema defaults that were not
+   * written down anywhere a reader would look. With this row, free is a plan.
+   *
+   * `stripeProductId: null`, because it is assigned rather than sold: it is
+   * invisible to Checkout by construction, which is right — nobody buys it.
+   *
+   * **Seeded from `FREE_PLAN_SEED`**, which reads off the same constant every
+   * organization create uses. A second copy of the numbers here is exactly the
+   * duplication this work removed.
+   *
+   * Idempotent on `name`, like every other seed: the row has no Stripe id to
+   * key on, so the name is the identity. Existing grants are UPDATED, so
+   * changing the free tier in code and restarting is enough to move it.
+   */
+  private async seedFreePlan(
+    tx: Prisma.TransactionClient,
+  ): Promise<{ created: boolean }> {
+    const existing = await tx.subscriptionPlan.findFirst({
+      where: { name: FREE_PLAN_SEED.name, deletedAt: null },
+      select: { id: true },
+    });
+
+    if (existing) {
+      await tx.subscriptionPlan.update({
+        where: { id: existing.id },
+        data: { ...FREE_PLAN_SEED },
+      });
+
+      return { created: false };
+    }
+
+    await tx.subscriptionPlan.create({ data: { ...FREE_PLAN_SEED } });
+
+    return { created: true };
   }
 
   /**

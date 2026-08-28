@@ -64,6 +64,8 @@
     "stripe:provision:apply": "node scripts/provision-stripe.mjs --apply",
     "plans:seed": "node scripts/seed-plans.mjs",
     "plans:seed:apply": "node scripts/seed-plans.mjs --apply",
+    "db:reset": "node scripts/reset-databases.mjs",
+    "db:verify": "node scripts/verify-schema.mjs",
     "proto:generate": "npm run proto:generate -w @synapsedesk/grpc-proto",
     "proto:check": "npm run proto:check -w @synapsedesk/grpc-proto",
     "proto:lint": "npm run proto:lint -w @synapsedesk/grpc-proto",

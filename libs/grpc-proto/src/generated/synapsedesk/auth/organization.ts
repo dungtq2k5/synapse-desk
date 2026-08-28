@@ -79,6 +79,17 @@ export interface OrganizationResponse {
    * every plan states it, so every tenant carries it.
    */
   maxAttachmentBytes: number;
+  /**
+   * The PLAN's count and window grants, on the same NOT-optional terms.
+   *
+   * `max_analytics_range_days` rides here rather than on a dedicated call
+   * because BOTH analytics surfaces — ingestion's and ticket's — already read
+   * this message for their own limits, and a window honoured by one service and
+   * not the other is worse than no window: the number a tenant sees would depend
+   * on which page they opened.
+   */
+  maxDocumentUploads: number;
+  maxAnalyticsRangeDays: number;
   createdAt: Timestamp | undefined;
   updatedAt: Timestamp | undefined;
 }

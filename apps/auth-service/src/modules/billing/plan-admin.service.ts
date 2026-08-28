@@ -38,12 +38,15 @@ import {
 /**
  * The dimensions `overLimit` actually checks.
  *
- * Seats only, and it is the honest half of a pair: `PLAN_LIMIT_DIMENSIONS`
- * names every limit an apply COULD put a tenant over, and the difference
- * between the two lists is what the response reports as unevaluated. Adding
- * storage means adding it here and to `overLimit` together — a list that
- * claimed a dimension this method does not compute is the exact inversion this
- * field exists to prevent.
+ * Seats only, and permanently so: `storage` and `documents` are counted from
+ * `ingestion-service`'s tables, and auth cannot ask — ingestion dials auth on
+ * every presign, so the reverse edge would close a cycle on the identity leaf.
+ * The GATEWAY composes the two, unioning its own coverage into this list.
+ *
+ * That is why this constant reports what THIS service evaluated rather than
+ * what the response will finally claim: two honest sources, neither overwriting
+ * the other. A list that named a dimension this method does not compute is the
+ * exact inversion the field exists to prevent.
  */
 const EVALUATED_DIMENSIONS: readonly PlanLimitDimension[] = ['seats'];
 
@@ -58,6 +61,8 @@ type SubscriberRow = {
   aiModelTier: string;
   maxDocumentBytes: bigint;
   maxAttachmentBytes: bigint;
+  maxDocumentUploads: number;
+  maxAnalyticsRangeDays: number;
 };
 
 /**
@@ -98,7 +103,8 @@ export class PlanAdminService {
     const page = request.page ?? emptyPage();
     const { skip, take, orderBy } = toPrismaPage(page, PLAN_SORTABLE_FIELDS);
 
-    // `deletedAt: null` unless asked otherwise — §7.1, and the same filter
+    // `deletedAt: null` unless asked otherwise — `development-conventions.md`
+    // §7.1, and the same filter
     // `PlanCatalogService` applies on the webhook path. A retired plan that
     // reappeared in a picker is a plan somebody can accidentally sell again.
     const where = {
@@ -159,6 +165,8 @@ export class PlanAdminService {
         aiModelTier: this.tierName(request.aiModelTier),
         maxDocumentBytes: BigInt(request.maxDocumentBytes),
         maxAttachmentBytes: BigInt(request.maxAttachmentBytes),
+        maxDocumentUploads: request.maxDocumentUploads,
+        maxAnalyticsRangeDays: request.maxAnalyticsRangeDays,
         isActive: request.isActive,
         prices: {
           create: (request.prices ?? []).map((price) => ({
@@ -229,6 +237,12 @@ export class PlanAdminService {
         ...(request.maxAttachmentBytes === undefined
           ? {}
           : { maxAttachmentBytes: BigInt(request.maxAttachmentBytes) }),
+        ...(request.maxDocumentUploads === undefined
+          ? {}
+          : { maxDocumentUploads: request.maxDocumentUploads }),
+        ...(request.maxAnalyticsRangeDays === undefined
+          ? {}
+          : { maxAnalyticsRangeDays: request.maxAnalyticsRangeDays }),
         ...(request.isActive === undefined
           ? {}
           : { isActive: request.isActive }),
@@ -305,7 +319,7 @@ export class PlanAdminService {
    * by different code from the apply it predicts is worse than no dry run: it
    * would be believed, and it would be believed exactly when it was wrong.
    *
-   * Three rules the loop encodes, each from D1 or D3:
+   * Three rules the loop encodes:
    *
    *  - **A pinned tenant is skipped entirely.** Off-catalogue by deliberate
    *    policy; re-deriving from the plan is the silent revert the pin exists to
@@ -341,6 +355,8 @@ export class PlanAdminService {
         aiModelTier: true,
         maxDocumentBytes: true,
         maxAttachmentBytes: true,
+        maxDocumentUploads: true,
+        maxAnalyticsRangeDays: true,
       },
       orderBy: { name: 'asc' },
     });
@@ -441,6 +457,19 @@ export class PlanAdminService {
       subscriber.maxAttachmentBytes,
       plan.maxAttachmentBytes,
     );
+    diff(
+      'maxDocumentUploads',
+      subscriber.maxDocumentUploads,
+      plan.maxDocumentUploads,
+    );
+    // Diffed like the rest even though it has no over-limit subset: a Super
+    // Admin narrowing the analytics window is taking history away from every
+    // subscriber at once, so it must appear in the projection they approve.
+    diff(
+      'maxAnalyticsRangeDays',
+      subscriber.maxAnalyticsRangeDays,
+      plan.maxAnalyticsRangeDays,
+    );
 
     // The budget is diffed either way — a Super Admin should see a deferred
     // reduction, not have it hidden until it silently lands weeks later.
@@ -520,6 +549,8 @@ export class PlanAdminService {
         aiModelTier: plan.aiModelTier,
         maxDocumentBytes: plan.maxDocumentBytes,
         maxAttachmentBytes: plan.maxAttachmentBytes,
+        maxDocumentUploads: plan.maxDocumentUploads,
+        maxAnalyticsRangeDays: plan.maxAnalyticsRangeDays,
         // Omitted entirely when deferred, rather than written with the old
         // value: `undefined` leaves the column alone, and re-writing what is
         // already there would bump `updated_at` for a change that did not
@@ -548,7 +579,8 @@ export class PlanAdminService {
   }
 
   /**
-   * The proto enum as the string the column holds — §7.3, ADR 0001.
+   * The proto enum as the string the column holds —
+   * `development-conventions.md` §7.3, ADR 0001.
    *
    * Refuses UNSPECIFIED rather than defaulting it. A plan states every grant it
    * makes, and silently writing `FAST` for a field the caller left blank is how

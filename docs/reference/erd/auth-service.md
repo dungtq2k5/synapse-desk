@@ -15,6 +15,8 @@ erDiagram
     BigInt monthly_ai_token_budget 
     BigInt max_document_bytes 
     BigInt max_attachment_bytes 
+    Int max_document_uploads 
+    Int max_analytics_range_days 
     DateTime billing_cycle_start 
     String ai_model_tier 
     String plan_id "❓"
@@ -215,6 +217,8 @@ erDiagram
     String ai_model_tier 
     BigInt max_document_bytes 
     BigInt max_attachment_bytes 
+    Int max_document_uploads 
+    Int max_analytics_range_days 
     Boolean is_active 
     DateTime created_at 
     DateTime updated_at 

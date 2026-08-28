@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import {
   AuditPublisher,
+  MAX_ANALYTICS_RANGE_DAYS,
   MAX_ATTACHMENT_BYTES,
   MAX_ATTACHMENTS_PER_MESSAGE,
 } from '@synapsedesk/common';
@@ -82,11 +83,18 @@ export async function bootstrapE2eTest(): Promise<E2eFixture> {
   // bootstrap — so a one-time install works for exactly the first test in those
   // files and then every later one answers UNAVAILABLE.
   const authReference = moduleRef.get(AuthReferenceService);
-  const armAttachmentLimits = () =>
+  const armAttachmentLimits = () => {
     jest.spyOn(authReference, 'getAttachmentLimits').mockResolvedValue({
       maxBytes: MAX_ATTACHMENT_BYTES,
       maxPerMessage: MAX_ATTACHMENTS_PER_MESSAGE,
     });
+    // Same reasoning, same failure direction: `getAnalyticsRangeDays` reads
+    // auth and fails closed, so without it every analytics read in the service
+    // answers UNAVAILABLE. A suite testing a NARROWED window overrides it.
+    jest
+      .spyOn(authReference, 'getAnalyticsRangeDays')
+      .mockResolvedValue(MAX_ANALYTICS_RANGE_DAYS);
+  };
 
   armAttachmentLimits();
 

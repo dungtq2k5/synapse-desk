@@ -2,7 +2,7 @@
  * A throwaway service-account key for the Storage EMULATOR.
  *
  * The emulator never verifies the signature — it accepts any well-formed
- * credential — but `firebase-admin` refuses to initialise without one, and V4
+ * credential — but `firebase-admin` refuses to initialize without one, and V4
  * signing needs a private key present locally to sign with. So the key has to
  * be real RSA and must not be real Google credentials.
  *

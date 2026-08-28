@@ -18,6 +18,7 @@ import {
 import {
   formatErrorMsg,
   MAX_ATTACHMENT_BYTES,
+  resolveAnalyticsRangeDays,
   MAX_ATTACHMENTS_PER_MESSAGE,
   requireTenant,
 } from '@synapsedesk/common';
@@ -94,7 +95,7 @@ export class AuthReferenceService implements OnModuleInit {
    * `billing.entitlements_changed` already exists and
    * `ai-settings/entitlements.consumer.ts` already consumes it exactly this way
    * — so `getStorageLimitBytes` refuses to cache because it has no consumer,
-   * not because entitlements are uncacheable. Phase 2 can have the safe
+   * not because entitlements are uncacheable. A later phase can have the safe
    * version.
    *
    * **Entries are never evicted, and that is deliberate.** An expired one falls
@@ -126,6 +127,43 @@ export class AuthReferenceService implements OnModuleInit {
       this.client.getService<OrganizationServiceClient>(
         ORGANIZATION_SERVICE_NAME,
       );
+  }
+
+  /**
+   * How far back this tenant may look, in days — `min(platform, plan)`.
+   *
+   * **Resolved by the SHARED `resolveAnalyticsRangeDays`, not by arithmetic
+   * written here.** `ingestion-service` has the same method for its own
+   * analytics surface, and the failure this limit invites is the two disagreeing
+   * — a window honoured on one page and not the other, with each service's own
+   * suite green. Sharing the composition removes the way they could differ;
+   * `analytics-window.contract.ts` is what proves they still do not.
+   *
+   * Uncached, unlike `getAttachmentLimits` beside it: an analytics read is not
+   * the high-volume path an attachment presign is, and a tenant who just had
+   * their window narrowed should not keep the old one for thirty seconds.
+   *
+   * @throws RpcException `UNAVAILABLE` when the organization cannot be read.
+   */
+  async getAnalyticsRangeDays(context: CallerContext): Promise<number> {
+    try {
+      const organization = await firstValueFrom(
+        this.organizationService
+          .getCurrentOrganization({}, packRequestContext(context))
+          .pipe(timeout(GRPC_DEADLINE_MS)),
+      );
+
+      return resolveAnalyticsRangeDays(organization.maxAnalyticsRangeDays);
+    } catch (error) {
+      this.logger.error(
+        `Could not read the analytics range limit: ${formatErrorMsg(error)}`,
+      );
+
+      throw new RpcException({
+        code: status.UNAVAILABLE,
+        message: 'Could not verify the analytics range limit',
+      });
+    }
   }
 
   /**

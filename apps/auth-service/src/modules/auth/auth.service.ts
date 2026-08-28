@@ -42,6 +42,7 @@ import {
   TenantSelectionJwtPayload,
   TwoFactorJwtPayload,
   WEB_ROUTES,
+  FREE_TIER_ORGANIZATION_GRANTS,
 } from '@synapsedesk/common';
 import { JwtService, JwtSignOptions } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -273,6 +274,11 @@ export class AuthService {
           existingOrg ??
           (await tx.organization.create({
             data: {
+              // What a self-service workspace gets, stated rather than
+              // inherited. These used to be seven `@default()`s nobody reading
+              // this file could see, and they set every new tenant to the
+              // PLATFORM CEILING on four dimensions.
+              ...FREE_TIER_ORGANIZATION_GRANTS,
               name: `Workspace for ${email}`,
               slug: generateUniqueOrganizationSlug(email),
               status: OrgStatus.PENDING_ONBOARDING,
@@ -1380,6 +1386,9 @@ export class AuthService {
         })) ||
         (await tx.organization.create({
           data: {
+            // The same free tier as password registration. Two sign-up paths
+            // that provisioned differently would be a difference nobody chose.
+            ...FREE_TIER_ORGANIZATION_GRANTS,
             name: `Workspace for ${identity.email}`,
             slug: generateUniqueOrganizationSlug(identity.email),
             status: OrgStatus.PENDING_ONBOARDING,

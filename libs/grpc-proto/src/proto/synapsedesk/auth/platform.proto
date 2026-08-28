@@ -154,9 +154,7 @@ message CreateGlobalRoleRequest {
   repeated string permission_codes = 3;
 }
 
-// ---------------------------------------------------------------------------
-// Metrics
-// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------- Metrics
 
 message GetPlatformMetricsRequest {}
 
@@ -220,6 +218,8 @@ message SubscriptionPlanResponse {
   AiModelTier ai_model_tier = 7;
   int64 max_document_bytes = 8;
   int64 max_attachment_bytes = 9;
+  int32 max_document_uploads = 16;
+  int32 max_analytics_range_days = 17;
 
   bool is_active = 10;
   repeated SubscriptionPlanPriceResponse prices = 11;
@@ -260,6 +260,8 @@ message CreatePlanRequest {
   AiModelTier ai_model_tier = 6;
   int64 max_document_bytes = 7;
   int64 max_attachment_bytes = 8;
+  int32 max_document_uploads = 11;
+  int32 max_analytics_range_days = 12;
 
   bool is_active = 9;
   repeated CreatePlanPriceInput prices = 10;
@@ -286,6 +288,8 @@ message UpdatePlanRequest {
   optional AiModelTier ai_model_tier = 8;
   optional int64 max_document_bytes = 9;
   optional int64 max_attachment_bytes = 10;
+  optional int32 max_document_uploads = 12;
+  optional int32 max_analytics_range_days = 13;
 
   optional bool is_active = 11;
 }
@@ -299,17 +303,19 @@ message PlanSubscriberProjection {
   // A map keyed by field name so a new grant needs no new field here.
   map<string, string> changes = 3;
 
-  // **Already over a limit the new plan sets.** Not a blocker: D1's rule is
-  // that a limit gates ADMISSION, never TENURE, so these tenants keep
+  // **Already over a limit the new plan sets.** Not a blocker: a limit gates
+  // ADMISSION and never TENURE, so these tenants keep
   // everything they have and are refused their NEXT addition. It is reported
   // so a Super Admin sees the blast radius rather than learning it from a
   // support ticket.
   repeated string over_limit = 4;
 
-  // Skipped entirely: the tenant is off-catalogue by deliberate policy (D3).
+  // Skipped entirely: the tenant is off-catalogue by deliberate policy — a
+  // Super Admin pinned their entitlements, and re-deriving from the plan is the
+  // silent revert the pin exists to prevent.
   bool skipped_pinned = 5;
 
-  // Held back to the next cycle roll rather than applied now (D1): lowering a
+  // Held back to the next cycle roll rather than applied now: lowering a
   // part-spent budget mid-cycle is retroactive in effect.
   bool budget_deferred = 6;
 }

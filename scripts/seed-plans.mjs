@@ -47,6 +47,8 @@ const GRANTS = {
     aiModelTier: 'FAST',
     maxDocumentBytes: 5 * MIB,
     maxAttachmentBytes: 2 * MIB,
+    maxDocumentUploads: 1_000,
+    maxAnalyticsRangeDays: 30,
   },
   pro: {
     maxAgentSeats: 25,
@@ -55,6 +57,8 @@ const GRANTS = {
     aiModelTier: 'QUALITY',
     maxDocumentBytes: 25 * MIB,
     maxAttachmentBytes: 5 * MIB,
+    maxDocumentUploads: 10_000,
+    maxAnalyticsRangeDays: 180,
   },
   enterprise: {
     maxAgentSeats: 200,
@@ -63,6 +67,8 @@ const GRANTS = {
     aiModelTier: 'QUALITY',
     maxDocumentBytes: 100 * MIB,
     maxAttachmentBytes: 10 * MIB,
+    maxDocumentUploads: 100_000,
+    maxAnalyticsRangeDays: 400,
   },
 };
 
@@ -154,7 +160,8 @@ try {
     say(
       `plan ${product.name} (${product.id}) — ${grants.maxAgentSeats} seats, ` +
         `${grants.maxStorageBytes / GIB} GiB, ${grants.aiModelTier}, ` +
-        `doc ${grants.maxDocumentBytes / MIB} MB, att ${grants.maxAttachmentBytes / MIB} MB`,
+        `doc ${grants.maxDocumentBytes / MIB} MB, att ${grants.maxAttachmentBytes / MIB} MB, ` +
+        `${grants.maxDocumentUploads} docs, ${grants.maxAnalyticsRangeDays}d history`,
     );
 
     for (const price of prices.data) {
@@ -169,8 +176,9 @@ try {
       `INSERT INTO subscription_plans
          (name, stripe_product_id, max_agent_seats, max_storage_bytes,
           monthly_ai_token_budget, ai_model_tier, max_document_bytes,
-          max_attachment_bytes, is_active, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, TRUE, now())
+          max_attachment_bytes, max_document_uploads, max_analytics_range_days,
+          is_active, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, TRUE, now())
        ON CONFLICT (stripe_product_id) DO UPDATE SET
          name = EXCLUDED.name,
          max_agent_seats = EXCLUDED.max_agent_seats,
@@ -179,6 +187,8 @@ try {
          ai_model_tier = EXCLUDED.ai_model_tier,
          max_document_bytes = EXCLUDED.max_document_bytes,
          max_attachment_bytes = EXCLUDED.max_attachment_bytes,
+         max_document_uploads = EXCLUDED.max_document_uploads,
+         max_analytics_range_days = EXCLUDED.max_analytics_range_days,
          updated_at = now()
        RETURNING id`,
       [
@@ -190,6 +200,8 @@ try {
         grants.aiModelTier,
         grants.maxDocumentBytes,
         grants.maxAttachmentBytes,
+        grants.maxDocumentUploads,
+        grants.maxAnalyticsRangeDays,
       ],
     );
 

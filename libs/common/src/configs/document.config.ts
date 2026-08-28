@@ -372,6 +372,31 @@ export const NON_LATIN_OCR_LANGUAGES: readonly OcrLanguage[] = ['ja', 'zh'];
 export const DEFAULT_OCR_LANGUAGE: OcrLanguage = 'en';
 
 /**
+ * The most documents ONE tenant may hold — 100,000.
+ *
+ * **The first cap on the corpus itself, rather than on any one upload.**
+ * {@link MAX_DOCUMENT_BYTES} bounds a file and `maxStorageBytes` bounds the
+ * bytes; nothing bounded the COUNT, and the count is what sizes the retrieval
+ * corpus: at {@link MAX_CHUNKS_PER_DOCUMENT} this is the ceiling on vector
+ * points a single tenant can put behind search, which is a running cost rather
+ * than a one-off one.
+ *
+ * **Chosen, not inherited.** Every other grant defaults to a platform ceiling
+ * that already existed; this one had none, so the column's default IS this
+ * number and a plan narrows below it. The alternative — a large sentinel like
+ * `1_000_000` — reads as a real limit nobody hits, and the day somebody does
+ * they are refused by a number no one chose.
+ *
+ * **It is a NARROWING on migration day**, unlike the grants that came before
+ * it. The count was unlimited until this column existed, so a tenant already
+ * above it is instantly over — safe, because a limit gates admission and never
+ * tenure (they keep every document and are refused the next upload), but it is
+ * a real behaviour change and the reason this number is set well above anything
+ * a tenant has reached.
+ */
+export const MAX_DOCUMENTS_PER_TENANT = 100_000;
+
+/**
  * The largest a document may be, in bytes — 100 MB.
  *
  * **The whole FILE at presign, and nothing else.** Three layers read this ONE
@@ -454,9 +479,7 @@ export type DocumentFlagSortableField =
 export type DocumentChunkSortableField =
   (typeof DOCUMENT_CHUNK_SORTABLE_FIELDS)[number];
 
-// ---------------------------------------------------------------------------
-// The ingestion queue
-// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------- The ingestion queue
 
 /**
  * The BullMQ queue name, shared by the producer and the worker.

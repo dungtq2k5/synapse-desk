@@ -8,6 +8,7 @@ import {
   AuditPublisher,
   avatarObjectPath,
   SystemRoleName,
+  FREE_PLAN_SEED,
 } from '@synapsedesk/common';
 import { randomUUID } from 'node:crypto';
 import { StorageReferenceService } from '../../src/modules/storage-client/storage-reference.service';
@@ -218,7 +219,13 @@ export async function bootstrapE2eTest(): Promise<E2eFixture> {
       // **Keep this block above the users delete** or that stops being true.
       prisma.$executeRawUnsafe('DELETE FROM subscription_plan_prices'),
       prisma.$executeRawUnsafe('UPDATE organizations SET plan_id = NULL'),
-      prisma.$executeRawUnsafe('DELETE FROM subscription_plans'),
+      // Every plan EXCEPT the seeded Free row, which is platform data rather
+      // than test data — the seeder creates it at boot and nothing re-runs
+      // between suites, so deleting it would leave the free tier missing for
+      // every test after the first.
+      prisma.$executeRawUnsafe(
+        `DELETE FROM subscription_plans WHERE name <> '${FREE_PLAN_SEED.name}'`,
+      ),
 
       prisma.$executeRawUnsafe('DELETE FROM user_departments'),
       prisma.$executeRawUnsafe('DELETE FROM user_invitations'),

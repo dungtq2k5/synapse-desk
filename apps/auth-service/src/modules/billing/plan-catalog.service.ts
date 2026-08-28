@@ -7,7 +7,8 @@ import { PrismaService } from '../prisma/prisma.service';
  *
  * **Replaces the code catalogue entirely.** `DEFAULT_PLAN_CATALOG` and
  * `loadPlanCatalog` are gone rather than kept beside this: two sources
- * answering one question is what §12.3 and this repo's known-gaps history are
+ * answering one question is what `development-conventions.md` §12.3 and this
+ * repo's known-gaps history are
  * about, and the code one could only ever be right for the environment it was
  * compiled for.
  *
@@ -43,7 +44,8 @@ export class PlanCatalogService {
       include: { plan: true },
     });
 
-    // A soft-deleted plan is not a plan. §7.1 — every read filters it, and a
+    // A soft-deleted plan is not a plan. `development-conventions.md` §7.1 —
+    // every read filters it, and a
     // price still pointing at one is the same unmapped case as a price nobody
     // ever added.
     if (price?.plan.deletedAt !== null) {
@@ -60,6 +62,8 @@ export class PlanCatalogService {
       aiModelTier: price.plan.aiModelTier as PlanEntitlements['aiModelTier'],
       maxDocumentBytes: price.plan.maxDocumentBytes,
       maxAttachmentBytes: price.plan.maxAttachmentBytes,
+      maxDocumentUploads: price.plan.maxDocumentUploads,
+      maxAnalyticsRangeDays: price.plan.maxAnalyticsRangeDays,
       // A label for logs and the billing page. NEVER an authorization input —
       // the same rule the code catalogue carried, and the reason `name` is not
       // what anything joins on.

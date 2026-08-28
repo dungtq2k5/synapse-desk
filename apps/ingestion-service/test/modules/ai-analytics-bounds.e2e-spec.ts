@@ -1,4 +1,8 @@
-import { ANALYTICS_TOP_N, AiGenerationPurpose } from '@synapsedesk/common';
+import {
+  ANALYTICS_TOP_N,
+  AiGenerationPurpose,
+  MAX_ANALYTICS_RANGE_DAYS,
+} from '@synapsedesk/common';
 import { E2eFixture, bootstrapE2eTest, memberContext } from '../utils';
 import {
   buildTenant,
@@ -27,6 +31,7 @@ describe('The AI analytics top-N bound (e2e)', () => {
   let fx: E2eFixture;
   let analytics: AiAnalyticsService;
   let getAiEntitlement: jest.SpyInstance;
+  let getAnalyticsRangeDays: jest.SpyInstance;
 
   let tenant: TenantFixture;
 
@@ -69,6 +74,13 @@ describe('The AI analytics top-N bound (e2e)', () => {
       fx.moduleRef.get(AuthReferenceService),
       'getAiEntitlement',
     );
+    // The tenant's analytics WINDOW, read the same way and failing closed the
+    // same way: without it every range in this suite answers UNAVAILABLE. The
+    // platform ceiling is what "nothing narrowed" means.
+    getAnalyticsRangeDays = jest.spyOn(
+      fx.moduleRef.get(AuthReferenceService),
+      'getAnalyticsRangeDays',
+    );
   });
 
   beforeEach(async () => {
@@ -78,6 +90,7 @@ describe('The AI analytics top-N bound (e2e)', () => {
       budgetMicros: 10_000_000n,
       billingCycleStart: new Date('2026-01-01T00:00:00.000Z'),
     });
+    getAnalyticsRangeDays.mockResolvedValue(MAX_ANALYTICS_RANGE_DAYS);
   });
 
   afterAll(() => fx.close());
@@ -144,7 +157,7 @@ describe('The AI analytics top-N bound (e2e)', () => {
     });
 
     /**
-     * Doc 56 §E — the rate, not the flags.
+     * The rate, not the flags.
      *
      * Written against `ai_generation_daily_stats` directly rather than through
      * the rollup, because what is under test is the READ: which population the
@@ -224,8 +237,8 @@ describe('The AI analytics top-N bound (e2e)', () => {
       it('**8. a corpus gap with no attachment still reads as a gap**', async () => {
         // The other direction, and what stops the fix erasing the metric. If
         // the empty retrieval had nothing to do with an attachment, the rate
-        // must still report it — otherwise §E would have replaced a metric that
-        // over-counted with one that counts nothing.
+        // must still report it — otherwise the attachment carve-out would have
+        // replaced a metric that over-counted with one that counts nothing.
         await stats({
           generations: 10,
           emptyRetrievals: 4,

@@ -201,6 +201,16 @@ default is none of that check's business: `clearStripeProductId` resolves its
 absent case at the mapper precisely because a default at the DTO would clear the
 column on every unrelated PATCH.
 
+**A constant spread into a `create` MUST be typed to the shape it is spread
+INTO, not the shape it came from.** Object literals get excess-property checks;
+**spreads do not**. So `{ ...SOME_CONSTANT }` passed to a Prisma `create` is
+unchecked for extra fields, it compiles, and the failure surfaces at the
+database rather than at the compiler. Measured: spreading a nine-field
+entitlement constant — one field of which is a PLAN's label with no column on
+`organizations` — into an organization create broke 359 tests at runtime with a
+clean build. Derive the narrower shape (`Omit<…>`) and `satisfies` it, so a
+field added to the wider type still has to be answered on both paths.
+
 **A default is VALIDATED, so it must satisfy the field's own bounds.** `@IsOptional()` skips only `undefined` and `null`; a defaulted field always holds a value, so the validators run on it. `limit: number = 0` beside `@Min(1)` rejects every request that omits the field — a 400 on the default path, which no test that always sends the field will catch.
 
 ### 5.3 Guard matrix
@@ -341,6 +351,19 @@ Soft-deletable: `organizations`, `departments`, `users`, `documents`, `tickets`.
 `@unique` is a **database-wide** constraint that knows nothing about `deletedAt`. So soft-deleting `alice@acme.com` **blocks re-registration of that address forever**, and "unique among active rows" **cannot** be expressed as `@unique`.
 
 **Therefore:** for every unique field on a soft-deletable table, the service layer **MUST** own the check — query with `deletedAt: null`, decide, and handle the race (`P2002`) explicitly. Where "unique among active" is the real rule, use a **partial unique index** in migration SQL, as `user_departments` does for `is_primary`.
+
+**But "unique among active" is not always the real rule, and the deciding question is: DOES THE ROW COME BACK?** Both answers appear in `auth-service`, and reading the trap in only one direction gets the other one wrong:
+
+| | Restorable? | Index | Why |
+| :--- | :--- | :--- | :--- |
+| `organizations.slug` | **Yes** — `restoreOrganization` un-deletes a tenant in place and it keeps its slug | full `@unique` | The name must stay RESERVED while offboarded. A partial index would let a new tenant claim `acme` in the meantime, and the restore then fails — or worse, succeeds and leaves two live tenants answering one URL. |
+| `subscription_plans.name` | **No** — a retired plan is never un-retired | partial, `WHERE deleted_at IS NULL` | Reuse is wanted. A full `@unique` would block ever creating another plan called "Pro", permanently, over a row every read filters out. |
+
+Same trap, opposite conclusions. Ask whether anything un-deletes the row before choosing: a partial index on a restorable row is a restore that fails later, and a full `@unique` on a non-restorable one is a name burned forever.
+
+**Adding a NOT NULL column to a SEEDED table is a backfill, not a push.** A grant column carries no `@default()` by design — the point is that every create answers "what does this get" at compile time — and `prisma db push` refuses to add a required column with no default to a table that already has rows. The catalogue tables are seeded, so **every grant added from now on has this shape**: add the column with a temporary default, backfill the existing rows, then `DROP DEFAULT` so the column matches the schema.
+
+**And verify it landed in EVERY database, not the one the suite uses.** Measured: the same push succeeded against the test database (its table was empty) and refused against dev, and the command's own summary said "in sync". An e2e assertion cannot catch that divergence — it only ever connects to one of the two. `npm run db:verify` checks both.
 
 ### 7.3 No enums in `schema.prisma` — ever
 
@@ -814,6 +837,53 @@ expect(cookies.some((c) => c.startsWith(`${twoFaCookieName}=`))).toBe(false);
 
 One suite, run in CI, that boots the **real** auth-service gRPC server (in-process, real Prisma against the test database) and a **real** `@grpc/grpc-js` client against it — no stub on either side — and drives one request through each RPC. This is what catches a proto regenerated on one side and not the other before a deploy does.
 
+### 13.8 Source scans — what they can prove, and when they are the only option
+
+A **source scan** is a test that reads the tree — the shape used by
+`limit-comparison.spec.ts`, `default-branch-pairing.spec.ts`,
+`mapper-naming.spec.ts` and `analytics-window.spec.ts`. It proves that text
+**exists**, never that it **runs**. That single limit decides where it belongs.
+
+Before writing one, ask **what the property actually is**:
+
+| Property | Guard |
+| :--- | :--- |
+| **Testable per instance, quantified over ALL instances** | **Both.** The test covers a site; the scan covers the "every". |
+| Has no runtime expression at all | **The scan is the only guard.** |
+| Has a runtime expression; the scan stands in for a test | **Incomplete — write the test and drop the scan.** |
+
+**The first row is the common case here, and the one where the proxy creeps
+in:** it is easy to pick the instance, write a scan for it, and end up with
+neither guard. `limit-comparison.spec.ts` is the clean example — *"this site
+refuses a `NaN` limit"* is testable at any one of seven call sites, while
+*"every site, including the one added next year"* is not testable at all. Write
+both; they guard different things.
+
+**The second row is why scans exist.** `FREE_TIER_ENTITLEMENTS` referencing
+`MAX_DOCUMENTS_PER_TENANT` rather than the literal `100_000` has **no runtime
+expression** — measured, the two are indistinguishable until the constant moves,
+which is the moment nobody is looking. Same for *"the mapper branch was
+deleted"*: both arrangements put identical bytes on the wire. No test can be
+written that fails today, so the scan is not scaffolding — it is the guard.
+
+**The third row is the ceiling.** Measured: `if (false && days > maxRangeDays)`
+still matches a source pattern looking for that comparison. A scan cannot see
+that the text does not run, so a behavioural property guarded only by a scan is
+guarded only in appearance. `analytics-window.spec.ts` moved OUT of this row
+during doc 60's hardening: sharing `parseAnalyticsRange` made *"both windows
+resolve identically"* true by construction, and what was left to guard —
+*"neither service has grown a local copy back"* — has no runtime expression.
+The replacement is better because the property changed underneath it.
+
+**Every scan MUST carry its own vacuity guards**, because the failure mode of a
+scan is silence:
+
+- **A corpus floor.** A walk over zero files reports exactly what a clean repo
+  reports. Assert the file count, and name one file that must be in it.
+- **A pattern-fires test.** Assert the detector matches the shape it was written
+  for, and does NOT match the corrected form. Without it, test 2 passes for a
+  regex that matches nothing.
+
 ---
 
 ## 14. Definition of Done (pre-PR checklist)
@@ -821,6 +891,7 @@ One suite, run in CI, that boots the **real** auth-service gRPC server (in-proce
 ### Reuse
 
 - [ ] Searched `libs/` before writing any helper; anything cross-service lives there.
+- [ ] Any source scan added carries a corpus floor AND a pattern-fires test, and guards a property that has no runtime expression — or is paired with the test that does (§13.8).
 - [ ] No duplicated enum, timestamp conversion, metadata key, or hashing helper.
 
 ### Security & tenancy

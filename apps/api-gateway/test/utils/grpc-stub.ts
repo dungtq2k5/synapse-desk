@@ -12,6 +12,8 @@ import {
   OTP_SERVICE_NAME,
   OtpServiceClient,
   PLATFORM_SERVICE_NAME,
+  INGESTION_PLATFORM_SERVICE_NAME,
+  type IngestionPlatformServiceClient,
   PlatformServiceClient,
   ROLE_SERVICE_NAME,
   RoleServiceClient,
@@ -88,6 +90,8 @@ export type GrpcStubs = {
   // stubbed through the same map for the same reason: a test asserting on a
   // gateway route should not have to know which service answers it.
   document: MockProxy<DocumentServiceClient>;
+  /** Ingestion's CROSS-TENANT read, behind the same peer as `document`. */
+  ingestionPlatform: MockProxy<IngestionPlatformServiceClient>;
   billing: MockProxy<BillingServiceClient>;
   /** Domain C's Python peer. Stubbed like every other, and for the same
    *  reason: what the gateway can prove alone is its own boundary. */
@@ -138,6 +142,7 @@ export function stubGrpcServices(): GrpcStubFixture {
     audit: mock<AuditServiceClient>(),
 
     document: mock<DocumentServiceClient>(),
+    ingestionPlatform: mock<IngestionPlatformServiceClient>(),
     billing: mock<BillingServiceClient>(),
     rag: mock<RagServiceClient>(),
     notification: mock<NotificationServiceClient>(),
@@ -146,6 +151,7 @@ export function stubGrpcServices(): GrpcStubFixture {
   };
 
   const byServiceName: Record<string, unknown> = {
+    [INGESTION_PLATFORM_SERVICE_NAME]: stubs.ingestionPlatform,
     [AUTH_SERVICE_NAME]: stubs.auth,
     [TWO_FACTOR_AUTH_SERVICE_NAME]: stubs.twoFactor,
     [OTP_SERVICE_NAME]: stubs.otp,

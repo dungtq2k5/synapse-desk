@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { toIsoDay } from '@synapsedesk/common';
 import { CacheService } from '../../common/cache/cache.service';
 
 /**
@@ -82,7 +83,7 @@ export class AnalyticsCacheService {
    * local days and an instant comparison would flip an hour early or late
    * depending on the server's zone.
    */
-  ttlSecondsFor(to: string, today: string = todayIso()): number {
+  ttlSecondsFor(to: string, today: string = toIsoDay(new Date())): number {
     return to < today ? CLOSED_RANGE_TTL_SECONDS : OPEN_RANGE_TTL_SECONDS;
   }
 
@@ -130,9 +131,4 @@ export class AnalyticsCacheService {
       version: input.computedAt ? input.computedAt.getTime() : undefined,
     };
   }
-}
-
-/** Today, as `YYYY-MM-DD`. */
-function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
 }

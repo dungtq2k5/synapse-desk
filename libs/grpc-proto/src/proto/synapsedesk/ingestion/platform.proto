@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package synapsedesk.ingestion;
+
+// Cross-tenant reads of ingestion's tables, for a platform caller.
+//
+// **Its own service, and its own file, for the reason `auth/platform.proto`
+// gives**: nothing here applies a tenant filter, and a method that deliberately
+// spans every customer sitting beside the tenant-scoped document RPCs is one
+// forgotten filter away from being indistinguishable from them. Separating the
+// surface is what makes "this call has no tenant" a property of the service
+// rather than a property somebody remembered.
+//
+// The gateway gates it with `SuperAdminGuard`, exactly as it gates auth's.
+//
+// **One existing exception, named rather than stepped around.**
+// `AiLedgerService.GetAiJobHealth` is untenanted and stays where it is. It
+// returns the scheduler's own heartbeat rows — operational state belonging to
+// the service, not rows belonging to any tenant — so it is not a cross-tenant
+// read of tenant-owned data and the rule this file states does not reach it.
+// The distinction that matters is WHOSE data crosses, not whether a tenant id
+// appears in the request.
+
+// Usage for MANY tenants at once.
+//
+// Batched on purpose: the plan-apply projection asks about every subscriber of
+// a plan, and N sequential calls from a caller with no tenant is precisely the
+// shape this surface exists to avoid.
+message PlatformUsageRequest { repeated string organization_ids = 1; }
+
+message TenantUsage {
+  string organization_id = 1;
+  int64 used_bytes = 2;
+  int32 document_count = 3;
+}
+
+// **One row per REQUESTED id, zero-filled** — never one row per id that happens
+// to own a document.
+//
+// A tenant with no documents produces no `groupBy` row, and a sparse response
+// would make the caller decide what absence means — and the two readings
+// available, "this tenant is under the limit" and "we did not check this
+// tenant", must not arrive as the same message. The request
+// carries the id list, so the surface can make the sparse case unrepresentable
+// and does.
+message PlatformUsageResponse { repeated TenantUsage usage = 1; }
+
+service IngestionPlatformService {
+  rpc GetPlatformUsage(PlatformUsageRequest) returns (PlatformUsageResponse);
+}

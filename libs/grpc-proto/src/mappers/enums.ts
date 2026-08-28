@@ -76,6 +76,13 @@ import { enumBridge } from './enum-bridge';
  * Two different types share the name `Gender` and they are NOT interchangeable:
  * the shared domain enum is a string ('MALE'), the proto one is numeric (1).
  * These two functions are the only sanctioned bridge.
+ *
+ * **Hand-written rather than `enumBridge`, and it has to stay that way.**
+ * `Gender.UNSPECIFIED` is a real domain member, so `fromProtoGender` is TOTAL —
+ * it answers `Gender`, never null. `enumBridge`'s `fromProto` answers
+ * `D | null` and would turn an `UNRECOGNIZED` (-1) into null, where the whole
+ * point here is that an unknown value reads as "unspecified" rather than as an
+ * absence the caller has to handle.
  */
 const PROTO_GENDER_BY_NAME: Record<Gender, ProtoGender> = {
   [Gender.UNSPECIFIED]: ProtoGender.GENDER_UNSPECIFIED,
@@ -117,6 +124,12 @@ export function fromProtoGender(gender: ProtoGender): Gender {
  * was omitted" and must be rejected rather than defaulting to a real purpose.
  * Returns null for that, leaving the "how do I complain?" decision (RpcException
  * vs HTTP 400) to the caller, which knows its own transport.
+ *
+ * **Hand-written rather than `enumBridge`, unlike its neighbours.** `to*` takes
+ * the domain enum and has no fallback: an OTP purpose is chosen in code, never
+ * read out of a `VarChar`, and its call site passes a real domain value. The
+ * narrow parameter is doing work here — which is exactly what stopped being
+ * true for `InvitationStatus` below.
  */
 const DOMAIN_OTP_PURPOSE_BY_PROTO: Record<number, OtpPurpose> = {
   [ProtoOtpPurpose.OTP_PURPOSE_EMAIL_VERIFICATION]:
@@ -145,45 +158,30 @@ export function toProtoOtpPurpose(purpose: OtpPurpose): ProtoOtpPurpose {
 }
 
 /**
- * Bridges the proto's numeric `InvitationStatus` to the domain enum stored as
- * text in `user_invitations.status`.
+ * `user_invitations.status`.
  *
- * Same shape as the OtpPurpose bridge: UNSPECIFIED means "the caller omitted
- * the field" and maps to null, so a filter that was never set cannot silently
- * become a filter for PENDING.
+ * UNSPECIFIED means "the caller omitted the field" and maps to null, so a
+ * filter that was never set cannot silently become a filter for PENDING.
+ *
+ * **`to*` takes a `string` now, and that DELETED a cast rather than adding a
+ * risk.** It used to take `InvitationStatus`, which reads as the safer
+ * signature — but the column is a `VarChar`, so the service call site satisfied
+ * it with `invitation.status as InvitationStatus`. The narrow parameter was
+ * being defeated at the one place it would have mattered.
  */
-const DOMAIN_INVITATION_STATUS_BY_PROTO: Record<number, InvitationStatus> = {
-  [ProtoInvitationStatus.INVITATION_STATUS_PENDING]: InvitationStatus.PENDING,
-  [ProtoInvitationStatus.INVITATION_STATUS_ACCEPTED]: InvitationStatus.ACCEPTED,
-  [ProtoInvitationStatus.INVITATION_STATUS_REVOKED]: InvitationStatus.REVOKED,
-  [ProtoInvitationStatus.INVITATION_STATUS_EXPIRED]: InvitationStatus.EXPIRED,
-};
+const invitationStatus = enumBridge<InvitationStatus, ProtoInvitationStatus>(
+  {
+    [InvitationStatus.PENDING]: ProtoInvitationStatus.INVITATION_STATUS_PENDING,
+    [InvitationStatus.ACCEPTED]:
+      ProtoInvitationStatus.INVITATION_STATUS_ACCEPTED,
+    [InvitationStatus.REVOKED]: ProtoInvitationStatus.INVITATION_STATUS_REVOKED,
+    [InvitationStatus.EXPIRED]: ProtoInvitationStatus.INVITATION_STATUS_EXPIRED,
+  },
+  ProtoInvitationStatus.INVITATION_STATUS_UNSPECIFIED,
+);
 
-const PROTO_INVITATION_STATUS_BY_DOMAIN: Record<
-  InvitationStatus,
-  ProtoInvitationStatus
-> = {
-  [InvitationStatus.PENDING]: ProtoInvitationStatus.INVITATION_STATUS_PENDING,
-  [InvitationStatus.ACCEPTED]: ProtoInvitationStatus.INVITATION_STATUS_ACCEPTED,
-  [InvitationStatus.REVOKED]: ProtoInvitationStatus.INVITATION_STATUS_REVOKED,
-  [InvitationStatus.EXPIRED]: ProtoInvitationStatus.INVITATION_STATUS_EXPIRED,
-};
-
-export function fromProtoInvitationStatus(
-  status: ProtoInvitationStatus,
-): InvitationStatus | null {
-  return DOMAIN_INVITATION_STATUS_BY_PROTO[status] ?? null;
-}
-
-export function toProtoInvitationStatus(
-  status: InvitationStatus,
-): ProtoInvitationStatus {
-  return PROTO_INVITATION_STATUS_BY_DOMAIN[status];
-}
-
-// ---------------------------------------------------------------------------
-// Tenant lifecycle
-// ---------------------------------------------------------------------------
+export const toProtoInvitationStatus = invitationStatus.toProto;
+export const fromProtoInvitationStatus = invitationStatus.fromProto;
 
 /**
  * `UNSPECIFIED` maps to null rather than to a status.
@@ -193,39 +191,27 @@ export function toProtoInvitationStatus(
  * unfreeze a tenant, and defaulting to FROZEN would lock one out. The caller is
  * given null and decides how to complain, because it knows its own transport.
  */
-const DOMAIN_ORG_STATUS_BY_PROTO: Record<number, OrgStatus> = {
-  [ProtoOrgStatus.ORG_STATUS_PENDING_ONBOARDING]: OrgStatus.PENDING_ONBOARDING,
-  [ProtoOrgStatus.ORG_STATUS_ACTIVE]: OrgStatus.ACTIVE,
-  [ProtoOrgStatus.ORG_STATUS_SUSPENDED_PAST_DUE]: OrgStatus.SUSPENDED_PAST_DUE,
-  [ProtoOrgStatus.ORG_STATUS_FROZEN]: OrgStatus.FROZEN,
-};
-
-const PROTO_ORG_STATUS_BY_DOMAIN: Record<OrgStatus, ProtoOrgStatus> = {
-  [OrgStatus.PENDING_ONBOARDING]: ProtoOrgStatus.ORG_STATUS_PENDING_ONBOARDING,
-  [OrgStatus.ACTIVE]: ProtoOrgStatus.ORG_STATUS_ACTIVE,
-  [OrgStatus.SUSPENDED_PAST_DUE]: ProtoOrgStatus.ORG_STATUS_SUSPENDED_PAST_DUE,
-  [OrgStatus.FROZEN]: ProtoOrgStatus.ORG_STATUS_FROZEN,
-};
-
-export function fromProtoOrgStatus(status: ProtoOrgStatus): OrgStatus | null {
-  return DOMAIN_ORG_STATUS_BY_PROTO[status] ?? null;
-}
+const orgStatus = enumBridge<OrgStatus, ProtoOrgStatus>(
+  {
+    [OrgStatus.PENDING_ONBOARDING]:
+      ProtoOrgStatus.ORG_STATUS_PENDING_ONBOARDING,
+    [OrgStatus.ACTIVE]: ProtoOrgStatus.ORG_STATUS_ACTIVE,
+    [OrgStatus.SUSPENDED_PAST_DUE]:
+      ProtoOrgStatus.ORG_STATUS_SUSPENDED_PAST_DUE,
+    [OrgStatus.FROZEN]: ProtoOrgStatus.ORG_STATUS_FROZEN,
+  },
+  ProtoOrgStatus.ORG_STATUS_UNSPECIFIED,
+);
 
 /**
- * Takes the domain enum, but also the bare `string` Prisma hands back for a
- * `VarChar` column (conventions §7.3 — enumerated columns are strings in Postgres).
- *
- * An unknown string maps to UNSPECIFIED rather than throwing: this runs on the
- * RESPONSE path, and a row carrying a status nobody recognises should surface
- * as "unset" to the client rather than failing a read the caller is entitled
- * to. The write paths validate before storing, so it should not arise.
+ * `to*` takes the bare `string` Prisma hands back for a `VarChar` column
+ * (conventions §7.3), and an unknown one maps to UNSPECIFIED rather than
+ * throwing: this runs on the RESPONSE path, and a row carrying a status nobody
+ * recognizes should surface as "unset" rather than failing a read the caller is
+ * entitled to. The write paths validate before storing, so it should not arise.
  */
-export function toProtoOrgStatus(status: OrgStatus | string): ProtoOrgStatus {
-  return (
-    PROTO_ORG_STATUS_BY_DOMAIN[status as OrgStatus] ??
-    ProtoOrgStatus.ORG_STATUS_UNSPECIFIED
-  );
-}
+export const toProtoOrgStatus = orgStatus.toProto;
+export const fromProtoOrgStatus = orgStatus.fromProto;
 
 /**
  * The AI tier
@@ -235,157 +221,66 @@ export function toProtoOrgStatus(status: OrgStatus | string): ProtoOrgStatus {
  * field as FAST would silently downgrade a paying customer and reading it as
  * QUALITY would hand the expensive model to everyone.
  */
-const DOMAIN_AI_MODEL_TIER_BY_PROTO: Record<number, AiModelTier> = {
-  [ProtoAiModelTier.AI_MODEL_TIER_FAST]: 'FAST',
-  [ProtoAiModelTier.AI_MODEL_TIER_QUALITY]: 'QUALITY',
-};
+const aiModelTier = enumBridge<AiModelTier, ProtoAiModelTier>(
+  {
+    FAST: ProtoAiModelTier.AI_MODEL_TIER_FAST,
+    QUALITY: ProtoAiModelTier.AI_MODEL_TIER_QUALITY,
+  },
+  ProtoAiModelTier.AI_MODEL_TIER_UNSPECIFIED,
+);
 
-const PROTO_AI_MODEL_TIER_BY_DOMAIN: Record<AiModelTier, ProtoAiModelTier> = {
-  FAST: ProtoAiModelTier.AI_MODEL_TIER_FAST,
-  QUALITY: ProtoAiModelTier.AI_MODEL_TIER_QUALITY,
-};
-
-export function fromProtoAiModelTier(
-  tier: ProtoAiModelTier,
-): AiModelTier | null {
-  return DOMAIN_AI_MODEL_TIER_BY_PROTO[tier] ?? null;
-}
+export const toProtoAiModelTier = aiModelTier.toProto;
+export const fromProtoAiModelTier = aiModelTier.fromProto;
 
 /**
- * Takes a plain `string`, not `AiModelTier | string` — that union collapses to
- * `string` and the linter is right to say so. The parameter is wide ON PURPOSE:
- * the caller is usually handing over a Prisma `VarChar` column, and an
- * unrecognized value maps to UNSPECIFIED rather than throwing, for the same
- * reason `toProtoOrgStatus` does.
- */
-export function toProtoAiModelTier(tier: string): ProtoAiModelTier {
-  return (
-    PROTO_AI_MODEL_TIER_BY_DOMAIN[tier as AiModelTier] ??
-    ProtoAiModelTier.AI_MODEL_TIER_UNSPECIFIED
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Notification preferences
-// ---------------------------------------------------------------------------
-
-/**
- * The three enums a preference is made of.
+ * `notifications.priority` — a `VarChar` with a `"NORMAL"` default, which is
+ * why `to*` takes a bare string.
  *
- * Same UNSPECIFIED-is-null rule as the pairs above, and the `to*` direction is
- * deliberately wide (`string`) for the same reason: the caller is usually
- * handing over a Prisma `VarChar` column, because enumerated columns are
- * strings in Postgres.
- *
- * The asymmetry is the point. `to*` is the RESPONSE path and must not throw —
- * a row carrying a value nobody recognizes should read as "unset" rather than
- * failing a read the user is entitled to. `from*` returns null so the caller
- * decides how to complain, because it knows its own transport.
+ * Null for UNSPECIFIED on the way back, and note which way the damage runs:
+ * `CRITICAL` is the level that bypasses quiet hours and digest batching, so
+ * reading an unset field as `NORMAL` would mute an alert meant to wake someone,
+ * at 3am, silently. Reading it as `CRITICAL` would do the opposite and wake
+ * everyone. Null forces the caller to decide.
  */
-const DOMAIN_PRIORITY_BY_PROTO: Record<number, NotificationPriority> = {
-  [ProtoNotificationPriority.NOTIFICATION_PRIORITY_LOW]:
-    NotificationPriority.LOW,
-  [ProtoNotificationPriority.NOTIFICATION_PRIORITY_NORMAL]:
-    NotificationPriority.NORMAL,
-  [ProtoNotificationPriority.NOTIFICATION_PRIORITY_HIGH]:
-    NotificationPriority.HIGH,
-  [ProtoNotificationPriority.NOTIFICATION_PRIORITY_CRITICAL]:
-    NotificationPriority.CRITICAL,
-};
-
-const PROTO_PRIORITY_BY_DOMAIN: Record<
+const notificationPriority = enumBridge<
   NotificationPriority,
   ProtoNotificationPriority
-> = {
-  [NotificationPriority.LOW]:
-    ProtoNotificationPriority.NOTIFICATION_PRIORITY_LOW,
-  [NotificationPriority.NORMAL]:
-    ProtoNotificationPriority.NOTIFICATION_PRIORITY_NORMAL,
-  [NotificationPriority.HIGH]:
-    ProtoNotificationPriority.NOTIFICATION_PRIORITY_HIGH,
-  [NotificationPriority.CRITICAL]:
-    ProtoNotificationPriority.NOTIFICATION_PRIORITY_CRITICAL,
-};
+>(
+  {
+    [NotificationPriority.LOW]:
+      ProtoNotificationPriority.NOTIFICATION_PRIORITY_LOW,
+    [NotificationPriority.NORMAL]:
+      ProtoNotificationPriority.NOTIFICATION_PRIORITY_NORMAL,
+    [NotificationPriority.HIGH]:
+      ProtoNotificationPriority.NOTIFICATION_PRIORITY_HIGH,
+    [NotificationPriority.CRITICAL]:
+      ProtoNotificationPriority.NOTIFICATION_PRIORITY_CRITICAL,
+  },
+  ProtoNotificationPriority.NOTIFICATION_PRIORITY_UNSPECIFIED,
+);
 
-/**
- * Null for UNSPECIFIED, like every other `from*` here — and note which way the
- * damage runs.
- *
- * `CRITICAL` is the level that bypasses quiet hours and digest batching, so
- * reading an unset field as `NORMAL` would mute an alert that was meant to
- * wake someone, at 3am, silently. Reading it as `CRITICAL` would do the
- * opposite and wake everyone. Null forces the caller to decide.
- */
-export function fromProtoNotificationPriority(
-  priority: ProtoNotificationPriority,
-): NotificationPriority | null {
-  return DOMAIN_PRIORITY_BY_PROTO[priority] ?? null;
-}
+export const toProtoNotificationPriority = notificationPriority.toProto;
+export const fromProtoNotificationPriority = notificationPriority.fromProto;
 
-/**
- * Takes a bare `string`: `notifications.priority` is a `VarChar` with a
- * `"NORMAL"` default, so this is what Prisma hands back.
- */
-export function toProtoNotificationPriority(
-  priority: string,
-): ProtoNotificationPriority {
-  return (
-    PROTO_PRIORITY_BY_DOMAIN[priority as NotificationPriority] ??
-    ProtoNotificationPriority.NOTIFICATION_PRIORITY_UNSPECIFIED
-  );
-}
-
-const DOMAIN_CHANNEL_BY_PROTO: Record<number, NotificationChannel> = {
-  [ProtoNotificationChannel.NOTIFICATION_CHANNEL_IN_APP]:
-    NotificationChannel.IN_APP,
-  [ProtoNotificationChannel.NOTIFICATION_CHANNEL_EMAIL]:
-    NotificationChannel.EMAIL,
-  [ProtoNotificationChannel.NOTIFICATION_CHANNEL_SMS]: NotificationChannel.SMS,
-  [ProtoNotificationChannel.NOTIFICATION_CHANNEL_WEBHOOK]:
-    NotificationChannel.WEBHOOK,
-};
-
-const PROTO_CHANNEL_BY_DOMAIN: Record<
+const notificationChannel = enumBridge<
   NotificationChannel,
   ProtoNotificationChannel
-> = {
-  [NotificationChannel.IN_APP]:
-    ProtoNotificationChannel.NOTIFICATION_CHANNEL_IN_APP,
-  [NotificationChannel.EMAIL]:
-    ProtoNotificationChannel.NOTIFICATION_CHANNEL_EMAIL,
-  [NotificationChannel.SMS]: ProtoNotificationChannel.NOTIFICATION_CHANNEL_SMS,
-  [NotificationChannel.WEBHOOK]:
-    ProtoNotificationChannel.NOTIFICATION_CHANNEL_WEBHOOK,
-};
+>(
+  {
+    [NotificationChannel.IN_APP]:
+      ProtoNotificationChannel.NOTIFICATION_CHANNEL_IN_APP,
+    [NotificationChannel.EMAIL]:
+      ProtoNotificationChannel.NOTIFICATION_CHANNEL_EMAIL,
+    [NotificationChannel.SMS]:
+      ProtoNotificationChannel.NOTIFICATION_CHANNEL_SMS,
+    [NotificationChannel.WEBHOOK]:
+      ProtoNotificationChannel.NOTIFICATION_CHANNEL_WEBHOOK,
+  },
+  ProtoNotificationChannel.NOTIFICATION_CHANNEL_UNSPECIFIED,
+);
 
-export function fromProtoNotificationChannel(
-  channel: ProtoNotificationChannel,
-): NotificationChannel | null {
-  return DOMAIN_CHANNEL_BY_PROTO[channel] ?? null;
-}
-
-export function toProtoNotificationChannel(
-  channel: string,
-): ProtoNotificationChannel {
-  return (
-    PROTO_CHANNEL_BY_DOMAIN[channel as NotificationChannel] ??
-    ProtoNotificationChannel.NOTIFICATION_CHANNEL_UNSPECIFIED
-  );
-}
-
-const DOMAIN_DIGEST_BY_PROTO: Record<number, DigestMode> = {
-  [ProtoDigestMode.DIGEST_MODE_IMMEDIATE]: DigestMode.IMMEDIATE,
-  [ProtoDigestMode.DIGEST_MODE_HOURLY]: DigestMode.HOURLY,
-  [ProtoDigestMode.DIGEST_MODE_DAILY]: DigestMode.DAILY,
-  [ProtoDigestMode.DIGEST_MODE_OFF]: DigestMode.OFF,
-};
-
-const PROTO_DIGEST_BY_DOMAIN: Record<DigestMode, ProtoDigestMode> = {
-  [DigestMode.IMMEDIATE]: ProtoDigestMode.DIGEST_MODE_IMMEDIATE,
-  [DigestMode.HOURLY]: ProtoDigestMode.DIGEST_MODE_HOURLY,
-  [DigestMode.DAILY]: ProtoDigestMode.DIGEST_MODE_DAILY,
-  [DigestMode.OFF]: ProtoDigestMode.DIGEST_MODE_OFF,
-};
+export const toProtoNotificationChannel = notificationChannel.toProto;
+export const fromProtoNotificationChannel = notificationChannel.fromProto;
 
 /**
  * Null for UNSPECIFIED, and that is load-bearing rather than incidental: an
@@ -393,46 +288,32 @@ const PROTO_DIGEST_BY_DOMAIN: Record<DigestMode, ProtoDigestMode> = {
  * Reading "unset" as `IMMEDIATE` would switch a user off a digest they chose,
  * on a PATCH that never mentioned it.
  */
-export function fromProtoDigestMode(
-  digest: ProtoDigestMode,
-): DigestMode | null {
-  return DOMAIN_DIGEST_BY_PROTO[digest] ?? null;
-}
+const digestMode = enumBridge<DigestMode, ProtoDigestMode>(
+  {
+    [DigestMode.IMMEDIATE]: ProtoDigestMode.DIGEST_MODE_IMMEDIATE,
+    [DigestMode.HOURLY]: ProtoDigestMode.DIGEST_MODE_HOURLY,
+    [DigestMode.DAILY]: ProtoDigestMode.DIGEST_MODE_DAILY,
+    [DigestMode.OFF]: ProtoDigestMode.DIGEST_MODE_OFF,
+  },
+  ProtoDigestMode.DIGEST_MODE_UNSPECIFIED,
+);
 
-export function toProtoDigestMode(digest: string): ProtoDigestMode {
-  return (
-    PROTO_DIGEST_BY_DOMAIN[digest as DigestMode] ??
-    ProtoDigestMode.DIGEST_MODE_UNSPECIFIED
-  );
-}
+export const toProtoDigestMode = digestMode.toProto;
+export const fromProtoDigestMode = digestMode.fromProto;
 
-const DOMAIN_SOURCE_BY_PROTO: Record<number, PreferenceSource> = {
-  [ProtoPreferenceSource.PREFERENCE_SOURCE_EXPLICIT]: PreferenceSource.EXPLICIT,
-  [ProtoPreferenceSource.PREFERENCE_SOURCE_WILDCARD]: PreferenceSource.WILDCARD,
-  [ProtoPreferenceSource.PREFERENCE_SOURCE_DEFAULT]: PreferenceSource.DEFAULT,
-};
-
-const PROTO_SOURCE_BY_DOMAIN: Record<PreferenceSource, ProtoPreferenceSource> =
+const preferenceSource = enumBridge<PreferenceSource, ProtoPreferenceSource>(
   {
     [PreferenceSource.EXPLICIT]:
       ProtoPreferenceSource.PREFERENCE_SOURCE_EXPLICIT,
     [PreferenceSource.WILDCARD]:
       ProtoPreferenceSource.PREFERENCE_SOURCE_WILDCARD,
     [PreferenceSource.DEFAULT]: ProtoPreferenceSource.PREFERENCE_SOURCE_DEFAULT,
-  };
+  },
+  ProtoPreferenceSource.PREFERENCE_SOURCE_UNSPECIFIED,
+);
 
-export function fromProtoPreferenceSource(
-  source: ProtoPreferenceSource,
-): PreferenceSource | null {
-  return DOMAIN_SOURCE_BY_PROTO[source] ?? null;
-}
-
-export function toProtoPreferenceSource(source: string): ProtoPreferenceSource {
-  return (
-    PROTO_SOURCE_BY_DOMAIN[source as PreferenceSource] ??
-    ProtoPreferenceSource.PREFERENCE_SOURCE_UNSPECIFIED
-  );
-}
+export const toProtoPreferenceSource = preferenceSource.toProto;
+export const fromProtoPreferenceSource = preferenceSource.fromProto;
 
 /**
  * `notifications.type` — the ORIGINATING event.
@@ -487,10 +368,6 @@ const notificationResourceType = enumBridge<
 export const toProtoNotificationResourceType = notificationResourceType.toProto;
 export const fromProtoNotificationResourceType =
   notificationResourceType.fromProto;
-
-// ---------------------------------------------------------------------------
-// Pagination
-// ---------------------------------------------------------------------------
 
 /** `documents.status`. */
 const documentStatus = enumBridge<DocumentStatus, ProtoDocumentStatus>(
@@ -640,10 +517,6 @@ const aiGenerationOutcome = enumBridge<
 export const toProtoAiGenerationOutcome = aiGenerationOutcome.toProto;
 export const fromProtoAiGenerationOutcome = aiGenerationOutcome.fromProto;
 
-// ---------------------------------------------------------------------------
-// Domain B — the audit trail
-// ---------------------------------------------------------------------------
-
 /** `audit_logs.action`. */
 const auditAction = enumBridge<AuditAction, ProtoAuditAction>(
   {
@@ -750,10 +623,6 @@ const auditResourceType = enumBridge<AuditResourceType, ProtoAuditResourceType>(
 export const toProtoAuditResourceType = auditResourceType.toProto;
 export const fromProtoAuditResourceType = auditResourceType.fromProto;
 
-// ---------------------------------------------------------------------------
-// Domain B — analytics exports
-// ---------------------------------------------------------------------------
-
 const analyticsExportKind = enumBridge<
   AnalyticsExportKind,
   ProtoAnalyticsExportKind
@@ -791,10 +660,6 @@ const analyticsExportStatus = enumBridge<
 
 export const toProtoAnalyticsExportStatus = analyticsExportStatus.toProto;
 export const fromProtoAnalyticsExportStatus = analyticsExportStatus.fromProto;
-
-// ---------------------------------------------------------------------------
-// Domain B — tickets
-// ---------------------------------------------------------------------------
 
 /** `PURPOSE_POLICY` keys — what an object is stored for. */
 const storagePurpose = enumBridge<StoragePurpose, ProtoStoragePurpose>(
@@ -879,10 +744,6 @@ const ticketSource = enumBridge<TicketSource, ProtoTicketSource>(
 
 export const toProtoTicketSource = ticketSource.toProto;
 export const fromProtoTicketSource = ticketSource.fromProto;
-
-// ---------------------------------------------------------------------------
-// The answer status — three types for one fact
-// ---------------------------------------------------------------------------
 
 /**
  * `ticket_messages.answer_status`, against the `synapsedesk.ticket` enum.

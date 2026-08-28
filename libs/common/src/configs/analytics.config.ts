@@ -332,6 +332,33 @@ export const ANALYTICS_GRANULARITIES = Object.values(AnalyticsGranularity);
 export const MAX_ANALYTICS_RANGE_DAYS = 400;
 
 /**
+ * The tenant's analytics window, composed against the platform's.
+ *
+ * **One function, called by BOTH analytics services**, because the failure this
+ * limit invites is divergence rather than absence: `ai-analytics.service.ts` and
+ * `analytics.service.ts` each guard their own `parseRange`, and a window
+ * honoured by one and not the other means the history a tenant can see depends
+ * on which page they opened. Two correct-looking implementations would each
+ * pass their own suite.
+ *
+ * `?? 0` and not `?? MAX_ANALYTICS_RANGE_DAYS`: the column is NOT NULL and the
+ * proto field is not `optional`, so absent is a wire that lost a field, and
+ * refusing every range is the loud direction — the same asymmetry the byte
+ * limits carry.
+ *
+ * @param granted the tenant's `maxAnalyticsRangeDays`, off `OrganizationResponse`.
+ * @returns the number of days a range may span.
+ *
+ * @example
+ * resolveAnalyticsRangeDays(30)        // 30  — the plan narrows
+ * resolveAnalyticsRangeDays(9_000)     // 400 — the platform still binds
+ * resolveAnalyticsRangeDays(undefined) // 0   — refuses, rather than widening
+ */
+export function resolveAnalyticsRangeDays(granted: number | undefined): number {
+  return Math.min(MAX_ANALYTICS_RANGE_DAYS, granted ?? 0);
+}
+
+/**
  * How many rows a top-N list returns — knowledge gaps, document lists.
  *
  * Its own constant rather than `DEFAULT_SEARCH`: these lists are read as "the
@@ -344,9 +371,7 @@ export const ANALYTICS_TOP_N = {
   DEFAULT: 20,
 } as const;
 
-// ---------------------------------------------------------------------------
-// Export
-// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------- Export
 
 /**
  * The export queue and its job name, declared once.

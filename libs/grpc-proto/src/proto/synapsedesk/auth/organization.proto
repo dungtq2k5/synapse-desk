@@ -64,6 +64,16 @@ message OrganizationResponse {
   // every plan states it, so every tenant carries it.
   int64 max_attachment_bytes = 19;
 
+  // The PLAN's count and window grants, on the same NOT-optional terms.
+  //
+  // `max_analytics_range_days` rides here rather than on a dedicated call
+  // because BOTH analytics surfaces — ingestion's and ticket's — already read
+  // this message for their own limits, and a window honoured by one service and
+  // not the other is worse than no window: the number a tenant sees would depend
+  // on which page they opened.
+  int32 max_document_uploads = 20;
+  int32 max_analytics_range_days = 21;
+
   google.protobuf.Timestamp created_at = 12;
   google.protobuf.Timestamp updated_at = 13;
 }

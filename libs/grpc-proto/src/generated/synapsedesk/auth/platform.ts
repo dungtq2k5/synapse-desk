@@ -234,6 +234,8 @@ export interface SubscriptionPlanResponse {
   aiModelTier: AiModelTier;
   maxDocumentBytes: number;
   maxAttachmentBytes: number;
+  maxDocumentUploads: number;
+  maxAnalyticsRangeDays: number;
   isActive: boolean;
   prices: SubscriptionPlanPriceResponse[];
   /**
@@ -276,6 +278,8 @@ export interface CreatePlanRequest {
   aiModelTier: AiModelTier;
   maxDocumentBytes: number;
   maxAttachmentBytes: number;
+  maxDocumentUploads: number;
+  maxAnalyticsRangeDays: number;
   isActive: boolean;
   prices: CreatePlanPriceInput[];
 }
@@ -301,6 +305,8 @@ export interface UpdatePlanRequest {
   aiModelTier?: AiModelTier | undefined;
   maxDocumentBytes?: number | undefined;
   maxAttachmentBytes?: number | undefined;
+  maxDocumentUploads?: number | undefined;
+  maxAnalyticsRangeDays?: number | undefined;
   isActive?: boolean | undefined;
 }
 
@@ -314,17 +320,21 @@ export interface PlanSubscriberProjection {
    */
   changes: { [key: string]: string };
   /**
-   * *Already over a limit the new plan sets.** Not a blocker: D1's rule is
-   * that a limit gates ADMISSION, never TENURE, so these tenants keep
+   * *Already over a limit the new plan sets.** Not a blocker: a limit gates
+   * ADMISSION and never TENURE, so these tenants keep
    * everything they have and are refused their NEXT addition. It is reported
    * so a Super Admin sees the blast radius rather than learning it from a
    * support ticket.
    */
   overLimit: string[];
-  /** Skipped entirely: the tenant is off-catalogue by deliberate policy (D3). */
+  /**
+   * Skipped entirely: the tenant is off-catalogue by deliberate policy — a
+   * Super Admin pinned their entitlements, and re-deriving from the plan is the
+   * silent revert the pin exists to prevent.
+   */
   skippedPinned: boolean;
   /**
-   * Held back to the next cycle roll rather than applied now (D1): lowering a
+   * Held back to the next cycle roll rather than applied now: lowering a
    * part-spent budget mid-cycle is retroactive in effect.
    */
   budgetDeferred: boolean;

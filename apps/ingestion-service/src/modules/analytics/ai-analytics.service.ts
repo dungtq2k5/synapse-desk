@@ -1,6 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { RpcException } from '@nestjs/microservices';
-import { status } from '@grpc/grpc-js';
 import {
   AiGenerationPurpose,
   addAiStats,
@@ -14,10 +12,13 @@ import {
   attachmentGroundedRate,
   emptyRetrievalRate,
   failureRate,
-  MAX_ANALYTICS_RANGE_DAYS,
   Mean,
   meanLatencyMs,
   Rate,
+  bucketKey,
+  granularityOf,
+  newestComputedAt,
+  parseAnalyticsRange,
   requireTenant,
 } from '@synapsedesk/common';
 import {
@@ -80,7 +81,11 @@ export class AiAnalyticsService {
     context: CallerContext,
   ): Promise<AiUsageResponse> {
     const organizationId = requireTenant(context);
-    const range = parseRange(request.from, request.to);
+    const range = parseAnalyticsRange(
+      request.from,
+      request.to,
+      await this.authReference.getAnalyticsRangeDays(context),
+    );
 
     const [rows, entitlement, tier, dataThrough] = await Promise.all([
       this.dailyRows(organizationId, range),
@@ -146,7 +151,11 @@ export class AiAnalyticsService {
     context: CallerContext,
   ): Promise<KnowledgeGapsResponse> {
     const organizationId = requireTenant(context);
-    const range = parseRange(request.from, request.to);
+    const range = parseAnalyticsRange(
+      request.from,
+      request.to,
+      await this.authReference.getAnalyticsRangeDays(context),
+    );
 
     const rows = answeringOnly(await this.dailyRows(organizationId, range));
     const totals = sumAll(rows);
@@ -383,69 +392,6 @@ function bucketByDay(
   return buckets;
 }
 
-function bucketKey(day: Date, granularity: AnalyticsGranularity): string {
-  const iso = day.toISOString().slice(0, 10);
-
-  if (granularity === AnalyticsGranularity.DAY) return iso;
-  if (granularity === AnalyticsGranularity.MONTH)
-    return `${iso.slice(0, 7)}-01`;
-
-  const monday = new Date(day);
-  monday.setUTCDate(monday.getUTCDate() - ((monday.getUTCDay() + 6) % 7));
-
-  return monday.toISOString().slice(0, 10);
-}
-
-function granularityOf(value: string | undefined): AnalyticsGranularity {
-  const granularity = value as AnalyticsGranularity | undefined;
-
-  return granularity &&
-    Object.values(AnalyticsGranularity).includes(granularity)
-    ? granularity
-    : AnalyticsGranularity.DAY;
-}
-
-function parseRange(from: string, to: string): { from: Date; to: Date } {
-  const start = parseDay(from, 'from');
-  const end = parseDay(to, 'to');
-
-  if (start > end) {
-    throw new RpcException({
-      code: status.INVALID_ARGUMENT,
-      message: '`from` must not be after `to`',
-    });
-  }
-
-  const days = Math.round((end.getTime() - start.getTime()) / 86_400_000) + 1;
-  if (days > MAX_ANALYTICS_RANGE_DAYS) {
-    throw new RpcException({
-      code: status.INVALID_ARGUMENT,
-      message: `Range is ${days} days; the maximum is ${MAX_ANALYTICS_RANGE_DAYS}`,
-    });
-  }
-
-  return { from: start, to: end };
-}
-
-function parseDay(value: string, field: string): Date {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value ?? '')) {
-    throw new RpcException({
-      code: status.INVALID_ARGUMENT,
-      message: `\`${field}\` must be a YYYY-MM-DD date`,
-    });
-  }
-
-  const parsed = new Date(`${value}T00:00:00.000Z`);
-  if (Number.isNaN(parsed.getTime())) {
-    throw new RpcException({
-      code: status.INVALID_ARGUMENT,
-      message: `\`${field}\` is not a real date`,
-    });
-  }
-
-  return parsed;
-}
-
 /**
  * Bounded, and defaulted when a client sends 0 — proto3 has no "absent" int.
  *
@@ -460,15 +406,16 @@ function clampLimit(limit: number | undefined): number {
   return Math.min(limit, ANALYTICS_TOP_N.MAX);
 }
 
+/**
+ * How fresh this dashboard is, on the wire.
+ *
+ * The fold is shared; the proto conversion stays here because `libs/` cannot
+ * import `libs/grpc-proto`.
+ */
 function latestComputedAt(rows: AiDailyRow[]) {
-  if (rows.length === 0) return undefined;
+  const newest = newestComputedAt(rows);
 
-  return toProtoTimestamp(
-    rows.reduce(
-      (latest, row) => (row.computedAt > latest ? row.computedAt : latest),
-      rows[0].computedAt,
-    ),
-  );
+  return newest ? toProtoTimestamp(newest) : undefined;
 }
 
 function toAiRateValue(value: Rate): AiRateValue {

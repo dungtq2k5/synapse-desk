@@ -125,9 +125,7 @@ export class DocumentsService {
       configService.getOrThrow<number>('DOWNLOAD_URL_TTL_SECONDS') * 1000;
   }
 
-  // -------------------------------------------------------------------------
-  // Upload — presign, then confirm
-  // -------------------------------------------------------------------------
+  // ---------------------------------------------------------------- Upload — presign, then confirm
 
   /**
    * Gate on quota, THEN sign.
@@ -148,11 +146,14 @@ export class DocumentsService {
     // refused for the cost of a comparison.
     this.assertUploadable(request.contentType, request.sizeBytes);
 
-    const [limitBytes, usedBytes, sizeLimitBytes] = await Promise.all([
-      this.authReference.getStorageLimitBytes(context),
-      this.usedBytes(organizationId),
-      this.authReference.getDocumentSizeLimitBytes(context),
-    ]);
+    const [limitBytes, usedBytes, sizeLimitBytes, countLimit, documentCount] =
+      await Promise.all([
+        this.authReference.getStorageLimitBytes(context),
+        this.usedBytes(organizationId),
+        this.authReference.getDocumentSizeLimitBytes(context),
+        this.authReference.getDocumentCountLimit(context),
+        this.documentCount(organizationId),
+      ]);
 
     // The TENANT ceiling, which needed a read. Separate from the storage quota
     // beside it and separate from the platform check above: this one is "your
@@ -173,6 +174,22 @@ export class DocumentsService {
       throw new RpcException({
         code: status.RESOURCE_EXHAUSTED,
         message: `This workspace has used ${usedBytes} of ${limitBytes} bytes of document storage`,
+      });
+    }
+
+    // The COUNT limit, checked at ADMISSION like every other one — which is what
+    // makes the admission rule hold for it. Lowering a plan's document count
+    // refuses the next
+    // upload and touches nothing that exists; there is no sweep, no
+    // deactivation, and no choosing which of a tenant's documents to remove.
+    //
+    // `+ 1` because the question is whether THIS upload fits, not whether the
+    // tenant is already at the limit — at exactly the limit the next one is the
+    // one to refuse.
+    if (exceedsLimit(documentCount + 1, countLimit)) {
+      throw new RpcException({
+        code: status.RESOURCE_EXHAUSTED,
+        message: `This workspace holds ${documentCount} of ${countLimit} documents`,
       });
     }
 
@@ -336,9 +353,7 @@ export class DocumentsService {
     }
   }
 
-  // -------------------------------------------------------------------------
-  // Read
-  // -------------------------------------------------------------------------
+  // ---------------------------------------------------------------- Read
 
   async listDocuments(
     request: ListDocumentsRequest,
@@ -1186,6 +1201,19 @@ export class DocumentsService {
   /** {@link documentVisibility}, as a method so the call sites read unchanged. */
   private visibilityScope(context: CallerContext): Prisma.DocumentWhereInput {
     return documentVisibility(context);
+  }
+
+  /**
+   * Live documents for one tenant.
+   *
+   * `deletedAt: null`, so a soft-deleted document frees a slot — the count
+   * limit is about what the tenant HOLDS, and the storage quota beside it
+   * already makes the same choice about bytes.
+   */
+  private async documentCount(organizationId: string): Promise<number> {
+    return this.prisma.document.count({
+      where: { organizationId, deletedAt: null },
+    });
   }
 
   /** `SUM(file_size_bytes)` over the tenant's LIVE documents. */

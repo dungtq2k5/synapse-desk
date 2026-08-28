@@ -782,7 +782,7 @@ export class InvitationsService {
     return {
       id: invitation.id,
       email: invitation.email,
-      status: toProtoInvitationStatus(invitation.status as InvitationStatus),
+      status: toProtoInvitationStatus(invitation.status),
       roleIds: invitation.roleIds,
       departmentIds: invitation.departmentIds,
       primaryDepartmentId: invitation.primaryDepartmentId ?? undefined,

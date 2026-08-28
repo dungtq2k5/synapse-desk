@@ -28,6 +28,10 @@ export const PLAN_FIXTURES = [
     // one — at the ceiling, `min()` is indistinguishable from no plan at all.
     maxDocumentBytes: 25n * MIB,
     maxAttachmentBytes: 5n * MIB,
+    // Starter narrows both new dimensions too, so a test that wants to see the
+    // plan layer bite has one fixture that does it on every grant.
+    maxDocumentUploads: 1_000,
+    maxAnalyticsRangeDays: 30,
     prices: [{ stripePriceId: 'price_starter_monthly', interval: 'month' }],
   },
   {
@@ -39,6 +43,8 @@ export const PLAN_FIXTURES = [
     aiModelTier: 'QUALITY',
     maxDocumentBytes: 100n * MIB,
     maxAttachmentBytes: 10n * MIB,
+    maxDocumentUploads: 10_000,
+    maxAnalyticsRangeDays: 180,
     prices: [
       { stripePriceId: 'price_pro_monthly', interval: 'month' },
       // A SECOND price on one plan, which is the shape the product keying
@@ -55,6 +61,8 @@ export const PLAN_FIXTURES = [
     aiModelTier: 'QUALITY',
     maxDocumentBytes: 100n * MIB,
     maxAttachmentBytes: 10n * MIB,
+    maxDocumentUploads: 100_000,
+    maxAnalyticsRangeDays: 400,
     prices: [{ stripePriceId: 'price_enterprise_monthly', interval: 'month' }],
   },
 ] as const;

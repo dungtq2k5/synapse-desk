@@ -3,6 +3,8 @@ import { RequestContext } from '@synapsedesk/common';
 import { toProtoOrgStatus } from '@synapsedesk/grpc-proto';
 import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
 import { PlatformGrpcClient } from './platform-grpc.client';
+import { PlatformUsageClient } from './platform-usage.client';
+import { enrichWithUsage } from './plan-usage.composer';
 import {
   toCreatePlatformOrganizationResponseDto,
   toGlobalRolePageDto,
@@ -47,7 +49,10 @@ import {
 /** The platform-admin surface. Returns REST DTOs; the wire stays in the client. */
 @Injectable()
 export class PlatformService {
-  constructor(private readonly platformGrpcClient: PlatformGrpcClient) {}
+  constructor(
+    private readonly platformGrpcClient: PlatformGrpcClient,
+    private readonly usageClient: PlatformUsageClient,
+  ) {}
 
   async listOrganizations(
     query: ListPlatformOrganizationsQueryDto,
@@ -264,13 +269,38 @@ export class PlatformService {
     return { deleted: response.deleted };
   }
 
+  /**
+   * The plan projection, composed across two services.
+   *
+   * `auth-service` answers seats from its own tables; `ingestion-service`
+   * answers storage and documents from its. Neither can answer the other's, and
+   * auth cannot ask ingestion — ingestion dials auth on every presign, so that
+   * edge would close a cycle on the identity leaf. This is the composition
+   * layer, which is the whole reason it exists.
+   *
+   * **Both the dry run AND the apply come through here.** The two must be one
+   * pass — a dry run computed by different code from the apply it predicts
+   * would be believed exactly when it was wrong — and the auth layer asserts
+   * that as an equality of projections. Enriching only the dry run would put
+   * the divergence ABOVE the layer that test observes, so the gateway suite
+   * asserts the same equality on the enriched pair.
+   *
+   * @param dryRun writes nothing and returns the projection the apply would act on.
+   */
   async applyPlan(
     planId: string,
     dryRun: boolean,
     context: RequestContext,
   ): Promise<ApplyPlanResponseDto> {
-    return toApplyPlanResponseDto(
+    const projection = toApplyPlanResponseDto(
       await this.platformGrpcClient.applyPlan({ planId, dryRun }, context),
     );
+
+    const usage = await this.usageClient.usageFor(
+      projection.subscribers.map((row) => row.organizationId),
+      context,
+    );
+
+    return enrichWithUsage(projection, usage);
   }
 }

@@ -8,6 +8,7 @@ import {
   DocumentStatus,
   IngestionJobStatus,
   MAX_DOCUMENT_BYTES,
+  MAX_DOCUMENTS_PER_TENANT,
   SupersededReason,
   type DocumentFileType,
 } from '@synapsedesk/common';
@@ -58,6 +59,7 @@ describe('Documents (e2e)', () => {
 
   let getStorageLimitBytes: jest.SpyInstance;
   let getDocumentSizeLimitBytes: jest.SpyInstance;
+  let getDocumentCountLimit: jest.SpyInstance;
   let assertDepartmentsExist: jest.SpyInstance;
   let presignDocument: jest.SpyInstance;
   let confirmUpload: jest.SpyInstance;
@@ -146,6 +148,7 @@ describe('Documents (e2e)', () => {
       authReference,
       'getDocumentSizeLimitBytes',
     );
+    getDocumentCountLimit = jest.spyOn(authReference, 'getDocumentCountLimit');
     assertDepartmentsExist = jest.spyOn(
       authReference,
       'assertDepartmentsExist',
@@ -170,6 +173,7 @@ describe('Documents (e2e)', () => {
     getStorageLimitBytes.mockResolvedValue(DEFAULT_STORAGE_LIMIT);
     // Nothing configured is the normal state, so the platform ceiling applies.
     getDocumentSizeLimitBytes.mockResolvedValue(MAX_DOCUMENT_BYTES);
+    getDocumentCountLimit.mockResolvedValue(MAX_DOCUMENTS_PER_TENANT);
     assertDepartmentsExist.mockResolvedValue(undefined);
     presignDocument.mockImplementation(
       (input: { documentId: string; contentType: string }) =>
@@ -271,6 +275,58 @@ describe('Documents (e2e)', () => {
       // the refusal only after uploading 25 MB.
       getStorageLimitBytes.mockResolvedValue(1024);
       await createDocument(fx.prisma, tenant, { fileSizeBytes: BigInt(1024) });
+
+      await expectRpc(
+        documents.presignDocument(presignRequest(), manager()),
+        status.RESOURCE_EXHAUSTED,
+      );
+
+      expect(presignDocument).not.toHaveBeenCalled();
+    });
+
+    it('**2b. REFUSES at the document COUNT limit, and keeps every document**', async () => {
+      // The admission rule for the newest dimension, and both halves in one
+      // test because
+      // either alone passes for a broken system: a limit that refuses nothing,
+      // or a sweep that trims the tenant down to fit. The count gates
+      // ADMISSION, so lowering it can only refuse the NEXT upload.
+      getDocumentCountLimit.mockResolvedValue(2);
+      await createDocument(fx.prisma, tenant);
+      await createDocument(fx.prisma, tenant);
+
+      await expectRpc(
+        documents.presignDocument(presignRequest(), manager()),
+        status.RESOURCE_EXHAUSTED,
+      );
+
+      // Nothing was taken away to make room.
+      await expect(
+        fx.prisma.document.count({
+          where: { organizationId: tenant.organizationId, deletedAt: null },
+        }),
+      ).resolves.toBe(2);
+      expect(presignDocument).not.toHaveBeenCalled();
+    });
+
+    it('2c. …and the upload that fits EXACTLY is admitted', async () => {
+      // The boundary, in the direction that matters: at one below the limit the
+      // next upload is the one that fills it, not the one that is refused. A
+      // `>=` here would cost every tenant their last slot silently.
+      getDocumentCountLimit.mockResolvedValue(2);
+      await createDocument(fx.prisma, tenant);
+
+      await expect(
+        documents.presignDocument(presignRequest(), manager()),
+      ).resolves.toMatchObject({ uploadUrl: expect.any(String) });
+    });
+
+    it('2d. **A ZERO limit refuses cleanly — the lost-wire case is not a 500**', async () => {
+      // `getDocumentCountLimit` resolves `min(platform, grant ?? 0)`, so a wire
+      // that lost the grant yields ZERO. That is the fail-closed direction and
+      // it must arrive as a refusal the caller can read, not as an internal
+      // error — which is exactly what `countLimit - 1` would produce, since
+      // `exceedsLimit` rejects a negative ceiling as unusable.
+      getDocumentCountLimit.mockResolvedValue(0);
 
       await expectRpc(
         documents.presignDocument(presignRequest(), manager()),

@@ -221,6 +221,12 @@ export class EntitlementWriterService {
         // the tenant's own override, so a plan can narrow and never widen.
         maxDocumentBytes: entitlements.maxDocumentBytes,
         maxAttachmentBytes: entitlements.maxAttachmentBytes,
+        maxDocumentUploads: entitlements.maxDocumentUploads,
+        // Applied like any other grant. Narrowing it is retroactive — the
+        // tenant sees less history immediately — which is accepted rather than
+        // grandfathered: a per-subscriber window would make a plan's stated
+        // grant not be what its subscribers have.
+        maxAnalyticsRangeDays: entitlements.maxAnalyticsRangeDays,
         stripeSubscriptionId: subscription.id,
         // **The cycle follows Stripe**, and its epoch is inside the Redis
         // quota key — so this line also re-arms every threshold alert and

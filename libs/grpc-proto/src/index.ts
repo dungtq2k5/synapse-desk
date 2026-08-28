@@ -26,6 +26,7 @@ export * from './generated/synapsedesk/storage/storage';
 export * from './generated/synapsedesk/auth/billing';
 export * from './generated/synapsedesk/ingestion/document';
 export * from './generated/synapsedesk/ingestion/ledger';
+export * from './generated/synapsedesk/ingestion/platform';
 export * from './generated/synapsedesk/rag/rag';
 export * from './generated/synapsedesk/notification/notification';
 

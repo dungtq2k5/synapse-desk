@@ -1,5 +1,5 @@
 /**
- * Conversions between Prisma rows, domain values and the gRPC wire.
+ * @file Conversions between Prisma rows, domain values and the gRPC wire.
  *
  * - `timestamp` — `google.protobuf.Timestamp` and required-field helpers
  * - `enum-bridge` — the factory every domain <-> proto enum pair is built with

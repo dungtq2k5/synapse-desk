@@ -71,6 +71,9 @@ export class SubscriptionPlanResponseDto {
   readonly aiModelTier!: string;
   readonly maxDocumentBytes!: number;
   readonly maxAttachmentBytes!: number;
+  readonly maxDocumentUploads!: number;
+  /** Days of history analytics may look back over. Narrowing it is retroactive. */
+  readonly maxAnalyticsRangeDays!: number;
   readonly isActive!: boolean;
   readonly prices!: SubscriptionPlanPriceResponseDto[];
   /** Live tenants on this plan: the delete gate and the apply's blast radius. */

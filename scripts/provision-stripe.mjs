@@ -108,7 +108,7 @@ async function ownedProducts() {
   return owned;
 }
 
-async function main() { // NOSONAR
+async function main() {
   const existing = await ownedProducts();
   say(`found ${existing.size} product(s) already carrying \`${MARKER}\``);
 

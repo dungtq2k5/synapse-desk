@@ -1,5 +1,6 @@
+import { createOrganization } from './factories';
 import { bootstrapE2eTest, E2eFixture } from './utils/bootstrap';
-import { OrgStatus, PERMISSION_CODES } from '@synapsedesk/common';
+import { PERMISSION_CODES } from '@synapsedesk/common';
 
 /**
  * Proves the fixture itself, before any suite depends on it.
@@ -60,12 +61,12 @@ describe('e2e bootstrap (auth-service)', () => {
   });
 
   it('reset() clears tenant data but leaves the seeded catalogue', async () => {
-    await fx.prisma.organization.create({
-      data: {
-        name: 'Throwaway',
-        slug: `throwaway-${Date.now()}`,
-        status: OrgStatus.ACTIVE,
-      },
+    // Routed through the factory rather than supplying seven quota columns by
+    // hand: this test is about `reset()`, and an inline literal here is one
+    // more place a new required column has to be remembered.
+    await createOrganization(fx.prisma, {
+      name: 'Throwaway',
+      slug: `throwaway-${Date.now()}`,
     });
     expect(await fx.prisma.organization.count()).toBe(1);
 

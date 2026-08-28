@@ -1,4 +1,6 @@
-/** Timestamp conversions and required-field helpers for the gRPC boundary. */
+/**
+ * @file Timestamp conversions and required-field helpers for the gRPC boundary.
+ */
 
 /** The runtime shape of `google.protobuf.Timestamp` under @grpc/proto-loader. */
 export type ProtoTimestamp = { seconds: number; nanos: number };

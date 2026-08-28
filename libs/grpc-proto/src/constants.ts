@@ -116,6 +116,7 @@ export const STORAGE_PROTO_PATHS = [
 export const INGESTION_PROTO_PATHS = [
   join(PROTO_ROOT, 'synapsedesk', 'ingestion', 'document.proto'),
   join(PROTO_ROOT, 'synapsedesk', 'ingestion', 'ledger.proto'),
+  join(PROTO_ROOT, 'synapsedesk', 'ingestion', 'platform.proto'),
 ];
 
 /**

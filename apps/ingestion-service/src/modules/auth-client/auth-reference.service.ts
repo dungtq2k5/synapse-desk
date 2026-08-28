@@ -17,6 +17,8 @@ import {
   DEFAULT_AI_MODEL_TIER,
   formatErrorMsg,
   MAX_DOCUMENT_BYTES,
+  MAX_DOCUMENTS_PER_TENANT,
+  resolveAnalyticsRangeDays,
 } from '@synapsedesk/common';
 
 /**
@@ -98,7 +100,7 @@ export class AuthReferenceService implements OnModuleInit {
           .pipe(timeout(GRPC_DEADLINE_MS)),
       );
 
-      return Number(organization.maxStorageBytes);
+      return organization.maxStorageBytes;
     } catch (error) {
       this.logger.error(
         `Could not read the storage entitlement: ${formatErrorMsg(error)}`,
@@ -110,6 +112,85 @@ export class AuthReferenceService implements OnModuleInit {
       throw new RpcException({
         code: status.UNAVAILABLE,
         message: 'Could not verify the storage quota',
+      });
+    }
+  }
+
+  /**
+   * How far back this tenant may look, in days — `min(platform, plan)`.
+   *
+   * **The one limit whose narrowing is retroactive**, and the one that must
+   * resolve identically in `ticket-service`. A window honoured on one analytics
+   * page and not the other is worse than no window: the answer would depend on
+   * which page the tenant opened, and neither number would be wrong on its own.
+   * `analytics-window.contract.ts` is the shared test that pins the two
+   * together; this method is one of its two subjects.
+   *
+   * @throws RpcException `UNAVAILABLE` when the organization cannot be read.
+   */
+  async getAnalyticsRangeDays(context: CallerContext): Promise<number> {
+    try {
+      const organization = await firstValueFrom(
+        this.organizationService
+          .getCurrentOrganization({}, packRequestContext(context))
+          .pipe(timeout(GRPC_DEADLINE_MS)),
+      );
+
+      return resolveAnalyticsRangeDays(organization.maxAnalyticsRangeDays);
+    } catch (error) {
+      this.logger.error(
+        `Could not read the analytics range limit: ${formatErrorMsg(error)}`,
+      );
+
+      throw new RpcException({
+        code: status.UNAVAILABLE,
+        message: 'Could not verify the analytics range limit',
+      });
+    }
+  }
+
+  /**
+   * The most documents this tenant may hold, composed like every other limit.
+   *
+   * `min(platform ceiling, plan grant)` — there is no tenant override for the
+   * count, so the composition is two layers rather than three. `?? 0` on the
+   * grant for the reason the byte limits use it: the column is NOT NULL and the
+   * proto field is not `optional`, so absent is a wire that lost a field, and
+   * refusing is the loud direction.
+   *
+   * **Rides the same call as the storage quota** and is therefore free.
+   *
+   * @throws RpcException `UNAVAILABLE` when the organization cannot be read.
+   */
+  async getDocumentCountLimit(context: CallerContext): Promise<number> {
+    try {
+      const organization = await firstValueFrom(
+        this.organizationService
+          .getCurrentOrganization({}, packRequestContext(context))
+          .pipe(timeout(GRPC_DEADLINE_MS)),
+      );
+
+      return Math.min(
+        MAX_DOCUMENTS_PER_TENANT,
+        // **`?? 0` decides how the fail-closed path FAILS, not whether it
+        // fails.** The field is non-optional, so under the shipped loader
+        // options it is always a number and this never fires. Under
+        // `defaults: false` it would be `undefined` — and the difference is a
+        // clean `RESOURCE_EXHAUSTED` the caller can read, versus `exceedsLimit`
+        // refusing a `NaN` ceiling and surfacing as a 500. Both refuse; only
+        // one of them is answerable.
+        organization.maxDocumentUploads ?? 0,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Could not read the document count limit: ${formatErrorMsg(error)}`,
+      );
+
+      // FAILS CLOSED, like every other limit here: an unreadable ceiling must
+      // not mean "unlimited".
+      throw new RpcException({
+        code: status.UNAVAILABLE,
+        message: 'Could not verify the document count limit',
       });
     }
   }
@@ -161,6 +242,9 @@ export class AuthReferenceService implements OnModuleInit {
       return Math.min(
         MAX_DOCUMENT_BYTES,
         organization.maxDocumentBytesOverride ?? MAX_DOCUMENT_BYTES,
+        // The same guard and the same reason as `getDocumentCountLimit`: it
+        // chooses a readable refusal over a thrown comparison, and it is the
+        // reason to keep it rather than delete it as unreachable.
         organization.maxDocumentBytes ?? 0,
       );
     } catch (error) {
