@@ -32,6 +32,17 @@ export enum EmailTemplateName {
   SECURITY_ALERT = 'SECURITY_ALERT',
   /** A budget threshold crossing. */
   QUOTA_ALERT = 'QUOTA_ALERT',
+  /** A seat, storage or document-count threshold crossing. */
+  LIMIT_ALERT = 'LIMIT_ALERT',
+  /**
+   * A failed payment, with the retry date.
+   *
+   * The one template in this list where the tenant LOSES ACCESS if they do
+   * nothing, which is why it carries a deadline rather than a percentage.
+   */
+  PAYMENT_FAILED = 'PAYMENT_FAILED',
+  /** Entitlements changed — framed as "your plan was updated". */
+  PLAN_CHANGED = 'PLAN_CHANGED',
 }
 
 export enum SmsTemplateName {
@@ -143,6 +154,49 @@ export type SendEmailCommand =
          */
         detail: string;
       };
+    }
+  | {
+      template: EmailTemplateName.LIMIT_ALERT;
+      to: string;
+      data: {
+        fullName: string;
+        /** e.g. "Storage 80% used". */
+        headline: string;
+        /** What is refused at 100%, in the tenant's terms. */
+        detail: string;
+      };
+    }
+  | {
+      template: EmailTemplateName.PAYMENT_FAILED;
+      to: string;
+      data: {
+        fullName: string;
+        /**
+         * WHEN Stripe tries again, or `null` when it will not.
+         *
+         * The field that makes this actionable: "we will retry on the 14th" and
+         * "this was the last attempt" are different emails, and a tenant who
+         * cannot tell them apart cannot decide whether to do anything today.
+         *
+         * **`| null` is load-bearing**, not defensive. The renderer branches on
+         * it, and that branch IS the template — typing it `string` forced a cast
+         * in the only test that exercised the final-attempt case, which is where
+         * a type is being argued with rather than used.
+         */
+        nextAttempt: string | null;
+        /** Stripe's own reason, passed through rather than paraphrased. */
+        reason: string;
+      };
+    }
+  | {
+      template: EmailTemplateName.PLAN_CHANGED;
+      to: string;
+      data: {
+        fullName: string;
+        planName: string;
+        /** What changed, in the tenant's terms rather than column names. */
+        summary: string;
+      };
     };
 
 export type SendSmsCommand = {
@@ -154,9 +208,7 @@ export type SendSmsCommand = {
   };
 };
 
-// ---------------------------------------------------------------------------
-// In-app notifications — Domain E's table, published to before it exists
-// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------- In-app notifications — Domain E's table, published to before it exists
 
 /** The subject Domain E subscribes to for in-app notifications. */
 export const IN_APP_NOTIFICATION_PATTERN =
@@ -175,6 +227,19 @@ export const NOTIFICATION_TYPES = {
   ticketMessageCreated: 'ticket.message_created',
   ticketStatusChanged: 'ticket.status_changed',
   quotaThreshold: 'quota.threshold',
+  /**
+   * A LEVEL crossing — seats, storage or document count.
+   *
+   * Separate from `quotaThreshold` on purpose: the two are produced by
+   * different mechanisms (a meter that resets, an alarm that re-arms) and a
+   * tenant may reasonably want one and not the other. Preference resolution
+   * keys on this value, so collapsing them removes that choice.
+   */
+  limitThreshold: 'limit.threshold',
+  /** A payment Stripe could not take. The only one with a deadline. */
+  paymentFailed: 'billing.payment_failed',
+  /** Entitlements changed — a subscription, or a plan edit applied. */
+  planChanged: 'billing.plan_changed',
 } as const;
 
 export type NotificationType =

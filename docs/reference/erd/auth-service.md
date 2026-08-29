@@ -234,6 +234,14 @@ erDiagram
     String interval 
     }
   
+
+  "limit_alert_generations" {
+    String organization_id 
+    String dimension "🗝️"
+    Int generation 
+    DateTime updated_at 
+    }
+  
     "organizations" }o--|o subscription_plans : "plan"
     "organizations" }o--|o users : "deletedBy"
     "departments" }o--|| organizations : "organization"

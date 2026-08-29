@@ -80,9 +80,7 @@ message SetRolePermissionsRequest {
   repeated string permission_codes = 2;
 }
 
-// ---------------------------------------------------------------------------
-// Permission catalogue
-// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------- Permission catalogue
 
 message PermissionResponse {
   string id = 1;

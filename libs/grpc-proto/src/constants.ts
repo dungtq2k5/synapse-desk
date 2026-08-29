@@ -140,7 +140,7 @@ export const NOTIFICATION_PROTO_PATHS = [
 ];
 
 /**
- * @grpc/proto-loader options, pinned so the runtime shape matches the types
+ * `@grpc/proto-loader` options, pinned so the runtime shape matches the types
  * ts-proto generates. Nest forwards `options.loader` straight to
  * protoLoader.loadSync, and its defaults do NOT line up with ts-proto:
  *   - keepCase:false  -> camelCase fields, matching the generated interfaces

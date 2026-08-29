@@ -161,6 +161,20 @@ export class AuthService {
    * JwtAuthGuard), so blocking login until verified would deadlock: no token
    * without verifying, no verifying without a token.
    *
+   * **KNOWN GAP — domain-matched registration takes a seat and checks
+   * nothing.** The other two paths that consume a seat (`invitations.create`
+   * and `users.create`) both compare `seatsInUse` against `maxAgentSeats` and
+   * refuse, and both fire the seat alarm afterwards. This one does neither: a
+   * tenant that lists its own domain in `allowedEmailDomains` can be taken past
+   * `maxAgentSeats` by self-registration alone, silently, and the usage page
+   * will then report `used > limit`.
+   *
+   * Pre-existing rather than introduced here, and out of scope for the
+   * notification work — closing it is a refusal, and refusing a registration
+   * needs a product answer for what the user sees (their workspace exists and
+   * will not let them in). Recorded so the next reader does not conclude the
+   * three paths agree.
+   *
    * Instead the account is usable immediately but LIMITED — `isEmailVerified`
    * rides in the JWT and `EmailVerifiedGuard` in the gateway gates the routes
    * that need a proven address. Registration dispatches the first code straight

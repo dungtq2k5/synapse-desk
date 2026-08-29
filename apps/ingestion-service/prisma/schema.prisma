@@ -474,3 +474,47 @@ model JobRun {
 
   @@map("job_runs")
 }
+
+/// How many times a tenant's limit alarm has RE-ARMED, per dimension.
+///
+/// **Durable because it defeats a durable guard.** The alert's
+/// `notifications.event_id` is derived, so a re-crossing after a recovery would
+/// republish an id Domain E's permanent `UNIQUE (recipient_id, event_id)`
+/// already holds — and be rejected as a duplicate the tenant never sees. The
+/// generation makes each occurrence a new event.
+///
+/// It cannot live in Redis beside the alarm LEVEL: a flush would reset it to
+/// zero, the next crossing would republish a held id, and that dimension would
+/// stop alerting for that tenant permanently, from a transient failure. A
+/// counter that steps past a permanent guard must outlive it.
+///
+/// The level stays in Redis on purpose — losing it costs at most one duplicate
+/// alert, which the durable guard then collapses.
+model LimitAlertGeneration {
+  organizationId String @map("organization_id") @db.Uuid
+
+  /// `seats` | `storage` | `documents` — `LimitAlertDimension` in
+  /// `@synapsedesk/common`, stored VERBATIM in that union's own lowercase. A
+  /// String, not a Prisma enum — see development-conventions §7.3.
+  ///
+  /// Lowercase deliberately, and it must stay that way: the same literal is a
+  /// segment of `limit-alert:{org}:{dimension}` in Redis and of the derived
+  /// event id `limit:{org}:{dimension}:{threshold}:{gen}` that Domain E dedupes
+  /// on. Upper-casing this column alone would give one fact two spellings, and
+  /// the id is the half that cannot be respelled without invalidating every
+  /// stored `event_id`. §7.3's SCREAMING_SNAKE rule is about enumerated domain
+  /// values defined for a wire or database contract; these are internal keys of
+  /// a config array, the same carve-out `SubscriptionPlanPrice.interval`
+  /// already documents.
+  dimension String @db.VarChar(32)
+
+  /// Incremented once per RECOVERY, never per threshold cleared: falling from
+  /// 100% to 5% is one recovery, and a counter that skipped values would be a
+  /// step counter nobody could explain later.
+  generation Int @default(0)
+
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@id([organizationId, dimension])
+  @@map("limit_alert_generations")
+}

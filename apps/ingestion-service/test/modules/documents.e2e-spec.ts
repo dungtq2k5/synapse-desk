@@ -8,6 +8,7 @@ import {
   DocumentStatus,
   IngestionJobStatus,
   MAX_DOCUMENT_BYTES,
+  LimitAlertPublisher,
   MAX_DOCUMENTS_PER_TENANT,
   SupersededReason,
   type DocumentFileType,
@@ -60,6 +61,7 @@ describe('Documents (e2e)', () => {
   let getStorageLimitBytes: jest.SpyInstance;
   let getDocumentSizeLimitBytes: jest.SpyInstance;
   let getDocumentCountLimit: jest.SpyInstance;
+  let evaluateAlarm: jest.SpyInstance;
   let assertDepartmentsExist: jest.SpyInstance;
   let presignDocument: jest.SpyInstance;
   let confirmUpload: jest.SpyInstance;
@@ -149,6 +151,11 @@ describe('Documents (e2e)', () => {
       'getDocumentSizeLimitBytes',
     );
     getDocumentCountLimit = jest.spyOn(authReference, 'getDocumentCountLimit');
+    // The alarm reaches Redis and JetStream, neither of which this suite runs.
+    // Spied rather than stubbed away: two tests assert on its arguments.
+    evaluateAlarm = jest
+      .spyOn(fx.moduleRef.get(LimitAlertPublisher), 'evaluate')
+      .mockResolvedValue(undefined);
     assertDepartmentsExist = jest.spyOn(
       authReference,
       'assertDepartmentsExist',
@@ -174,6 +181,7 @@ describe('Documents (e2e)', () => {
     // Nothing configured is the normal state, so the platform ceiling applies.
     getDocumentSizeLimitBytes.mockResolvedValue(MAX_DOCUMENT_BYTES);
     getDocumentCountLimit.mockResolvedValue(MAX_DOCUMENTS_PER_TENANT);
+    evaluateAlarm.mockClear();
     assertDepartmentsExist.mockResolvedValue(undefined);
     presignDocument.mockImplementation(
       (input: { documentId: string; contentType: string }) =>
@@ -334,6 +342,49 @@ describe('Documents (e2e)', () => {
       );
 
       expect(presignDocument).not.toHaveBeenCalled();
+    });
+
+    it('**2e. Both owned dimensions are evaluated on a successful presign**', async () => {
+      // Behavioural, and deliberately not a source scan: a scan asserting the
+      // file mentions `limitAlerts.evaluate` is satisfied by ONE of the two
+      // call sites, so deleting the storage one leaves it green. Measured —
+      // that mutation passed the scan and only this test catches it.
+      //
+      // The readings include THIS upload, because the crossing is the event
+      // worth telling the tenant about and the pre-upload number is always one
+      // behind.
+      await createDocument(fx.prisma, tenant, { fileSizeBytes: BigInt(400) });
+      evaluateAlarm.mockClear();
+
+      await documents.presignDocument(presignRequest(), manager());
+
+      const dimensions = evaluateAlarm.mock.calls.map(
+        (call: unknown[]) => call[1] as string,
+      );
+      expect(new Set(dimensions)).toEqual(new Set(['storage', 'documents']));
+
+      const storage = evaluateAlarm.mock.calls.find(
+        (call: unknown[]) => call[1] === 'storage',
+      );
+      // used = existing bytes + this upload; limit = the resolved ceiling.
+      expect(storage?.[2]).toBe(400 + 2048);
+      expect(storage?.[3]).toBe(DEFAULT_STORAGE_LIMIT);
+    });
+
+    it('2f. …and NOT when the upload is refused', async () => {
+      // A tenant refused at 100% is not "approaching" anything, and warning
+      // them about a level they were just stopped at is noise on top of a
+      // rejection.
+      getStorageLimitBytes.mockResolvedValue(1024);
+      await createDocument(fx.prisma, tenant, { fileSizeBytes: BigInt(1024) });
+      evaluateAlarm.mockClear();
+
+      await expectRpc(
+        documents.presignDocument(presignRequest(), manager()),
+        status.RESOURCE_EXHAUSTED,
+      );
+
+      expect(evaluateAlarm).not.toHaveBeenCalled();
     });
 
     it('3. counts only LIVE documents toward the quota', async () => {

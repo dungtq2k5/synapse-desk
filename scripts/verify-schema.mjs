@@ -25,6 +25,7 @@ import { readDatabaseUrl, redact } from './database-url.mjs';
 const CHECKS = [
   {
     name: 'the seven quota columns carry NO default',
+    databases: ['auth'],
     sql: `SELECT count(*)::int AS n FROM information_schema.columns
            WHERE table_name = 'organizations'
              AND column_name IN ('max_agent_seats','max_storage_bytes',
@@ -37,6 +38,7 @@ const CHECKS = [
   },
   {
     name: 'all seven quota columns EXIST',
+    databases: ['auth'],
     sql: `SELECT count(*)::int AS n FROM information_schema.columns
            WHERE table_name = 'organizations'
              AND column_name IN ('max_agent_seats','max_storage_bytes',
@@ -48,6 +50,7 @@ const CHECKS = [
   },
   {
     name: 'the plan grants exist and are NOT NULL',
+    databases: ['auth'],
     sql: `SELECT count(*)::int AS n FROM information_schema.columns
            WHERE table_name = 'subscription_plans'
              AND column_name IN ('max_document_bytes','max_attachment_bytes',
@@ -58,17 +61,29 @@ const CHECKS = [
   },
   {
     name: 'plan names are unique among LIVE rows',
+    databases: ['auth'],
     sql: `SELECT count(*)::int AS n FROM pg_indexes
            WHERE tablename = 'subscription_plans'
              AND indexname = 'subscription_plans_name_key'`,
     expected: 1,
     why: 'a full @unique would block re-using a retired plan name forever',
   },
+  {
+    name: 'the limit-alert generation table exists',
+    databases: ['auth', 'ingestion'],
+    sql: `SELECT count(*)::int AS n FROM information_schema.columns
+           WHERE table_name = 'limit_alert_generations'
+             AND column_name IN ('organization_id','dimension','generation')`,
+    expected: 3,
+    why: 'a generation kept only in Redis resets on a flush, and that dimension then stops alerting for the tenant permanently',
+  },
 ];
 
 for (const file of [
   '../apps/auth-service/.env',
   '../apps/auth-service/.env.test',
+  '../apps/ingestion-service/.env',
+  '../apps/ingestion-service/.env.test',
 ]) {
   // Each URL is read in its own pass, because `loadEnvFile` does not overwrite
   // and both files name the same variable.
@@ -79,7 +94,7 @@ for (const file of [
     process.exit(1);
   }
 
-  await verify(file, url);
+  await verify(file, url, file.includes('auth-service') ? 'auth' : 'ingestion');
 }
 
 // **Conditional, and it was not at first.** The first version printed this
@@ -92,7 +107,7 @@ if (process.exitCode) {
   console.log('\nEvery database agrees with the schema.');
 }
 
-async function verify(label, url) {
+async function verify(label, url, service) {
   const client = new Client({ connectionString: url });
   await client.connect();
 
@@ -102,6 +117,19 @@ async function verify(label, url) {
     let failed = 0;
 
     for (const check of CHECKS) {
+      // **Applicability is a property of the DATABASE, never of the table under
+      // test.** The first version probed `check.table` — the very table the
+      // check asserts about — so dropping `limit_alert_generations`, the exact
+      // condition the check exists to catch, made it skip in both databases and
+      // print "Every database agrees with the schema".
+      //
+      // A check naming a database it does not apply to is skipped and SAID so;
+      // passing it silently is how a check stops checking.
+      if (!check.databases.includes(service)) {
+        console.log(`  skip ${check.name} (not a ${service} table)`);
+        continue;
+      }
+
       const { rows } = await client.query(check.sql);
       const actual = rows[0].n;
       const ok = actual === check.expected;

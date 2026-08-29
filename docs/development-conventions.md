@@ -603,6 +603,8 @@ Two independent classes, paired by a contract spec (`<name>.contract.spec.ts`) t
 
 **SHOULD** — put a genuine trap at the line it applies to, as a `//` comment, short enough to read in one pass.
 
+**MUST NOT** — start a doc line with a bare `@`. TypeScript's JSDoc scanner opens a block TAG at any `@` preceded by whitespace, so `@grpc/proto-loader` or `@UseGuards(…)` ends the description there and turns the rest into a tag nobody declared — measured: `GRPC_LOADER_OPTIONS` had no description at all, and three decorators stopped at the colon introducing their own examples. Backtick it (`` `@UseGuards(…)` ``), which is correct anyway since a package name or a decorator IS code. Fenced blocks, indentation and moving the `@` mid-line do NOT help — only a non-whitespace character before it does. Prisma `///` docs are copied into the generated client, so the same rule binds there. `jsdoc-tags.spec.ts` enforces this.
+
 **MUST NOT** — write a `/** */` where POSITION makes it attach to something other than what it describes. A docblock binds to whatever declaration follows it, and the failure is always the same shape: the text looks attached, is not, and the file reads as thoroughly documented while the symbol has nothing. Three instances, one rule:
 
 - **Between a DTO property's decorators and its name.** The Swagger plugin runs with `introspectComments` and takes the LEADING comment, so a block below the decorators never reaches the published spec. `AcceptInvitationDto.deviceName` shipped with no description at all this way. A note about why a decorator is present or absent is a trap, so it belongs at that decorator as `//`; what the FIELD is belongs above them all. `dto-docblock.spec.ts` enforces this one.

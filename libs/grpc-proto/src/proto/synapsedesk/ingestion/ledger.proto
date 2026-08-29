@@ -92,7 +92,7 @@ message RecordGenerationRequest {
   int32 prompt_tokens = 6;
   int32 completion_tokens = 7;
   optional int32 latency_ms = 8;
-  // AiGenerationStatus. A FAILED call still consumed prompt tokens.
+  // AiGenerationStatus, as a string — see `purpose` above. A FAILED call still consumed prompt tokens.
   string status = 9;
 
   // Populated for DRAFT and SUMMARY; absent for EMBEDDING and the

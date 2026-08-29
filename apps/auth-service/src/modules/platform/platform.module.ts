@@ -5,6 +5,7 @@ import { AuditModule } from '../audit/audit.module';
 import { SessionsModule } from '../sessions/sessions.module';
 import { RolesModule } from '../roles/roles.module';
 import { BillingModule } from '../billing/billing.module';
+import { LimitAlertsModule } from '../limit-alerts/limit-alerts.module';
 import { PlatformService } from './platform.service';
 import { PlatformGrpcController } from './platform-grpc.controller';
 
@@ -25,6 +26,7 @@ import { PlatformGrpcController } from './platform-grpc.controller';
     // the cross-tenant writes, so the controller lives here and the service
     // stays where its tables are.
     BillingModule,
+    LimitAlertsModule,
   ],
   controllers: [PlatformGrpcController],
   providers: [PlatformService],

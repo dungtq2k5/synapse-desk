@@ -8,6 +8,8 @@ import {
   NotificationChannel,
   NotificationPriority,
   NotificationResourceType,
+  NOTIFICATION_TYPES,
+  SendEmailCommand,
 } from '@synapsedesk/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthReferenceService } from '../auth-client/auth-reference.service';
@@ -378,28 +380,25 @@ export class InAppNotificationService {
       });
 
       if (!decision.allowed) {
-        // **A suppressed notification is a SKIPPED row, never a silent drop**
-        //. "I never got notified" is unanswerable without it, and
-        // it is the single most common support question this feature will
-        // generate.
+        // **A suppressed notification is a SKIPPED row, never a silent drop.**
+        // "I never got notified" is unanswerable without it, and it is the
+        // single most common support question this feature will generate.
         await this.skipEmail(command, recipient, decision.reason);
+        continue;
+      }
+
+      const email = emailFor(command, recipient);
+
+      if (!email) {
+        // A type with no email arm. Not an error and not a suppression: the
+        // notification exists in the feed, and there is simply no template for
+        // it — which is true of every ticket event and of `plan.changed`.
         continue;
       }
 
       try {
         const result = await this.email.send(
-          {
-            template: EmailTemplateName.QUOTA_ALERT,
-            to: recipient.email,
-            data: {
-              fullName: recipient.fullName,
-              headline: command.title,
-              // The BODY, not a rewrite of it. The producer wrote the sentence
-              // that says what happens next; paraphrasing here would mean two
-              // places deciding what the warning means.
-              detail: command.body,
-            },
-          },
+          email,
           // **A ticket notification is answerable; everything else is not** —
           // The address carries a per-ticket token, so replying to
           // this email appends to the thread it is about rather than opening a
@@ -505,4 +504,83 @@ function describeAudience(audience: NotificationAudience): string {
   return audience.kind === 'permission'
     ? `permission '${audience.permission}'`
     : `${audience.userIds.length} user(s)`;
+}
+
+/**
+ * The email a notification becomes, or `null` when it becomes none.
+ *
+ * **This used to be a hardcoded `QUOTA_ALERT`, and that was CORRECT when it was
+ * written**: `quota-alert.service.ts` was the only producer of a `CRITICAL`
+ * command, so the template genuinely was always that one. It stopped being true
+ * the moment a second and third CRITICAL producer arrived, and nothing said so —
+ * a dunning notice rendered under a budget-alert subject with its retry date
+ * dropped, and no test could see it because the renderers were driven directly.
+ *
+ * So the shape here is the point: an **exhaustive switch**, so adding a
+ * `NotificationType` is a compile error until somebody decides what it emails.
+ * Six of the nine types answer `null`, and that is the honest answer rather than
+ * a gap — the five ticket events and `plan.changed` are all published below
+ * `CRITICAL` and never reach this code, and inventing a template for them to
+ * satisfy a total `Record` would be worse than the bug this replaces.
+ */
+function emailFor(
+  command: CreateInAppNotificationCommand,
+  recipient: { email: string; fullName: string },
+): SendEmailCommand | null {
+  switch (command.type) {
+    case NOTIFICATION_TYPES.quotaThreshold:
+      return {
+        template: EmailTemplateName.QUOTA_ALERT,
+        to: recipient.email,
+        data: {
+          fullName: recipient.fullName,
+          headline: command.title,
+          // The BODY, not a rewrite of it. The producer wrote the sentence that
+          // says what happens next; paraphrasing here would mean two places
+          // deciding what the warning means.
+          detail: command.body,
+        },
+      };
+
+    case NOTIFICATION_TYPES.limitThreshold:
+      return {
+        template: EmailTemplateName.LIMIT_ALERT,
+        to: recipient.email,
+        data: {
+          fullName: recipient.fullName,
+          headline: command.title,
+          detail: command.body,
+        },
+      };
+
+    case NOTIFICATION_TYPES.paymentFailed:
+      return {
+        template: EmailTemplateName.PAYMENT_FAILED,
+        to: recipient.email,
+        data: {
+          fullName: recipient.fullName,
+          // **Read from `data`, not re-derived from the body.** The producer
+          // already decided whether there is a retry; parsing its sentence back
+          // out would be a second place deciding what the message means, and
+          // the final-attempt wording is the whole reason this template exists.
+          nextAttempt: asString(command.data?.nextAttempt),
+          reason: asString(command.data?.reason) ?? 'No reason given',
+        },
+      };
+
+    // Below `CRITICAL` and therefore unreachable from `fanOutEmail` — listed so
+    // the switch stays exhaustive and a new type has to be considered here.
+    case NOTIFICATION_TYPES.planChanged:
+    case NOTIFICATION_TYPES.ticketAssigned:
+    case NOTIFICATION_TYPES.ticketReassigned:
+    case NOTIFICATION_TYPES.ticketEscalated:
+    case NOTIFICATION_TYPES.ticketMessageCreated:
+    case NOTIFICATION_TYPES.ticketStatusChanged:
+      return null;
+  }
+}
+
+/** `data` is `Record<string, unknown>`, so every read out of it is narrowed. */
+function asString(value: unknown): string | null {
+  return typeof value === 'string' ? value : null;
 }

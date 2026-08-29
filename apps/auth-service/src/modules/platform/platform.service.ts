@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
 import { status } from '@grpc/grpc-js';
 import {
@@ -44,8 +44,13 @@ import {
   SystemRoleName,
   USER_SORTABLE_FIELDS,
   FREE_TIER_ORGANIZATION_GRANTS,
+  formatErrorMsg,
+  limitAlertStateKeys,
 } from '@synapsedesk/common';
 import { PrismaService } from '../prisma/prisma.service';
+import Redis from 'ioredis';
+import { AuthGenerationStore } from '../limit-alerts/generation.store';
+import { LIMIT_ALERT_REDIS } from '../limit-alerts/limit-alerts.module';
 import { SessionsService } from '../sessions/sessions.service';
 import { RolesService } from '../roles/roles.service';
 import { toOrganizationResponse } from '../organizations/organization.mapper';
@@ -78,16 +83,18 @@ type OrganizationRow = Organization & {
  */
 @Injectable()
 export class PlatformService {
+  private readonly logger = new Logger(PlatformService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditPublisher,
     private readonly sessionsService: SessionsService,
     private readonly rolesService: RolesService,
+    private readonly generations: AuthGenerationStore,
+    @Inject(LIMIT_ALERT_REDIS) private readonly limitAlertRedis: Redis,
   ) {}
 
-  // -------------------------------------------------------------------------
-  // Tenants
-  // -------------------------------------------------------------------------
+  // ---------------------------------------------------------------- Tenants
 
   async listOrganizations(
     request: ListPlatformOrganizationsRequest,
@@ -450,6 +457,24 @@ export class PlatformService {
 
     const revokedSessionCount = await this.revokeAllTenantSessions(existing.id);
 
+    // **Only the LEVELS are cleared, and the generation deliberately survives.**
+    //
+    // An earlier version deleted the generation rows here and it performed the
+    // exact failure they exist to prevent. `restoreOrganization` un-deletes a
+    // tenant IN PLACE; Domain E's `notifications` rows live in another database
+    // and are untouched by offboarding. So: cross 80% (publishes
+    // `limit:{org}:storage:80:0`), offboard (generation reset to 0), restore,
+    // cross 80% again — and the permanent partial index already holds that id,
+    // so the alert is rejected and that tenant is never told about that
+    // dimension again. That is the Redis-flush scenario executed deliberately.
+    //
+    // The levels are safe to clear for the reason the config gives: losing one
+    // costs at most a duplicate alert the durable guard then collapses.
+    //
+    // The generation rows are reclaimed on a HARD delete, where the
+    // notifications go too — not on a soft delete that restore reverses.
+    await this.clearLimitAlarmLevels(existing.id);
+
     this.audit.record(context, {
       action: AuditAction.PLATFORM_ORGANIZATION_OFFBOARDED,
       resourceType: AuditResourceType.ORGANIZATION,
@@ -493,9 +518,7 @@ export class PlatformService {
     return toPlatformOrganizationResponse(organization);
   }
 
-  // -------------------------------------------------------------------------
-  // Cross-tenant search
-  // -------------------------------------------------------------------------
+  // ---------------------------------------------------------------- Cross-tenant search
 
   /**
    * Every row carries its tenant.
@@ -641,9 +664,7 @@ export class PlatformService {
     }
   }
 
-  // -------------------------------------------------------------------------
-  // Metrics
-  // -------------------------------------------------------------------------
+  // ---------------------------------------------------------------- Metrics
 
   /**
    * Platform-wide rollups.
@@ -702,6 +723,30 @@ export class PlatformService {
   }
 
   // -------------------------------------------------------------------------
+
+  /**
+   * Drops a departed tenant's cached alarm LEVELS. Never the generations.
+   *
+   * One `del` covers all three dimensions because both services point at the
+   * same Redis — which is the half that can be cleared from here. The
+   * generations cannot: they live in each owning service's own database, and
+   * reaching `ingestion-service`'s would need a gRPC leg or an offboarding
+   * event. That asymmetry is the reason this method clears one half rather than
+   * looking like it clears both.
+   *
+   * Failure is logged and swallowed: an offboarding must not fail because a
+   * cache did not answer, and a stale level costs at most one duplicate alert
+   * if the tenant is ever restored.
+   */
+  private async clearLimitAlarmLevels(organizationId: string): Promise<void> {
+    try {
+      await this.limitAlertRedis.del(...limitAlertStateKeys(organizationId));
+    } catch (error) {
+      this.logger.warn(
+        `Could not clear the limit alarm levels for ${organizationId}: ${formatErrorMsg(error)}`,
+      );
+    }
+  }
 
   /** Every live session for every member of a tenant. */
   private async revokeAllTenantSessions(

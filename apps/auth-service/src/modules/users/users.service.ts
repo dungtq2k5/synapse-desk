@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
 import { status } from '@grpc/grpc-js';
 import {
@@ -59,6 +59,7 @@ import {
   SystemRoleName,
   tenantScope,
   USER_SORTABLE_FIELDS,
+  formatErrorMsg,
 } from '@synapsedesk/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationPublisher } from '../notifications/notification-publisher.service';
@@ -81,6 +82,8 @@ import { Prisma } from '../../generated/prisma/client';
 
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditPublisher,
@@ -487,6 +490,26 @@ export class UsersService {
         where: { id: createdId },
         include: USER_SUMMARY_INCLUDE,
       });
+
+      // **The seat alarm, at the second enforcement point.** Direct creation
+      // takes a seat exactly as an invitation does — the refusal ten lines up
+      // is the same comparison — so a tenant filling seats this way has to hear
+      // the same thing a tenant filling them by invitation hears.
+      //
+      // Fired after the transaction commits, so the count includes the user
+      // just created: the crossing is what the tenant needs told.
+      //
+      // `.catch()` and not a bare `void` — the helper queries before reaching
+      // `evaluate`'s internal guard, and an unhandled rejection terminates the
+      // process. An alarm must never fail the create; without the catch it
+      // takes the service down instead.
+      void this.organizationsService
+        .alertOnSeats(organizationId, organization.maxAgentSeats)
+        .catch((error: unknown) =>
+          this.logger.warn(
+            `Could not evaluate the seat alarm for ${organizationId}: ${formatErrorMsg(error)}`,
+          ),
+        );
 
       this.audit.record(context, {
         action: AuditAction.USER_CREATED,

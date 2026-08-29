@@ -135,6 +135,14 @@ erDiagram
     DateTime updated_at 
     }
   
+
+  "limit_alert_generations" {
+    String organization_id 
+    String dimension "🗝️"
+    Int generation 
+    DateTime updated_at 
+    }
+  
     "department_documents" }o--|| documents : "document"
     "document_chunks" }o--|| documents : "document"
     "ingestion_jobs" }o--|| documents : "document"

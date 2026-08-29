@@ -8,6 +8,7 @@ import {
   seedForeignTenant,
   seedTenantWithUser,
 } from '../factories';
+import { OrganizationsService } from '../../src/modules/organizations/organizations.service';
 import { InvitationsService } from '../../src/modules/invitations/invitations.service';
 
 /**
@@ -271,6 +272,75 @@ describe('Invitations (e2e)', () => {
           where: { email: 'joiner@invite.test', organizationId: t.org.id },
         }),
       ).not.toBeNull();
+    });
+  });
+
+  describe('the seat alarm', () => {
+    it('an alarm that REJECTS does not fail the invitation, or the process', async () => {
+      // The helper puts two `count` queries in front of `evaluate`'s internal
+      // guard, so it can reject even though `evaluate` cannot. A bare `void` on
+      // it makes a pool timeout an unhandled rejection, and Node terminates the
+      // process for those — an alert failing would take the service down.
+      const organizations = fx.moduleRef.get(OrganizationsService);
+      const alertOnSeats = jest
+        .spyOn(organizations, 'alertOnSeats')
+        .mockRejectedValue(new Error('the pool is exhausted'));
+
+      try {
+        const t = await seedTenantWithUser(fx.prisma, {
+          organization: { maxAgentSeats: 50 },
+        });
+
+        const result = await invitations.createInvitations(
+          {
+            organizationId: t.org.id,
+            invitedById: t.user.id,
+            invitations: [
+              { email: 'alarm@invite.test', roleIds: [], departmentIds: [] },
+            ],
+          },
+          { ip: '127.0.0.1', userAgent: 'jest' },
+        );
+
+        expect(result.created).toHaveLength(1);
+        expect(result.failed).toEqual([]);
+        expect(alertOnSeats).toHaveBeenCalled();
+
+        // The rejection has to be observed before the assertion ends, or the
+        // handler runs after this test and the failure lands in another one.
+        await new Promise((resolve) => setImmediate(resolve));
+      } finally {
+        alertOnSeats.mockRestore();
+      }
+    });
+
+    it('accepting an invitation does not change seatsInUse', async () => {
+      // §5's premise, stated as a test rather than as an argument. `seatsInUse`
+      // counts live users PLUS pending invitations, so acceptance moves a row
+      // from the second term to the first — which is why acceptance is not a
+      // second alarm site, and why adding one there would alert on a crossing
+      // that already happened at creation.
+      const organizations = fx.moduleRef.get(OrganizationsService);
+      const t = await seedTenantWithUser(fx.prisma, {
+        organization: { maxAgentSeats: 50 },
+      });
+      const { token } = await createInvitation(fx.prisma, t.org.id, {
+        invitedById: t.user.id,
+        email: 'neutral@invite.test',
+      });
+
+      const before = await organizations.seatsInUse(fx.prisma, t.org.id);
+
+      await invitations.acceptInvitation(
+        { token, fullName: 'Neutral', password: 'TestPassw0rd!' },
+        { ip: '127.0.0.1', userAgent: 'jest' },
+      );
+
+      const after = await organizations.seatsInUse(fx.prisma, t.org.id);
+
+      expect(after).toBe(before);
+      // Not vacuous: the pending invitation was counted in the first place.
+      expect(before).toBeGreaterThanOrEqual(2);
     });
   });
 

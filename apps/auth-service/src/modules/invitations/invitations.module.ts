@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '../prisma/prisma.module';
+import { LimitAlertsModule } from '../limit-alerts/limit-alerts.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { AuthModule } from '../auth/auth.module';
 import { RolesModule } from '../roles/roles.module';
@@ -13,6 +14,7 @@ import { InvitationsGrpcController } from './invitations-grpc.controller';
  */
 @Module({
   imports: [
+    LimitAlertsModule,
     PrismaModule,
     NotificationsModule,
     AuthModule,

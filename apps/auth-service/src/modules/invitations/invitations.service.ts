@@ -39,6 +39,7 @@ import {
   isUniqueConstraintViolation,
   normalizeEmail,
   requireTenant,
+  formatErrorMsg,
 } from '@synapsedesk/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthService } from '../auth/auth.service';
@@ -716,6 +717,28 @@ export class InvitationsService {
         },
       });
     });
+
+    // **The seat alarm, at the enforcement point.** The count was just read for
+    // the refusal above, so the reading is nearly free — and it includes the
+    // seat this invitation now holds, because the crossing is what the tenant
+    // needs told.
+    //
+    // **`.catch()` and not a bare `void`.** `LimitAlertPublisher.evaluate`
+    // documents that it cannot reject, but this wrapper puts two `count`
+    // queries in FRONT of that guarantee — and a pool timeout there is an
+    // unhandled rejection, which Node terminates the process for. The comment
+    // said an alert must never fail the invitation; without this it takes the
+    // service down instead.
+    //
+    // `void` is only safe on a promise documented not to reject, and awaiting
+    // anything before such a promise removes that property.
+    void this.organizationsService
+      .alertOnSeats(context.organizationId, context.maxAgentSeats)
+      .catch((error: unknown) =>
+        this.logger.warn(
+          `Could not evaluate the seat alarm for ${context.organizationId}: ${formatErrorMsg(error)}`,
+        ),
+      );
 
     const roleNames = await this.resolveRoleNames(invitation.roleIds);
 

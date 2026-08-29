@@ -16,9 +16,9 @@ const FALSE_VALUES: ReadonlySet<unknown> = new Set([false, 'false', '0']);
  *
  * @example
  * class ListDocumentsQueryDto {
- *   @IsOptional()
- *   @IsBoolean()
- *   @ToBoolean()
+ *   `@IsOptional()`
+ *   `@IsBoolean()`
+ *   `@ToBoolean()`
  *   readonly includeDeleted?: boolean = false;
  * }
  *

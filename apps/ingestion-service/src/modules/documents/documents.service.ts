@@ -61,6 +61,7 @@ import {
   restoreData,
   softDeleteData,
   exceedsLimit,
+  LimitAlertPublisher,
 } from '@synapsedesk/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthReferenceService } from '../auth-client/auth-reference.service';
@@ -114,6 +115,7 @@ export class DocumentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly authReference: AuthReferenceService,
+    private readonly limitAlerts: LimitAlertPublisher,
     private readonly storage: StorageReferenceService,
     private readonly events: DocumentEventPublisher,
     private readonly scopeWriter: ScopeWriterService,
@@ -192,6 +194,39 @@ export class DocumentsService {
         message: `This workspace holds ${documentCount} of ${countLimit} documents`,
       });
     }
+
+    // **The alarm, evaluated where the numbers already are.** Both readings
+    // were fetched above for the refusal checks, so this costs no query — which
+    // is the whole reason detection lives at the enforcement point rather than
+    // in a sweep that would recompute them.
+    //
+    // Fire-and-forget: an alert that cannot be published must never fail the
+    // upload it was warning about. Deliberately AFTER the refusals, so a tenant
+    // who is over the limit is refused rather than warned about being close.
+    //
+    // The reading includes THIS upload, because the tenant crossing 80% is the
+    // event worth telling them about and reporting the pre-upload number would
+    // always be one behind.
+    //
+    // **Which means an ABANDONED presign counts.** A tenant who requests a URL
+    // and never uploads can be warned on bytes that were never written, and the
+    // level only self-corrects once they fall a full hysteresis band below.
+    // Accepted: the alternative is alerting from `confirmUpload`, which is the
+    // path that can be skipped entirely by a client that walks away, so it
+    // trades a warning that is early for one that never arrives. Over-counting
+    // on a limit is the safe direction.
+    void this.limitAlerts.evaluate(
+      organizationId,
+      'storage',
+      usedBytes + request.sizeBytes,
+      limitBytes,
+    );
+    void this.limitAlerts.evaluate(
+      organizationId,
+      'documents',
+      documentCount + 1,
+      countLimit,
+    );
 
     // A per-upload NONCE, and not the id the row will have — `confirmDocument`
     // lets Postgres generate that, so the two never match. Tempting to read it
@@ -540,9 +575,7 @@ export class DocumentsService {
     };
   }
 
-  // -------------------------------------------------------------------------
-  // Write
-  // -------------------------------------------------------------------------
+  // ---------------------------------------------------------------- Write
 
   async updateDocument(
     request: UpdateDocumentRequest,

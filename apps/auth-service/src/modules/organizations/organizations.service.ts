@@ -43,6 +43,7 @@ import {
   MAX_ATTACHMENT_BYTES,
   MAX_ATTACHMENTS_PER_MESSAGE,
   MAX_DOCUMENT_BYTES,
+  LimitAlertPublisher,
 } from '@synapsedesk/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { SessionsService } from '../sessions/sessions.service';
@@ -62,6 +63,7 @@ export class OrganizationsService {
     private readonly audit: AuditPublisher,
     private readonly sessionsService: SessionsService,
     private readonly notifications: NotificationPublisher,
+    private readonly limitAlerts: LimitAlertPublisher,
   ) {}
 
   async getCurrentOrganization(
@@ -773,6 +775,38 @@ export class OrganizationsService {
     ]);
 
     return active + pending;
+  }
+
+  /**
+   * Evaluate the seat alarm for one tenant.
+   *
+   * Lives beside `seatsInUse` because it is the same count read a second time,
+   * and a copy of it in each enforcement point would be a second definition of
+   * "seats used" that can drift from the one the refusal applies.
+   *
+   * Called AFTER the row that consumed the seat is committed, so the reading
+   * includes it — the crossing is what the tenant needs told.
+   *
+   * **Not called on invitation acceptance**, which is the tempting fourth call
+   * site: `seatsInUse` counts live users plus PENDING invitations, so accepting
+   * one moves a row from the second term to the first and the sum does not
+   * change. Acceptance can never produce a crossing that creation did not.
+   *
+   * **May reject** — it queries before reaching `evaluate`'s internal guard —
+   * so every caller catches rather than bare-`void`ing it.
+   */
+  async alertOnSeats(
+    organizationId: string,
+    maxAgentSeats: number,
+  ): Promise<void> {
+    const seatsInUse = await this.seatsInUse(this.prisma, organizationId);
+
+    await this.limitAlerts.evaluate(
+      organizationId,
+      'seats',
+      seatsInUse,
+      maxAgentSeats,
+    );
   }
 
   /**

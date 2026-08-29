@@ -15,7 +15,7 @@ import { requestOf } from '../utils/execution-request.util';
  * Stack it AFTER `JwtAuthGuard` on business routes — tickets, documents,
  * invitations, anything that sends mail or spends quota:
  *
- *     @UseGuards(JwtAuthGuard, EmailVerifiedGuard)
+ *     `@UseGuards(JwtAuthGuard, EmailVerifiedGuard)`
  *
  * It must NOT go on `/auth/*` or `/auth/email/verify*`: those are how an
  * unverified user becomes verified, and guarding them would deadlock the account

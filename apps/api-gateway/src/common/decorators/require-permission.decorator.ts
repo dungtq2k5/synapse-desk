@@ -9,8 +9,8 @@ export const PERMISSION_KEY = 'permission';
  * Semantics are **ANY**, and the caller cannot see that from the call site — so
  * it is stated here:
  *
- *     @RequirePermission('ticket.update')                    // needs that one
- *     @RequirePermission('ticket.assign', 'ticket.assign.self') // needs EITHER
+ *     `@RequirePermission('ticket.update')`                    // needs that one
+ *     `@RequirePermission('ticket.assign', 'ticket.assign.self')` // needs EITHER
  *
  * For a route that genuinely needs two distinct grants, stack the guard twice
  * rather than relying on this decorator, so the conjunction stays visible.

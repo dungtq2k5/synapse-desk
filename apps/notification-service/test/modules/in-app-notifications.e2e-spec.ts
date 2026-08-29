@@ -2,6 +2,7 @@ import {
   DeliverySkipReason,
   DeliveryStatus,
   DigestMode,
+  EmailTemplateName,
   NOTIFICATION_REALTIME_PATTERNS,
   NOTIFICATION_TYPES,
   NotificationChannel,
@@ -9,6 +10,7 @@ import {
   NotificationResourceType,
   compareAlphabetically,
   quotaThresholdEventId,
+  limitThresholdEventId,
   UnprocessableMessage,
 } from '@synapsedesk/common';
 import { bootstrapE2eTest, E2eFixture } from '../utils/bootstrap';
@@ -60,6 +62,44 @@ describe('In-app notification delivery (e2e)', () => {
       timezone: null,
     },
   ];
+
+  /** A seat/storage/document level alert — `LimitAlertPublisher`'s command. */
+  const limitAlert = (threshold: number) => ({
+    ...quotaAlert(threshold),
+    type: NOTIFICATION_TYPES.limitThreshold,
+    eventId: limitThresholdEventId(ORG, 'seats', threshold, 0),
+    title: `Seats ${threshold}% used`,
+    body: 'Inviting another teammate will be refused at 100%.',
+  });
+
+  /** `DunningService`'s command — always CRITICAL, retry date in `data`. */
+  const paymentFailed = ({ nextAttempt }: { nextAttempt: string | null }) => ({
+    ...quotaAlert(100),
+    type: NOTIFICATION_TYPES.paymentFailed,
+    eventId: `dunning:evt_${nextAttempt ?? 'final'}`,
+    title: 'A payment did not go through',
+    body: 'We could not take payment for your subscription.',
+    data: { nextAttempt, reason: 'Your card was declined' },
+  });
+
+  /**
+   * A type with no email template.
+   *
+   * **CRITICAL here, NORMAL in production** — deliberately. The producer
+   * publishes plan-changed at `NORMAL`, so the priority gate returns before the
+   * email arm and the switch is never consulted. That gate is a second guard,
+   * and testing through it would mean this test passes for a reason that has
+   * nothing to do with the arm it names. Forced past it, what is left is the
+   * property: a type the switch answers `null` for sends no email.
+   */
+  const planChanged = () => ({
+    ...quotaAlert(80),
+    type: NOTIFICATION_TYPES.planChanged,
+    eventId: `plan-changed:${ORG}:evt_1`,
+    title: 'Your plan was updated',
+    body: 'The limits on your workspace have changed.',
+    priority: NotificationPriority.CRITICAL,
+  });
 
   /** The command `quota-alert.service.ts` actually emits. */
   const quotaAlert = (threshold: number, overrides = {}) => {
@@ -552,6 +592,62 @@ describe('In-app notification delivery (e2e)', () => {
       } finally {
         create.mockRestore();
       }
+    });
+
+    it('30. Routes a limit alert through LIMIT_ALERT, not the budget template', async () => {
+      // The fan-out used to hardcode `QUOTA_ALERT` — correct while
+      // `quota-alert.service.ts` was the only CRITICAL producer, and wrong the
+      // moment this phase added two more. A tenant at 100% of their SEATS would
+      // have been emailed the AI budget email.
+      await inApp.deliver(limitAlert(100));
+
+      expect(sendEmail).toHaveBeenCalledTimes(2);
+      const [command] = sendEmail.mock.calls[0] as [
+        { template: string; to: string; data: Record<string, unknown> },
+      ];
+      expect(command.template).toBe(EmailTemplateName.LIMIT_ALERT);
+      expect(command.to).toBe(ADMINS[0].email);
+      expect(command.data.headline).toBe('Seats 100% used');
+    });
+
+    it('31. Routes a failed payment through PAYMENT_FAILED, carrying its own fields', async () => {
+      // The dunning fields are the whole reason the template exists, and they
+      // live in `data` rather than in the body sentence. Rendered through
+      // `QUOTA_ALERT` they are dropped silently: the shapes happen to agree on
+      // `{fullName, headline, detail}`, so nothing complains.
+      await inApp.deliver(paymentFailed({ nextAttempt: '2026-09-04' }));
+
+      const [command] = sendEmail.mock.calls[0] as [
+        { template: string; data: Record<string, unknown> },
+      ];
+      expect(command.template).toBe(EmailTemplateName.PAYMENT_FAILED);
+      expect(command.data.nextAttempt).toBe('2026-09-04');
+      expect(command.data.reason).toBe('Your card was declined');
+    });
+
+    it('32. A FINAL attempt reaches the template with no retry date', async () => {
+      // Asserted at the PRODUCER boundary, not only in `renderEmail`. The
+      // renderer's own spec proves it omits the retry promise when handed
+      // `null`; this proves it is handed `null` — which is the half the
+      // hardcoded template broke.
+      await inApp.deliver(paymentFailed({ nextAttempt: null }));
+
+      const [command] = sendEmail.mock.calls[0] as [
+        { template: string; data: Record<string, unknown> },
+      ];
+      expect(command.template).toBe(EmailTemplateName.PAYMENT_FAILED);
+      expect(command.data.nextAttempt).toBeNull();
+    });
+
+    it('33. A type with no email template writes the row and sends nothing', async () => {
+      // Six of the nine notification types have no email and should not have
+      // one. The exhaustive switch answers `null` for them; what must not
+      // happen is one of them being emailed through a billing template because
+      // the fan-out has a single hardcoded answer.
+      const outcome = await inApp.deliver(planChanged());
+
+      expect(outcome.created).toBe(2);
+      expect(sendEmail).not.toHaveBeenCalled();
     });
 
     it('**29. A malformed command is PARKED, not acked away**', async () => {

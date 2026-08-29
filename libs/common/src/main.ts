@@ -20,6 +20,8 @@ export * from './utils/class-transformer';
 export * from './utils/sorting';
 export * from './utils/limits';
 export * from './utils/analytics-range';
+export * from './configs/limit-alerts.config';
+export * from './utils/limit-alert-publisher';
 export * from './utils/tenant-scope';
 export * from './utils/soft-delete';
 export * from './utils/rollup-window';

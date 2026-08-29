@@ -47,6 +47,12 @@ export function renderEmail(
       return inboundRejected(command.data, branding);
     case EmailTemplateName.QUOTA_ALERT:
       return quotaAlert(command.data, branding);
+    case EmailTemplateName.LIMIT_ALERT:
+      return limitAlert(command.data, branding);
+    case EmailTemplateName.PAYMENT_FAILED:
+      return paymentFailed(command.data, branding);
+    case EmailTemplateName.PLAN_CHANGED:
+      return planChanged(command.data, branding);
   }
 }
 
@@ -328,5 +334,89 @@ function quotaAlert(
        <p style="margin:0;">${esc(data.detail)}</p>`,
     ),
     text: `${data.headline}\n\nHi ${data.fullName},\n\n${data.detail}`,
+  };
+}
+
+/**
+ * A seat, storage or document-count threshold crossing.
+ *
+ * Deliberately the same shape as {@link quotaAlert}: a tenant who gets both
+ * should not have to learn two layouts for one idea, and the sentence that
+ * matters — what is refused at 100% — sits in the same place in each.
+ */
+function limitAlert(
+  data: Data<EmailTemplateName.LIMIT_ALERT>,
+  branding: TemplateBranding,
+): RenderedEmail {
+  return {
+    subject: `${branding.appName}: ${data.headline}`,
+    html: layout(
+      branding,
+      data.headline,
+      `<p style="margin:0 0 12px;">Hi ${esc(data.fullName)},</p>
+       <p style="margin:0;">${esc(data.detail)}</p>`,
+    ),
+    text: `${data.headline}\n\nHi ${data.fullName},\n\n${data.detail}`,
+  };
+}
+
+/**
+ * A payment Stripe could not take.
+ *
+ * **The subject line carries the deadline, not the failure.** "A payment
+ * problem" is a message people archive; a date is one they act on. `reason`
+ * comes from Stripe and is escaped like any other untrusted string — it is
+ * shown because "your card was declined" and "your card expired" need different
+ * things done about them.
+ */
+function paymentFailed(
+  data: Data<EmailTemplateName.PAYMENT_FAILED>,
+  branding: TemplateBranding,
+): RenderedEmail {
+  const headline = data.nextAttempt
+    ? `Payment failed — we will retry on ${data.nextAttempt}`
+    : 'Payment failed — this was the final attempt';
+
+  const detail = data.nextAttempt
+    ? `We could not take payment for your ${branding.appName} subscription. Stripe will try again on ${data.nextAttempt}. Updating your payment method before then avoids any interruption.`
+    : `We could not take payment for your ${branding.appName} subscription, and this was the final attempt. Your workspace may be suspended until a working payment method is added.`;
+
+  return {
+    subject: `${branding.appName}: ${headline}`,
+    html: layout(
+      branding,
+      headline,
+      `<p style="margin:0 0 12px;">Hi ${esc(data.fullName)},</p>
+       <p style="margin:0 0 12px;">${esc(detail)}</p>
+       <p style="margin:0;color:#666;">Reason given by our payment provider: ${esc(data.reason)}</p>`,
+    ),
+    text: `${headline}\n\nHi ${data.fullName},\n\n${detail}\n\nReason: ${data.reason}`,
+  };
+}
+
+/**
+ * Entitlements changed — a subscription, or a plan edit applied to every
+ * subscriber at once.
+ *
+ * **"Your plan was updated", never "you upgraded".** One apply notifies every
+ * tenant on the plan, and most of them did nothing: wording that implies they
+ * acted turns a routine notice into a support ticket.
+ */
+function planChanged(
+  data: Data<EmailTemplateName.PLAN_CHANGED>,
+  branding: TemplateBranding,
+): RenderedEmail {
+  const headline = 'Your plan was updated';
+
+  return {
+    subject: `${branding.appName}: ${headline}`,
+    html: layout(
+      branding,
+      headline,
+      `<p style="margin:0 0 12px;">Hi ${esc(data.fullName)},</p>
+       <p style="margin:0 0 12px;">Your workspace is now on <strong>${esc(data.planName)}</strong>.</p>
+       <p style="margin:0;">${esc(data.summary)}</p>`,
+    ),
+    text: `${headline}\n\nHi ${data.fullName},\n\nYour workspace is now on ${data.planName}.\n\n${data.summary}`,
   };
 }

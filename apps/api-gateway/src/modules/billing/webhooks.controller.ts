@@ -46,8 +46,7 @@ export class WebhooksController {
   constructor(private readonly billing: BillingService) {}
 
   /**
-   * **Authenticated by SIGNATURE, not by a scheme OpenAPI can express** —
-   *
+   * **Authenticated by SIGNATURE, not by a scheme OpenAPI can express**
    *
    * There is no security requirement here because Swagger has no way to state
    * "verified HMAC over the raw body". The `description` says so explicitly:

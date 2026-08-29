@@ -10,6 +10,7 @@ import { BillingEventPublisher } from './billing-event.publisher';
 import { EntitlementWriterService } from './entitlement-writer.service';
 import { PlanCatalogService } from './plan-catalog.service';
 import { PlanAdminService } from './plan-admin.service';
+import { DunningService } from './dunning.service';
 import { BillingGrpcController } from './billing-grpc.controller';
 
 /**
@@ -46,6 +47,7 @@ import { BillingGrpcController } from './billing-grpc.controller';
     EntitlementWriterService,
     PlanCatalogService,
     PlanAdminService,
+    DunningService,
   ],
   exports: [
     BillingService,

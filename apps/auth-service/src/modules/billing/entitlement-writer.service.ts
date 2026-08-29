@@ -13,6 +13,7 @@ import { Prisma } from '../../generated/prisma/client';
 import { BillingEventPublisher } from './billing-event.publisher';
 import { StripeService } from './stripe.service';
 import { PlanCatalogService } from './plan-catalog.service';
+import { DunningService } from './dunning.service';
 
 /** What the writer decided, for the response and for the tests. */
 export type WriteOutcome = {
@@ -48,6 +49,7 @@ export class EntitlementWriterService {
     private readonly stripe: StripeService,
     private readonly events: BillingEventPublisher,
     private readonly planCatalog: PlanCatalogService,
+    private readonly dunning: DunningService,
   ) {}
 
   /**
@@ -79,6 +81,30 @@ export class EntitlementWriterService {
     if (!claim) {
       this.logger.log(`Stripe event ${event.id} was already processed`);
       return { status: BillingEventStatus.SKIPPED_DUPLICATE };
+    }
+
+    if (DUNNING_EVENT_TYPES.has(event.type)) {
+      // **Dispatched, never absorbed.** The claim above is the idempotency
+      // mechanism for EVERY Stripe event — it belongs to whoever owns
+      // `billing_events` — so the routing has to happen after it. What must not
+      // happen is an invoice reaching the entitlement path below, which reads
+      // `event.data.object` as a Subscription and derives a plan from its
+      // price.
+      //
+      // **The ORDERING is the guard, not the set membership.** `return`ing here
+      // is what keeps an invoice off the entitlement path; the fact that
+      // `invoice.payment_failed` is absent from `HANDLED_EVENT_TYPES` is a
+      // second, weaker line that never gets read. So adding the type to that
+      // set changes nothing observable — and deleting THIS return is the edit
+      // that would apply a plan derived from an invoice's line item. Anyone
+      // restructuring this dispatch is moving the guard, not tidying it.
+      const outcome = await this.dunning.handle(event);
+
+      return this.settle(
+        claim,
+        outcome.organizationId,
+        BillingEventStatus.PROCESSED,
+      );
     }
 
     if (!HANDLED_EVENT_TYPES.has(event.type)) {
@@ -170,7 +196,12 @@ export class EntitlementWriterService {
       );
     }
 
-    await this.apply(organization.id, subscription, entitlements, event.type);
+    const grantsMoved = await this.apply(
+      organization.id,
+      subscription,
+      entitlements,
+      event.type,
+    );
 
     const outcome = await this.settle(
       claim,
@@ -182,7 +213,19 @@ export class EntitlementWriterService {
     // refill the cache from the OLD row — leaving a downgraded tenant on the
     // premium model for the whole TTL, which is precisely the failure the
     // event exists to prevent.
-    this.events.publishEntitlementsChanged(organization.id);
+    // **The tenant notice only when a GRANT actually moved.** Stripe sends
+    // `customer.subscription.updated` for a card change, a
+    // `cancel_at_period_end` toggle, a quantity edit and every renewal — and
+    // telling everyone holding `organization.update` that "the limits on your
+    // workspace have changed" after a renewal that changed nothing is how a
+    // useful notice becomes one people filter.
+    //
+    // The cache invalidation above is unconditional and stays that way: it is
+    // cheap, and a consumer refreshing from an unchanged row is harmless.
+    this.events.publishEntitlementsChanged(
+      organization.id,
+      grantsMoved ? event.id : undefined,
+    );
 
     return outcome;
   }
@@ -199,9 +242,26 @@ export class EntitlementWriterService {
     subscription: Stripe.Subscription,
     entitlements: PlanEntitlements & { planId: string },
     eventType: string,
-  ): Promise<void> {
+  ): Promise<boolean> {
     const cycleStart = periodStartOf(subscription);
     const status = this.lifecycleStatusFor(subscription, eventType);
+
+    // Read before the write, so "did anything change" is answerable. One extra
+    // query on the webhook path, which runs per subscription event rather than
+    // per request — and it is what stops every renewal announcing itself.
+    const before = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: {
+        maxAgentSeats: true,
+        maxStorageBytes: true,
+        monthlyAiTokenBudget: true,
+        aiModelTier: true,
+        maxDocumentBytes: true,
+        maxAttachmentBytes: true,
+        maxDocumentUploads: true,
+        maxAnalyticsRangeDays: true,
+      },
+    });
 
     await this.prisma.organization.update({
       where: { id: organizationId },
@@ -236,6 +296,16 @@ export class EntitlementWriterService {
         ...(status ? { status } : {}),
       },
     });
+
+    // A tenant with no prior row cannot have "changed" — but there is no such
+    // tenant on this path, since the organization was resolved by
+    // `stripeCustomerId` above. `true` is the safe answer for the impossible
+    // case: it announces once rather than staying silent forever.
+    if (!before) return true;
+
+    return GRANT_COLUMNS.some(
+      (column) => String(before[column]) !== String(entitlements[column]),
+    );
   }
 
   /**
@@ -357,13 +427,53 @@ export class EntitlementWriterService {
 }
 
 /**
+ * The grants a tenant would notice moving.
+ *
+ * `planId`, `stripeSubscriptionId`, `billingCycleStart` and `status` are
+ * deliberately absent: a renewal moves the cycle on every invoice, and
+ * announcing "your limits changed" because the billing period rolled is exactly
+ * the noise this list exists to prevent. Compared as strings so a `bigint` and
+ * a `number` holding the same value do not read as a change.
+ */
+const GRANT_COLUMNS = [
+  'maxAgentSeats',
+  'maxStorageBytes',
+  'monthlyAiTokenBudget',
+  'aiModelTier',
+  'maxDocumentBytes',
+  'maxAttachmentBytes',
+  'maxDocumentUploads',
+  'maxAnalyticsRangeDays',
+] as const satisfies readonly (keyof PlanEntitlements)[];
+
+/**
+ * The events that carry a FAILED PAYMENT, handled by their own consumer.
+ *
+ * Deliberately a separate set rather than members of `HANDLED_EVENT_TYPES`:
+ * that one is read as "types the entitlement writer acts on", and an invoice
+ * has no plan to derive. Two sets, one dispatch, and the narrowness of the
+ * first one preserved.
+ */
+// The type argument is not decoration. `Stripe.Event['type']` is a literal
+// union in the SDK, so a typo is a compile error; untyped,
+// `'invoice.payment_faild'` builds a set that matches nothing and every failed
+// payment falls silently through to "recorded but not acted on" — the same
+// fail-open shape as an unmapped price, without even the FAILED row to find
+// later.
+const DUNNING_EVENT_TYPES = new Set<Stripe.Event['type']>([
+  'invoice.payment_failed',
+]);
+
+/**
  * The event types that carry entitlements.
  *
  * Narrow on purpose. Stripe sends dozens of types and acting on the wrong one —
  * `invoice.paid`, say — would apply entitlements from an object that does not
  * describe a plan.
  */
-const HANDLED_EVENT_TYPES = new Set([
+// Typed for the same reason `DUNNING_EVENT_TYPES` is: an unchecked typo here
+// fails open silently.
+const HANDLED_EVENT_TYPES = new Set<Stripe.Event['type']>([
   'customer.subscription.created',
   'customer.subscription.updated',
   'customer.subscription.deleted',

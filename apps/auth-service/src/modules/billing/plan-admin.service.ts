@@ -372,7 +372,14 @@ export class PlanAdminService {
 
       await this.write(subscriber, plan, projection.budgetDeferred);
       // Same announcement the webhook path makes, for the same consumers.
-      this.billingEvents.publishEntitlementsChanged(subscriber.id);
+      // The PLAN's `updatedAt` is what identifies this change: every subscriber
+      // in one apply shares it, and two applies of the same plan do not — so a
+      // retried apply collapses onto one notice per tenant rather than minting
+      // a second id for the same edit.
+      this.billingEvents.publishEntitlementsChanged(
+        subscriber.id,
+        `apply:${plan.id}:${plan.updatedAt.toISOString()}`,
+      );
     }
 
     const changed = projections.filter(

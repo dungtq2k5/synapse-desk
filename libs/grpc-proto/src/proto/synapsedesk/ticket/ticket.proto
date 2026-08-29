@@ -174,7 +174,6 @@ message BulkTicketStatusResponse {
   repeated BulkTicketFailure failed = 2;
 }
 
-
 // ---------------------------------------------------------------------------
 // `ListXByIds` — the contract behind every DataLoader.
 //
@@ -199,6 +198,7 @@ message BulkTicketStatusResponse {
 // SOFT DELETES ARE VISIBLE BY ID. A ticket citing a deleted user still needs to
 // render someone; omitting it makes property 2 fire for a row that exists.
 // ---------------------------------------------------------------------------
+
 message ListTicketsByIdsRequest { repeated string ticket_ids = 1; }
 
 message ListTicketsByIdsResponse { repeated TicketResponse items = 1; }

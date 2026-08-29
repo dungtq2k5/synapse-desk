@@ -34,6 +34,11 @@ import { MAX_ANALYTICS_RANGE_DAYS } from './analytics.config';
  * narrowing it affects every subscriber equally and immediately. Adding it for
  * symmetry would make the list mean two different things.
  *
+ * **Not the same list as `LIMIT_ALERT_DIMENSIONS`**, which happens to have the
+ * same three members and answers "which dimensions have an approaching state".
+ * Its exclusions are per-file byte gates; this one's exclusion is `analytics`.
+ * See that constant for why the two are allowed to diverge.
+ *
  * Which of these a given run actually checked is reported per response, because
  * the answer is dynamic: `storage` and `documents` are answered by
  * `ingestion-service`, so a leg that does not respond drops them from that run's

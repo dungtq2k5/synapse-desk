@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '../prisma/prisma.module';
+import { LimitAlertsModule } from '../limit-alerts/limit-alerts.module';
 import { AuditModule } from '../audit/audit.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { SessionsModule } from '../sessions/sessions.module';
@@ -16,7 +17,13 @@ import { OrganizationsGrpcController } from './organizations-grpc.controller';
  * immediately rather than whenever each access token expires.
  */
 @Module({
-  imports: [PrismaModule, AuditModule, NotificationsModule, SessionsModule],
+  imports: [
+    PrismaModule,
+    AuditModule,
+    NotificationsModule,
+    SessionsModule,
+    LimitAlertsModule,
+  ],
   controllers: [OrganizationsGrpcController],
   providers: [OrganizationsService],
   exports: [OrganizationsService],

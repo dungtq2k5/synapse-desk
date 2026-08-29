@@ -4,6 +4,7 @@ import {
   AuditAction,
   AuditPublisher,
   PLAN_LIMIT_DIMENSIONS,
+  JetStreamPublisher,
 } from '@synapsedesk/common';
 import { AiModelTier as ProtoAiModelTier } from '@synapsedesk/grpc-proto';
 import {
@@ -39,6 +40,7 @@ describe('The plan catalogue (e2e)', () => {
   let auth: AuthService;
   let auditRecord: jest.SpyInstance;
   let publishEntitlementsChanged: jest.SpyInstance;
+  let jetstreamPublish: jest.SpyInstance;
 
   const SUPER_ADMIN_ID = '00000000-0000-4000-8000-00000000beef';
   const context = () => superAdminContext(SUPER_ADMIN_ID);
@@ -129,13 +131,18 @@ describe('The plan catalogue (e2e)', () => {
       .spyOn(fx.moduleRef.get(AuditPublisher), 'record')
       .mockImplementation(() => undefined);
     auditRecord.mockClear();
-    publishEntitlementsChanged = jest
-      .spyOn(
-        fx.moduleRef.get(BillingEventPublisher),
-        'publishEntitlementsChanged',
-      )
-      .mockImplementation(() => undefined);
+    // **Spied, not stubbed** — the plan-changed notice is built inside this
+    // method, so replacing it deletes the thing test 4c is about. The real one
+    // runs and the transport below is what gets replaced.
+    publishEntitlementsChanged = jest.spyOn(
+      fx.moduleRef.get(BillingEventPublisher),
+      'publishEntitlementsChanged',
+    );
     publishEntitlementsChanged.mockClear();
+    jetstreamPublish = jest
+      .spyOn(fx.moduleRef.get(JetStreamPublisher), 'publish')
+      .mockImplementation(() => undefined);
+    jetstreamPublish.mockClear();
   });
 
   afterAll(() => fx.close());
@@ -327,8 +334,14 @@ describe('The plan catalogue (e2e)', () => {
         where: { id: organization.id },
       });
       expect(applied.maxAgentSeats).toBe(7);
-      // The same announcement the webhook path makes, for the same consumers.
-      expect(publishEntitlementsChanged).toHaveBeenCalledWith(organization.id);
+      // The same announcement the webhook path makes, for the same consumers,
+      // with the change id derived from the PLAN's `updatedAt` — every
+      // subscriber in one apply shares it, and a retried apply collapses onto
+      // one notice per tenant rather than minting a second.
+      expect(publishEntitlementsChanged).toHaveBeenCalledWith(
+        organization.id,
+        expect.stringContaining(`apply:${plan.id}:`),
+      );
     });
 
     it('9. **A DRY RUN reports exactly what the apply then does — and writes nothing**', async () => {
@@ -379,6 +392,85 @@ describe('The plan catalogue (e2e)', () => {
       expect(byId.get(pinned.id)?.skippedPinned).toBe(true);
       expect(byId.get(first.id)?.overLimit.length).toBeGreaterThan(0);
       expect(byId.get(second.id)?.overLimit).toEqual([]);
+    });
+
+    it('4. **An apply over N subscribers notifies N tenants, one each**', async () => {
+      // The fan-out shape. Two failures are available and they are opposites:
+      // deduping on the PLAN collapses 200 tenants into one notification only
+      // the first receives, and no dedupe at all republishes the same id for
+      // every apply. The id carries the ORGANIZATION and the timestamp, so
+      // neither happens.
+      const plan = await buildPlan({ maxAgentSeats: 25 });
+      const first = await subscriberOf(plan.id);
+      const second = await subscriberOf(plan.id);
+      const third = await subscriberOf(plan.id);
+
+      await plans.updatePlan(
+        { planId: plan.id, maxAgentSeats: 9 } as never,
+        context(),
+      );
+      await plans.applyPlan({ planId: plan.id, dryRun: false }, context());
+
+      // One per tenant, and every tenant distinct — asserted as a SET, because
+      // three calls carrying one organization id would satisfy a bare count.
+      const notified = publishEntitlementsChanged.mock.calls.map(
+        (call) => call[0] as string,
+      );
+      expect(new Set(notified)).toEqual(
+        new Set([first.id, second.id, third.id]),
+      );
+      expect(notified).toHaveLength(3);
+    });
+
+    it('4c. …and each tenant’s NOTICE carries its own event id', async () => {
+      // The assertion above measures the fan-out. This measures the
+      // notification inside it, which is a different property: an id keyed on
+      // the plan rather than the tenant gives three subscribers one id, and
+      // Domain E's unique index is `(recipient_id, event_id)` — so the second
+      // and third tenants' admins would be deduplicated against the first.
+      const plan = await buildPlan({ maxAgentSeats: 25 });
+      const first = await subscriberOf(plan.id);
+      const second = await subscriberOf(plan.id);
+
+      await plans.updatePlan(
+        { planId: plan.id, maxAgentSeats: 9 } as never,
+        context(),
+      );
+      await plans.applyPlan({ planId: plan.id, dryRun: false }, context());
+
+      const notices = jetstreamPublish.mock.calls
+        .map(([, command, messageId]) => [
+          command as { organizationId: string; eventId: string },
+          messageId as string,
+        ])
+        .filter(([command]) =>
+          (command as { eventId: string }).eventId.startsWith('plan-changed:'),
+        ) as [{ organizationId: string; eventId: string }, string][];
+
+      expect(notices).toHaveLength(2);
+      expect(
+        new Set(notices.map(([command]) => command.organizationId)),
+      ).toEqual(new Set([first.id, second.id]));
+      expect(new Set(notices.map(([command]) => command.eventId)).size).toBe(2);
+      // Message id and durable id are one string, as everywhere else.
+      for (const [command, messageId] of notices) {
+        expect(messageId).toBe(command.eventId);
+      }
+    });
+
+    it('4b. …and a DRY RUN notifies nobody', async () => {
+      // A projection that told two hundred tenants their plan changed would be
+      // the worst possible way to discover the dry run was not dry.
+      const plan = await buildPlan({ maxAgentSeats: 25 });
+      await subscriberOf(plan.id);
+
+      await plans.updatePlan(
+        { planId: plan.id, maxAgentSeats: 9 } as never,
+        context(),
+      );
+      await plans.applyPlan({ planId: plan.id, dryRun: true }, context());
+
+      expect(publishEntitlementsChanged).not.toHaveBeenCalled();
     });
 
     it('2. **The response says which limits it CHECKED — storage is not one**', async () => {

@@ -340,6 +340,12 @@ const notificationType = enumBridge<NotificationType, ProtoNotificationType>(
       ProtoNotificationType.NOTIFICATION_TYPE_TICKET_STATUS_CHANGED,
     [NOTIFICATION_TYPES.quotaThreshold]:
       ProtoNotificationType.NOTIFICATION_TYPE_QUOTA_THRESHOLD,
+    [NOTIFICATION_TYPES.limitThreshold]:
+      ProtoNotificationType.NOTIFICATION_TYPE_LIMIT_THRESHOLD,
+    [NOTIFICATION_TYPES.paymentFailed]:
+      ProtoNotificationType.NOTIFICATION_TYPE_PAYMENT_FAILED,
+    [NOTIFICATION_TYPES.planChanged]:
+      ProtoNotificationType.NOTIFICATION_TYPE_PLAN_CHANGED,
   },
   ProtoNotificationType.NOTIFICATION_TYPE_UNSPECIFIED,
 );

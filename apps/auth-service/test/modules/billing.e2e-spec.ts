@@ -5,6 +5,9 @@ import {
   AuditPublisher,
   BillingEventStatus,
   OrgStatus,
+  JetStreamPublisher,
+  NOTIFICATION_TYPES,
+  NotificationPriority,
 } from '@synapsedesk/common';
 import { fromProtoAiModelTier } from '@synapsedesk/grpc-proto';
 import {
@@ -35,6 +38,7 @@ describe('Billing and entitlements (e2e)', () => {
   let organizations: OrganizationsService;
   let auditRecord: jest.SpyInstance;
   let publishEntitlementsChanged: jest.SpyInstance;
+  let jetstreamPublish: jest.SpyInstance;
 
   /** Matches `STRIPE_WEBHOOK_SECRET` in .env.test. */
   const WEBHOOK_SECRET = 'whsec_test_secret_for_the_e2e_suite';
@@ -117,6 +121,41 @@ describe('Billing and entitlements (e2e)', () => {
     return createOrganization(fx.prisma, { stripeCustomerId: customerId });
   };
 
+  /**
+   * A failed payment, shaped as Stripe sends it.
+   *
+   * `next_payment_attempt` present means "we will try again"; absent means this
+   * was the last attempt — which is the distinction the notice turns on.
+   */
+  const invoicePaymentFailedEvent = (options: {
+    customerId: string;
+    nextAttempt?: number | null;
+  }): Record<string, unknown> => {
+    eventCounter += 1;
+
+    return {
+      id: `evt_dunning_${eventCounter}_${Date.now()}`,
+      object: 'event',
+      api_version: '2024-06-20',
+      created: Math.floor(Date.now() / 1000),
+      type: 'invoice.payment_failed',
+      data: {
+        object: {
+          id: `in_test_${eventCounter}`,
+          object: 'invoice',
+          customer: options.customerId,
+          amount_due: 4900,
+          currency: 'usd',
+          attempt_count: 1,
+          next_payment_attempt:
+            options.nextAttempt === undefined
+              ? Math.floor(Date.now() / 1000) + 86_400 * 3
+              : options.nextAttempt,
+        },
+      },
+    };
+  };
+
   const deliver = async (event: Record<string, unknown>) => {
     const { payload, signature } = signedEvent(event);
 
@@ -135,11 +174,22 @@ describe('Billing and entitlements (e2e)', () => {
     // so a real publish would prove nothing either way.
     auditRecord = jest.spyOn(fx.moduleRef.get(AuditPublisher), 'record');
 
-    // NATS is not running for this suite, and the emit is fire-and-forget —
-    // a real publish would fail silently and prove nothing either way.
+    // **Spied, not stubbed.** The plan-changed notice is built INSIDE
+    // `publishEntitlementsChanged`, so replacing the method removes the thing
+    // under test — every assertion about the notice would have measured a
+    // method that never ran. The real one executes and the transport below is
+    // what gets replaced.
     publishEntitlementsChanged = jest.spyOn(
       fx.moduleRef.get(BillingEventPublisher),
       'publishEntitlementsChanged',
+    );
+
+    // NATS is not running for this suite and the publish is fire-and-forget, so
+    // the real one would log an error and prove nothing. This is the boundary
+    // the notice actually crosses.
+    jetstreamPublish = jest.spyOn(
+      fx.moduleRef.get(JetStreamPublisher),
+      'publish',
     );
   });
 
@@ -151,7 +201,7 @@ describe('Billing and entitlements (e2e)', () => {
     // by simply not seeding one.
     await seedPlans(fx.prisma);
     jest.clearAllMocks();
-    publishEntitlementsChanged.mockImplementation(() => undefined);
+    jetstreamPublish.mockImplementation(() => undefined);
     auditRecord.mockImplementation(() => undefined);
   });
 
@@ -483,6 +533,102 @@ describe('Billing and entitlements (e2e)', () => {
       ).resolves.toBe(1);
     });
 
+    it('5d. **`invoice.payment_failed` reaches the DUNNING consumer, not the writer**', async () => {
+      // §4's whole design. Widening `HANDLED_EVENT_TYPES` instead would feed an
+      // INVOICE into a writer that reads `event.data.object` as a Subscription
+      // and derives a plan from its price — applying entitlements from an
+      // object that does not describe one.
+      const organization = await subscribedOrganization('cus_dunning');
+      const before = await fx.prisma.organization.findUniqueOrThrow({
+        where: { id: organization.id },
+      });
+
+      const outcome = await deliver(
+        invoicePaymentFailedEvent({ customerId: 'cus_dunning' }),
+      );
+
+      expect(outcome.status).toBe(BillingEventStatus.PROCESSED);
+
+      // **Not one entitlement moved.** The dunning path tells somebody; it does
+      // not decide what they are entitled to. Suspension arrives separately, on
+      // the subscription event Stripe sends alongside.
+      const after = await fx.prisma.organization.findUniqueOrThrow({
+        where: { id: organization.id },
+      });
+      expect(after.maxAgentSeats).toBe(before.maxAgentSeats);
+      expect(after.aiModelTier).toBe(before.aiModelTier);
+      expect(after.maxDocumentUploads).toBe(before.maxDocumentUploads);
+
+      // And it is recorded against the tenant, so "did we tell them" is
+      // answerable during the support call that follows.
+      const row = await fx.prisma.billingEvent.findFirstOrThrow({
+        where: { organizationId: organization.id },
+        orderBy: { processedAt: 'desc' },
+      });
+      expect(row.eventType).toBe('invoice.payment_failed');
+
+      // **And somebody was actually told.** The three assertions above are the
+      // negative half — nothing moved — which a `handle` that returned
+      // immediately would also satisfy. This is the half that fails if the
+      // dunning consumer stops publishing.
+      const dunning = jetstreamPublish.mock.calls.find(([, command]) =>
+        String((command as { eventId?: string }).eventId ?? '').startsWith(
+          'dunning:',
+        ),
+      );
+      expect(dunning).toBeDefined();
+
+      const [, command, messageId] = dunning as [
+        string,
+        {
+          organizationId: string;
+          type: string;
+          priority: string;
+          eventId: string;
+          data: { nextAttempt: string | null };
+        },
+        string,
+      ];
+      expect(command.organizationId).toBe(organization.id);
+      expect(command.type).toBe(NOTIFICATION_TYPES.paymentFailed);
+      // Always CRITICAL: every one of these has a deadline attached.
+      expect(command.priority).toBe(NotificationPriority.CRITICAL);
+      expect(command.data.nextAttempt).not.toBeNull();
+      // Derived, and the SAME string in both places — so the stream's dedupe
+      // window and Domain E's partial unique index collapse on one field.
+      expect(messageId).toBe(command.eventId);
+    });
+
+    it('5e. …and an unresolved customer is recorded rather than dropped', async () => {
+      // The same rule the entitlement path follows: a payment failing for a
+      // customer we cannot resolve is a data problem worth a row, not a silent
+      // discard.
+      const outcome = await deliver(
+        invoicePaymentFailedEvent({ customerId: 'cus_nobody_dunning' }),
+      );
+
+      expect(outcome.status).toBe(BillingEventStatus.PROCESSED);
+
+      // **Unattached, which is the stated behaviour.** Counting rows of this
+      // event type was satisfied by 5d's row too, so it asserted nothing this
+      // test is about: a customer we cannot resolve has no tenant to hang the
+      // row on, and the row is kept anyway.
+      const row = await fx.prisma.billingEvent.findFirstOrThrow({
+        where: { eventType: 'invoice.payment_failed' },
+        orderBy: { processedAt: 'desc' },
+      });
+      expect(row.organizationId).toBeNull();
+
+      // And nobody was notified, because there is nobody to notify.
+      expect(
+        jetstreamPublish.mock.calls.filter(([, command]) =>
+          String((command as { eventId?: string }).eventId ?? '').startsWith(
+            'dunning:',
+          ),
+        ),
+      ).toHaveLength(0);
+    });
+
     it('4. Records NOTHING for a tampered payload', async () => {
       // A `billing_events` row means "we believed this and acted on it".
       // Recording unverified events would turn the table into a log of things
@@ -655,7 +801,70 @@ describe('Billing and entitlements (e2e)', () => {
 
       await deliver(subscriptionEvent({ customerId: 'cus_emit' }));
 
-      expect(publishEntitlementsChanged).toHaveBeenCalledWith(organization.id);
+      expect(publishEntitlementsChanged).toHaveBeenCalledWith(
+        organization.id,
+        // The Stripe event id, carried through as the change id — see test 12.
+        expect.any(String),
+      );
+    });
+
+    it('12. Publishes a plan-changed notice ONLY when a grant actually moved', async () => {
+      // Stripe sends `customer.subscription.updated` for a card change, a
+      // `cancel_at_period_end` toggle, a quantity edit and every renewal. A
+      // notice on each one says "the limits on your workspace have changed"
+      // when nothing did — which is how a useful notice becomes one people
+      // filter. The cache invalidation stays unconditional; only the tenant
+      // notice is gated.
+      const organization = await subscribedOrganization('cus_same_grants');
+
+      // First event: no plan on the row yet, so every grant moves.
+      await deliver(subscriptionEvent({ customerId: 'cus_same_grants' }));
+
+      const planChangedOf = () =>
+        jetstreamPublish.mock.calls.filter(([, command]) =>
+          String((command as { eventId?: string }).eventId ?? '').startsWith(
+            'plan-changed:',
+          ),
+        );
+
+      expect(planChangedOf()).toHaveLength(1);
+      const [, first] = planChangedOf()[0] as [
+        string,
+        { organizationId: string; eventId: string },
+      ];
+      expect(first.organizationId).toBe(organization.id);
+
+      jetstreamPublish.mockClear();
+
+      // Second event: same price, same grants. A renewal.
+      await deliver(subscriptionEvent({ customerId: 'cus_same_grants' }));
+
+      // The cache still gets invalidated — cheap, and a consumer refreshing
+      // from an unchanged row is harmless.
+      expect(publishEntitlementsChanged).toHaveBeenCalled();
+      // The tenant does not get told twice about one plan.
+      expect(planChangedOf()).toHaveLength(0);
+    });
+
+    it('12b. …and the notice’s id comes from the Stripe event, not the clock', async () => {
+      // `new Date().toISOString()` at publish time is what
+      // `limitThresholdEventId`'s docblock forbids two files away: a redelivery
+      // of one logical change mints a second id, and Domain E's constraint has
+      // nothing to collapse on. The event id is what the change OWNS.
+      await subscribedOrganization('cus_derived_id');
+      const event = subscriptionEvent({ customerId: 'cus_derived_id' });
+
+      await deliver(event);
+
+      const [, command, messageId] = jetstreamPublish.mock.calls.find(
+        ([, payload]) =>
+          String((payload as { eventId?: string }).eventId ?? '').startsWith(
+            'plan-changed:',
+          ),
+      ) as [string, { eventId: string }, string];
+
+      expect(command.eventId).toContain(String(event.id));
+      expect(messageId).toBe(command.eventId);
     });
 
     it('10b. Emits NOTHING when the write was skipped or failed', async () => {

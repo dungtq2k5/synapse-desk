@@ -57,6 +57,16 @@ export enum NotificationType {
   NOTIFICATION_TYPE_TICKET_MESSAGE_CREATED = 4,
   NOTIFICATION_TYPE_TICKET_STATUS_CHANGED = 5,
   NOTIFICATION_TYPE_QUOTA_THRESHOLD = 6,
+  /**
+   * NOTIFICATION_TYPE_LIMIT_THRESHOLD - A LEVEL crossing — seats, storage or document count. Distinct from the
+   * budget threshold above because the two are produced by different
+   * mechanisms and a tenant may want one and not the other; preference
+   * resolution keys on this value.
+   */
+  NOTIFICATION_TYPE_LIMIT_THRESHOLD = 7,
+  /** NOTIFICATION_TYPE_PAYMENT_FAILED - A payment Stripe could not take — the only one with a deadline. */
+  NOTIFICATION_TYPE_PAYMENT_FAILED = 8,
+  NOTIFICATION_TYPE_PLAN_CHANGED = 9,
   UNRECOGNIZED = -1,
 }
 

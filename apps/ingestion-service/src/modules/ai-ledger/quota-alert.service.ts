@@ -85,10 +85,18 @@ export class QuotaAlertService {
 
       // Two independent idempotency guards, and both earn their place.
       //
-      // Domain E's `UNIQUE (recipient_id, event_id)` is the durable one and the
-      // reason `eventId` is derived rather than generated — but Domain E does
-      // not exist yet, so relying on it alone would mean every charge past 80%
-      // publishes another command into a subject nobody is draining.
+      // Domain E's durable guard is the reason `eventId` is derived rather than
+      // generated — and it is a PARTIAL unique index,
+      // `(recipient_id, event_id) WHERE event_id IS NOT NULL`, chosen so two
+      // notifications with no id can coexist. That shape is why a derived id is
+      // load-bearing rather than tidy: a producer that omitted one would not
+      // fail to match the constraint, it would fall OUTSIDE it and get no
+      // durable dedupe at all, looking identical to a producer that did.
+      //
+      // The local guard still earns its place, and the reason has changed now
+      // that Domain E exists: it stops the command being PUBLISHED at all,
+      // which the durable one cannot do — it can only refuse the row once the
+      // consumer has already taken the message.
       //
       // `SET NX` here is the local guard: cheap, and keyed on the same id so
       // the two agree by construction. `EX` rather than a permanent key because

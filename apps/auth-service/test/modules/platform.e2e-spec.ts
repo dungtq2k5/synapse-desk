@@ -9,6 +9,9 @@ import {
   ORG_STATUS_TRANSITIONS,
   OrgStatus,
   SystemRoleName,
+  JetStreamPublisher,
+  LimitAlertPublisher,
+  limitAlertStateKey,
 } from '@synapsedesk/common';
 import {
   E2eFixture,
@@ -22,7 +25,10 @@ import {
   createOrganization,
   seedTenantWithUser,
 } from '../factories';
+import type Redis from 'ioredis';
 import { PlatformService } from '../../src/modules/platform/platform.service';
+import { LIMIT_ALERT_REDIS } from '../../src/modules/limit-alerts/limit-alerts.module';
+import { AuthGenerationStore } from '../../src/modules/limit-alerts/generation.store';
 
 describe('Platform (e2e)', () => {
   let fx: E2eFixture;
@@ -352,6 +358,118 @@ describe('Platform (e2e)', () => {
           })
         ).deletedAt,
       ).toBeNull();
+    });
+
+    it('**offboard → restore → re-cross publishes a DIFFERENT event id**', async () => {
+      // The central rule of the alarm's design, tested against the operation
+      // most likely to break it. Domain E's `notifications` live in ANOTHER
+      // database, which offboarding does not touch: a generation reset here
+      // would republish an id the permanent partial index already holds, and
+      // that dimension would go silent for that tenant forever — the exact
+      // failure the generation exists to prevent, produced by the cleanup that
+      // looks like tidiness.
+      const t = await seedTenantWithUser(fx.prisma, {
+        organization: { maxAgentSeats: 10 },
+      });
+      const alerts = fx.moduleRef.get(LimitAlertPublisher);
+      const publish = jest
+        .spyOn(fx.moduleRef.get(JetStreamPublisher), 'publish')
+        .mockImplementation(() => undefined);
+
+      try {
+        // Cross 80%, recover, and cross again — one recovery, one generation.
+        await alerts.evaluate(t.org.id, 'seats', 9, 10);
+        await alerts.evaluate(t.org.id, 'seats', 1, 10);
+
+        await platform.offboardOrganization(
+          { organizationId: t.org.id, reason: 'churned' },
+          ctx,
+        );
+        await platform.restoreOrganization({ organizationId: t.org.id }, ctx);
+
+        await alerts.evaluate(t.org.id, 'seats', 9, 10);
+
+        const ids = publish.mock.calls
+          .map(([, command]) => (command as { eventId: string }).eventId)
+          .filter((eventId) => eventId.startsWith('limit:'));
+
+        // Two crossings of the same threshold, and the ids differ.
+        expect(ids).toHaveLength(2);
+        expect(new Set(ids).size).toBe(2);
+      } finally {
+        publish.mockRestore();
+      }
+    });
+
+    it('…and offboarding clears the LEVEL while leaving the generation', async () => {
+      // Two adjacent pieces of state with different lifetimes, which is the
+      // thing a reader is most likely to "tidy" into one. The level is a cache
+      // — losing it costs at most one duplicate alert. The generation is the
+      // key half of a permanent constraint, so it must outlive the tenant's
+      // absence.
+      const t = await seedTenantWithUser(fx.prisma, {
+        organization: { maxAgentSeats: 10 },
+      });
+      const alerts = fx.moduleRef.get(LimitAlertPublisher);
+      const redis = fx.moduleRef.get<Redis>(LIMIT_ALERT_REDIS);
+      const publish = jest
+        .spyOn(fx.moduleRef.get(JetStreamPublisher), 'publish')
+        .mockImplementation(() => undefined);
+
+      try {
+        await alerts.evaluate(t.org.id, 'seats', 9, 10);
+        await alerts.evaluate(t.org.id, 'seats', 1, 10);
+
+        await expect(
+          redis.get(limitAlertStateKey(t.org.id, 'seats')),
+        ).resolves.not.toBeNull();
+        await expect(
+          fx.prisma.limitAlertGeneration.count({
+            where: { organizationId: t.org.id },
+          }),
+        ).resolves.toBe(1);
+
+        await platform.offboardOrganization(
+          { organizationId: t.org.id, reason: 'churned' },
+          ctx,
+        );
+
+        await expect(
+          redis.get(limitAlertStateKey(t.org.id, 'seats')),
+        ).resolves.toBeNull();
+        await expect(
+          fx.prisma.limitAlertGeneration.count({
+            where: { organizationId: t.org.id },
+          }),
+        ).resolves.toBe(1);
+      } finally {
+        publish.mockRestore();
+      }
+    });
+
+    it('a HARD delete leaves no generation row', async () => {
+      // The other half of the trade: the rows are kept across a soft delete
+      // deliberately, and something has to own them when the tenant is gone for
+      // good. `clear` is that owner, and this is the only test that runs it —
+      // hard deletion does not exist yet, so without this the method is dead
+      // code that would be discovered broken on the day it is wired up.
+      const t = await seedTenantWithUser(fx.prisma);
+      const generations = fx.moduleRef.get(AuthGenerationStore);
+
+      await generations.bump(t.org.id, 'seats');
+      await expect(
+        fx.prisma.limitAlertGeneration.count({
+          where: { organizationId: t.org.id },
+        }),
+      ).resolves.toBe(1);
+
+      await generations.clear(t.org.id);
+
+      await expect(
+        fx.prisma.limitAlertGeneration.count({
+          where: { organizationId: t.org.id },
+        }),
+      ).resolves.toBe(0);
     });
 
     it('a deleted tenant is hidden from the list unless asked for', async () => {

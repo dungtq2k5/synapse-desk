@@ -30,6 +30,12 @@ message StripeWebhookRequest {
 message StripeWebhookResponse {
   // BillingEventStatus, or empty when the event type is one we do not act on.
   // Stripe only needs a 2xx; this is for the gateway's log and for tests.
+  //
+  // A string rather than an enum, for the same reason `ledger.proto` gives for
+  // `purpose`: this repo stores enumerated columns as strings, and a status
+  // added on one side (`SKIPPED_PINNED` arrived two phases ago) would otherwise
+  // need a proto bump and a mapper on both sides for a field whose whole job is
+  // the line below.
   string status = 1;
   // Present when a `billing_events` row was written.
   optional string billing_event_id = 2;
@@ -78,6 +84,12 @@ message InvoiceResponse {
   string number = 2;
   int64 amount_due = 3;
   string currency = 4;
+  // STRIPE's invoice status — `draft`, `open`, `paid`, `uncollectible`, `void`
+  // — passed through from a live API read, so it is not ours to enumerate. An
+  // enum over a third party's vocabulary turns a value they add into
+  // `UNSPECIFIED` on our wire, which is a silent downgrade of an invoice's
+  // state on a page about money. Same rule as `SubscriptionPlanPrice.interval`:
+  // a foreign literal is stored and forwarded as it arrives.
   string status = 5;
   google.protobuf.Timestamp created = 6;
   string hosted_invoice_url = 7;

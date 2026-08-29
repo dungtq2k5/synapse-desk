@@ -309,6 +309,7 @@ export const MAX_BILLING_PRICE_ID_LENGTH = 255;
  * relaxed for convenience.
  */
 export const STRIPE_REDIRECT_URL = {
+  // ASK Idk should we keep to `false` always or when being in production, we need to change it to `true` (or simple remove because the default is `true`)?
   require_tld: false,
   protocols: ['http', 'https'],
 };
