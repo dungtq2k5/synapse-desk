@@ -102,7 +102,7 @@ export interface RecordGenerationRequest {
   latencyMs?:
     | number
     | undefined;
-  /** AiGenerationStatus. A FAILED call still consumed prompt tokens. */
+  /** AiGenerationStatus, as a string — see `purpose` above. A FAILED call still consumed prompt tokens. */
   status: string;
   /**
    * Populated for DRAFT and SUMMARY; absent for EMBEDDING and the

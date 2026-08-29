@@ -304,12 +304,21 @@ export const MAX_BILLING_PRICE_ID_LENGTH = 255;
  * validation while accepting `javascript:` or `data:`, and nothing at the call
  * site would show the difference.
  *
- * `require_tld: false` so a `localhost` redirect works in development. The
- * PROTOCOL restriction is the part that matters, and the part that must not be
- * relaxed for convenience.
+ * `require_tld: false` so a `localhost` redirect works in development —
+ * **unconditionally, never switched by environment.** Three reasons, and the
+ * third is the one that settles it:
+ *
+ * - A rule that is looser in development passes review, passes CI, and fails in
+ *   production on a URL nobody tested. The failure lands on the redirect AFTER
+ *   payment, which is the worst place in this flow for it.
+ * - It is not the security control. `protocols` is what refuses `javascript:`
+ *   and `data:`; a TLD stops nothing an attacker would try.
+ * - **The party receiving the URL is strict.** Live-mode Checkout and Portal
+ *   refuse non-HTTPS redirect URLs themselves, so a `localhost` success URL
+ *   cannot reach production undetected regardless of what this validator does.
+ *   Being lax here is safe precisely because Stripe is not.
  */
 export const STRIPE_REDIRECT_URL = {
-  // ASK Idk should we keep to `false` always or when being in production, we need to change it to `true` (or simple remove because the default is `true`)?
   require_tld: false,
   protocols: ['http', 'https'],
 };

@@ -191,6 +191,7 @@ erDiagram
     DateTime stripe_created_at 
     Json payload 
     String status 
+    String source 
     String error_log "❓"
     DateTime processed_at 
     }

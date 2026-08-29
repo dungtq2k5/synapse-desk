@@ -155,9 +155,9 @@ describe('Platform (e2e)', () => {
       expect(org.status).toBe(toProtoOrgStatus(OrgStatus.PENDING_ONBOARDING));
       expect(org.maxAgentSeats).toBeGreaterThan(0);
     });
-
-    // ---------------------------------------------------- the lifecycle machine
   });
+
+  // ---------------------------------------------------- the lifecycle machine
 
   describe('setOrganizationStatus', () => {
     it('2. every status transition is legal or 409 — the full 4x4 matrix', async () => {
@@ -297,9 +297,9 @@ describe('Platform (e2e)', () => {
         }),
       ).toBe(1);
     });
-
-    // ------------------------------------------------------------------ quotas
   });
+
+  // ------------------------------------------------------------------ quotas
 
   describe('updateOrganization / resetBillingCycle', () => {
     it('the platform CAN change quotas — the thing the tenant endpoint may not', async () => {
@@ -330,9 +330,9 @@ describe('Platform (e2e)', () => {
       });
       expect(org.billingCycleStart.getFullYear()).toBeGreaterThan(2020);
     });
-
-    // ------------------------------------------------------- offboard / restore
   });
+
+  // ------------------------------------------------------- offboard / restore
 
   describe('offboardOrganization / restoreOrganization', () => {
     it('offboarding soft-deletes the tenant and restore brings it back', async () => {
@@ -495,9 +495,9 @@ describe('Platform (e2e)', () => {
       );
       expect(shown.items.map((i) => i.organization!.id)).toContain(t.org.id);
     });
-
-    // --------------------------------------------------------- cross-tenant read
   });
+
+  // --------------------------------------------------------- cross-tenant read
 
   describe('listUsers', () => {
     it('5. cross-tenant user search carries the tenant on every row', async () => {
@@ -543,9 +543,9 @@ describe('Platform (e2e)', () => {
       );
       expect(orgIds.size).toBe(3);
     });
-
-    // ------------------------------------------------------------ global roles
   });
+
+  // ------------------------------------------------------------ global roles
 
   describe('createGlobalRole', () => {
     it('a platform-created role is GLOBAL and a system role', async () => {
@@ -581,9 +581,9 @@ describe('Platform (e2e)', () => {
         status.ALREADY_EXISTS,
       );
     });
-
-    // ----------------------------------------------------------------- metrics
   });
+
+  // ----------------------------------------------------------------- metrics
 
   describe('getMetrics', () => {
     it('metrics count tenants by status and seats across the platform', async () => {
@@ -606,8 +606,70 @@ describe('Platform (e2e)', () => {
       });
     });
 
-    // ------------------------------------------------------------------- audit
+    it('1b. **Locking a user moves `activeUsers` and NOT `seatsInUse`**', async () => {
+      // Two figures with two meanings, and the seats line used to be derived
+      // from the activity one. `activeUsers` means "not deleted and not
+      // locked", which is right for a figure about activity and wrong for a
+      // figure about billing: a tenant with locked users was charged for them
+      // and reported as holding fewer seats than the invitation gate refuses
+      // against.
+      //
+      // Locking is self-service and lapses on its own — `ExpiredLockSweep`
+      // clears `isLocked` with no human involved — so a lock-excluding seat
+      // count rises because a cron job ran.
+      const t = await seedTenantWithUser(fx.prisma, {
+        organization: { status: OrgStatus.ACTIVE, maxAgentSeats: 10 },
+      });
+
+      const before = await platform.getMetrics();
+
+      await fx.prisma.user.update({
+        where: { id: t.user.id },
+        data: { isLocked: true },
+      });
+
+      const after = await platform.getMetrics();
+
+      expect(after.activeUsers).toBe(before.activeUsers - 1);
+      expect(after.seatsInUse).toBe(before.seatsInUse);
+      // Not vacuous: the user really was counted in both to begin with.
+      expect(before.activeUsers).toBeGreaterThan(0);
+      expect(before.seatsInUse).toBeGreaterThan(0);
+    });
+
+    it('5. **Platform seats exclude SUPER ADMINS**', async () => {
+      // `seatsInUse` is scoped to one tenant, so it excludes platform staff by
+      // construction. Summing across every tenant does not — Super Admins carry
+      // `organization_id IS NULL` — and without the predicate this line
+      // reported platform accounts as occupied seats beside a `seatsAllocated`
+      // computed only from tenants. The rule is "a live user IN A TENANT": one
+      // table wider, not one predicate shorter.
+      await seedTenantWithUser(fx.prisma, {
+        organization: { status: OrgStatus.ACTIVE, maxAgentSeats: 10 },
+      });
+
+      const before = await platform.getMetrics();
+
+      await fx.prisma.user.create({
+        data: {
+          email: `extra-admin-${Date.now()}@platform.test`,
+          fullName: 'Extra Operator',
+          isSuperAdmin: true,
+          organizationId: null,
+        },
+      });
+
+      const after = await platform.getMetrics();
+
+      expect(after.seatsInUse).toBe(before.seatsInUse);
+      // The platform-wide user counts DO move — this is a seats question, not
+      // a "did the row get written" question.
+      expect(after.totalUsers).toBe(before.totalUsers + 1);
+      expect(after.activeUsers).toBe(before.activeUsers + 1);
+    });
   });
+
+  // ------------------------------------------------------------------- audit
 
   describe('audit + getOrganization', () => {
     it('3. every platform write records organizationId: null', async () => {

@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type Stripe from 'stripe';
 import {
+  BillingEventSource,
   BillingEventStatus,
   formatErrorMsg,
   isUniqueConstraintViolation,
@@ -342,6 +343,16 @@ export class EntitlementWriterService {
    * and a `FAILED` one changed nothing — treating either as the high-water mark
    * would let one bad event block every later one.
    *
+   * **And only rows Stripe produced.** `billing_events` has a second producer:
+   * a plan change claims a `LOCAL` row before calling Stripe, carrying `now()`
+   * to the millisecond. Stripe's `created` is whole SECONDS, so a claim at
+   * `10:00:00.190` makes the webhook it caused (`10:00:00.000`) compare older
+   * and the entitlement write is skipped — measured, and silent at every hop:
+   * the row reads `SKIPPED_STALE`, which is exactly what a genuinely late event
+   * produces. The tenant is billed for the new plan, holds the old grants, and
+   * is told nothing, because the notice and the cache invalidation are both
+   * downstream of the write that did not happen.
+   *
    * `excludeId` is the row this very call just claimed. Without it the check
    * would find itself — the claim is written as PROCESSED — and every event
    * would compare equal to its own timestamp.
@@ -355,6 +366,7 @@ export class EntitlementWriterService {
       where: {
         organizationId,
         status: BillingEventStatus.PROCESSED,
+        source: BillingEventSource.STRIPE,
         id: { not: excludeId },
       },
       orderBy: { stripeCreatedAt: 'desc' },
@@ -390,6 +402,10 @@ export class EntitlementWriterService {
           organizationId: null,
           eventType: event.type,
           stripeCreatedAt: stripeCreatedAt(event),
+          // Explicit rather than defaulted: this is the producer the default
+          // was chosen FOR, and stating it here is what makes the other
+          // producer's `LOCAL` read as a deliberate pair.
+          source: BillingEventSource.STRIPE,
           payload: event as unknown as Prisma.InputJsonValue,
           status: BillingEventStatus.PROCESSED,
         },

@@ -1,11 +1,14 @@
 /** @file What the organization routes return. */
 
+import type { AiModelTier, OrgStatus } from '@synapsedesk/common';
+
 export class OrganizationResponseDto {
   readonly id!: string;
   readonly name!: string;
   readonly slug!: string;
   readonly domain!: string | null;
-  readonly status!: string;
+  /** `OrgStatus`, null when the bridge answers null for `UNSPECIFIED` */
+  readonly status!: OrgStatus | null;
   readonly enforceTwoFactor!: boolean;
   readonly allowedEmailDomains!: string[];
   readonly maxAgentSeats!: number;
@@ -49,6 +52,17 @@ export class UsageMeterResponseDto {
 
 export class OrganizationUsageResponseDto {
   readonly seats!: UsageMeterResponseDto;
+  /**
+   * Composed at the GATEWAY from ingestion's tenant-scoped usage read.
+   *
+   * auth-service cannot answer it — it does not count documents and cannot dial
+   * the service that does — so it sends this meter unavailable and the gateway
+   * replaces it. `available: false` here therefore means the ingestion leg did
+   * not answer, and never "this workspace has no storage".
+   *
+   * The number is the one a plan-change refusal quotes. It has to be: a tenant
+   * told to reduce storage opens this page to find out what to delete.
+   */
   readonly storage!: UsageMeterResponseDto;
   readonly aiTokens!: UsageMeterResponseDto;
   readonly billingCycleStart!: Date;
@@ -60,7 +74,7 @@ export class OrganizationUsageResponseDto {
    * no plan next to it is a number they cannot act on: the next question is
    * always "what would I get if I upgraded".
    */
-  readonly aiModelTier!: string | null;
+  readonly aiModelTier!: AiModelTier | null;
   readonly planName!: string;
   /** NULL for a grandfathered tenant, who has no invoice period at all. */
   readonly currentPeriodEnd!: Date | null;
@@ -75,7 +89,8 @@ export class OnboardingStepResponseDto {
 export class OnboardingResponseDto {
   readonly steps!: OnboardingStepResponseDto[];
   readonly canComplete!: boolean;
-  readonly status!: string;
+  /** `OrgStatus` — see {@link OrganizationResponseDto.status}. */
+  readonly status!: OrgStatus | null;
 }
 
 export class OffboardResponseDto {

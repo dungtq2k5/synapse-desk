@@ -101,6 +101,94 @@ message ListInvoicesResponse { repeated InvoiceResponse items = 1; }
 
 message ListInvoicesRequest { int32 limit = 1; }
 
+// One tenant-visible plan. A DIFFERENT projection from the Super Admin one:
+// no `stripe_product_id`, no subscriber count, no `deleted_at`, no `is_active`
+// — a tenant is only ever shown joinable plans, so a flag saying so carries no
+// information and an operator identifier in a tenant response is the kind of
+// thing that turns up in a support ticket.
+message TenantPlanResponse {
+  string id = 1;
+  string name = 2;
+
+  int32 max_agent_seats = 3;
+  int64 max_storage_bytes = 4;
+  int64 monthly_ai_token_budget = 5;
+  AiModelTier ai_model_tier = 6;
+  int64 max_document_bytes = 7;
+  int64 max_attachment_bytes = 8;
+  int32 max_document_uploads = 9;
+  int32 max_analytics_range_days = 10;
+
+  repeated TenantPlanPriceResponse prices = 11;
+}
+
+message TenantPlanPriceResponse {
+  string stripe_price_id = 1;
+  // Stripe's literal — `month` | `year` in practice, and wider in theory.
+  string interval = 2;
+}
+
+message ListTenantPlansResponse { repeated TenantPlanResponse items = 1; }
+
+message PlanChangeRequest {
+  string plan_id = 1;
+  string price_id = 2;
+  // The caller's `Idempotency-Key`, forwarded verbatim. Absent when the client
+  // sent none — see `ChangePlan` for what that costs.
+  optional string idempotency_key = 3;
+}
+
+// What auth can decide ALONE, and what it needs the gateway to check.
+//
+// Auth answers seats because it owns the definition; it cannot answer storage
+// or document count, so it names the dimensions that NARROW and hands over the
+// target grants as numbers. The gateway dials ingestion only for those.
+message PlanChangePreviewResponse {
+  // Seat overruns, already formatted — `maxAgentSeats: 12 in use, plan grants 10`.
+  repeated string over_limit = 1;
+
+  // Dimensions where the target grant is BELOW this tenant's current grant, out
+  // of `storage` and `documents`. Empty means a widening change: the gateway
+  // dials nothing and the tenant cannot be blocked by an unrelated outage.
+  repeated string narrowed_dimensions = 2;
+
+  // The TARGET plan's grants, read from `subscription_plans` as numbers.
+  // Never parsed out of a rendered "before -> after" string: a formatting
+  // change upstream would turn a block into an allow.
+  int64 target_max_storage_bytes = 3;
+  int32 target_max_document_uploads = 4;
+
+  string plan_name = 5;
+}
+
+// What Stripe accepted. **Not the entitlement change** — entitlements are
+// written when `customer.subscription.updated` arrives, exactly as they are for
+// checkout. This reports that the change was made, not that it landed.
+message PlanChangeResponse {
+  string plan_id = 1;
+  string plan_name = 2;
+  // When the new grants take effect. Immediate in both directions, so this is
+  // the moment Stripe applied it — see the service docblock for why a
+  // period-end downgrade would make the block a formality.
+  google.protobuf.Timestamp effective_at = 3;
+  // Whether the proration produced a CREDIT rather than a charge — ABSENT when
+  // it could not be determined.
+  //
+  // A downgrade produces a credit against future invoices, never a refund, so a
+  // client that does not say so is a support ticket. The reading is deliberately
+  // three-valued rather than two: `always_invoice` does not guarantee the
+  // proration lands on `latest_invoice` — Stripe may issue it as a customer
+  // credit balance transaction, leaving `latest_invoice` pointing at the
+  // PREVIOUS invoice — so a `false` derived from that field can be wrong, and a
+  // `true` can be read off an unrelated negative invoice on a straight upgrade.
+  //
+  // Unset means "not determined": a client omits the sentence rather than
+  // printing a confident wrong one. Narrowing this to a plain `bool` is a
+  // deliberate edit after a sandbox downgrade confirms what the field holds,
+  // not something to assume it always was.
+  optional bool credit_issued = 4;
+}
+
 message BillingEmptyRequest {}
 
 service BillingService {
@@ -115,4 +203,18 @@ service BillingService {
   rpc CreateCheckoutSession(CreateCheckoutSessionRequest) returns (CheckoutSessionResponse);
   rpc CreatePortalSession(CreatePortalSessionRequest) returns (PortalSessionResponse);
   rpc ListInvoices(ListInvoicesRequest) returns (ListInvoicesResponse);
+
+  // The catalogue a tenant may join. Filtered to `deleted_at IS NULL` AND
+  // `is_active` — the same filter `ChangePlan` refuses on, because a list that
+  // offers a plan the endpoint rejects is worse than no list.
+  rpc ListTenantPlans(BillingEmptyRequest) returns (ListTenantPlansResponse);
+
+  // **Two calls, and the split is the privilege boundary.** `PreviewPlanChange`
+  // is everything auth can decide alone; the gateway then reads ingestion's
+  // TENANT-SCOPED usage for whichever dimensions narrowed and refuses there.
+  // Folding both into one call would mean either auth dialling ingestion (a
+  // cycle on the identity leaf) or the gateway passing usage numbers auth would
+  // have to trust.
+  rpc PreviewPlanChange(PlanChangeRequest) returns (PlanChangePreviewResponse);
+  rpc ChangePlan(PlanChangeRequest) returns (PlanChangeResponse);
 }

@@ -19,6 +19,7 @@ import {
   createUser,
   createUserWithPassword,
 } from '../factories';
+import { OrganizationsService } from '../../src/modules/organizations/organizations.service';
 import { PlanAdminService } from '../../src/modules/billing/plan-admin.service';
 import { BillingEventPublisher } from '../../src/modules/billing/billing-event.publisher';
 import { InvitationsService } from '../../src/modules/invitations/invitations.service';
@@ -392,6 +393,52 @@ describe('The plan catalogue (e2e)', () => {
       expect(byId.get(pinned.id)?.skippedPinned).toBe(true);
       expect(byId.get(first.id)?.overLimit.length).toBeGreaterThan(0);
       expect(byId.get(second.id)?.overLimit).toEqual([]);
+    });
+
+    it('1. **The projection counts a seat the same way the GATE does**', async () => {
+      // The regression this phase fixed. `overLimit` re-implemented the count
+      // with `isLocked: false` while `seatsInUse` — the number that refuses an
+      // invitation — does not filter locks. A tenant with three locked users
+      // read as twelve to a refusal and nine to this projection, and the
+      // comment above each of them claimed they were the same definition.
+      //
+      // Asserted against `seatsInUse` itself rather than against a literal, so
+      // the two cannot drift apart again without this failing.
+      const plan = await buildPlan({ maxAgentSeats: 25 });
+      const organization = await subscriberOf(plan.id, 6);
+
+      const locked = await fx.prisma.user.findFirstOrThrow({
+        where: { organizationId: organization.id },
+      });
+      await fx.prisma.user.update({
+        where: { id: locked.id },
+        data: { isLocked: true },
+      });
+
+      const seatsInUse = await fx.moduleRef
+        .get(OrganizationsService)
+        .seatsInUse(fx.prisma, organization.id);
+
+      await plans.updatePlan(
+        { planId: plan.id, maxAgentSeats: seatsInUse - 1 } as never,
+        context(),
+      );
+      const projected = await plans.applyPlan(
+        { planId: plan.id, dryRun: true },
+        context(),
+      );
+
+      const row = projected.subscribers.find(
+        (subscriber) => subscriber.organizationId === organization.id,
+      );
+
+      // The projection quotes the gate's number, locked user included.
+      expect(row?.overLimit).toEqual([
+        `maxAgentSeats: ${seatsInUse} in use, plan grants ${seatsInUse - 1}`,
+      ]);
+      // Not vacuous: a locked user really is in that count.
+      expect(locked.isLocked).toBe(false);
+      expect(seatsInUse).toBe(6);
     });
 
     it('4. **An apply over N subscribers notifies N tenants, one each**', async () => {

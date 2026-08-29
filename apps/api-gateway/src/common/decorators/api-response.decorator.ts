@@ -48,7 +48,7 @@ export const ERROR_ENVELOPE_PROPERTIES = {
 
 /** What a route may declare. `500` is always added; `429` unless opted out. */
 export type ApiErrorStatus =
-  '400' | '401' | '402' | '403' | '404' | '409' | '422';
+  '400' | '401' | '402' | '403' | '404' | '409' | '422' | '503';
 
 const ERROR_DESCRIPTIONS: Record<ApiErrorStatus | '429' | '500', string> = {
   '400': 'Validation failed, or the request is malformed.',
@@ -69,6 +69,11 @@ const ERROR_DESCRIPTIONS: Record<ApiErrorStatus | '429' | '500', string> = {
     'Rate limited. Nearly every route is throttled — see the tier on the ' +
     'route. The exceptions are the webhook intakes, which carry no 429 at all.',
   '500': 'Unexpected server error. The response body carries no internals.',
+  '503':
+    'A dependency this route REFUSES without could not be reached. Carried ' +
+    'only by routes whose check may not degrade — a plan change verifies ' +
+    'usage before it is applied, and an unreadable usage leg is a refusal ' +
+    'rather than an allow with that dimension unchecked.',
 };
 
 /**

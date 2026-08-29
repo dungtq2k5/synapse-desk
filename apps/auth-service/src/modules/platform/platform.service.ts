@@ -580,9 +580,7 @@ export class PlatformService {
     };
   }
 
-  // -------------------------------------------------------------------------
-  // Global roles
-  // -------------------------------------------------------------------------
+  // ---------------------------------------------------------------- Global roles
 
   async listGlobalRoles(
     request: ListGlobalRolesRequest,
@@ -682,6 +680,7 @@ export class PlatformService {
       byStatus,
       totalUsers,
       activeUsers,
+      seatedUsers,
       pendingInvitations,
       liveSessions,
       seatAllocation,
@@ -694,6 +693,29 @@ export class PlatformService {
       }),
       this.prisma.user.count(),
       this.prisma.user.count({ where: { deletedAt: null, isLocked: false } }),
+      // **A fourth count, for the seats line only.** `activeUsers` above means
+      // "not deleted and not locked", which is the right meaning for a figure
+      // about activity — and the wrong one for a figure about billing. The
+      // seats line used to be derived from it, which made this rollup disagree
+      // with the gate that actually refuses an invitation: a tenant with three
+      // locked users is charged for twelve seats and was reported as holding
+      // nine.
+      //
+      // Locking is self-service and lapses on its own — `ExpiredLockSweep`
+      // clears `isLocked` with no human involved — so a lock-excluding seat
+      // count rises because a cron job ran. Deleting frees a seat; locking does
+      // not.
+      //
+      // **`organizationId: { not: null }` is the second half of that rule, and
+      // the first version dropped it.** `seatsInUse` is scoped to one tenant,
+      // so it excludes platform staff by construction; summing across every
+      // tenant does not, and Super Admins carry `organization_id IS NULL`. Left
+      // out, this line reported platform accounts as occupied seats beside a
+      // `seatsAllocated` computed only from tenants. The rule is "a live user
+      // IN A TENANT" — one table wider, not one predicate shorter.
+      this.prisma.user.count({
+        where: { deletedAt: null, organizationId: { not: null } },
+      }),
       this.prisma.userInvitation.count({
         where: { status: InvitationStatus.PENDING, expiresAt: { gt: now } },
       }),
@@ -716,8 +738,10 @@ export class PlatformService {
       pendingInvitations,
       liveSessions,
       seatsAllocated: seatAllocation._sum.maxAgentSeats ?? 0,
-      // The same definition the tenant usage page and the invitation gate use.
-      seatsInUse: activeUsers + pendingInvitations,
+      // The same definition `seatsInUse` applies per tenant — locked users
+      // included — summed across every tenant rather than derived from
+      // `activeUsers`.
+      seatsInUse: seatedUsers + pendingInvitations,
       generatedAt: toProtoTimestamp(now),
     };
   }

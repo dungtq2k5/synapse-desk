@@ -697,10 +697,25 @@ model UserInvitation {
 model BillingEvent {
   id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
 
-  /// Stripe's `evt_…` id. **The unique constraint IS the idempotency
-  /// mechanism**: a redelivered webhook is a duplicate-key violation the
-  /// handler catches and acknowledges, not a second entitlement write. Delivery
-  /// is at-least-once, so this is the normal path rather than a defensive one.
+  /// The id of the ACT this row records. **The unique constraint IS the
+  /// idempotency mechanism**: a redelivered webhook is a duplicate-key
+  /// violation the handler catches and acknowledges, not a second entitlement
+  /// write. Delivery is at-least-once, so this is the normal path rather than a
+  /// defensive one.
+  ///
+  /// **Two producers, and the column name names only the first.** Stripe's
+  /// `evt_…` for an event we CONSUMED, and a derived `plan-change:{org}:{key}`
+  /// for a change we are PRODUCING — the same mechanism from the other
+  /// direction, which is what stops a double-submitted plan change reaching
+  /// Stripe twice and being invoiced twice. Kept as one column rather than two
+  /// tables because the question both answer is identical: *did we already act
+  /// on this?*
+  ///
+  /// **The two differ in LIFETIME, and `source` is how to tell them apart.** A
+  /// `STRIPE` row is permanent history. A `LOCAL` row is a lock held for one
+  /// request and deleted when the attempt settles either way — kept, it became
+  /// a plan change nobody could retry, because the constraint has no TTL and
+  /// the no-header key is the plan tuple, which recurs.
   stripeEventId String @unique @map("stripe_event_id") @db.VarChar(255)
 
   /// Resolved from `stripe_customer_id`. NULLABLE because an event can arrive
@@ -725,6 +740,20 @@ model BillingEvent {
   /// BillingEventStatus. `SKIPPED_STALE` is the monotonic guard firing, and
   /// seeing it regularly is information rather than noise.
   status String @default("PROCESSED") @db.VarChar(20)
+
+  /// BillingEventSource — who WROTE this row.
+  ///
+  /// **`STRIPE` rows order the tenant's timeline; `LOCAL` rows must not.** The
+  /// monotonic guard takes the newest PROCESSED row as the high-water mark and
+  /// compares Stripe's `created` (whole SECONDS) against it. A locally-produced
+  /// claim carries `now()` to the millisecond, so without this filter a plan
+  /// change's own claim makes the webhook it caused look stale — measured: the
+  /// event settles `SKIPPED_STALE`, entitlements are never written, and the
+  /// tenant is billed for a plan they do not hold.
+  ///
+  /// Defaulted to `STRIPE` because every row that existed before this column
+  /// was one.
+  source String @default("STRIPE") @db.VarChar(20)
 
   /// Why a FAILED event failed, for replay.
   errorLog String? @map("error_log") @db.Text

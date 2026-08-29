@@ -444,10 +444,21 @@ export class OrganizationsService {
   }
 
   /**
-   * Three meters (RDM), two of which belong to domains that do not exist.
+   * Three meters, one of which is this service's to answer.
    *
-   * Those report `available: false` with no number rather than 0 — a zero reads
-   * as "you have used nothing", which is a claim we cannot make.
+   * **Seats are auth's. Storage is not, and the GATEWAY fills it in** — it
+   * holds ingestion's client, and auth cannot dial ingestion because ingestion
+   * dials auth on every presign, so the reverse edge would close a cycle on the
+   * identity leaf. So `storage` leaves here `available: false` meaning *"not
+   * mine to answer"*, and a client never sees that value: the gateway replaces
+   * it with the tenant-scoped read before the response is serialized.
+   *
+   * The AI meter is genuinely unanswered. The ledger and the Redis counter
+   * exist, but "spend against budget" is a different read from either, with no
+   * caller yet.
+   *
+   * Unanswered meters report `available: false` with no number rather than 0 —
+   * a zero reads as "you have used nothing", which is a claim we cannot make.
    */
   async getOrganizationUsage(
     context: CallerContext,
@@ -469,10 +480,13 @@ export class OrganizationsService {
         used: seatsUsed,
         limit: organization.maxAgentSeats,
       },
+      // Overwritten by the gateway with ingestion's numbers. The reason is
+      // phrased for the case where that leg fails and this one survives — never
+      // "storage is not enabled", which was false the moment ingestion started
+      // counting bytes and contradicted every refusal that quoted them.
       storage: {
         available: false,
-        unavailableReason:
-          'Document storage is not enabled for this workspace yet',
+        unavailableReason: 'Storage usage is answered by ingestion-service',
       },
       aiTokens: {
         available: false,

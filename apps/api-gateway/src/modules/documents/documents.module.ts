@@ -17,6 +17,12 @@ import { DocumentsResolver } from './documents.resolver';
   ],
   controllers: [DocumentsController],
   providers: [DocumentsGrpcClient, DocumentsService, DocumentsResolver],
-  exports: [DocumentsService],
+  // `DocumentsGrpcClient` is exported for the two composites that need
+  // ingestion's TENANT-SCOPED usage read: the usage meter and the plan-change
+  // block. Both are folds the gateway performs because auth cannot dial
+  // ingestion, and both must go through this one client rather than opening a
+  // second — `IngestionGrpcModule` is `@Global` precisely so there is one
+  // channel to that peer.
+  exports: [DocumentsService, DocumentsGrpcClient],
 })
 export class DocumentsModule {}

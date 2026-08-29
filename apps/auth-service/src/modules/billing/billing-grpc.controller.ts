@@ -9,6 +9,10 @@ import {
   CreatePortalSessionRequest,
   ListInvoicesRequest,
   ListInvoicesResponse,
+  ListTenantPlansResponse,
+  PlanChangePreviewResponse,
+  PlanChangeRequest,
+  PlanChangeResponse,
   PortalSessionResponse,
   StripeWebhookRequest,
   StripeWebhookResponse,
@@ -16,6 +20,7 @@ import {
   unpackCallerContext,
 } from '@synapsedesk/grpc-proto';
 import { BillingService } from './billing.service';
+import { PlanChangeService } from './plan-change.service';
 import { EntitlementWriterService } from './entitlement-writer.service';
 
 @Controller()
@@ -24,6 +29,7 @@ export class BillingGrpcController implements BillingServiceController {
   constructor(
     private readonly billing: BillingService,
     private readonly writer: EntitlementWriterService,
+    private readonly planChange: PlanChangeService,
   ) {}
 
   /**
@@ -81,5 +87,29 @@ export class BillingGrpcController implements BillingServiceController {
     metadata?: Metadata,
   ): Promise<ListInvoicesResponse> {
     return this.billing.listInvoices(request, unpackCallerContext(metadata));
+  }
+
+  listTenantPlans(
+    _request: BillingEmptyRequest,
+    metadata?: Metadata,
+  ): Promise<ListTenantPlansResponse> {
+    return this.planChange.listTenantPlans(unpackCallerContext(metadata));
+  }
+
+  previewPlanChange(
+    request: PlanChangeRequest,
+    metadata?: Metadata,
+  ): Promise<PlanChangePreviewResponse> {
+    return this.planChange.previewPlanChange(
+      request,
+      unpackCallerContext(metadata),
+    );
+  }
+
+  changePlan(
+    request: PlanChangeRequest,
+    metadata?: Metadata,
+  ): Promise<PlanChangeResponse> {
+    return this.planChange.changePlan(request, unpackCallerContext(metadata));
   }
 }

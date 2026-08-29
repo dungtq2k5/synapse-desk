@@ -28,7 +28,7 @@ Per RDM §1.1, every authenticated request carries a JWT with `user_id`, `organi
 - **Deletes:** `DELETE` performs a **soft delete** (sets `deleted_at` / `deleted_by_id`) on `organizations`, `departments`, `users`, `documents`, `tickets`. Hard delete is never exposed over HTTP.
 - **Restore:** soft-deletable resources get `POST /<resource>/:id/restore`.
 - **Errors:** RFC7807-ish `{ statusCode, code, message, details? }`. `GlobalRpcExceptionFilter` maps gRPC status → HTTP status.
-- **Idempotency:** mutating AI/billing-relevant endpoints (`POST /tickets/:id/messages`, document upload) accept an `Idempotency-Key` header.
+- **Idempotency:** `POST /billing/plan` accepts an `Idempotency-Key` header and forwards it to Stripe's own idempotency — that route creates an invoice, so a retry is a second charge. The header is **aspirational** on the other mutating AI/billing-relevant endpoints (`POST /tickets/:id/messages`, document upload): nothing reads it there yet.
 - **Audit:** every non-GET endpoint marked ✎ writes an `audit_logs` row (action name given in the *Audit action* notes under each domain).
 
 ### 0.4 Tenant lifecycle gate
@@ -276,7 +276,7 @@ RDM §1.7: `organization_id IS NULL`, `is_super_admin = true`; audit rows writte
 
 ### 1.9 Billing & Subscription — `/billing`, `/webhooks/stripe`
 
-**Not built.** Specced here because it changes the meaning of endpoints that *are* built (§1.8's quota edits and cycle reset) and because Domain C's AI tier depends on it. Full design in [ADR 0026](./decisions/0026-stripe-webhook-idempotency.md); RDM §1.15 and Table 30.
+**Partly built** — the webhook, the subscription read, checkout, the portal, invoices, the tenant catalogue and the plan-change endpoint all exist. Specced here because it changes the meaning of endpoints that *are* built (§1.8's quota edits and cycle reset) and because Domain C's AI tier depends on it. Full design in [ADR 0026](./decisions/0026-stripe-webhook-idempotency.md); RDM §1.15 and Table 30.
 
 **The division of labour:** Stripe owns plans, prices, cards and renewals. This system owns *entitlements* — the five columns on `organizations`. The webhook is the only thing that connects them.
 
@@ -284,7 +284,9 @@ RDM §1.7: `organization_id IS NULL`, `is_super_admin = true`; audit rows writte
 | :---- | :---- | :---- | :---- |
 | GET | `/billing/subscription` | Current plan, status, period, and the entitlements it granted. Reads Postgres, **not** Stripe — a dashboard that fans out to a third party on every load fails when they do. | perm:`organization.read` |
 | POST | `/billing/checkout-session` ✎ | `{ priceId }` → a Stripe Checkout URL. Entitlements are **not** written here; they are written when the webhook confirms. A user who closes the tab mid-checkout must not end up upgraded. | perm:`organization.update` |
-| POST | `/billing/portal-session` ✎ | → a Stripe Customer Portal URL. Card updates, plan changes and cancellation all happen there rather than in bespoke UI, which is the main reason to use Stripe at all. | perm:`organization.update` |
+| POST | `/billing/portal-session` ✎ | → a Stripe Customer Portal URL. Card updates and cancellation happen there rather than in bespoke UI, which is the main reason to use Stripe at all. **Plan changes do NOT**: `subscription_update` is disabled on the portal configuration, because a change made inside Stripe's UI reaches this system only after Stripe has applied it — too late to refuse one that would put the tenant over a limit. That routing is what `POST /billing/plan` exists for, and known-gaps #20 is what it costs. | perm:`organization.update` |
+| GET | `/billing/plans` | The plans this workspace may move to: name, grants, and prices with their `interval`. **A different projection from the Super Admin catalogue** — no `stripeProductId`, no subscriber count, no `deletedAt`. Filtered to plans that are undeleted, active AND carry at least one price, which is the same definition of *joinable* the endpoint below refuses on: the Free plan is assigned rather than sold and has no price, so it is not offered. | perm:`organization.read` |
+| POST | `/billing/plan` ✎ | `{ planId, priceId }` → moves the subscription. **Four refusals before Stripe is touched** (no subscription, pinned entitlements, price/plan mismatch, retired plan), then the over-limit block. **The block is per-dimension, not a plan ordering**: only the dimensions the target NARROWS are checked, so an upgrade dials nothing. Seats come from auth's `seatsInUse` — the same count that refuses an invitation — and storage and document counts from ingestion's tenant-scoped usage read, composed at the gateway. A dimension that cannot be verified is a **503**, never an allow: a block that fails open is not a block. Entitlements are **not** written here; they are written when `customer.subscription.updated` arrives. Honours `Idempotency-Key` — `always_invoice` means a retry is a second proration invoice — and the local claim that stops an in-flight duplicate is released when the attempt settles, so a declined card can be retried and a tenant can move back to a plan they left. `creditIssued` is **three-valued**: `null` means Stripe's response did not say, because a downgrade credit does not reliably land on `latest_invoice`. Stripe being unreachable is a **503**, not a refusal. | perm:`organization.update` |
 | GET | `/billing/invoices` | Invoice history, proxied from Stripe and cached. The one place a live Stripe read is correct, because invoices are not mirrored. | perm:`organization.update` |
 | POST | `/webhooks/stripe` | **Unauthenticated by design** — authenticated by Stripe's signature over the **raw** request body. The entitlement writer. | PUBLIC |
 

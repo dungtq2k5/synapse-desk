@@ -6,7 +6,6 @@ import {
   AuditPublisher,
   AuditResourceType,
   CallerContext,
-  InvitationStatus,
   PLAN_SORTABLE_FIELDS,
   requireActor,
   type PlanLimitDimension,
@@ -28,6 +27,7 @@ import type {
   UpdatePlanRequest,
 } from '@synapsedesk/grpc-proto';
 import { PrismaService } from '../prisma/prisma.service';
+import { OrganizationsService } from '../organizations/organizations.service';
 import { BillingEventPublisher } from './billing-event.publisher';
 import {
   PLAN_INCLUDE,
@@ -86,6 +86,7 @@ export class PlanAdminService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditPublisher,
     private readonly billingEvents: BillingEventPublisher,
+    private readonly organizations: OrganizationsService,
   ) {}
 
   // ---------------------------------------------------------------- Read
@@ -341,7 +342,6 @@ export class PlanAdminService {
     requireActor(context);
 
     const plan = await this.load(request.planId);
-    const now = new Date();
 
     const subscribers = await this.prisma.organization.findMany({
       where: { planId: plan.id, deletedAt: null },
@@ -364,7 +364,7 @@ export class PlanAdminService {
     const projections: PlanSubscriberProjection[] = [];
 
     for (const subscriber of subscribers) {
-      const projection = await this.project(subscriber, plan, now);
+      const projection = await this.project(subscriber, plan);
       projections.push(projection);
 
       if (request.dryRun || projection.skippedPinned) continue;
@@ -431,7 +431,6 @@ export class PlanAdminService {
   private async project(
     subscriber: SubscriberRow,
     plan: PlanRow,
-    now: Date,
   ): Promise<PlanSubscriberProjection> {
     if (subscriber.entitlementsPinned) {
       return {
@@ -492,7 +491,7 @@ export class PlanAdminService {
       organizationId: subscriber.id,
       organizationName: subscriber.name,
       changes,
-      overLimit: await this.overLimit(subscriber, plan, now),
+      overLimit: await this.overLimit(subscriber, plan),
       skippedPinned: false,
       budgetDeferred,
     };
@@ -501,41 +500,34 @@ export class PlanAdminService {
   /**
    * Which of the new plan's limits this tenant is ALREADY past.
    *
-   * Seats only, and that is a real gap rather than an oversight: storage usage
-   * is `ingestion-service`'s to count, and answering it for every subscriber
-   * would need a cross-tenant usage RPC that does not exist. Adding one beside
-   * the tenant-scoped document RPCs is precisely the leak shape `platform.proto`
-   * exists to avoid, so it wants its own separated surface — known-gaps #18.
+   * **Seats only, and that is a division of labour rather than a gap now.**
+   * Storage and document counts are `ingestion-service`'s to count, and
+   * `auth-service` cannot dial it — ingestion dials auth on every presign, so
+   * the reverse edge would close a cycle on the identity leaf. The GATEWAY
+   * composes the two projections (known-gaps #18, closed), which is why
+   * `evaluatedDimensions` is dynamic: this pass reports what it evaluated and
+   * the gateway unions in what it evaluated.
+   *
+   * **The count is `seatsInUse`'s, not a local one.** It used to be re-derived
+   * here with `isLocked: false`, which made this projection disagree with the
+   * gate that refuses afterwards — a tenant with three locked users read as
+   * twelve to an invitation and nine to a plan apply. A projection computed
+   * from a different number than the rule it predicts is not a projection.
    */
   private async overLimit(
     subscriber: SubscriberRow,
     plan: PlanRow,
-    now: Date,
   ): Promise<string[]> {
     const over: string[] = [];
 
-    // The same definition the tenant usage page and the invitation gate use:
-    // an unspent invitation is a seat somebody is already holding.
-    const [activeUsers, pendingInvitations] = await Promise.all([
-      this.prisma.user.count({
-        where: {
-          organizationId: subscriber.id,
-          deletedAt: null,
-          isLocked: false,
-        },
-      }),
-      this.prisma.userInvitation.count({
-        where: {
-          organizationId: subscriber.id,
-          status: InvitationStatus.PENDING,
-          expiresAt: { gt: now },
-        },
-      }),
-    ]);
+    const seatsInUse = await this.organizations.seatsInUse(
+      this.prisma,
+      subscriber.id,
+    );
 
-    if (activeUsers + pendingInvitations > plan.maxAgentSeats) {
+    if (seatsInUse > plan.maxAgentSeats) {
       over.push(
-        `maxAgentSeats: ${activeUsers + pendingInvitations} in use, plan grants ${plan.maxAgentSeats}`,
+        `maxAgentSeats: ${seatsInUse} in use, plan grants ${plan.maxAgentSeats}`,
       );
     }
 

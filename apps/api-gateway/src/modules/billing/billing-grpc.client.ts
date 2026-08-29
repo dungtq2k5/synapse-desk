@@ -8,6 +8,10 @@ import {
   CreateCheckoutSessionRequest,
   CreatePortalSessionRequest,
   ListInvoicesResponse,
+  ListTenantPlansResponse,
+  PlanChangePreviewResponse,
+  PlanChangeRequest,
+  PlanChangeResponse,
   PortalSessionResponse,
   StripeWebhookResponse,
   SubscriptionResponse,
@@ -99,6 +103,36 @@ export class BillingGrpcClient extends BaseGrpcClient implements OnModuleInit {
     return this.call(
       (metadata) =>
         this.billingGrpcService.listInvoices({ limit: limit ?? 0 }, metadata),
+      context,
+      STRIPE_DEADLINE_MS,
+    );
+  }
+
+  listTenantPlans(context: RequestContext): Promise<ListTenantPlansResponse> {
+    return this.call(
+      (metadata) => this.billingGrpcService.listTenantPlans({}, metadata),
+      context,
+    );
+  }
+
+  /** Local reads only — no Stripe call, so the default deadline applies. */
+  previewPlanChange(
+    request: PlanChangeRequest,
+    context: RequestContext,
+  ): Promise<PlanChangePreviewResponse> {
+    return this.call(
+      (metadata) =>
+        this.billingGrpcService.previewPlanChange(request, metadata),
+      context,
+    );
+  }
+
+  changePlan(
+    request: PlanChangeRequest,
+    context: RequestContext,
+  ): Promise<PlanChangeResponse> {
+    return this.call(
+      (metadata) => this.billingGrpcService.changePlan(request, metadata),
       context,
       STRIPE_DEADLINE_MS,
     );

@@ -202,7 +202,15 @@ export class OrganizationsController {
     return settings;
   }
 
-  /** Storage and AI meters report `available: false` until those domains exist. */
+  /**
+   * **Composed from two services**: auth answers seats and the plan, ingestion
+   * answers storage. The AI meter reports `available: false` until "spend
+   * against budget" has a reader.
+   *
+   * The storage number here is the same number a plan-change refusal quotes —
+   * it has to be, or a tenant told to reduce storage opens this page and is
+   * told the feature is not enabled.
+   */
   @OrgAccessKind(OrgAccess.BILLING)
   @ApiOperation({
     summary:

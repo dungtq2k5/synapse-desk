@@ -6,6 +6,7 @@ import {
   fromProtoAiModelTier,
   OnboardingResponse,
   OrganizationUsageResponse,
+  StorageUsageResponse,
   OrganizationSettingsResponse,
 } from '@synapsedesk/grpc-proto';
 import {
@@ -31,7 +32,7 @@ export function toOrganizationResponseDto(
     name: organization.name,
     slug: organization.slug,
     domain: organization.domain ?? null,
-    status: fromProtoOrgStatus(organization.status) ?? '',
+    status: fromProtoOrgStatus(organization.status),
     enforceTwoFactor: organization.enforceTwoFactor,
     allowedEmailDomains: organization.allowedEmailDomains,
     maxAgentSeats: organization.maxAgentSeats,
@@ -74,14 +75,42 @@ export function toUsageMeterResponseDto(
  * `aiModelTier` becomes the domain string; the proto enum's number is
  * meaningless to a client rendering a plan.
  *
+ * @param response auth-service's projection: seats, the plan, the cycle.
+ * @param storage ingestion's tenant-scoped usage, or `null` when that leg did
+ *   not answer — the storage meter is composed here because auth cannot count
+ *   documents.
  * @throws Error if `billingCycleStart` is missing, which the proto requires.
  */
 export function toOrganizationUsageResponseDto(
   response: OrganizationUsageResponse,
+  storage: StorageUsageResponse | null,
 ): OrganizationUsageResponseDto {
   return {
     seats: toUsageMeterResponseDto(response.seats),
-    storage: toUsageMeterResponseDto(response.storage),
+    // **Ingestion's numbers, not auth's.** auth-service returns this meter
+    // `available: false` — it does not count documents and cannot dial the
+    // service that does — so the gateway replaces it with the leg it just read.
+    // Leaving auth's answer in place would tell a tenant that storage is not
+    // enabled for their workspace on the same page as a plan-change refusal
+    // quoting their byte count.
+    //
+    // `limitBytes` is used HERE and must not be used by the plan-change block:
+    // this meter is about the tenant's CURRENT ceiling, and that block compares
+    // against the target plan's grant.
+    storage: storage
+      ? {
+          available: true,
+          used: Number(storage.usedBytes),
+          limit: Number(storage.limitBytes),
+          unavailableReason: null,
+        }
+      : {
+          available: false,
+          used: null,
+          limit: null,
+          unavailableReason:
+            'Storage usage could not be read just now — try again shortly',
+        },
     aiTokens: toUsageMeterResponseDto(response.aiTokens),
     aiModelTier: fromProtoAiModelTier(response.aiModelTier),
     planName: response.planName,
@@ -99,7 +128,7 @@ export function toOrganizationUsageResponseDto(
 export function toOnboardingResponseDto(
   response: OnboardingResponse,
 ): OnboardingResponseDto {
-  return { ...response, status: fromProtoOrgStatus(response.status) ?? '' };
+  return { ...response, status: fromProtoOrgStatus(response.status) };
 }
 
 /**

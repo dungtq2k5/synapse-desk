@@ -244,6 +244,34 @@ export const FREE_PLAN_SEED = {
 // ---------------------------------------------------------------- Webhook bookkeeping — RDM §1.15, Table 30
 
 /**
+ * Who WROTE a `billing_events` row.
+ *
+ * **The table has two producers and only one of them is Stripe.** Events we
+ * consumed carry `STRIPE`; the in-flight claim a plan change takes carries
+ * `LOCAL`. The distinction is load-bearing rather than descriptive: the
+ * monotonic staleness guard computes a tenant's high-water mark from the newest
+ * PROCESSED row, and a locally-produced row is not an event in that ordering —
+ * it carries a wall-clock timestamp with millisecond precision, while Stripe's
+ * `created` is whole SECONDS, so a claim written at `10:00:00.190` makes the
+ * webhook it caused (`10:00:00.000`) look stale and the entitlement write is
+ * skipped.
+ *
+ * **A `source` column rather than a filter on `eventType`.** Excluding
+ * `plan.change_requested` by name would be correct only while there is exactly
+ * one local producer — the same single-producer assumption behind doc 62's
+ * hardcoded email template and its generated message id, which is three
+ * instances in three phases and therefore a pattern rather than three
+ * incidents. A discriminator cannot be silently wrong when a fourth producer
+ * arrives.
+ */
+export enum BillingEventSource {
+  /** A webhook we received and verified. Ordered by Stripe's `created`. */
+  STRIPE = 'STRIPE',
+  /** A row this system wrote about its own act. Never a high-water mark. */
+  LOCAL = 'LOCAL',
+}
+
+/**
  * What happened to a Stripe webhook the system accepted.
  *
  * `SKIPPED_STALE` is the monotonic guard firing, and seeing it regularly is

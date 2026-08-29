@@ -34,6 +34,12 @@ export interface StripeWebhookResponse {
   /**
    * BillingEventStatus, or empty when the event type is one we do not act on.
    * Stripe only needs a 2xx; this is for the gateway's log and for tests.
+   *
+   * A string rather than an enum, for the same reason `ledger.proto` gives for
+   * `purpose`: this repo stores enumerated columns as strings, and a status
+   * added on one side (`SKIPPED_PINNED` arrived two phases ago) would otherwise
+   * need a proto bump and a mapper on both sides for a field whose whole job is
+   * the line below.
    */
   status: string;
   /** Present when a `billing_events` row was written. */
@@ -96,6 +102,14 @@ export interface InvoiceResponse {
   number: string;
   amountDue: number;
   currency: string;
+  /**
+   * STRIPE's invoice status — `draft`, `open`, `paid`, `uncollectible`, `void`
+   * — passed through from a live API read, so it is not ours to enumerate. An
+   * enum over a third party's vocabulary turns a value they add into
+   * `UNSPECIFIED` on our wire, which is a silent downgrade of an invoice's
+   * state on a page about money. Same rule as `SubscriptionPlanPrice.interval`:
+   * a foreign literal is stored and forwarded as it arrives.
+   */
   status: string;
   created: Timestamp | undefined;
   hostedInvoiceUrl: string;
@@ -111,6 +125,109 @@ export interface ListInvoicesResponse {
 
 export interface ListInvoicesRequest {
   limit: number;
+}
+
+/**
+ * One tenant-visible plan. A DIFFERENT projection from the Super Admin one:
+ * no `stripe_product_id`, no subscriber count, no `deleted_at`, no `is_active`
+ * — a tenant is only ever shown joinable plans, so a flag saying so carries no
+ * information and an operator identifier in a tenant response is the kind of
+ * thing that turns up in a support ticket.
+ */
+export interface TenantPlanResponse {
+  id: string;
+  name: string;
+  maxAgentSeats: number;
+  maxStorageBytes: number;
+  monthlyAiTokenBudget: number;
+  aiModelTier: AiModelTier;
+  maxDocumentBytes: number;
+  maxAttachmentBytes: number;
+  maxDocumentUploads: number;
+  maxAnalyticsRangeDays: number;
+  prices: TenantPlanPriceResponse[];
+}
+
+export interface TenantPlanPriceResponse {
+  stripePriceId: string;
+  /** Stripe's literal — `month` | `year` in practice, and wider in theory. */
+  interval: string;
+}
+
+export interface ListTenantPlansResponse {
+  items: TenantPlanResponse[];
+}
+
+export interface PlanChangeRequest {
+  planId: string;
+  priceId: string;
+  /**
+   * The caller's `Idempotency-Key`, forwarded verbatim. Absent when the client
+   * sent none — see `ChangePlan` for what that costs.
+   */
+  idempotencyKey?: string | undefined;
+}
+
+/**
+ * What auth can decide ALONE, and what it needs the gateway to check.
+ *
+ * Auth answers seats because it owns the definition; it cannot answer storage
+ * or document count, so it names the dimensions that NARROW and hands over the
+ * target grants as numbers. The gateway dials ingestion only for those.
+ */
+export interface PlanChangePreviewResponse {
+  /** Seat overruns, already formatted — `maxAgentSeats: 12 in use, plan grants 10`. */
+  overLimit: string[];
+  /**
+   * Dimensions where the target grant is BELOW this tenant's current grant, out
+   * of `storage` and `documents`. Empty means a widening change: the gateway
+   * dials nothing and the tenant cannot be blocked by an unrelated outage.
+   */
+  narrowedDimensions: string[];
+  /**
+   * The TARGET plan's grants, read from `subscription_plans` as numbers.
+   * Never parsed out of a rendered "before -> after" string: a formatting
+   * change upstream would turn a block into an allow.
+   */
+  targetMaxStorageBytes: number;
+  targetMaxDocumentUploads: number;
+  planName: string;
+}
+
+/**
+ * What Stripe accepted. **Not the entitlement change** — entitlements are
+ * written when `customer.subscription.updated` arrives, exactly as they are for
+ * checkout. This reports that the change was made, not that it landed.
+ */
+export interface PlanChangeResponse {
+  planId: string;
+  planName: string;
+  /**
+   * When the new grants take effect. Immediate in both directions, so this is
+   * the moment Stripe applied it — see the service docblock for why a
+   * period-end downgrade would make the block a formality.
+   */
+  effectiveAt:
+    | Timestamp
+    | undefined;
+  /**
+   * Whether the proration produced a CREDIT rather than a charge — ABSENT when
+   * it could not be determined.
+   *
+   * A downgrade produces a credit against future invoices, never a refund, so a
+   * client that does not say so is a support ticket. The reading is deliberately
+   * three-valued rather than two: `always_invoice` does not guarantee the
+   * proration lands on `latest_invoice` — Stripe may issue it as a customer
+   * credit balance transaction, leaving `latest_invoice` pointing at the
+   * PREVIOUS invoice — so a `false` derived from that field can be wrong, and a
+   * `true` can be read off an unrelated negative invoice on a straight upgrade.
+   *
+   * Unset means "not determined": a client omits the sentence rather than
+   * printing a confident wrong one. Narrowing this to a plain `bool` is a
+   * deliberate edit after a sandbox downgrade confirms what the field holds,
+   * not something to assume it always was.
+   */
+  creditIssued?: boolean | undefined;
 }
 
 export interface BillingEmptyRequest {
@@ -137,6 +254,27 @@ export interface BillingServiceClient {
   createPortalSession(request: CreatePortalSessionRequest, metadata?: Metadata): Observable<PortalSessionResponse>;
 
   listInvoices(request: ListInvoicesRequest, metadata?: Metadata): Observable<ListInvoicesResponse>;
+
+  /**
+   * The catalogue a tenant may join. Filtered to `deleted_at IS NULL` AND
+   * `is_active` — the same filter `ChangePlan` refuses on, because a list that
+   * offers a plan the endpoint rejects is worse than no list.
+   */
+
+  listTenantPlans(request: BillingEmptyRequest, metadata?: Metadata): Observable<ListTenantPlansResponse>;
+
+  /**
+   * *Two calls, and the split is the privilege boundary.** `PreviewPlanChange`
+   * is everything auth can decide alone; the gateway then reads ingestion's
+   * TENANT-SCOPED usage for whichever dimensions narrowed and refuses there.
+   * Folding both into one call would mean either auth dialling ingestion (a
+   * cycle on the identity leaf) or the gateway passing usage numbers auth would
+   * have to trust.
+   */
+
+  previewPlanChange(request: PlanChangeRequest, metadata?: Metadata): Observable<PlanChangePreviewResponse>;
+
+  changePlan(request: PlanChangeRequest, metadata?: Metadata): Observable<PlanChangeResponse>;
 }
 
 export interface BillingServiceController {
@@ -172,6 +310,36 @@ export interface BillingServiceController {
     request: ListInvoicesRequest,
     metadata?: Metadata,
   ): Promise<ListInvoicesResponse> | Observable<ListInvoicesResponse> | ListInvoicesResponse;
+
+  /**
+   * The catalogue a tenant may join. Filtered to `deleted_at IS NULL` AND
+   * `is_active` — the same filter `ChangePlan` refuses on, because a list that
+   * offers a plan the endpoint rejects is worse than no list.
+   */
+
+  listTenantPlans(
+    request: BillingEmptyRequest,
+    metadata?: Metadata,
+  ): Promise<ListTenantPlansResponse> | Observable<ListTenantPlansResponse> | ListTenantPlansResponse;
+
+  /**
+   * *Two calls, and the split is the privilege boundary.** `PreviewPlanChange`
+   * is everything auth can decide alone; the gateway then reads ingestion's
+   * TENANT-SCOPED usage for whichever dimensions narrowed and refuses there.
+   * Folding both into one call would mean either auth dialling ingestion (a
+   * cycle on the identity leaf) or the gateway passing usage numbers auth would
+   * have to trust.
+   */
+
+  previewPlanChange(
+    request: PlanChangeRequest,
+    metadata?: Metadata,
+  ): Promise<PlanChangePreviewResponse> | Observable<PlanChangePreviewResponse> | PlanChangePreviewResponse;
+
+  changePlan(
+    request: PlanChangeRequest,
+    metadata?: Metadata,
+  ): Promise<PlanChangeResponse> | Observable<PlanChangeResponse> | PlanChangeResponse;
 }
 
 export function BillingServiceControllerMethods() {
@@ -182,6 +350,9 @@ export function BillingServiceControllerMethods() {
       "createCheckoutSession",
       "createPortalSession",
       "listInvoices",
+      "listTenantPlans",
+      "previewPlanChange",
+      "changePlan",
     ];
     for (const method of grpcMethods) {
       const descriptor: any = Reflect.getOwnPropertyDescriptor(constructor.prototype, method);
