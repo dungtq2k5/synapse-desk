@@ -11,7 +11,7 @@ Four Prisma schemas, no foreign keys between them. Prisma cannot express a relat
 ```mermaid
 graph LR
   subgraph auth["auth-service"]
-    A[(Organization<br/>User · Role<br/>Department)]
+    A[(Organization · User<br/>Role · Department<br/>SubscriptionPlan)]
   end
   subgraph ticket["ticket-service"]
     T[(Ticket · TicketMessage<br/>MessageAttachment<br/>AiSummary · AuditLog)]
@@ -225,3 +225,54 @@ flowchart LR
 The flag is written on the **message**, which is why one boolean removes both the sentence and the screenshot. The three transcript builders and two of the three attachment selectors read it; `Classify`'s selector deliberately does not (§3).
 
 A refused message is still visible to humans. Unlike an internal note — which is stripped before serialization, [ADR 0023](../decisions/0023-internal-notes-are-stripped-before-serialization.md) — a refusal is the customer's own text and hiding it from them would be a different product decision than the one that was made. The exclusion is from the **model's** context only.
+
+---
+
+## 6. Entitlements: who may ask whom
+
+Plans grant limits; two different services hold the numbers those limits are checked against. The shape of this section is set by one constraint that is easy to violate and expensive to discover:
+
+**`ingestion-service` dials `auth-service` on every presign, so `auth-service` must never dial back.** Storage bytes and document counts are ingestion's to count. Auth owns the limit and cannot ask what the usage is.
+
+```mermaid
+flowchart TD
+  SA([Super Admin]) -->|"edit plan / apply"| GW[api-gateway]
+  GW -->|gRPC| AU[auth-service<br/>owns the LIMITS]
+  GW -->|gRPC| IN[ingestion-service<br/>owns storage &amp; document COUNTS]
+  AU -. "must not dial" .-x IN
+  GW ==>|"composes both legs"| VERDICT[[Over-limit verdict<br/>per dimension]]
+
+  ST[[Stripe]] -->|webhook| AU
+  AU -->|"NATS billing.entitlements_changed"| IN2[ingestion-service<br/>invalidates cached tier]
+
+  classDef ext fill:#f6f6f6,stroke:#999,stroke-dasharray:3 3
+  class ST ext
+```
+
+**The gateway is the composer, not a convenience.** Auth answers `seats` from its own tables; ingestion answers `storage` and `documents`. Neither can produce the whole verdict, so the gateway unions the two legs — and **reports which dimensions each run actually covered**. A leg that does not respond drops its dimensions from that run's coverage rather than silently reporting nobody affected: an unevaluated dimension and an evaluated-and-clear one are different answers, and collapsing them would let a downgrade through on the strength of a timeout.
+
+### Every layer narrows; no layer widens
+
+Four values can bound one upload, and the effective limit is the `min()` of all of them:
+
+| Layer | Where | Can it widen? |
+| :---- | :---- | :---- |
+| Platform ceiling (`MAX_DOCUMENT_BYTES`) | code constant | — it *is* the ceiling |
+| Plan grant (`subscription_plans`, Table 40) | catalogue row | **No** — a plan may only narrow |
+| Denormalized grant (`organizations.max_document_bytes`) | tenant row | copy of the above, read on the hot path |
+| Tenant override (`…_override`, Table 1) | tenant row | **No** — the edge *refuses* a value above the ceiling rather than clamping it |
+
+The grant is denormalized onto the tenant deliberately: enforcement reads **one row**, and a join to the catalogue on every presign would put the plan table in the hot path of the highest-volume route in the system. `entitlements_pinned` is what stops the next routine webhook — a renewal, a card update — re-deriving those columns from the price and silently reverting a negotiated seat count.
+
+### The limit alarm, and why its counter is durable
+
+A workspace nearing a ceiling is told before it arrives. The alarm has two pieces of state deliberately kept in different stores:
+
+- **The level** lives in Redis. Losing it costs at most one duplicate alert.
+- **The generation** lives in Postgres (`limit_alert_generations`, Table 42), and it cannot join it.
+
+The alert's `notifications.event_id` is derived, and Domain E holds a **permanent** `UNIQUE (recipient_id, event_id)`. So a workspace that crosses 80%, frees space, and crosses again would republish an id that guard already holds — and the second alert would be dropped as a duplicate the tenant never sees. The generation counter makes each crossing a new event.
+
+Put that counter in Redis beside the level and one flush resets it to zero; the next crossing republishes a held id, and **that dimension stops alerting for that tenant permanently**, from a transient failure. A counter that steps past a permanent guard must outlive it.
+
+It increments once per **recovery**, never per threshold cleared — falling from 100% to 5% is one recovery, not three.

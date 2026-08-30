@@ -5,7 +5,7 @@
 The system is designed as a **Polyglot Hybrid Microservices Architecture**:
 
 * **TypeScript (Node.js)** drives core business logic, API gateways, authentication, real-time client communication, and helpdesk operations.
-* **Python** powers the high-performance RAG (Retrieval-Augmented Generation) microservice for document ingestion, parsing, embedding, and vector retrieval.
+* **Python** powers the RAG (Retrieval-Augmented Generation) microservice: embedding, hybrid retrieval, reranking and every LLM call. **It does not parse documents** — extraction and chunking are TypeScript, in `ingestion-service` (§4a), and `rag-service` is read-only against `postgres_ingestion`.
 * **Synchronous IPC:** gRPC (via Protocol Buffers) for sub-millisecond cross-language function calls.
 * **Asynchronous IPC:** NATS JetStream for persistent domain event streams across microservices.
 * **Background Processing:** BullMQ (Redis) for heavy job execution (file uploads, parsing queues).
@@ -34,11 +34,26 @@ The system is designed as a **Polyglot Hybrid Microservices Architecture**:
 
 | Layer / Subsystem | Primary Technology | Alternatives Evaluated | Justification |
 | :---- | :---- | :---- | :---- |
-| **API & IPC Server** | **FastAPI + grpcio** | Flask, Sanic | Async-native Python framework; natively serves gRPC endpoints for TS communication. |
-| **RAG Orchestration** | **LlamaIndex** | LangChain Python | Purpose-built indexing, document transformations, and context retrieval optimization. |
-| **Document Parsing** | **Docling / Unstructured** | PyPDF, pdfplumber | Advanced multi-column PDF layouts, markdown table extraction, and embedded document parsing. |
+| **IPC Server** | **`grpcio` (`grpc.aio`)** | FastAPI, Flask | **gRPC only — there is no HTTP listener and no FastAPI.** Nothing outside the cluster calls this service, so an HTTP surface would be a second entry point to secure for no caller. `grpcio-health-checking` serves `grpc.health.v1` on the same port, which is what makes the pod probeable without one. |
+| **RAG Orchestration** | **None — hand-written** | LlamaIndex, LangChain | The pipeline is ~200 lines of explicit stages (retrieve → hydrate → rerank → assemble → generate). A framework earns its place by removing decisions; here every stage is a decision this system has already made differently from the default — hydrate-before-rerank ([ADR 0008](./decisions/0008-hydrate-before-rerank.md)), a per-request nonce boundary, cap checks before any work. `@langchain/textsplitters` is used **in ingestion-service** for chunking, and is the only piece of that ecosystem present. |
+| **Postgres access** | **`asyncpg`, no ORM** | SQLAlchemy, Prisma | `rag-service` is **read-only** against `postgres_ingestion` and never writes a chunk row. The lexical arm is one hand-written query whose predicate is a tenant-isolation boundary — an ORM would hide the clause that must not be got wrong. |
 | **Embedding Model** | **Gemini text-embedding-004** (768-dim) | HuggingFace bge-large-en-v1.5 | Ultra-low latency and native Google GenAI SDK integration — and no GPU node, which a local HuggingFace model would have required under GKE. **Never tenant-configurable:** a Qdrant collection fixes its vector dimension at creation, so changing model is a full re-embed migration, and per-tenant models would force per-tenant collections. |
 | **Reranking Engine** | **FlashRank / Cohere Rerank** | BGE-Reranker | Lightweight, local, or API-based passage reranking to optimize context window precision before LLM inference. |
+
+### **4a. Document & attachment parsing (TypeScript, in `ingestion-service`)**
+
+Parsing is **not** in the Python service, and the split is deliberate: extraction is a per-upload batch job with a retry budget and a job row, while `rag-service` is on the synchronous request path. Putting an untrusted-file parser in the request path would give a malformed upload a way to spend a caller's latency.
+
+| Format | Library | Note |
+| :---- | :---- | :---- |
+| PDF | **`pdfjs-dist`** | Text layer first; a page with no extractable text falls to OCR ([ADR 0016](./decisions/0016-ocr-is-a-per-page-branch.md)) |
+| Scanned PDF | **Tesseract** | Per-page branch, not per-document. Language cap of four is a CPU bound ([ADR 0035](./decisions/0035-ocr-language-cap-is-a-cpu-bound.md)) |
+| `.docx` | **`mammoth`** | To HTML, then to markdown via `turndown` + `turndown-plugin-gfm` |
+| `.xlsx` | **`exceljs`** | One `## Sheet: …` section per sheet. The streaming reader does not work for this shape; the workbook is built then capped at `MAX_SHEET_ROWS` |
+| Chunking | **`@langchain/textsplitters`** | The one piece of that ecosystem in the repo |
+| Token counting | **`js-tiktoken`** | Metering, so `estimated_cost_micros` is booked from a count rather than a guess |
+
+`.doc` is **not** parseable here — a real Word 97-2003 file is an OLE compound file rather than a zip — so it was removed from the document pipeline and stays storable only as a ticket attachment.
 
 ## **5. Inter-Service Communication & Task Transport**
 
@@ -78,6 +93,11 @@ The system is designed as a **Polyglot Hybrid Microservices Architecture**:
 | **Ingress & Proxy** | **Nginx** | Reverse proxy, SSL termination, strict Content Security Policy (CSP) headers, custom error pages. |
 | **Authentication** | **OAuth 2.0 / OIDC + 2FA** | Social login (Google/GitHub) alongside TOTP authenticator app support. |
 | **Rate Limiting** | **ThrottlerStorageRedisService** | Distributed rate limiting across REST, GraphQL, and WebSocket protocols via Redis. |
+| **Billing** | **Stripe** (`stripe@22`) | Subscriptions and the plan catalogue. **Stripe owns what a plan costs; this system owns what it grants** (RDM Tables 40–41) — mirroring an amount would be two sources of truth diverging silently. Webhook idempotency is a UNIQUE constraint, not a check ([ADR 0026](./decisions/0026-stripe-webhook-idempotency.md)). |
+| **Email delivery** | **`nodemailer`** | Domain E's email channel, driven off NATS rather than gRPC — a caller never waits for an SMTP round trip. |
+| **SMS delivery** | **`twilio`** | Domain E's SMS channel, same fire-and-forget shape. |
+| **2FA** | **`otplib` + `qrcode`** | TOTP secrets and the enrolment QR. |
+| **Metrics** | **`prom-client`** | RED metrics per route, exposed on a **separate internal listener** rather than a route, so "unreachable from the internet" is a property of the process. |
 | **Containerization** | **Docker & Kubernetes (GKE)** | Multi-stage Docker builds orchestrating local services (docker-compose) and production K8s clusters. |
 | **Infrastructure as Code** | **Terraform** | Declarative provisioning for GKE, Memorystore (Redis), Cloud SQL (PostgreSQL), and the Firebase Storage bucket. Terraform is cloud-agnostic and unchanged by the AWS → GCP move; only the providers and resource types differ. |
 

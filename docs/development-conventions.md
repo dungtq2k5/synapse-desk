@@ -143,6 +143,18 @@ findOne(@CurrentUser('organizationId') orgId: string | null) { … }
 - For a background job with no real request, use the frozen shared `UNKNOWN_ORIGIN`, not an inline `{ ip: '', userAgent: '' }`.
 - `app.set('trust proxy', N)` — **N is a hop count.** Behind both an ALB and Nginx it must be `2`, or every provenance column records Nginx's address.
 
+### 4.4 Entitlements and limits — every layer narrows, no layer widens
+
+Four things can bound one operation: a **platform ceiling** (a code constant), the **plan grant** ([RDM Table 40](./rdm-specs.md)), the grant **denormalized onto the tenant**, and the tenant's own **override**. The effective limit is the `min()` of all of them.
+
+- **Read the `min()`, never one layer.** A reader that trusts the plan column alone ignores a tenant that narrowed itself; one that trusts the override alone ignores the plan. Compose at the read site.
+- **A plan may only narrow.** The platform ceiling protects a parser or a transport, and is not sellable — so a plan column is an argument to `min()`, never a replacement for it. Selling more than the platform admits must stay unexpressible.
+- **An override above the ceiling is REFUSED, not clamped.** Clamping accepts a request that asked for a self-service entitlement grant and silently gives less; the edge must 400.
+- **A plan grant is `NOT NULL`; a tenant override is nullable.** A subscription always grants a value, so a blank grant is a bug. `NULL` on an override means "the tenant configured nothing", which is the normal state — the two nullabilities carry different meanings and must not be unified.
+- **Denormalize the grant onto the tenant row.** Enforcement paths read one row; joining the catalogue on every presign puts it in the hot path of the highest-volume route in the system.
+- **The direction of dial-out is fixed: `ingestion-service` calls `auth-service`, never the reverse.** Auth owns the limits, ingestion owns storage and document counts, and neither can produce a whole verdict — the **gateway** composes the legs and reports **which dimensions each run actually covered**. An unevaluated dimension and an evaluated-and-clear one are different answers; collapsing them lets a downgrade through on a timeout.
+- **Adding a dimension is five edits, not one:** the plan column, the denormalized tenant column, the `min()` at every read, the composer's coverage list, and [rdm-specs.md](./rdm-specs.md). A dimension added to only the first two enforces nothing.
+
 ---
 
 ## 5. REST API Conventions (gateway)
@@ -890,6 +902,27 @@ scan is silence:
 
 ## 14. Definition of Done (pre-PR checklist)
 
+### 14.0 Run the machine checks first
+
+Half this list is mechanically decidable, and a human re-reading a diff is the least reliable way to decide it. Run these before reading the boxes below — **in this order**, because each one's failure makes the next one's output meaningless:
+
+```bash
+npm run typecheck        # a type error makes every later result noise
+npm run lint             # includes lint:models — the model-literal scan
+npm run format:check
+npm run proto:lint       # only if any .proto changed
+npm run proto:breaking   #   "     "   — reviewed, not just green
+npm run test             # unit
+npm run test:e2e         # the suites for the services you touched
+```
+
+Two failure modes this ordering exists to prevent:
+
+- **Running tests over a tree that does not compile.** Jest transpiles per-file with SWC and does **not** typecheck, so a broken signature can pass every test and fail the build. `typecheck` is first for that reason alone.
+- **Reporting a check you did not run.** "Tests pass" after editing only a `.py` file means `npm run test` said `--passWithNoTests`. Name the suite you ran, or run `test:py` too.
+
+**Any box below that a command can decide, let the command decide.** The boxes are for the properties no command can see.
+
 ### Reuse
 
 - [ ] Searched `libs/` before writing any helper; anything cross-service lives there.
@@ -902,6 +935,8 @@ scan is silence:
 - [ ] Every query on a tenant table filters `organizationId` (or the caller is `isSuperAdmin`).
 - [ ] Every query on a soft-deletable table filters `deletedAt: null`.
 - [ ] Unique-field checks handled in the service layer, soft-delete aware.
+- [ ] A new "unique among active rows" rule has its **partial index in the seeder's DDL block** ([ADR 0039](./decisions/0039-the-seeder-ddl-block-is-the-list.md)) — a service-layer check alone loses the race. Asked **"does the row come back?"** before choosing partial vs full `@unique` (§7.2).
+- [ ] A new limit or entitlement composes as `min()` across every layer, and an over-ceiling override is **refused, not clamped** (§4.4).
 - [ ] No `enum` block added to `schema.prisma`; every write path validates the value set (§7.3).
 - [ ] Correct guards, in the right order; verification endpoints not self-locked.
 - [ ] Hash choice matches the lookup pattern (§8.1); comparisons use `safeCompareHex`.
@@ -914,7 +949,8 @@ scan is silence:
 - [ ] gRPC calls go through `BaseGrpcClient.call()` with an origin.
 - [ ] `RpcException` carries a deliberate `status` from the §6.4 table.
 - [ ] `undefined` → `null` normalized in the mapper; `requireProtoTimestamp` for non-optional fields.
-- [ ] New NATS payload is a typed union arm in a `*.contract.ts`.
+- [ ] New NATS payload is a typed union arm in a `*.contract.ts`, and its subject is in a `*_PATTERNS` constant — **that constant is the registry**, and a subject absent from one does not exist.
+- [ ] A table replicated per-service (`job_runs`, `limit_alert_generations`) was added to **every** schema that owns a copy, not just the one in front of you.
 
 ### Background jobs — see [ADR 0003](./decisions/0003-bullmq-over-nest-cron.md)
 
@@ -936,7 +972,8 @@ scan is silence:
 - [ ] List endpoint extends `SearchPaginationDto` and returns `PaginationResponseDto<T>`.
 - [ ] New env var added to the Joi schema **and** `env.example`.
 - [ ] New permission code added to `PERMISSION_CODES` + `PERMISSION_NAMES` + role grants + [api-endpoints-plan.md §9](./api-endpoints-plan.md).
-- [ ] Endpoint documented in [api-endpoints-plan.md](./api-endpoints-plan.md); schema change reflected in [rdm-specs.md](./rdm-specs.md).
+- [ ] Endpoint documented in [api-endpoints-plan.md](./api-endpoints-plan.md); schema change reflected in [rdm-specs.md](./rdm-specs.md) — **columns, types, nullability, defaults and the enum's full value list.** A widened enum whose doc still lists the old members is the most common drift and the least visible.
+- [ ] New cross-service behaviour — an ordering constraint, a dial-out direction, a consistency sweep — recorded in [reference/sys-flows.md](./reference/sys-flows.md). Anything visible inside one service does **not** go there.
 - [ ] `npm run lint` clean.
 
 ### Docs & comments

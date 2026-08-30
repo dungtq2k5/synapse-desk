@@ -266,7 +266,8 @@ customer.subscription.created | updated | deleted
 
 [ Domain A: Tenant & User ]  ---> organizations, departments, users, user_departments, roles, permissions,
                                   user_roles, role_permissions, device_sessions, two_factor_backup_codes,
-                                  otps, password_reset_tokens, user_invitations
+                                  otps, password_reset_tokens, user_invitations, subscription_plans,
+                                  subscription_plan_prices
 [ Domain B: Support Engine ] ---> tickets, ticket_messages, message_attachments, ai_summaries,
                                   ticket_assignments, ticket_status_changes, ticket_read_states,
                                   inbound_emails
@@ -274,14 +275,14 @@ customer.subscription.created | updated | deleted
                                   document_flags
 [ Domain D: Analytics,      ---> ai_response_feedbacks, audit_logs, ai_generations, billing_events,
     Feedback & Compliance  ]      ticket_daily_stats, agent_daily_stats, ai_generation_daily_stats,
-                                  analytics_exports, job_runs
+                                  analytics_exports, job_runs, limit_alert_generations
 [ Domain E: Notifications ] ---> notifications, notification_deliveries, notification_preferences,
                                   inbound_auto_replies
 ```
 
-**39 tables**, across four Postgres databases — one per owning service, with no cross-database foreign keys (§1.13). `job_runs` is the one table that exists **three times**, identically, in `postgres_auth`, `postgres_ticket` and `postgres_ingestion`: a service records its own liveness without a cross-service write.
+**42 tables**, across four Postgres databases — one per owning service, with no cross-database foreign keys (§1.13). Two are replicated per-service rather than shared, so a service can record its own state without a cross-service write: `job_runs` (Table 38) exists **three times**, in `postgres_auth`, `postgres_ticket` and `postgres_ingestion`; `limit_alert_generations` (Table 42) exists **twice**, in `postgres_auth` and `postgres_ingestion`.
 
-Table numbers are **stable identifiers, not reading order** — they are cited from other documents (`api-endpoints-plan` §0.5, §1.1, §1.6, §9, §11) and from code docblocks, so a table keeps its number for life. Tables added after the original 1–25 were assigned are placed in their *domain's* section rather than at the end, which is why the sequence reads **1–12, 28, 13–16, 26, 31–33, 17–20, 27, 21–22, 29–30, 34–38, 23–25, 39**:
+Table numbers are **stable identifiers, not reading order** — they are cited from other documents (`api-endpoints-plan` §0.5, §1.1, §1.6, §9, §11) and from code docblocks, so a table keeps its number for life. Tables added after the original 1–25 were assigned are placed in their *domain's* section rather than at the end, which is why the sequence reads **1–12, 28, 40–41, 13–16, 26, 31–33, 17–20, 27, 21–22, 29–30, 34–38, 42, 23–25, 39**:
 
 | Late addition | Sits in | Why it was added |
 | :---- | :---- | :---- |
@@ -299,10 +300,28 @@ Table numbers are **stable identifiers, not reading order** — they are cited f
 | **Table 37** `analytics_exports` | Domain D | `GET /analytics/export` creates a job and produces a file; an export is a snapshot and needs somewhere to record what it was taken from |
 | **Table 38** `job_runs` | Domain D | A failed job at least logs; a job that never runs logs nothing at all |
 | **Table 39** `inbound_auto_replies` | Domain E | A mail-loop guard in Redis is a guard a flush removes, re-opening the exchange it exists to close |
+| **Table 40** `subscription_plans` | Domain A | Plan entitlements moved from a code constant to a table a Super Admin can edit, joined to Stripe |
+| **Table 41** `subscription_plan_prices` | Domain A | One Product has many Prices (monthly, annual, currencies); keying the catalogue by price would duplicate entitlements that then drift |
+| **Table 42** `limit_alert_generations` | Domain D | A counter that must step past Domain E's permanent `event_id` guard cannot itself live in a store a flush empties |
 
 Domain membership, not the number, is what tells you where a table belongs.
 
-#### **A note on array columns**
+### **A note on `UNIQUE` in this document**
+
+`UNIQUE` here states the **business rule**, which is not always a `@unique` in `schema.prisma`. On a soft-deletable table it cannot be: `@unique` is database-wide and knows nothing about `deleted_at`, so it would block re-using a name or re-registering an address **forever**, over a row every read filters out. Where the rule is "unique among active rows", the schema therefore carries no `@unique` and the constraint is a **partial unique index** applied by the seeder ([ADR 0039](./decisions/0039-the-seeder-ddl-block-is-the-list.md)) plus the service-layer check §7.2 of [development-conventions.md](./development-conventions.md) requires. That section also records why `organizations.slug` takes a **full** `@unique` while `subscription_plans.name` takes a partial one — the deciding question is whether anything un-deletes the row.
+
+So a row reading `UNIQUE *(among active rows)*` is enforced, just not by the column. Where:
+
+| Column | Enforced by |
+| :---- | :---- |
+| `users.email` | `users_org_email_key` — `(organization_id, email) WHERE deleted_at IS NULL`, plus `users_super_admin_email_key` on `(email) WHERE organization_id IS NULL AND deleted_at IS NULL` |
+| `departments.name` | `departments_org_name_key` — `(organization_id, name) WHERE deleted_at IS NULL` |
+| `roles.name` | `@@unique([organization_id, name])` in schema, plus `roles_global_name_key` on `(name) WHERE organization_id IS NULL` |
+| `documents.file_hash` | `documents_org_hash_key` — `(organization_id, file_hash) WHERE deleted_at IS NULL` |
+| `subscription_plans.name` | `subscription_plans_name_key` — `(name) WHERE deleted_at IS NULL` |
+| `user_invitations.email` | `user_invitations_pending_key` — `(organization_id, email) WHERE status = 'PENDING'` |
+
+### **A note on array columns**
 
 Eight columns are Postgres arrays. A Prisma scalar list **cannot be null**, so every one of them is `NOT NULL` and `{}` is the absent value — there is no third state, and a description that says "empty means not specified" is describing that, not a nullable column.
 
@@ -324,12 +343,21 @@ Three of them (`ai_generations.retrieved_chunk_ids`, `ai_generations.cited_chunk
 | **max_agent_seats** | INT | NOT NULL, Default: 10 | Seat quota enforced when an Org Admin invites new support agents. |
 | **max_storage_bytes** | BIGINT | NOT NULL, Default: 5368709120 (5GB) | Storage quota for documents uploaded for RAG ingestion. |
 | **monthly_ai_token_budget** | BIGINT | NOT NULL, Default: 1000000 | Hard cap on AI spend per billing cycle. Denominated internally in **micros of currency**, not tokens — the name is kept for continuity (§1.14). Written by the Stripe entitlement webhook (§1.15), not by hand. |
+| **max_document_bytes** | BIGINT | NOT NULL | The largest document this tenant's **plan** admits, denormalized onto the tenant for the reason `max_agent_seats` is: the enforcement paths read one row, and a join to `subscription_plans` on every presign would put the catalogue in the hot path of the highest-volume route in the system. Distinct from `max_document_bytes_override` below — this is what the plan **grants**, that is what the tenant chose to **narrow** to. Readers take the `min()` of both and the platform ceiling, so neither can widen the other. |
+| **max_attachment_bytes** | BIGINT | NOT NULL | The largest attachment this tenant's plan admits, denormalized for the same reason. **The ceiling above it is a transport bound, not a policy one**: `MAX_ATTACHMENT_BYTES` is 10 MB because the gRPC message limit binds there, with `MAX_AI_ATTACHMENT_BYTES` at 8 MB beneath it — so a plan has very little room to differentiate here, which is worth knowing before it reaches a pricing page. |
+| **max_document_uploads** | INT | NOT NULL | The most documents this tenant's plan admits, bounded by `MAX_DOCUMENTS_PER_TENANT` at every enforcement point. The first cap on the **corpus** rather than on any single upload: `max_storage_bytes` bounds the bytes, this bounds the vector points behind retrieval. Counting a tenant's documents is `ingestion-service`'s job; this column is only the limit, and the two meet at the gateway, never inside auth. |
+| **max_analytics_range_days** | INT | NOT NULL | How far back this tenant's plan lets analytics look, in days. **The one grant the admission rule does not cover**: every other limit is checked when something is *created*, so lowering it can only refuse the next thing. A lookback window has no creation event — it restricts a read over data that already exists, so narrowing it takes away history the tenant could see yesterday. Accepted deliberately rather than grandfathered, because a per-subscriber window would make a plan's stated grant not be what its subscribers have. |
 | **billing_cycle_start** | TIMESTAMPTZ | NOT NULL, NOW() | Anchor date for resetting AI usage back to 0. **Follows Stripe's `current_period_start`** once billing is live (§1.15) — it is load-bearing beyond its own column, since the Redis quota key embeds its epoch. |
 | **ai_model_tier** | VARCHAR(20) | NOT NULL, Default: 'FAST' | `FAST \| QUALITY`. The generation-model entitlement — the sellable AI tier. Resolved into concrete model names by the settings layer (§1.15), **never** compared to a model string at a call site. Written by the entitlement webhook. Does not apply to the embedding model, which is fixed for the life of the Qdrant collection (§1.14, Table 19). |
 | **stripe_customer_id** | VARCHAR(255) | Nullable, UNIQUE | Stripe `Customer`. NULL before the tenant ever reaches checkout. |
 | **stripe_subscription_id** | VARCHAR(255) | Nullable, UNIQUE | Stripe `Subscription`. Plan *definitions* live in Stripe and are deliberately not mirrored here — see §1.15. |
+| **plan_id** | UUID | Nullable, FK ➔ subscription_plans.id | The catalogue plan this workspace is on (Table 40). **NULL means "no plan; the entitlement columns above are authoritative"** — which is every tenant today, and stays true for any tenant that never subscribes. There is no backfill: a workspace acquires a plan by subscribing or by direct assignment, and until then behaves exactly as it does now. The same state the system is in when the Stripe API key is absent, where every tenant stays grandfathered. |
+| **entitlements_pinned** | BOOLEAN | NOT NULL, Default: false | Whether a Stripe webhook may rewrite this workspace's entitlements. **Set when a Super Admin grants something off-catalogue.** Without it the writer re-derives all five columns from the price on the next routine event — a renewal, a card update — and a negotiated seat count silently reverts. The monotonic guard cannot help: it compares Stripe's `created` timestamps and a manual edit has none. A **flag** rather than a parallel set of override columns, so "this tenant is off-catalogue" is a state one query can list rather than something inferred by diffing columns against a plan. |
 | **enforce_two_factor** | BOOLEAN | NOT NULL, Default: false | Forces 2FA setup for every user in the tenant during login. |
 | **inbound_token** | VARCHAR(32) | UNIQUE, Nullable | The tenant's inbound-mail address token. The support address is `support+{inbound_token}@<domain>`, delivered by one catch-all route. **Not the slug** — a slug is guessable, which would make every tenant's inbound address derivable from any other and the tenant list enumerable. Not a secret (customers email it), but unguessable and rotatable. NULL disables inbound email for the tenant. |
+| **max_document_bytes_override** | BIGINT | Nullable | The largest document this tenant will accept, at or below the platform ceiling. **A safety control, not a billing one**: an organization that knows its staff should never upload a 100 MB file sets 5 MB, so a mis-click or a compromised account cannot burn its storage grant. Every layer narrows and no layer widens — a value above `MAX_DOCUMENT_BYTES` would be a self-service entitlement grant, so the edge **refuses** it rather than clamping. **NULL means the tenant has configured nothing**, which is the normal state; the plan grants above are NOT NULL because a subscription always grants a value. |
+| **max_attachment_bytes_override** | BIGINT | Nullable | The largest *attachment* this tenant will accept. Same rule and same NULL meaning as above. |
+| **max_attachments_per_message_override** | INT | Nullable | How many attachments one message may carry, at or below the platform ceiling. Same rule and same NULL meaning. |
 | **timezone** | VARCHAR(64) | Nullable | The tenant's **business** timezone, an IANA name. Distinct from `users.timezone`, which is a person's quiet hours; this one answers "when does this tenant's Monday start", and every daily analytics figure is bucketed by it. A tenant at UTC+7 would otherwise see each daily number split across two rows. NULL is treated as UTC. |
 | **allowed_email_domains** | VARCHAR(255)[] | NOT NULL, **no column default** | Array of domains (e.g., {acme.com, acme.org}) validated during signup auto-join. |
 | **created_at** | TIMESTAMPTZ | NOT NULL, NOW() | Timestamp when the organization was onboarded. |
@@ -348,7 +376,7 @@ Three of them (`ai_generations.retrieved_chunk_ids`, `ai_generations.cited_chunk
 | :---- | :---- | :---- | :---- |
 | **id** | UUID | Primary Key, gen_random_uuid() | Unique identifier for the department. |
 | **organization_id** | UUID | NOT NULL, FK ➔ organizations.id | Tenant isolation boundary. |
-| **name** | VARCHAR(100) | NOT NULL | Department title (e.g., "IT Support", "HR", "Billing"). |
+| **name** | VARCHAR(100) | NOT NULL, **UNIQUE** *(per tenant, among active rows)* | Department title (e.g., "IT Support", "HR", "Billing"). |
 | **description** | TEXT | Nullable | Brief explanation of department responsibilities. |
 | **created_at** | TIMESTAMPTZ | NOT NULL, NOW() | Creation timestamp. |
 | **updated_at** | TIMESTAMPTZ | NOT NULL, NOW() | Modification timestamp. |
@@ -364,7 +392,7 @@ Three of them (`ai_generations.retrieved_chunk_ids`, `ai_generations.cited_chunk
 | **id** | UUID | Primary Key, gen_random_uuid() | Unique identifier for the user account. |
 | **organization_id** | UUID | Nullable, FK ➔ organizations.id | The enterprise organization the user belongs to. NULL identifies a SaaS Provider Super Admin operating across tenants. |
 | **is_super_admin** | BOOLEAN | NOT NULL, Default: false | Explicit platform-level privilege flag. Must be paired with a NULL organization_id. |
-| **email** | VARCHAR(255) | NOT NULL, Indexed | User login address, stored lower-cased. **Unique per tenant, not globally** — the same person may legitimately hold accounts in several tenants (a contractor serving two clients). See §1.10. |
+| **email** | VARCHAR(255) | NOT NULL, **UNIQUE** *(per tenant, among active rows)*, Indexed | User login address, stored lower-cased. **Unique per tenant, not globally** — the same person may legitimately hold accounts in several tenants (a contractor serving two clients). See §1.10. |
 | **is_email_verified** | BOOLEAN | NOT NULL, false | True if user verified email ownership via magic link/OTP. |
 | **password_hash** | VARCHAR(255) | Nullable | Argon2/Bcrypt hash. Null if user authenticated via OAuth2. |
 | **full_name** | VARCHAR(150) | NOT NULL | User's full display name (e.g., "John Doe"). |
@@ -425,7 +453,7 @@ Three of them (`ai_generations.retrieved_chunk_ids`, `ai_generations.cited_chunk
 | :---- | :---- | :---- | :---- |
 | **id** | UUID | Primary Key, gen_random_uuid() | Unique identifier for the role. |
 | **organization_id** | UUID | Nullable, FK ➔ organizations.id | NULL = global system role shipped with the platform (Default Admin, Default Agent, Default Viewer). A UUID = custom role owned by that tenant. |
-| **name** | VARCHAR(100) | NOT NULL | Role title (e.g., "Admin", "Tier 2 Agent", "Viewer"). |
+| **name** | VARCHAR(100) | NOT NULL, **UNIQUE** *(per tenant; and among global roles)* | Role title (e.g., "Admin", "Tier 2 Agent", "Viewer"). |
 | **description** | TEXT | Nullable | Human-readable explanation of the role's purpose, surfaced in the admin UI. |
 | **is_system_role** | BOOLEAN | NOT NULL, Default: false | True for built-in roles. Protects them from deletion or mutation by tenant admins. |
 | **user_assigned** | INT | NOT NULL, Default: 0 | Count of active users attached to this role. |
@@ -580,7 +608,7 @@ Conceptually a sibling of Tables 11–12 (§1.9) — a hashed, expiring, single-
 | :---- | :---- | :---- | :---- |
 | **id** | UUID | Primary Key, gen_random_uuid() | Unique identifier for this invitation. |
 | **organization_id** | UUID | NOT NULL, FK ➔ organizations.id, On Delete CASCADE, Indexed | Tenant the invitation grants membership in. |
-| **email** | VARCHAR(255) | NOT NULL | Address the invitation was sent to, stored lower-cased. Becomes `users.email` on acceptance. |
+| **email** | VARCHAR(255) | NOT NULL, **UNIQUE** *(per tenant, among PENDING rows)* | Address the invitation was sent to, stored lower-cased. Becomes `users.email` on acceptance. |
 | **token_hash** | VARCHAR(64) | NOT NULL, UNIQUE, Indexed | **SHA-256 hex** of a 32-byte URL-safe token embedded in the emailed link. Same by-value-lookup rationale as `password_reset_tokens.token_hash` (§1.9); the raw token exists only in the email. |
 | **status** | ENUM | NOT NULL, Default: 'PENDING' | `PENDING`, `ACCEPTED`, `REVOKED`, `EXPIRED`. A deliberate departure from the `is_used` boolean of Tables 11–12: an invitation has four terminal states an admin must be able to tell apart, and "never accepted" is a real onboarding-funnel metric. |
 | **role_ids** | UUID[] | NOT NULL, **no column default** | Roles to grant on acceptance. Validated at redemption, not by FK — see the Proposal vs. Fact note below. |
@@ -612,6 +640,46 @@ Conceptually a sibling of Tables 11–12 (§1.9) — a hashed, expiring, single-
 * **Resend Rotates the Token:** re-sending issues a fresh token and invalidates the previous one — the same rotation discipline as `password_reset_tokens`. `resent_count` increments and `last_sent_at` is stamped; the gateway rate-limits by invitation id in Redis so the endpoint cannot be turned into an email bomb.
 * **Pruning Transitions, Never Deletes:** the scheduled job that prunes `otps` and `password_reset_tokens` instead flips expired invitations `PENDING → EXPIRED`. The rows are retained because "16 of 47 invitees never accepted" is an onboarding metric, not garbage. Rows are removed only with their tenant, via CASCADE.
 * **On Success:** a `users` row is created with `is_email_verified = true` — delivery to the address is the same proof of ownership an `otps` challenge provides (§1.9), so requiring a second verification would be theatre. `user_roles` and `user_departments` are written from the validated arrays, `accepted_user_id` is linked, and the token is spent.
+
+#### **Table 40: subscription_plans**
+
+*A sellable plan: what it **grants**, joined to Stripe by an opaque id.*
+
+**Keyed on Stripe *Product*, not Price.** Stripe's model is one Product per plan with multiple Prices only for billing variants — monthly versus annual, or currencies — because Checkout and invoices render the **Product** name on every line item, so tiers sharing a Product are indistinguishable on a customer's receipt. Keying this table by price id would make "Pro monthly" and "Pro annual" two rows carrying duplicated entitlements that drift.
+
+**What a plan *costs* is Stripe's, and is deliberately absent here.** Mirroring an amount is the two-sources-of-truth problem `billing.config.ts` was written to prevent, and the divergence is silent because both sides keep answering confidently.
+
+| Field Name | Data Type | Constraints / Default | Description & Business Logic |
+| :---- | :---- | :---- | :---- |
+| **id** | UUID | Primary Key, gen_random_uuid() | Unique plan identifier. |
+| **name** | VARCHAR(100) | NOT NULL, **UNIQUE** *(among active rows)* | Display name — "Free", "Pro", "Enterprise". **Unique by business rule, not by `@unique`**: the table is soft-deletable, so uniqueness is a partial index `WHERE deleted_at IS NULL` (`subscription_plans_name_key`) plus the service-layer check §7.2 requires. A retired plan is **never un-retired**, so reuse is wanted — a full `@unique` would block ever creating another plan called "Pro", permanently, over a row every read filters out. The opposite conclusion from `organizations.slug`, and the deciding question is whether the row comes back. |
+| **stripe_product_id** | VARCHAR(255) | Nullable, UNIQUE | The Stripe Product. NULL for a plan **assigned rather than sold** — the negotiated agreement, invisible to self-service and legal on purpose. |
+| **max_agent_seats** | INT | NOT NULL | Seats this plan grants. |
+| **max_storage_bytes** | BIGINT | NOT NULL | Storage this plan grants. |
+| **monthly_ai_token_budget** | BIGINT | NOT NULL | AI budget per cycle this plan grants. |
+| **ai_model_tier** | VARCHAR(20) | NOT NULL | `FAST \| QUALITY`. A string, not a Prisma enum — [ADR 0001](./decisions/0001-no-prisma-enums.md). |
+| **max_document_bytes** | BIGINT | NOT NULL | The largest document this plan admits. **NOT NULL like every other grant: a plan states every limit it grants, with no blanks.** A plan that does not differentiate on file size states the platform ceiling explicitly — a decision recorded rather than inferred, and a CRUD form of six required fields rather than four plus two whose emptiness carries meaning. **A plan can only narrow**: `MAX_DOCUMENT_BYTES` protects the parser and is not sellable, so this is an argument to `min()` and never a replacement for it — selling a larger file than the platform admits is not expressible, which is correct. **The cost of NOT NULL is paid at apply time**: raising `MAX_DOCUMENT_BYTES` leaves every tenant gated at whatever their plan row says, top tier included, with no error anywhere, so moving the constant is a catalogue edit plus an apply — not a code change on its own. |
+| **max_attachment_bytes** | BIGINT | NOT NULL | The largest attachment this plan admits — same NOT NULL rule, same narrow-only composition, same staleness cost. **Almost no room to differentiate**, worth knowing before pricing on it: `MAX_ATTACHMENT_BYTES` is 10 MB because the gRPC message limit binds there, so creating headroom means moving a transport limit rather than a policy one. A 2/5/10 MB ladder is expressible; it is just a narrow one. |
+| **max_document_uploads** | INT | NOT NULL | The most documents this plan admits, bounded by `MAX_DOCUMENTS_PER_TENANT`. |
+| **max_analytics_range_days** | INT | NOT NULL | How far back this plan lets analytics look. **The only grant whose narrowing is retroactive**, so the only one a plan edit can take something away with. `applyPlan` reports no over-limit subset for it — there is none, because lowering it affects every subscriber equally and at once, which is why `PLAN_LIMIT_DIMENSIONS` does not list it. |
+| **is_active** | BOOLEAN | NOT NULL, Default: true | Whether the plan is currently sellable. Distinct from soft delete: an inactive plan still grants its subscribers. |
+| **created_at** | TIMESTAMPTZ | NOT NULL, NOW() | — |
+| **updated_at** | TIMESTAMPTZ | NOT NULL, auto-updated | — |
+| **deleted_at** | TIMESTAMPTZ | Nullable | Soft delete (§1.6). |
+| **deleted_by_id** | UUID | Nullable, FK ➔ users.id, **ON DELETE RESTRICT** | **Who retired the plan.** Retiring a plan is a catalogue decision with a blast radius, and the Super Admin who made it stays resolvable for as long as the row does rather than the decision going anonymous. `Restrict` is what enforces that: the deleter's own user row cannot be hard-deleted out from under it. |
+
+* **Partial unique index:** `UNIQUE (name) WHERE deleted_at IS NULL` — see the `name` row and §7.2 of [development-conventions.md](./development-conventions.md).
+
+#### **Table 41: subscription_plan_prices**
+
+*One Stripe Price, and the plan it grants.*
+
+| Field Name | Data Type | Constraints / Default | Description & Business Logic |
+| :---- | :---- | :---- | :---- |
+| **id** | UUID | Primary Key, gen_random_uuid() | Unique row identifier. |
+| **plan_id** | UUID | NOT NULL, FK ➔ subscription_plans.id, Indexed | The plan this price sells. |
+| **stripe_price_id** | VARCHAR(255) | NOT NULL, **UNIQUE** | The lookup the webhook performs. UNIQUE because one price belongs to exactly one plan — **and because the uniqueness is what makes an unmapped price a `FAILED` event rather than an ambiguous one.** |
+| **interval** | VARCHAR(20) | NOT NULL | `month \| year`. **Display and ordering only — never an entitlement input.** Lowercase because it is **Stripe's literal, stored as it arrives**: §7.3's *"values are SCREAMING_SNAKE_CASE, with no exceptions"* is about values this repo *defines*, and upper-casing a foreign literal breaks the comparison the moment anything matches it against a webhook payload. Stripe's vocabulary is also wider than these two, so this is not an enum of ours waiting to be written. |
 
 ### **Domain B: Support Tickets & Real-Time Messaging**
 
@@ -784,7 +852,7 @@ Written in the **same transaction** as the ticket or message it produced. Provid
 | **created_by_id** | UUID | NOT NULL, FK ➔ users.id | Knowledge Manager or Admin who uploaded the document. |
 | **title** | VARCHAR(255) | NOT NULL | Document title (e.g., "2026 Employee Handbook"). |
 | **file_url** | TEXT | NOT NULL | An internal Firebase Storage object path (`documents` purpose — reserved, not yet wired), same discipline as `users.avatar_url` and `message_attachments.file_url`. Not a URL despite the name. |
-| **file_hash** | VARCHAR(64) | NOT NULL | SHA-256 of the uploaded bytes. **Dedup is PER TENANT** (`documents_org_hash_key`) — global dedup would leak the existence of one tenant's upload to another. |
+| **file_hash** | VARCHAR(64) | NOT NULL, **UNIQUE** *(per tenant, among active rows)* | SHA-256 of the uploaded bytes. **Dedup is PER TENANT** (`documents_org_hash_key`) — global dedup would leak the existence of one tenant's upload to another. |
 | **file_type** | VARCHAR(50) | NOT NULL | File extension, from `ALLOWED_DOCUMENT_MIME_TYPES` — **four types: `pdf`, `docx`, `md`, `txt`**. `.doc` (`application/msword`) was **removed from the document pipeline**: a genuine Word 97-2003 file is an OLE compound file, not a zip, so the parser fails on it with a bare error that misses the deterministic-refusal arm and costs three download-and-parse retries to reach a message about zip files. It remains storable as a ticket *attachment* (Table 15), where nothing parses it. |
 | **file_size_bytes** | BIGINT | NOT NULL | File size in bytes, capped at `MAX_DOCUMENT_BYTES` = **100 MB** (raised from 25 MB). Checked at presign, before signing, against the tenant's remaining storage quota. |
 | **ocr_languages** | VarChar[] | NOT NULL, **no column default** | ISO 639-1 codes the uploader declared for OCR. **`[]` means "not specified", not NULL** — Prisma scalar lists cannot be null, so absent and empty are one value and the parser falls back to `eng`. ISO 639-1 (`vi`, `ja`) rather than tesseract's codes (`vie`, `jpn`); capped at four, ordered (ADR 0035). |
@@ -962,6 +1030,7 @@ Written in the **same transaction** as the ticket or message it produced. Provid
 | Field Name | Data Type | Constraints / Default | Description & Business Logic |
 | :---- | :---- | :---- | :---- |
 | **id** | UUID | Primary Key, gen_random_uuid() | — |
+| **source** | VARCHAR(20) | NOT NULL, Default `STRIPE` | `BillingEventSource` — who **wrote** this row. **`STRIPE` rows order the tenant's timeline; `LOCAL` rows must not.** The monotonic guard takes the newest `PROCESSED` row as the high-water mark and compares Stripe's `created` (whole **seconds**) against it. A locally-produced claim carries `now()` to the millisecond, so without this filter a plan change's own claim makes the webhook it caused look stale — measured: the event settles `SKIPPED_STALE`, entitlements are never written, and the tenant is billed for a plan they do not hold. Defaulted to `STRIPE` because every row that existed before this column was one. |
 | **stripe_event_id** | VARCHAR(255) | NOT NULL, **UNIQUE** | Stripe's `evt_…` id. The unique constraint **is** the idempotency mechanism: a redelivered webhook is a duplicate-key violation the handler catches and acknowledges, not a second entitlement write. Webhook delivery is at-least-once, so this is not defensive — it is the normal path. |
 | **organization_id** | UUID | Nullable, Indexed | Resolved from `stripe_customer_id`. Nullable because an event can arrive for a customer that has no tenant yet (checkout completed before onboarding finished), and losing the event would be worse than storing it unattached. |
 | **event_type** | VARCHAR(100) | NOT NULL, Indexed | `customer.subscription.updated`, `invoice.payment_failed`, … |
@@ -1108,6 +1177,25 @@ The jobs not running was never the real problem; the real problem was that nothi
 
 * See [ADR 0003](./decisions/0003-bullmq-over-nest-cron.md) for why the jobs run on BullMQ repeats.
 
+#### **Table 42: limit_alert_generations**
+
+*How many times a tenant's limit alarm has **re-armed**, per dimension.*
+
+Present **identically in `postgres_auth` and `postgres_ingestion`** — like `job_runs` (Table 38), a service records its own state without a cross-service write.
+
+**Durable because it defeats a durable guard.** The alert's `notifications.event_id` is derived, so a re-crossing after a recovery would republish an id Domain E's permanent `UNIQUE (recipient_id, event_id)` already holds — and be rejected as a duplicate the tenant never sees. The generation makes each occurrence a new event.
+
+It **cannot** live in Redis beside the alarm *level*: a flush would reset it to zero, the next crossing would republish a held id, and that dimension would stop alerting for that tenant **permanently**, from a transient failure. A counter that steps past a permanent guard must outlive it. The level stays in Redis on purpose — losing that costs at most one duplicate alert, which the durable guard then collapses.
+
+| Field Name | Data Type | Constraints / Default | Description & Business Logic |
+| :---- | :---- | :---- | :---- |
+| **organization_id** | UUID | NOT NULL | The tenant. |
+| **dimension** | VARCHAR(32) | NOT NULL | `seats \| storage \| documents` — `LimitAlertDimension`, stored **verbatim in that union's own lowercase**. A string, not a Prisma enum ([ADR 0001](./decisions/0001-no-prisma-enums.md)). **Lowercase deliberately, and it must stay that way**: the same literal is a segment of `limit-alert:{org}:{dimension}` in Redis *and* of the derived event id `limit:{org}:{dimension}:{threshold}:{gen}` that Domain E dedupes on. Upper-casing this column alone would give one fact two spellings, and the id is the half that cannot be respelled without invalidating every stored `event_id`. §7.3's SCREAMING_SNAKE rule governs enumerated domain values defined for a wire or database contract; these are internal keys of a config array — the same carve-out `subscription_plan_prices.interval` documents. |
+| **generation** | INT | NOT NULL, Default 0 | **Incremented once per *recovery*, never per threshold cleared**: falling from 100% to 5% is one recovery, and a counter that skipped values would be a step counter nobody could explain later. |
+| **updated_at** | TIMESTAMPTZ | NOT NULL, auto-updated | Last re-arm. |
+
+* **Primary key:** composite `(organization_id, dimension)`.
+
 ### **Domain E: Notifications & Messaging**
 
 #### **Table 23: notifications**
@@ -1221,6 +1309,7 @@ To prevent accidental database corruption or orphaned child records:
    * notifications ➔ users (If a user is hard-deleted, drop their notifications).
    * notification_preferences ➔ users (If a user is hard-deleted, drop their preference settings).
    * document_flags ➔ documents (If a document is hard-deleted, drop quality flags).
+   * subscription_plan_prices ➔ subscription_plans (a price with no plan grants nothing).
 2. **ON DELETE SET NULL:**
    * deleted_by_id ➔ users.id (If an admin user account is hard-deleted, preserve the deletion timestamp while setting deleted_by_id to NULL).
    * assigned_by_id ➔ users.id (in ticket_assignments; if the assigning user is deleted, retain the assignment record).
@@ -1229,7 +1318,9 @@ To prevent accidental database corruption or orphaned child records:
    * resolved_by_id ➔ users.id (in document_flags; if a Knowledge Manager is hard-deleted, retain the resolution record).
    * ticket_id ➔ tickets.id (in inbound_emails; **never CASCADE** — the row is the idempotency record for a delivery and must outlive what it produced, or the provider's next retry stops being a duplicate and the deleted ticket comes straight back).
    * actor_id ➔ users.id (in notifications; if the user who triggered the notification is deleted, retain the notification).
+   * plan_id ➔ subscription_plans.id (in organizations; a retired plan leaves its subscribers on the entitlement columns, which stay authoritative).
    * invited_by_id, accepted_user_id, revoked_by_id ➔ users.id (in user_invitations; the invitation record outlives any of the accounts referenced by it).
 3. **ON DELETE RESTRICT / NO ACTION (Default):**
+   * deleted_by_id ➔ users.id (in subscription_plans; retiring a plan is a catalogue decision with a blast radius, so the Super Admin who made it stays resolvable for as long as the row does).
    * tickets ➔ users (Do not allow deleting a user if they own active historical support tickets; soft-delete the user instead).
    * documents ➔ organizations.

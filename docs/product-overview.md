@@ -95,10 +95,10 @@ Our platform transforms support from a reactive, high-cost bottleneck into a pro
 
 1. **Initial Assignment:** A ticket arrives in the **IT Support** department queue: *"My VPN connection is extremely slow and I can't access the file server."*
 2. **Initial Investigation:** The assigned IT agent troubleshoots the VPN connection but discovers the real issue is that the customer's storage quota on the file server is 99% full—a **Finance/Operations** issue, not IT.
-3. **Smart Reassignment:** The IT agent reassigns the ticket to the Finance/Operations department with reason **"Skill Mismatch"** and a note explaining the root cause.
+3. **Smart Reassignment:** The IT agent reassigns the ticket to the Finance/Operations department with reason **"Department Change"** and a note explaining the root cause.
 4. **Seamless Handoff:** Finance/Operations receives the ticket in their queue. The full conversation history (chat thread + AI summaries) travels with the ticket. The Finance agent knows exactly what was tried and why the ticket was transferred.
 5. **Resolution:** Finance increases the customer's quota. The ticket is resolved without the customer ever knowing it moved between departments—they see only one continuous conversation thread.
-6. **Outcome:** Audit trail shows ticket touched two departments; analytics can track this reassignment as "workload balancing" data for team planning.
+6. **Outcome:** Audit trail shows ticket touched two departments; analytics can track reassignments by reason for team planning.
 
 ## **6. Core Product Modules & Features**
 
@@ -110,8 +110,8 @@ Our platform transforms support from a reactive, high-cost bottleneck into a pro
 
 ### **6.2 Intelligent Helpdesk & Ticket Management**
 
-* **Lifecycle Tracking:** Complete status progression (*New \-\> Open \-\> Pending Agent \-\> Escalated \-\> Resolved \-\> Closed*) with timestamp and actor recorded at each transition.
-* **Department-Based Routing & Assignment:** AI classifies tickets by issue type and automatically routes them to the appropriate department queue (IT, HR, Billing, Operations). Agents accept tickets from their department's queue and handle them. If an agent discovers the issue requires expertise from another department, they can seamlessly reassign the ticket to that department—tracked with reason (escalation, skill mismatch, workload balance).
+* **Lifecycle Tracking:** Complete status progression (*New → Open → Pending Agent → Escalated → Resolved → Closed*) with timestamp and actor recorded at each transition.
+* **Department-Based Routing & Assignment:** AI classifies tickets by issue type and automatically routes them to the appropriate department queue (IT, HR, Billing, Operations). Agents accept tickets from their department's queue and handle them. If an agent discovers the issue requires expertise from another department, they can seamlessly reassign the ticket to that department—tracked with one of seven reasons (*initial, department change, escalation, unavailable, load balancing, self-assigned, manual*).
 * **Assignment Audit Trail:** Complete history of who held each ticket, when, and which department they were in. Supports analytics on agent productivity, escalation patterns, and reassignment frequency.
 
 ### **6.3 Agent AI Co-Pilot Workplace**
@@ -119,7 +119,7 @@ Our platform transforms support from a reactive, high-cost bottleneck into a pro
 * **Smart Summarization:** Provides agents with an immediate condensed summary of long chat histories, complex customer descriptions, and full assignment history (who handled it before, when, and why it was reassigned).
 * **Auto-Drafted Responses:** Generates pre-written, highly accurate response recommendations tailored to the specific problem, learning from past resolutions across the organization.
 * **Knowledge Recommendations:** Surface relevant articles, past ticket resolutions, and internal expertise (e.g., "Similar issue resolved by the Ops team 2 weeks ago") alongside the active ticket thread.
-* **Flexible Reassignment:** One-click reassignment to colleagues in the same or different departments—with optional reason (escalation, skill transfer, workload balance) and automatic context transfer. Customers see one continuous conversation thread regardless of which agent (or department) handles the ticket behind the scenes.
+* **Flexible Reassignment:** One-click reassignment to colleagues in the same or different departments—with a recorded reason (escalation, department change, load balancing, and four others) and automatic context transfer. Customers see one continuous conversation thread regardless of which agent (or department) handles the ticket behind the scenes.
 
 ### **6.4 Unified Knowledge Management Center**
 
@@ -138,6 +138,13 @@ Our platform transforms support from a reactive, high-cost bottleneck into a pro
 * **Resolution Volume Tracking:** Overview of total inquiries handled, percentage solved by self-service vs. human agents.
 * **Response Time Metrics:** Clear metrics on Average Time to First Response and Average Time to Resolution.
 * **Knowledge Gap Analysis:** Reports showing frequent user questions that lacked clear documentation answers, helping managers improve knowledge content.
+
+### **6.7 Plans, Limits & Usage Governance**
+
+* **Plan Catalogue:** Plans are data an administrator edits, not a constant in the code — each one states every limit it grants (seats, storage, AI budget, model tier, document size, attachment size, document count, analytics lookback) with no blanks, so what a tier offers is readable in one row. Pricing itself stays in Stripe: this platform owns what a plan *grants*, Stripe owns what it *costs*, and neither mirrors the other.
+* **Tenant Self-Governance:** An organization can narrow its own limits below what its plan allows — a company that knows its staff should never upload a 100 MB file sets 5 MB, so a mis-click or a compromised account cannot burn its storage. **Every layer narrows and no layer widens**: a tenant can tighten a limit, never grant itself more than it bought.
+* **Approaching-Limit Alerts:** Notifications as a workspace nears its seat, storage or document ceiling, so running out is something a customer sees coming rather than discovers when an upload fails. Alerts re-arm after a recovery, so a workspace that frees space and fills it again is told again.
+* **Safe Plan Changes:** Upgrades apply immediately. A **downgrade that would strand existing data is refused rather than silently enforced** — a workspace over the new plan's document or seat count is told what exceeds it, instead of having content become unreachable behind a limit it never agreed to.
 
 ## **7. Strategic Business Benefits & ROI**
 
