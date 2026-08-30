@@ -1,0 +1,28 @@
+{
+  // The seeder is TypeScript because it imports the services' typed factories
+  // and generated Prisma clients — `seed-plans.mjs`'s raw `pg` precedent does
+  // not carry. `tsx` reads this file, and the `paths` below are why: without
+  // them `@synapsedesk/common` resolves through node_modules to the BUILT
+  // `dist/main.js`, whose named exports an ESM importer cannot always see —
+  // the symptom is `does not provide an export named 'BillingEventStatus'` for
+  // a symbol that is plainly there.
+  //
+  // Mirrors the root tsconfig's paths and jest's `moduleNameMapper`, pointed at
+  // source for the same reason both of those are.
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": "..",
+    "paths": {
+      "@synapsedesk/common": ["libs/common/src/main.ts"],
+      "@synapsedesk/common/*": ["libs/common/src/*"],
+      "@synapsedesk/grpc-proto": ["libs/grpc-proto/src/index.ts"],
+      "@synapsedesk/grpc-proto/*": ["libs/grpc-proto/src/*"]
+    }
+  },
+  "include": ["seed-demo/**/*.ts", "../apps/*/src/**/*", "../apps/*/test/**/*", "../libs/*/src/**/*"],
+  // `jest.config.ts` imports `../jest.config.base.ts` by its `.ts` extension —
+  // jest loads it through native ESM resolution, which does not do
+  // extensionless lookups — and that is an error under `tsc`. Every other
+  // project's config sits outside its tsconfig for the same reason.
+  "exclude": ["jest.config.ts"]
+}

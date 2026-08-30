@@ -1,0 +1,5 @@
+{
+  "//": "Makes `scripts/` its own CommonJS module scope, and does nothing else. **The mechanism is the ABSENCE of a `type` field**: a package.json without one defaults to CommonJS, which is also how the services run \u2014 none of them declares a type either. Adding `\"type\": \"module\"` here breaks the seeder, and so does deleting this file. Why it matters: the repository root declares `type: module`, so without this file tsx compiles a .ts under `scripts/` to ESM \u2014 and an ESM import of `@synapsedesk/common` gets the library's CommonJS `dist/main.js` through cjs-module-lexer, which cannot see through its `export *` chain. The symptom is `does not provide an export named 'BillingEventStatus'` for a symbol `require()` returns happily. The `.mjs` scripts here are unaffected: that extension is ESM regardless of this field.",
+  "name": "@synapsedesk/scripts",
+  "private": true
+}

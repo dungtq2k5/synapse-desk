@@ -15,47 +15,40 @@ const baseConfig: Config = {
   moduleFileExtensions: ['js', 'mjs', 'json', 'ts'],
   testEnvironment: 'node',
 
-  /**
-   * Resolve dual-published packages through their CommonJS entry.
-   *
-   * Jest's node environment otherwise picks the `import` condition, which hands
-   * ts-jest an ESM file it does not transform — the symptom is
-   * `SyntaxError: Unexpected token 'export'` from deep inside a dependency
-   * (firebase-admin/auth is the one that surfaced it here) with a stack that
-   * points at library internals rather than at anything in this repo.
-   *
-   * These services are compiled to CommonJS in production, so the `require`
-   * entry is also the one that actually ships.
-   */
+  // Resolve dual-published packages through their CommonJS entry.
+  // Jest's node environment otherwise picks the `import` condition, which hands
+  // ts-jest an ESM file it does not transform — the symptom is
+  // `SyntaxError: Unexpected token 'export'` from deep inside a dependency
+  // (firebase-admin/auth is the one that surfaced it here) with a stack that
+  // points at library internals rather than at anything in this repo.
+  //
+  // These services are compiled to CommonJS in production, so the `require`
+  // entry is also the one that actually ships.
   testEnvironmentOptions: {
     customExportConditions: ['node', 'require', 'default'],
   },
 
-  /**
-   * Only `*.spec.ts` / `*.test.ts`.
-   *
-   * The previous pattern was `(.[jt]s)$`, in which `.` is "any character" — so
-   * it matched EVERY `.ts` file in the project and jest would have tried to run
-   * each source module as a test suite.
-   */
+  // Only `*.spec.ts` / `*.test.ts`.
+  //
+  // The previous pattern was `(.[jt]s)$`, in which `.` is "any character" — so
+  // it matched EVERY `.ts` file in the project and jest would have tried to run
+  // each source module as a test suite.
   testRegex: String.raw`\.(spec|test)\.[jt]s$`,
 
-  /**
-   * `testRegex` above matches `*.e2e-spec.ts` too — it ends in `.spec.ts`.
-   * Excluding it here keeps `npm test` a pure unit run: the e2e layer needs a
-   * live Postgres or a bound HTTP port and Redis, so left in, the default
-   * script fails on a machine with nothing running.
-   *
-   * Each service's e2e project re-includes itself in its own
-   * `jest.e2e.config.ts`.
-   *
-   * **`/dist/` is here because `testRegex` matches `.spec.js`, not just
-   * `.spec.ts`.** SWC does not read `tsconfig.build.json`'s spec exclude, so
-   * when the services moved to it jest collected `dist/src/**\/*.spec.js`
-   * alongside the real suites. The build now ignores specs, so this is the
-   * second line of defence: a stale `dist` must not be able to turn `npm test`
-   * red for a reason unrelated to the code.
-   */
+  // `testRegex` above matches `*.e2e-spec.ts` too — it ends in `.spec.ts`.
+  // Excluding it here keeps `npm test` a pure unit run: the e2e layer needs a
+  // live Postgres or a bound HTTP port and Redis, so left in, the default
+  // script fails on a machine with nothing running.
+  //
+  // Each service's e2e project re-includes itself in its own
+  // `jest.e2e.config.ts`.
+  //
+  // **`/dist/` is here because `testRegex` matches `.spec.js`, not just
+  // `.spec.ts`.** SWC does not read `tsconfig.build.json`'s spec exclude, so
+  // when the services moved to it jest collected `dist/src/**\/*.spec.js`
+  // alongside the real suites. The build now ignores specs, so this is the
+  // second line of defence: a stale `dist` must not be able to turn `npm test`
+  // red for a reason unrelated to the code.
   testPathIgnorePatterns: [
     '/node_modules/',
     '/dist/',
@@ -78,25 +71,22 @@ const baseConfig: Config = {
     '^@synapsedesk/grpc-proto/(.*)$': '<rootDir>/../../libs/grpc-proto/src/$1',
   },
 
-  /**
-   * These ship ESM-only builds, so they must be transformed rather than skipped.
-   *
-   * `jose` is here transitively, not because anything imports it directly:
-   * firebase-admin -> jwks-rsa -> jose, and jose v6 publishes a single
-   * `default` export condition pointing at ESM. Node 22 resolves that from CJS
-   * on its own (which is why the service runs); jest does not, and fails with
-   * `Unexpected token 'export'` from a file three dependencies deep.
-   *
-   * The parsing stack needs nothing here. `mammoth`, `turndown` and
-   * `turndown-plugin-gfm` are real CommonJS; `js-tiktoken` and
-   * `@langchain/textsplitters` declare `type: module` but ship a `.cjs` entry
-   * that jest resolves through the `require` condition above.
-   *
-   * `pdfjs-dist` is the one exception and is deliberately NOT listed. It is
-   * ESM-only AND uses `import.meta.url`, which cannot survive a transform to
-   * CommonJS at all — so `document-parser.service.ts` loads it through Node's
-   * real `require`, bypassing jest's registry entirely. See `loadPdfjs` there.
-   */
+  // These ship ESM-only builds, so they must be transformed rather than skipped.
+  // `jose` is here transitively, not because anything imports it directly:
+  // firebase-admin -> jwks-rsa -> jose, and jose v6 publishes a single
+  // `default` export condition pointing at ESM. Node 22 resolves that from CJS
+  // on its own (which is why the service runs); jest does not, and fails with
+  // `Unexpected token 'export'` from a file three dependencies deep.
+  //
+  // The parsing stack needs nothing here. `mammoth`, `turndown` and
+  // `turndown-plugin-gfm` are real CommonJS; `js-tiktoken` and
+  // `@langchain/textsplitters` declare `type: module` but ship a `.cjs` entry
+  // that jest resolves through the `require` condition above.
+  //
+  // `pdfjs-dist` is the one exception and is deliberately NOT listed. It is
+  // ESM-only AND uses `import.meta.url`, which cannot survive a transform to
+  // CommonJS at all — so `document-parser.service.ts` loads it through Node's
+  // real `require`, bypassing jest's registry entirely. See `loadPdfjs` there.
   transformIgnorePatterns: [
     'node_modules/(?!.*(@scure|otplib|@otplib|@noble|@faker-js|jose))',
   ],

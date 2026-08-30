@@ -42,6 +42,11 @@ export default defineConfig(
           './tsconfig.json',
           './apps/*/tsconfig.json',
           './libs/*/tsconfig.json',
+          // The demo seeder. `scripts/` is neither an app nor a lib, and the
+          // root tsconfig does not include it — without this entry every file
+          // under `scripts/seed-demo/` fails to parse with "none of those
+          // tsconfigs include this file" rather than being linted.
+          './scripts/tsconfig.json',
         ],
         tsconfigRootDir: import.meta.dirname,
       },

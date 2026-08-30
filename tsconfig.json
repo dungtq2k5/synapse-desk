@@ -8,7 +8,13 @@
     "apps/*/src/**/*",
     "apps/*/test/**/*",
     "apps/*/prisma.config.ts",
-    "libs/*/src/**/*"
+    "libs/*/src/**/*",
+    // The demo seeder. In the root program because `tsx` does not typecheck —
+    // a wrong enum member is `undefined` at runtime, which once wrote 200
+    // documents with the column default and reported success. Left out, every
+    // aggregate command in this repository was green over code none of them
+    // read.
+    "scripts/seed-demo/**/*"
   ],
   "exclude": ["node_modules", "dist"],
   "compilerOptions": {
