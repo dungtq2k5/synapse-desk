@@ -209,6 +209,190 @@ export interface PlatformMetricsResponse_OrganizationsByStatusEntry {
   value: number;
 }
 
+export interface GetFinanceSnapshotRequest {
+}
+
+/**
+ * Tenant counts, from auth's own tables. The same definition `GetMetrics` uses
+ * -- `deleted_at IS NULL` -- so the two routes cannot disagree about which
+ * tenants exist.
+ */
+export interface FinanceTenantCounts {
+  total: number;
+  /**
+   * Keyed by status, for the reason `organizations_by_status` is: a new status
+   * must not need a new field.
+   *
+   * **`ACTIVE` here is NOT `active_subscriptions` in the revenue section.** The
+   * Stripe status mapping folds `trialing` into `ACTIVE`, while the revenue
+   * estimate counts `status: 'active'` subscriptions only. Two populations, one
+   * adjective -- named apart so they cannot be subtracted from each other.
+   */
+  byStatus: { [key: string]: number };
+}
+
+export interface FinanceTenantCounts_ByStatusEntry {
+  key: string;
+  value: number;
+}
+
+export interface FinancePlanMix {
+  planId: string;
+  planName: string;
+  /**
+   * *Not `SubscriptionPlanResponse.subscriber_count`, and deliberately.** That
+   * one is unfiltered: it counts SOFT-DELETED tenants, because `DeletePlan`
+   * reads it to refuse retiring a plan somebody still points at, and an
+   * offboarded tenant can be RESTORED. Finance asks a different question --
+   * who is a subscriber now -- and gets `deleted_at IS NULL`.
+   *
+   * Three consumers, three correct answers. See `liveSubscribersByPlan`.
+   */
+  subscribers: number;
+  /**
+   * Summed from `organizations.max_agent_seats`, never `plan.max_agent_seats x
+   * subscribers`: the two diverge for every tenant with `entitlements_pinned`
+   * or a manual override, which is exactly the population plan-apply does not
+   * touch. This is what tenants HOLD.
+   */
+  seatsAllocated: number;
+}
+
+export interface DunningTenant {
+  id: string;
+  name: string;
+  /**
+   * *`updated_at`, and NOT "past due since".** There is no status-change
+   * timestamp on `organizations` -- the column does not exist -- so the closest
+   * available fact is when the row last changed, which a rename, a quota edit
+   * or a webhook all move. Naming it `since` would have rendered as a dunning
+   * age on a finance page, which is a confidently wrong number of exactly the
+   * kind section 3a refuses for failed-payment amounts.
+   */
+  updatedAt: Timestamp | undefined;
+}
+
+/**
+ * *`FROZEN` is deliberately absent from this message.** Two unrelated things
+ * produce it: Stripe cancelling a subscription, and an operator applying a
+ * compliance hold through `SetOrganizationStatus` -- which exists precisely
+ * because it has no Stripe equivalent. A churn figure built on `FROZEN` counts
+ * legal holds as lost customers. Cancellations come from `billing_events`,
+ * where the two are distinguishable, and the frozen COUNT stays under tenancy.
+ */
+export interface FinanceDunning {
+  pastDue: number;
+  tenants: DunningTenant[];
+}
+
+/**
+ * The revenue estimate, or why there is not one.
+ *
+ * Follows `UsageMeterResponse`'s degrade-with-a-reason shape rather than
+ * failing the call: a Stripe outage must cost the revenue section and nothing
+ * else on the page.
+ */
+export interface FinanceRevenue {
+  available: boolean;
+  unavailableReason?:
+    | string
+    | undefined;
+  /**
+   * In the currency's smallest unit, as Stripe reports it. Annual prices are
+   * divided by twelve.
+   */
+  estimatedMrr?: number | undefined;
+  currency?: string | undefined;
+  activeSubscriptions?:
+    | number
+    | undefined;
+  /**
+   * When the JOB read Stripe -- not when this endpoint answered. A fresh page
+   * over a two-hour-old snapshot is indistinguishable from a stale page
+   * without it.
+   */
+  computedAt?:
+    | Timestamp
+    | undefined;
+  /** The caveats, on the wire. See REVENUE_EXCLUSIONS. */
+  excludes: string[];
+}
+
+export interface FinanceSnapshotResponse {
+  tenants: FinanceTenantCounts | undefined;
+  plans: FinancePlanMix[];
+  dunning: FinanceDunning | undefined;
+  revenue:
+    | FinanceRevenue
+    | undefined;
+  /**
+   * When THIS response was assembled. Distinct from `revenue.computed_at`,
+   * which is the snapshot's own age.
+   */
+  generatedAt: Timestamp | undefined;
+}
+
+export interface ListBillingEventsRequest {
+  /**
+   * Inclusive ISO dates. Both required: `billing_events` never shrinks, so an
+   * unbounded default range is a full scan of the entire history on a page
+   * load.
+   */
+  from: string;
+  to: string;
+}
+
+/**
+ * One (day, event_type) cell.
+ *
+ * **`repeated`, not a map.** A map is unordered and single-keyed, and this is
+ * ordered and keyed by the pair. Same shape as `AiUsagePoint`, for the same
+ * reason.
+ */
+export interface BillingEventPoint {
+  day: string;
+  /** Deliberately a string - see `BillingEventPointResponseDto` for the reason. */
+  eventType: string;
+  count: number;
+}
+
+export interface ListBillingEventsResponse {
+  points: BillingEventPoint[];
+  /**
+   * Tenants CURRENTLY offboarded, bucketed by the day they were offboarded.
+   *
+   * Beside the cancellation events rather than merged into them: Stripe
+   * cancelling a subscription and an operator offboarding a workspace are
+   * different endings, and a series that conflates them cannot tell voluntary
+   * churn from an incident.
+   *
+   * **Named for the state rather than the event, and that is the disclosure.**
+   * It reads `organizations.deleted_at`, which `RestoreOrganization` CLEARS --
+   * so restoring a tenant removes it from every past range, including months
+   * already read and quoted. As `offboardings` that was an event count that
+   * shrinks, which is a defect; as `currently_offboarded` it is a projection of
+   * current state behaving as named.
+   *
+   * A stable churn series needs an append-only source --
+   * `PLATFORM_ORGANIZATION_OFFBOARDED` in `audit_logs`, which lives in
+   * ticket-service and would be a cross-service read this surface does not
+   * have. Not built here; the name is what stops the number being read as
+   * history in the meantime.
+   */
+  currentlyOffboarded: BillingEventPoint[];
+  /**
+   * *The event types actually SEEN in this range**, so a type that has never
+   * arrived is visibly absent rather than reported as zero.
+   *
+   * Which types arrive at all is decided by the Stripe endpoint's
+   * `enabled_events`, and NOTHING in this repository sets it --
+   * `provision-stripe.mjs` never touches `webhookEndpoints`. So "no
+   * cancellations this month" and "cancellations were never enabled" render
+   * identically, and this field is the only thing that separates them.
+   */
+  observedEventTypes: string[];
+}
+
 export interface SubscriptionPlanPriceResponse {
   id: string;
   stripePriceId: string;
@@ -446,6 +630,16 @@ export interface PlatformServiceClient {
 
   getMetrics(request: GetPlatformMetricsRequest, metadata?: Metadata): Observable<PlatformMetricsResponse>;
 
+  /**
+   * *Two RPCs, because they have different failure domains.** The snapshot has
+   * a Stripe leg that can degrade; the series is local and therefore always
+   * answerable, which is what makes it worth having when the other is degraded.
+   */
+
+  getFinanceSnapshot(request: GetFinanceSnapshotRequest, metadata?: Metadata): Observable<FinanceSnapshotResponse>;
+
+  listBillingEvents(request: ListBillingEventsRequest, metadata?: Metadata): Observable<ListBillingEventsResponse>;
+
   getAuthJobHealth(request: AuthJobHealthRequest, metadata?: Metadata): Observable<AuthJobHealthResponse>;
 }
 
@@ -552,6 +746,22 @@ export interface PlatformServiceController {
     metadata?: Metadata,
   ): Promise<PlatformMetricsResponse> | Observable<PlatformMetricsResponse> | PlatformMetricsResponse;
 
+  /**
+   * *Two RPCs, because they have different failure domains.** The snapshot has
+   * a Stripe leg that can degrade; the series is local and therefore always
+   * answerable, which is what makes it worth having when the other is degraded.
+   */
+
+  getFinanceSnapshot(
+    request: GetFinanceSnapshotRequest,
+    metadata?: Metadata,
+  ): Promise<FinanceSnapshotResponse> | Observable<FinanceSnapshotResponse> | FinanceSnapshotResponse;
+
+  listBillingEvents(
+    request: ListBillingEventsRequest,
+    metadata?: Metadata,
+  ): Promise<ListBillingEventsResponse> | Observable<ListBillingEventsResponse> | ListBillingEventsResponse;
+
   getAuthJobHealth(
     request: AuthJobHealthRequest,
     metadata?: Metadata,
@@ -579,6 +789,8 @@ export function PlatformServiceControllerMethods() {
       "deletePlan",
       "applyPlan",
       "getMetrics",
+      "getFinanceSnapshot",
+      "listBillingEvents",
       "getAuthJobHealth",
     ];
     for (const method of grpcMethods) {

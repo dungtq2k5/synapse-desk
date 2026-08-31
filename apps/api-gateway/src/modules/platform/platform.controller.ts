@@ -41,6 +41,7 @@ import {
   CreatePlanDto,
   ListPlansQueryDto,
   UpdatePlanDto,
+  FinanceEventsQueryDto,
 } from './dto/rest/platform.dto';
 import {
   CreatePlatformOrganizationResponseDto,
@@ -52,6 +53,10 @@ import {
   DeletePlanResponseDto,
   SubscriptionPlanResponseDto,
 } from './dto/rest/platform-response.dto';
+import {
+  BillingEventsResponseDto,
+  FinanceSnapshotResponseDto,
+} from './dto/rest/finance-response.dto';
 
 /**
  * Platform administration (api-endpoints-plan).
@@ -370,5 +375,54 @@ export class PlatformController {
     @CurrentUser() context: RequestContext,
   ): Promise<PlatformMetricsResponseDto> {
     return this.platform.getMetrics(context);
+  }
+
+  // ---------------------------------------------------------------- Finance
+
+  /**
+   * The finance snapshot: plan mix, dunning, and the revenue estimate.
+   *
+   * **Not folded into `/platform/metrics`, and not one route with the series.**
+   * `metrics` answers from auth's own tables and cannot fail; this has a
+   * Stripe-fed section that can. Merging them would let a Stripe outage take
+   * down the tenancy dashboard.
+   *
+   * The revenue section degrades with a reason rather than failing the call —
+   * three of its four sections are local and exact, and a missing estimate must
+   * not cost them.
+   */
+  @ApiOperation({
+    summary: 'Plan mix, dunning, and an estimated MRR — revenue may degrade',
+  })
+  @ApiWrappedResponse(FinanceSnapshotResponseDto)
+  @ApiFilterErrors(['401'])
+  @Get('finance')
+  getFinanceSnapshot(
+    @CurrentUser() context: RequestContext,
+  ): Promise<FinanceSnapshotResponseDto> {
+    return this.platform.getFinanceSnapshot(context);
+  }
+
+  /**
+   * The event series — new subscriptions, cancellations, failed payments.
+   *
+   * **Entirely local, and therefore always answerable**, which is the point of
+   * splitting it from the snapshot: it still works during the outage that
+   * degrades the other one, and that is exactly when somebody looks.
+   *
+   * Counts, never amounts. A failed-payment count is a fact about events we
+   * received; a failed-payment sum is a claim about money that Stripe will
+   * contradict — retries repeat the invoice, and a retry that later succeeds
+   * leaves its failure row in place.
+   */
+  @ApiOperation({ summary: 'Billing events per day, by type. Counts only' })
+  @ApiWrappedResponse(BillingEventsResponseDto)
+  @ApiFilterErrors(['400', '401'])
+  @Get('finance/events')
+  listBillingEvents(
+    @CurrentUser() context: RequestContext,
+    @Query() query: FinanceEventsQueryDto,
+  ): Promise<BillingEventsResponseDto> {
+    return this.platform.listBillingEvents(query, context);
   }
 }

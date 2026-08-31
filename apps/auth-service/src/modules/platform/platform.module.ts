@@ -6,6 +6,7 @@ import { SessionsModule } from '../sessions/sessions.module';
 import { RolesModule } from '../roles/roles.module';
 import { BillingModule } from '../billing/billing.module';
 import { LimitAlertsModule } from '../limit-alerts/limit-alerts.module';
+import { FinanceModule } from '../finance/finance.module';
 import { PlatformService } from './platform.service';
 import { PlatformGrpcController } from './platform-grpc.controller';
 
@@ -27,6 +28,10 @@ import { PlatformGrpcController } from './platform-grpc.controller';
     // stays where its tables are.
     BillingModule,
     LimitAlertsModule,
+    // For the two finance RPCs. Same arrangement as `BillingModule` above: the
+    // queries live with their tables, the Super Admin surface over them lives
+    // behind `SuperAdminGuard` with the rest of the cross-tenant reads.
+    FinanceModule,
   ],
   controllers: [PlatformGrpcController],
   providers: [PlatformService],

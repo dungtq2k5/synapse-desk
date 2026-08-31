@@ -379,3 +379,13 @@ export const MAX_PLAN_PRICES = 12;
  * whitespace, punctuation, anything that could only be a paste accident.
  */
 export const STRIPE_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
+
+/**
+ * A calendar date, `YYYY-MM-DD`.
+ *
+ * Stricter than `@IsISO8601()` on purpose. That accepts a full timestamp, and a
+ * range parameter that quietly accepts one invites a caller to believe it
+ * selects a sub-day window — the series is bucketed by UTC day and no such
+ * window exists. The refusal is at the edge, where the message can say so.
+ */
+export const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;

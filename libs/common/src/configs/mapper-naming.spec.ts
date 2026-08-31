@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 /**
@@ -29,14 +29,26 @@ describe('mapper functions name their return type verbatim', () => {
   const REPO_ROOT = join(__dirname, '../../../..');
 
   /**
-   * One `export function to…(…): ReturnType {` declaration.
+   * One `function to…(…): ReturnType {` declaration, exported or not.
    *
    * `[\\s\\S]*?` is lazy and bounded by the FIRST `)` that is followed by `:` —
    * so a multi-line parameter list is one match and the next declaration is
    * never absorbed into it.
+   *
+   * **`export` is OPTIONAL, and requiring it was a scope hole.** The rule is
+   * about mapper FILES (§12.1); this pattern was about exported functions in
+   * mapper files, and the gap between the two is where `toRevenueDto` lived —
+   * a file-local helper in `finance.mapper.ts`, invisible to six runs of this
+   * guard and found by somebody reading the file, which is the failure mode the
+   * docblock above says this spec exists to end.
+   *
+   * The carve-out that remains is a `to…` helper inside a SERVICE, and it
+   * remains because the corpus below is mapper files — the exemption is the
+   * file list, which is where it belongs, rather than a keyword that happened
+   * to correlate with it.
    */
   const DECLARATION =
-    /export function (to[A-Za-z0-9_]*)\s*\((?:(?!export function)[\s\S])*?\)\s*:\s*([^{;]+?)\s*\{/g;
+    /(?:export\s+)?function (to[A-Za-z0-9_]*)\s*\((?:(?!function)[\s\S])*?\)\s*:\s*([^{;]+?)\s*\{/g;
 
   /**
    * Mapper files only.
@@ -47,7 +59,29 @@ describe('mapper functions name their return type verbatim', () => {
   const mapperFiles = (): string[] =>
     execFileSync(
       'git',
-      ['ls-files', '--', 'apps/**/*.mapper.ts', 'libs/**/*.mapper.ts'],
+      [
+        'ls-files',
+        // **`--cached` alone lists the INDEX**, which is not the source tree.
+        // Measured: an unstaged `probe.mapper.ts` carrying a deliberate
+        // violation returned zero matches — so every new mapper file was
+        // invisible to this guard until somebody `git add`ed it, which is
+        // precisely the window in which a mapper is written and named.
+        //
+        // `finance.mapper.ts` happened to be staged when its violation was
+        // found, and that is the only reason the diagnosis landed on `export`.
+        // Unstaged, widening the pattern would have changed nothing and the fix
+        // would have looked applied.
+        '--cached',
+        '--others',
+        // Still `git` rather than a filesystem walk, for the one thing git is
+        // better at here: `.gitignore` already excludes `dist`, `node_modules`
+        // and the generated Prisma clients, and a hand-rolled walk would have
+        // to re-encode all of it and drift.
+        '--exclude-standard',
+        '--',
+        'apps/**/*.mapper.ts',
+        'libs/**/*.mapper.ts',
+      ],
       { cwd: REPO_ROOT, encoding: 'utf8' },
     )
       .split('\n')
@@ -155,6 +189,53 @@ describe('mapper functions name their return type verbatim', () => {
     expect(
       expectedName('Promise<PaginationResponseDto<MessageResponseDto>>'),
     ).toBeNull();
+  });
+
+  it('**4b. a NON-EXPORTED declaration is seen**', () => {
+    // The first of two scope holes `toRevenueDto` slipped through: a file-local
+    // helper in `finance.mapper.ts`, which the rule covers (§12.1 is about
+    // mapper FILES) and the pattern did not.
+    const found = [
+      ...`function toRevenueDto(x: Wire): FinanceRevenueResponseDto {`.matchAll(
+        DECLARATION,
+      ),
+    ];
+
+    expect(found).toHaveLength(1);
+    expect(expectedName(found[0][2])).toBe('toFinanceRevenueResponseDto');
+    expect(found[0][1]).toBe('toRevenueDto');
+
+    // And the exported form still matches, so widening did not trade one half
+    // for the other.
+    expect([
+      ...`export function toRevenueDto(x: Wire): FinanceRevenueResponseDto {`.matchAll(
+        DECLARATION,
+      ),
+    ]).toHaveLength(1);
+  });
+
+  it('**4c. an UNSTAGED mapper file is in the corpus**', () => {
+    // The second, wider hole. `git ls-files --cached` lists the INDEX, so a
+    // mapper written and not yet `git add`ed was invisible — which is exactly
+    // the window in which a mapper is written and named.
+    //
+    // Written to disk rather than asserted against the flags, because the flags
+    // are what is under test: a spec that checked the argv would pass for any
+    // combination somebody believed in.
+    const probe = join(
+      REPO_ROOT,
+      'apps/api-gateway/src/modules/platform/unstaged-probe.mapper.ts',
+    );
+
+    try {
+      writeFileSync(probe, 'export const marker = 1;\n');
+
+      expect(
+        mapperFiles().some((file) => file.endsWith('unstaged-probe.mapper.ts')),
+      ).toBe(true);
+    } finally {
+      rmSync(probe, { force: true });
+    }
   });
 
   it('**5. the scan reaches real files, not an empty list**', () => {

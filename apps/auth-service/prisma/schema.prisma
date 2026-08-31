@@ -766,6 +766,16 @@ model BillingEvent {
   /// webhook, so this index is on the hot path of the integration.
   @@index([organizationId, stripeCreatedAt(sort: Desc)])
   @@index([eventType])
+
+  /// The FINANCE read, which neither index above covers. The composite is
+  /// tenant-first and unusable for a cross-tenant range; `[eventType]` has no
+  /// time component. A platform-wide `stripe_created_at BETWEEN ... GROUP BY
+  /// event_type, day` walks the table without this.
+  ///
+  /// `source` leads because every finance query filters it to `STRIPE` — one
+  /// equality then a range, served in a single seek. Leading with the timestamp
+  /// would make the filter a post-scan predicate on rows already read.
+  @@index([source, stripeCreatedAt])
   @@map("billing_events")
 }
 

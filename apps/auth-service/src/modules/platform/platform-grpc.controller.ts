@@ -34,9 +34,13 @@ import {
   PlanIdRequest,
   SubscriptionPlanResponse,
   UpdatePlanRequest,
+  FinanceSnapshotResponse,
+  ListBillingEventsRequest,
+  ListBillingEventsResponse,
 } from '@synapsedesk/grpc-proto';
 import { PlatformService } from './platform.service';
 import { PlanAdminService } from '../billing/plan-admin.service';
+import { FinanceService } from '../finance/finance.service';
 
 /**
  * Authorization for this whole surface lives at the GATEWAY, in
@@ -51,6 +55,7 @@ export class PlatformGrpcController implements PlatformServiceController {
     private readonly platformService: PlatformService,
     private readonly planAdmin: PlanAdminService,
     private readonly jobHealth: JobHealthService,
+    private readonly finance: FinanceService,
   ) {}
 
   listOrganizations(
@@ -203,6 +208,24 @@ export class PlatformGrpcController implements PlatformServiceController {
 
   getMetrics(): Promise<PlatformMetricsResponse> {
     return this.platformService.getMetrics();
+  }
+
+  /**
+   * The snapshot: plan mix, dunning and the revenue estimate.
+   *
+   * Separate from `getMetrics` because it has a Stripe leg that can degrade,
+   * and merging them would let a Stripe outage take the tenancy dashboard with
+   * it.
+   */
+  getFinanceSnapshot(): Promise<FinanceSnapshotResponse> {
+    return this.finance.getSnapshot();
+  }
+
+  /** The time series. Entirely local, and therefore always answerable. */
+  listBillingEvents(
+    request: ListBillingEventsRequest,
+  ): Promise<ListBillingEventsResponse> {
+    return this.finance.listEvents(request);
   }
 
   /**

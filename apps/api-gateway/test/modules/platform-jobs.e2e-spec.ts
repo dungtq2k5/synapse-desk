@@ -1,6 +1,10 @@
 import { of, throwError } from 'rxjs';
 import { status as GrpcStatus } from '@grpc/grpc-js';
-import { SCHEDULED_JOBS } from '@synapsedesk/common';
+import {
+  SCHEDULED_JOBS,
+  expectedIntervalMs,
+  jobsOwnedBy,
+} from '@synapsedesk/common';
 import {
   API,
   E2eFixture,
@@ -89,15 +93,33 @@ describe('Platform job health (e2e)', () => {
     },
   ];
 
+  /**
+   * Every job auth-service owns, each a half-interval old.
+   *
+   * **Derived rather than listed**, which pays off the note on
+   * `SCOPE_RECONCILE` above: test 2 asserts that every name in
+   * `SCHEDULED_JOBS` reports healthy, so a literal list here turns "somebody
+   * added an auth job" into a failure in a test about job health.
+   *
+   * Half of each job's own expected interval, so the age is healthy for an
+   * hourly job and for a daily one without either being spelled out — a fixed
+   * `hoursAgo(1)` would go stale the day a ten-minute auth job is added.
+   */
   const healthyAuthRows = () =>
-    [SCHEDULED_JOBS.AUTH_HOURLY, SCHEDULED_JOBS.AUTH_DAILY].map((jobName) => ({
-      jobName,
-      lastStartedAt: hoursAgo(1),
-      lastSucceededAt: hoursAgo(1),
-      lastDurationMs: 30,
-      lastError: undefined,
-      consecutiveFailures: 0,
-    }));
+    jobsOwnedBy('auth').map((jobName) => {
+      const at = timestamp(
+        new Date(Date.now() - expectedIntervalMs(jobName) / 2),
+      );
+
+      return {
+        jobName,
+        lastStartedAt: at,
+        lastSucceededAt: at,
+        lastDurationMs: 30,
+        lastError: undefined,
+        consecutiveFailures: 0,
+      };
+    });
 
   const stubHealthy = () => {
     fx.stubs.analytics.getJobHealth.mockReturnValue(

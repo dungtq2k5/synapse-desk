@@ -59,19 +59,25 @@ describe('The scheduler (e2e)', () => {
   afterAll(() => fx.close());
 
   describe('registration', () => {
-    it('1. registers both repeat entries on boot', async () => {
+    it('1. registers every repeat entry this service owns, on boot', async () => {
+      // **Iterated rather than listed**, so a job added to `JOB_SERVICE` is
+      // covered here the moment it is declared. The list version asserted two
+      // names and would have said nothing about a third.
       await registrar.onApplicationBootstrap();
 
       const byName = new Map(
         (await queue.getJobSchedulers()).map((r) => [r.name, r]),
       );
 
-      expect(byName.get(SCHEDULED_JOBS.AUTH_HOURLY)?.pattern).toBe(
-        SCHEDULE_CRON[SCHEDULED_JOBS.AUTH_HOURLY],
-      );
-      expect(byName.get(SCHEDULED_JOBS.AUTH_DAILY)?.pattern).toBe(
-        SCHEDULE_CRON[SCHEDULED_JOBS.AUTH_DAILY],
-      );
+      for (const name of jobsOwnedBy('auth')) {
+        expect([name, byName.get(name)?.pattern]).toEqual([
+          name,
+          SCHEDULE_CRON[name],
+        ]);
+      }
+
+      // A floor, so an empty ownership list cannot satisfy the loop above.
+      expect(jobsOwnedBy('auth').length).toBeGreaterThanOrEqual(3);
     });
 
     it('2. **restarting does not create a duplicate schedule**', async () => {
@@ -86,10 +92,7 @@ describe('The scheduler (e2e)', () => {
 
       expect(repeats).toHaveLength(jobsOwnedBy('auth').length);
       expect(repeats.map((r) => r.key).sort(compareAlphabetically)).toEqual(
-        [
-          repeatJobId(SCHEDULED_JOBS.AUTH_DAILY),
-          repeatJobId(SCHEDULED_JOBS.AUTH_HOURLY),
-        ].sort(compareAlphabetically),
+        jobsOwnedBy('auth').map(repeatJobId).sort(compareAlphabetically),
       );
     });
   });

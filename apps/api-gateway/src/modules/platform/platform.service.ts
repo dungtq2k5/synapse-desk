@@ -34,6 +34,7 @@ import {
   CreatePlanDto,
   ListPlansQueryDto,
   UpdatePlanDto,
+  FinanceEventsQueryDto,
 } from './dto/rest/platform.dto';
 import {
   CreatePlatformOrganizationResponseDto,
@@ -45,6 +46,14 @@ import {
   DeletePlanResponseDto,
   SubscriptionPlanResponseDto,
 } from './dto/rest/platform-response.dto';
+import type {
+  BillingEventsResponseDto,
+  FinanceSnapshotResponseDto,
+} from './dto/rest/finance-response.dto';
+import {
+  toBillingEventsResponseDto,
+  toFinanceSnapshotResponseDto,
+} from './finance.mapper';
 
 /** The platform-admin surface. Returns REST DTOs; the wire stays in the client. */
 @Injectable()
@@ -210,9 +219,29 @@ export class PlatformService {
     );
   }
 
-  // -------------------------------------------------------------------------
-  // The plan catalogue
-  // -------------------------------------------------------------------------
+  // ----------------------------------------------------------------  Finance
+
+  async getFinanceSnapshot(
+    context: RequestContext,
+  ): Promise<FinanceSnapshotResponseDto> {
+    return toFinanceSnapshotResponseDto(
+      await this.platformGrpcClient.getFinanceSnapshot(context),
+    );
+  }
+
+  async listBillingEvents(
+    query: FinanceEventsQueryDto,
+    context: RequestContext,
+  ): Promise<BillingEventsResponseDto> {
+    return toBillingEventsResponseDto(
+      await this.platformGrpcClient.listBillingEvents(
+        { from: query.from, to: query.to },
+        context,
+      ),
+    );
+  }
+
+  // ----------------------------------------------------------------  The plan catalogue
 
   async listPlans(
     query: ListPlansQueryDto,

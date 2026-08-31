@@ -27,6 +27,9 @@ import {
   ListPlansResponse,
   SubscriptionPlanResponse,
   UpdatePlanRequest,
+  FinanceSnapshotResponse,
+  ListBillingEventsRequest,
+  ListBillingEventsResponse,
 } from '@synapsedesk/grpc-proto';
 import { RequestContext } from '@synapsedesk/common';
 import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
@@ -183,9 +186,36 @@ export class PlatformGrpcClient extends BaseGrpcClient implements OnModuleInit {
       context,
     );
   }
+
   // -------------------------------------------------------------------------
-  // The plan catalogue
+  // Finance
+  //
+  // Two calls rather than one, because they have different failure domains: the
+  // snapshot has a Stripe-fed section that can degrade, the series is local and
+  // always answerable.
   // -------------------------------------------------------------------------
+
+  getFinanceSnapshot(
+    context: RequestContext,
+  ): Promise<FinanceSnapshotResponse> {
+    return this.call(
+      (metadata) => this.platformGrpcService.getFinanceSnapshot({}, metadata),
+      context,
+    );
+  }
+
+  listBillingEvents(
+    request: ListBillingEventsRequest,
+    context: RequestContext,
+  ): Promise<ListBillingEventsResponse> {
+    return this.call(
+      (metadata) =>
+        this.platformGrpcService.listBillingEvents(request, metadata),
+      context,
+    );
+  }
+
+  // ----------------------------------------------------------------  The plan catalogue
 
   listPlans(
     request: ListPlansRequest,

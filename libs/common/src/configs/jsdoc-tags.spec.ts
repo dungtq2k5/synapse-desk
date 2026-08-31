@@ -53,6 +53,19 @@ describe('doc comments do not open accidental JSDoc tags', () => {
       'git',
       [
         'ls-files',
+        // **The index is not the source tree**, and this scan had both halves
+        // of that: a file written and not yet staged was never read, and a file
+        // staged-then-deleted made this spec throw `ENOENT` on a path that no
+        // longer exists. The second half is why it is fixed here rather than
+        // left for the next reader — it fails loudly, which is luckier than
+        // `mapper-naming.spec.ts`, where the same corpus bug hid a violation in
+        // silence for six runs.
+        '--cached',
+        '--others',
+        // Still `git` rather than a filesystem walk, for the one thing git is
+        // better at: `.gitignore` already excludes `dist`, `node_modules` and
+        // the generated Prisma clients.
+        '--exclude-standard',
         '--',
         'apps/**/*.ts',
         'libs/**/*.ts',

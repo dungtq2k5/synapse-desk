@@ -9,6 +9,7 @@ import {
 import { InvitationsService } from '../invitations/invitations.service';
 import { ExpiredLockSweep } from '../users/expired-lock.sweep';
 import { ExpiredRecordsPruner } from '../sessions/expired-records.job';
+import { BillingSnapshotJob } from '../finance/billing-snapshot.job';
 
 /**
  * auth-service's scheduler.
@@ -33,6 +34,7 @@ export class SchedulerProcessor extends WorkerHost {
     private readonly pruner: ExpiredRecordsPruner,
     private readonly expiredLocks: ExpiredLockSweep,
     private readonly runs: JobRunRecorder,
+    private readonly billingSnapshot: BillingSnapshotJob,
   ) {
     super();
   }
@@ -43,6 +45,12 @@ export class SchedulerProcessor extends WorkerHost {
         return this.runs.track(job.name, () => this.hourly());
       case SCHEDULED_JOBS.AUTH_DAILY:
         return this.runs.track(job.name, () => this.daily());
+      // **Its own heartbeat, which is the whole reason it is its own job.**
+      // `track` records one row per job name, so folding this into
+      // `AUTH_HOURLY` would report invitation expiry as failing whenever Stripe
+      // is down — a job that ran perfectly, red in `/platform/jobs`.
+      case SCHEDULED_JOBS.BILLING_SNAPSHOT:
+        return this.runs.track(job.name, () => this.billingSnapshot.run());
       default:
         // **A defect, not routine cross-talk** — and the difference is what
         // makes throwing correct now.

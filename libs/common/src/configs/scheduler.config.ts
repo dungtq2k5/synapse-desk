@@ -60,6 +60,22 @@ export const SCHEDULED_JOBS = {
   AUTH_DAILY: 'auth-daily',
 
   /**
+   * auth-service, hourly. Reads active subscriptions from Stripe and stores the
+   * revenue snapshot `GET /platform/finance` serves.
+   *
+   * **Its own job rather than a step on `AUTH_HOURLY`, and the heartbeat is
+   * what decides it.** `JobRunRecorder.track` records one row per JOB, not per
+   * step, so a Stripe outage folded into `AUTH_HOURLY` would report invitation
+   * expiry as failing — a job that ran perfectly, red in `/platform/jobs`
+   * because something unrelated shares its heartbeat.
+   *
+   * Hourly because the endpoint reads the snapshot and never Stripe: freshness
+   * is bounded by this cadence, and `subscriptions.list` pages at 100 so the
+   * read grows with tenant count.
+   */
+  BILLING_SNAPSHOT: 'billing-snapshot',
+
+  /**
    * ingestion-service, every ten minutes. Re-queues jobs the queue lost or
    * deferred.
    *
@@ -107,6 +123,7 @@ export const SCHEDULE_CRON = {
   [SCHEDULED_JOBS.ANALYTICS_DAILY]: '0 2 * * *',
   [SCHEDULED_JOBS.AUTH_HOURLY]: '0 * * * *',
   [SCHEDULED_JOBS.AUTH_DAILY]: '0 3 * * *',
+  [SCHEDULED_JOBS.BILLING_SNAPSHOT]: '0 * * * *',
   [SCHEDULED_JOBS.INGESTION_RECONCILE]: '*/10 * * * *',
   [SCHEDULED_JOBS.SCOPE_RECONCILE]: '0 * * * *',
 } as const satisfies Record<ScheduledJobName, string>;
@@ -133,6 +150,7 @@ export const JOB_SEQUENCES = {
   [SCHEDULED_JOBS.ANALYTICS_DAILY]: ['ticket-rollup'],
   [SCHEDULED_JOBS.AUTH_HOURLY]: ['invitations-expiry'],
   [SCHEDULED_JOBS.AUTH_DAILY]: ['expired-records'],
+  [SCHEDULED_JOBS.BILLING_SNAPSHOT]: ['billing-snapshot'],
   [SCHEDULED_JOBS.INGESTION_RECONCILE]: ['ingestion-reconcile'],
   [SCHEDULED_JOBS.SCOPE_RECONCILE]: ['scope-reconcile'],
 } as const satisfies Record<ScheduledJobName, readonly string[]>;
@@ -164,6 +182,7 @@ export const JOB_SERVICE = {
   [SCHEDULED_JOBS.ANALYTICS_DAILY]: 'ticket',
   [SCHEDULED_JOBS.AUTH_HOURLY]: 'auth',
   [SCHEDULED_JOBS.AUTH_DAILY]: 'auth',
+  [SCHEDULED_JOBS.BILLING_SNAPSHOT]: 'auth',
   [SCHEDULED_JOBS.INGESTION_RECONCILE]: 'ingestion',
   [SCHEDULED_JOBS.SCOPE_RECONCILE]: 'ingestion',
 } as const satisfies Record<ScheduledJobName, SchedulerService>;

@@ -1,4 +1,5 @@
 import { NoEmoji } from '../../../../common/decorators/no-emoji.decorator';
+import { ISO_DATE_PATTERN } from '../../../../common/config/dto.config';
 import { MARKDOWN_FIELD_CONTRACT } from '../../../../common/config/markdown-contract.config';
 import {
   MAX_ADMIN_REASON_LENGTH,
@@ -552,6 +553,37 @@ export class ApplyPlanQueryDto {
   @ToBoolean()
   @ApiPropertyOptional()
   readonly dryRun: boolean = false;
+}
+
+/**
+ * The finance event range.
+ *
+ * **Both bounds required, and both inclusive.** `billing_events` never shrinks,
+ * so the range is the only thing bounding the read — an optional `from` with a
+ * sensible-looking default would walk the entire history on a page load. The
+ * upper bound is `MAX_FINANCE_RANGE_DAYS`, checked in auth-service where the
+ * query is.
+ *
+ * Dates rather than instants, matching `AnalyticsRangeQueryDto`: the series is
+ * bucketed by UTC day and accepting a timestamp would invite a caller to
+ * believe it selects a sub-day window, which does not exist.
+ */
+export class FinanceEventsQueryDto {
+  // **Strings rather than `@Type(() => Date)`, and the third reason decides it.**
+  //
+  //   - `AnalyticsRangeQueryDto` already takes ISO date strings, and two range
+  //     DTOs with two shapes is a difference a caller has to learn for no gain.
+  //   - A `Date` on the DTO is exactly the invitation the docblock above refuses:
+  //     the type would say an instant is accepted.
+  //   - `FinanceService.range` builds `new Date(`${from}T00:00:00.000Z`)`
+  //     EXPLICITLY in UTC. Handing it a `Date` moves that decision into
+  //     class-transformer, where the string never appears and the UTC intent is
+  //     invisible. The parse belongs where the timezone argument is written down.
+  @Matches(ISO_DATE_PATTERN, { message: 'from must be a date (YYYY-MM-DD)' })
+  readonly from!: string;
+
+  @Matches(ISO_DATE_PATTERN, { message: 'to must be a date (YYYY-MM-DD)' })
+  readonly to!: string;
 }
 
 // Live, though nothing below mentions it: the platform controller and client
