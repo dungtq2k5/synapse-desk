@@ -1,6 +1,7 @@
 import { applyDecorators, UseFilters } from '@nestjs/common';
 import { GatewayMetadata, WebSocketGateway } from '@nestjs/websockets';
 import { AllWsExceptionsFilter } from '../filters/ws-exception.filter';
+import { corsOrigins } from '../config/cors.config';
 
 /**
  * `@WebSocketGateway` plus the two things every gateway must have and one of
@@ -42,12 +43,16 @@ export function SecureGateway(
           origin: string | undefined,
           callback: (error: Error | null, allow?: boolean) => void,
         ) => {
-          const allowed = new Set((process.env.CORS ?? '*').split(','));
+          // The SAME normalization the HTTP side uses — see `cors.config.ts`.
+          // Splitting here and there was one value read two ways, and the
+          // untrimmed split additionally refused an origin whose only fault was
+          // a space after the comma.
+          const allowed = corsOrigins(process.env.CORS ?? '*');
 
           // A missing Origin header is a non-browser client (a CLI, a server,
           // our own e2e suite) — there is no origin to refuse, and refusing it
           // would block exactly the callers CORS was never about.
-          if (!origin || allowed.has('*') || allowed.has(origin)) {
+          if (!origin || allowed === '*' || allowed.includes(origin)) {
             callback(null, true);
             return;
           }

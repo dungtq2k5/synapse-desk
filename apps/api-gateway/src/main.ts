@@ -7,6 +7,12 @@ import { Logger, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import cookieParser from 'cookie-parser';
+import {
+  CORS_ALLOWED_HEADERS,
+  CORS_EXPOSED_HEADERS,
+  CORS_METHODS,
+  corsOrigins,
+} from './common/config/cors.config';
 import { AllHttpExceptionFilter } from './common/filters/all-http-exception.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
@@ -55,11 +61,21 @@ async function bootstrap() {
   app.use(cookieParser());
 
   // Enable CORS for all origins
+  //
+  // **Normalised once**, and the socket decorator reads the same helper — the
+  // variable used to be split here and `Set`-ed there, which is how `CORS = *`
+  // refused every browser request while allowing every socket handshake.
+  //
+  // `credentials: true` is required for the HttpOnly access-token cookie, and
+  // it is also why `*` cannot work in a browser at all: the spec forbids
+  // `Access-Control-Allow-Origin: *` on a credentialed request. `*` here is not
+  // a permissive setting, it is an unusable one.
   app.enableCors({
-    origin: configService.getOrThrow<string>('CORS').split(','),
+    origin: corsOrigins(configService.getOrThrow<string>('CORS')),
     credentials: true,
-    methods: ['GET', 'POST', 'PATCH', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    methods: CORS_METHODS,
+    allowedHeaders: CORS_ALLOWED_HEADERS,
+    exposedHeaders: CORS_EXPOSED_HEADERS,
   });
 
   const isProduction =

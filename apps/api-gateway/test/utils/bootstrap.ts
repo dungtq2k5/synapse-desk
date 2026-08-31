@@ -21,6 +21,12 @@ import { setupSwagger } from '../../src/common/config/swagger.config';
 import { AllHttpExceptionFilter } from '../../src/common/filters/all-http-exception.filter';
 import { LoggingInterceptor } from '../../src/common/interceptors/logging.interceptor';
 import { TransformInterceptor } from '../../src/common/interceptors/transform.interceptor';
+import {
+  CORS_ALLOWED_HEADERS,
+  CORS_EXPOSED_HEADERS,
+  CORS_METHODS,
+  corsOrigins,
+} from '../../src/common/config/cors.config';
 import { GrpcStubs, stubGrpcServices } from './grpc-stub';
 import { Server } from 'node:http';
 
@@ -103,6 +109,19 @@ export async function bootstrapE2eTest(
     exclude: OPS_ROUTES,
   });
   app.use(cookieParser());
+
+  // **The CORS policy, mirrored from main.ts.** Its absence here is the reason
+  // the policy went unguarded: a suite that never calls `enableCors` cannot
+  // fail when the policy is wrong, and every other suite in this directory
+  // sends no `Origin` header, so `cors` short-circuits and the omission is
+  // invisible to all of them.
+  app.enableCors({
+    origin: corsOrigins(configService.getOrThrow<string>('CORS')),
+    credentials: true,
+    methods: CORS_METHODS,
+    allowedHeaders: CORS_ALLOWED_HEADERS,
+    exposedHeaders: CORS_EXPOSED_HEADERS,
+  });
   app.useGlobalFilters(new AllHttpExceptionFilter(false));
   app.useGlobalInterceptors(new LoggingInterceptor(true));
   app.useGlobalInterceptors(new TransformInterceptor(app.get(Reflector)));

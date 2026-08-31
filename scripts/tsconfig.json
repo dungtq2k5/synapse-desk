@@ -19,7 +19,12 @@
       "@synapsedesk/grpc-proto/*": ["libs/grpc-proto/src/*"]
     }
   },
-  "include": ["seed-demo/**/*.ts", "../apps/*/src/**/*", "../apps/*/test/**/*", "../libs/*/src/**/*"],
+  "include": [
+    "seed-demo/**/*.ts",
+    "../apps/*/src/**/*",
+    "../apps/*/test/**/*",
+    "../libs/*/src/**/*"
+  ],
   // `jest.config.ts` imports `../jest.config.base.ts` by its `.ts` extension —
   // jest loads it through native ESM resolution, which does not do
   // extensionless lookups — and that is an error under `tsc`. Every other
