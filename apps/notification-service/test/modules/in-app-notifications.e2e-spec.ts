@@ -560,6 +560,10 @@ describe('In-app notification delivery (e2e)', () => {
         grouped: 0,
         duplicates: 0,
         emailed: 0,
+        // Zero rather than absent: an exhaustive `toEqual` is what noticed the
+        // channel had been added, which is the point of asserting the whole
+        // shape rather than the fields this test cares about.
+        pushed: 0,
       });
       await expect(fx.prisma.notification.count()).resolves.toBe(0);
     });

@@ -90,6 +90,32 @@ export class DeliveryRecorder {
     });
   }
 
+  /**
+   * Every address we knew about is gone.
+   *
+   * **Materially different from `FAILED`**, which is why the status exists:
+   * `FAILED` is "the transport did not work this time", and this is "there is
+   * nowhere left to send" — an outcome no retry improves and the only one where
+   * the fix is the user re-registering a device. Its first producer is the push
+   * arm; the enum member predates it.
+   *
+   * `attempts` counts, unlike a skip: something really was tried.
+   */
+  async recordBounced(
+    notificationId: string,
+    channel: NotificationChannel,
+    details: { target: string | null; error: string },
+  ): Promise<void> {
+    await this.upsert(notificationId, channel, {
+      status: DeliveryStatus.BOUNCED,
+      target: details.target,
+      errorLog: details.error.slice(0, 1_000),
+      failedAt: new Date(),
+      skipReason: null,
+      providerMessageId: null,
+    });
+  }
+
   private async upsert(
     notificationId: string,
     channel: NotificationChannel,

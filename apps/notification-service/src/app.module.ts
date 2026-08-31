@@ -9,6 +9,7 @@ import { InAppNotificationService } from './modules/in-app/in-app-notification.s
 import { TicketNotificationConsumer } from './modules/in-app/ticket-notification.consumer';
 import { EmailService } from './modules/email/email.service';
 import { SmsService } from './modules/sms/sms.service';
+import { PushModule } from './modules/push/push.module';
 import { DeliveriesModule } from './modules/deliveries/deliveries.module';
 import { PreferencesModule } from './modules/preferences/preferences.module';
 import { NotificationRealtimeModule } from './modules/realtime/realtime.module';
@@ -39,6 +40,7 @@ import { InboundRejectionConsumer } from './modules/inbound-email/inbound-reject
     // The read half. Domain E was NATS-only until this existed:
     // it consumed events and wrote rows nobody could read back.
     FeedModule,
+    PushModule,
     OpsModule,
   ],
   controllers: [

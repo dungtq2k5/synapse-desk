@@ -55,7 +55,18 @@ export class TicketNotificationConsumer {
       eventId: `ticket.assigned:${event.ticketId}:${event.assignedToId}`,
       title: `Ticket #${event.ticketNumber} assigned to you`,
       body: 'You are now the assignee.',
-      priority: NotificationPriority.NORMAL,
+      // **HIGH, because work assigned to a named person is the canonical push.**
+      // The push gate admits `HIGH` and above precisely so an assignee learns
+      // from their phone; published at `NORMAL` this never reached it, which
+      // made the gate's own justification — *"at CRITICAL only, a phone user
+      // still learns nothing about a ticket assigned to them"* — remain true
+      // after the channel shipped.
+      //
+      // The blast radius is exactly one behaviour: the push gate is the only
+      // thing in the tree that separates `HIGH` from `NORMAL`. Email tests
+      // `CRITICAL` alone, the quiet-hours exemption is `CRITICAL` alone, and
+      // the realtime publisher does not read priority at all.
+      priority: NotificationPriority.HIGH,
       occurredAt: event.occurredAt,
       // Rule 1: `assignedById` is null when the system assigned it, and then
       // there is no actor to suppress.
@@ -82,7 +93,9 @@ export class TicketNotificationConsumer {
       eventId: `ticket.reassigned:${event.ticketId}:${event.toAssigneeId}`,
       title: `Ticket #${event.ticketNumber} was reassigned`,
       body: 'The assignee for this ticket has changed.',
-      priority: NotificationPriority.NORMAL,
+      // HIGH for the same reason as `ticket.assigned` above: the new assignee
+      // is being handed work.
+      priority: NotificationPriority.HIGH,
       occurredAt: event.occurredAt,
       actorId: event.assignedById ?? undefined,
       ...ticketTarget(event.ticketId, event.ticketNumber),

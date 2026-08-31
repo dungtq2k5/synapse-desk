@@ -1,6 +1,10 @@
 import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { ClientGrpc } from '@nestjs/microservices';
 import {
+  DeviceTokenResponse,
+  ForgetDeviceResponse,
+  ListDevicesResponse,
+  RegisterDeviceRequest,
   ListNotificationsRequest,
   ListNotificationsResponse,
   ListPreferencesResponse,
@@ -103,6 +107,34 @@ export class NotificationsGrpcClient
     return this.call(
       (metadata) =>
         this.notificationGrpcService.updatePreference(request, metadata),
+      context,
+    );
+  }
+
+  registerDevice(
+    request: RegisterDeviceRequest,
+    context: RequestContext,
+  ): Promise<DeviceTokenResponse> {
+    return this.call(
+      (metadata) =>
+        this.notificationGrpcService.registerDevice(request, metadata),
+      context,
+    );
+  }
+
+  listDevices(context: RequestContext): Promise<ListDevicesResponse> {
+    return this.call(
+      (metadata) => this.notificationGrpcService.listDevices({}, metadata),
+      context,
+    );
+  }
+
+  forgetDevice(
+    id: string,
+    context: RequestContext,
+  ): Promise<ForgetDeviceResponse> {
+    return this.call(
+      (metadata) => this.notificationGrpcService.forgetDevice({ id }, metadata),
       context,
     );
   }

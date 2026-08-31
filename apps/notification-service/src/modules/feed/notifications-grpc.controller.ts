@@ -1,9 +1,19 @@
 import { Controller } from '@nestjs/common';
-import type { Metadata } from '@grpc/grpc-js';
+import { requireActor, requireTenant } from '@synapsedesk/common';
+import { status, type Metadata } from '@grpc/grpc-js';
+import { RpcException } from '@nestjs/microservices';
+import type { DevicePlatform } from '@synapsedesk/common';
 import {
   ListNotificationsRequest,
   ListNotificationsResponse,
+  DeviceIdRequest,
+  DevicePlatform as ProtoDevicePlatform,
+  fromProtoDevicePlatform,
+  DeviceTokenResponse,
+  ForgetDeviceResponse,
+  ListDevicesResponse,
   ListPreferencesResponse,
+  RegisterDeviceRequest,
   MarkReadRequest,
   MarkReadResponse,
   NotificationIdRequest,
@@ -19,6 +29,8 @@ import {
 import { FeedService } from './feed.service';
 import { InboundThreadService } from './inbound-thread.service';
 import { PreferencesService } from '../preferences/preferences.service';
+import { DeviceTokenService } from '../push/device-token.service';
+import { toDeviceTokenResponse } from './feed.mapper';
 
 /**
  * Domain E's gRPC surface
@@ -40,6 +52,7 @@ export class NotificationsGrpcController implements NotificationServiceControlle
     private readonly feed: FeedService,
     private readonly preferences: PreferencesService,
     private readonly inboundThreads: InboundThreadService,
+    private readonly devices: DeviceTokenService,
   ) {}
 
   /**
@@ -106,4 +119,64 @@ export class NotificationsGrpcController implements NotificationServiceControlle
   ): Promise<PreferenceResponse> {
     return this.preferences.update(request, unpackCallerContext(metadata));
   }
+
+  async registerDevice(
+    request: RegisterDeviceRequest,
+    metadata?: Metadata,
+  ): Promise<DeviceTokenResponse> {
+    const context = unpackCallerContext(metadata);
+
+    return toDeviceTokenResponse(
+      await this.devices.register({
+        userId: requireActor(context),
+        organizationId: requireTenant(context),
+        token: request.token,
+        platform: requirePlatform(request.platform),
+        deviceName: request.deviceName,
+      }),
+    );
+  }
+
+  async listDevices(
+    _request: Record<string, never>,
+    metadata?: Metadata,
+  ): Promise<ListDevicesResponse> {
+    const context = unpackCallerContext(metadata);
+    const devices = await this.devices.listForUser(requireActor(context));
+
+    return { items: devices.map(toDeviceTokenResponse) };
+  }
+
+  async forgetDevice(
+    request: DeviceIdRequest,
+    metadata?: Metadata,
+  ): Promise<ForgetDeviceResponse> {
+    const context = unpackCallerContext(metadata);
+    await this.devices.remove(request.id, requireActor(context));
+
+    return { forgotten: true };
+  }
+}
+
+/**
+ * The wire's platform, refused rather than defaulted when it is not one.
+ *
+ * **The mapper is the gRPC edge's validation** (development-conventions §7.3),
+ * and it is a narrowing of an enum the wire already constrained — not the
+ * hand-written string check this replaced. `fromProto` answers `null` for
+ * `UNSPECIFIED` and for ts-proto's `UNRECOGNIZED`, and neither is a device: a
+ * row silently written as `WEB` is a wrong answer on a settings screen and a
+ * wrong branch the day payloads differ per platform.
+ */
+function requirePlatform(platform: ProtoDevicePlatform): DevicePlatform {
+  const narrowed = fromProtoDevicePlatform(platform);
+
+  if (!narrowed) {
+    throw new RpcException({
+      code: status.INVALID_ARGUMENT,
+      message: 'A device must name a platform',
+    });
+  }
+
+  return narrowed;
 }

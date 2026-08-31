@@ -6,6 +6,7 @@ import {
   isUniqueConstraintViolation,
   NotificationAudience,
   NotificationChannel,
+  type SendPushCommand,
   NotificationPriority,
   NotificationResourceType,
   NOTIFICATION_TYPES,
@@ -13,6 +14,9 @@ import {
 } from '@synapsedesk/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthReferenceService } from '../auth-client/auth-reference.service';
+import type { NotificationRecipient } from '../auth-client/auth-reference.mapper';
+import { DeviceTokenService } from '../push/device-token.service';
+import { FirebaseMessagingService } from '../push/firebase-messaging.service';
 import { EmailService } from '../email/email.service';
 import { ReplyAddressService } from '../email/reply-address.service';
 import { DeliveryRecorder } from '../deliveries/delivery-recorder.service';
@@ -27,14 +31,35 @@ export type DeliveryOutcome = {
   grouped: number;
   duplicates: number;
   emailed: number;
+  /**
+   * People reached on PUSH, not devices — the unit the delivery row uses.
+   *
+   * Present for the reason this type's docblock gives: computed and logged but
+   * absent from the return, every push assertion had to go through
+   * `notification_deliveries`, which answers what was RECORDED rather than what
+   * the fan-out did.
+   */
+  pushed: number;
 };
 
-/** A resolved recipient — the shape both audience kinds produce. */
-type Recipient = {
-  userId: string;
-  email: string;
-  fullName: string;
-};
+/**
+ * A recipient, with everything needed to DECIDE about them.
+ *
+ * **`NotificationRecipient` rather than a narrower local type**, and the
+ * difference is a live guard. This used to be `{ userId, email, fullName }` —
+ * structurally assignable from what `AuthReferenceService` returns, so it
+ * compiled while silently dropping `quietHoursStart`, `quietHoursEnd` and
+ * `timezone` at the boundary. `resolve()` was then called without them,
+ * `input.quietHours` was always `undefined`, and the quiet-hours branch was
+ * unreachable: `DeliverySkipReason.QUIET_HOURS` had no producer anywhere in the
+ * system, while its resolver and its window arithmetic were both correct and
+ * both unit-tested.
+ *
+ * The narrowing is the whole defect, which is why this alias exists rather than
+ * a hand-written shape: a type that lists three fields cannot fail to compile
+ * when a fourth becomes load-bearing.
+ */
+type Recipient = NotificationRecipient;
 
 /**
  * How many recent group event ids a notification remembers.
@@ -73,6 +98,8 @@ export class InAppNotificationService {
     private readonly preferences: PreferenceResolver,
     private readonly realtime: NotificationRealtimePublisher,
     private readonly replyAddress: ReplyAddressService,
+    private readonly deviceTokens: DeviceTokenService,
+    private readonly messaging: FirebaseMessagingService,
   ) {}
 
   async deliver(
@@ -115,6 +142,7 @@ export class InAppNotificationService {
         grouped: 0,
         duplicates: 0,
         emailed: 0,
+        pushed: 0,
       };
     }
 
@@ -155,10 +183,11 @@ export class InAppNotificationService {
     // redelivery does not re-mail an audience. The notification row is the
     // idempotency record for BOTH channels, which is why it is written first.
     const emailed = await this.fanOutEmail(command, newlyNotified);
+    const pushed = await this.fanOutPush(command, newlyNotified);
 
     this.logger.log(
       `'${command.title}' (${command.type}) → ${created} new, ${grouped} grouped, ` +
-        `${duplicates} duplicate, ${emailed} emailed`,
+        `${duplicates} duplicate, ${emailed} emailed, ${pushed} pushed`,
     );
 
     return {
@@ -167,6 +196,7 @@ export class InAppNotificationService {
       grouped,
       duplicates,
       emailed,
+      pushed,
     };
   }
 
@@ -366,6 +396,16 @@ export class InAppNotificationService {
     // has an effect on `CRITICAL` notifications today. It is still worth
     // storing — those are the ones a user most wants control over — and it
     // becomes broader the moment another priority earns the channel.
+    //
+    // **And QUIET HOURS cannot fire on this channel at all**, which is a
+    // second consequence of the same line and not obvious from either half.
+    // The resolver suppresses on quiet hours only for non-`CRITICAL`
+    // notifications, and this gate means nothing below `CRITICAL` ever reaches
+    // the resolver — so the two conditions are mutually exclusive here. The
+    // window is still passed (it was silently dropped before, which is a
+    // separate defect this change fixed), and the first channel where it can
+    // actually suppress anything is PUSH, whose gate is `HIGH`. That is why
+    // the quiet-hours test lives on the push arm rather than this one.
     if (command.priority !== NotificationPriority.CRITICAL) return 0;
 
     let sent = 0;
@@ -377,6 +417,11 @@ export class InAppNotificationService {
         type: command.type,
         channel: NotificationChannel.EMAIL,
         priority: command.priority,
+        // **Carried through, which it was not.** The read that produced this
+        // recipient fetches the window precisely so this call does not need a
+        // second round trip; passing it is the line that makes the resolver's
+        // quiet-hours branch reachable at all.
+        quietHours: quietHoursOf(recipient),
       });
 
       if (!decision.allowed) {
@@ -462,6 +507,194 @@ export class InAppNotificationService {
     return this.replyAddress.forTicket(command.organizationId, ticketNumber);
   }
 
+  /**
+   * The push arm — one delivery row per PERSON, `n` tokens.
+   *
+   * **`HIGH` and above, not `CRITICAL`.** Copying email's gate would reproduce
+   * the gap this channel exists to close: at `CRITICAL` only, a phone user
+   * still learns nothing about a ticket assigned to them, an escalation, or 80%
+   * storage — precisely the notifications a mobile client is for. Push is the
+   * cheap-attention channel: no per-message cost, no inbox to pollute, and an
+   * OS-level mute the user already controls.
+   *
+   * **The gate only means something if producers publish above it**, and for a
+   * while this one did not: `ticket.assigned` and `ticket.reassigned` — the two
+   * the sentence above names — were published at `NORMAL`, so the example
+   * justifying the gate was one the gate never saw. The priorities are where
+   * that decision actually lives, and `push.e2e-spec` test 10 drives the real
+   * consumer so the two cannot drift apart again silently.
+   *
+   * **The no-row rule below the gate is kept**, for the reason email states: a
+   * `SKIPPED` row per ticket reply would bury the `quiet_hours` and
+   * `user_preference` rows that exist to answer a support question. Push has
+   * more volume than email, not less.
+   */
+  private async fanOutPush(
+    command: CreateInAppNotificationCommand,
+    recipients: Recipient[],
+  ): Promise<number> {
+    if (recipients.length === 0) return 0;
+
+    if (
+      command.priority !== NotificationPriority.CRITICAL &&
+      command.priority !== NotificationPriority.HIGH
+    ) {
+      return 0;
+    }
+
+    // **Before the loop, because it is a pure function of `command.type`.**
+    // Below, it ran after `resolve()` and `listForUser()` — two queries and a
+    // possible `SKIPPED` row — so a user with push disabled could be given a
+    // `USER_PREFERENCE` row for a notification that had no push to suppress:
+    // the noise the no-row rule exists to prevent, arriving through the other
+    // door. Unreachable while every `null` arm was published below the gate,
+    // and reachable the moment one of them is raised.
+    const push = pushFor(command);
+    if (!push) return 0;
+
+    let sent = 0;
+
+    for (const recipient of recipients) {
+      const decision = await this.preferences.resolve({
+        userId: recipient.userId,
+        organizationId: command.organizationId,
+        type: command.type,
+        channel: NotificationChannel.PUSH,
+        priority: command.priority,
+        // **The channel where quiet hours can finally fire.** Email's gate is
+        // `CRITICAL`-only and the resolver exempts `CRITICAL`, so the two are
+        // mutually exclusive there; a `HIGH` push at 3am is the case the window
+        // was written for — an email waits until morning, a push wakes someone.
+        quietHours: quietHoursOf(recipient),
+      });
+
+      if (!decision.allowed) {
+        await this.skipPush(command, recipient, decision.reason);
+        continue;
+      }
+
+      const devices = await this.deviceTokens.listForUser(recipient.userId);
+
+      // **No row at all**, and this is not a skip: nothing was suppressed,
+      // there was nowhere to send. A `SKIPPED` row per notification per
+      // web-only user would bury the rows that answer real questions.
+      if (devices.length === 0) continue;
+
+      sent += await this.sendPush(command, recipient, devices, push);
+    }
+
+    return sent;
+  }
+
+  /**
+   * One multicast, one delivery row, and the per-device outcome written where
+   * it is useful.
+   *
+   * @returns 1 when at least one device accepted, 0 otherwise — the unit is
+   *   PEOPLE reached, matching what the delivery row records.
+   */
+  private async sendPush(
+    command: CreateInAppNotificationCommand,
+    recipient: Recipient,
+    devices: { token: string }[],
+    push: SendPushCommand,
+  ): Promise<number> {
+    const notificationId = await this.notificationIdFor(
+      command,
+      recipient.userId,
+    );
+    const tokens = devices.map((device) => device.token);
+    // `"3 devices"`, not a token. See the column's docblock: this is the
+    // DESTINATION DESCRIPTION at send time, and for a fan-out channel that is a
+    // count. A 150+ character rotating credential in a durable row would be
+    // storing a secret to answer a question nobody asks.
+    const target = `${tokens.length} device${tokens.length === 1 ? '' : 's'}`;
+
+    try {
+      const response = await this.messaging.sendEachForMulticast(tokens, {
+        notification: { title: push.title, body: push.body },
+        data: push.data,
+      });
+
+      const dead: string[] = [];
+      const delivered: string[] = [];
+
+      response.responses.forEach((result, index) => {
+        // FCM's responses carry no token of their own — they are positional,
+        // which is what makes the order of `tokens` load-bearing.
+        const token = tokens[index];
+
+        if (result.success) {
+          delivered.push(token);
+
+          return;
+        }
+
+        if (isDeadTokenError(result.error?.code)) dead.push(token);
+      });
+
+      await this.deviceTokens.prune(dead);
+      await this.deviceTokens.markUsed(delivered);
+
+      if (delivered.length > 0) {
+        await this.deliveries.recordSent(
+          notificationId,
+          NotificationChannel.PUSH,
+          {
+            target,
+            // **Null, deliberately.** FCM returns one id per token; there is no
+            // single id, and picking the first would be a record pointing at one
+            // arbitrary device.
+            providerMessageId: null,
+          },
+        );
+
+        return 1;
+      }
+
+      await this.deliveries.recordBounced(
+        notificationId,
+        NotificationChannel.PUSH,
+        {
+          target,
+          error: `every device rejected (${dead.length} pruned of ${tokens.length})`,
+        },
+      );
+
+      return 0;
+    } catch (error) {
+      // A transport error, or push being unconfigured. Recorded rather than
+      // swallowed: a channel that is off has to be VISIBLY off in the table
+      // people read to answer "why didn't I get notified".
+      this.logger.error(
+        `Could not push '${command.title}' to ${recipient.userId}: ${formatErrorMsg(error)}`,
+      );
+
+      await this.deliveries.recordFailed(
+        notificationId,
+        NotificationChannel.PUSH,
+        {
+          target,
+          error: formatErrorMsg(error),
+        },
+      );
+
+      return 0;
+    }
+  }
+
+  private async skipPush(
+    command: CreateInAppNotificationCommand,
+    recipient: Recipient,
+    reason: string,
+  ): Promise<void> {
+    await this.deliveries.recordSkipped(
+      await this.notificationIdFor(command, recipient.userId),
+      NotificationChannel.PUSH,
+      { target: null, reason },
+    );
+  }
+
   private async skipEmail(
     command: CreateInAppNotificationCommand,
     recipient: Recipient,
@@ -504,6 +737,92 @@ function describeAudience(audience: NotificationAudience): string {
   return audience.kind === 'permission'
     ? `permission '${audience.permission}'`
     : `${audience.userIds.length} user(s)`;
+}
+
+/**
+ * The FCM error codes that mean a token is DEAD.
+ *
+ * **Exactly two, and the default is KEEP.** This is the one path where the
+ * system destroys a stored credential because a third party said so, and a
+ * broad `catch → delete` turns an FCM outage into every user silently losing
+ * push — no error, no way back except reinstalling the app.
+ * `message-rate-exceeded`, `internal-error` and `server-unavailable` are
+ * transient and must not delete anything; an unrecognized code is kept and the
+ * send simply counts as failed.
+ *
+ * **Verified against a fixture, not against Firebase.** There is no client in
+ * this repository and no live FCM in the test environment, so the mapping is
+ * asserted at a mocked `sendEachForMulticast` boundary. Getting a code wrong in
+ * the *keep* direction is harmless; wrong in the *delete* direction silently
+ * unsubscribes a user, which is why the set is a literal rather than a pattern.
+ */
+const DEAD_TOKEN_ERRORS = new Set([
+  'messaging/registration-token-not-registered',
+  'messaging/invalid-registration-token',
+]);
+
+/** Whether FCM has told us this token is dead — see `DEAD_TOKEN_ERRORS`. */
+function isDeadTokenError(code: string | undefined): boolean {
+  return code !== undefined && DEAD_TOKEN_ERRORS.has(code);
+}
+
+/**
+ * What to push for one notification, or `null` when this type gets none.
+ *
+ * An exhaustive `switch`, so a new `NotificationType` is a compile error rather
+ * than a silent fall-through into whatever the last branch happened to be.
+ * That defect shipped once already, on the email arm — `emailFor` below carries
+ * the same shape for the same reason.
+ */
+function pushFor(
+  command: CreateInAppNotificationCommand,
+): SendPushCommand | null {
+  // `satisfies`, so the empty-string fallbacks are checked against the payload
+  // type rather than widened to `string` by inference — which is what let a
+  // `resourceType` of any string compile.
+  const data = {
+    notificationType: command.type,
+    resourceType: command.resourceType ?? '',
+    resourceId: command.resourceId ?? '',
+    actionUrl: command.actionUrl ?? '',
+  } satisfies SendPushCommand['data'];
+
+  switch (command.type) {
+    // Everything a phone should buzz for: the alerts, the money, and the work
+    // assigned to a person.
+    case NOTIFICATION_TYPES.quotaThreshold:
+    case NOTIFICATION_TYPES.limitThreshold:
+    case NOTIFICATION_TYPES.paymentFailed:
+    case NOTIFICATION_TYPES.ticketAssigned:
+    case NOTIFICATION_TYPES.ticketReassigned:
+    case NOTIFICATION_TYPES.ticketEscalated:
+      return { title: command.title, body: command.body, data };
+
+    // Published below the gate today, so unreachable from here — listed so the
+    // switch stays exhaustive and a new type has to be considered rather than
+    // inheriting a default.
+    case NOTIFICATION_TYPES.planChanged:
+    case NOTIFICATION_TYPES.ticketMessageCreated:
+    case NOTIFICATION_TYPES.ticketStatusChanged:
+      return null;
+  }
+}
+
+/**
+ * The quiet-hours window for a recipient, or `undefined` when they set none.
+ *
+ * `undefined` rather than an object of nulls: the resolver treats an absent
+ * window as "no quiet hours", and handing it `{ start: null, end: null }` would
+ * make every recipient look like they had configured something.
+ */
+function quietHoursOf(recipient: Recipient) {
+  if (!recipient.quietHoursStart || !recipient.quietHoursEnd) return undefined;
+
+  return {
+    quietHoursStart: recipient.quietHoursStart,
+    quietHoursEnd: recipient.quietHoursEnd,
+    timezone: recipient.timezone,
+  };
 }
 
 /**

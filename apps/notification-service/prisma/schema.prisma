@@ -258,3 +258,48 @@ model NotificationPreference {
   @@index([organizationId])
   @@map("notification_preferences")
 }
+
+/// Where a person's push notifications go — one row per APP INSTALL.
+///
+/// **In this database rather than beside `device_sessions` in auth**, and the
+/// distinction is a lifetime: a `DeviceSession` is keyed to a refresh-token
+/// family and is rotated and revoked with it, while a push token outlives every
+/// session, survives logout on most platforms, and is reissued by the OS on its
+/// own schedule. Sharing a table would mean one revoke path deleting rows the
+/// other still needs.
+///
+/// `userId` and `organizationId` are cross-service ids with no foreign key,
+/// like every other id in this database (RDM §1.13).
+model DeviceToken {
+  id             String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId         String @map("user_id") @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+
+  /// The FCM registration token. **UNIQUE, and the uniqueness IS the
+  /// mechanism**: the same install re-registering must UPDATE rather than
+  /// accumulate, and a token FCM reassigns to a different user must move rather
+  /// than duplicate — a shared tablet two people sign into must not deliver one
+  /// person's notifications to the other. An upsert on this column does both,
+  /// which `(user_id, token)` could not.
+  token String @unique @db.VarChar(512)
+
+  /// `IOS` | `ANDROID` | `WEB` — a String, not a Prisma enum
+  /// (development-conventions §7.3).
+  platform String @db.VarChar(20)
+
+  /// For the settings screen — "iPhone 15, last used 3 days ago".
+  deviceName String? @map("device_name") @db.VarChar(100)
+
+  /// Touched on a successful send, so the settings list can say how stale a
+  /// device is without a second table.
+  lastUsedAt DateTime? @map("last_used_at") @db.Timestamptz
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  /// **No soft delete, deliberately.** A dead token is not history worth
+  /// keeping — it is a credential that no longer works, and every read of this
+  /// table wants only live rows. A `deletedAt` here would mean every send has
+  /// to filter it and a token FCM has already rejected would keep being
+  /// counted in the device total a delivery row reports.
+  @@index([userId])
+  @@map("device_tokens")
+}

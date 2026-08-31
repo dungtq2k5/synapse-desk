@@ -253,20 +253,95 @@ export const NOTIFICATION_TYPE_VALUES: NotificationType[] =
 export const PREFERENCE_WILDCARD_TYPE = '*';
 
 export enum NotificationPriority {
-  // LOW and HIGH are declared by RDM Table 23 but nothing branches on them yet
-  // — both behave as NORMAL. Known gap
+  /**
+   * Declared by RDM Table 23 and still inert — nothing branches on it, so it
+   * behaves as `NORMAL`.
+   */
   LOW = 'LOW',
   NORMAL = 'NORMAL',
+  /**
+   * **The PUSH gate**, which admits `HIGH` and above.
+   *
+   * No longer a synonym for `NORMAL`, and the distinction is now the only
+   * thing separating a notification that reaches a phone from one that does
+   * not — nothing else in the tree reads it. The stale version of this comment
+   * said both levels were inert, which is the sentence somebody consults
+   * before choosing a priority for a new producer: it argued, correctly given
+   * what it claimed, that raising a type to `HIGH` would achieve nothing.
+   * `ticket.assigned` sat at `NORMAL` for exactly that reason.
+   */
   HIGH = 'HIGH',
   /** Bypasses quiet hours and digest batching (RDM Table 25). */
   CRITICAL = 'CRITICAL',
 }
+
+/**
+ * Where a device token came from — `device_tokens.platform`.
+ *
+ * **An `enum`, and a proto enum on the wire**, because it is a PERSISTED DOMAIN
+ * VALUE: written to a column, crossing a service boundary, one declaration both
+ * ends read (development-conventions §7.3). The `as const` form is for a key
+ * namespace or a wire-literal map — `CACHE_SCOPES`, `REALTIME_EVENTS` — matched
+ * literally by a client, which this is not.
+ *
+ * The first version of this was `as const` with a hand-written `asDevicePlatform`
+ * narrowing the gRPC edge. That is exactly the shape §7.3 and
+ * `notification.proto` both record having removed: *"the wire format rejects an
+ * unknown value before any handler runs, which is a stronger gate than a runtime
+ * check somebody has to remember to write."* The bridge in `mappers/enums.ts`
+ * now does it, and `Record<D, P>` makes a fourth platform a compile error rather
+ * than a string that flows through.
+ */
+export enum DevicePlatform {
+  IOS = 'IOS',
+  ANDROID = 'ANDROID',
+  WEB = 'WEB',
+}
+
+export const DEVICE_PLATFORMS = Object.values(DevicePlatform);
+
+export type SendPushCommand = {
+  title: string;
+  body: string;
+  /** Where the tap goes. The same value the in-app row carries. */
+  data: {
+    /**
+     * `NotificationType`, which is a string union — so it satisfies FCM's
+     * string-only payload while keeping the guarantee a bare `string` throws
+     * away.
+     */
+    notificationType: NotificationType;
+    /**
+     * `NotificationResourceType` **or the empty string**, and the union is the
+     * honest type rather than the tidy one.
+     *
+     * A command need not name a resource, FCM's payload cannot hold `null`, and
+     * `''` is what the producer writes for "none". Narrowing to
+     * `NotificationResourceType` would be a lie about a value that really does
+     * occur; `string` would merely be vague. The empty string is doing real
+     * work here, and the type says so.
+     */
+    resourceType: NotificationResourceType | '';
+    resourceId: string;
+    actionUrl: string;
+  };
+};
 
 /** RDM Table 24 — the transports a notification can take. */
 export enum NotificationChannel {
   IN_APP = 'IN_APP',
   EMAIL = 'EMAIL',
   SMS = 'SMS',
+  /**
+   * FCM, one delivery row per PERSON rather than per device.
+   *
+   * `notification_deliveries` is unique on `(notificationId, channel)`, and
+   * that is the design rather than a limit to work around: the table answers
+   * *"did we tell this person, and if not why"*, and that question has one
+   * answer per person however many phones they own. Per-device outcome lives on
+   * `device_tokens`, which is the row that actually gets deleted.
+   */
+  PUSH = 'PUSH',
   // Declared but unimplemented.
   WEBHOOK = 'WEBHOOK',
 }
@@ -276,6 +351,13 @@ export const PREFERENCE_CHANNELS = [
   NotificationChannel.IN_APP,
   NotificationChannel.EMAIL,
   NotificationChannel.SMS,
+  /**
+   * Every existing user is opted IN the moment this ships, because a missing
+   * preference row is deliberately permissive. That is the intended reading —
+   * the real opt-in happened when they installed the app and granted the OS
+   * permission — and it is stated here rather than arrived at by omission.
+   */
+  NotificationChannel.PUSH,
 ] as const;
 
 /** RDM Table 24. `SENT` is not `READ`, and neither is `DELIVERED`. */
@@ -397,9 +479,7 @@ export type CreateInAppNotificationCommand = {
   groupKey?: string;
 };
 
-// ---------------------------------------------------------------------------
-// Real-time — notification-service publishes, the gateway relays
-// ---------------------------------------------------------------------------
+// ----------------------------------------------------------------  Real-time — notification-service publishes, the gateway relays
 
 /**
  * Subjects the gateway subscribes to in order to push a notification down a

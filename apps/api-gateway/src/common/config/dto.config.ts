@@ -14,6 +14,15 @@ export const MAX_FULL_NAME_LENGTH = 150;
 export const MAX_DEVICE_NAME_LENGTH = 100;
 
 /**
+ * Matches Prisma's `device_tokens.token` column width.
+ *
+ * A bound rather than a spec: FCM's registration tokens are ~150-250 characters
+ * and the format is theirs to change, so the column is generous and this
+ * refuses only what could not be stored.
+ */
+export const MAX_DEVICE_TOKEN_LENGTH = 512;
+
+/**
  * Upper bound on one invitation batch.
  *
  * Guards the REQUEST BODY, not the seat quota — `organizations.max_agent_seats`

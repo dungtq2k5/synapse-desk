@@ -520,6 +520,9 @@ Numbered `4b` rather than `5` — the same convention §2.3b and §3.1b already 
 | POST | `/notifications/read` ✎ | Bulk read: `{ ids: [] }` **or** `{ resourceType, resourceId }`. The second form is what makes opening ticket #1042 clear all 12 of its notifications in one call, using the `resource_id` index. | SELF |
 | GET | `/notifications/preferences` | Full resolved catalogue per (type, channel) — exact match, else `('*', channel)`, else the hard-coded default. Returns the **resolved** value plus whether it came from an explicit row, so the UI can show "inherited" vs "set". | SELF |
 | PATCH | `/notifications/preferences` ✎ | Upsert `{ type, channel, isEnabled, digest }`. Unique on `(user_id, type, channel)`, so this is an upsert, never a duplicate-row insert. | SELF |
+| POST | `/notifications/devices` ✎ | `{ token, platform, deviceName? }` → registers this install for push. An **upsert on the token**, which handles both cases that look like duplicates and are not: the same install re-registering, and a token FCM reassigned to another account on a shared device — the second overwrites `user_id`, so one person's notifications cannot reach the other. Authentication only, no permission: every user registers their own phone. | SELF |
+| GET | `/notifications/devices` | This user's registered devices. **Never carries the token** — a settings screen needs an id to delete by and a name to show, not a 150+ character credential. | SELF |
+| DELETE | `/notifications/devices/:id` ✎ | Forget one device, **by row id rather than by token**: a user signing out on a phone they have lost cannot produce that device's token. Somebody else's device is `404`, never `403`. | SELF |
 
 **Not exposed over HTTP, deliberately:**
 

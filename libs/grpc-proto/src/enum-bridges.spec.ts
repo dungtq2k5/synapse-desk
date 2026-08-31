@@ -14,6 +14,7 @@ import {
   NotificationChannel,
   NotificationPriority,
   OrgStatus,
+  DevicePlatform,
   PreferenceSource,
   NotificationResourceType,
   ReassignmentReason,
@@ -78,6 +79,8 @@ import {
   toProtoNotificationPriority,
   toProtoNotificationResourceType,
   toProtoOrgStatus,
+  toProtoDevicePlatform,
+  fromProtoDevicePlatform,
   toProtoPreferenceSource,
   toProtoNotificationType,
   toProtoRagAnswerStatus,
@@ -282,6 +285,12 @@ describe('every enum bridge round-trips', () => {
       Object.values(PreferenceSource),
       toProtoPreferenceSource,
       fromProtoPreferenceSource,
+    ],
+    [
+      'DevicePlatform',
+      Object.values(DevicePlatform),
+      toProtoDevicePlatform,
+      fromProtoDevicePlatform,
     ],
   ];
 

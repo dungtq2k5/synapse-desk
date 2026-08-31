@@ -62,5 +62,17 @@ erDiagram
     DateTime updated_at 
     }
   
+
+  "device_tokens" {
+    String id "🗝️"
+    String user_id 
+    String organization_id 
+    String token 
+    String platform 
+    String device_name "❓"
+    DateTime last_used_at "❓"
+    DateTime created_at 
+    }
+  
     "notification_deliveries" }o--|| notifications : "notification"
 ```

@@ -242,6 +242,10 @@ describe('REST and GraphQL DTOs are independent but not divergent', () => {
   const TWINLESS: Readonly<Record<string, string>> = {
     // tickets — the co-pilot is a REST surface; no client reads drafts,
     // summaries or suggestions through the schema.
+    // notifications — a device is a per-user SETTING managed from one screen,
+    // not an entity anything queries by id or joins to. The token never leaves
+    // the server, so there is nothing for a schema to expose either.
+    DeviceTokenResponseDto: 'a settings-screen row, never a query',
     AiSummaryResponseDto: 'co-pilot output, REST-only surface',
     AiDraftResponseDto: 'co-pilot output, REST-only surface',
     AiSuggestionsResponseDto: 'co-pilot output, REST-only surface',

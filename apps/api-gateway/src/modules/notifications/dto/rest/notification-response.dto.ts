@@ -6,6 +6,7 @@ import {
   NotificationType,
   PreferenceSource,
   PREFERENCE_WILDCARD_TYPE,
+  type DevicePlatform,
 } from '@synapsedesk/common';
 
 /**
@@ -91,4 +92,23 @@ export class PreferenceResponseDto {
    * Lets the UI show "inherited" rather than presenting a default as a choice.
    */
   source!: PreferenceSource | null;
+}
+
+/**
+ * One registered push device.
+ *
+ * **No token.** It is a 150+ character credential, and a settings screen needs
+ * an id to delete by and a name to show — putting the secret on the wire would
+ * spread it to every client that lists devices, for no reader.
+ */
+export class DeviceTokenResponseDto {
+  readonly id!: string;
+  /**
+   * `IOS` | `ANDROID` | `WEB` or `null` if the platform is not recognized.
+   */
+  readonly platform!: DevicePlatform | null;
+  readonly deviceName!: string | null;
+  /** Null until the first successful push — how stale this device is. */
+  readonly lastUsedAt!: Date | null;
+  readonly createdAt!: Date | null;
 }

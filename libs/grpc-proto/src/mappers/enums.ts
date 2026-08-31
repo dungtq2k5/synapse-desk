@@ -16,6 +16,7 @@ import {
   Gender,
   InvitationStatus,
   NOTIFICATION_TYPES,
+  DevicePlatform,
   NotificationChannel,
   NotificationPriority,
   NotificationResourceType,
@@ -38,6 +39,7 @@ import { InvitationStatus as ProtoInvitationStatus } from '../generated/synapsed
 import { OtpPurpose as ProtoOtpPurpose } from '../generated/synapsedesk/auth/otp';
 import {
   DigestMode as ProtoDigestMode,
+  DevicePlatform as ProtoDevicePlatform,
   NotificationChannel as ProtoNotificationChannel,
   NotificationPriority as ProtoNotificationPriority,
   NotificationResourceType as ProtoNotificationResourceType,
@@ -275,12 +277,30 @@ const notificationChannel = enumBridge<
       ProtoNotificationChannel.NOTIFICATION_CHANNEL_SMS,
     [NotificationChannel.WEBHOOK]:
       ProtoNotificationChannel.NOTIFICATION_CHANNEL_WEBHOOK,
+    [NotificationChannel.PUSH]:
+      ProtoNotificationChannel.NOTIFICATION_CHANNEL_PUSH,
   },
   ProtoNotificationChannel.NOTIFICATION_CHANNEL_UNSPECIFIED,
 );
 
 export const toProtoNotificationChannel = notificationChannel.toProto;
 export const fromProtoNotificationChannel = notificationChannel.fromProto;
+
+/**
+ * `device_tokens.platform` — the same UNSPECIFIED-is-null rule as the channels
+ * above, and the reason the gRPC edge needs no hand-written check.
+ */
+const devicePlatform = enumBridge<DevicePlatform, ProtoDevicePlatform>(
+  {
+    [DevicePlatform.IOS]: ProtoDevicePlatform.DEVICE_PLATFORM_IOS,
+    [DevicePlatform.ANDROID]: ProtoDevicePlatform.DEVICE_PLATFORM_ANDROID,
+    [DevicePlatform.WEB]: ProtoDevicePlatform.DEVICE_PLATFORM_WEB,
+  },
+  ProtoDevicePlatform.DEVICE_PLATFORM_UNSPECIFIED,
+);
+
+export const toProtoDevicePlatform = devicePlatform.toProto;
+export const fromProtoDevicePlatform = devicePlatform.fromProto;
 
 /**
  * Null for UNSPECIFIED, and that is load-bearing rather than incidental: an

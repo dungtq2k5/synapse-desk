@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -15,7 +16,12 @@ import { RequestContext } from '@synapsedesk/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { NotificationsService } from './notifications.service';
-import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiCookieAuth,
+  ApiNoContentResponse,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 import { AUTH_SCHEMES } from '../../common/config/swagger.config';
 import {
   ApiFilterErrors,
@@ -25,12 +31,14 @@ import {
   ListNotificationsQueryDto,
   MarkManyReadDto,
   UpdatePreferenceDto,
+  RegisterDeviceDto,
 } from './dto/rest/notification.dto';
 import {
   MarkReadResponseDto,
   NotificationFeedResponseDto,
   PreferenceResponseDto,
   UnreadCountResponseDto,
+  DeviceTokenResponseDto,
 } from './dto/rest/notification-response.dto';
 
 /**
@@ -112,6 +120,62 @@ export class NotificationsController {
     @Body() dto: UpdatePreferenceDto,
   ): Promise<PreferenceResponseDto> {
     return this.notifications.updatePreference(dto, context);
+  }
+
+  /**
+   * Register or refresh this device's push token.
+   *
+   * **Authentication only, no `@RequirePermission`.** Every authenticated user
+   * registers their own device; a permission here would be asking whether
+   * somebody may configure their own phone. The same posture as the preference
+   * routes above, and for the same reason.
+   *
+   * An upsert on the token, so a re-register after an app restart updates the
+   * row rather than adding one.
+   */
+  @ApiOperation({ summary: 'Register a push device' })
+  @ApiWrappedResponse(DeviceTokenResponseDto)
+  @ApiFilterErrors(['400', '401'])
+  @Post('devices')
+  @HttpCode(HttpStatus.OK)
+  registerDevice(
+    @CurrentUser() context: RequestContext,
+    @Body() dto: RegisterDeviceDto,
+  ): Promise<DeviceTokenResponseDto> {
+    return this.notifications.registerDevice(dto, context);
+  }
+
+  /** This user's devices, for a settings screen. Never carries the token. */
+  @ApiOperation({ summary: 'List push devices' })
+  @ApiWrappedResponse(DeviceTokenResponseDto, { isArray: true })
+  @ApiFilterErrors(['401'])
+  @Get('devices')
+  listDevices(
+    @CurrentUser() context: RequestContext,
+  ): Promise<DeviceTokenResponseDto[]> {
+    return this.notifications.listDevices(context);
+  }
+
+  /**
+   * Forget one device, BY ROW ID.
+   *
+   * Not by token: a user signing out on a phone they have lost cannot produce
+   * that device's token, and this is the screen that lists rows. A device
+   * belonging to somebody else is `404`, never `403` — the same rule as every
+   * other by-id route, so this cannot answer "does this id exist" across users.
+   */
+  @ApiOperation({ summary: 'Forget a push device' })
+  @ApiNoContentResponse({
+    description: 'The device is forgotten; no push will reach it again.',
+  })
+  @ApiFilterErrors(['401', '404'])
+  @Delete('devices/:id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  forgetDevice(
+    @CurrentUser() context: RequestContext,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<void> {
+    return this.notifications.forgetDevice(id, context);
   }
 
   /**

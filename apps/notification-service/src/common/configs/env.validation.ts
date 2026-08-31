@@ -52,6 +52,19 @@ export const envValidationSchema = Joi.object({
   TWILIO_AUTH_TOKEN: Joi.string().optional().allow(''),
   TWILIO_AUTH_PHONE: Joi.string().optional().allow(''),
 
+  // FCM, optional for the same reason and with the same posture: push is one
+  // channel of four, and a notification-service that refuses to start without a
+  // credential takes the in-app feed and email down with it. Unset, the service
+  // logs once at boot and records a FAILED delivery row per push attempt — off
+  // has to be VISIBLY off in the table people read to answer "why didn't I get
+  // notified", which is the half `SmsService` states and a silent no-op would
+  // lose.
+  //
+  // `storage-service` REQUIRES its own Firebase credential, and that asymmetry
+  // is deliberate: every presign needs it, so booting without one only defers
+  // the failure to a request.
+  FIREBASE_MESSAGING_SERVICE_ACCOUNT_PATH: Joi.string().optional().allow(''),
+
   NODE_ENV: Joi.string()
     .required()
     .valid(...NODE_ENV_OPTIONS),

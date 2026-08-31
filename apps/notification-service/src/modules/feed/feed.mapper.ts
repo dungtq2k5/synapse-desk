@@ -1,4 +1,6 @@
 import {
+  DeviceTokenResponse,
+  toProtoDevicePlatform,
   NotificationResponse,
   toProtoNotificationPriority,
   toProtoNotificationResourceType,
@@ -45,5 +47,28 @@ export function toNotificationResponse(
       ? toProtoTimestamp(notification.archivedAt)
       : undefined,
     createdAt: toProtoTimestamp(notification.createdAt),
+  };
+}
+
+/**
+ * A device row, WITHOUT its token.
+ *
+ * The token is a credential; a settings screen needs an id to delete by and a
+ * name to show. Putting it on the wire would spread a secret to every client
+ * that lists devices, for no reader.
+ */
+export function toDeviceTokenResponse(device: {
+  id: string;
+  platform: string;
+  deviceName: string | null;
+  lastUsedAt: Date | null;
+  createdAt: Date;
+}): DeviceTokenResponse {
+  return {
+    id: device.id,
+    platform: toProtoDevicePlatform(device.platform),
+    deviceName: device.deviceName ?? undefined,
+    lastUsedAt: toProtoTimestamp(device.lastUsedAt),
+    createdAt: toProtoTimestamp(device.createdAt),
   };
 }

@@ -7,7 +7,9 @@ import {
   toProtoNotificationResourceType,
   toProtoNotificationType,
   fromProtoPreferenceSource,
+  fromProtoDevicePlatform,
   fromProtoTimestamp,
+  DeviceTokenResponse,
   ListNotificationsResponse,
   ListPreferencesResponse,
   MarkReadRequest,
@@ -33,6 +35,7 @@ import {
   NotificationFeedResponseDto,
   NotificationResponseDto,
   PreferenceResponseDto,
+  DeviceTokenResponseDto,
 } from './dto/rest/notification-response.dto';
 
 /**
@@ -182,5 +185,20 @@ export function toUpdatePreferenceRequest(
     channel: toProtoNotificationChannel(dto.channel),
     isEnabled: dto.isEnabled,
     digest: toProtoDigestMode(dto.digest ?? ''),
+  };
+}
+
+/**
+ * A device row off the wire. The token never appears — see the DTO.
+ */
+export function toDeviceTokenResponseDto(
+  device: DeviceTokenResponse,
+): DeviceTokenResponseDto {
+  return {
+    id: device.id,
+    platform: fromProtoDevicePlatform(device.platform),
+    deviceName: device.deviceName ?? null,
+    lastUsedAt: fromProtoTimestamp(device.lastUsedAt) ?? null,
+    createdAt: fromProtoTimestamp(device.createdAt) ?? null,
   };
 }

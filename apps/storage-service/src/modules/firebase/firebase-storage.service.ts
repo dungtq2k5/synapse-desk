@@ -59,7 +59,7 @@ export class FirebaseStorageService implements OnModuleInit {
       );
     }
 
-    // A NAMED app. `auth-service`'s FirebaseService initialises the default one
+    // A NAMED app. `auth-service`'s FirebaseService initializes the default one
     // with a different credential, and in any process where both ran the second
     // `initializeApp()` would throw on the duplicate name — or worse, silently
     // reuse the first app's credential and quietly give Storage calls an

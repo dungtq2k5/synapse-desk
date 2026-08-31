@@ -75,6 +75,12 @@ export async function bootstrapE2eTest(): Promise<E2eFixture> {
         -- the next test suppresses that test's first reply, which reads as the
         -- consumer being broken rather than as a dirty fixture.
         "inbound_auto_replies",
+        -- Push devices. No FK to the notifications table, so CASCADE does not
+        -- reach them: a token surviving into the next test makes a "user with
+        -- no devices" case push to somebody, which reads as the gate being
+        -- broken rather than as a dirty fixture. (No backticks in here: this
+        -- SQL is a template literal, and one would open a substitution.)
+        "device_tokens",
         "notifications" RESTART IDENTITY CASCADE;
     `);
     emitted.length = 0;

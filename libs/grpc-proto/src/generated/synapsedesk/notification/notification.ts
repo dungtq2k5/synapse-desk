@@ -17,12 +17,15 @@ import { Timestamp } from "../../google/protobuf/timestamp";
  * and no producer invents a fifth, which is exactly the property that makes an
  * enum right here and wrong there.
  *
- * `LOW` and `HIGH` are declared and nothing branches on them yet — they behave
- * as `NORMAL`. They are on the wire regardless: a producer needs
- * somewhere to put "this matters more than a reply", and a value that survives
- * the round trip can be acted on later without a proto change. `CRITICAL` is
- * the one that already means something — it bypasses quiet hours and digest
- * batching, so reading it as anything else silently mutes an alert.
+ * `LOW` is declared and nothing branches on it yet — it behaves as `NORMAL`.
+ *
+ * **`HIGH` is the PUSH gate**: the push arm admits `HIGH` and above, so it is
+ * what separates a notification that reaches a phone from one that does not.
+ * It is the level a producer reaches for to say "this matters more than a
+ * reply", and that now has a consequence rather than only a meaning.
+ *
+ * `CRITICAL` bypasses quiet hours and digest batching, so reading it as
+ * anything else silently mutes an alert.
  */
 export enum NotificationPriority {
   NOTIFICATION_PRIORITY_UNSPECIFIED = 0,
@@ -101,6 +104,7 @@ export enum NotificationChannel {
   NOTIFICATION_CHANNEL_EMAIL = 2,
   NOTIFICATION_CHANNEL_SMS = 3,
   NOTIFICATION_CHANNEL_WEBHOOK = 4,
+  NOTIFICATION_CHANNEL_PUSH = 5,
   UNRECOGNIZED = -1,
 }
 
@@ -133,6 +137,24 @@ export enum PreferenceSource {
   PREFERENCE_SOURCE_WILDCARD = 2,
   /** PREFERENCE_SOURCE_DEFAULT - No row at all — the permissive floor. */
   PREFERENCE_SOURCE_DEFAULT = 3,
+  UNRECOGNIZED = -1,
+}
+
+/**
+ * Mirrors `DevicePlatform` in `@synapsedesk/common`.
+ *
+ * An enum rather than a string, per the rule the block above records: a
+ * persisted domain value crossing the wire gets the proto enum, so an unknown
+ * is rejected by the wire format before any handler runs. The first version of
+ * this field was a `string` narrowed by a hand-written check at the gRPC
+ * boundary — the very shape `validateChannel` and `validateDigest` were deleted
+ * for.
+ */
+export enum DevicePlatform {
+  DEVICE_PLATFORM_UNSPECIFIED = 0,
+  DEVICE_PLATFORM_IOS = 1,
+  DEVICE_PLATFORM_ANDROID = 2,
+  DEVICE_PLATFORM_WEB = 3,
   UNRECOGNIZED = -1,
 }
 
@@ -291,6 +313,55 @@ export interface UpdatePreferenceRequest {
 }
 
 /**
+ * One registered device.
+ *
+ * The TOKEN is deliberately absent from every response: it is a 150+ character
+ * credential, and a settings screen listing devices needs an id to delete by
+ * and a name to show, not the secret itself.
+ */
+export interface DeviceTokenResponse {
+  id: string;
+  platform: DevicePlatform;
+  deviceName?: string | undefined;
+  lastUsedAt?: Timestamp | undefined;
+  createdAt: Timestamp | undefined;
+}
+
+export interface RegisterDeviceRequest {
+  /**
+   * The FCM registration token. Upserted on — the same install re-registering
+   * must update rather than accumulate.
+   */
+  token: string;
+  /**
+   * No `optional`: `UNSPECIFIED` is not a platform, and the mapper refuses it
+   * rather than defaulting — a device silently recorded as `WEB` is a wrong
+   * answer on a settings screen and a wrong branch the day payloads differ.
+   */
+  platform: DevicePlatform;
+  deviceName?: string | undefined;
+}
+
+/**
+ * By ROW ID, never by token: a user signing out on a phone they have lost
+ * cannot produce that device's token, and the settings screen lists rows.
+ */
+export interface DeviceIdRequest {
+  id: string;
+}
+
+export interface ListDevicesRequest {
+}
+
+export interface ListDevicesResponse {
+  items: DeviceTokenResponse[];
+}
+
+export interface ForgetDeviceResponse {
+  forgotten: boolean;
+}
+
+/**
  * The ticket an outbound notification was about, found by its `Message-ID`.
  * The `In-Reply-To` fallback.
  *
@@ -338,6 +409,19 @@ export interface NotificationServiceClient {
   listPreferences(request: ListPreferencesRequest, metadata?: Metadata): Observable<ListPreferencesResponse>;
 
   updatePreference(request: UpdatePreferenceRequest, metadata?: Metadata): Observable<PreferenceResponse>;
+
+  /**
+   * Push devices, beside the preference surface because both are per-user
+   * settings the owner manages for themselves. Authentication only — every
+   * authenticated user registers their own device, so a permission would be
+   * asking whether somebody may configure their own phone.
+   */
+
+  registerDevice(request: RegisterDeviceRequest, metadata?: Metadata): Observable<DeviceTokenResponse>;
+
+  listDevices(request: ListDevicesRequest, metadata?: Metadata): Observable<ListDevicesResponse>;
+
+  forgetDevice(request: DeviceIdRequest, metadata?: Metadata): Observable<ForgetDeviceResponse>;
 }
 
 export interface NotificationServiceController {
@@ -383,6 +467,28 @@ export interface NotificationServiceController {
     request: UpdatePreferenceRequest,
     metadata?: Metadata,
   ): Promise<PreferenceResponse> | Observable<PreferenceResponse> | PreferenceResponse;
+
+  /**
+   * Push devices, beside the preference surface because both are per-user
+   * settings the owner manages for themselves. Authentication only — every
+   * authenticated user registers their own device, so a permission would be
+   * asking whether somebody may configure their own phone.
+   */
+
+  registerDevice(
+    request: RegisterDeviceRequest,
+    metadata?: Metadata,
+  ): Promise<DeviceTokenResponse> | Observable<DeviceTokenResponse> | DeviceTokenResponse;
+
+  listDevices(
+    request: ListDevicesRequest,
+    metadata?: Metadata,
+  ): Promise<ListDevicesResponse> | Observable<ListDevicesResponse> | ListDevicesResponse;
+
+  forgetDevice(
+    request: DeviceIdRequest,
+    metadata?: Metadata,
+  ): Promise<ForgetDeviceResponse> | Observable<ForgetDeviceResponse> | ForgetDeviceResponse;
 }
 
 export function NotificationServiceControllerMethods() {
@@ -396,6 +502,9 @@ export function NotificationServiceControllerMethods() {
       "markManyRead",
       "listPreferences",
       "updatePreference",
+      "registerDevice",
+      "listDevices",
+      "forgetDevice",
     ];
     for (const method of grpcMethods) {
       const descriptor: any = Reflect.getOwnPropertyDescriptor(constructor.prototype, method);

@@ -1,6 +1,8 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
   MAX_BULK_NOTIFICATION_IDS,
+  MAX_DEVICE_NAME_LENGTH,
+  MAX_DEVICE_TOKEN_LENGTH,
   MAX_FEED_CURSOR_LENGTH,
   NOTIFICATION_FEED_LIMIT,
 } from '../../../../common/config/dto.config';
@@ -9,6 +11,7 @@ import {
   ArrayMaxSize,
   IsArray,
   IsBoolean,
+  IsEnum,
   IsIn,
   IsInt,
   IsOptional,
@@ -17,8 +20,10 @@ import {
   Max,
   MaxLength,
   Min,
+  MinLength,
 } from 'class-validator';
 import {
+  DevicePlatform,
   DigestMode,
   NOTIFICATION_TYPE_VALUES,
   NotificationResourceType,
@@ -116,4 +121,25 @@ export class UpdatePreferenceDto {
   @IsOptional()
   @IsIn(Object.values(DigestMode))
   readonly digest?: DigestMode;
+}
+
+/**
+ * Registering one device. Upserted on `token` — see the service.
+ *
+ * `MaxLength(512)` matches the column, which is sized for FCM's tokens; a
+ * longer one is a client bug rather than a value to truncate.
+ */
+export class RegisterDeviceDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(MAX_DEVICE_TOKEN_LENGTH)
+  token!: string;
+
+  @IsEnum(DevicePlatform)
+  platform!: DevicePlatform;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(MAX_DEVICE_NAME_LENGTH)
+  deviceName?: string;
 }
