@@ -7,12 +7,12 @@
     "apps/*",
     "libs/*"
   ],
-  "//overrides": "`@nestjs/apollo@13` requires `@apollo/server@^5` while depending on `@apollo/server-plugin-landing-page-graphql-playground@4`, which peers on `^4` — an internal conflict in the package, not in this repo. Pinning one Apollo server for the whole tree resolves it. The plugin is only reached when `playground: true`, which the GraphQL config turns off, so the version it never loads against is the version it never runs on.",
+  "//overrides": "`@nestjs/apollo@13` requires `@apollo/server@^5` while depending on `@apollo/server-plugin-landing-page-graphql-playground@4`, which peers on `^4` \u2014 an internal conflict in the package, not in this repo. Pinning one Apollo server for the whole tree resolves it. The plugin is only reached when `playground: true`, which the GraphQL config turns off, so the version it never loads against is the version it never runs on.",
   "overrides": {
     "@apollo/server": "^5.5.1"
   },
   "scripts": {
-    "test": "jest --projects apps/*/jest.config.ts libs/*/jest.config.ts scripts/jest.config.ts --passWithNoTests --runInBand",
+    "test": "jest --projects apps/*/jest.config.ts libs/*/jest.config.ts scripts/jest.config.ts test/system/jest.unit.config.ts --passWithNoTests --runInBand",
     "test:all": "jest --projects apps/*/jest.config.ts libs/*/jest.config.ts scripts/jest.config.ts --passWithNoTests",
     "setup:py": "cd apps/rag-service && python3 -m venv .venv && .venv/bin/pip install -q -r requirements.txt -r requirements-dev.txt",
     "test:py": "cd apps/rag-service && .venv/bin/pytest -q",
@@ -28,6 +28,8 @@
     "test:e2e:ingestion": "dotenv -e apps/ingestion-service/.env.test -- jest --config apps/ingestion-service/jest.e2e.config.ts --runInBand",
     "test:e2e:storage": "dotenv -e apps/storage-service/.env.test -- jest --config apps/storage-service/jest.e2e.config.ts --runInBand",
     "test:e2e": "npm run test:e2e:gateway && npm run test:e2e:auth && npm run test:e2e:ticket && npm run test:e2e:notification && npm run test:e2e:ingestion && npm run test:e2e:storage",
+    "//test:system": "DESTRUCTIVE to three stores on every run, in setup AND teardown: flushes the entire dev Redis (BullMQ schedules, throttler counters, AI quota counters, socket channels, alert levels), drops the Qdrant collection, and resets the JetStream streams. Postgres alone is spared \u2014 wipe it first with `node scripts/reset-databases.mjs --dev-only`; seeding happens inside the run, after the stack is up, because both seeders depend on rows a service writes at boot.",
+    "test:system": "jest --config test/system/jest.config.ts",
     "test:cov": "jest --projects apps/*/jest.config.ts libs/*/jest.config.ts scripts/jest.config.ts --coverage --passWithNoTests",
     "db:generate:auth": "npm run db:generate -w @synapsedesk/auth-service",
     "db:generate:ticket": "npm run db:generate -w @synapsedesk/ticket-service",
@@ -47,7 +49,8 @@
     "build": "turbo run build",
     "dev:py": "npm run dev -w @synapsedesk/rag-service",
     "dev": "turbo run dev",
-    "lint": "npm run lint:models && turbo run lint",
+    "//lint": "turbo lints WORKSPACES, and `scripts/seed-demo/` and `test/system/` are not workspaces \u2014 both were invisible to this command until the trailing eslint call, the same shape as the root tsconfig include gap. The loose `.mjs` scripts stay outside: they are plain JS no lint project parses, which is the status quo this line inherits rather than a decision it makes.",
+    "lint": "npm run lint:models && turbo run lint && eslint scripts/seed-demo test/system",
     "lint:models": "node scripts/check-model-literals.mjs",
     "lint:fix": "turbo run lint -- --fix",
     "lint:py": "cd apps/rag-service && .venv/bin/ruff check rag_service tests scripts eval && .venv/bin/python scripts/check-imports.py",

@@ -2,9 +2,11 @@
   "name": "@synapsedesk/rag-service",
   "version": "1.0.0",
   "private": true,
-  "//": "A PYTHON service with an npm manifest, which exists for exactly one reason: turbo dispatches by workspace, and a directory with no package.json is not one — so `npm run dev` started six services and silently skipped the seventh. This file makes it visible to `turbo run dev` and nothing else. Note it declares NO `build`, `lint`, `clean` or `test` script, and that is the whole design: turbo skips a task a workspace does not define, so this cannot become a `turbo run build` or `turbo run lint` target the way `workers/email-inbound` would have been (see its own note for the breakage that avoids). The Python equivalents stay where they are, behind the root `*:py` scripts, because they need the venv and a different toolchain.",
+  "//": "A PYTHON service with an npm manifest, which exists for exactly one reason: turbo dispatches by workspace, and a directory with no package.json is not one \u2014 so `npm run dev` started six services and silently skipped the seventh. This file makes it visible to `turbo run dev` and nothing else. Note it declares NO `build`, `lint`, `clean` or `test` script, and that is the whole design: turbo skips a task a workspace does not define, so this cannot become a `turbo run build` or `turbo run lint` target the way `workers/email-inbound` would have been (see its own note for the breakage that avoids). The Python equivalents stay where they are, behind the root `*:py` scripts, because they need the venv and a different toolchain.",
   "scripts": {
-    "//dev": "Run from this directory by turbo, so no `cd` — and `.venv` must exist. `npm run dev:py` at the root delegates here rather than repeating the command, because two spellings of a launch line drift the first time one is edited.",
-    "dev": ".venv/bin/dotenv -f .env run -- .venv/bin/python -m rag_service.server"
+    "//dev": "Run from this directory by turbo, so no `cd` \u2014 and `.venv` must exist. `npm run dev:py` at the root delegates here rather than repeating the command, because two spellings of a launch line drift the first time one is edited.",
+    "dev": ".venv/bin/dotenv -f .env run -- .venv/bin/python -m rag_service.server",
+    "//start:prod": "The same launch line as `dev`, under the name the Nest services use. `dev` is not a watcher today, and the system harness must not silently inherit one if that changes.",
+    "start:prod": ".venv/bin/dotenv -f .env run -- .venv/bin/python -m rag_service.server"
   }
 }

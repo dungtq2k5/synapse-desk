@@ -14,9 +14,20 @@
     // documents with the column default and reported success. Left out, every
     // aggregate command in this repository was green over code none of them
     // read.
-    "scripts/seed-demo/**/*"
+    "scripts/seed-demo/**/*",
+    // The system harness, for the seeder's exact reason one entry up: ts-jest
+    // transpiles per file and typechecks no program, so a green run says
+    // nothing — and this directory landed outside the include three documents
+    // after the seeder did. `typecheck-coverage.spec.ts` is what turns this
+    // list from a series of patches into a rule.
+    "test/system/**/*"
   ],
-  "exclude": ["node_modules", "dist"],
+  // The two harness jest configs are the header's jest-config case again: they
+  // import each other with the explicit `.ts` extension jest's ESM loading
+  // requires and tsc rejects (TS5097). They stay typechecked — by
+  // `test/system/tsconfig.json`, whose `noEmit` makes the permitting flag
+  // legal there.
+  "exclude": ["node_modules", "dist", "test/system/jest*.config.ts"],
   "compilerOptions": {
     "module": "commonjs",
     "declaration": true,

@@ -32,7 +32,10 @@
  * a side effect of running.
  *
  * DESTRUCTIVE, AND ONLY FOR LOCAL DEVELOPMENT. Every row in every service
- * database goes. It refuses any connection string that does not point at this
+ * database goes. `--test-only` narrows it to `.env.test`, `--dev-only` to
+ * `.env`; passing neither resets both, which is what a caller who owns the
+ * whole machine wants and is the wrong default for a pipeline that runs beside
+ * an e2e suite. It refuses any connection string that does not point at this
  * machine, and `--force` is deliberately NOT offered: a remote database is not
  * a thing this script should be able to reach at all.
  */
@@ -45,6 +48,28 @@ import { isLocalDatabase, readDatabaseUrl, redact } from './database-url.mjs';
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const testOnly = process.argv.includes('--test-only');
+
+/**
+ * `--dev-only`, the counterpart `--test-only` implied and did not have.
+ *
+ * **Added for the system harness, and the gap it closes is a real one.** Plain
+ * `db:reset` truncates `.env` AND `.env.test`, so a pipeline that resets the
+ * dev databases before a run also destroys the test databases — and an e2e
+ * suite running in another terminal fails for a reason nowhere near itself.
+ * That is the shape known-gap #14 records: a run that tears down shared state
+ * fails a victim who did not change anything.
+ *
+ * The two flags are mutually exclusive by construction below rather than by
+ * documentation, because a caller passing both means one of them is a mistake.
+ */
+const devOnly = process.argv.includes('--dev-only');
+
+if (testOnly && devOnly) {
+  console.error(
+    '--test-only and --dev-only are mutually exclusive. Pass neither to reset both.',
+  );
+  process.exit(1);
+}
 
 // Discovered rather than listed, for the reason `reset-jetstream.mjs` reads the
 // live stream list: a service added later is included without anyone
@@ -66,7 +91,11 @@ if (services.length === 0) {
 const targets = [];
 
 for (const service of services) {
-  const envFiles = testOnly ? ['.env.test'] : ['.env', '.env.test'];
+  const envFiles = testOnly
+    ? ['.env.test']
+    : devOnly // NOSONAR
+      ? ['.env']
+      : ['.env', '.env.test'];
 
   for (const envFile of envFiles) {
     const fileUrl = new URL(`../apps/${service}/${envFile}`, import.meta.url);
@@ -106,7 +135,7 @@ for (const { service, envFile, url } of targets) {
     envFile === '.env' ? push : ['dotenv', '-e', '.env.test', '--', ...push];
 
   try {
-    execFileSync('npx', args, {
+    execFileSync('npx', args, { // NOSONAR
       cwd: join(REPO_ROOT, 'apps', service),
       stdio: ['ignore', 'ignore', 'pipe'],
       encoding: 'utf8',

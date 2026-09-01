@@ -1,4 +1,5 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { stripComments } from '@synapsedesk/common/testing/strip-comments';
 import { join } from 'node:path';
 import {
   CORS_ALLOWED_HEADERS,
@@ -54,21 +55,12 @@ describe('CORS allow-lists cover the client contract', () => {
    * to describe this policy in a block comment would reintroduce exactly the
    * shape the line-comment half was proven to prevent.
    */
-  const code = (path: string): string => {
-    return (
-      readFileSync(path, 'utf8')
-        .replace(/\/\*[\s\S]*?\*\//g, '')
-        // `[ \t]`, not `\s`. `\s` matches a NEWLINE, so `^\s*` runs past the
-        // start of its own line and backtracks across every blank line looking for
-        // a `//` that is not there — measured quadratic over this corpus: 4.2ms at
-        // 2k blank lines, 15.4ms at 4k, 61.8ms at 8k, against 0.0ms for this form.
-        //
-        // Behaviour is unchanged where it matters: over all 346 files this scan
-        // reads, the two forms differ on 106 of them and in ZERO non-whitespace
-        // content. `\s` was only swallowing the blank lines between comments.
-        .replace(/^[ \t]*\/\/.*$/gm, '')
-    );
-  };
+  // The SHARED strip. This file wrote the safe character class first — the
+  // quadratic-`\s` measurement was made here — and the system harness's copy
+  // regressed it within a week, which is why the regex and its measurement now
+  // live once, on `stripComments`, where a third scan cannot drift from them.
+  const code = (path: string): string =>
+    stripComments(readFileSync(path, 'utf8'));
 
   const FILES = sources(SRC).filter((path) => path !== CONFIG);
 

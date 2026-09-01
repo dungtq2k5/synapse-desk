@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "scripts": {
     "build": "nest build",
+    "start:prod": "node dist/apps/api-gateway/src/main.js",
     "dev": "nest start --watch",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\"",
     "clean": "rimraf dist *.tsbuildinfo"

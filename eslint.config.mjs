@@ -25,6 +25,12 @@ export default defineConfig(
       // It carries its own tsconfig and is checked by `npm run typecheck`
       // inside its directory.
       'workers/**',
+      // Tooling config, the same class each app's lint glob already omits:
+      // jest configs import with the explicit `.ts` extension jest's ESM
+      // loading needs, which no lint project parses, and the sequencer is
+      // plain CommonJS.
+      'test/system/jest*.config.ts',
+      'test/system/sequencer.cjs',
     ],
   },
   eslint.configs.recommended,
@@ -47,6 +53,10 @@ export default defineConfig(
           // under `scripts/seed-demo/` fails to parse with "none of those
           // tsconfigs include this file" rather than being linted.
           './scripts/tsconfig.json',
+          // The system harness, for the same reason as `scripts/` above:
+          // `test/system/` is neither an app nor a lib, and the root tsconfig
+          // does not include it.
+          './test/system/tsconfig.json',
         ],
         tsconfigRootDir: import.meta.dirname,
       },
