@@ -27,6 +27,7 @@ export * from './utils/soft-delete';
 export * from './utils/rollup-window';
 export * from './utils/prisma-errors';
 export * from './contracts/notification.contract';
+export * from './contracts/webhook.contract';
 export * from './contracts/audit.contract';
 export * from './contracts/ticket.contract';
 export * from './contracts/storage.contract';

@@ -13,6 +13,7 @@ import {
   SendEmailCommand,
 } from '@synapsedesk/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { WebhookDispatchService } from '../webhooks/webhook-dispatch.service';
 import { AuthReferenceService } from '../auth-client/auth-reference.service';
 import type { NotificationRecipient } from '../auth-client/auth-reference.mapper';
 import { DeviceTokenService } from '../push/device-token.service';
@@ -100,11 +101,20 @@ export class InAppNotificationService {
     private readonly replyAddress: ReplyAddressService,
     private readonly deviceTokens: DeviceTokenService,
     private readonly messaging: FirebaseMessagingService,
+    private readonly webhooks: WebhookDispatchService,
   ) {}
 
   async deliver(
     command: CreateInAppNotificationCommand,
   ): Promise<DeliveryOutcome> {
+    // **Webhooks first — before the audience is even resolved.** Everything
+    // below this line is people rules: the actor filter and the empty-audience
+    // return decide who gets TOLD, and an integration is not a person — it
+    // wants the event BECAUSE somebody did something. Hooked any later, a
+    // self-assigned ticket (zero notification rows by design, measured by the
+    // system test) would silently never reach the tenant's endpoint.
+    await this.webhooks.dispatch(command);
+
     const recipients = await this.resolveAudience(
       command.organizationId,
       command.audience,
@@ -796,6 +806,11 @@ function pushFor(
     case NOTIFICATION_TYPES.ticketAssigned:
     case NOTIFICATION_TYPES.ticketReassigned:
     case NOTIFICATION_TYPES.ticketEscalated:
+    // `webhookEndpointDisabled` is published at HIGH by the delivery arm
+    // itself: an integration outage is the kind of thing a tenant admin wants
+    // on a lock screen, because the events it was receiving have already
+    // stopped.
+    case NOTIFICATION_TYPES.webhookEndpointDisabled: // eslint-disable-line no-fallthrough
       return { title: command.title, body: command.body, data };
 
     // Published below the gate today, so unreachable from here — listed so the
@@ -889,6 +904,10 @@ function emailFor(
 
     // Below `CRITICAL` and therefore unreachable from `fanOutEmail` — listed so
     // the switch stays exhaustive and a new type has to be considered here.
+    //
+    // `webhookEndpointDisabled` is published at HIGH: push and in-app, no
+    // email, matching the other operational notices.
+    case NOTIFICATION_TYPES.webhookEndpointDisabled:
     case NOTIFICATION_TYPES.planChanged:
     case NOTIFICATION_TYPES.ticketAssigned:
     case NOTIFICATION_TYPES.ticketReassigned:

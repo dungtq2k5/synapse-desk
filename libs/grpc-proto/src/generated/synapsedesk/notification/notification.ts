@@ -70,6 +70,12 @@ export enum NotificationType {
   /** NOTIFICATION_TYPE_PAYMENT_FAILED - A payment Stripe could not take — the only one with a deadline. */
   NOTIFICATION_TYPE_PAYMENT_FAILED = 8,
   NOTIFICATION_TYPE_PLAN_CHANGED = 9,
+  /**
+   * NOTIFICATION_TYPE_WEBHOOK_ENDPOINT_DISABLED - A tenant's webhook endpoint was auto-disabled after sustained failure.
+   * Produced by notification-service itself -- the delivery arm noticing its
+   * own patient has died -- so it is the one type with no NATS producer.
+   */
+  NOTIFICATION_TYPE_WEBHOOK_ENDPOINT_DISABLED = 10,
   UNRECOGNIZED = -1,
 }
 
@@ -155,6 +161,18 @@ export enum DevicePlatform {
   DEVICE_PLATFORM_IOS = 1,
   DEVICE_PLATFORM_ANDROID = 2,
   DEVICE_PLATFORM_WEB = 3,
+  UNRECOGNIZED = -1,
+}
+
+/**
+ * Mirrors `WebhookDeliveryStatus` in @synapsedesk/common -- a persisted domain
+ * value, so an enum with a bridge rather than a string each caller narrows.
+ */
+export enum WebhookDeliveryStatus {
+  WEBHOOK_DELIVERY_STATUS_UNSPECIFIED = 0,
+  WEBHOOK_DELIVERY_STATUS_PENDING = 1,
+  WEBHOOK_DELIVERY_STATUS_DELIVERED = 2,
+  WEBHOOK_DELIVERY_STATUS_FAILED = 3,
   UNRECOGNIZED = -1,
 }
 
@@ -390,6 +408,159 @@ export interface ResolveTicketByMessageIdResponse {
   ticketId?: string | undefined;
 }
 
+export interface WebhookEndpointResponse {
+  id: string;
+  url: string;
+  description?:
+    | string
+    | undefined;
+  /**
+   * The `NotificationType` vocabulary, never the NATS subject -- close enough
+   * to confuse and not the same set: subjects include internal ones no
+   * customer should learn, and they change when we re-plumb.
+   *
+   * **The ENUM, unlike a delivery's `event_type` below**, and the difference is
+   * live-versus-historical. A subscription list is re-validated on every write
+   * against the current vocabulary, so it cannot hold a retired member; a
+   * delivery row is history and can. Typing this one narrowly deleted the two
+   * casts that upheld the same invariant by hand -- `as NotificationType[]` in
+   * the owning service and again in the gateway mapper.
+   *
+   * **Never empty**, which the wire cannot say. An endpoint subscribed to zero
+   * types is refused at creation rather than created silently useless, and an
+   * empty list here NEVER means "all" -- known-gap #25 is what that ambiguity
+   * costs from the consuming side. `assertEventTypes` still enforces that, and
+   * the de-duplication beside it, for the same reason: neither is expressible
+   * as a field type.
+   */
+  eventTypes: NotificationType[];
+  isActive: boolean;
+  /**
+   * Why `is_active` is false, when the DISABLING was ours (auto-disable after
+   * sustained failure). Absent for a tenant's own PATCH.
+   */
+  disabledReason?: string | undefined;
+  createdAt: Timestamp | undefined;
+  updatedAt: Timestamp | undefined;
+}
+
+export interface CreateWebhookEndpointRequest {
+  url: string;
+  description?: string | undefined;
+  eventTypes: NotificationType[];
+}
+
+/**
+ * The secret rides ONLY on create and rotate -- shown once, like the Stripe
+ * dashboard does it, so a leaked listing does not leak the signing keys.
+ */
+export interface WebhookEndpointWithSecretResponse {
+  endpoint: WebhookEndpointResponse | undefined;
+  secret: string;
+}
+
+export interface UpdateWebhookEndpointRequest {
+  endpointId: string;
+  url?: string | undefined;
+  description?:
+    | string
+    | undefined;
+  /**
+   * A WRAPPER, because proto3 cannot tell an empty repeated from an absent
+   * one -- and "clear the subscriptions" must be a refusal, not a default.
+   */
+  eventTypes?: EventTypeList | undefined;
+  isActive?: boolean | undefined;
+}
+
+export interface EventTypeList {
+  values: NotificationType[];
+}
+
+export interface WebhookEndpointIdRequest {
+  endpointId: string;
+}
+
+export interface ListWebhookEndpointsRequest {
+}
+
+export interface ListWebhookEndpointsResponse {
+  items: WebhookEndpointResponse[];
+}
+
+export interface DeleteWebhookEndpointResponse {
+  deleted: boolean;
+}
+
+/**
+ * The SAME delivery path with the same guards, never a shortcut around them --
+ * an unguarded "send a test event" is an SSRF endpoint with a friendly name.
+ */
+export interface TestWebhookEndpointResponse {
+  delivered: boolean;
+  responseStatus?: number | undefined;
+  error?: string | undefined;
+}
+
+export interface ListWebhookDeliveriesRequest {
+  endpointId: string;
+  /** Most-recent-first, capped server-side. A debugging surface, not an export. */
+  limit: number;
+}
+
+export interface WebhookDeliveryResponse {
+  id: string;
+  /** The payload `id` the receiver deduplicates on -- stable across retries. */
+  eventId: string;
+  eventType: string;
+  status: WebhookDeliveryStatus;
+  attempts: number;
+  responseStatus?: number | undefined;
+  lastError?: string | undefined;
+  occurredAt: Timestamp | undefined;
+  deliveredAt?: Timestamp | undefined;
+}
+
+export interface ListWebhookDeliveriesResponse {
+  items: WebhookDeliveryResponse[];
+}
+
+/**
+ * The catalogue, so a customer can tell "not subscribed" from "never
+ * happened" -- we are the provider in known-gap #25's picture now.
+ */
+export interface ListWebhookEventTypesRequest {
+}
+
+export interface ListWebhookEventTypesResponse {
+  /**
+   * The same type as the subscription list it exists to be chosen from. A
+   * catalogue answering in strings while `CreateWebhookEndpointRequest` took
+   * enums would be one concept with two wire formats -- the shape the note
+   * above `NotificationChannel` refuses.
+   */
+  types: NotificationType[];
+}
+
+export interface NotificationJobHealthRequest {
+}
+
+export interface NotificationJobRunStatus {
+  jobName: string;
+  lastStartedAt?:
+    | Timestamp
+    | undefined;
+  /** Preserved across a failure -- the staleness check reads this. */
+  lastSucceededAt?: Timestamp | undefined;
+  lastDurationMs?: number | undefined;
+  lastError?: string | undefined;
+  consecutiveFailures: number;
+}
+
+export interface NotificationJobHealthResponse {
+  items: NotificationJobRunStatus[];
+}
+
 export interface NotificationServiceClient {
   resolveTicketByMessageId(
     request: ResolveTicketByMessageIdRequest,
@@ -422,6 +593,55 @@ export interface NotificationServiceClient {
   listDevices(request: ListDevicesRequest, metadata?: Metadata): Observable<ListDevicesResponse>;
 
   forgetDevice(request: DeviceIdRequest, metadata?: Metadata): Observable<ForgetDeviceResponse>;
+
+  /**
+   * Outbound webhook management. Tenant configuration, so the gateway gates
+   * these behind `organization.read` / `organization.update`.
+   */
+
+  listWebhookEndpoints(
+    request: ListWebhookEndpointsRequest,
+    metadata?: Metadata,
+  ): Observable<ListWebhookEndpointsResponse>;
+
+  getWebhookEndpoint(request: WebhookEndpointIdRequest, metadata?: Metadata): Observable<WebhookEndpointResponse>;
+
+  createWebhookEndpoint(
+    request: CreateWebhookEndpointRequest,
+    metadata?: Metadata,
+  ): Observable<WebhookEndpointWithSecretResponse>;
+
+  updateWebhookEndpoint(
+    request: UpdateWebhookEndpointRequest,
+    metadata?: Metadata,
+  ): Observable<WebhookEndpointResponse>;
+
+  deleteWebhookEndpoint(
+    request: WebhookEndpointIdRequest,
+    metadata?: Metadata,
+  ): Observable<DeleteWebhookEndpointResponse>;
+
+  rotateWebhookSecret(
+    request: WebhookEndpointIdRequest,
+    metadata?: Metadata,
+  ): Observable<WebhookEndpointWithSecretResponse>;
+
+  testWebhookEndpoint(request: WebhookEndpointIdRequest, metadata?: Metadata): Observable<TestWebhookEndpointResponse>;
+
+  listWebhookDeliveries(
+    request: ListWebhookDeliveriesRequest,
+    metadata?: Metadata,
+  ): Observable<ListWebhookDeliveriesResponse>;
+
+  listWebhookEventTypes(
+    request: ListWebhookEventTypesRequest,
+    metadata?: Metadata,
+  ): Observable<ListWebhookEventTypesResponse>;
+
+  getNotificationJobHealth(
+    request: NotificationJobHealthRequest,
+    metadata?: Metadata,
+  ): Observable<NotificationJobHealthResponse>;
 }
 
 export interface NotificationServiceController {
@@ -489,6 +709,67 @@ export interface NotificationServiceController {
     request: DeviceIdRequest,
     metadata?: Metadata,
   ): Promise<ForgetDeviceResponse> | Observable<ForgetDeviceResponse> | ForgetDeviceResponse;
+
+  /**
+   * Outbound webhook management. Tenant configuration, so the gateway gates
+   * these behind `organization.read` / `organization.update`.
+   */
+
+  listWebhookEndpoints(
+    request: ListWebhookEndpointsRequest,
+    metadata?: Metadata,
+  ): Promise<ListWebhookEndpointsResponse> | Observable<ListWebhookEndpointsResponse> | ListWebhookEndpointsResponse;
+
+  getWebhookEndpoint(
+    request: WebhookEndpointIdRequest,
+    metadata?: Metadata,
+  ): Promise<WebhookEndpointResponse> | Observable<WebhookEndpointResponse> | WebhookEndpointResponse;
+
+  createWebhookEndpoint(
+    request: CreateWebhookEndpointRequest,
+    metadata?: Metadata,
+  ):
+    | Promise<WebhookEndpointWithSecretResponse>
+    | Observable<WebhookEndpointWithSecretResponse>
+    | WebhookEndpointWithSecretResponse;
+
+  updateWebhookEndpoint(
+    request: UpdateWebhookEndpointRequest,
+    metadata?: Metadata,
+  ): Promise<WebhookEndpointResponse> | Observable<WebhookEndpointResponse> | WebhookEndpointResponse;
+
+  deleteWebhookEndpoint(
+    request: WebhookEndpointIdRequest,
+    metadata?: Metadata,
+  ): Promise<DeleteWebhookEndpointResponse> | Observable<DeleteWebhookEndpointResponse> | DeleteWebhookEndpointResponse;
+
+  rotateWebhookSecret(
+    request: WebhookEndpointIdRequest,
+    metadata?: Metadata,
+  ):
+    | Promise<WebhookEndpointWithSecretResponse>
+    | Observable<WebhookEndpointWithSecretResponse>
+    | WebhookEndpointWithSecretResponse;
+
+  testWebhookEndpoint(
+    request: WebhookEndpointIdRequest,
+    metadata?: Metadata,
+  ): Promise<TestWebhookEndpointResponse> | Observable<TestWebhookEndpointResponse> | TestWebhookEndpointResponse;
+
+  listWebhookDeliveries(
+    request: ListWebhookDeliveriesRequest,
+    metadata?: Metadata,
+  ): Promise<ListWebhookDeliveriesResponse> | Observable<ListWebhookDeliveriesResponse> | ListWebhookDeliveriesResponse;
+
+  listWebhookEventTypes(
+    request: ListWebhookEventTypesRequest,
+    metadata?: Metadata,
+  ): Promise<ListWebhookEventTypesResponse> | Observable<ListWebhookEventTypesResponse> | ListWebhookEventTypesResponse;
+
+  getNotificationJobHealth(
+    request: NotificationJobHealthRequest,
+    metadata?: Metadata,
+  ): Promise<NotificationJobHealthResponse> | Observable<NotificationJobHealthResponse> | NotificationJobHealthResponse;
 }
 
 export function NotificationServiceControllerMethods() {
@@ -505,6 +786,16 @@ export function NotificationServiceControllerMethods() {
       "registerDevice",
       "listDevices",
       "forgetDevice",
+      "listWebhookEndpoints",
+      "getWebhookEndpoint",
+      "createWebhookEndpoint",
+      "updateWebhookEndpoint",
+      "deleteWebhookEndpoint",
+      "rotateWebhookSecret",
+      "testWebhookEndpoint",
+      "listWebhookDeliveries",
+      "listWebhookEventTypes",
+      "getNotificationJobHealth",
     ];
     for (const method of grpcMethods) {
       const descriptor: any = Reflect.getOwnPropertyDescriptor(constructor.prototype, method);

@@ -15,6 +15,8 @@ import { PreferencesModule } from './modules/preferences/preferences.module';
 import { NotificationRealtimeModule } from './modules/realtime/realtime.module';
 import { FeedModule } from './modules/feed/feed.module';
 import { OpsModule } from './modules/ops/ops.module';
+import { WebhooksModule } from './modules/webhooks/webhooks.module';
+import { SchedulerModule } from './modules/scheduler/scheduler.module';
 import { InboundRejectionConsumer } from './modules/inbound-email/inbound-rejection.consumer';
 
 @Module({
@@ -42,6 +44,11 @@ import { InboundRejectionConsumer } from './modules/inbound-email/inbound-reject
     FeedModule,
     PushModule,
     OpsModule,
+    // The tenant-level channel, and the scheduler it brought with it — this
+    // service had no queue at all until webhooks needed retries and
+    // `webhook_deliveries` needed a retention sweep.
+    WebhooksModule,
+    SchedulerModule,
   ],
   controllers: [
     // `ticket.*` → notifications. A separate class rather than more handlers on

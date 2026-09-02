@@ -21,7 +21,7 @@ import {
 /**
  * The gRPC peer for each scheduler-owning service.
  *
- * Three entries, and it exists because the two vocabularies differ:
+ * Four entries, and it exists because the two vocabularies differ:
  * `SCHEDULER_QUEUE` is keyed `'ingestion'` and a `GrpcPeer` is
  * `'ingestion-service'`. Derived rather than string-built, so a peer that stops
  * matching is a compile error instead of a call to a name nothing answers.
@@ -30,6 +30,7 @@ const SERVICE_PEER: Record<SchedulerService, GrpcPeer> = {
   auth: 'auth-service',
   ticket: 'ticket-service',
   ingestion: 'ingestion-service',
+  notification: 'notification-service',
 };
 
 /**
@@ -82,25 +83,29 @@ export class PlatformJobsService {
     // put a fake actor in the audit trail of a read that nobody performed.
     context: RequestContext | RequestOrigin,
   ): Promise<JobHealthResponseDto> {
-    // Three legs, because the heartbeat table lives in each service's own
-    // database — auth-service joined them when it moved off `@nestjs/schedule`.
-    //
-    const [ticketLeg, ingestionLeg, authLeg] = await Promise.all([
-      this.client.tryLeg('ticket-service', () =>
-        this.client.ticketHeartbeats(context),
-      ),
-      this.client.tryLeg('ingestion-service', () =>
-        this.client.ingestionHeartbeats(context),
-      ),
-      this.client.tryLeg('auth-service', () =>
-        this.client.authHeartbeats(context),
-      ),
-    ]);
+    // Four legs, because the heartbeat table lives in each service's own
+    // database — auth-service joined when it moved off `@nestjs/schedule`,
+    // notification-service when outbound webhooks gave it scheduled work.
+    const [ticketLeg, ingestionLeg, authLeg, notificationLeg] =
+      await Promise.all([
+        this.client.tryLeg('ticket-service', () =>
+          this.client.ticketHeartbeats(context),
+        ),
+        this.client.tryLeg('ingestion-service', () =>
+          this.client.ingestionHeartbeats(context),
+        ),
+        this.client.tryLeg('auth-service', () =>
+          this.client.authHeartbeats(context),
+        ),
+        this.client.tryLeg('notification-service', () =>
+          this.client.notificationHeartbeats(context),
+        ),
+      ]);
 
     const unavailable: string[] = [];
     const rows: Omit<JobRunStatusResponseDto, 'health'>[] = [];
 
-    for (const leg of [ticketLeg, ingestionLeg, authLeg]) {
+    for (const leg of [ticketLeg, ingestionLeg, authLeg, notificationLeg]) {
       if ('failure' in leg) {
         unavailable.push(leg.failure);
         continue;

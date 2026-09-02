@@ -27,6 +27,7 @@ describe('SCHEDULER_QUEUE', () => {
       auth: 'scheduler-auth',
       ticket: 'scheduler-ticket',
       ingestion: 'scheduler-ingestion',
+      notification: 'scheduler-notification',
     });
   });
 
@@ -43,6 +44,7 @@ describe('SCHEDULER_QUEUE', () => {
     expect(Object.keys(SCHEDULER_QUEUE).sort()).toEqual([
       'auth',
       'ingestion',
+      'notification',
       'ticket',
     ]);
     expect(Object.keys(SCHEDULED_JOBS).length).toBeGreaterThanOrEqual(3);

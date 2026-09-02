@@ -75,6 +75,10 @@ enum NotificationType {
   // A payment Stripe could not take — the only one with a deadline.
   NOTIFICATION_TYPE_PAYMENT_FAILED = 8;
   NOTIFICATION_TYPE_PLAN_CHANGED = 9;
+  // A tenant's webhook endpoint was auto-disabled after sustained failure.
+  // Produced by notification-service itself -- the delivery arm noticing its
+  // own patient has died -- so it is the one type with no NATS producer.
+  NOTIFICATION_TYPE_WEBHOOK_ENDPOINT_DISABLED = 10;
 }
 
 // What a notification is ABOUT — mirrors `NotificationResourceType` in
@@ -344,6 +348,156 @@ message ResolveTicketByMessageIdResponse {
   optional string ticket_id = 1;
 }
 
+// ---------------------------------------------------------------- Outbound webhooks
+//
+// Management of a TENANT-level integration -- which is why nothing here is
+// per-user and why deliveries have their own table and their own messages:
+// `notification_deliveries` answers "did we tell this person", and a webhook
+// is not telling a person anything.
+
+// Mirrors `WebhookDeliveryStatus` in @synapsedesk/common -- a persisted domain
+// value, so an enum with a bridge rather than a string each caller narrows.
+enum WebhookDeliveryStatus {
+  WEBHOOK_DELIVERY_STATUS_UNSPECIFIED = 0;
+  WEBHOOK_DELIVERY_STATUS_PENDING = 1;
+  WEBHOOK_DELIVERY_STATUS_DELIVERED = 2;
+  WEBHOOK_DELIVERY_STATUS_FAILED = 3;
+}
+
+message WebhookEndpointResponse {
+  string id = 1;
+  string url = 2;
+  optional string description = 3;
+
+  // The `NotificationType` vocabulary, never the NATS subject -- close enough
+  // to confuse and not the same set: subjects include internal ones no
+  // customer should learn, and they change when we re-plumb.
+  //
+  // **The ENUM, unlike a delivery's `event_type` below**, and the difference is
+  // live-versus-historical. A subscription list is re-validated on every write
+  // against the current vocabulary, so it cannot hold a retired member; a
+  // delivery row is history and can. Typing this one narrowly deleted the two
+  // casts that upheld the same invariant by hand -- `as NotificationType[]` in
+  // the owning service and again in the gateway mapper.
+  //
+  // **Never empty**, which the wire cannot say. An endpoint subscribed to zero
+  // types is refused at creation rather than created silently useless, and an
+  // empty list here NEVER means "all" -- known-gap #25 is what that ambiguity
+  // costs from the consuming side. `assertEventTypes` still enforces that, and
+  // the de-duplication beside it, for the same reason: neither is expressible
+  // as a field type.
+  repeated NotificationType event_types = 4;
+
+  bool is_active = 5;
+  // Why `is_active` is false, when the DISABLING was ours (auto-disable after
+  // sustained failure). Absent for a tenant's own PATCH.
+  optional string disabled_reason = 6;
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp updated_at = 8;
+}
+
+message CreateWebhookEndpointRequest {
+  string url = 1;
+  optional string description = 2;
+  repeated NotificationType event_types = 3;
+}
+
+// The secret rides ONLY on create and rotate -- shown once, like the Stripe
+// dashboard does it, so a leaked listing does not leak the signing keys.
+message WebhookEndpointWithSecretResponse {
+  WebhookEndpointResponse endpoint = 1;
+  string secret = 2;
+}
+
+message UpdateWebhookEndpointRequest {
+  string endpoint_id = 1;
+  optional string url = 2;
+  optional string description = 3;
+  // A WRAPPER, because proto3 cannot tell an empty repeated from an absent
+  // one -- and "clear the subscriptions" must be a refusal, not a default.
+  optional EventTypeList event_types = 4;
+  optional bool is_active = 5;
+}
+
+message EventTypeList {
+  repeated NotificationType values = 1;
+}
+
+message WebhookEndpointIdRequest {
+  string endpoint_id = 1;
+}
+
+message ListWebhookEndpointsRequest {}
+
+message ListWebhookEndpointsResponse {
+  repeated WebhookEndpointResponse items = 1;
+}
+
+message DeleteWebhookEndpointResponse {
+  bool deleted = 1;
+}
+
+// The SAME delivery path with the same guards, never a shortcut around them --
+// an unguarded "send a test event" is an SSRF endpoint with a friendly name.
+message TestWebhookEndpointResponse {
+  bool delivered = 1;
+  optional int32 response_status = 2;
+  optional string error = 3;
+}
+
+message ListWebhookDeliveriesRequest {
+  string endpoint_id = 1;
+  // Most-recent-first, capped server-side. A debugging surface, not an export.
+  int32 limit = 2;
+}
+
+message WebhookDeliveryResponse {
+  string id = 1;
+  // The payload `id` the receiver deduplicates on -- stable across retries.
+  string event_id = 2;
+  string event_type = 3;
+  WebhookDeliveryStatus status = 4;
+  int32 attempts = 5;
+  optional int32 response_status = 6;
+  optional string last_error = 7;
+  google.protobuf.Timestamp occurred_at = 8;
+  optional google.protobuf.Timestamp delivered_at = 9;
+}
+
+message ListWebhookDeliveriesResponse {
+  repeated WebhookDeliveryResponse items = 1;
+}
+
+// The catalogue, so a customer can tell "not subscribed" from "never
+// happened" -- we are the provider in known-gap #25's picture now.
+message ListWebhookEventTypesRequest {}
+
+message ListWebhookEventTypesResponse {
+  // The same type as the subscription list it exists to be chosen from. A
+  // catalogue answering in strings while `CreateWebhookEndpointRequest` took
+  // enums would be one concept with two wire formats -- the shape the note
+  // above `NotificationChannel` refuses.
+  repeated NotificationType types = 1;
+}
+
+// ---------------------------------------------------------------- Job health
+
+message NotificationJobHealthRequest {}
+
+message NotificationJobRunStatus {
+  string job_name = 1;
+  optional google.protobuf.Timestamp last_started_at = 2;
+  // Preserved across a failure -- the staleness check reads this.
+  optional google.protobuf.Timestamp last_succeeded_at = 3;
+  optional int32 last_duration_ms = 4;
+  optional string last_error = 5;
+  int32 consecutive_failures = 6;
+}
+
+message NotificationJobHealthResponse {
+  repeated NotificationJobRunStatus items = 1;
+}
+
 service NotificationService {
   rpc ResolveTicketByMessageId(ResolveTicketByMessageIdRequest) returns (ResolveTicketByMessageIdResponse);
 
@@ -364,4 +518,18 @@ service NotificationService {
   rpc RegisterDevice(RegisterDeviceRequest) returns (DeviceTokenResponse);
   rpc ListDevices(ListDevicesRequest) returns (ListDevicesResponse);
   rpc ForgetDevice(DeviceIdRequest) returns (ForgetDeviceResponse);
+
+  // Outbound webhook management. Tenant configuration, so the gateway gates
+  // these behind `organization.read` / `organization.update`.
+  rpc ListWebhookEndpoints(ListWebhookEndpointsRequest) returns (ListWebhookEndpointsResponse);
+  rpc GetWebhookEndpoint(WebhookEndpointIdRequest) returns (WebhookEndpointResponse);
+  rpc CreateWebhookEndpoint(CreateWebhookEndpointRequest) returns (WebhookEndpointWithSecretResponse);
+  rpc UpdateWebhookEndpoint(UpdateWebhookEndpointRequest) returns (WebhookEndpointResponse);
+  rpc DeleteWebhookEndpoint(WebhookEndpointIdRequest) returns (DeleteWebhookEndpointResponse);
+  rpc RotateWebhookSecret(WebhookEndpointIdRequest) returns (WebhookEndpointWithSecretResponse);
+  rpc TestWebhookEndpoint(WebhookEndpointIdRequest) returns (TestWebhookEndpointResponse);
+  rpc ListWebhookDeliveries(ListWebhookDeliveriesRequest) returns (ListWebhookDeliveriesResponse);
+  rpc ListWebhookEventTypes(ListWebhookEventTypesRequest) returns (ListWebhookEventTypesResponse);
+
+  rpc GetNotificationJobHealth(NotificationJobHealthRequest) returns (NotificationJobHealthResponse);
 }

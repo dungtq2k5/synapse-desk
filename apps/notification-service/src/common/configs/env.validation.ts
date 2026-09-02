@@ -22,6 +22,15 @@ export const envValidationSchema = Joi.object({
   // than none — see ADR 0041.
   NATS_MONITOR_URL: Joi.string().uri().required(),
 
+  // BullMQ — the webhook delivery queue and the scheduler. This service had no
+  // Redis at all before outbound webhooks.
+  REDIS_URL: Joi.string().required(),
+
+  // The SSRF escape hatch, for a developer's localhost receiver. Honoured ONLY
+  // when NODE_ENV is development — see `privateTargetsAllowed` — so a copied
+  // .env cannot carry it into production.
+  WEBHOOK_ALLOW_PRIVATE_TARGETS: Joi.string().valid('true', 'false').optional(),
+
   APP_NAME: Joi.string().required(),
   // Base URL of the SPA, used to build links in outbound mail. Wrong value =
   // every reset link points somewhere useless, so it is required rather than

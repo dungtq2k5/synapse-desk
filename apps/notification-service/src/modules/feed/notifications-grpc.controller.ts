@@ -1,5 +1,9 @@
 import { Controller } from '@nestjs/common';
-import { requireActor, requireTenant } from '@synapsedesk/common';
+import {
+  JobHealthService,
+  requireActor,
+  requireTenant,
+} from '@synapsedesk/common';
 import { status, type Metadata } from '@grpc/grpc-js';
 import { RpcException } from '@nestjs/microservices';
 import type { DevicePlatform } from '@synapsedesk/common';
@@ -24,6 +28,20 @@ import {
   PreferenceResponse,
   UnreadCountResponse,
   unpackCallerContext,
+  toProtoTimestamp,
+  CreateWebhookEndpointRequest,
+  DeleteWebhookEndpointResponse,
+  ListWebhookDeliveriesRequest,
+  ListWebhookDeliveriesResponse,
+  ListWebhookEndpointsRequest,
+  ListWebhookEndpointsResponse,
+  ListWebhookEventTypesResponse,
+  NotificationJobHealthResponse,
+  TestWebhookEndpointResponse,
+  UpdateWebhookEndpointRequest,
+  WebhookEndpointIdRequest,
+  WebhookEndpointResponse,
+  WebhookEndpointWithSecretResponse,
   UpdatePreferenceRequest,
 } from '@synapsedesk/grpc-proto';
 import { FeedService } from './feed.service';
@@ -31,6 +49,7 @@ import { InboundThreadService } from './inbound-thread.service';
 import { PreferencesService } from '../preferences/preferences.service';
 import { DeviceTokenService } from '../push/device-token.service';
 import { toDeviceTokenResponse } from './feed.mapper';
+import { WebhookAdminService } from '../webhooks/webhook-admin.service';
 
 /**
  * Domain E's gRPC surface
@@ -53,6 +72,8 @@ export class NotificationsGrpcController implements NotificationServiceControlle
     private readonly preferences: PreferencesService,
     private readonly inboundThreads: InboundThreadService,
     private readonly devices: DeviceTokenService,
+    private readonly webhooks: WebhookAdminService,
+    private readonly jobHealth: JobHealthService,
   ) {}
 
   /**
@@ -155,6 +176,101 @@ export class NotificationsGrpcController implements NotificationServiceControlle
     await this.devices.remove(request.id, requireActor(context));
 
     return { forgotten: true };
+  }
+
+  // -------------------------------------------------------------- Webhooks
+  //
+  // Tenant configuration, not a user setting — the gateway gates these behind
+  // `organization.read` / `organization.update`, and every method here scopes
+  // by the caller's tenant so another workspace's endpoint id selects nothing.
+
+  listWebhookEndpoints(
+    _request: ListWebhookEndpointsRequest,
+    metadata?: Metadata,
+  ): Promise<ListWebhookEndpointsResponse> {
+    return this.webhooks.list(unpackCallerContext(metadata));
+  }
+
+  getWebhookEndpoint(
+    request: WebhookEndpointIdRequest,
+    metadata?: Metadata,
+  ): Promise<WebhookEndpointResponse> {
+    return this.webhooks.get(request.endpointId, unpackCallerContext(metadata));
+  }
+
+  createWebhookEndpoint(
+    request: CreateWebhookEndpointRequest,
+    metadata?: Metadata,
+  ): Promise<WebhookEndpointWithSecretResponse> {
+    return this.webhooks.create(request, unpackCallerContext(metadata));
+  }
+
+  updateWebhookEndpoint(
+    request: UpdateWebhookEndpointRequest,
+    metadata?: Metadata,
+  ): Promise<WebhookEndpointResponse> {
+    return this.webhooks.update(request, unpackCallerContext(metadata));
+  }
+
+  deleteWebhookEndpoint(
+    request: WebhookEndpointIdRequest,
+    metadata?: Metadata,
+  ): Promise<DeleteWebhookEndpointResponse> {
+    return this.webhooks.delete(
+      request.endpointId,
+      unpackCallerContext(metadata),
+    );
+  }
+
+  rotateWebhookSecret(
+    request: WebhookEndpointIdRequest,
+    metadata?: Metadata,
+  ): Promise<WebhookEndpointWithSecretResponse> {
+    return this.webhooks.rotateSecret(
+      request.endpointId,
+      unpackCallerContext(metadata),
+    );
+  }
+
+  testWebhookEndpoint(
+    request: WebhookEndpointIdRequest,
+    metadata?: Metadata,
+  ): Promise<TestWebhookEndpointResponse> {
+    return this.webhooks.test(
+      request.endpointId,
+      unpackCallerContext(metadata),
+    );
+  }
+
+  listWebhookDeliveries(
+    request: ListWebhookDeliveriesRequest,
+    metadata?: Metadata,
+  ): Promise<ListWebhookDeliveriesResponse> {
+    return this.webhooks.listDeliveries(request, unpackCallerContext(metadata));
+  }
+
+  listWebhookEventTypes(): ListWebhookEventTypesResponse {
+    return this.webhooks.listEventTypes();
+  }
+
+  /** The heartbeat — every row, unjudged, for the gateway's fourth leg. */
+  async getNotificationJobHealth(): Promise<NotificationJobHealthResponse> {
+    const rows = await this.jobHealth.list();
+
+    return {
+      items: rows.map((row) => ({
+        jobName: row.jobName,
+        lastStartedAt: row.lastStartedAt
+          ? toProtoTimestamp(row.lastStartedAt)
+          : undefined,
+        lastSucceededAt: row.lastSucceededAt
+          ? toProtoTimestamp(row.lastSucceededAt)
+          : undefined,
+        lastDurationMs: row.lastDurationMs ?? undefined,
+        lastError: row.lastError ?? undefined,
+        consecutiveFailures: row.consecutiveFailures,
+      })),
+    };
   }
 }
 

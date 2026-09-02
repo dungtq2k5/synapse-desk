@@ -303,3 +303,170 @@ model DeviceToken {
   @@index([userId])
   @@map("device_tokens")
 }
+
+/// The HEARTBEAT.
+///
+/// **One row per job name, and the deepest fix in that document.** The jobs not
+/// running was not the real problem; the real problem was that nothing anywhere
+/// could tell you they were not running. A failed job at least logs. A job that
+/// never runs logs nothing at all — which is precisely the case that occurred,
+/// and it stayed invisible for two domains.
+///
+/// **Four copies of this table is CORRECT**, and this note
+/// exists so nobody re-opens it. Service-per-database means each service
+/// records its own jobs in its own failure domain: "did ingestion-service's
+/// rollup run?" is a question about ingestion-service's database, and a shared
+/// heartbeat service would report healthy while that database was unreachable —
+/// the original bug, reintroduced with extra infrastructure. Four tables
+/// holding different rows is not duplication of facts; no single fact is stored
+/// twice.
+///
+/// The *behaviour* lives once, in `JobRunRecorder` (`libs/common`), over a
+/// hand-written `JobRunStore` that each service binds to its own delegate.
+/// `job-run-schema.spec.ts` asserts these four blocks stay identical — they
+/// had already begun to drift in comments before it existed.
+///
+/// Not tenant-scoped: these jobs sweep across every tenant, so "did the rollup
+/// run" is one question with one answer per service.
+model JobRun {
+  /// The job name from `SCHEDULED_JOBS`, or a step within one. The PK, so
+  /// recording a run is a single upsert with no read first.
+  jobName String @id @map("job_name")
+
+  lastStartedAt   DateTime  @map("last_started_at")
+  /// **Preserved across a failure**, deliberately. This is what the staleness
+  /// alert reads, and clearing it on failure would turn "broken since Tuesday"
+  /// into "never ran", losing the one piece of information worth having.
+  ///
+  /// Nullable because it is null until the FIRST success — which is how
+  /// `checkStaleness` tells "never ran" from "stale".
+  lastSucceededAt DateTime? @map("last_succeeded_at")
+
+  lastDurationMs Int?    @map("last_duration_ms")
+  /// Truncated by `JobRunRecorder` — a driver stack trace is kilobytes and the
+  /// first line is what anybody reads.
+  lastError      String? @map("last_error")
+
+  /// Reset to 0 on success. A count that only ever grows is how a job failing
+  /// every night for a month reads as one failure.
+  consecutiveFailures Int @default(0) @map("consecutive_failures")
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("job_runs")
+}
+
+/// A tenant-registered receiver for outbound webhooks.
+///
+/// **Tenant configuration, not a user setting** — which is why `WEBHOOK` is
+/// absent from `PREFERENCE_CHANNELS` and why deliveries get their own table:
+/// `notification_deliveries` answers "did we tell this person", and a webhook
+/// is not telling a person anything.
+model WebhookEndpoint {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  organizationId String @map("organization_id") @db.Uuid
+
+  /// HTTPS only, and the string here is NOT the control: the URL is validated
+  /// when saved and RESOLVED when delivered to, and DNS can change in between.
+  /// The real check runs at connection time on every resolved address — see
+  /// `webhook-target.guard.ts`.
+  url String @db.VarChar(2000)
+
+  description String? @db.VarChar(500)
+
+  /// `NotificationType` values (`ticket.assigned`) — the PUBLIC vocabulary,
+  /// never the NATS subject. **Never empty**: an endpoint subscribed to zero
+  /// types is refused at creation rather than created silently useless, and an
+  /// empty list never means "all" (known-gap #25 is what that ambiguity costs
+  /// from the consuming side).
+  eventTypes String[] @map("event_types")
+
+  /// **Plaintext at rest, like `inboundToken`, and unlike every other secret
+  /// here.** The others are hashed because we only ever RECOGNISE them; this
+  /// one is REPLAYED — an HMAC over every send — so a digest is unusable.
+  /// Unguessable (32 random bytes, hex) and rotatable, never derived.
+  secret String @db.VarChar(64)
+
+  /// Rotation's overlap, as STATE rather than a job somebody runs: while
+  /// `previous_secret_expires_at` is in the future, deliveries carry two
+  /// signatures so the customer can roll without dropping events.
+  previousSecret          String?   @map("previous_secret") @db.VarChar(64)
+  previousSecretExpiresAt DateTime? @map("previous_secret_expires_at") @db.Timestamptz
+
+  isActive Boolean @default(true) @map("is_active")
+
+  /// Why WE disabled it (auto-disable after sustained failure). Null for a
+  /// tenant's own PATCH — the distinction the UI renders.
+  disabledReason String? @map("disabled_reason") @db.VarChar(500)
+
+  /// Consecutive terminal failures, reset on any delivered event. At
+  /// `WEBHOOK_DISABLE_AFTER_FAILURES` the endpoint is disabled, the reason
+  /// written, and the tenant told at HIGH priority.
+  consecutiveFailures Int @default(0) @map("consecutive_failures")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  deliveries WebhookDelivery[]
+
+  /// Every dispatch asks "which of this tenant's ACTIVE endpoints subscribe to
+  /// this type" — tenant-first, like every hot-path index in this schema.
+  @@index([organizationId, isActive])
+  @@map("webhook_endpoints")
+}
+
+/// One EVENT delivered (or not) to one endpoint.
+///
+/// Anchored to the event, not to a notification: one POST per event however
+/// many people the notification reached, so a row here is a fact about the
+/// integration rather than about any recipient. Pruned by `webhook-retention`
+/// after `WEBHOOK_RETENTION_DAYS` — one row per event per endpoint is unbounded
+/// in a way `notification_deliveries` never was.
+model WebhookDelivery {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  endpointId String @map("endpoint_id") @db.Uuid
+
+  /// The payload `id` the receiver deduplicates on. **Fixed at enqueue**, so
+  /// five retries of one event send one id five times — the property the
+  /// customer's idempotency depends on.
+  eventId String @map("event_id") @db.Uuid
+
+  /// `NotificationType` — the public vocabulary, matching the payload's `type`.
+  eventType String @map("event_type") @db.VarChar(100)
+
+  /// The `WebhookEventPayload`, stored at enqueue. The row is the source of
+  /// truth for every retry — the queue job carries only this row's id — and
+  /// storing it is also what lets `.../test` and a support thread see exactly
+  /// what a receiver was sent. Serialization to bytes happens once, in the
+  /// sender, so signing and sending still share one string.
+  payload Json @db.JsonB
+
+  /// WebhookDeliveryStatus. PENDING until the receiver answers 2xx
+  /// (DELIVERED) or every attempt is exhausted (FAILED).
+  status String @default("PENDING") @db.VarChar(20)
+
+  attempts Int @default(0)
+
+  /// The receiver's last HTTP status — the field that makes
+  /// `GET .../deliveries` a debugging surface rather than a mystery.
+  responseStatus Int?    @map("response_status")
+  lastError      String? @map("last_error") @db.VarChar(500)
+
+  /// When the EVENT occurred — the payload's `occurredAt`, not this attempt.
+  occurredAt  DateTime  @map("occurred_at") @db.Timestamptz
+  deliveredAt DateTime? @map("delivered_at") @db.Timestamptz
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  endpoint WebhookEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+
+  /// One row per event per endpoint — the retry updates its row rather than
+  /// appending, so "was this event delivered" has one answer.
+  @@unique([endpointId, eventId])
+  /// The debugging surface reads most-recent-first per endpoint; retention
+  /// sweeps by age.
+  @@index([endpointId, createdAt(sort: Desc)])
+  @@index([createdAt])
+  @@map("webhook_deliveries")
+}

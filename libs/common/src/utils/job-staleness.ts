@@ -45,6 +45,7 @@ const INTERVAL_MS: Record<(typeof SCHEDULE_CRON)[ScheduledJobName], number> = {
   '0 * * * *': 60 * 60 * 1000,
   '0 2 * * *': 24 * 60 * 60 * 1000,
   '0 3 * * *': 24 * 60 * 60 * 1000,
+  '0 4 * * *': 24 * 60 * 60 * 1000,
 };
 
 export function expectedIntervalMs(name: ScheduledJobName): number {

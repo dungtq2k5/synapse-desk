@@ -29,6 +29,7 @@ import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
 import { DocumentsModule } from './modules/documents/documents.module';
 import { IngestionJobsModule } from './modules/ingestion-jobs/ingestion-jobs.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { WebhookEndpointsModule } from './modules/webhook-endpoints/webhook-endpoints.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { KnowledgeModule } from './modules/knowledge/knowledge.module';
 import { BillingModule } from './modules/billing/billing.module';
@@ -103,6 +104,7 @@ import { HttpMetricsInterceptor } from './modules/metrics/http-metrics.intercept
     DocumentsModule,
     IngestionJobsModule,
     NotificationsModule,
+    WebhookEndpointsModule,
     AnalyticsModule,
     KnowledgeModule,
     BillingModule,

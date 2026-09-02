@@ -74,5 +74,50 @@ erDiagram
     DateTime created_at 
     }
   
+
+  "job_runs" {
+    String job_name "🗝️"
+    DateTime last_started_at 
+    DateTime last_succeeded_at "❓"
+    Int last_duration_ms "❓"
+    String last_error "❓"
+    Int consecutive_failures 
+    DateTime updated_at 
+    }
+  
+
+  "webhook_endpoints" {
+    String id "🗝️"
+    String organization_id 
+    String url 
+    String description "❓"
+    String event_types 
+    String secret 
+    String previous_secret "❓"
+    DateTime previous_secret_expires_at "❓"
+    Boolean is_active 
+    String disabled_reason "❓"
+    Int consecutive_failures 
+    DateTime created_at 
+    DateTime updated_at 
+    }
+  
+
+  "webhook_deliveries" {
+    String id "🗝️"
+    String endpoint_id 
+    String event_id 
+    String event_type 
+    Json payload 
+    String status 
+    Int attempts 
+    Int response_status "❓"
+    String last_error "❓"
+    DateTime occurred_at 
+    DateTime delivered_at "❓"
+    DateTime created_at 
+    }
+  
     "notification_deliveries" }o--|| notifications : "notification"
+    "webhook_deliveries" }o--|| webhook_endpoints : "endpoint"
 ```

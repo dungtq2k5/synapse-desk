@@ -11,6 +11,9 @@ import {
   AUTH_GRPC_CLIENT,
   PLATFORM_SERVICE_NAME,
   PlatformServiceClient,
+  NOTIFICATION_GRPC_CLIENT,
+  NOTIFICATION_SERVICE_NAME,
+  NotificationServiceClient,
 } from '@synapsedesk/grpc-proto';
 import {
   formatErrorMsg,
@@ -54,11 +57,14 @@ export class PlatformJobsClient extends BaseGrpcClient implements OnModuleInit {
   private analyticsService!: AnalyticsServiceClient;
   private ledgerService!: AiLedgerServiceClient;
   private platformService!: PlatformServiceClient;
+  private notificationService!: NotificationServiceClient;
 
   constructor(
     @Inject(TICKET_GRPC_CLIENT) private readonly ticketClient: ClientGrpc,
     @Inject(INGESTION_GRPC_CLIENT) private readonly ingestionClient: ClientGrpc,
     @Inject(AUTH_GRPC_CLIENT) private readonly authClient: ClientGrpc,
+    @Inject(NOTIFICATION_GRPC_CLIENT)
+    private readonly notificationClient: ClientGrpc,
   ) {
     super();
   }
@@ -74,6 +80,10 @@ export class PlatformJobsClient extends BaseGrpcClient implements OnModuleInit {
     this.platformService = this.authClient.getService<PlatformServiceClient>(
       PLATFORM_SERVICE_NAME,
     );
+    this.notificationService =
+      this.notificationClient.getService<NotificationServiceClient>(
+        NOTIFICATION_SERVICE_NAME,
+      );
   }
 
   async authHeartbeats(context: HeartbeatCaller): Promise<ServiceHeartbeats> {
@@ -86,6 +96,34 @@ export class PlatformJobsClient extends BaseGrpcClient implements OnModuleInit {
       service: 'auth-service',
       rows: response.items.map((item) => ({
         service: 'auth-service',
+        jobName: item.jobName,
+        lastStartedAt:
+          fromProtoTimestamp(item.lastStartedAt)?.toISOString() ?? null,
+        lastSucceededAt:
+          fromProtoTimestamp(item.lastSucceededAt)?.toISOString() ?? null,
+        lastDurationMs: item.lastDurationMs ?? null,
+        lastError: item.lastError ?? null,
+        consecutiveFailures: item.consecutiveFailures,
+      })),
+    };
+  }
+
+  /** The FOURTH leg — outbound webhooks made notification-service a
+   * scheduled-jobs service, and its heartbeat lives in its own database like
+   * every other service's. */
+  async notificationHeartbeats(
+    context: HeartbeatCaller,
+  ): Promise<ServiceHeartbeats> {
+    const response = await this.call(
+      (metadata) =>
+        this.notificationService.getNotificationJobHealth({}, metadata),
+      context,
+    );
+
+    return {
+      service: 'notification-service',
+      rows: response.items.map((item) => ({
+        service: 'notification-service',
         jobName: item.jobName,
         lastStartedAt:
           fromProtoTimestamp(item.lastStartedAt)?.toISOString() ?? null,

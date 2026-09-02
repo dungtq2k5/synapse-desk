@@ -240,6 +240,15 @@ export const NOTIFICATION_TYPES = {
   paymentFailed: 'billing.payment_failed',
   /** Entitlements changed — a subscription, or a plan edit applied. */
   planChanged: 'billing.plan_changed',
+  /**
+   * A tenant's webhook endpoint was auto-disabled after sustained failure.
+   *
+   * Exists because an endpoint that silently stops is worse than one that
+   * noisily does — the disable must be told, not just recorded. Produced by
+   * notification-service ITSELF — the one type with no NATS producer, because
+   * the thing that happened is inside the delivery arm.
+   */
+  webhookEndpointDisabled: 'webhook.endpoint_disabled',
 } as const;
 
 export type NotificationType =
@@ -342,7 +351,15 @@ export enum NotificationChannel {
    * `device_tokens`, which is the row that actually gets deleted.
    */
   PUSH = 'PUSH',
-  // Declared but unimplemented.
+  /**
+   * One POST per EVENT to a tenant-registered endpoint.
+   *
+   * **Not a user channel** — the destination belongs to the organization, not
+   * to a person, which is why it appears nowhere in
+   * {@link PREFERENCE_CHANNELS} and writes `webhook_deliveries` rather than
+   * `notification_deliveries`: this table answers "did we tell this person"
+   * and a webhook is not telling a person anything.
+   */
   WEBHOOK = 'WEBHOOK',
 }
 
@@ -358,6 +375,12 @@ export const PREFERENCE_CHANNELS = [
    * permission — and it is stated here rather than arrived at by omission.
    */
   NotificationChannel.PUSH,
+  // **`WEBHOOK` is absent because it is not a USER channel, and permanently
+  // so.** The endpoint belongs to the organization; a per-user preference over
+  // a tenant-level integration would either do nothing or silently break the
+  // whole tenant's integration, and neither is a setting anybody wants. This
+  // is not "unimplemented" — the implementation exists and the absence
+  // survives it. Pinned by `notification.contract.spec.ts`.
 ] as const;
 
 /** RDM Table 24. `SENT` is not `READ`, and neither is `DELIVERED`. */

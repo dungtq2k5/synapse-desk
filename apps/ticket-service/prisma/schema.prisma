@@ -801,18 +801,18 @@ model AnalyticsExport {
 /// never runs logs nothing at all — which is precisely the case that occurred,
 /// and it stayed invisible for two domains.
 ///
-/// **Three copies of this table is CORRECT**, and this note
+/// **Four copies of this table is CORRECT**, and this note
 /// exists so nobody re-opens it. Service-per-database means each service
 /// records its own jobs in its own failure domain: "did ingestion-service's
 /// rollup run?" is a question about ingestion-service's database, and a shared
 /// heartbeat service would report healthy while that database was unreachable —
-/// the original bug, reintroduced with extra infrastructure. Three tables
+/// the original bug, reintroduced with extra infrastructure. Four tables
 /// holding different rows is not duplication of facts; no single fact is stored
 /// twice.
 ///
 /// The *behaviour* lives once, in `JobRunRecorder` (`libs/common`), over a
 /// hand-written `JobRunStore` that each service binds to its own delegate.
-/// `job-run-schema.spec.ts` asserts these three blocks stay identical — they
+/// `job-run-schema.spec.ts` asserts these four blocks stay identical — they
 /// had already begun to drift in comments before it existed.
 ///
 /// Not tenant-scoped: these jobs sweep across every tenant, so "did the rollup

@@ -18,7 +18,16 @@ import { join } from 'node:path';
  * three bindings.
  */
 describe('model JobRun is identical across the three schemas', () => {
-  const SERVICES = ['auth-service', 'ticket-service', 'ingestion-service'];
+  const SERVICES = [
+    'auth-service',
+    'ticket-service',
+    'ingestion-service',
+    // The fourth copy — outbound webhooks made notification-service a
+    // scheduled-jobs service, and the docblock in all four schemas states the
+    // count. Added HERE in the same change, because a block outside this list
+    // can drift exactly the way the spec exists to prevent.
+    'notification-service',
+  ];
 
   /**
    * The field lines of `model JobRun`, normalised.
@@ -47,10 +56,16 @@ describe('model JobRun is identical across the three schemas', () => {
   };
 
   it('1. **every service declares the same fields, types and modifiers**', () => {
-    const [auth, ticket, ingestion] = SERVICES.map(fieldsOf);
+    // Compared each-against-the-first rather than destructured by name, so the
+    // fifth copy is covered by arriving in SERVICES rather than by somebody
+    // extending a pattern of pairwise expects.
+    const [reference, ...rest] = SERVICES.map(fieldsOf);
 
-    expect(ticket).toEqual(auth);
-    expect(ingestion).toEqual(auth);
+    for (const fields of rest) {
+      expect(fields).toEqual(reference);
+    }
+
+    expect(rest.length).toBeGreaterThanOrEqual(3);
   });
 
   it('2. the block carries every column `JobRunStore` writes', () => {

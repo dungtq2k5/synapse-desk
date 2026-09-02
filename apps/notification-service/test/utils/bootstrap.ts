@@ -1,7 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ClientProxy } from '@nestjs/microservices';
 import { of } from 'rxjs';
-import { NATS_CLIENT } from '@synapsedesk/common';
+import { Queue } from 'bullmq';
+import {
+  NATS_CLIENT,
+  SCHEDULER_QUEUE,
+  WEBHOOK_QUEUE,
+} from '@synapsedesk/common';
 import { AppModule } from '../../src/app.module';
 import { PrismaService } from '../../src/modules/prisma/prisma.service';
 import { DatabaseSeeder } from '../../src/modules/prisma/database.seeder';
@@ -81,9 +86,35 @@ export async function bootstrapE2eTest(): Promise<E2eFixture> {
         -- broken rather than as a dirty fixture. (No backticks in here: this
         -- SQL is a template literal, and one would open a substitution.)
         "device_tokens",
+        -- The webhook tables. Endpoint rows CASCADE their deliveries, but a
+        -- delivery is also keyed by event, so both are named rather than
+        -- trusted to a chain.
+        "webhook_deliveries", "webhook_endpoints",
         "notifications" RESTART IDENTITY CASCADE;
     `);
     emitted.length = 0;
+
+    // **The queues, every reset — known-gap #7's fix, built in from the first
+    // day this service HAS queues rather than retrofitted after a seventh
+    // sighting.** The registrar writes a repeat schedule into the shared test
+    // Redis at every boot, and a leftover is executed by whichever suite next
+    // boots a worker on the queue name — the exact mechanism the gap's sixth
+    // sighting proved end to end.
+    await obliterateQueues();
+  };
+
+  const obliterateQueues = async (): Promise<void> => {
+    for (const name of [SCHEDULER_QUEUE.notification, WEBHOOK_QUEUE]) {
+      const queue = new Queue(name, {
+        connection: { url: process.env.REDIS_URL as string },
+      });
+
+      try {
+        await queue.obliterate({ force: true });
+      } finally {
+        await queue.close();
+      }
+    }
   };
 
   const close = async (): Promise<void> => {

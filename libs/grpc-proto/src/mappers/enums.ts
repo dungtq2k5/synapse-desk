@@ -16,6 +16,7 @@ import {
   Gender,
   InvitationStatus,
   NOTIFICATION_TYPES,
+  WebhookDeliveryStatus,
   DevicePlatform,
   NotificationChannel,
   NotificationPriority,
@@ -44,6 +45,7 @@ import {
   NotificationPriority as ProtoNotificationPriority,
   NotificationResourceType as ProtoNotificationResourceType,
   NotificationType as ProtoNotificationType,
+  WebhookDeliveryStatus as ProtoWebhookDeliveryStatus,
   PreferenceSource as ProtoPreferenceSource,
 } from '../generated/synapsedesk/notification/notification';
 import {
@@ -366,12 +368,37 @@ const notificationType = enumBridge<NotificationType, ProtoNotificationType>(
       ProtoNotificationType.NOTIFICATION_TYPE_PAYMENT_FAILED,
     [NOTIFICATION_TYPES.planChanged]:
       ProtoNotificationType.NOTIFICATION_TYPE_PLAN_CHANGED,
+    [NOTIFICATION_TYPES.webhookEndpointDisabled]:
+      ProtoNotificationType.NOTIFICATION_TYPE_WEBHOOK_ENDPOINT_DISABLED,
   },
   ProtoNotificationType.NOTIFICATION_TYPE_UNSPECIFIED,
 );
 
 export const toProtoNotificationType = notificationType.toProto;
 export const fromProtoNotificationType = notificationType.fromProto;
+
+/**
+ * `webhook_deliveries.status` — a persisted domain value, so an enum with a
+ * bridge (§7.3), and `Record<D, P>` makes a fourth status a compile error here
+ * until it is mapped.
+ */
+const webhookDeliveryStatus = enumBridge<
+  WebhookDeliveryStatus,
+  ProtoWebhookDeliveryStatus
+>(
+  {
+    [WebhookDeliveryStatus.PENDING]:
+      ProtoWebhookDeliveryStatus.WEBHOOK_DELIVERY_STATUS_PENDING,
+    [WebhookDeliveryStatus.DELIVERED]:
+      ProtoWebhookDeliveryStatus.WEBHOOK_DELIVERY_STATUS_DELIVERED,
+    [WebhookDeliveryStatus.FAILED]:
+      ProtoWebhookDeliveryStatus.WEBHOOK_DELIVERY_STATUS_FAILED,
+  },
+  ProtoWebhookDeliveryStatus.WEBHOOK_DELIVERY_STATUS_UNSPECIFIED,
+);
+
+export const toProtoWebhookDeliveryStatus = webhookDeliveryStatus.toProto;
+export const fromProtoWebhookDeliveryStatus = webhookDeliveryStatus.fromProto;
 
 /** `notifications.resource_type` — what the notification is ABOUT. */
 const notificationResourceType = enumBridge<

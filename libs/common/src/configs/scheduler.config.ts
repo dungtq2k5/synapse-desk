@@ -24,6 +24,7 @@ export const SCHEDULER_QUEUE = {
   auth: 'scheduler-auth',
   ticket: 'scheduler-ticket',
   ingestion: 'scheduler-ingestion',
+  notification: 'scheduler-notification',
 } as const;
 
 export type SchedulerQueueName =
@@ -108,6 +109,18 @@ export const SCHEDULED_JOBS = {
    * nothing.
    */
   SCOPE_RECONCILE: 'scope-reconcile',
+
+  /**
+   * notification-service, daily. Prunes `webhook_deliveries` older than
+   * `WEBHOOK_RETENTION_DAYS`.
+   *
+   * The table is one row per event per endpoint and nothing else bounds it —
+   * unlike `notification_deliveries`, which is bounded by notifications, which
+   * are bounded by events that involve people. This job is also what made
+   * notification-service a scheduled-jobs service at all: the fourth
+   * `job_runs` table, the fourth `/platform/jobs` leg, the fourth queue.
+   */
+  WEBHOOK_RETENTION: 'webhook-retention',
 } as const;
 
 export type ScheduledJobName =
@@ -126,6 +139,7 @@ export const SCHEDULE_CRON = {
   [SCHEDULED_JOBS.BILLING_SNAPSHOT]: '0 * * * *',
   [SCHEDULED_JOBS.INGESTION_RECONCILE]: '*/10 * * * *',
   [SCHEDULED_JOBS.SCOPE_RECONCILE]: '0 * * * *',
+  [SCHEDULED_JOBS.WEBHOOK_RETENTION]: '0 4 * * *',
 } as const satisfies Record<ScheduledJobName, string>;
 
 /**
@@ -153,6 +167,7 @@ export const JOB_SEQUENCES = {
   [SCHEDULED_JOBS.BILLING_SNAPSHOT]: ['billing-snapshot'],
   [SCHEDULED_JOBS.INGESTION_RECONCILE]: ['ingestion-reconcile'],
   [SCHEDULED_JOBS.SCOPE_RECONCILE]: ['scope-reconcile'],
+  [SCHEDULED_JOBS.WEBHOOK_RETENTION]: ['webhook-retention'],
 } as const satisfies Record<ScheduledJobName, readonly string[]>;
 
 /**
@@ -185,6 +200,7 @@ export const JOB_SERVICE = {
   [SCHEDULED_JOBS.BILLING_SNAPSHOT]: 'auth',
   [SCHEDULED_JOBS.INGESTION_RECONCILE]: 'ingestion',
   [SCHEDULED_JOBS.SCOPE_RECONCILE]: 'ingestion',
+  [SCHEDULED_JOBS.WEBHOOK_RETENTION]: 'notification',
 } as const satisfies Record<ScheduledJobName, SchedulerService>;
 
 /**

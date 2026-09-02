@@ -101,8 +101,10 @@ export class UpdatePreferenceDto {
   @IsIn([PREFERENCE_WILDCARD_TYPE, ...NOTIFICATION_TYPE_VALUES])
   readonly type!: NotificationType | typeof PREFERENCE_WILDCARD_TYPE;
 
-  // `WEBHOOK` is absent on purpose: it is in the channel enum for completeness
-  // and has no implementation, so a preference for it would control nothing.
+  // `WEBHOOK` is absent because it is not a USER channel, and permanently so:
+  // the endpoint belongs to the organization, so a per-user preference over it
+  // would either do nothing or silently break the whole tenant's integration.
+  // The durable statement lives on `PREFERENCE_CHANNELS` itself.
   @IsIn(PREFERENCE_CHANNELS)
   readonly channel!: (typeof PREFERENCE_CHANNELS)[number];
 

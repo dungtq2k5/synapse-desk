@@ -29,6 +29,7 @@ import {
   TICKET_PRIORITIES,
   TicketSource,
   TicketStatus,
+  WebhookDeliveryStatus,
 } from '@synapsedesk/common';
 import { AnswerStatus as ProtoRagAnswerStatus } from './generated/synapsedesk/rag/rag';
 import { MessageAnswerStatus as ProtoMessageAnswerStatus } from './generated/synapsedesk/ticket/message';
@@ -80,6 +81,8 @@ import {
   toProtoNotificationResourceType,
   toProtoOrgStatus,
   toProtoDevicePlatform,
+  toProtoWebhookDeliveryStatus,
+  fromProtoWebhookDeliveryStatus,
   fromProtoDevicePlatform,
   toProtoPreferenceSource,
   toProtoNotificationType,
@@ -291,6 +294,12 @@ describe('every enum bridge round-trips', () => {
       Object.values(DevicePlatform),
       toProtoDevicePlatform,
       fromProtoDevicePlatform,
+    ],
+    [
+      'WebhookDeliveryStatus',
+      Object.values(WebhookDeliveryStatus),
+      toProtoWebhookDeliveryStatus,
+      fromProtoWebhookDeliveryStatus,
     ],
   ];
 

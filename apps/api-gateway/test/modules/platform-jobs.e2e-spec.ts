@@ -105,8 +105,8 @@ describe('Platform job health (e2e)', () => {
    * hourly job and for a daily one without either being spelled out — a fixed
    * `hoursAgo(1)` would go stale the day a ten-minute auth job is added.
    */
-  const healthyAuthRows = () =>
-    jobsOwnedBy('auth').map((jobName) => {
+  const healthyRowsFor = (service: Parameters<typeof jobsOwnedBy>[0]) =>
+    jobsOwnedBy(service).map((jobName) => {
       const at = timestamp(
         new Date(Date.now() - expectedIntervalMs(jobName) / 2),
       );
@@ -129,7 +129,13 @@ describe('Platform job health (e2e)', () => {
       of({ items: healthyIngestionRows() }),
     );
     fx.stubs.platform.getAuthJobHealth.mockReturnValue(
-      of({ items: healthyAuthRows() }),
+      of({ items: healthyRowsFor('auth') }),
+    );
+    // The fourth leg — outbound webhooks made notification-service a
+    // scheduled-jobs service. Derived from `jobsOwnedBy`, like auth, so a
+    // second notification job needs no fixture edit here.
+    fx.stubs.notification.getNotificationJobHealth.mockReturnValue(
+      of({ items: healthyRowsFor('notification') }),
     );
   };
 
@@ -137,7 +143,16 @@ describe('Platform job health (e2e)', () => {
     fx = await bootstrapE2eTest();
   });
 
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    // The fourth leg's healthy default. Tests that vary ONE service's health
+    // re-stub that service; leaving notification healthy keeps those tests
+    // about the service they name rather than about `WEBHOOK_RETENTION`
+    // reporting never-ran because nobody stubbed the leg that carries it.
+    fx.stubs.notification.getNotificationJobHealth.mockReturnValue(
+      of({ items: healthyRowsFor('notification') }),
+    );
+  });
 
   afterAll(() => fx.close());
 
@@ -181,7 +196,7 @@ describe('Platform job health (e2e)', () => {
         of({ items: healthyIngestionRows() }),
       );
       fx.stubs.platform.getAuthJobHealth.mockReturnValue(
-        of({ items: healthyAuthRows() }),
+        of({ items: healthyRowsFor('auth') }),
       );
 
       const response = await superAdmin()
@@ -208,7 +223,7 @@ describe('Platform job health (e2e)', () => {
         of({ items: healthyIngestionRows() }),
       );
       fx.stubs.platform.getAuthJobHealth.mockReturnValue(
-        of({ items: healthyAuthRows() }),
+        of({ items: healthyRowsFor('auth') }),
       );
 
       const response = await superAdmin()
@@ -245,7 +260,7 @@ describe('Platform job health (e2e)', () => {
         of({ items: healthyIngestionRows() }),
       );
       fx.stubs.platform.getAuthJobHealth.mockReturnValue(
-        of({ items: healthyAuthRows() }),
+        of({ items: healthyRowsFor('auth') }),
       );
 
       const response = await superAdmin()
@@ -273,7 +288,7 @@ describe('Platform job health (e2e)', () => {
         throwError(() => grpcError(GrpcStatus.UNAVAILABLE, 'down')),
       );
       fx.stubs.platform.getAuthJobHealth.mockReturnValue(
-        of({ items: healthyAuthRows() }),
+        of({ items: healthyRowsFor('auth') }),
       );
 
       const response = await superAdmin()
