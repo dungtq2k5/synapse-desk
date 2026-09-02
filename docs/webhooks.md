@@ -65,6 +65,9 @@ One HTTPS `POST` per event per endpoint, `Content-Type: application/json`:
 - **There is no `title` or `body`.** Those are product copy written for a
   person; the payload is the event. Build your own text from `type` and
   `data`.
+- **`resourceType` and `resourceId` can both be `null`.** Not every event is
+  about a resource you can link to. Write the null arm; a consumer that
+  interpolates them straight into a URL will produce `/tickets/null`.
 - `data` is typed per event type; treat unknown keys as additive, not
   breaking.
 
@@ -142,7 +145,11 @@ pace inside the window and no event is dropped.
 - Respond fast and process later: we read at most 16 KB of your response and
   ignore the body entirely; only the status code matters.
 - A failed delivery is retried up to **5 attempts** with exponential backoff
-  starting at 30 seconds — the whole sequence spans roughly half an hour.
+  starting at 30 seconds and doubling: the four retries land at roughly
+  **+30s, +1m30s, +3m30s and +7m30s** after the first try, so the whole
+  sequence is over in **under ten minutes**. It covers a receiver restart, not
+  a receiver outage — for that, read the delivery list and re-drive from your
+  own side.
 - After **10 consecutive** exhausted deliveries the endpoint is
   **auto-disabled**, the reason is recorded on it, and your admins receive a
   high-priority in-app notification (`webhook.endpoint_disabled` — which is

@@ -12,6 +12,17 @@ Start here. Every document has exactly one job; this page says which.
 | [rdm-specs.md](./rdm-specs.md) | Tables, columns, constraints, cascade rules |
 | [api-endpoints-plan.md](./api-endpoints-plan.md) | Every endpoint, permission, WS event, NATS subject |
 
+## Integrator references — written for someone outside this repo
+
+Not internal specs. Each one is the **contract** a client codes against, and each names the source file that wins if the two disagree.
+
+| Document | Audience | Source of truth it mirrors |
+| :---- | :---- | :---- |
+| [websocket-api.md](./websocket-api.md) | Front end | `realtime.config.ts` (events, limits), `realtime.gateway.ts` (handshake) |
+| [webhooks.md](./webhooks.md) | Customer integrators | `libs/common/src/contracts/webhook.contract.ts` (payload, signing, every constant) |
+
+**A change to either source file is a change to a published contract.** These are the only documents here read by people who cannot see the code, so drift in them is not a stale note — it is a receiver that verifies a signature wrongly, or a client that waits forever for an event that was renamed.
+
 ## `decisions/` — why, permanently
 
 Append-only. A decision is never edited; superseding one means writing a new one that links back. Docblocks and comments cite these, because their numbers do not move.

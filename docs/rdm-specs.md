@@ -277,12 +277,13 @@ customer.subscription.created | updated | deleted
     Feedback & Compliance  ]      ticket_daily_stats, agent_daily_stats, ai_generation_daily_stats,
                                   analytics_exports, job_runs, limit_alert_generations
 [ Domain E: Notifications ] ---> notifications, notification_deliveries, notification_preferences,
-                                  inbound_auto_replies
+                                  inbound_auto_replies, webhook_endpoints, webhook_deliveries,
+                                  device_tokens
 ```
 
-**42 tables**, across four Postgres databases — one per owning service, with no cross-database foreign keys (§1.13). Two are replicated per-service rather than shared, so a service can record its own state without a cross-service write: `job_runs` (Table 38) exists **three times**, in `postgres_auth`, `postgres_ticket` and `postgres_ingestion`; `limit_alert_generations` (Table 42) exists **twice**, in `postgres_auth` and `postgres_ingestion`.
+**45 tables**, across four Postgres databases — one per owning service, with no cross-database foreign keys (§1.13). Two are replicated per-service rather than shared, so a service can record its own state without a cross-service write: `job_runs` (Table 38) exists **three times**, in `postgres_auth`, `postgres_ticket` and `postgres_ingestion`; `limit_alert_generations` (Table 42) exists **twice**, in `postgres_auth` and `postgres_ingestion`.
 
-Table numbers are **stable identifiers, not reading order** — they are cited from other documents (`api-endpoints-plan` §0.5, §1.1, §1.6, §9, §11) and from code docblocks, so a table keeps its number for life. Tables added after the original 1–25 were assigned are placed in their *domain's* section rather than at the end, which is why the sequence reads **1–12, 28, 40–41, 13–16, 26, 31–33, 17–20, 27, 21–22, 29–30, 34–38, 42, 23–25, 39**:
+Table numbers are **stable identifiers, not reading order** — they are cited from other documents (`api-endpoints-plan` §0.5, §1.1, §1.6, §9, §11) and from code docblocks, so a table keeps its number for life. Tables added after the original 1–25 were assigned are placed in their *domain's* section rather than at the end, which is why the sequence reads **1–12, 28, 40–41, 13–16, 26, 31–33, 17–20, 27, 21–22, 29–30, 34–38, 42, 23–25, 39, 44–45, 43**:
 
 | Late addition | Sits in | Why it was added |
 | :---- | :---- | :---- |
@@ -303,6 +304,9 @@ Table numbers are **stable identifiers, not reading order** — they are cited f
 | **Table 40** `subscription_plans` | Domain A | Plan entitlements moved from a code constant to a table a Super Admin can edit, joined to Stripe |
 | **Table 41** `subscription_plan_prices` | Domain A | One Product has many Prices (monthly, annual, currencies); keying the catalogue by price would duplicate entitlements that then drift |
 | **Table 42** `limit_alert_generations` | Domain D | A counter that must step past Domain E's permanent `event_id` guard cannot itself live in a store a flush empties |
+| **Table 43** `device_tokens` | Domain E | A push token outlives every session, so it cannot share `device_sessions`' revoke-with-the-family lifetime |
+| **Table 44** `webhook_endpoints` | Domain E | Outbound webhooks are tenant configuration, not a user preference — `WEBHOOK` is deliberately absent from `PREFERENCE_CHANNELS` |
+| **Table 45** `webhook_deliveries` | Domain E | `notification_deliveries` answers "did we tell this person"; a webhook tells an integration, and the two are anchored to different things |
 
 Domain membership, not the number, is what tells you where a table belongs.
 
@@ -1285,6 +1289,75 @@ It **cannot** live in Redis beside the alarm *level*: a flush would reset it to 
 * **Primary key:** composite `(organization_id, email)`.
 * **Indexes:** `(last_sent_at)` — for the daily prune. Rows older than the window are dead weight, and without a sweep this grows by one row per distinct stranger, forever.
 
+#### **Table 44: webhook_endpoints**
+
+*A tenant-registered receiver for outbound webhooks.*
+
+**Tenant configuration, not a user setting** — which is why `WEBHOOK` is absent from `PREFERENCE_CHANNELS` (Table 25) and why deliveries get their own table: `notification_deliveries` answers *"did we tell this person"*, and a webhook is not telling a person anything.
+
+| Field Name | Data Type | Constraints / Default | Description & Business Logic |
+| :---- | :---- | :---- | :---- |
+| **id** | UUID | Primary Key, gen_random_uuid() | Unique endpoint identifier. |
+| **organization_id** | UUID | NOT NULL, Indexed | The owning tenant. No FK (§1.13). |
+| **url** | VARCHAR(2000) | NOT NULL | HTTPS only — and **the string here is not the control**. The URL is validated when saved and **resolved** when delivered to, and DNS can change in between. The real check runs at connection time on every resolved address, with the connection pinned to a checked one so a rebind has no second resolution to exploit ([known-gaps #26](./reference/known-gaps.md)). |
+| **description** | VARCHAR(500) | Nullable | Tenant's own label. |
+| **event_types** | TEXT[] | NOT NULL | `NotificationType` values (`ticket.assigned`) — the **public vocabulary, never the NATS subject**. **Never empty**: an endpoint subscribed to zero types is refused at creation rather than created silently useless, and an empty list never means "all". |
+| **secret** | VARCHAR(64) | NOT NULL | The HMAC signing key. **Plaintext at rest, like `organizations.inbound_token` and unlike every other secret here** — the others are hashed because we only ever *recognise* them; this one is **replayed** on every send, so a digest is unusable. Unguessable (32 random bytes, hex) and rotatable, never derived. Returned to the caller **once**, in the create response. |
+| **previous_secret** | VARCHAR(64) | Nullable | Rotation's overlap, held as **state rather than a job somebody runs**. |
+| **previous_secret_expires_at** | TIMESTAMPTZ | Nullable | While this is in the future, deliveries carry **two** signatures so a customer can roll their stored secret without dropping events. |
+| **is_active** | BOOLEAN | NOT NULL, Default: true | Whether deliveries are attempted. |
+| **disabled_reason** | VARCHAR(500) | Nullable | Why **we** disabled it (auto-disable after sustained failure). NULL for a tenant's own `PATCH` — the distinction the UI renders. |
+| **consecutive_failures** | INT | NOT NULL, Default 0 | Consecutive terminal failures, **reset on any delivered event**. At `WEBHOOK_DISABLE_AFTER_FAILURES` the endpoint is disabled, the reason written, and the tenant told at HIGH priority via `webhook.endpoint_disabled` — itself a subscribable type. |
+| **created_at** | TIMESTAMPTZ | NOT NULL, NOW() | — |
+| **updated_at** | TIMESTAMPTZ | NOT NULL, auto-updated | — |
+
+* **Indexes:** `(organization_id, is_active)` — every dispatch asks "which of this tenant's *active* endpoints subscribe to this type", tenant-first like every hot-path index in this schema.
+
+#### **Table 45: webhook_deliveries**
+
+*One **event** delivered (or not) to one endpoint.*
+
+Anchored to the **event**, not to a notification: one POST per event however many people the notification reached, so a row here is a fact about the **integration** rather than about any recipient.
+
+| Field Name | Data Type | Constraints / Default | Description & Business Logic |
+| :---- | :---- | :---- | :---- |
+| **id** | UUID | Primary Key, gen_random_uuid() | Unique row identifier. |
+| **endpoint_id** | UUID | NOT NULL, FK ➔ webhook_endpoints.id, **ON DELETE CASCADE** | The receiver. Deleting an endpoint discards its delivery history with it. |
+| **event_id** | UUID | NOT NULL | The payload `id` the receiver deduplicates on. **Fixed at enqueue**, so five retries of one event send **one id five times** — the property the customer's idempotency depends on. |
+| **event_type** | VARCHAR(100) | NOT NULL | `NotificationType` — the public vocabulary, matching the payload's `type`. |
+| **payload** | JSONB | NOT NULL | The `WebhookEventPayload`, stored at enqueue. **The row is the source of truth for every retry** — the queue job carries only this row's id — and storing it is also what lets `POST .../test` and a support thread see exactly what a receiver was sent. Serialization to bytes happens once, in the sender, so signing and sending share one string. |
+| **status** | VARCHAR(20) | NOT NULL, Default `PENDING` | `PENDING \| DELIVERED \| FAILED`. `PENDING` until the receiver answers 2xx (`DELIVERED`) or every attempt is exhausted (`FAILED`). |
+| **attempts** | INT | NOT NULL, Default 0 | Attempts made so far. |
+| **response_status** | INT | Nullable | The receiver's last HTTP status — the field that makes `GET .../deliveries` a debugging surface rather than a mystery. |
+| **last_error** | VARCHAR(500) | Nullable | The last failure, bounded. |
+| **occurred_at** | TIMESTAMPTZ | NOT NULL | When the **event** occurred — the payload's `occurredAt`, not this attempt. Deliveries are unordered, so this is what a receiver sorts by. |
+| **delivered_at** | TIMESTAMPTZ | Nullable | When a 2xx was received. |
+| **created_at** | TIMESTAMPTZ | NOT NULL, NOW() | Enqueue timestamp. |
+
+* **Unique:** `(endpoint_id, event_id)` — one row per event per endpoint. **The retry updates its row rather than appending**, so "was this event delivered" has exactly one answer.
+* **Indexes:** `(endpoint_id, created_at DESC)` for the debugging read; `(created_at)` for the retention sweep.
+* **Pruned by `webhook-retention`** after `WEBHOOK_RETENTION_DAYS`: one row per event per endpoint is unbounded in a way `notification_deliveries` never was.
+
+#### **Table 43: device_tokens**
+
+*Where a person's push notifications go — one row per **app install**.*
+
+**In this database rather than beside `device_sessions` (Table 9) in auth, and the distinction is a lifetime.** A `DeviceSession` is keyed to a refresh-token family and is rotated and revoked with it; a push token **outlives every session**, survives logout on most platforms, and is reissued by the OS on its own schedule. Sharing a table would mean one revoke path deleting rows the other still needs.
+
+| Field Name | Data Type | Constraints / Default | Description & Business Logic |
+| :---- | :---- | :---- | :---- |
+| **id** | UUID | Primary Key, gen_random_uuid() | Unique row identifier. |
+| **user_id** | UUID | NOT NULL, Indexed | Whose device. No FK (§1.13). |
+| **organization_id** | UUID | NOT NULL | The tenant. No FK (§1.13). |
+| **token** | VARCHAR(512) | NOT NULL, **UNIQUE** | The FCM registration token. **The uniqueness *is* the mechanism**: the same install re-registering must UPDATE rather than accumulate, and a token FCM reassigns to a different user must **move** rather than duplicate — a shared tablet two people sign into must not deliver one person's notifications to the other. An upsert on this column does both, which `(user_id, token)` could not. |
+| **platform** | VARCHAR(20) | NOT NULL | `IOS \| ANDROID \| WEB`. A string, not a Prisma enum ([ADR 0001](./decisions/0001-no-prisma-enums.md)). |
+| **device_name** | VARCHAR(100) | Nullable | For the settings screen — "iPhone 15, last used 3 days ago". |
+| **last_used_at** | TIMESTAMPTZ | Nullable | Touched on a **successful** send, so the settings list can say how stale a device is without a second table. |
+| **created_at** | TIMESTAMPTZ | NOT NULL, NOW() | Registration timestamp. |
+
+* **No soft delete, deliberately.** A dead token is not history worth keeping — it is a credential that no longer works, and every read of this table wants only live rows. A `deleted_at` here would mean every send has to filter it, and a token FCM has already rejected would keep being counted in the device total a delivery row reports.
+* **Deletion is driven by FCM, on exactly two error codes** — see [known-gaps #23](./reference/known-gaps.md): a code wrongly absent means a dead token lingers harmlessly, while a code wrongly present silently unsubscribes a live device with no way back except reinstalling. Which is why the set is a literal rather than a prefix match, and why an unknown code **keeps**.
+
 ## **3. Recommended Foreign Key Cascade Rules**
 
 To prevent accidental database corruption or orphaned child records:
@@ -1310,6 +1383,7 @@ To prevent accidental database corruption or orphaned child records:
    * notification_preferences ➔ users (If a user is hard-deleted, drop their preference settings).
    * document_flags ➔ documents (If a document is hard-deleted, drop quality flags).
    * subscription_plan_prices ➔ subscription_plans (a price with no plan grants nothing).
+   * webhook_deliveries ➔ webhook_endpoints (deleting an endpoint discards its delivery history with it).
 2. **ON DELETE SET NULL:**
    * deleted_by_id ➔ users.id (If an admin user account is hard-deleted, preserve the deletion timestamp while setting deleted_by_id to NULL).
    * assigned_by_id ➔ users.id (in ticket_assignments; if the assigning user is deleted, retain the assignment record).

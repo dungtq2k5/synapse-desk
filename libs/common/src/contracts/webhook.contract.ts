@@ -112,8 +112,9 @@ export enum WebhookDeliveryStatus {
 
 /**
  * Attempts before an endpoint's delivery is abandoned, exponential backoff
- * between them. Five spans roughly half an hour, which covers a deploy at the
- * receiver's end without covering an abandoned one.
+ * between them. Doubling from `WEBHOOK_BACKOFF_MS`, the four retries land at
+ * +30s, +1m30s, +3m30s and +7m30s, so five attempts are exhausted in UNDER TEN
+ * MINUTES — enough to ride out a restart at the receiver's end, not an outage.
  */
 export const WEBHOOK_MAX_ATTEMPTS = 5;
 

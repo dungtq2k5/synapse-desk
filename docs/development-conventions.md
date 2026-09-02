@@ -884,7 +884,7 @@ written that fails today, so the scan is not scaffolding — it is the guard.
 still matches a source pattern looking for that comparison. A scan cannot see
 that the text does not run, so a behavioural property guarded only by a scan is
 guarded only in appearance. `analytics-window.spec.ts` moved OUT of this row
-during doc 60's hardening: sharing `parseAnalyticsRange` made *"both windows
+when the two windows were unified: sharing `parseAnalyticsRange` made *"both windows
 resolve identically"* true by construction, and what was left to guard —
 *"neither service has grown a local copy back"* — has no runtime expression.
 The replacement is better because the property changed underneath it.

@@ -18,6 +18,6 @@ That is the structural argument, and it is not about diligence. A prose enumerat
 
 - **§7 states the rule and points at the blocks.** It no longer lists objects, so it cannot go stale again.
 - **known-gaps row 5 keeps its subject.** It is about a missing constraint, not about a stale list, and removing the list does not resolve it — if anything it sharpens it, because the seeder block is now the only place the constraint's absence can be read.
-- **A new object is one edit, not two.** `ingestion_jobs_one_live_per_document` (doc 46 §4) is the first added under this rule.
+- **A new object is one edit, not two.** `ingestion_jobs_one_live_per_document` is the first added under this rule.
 - **Reviewing "what raw SQL does this service have" is `grep executeRaw` in one directory**, which is a question the previous arrangement answered wrongly.
 - **The cost is that no single page lists them all.** Accepted: a page that lists them all is exactly what was wrong, and per-service is the boundary that matters — a constraint belongs to the schema that owns it.
