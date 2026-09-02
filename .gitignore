@@ -4,6 +4,10 @@ node_modules/
 docs/archive
 cspell.json
 .env
+# A developer's REAL test credentials — the only place a real secret may live,
+# since `.env.test` is tracked. Loaded FIRST by the test:e2e:* scripts (dotenv
+# never overwrites, so first wins); absent by default and silently skipped.
+.env.test.local
 *.tsbuildinfo
 .claude/
 coverage/

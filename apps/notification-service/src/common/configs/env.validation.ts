@@ -1,7 +1,29 @@
 import * as Joi from 'joi';
 import { LOG_LEVELS, NODE_ENV_OPTIONS } from '@synapsedesk/common';
 
+/**
+ * Keys in the shared section order (RUNTIME, BUILD, DATA, MESSAGING, PEERS,
+ * AUTH & SECRETS, THIRD PARTY, POLICY, DEVELOPMENT), the same order
+ * `.env.example` uses — one of them is the schema and the other is the
+ * documentation, and a reader comparing them should not have to search.
+ */
 export const envValidationSchema = Joi.object({
+  // ------------------------------------------------------------- 1 RUNTIME
+
+  NODE_ENV: Joi.string()
+    .required()
+    .valid(...NODE_ENV_OPTIONS),
+  LOG_LEVEL: Joi.string()
+    .required()
+    .valid(...LOG_LEVELS),
+
+  // The gRPC server added with the feed API. Required rather
+  // than defaulted: a service that bound to a wrong port would look healthy
+  // and answer nothing, which is worse than failing to boot.
+  GRPC_HOST: Joi.string().required(),
+  GRPC_PORT: Joi.number().required(),
+
+  // --------------------------------------------------------------- 2 BUILD
   // **Which build is this?**. Baked at image build time, never read
   // from git at runtime: a container has no `.git`, so a runtime lookup returns
   // nothing and the natural fallback is `"unknown"` — the answer you get at
@@ -11,9 +33,23 @@ export const envValidationSchema = Joi.object({
   // that cannot identify itself fails to BOOT rather than lying about what it
   // is. The Dockerfile's `test -n "$GIT_SHA"` guard is the same rule one stage
   // earlier.
+
   APP_VERSION: Joi.string().required(),
   BUILD_SHA: Joi.string().required(),
   BUILD_TIME: Joi.string().isoDate().required(),
+
+  // ---------------------------------------------------------------- 3 DATA
+
+  // Domain E's own database — added with in-app notifications.
+  // Email and SMS carry their recipient in the command and need no storage; a
+  // feed is storage by definition.
+  DATABASE_URL: Joi.string().required(),
+
+  // BullMQ — the webhook delivery queue and the scheduler. This service had no
+  // Redis at all before outbound webhooks.
+  REDIS_URL: Joi.string().required(),
+
+  // ----------------------------------------------------------- 4 MESSAGING
 
   NATS_URL: Joi.string().required(),
   // The HTTP monitoring root, read once at boot to prove JetStream's store
@@ -22,21 +58,24 @@ export const envValidationSchema = Joi.object({
   // than none — see ADR 0041.
   NATS_MONITOR_URL: Joi.string().uri().required(),
 
-  // BullMQ — the webhook delivery queue and the scheduler. This service had no
-  // Redis at all before outbound webhooks.
-  REDIS_URL: Joi.string().required(),
+  // --------------------------------------------------------------- 5 PEERS
 
-  // The SSRF escape hatch, for a developer's localhost receiver. Honoured ONLY
-  // when NODE_ENV is development — see `privateTargetsAllowed` — so a copied
-  // .env cannot carry it into production.
-  WEBHOOK_ALLOW_PRIVATE_TARGETS: Joi.string().valid('true', 'false').optional(),
+  // For resolving a notification AUDIENCE from a permission code. Required:
+  // an in-app notification whose recipients cannot be resolved reaches nobody,
+  // and a service that boots without this would drop every one of them while
+  // looking healthy.
+  AUTH_SERVICE_URL: Joi.string().required(),
 
-  APP_NAME: Joi.string().required(),
-  // Base URL of the SPA, used to build links in outbound mail. Wrong value =
-  // every reset link points somewhere useless, so it is required rather than
-  // defaulted to localhost.
-  APP_WEB_URL: Joi.string().uri().required(),
-  SUPPORT_EMAIL: Joi.string().email().required(),
+  // ------------------------------------------------------- 6 AUTH & SECRETS
+
+  // Building the `Reply-To` that makes an emailed notification answerable —
+  // The secret must MATCH the gateway's: it verifies what this
+  // signs, and a mismatch makes every reply open a duplicate ticket rather
+  // than failing visibly.
+  INBOUND_EMAIL_SECRET: Joi.string().required(),
+  INBOUND_EMAIL_DOMAIN: Joi.string().required(),
+
+  // --------------------------------------------------------- 7 THIRD PARTY
 
   // Nodemailer (Gmail SMTP by default)
   EMAIL_HOST: Joi.string().required(),
@@ -46,13 +85,6 @@ export const envValidationSchema = Joi.object({
   EMAIL_USER: Joi.string().required(),
   EMAIL_PASS: Joi.string().required(),
   EMAIL_SENDER: Joi.string().required(),
-
-  // Building the `Reply-To` that makes an emailed notification answerable —
-  // The secret must MATCH the gateway's: it verifies what this
-  // signs, and a mismatch makes every reply open a duplicate ticket rather
-  // than failing visibly.
-  INBOUND_EMAIL_SECRET: Joi.string().required(),
-  INBOUND_EMAIL_DOMAIN: Joi.string().required(),
 
   // Twilio. Optional as a group: SMS is only needed once phone verification is
   // switched on, and requiring credentials would block every other notification
@@ -74,32 +106,24 @@ export const envValidationSchema = Joi.object({
   // the failure to a request.
   FIREBASE_MESSAGING_SERVICE_ACCOUNT_PATH: Joi.string().optional().allow(''),
 
-  NODE_ENV: Joi.string()
-    .required()
-    .valid(...NODE_ENV_OPTIONS),
-  LOG_LEVEL: Joi.string()
-    .required()
-    .valid(...LOG_LEVELS),
+  // -------------------------------------------------------------- 8 POLICY
 
-  // Domain E's own database — added with in-app notifications.
-  // Email and SMS carry their recipient in the command and need no storage; a
-  // feed is storage by definition.
-  DATABASE_URL: Joi.string().required(),
+  APP_NAME: Joi.string().required(),
+  // Base URL of the SPA, used to build links in outbound mail. Wrong value =
+  // every reset link points somewhere useless, so it is required rather than
+  // defaulted to localhost.
+  APP_WEB_URL: Joi.string().uri().required(),
+  SUPPORT_EMAIL: Joi.string().email().required(),
 
-  // The gRPC server added with the feed API. Required rather
-  // than defaulted: a service that bound to a wrong port would look healthy
-  // and answer nothing, which is worse than failing to boot.
-  GRPC_HOST: Joi.string().required(),
-  GRPC_PORT: Joi.number().required(),
+  // --------------------------------------------------------- 9 DEVELOPMENT
 
-  // Applies the four partial indexes `schema.prisma` cannot express (
+  // Applies the four partial indexes `schema.prisma` cannot express.
   // False in tests, which seed explicitly from the fixture so there is
   // ONE seeding path rather than one that races module init.
   SEED_ON_BOOTSTRAP: Joi.boolean().required(),
 
-  // For resolving a notification AUDIENCE from a permission code. Required:
-  // an in-app notification whose recipients cannot be resolved reaches nobody,
-  // and a service that boots without this would drop every one of them while
-  // looking healthy.
-  AUTH_SERVICE_URL: Joi.string().required(),
+  // The SSRF escape hatch, for a developer's localhost receiver. Honoured ONLY
+  // when NODE_ENV is development — see `privateTargetsAllowed` — so a copied
+  // .env cannot carry it into production.
+  WEBHOOK_ALLOW_PRIVATE_TARGETS: Joi.string().valid('true', 'false').optional(),
 });

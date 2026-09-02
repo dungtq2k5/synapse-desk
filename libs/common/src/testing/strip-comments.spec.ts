@@ -37,4 +37,24 @@ describe('stripComments', () => {
     // `typecheck-coverage.spec.ts` failing every directory at once.
     expect(stripComments('"apps/*/src/**/*"')).not.toContain('src');
   });
+
+  it('5. **a block-comment OPENER inside a line comment opens nothing**', () => {
+    // The measured regression: the gateway schema's
+    // `// … answers \`/knowledge/*\` with a 500 …` fed the block pass a `/*`
+    // that swallowed the next 38 lines and 14 schema keys — silently, because
+    // the env-contract scan's floor was the only thing positioned to notice.
+    // Line comments are stripped FIRST so the opener never reaches the block
+    // pass; this pin is what keeps the two passes in that order.
+    const source =
+      '  // answers `/knowledge/*` with a 500\n' +
+      '  KEY_ONE: 1,\n' +
+      '  /** real block */\n' +
+      '  KEY_TWO: 2,\n';
+
+    const stripped = stripComments(source);
+
+    expect(stripped).toContain('KEY_ONE');
+    expect(stripped).toContain('KEY_TWO');
+    expect(stripped).not.toContain('real block');
+  });
 });

@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { envValidationSchema } from './env.validation';
 import { extractEmailAddress } from '@synapsedesk/common';
+import { parseEnvFile } from '@synapsedesk/common/testing/env-file';
 
 /**
  * The self-loop guard is only as real as its variable.
@@ -26,18 +27,13 @@ describe('the gateway’s inbound-email configuration', () => {
    * inbound email. Reading the file the suite actually boots with proves two
    * things at once: the schema accepts it, and it defines these three.
    */
+  // The shared parser — this spec's local copy was PROMOTED to
+  // `@synapsedesk/common/testing/env-file` as the one counting rule for every
+  // env scan (the env-contract guard included), because two ways of counting
+  // the same file is how a guard and a document disagree about whether they
+  // agree.
   const envFile = (path: string): Record<string, string> =>
-    Object.fromEntries(
-      readFileSync(join(__dirname, path), 'utf8')
-        .split('\n')
-        .map((line) => line.trim())
-        .filter((line) => line && !line.startsWith('#') && line.includes('='))
-        .map((line) => {
-          const at = line.indexOf('=');
-
-          return [line.slice(0, at).trim(), line.slice(at + 1).trim()];
-        }),
-    );
+    parseEnvFile(readFileSync(join(__dirname, path), 'utf8'));
 
   const baseline = (): Record<string, string> => envFile('../../../.env.test');
 

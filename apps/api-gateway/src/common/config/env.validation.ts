@@ -16,11 +16,29 @@ const validCookieName = Joi.string()
   .pattern(/^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/)
   .message('{{#label}} is not a valid cookie name');
 
+/**
+ * Keys in the shared section order (RUNTIME, BUILD, DATA, MESSAGING, PEERS,
+ * AUTH & SECRETS, POLICY), the same order `.env.example` uses — one of them
+ * is the schema and the other is the documentation, and a reader comparing
+ * them should not have to search.
+ */
 export const envValidationSchema = Joi.object({
-  PORT: Joi.number().required(),
+  // ------------------------------------------------------------- 1 RUNTIME
 
-  // Defaults to FALSE, so an environment that never considered the question is
-  // closed rather than open.
+  NODE_ENV: Joi.string()
+    .valid(...NODE_ENV_OPTIONS)
+    .required(),
+
+  PORT: Joi.number().required(),
+  GLOBAL_PREFIX: Joi.string().required(),
+  CORS: Joi.string().required(),
+
+  // `/docs` and `/docs-json`. Defaults to FALSE, so an environment that never
+  // considered the question is closed rather than open. **Config, not an
+  // inline `NODE_ENV !== 'production'`**: that check is the one that gets
+  // inverted during a refactor and nobody notices, because the failure
+  // direction is MORE exposure and more exposure looks like everything
+  // working.
   SWAGGER_ENABLED: Joi.boolean().default(false),
 
   // `/metrics`, on its OWN listener. A distinct port is what makes
@@ -32,6 +50,7 @@ export const envValidationSchema = Joi.object({
   // so a deployment that never thought about it is safe rather than exposed.
   METRICS_HOST: Joi.string().default('127.0.0.1'),
 
+  // --------------------------------------------------------------- 2 BUILD
   // **Which build is this?**. Baked at image build time, never read
   // from git at runtime: a container has no `.git`, so a runtime lookup returns
   // nothing and the natural fallback is `"unknown"` — the answer you get at
@@ -41,20 +60,43 @@ export const envValidationSchema = Joi.object({
   // that cannot identify itself fails to BOOT, loudly and immediately, instead
   // of starting happily and lying to the person trying to end an outage. The
   // Dockerfile's `test -n "$GIT_SHA"` guard is the same rule one stage earlier.
-  // `/docs` and `/docs-json`. **Config, not an inline
-  // `NODE_ENV !== 'production'`**: that check is the one that gets inverted
-  // during a refactor and nobody notices, because the failure direction is MORE
-  // exposure and more exposure looks like everything working.
+
   APP_VERSION: Joi.string().required(),
   BUILD_SHA: Joi.string().required(),
   BUILD_TIME: Joi.string().isoDate().required(),
 
-  GLOBAL_PREFIX: Joi.string().required(),
-  CORS: Joi.string().required(),
+  // ---------------------------------------------------------------- 3 DATA
 
-  NODE_ENV: Joi.string()
-    .valid(...NODE_ENV_OPTIONS)
-    .required(),
+  // Rate-limit counters live in Redis rather than in-process memory: with the
+  // in-memory default every replica keeps its own tally, so a 5-per-15-minutes
+  // login limit silently becomes 5 x N.
+  REDIS_URL: Joi.string().required(),
+
+  // ----------------------------------------------------------- 4 MESSAGING
+
+  // The gateway is a hybrid app: HTTP for clients, and a NATS CONSUMER for the
+  // domain events it relays to WebSocket rooms. It publishes nothing.
+  NATS_URL: Joi.string().required(),
+
+  // --------------------------------------------------------------- 5 PEERS
+
+  AUTH_SERVICE_URL: Joi.string().required(),
+  TICKET_SERVICE_URL: Joi.string().required(),
+
+  // ingestion-service — document and knowledge surface.
+  INGESTION_SERVICE_URL: Joi.string().required(),
+
+  // Notification gRPC server, added with the feed API. Required
+  // like every other peer: a gateway that boots without it would answer 500 on
+  // the notification bell rather than failing where the misconfiguration is.
+  NOTIFICATION_SERVICE_URL: Joi.string().required(),
+
+  // rag-service — the one Python peer, and the only service the gateway calls
+  // that is not a NestJS app. Required like the rest: a gateway that boots
+  // without it answers `/knowledge/*` with a 500 that names no cause.
+  RAG_SERVICE_URL: Joi.string().required(),
+
+  // ------------------------------------------------------- 6 AUTH & SECRETS
 
   JWT_ACCESS_NAME: validCookieName,
   JWT_ACCESS_PUBLIC_KEY_PATH: Joi.string().required(),
@@ -84,30 +126,28 @@ export const envValidationSchema = Joi.object({
     .required()
     .valid(...COOKIE_SAMESITE_OPTIONS),
 
-  AUTH_SERVICE_URL: Joi.string().required(),
-  TICKET_SERVICE_URL: Joi.string().required(),
+  // Inbound email — the gateway is the email adapter: it verifies the
+  // Worker's signature, parses the address, and runs the loop guards.
 
-  // ingestion-service — document and knowledge surface.
-  INGESTION_SERVICE_URL: Joi.string().required(),
+  /** Shared with the Cloudflare Worker — the HMAC key over the raw body. */
+  INBOUND_EMAIL_SECRET: Joi.string().required(),
 
-  // Notification gRPC server, added with the feed API. Required
-  // like every other peer: a gateway that boots without it would answer 500 on
-  // the notification bell rather than failing where the misconfiguration is.
-  NOTIFICATION_SERVICE_URL: Joi.string().required(),
+  /** The mail domain the catch-all route serves, for building `Reply-To`. */
+  INBOUND_EMAIL_DOMAIN: Joi.string().required(),
 
-  // rag-service — the one Python peer, and the only service the gateway calls
-  // that is not a NestJS app. Required like the rest: a gateway that boots
-  // without it answers `/knowledge/*` with a 500 that names no cause.
-  RAG_SERVICE_URL: Joi.string().required(),
+  /**
+   * **The self-loop guard's whole basis**
+   *
+   * Our own sending address. Mail from it is ignored unconditionally, which is
+   * what stops a notification bouncing off an auto-responder forever.
+   *
+   * `required()` rather than optional, and that is the point: a guard reading
+   * an undefined variable always passes, and it fails OPEN into precisely the
+   * unbounded loop it exists to stop. Better to refuse to boot.
+   */
+  EMAIL_SENDER: Joi.string().required(),
 
-  // The gateway is a hybrid app: HTTP for clients, and a NATS CONSUMER for the
-  // domain events it relays to WebSocket rooms. It publishes nothing.
-  NATS_URL: Joi.string().required(),
-
-  // Rate-limit counters live in Redis rather than in-process memory: with the
-  // in-memory default every replica keeps its own tally, so a 5-per-15-minutes
-  // login limit silently becomes 5 x N.
-  REDIS_URL: Joi.string().required(),
+  // -------------------------------------------------------------- 8 POLICY
 
   // Four tiers. `short`/`medium`/`long` are the general backstop applied to
   // ordinary routes; `auth` is the strict one applied ONLY to routes marked
@@ -128,28 +168,4 @@ export const envValidationSchema = Joi.object({
   WS_HANDSHAKE_LIMIT: Joi.number().required(),
   WS_HANDSHAKE_TTL: Joi.number().required(),
   WS_HANDSHAKE_BLOCK_DURATION: Joi.number().required(),
-
-  // ------------------------------------------------------- inbound email
-  //
-  // The gateway is the email adapter: it verifies the Worker's
-  // signature, parses the address, and runs the loop guards. All three need
-  // configuration that previously lived only in notification-service.
-
-  /** Shared with the Cloudflare Worker — the HMAC key over the raw body. */
-  INBOUND_EMAIL_SECRET: Joi.string().required(),
-
-  /** The mail domain the catch-all route serves, for building `Reply-To`. */
-  INBOUND_EMAIL_DOMAIN: Joi.string().required(),
-
-  /**
-   * **The self-loop guard's whole basis**
-   *
-   * Our own sending address. Mail from it is ignored unconditionally, which is
-   * what stops a notification bouncing off an auto-responder forever.
-   *
-   * `required()` rather than optional, and that is the point: a guard reading
-   * an undefined variable always passes, and it fails OPEN into precisely the
-   * unbounded loop it exists to stop. Better to refuse to boot.
-   */
-  EMAIL_SENDER: Joi.string().required(),
 });

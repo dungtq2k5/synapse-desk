@@ -31,7 +31,16 @@
  * a block-comment closer, which the three scans using this accept knowingly.
  */
 export function stripComments(source: string): string {
+  // **Line comments FIRST, and the order is load-bearing.** A line comment
+  // containing a block-comment OPENER — measured victim: the gateway schema's
+  // `// … answers \`/knowledge/*\` with a 500 …` — fed the block pass a `/*`
+  // that swallowed the next 38 lines and 14 schema keys. Full-line comments
+  // gone first, that opener never reaches the block pass; a `//`-led line
+  // INSIDE a real block comment is removed harmlessly, since the still-
+  // balanced block goes next. The remaining hazard is the same one already
+  // documented: delimiters inside strings, or a trailing (not full-line)
+  // comment carrying `/*`.
   return source
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/^[ \t]*\/\/.*$/gm, '');
+    .replace(/^[ \t]*\/\/.*$/gm, '')
+    .replace(/\/\*[\s\S]*?\*\//g, '');
 }

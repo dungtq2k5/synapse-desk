@@ -1,7 +1,26 @@
 import * as Joi from 'joi';
 import { LOG_LEVELS, NODE_ENV_OPTIONS } from '@synapsedesk/common';
 
+/**
+ * Keys in the shared section order (RUNTIME, BUILD, DATA, MESSAGING, PEERS,
+ * AUTH & SECRETS, THIRD PARTY, POLICY, DEVELOPMENT), the same order
+ * `.env.example` uses — one of them is the schema and the other is the
+ * documentation, and a reader comparing them should not have to search.
+ */
 export const envValidationSchema = Joi.object({
+  // ------------------------------------------------------------- 1 RUNTIME
+
+  NODE_ENV: Joi.string()
+    .required()
+    .valid(...NODE_ENV_OPTIONS),
+  LOG_LEVEL: Joi.string()
+    .required()
+    .valid(...LOG_LEVELS),
+
+  GRPC_HOST: Joi.string().required(),
+  GRPC_PORT: Joi.number().required(),
+
+  // --------------------------------------------------------------- 2 BUILD
   // **Which build is this?**. Baked at image build time, never read
   // from git at runtime: a container has no `.git`, so a runtime lookup returns
   // nothing and the natural fallback is `"unknown"` — the answer you get at
@@ -11,24 +30,30 @@ export const envValidationSchema = Joi.object({
   // that cannot identify itself fails to BOOT rather than lying about what it
   // is. The Dockerfile's `test -n "$GIT_SHA"` guard is the same rule one stage
   // earlier.
+
   APP_VERSION: Joi.string().required(),
   BUILD_SHA: Joi.string().required(),
   BUILD_TIME: Joi.string().isoDate().required(),
+
+  // ---------------------------------------------------------------- 3 DATA
+
+  DATABASE_URL: Joi.string().required(),
+
+  REDIS_URL: Joi.string().required(),
+
+  // ----------------------------------------------------------- 4 MESSAGING
+
+  NATS_URL: Joi.string().required(),
+  NATS_MONITOR_URL: Joi.string().uri().required(),
+
+  // --------------------------------------------------------------- 5 PEERS
 
   // The gRPC client pointed at storage-service, for avatar uploads. Required
   // rather than optional: an avatar endpoint that silently 500s because a URL
   // was never configured is worse than a service that refuses to boot.
   STORAGE_SERVICE_URL: Joi.string().required(),
 
-  DATABASE_URL: Joi.string().required(),
-
-  REDIS_URL: Joi.string().required(),
-
-  NATS_URL: Joi.string().required(),
-  NATS_MONITOR_URL: Joi.string().uri().required(),
-
-  GRPC_HOST: Joi.string().required(),
-  GRPC_PORT: Joi.number().required(),
+  // ------------------------------------------------------- 6 AUTH & SECRETS
 
   // This service mints and verifies tokens; it never writes cookies.
   // The *_NAME and COOKIE_* vars are api-gateway concerns and are validated there.
@@ -59,14 +84,6 @@ export const envValidationSchema = Joi.object({
   // trust domain — so it needs no key path of its own.
   JWT_TENANT_SELECTION_EXPIRES_IN: Joi.string().required(),
 
-  // How long an invitation link stays redeemable. Also the window over which a
-  // PENDING invite reserves a seat, so it is a quota knob as much as a
-  // security one.
-  INVITATION_TTL_DAYS: Joi.number().required(),
-
-  // Shown as the issuer in the user's authenticator app.
-  APP_NAME: Joi.string().required(),
-
   // Encrypts users.two_factor_secret at rest. A TOTP secret must be readable
   // to verify a code, so it cannot be hashed -- see encryptSecret().
   // Rotating this without re-encrypting every stored secret breaks 2FA for
@@ -84,10 +101,11 @@ export const envValidationSchema = Joi.object({
 
   BCRYPT_ROUNDS: Joi.number().required(),
 
-  // Mail and SMS delivery moved to notification-service (Domain E); this
-  // service only publishes NATS commands and holds no provider credentials.
-  // Base URL of the SPA, used to build the links inside those notifications.
-  APP_WEB_URL: Joi.string().uri().required(),
+  OTP_LENGTH: Joi.number().required(),
+  OTP_EXPIRY_MINUTES: Joi.number().required(),
+  OTP_MAX_ATTEMPTS: Joi.number().required(),
+
+  // --------------------------------------------------------- 7 THIRD PARTY
 
   // Path to the service-account JSON downloaded from the Firebase console,
   // relative to the service root. Used to verify the Google ID tokens the
@@ -102,17 +120,37 @@ export const envValidationSchema = Joi.object({
   // NEVER commit this file. It is a bearer credential for the whole project.
   FIREBASE_SERVICE_ACCOUNT_PATH: Joi.string().required(),
 
-  GITHUB_CLIENT_ID: Joi.string().required(),
-  GITHUB_CLIENT_SECRET: Joi.string().required(),
+  // Billing — OPTIONAL, and deliberately so.
+  //
+  // Every existing tenant is grandfathered: no Stripe objects at all, and on
+  // the day this ships that is all of them. A service that refused to boot
+  // without billing configured would take down LOGIN for a system where
+  // billing is not yet in use — so the keys are optional and `StripeService`
+  // degrades to UNAVAILABLE on the billing endpoints alone.
+  STRIPE_SECRET_KEY: Joi.string().optional(),
+  STRIPE_WEBHOOK_SECRET: Joi.string().optional(),
 
-  OTP_LENGTH: Joi.number().required(),
-  OTP_EXPIRY_MINUTES: Joi.number().required(),
-  OTP_MAX_ATTEMPTS: Joi.number().required(),
+  // -------------------------------------------------------------- 8 POLICY
+
+  // Shown as the issuer in the user's authenticator app.
+  APP_NAME: Joi.string().required(),
+
+  // Mail and SMS delivery moved to notification-service (Domain E); this
+  // service only publishes NATS commands and holds no provider credentials.
+  // Base URL of the SPA, used to build the links inside those notifications.
+  APP_WEB_URL: Joi.string().uri().required(),
+
+  // How long an invitation link stays redeemable. Also the window over which a
+  // PENDING invite reserves a seat, so it is a quota knob as much as a
+  // security one.
+  INVITATION_TTL_DAYS: Joi.number().required(),
 
   // Mirrors every audit event to the log as well as publishing it to NATS.
   // A stopgap until ticket-service owns `audit_logs` and subscribes — see the
   // docblock on AuditPublisher. Set false once a real consumer exists.
   AUDIT_LOG_TO_CONSOLE: Joi.boolean().default(true),
+
+  // --------------------------------------------------------- 9 DEVELOPMENT
 
   // Bootstrap seeding (see src/modules/prisma/database.seeder.ts). Runs on every startup and is
   // idempotent; set SEED_ON_BOOTSTRAP=false to skip it entirely.
@@ -136,23 +174,4 @@ export const envValidationSchema = Joi.object({
   SUPER_ADMIN_EMAIL: Joi.string().email().required(),
   SUPER_ADMIN_FULL_NAME: Joi.string().required(),
   SUPER_ADMIN_PASSWORD: Joi.string().min(12).required(),
-
-  NODE_ENV: Joi.string()
-    .required()
-    .valid(...NODE_ENV_OPTIONS),
-  LOG_LEVEL: Joi.string()
-    .required()
-    .valid(...LOG_LEVELS),
-
-  // ---------------------------------------------------------------------
-  // Billing — OPTIONAL, and deliberately so.
-  //
-  // Every existing tenant is grandfathered: no Stripe objects at all, and on
-  // the day this ships that is all of them. A service that refused to boot
-  // without billing configured would take down LOGIN for a system where
-  // billing is not yet in use — so the keys are optional and `StripeService`
-  // degrades to UNAVAILABLE on the billing endpoints alone.
-  // ---------------------------------------------------------------------
-  STRIPE_SECRET_KEY: Joi.string().optional(),
-  STRIPE_WEBHOOK_SECRET: Joi.string().optional(),
 });
