@@ -1,6 +1,8 @@
+import { ORGANIZATION_SLUG_PATTERN } from '@synapsedesk/common';
 import {
   generateBackupCode,
   generateBackupCodes,
+  generateUniqueOrganizationSlug,
   hashToken,
   maskEmail,
   normalizeBackupCode,
@@ -97,5 +99,34 @@ describe('maskEmail (unit)', () => {
     // The domain survives, which is what makes the masked value useful at all:
     // "is this the work address or the personal one?"
     expect(masked).toContain('example.test');
+  });
+});
+
+describe('generateUniqueOrganizationSlug (unit)', () => {
+  it('**emits only slugs the shared pattern accepts** — the producer half of the contract', () => {
+    // `ORGANIZATION_SLUG_PATTERN` is the contract between this generator
+    // (registration writes a slug with NO DTO in the path) and the gateway's
+    // validators (every later edit). A value emitted here and rejected there
+    // is an organization that cannot be edited without changing a field its
+    // admin never chose — and the symptom appears on a `PATCH` months later.
+    //
+    // Lowercasing the input first mirrors every real call site
+    // (`normalizeEmail` in `auth.service.register`, `.toLowerCase()` in
+    // `firebase.service.verifyGoogleIdToken`) — the safety lives in the CALL
+    // SITES, and this pins the round trip so a third caller that forgets is
+    // caught here rather than in production.
+    for (const email of [
+      'bob@acme.com',
+      'Bob@ACME.COM',
+      'someone@sub.example.co.uk',
+      'user@a-b.io',
+    ]) {
+      const slug = generateUniqueOrganizationSlug(email.toLowerCase());
+
+      expect([email, ORGANIZATION_SLUG_PATTERN.test(slug)]).toEqual([
+        email,
+        true,
+      ]);
+    }
   });
 });

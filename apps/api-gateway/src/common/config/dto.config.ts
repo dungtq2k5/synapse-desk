@@ -182,27 +182,12 @@ export const MIN_ORGANIZATION_NAME_LENGTH = 2;
 export const MAX_ORGANIZATION_SLUG_LENGTH = 100;
 export const MIN_ORGANIZATION_SLUG_LENGTH = 2;
 
-/**
- * The shape a slug must have: lowercase alphanumerics and hyphens.
- *
- * **A format rule, not a character exclusion.** Until this existed a slug had
- * only a length bound, so a space, a `/`, an `@` or an emoji all passed — in a
- * field that is `@unique` and reads like a URL segment.
- *
- * **Strict lowercase is safe because BOTH producers already lowercase.** A slug
- * comes from a user through a DTO, or from `generateUniqueOrganizationSlug` at
- * registration; the latter takes whatever `extractEmailDomain` returns, which
- * does no lowercasing of its own — but every caller normalizes first
- * (`normalizeEmail` in `auth.service.register`, `.toLowerCase()` in
- * `firebase.service.verifyGoogleIdToken`). So `Bob@ACME.COM` yields `acme-com`,
- * not `ACME-COM`.
- *
- * That safety lives in the CALL SITES rather than in the generator, which is
- * the thing to know before adding a third one: a caller that forgets would
- * write a slug this rule then rejects on the tenant's next `PATCH` — an account
- * that cannot be edited without changing a field its admin never chose.
- */
-export const ORGANIZATION_SLUG_PATTERN = /^[a-z0-9-]+$/;
+// The slug format moved to `@synapsedesk/common` (organization.config.ts):
+// it is a contract between auth-service's generator and this gateway's
+// validators, and a gateway spec asserting the producer's conformance had to
+// reach across workspaces to do it — an import a pruned image build refuses.
+// Re-exported so the gateway's DTO imports stay local.
+export { ORGANIZATION_SLUG_PATTERN } from '@synapsedesk/common';
 
 /** Matches `organizations.allowed_email_domains` — `@db.VarChar(255)`. */
 export const MAX_ORGANIZATION_DOMAIN_LENGTH = 255;

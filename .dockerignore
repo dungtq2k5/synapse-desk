@@ -34,6 +34,21 @@ secrets/
 .env
 **/.env
 **/.env.*
+# The Firebase service account, which is the one credential that does not
+# reliably sit under `secrets/`. auth-service's contract points into it
+# (`FIREBASE_SERVICE_ACCOUNT_PATH = ./secrets/serviceAccountKey.json`) but
+# storage-service's does not (`./serviceAccountKey.json`, at the package ROOT),
+# and a copy exists at BOTH package roots on disk. The pattern is unanchored so
+# it holds wherever the file lands, which is the point — the `secrets/` rule
+# above only covers one of the two locations.
+# It was gitignored and NOT listed here, so it entered the context and landed in
+# the `prune` stage's `COPY . .` layer. It never reached a shipped image —
+# `turbo prune` emits only git-tracked files, so it is absent from `out/full`,
+# and `runtime` copies only `package.json` and `dist` — but `--target build` or
+# a registry cache export would have published it. The rule this file opens with
+# is that credentials do not enter a build context; this is the line that makes
+# it true of all of them.
+**/serviceAccountKey.json
 
 # Python local state, so a developer's virtualenv never lands in an image.
 .venv

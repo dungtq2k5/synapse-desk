@@ -13,6 +13,29 @@
 #       --build-arg BUILD_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
 # -t synapsedesk/api-gateway.
 #
+# And to RUN the result (the mount is the one thing a reader cannot derive):
+#
+# The network is `synapsedesk-network` because `docker-compose.yml` sets
+# `networks.default.name` explicitly. Compose's OWN default would be
+# `<project>_default` — which is what this comment said until it was measured,
+# and `docker run` answers a wrong network name with `network … not found`
+# rather than anything that hints at the real one.
+#
+#     docker run --rm --network synapsedesk-network \
+#       --env-file apps/auth-service/.env.docker \
+#       -v "$PWD/apps/auth-service/secrets:/app/apps/auth-service/secrets:ro" \
+#       synapsedesk/auth-service
+#
+# The mount target is `$WORKDIR/secrets`, because the key paths in the env
+# contract are RELATIVE and resolved against `process.cwd()` — the same cwd
+# `turbo run dev` uses in the package directory, which is why one value works
+# in both places. storage-service is the odd one out: its credential is
+# `./serviceAccountKey.json` at the package ROOT, not under `secrets/`, so its
+# mount is `-v .../serviceAccountKey.json:/app/apps/storage-service/serviceAccountKey.json:ro`.
+# `.env.docker` is GENERATED from `.env` by `scripts/generate-docker-env.mjs`
+# (host addresses swapped for compose service names) and is gitignored — see
+# that script's header for why generated-not-tracked is the drift answer.
+#
 # `rag-service` is Python and has its own file; it is the one service where the
 # stages genuinely differ.
 
@@ -20,10 +43,16 @@
 # pins `engines.node: >=22.12` because `pdfjs-dist` is ESM-only and is loaded
 # through `createRequire`, which needs a Node that can `require()` ESM. Running
 # the image on 22.11 fails at the first PDF, not at boot.
-ARG NODE_VERSION=24-alpine
-
-# ============================================================ build-args gate
 #
+# And the CEILING is pinned too, to a full version rather than `24-alpine`: a
+# floating tag makes the image a function of the pull date — measured, the npm
+# it ships moved 11.17.0 -> 11.19.0 between two pulls one hour apart, across
+# the release that changed whether install scripts run at all. Read the new
+# value off the registry when bumping; a tag still moves for security rebuilds
+# of the same version, which is the pin's deliberate looseness.
+ARG NODE_VERSION=24.19.0-alpine3.24
+
+# --------------------------------------------------------------- build-args gate
 # **First stage, and it depends on nothing** — so a missing arg fails in seconds
 # rather than after the full install-and-compile. A guard that only fires ten
 # minutes into a build is a guard people learn to work around by passing
@@ -44,8 +73,7 @@ RUN test -n "$GIT_SHA" \
       && false)
 RUN test -n "$BUILD_TIME" || (echo 'BUILD_TIME build arg is required' && false)
 
-# ==================================================================== prune
-#
+# --------------------------------------------------------------- prune
 # **`turbo prune` is what keeps one service's image from carrying all six
 # services' dependencies.** A plain `npm ci` at the workspace root installs
 # every workspace's production tree, so the notification-service image shipped
@@ -59,11 +87,28 @@ FROM node:${NODE_VERSION} AS prune
 WORKDIR /app
 COPY . .
 ARG SERVICE
-RUN npx --yes turbo@^2 prune "@synapsedesk/${SERVICE}" --docker
+# Must match `turbo` in package-lock.json. The pruner decides the shape of the
+# lockfile `npm ci` then installs from, so an unpinned `turbo@^2` makes the
+# image's dependency tree a function of the build DATE — measured: the prune
+# stage ran 2.10.12 from the network while the build stage ran the lockfile's
+# 2.10.9. `image-contract.spec.ts` asserts this ARG equals the lockfile.
+ARG TURBO_VERSION=2.10.9
+RUN npx --yes "turbo@${TURBO_VERSION}" prune "@synapsedesk/${SERVICE}" --docker
 
-# =============================================================== deps (full)
+# --------------------------------------------------------------- deps (full)
 FROM node:${NODE_VERSION} AS deps
 WORKDIR /app
+
+# Must match `packageManager` in package.json — which is TRUE on developer
+# machines (measured: local npm is exactly 11.9.0) and was false only in the
+# image, where the base ships whatever npm is current on the day of the pull.
+# npm 11.17 changed whether install scripts run at all (`allowScripts`); the
+# gate is harmless for this dependency set today (Prisma 7 ships its musl
+# engine in-package, the native modules resolve prebuilds at require time),
+# and pinning converts that from luck into construction.
+# `image-contract.spec.ts` asserts this ARG equals the manifest.
+ARG NPM_VERSION=11.9.0
+RUN npm i -g "npm@${NPM_VERSION}"
 
 # Manifests only, before the source. This layer is keyed on the pruned
 # lockfile, so an ordinary source change reuses the cached `npm ci` instead of
@@ -79,9 +124,14 @@ COPY --from=prune /app/out/json/ ./
 # Generation is now a turbo task that `build` depends on, so it happens in the
 # stage that already has the source, and this layer is keyed on the pruned
 # lockfile alone.
+#
+# No build toolchain (`build-base`, `python3`, `g++`) here, ON PURPOSE — the
+# classic Alpine native-module trap does not apply: both native packages in
+# the tree (`bcrypt` via prebuildify, `msgpackr-extract`) ship musl prebuilds.
+# Measured on this base: both install and load with a bare `npm ci`.
 RUN --mount=type=cache,target=/root/.npm npm ci
 
-# ==================================================================== build
+# --------------------------------------------------------------- build
 FROM deps AS build
 WORKDIR /app
 ARG SERVICE
@@ -90,7 +140,12 @@ COPY --from=prune /app/out/full/ ./
 # `scripts/` sits outside every workspace, so prune leaves it behind — and
 # `grpc-proto`'s build shells out to `scripts/copy-protos.mjs`, without which
 # the image has compiled types and no.proto files to load at boot.
-COPY --from=prune /app/scripts ./scripts
+#
+# ONLY that file, not `scripts/`: the directory also holds `seed-demo/`, whose
+# TypeScript imports the generated Prisma clients of TWO services — code that
+# cannot typecheck in a pruned single-service context, and the typecheck below
+# is the point of this stage.
+COPY --from=prune /app/scripts/copy-protos.mjs ./scripts/
 # The ROOT tsconfig, which `prisma.config.ts` extends. Prisma 7 loads that config
 # through the TypeScript compiler, so without it `db:generate` fails with
 # `File '././tsconfig.json' not found`. Copied from the prune stage's own
@@ -100,15 +155,52 @@ COPY --from=prune /app/scripts ./scripts
 # with the rest of the build — see the note above `npm ci`.
 COPY --from=prune /app/tsconfig.json ./
 
+# `prisma-erd-generator` writes to `docs/reference/erd/<service>.md`, which
+# `.dockerignore` excludes on purpose — documentation has no business in a
+# build context. The generator opens the path and does not create the
+# directory, so `db:generate` — a `dependsOn` of `build` — dies on ENOENT
+# without this. The ERD it writes here is discarded with the stage; the
+# committed one is generated on a developer machine, where the directory
+# exists.
+RUN mkdir -p /app/docs/reference/erd
+
 # `...` builds this service AND the workspaces it depends on. Prune already
 # narrowed the graph; the filter keeps the intent readable.
 #
 # This also runs `db:generate` first: `build` depends on it in `turbo.json`, so
 # the Prisma client is produced here rather than as a side effect of `npm ci`.
+# There is no `binaryTargets` in any schema and none is needed: generation
+# happens HERE, on the same Alpine base the runtime stage uses, so the client
+# is built for the platform it will run on. Adding
+# `binaryTargets = ["linux-musl-openssl-3.0.x"]` would pin this image's
+# platform into schemas that developers also generate from on glibc.
 RUN npx turbo run build --filter="@synapsedesk/${SERVICE}..."
 
-# ============================================================ deps (runtime)
+# **The BROADER of two type checks, and it is not redundant with the other.**
 #
+# This was once the only one: five of six services built with SWC at
+# `typeCheck: false`, so a type error in `auth-service/src` shipped. They now
+# set `typeCheck: true`, which means `turbo run build` above already rejected a
+# type error in each service's `src/` — on the developer's machine too, not
+# only here.
+#
+# What that pass does NOT cover is why this line stays. Each service's
+# `tsconfig.build.json` carries `"exclude": [..., "test", "**/*spec.ts"]`, so
+# the per-service check is blind to spec and harness files — and the measured
+# case is exactly there: notification's `test/utils/bootstrap.ts` imported
+# `@nestjs/testing` undeclared, and a full image run was what caught it. The
+# root config includes `apps/*/test/**` and resolves `@synapsedesk/*` to SOURCE
+# through `paths`, where the per-service pass resolves to the built `.d.ts`.
+# Two corpora, two resolution modes; a green build is not a green typecheck.
+#
+# Over the pruned tree this checks the target service and the libs — the root
+# include globs over absent workspaces match nothing.
+#
+# MOVE THIS TO CI when CI exists — it is a relocation, not a deletion, and the
+# image build gets its minute back.
+RUN npm run typecheck
+
+# --------------------------------------------------------------- deps (runtime)
 # A SECOND install rather than pruning the first. `npm prune --omit=dev` across
 # workspaces leaves the symlink farm in a state that is hard to verify, and the
 # thing being verified here is "does the runtime image contain a compiler" — a
@@ -117,7 +209,7 @@ FROM deps AS prod-deps
 WORKDIR /app
 RUN --mount=type=cache,target=/root/.npm npm ci --omit=dev
 
-# ================================================================== runtime
+# --------------------------------------------------------------- runtime
 FROM node:${NODE_VERSION} AS runtime
 WORKDIR /app
 
@@ -196,8 +288,7 @@ WORKDIR /app/apps/${SERVICE}
 ENV ENTRY=/app/apps/${SERVICE}/entry.js
 CMD ["sh", "-c", "exec node \"$ENTRY\""]
 
-# ============================================================== runtime-ocr
-#
+# --------------------------------------------------------------- runtime-ocr
 # ingestion-service only.
 #
 #     docker build -f docker/node-service.Dockerfile \
@@ -224,7 +315,34 @@ CMD ["sh", "-c", "exec node \"$ENTRY\""]
 # are the large ones, and a demo that reads English scans should not carry
 # Japanese and Chinese models to do it. Adding a language is one word here plus
 # nothing else — the code already accepts all eight.
+FROM busybox:1.37 AS ocr-args
+ARG SERVICE
+# `runtime-ocr` was "ingestion-service only" by convention; the heap bound
+# below turned the convention into a correctness rule — a mis-targeted build
+# now gets OCR binaries AND an ingestion-sized old-space cap, which is a
+# misconfiguration rather than a fat image. Same shape as `build-args`, for
+# the same reason: fail in seconds, before anything expensive.
+RUN test "$SERVICE" = "ingestion-service" \
+  || (echo "runtime-ocr is ingestion-service only — it carries OCR binaries and an ingestion-sized heap cap; SERVICE=$SERVICE would get both" \
+      && false)
+
 FROM runtime AS runtime-ocr
+
+# Forces the `ocr-args` gate into this image's dependency graph — without a
+# reference BuildKit prunes the stage and the guard never runs, exactly as the
+# `build-args` tether above documents.
+COPY --from=ocr-args /bin/true /tmp/.ocr-args-checked
+
+# ingestion-service only (the gate above enforces it). `MAX_DOCUMENT_BYTES` is
+# 100 MB and the worker runs at `concurrency: 2`, so two raw buffers plus
+# parser overhead are resident at the peak. Buffers live OUTSIDE the V8 heap,
+# so this flag does not bound them — it bounds the extracted text and the
+# chunk arrays. The raw buffers are bounded only by the container's memory
+# limit, which is set where the container is run (compose `mem_limit`, k8s
+# `resources.limits.memory`), not here. The two numbers are chosen TOGETHER:
+# 768 MB old-space inside a 1.5 GB container limit leaves headroom for the two
+# 100 MB buffers and the runtime.
+ENV NODE_OPTIONS=--max-old-space-size=768
 
 # **Back to root to install, and back to `node` before the CMD.** The `runtime`
 # stage ends on `USER node` deliberately; an image that installs packages and
@@ -262,8 +380,7 @@ RUN apk add --no-cache \
 
 USER node
 
-# ================================================================== default
-#
+# --------------------------------------------------------------- default
 # **This stage exists to restore the default target, and must stay last.**
 #
 # `docker build` with no `--target` builds the FINAL stage. Without this, that

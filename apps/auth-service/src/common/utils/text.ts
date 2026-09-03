@@ -1,5 +1,5 @@
 /**
- * String shaping: slugs, masking and URL tidying.
+ * @file String shaping: slugs, masking and URL tidying.
  */
 
 import { extractEmailDomain } from '@synapsedesk/common';
@@ -31,9 +31,7 @@ export function maskEmail(email: string): string {
   return `${visible}@${domain}`;
 }
 
-// ---------------------------------------------------------------------------
-// TOTP secret encryption
-// ---------------------------------------------------------------------------
+// ----------------------------------------------------------------  TOTP secret encryption
 
 /**
  * Strips trailing slashes without a regex.

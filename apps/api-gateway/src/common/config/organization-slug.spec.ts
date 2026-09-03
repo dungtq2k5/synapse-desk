@@ -4,7 +4,6 @@ import {
   ORGANIZATION_DOMAIN_PATTERN,
   ORGANIZATION_SLUG_PATTERN,
 } from './dto.config';
-import { generateUniqueOrganizationSlug } from '../../../../auth-service/src/common/utils/text';
 import { UpdateOrganizationDto } from '../../modules/organizations/dto/rest/organization.dto';
 import { CreatePlatformOrganizationDto } from '../../modules/platform/dto/rest/platform.dto';
 
@@ -71,30 +70,11 @@ describe('Organization slug format (unit)', () => {
     expect(ORGANIZATION_SLUG_PATTERN.test('ACME-CORP')).toBe(false);
   });
 
-  it('**3. accepts what `generateUniqueOrganizationSlug` actually emits**', () => {
-    // The test that decides whether the pattern may be strict.
-    //
-    // Registration writes a slug with no DTO in the path, so a rule this
-    // generator can violate produces an organization that cannot be edited
-    // without changing a field its admin never chose — and the symptom appears
-    // on a `PATCH` months later, not at the call.
-    //
-    // It is safe because every caller lowercases the address first
-    // (`normalizeEmail` in `auth.service.register`, `.toLowerCase()` in
-    // `firebase.service.verifyGoogleIdToken`), which is a property of the CALL
-    // SITES rather than of the generator. This pins the round trip so a third
-    // caller that forgets is caught here rather than in production.
-    for (const email of [
-      'bob@acme.com',
-      'Bob@ACME.COM',
-      'someone@sub.example.co.uk',
-      'user@a-b.io',
-    ]) {
-      const slug = generateUniqueOrganizationSlug(email.toLowerCase());
-
-      expect([email, slugErrors(slug)]).toEqual([email, []]);
-    }
-  });
+  // Test 3 — "accepts what `generateUniqueOrganizationSlug` actually emits" —
+  // moved to auth-service's `utils.spec.ts`: it asserts the PRODUCER's
+  // conformance to the (now shared) pattern, and asserting it from here took
+  // a cross-workspace relative import that a pruned image build refuses —
+  // measured as the first failure the in-image typecheck ever caught.
 
   describe('**the domain format rule**', () => {
     const domainErrors = (domain: unknown) =>

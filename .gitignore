@@ -8,6 +8,11 @@ cspell.json
 # since `.env.test` is tracked. Loaded FIRST by the test:e2e:* scripts (dotenv
 # never overwrites, so first wins); absent by default and silently skipped.
 .env.test.local
+# Generated per-service container env — `scripts/generate-docker-env.mjs`
+# rewrites `.env`'s host addresses to compose service names. Generated, never
+# tracked: a tracked copy would be a third hand-maintained value-set outside
+# the env-contract guard's completeness checks.
+.env.docker
 *.tsbuildinfo
 .claude/
 coverage/

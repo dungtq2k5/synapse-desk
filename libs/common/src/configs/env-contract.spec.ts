@@ -110,10 +110,15 @@ describe('the environment contract', () => {
 
   it('**covers every service** — a moved schema fails rather than skips', () => {
     // The corpus floor. The gateway's schema already sits at a different path
-    // (`common/config/` vs `common/configs/`) — found here because the glob
-    // spans src/** — and a service whose schema is RENAMED, or a new service
-    // with no schema at all, lands in this diff rather than silently outside
-    // the scan.
+    // (`common/config/` vs `common/configs/`) and is still found — though NOT
+    // because `**` is generous: in a git pathspec `a/**/b` requires at least
+    // one intervening component, so a schema moved to `apps/x/src/` directly
+    // would be MISSED by the glob above. What holds then is this very
+    // assertion: `covered` is compared against the real service list, so the
+    // dropped service goes red — reading as "schema missing", which is close
+    // enough to point at the move. A renamed schema, or a new service with no
+    // schema at all, lands in the same diff rather than silently outside the
+    // scan.
     const covered = [
       ...schemaFiles().keys(),
       ...Object.keys(GUARDED_ELSEWHERE),

@@ -18,8 +18,20 @@
     //
     // Empty here and untouched in `tsconfig.json`, so the alias keeps working
     // for the IDE, jest and `npm run typecheck` while the emitted `require`
-    // stays a bare specifier that the symlink resolves. This file feeds nothing
-    // else - `typeCheck` is false, so no type resolution happens through it.
+    // stays a bare specifier that the symlink resolves.
+    //
+    // **`typeCheck` is now true, so this file DOES feed type resolution** — and
+    // with no `paths`, `@synapsedesk/*` resolves the way Node will at runtime:
+    // through the workspace symlink to `libs/*/dist/*.d.ts`, the compiled
+    // contract, rather than to source. That is the stricter of the two readings
+    // and the one that matches the image.
+    //
+    // Its one consequence: a BARE `npm run build -w @synapsedesk/<svc>` now
+    // fails on a fresh clone with `Cannot find module '@synapsedesk/common'`,
+    // because the lib has no `dist` yet. Every real entry point goes through
+    // turbo, whose `build` has `dependsOn: ["^build"]`, so the libs are always
+    // built first — `npm run build`, and the image's
+    // `turbo run build --filter="@synapsedesk/<svc>..."` alike.
     "paths": {}
   },
   "exclude": ["node_modules", "dist", "test", "**/*spec.ts"]

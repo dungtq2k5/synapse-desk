@@ -16,11 +16,13 @@
     "@nestjs/core": "^11.1.28",
     "@nestjs/microservices": "^11.1.28",
     "class-validator": "^0.15.1",
+    "ioredis": "^6.0.0",
     "nats": "^2.29.3"
   },
   "devDependencies": {
     "@faker-js/faker": "^10.5.0",
     "@types/jest": "^30.0.0",
-    "@types/node": "^26.1.1"
+    "@types/node": "^26.1.1",
+    "typescript": "^6.0.3"
   }
 }

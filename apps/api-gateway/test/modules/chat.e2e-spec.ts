@@ -14,7 +14,7 @@ import {
   flushTestRedis,
 } from '../utils';
 import { wireCreatedMessage, wirePage, wireTicket } from '../fixtures/wire';
-import { StartConversationDto } from 'apps/api-gateway/src/modules/chat/dto/rest/chat.dto';
+import { StartConversationDto } from '../../src/modules/chat/dto/rest/chat.dto';
 
 /**
  * Self-service chat — proving it is a WRAPPER, not a second implementation.

@@ -1,7 +1,5 @@
 services:
-  # ---------------------------------------------------------------------------
-  # Database Layer (Isolated Postgres Databases per Domain)
-  # ---------------------------------------------------------------------------
+  # ---------------------------------------------------------------- Database Layer (Isolated Postgres Databases per Domain)
   postgres-auth:
     image: postgres:18.4-alpine
     container_name: synapsedesk-postgres-auth
@@ -83,9 +81,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # ---------------------------------------------------------------------------
-  # Message Queue & Cache Layer
-  # ---------------------------------------------------------------------------
+  # ---------------------------------------------------------------- Message Queue & Cache Layer
   redis:
     image: redis:8.8.0-alpine
     container_name: synapsedesk-redis
@@ -166,11 +162,10 @@ services:
     volumes:
       - nats_data:/data
 
-  # ---------------------------------------------------------------------------
-  # AI & Vector Search Engine Layer
-  # ---------------------------------------------------------------------------
+  # ---------------------------------------------------------------- AI & Vector Search Engine Layer
   qdrant:
-    image: qdrant/qdrant:latest
+    # Pinned — `latest` made the vector store a function of the pull date.
+    image: qdrant/qdrant:v1.18.3
     container_name: synapsedesk-qdrant
     ports:
       - '${QDRANT_PORT}:6333' # HTTP API / Dashboard
@@ -185,7 +180,8 @@ services:
   # would otherwise delete real customer files. It is also what lets the storage
   # suite run on a fresh clone with no Google project at all.
   firebase-storage:
-    image: andreysenov/firebase-tools:latest
+    # Pinned — same rule as qdrant above.
+    image: andreysenov/firebase-tools:15.25.1
     container_name: synapsedesk-firebase-storage
     working_dir: /home/node
     command: firebase emulators:start --only storage --project synapsedesk-test

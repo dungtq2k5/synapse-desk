@@ -83,3 +83,28 @@ export const ORG_STATUS_TRANSITIONS: Record<OrgStatus, readonly OrgStatus[]> = {
   [OrgStatus.SUSPENDED_PAST_DUE]: [OrgStatus.ACTIVE, OrgStatus.FROZEN],
   [OrgStatus.FROZEN]: [OrgStatus.ACTIVE],
 };
+
+/**
+ * The shape a slug must have: lowercase alphanumerics and hyphens.
+ *
+ * **A cross-service CONTRACT, which is why it lives here.** auth-service's
+ * `generateUniqueOrganizationSlug` PRODUCES slugs at registration (no DTO in
+ * that path), and the gateway's DTOs VALIDATE slugs on every later edit — a
+ * value the producer can emit and the validator rejects is an organization
+ * that cannot be edited without changing a field its admin never chose, and
+ * the symptom appears on a `PATCH` months after the registration that caused
+ * it. Producer conformance is pinned in auth's own `utils.spec.ts`, against
+ * this constant.
+ *
+ * **A format rule, not a character exclusion.** Before it, a slug had only a
+ * length bound, so a space, a `/`, an `@` or an emoji all passed — in a field
+ * that is `@unique` and reads like a URL segment.
+ *
+ * **Strict lowercase is safe because BOTH producers already lowercase.** The
+ * generator takes whatever `extractEmailDomain` returns and does no
+ * lowercasing of its own — but every caller normalizes first (`normalizeEmail`
+ * in `auth.service.register`, `.toLowerCase()` in
+ * `firebase.service.verifyGoogleIdToken`). That safety lives in the CALL
+ * SITES, which is the thing to know before adding a third one.
+ */
+export const ORGANIZATION_SLUG_PATTERN = /^[a-z0-9-]+$/;

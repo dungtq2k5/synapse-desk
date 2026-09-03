@@ -11,7 +11,7 @@
         "ignore": ["**/*.spec.ts", "**/*.e2e-spec.ts"]
       }
     },
-    "typeCheck": false
+    "typeCheck": true
   },
   "entryFile": "src/main"
 }

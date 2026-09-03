@@ -11,10 +11,12 @@
 #       --build-arg BUILD_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
 #       -t synapsedesk/rag-service .
 
-ARG PYTHON_VERSION=3.12-slim
+# Pinned to a full version, not `3.12-slim` — a floating tag makes the image a
+# function of the pull date (the Node file's ARG documents the measured case).
+# Read the new value off the registry when bumping.
+ARG PYTHON_VERSION=3.12.14-slim-trixie
 
-# ============================================================ build-args gate
-#
+# --------------------------------------------------------------- build-args gate
 # First stage and dependency-free, so a missing arg fails in seconds rather than
 # after pip has resolved the whole dependency tree.
 FROM busybox:1.37 AS build-args
@@ -25,7 +27,7 @@ RUN test -n "$GIT_SHA" \
       && false)
 RUN test -n "$BUILD_TIME" || (echo 'BUILD_TIME build arg is required' && false)
 
-# ==================================================================== deps
+# --------------------------------------------------------------- deps
 FROM python:${PYTHON_VERSION} AS deps
 WORKDIR /app
 
@@ -35,7 +37,7 @@ COPY apps/rag-service/requirements.txt ./
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --prefix=/install -r requirements.txt
 
-# ================================================================== runtime
+# --------------------------------------------------------------- runtime
 FROM python:${PYTHON_VERSION} AS runtime
 WORKDIR /app
 
@@ -58,6 +60,11 @@ ENV BUILD_SHA=$GIT_SHA \
     # dirties the layer at runtime.
     PYTHONDONTWRITEBYTECODE=1
 
+# `--prefix=/install` then copying into /usr/local is sound HERE and fragile
+# in general: it works because the service starts with `python -m`, so no
+# console script exists with a `#!/install/bin/python` shebang baked in. The
+# day an entry point is added, that shebang points at a path absent from this
+# image and the failure is `No such file or directory` at exec.
 COPY --from=deps /install /usr/local
 COPY apps/rag-service/rag_service ./rag_service
 
