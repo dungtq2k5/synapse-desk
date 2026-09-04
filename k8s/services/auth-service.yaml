@@ -34,7 +34,11 @@ spec:
         # readiness path: the same statements, before this pod is in the
         # endpoint list rather than in front of it.
         - name: migrate
-          image: synapsedesk/auth-service-migrate:latest
+          image: us-central1-docker.pkg.dev/synapsedesk/services/auth-service-migrate:0c1c9e9270ec82b834a0b4914990c41a28f15d16
+          # The tag is a commit sha and therefore immutable; re-pulling it can
+          # only cost time. Declared rather than left to the default, which
+          # changes meaning with the tag shape.
+          imagePullPolicy: IfNotPresent
           envFrom:
             - configMapRef:
                 name: auth-service-config
@@ -67,7 +71,11 @@ spec:
       automountServiceAccountToken: false
       containers:
         - name: auth-service
-          image: synapsedesk/auth-service:latest
+          image: us-central1-docker.pkg.dev/synapsedesk/services/auth-service:0c1c9e9270ec82b834a0b4914990c41a28f15d16
+          # The tag is a commit sha and therefore immutable; re-pulling it can
+          # only cost time. Declared rather than left to the default, which
+          # changes meaning with the tag shape.
+          imagePullPolicy: IfNotPresent
           ports:
             - name: grpc
               containerPort: 5001

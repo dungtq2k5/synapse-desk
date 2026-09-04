@@ -39,7 +39,28 @@ spec:
       automountServiceAccountToken: false
       containers:
         - name: api-gateway
-          image: synapsedesk/api-gateway:latest
+          # **A real tag, never a placeholder.** The committed value is the
+          # commit these manifests were written against;
+          # CD rewrites it per deploy (`kubectl set image`). A sentinel like
+          # `IMAGE_TAG` would either fail `image-contract.spec.ts`'s
+          # floating-tag check or force it to special-case the sentinel, which
+          # is how a guard learns to ignore what it guards.
+          #
+          # `:latest` is worse here than in compose for two reasons:
+          # `imagePullPolicy` defaults to `Always` on it, so every restart —
+          # including one a liveness probe caused mid-incident — can pull
+          # different code; and `kubectl rollout undo` restores a pod SPEC, so a
+          # spec naming a moving pointer rolls back to the same pointer. A code
+          # rollback is the only rollback this system has (ADR 0044).
+          #
+          # The REGISTRY HOST is the one value an operator changes — see
+          # `k8s/README.md`. Unqualified `synapsedesk/api-gateway` would resolve
+          # to Docker Hub, which is not where these images are.
+          image: us-central1-docker.pkg.dev/synapsedesk/services/api-gateway:0c1c9e9270ec82b834a0b4914990c41a28f15d16
+          # The tag is a commit sha and therefore immutable; re-pulling it can
+          # only cost time. Declared rather than left to the default, which
+          # changes meaning with the tag shape.
+          imagePullPolicy: IfNotPresent
           ports:
             - name: http
               containerPort: 3000

@@ -68,17 +68,41 @@ describe('the CI contract', () => {
       expect(workflows().length).toBeGreaterThanOrEqual(1);
     });
 
+    /**
+     * `npm run` names actually INVOKED, comments stripped.
+     *
+     * **The strip is the correction and it was measured.** `cd.yml` runs
+     * `docker` and `kubectl` and no npm script at all — its only `npm run` is
+     * inside the must-never-run header comment, naming `db:push`. Over raw text
+     * that comment satisfied the per-file floor below, so the floor was green
+     * on a workflow it had not read a single step of. The destructive check a
+     * few lines down already strips YAML comments for the mirror-image reason;
+     * this one did not, and the two disagreed about what a workflow says.
+     */
+    const invocations = (file: string): string[] =>
+      [
+        ...read(file)
+          .replace(/^[ \t]*#.*$/gm, '')
+          .matchAll(/npm run ([a-z0-9:_-]+)/g),
+      ].map((match) => match[1]);
+
+    it('the corpus invokes npm scripts at all — the pattern-fires floor', () => {
+      // **Across the corpus, not per file.** A per-workflow floor asserts
+      // something untrue of a deploy job: `cd.yml` legitimately invokes none.
+      // The floor still catches the case it exists for — a regex that broke, or
+      // steps that moved to a form this cannot read — because `ci.yml` alone
+      // invokes eight.
+      const total = workflows().flatMap(invocations);
+
+      expect(total.length).toBeGreaterThanOrEqual(5);
+    });
+
     it.each(workflows())('%s', (file) => {
       const declared = scriptNames();
-      const invoked = [...read(file).matchAll(/npm run ([a-z0-9:_-]+)/g)].map(
-        (match) => match[1],
+
+      expect(invocations(file).filter((name) => !declared.has(name))).toEqual(
+        [],
       );
-
-      // Pattern-fires floor: a workflow that names no npm script at all means
-      // the regex broke or the steps moved to something this cannot read.
-      expect(invoked.length).toBeGreaterThanOrEqual(1);
-
-      expect(invoked.filter((name) => !declared.has(name))).toEqual([]);
     });
   });
 

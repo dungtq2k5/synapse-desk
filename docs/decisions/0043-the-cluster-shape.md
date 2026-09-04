@@ -44,7 +44,7 @@ concurrent runs a multi-replica rollout produces serialise and the losers no-op.
 The three Deployments with no Prisma schema — api-gateway, storage-service,
 rag-service — get no init container, because there is nothing for it to do.
 
-**The twenty-six objects Prisma cannot express moved here too**, out of the
+**The twenty-four objects Prisma cannot express moved here too**, out of the
 application boot hook and into `src/schema-apply.ts`, which the same container
 runs immediately after the migration. The reason is measured and is not the one
 the first draft of this decision gave:
@@ -131,7 +131,7 @@ ticked off on half its meaning.
 ## What this does not decide
 
 - **Whether the schema objects eventually become migration SQL.** They are one
-  method called from two places now, which is a smaller thing than twenty-six
+  method called from two places now, which is a smaller thing than twenty-four
   statements spread across migration files — but it also means `migrate deploy`
   alone does not produce a complete schema, and a future operator reading
   Prisma's `_prisma_migrations` table will not see them. Left open.

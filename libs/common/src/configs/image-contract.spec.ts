@@ -335,19 +335,111 @@ describe('the image contract (static half)', () => {
       }
     });
 
-    it('every compose image has a tag and none is `latest`', () => {
-      const images = [
-        ...read('docker-compose.yml').matchAll(/^\s+image:\s+(\S+)$/gm),
-      ].map((match) => match[1]);
+    /**
+     * **From the FILES toward the config.** This check read
+     * `docker-compose.yml` by name and was green on eleven `:latest` tags in
+     * `k8s/` — a directory that did not exist when it was written, holding the
+     * eleven images this repository actually ships.
+     *
+     * That is the fifth instance of one shape here: two `tsconfig` include
+     * gaps, the turbo lint gap, the prettier glob gap, and this. The prettier
+     * check was rewritten specifically to avoid it — *"written from the FILES
+     * toward the config, a new top-level directory is red on arrival instead of
+     * silently unformatted"* — and this one was not, so it repeated.
+     *
+     * **The pathspec is deliberately the loose form.** In a git pathspec
+     * without `:(glob)`, `*` is plain fnmatch and CROSSES `/`, so `'*.yaml'`
+     * reaches `k8s/services/*.yaml`; the doubled-star form requires an
+     * intervening component and would be NARROWER. Measured: 32 files, 21
+     * `image:` lines.
+     */
+    const imageRefs = (): { file: string; image: string }[] =>
+      gitFiles('*.yml')
+        .concat(gitFiles('*.yaml'))
+        .flatMap((file) =>
+          [...read(file).matchAll(/^\s+image:\s+(\S+)$/gm)].map((match) => ({
+            file,
+            image: match[1],
+          })),
+        );
 
-      // The corpus floor: eight infrastructure services today, one image
-      // line each.
-      expect(images.length).toBeGreaterThanOrEqual(8);
+    it('finds at least twenty image references — the corpus floor', () => {
+      // Twenty-one today: eight in compose, thirteen in `k8s/`. A pathspec or a
+      // regex that stopped matching would make both assertions below vacuous,
+      // which is the failure this check exists to prevent, arriving through the
+      // check.
+      const refs = imageRefs();
 
-      for (const image of images) {
-        expect([image, image.includes(':')]).toEqual([image, true]);
-        expect([image, image.endsWith(':latest')]).toEqual([image, false]);
-      }
+      expect(refs.length).toBeGreaterThanOrEqual(20);
+      // Both directories represented, so a corpus that silently narrowed back
+      // to one file is red rather than merely smaller.
+      expect(refs.some(({ file }) => file === 'docker-compose.yml')).toBe(true);
+      expect(refs.some(({ file }) => file.startsWith('k8s/'))).toBe(true);
+    });
+
+    it('every image reference has a tag and none is `latest`', () => {
+      const floating = imageRefs().filter(
+        ({ image }) => !image.includes(':') || image.endsWith(':latest'),
+      );
+
+      // An omitted tag counts as floating for the same reason `:latest` does —
+      // `imagePullPolicy` defaults to `Always` for both, so every pod restart
+      // becomes an opportunity to run different code.
+      expect(floating.map(({ file, image }) => `${file}: ${image}`)).toEqual(
+        [],
+      );
+    });
+
+    /**
+     * **Application images name a registry; third-party images do not have to.**
+     *
+     * `nats:2.10-alpine` and `qdrant/qdrant:v1.18.3` are unqualified Docker Hub
+     * references and correctly so. `synapsedesk/auth-service` is unqualified and
+     * WRONG: it resolves to Docker Hub, which is not where these images are — a
+     * pull failure if the name is unclaimed, and something considerably worse if
+     * it is not. So the rule is scoped by the prefix rather than by directory,
+     * the same set `docker/check-images.sh` already means by
+     * `docker images 'synapsedesk/*'`.
+     */
+    const APPLICATION_IMAGE = /(?:^|\/)synapsedesk\//;
+
+    it('the application-image pattern fires', () => {
+      expect(
+        [
+          'synapsedesk/auth-service:abc',
+          'us-central1-docker.pkg.dev/proj/synapsedesk/auth-service:abc',
+        ].filter((image) => !APPLICATION_IMAGE.test(image)),
+      ).toEqual([]);
+
+      expect(
+        [
+          'nats:2.10-alpine',
+          'qdrant/qdrant:v1.18.3',
+          'postgres:18.4-alpine',
+        ].filter((image) => APPLICATION_IMAGE.test(image)),
+      ).toEqual([]);
+    });
+
+    it('**every application image names a registry host**', () => {
+      const application = imageRefs().filter(({ image }) =>
+        APPLICATION_IMAGE.test(image),
+      );
+
+      // Eleven today: seven runtime images and four `migrate` images.
+      expect(application.length).toBeGreaterThanOrEqual(11);
+
+      // A registry host is the first path segment when it contains a `.` or a
+      // `:` — Docker's own rule for telling `myregistry.io/x` from the implicit
+      // `docker.io/library/x`.
+      const unqualified = application.filter(({ image }) => {
+        const [first] = image.split('/');
+
+        return !first.includes('.') && !first.includes(':');
+      });
+
+      expect(unqualified.map(({ file, image }) => `${file}: ${image}`)).toEqual(
+        [],
+      );
     });
   });
 

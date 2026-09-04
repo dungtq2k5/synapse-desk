@@ -8,7 +8,7 @@ A production database gets its schema from **`prisma migrate deploy`**, run as a
 
 `prisma db push` remains the development answer, exactly as `development-conventions.md` §7 says: _"Schema is source of truth; reset freely."_ That sentence stays true where it was written and stops being the production answer, which it had become by default because nothing else was written down.
 
-The twenty-six objects Prisma cannot express — partial indexes, `CHECK` constraints, composite GIN over a `tsvector`, extensions — keep their home in each service's `applySchemaObjects()`. They ran on every application boot when this was written and now run in the deploy step beside `migrate deploy` ([ADR 0043](./0043-the-cluster-shape.md)); either way they are one method, not migration SQL. Folding them into migration files is possible later and is not required by this decision.
+The twenty-four objects Prisma cannot express — partial indexes, `CHECK` constraints, composite GIN over a `tsvector`, extensions — keep their home in each service's `applySchemaObjects()`. They ran on every application boot when this was written and now run in the deploy step beside `migrate deploy` ([ADR 0043](./0043-the-cluster-shape.md)); either way they are one method, not migration SQL. Folding them into migration files is possible later and is not required by this decision.
 
 ## Why
 

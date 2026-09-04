@@ -463,6 +463,54 @@ describe('the manifest contract', () => {
     });
   });
 
+  // ------------------------------ 4a. the one value three surfaces must share
+
+  it('**`INBOUND_EMAIL_SECRET` is present in BOTH Secrets that need it**', () => {
+    // **A PRESENCE check, and the direction is the point.** Check 3 above says
+    // no credential lands in a ConfigMap — an exclusion, and Phase 4's own green
+    // sabotage showed what an exclusion misses: a key that moves ENTIRELY out of
+    // the Secret satisfies "not in both" while sitting somewhere it should not.
+    // The mirror failure is a key that is simply absent, and this catches that.
+    //
+    // **One value, three deployment surfaces.** `inbound-email.config.ts` opens
+    // with *"One definition, three readers"*: the Worker signs with it
+    // (`wrangler secret put INBOUND_SECRET`), the gateway verifies that
+    // signature AND parses the per-ticket reply token, and notification-service
+    // MINTS that reply token into `Reply-To`.
+    //
+    // **The two agreements fail in opposite directions and only one is loud.** A
+    // Worker mismatch is a 401 on every message, which the Worker reports rather
+    // than retries. A notification/gateway mismatch makes
+    // `parseTicketReplyToken` return `null` and the caller open a NEW ticket —
+    // correctly and deliberately, since threading a stranger's mail onto
+    // somebody else's conversation is a disclosure — with nothing in a log. It
+    // presents weeks later as "threading stopped working", which is the hardest
+    // possible attribution, and a partial rotation is worse than a wrong one
+    // because two thirds of it keeps working.
+    const KEY = 'INBOUND_EMAIL_SECRET';
+    const HOLDERS = ['api-gateway', 'notification-service'];
+
+    const holdersInSecrets = HOLDERS.filter((service) =>
+      Object.keys(
+        byKind('Secret').find(
+          ({ doc }) => doc.metadata?.name === `${service}-secret`,
+        )?.doc.stringData ?? {},
+      ).includes(KEY),
+    );
+
+    expect(holdersInSecrets).toEqual(HOLDERS);
+
+    // Derived rather than asserted from the list above: the services whose Joi
+    // schema NAMES the variable are the services that must hold it, so a third
+    // consumer added later fails here instead of shipping with no Secret.
+    const declaring = gitFiles('apps/*/src/**/env.validation.ts')
+      .filter((file) => stripComments(read(file)).includes(`${KEY}:`))
+      .map((file) => file.split('/')[1])
+      .sort();
+
+    expect(declaring).toEqual(HOLDERS);
+  });
+
   // ------------------------------------------------ 5. ingestion's memory limit
 
   it("5. **ingestion's memory limit is derived, not compared**", () => {

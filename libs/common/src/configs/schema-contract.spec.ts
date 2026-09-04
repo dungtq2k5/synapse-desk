@@ -190,6 +190,122 @@ describe('the schema contract', () => {
     }
   });
 
+  // ------------------------------ 3b. the migrations, and their one boundary
+
+  describe("**the migrations exist and stay out of the seeder's territory**", () => {
+    const withSchema = (): string[] =>
+      gitFiles('apps/*/prisma/schema.prisma')
+        .map((file) => file.split('/')[1])
+        .sort();
+
+    /**
+     * Every object `applySchemaObjects()` creates, by name, read from the code
+     * that creates it.
+     *
+     * **`stripComments` first, and it is not a formality — it was measured
+     * here.** A first version of this extractor ran over raw source and pulled
+     * the word `on` out of a prose comment (*"CREATE INDEX IF NOT EXISTS on an
+     * EXISTING index"*), which then "matched" every migration containing the
+     * letters `on`. A two-letter English word reported as a schema-object
+     * collision is the vacuity class arriving through a false POSITIVE rather
+     * than a false negative, which is rarer and reads as a real finding.
+     */
+    const seederObjects = (service: string): string[] => {
+      const source = stripComments(
+        read(`apps/${service}/src/modules/prisma/database.seeder.ts`),
+      );
+
+      return [
+        ...[
+          ...source.matchAll(
+            /CREATE (?:UNIQUE )?INDEX IF NOT EXISTS "?([a-z][a-z0-9_]*)"?/gi,
+          ),
+        ].map((match) => match[1]),
+        ...[...source.matchAll(/ADD CONSTRAINT "([a-z0-9_]+)"/gi)].map(
+          (match) => match[1],
+        ),
+      ];
+    };
+
+    it('extracts twenty-three named objects plus one extension — the floor', () => {
+      // auth 8, ticket 5, ingestion 7 (six indexes and `btree_gin`),
+      // notification 4 = 24.
+      //
+      // **The prose said twenty-six for three ADRs, and this is why it is a
+      // test now.** That figure came from a raw `grep -c` over the seeders,
+      // uncomment-stripped, which counted two matches inside docblocks — auth
+      // 10 instead of 8, ticket 6 instead of 5. It then propagated to ADR 0039,
+      // ADR 0042, ADR 0043, the Dockerfile and `k8s/README.md`, none of which
+      // could disagree with each other because they were all copies of one
+      // uncorrected count.
+      //
+      // ADR 0039's own thesis is that a prose enumeration of database objects
+      // has no verifier. The count was the enumeration it did not think it was
+      // making. All six are corrected; this assertion is what makes the next
+      // drift a red test rather than a re-read.
+      const named = withSchema().flatMap(seederObjects);
+      const extensions = withSchema()
+        .map((service) =>
+          stripComments(
+            read(`apps/${service}/src/modules/prisma/database.seeder.ts`),
+          ),
+        )
+        .join('\n')
+        .match(/CREATE EXTENSION/gi);
+
+      expect(named.length).toBe(23);
+      expect(extensions?.length).toBe(1);
+    });
+
+    it.each(withSchema())('%s has a migration', (service) => {
+      // Check 3. `migrate deploy` with an empty `migrations/` directory exits
+      // non-zero, so the init container holds the pod at `Init:Error` forever —
+      // the safe failure, and a slow way to discover a missing directory.
+      const migrations = gitFiles(
+        `apps/${service}/prisma/migrations/*/migration.sql`,
+      );
+
+      expect(migrations.length).toBeGreaterThanOrEqual(1);
+      expect(read(migrations[0]).length).toBeGreaterThan(500);
+    });
+
+    it.each(withSchema())(
+      "%s's migrations create nothing `schema-apply` owns",
+      (service) => {
+        // **Check 4, and the forbidden set is DERIVED rather than listed.** The
+        // twenty-four objects have one producer today; a migration is exactly
+        // where a second would appear, because writing `CREATE INDEX` in SQL is
+        // the obvious thing to do when you are already writing SQL. Two
+        // producers are invisible until they disagree.
+        //
+        // Measured on the generated `0_init` files: zero overlap, zero
+        // `WHERE`-clause partial indexes, zero `CHECK` constraints, and the
+        // `ADD CONSTRAINT` lines Prisma does emit are all foreign keys. The
+        // reason is structural rather than lucky — `schema.prisma` declares no
+        // `postgresqlExtensions`, so `migrate diff` cannot see `btree_gin` at
+        // all, and it has no syntax for a partial index.
+        const forbidden = seederObjects(service);
+        expect(forbidden.length).toBeGreaterThanOrEqual(4);
+
+        const sql = gitFiles(
+          `apps/${service}/prisma/migrations/*/migration.sql`,
+        )
+          .map((file) => `${file}\n${read(file)}`)
+          .join('\n');
+
+        expect(sql.length).toBeGreaterThan(500);
+
+        const collisions = forbidden.filter((name) => sql.includes(name));
+        expect(collisions).toEqual([]);
+
+        // The three shapes a hand-edit would take even under a new name.
+        expect(/CREATE EXTENSION/i.test(sql)).toBe(false);
+        expect(/USING GIN/i.test(sql)).toBe(false);
+        expect(/CREATE (?:UNIQUE )?INDEX[^;]*\sWHERE\s/i.test(sql)).toBe(false);
+      },
+    );
+  });
+
   // ------------------------- 3a. the schema step has TWO callers, always
 
   describe('**the schema step reaches both environments**', () => {

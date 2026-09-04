@@ -1,0 +1,239 @@
+# CD — build, push, apply, wait. The half `ci.yml` opens by saying it is not:
+#
+#   "No publishing, no registry, no deploy: those need Phase 1's images AND a
+#    cluster, and splitting them is what let this land now."
+#
+# Both now exist, so this is that job. It is separate from `ci.yml` rather than
+# a fourth job in it, because the two answer different questions and only one
+# of them may run on a fork's pull request.
+#
+# **What must never run here**, as a named list rather than an absence — the
+# same shape `ci.yml` uses, and `ci-contract.spec.ts` fails if one appears:
+#
+#   npm run db:push       targets a database DIRECTLY and creates it on a typo.
+#                         ADR 0042 replaced it for production; the init
+#                         container runs `migrate deploy` instead.
+#   kubectl apply k8s/generated/*.secret.example.yaml
+#                         those are SKELETONS with empty values. Applying one
+#                         over a real Secret empties it, and the pods that
+#                         mount it fail at boot with no obvious cause.
+#   anything on pull_request
+#                         a deploy triggered by a fork's PR is a deploy an
+#                         outsider chose. The trigger below is `push` to `main`
+#                         and `workflow_dispatch` only.
+name: CD
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# **Never cancel a deploy in progress.** `ci.yml` cancels superseded PR runs
+# because a stale test result is merely useless; a cancelled deploy can leave a
+# rollout half-applied, and the next run starts from a state nobody chose.
+concurrency:
+  group: cd-production
+  cancel-in-progress: false
+
+env:
+  REGISTRY: us-central1-docker.pkg.dev
+  # Must match the prefix in `k8s/services/*.yaml`, which
+  # `image-contract.spec.ts` asserts is a real registry path.
+  IMAGE_PREFIX: us-central1-docker.pkg.dev/synapsedesk/services
+
+jobs:
+  # ----------------------------------------------------------------- build
+  #
+  # Eleven images: seven runtime and four `migrate`. The split is not a
+  # preference — `migrate` is `FROM build` and costs 3.17 GB against `runtime`'s
+  # 1.01 GB, so it is built ONLY for the four services that own a
+  # `prisma/schema.prisma`, which is the condition the target already gates on
+  # (`docker/node-service.Dockerfile`, `test -f prisma/schema.prisma`).
+  build:
+    name: build and push
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Workload Identity Federation rather than a long-lived key JSON. A
+      # service-account key in a repository secret is a credential with no
+      # expiry that every workflow can read.
+      id-token: write
+    strategy:
+      # One image per job, so a failure names the service rather than the
+      # matrix. `fail-fast: false` because knowing all failures beats knowing
+      # the first — a registry outage looks identical to a broken Dockerfile
+      # when only one job ran.
+      fail-fast: false
+      matrix:
+        include:
+          - service: api-gateway
+            target: runtime
+          - service: auth-service
+            target: runtime
+          - service: ticket-service
+            target: runtime
+          - service: ingestion-service
+            target: runtime-ocr
+          - service: notification-service
+            target: runtime
+          - service: storage-service
+            target: runtime
+          - service: auth-service
+            target: migrate
+          - service: ticket-service
+            target: migrate
+          - service: ingestion-service
+            target: migrate
+          - service: notification-service
+            target: migrate
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_DEPLOY_SERVICE_ACCOUNT }}
+
+      - name: registry login
+        run: gcloud auth configure-docker "$REGISTRY" --quiet
+
+      # `ingestion-service` is the one service whose runtime target is not
+      # `runtime`: `runtime-ocr` carries poppler, tesseract and an
+      # ingestion-sized heap cap, and a mis-targeted build now fails at the
+      # `ocr-args` gate rather than shipping a fat image.
+      #
+      # The `migrate` images take a `-migrate` name suffix, matching the
+      # `initContainers` in `k8s/services/*.yaml`.
+      - name: build and push
+        run: |
+          set -euo pipefail
+          name="${{ matrix.service }}"
+          [ "${{ matrix.target }}" = "migrate" ] && name="${name}-migrate"
+
+          docker build \
+            -f docker/node-service.Dockerfile \
+            --target "${{ matrix.target }}" \
+            --build-arg SERVICE="${{ matrix.service }}" \
+            --build-arg GIT_SHA="$GITHUB_SHA" \
+            --build-arg BUILD_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            -t "$IMAGE_PREFIX/${name}:$GITHUB_SHA" \
+            .
+
+          docker push "$IMAGE_PREFIX/${name}:$GITHUB_SHA"
+
+  # rag-service builds from its own Dockerfile — it is the one service where
+  # the stages genuinely differ, so it is a job rather than a matrix row.
+  build-rag:
+    name: build and push (rag-service)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_DEPLOY_SERVICE_ACCOUNT }}
+      - run: gcloud auth configure-docker "$REGISTRY" --quiet
+      - run: |
+          set -euo pipefail
+          docker build -f docker/rag-service.Dockerfile \
+            --build-arg GIT_SHA="$GITHUB_SHA" \
+            --build-arg BUILD_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            -t "$IMAGE_PREFIX/rag-service:$GITHUB_SHA" .
+          docker push "$IMAGE_PREFIX/rag-service:$GITHUB_SHA"
+
+  # ----------------------------------------------------------------- deploy
+  deploy:
+    name: apply and wait
+    needs: [build, build-rag]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_DEPLOY_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/get-gke-credentials@v2
+        with:
+          cluster_name: ${{ vars.GKE_CLUSTER }}
+          location: ${{ vars.GKE_LOCATION }}
+
+      # **Explicitly, and never `-f k8s/`.** A recursive apply would include
+      # `k8s/generated/*.secret.example.yaml` — skeletons whose values are
+      # empty strings — over the real Secrets, emptying every credential in the
+      # namespace. The ConfigMaps ARE applied: they are generated from
+      # `.env.example` and carry no secret values by construction.
+      - name: apply
+        run: |
+          set -euo pipefail
+
+          # ConfigMaps by GLOB, never the directory: `k8s/generated/` also holds
+          # `*.secret.example.yaml`, and `-f k8s/generated/` would apply those.
+          for file in k8s/generated/*.configmap.yaml; do
+            kubectl apply -f "$file"
+          done
+
+          kubectl apply -f k8s/infrastructure/
+          kubectl apply -f k8s/policy/
+          kubectl apply -f k8s/services/
+          kubectl apply -f k8s/ingress.yaml
+
+      # **The tracked manifest names a real tag and this rewrites it.** There is
+      # no `kustomization.yaml` in the tree, and `set image` is the form that
+      # needs none. The committed value is a real commit sha rather than a
+      # placeholder, because a sentinel would have to be special-cased by
+      # `image-contract.spec.ts`'s floating-tag check — which is how a guard
+      # learns to ignore the thing it guards.
+      #
+      # Both containers per Deployment where there are two: the init container
+      # is named `migrate` and carries its own image.
+      - name: set images
+        run: |
+          set -euo pipefail
+          for service in api-gateway auth-service ticket-service \
+                         ingestion-service notification-service \
+                         storage-service rag-service; do
+            kubectl set image "deployment/$service" \
+              "$service=$IMAGE_PREFIX/$service:$GITHUB_SHA"
+          done
+
+          for service in auth-service ticket-service \
+                         ingestion-service notification-service; do
+            kubectl set image "deployment/$service" \
+              "migrate=$IMAGE_PREFIX/$service-migrate:$GITHUB_SHA"
+          done
+
+      # **The step that makes a failed migration fail the pipeline.** Without
+      # it, an `Init:Error` leaves the rollout stuck and the workflow green —
+      # the deploy equivalent of a test suite that reports success because
+      # nothing ran. `--timeout` bounds it, because `rollout status` waits
+      # forever by default and a stuck job is a job nobody reads.
+      - name: wait for every rollout
+        run: |
+          set -euo pipefail
+          for service in api-gateway auth-service ticket-service \
+                         ingestion-service notification-service \
+                         storage-service rag-service; do
+            kubectl rollout status "deployment/$service" --timeout=5m
+          done
+
+      # An `Init:Error` says nothing on its own; the init container's logs say
+      # which migration and which statement. Captured on failure only, for the
+      # same reason `ci.yml` captures shared state: the information is gone by
+      # the time anyone looks.
+      - name: capture on failure
+        if: failure()
+        run: |
+          kubectl get pods -o wide || true
+          for service in auth-service ticket-service \
+                         ingestion-service notification-service; do
+            echo "===== $service init container ====="
+            kubectl logs "deployment/$service" -c migrate --tail=200 || true
+          done
+          kubectl get events --sort-by=.lastTimestamp | tail -50 || true

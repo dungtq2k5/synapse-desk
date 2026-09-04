@@ -72,6 +72,7 @@ Append-only. A decision is never edited; superseding one means writing a new one
 | [0041](./decisions/0041-durable-subjects-are-the-ones-with-nothing-to-reconcile-against.md) | Durable subjects are the ones with nothing to reconcile against |
 | [0042](./decisions/0042-schema-reaches-production-through-migrate-deploy.md) | Schema reaches production through `prisma migrate deploy` |
 | [0043](./decisions/0043-the-cluster-shape.md) | The cluster shape: one Postgres instance, an initContainer, and `ingress-nginx` |
+| [0044](./decisions/0044-expand-and-contract-never-in-one-release.md) | Expand and contract, never in one release |
 
 ## `reference/` — what is true today
 

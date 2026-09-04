@@ -32,7 +32,11 @@ spec:
         # readiness path: the same statements, before this pod is in the
         # endpoint list rather than in front of it.
         - name: migrate
-          image: synapsedesk/notification-service-migrate:latest
+          image: us-central1-docker.pkg.dev/synapsedesk/services/notification-service-migrate:0c1c9e9270ec82b834a0b4914990c41a28f15d16
+          # The tag is a commit sha and therefore immutable; re-pulling it can
+          # only cost time. Declared rather than left to the default, which
+          # changes meaning with the tag shape.
+          imagePullPolicy: IfNotPresent
           envFrom:
             # The ConfigMap too, not just the Secret: `schema-apply.ts` creates
             # a Nest context, and its `ConfigModule` validates the service's
@@ -59,7 +63,11 @@ spec:
       automountServiceAccountToken: false
       containers:
         - name: notification-service
-          image: synapsedesk/notification-service:latest
+          image: us-central1-docker.pkg.dev/synapsedesk/services/notification-service:0c1c9e9270ec82b834a0b4914990c41a28f15d16
+          # The tag is a commit sha and therefore immutable; re-pulling it can
+          # only cost time. Declared rather than left to the default, which
+          # changes meaning with the tag shape.
+          imagePullPolicy: IfNotPresent
           ports:
             - name: grpc
               containerPort: 5005

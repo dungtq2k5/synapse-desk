@@ -7,8 +7,25 @@ compatibility_date = "2026-01-01"
 #
 #   wrangler secret put INBOUND_SECRET
 #
-# It must match the gateway's `INBOUND_EMAIL_SECRET` byte for byte — a mismatch
-# is a 401 on every message, which the Worker reports rather than retries.
+# It must match `INBOUND_EMAIL_SECRET` byte for byte — and that variable has
+# THREE holders, not two, which is what makes a partial rotation worse than a
+# wrong one:
+#
+#   this Worker                 signs the webhook request
+#   api-gateway                 verifies that signature, AND parses the
+#                               per-ticket reply token in the address
+#   notification-service        MINTS that reply token into `Reply-To`
+#
+# `libs/common/src/configs/inbound-email.config.ts` opens by saying so — "One
+# definition, three readers."
+#
+# **The two agreements fail in opposite directions and only one is loud.** A
+# mismatch here is a 401 on every message, which the Worker reports rather than
+# retries. A mismatch between notification-service and the gateway is silent:
+# `parseTicketReplyToken` returns null, every customer reply opens a NEW ticket
+# instead of threading — correctly, since threading a stranger's mail onto
+# somebody else's conversation is a disclosure — and nothing logs an error. It
+# surfaces weeks later as "threading stopped working". Rotate all three at once.
 [vars]
 WEBHOOK_URL = "https://api.example.test/api/v1/webhooks/email/inbound"
 
