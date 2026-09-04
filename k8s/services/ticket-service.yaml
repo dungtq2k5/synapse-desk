@@ -1,0 +1,105 @@
+# ticket-service — six schema objects at boot, no secret FILES.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ticket-service
+  labels:
+    app.kubernetes.io/name: ticket-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ticket-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ticket-service
+    spec:
+      terminationGracePeriodSeconds: 45
+      initContainers:
+        # ADR 0043. The pod cannot start its app container until this exits 0,
+        # which is the ordering constraint ADR 0042 named — from the kubelet,
+        # with no sync-wave tooling. It runs TWO steps in one container:
+        # `prisma migrate deploy`, then `src/schema-apply.ts` for the objects
+        # Prisma cannot express. Both are idempotent — `migrate deploy` takes
+        # Prisma's own advisory lock and the DDL is `IF NOT EXISTS`
+        # throughout — so the N concurrent runs a multi-replica rollout
+        # produces serialize and the losers no-op.
+        #
+        # Moving the DDL here is what takes its `ShareLock` wait off the
+        # readiness path: the same statements, before this pod is in the
+        # endpoint list rather than in front of it.
+        - name: migrate
+          image: synapsedesk/ticket-service-migrate:latest
+          envFrom:
+            # The ConfigMap too, not just the Secret: `schema-apply.ts` creates
+            # a Nest context, and its `ConfigModule` validates the service's
+            # WHOLE Joi schema — a container given only `DATABASE_URL` fails at
+            # boot with `"NATS_URL" is required` rather than at the migration.
+            - configMapRef:
+                name: ticket-service-config
+            - secretRef:
+                name: ticket-service-secret
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+              ephemeral-storage: 256Mi
+            limits:
+              memory: 512Mi
+              ephemeral-storage: 1Gi
+      # Nothing in this pod talks to the Kubernetes API, so the token that
+      # would otherwise be mounted at
+      # /var/run/secrets/kubernetes.io/serviceaccount is a credential with no
+      # reader and a real blast radius — it is what an SSRF or an RCE reaches
+      # for first. Off by declaration rather than by there being no RoleBinding:
+      # an unbound token still authenticates, and the default is `true`.
+      automountServiceAccountToken: false
+      containers:
+        - name: ticket-service
+          image: synapsedesk/ticket-service:latest
+          ports:
+            - name: grpc
+              containerPort: 5002
+          envFrom:
+            - configMapRef:
+                name: ticket-service-config
+            - secretRef:
+                name: ticket-service-secret
+          livenessProbe:
+            grpc:
+              port: 5002
+              service: ''
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            grpc:
+              port: 5002
+              service: 'readiness'
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 200m
+              memory: 384Mi
+              ephemeral-storage: 256Mi
+            limits:
+              memory: 768Mi
+              ephemeral-storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ticket-service
+  labels:
+    app.kubernetes.io/name: ticket-service
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: ticket-service
+  ports:
+    - name: grpc
+      port: 5002
+      targetPort: grpc

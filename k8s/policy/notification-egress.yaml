@@ -1,0 +1,68 @@
+# Known gap #26's answer: egress control the process cannot bypass.
+#
+# The row states the position exactly — *"The durable answer is egress control
+# the process cannot bypass — a NetworkPolicy or egress proxy that refuses the
+# metadata endpoint and the mesh regardless of what the application resolves —
+# which is a deployment artifact this repo does not contain."* This is that
+# artifact.
+#
+# **It does not replace `webhook-target.guard.ts`; it stands behind it.** The
+# guard resolves, checks every address and PINS the connection to a checked one,
+# which is the only layer that can produce a useful error message to the tenant
+# who configured the URL. What it cannot promise is completeness — a novel
+# encoding or an address class it does not enumerate would pass. A kernel-level
+# deny is what makes that gap survivable rather than fatal, which is why doc
+# 69's validation finding two holes in the guard is an argument FOR this file
+# rather than against the guard.
+#
+# **`ipBlock.except` is the whole mechanism.** A NetworkPolicy has no "deny"
+# rule: it is allow-only, and the way to refuse a range is to allow everything
+# else. The excepts below are the same ranges `addressIsDenied` refuses, plus
+# 169.254.169.254 — the cloud metadata endpoint, the single most valuable SSRF
+# target on any managed platform.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: notification-service-egress
+  labels:
+    app.kubernetes.io/name: notification-service
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: notification-service
+  policyTypes:
+    - Egress
+  egress:
+    # In-cluster peers it legitimately talks to. Named explicitly because the
+    # public rule below excludes the whole private space, this one included.
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: auth-service
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: nats
+    # DNS. Without this the pod cannot resolve anything at all, including the
+    # webhook targets the policy exists to constrain.
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # The public internet, minus everything private. Outbound webhooks, SMTP
+    # and Twilio all leave through here.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+              - 127.0.0.0/8
+              - 100.64.0.0/10
+              - 169.254.0.0/16

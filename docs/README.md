@@ -71,6 +71,7 @@ Append-only. A decision is never edited; superseding one means writing a new one
 | [0040](./decisions/0040-ticket-status-history-is-a-table-not-a-trail.md) | A ticket's status history is a table, not an audit trail |
 | [0041](./decisions/0041-durable-subjects-are-the-ones-with-nothing-to-reconcile-against.md) | Durable subjects are the ones with nothing to reconcile against |
 | [0042](./decisions/0042-schema-reaches-production-through-migrate-deploy.md) | Schema reaches production through `prisma migrate deploy` |
+| [0043](./decisions/0043-the-cluster-shape.md) | The cluster shape: one Postgres instance, an initContainer, and `ingress-nginx` |
 
 ## `reference/` — what is true today
 

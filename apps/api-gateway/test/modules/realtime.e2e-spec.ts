@@ -17,7 +17,9 @@ import {
   ACCESS_COOKIE,
   RealtimeFixture,
   bootstrapRealtimeTest,
+  buildJwtPayload,
   expectNoEvent,
+  signAccessToken,
   signTwoFactorToken,
   waitForEvent,
   waitForMatchingEvent,
@@ -187,6 +189,41 @@ describe('the real-time relay (e2e)', () => {
           socket.on('disconnect', () => {
             clearTimeout(timer);
             resolve();
+          });
+          socket.on('connect_error', () => {
+            clearTimeout(timer);
+            resolve();
+          });
+        }),
+      ).resolves.toBeUndefined();
+    });
+
+    it('**REFUSES a polling client, with a VALID cookie** — transports are pinned', async () => {
+      // The multi-replica constraint, asserted at the one place it is
+      // observable. Socket.IO's default list is `['polling', 'websocket']` and
+      // the polling handshake is a sequence of HTTP requests that must reach
+      // the SAME process — `@socket.io/redis-adapter` shares broadcasts, not
+      // handshake state. `SecureGateway` pins `transports: ['websocket']` so
+      // such a client fails immediately and visibly here, rather than working
+      // on one pod and reconnect-looping on the next.
+      //
+      // The cookie is deliberately VALID: this must fail on the transport and
+      // nothing else, or it would pass for the same reason the three tests
+      // above do.
+      const socket = fx.connectWithTransports(
+        `${ACCESS_COOKIE}=${signAccessToken(buildJwtPayload({ organizationId }))}`,
+        ['polling'],
+      );
+
+      await expect(
+        new Promise<void>((resolve, reject) => {
+          const timer = setTimeout(
+            () => reject(new Error('a polling client CONNECTED')),
+            5_000,
+          );
+          socket.on('connect', () => {
+            clearTimeout(timer);
+            reject(new Error('a polling client CONNECTED'));
           });
           socket.on('connect_error', () => {
             clearTimeout(timer);

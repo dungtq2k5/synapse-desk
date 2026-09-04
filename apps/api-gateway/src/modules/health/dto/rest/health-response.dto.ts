@@ -24,9 +24,16 @@ export class ReadinessDependenciesResponseDto {
  * field added to `peers` informs a human. Putting a new check in the wrong one
  * is how the cascading outage happened, so they are separate objects rather than one flat
  * bag a future field could land in by accident.
+ *
+ * `draining` is the one thing that gates without being a dependency, so it sits
+ * beside `ready` rather than inside `dependencies`: a draining pod's Redis is
+ * fine, and reporting it as a Redis fault during an ordinary rollout would send
+ * whoever reads this at the wrong system.
  */
 export class ReadinessResponseDto {
   ready!: boolean;
+  /** This instance is shutting down. Gates `ready`; see `DrainState`. */
+  draining!: boolean;
   dependencies!: ReadinessDependenciesResponseDto;
   /** Peer connectivity, for humans during an incident. Does NOT gate. */
   peers!: Record<string, ServiceEndpoint>;

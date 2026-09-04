@@ -1,0 +1,88 @@
+# rag-service — the Python image (`docker/rag-service.Dockerfile`), no Prisma
+# schema and therefore no init container. It reads ingestion's database
+# read-only through `INGESTION_DATABASE_URL`, which is why it has a Secret and
+# no migration step.
+#
+# Its `GRPC_PORT` is documented on a COMMENTED line in `.env.example` — the
+# development default is right and only a pod needs it set — so the generated
+# ConfigMap carries it, which is the whole reason the generator reads commented
+# lines. Same for `GRPC_HOST`.
+#
+# **One replica to start**, for the same reason as ingestion: every replica is
+# another concurrent consumer of a paid embedding API.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rag-service
+  labels:
+    app.kubernetes.io/name: rag-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: rag-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: rag-service
+    spec:
+      terminationGracePeriodSeconds: 45
+      # Nothing in this pod talks to the Kubernetes API, so the token that
+      # would otherwise be mounted at
+      # /var/run/secrets/kubernetes.io/serviceaccount is a credential with no
+      # reader and a real blast radius — it is what an SSRF or an RCE reaches
+      # for first. Off by declaration rather than by there being no RoleBinding:
+      # an unbound token still authenticates, and the default is `true`.
+      automountServiceAccountToken: false
+      containers:
+        - name: rag-service
+          image: synapsedesk/rag-service:latest
+          ports:
+            - name: grpc
+              containerPort: 50255
+          envFrom:
+            - configMapRef:
+                name: rag-service-config
+            - secretRef:
+                name: rag-service-secret
+          # `server.py` registers `grpc_health.v1` on the SAME port and sets
+          # `""` SERVING at startup and `readiness` only once its dependencies
+          # answer — the same two questions the Node services serve, in the
+          # library's own implementation.
+          livenessProbe:
+            grpc:
+              port: 50255
+              service: ''
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            grpc:
+              port: 50255
+              service: 'readiness'
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 300m
+              memory: 512Mi
+              ephemeral-storage: 256Mi
+            limits:
+              memory: 1024Mi
+              ephemeral-storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rag-service
+  labels:
+    app.kubernetes.io/name: rag-service
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: rag-service
+  ports:
+    - name: grpc
+      port: 50255
+      targetPort: grpc

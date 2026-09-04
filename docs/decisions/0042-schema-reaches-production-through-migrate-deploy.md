@@ -6,9 +6,9 @@
 
 A production database gets its schema from **`prisma migrate deploy`**, run as a deploy step that completes before any replica serves traffic.
 
-`prisma db push` remains the development answer, exactly as `development-conventions.md` §7 says: *"Schema is source of truth; reset freely."* That sentence stays true where it was written and stops being the production answer, which it had become by default because nothing else was written down.
+`prisma db push` remains the development answer, exactly as `development-conventions.md` §7 says: _"Schema is source of truth; reset freely."_ That sentence stays true where it was written and stops being the production answer, which it had become by default because nothing else was written down.
 
-The twenty-six objects Prisma cannot express — partial indexes, `CHECK` constraints, composite GIN over a `tsvector`, extensions — keep their home in each service's `applySchemaObjects()` and run on every boot. Moving them into migration SQL is possible later and is not required by this decision.
+The twenty-six objects Prisma cannot express — partial indexes, `CHECK` constraints, composite GIN over a `tsvector`, extensions — keep their home in each service's `applySchemaObjects()`. They ran on every application boot when this was written and now run in the deploy step beside `migrate deploy` ([ADR 0043](./0043-the-cluster-shape.md)); either way they are one method, not migration SQL. Folding them into migration files is possible later and is not required by this decision.
 
 ## Why
 
@@ -16,7 +16,7 @@ The twenty-six objects Prisma cannot express — partial indexes, `CHECK` constr
 
 1. **It creates a missing database on connect** rather than failing — `PostgreSQL database ci_probe_scratch_db created at localhost:5433`. A typo in a production `DATABASE_URL` does not stop the deploy; it provisions an empty database, and the service then boots against it.
 2. **It refuses data-losing changes** without `--accept-data-loss`. A release that drops a column fails at the moment of deploy, with the previous version already stopped and no recorded way back.
-3. **It leaves no history.** Nothing on the database records which schema it is at, so *"is this replica up to date"* has no answer that does not involve reading the catalogue by hand.
+3. **It leaves no history.** Nothing on the database records which schema it is at, so _"is this replica up to date"_ has no answer that does not involve reading the catalogue by hand.
 
 `migrate deploy` answers all three: it refuses to run against an unexpected state, it records what has been applied, and it never creates a database as a side effect.
 
@@ -28,8 +28,8 @@ Nothing new to learn, and the dev and prod paths stay identical — genuinely th
 
 ## What this does not decide
 
-- **Where the step runs.** An init container, a `Job`, or a step in whatever Phase 4 builds. It must complete before any replica serves; that ordering is the constraint, not the shape.
-- **Whether `applySchemaObjects()` moves.** It runs on every boot today, is idempotent by construction (`IF NOT EXISTS`), and can relocate to the migration step later. Splitting it out of the seeding gate — which this decision did — is what makes that a move rather than a rewrite.
+- ~~**Where the step runs.**~~ **Decided by [ADR 0043](./0043-the-cluster-shape.md): an `initContainer` on each Deployment that owns a Prisma schema.** The ordering constraint named here is exactly what the kubelet gives for free, and it was the hard part.
+- ~~**Whether `applySchemaObjects()` moves.**~~ **It moved, in [ADR 0043](./0043-the-cluster-shape.md).** It runs in the same init container as `migrate deploy`, through `src/schema-apply.ts`, and no longer on every application boot. Splitting it out of the seeding gate — which this decision did — is what made that a move rather than a rewrite. What stays in the boot hook is `assertSchemaExists()`, so a pod booted against an unmigrated database refuses to serve instead of serving 500s.
 
 ## Consequences
 

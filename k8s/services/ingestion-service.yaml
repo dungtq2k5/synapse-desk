@@ -1,0 +1,135 @@
+# ingestion-service — the `runtime-ocr` image, and the one Deployment whose
+# memory limit is a correctness setting rather than a default.
+#
+# **ONE replica to start.** Replicas multiply concurrency: two pods is four
+# concurrent parses and four times the embedding spend per unit time. The limit
+# below is per-pod and says nothing about the aggregate;
+# `MAX_CHUNKS_PER_DOCUMENT` bounds the spend and it is per-document. Scale this
+# deliberately, not as a default.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ingestion-service
+  labels:
+    app.kubernetes.io/name: ingestion-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ingestion-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ingestion-service
+    spec:
+      terminationGracePeriodSeconds: 45
+      initContainers:
+        # ADR 0043. The pod cannot start its app container until this exits 0,
+        # which is the ordering constraint ADR 0042 named — from the kubelet,
+        # with no sync-wave tooling. It runs TWO steps in one container:
+        # `prisma migrate deploy`, then `src/schema-apply.ts` for the objects
+        # Prisma cannot express. Both are idempotent — `migrate deploy` takes
+        # Prisma's own advisory lock and the DDL is `IF NOT EXISTS`
+        # throughout — so the N concurrent runs a multi-replica rollout
+        # produces serialise and the losers no-op.
+        #
+        # Moving the DDL here is what takes its `ShareLock` wait off the
+        # readiness path: the same statements, before this pod is in the
+        # endpoint list rather than in front of it.
+        - name: migrate
+          image: synapsedesk/ingestion-service-migrate:latest
+          envFrom:
+            # The ConfigMap too, not just the Secret: `schema-apply.ts` creates
+            # a Nest context, and its `ConfigModule` validates the service's
+            # WHOLE Joi schema — a container given only `DATABASE_URL` fails at
+            # boot with `"NATS_URL" is required` rather than at the migration.
+            - configMapRef:
+                name: ingestion-service-config
+            - secretRef:
+                name: ingestion-service-secret
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+              ephemeral-storage: 256Mi
+            limits:
+              memory: 512Mi
+              ephemeral-storage: 1Gi
+      # Nothing in this pod talks to the Kubernetes API, so the token that
+      # would otherwise be mounted at
+      # /var/run/secrets/kubernetes.io/serviceaccount is a credential with no
+      # reader and a real blast radius — it is what an SSRF or an RCE reaches
+      # for first. Off by declaration rather than by there being no RoleBinding:
+      # an unbound token still authenticates, and the default is `true`.
+      automountServiceAccountToken: false
+      containers:
+        - name: ingestion-service
+          # `--target runtime-ocr`. A build without it serves every text
+          # document correctly and fails every scanned one, and nothing an
+          # operator watches goes red — known gap #16.
+          image: synapsedesk/ingestion-service:latest
+          ports:
+            - name: grpc
+              containerPort: 5004
+          envFrom:
+            - configMapRef:
+                name: ingestion-service-config
+            - secretRef:
+                name: ingestion-service-secret
+          livenessProbe:
+            grpc:
+              port: 5004
+              service: ''
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            grpc:
+              port: 5004
+              service: 'readiness'
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 500m
+              # Matches the image's `--max-old-space-size=768`: the heap the
+              # process will actually take.
+              memory: 768Mi
+              ephemeral-storage: 256Mi
+            limits:
+              # **Known gap #15's other half.** `MAX_DOCUMENT_BYTES` is 100 MB
+              # and the worker runs at `concurrency: 2`, so two raw buffers are
+              # resident at the peak — and Buffers live OUTSIDE the V8 heap, so
+              # the 768 MB `--max-old-space-size` in `runtime-ocr` does not
+              # bound them. This limit is the only thing that does, and the two
+              # numbers were chosen together: 768 heap + 2 x 100 MB buffers +
+              # runtime overhead. `manifest-contract.spec.ts` derives that floor
+              # from `document.config.ts` and `ingestion.worker.ts` rather than
+              # restating 1536 here, because a comparison against the heap cap
+              # alone would accept 800Mi — which OOMKills on the second
+              # concurrent parse.
+              memory: 1536Mi
+              # Larger than every other service's, and for a reason only this
+              # one has: `pdftoppm` rasterises each PDF page to a temp FILE
+              # before tesseract reads it, so a scanned document's pages land
+              # on the container filesystem rather than in the heap the line
+              # above bounds. Unbounded, a large scan fills the node's disk and
+              # takes every other pod on it down — a different blast radius
+              # from an OOMKill, which is confined to this container.
+              ephemeral-storage: 4Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ingestion-service
+  labels:
+    app.kubernetes.io/name: ingestion-service
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: ingestion-service
+  ports:
+    - name: grpc
+      port: 5004
+      targetPort: grpc

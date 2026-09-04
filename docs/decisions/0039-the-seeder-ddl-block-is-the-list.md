@@ -6,7 +6,7 @@
 
 Schema stays the source of truth and ordinary changes stay in `schema.prisma`. Constraints and indexes Prisma cannot express live in the owning service's seeder DDL block — `applySchemaObjects()`, one name in all four services — and **that block is the complete list**. No document enumerates them.
 
-That block runs on every boot, outside `SEED_ON_BOOTSTRAP`. It was inside it until that gating was measured: the flag an operator sets in production removed twenty-six objects, including the partial index [ADR 0020](./0020-email-uniqueness-is-per-tenant.md) says the service-layer check does not replace.
+That block runs in the **deploy step** — `src/schema-apply.ts`, called by the `migrate` init container after `prisma migrate deploy` and by `npm run db:push` in development ([ADR 0043](./0043-the-cluster-shape.md)). It ran on every application boot until that step existed, and in both arrangements it is outside `SEED_ON_BOOTSTRAP`. It was inside it until that gating was measured: the flag an operator sets in production removed twenty-six objects, including the partial index [ADR 0020](./0020-email-uniqueness-is-per-tenant.md) says the service-layer check does not replace.
 
 ## Why
 

@@ -1,0 +1,45 @@
+# The one Ingress. Item 33's routing-and-TLS half — ADR 0043.
+#
+# **`ingress-nginx`, and only the gateway.** The five gRPC services and
+# rag-service have `ClusterIP` Services and nothing else: they are reachable
+# from inside the cluster and from nowhere else, which is the property
+# `AUTH_SERVICE_URL = auth-service:5001` already assumes.
+#
+# **`trust proxy` is 1 in `main.ts` and this is why it is right.** That literal
+# is a HOP COUNT and its comment says "Behind both an ALB and Nginx it must be
+# 2". One `ingress-nginx` in front is exactly one hop. Front this controller
+# with a second proxy and `req.ip` becomes the proxy's address — which feeds
+# `device_sessions.ip_address`, the throttler's tracker and the audit log.
+#
+# **The metrics port is deliberately not routed.** `METRICS_PORT = 9464` is its
+# own listener so that "not reachable from the internet" is structural rather
+# than an ingress rule; there is no path here that reaches it.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api-gateway
+  labels:
+    app.kubernetes.io/name: api-gateway
+  annotations:
+    # WebSocket upgrades need a read timeout longer than the default 60s or an
+    # idle socket is closed under the client. `pingInterval` is Socket.IO's
+    # default 25s, so 3600 leaves the server's own keepalive in charge.
+    nginx.ingress.kubernetes.io/proxy-read-timeout: '3600'
+    nginx.ingress.kubernetes.io/proxy-send-timeout: '3600'
+    # **No session affinity, on purpose.** It would work and it is the wrong
+    # fix: `SecureGateway` pins `transports: ['websocket']`, so there is no
+    # polling handshake that needs to land on the same replica, and affinity
+    # would cost the even distribution `@socket.io/redis-adapter` exists to
+    # allow.
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: api-gateway
+                port:
+                  name: http

@@ -72,15 +72,25 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
 
   async onApplicationBootstrap(): Promise<void> {
     try {
-      // **Schema objects are not seeding, and this is the only service where
-      // the distinction was ever real.** Prisma cannot express partial
-      // indexes, CHECK constraints or extensions, so this block is the only
-      // thing that creates them — while `SEED_ON_BOOTSTRAP` exists to skip
-      // inserting ROWS, which is a decision an operator makes freely. Behind
-      // one boolean, the production-looking setting removed the partial index
-      // that makes a duplicate signup impossible (ADR 0020) while the catch
-      // below still said serving without these was worse than not serving.
-      await this.applySchemaObjects();
+      // **The hook ASSERTS; it no longer applies.** Schema objects are created
+      // by the deploy step now — `prisma migrate deploy` and then
+      // `applySchemaObjects()`, both in the init container ADR 0043 chose,
+      // both before this pod is in the endpoint list.
+      //
+      // What stays here is the check, and it has to: ADR 0042's finding was
+      // a schema step that could be skipped without anything noticing, and
+      // moving the step out of the boot path would recreate that exactly if
+      // the boot path fell silent with it. A service started OUTSIDE
+      // Kubernetes — a developer, a one-off container — gets no init
+      // container, so this is the only thing between it and serving 500s
+      // against an unmigrated database.
+      //
+      // `assertSchemaExists()` was `applySchemaObjects()`'s own first line,
+      // for the same reason it is this hook's: `prisma db push` CREATES a
+      // missing database rather than failing, so a typo in `DATABASE_URL`
+      // yields a real empty one that a service would otherwise boot against,
+      // report healthy on, and fail every query against forever.
+      await this.assertSchemaExists();
 
       if (!this.configService.getOrThrow<boolean>('SEED_ON_BOOTSTRAP')) {
         this.logger.log('SEED_ON_BOOTSTRAP is false — skipping seed ROWS');
@@ -131,9 +141,27 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
     // check would boot, report healthy, and fail on the first query forever.
     await this.assertSchemaExists();
 
-    // Deliberately OUTSIDE the transaction. `CREATE INDEX` takes an ACCESS
-    // EXCLUSIVE lock on `roles` that is held until commit, so running it inside
-    // would block every other reader of the table for the seed's full duration.
+    // Deliberately OUTSIDE the transaction, and **measured** — this comment
+    // said ACCESS EXCLUSIVE and "blocks every other reader", and both halves
+    // were wrong:
+    //
+    //   CREATE INDEX IF NOT EXISTS on an EXISTING index
+    //     -> ShareLock on `roles`            (the table)
+    //   CREATE INDEX that actually creates one
+    //     -> ShareLock on `roles` AND AccessExclusiveLock on the NEW INDEX
+    //
+    // `ShareLock` conflicts with `RowExclusiveLock` — writers — and not with
+    // `AccessShareLock` — readers. A concurrent SELECT runs straight through
+    // (0.04 s measured, while this statement itself waited 7 s behind an
+    // 8-second writer).
+    //
+    // So the placement is right for a sharper reason than the one it used to
+    // give: `ShareLock` QUEUES behind any open write transaction and then holds
+    // the head of the queue, so every later writer stalls behind a statement
+    // that will do nothing. Inside the seed's transaction that wait would be
+    // held for the row-seeding duration on top of its own. Outside, it is one
+    // statement's worth.
+    //
     // It is also DDL: idempotent on its own and not something we want rolled
     // back alongside the data.
     await this.ensureGlobalRoleNameIndex();
@@ -364,7 +392,7 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
    * expected set is small on purpose — the tables the seeder and the boot path
    * touch — because this is a smoke check, not a schema diff.
    */
-  private async assertSchemaExists(): Promise<void> {
+  async assertSchemaExists(): Promise<void> {
     const expected = ['roles', 'users', 'permissions', 'organizations'];
 
     const rows = await this.prisma.$queryRaw<{ table_name: string }[]>`

@@ -1,4 +1,4 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, HttpStatus, Res } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiFilterErrors,
@@ -8,7 +8,9 @@ import {
   ServiceRegistry,
   type ServiceHealth,
 } from './service-registry.service';
+import type { Response } from 'express';
 import { RedisHealthService } from './redis-health.service';
+import { DrainState } from './drain-state.service';
 import {
   LivenessResponseDto,
   ReadinessResponseDto,
@@ -25,6 +27,7 @@ export class HealthController {
   constructor(
     private readonly serviceRegistry: ServiceRegistry,
     private readonly redis: RedisHealthService,
+    private readonly drain: DrainState,
   ) {}
 
   /**
@@ -69,31 +72,54 @@ export class HealthController {
    * Peers are still reported, in the body, where they inform rather than
    * decide. **A partial outage should look partial.**
    *
+   * **Draining gates too, and it is a different kind of reason.** Redis answers
+   * "can this instance serve?"; draining answers "should anything still be sent
+   * here?" — see `DrainState`. Both make the answer no, so both belong in
+   * `ready`.
+   *
+   * **The status code is the answer a probe can read.** A `httpGet`
+   * `readinessProbe` succeeds on any 2xx/3xx and never parses the body, so a
+   * 200 carrying `ready: false` reports HEALTHY to the kubelet — the failure
+   * that looks exactly like health, one transport over from the one
+   * `ops-controller.ts` refuses. `@Res({ passthrough: true })` keeps the
+   * envelope and the body identical and changes only the line the orchestrator
+   * acts on; `TransformInterceptor` reads `response.statusCode` after the
+   * handler for exactly this case.
+   *
    * See `docs/decisions/0010-readiness-probes-do-not-cascade.md`.
    */
   @ApiOperation({
     summary: 'Readiness — should traffic reach THIS instance?',
     description:
-      '`ready` gates on Redis alone. Peer gRPC health is REPORTED under `peers` ' +
-      'and deliberately does not gate: every instance sees the same peer down, so ' +
-      'gating would remove all of them and turn one service outage into a total ' +
-      'one. A partial outage should look partial.',
+      '`ready` gates on Redis and on whether this instance is draining. Peer gRPC ' +
+      'health is REPORTED under `peers` and deliberately does not gate: every ' +
+      'instance sees the same peer down, so gating would remove all of them and ' +
+      'turn one service outage into a total one. A partial outage should look ' +
+      'partial. Returns 503 when not ready — a probe reads the status line, not ' +
+      'the body.',
     security: [],
   })
   @ApiWrappedResponse(ReadinessResponseDto)
   @ApiFilterErrors()
   @Get('ready')
-  async readiness(): Promise<ReadinessResponseDto> {
+  async readiness(
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<ReadinessResponseDto> {
     // Started before the peer read so the two overlap rather than queue. Both
     // are bounded; this only keeps the probe's latency at the slower of the two
     // rather than their sum.
     const redisReachable = this.redis.isReachable();
     const peers = this.serviceRegistry.checkAll();
 
+    const draining = this.drain.isDraining();
     const redis: ServiceHealth = (await redisReachable) ? 'UP' : 'DOWN';
+    const ready = redis === 'UP' && !draining;
+
+    if (!ready) response.status(HttpStatus.SERVICE_UNAVAILABLE);
 
     return {
-      ready: redis === 'UP',
+      ready,
+      draining,
       dependencies: { redis },
       peers,
       timestamp: new Date(),

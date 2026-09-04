@@ -380,11 +380,79 @@ RUN apk add --no-cache \
 
 USER node
 
+# --------------------------------------------------------------- migrate
+# The init container ADR 0043 chose: `prisma migrate deploy`, before any replica
+# serves.
+#
+#     docker build -f docker/node-service.Dockerfile \
+#       --target migrate --build-arg SERVICE=auth-service \
+#       -t synapsedesk/auth-service-migrate.
+#
+# **`FROM build`, and not from `runtime`, because `runtime` structurally cannot
+# do this.** Three separate reasons, each fatal on its own:
+#
+#   1. `prisma` (the CLI) is a devDependency, and `prod-deps` installs with
+#      `--omit=dev`.
+#   2. `runtime` copies `package.json` and `dist` per service — there is no
+#      `prisma/` directory in it, so no `schema.prisma` and no `migrations/`.
+#   3. `prisma.config.ts` is loaded through the TypeScript compiler and extends
+#      the root `tsconfig.json`, which only `build` carries.
+#
+# So this is the fat stage on purpose, and the number is worth stating:
+# **3.17 GB against `runtime`'s 1.01 GB for the same service**, measured. It
+# runs for seconds, exits, and is discarded with the pod's init phase; nothing
+# it carries is ever exposed to traffic. Making `runtime` able to migrate would
+# put that difference on every serving replica of every service, permanently,
+# to save building one extra image.
+#
+# **Gated on the schema existing rather than on a list of services.** Three of
+# the seven Deployments own no Prisma schema (api-gateway, storage-service,
+# rag-service) and must not get an init container; a list here would be a
+# fourth place to keep that fact.
+FROM build AS migrate
+ARG SERVICE
+WORKDIR /app/apps/${SERVICE}
+
+RUN test -f prisma/schema.prisma \
+  || (echo "migrate target needs apps/${SERVICE}/prisma/schema.prisma — this service owns no schema and needs no init container" \
+      && false)
+
+# The schema-object step's entrypoint, checked HERE rather than discovered at
+# `Init:Error` in a cluster. All four schema-owning services build with SWC and
+# emit `dist/src/`; api-gateway is the one on `tsc` with the nested layout and
+# the gate above already refuses it, so one path is correct rather than lucky —
+# and this line is what makes that a build failure if it stops being true.
+RUN test -f dist/src/schema-apply.js \
+  || (echo "migrate target needs apps/${SERVICE}/dist/src/schema-apply.js — see src/schema-apply.ts" \
+      && false)
+
+USER node
+
+# **Two steps, one container, in this order.**
+#
+# `migrate deploy`, never `db push` — ADR 0042. It applies committed migrations
+# and refuses anything else; it will NOT create a missing database, which is
+# the property that makes a typo'd `DATABASE_URL` fail the deploy instead of
+# provisioning an empty one.
+#
+# Then the twenty-six objects Prisma cannot express, which used to run on every
+# application boot. `CREATE INDEX` takes a `ShareLock` on its table even when
+# `IF NOT EXISTS` makes it a no-op, and that lock queues behind any open write
+# transaction — measured at 7.08 s behind an 8-second writer, with every later
+# writer stalling behind it. On the boot path that wait sat in front of
+# readiness; here it happens before the pod is in the endpoint list.
+#
+# `&&`, so a failed migration never reaches the DDL, and `sh -c` because exec
+# form cannot chain. One container rather than two: same image, same env, and
+# an ordering the kubelet does not need to be told about.
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/src/schema-apply.js"]
+
 # --------------------------------------------------------------- default
 # **This stage exists to restore the default target, and must stay last.**
 #
 # `docker build` with no `--target` builds the FINAL stage. Without this, that
-# would be `runtime-ocr` — so every service built with the documented command
+# would be whatever stage happens to be last — `runtime-ocr` when this was
+# written, `migrate` after it — so every service built with the documented command
 # above would carry a rasteriser and an OCR engine, silently undoing the one
 # reason `runtime-ocr` is a separate target. The first build of it proved
 # exactly that: `runtime` and `runtime-ocr` came out byte-identical, both with

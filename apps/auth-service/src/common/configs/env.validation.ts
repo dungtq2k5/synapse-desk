@@ -208,15 +208,15 @@ export const envValidationSchema = Joi.object({
   // account is created; rotating it later is done through the API, not here.
   SUPER_ADMIN_EMAIL: Joi.string().email().required(),
   SUPER_ADMIN_FULL_NAME: Joi.string().required(),
-  // FIXME Don't reference to impl doc!
   // **A list of PUBLISHED values, not of weak ones.** Length is already
   // `min(12)`'s job and both of these pass it — the first is 37 characters.
   // What makes them dangerous is that a reader can look them up: one ships in
-  // `.env.example`, the file doc 70 made the contract a deployer follows, and
-  // the other is in the tracked `.env.test` and rides into `.env.docker`
-  // through `scripts/generate-docker-env.mjs`. A deployment that follows the
-  // documented process and edits every line but this one would otherwise get a
-  // super-administrator whose password is in the repository.
+  // `.env.example` — the deployment contract `development-conventions.md` §10
+  // requires of every service — and the other is in the tracked `.env.test`
+  // and rides into `.env.docker` through `scripts/generate-docker-env.mjs`. A
+  // deployment that follows the documented process and edits every line but
+  // this one would otherwise get a super-administrator whose password is in
+  // the repository.
   //
   // **Refused everywhere EXCEPT `NODE_ENV=test`, and that exemption is the
   // point rather than a concession.** `.env.test` supplies the second value —

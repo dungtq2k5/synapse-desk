@@ -1,0 +1,107 @@
+# api-gateway — the only Deployment with an Ingress, and the only pod a user
+# reaches directly.
+#
+# Probes are HTTP here and gRPC everywhere else, because this is the one service
+# with an HTTP listener. `/health` and `/health/ready` are served OUTSIDE the
+# `/api/v1` prefix (`ops-routes.ts`): an orchestrator is not an API client and
+# cannot follow a version migration.
+#
+# **No init container.** api-gateway owns no Prisma schema — see ADR 0043.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+  labels:
+    app.kubernetes.io/name: api-gateway
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: api-gateway
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: api-gateway
+    spec:
+      # Longer than (readiness periodSeconds x failureThreshold) plus the
+      # in-flight drain. `HealthModule.onApplicationShutdown` flips readiness to
+      # 503 immediately, so the endpoint is removed while requests finish —
+      # there is no `preStop` sleep here on purpose, because a sleep delays
+      # SIGTERM and hopes the endpoint update wins the race instead of saying
+      # unready.
+      terminationGracePeriodSeconds: 45
+      # Nothing in this pod talks to the Kubernetes API, so the token that
+      # would otherwise be mounted at
+      # /var/run/secrets/kubernetes.io/serviceaccount is a credential with no
+      # reader and a real blast radius — it is what an SSRF or an RCE reaches
+      # for first. Off by declaration rather than by there being no RoleBinding:
+      # an unbound token still authenticates, and the default is `true`.
+      automountServiceAccountToken: false
+      containers:
+        - name: api-gateway
+          image: synapsedesk/api-gateway:latest
+          ports:
+            - name: http
+              containerPort: 3000
+            # Its OWN listener, which is what makes "not reachable from the
+            # internet" structural rather than an ingress rule. The Ingress
+            # below routes to `http` only.
+            - name: metrics
+              containerPort: 9464
+          envFrom:
+            - configMapRef:
+                name: api-gateway-config
+            - secretRef:
+                name: api-gateway-secret
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          volumeMounts:
+            # `JWT_*_PUBLIC_KEY_PATH` is `./secrets/*.pub` and `WORKDIR` is
+            # `/app/apps/api-gateway`, so this is where those relative paths
+            # resolve. The gateway holds the PUBLIC halves only — it verifies
+            # and never mints.
+            - name: jwt-public
+              mountPath: /app/apps/api-gateway/secrets
+              readOnly: true
+          resources:
+            requests:
+              cpu: 200m
+              memory: 384Mi
+              ephemeral-storage: 256Mi
+            limits:
+              memory: 768Mi
+              ephemeral-storage: 1Gi
+      volumes:
+        - name: jwt-public
+          secret:
+            secretName: api-gateway-jwt-public
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway
+  labels:
+    app.kubernetes.io/name: api-gateway
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: api-gateway
+  ports:
+    - name: http
+      port: 3000
+      targetPort: http
+    - name: metrics
+      port: 9464
+      targetPort: metrics

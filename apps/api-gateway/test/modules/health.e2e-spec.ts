@@ -3,6 +3,7 @@ import { E2eFixture, bootstrapE2eTest } from '../utils';
 import { envValidationSchema } from '../../src/common/config/env.validation';
 import { ServiceRegistry } from '../../src/modules/health/service-registry.service';
 import { RedisHealthService } from '../../src/modules/health/redis-health.service';
+import { DrainState } from '../../src/modules/health/drain-state.service';
 import { compareAlphabetically } from '@synapsedesk/common';
 
 /**
@@ -71,20 +72,63 @@ describe('Health probes (e2e)', () => {
     });
   });
 
-  it('2. Redis unreachable → `ready: false`', async () => {
+  it('2. Redis unreachable → `ready: false` **and HTTP 503**', async () => {
     // The one dependency that genuinely gates. Sessions, throttling and the
     // Socket.IO adapter all run through it, and unlike a peer outage this CAN
     // be instance-local — so routing around this instance is a real remedy.
+    //
+    // **The status code is the assertion that matters to an orchestrator.** A
+    // `httpGet` readinessProbe succeeds on any 2xx and never parses the body,
+    // so a 200 carrying `ready: false` reports HEALTHY — this endpoint returned
+    // exactly that until the drain work, which made every readiness answer
+    // advisory. The body is unchanged and still the diagnostic.
     jest
       .spyOn(fx.app.get(RedisHealthService), 'isReachable')
       .mockResolvedValue(false);
 
-    const response = await readiness().expect(200);
+    const response = await readiness().expect(503);
 
     expect(response.body.data).toMatchObject({
       ready: false,
+      draining: false,
       dependencies: { redis: 'DOWN' },
     });
+  });
+
+  it('2a. **draining → `ready: false` and 503, with Redis still UP**', async () => {
+    // The rollout case, and the reason `draining` is beside `ready` rather than
+    // inside `dependencies`: nothing is broken. Kubernetes removes a
+    // terminating pod from Service endpoints and sends SIGTERM concurrently,
+    // and this is what closes that window for the one pod behind the Ingress.
+    jest.spyOn(fx.app.get(DrainState), 'isDraining').mockReturnValue(true);
+
+    const response = await readiness().expect(503);
+
+    expect(response.body.data).toMatchObject({
+      ready: false,
+      draining: true,
+      // Not a dependency failure. Reporting one would send whoever reads this
+      // at Redis during an ordinary deploy.
+      dependencies: { redis: 'UP' },
+    });
+  });
+
+  it('2b. **`onApplicationShutdown` is what sets it** — not a side effect', async () => {
+    // The gateway's readiness used to go red only because
+    // `RedisHealthService.onApplicationShutdown` disconnected its client, which
+    // is late, indirect, and only lands if a probe arrives in the window. The
+    // five gRPC services all call `startDraining()` explicitly from their ops
+    // modules; this asserts the gateway's own hook, on a THROWAWAY instance so
+    // the fixture's app is not shut down under the rest of the suite.
+    const drain = new DrainState();
+    expect(drain.isDraining()).toBe(false);
+
+    const { HealthModule } =
+      await import('../../src/modules/health/health.module');
+
+    new HealthModule(drain).onApplicationShutdown();
+
+    expect(drain.isDraining()).toBe(true);
   });
 
   it('3. **liveness is UP with every peer DOWN and Redis down**', async () => {

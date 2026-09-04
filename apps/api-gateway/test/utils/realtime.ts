@@ -28,6 +28,21 @@ import { GrpcStubs, stubGrpcServices } from './grpc-stub';
 import { ACCESS_COOKIE, buildJwtPayload } from './auth';
 import { signAccessToken } from './tokens';
 
+/**
+ * The transports a client may be pinned to.
+ *
+ * Named rather than repeated, and NARROWER than the library's own option type:
+ * `socket.io-client` declares
+ * `("polling" | "websocket" | "webtransport" | (string & {}))[]`, whose last
+ * arm accepts any string — so it cannot say which transports this gateway
+ * actually has, and a typo would type-check.
+ *
+ * `'polling'` is in the union for exactly one caller: the refusal test.
+ * Production pins `['websocket']` in `SecureGateway`, and the comment there
+ * says why that is a deployment constraint rather than a preference.
+ */
+type Transports = ('polling' | 'websocket')[];
+
 export type RealtimeFixture = {
   app: INestApplication<Server>;
   stubs: GrpcStubs;
@@ -47,6 +62,17 @@ export type RealtimeFixture = {
   connectClient: (overrides?: Partial<JwtPayload>) => Promise<ClientSocket>;
   /** A client with a deliberately bad cookie, for the rejection cases. */
   connectRaw: (cookie: string) => ClientSocket;
+  /**
+   * A client pinned to a chosen transport list, for the polling refusal.
+   *
+   * `connectRaw` hard-codes `['websocket']` because that is what every real
+   * client does; this exists so one test can ask what happens when a client
+   * does NOT — see `SecureGateway`'s `transports` comment.
+   */
+  connectWithTransports: (
+    cookie: string,
+    transports: Transports,
+  ) => ClientSocket;
   /**
    * A direct Redis handle, for the presence tests.
    *
@@ -195,6 +221,21 @@ export async function bootstrapRealtimeTest(
       }),
     );
 
+  const connectWithTransports = (
+    cookie: string,
+    transports: Transports,
+  ): ClientSocket =>
+    track(
+      io(wsUrl, {
+        forceNew: true,
+        transports,
+        extraHeaders: { cookie },
+        // One attempt. The default retries forever, and a refused handshake
+        // that reconnects is a test that hangs rather than one that fails.
+        reconnection: false,
+      }),
+    );
+
   const connectClient = (
     overrides: Partial<JwtPayload> = {},
   ): Promise<ClientSocket> => {
@@ -243,6 +284,7 @@ export async function bootstrapRealtimeTest(
     publishOn,
     connectClient,
     connectRaw,
+    connectWithTransports,
     redis,
     close,
   };

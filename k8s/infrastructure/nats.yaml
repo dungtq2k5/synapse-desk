@@ -1,0 +1,97 @@
+# NATS with JetStream, in-cluster — ADR 0043.
+#
+# **A StatefulSet with a PersistentVolumeClaim, never a Deployment with an
+# `emptyDir`.** JetStream persists durables to disk, and known gap #14's third
+# sighting is precisely a durable that outlived a restart: *"the obstacle
+# belongs to nobody's suite, survives every restart because JetStream persists
+# to disk"*. That persistence is the behaviour production wants — a durable
+# consumer that forgot its position on every pod restart would redeliver or lose
+# the backlog it exists to hold — and it needs real storage.
+#
+# `-sd /data` is NOT a tuning choice, and `docker-compose.yml` says why in the
+# same words: without it JetStream stores into `/tmp`, inside the container's
+# writable layer, so the volume sits mounted, named and empty while every
+# persisted message dies with the pod. `assertDurableStore` refuses to boot
+# against that, which is the only reason it was ever caught.
+apiVersion: v1
+kind: Service
+metadata:
+  name: nats
+  labels:
+    app.kubernetes.io/name: nats
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: nats
+  ports:
+    - name: client
+      port: 4222
+      targetPort: client
+    # `NATS_MONITOR_URL` — `/healthz` here is JetStream-aware, which is what
+    # makes the readiness probe wait for the STORE rather than the socket.
+    - name: monitor
+      port: 8222
+      targetPort: monitor
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: nats
+  labels:
+    app.kubernetes.io/name: nats
+spec:
+  serviceName: nats
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: nats
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: nats
+    spec:
+      # Nothing in this pod talks to the Kubernetes API, so the token that
+      # would otherwise be mounted at
+      # /var/run/secrets/kubernetes.io/serviceaccount is a credential with no
+      # reader and a real blast radius — it is what an SSRF or an RCE reaches
+      # for first. Off by declaration rather than by there being no RoleBinding:
+      # an unbound token still authenticates, and the default is `true`.
+      automountServiceAccountToken: false
+      containers:
+        - name: nats
+          image: nats:2.10-alpine
+          args: ['-js', '-sd', '/data', '-m', '8222']
+          ports:
+            - name: client
+              containerPort: 4222
+            - name: monitor
+              containerPort: 8222
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: monitor
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: monitor
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+              ephemeral-storage: 256Mi
+            limits:
+              memory: 512Mi
+              ephemeral-storage: 1Gi
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ['ReadWriteOnce']
+        resources:
+          requests:
+            storage: 10Gi

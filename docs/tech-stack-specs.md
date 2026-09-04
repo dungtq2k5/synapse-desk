@@ -90,7 +90,7 @@ Parsing is **not** in the Python service, and the split is deliberate: extractio
 
 | Layer | Technology | Usage |
 | :---- | :---- | :---- |
-| **Ingress & Proxy** | **Nginx** | Reverse proxy, SSL termination, strict Content Security Policy (CSP) headers, custom error pages. |
+| **Ingress & Proxy** | **`ingress-nginx`** + **`helmet`** | Reverse proxy and SSL termination are the Ingress's ([ADR 0043](./decisions/0043-the-cluster-shape.md) — `k8s/ingress.yaml`, one controller and one `Ingress`, not a hand-written `nginx.conf`). **The CSP and error-page half is NOT the proxy's and is not built** — there is no `helmet` and no `contentSecurityPolicy` anywhere in this repository, and that half belongs in `main.ts`: one middleware, versioned with the code that decides what a page may load, surviving a change of ingress controller. Split here so the row is not read as done. |
 | **Authentication** | **OAuth 2.0 / OIDC + 2FA** | Social login (Google/GitHub) alongside TOTP authenticator app support. |
 | **Rate Limiting** | **ThrottlerStorageRedisService** | Distributed rate limiting across REST, GraphQL, and WebSocket protocols via Redis. |
 | **Billing** | **Stripe** (`stripe@22`) | Subscriptions and the plan catalogue. **Stripe owns what a plan costs; this system owns what it grants** (RDM Tables 40–41) — mirroring an amount would be two sources of truth diverging silently. Webhook idempotency is a UNIQUE constraint, not a check ([ADR 0026](./decisions/0026-stripe-webhook-idempotency.md)). |

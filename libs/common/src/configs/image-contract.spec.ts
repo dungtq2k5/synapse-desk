@@ -4,7 +4,6 @@ import { builtinModules } from 'node:module';
 import { join } from 'node:path';
 import { stripComments } from '../testing/strip-comments';
 
-// FIXME Don't reference to impl doc!
 /**
  * The image contract's STATIC half — everything about the Docker build that a
  * file parse can decide, so it runs on every `npm run test` instead of
@@ -14,11 +13,11 @@ import { stripComments } from '../testing/strip-comments';
  * like current state. The daemon-needing half lives in
  * `docker/check-images.sh`.
  *
- * Corpus discipline as established by docs 68–70: every corpus from
- * `git ls-files --cached --others --exclude-standard` (never a directory
- * walk), `stripComments` before any source is pattern-matched, and a
- * pattern-fires floor on each parse so a regex that silently matches nothing
- * fails instead of passing.
+ * Corpus discipline as `development-conventions.md` §13.8 requires it: every
+ * corpus from `git ls-files --cached --others --exclude-standard` (never a
+ * directory walk), `stripComments` before any source is pattern-matched, and
+ * a pattern-fires floor on each parse so a regex that silently matches
+ * nothing fails instead of passing.
  */
 describe('the image contract (static half)', () => {
   const REPO_ROOT = join(__dirname, '../../../..');
@@ -355,12 +354,11 @@ describe('the image contract (static half)', () => {
   // ------------------------------------- the generated container env contract
 
   it('`.env.docker` is generated, never tracked', () => {
-    // FIXME Don't reference to impl doc!
-    // The decision doc 70's guard needs made before the file exists: a
-    // TRACKED `.env.docker` would enter that guard's archive-reference corpus
-    // and NOT its completeness checks (which read `.env.example` by name) — a
-    // third hand-maintained value-set with no drift guard, the exact class
-    // doc 70 closed. Generated from `.env` by
+    // The decision `env-contract.spec.ts` needs made before the file exists:
+    // a TRACKED `.env.docker` would enter that guard's archive-reference
+    // corpus and NOT its completeness checks (which read `.env.example` by
+    // name) — a third hand-maintained value-set with no drift guard, the exact
+    // class that guard closed for `.env.example`. Generated from `.env` by
     // `scripts/generate-docker-env.mjs` (host addresses swapped for compose
     // service names), it cannot drift by construction — provided it stays
     // untracked, which is what this pins.

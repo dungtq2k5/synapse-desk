@@ -202,6 +202,38 @@ for var in BUILD_SHA BUILD_TIME; do
 done
 echo "   ok — all seven"
 
+# --------------------------------------------------- 7a. the migrate target
+#
+# The init container ADR 0043 chose. Three properties, none of which a file
+# parse can decide:
+#
+#   - it BUILDS for a service that owns a schema;
+#   - it REFUSES one that does not, which is what keeps the manifest's
+#     "init container exactly where a schema is" true on the image side too;
+#   - it carries the Prisma CLI, which `runtime` cannot — that is the whole
+#     reason the stage is `FROM build`.
+echo "7a. the migrate target builds where a schema is and refuses where it is not"
+
+docker build -f docker/node-service.Dockerfile --target migrate \
+  --build-arg SERVICE=auth-service \
+  --build-arg GIT_SHA="$GIT_SHA" --build-arg BUILD_TIME="$BUILD_TIME" \
+  -t synapsedesk/auth-service-migrate . >/dev/null \
+  || fail "migrate target failed to build for auth-service"
+
+docker run --rm --entrypoint sh synapsedesk/auth-service-migrate \
+  -c 'test -f prisma/schema.prisma && npx prisma --version >/dev/null' \
+  || fail "migrate image lacks the schema or the Prisma CLI"
+
+# api-gateway owns no schema. The stage must refuse it rather than produce an
+# image whose init container would hang the pod at Init:Error forever.
+if docker build -f docker/node-service.Dockerfile --target migrate \
+     --build-arg SERVICE=api-gateway \
+     --build-arg GIT_SHA="$GIT_SHA" --build-arg BUILD_TIME="$BUILD_TIME" \
+     -t synapsedesk/gateway-migrate-should-not-exist . >/dev/null 2>&1; then
+  fail "migrate target built for api-gateway, which owns no prisma/schema.prisma"
+fi
+echo "   ok — built for auth-service, refused api-gateway"
+
 # --------------------------------------------------------------- 8. OCR section
 
 ocr_checks

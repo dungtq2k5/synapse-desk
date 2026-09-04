@@ -4,8 +4,8 @@ import { AllWsExceptionsFilter } from '../filters/ws-exception.filter';
 import { corsOrigins } from '../config/cors.config';
 
 /**
- * `@WebSocketGateway` plus the two things every gateway must have and one of
- * them is easy to forget.
+ * `@WebSocketGateway` plus the three things every gateway must have, two of
+ * which are easy to forget.
  *
  * Same reasoning as registering `SmartThrottlerGuard` with `APP_GUARD` rather
  * than per controller: the gateway someone adds later and forgets to wire is
@@ -15,6 +15,9 @@ import { corsOrigins } from '../config/cors.config';
  * CORS is not optional for a browser client — a socket handshake is subject to
  * the same origin rules as any other request, and the default (`*` off, no
  * credentials) refuses the cookie the handshake authenticates with.
+ *
+ * The transport pin is the third, and it is the one that is invisible until
+ * there are two replicas — see the comment on `transports` below.
  */
 export function SecureGateway(
   namespace: string,
@@ -65,6 +68,22 @@ export function SecureGateway(
         credentials: true,
       },
       ...options,
+
+      // **WebSocket only, and this is a deployment constraint rather than a
+      // preference.** Socket.IO's default `['polling', 'websocket']` starts
+      // with an HTTP handshake that must reach the SAME replica —
+      // `@socket.io/redis-adapter` shares broadcasts, not handshake state — so
+      // polling across more than one gateway pod produces `Session ID unknown`
+      // and a reconnect loop. Pinning here makes a polling client fail its
+      // handshake immediately and visibly, instead of working on one replica
+      // and failing on the next. `docs/websocket-api.md` already tells clients
+      // the same thing; this is what makes it true rather than advisory.
+      //
+      // **After `...options`, deliberately.** `cors` above is a default a
+      // caller may replace; this is not one. A constraint a caller can unset
+      // by passing `transports` is a constraint that fails on the pod nobody
+      // tested, which is the failure this line exists to remove.
+      transports: ['websocket'],
     }),
 
     UseFilters(new AllWsExceptionsFilter()),

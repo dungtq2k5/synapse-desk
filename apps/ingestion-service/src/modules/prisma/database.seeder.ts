@@ -42,7 +42,19 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
    * never load-bearing here.
    */
   async onApplicationBootstrap(): Promise<void> {
-    await this.seed();
+    // **The hook ASSERTS; it no longer applies.** ADR 0043 moved the schema
+    // objects to the deploy step — `prisma migrate deploy` then
+    // `src/schema-apply.ts`, both in the init container, both before this pod
+    // is in the endpoint list. `CREATE INDEX` takes a `ShareLock` even when
+    // `IF NOT EXISTS` makes it a no-op, and that lock queues behind any open
+    // write transaction; on the boot path that wait sat in front of readiness.
+    //
+    // The check STAYS, and that is the load-bearing half: ADR 0042's finding
+    // was a schema step that could be skipped without anything noticing, and
+    // a boot path that fell silent along with the step would recreate it. A
+    // service started outside Kubernetes gets no init container, so this is
+    // the only thing between it and serving against an unmigrated database.
+    await this.assertSchemaExists();
   }
 
   /**
@@ -91,7 +103,7 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
    * expected set is small on purpose — the tables the seeder and the boot path
    * touch — because this is a smoke check, not a schema diff.
    */
-  private async assertSchemaExists(): Promise<void> {
+  async assertSchemaExists(): Promise<void> {
     const expected = ['documents', 'document_chunks', 'ingestion_jobs'];
 
     const rows = await this.prisma.$queryRaw<{ table_name: string }[]>`

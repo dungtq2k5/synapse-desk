@@ -140,14 +140,28 @@ describe('the schema contract', () => {
     }
   });
 
-  it('**every seeder applies its schema objects outside any flag**', () => {
+  it('**every seeder ASSERTS its schema outside any flag**', () => {
     // **The CALL SITE, not the declaration.** This assertion used to test that
     // a method named `applySchemaObjects` existed — equally true of a seeder
     // that calls it from INSIDE the seeding branch, which is the exact defect
-    // this phase removed. Measured: restoring that defect in auth left this
+    // ADR 0042 removed. Measured then: restoring that defect in auth left this
     // spec 5/5 green, ticket's behavioural spec green, and auth's own 471-test
     // suite green. What matters is that nothing conditional stands between the
-    // hook and the DDL.
+    // hook and the schema step.
+    //
+    // **What the hook owes changed with ADR 0043 and the invariant did not.**
+    // The DDL moved to the init container, so the hook no longer APPLIES —
+    // it ASSERTS, via `assertSchemaExists()`. That is the same guard aimed one
+    // step earlier: ADR 0042's finding was a schema step that could be
+    // skipped without anything noticing, and a boot path that fell silent when
+    // the step moved would recreate it exactly. A pod whose migration did not
+    // run must refuse to serve rather than serve 500s, and a service started
+    // outside Kubernetes — which gets no init container at all — has nothing
+    // else watching.
+    //
+    // `applySchemaObjects` is still ACCEPTED here, deliberately: a service that
+    // has not moved yet is not broken, and this check is about the branch, not
+    // about which of the two the hook chose.
     //
     // A source regex is brittle and this one earns it: it is the only check
     // covering all four services at once, and the edit it catches is the edit
@@ -169,9 +183,74 @@ describe('the schema contract', () => {
 
       expect([
         seeder,
-        /await this\.(applySchemaObjects|seed)\(\)/.test(beforeAnyBranch),
+        /await this\.(assertSchemaExists|applySchemaObjects|seed)\(\)/.test(
+          beforeAnyBranch,
+        ),
       ]).toEqual([seeder, true]);
     }
+  });
+
+  // ------------------------- 3a. the schema step has TWO callers, always
+
+  describe('**the schema step reaches both environments**', () => {
+    /**
+     * ADR 0043 moved `applySchemaObjects()` off the application boot path and
+     * into the deploy step. That is safe only while the step has BOTH callers,
+     * and the second is the one nothing else would notice was gone:
+     *
+     *   - production: the `migrate` init container, after `migrate deploy`;
+     *   - development: `npm run db:push`, which chains `db:schema`.
+     *
+     * **`assertSchemaExists()` cannot cover for a missing development caller.**
+     * It counts TABLES, and `prisma db push` creates every table while creating
+     * none of the partial indexes or CHECK constraints — so a developer's
+     * database would boot, serve, pass the assertion, and silently permit the
+     * duplicate signup ADR 0020's partial index refuses. Nothing goes red. That
+     * is the exact shape of ADR 0042's finding, one environment over.
+     */
+    const withSchema = (): string[] =>
+      gitFiles('apps/*/prisma/schema.prisma')
+        .map((file) => file.split('/')[1])
+        .sort();
+
+    it('four services own a Prisma schema — the corpus floor', () => {
+      expect(withSchema()).toHaveLength(4);
+    });
+
+    it.each(withSchema())('%s', (service) => {
+      const entrypoint = `apps/${service}/src/schema-apply.ts`;
+      expect(gitFiles(entrypoint)).toEqual([entrypoint]);
+
+      // The entrypoint must reach the DDL, not merely exist.
+      expect(
+        /applySchemaObjects\(\)/.test(stripComments(read(entrypoint))),
+      ).toBe(true);
+
+      // The development caller. `db:push` alone leaves a database with every
+      // table and none of the objects.
+      const scripts = (
+        JSON.parse(read(`apps/${service}/package.json`)) as {
+          scripts: Record<string, string>;
+        }
+      ).scripts;
+
+      expect(scripts['db:schema']).toContain('schema-apply');
+      expect(scripts['db:push']).toContain('db:schema');
+    });
+
+    it('the production caller is the migrate image, in one container', () => {
+      // `&&`, so a failed migration never reaches the DDL. Two init containers
+      // would work and would put an ordering the kubelet enforces into a place
+      // a future edit can reorder.
+      const dockerfile = read('docker/node-service.Dockerfile');
+      const cmd = /^CMD \["sh", "-c", "([^"]+)"\]/m.exec(dockerfile)?.[1] ?? '';
+
+      expect(cmd).toContain('prisma migrate deploy');
+      expect(cmd).toContain('schema-apply.js');
+      expect(cmd.indexOf('migrate deploy')).toBeLessThan(
+        cmd.indexOf('schema-apply.js'),
+      );
+    });
   });
 
   // ------------------------------- 4. the published super-admin passwords

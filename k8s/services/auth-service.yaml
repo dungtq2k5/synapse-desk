@@ -1,0 +1,132 @@
+# auth-service — the only service that may SIGN a token, and the only one that
+# mounts a JWT private key.
+#
+# Nine schema objects at boot (`applySchemaObjects`), the most of any service,
+# and the only row-seeding one — see `SEED_ON_BOOTSTRAP` in its ConfigMap.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-service
+  labels:
+    app.kubernetes.io/name: auth-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: auth-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: auth-service
+    spec:
+      terminationGracePeriodSeconds: 45
+      initContainers:
+        # ADR 0043. The pod cannot start its app container until this exits 0,
+        # which is the ordering constraint ADR 0042 named — from the kubelet,
+        # with no sync-wave tooling. It runs TWO steps in one container:
+        # `prisma migrate deploy`, then `src/schema-apply.ts` for the objects
+        # Prisma cannot express. Both are idempotent — `migrate deploy` takes
+        # Prisma's own advisory lock and the DDL is `IF NOT EXISTS`
+        # throughout — so the N concurrent runs a multi-replica rollout
+        # produces serialise and the losers no-op.
+        #
+        # Moving the DDL here is what takes its `ShareLock` wait off the
+        # readiness path: the same statements, before this pod is in the
+        # endpoint list rather than in front of it.
+        - name: migrate
+          image: synapsedesk/auth-service-migrate:latest
+          envFrom:
+            - configMapRef:
+                name: auth-service-config
+            - secretRef:
+                name: auth-service-secret
+          env:
+            # **The ONE override, and it is auth-only.** Creating the Nest
+            # context in `schema-apply.ts` fires the seeder's bootstrap hook,
+            # which after ADR 0043 asserts the schema — useful here, it is the
+            # cheapest check that `migrate deploy` did what it said. auth is
+            # the only service whose hook goes on to seed ROWS, and rows are
+            # the app pod's job, not the init container's. Without this the
+            # bootstrap Super Admin would be created from two places.
+            - name: SEED_ON_BOOTSTRAP
+              value: 'false'
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+              ephemeral-storage: 256Mi
+            limits:
+              memory: 512Mi
+              ephemeral-storage: 1Gi
+      # Nothing in this pod talks to the Kubernetes API, so the token that
+      # would otherwise be mounted at
+      # /var/run/secrets/kubernetes.io/serviceaccount is a credential with no
+      # reader and a real blast radius — it is what an SSRF or an RCE reaches
+      # for first. Off by declaration rather than by there being no RoleBinding:
+      # an unbound token still authenticates, and the default is `true`.
+      automountServiceAccountToken: false
+      containers:
+        - name: auth-service
+          image: synapsedesk/auth-service:latest
+          ports:
+            - name: grpc
+              containerPort: 5001
+          envFrom:
+            - configMapRef:
+                name: auth-service-config
+            - secretRef:
+                name: auth-service-secret
+          # One port, two questions — `ops-controller.ts` dispatches on the
+          # `service` field and answers NOT_FOUND to anything else, so a typo
+          # here is a pod that never becomes ready rather than one that lies.
+          livenessProbe:
+            grpc:
+              port: 5001
+              service: ''
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            grpc:
+              port: 5001
+              service: 'readiness'
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          volumeMounts:
+            # `JWT_*_PRIVATE_KEY_PATH` and `FIREBASE_SERVICE_ACCOUNT_PATH` are
+            # all `./secrets/…` here, against `WORKDIR=/app/apps/auth-service`.
+            # auth is the service whose Firebase key is UNDER `secrets/`;
+            # storage's and notification's sit at their package root. Three
+            # variable names, two directory conventions — the check derives this
+            # path from the ConfigMap rather than trusting the list.
+            - name: auth-secrets
+              mountPath: /app/apps/auth-service/secrets
+              readOnly: true
+          resources:
+            requests:
+              cpu: 200m
+              memory: 384Mi
+              ephemeral-storage: 256Mi
+            limits:
+              memory: 768Mi
+              ephemeral-storage: 1Gi
+      volumes:
+        - name: auth-secrets
+          secret:
+            secretName: auth-service-files
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth-service
+  labels:
+    app.kubernetes.io/name: auth-service
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: auth-service
+  ports:
+    - name: grpc
+      port: 5001
+      targetPort: grpc

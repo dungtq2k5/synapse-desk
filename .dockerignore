@@ -63,3 +63,6 @@ __pycache__
 docs
 .vscode
 .claude
+# Deployment manifests. Nothing in any stage COPYs them, and the context is
+# uploaded to the daemon before the first instruction runs.
+k8s
