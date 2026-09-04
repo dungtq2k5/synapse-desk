@@ -17,6 +17,13 @@ cspell.json
 .claude/
 coverage/
 
+# CI run artifacts. `pytest.xml` is the JUnit report the python job hands to
+# `scripts/check-pytest-skips.mjs`; `ci-artifacts/` is where the e2e job's
+# failure capture lands before upload. Both are per-run output, and both are
+# written by commands a developer can also run locally.
+pytest.xml
+ci-artifacts/
+
 # Turborepo per-package task logs and local cache. One appears in every
 # workspace the moment a turbo task runs, and the contents are machine-specific.
 .turbo/

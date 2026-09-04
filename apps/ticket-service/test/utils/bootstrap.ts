@@ -1,9 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { obliterateQueues } from '@synapsedesk/common/testing/queues';
 import {
+  ANALYTICS_EXPORT_QUEUE,
   AuditPublisher,
   MAX_ANALYTICS_RANGE_DAYS,
   MAX_ATTACHMENT_BYTES,
   MAX_ATTACHMENTS_PER_MESSAGE,
+  SCHEDULER_QUEUE,
 } from '@synapsedesk/common';
 import { AuthReferenceService } from '../../src/modules/auth-client/auth-reference.service';
 import { AppModule } from '../../src/app.module';
@@ -140,6 +143,12 @@ export async function bootstrapE2eTest(): Promise<E2eFixture> {
   };
 
   const close = async (): Promise<void> => {
+    // BEFORE the module closes: the registrar's repeat entries outlive this
+    // process otherwise, and the next suite to boot a worker on
+    // `scheduler-ticket` executes them. The export queue rides along for the
+    // same reason ingestion obliterates its work queues — a leftover job is a
+    // leftover job.
+    await obliterateQueues([SCHEDULER_QUEUE.ticket, ANALYTICS_EXPORT_QUEUE]);
     await moduleRef.close();
   };
 

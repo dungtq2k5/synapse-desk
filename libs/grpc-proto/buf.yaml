@@ -8,6 +8,14 @@ modules:
 lint:
   use:
     - STANDARD
+  ignore:
+    # Vendored verbatim from grpc/grpc-proto. Every name here is the wire
+    # contract Kubernetes probes natively — `Health`, `SERVING`, `UNKNOWN` —
+    # so STANDARD's naming rules cannot be satisfied without breaking the one
+    # property the file exists for: renaming `Health` to `HealthService` makes
+    # `buf lint` green and the kubelet's probe wrong. Excluded by PATH, not by
+    # rule, so synapsedesk's own protos keep the full rule set.
+    - src/proto/grpc
   except:
     # STANDARD requires a version suffix (`synapsedesk.auth.v1`). Skipped
     # deliberately: this package is internal to the monorepo — both peers ship
@@ -35,6 +43,24 @@ lint:
     - RPC_REQUEST_RESPONSE_UNIQUE
     - RPC_REQUEST_STANDARD_NAME
     - RPC_RESPONSE_STANDARD_NAME
+    # The zero value of `UserProjection` is a real choice, not an absence:
+    # `USER_PROJECTION_NOTIFICATION = 0` is what every existing caller means by
+    # sending nothing, and its own comment says so. Renaming it to
+    # `_UNSPECIFIED` would satisfy this rule and cost more than it buys:
+    #
+    #   - `buf breaking` REJECTS it — measured. `ENUM_VALUE_SAME_NAME` is part
+    #     of `FILE`, which the breaking config below uses. The change is
+    #     wire-compatible and SOURCE-breaking, and suppressing the one guard
+    #     this file calls "the ONLY guard against a wire-incompatible change"
+    #     is the wrong trade for a naming rule.
+    #   - it would not even buy distinguishability: proto3 cannot tell an
+    #     absent enum from its zero value, so the field would read
+    #     `UNSPECIFIED` and behave as "notification". Actually separating them
+    #     needs `UNSPECIFIED = 0` PLUS `NOTIFICATION = 2` and all twelve call
+    #     sites — a real change with a real benefit, and not a lint fix.
+    #
+    # Revisit when that distinction is actually needed.
+    - ENUM_ZERO_VALUE_SUFFIX
 
 breaking:
   use:

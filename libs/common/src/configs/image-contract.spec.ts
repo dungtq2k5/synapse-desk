@@ -288,6 +288,22 @@ describe('the image contract (static half)', () => {
 
       expect(`npm@${arg('NPM_VERSION')}`).toBe(manifest.packageManager);
     });
+
+    it('.nvmrc equals the image base version', () => {
+      // The third place a Node version is named. CI reads `.nvmrc` through
+      // `setup-node`'s `node-version-file`, the image reads `NODE_VERSION`,
+      // and nothing tied them — a CI that tests a runtime the image does not
+      // ship is a CI whose green means less than it appears to.
+      //
+      // `engines.node: ">=22.12"` in ingestion-service is deliberately NOT in
+      // this comparison: it is a FLOOR with a stated reason (pdfjs-dist is
+      // ESM-only and loaded through `createRequire`), and a floor and a pin
+      // are allowed to differ.
+      const image = /^(\d+\.\d+\.\d+)/.exec(arg('NODE_VERSION'));
+
+      expect(image).not.toBeNull();
+      expect(read('.nvmrc').trim()).toBe(image?.[1]);
+    });
   });
 
   // ------------------------------------------------------------ floating tags

@@ -135,11 +135,15 @@ for (const { service, envFile, url } of targets) {
     envFile === '.env' ? push : ['dotenv', '-e', '.env.test', '--', ...push];
 
   try {
-    execFileSync('npx', args, { // NOSONAR
-      cwd: join(REPO_ROOT, 'apps', service),
-      stdio: ['ignore', 'ignore', 'pipe'],
-      encoding: 'utf8',
-    });
+    execFileSync(
+      'npx', // NOSONAR
+      args,
+      {
+        cwd: join(REPO_ROOT, 'apps', service),
+        stdio: ['ignore', 'ignore', 'pipe'],
+        encoding: 'utf8',
+      },
+    );
   } catch (error) {
     console.error(`\n  FAILED: ${service} ${envFile}`);
     console.error(error.stderr || error.message);

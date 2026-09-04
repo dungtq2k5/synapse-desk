@@ -1,5 +1,14 @@
 /**
- * A throwaway service-account key for the Storage EMULATOR.
+ * @file A throwaway service-account key for a Firebase SDK that must initialize
+ * without reaching Google.
+ *
+ * **Two consumers, and only one of them is an emulator.** storage-service
+ * points the SDK at the Storage emulator; auth-service's `FirebaseService`
+ * calls `cert(keyPath)` at `onModuleInit` and then never reaches Google in a
+ * test run, because every auth e2e spies on `verifyGoogleIdToken`. `cert()`
+ * parses the JSON and the PEM and makes no network call, so a synthetic
+ * credential satisfies both — `npm run keys:service-account` writes one per
+ * service.
  *
  * The emulator never verifies the signature — it accepts any well-formed
  * credential — but `firebase-admin` refuses to initialize without one, and V4
@@ -11,8 +20,11 @@
  * worthless is not something a scanner (or a future reader) can tell at a
  * glance.
  *
- * Mirrors scripts/generate-jwt-keys.mjs's one-off-script convention.
+ * Mirrors scripts/generate-jwt-keys.mjs's one-off-script convention. Unlike
+ * that script this one is idempotent-by-default rather than refusing: it exits
+ * 0 when the target exists, so a CI step can run it unconditionally.
  */
+
 import { generateKeyPairSync } from 'node:crypto';
 import { writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';

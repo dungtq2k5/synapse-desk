@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { obliterateQueues } from '@synapsedesk/common/testing/queues';
 import { AppModule } from '../../src/app.module';
 import { SchedulerProcessor } from '../../src/modules/scheduler/scheduler.processor';
 import { PrismaService } from '../../src/modules/prisma/prisma.service';
@@ -9,6 +10,7 @@ import {
   avatarObjectPath,
   SystemRoleName,
   FREE_PLAN_SEED,
+  SCHEDULER_QUEUE,
 } from '@synapsedesk/common';
 import { randomUUID } from 'node:crypto';
 import { StorageReferenceService } from '../../src/modules/storage-client/storage-reference.service';
@@ -279,6 +281,10 @@ export async function bootstrapE2eTest(): Promise<E2eFixture> {
   };
 
   const close = async (): Promise<void> => {
+    // BEFORE the module closes: the registrar's repeat entries outlive this
+    // process otherwise, and the next suite to boot a worker on
+    // `scheduler-auth` executes them.
+    await obliterateQueues([SCHEDULER_QUEUE.auth]);
     await moduleRef.close();
   };
 

@@ -20,6 +20,7 @@ import {
   expectNoEvent,
   signTwoFactorToken,
   waitForEvent,
+  waitForMatchingEvent,
 } from '../utils';
 import {
   grpcError,
@@ -1526,16 +1527,24 @@ describe('the real-time relay (e2e)', () => {
 
     it('5. presence reaches the org room and NEVER another tenant', async () => {
       const otherOrg = faker.string.uuid();
+      const userId = faker.string.uuid();
       const user = await fx.connectClient({
-        sub: faker.string.uuid(),
+        sub: userId,
         organizationId,
       });
       const colleague = await fx.connectClient({ organizationId });
       const stranger = await fx.connectClient({ organizationId: otherOrg });
 
-      const seen = waitForEvent<WirePresence>(
+      // **Matched on the user, not "the first presence frame".** `colleague`
+      // connecting broadcasts its OWN `online` to the org room through
+      // `announceConnected`, and whether that lands before or after this
+      // listener registers is a property of how busy the machine is — known
+      // gap #13's second sighting, where this test saw `online` and expected
+      // `away`. The frame this test is about is the one carrying `user`.
+      const seen = waitForMatchingEvent<WirePresence>(
         colleague,
         REALTIME_EVENTS.presence,
+        (frame) => frame.data.userId === userId,
       );
       const silence = expectNoEvent(stranger, REALTIME_EVENTS.presence);
 

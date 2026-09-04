@@ -1,0 +1,36 @@
+# The proto checks that only mean something on a pull request.
+#
+# `proto:breaking` compares against `main` (`../../.git#branch=main,subdir=…`),
+# so it needs the full history — `fetch-depth: 0`, since the default shallow
+# checkout has no `main` to resolve — and it is meaningless on a push to
+# `main`, where it would compare a branch to itself.
+#
+# `buf.yaml` states why this matters more here than it usually would: the
+# module excepts `PACKAGE_VERSION_SUFFIX`, so there is no `v2` escape hatch for
+# an incompatible change, which makes `buf breaking` "the ONLY guard against a
+# wire-incompatible change".
+name: proto
+
+on: pull_request
+
+jobs:
+  compatibility:
+    name: breaking + generated-code drift
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history: `--against` resolves a branch out of the local .git.
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+
+      # Regenerates and diffs — a proto edited without regenerating leaves the
+      # TypeScript describing the previous wire shape, which typechecks
+      # perfectly and is wrong.
+      - run: npm run proto:check
+
+      - run: npm run proto:breaking

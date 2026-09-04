@@ -13,6 +13,15 @@ node_modules/
 # ESLint already skips these via the `**/generated/**` ignore in eslint.config.mjs.
 **/generated/
 
+# Lockfiles. npm owns their formatting and rewrites them wholesale on every
+# install; prettier reformatting one produces a diff that comes straight back,
+# and a `format:check` that fails after `npm i` teaches people to skip the
+# gate. Excluded HERE rather than by shaping the glob around them, so the
+# coverage check in `ci-contract.spec.ts` — which reads from the files toward
+# the config — sees a deliberate exclusion instead of an uncovered file.
+package-lock.json
+**/package-lock.json
+
 # Secrets and env
 secrets/
 *.key

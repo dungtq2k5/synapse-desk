@@ -1,0 +1,263 @@
+# CI — build, lint, typecheck and test. No publishing, no registry, no deploy:
+# those need Phase 1's images AND a cluster, and splitting them is what let
+# this land now.
+#
+# **What must never run here**, as a named list rather than an absence — an
+# absence and an oversight look identical to whoever adds the next job, and
+# `libs/common/src/configs/ci-contract.spec.ts` fails if one appears:
+#
+#   npm run test:system   DESTRUCTIVE to three stores in setup AND teardown —
+#                         flushes the whole dev Redis, drops the Qdrant
+#                         collection, resets the JetStream streams — spawns
+#                         seven processes, and two of its steps need a live
+#                         paid API.
+#   npm run db:push       (no `:test:`) targets the DEV databases.
+#   seed:demo / stripe:provision / plans:seed with `--apply`
+#                         write to a real Stripe sandbox and real databases.
+#                         Their dry-run forms are harmless.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  # PRs only. On `main` a cancellation leaves the superseded commit having
+  # never been fully tested — two quick merges and the first one's result is
+  # simply absent, which is indistinguishable from green in the branch
+  # history.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # Nothing here reads a real credential. The Firebase service accounts are
+  # generated synthetically (see the e2e job) and the JWT keys are minted per
+  # run, because `cert()` and `readFileSync` only need well-formed material.
+  CI: true
+
+jobs:
+  # ---------------------------------------------------------------- static
+  static:
+    name: static (format, lint, typecheck, proto)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          # `.nvmrc` carries the image's exact Node version, and
+          # `image-contract.spec.ts` asserts the two agree — a CI that tests a
+          # runtime the image does not ship is a CI whose green means less
+          # than it looks.
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      # `lint` is a composite: lint:models && turbo run lint && eslint over the
+      # two directories turbo does not own (scripts/seed-demo, test/system).
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm run typecheck
+      - run: npm run proto:lint
+
+  # ----------------------------------------------------------------- build
+  #
+  # NOT redundant with `typecheck`, and the reason is recent: every SWC service
+  # now carries `"typeCheck": true`, so `nest build` typechecks each service
+  # through its OWN `tsconfig.build.json` — a different program from the root
+  # `tsc -p tsconfig.json --noEmit` that `static` runs. Different include,
+  # different paths (auth's is `"paths": {}` deliberately), different files.
+  # Two programs, two answers, and only one of them is the one that ships.
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+
+  # ------------------------------------------------------------------ unit
+  #
+  # No infrastructure, by design — `test/system/jest.config.ts` states the
+  # property in its own header: "`npm test` must stay runnable on a machine
+  # with nothing started." Do not let a unit suite acquire an infrastructure
+  # dependency to make a test easier.
+  unit:
+    name: unit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm test
+
+  # ------------------------------------------------------------------- e2e
+  #
+  # **One job running the six suites sequentially, deliberately.** Six parallel
+  # jobs against one stack would interfere; six parallel jobs on ONE runner
+  # would manufacture failures — measured, the six suites take ~3 minutes
+  # uncontended and ~2.4x that under CPU contention, with a timeout flake that
+  # passed in isolation. That is known gap #13's exact signature: "a poll
+  # budget sized for an idle process, expiring when --runInBand gives the box
+  # more to do." The case for sequential is not wall-clock, which sequential
+  # loses; it is that the alternative shares a CPU and this repo has a
+  # documented row about what that does to these suites.
+  e2e:
+    name: e2e (six suites, sequential)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+
+      # docker-compose.yml resolves every `${VAR}` from the root `.env`, which
+      # is gitignored — without this the postgres containers come up with no
+      # user, no password and no database, and it surfaces as the suites
+      # failing to connect. (No number here on purpose: this comment said "16"
+      # and was correct until deleting `init-test-db.sh` removed
+      # `AUTH_TEST_DB_NAME` in the same phase. `ci-contract.spec.ts` carries
+      # the count as a floor, where it cannot go stale silently.)
+      - name: stack env
+        run: cp .env.example .env
+
+      # `--wait` waits only for services that DECLARE a healthcheck. All eight
+      # now do; the three that did not (nats, qdrant, firebase-storage) were
+      # added for this job, because a startup race here would look exactly like
+      # known gaps #7/#13/#14 and be misfiled as one of them.
+      - name: start the stack
+        run: docker compose up -d --wait
+
+      # Test-only material, generated per run rather than stored as secrets:
+      # `cert()` parses the JSON and the PEM and makes no network call, and
+      # every auth e2e already spies on `verifyGoogleIdToken`, so nothing in
+      # this job reaches Google. A real service account here would be a real
+      # credential in every fork's PR environment the moment somebody relaxes
+      # the trigger.
+      - name: credentials
+        run: |
+          npm run keys:generate -- --force
+          npm run keys:service-account
+
+      # Creates all four test databases — `prisma db push` creates a missing database on connect.
+      - name: test databases
+        run: npm run db:test:push
+
+      # **`set -o pipefail` is not optional here.** GitHub Actions runs steps
+      # under `bash -e` WITHOUT pipefail, so `npm run test:e2e | tee` would
+      # report `tee`'s exit status and turn the step green when the suites
+      # fail — a considerably worse bug than the missing capture the tee is
+      # here to enable. The log is what `capture-e2e-state.mjs` reads for
+      # known gap #13's ask: which suites were in the run and how far it got,
+      # neither of which the process table can answer for a sequential chain.
+      - name: e2e suites
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run test:e2e 2>&1 | tee e2e.log
+
+      # **Run-scoped, not spec-scoped** — known gap #13's correction to #7,
+      # whose capture instruction is scoped to one spec and so loses the thing
+      # it protects (which suites were in the run). The same script a developer
+      # runs by hand, because CI structurally cannot reproduce two of these
+      # three classes: a runner starts with an empty Redis and an empty
+      # JetStream every time, while the machine that keeps producing them
+      # accumulates state for weeks.
+      - name: capture shared state on failure
+        if: failure()
+        env:
+          E2E_LOG: e2e.log
+        run: node scripts/capture-e2e-state.mjs --out ci-artifacts
+
+      - name: upload capture
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-state
+          path: ci-artifacts/
+          if-no-files-found: warn
+
+  # ---------------------------------------------------------------- python
+  python:
+    name: python (rag-service)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # The one job that would otherwise run `npm run` four times and a `node`
+      # script on whatever Node ubuntu-latest happens to ship — in a phase
+      # that added `.nvmrc` and an assertion precisely so that could not
+      # happen.
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          # Matches the image base, `python:3.12.14-slim-trixie`.
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: |
+            apps/rag-service/requirements.txt
+            apps/rag-service/requirements-dev.txt
+
+      # `test_multimodal_e2e.py` carries TWO skip marks: one on GEMINI_API_KEY
+      # and one on `poppler_available()`. A runner holding the secret and no
+      # poppler skips exactly as silently as one holding neither — this is the
+      # same binary `runtime-ocr` installs with apk, and it is not optional.
+      - name: poppler
+        run: sudo apt-get update && sudo apt-get install -y poppler-utils
+
+      - run: npm run setup:py
+      - run: npm run lint:py
+      - run: npm run typecheck:py
+
+      # The key is a repository secret, so it is absent on fork pull requests
+      # and the acceptance test skips there. That is acceptable ONLY because
+      # the step below makes the skip visible.
+      - name: tests
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: npm run test:py -- --junitxml=pytest.xml -rs
+
+      # **The half that works with or without a key.** A test that quietly
+      # stops running is the vacuity class arriving through a skip rather than
+      # a bad assertion, and "did we supply the key" would pass on a runner
+      # that skips for the other reason. This fails when MORE tests skip than
+      # the known floor.
+      - name: skips are accounted for
+        if: always()
+        run: node scripts/check-pytest-skips.mjs apps/rag-service/pytest.xml
+
+  # ---------------------------------------------------------------- worker
+  #
+  # `workers/email-inbound` is outside the root workspaces (`apps/*`, `libs/*`),
+  # carries its OWN package-lock.json — so the root `npm ci` does not install
+  # it and the root `npm test` cannot reach it — and is explicitly ignored by
+  # eslint.config.mjs because no tsconfig in `parserOptions.project` covers a
+  # Workers runtime. `typecheck` is its entire checkable surface today, and
+  # this job is what stops it being the one tracked TypeScript in the repo that
+  # nothing compiles.
+  worker:
+    name: worker (email-inbound)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: workers/email-inbound
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: workers/email-inbound/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck

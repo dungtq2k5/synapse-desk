@@ -957,12 +957,22 @@ describe('The ingestion pipeline (e2e)', () => {
       const running = processor.process(data);
 
       // PARSING, observable from another connection while the download hangs.
+      //
+      // **An explicit budget, because the default one assumed an idle box** —
+      // known gap #13's first sighting. This polls its own job row in
+      // Postgres, touches no queue and opens no Redis connection, so its
+      // failure was never cross-suite interference: it was a 5-second budget
+      // expiring when `--runInBand` gave the machine more to do. Measured
+      // during the CI phase: the same suites run ~2.4x slower under CPU
+      // contention, which puts a fast pass uncomfortably close to that
+      // ceiling. 20s stays well inside the file's 30s test timeout, so a real
+      // hang still fails as a hang rather than as a jest timeout.
       await waitFor(async () => {
         const job = await fx.prisma.ingestionJob.findUniqueOrThrow({
           where: { id: data.ingestionJobId },
         });
         return job.status === String(IngestionJobStatus.PARSING);
-      });
+      }, 20_000);
 
       const document = await fx.prisma.document.findUniqueOrThrow({
         where: { id: data.documentId },

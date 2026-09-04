@@ -7,17 +7,10 @@ services:
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: ${AUTH_DB_NAME}
-      # Read by init-test-db.sh below — POSTGRES_DB only auto-creates ONE
-      # database on first init, so the test database needs its own script.
-      AUTH_TEST_DB_NAME: ${AUTH_TEST_DB_NAME}
     ports:
       - '${AUTH_DB_PORT}:5432'
     volumes:
       - pgdata_auth:/var/lib/postgresql
-      # Postgres executes every file here exactly once, on first init against
-      # an EMPTY volume — see the script's own header for what that means for
-      # an already-initialized `pgdata_auth`.
-      - ./docker/postgres-auth/init-test-db.sh:/docker-entrypoint-initdb.d/init-test-db.sh:ro
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U postgres']
       interval: 5s
@@ -161,6 +154,21 @@ services:
       - '${NATS_DASHBOARD_PORT}:8222' # HTTP Management/Monitoring UI
     volumes:
       - nats_data:/data
+    # `--wait` only waits for services that declare one, so without this
+    # `compose up -d --wait` returns while the broker is still binding and the
+    # first suite connects to nothing. That failure looks exactly like known
+    # gaps #7/#13/#14 — intermittent e2e failures that pass on re-run — and
+    # would be misfiled as one of them for as long as it took somebody to
+    # notice the failures cluster at the START of a run.
+    #
+    # `wget` is present in this image and the monitor port is already exposed
+    # for NATS_MONITOR_URL; `/healthz` is JetStream-aware, so this waits for
+    # the store to be ready rather than just the socket.
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:8222/healthz']
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   # ---------------------------------------------------------------- AI & Vector Search Engine Layer
   qdrant:
@@ -172,6 +180,14 @@ services:
       - '${QDRANT_GRPC_PORT}:6334' # gRPC API
     volumes:
       - qdrant_data:/qdrant/storage
+    # No curl, no wget and no nc in this image — but bash is there and
+    # `/dev/tcp` is a bash builtin, which is enough to prove the port accepts.
+    # Same reason as nats above: without a healthcheck `--wait` does not wait.
+    healthcheck:
+      test: ['CMD', 'bash', '-c', 'exec 3<>/dev/tcp/127.0.0.1/6333']
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   # The Firebase Storage EMULATOR.
   #
@@ -189,6 +205,19 @@ services:
       - '9199:9199'
     volumes:
       - ./docker/firebase:/home/node
+    # A node image with neither curl nor wget, so `node -e` is the probe it
+    # has. More retries than its neighbours because the emulator suite is the
+    # slowest thing here to become ready — measured cold-start below the
+    # 50s ceiling this allows (10 x 5s).
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "require('http').get('http://127.0.0.1:9199/',r=>process.exit(0)).on('error',()=>process.exit(1))"
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
 volumes:
   pgdata_auth:

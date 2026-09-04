@@ -84,7 +84,10 @@ for (const service of SERVICES) {
     '# GENERATED from .env by scripts/generate-docker-env.mjs — do not edit,\n' +
     '# do not track. Host addresses are rewritten to compose service names.\n\n';
 
-  writeFileSync(join(REPO_ROOT, 'apps', service, '.env.docker'), banner + content);
+  writeFileSync(
+    join(REPO_ROOT, 'apps', service, '.env.docker'),
+    banner + content,
+  );
   generated += 1;
   console.log(`apps/${service}/.env.docker`);
 }

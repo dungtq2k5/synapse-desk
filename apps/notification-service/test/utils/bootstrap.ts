@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { obliterateQueues } from '@synapsedesk/common/testing/queues';
 import { ClientProxy } from '@nestjs/microservices';
 import { of } from 'rxjs';
-import { Queue } from 'bullmq';
 import {
   NATS_CLIENT,
   SCHEDULER_QUEUE,
@@ -100,21 +100,7 @@ export async function bootstrapE2eTest(): Promise<E2eFixture> {
     // Redis at every boot, and a leftover is executed by whichever suite next
     // boots a worker on the queue name — the exact mechanism the gap's sixth
     // sighting proved end to end.
-    await obliterateQueues();
-  };
-
-  const obliterateQueues = async (): Promise<void> => {
-    for (const name of [SCHEDULER_QUEUE.notification, WEBHOOK_QUEUE]) {
-      const queue = new Queue(name, {
-        connection: { url: process.env.REDIS_URL as string },
-      });
-
-      try {
-        await queue.obliterate({ force: true });
-      } finally {
-        await queue.close();
-      }
-    }
+    await obliterateQueues([SCHEDULER_QUEUE.notification, WEBHOOK_QUEUE]);
   };
 
   const close = async (): Promise<void> => {

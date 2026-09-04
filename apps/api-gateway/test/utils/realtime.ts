@@ -275,6 +275,45 @@ export function waitForEvent<T = unknown>(
 }
 
 /**
+ * Resolves with the first frame the predicate accepts, ignoring the rest.
+ *
+ * **`waitForEvent` takes the FIRST frame, and that is an arrangement which
+ * assumes an idle machine** — known gap #13's second sighting. A client that
+ * connects to an org room receives its own connect-time `presence: online`
+ * from `announceConnected`; on an idle box that broadcast lands before the
+ * test registers a listener, and under a full run it can land after, so the
+ * listener resolves with `online` where the test meant to observe `away`.
+ *
+ * Waiting for the frame the test is actually about removes the race rather
+ * than widening a window around it — the fix shape the row asks for: "make
+ * the arrangement wait for the thing it is racing rather than assume it has
+ * already happened."
+ */
+export function waitForMatchingEvent<T = unknown>(
+  socket: ClientSocket,
+  event: string,
+  match: (payload: T) => boolean,
+  timeoutMs = 3_000,
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const handler = (payload: T) => {
+      if (!match(payload)) return;
+
+      clearTimeout(timer);
+      socket.off(event, handler);
+      resolve(payload);
+    };
+
+    const timer = setTimeout(() => {
+      socket.off(event, handler);
+      reject(new Error(`Timed out waiting for a matching '${event}'`));
+    }, timeoutMs);
+
+    socket.on(event, handler);
+  });
+}
+
+/**
  * Resolves TRUE if the event does NOT arrive within the window.
  *
  * The negative case needs its own helper because "assert nothing happened"
