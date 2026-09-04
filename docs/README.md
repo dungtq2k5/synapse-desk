@@ -70,6 +70,7 @@ Append-only. A decision is never edited; superseding one means writing a new one
 | [0039](./decisions/0039-the-seeder-ddl-block-is-the-list.md) | The seeder's DDL block is the list of hand-written SQL |
 | [0040](./decisions/0040-ticket-status-history-is-a-table-not-a-trail.md) | A ticket's status history is a table, not an audit trail |
 | [0041](./decisions/0041-durable-subjects-are-the-ones-with-nothing-to-reconcile-against.md) | Durable subjects are the ones with nothing to reconcile against |
+| [0042](./decisions/0042-schema-reaches-production-through-migrate-deploy.md) | Schema reaches production through `prisma migrate deploy` |
 
 ## `reference/` — what is true today
 

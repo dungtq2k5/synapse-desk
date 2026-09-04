@@ -117,13 +117,33 @@ export const envValidationSchema = Joi.object({
 
   // --------------------------------------------------------- 9 DEVELOPMENT
 
-  // Applies the four partial indexes `schema.prisma` cannot express.
-  // False in tests, which seed explicitly from the fixture so there is
-  // ONE seeding path rather than one that races module init.
-  SEED_ON_BOOTSTRAP: Joi.boolean().required(),
-
   // The SSRF escape hatch, for a developer's localhost receiver. Honoured ONLY
   // when NODE_ENV is development — see `privateTargetsAllowed` — so a copied
   // .env cannot carry it into production.
-  WEBHOOK_ALLOW_PRIVATE_TARGETS: Joi.string().valid('true', 'false').optional(),
+  //
+  // **Refused outright outside development too, in ADDITION to that guard and
+  // never instead of it.** `webhook-target.guard.ts` is the control, because
+  // doc 69's lesson is that a string check is a courtesy and the real refusal
+  // belongs at the enforcement point. What this adds is loudness: a production
+  // `.env` carrying `WEBHOOK_ALLOW_PRIVATE_TARGETS=true` boots fine today and
+  // the value is silently ignored, which teaches an operator that the setting
+  // works. Failing here says otherwise, once, at the only moment anybody is
+  // looking.
+  //
+  // `.optional()` first, so an ABSENT variable stays fine everywhere and the
+  // `otherwise` branch governs only a value that is present. Both properties
+  // are pinned in `webhook-private-targets.spec.ts` — including the
+  // unset-`NODE_ENV` row, because a rule keyed on an environment variable is
+  // only as good as its behaviour when that variable is missing.
+  //
+  // **`invalid('true')`, not `valid('false')`, and the difference is not
+  // stylistic.** Joi CONCATENATES a `when` branch onto the base rather than
+  // replacing it, so `valid('false')` unions with the base's
+  // `valid('true','false')` and permits exactly what it looks like it forbids.
+  // Measured: with that spelling every environment accepted `true`, and the
+  // behavioural rows are what caught it — the file read correctly either way.
+  WEBHOOK_ALLOW_PRIVATE_TARGETS: Joi.string()
+    .valid('true', 'false')
+    .optional()
+    .when('NODE_ENV', { is: 'development', otherwise: Joi.invalid('true') }),
 });

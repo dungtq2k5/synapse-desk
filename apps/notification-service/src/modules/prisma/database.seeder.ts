@@ -1,5 +1,4 @@
 import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { formatErrorMsg } from '@synapsedesk/common';
 import { PrismaService } from './prisma.service';
 
@@ -25,21 +24,50 @@ import { PrismaService } from './prisma.service';
 export class DatabaseSeeder implements OnApplicationBootstrap {
   private readonly logger = new Logger(DatabaseSeeder.name);
 
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly configService: ConfigService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
+  /**
+   * The schema objects, on EVERY boot.
+   *
+   * **There is no `SEED_ON_BOOTSTRAP` branch here any more, and there never
+   * should have been one.** This service seeds no rows — `seed()` is
+   * `assertSchemaExists()` plus DDL and nothing else — so the flag gated
+   * nothing a person could want to skip while removing partial indexes and
+   * CHECK constraints that Prisma cannot express and nothing else creates.
+   * Every statement is `IF NOT EXISTS` or equivalent, so running it
+   * unconditionally is idempotent by construction, which is why the flag was
+   * never load-bearing here.
+   */
   async onApplicationBootstrap(): Promise<void> {
-    if (!this.configService.getOrThrow<boolean>('SEED_ON_BOOTSTRAP')) {
-      this.logger.log('SEED_ON_BOOTSTRAP is false — skipping schema seed');
-      return;
-    }
-
     await this.seed();
   }
 
+  /**
+   * Both halves — which here is one half: this service seeds no rows.
+   *
+   * **Kept deliberately, and not because five call sites would need editing.**
+   * `seed()` means "put this database into the state a service expects", and
+   * that sentence stays true the day this service grows rows;
+   * `applySchemaObjects()` would not, and a fixture calling the narrower name
+   * would keep compiling, keep passing, and silently stop applying them — the
+   * same shape as the flag this phase removed, arriving through a rename.
+   *
+   * **The hook calls this same method for the reason `.env.test` turns the
+   * hook off:** two seeding paths where one only sometimes runs is worse than
+   * one. Inlining `applySchemaObjects()` into the hook while the fixtures call
+   * `seed()` would recreate exactly that split. The chain is two levels here,
+   * not three, and it exists so both callers reach the same code.
+   */
   async seed(): Promise<void> {
+    await this.applySchemaObjects();
+  }
+
+  /**
+   * Everything Prisma cannot express, plus the check that the schema is there
+   * at all. One name across all four services, so ADR 0039 and
+   * `development-conventions.md` §7 can point at a method that exists.
+   */
+  async applySchemaObjects(): Promise<void> {
     await this.assertSchemaExists();
 
     try {
@@ -48,6 +76,41 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
     } catch (error) {
       this.logger.error(`Schema seed failed: ${formatErrorMsg(error)}`);
       throw error;
+    }
+  }
+
+  /**
+   * Every table this service cannot start without — COUNTED, not probed.
+   *
+   * A single probe answers "is the database empty", and that is not the only
+   * way a schema arrives incomplete: `prisma db push` interrupted partway
+   * leaves `notifications` present and the rest missing, which reads as success. The
+   * expected set is small on purpose — the tables the seeder and the boot path
+   * touch — because this is a smoke check, not a schema diff.
+   */
+  private async assertSchemaExists(): Promise<void> {
+    const expected = [
+      'notifications',
+      'device_tokens',
+      'notification_preferences',
+    ];
+
+    const rows = await this.prisma.$queryRaw<{ table_name: string }[]>`
+      SELECT table_name FROM information_schema.tables
+      WHERE table_schema = 'public' AND table_name = ANY(${expected})
+    `;
+
+    const missing = expected.filter(
+      (table) => !rows.some((row) => row.table_name === table),
+    );
+
+    if (missing.length) {
+      throw new Error(
+        `The database is missing ${missing.length} expected table(s): ` +
+          `${missing.join(', ')}. Nothing has been pushed to it, or a push ` +
+          'was interrupted. Run `npm run db:push` (dev) or ' +
+          '`npm run db:test:push` (test) and start again.',
+      );
     }
   }
 
@@ -67,22 +130,6 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
    * service that said what to do when a `docker compose down -v` wiped the
    * volumes.
    */
-  private async assertSchemaExists(): Promise<void> {
-    const [{ present }] = await this.prisma.$queryRaw<[{ present: boolean }]>`
-      SELECT EXISTS (
-        SELECT 1 FROM information_schema.tables
-        WHERE table_schema = 'public' AND table_name = 'notifications'
-      ) AS present
-    `;
-
-    if (!present) {
-      throw new Error(
-        'The database has no schema — nothing has been pushed to it yet. ' +
-          'Run `npm run db:push` (dev) or `npm run db:test:push` (test) and start again.',
-      );
-    }
-  }
-
   private async applyIndexes(): Promise<void> {
     // The feed query: `GET /notifications`, newest first, archived excluded.
     // Partial rather than plain, because the default feed NEVER reads archived

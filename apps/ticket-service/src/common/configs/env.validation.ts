@@ -91,10 +91,4 @@ export const envValidationSchema = Joi.object({
   // How long a sender may edit their own message. Named and configured rather
   // than a hardcoded number, the same treatment OTP_EXPIRY_MINUTES gets.
   MESSAGE_EDIT_WINDOW_MINUTES: Joi.number().required(),
-
-  // --------------------------------------------------------- 9 DEVELOPMENT
-
-  // Applies the partial unique index and the CHECK constraint on boot. False in
-  // the test environment, where the fixture calls the seeder explicitly.
-  SEED_ON_BOOTSTRAP: Joi.boolean().required(),
 });

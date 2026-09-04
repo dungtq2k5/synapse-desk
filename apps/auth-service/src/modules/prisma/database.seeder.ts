@@ -71,13 +71,23 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
-    if (!this.configService.getOrThrow<boolean>('SEED_ON_BOOTSTRAP')) {
-      this.logger.log('SEED_ON_BOOTSTRAP is false — skipping database seed');
-      return;
-    }
-
     try {
-      await this.seed();
+      // **Schema objects are not seeding, and this is the only service where
+      // the distinction was ever real.** Prisma cannot express partial
+      // indexes, CHECK constraints or extensions, so this block is the only
+      // thing that creates them — while `SEED_ON_BOOTSTRAP` exists to skip
+      // inserting ROWS, which is a decision an operator makes freely. Behind
+      // one boolean, the production-looking setting removed the partial index
+      // that makes a duplicate signup impossible (ADR 0020) while the catch
+      // below still said serving without these was worse than not serving.
+      await this.applySchemaObjects();
+
+      if (!this.configService.getOrThrow<boolean>('SEED_ON_BOOTSTRAP')) {
+        this.logger.log('SEED_ON_BOOTSTRAP is false — skipping seed ROWS');
+        return;
+      }
+
+      await this.seedRows();
     } catch (err) {
       // A half-seeded database is not something the service can serve traffic
       // on: with no permissions and no roles every request 403s. Fail loudly.
@@ -86,9 +96,39 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
     }
   }
 
+  /**
+   * Both halves, in order.
+   *
+   * **The name every test calls, and it keeps meaning "put this database into
+   * the state a service expects".** Nine call sites outside this file rely on
+   * that and one asserts on it, because `.env.test` turns `SEED_ON_BOOTSTRAP`
+   * off in every service — a bare `TestingModule` does not reliably fire Nest
+   * lifecycle hooks, so the fixtures call the seeder by hand. Repurposing this
+   * name as the rows-only half would have stopped every e2e fixture applying
+   * the schema objects, which is exactly the state the gate's own guard exists
+   * to detect.
+   */
   async seed(): Promise<void> {
-    const startedAt = Date.now();
+    await this.applySchemaObjects();
+    await this.seedRows();
+  }
 
+  /**
+   * Everything Prisma cannot express, plus the check that the schema is there
+   * at all.
+   *
+   * Runs on EVERY boot regardless of `SEED_ON_BOOTSTRAP`: every statement is
+   * `IF NOT EXISTS` or an equivalent, so it costs one round trip per object
+   * and is idempotent by construction. `development-conventions.md` §7 and
+   * ADR 0039 point at this method by name — they used to name `applyIndexes`,
+   * which exists in no service.
+   */
+  async applySchemaObjects(): Promise<void> {
+    // **First, and outside the gate**, because the composition it guards
+    // against is only reachable when the gate is closed: `prisma db push`
+    // CREATES a missing database rather than failing, so a typo in
+    // `DATABASE_URL` yields a real empty one — and a service that skipped this
+    // check would boot, report healthy, and fail on the first query forever.
     await this.assertSchemaExists();
 
     // Deliberately OUTSIDE the transaction. `CREATE INDEX` takes an ACCESS
@@ -99,6 +139,13 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
     await this.ensureGlobalRoleNameIndex();
     await this.applyPartialIndexes();
     await this.applyCheckConstraints();
+  }
+
+  /** The row half: permissions, the system user, the bootstrap Super Admin,
+   * the system roles and the free plan. Skipped when `SEED_ON_BOOTSTRAP` is
+   * false, which is what that flag has always meant to an operator. */
+  async seedRows(): Promise<void> {
+    const startedAt = Date.now();
 
     // Hash before opening the transaction: bcrypt is deliberately slow and
     // CPU-bound, and holding a pooled connection open across it is wasteful.
@@ -309,6 +356,37 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
   }
 
   /**
+   * Every table this service cannot start without — COUNTED, not probed.
+   *
+   * A single probe answers "is the database empty", and that is not the only
+   * way a schema arrives incomplete: `prisma db push` interrupted partway
+   * leaves `roles` present and the rest missing, which reads as success. The
+   * expected set is small on purpose — the tables the seeder and the boot path
+   * touch — because this is a smoke check, not a schema diff.
+   */
+  private async assertSchemaExists(): Promise<void> {
+    const expected = ['roles', 'users', 'permissions', 'organizations'];
+
+    const rows = await this.prisma.$queryRaw<{ table_name: string }[]>`
+      SELECT table_name FROM information_schema.tables
+      WHERE table_schema = 'public' AND table_name = ANY(${expected})
+    `;
+
+    const missing = expected.filter(
+      (table) => !rows.some((row) => row.table_name === table),
+    );
+
+    if (missing.length) {
+      throw new Error(
+        `The database is missing ${missing.length} expected table(s): ` +
+          `${missing.join(', ')}. Nothing has been pushed to it, or a push ` +
+          'was interrupted. Run `npm run db:push` (dev) or ' +
+          '`npm run db:test:push` (test) and start again.',
+      );
+    }
+  }
+
+  /**
    * Fail with an ACTIONABLE message when the database has no schema at all.
    *
    * Without this the first statement of the seed is a `CREATE INDEX... ON
@@ -320,22 +398,6 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
    * environment, so the only people who ever see it are on a fresh clone or a
    * fresh Docker volume — exactly the audience least able to interpret it.
    */
-  private async assertSchemaExists(): Promise<void> {
-    const [{ present }] = await this.prisma.$queryRaw<[{ present: boolean }]>`
-      SELECT EXISTS (
-        SELECT 1 FROM information_schema.tables
-        WHERE table_schema = 'public' AND table_name = 'roles'
-      ) AS present
-    `;
-
-    if (!present) {
-      throw new Error(
-        'The database has no schema — nothing has been pushed to it yet. ' +
-          'Run `npm run db:push` (dev) or `npm run db:test:push` (test) and start again.',
-      );
-    }
-  }
-
   private async ensureGlobalRoleNameIndex(): Promise<void> {
     await this.prisma.$executeRawUnsafe(
       `CREATE UNIQUE INDEX IF NOT EXISTS roles_global_name_key

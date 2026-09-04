@@ -1,5 +1,21 @@
 import * as Joi from 'joi';
-import { LOG_LEVELS, NODE_ENV_OPTIONS } from '@synapsedesk/common';
+import {
+  LOG_LEVELS,
+  MIN_PASSWORD_LENGTH,
+  NODE_ENV_OPTIONS,
+} from '@synapsedesk/common';
+
+/**
+ * Passwords that exist in this repository, and therefore in everyone's clone.
+ *
+ * Exported so `super-admin-password.spec.ts` can assert the list against the
+ * files that publish them rather than restating the strings — the same
+ * counting-rule discipline the env-contract guard uses.
+ */
+export const PUBLISHED_SUPER_ADMIN_PASSWORDS = [
+  'a-strong-password-of-12-chars-or-more',
+  'ChangeMe_SuperAdmin_2026',
+] as const;
 
 /**
  * Keys in the shared section order (RUNTIME, BUILD, DATA, MESSAGING, PEERS,
@@ -88,6 +104,13 @@ export const envValidationSchema = Joi.object({
   // to verify a code, so it cannot be hashed -- see encryptSecret().
   // Rotating this without re-encrypting every stored secret breaks 2FA for
   // every enrolled user.
+  //
+  // No constant for the `32`, deliberately. A constant earns its place when
+  // two things must AGREE — `MIN_PASSWORD_LENGTH` below is the counterpart,
+  // because the platform's password policy and this schema are two readers
+  // of one number. This 32 agrees with nothing: it is a floor on a key
+  // length, chosen here, read once. Naming it would add a lookup without
+  // adding a tie.
   TWO_FACTOR_MASTER_KEY: Joi.string().required().min(32),
 
   // How many 30s steps either side of "now" a TOTP code stays valid. Each step
@@ -150,11 +173,23 @@ export const envValidationSchema = Joi.object({
   // docblock on AuditPublisher. Set false once a real consumer exists.
   AUDIT_LOG_TO_CONSOLE: Joi.boolean().default(true),
 
-  // --------------------------------------------------------- 9 DEVELOPMENT
+  // ------------------------------------------------- 9 BOOTSTRAP IDENTITIES
+  //
+  // **Not "development".** These four create a platform super-administrator
+  // and the system actor on first boot, in every environment — the heading
+  // that used to sit here said `9 DEVELOPMENT`, which is what made a
+  // `default(true)` beside a published password look harmless.
 
-  // Bootstrap seeding (see src/modules/prisma/database.seeder.ts). Runs on every startup and is
-  // idempotent; set SEED_ON_BOOTSTRAP=false to skip it entirely.
-  SEED_ON_BOOTSTRAP: Joi.boolean().default(true),
+  // Whether the seeder inserts ROWS. It no longer gates the schema objects:
+  // Prisma cannot express partial indexes or CHECK constraints, so the seeder
+  // applies those on every boot regardless — see `applySchemaObjects()`. This
+  // is the only service where the flag ever meant anything, because it is the
+  // only one that seeds rows at all.
+  //
+  // `required()`, like its three former peers had: an unset seeding flag
+  // should stop a service rather than choose for it, and the default said yes
+  // to creating a super-admin from environment variables.
+  SEED_ON_BOOTSTRAP: Joi.boolean().required(),
 
   // The non-login platform actor that owns rows no human created — currently
   // roles.created_by_id on the global system roles.
@@ -173,5 +208,27 @@ export const envValidationSchema = Joi.object({
   // account is created; rotating it later is done through the API, not here.
   SUPER_ADMIN_EMAIL: Joi.string().email().required(),
   SUPER_ADMIN_FULL_NAME: Joi.string().required(),
-  SUPER_ADMIN_PASSWORD: Joi.string().min(12).required(),
+  // FIXME Don't reference to impl doc!
+  // **A list of PUBLISHED values, not of weak ones.** Length is already
+  // `min(12)`'s job and both of these pass it — the first is 37 characters.
+  // What makes them dangerous is that a reader can look them up: one ships in
+  // `.env.example`, the file doc 70 made the contract a deployer follows, and
+  // the other is in the tracked `.env.test` and rides into `.env.docker`
+  // through `scripts/generate-docker-env.mjs`. A deployment that follows the
+  // documented process and edits every line but this one would otherwise get a
+  // super-administrator whose password is in the repository.
+  //
+  // **Refused everywhere EXCEPT `NODE_ENV=test`, and that exemption is the
+  // point rather than a concession.** `.env.test` supplies the second value —
+  // measured: refusing it unconditionally failed all 471 auth e2e tests at
+  // `ConfigModule.forRoot` — and a tracked test fixture is not a deployment.
+  // Every published value stays refused in the environments where "published"
+  // means "an attacker can read it too".
+  SUPER_ADMIN_PASSWORD: Joi.string()
+    .min(MIN_PASSWORD_LENGTH)
+    .required()
+    .when('NODE_ENV', {
+      is: 'test',
+      otherwise: Joi.string().invalid(...PUBLISHED_SUPER_ADMIN_PASSWORDS),
+    }),
 });

@@ -343,9 +343,9 @@ Mappers live in `libs/grpc-proto/src/mappers/`, named per §12.1.
 
 ## 7. Prisma & Data Access
 
-Schema is source of truth; reset freely. Do **not** hand-write migration SQL for ordinary changes.
+Schema is source of truth; reset freely. Do **not** hand-write migration SQL for ordinary changes. **This is the development answer** — production applies schema through `prisma migrate deploy` ([ADR 0042](./decisions/0042-schema-reaches-production-through-migrate-deploy.md)), because `db push` creates a missing database on a typo, refuses data-losing changes at the moment of deploy, and records no history.
 
-What Prisma cannot express — partial indexes, `CHECK` constraints, composite GIN over a `tsvector`, extensions — goes in the owning service's seeder DDL block (`apps/*/src/modules/prisma/database.seeder.ts`, `applyIndexes`), as `CREATE … IF NOT EXISTS`, with a comment saying what invariant it holds.
+What Prisma cannot express — partial indexes, `CHECK` constraints, composite GIN over a `tsvector`, extensions — goes in the owning service's seeder DDL block (`apps/*/src/modules/prisma/database.seeder.ts`, `applySchemaObjects`), as `CREATE … IF NOT EXISTS`, with a comment saying what invariant it holds. That method runs on **every** boot and is not behind `SEED_ON_BOOTSTRAP` — the flag gates seed ROWS, and only auth-service has any.
 
 **That block is the list.** This section deliberately names none of them: it used to name two, and the seeders had grown to twenty-one — one of the two having never been applied at all (known-gaps row 5). A prose enumeration of database objects has nothing that fails when it drifts. See [ADR 0039](./decisions/0039-the-seeder-ddl-block-is-the-list.md).
 
