@@ -258,9 +258,9 @@ export const FREE_PLAN_SEED = {
  *
  * **A `source` column rather than a filter on `eventType`.** Excluding
  * `plan.change_requested` by name would be correct only while there is exactly
- * one local producer — the same single-producer assumption behind doc 62's
- * hardcoded email template and its generated message id, which is three
- * instances in three phases and therefore a pattern rather than three
+ * one local producer — the same single-producer assumption behind the limit
+ * alert's hardcoded email template and its generated message id, which is
+ * three instances in three phases and therefore a pattern rather than three
  * incidents. A discriminator cannot be silently wrong when a fourth producer
  * arrives.
  */

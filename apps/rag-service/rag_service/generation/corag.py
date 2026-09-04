@@ -507,7 +507,7 @@ class CoRagGenerator:
                 retrieved_chunk_ids=[],
                 user_id=user_id,
                 ticket_id=ticket_id,
-                # **The row doc 56 E exists for.** Empty retrieval plus an
+                # **The row this column exists for.** Empty retrieval plus an
                 # attachment is a question the corpus was never expected to
                 # answer, and without this it is indistinguishable from one it
                 # should have answered and did not.

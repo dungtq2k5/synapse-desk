@@ -120,7 +120,7 @@ describe('NoEmoji (unit)', () => {
     /**
      * Derived by scanning, never from a list.
      *
-     * The count in doc 53's first draft was thirteen; the tree holds sixteen,
+     * The first count written by hand was thirteen; the tree holds sixteen,
      * and three of the misses were `slug`. A scan asserting a hand-written floor
      * would have passed green with fields unguarded — so the expected set comes
      * from the same walk that finds the offenders.

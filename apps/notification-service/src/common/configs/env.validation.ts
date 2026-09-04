@@ -122,9 +122,9 @@ export const envValidationSchema = Joi.object({
   // .env cannot carry it into production.
   //
   // **Refused outright outside development too, in ADDITION to that guard and
-  // never instead of it.** `webhook-target.guard.ts` is the control, because
-  // doc 69's lesson is that a string check is a courtesy and the real refusal
-  // belongs at the enforcement point. What this adds is loudness: a production
+  // never instead of it.** `webhook-target.guard.ts` is the control, because a
+  // string check is a courtesy and the real refusal belongs at the enforcement
+  // point. What this adds is loudness: a production
   // `.env` carrying `WEBHOOK_ALLOW_PRIVATE_TARGETS=true` boots fine today and
   // the value is silently ignored, which teaches an operator that the setting
   // works. Failing here says otherwise, once, at the only moment anybody is

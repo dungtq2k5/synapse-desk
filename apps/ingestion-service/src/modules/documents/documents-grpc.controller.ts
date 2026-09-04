@@ -274,7 +274,8 @@ export class DocumentsGrpcController implements DocumentServiceController {
   // ---------------------------------------------------------------- flags
   //
   // Stubs so the tree compiles at this gate rather than staying red until the
-  // module lands — the shape `listSimilarTickets` uses, and doc 40 before it.
+  // module lands — the shape `listSimilarTickets` uses, and the gates before
+  // it.
 
   getDocumentFlag(
     request: DocumentFlagIdRequest,
@@ -330,7 +331,7 @@ export class DocumentsGrpcController implements DocumentServiceController {
   // ------------------------------------------------------------- articles
   //
   // Stubs so the tree compiles at this gate rather than staying red until the
-  // module lands — doc 40's shape, and doc 41's before it.
+  // module lands — the same shape every earlier gate used.
 
   listKnowledgeArticles(
     request: ListKnowledgeArticlesRequest,

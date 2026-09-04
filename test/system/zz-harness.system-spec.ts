@@ -166,12 +166,12 @@ describe('The harness', () => {
     // started — or worse, not waiting on one that was. One table, distinct
     // ports, and a floor DERIVED rather than pinned.
     //
-    // It was `toHaveLength(7)` — the `toBe(366)` shape doc 67 deleted: an
-    // eighth service turns a literal red for a correct change and the repair is
-    // to edit the number. A service is in the stack iff it can be launched, and
-    // `start:prod` is the launch line — so the scripts are the independent
-    // source, and a service added with one and not the other fails here in
-    // whichever direction it was forgotten.
+    // It was `toHaveLength(7)` — the same `toBe(366)` shape struck from
+    // `finance.e2e-spec.ts`: an eighth service turns a literal red for a
+    // correct change and the repair is to edit the number. A service is in the
+    // stack iff it can be launched, and `start:prod` is the launch line — so
+    // the scripts are the independent source, and a service added with one and
+    // not the other fails here in whichever direction it was forgotten.
     const ports = SERVICES.map((service) => service.port);
 
     const launchable = readdirSync(join(REPO_ROOT, 'apps')).filter((app) => {

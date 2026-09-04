@@ -210,7 +210,7 @@ describe('The AI generation rollup (e2e)', () => {
     });
 
     it('**8b. An attachment-grounded empty retrieval is SPLIT OUT, not dropped**', async () => {
-      // Doc 56 §E. The count is not factually wrong — retrieval ran and
+      // The count is not factually wrong — retrieval ran and
       // returned nothing — but the INFERENCE is: `emptyRetrievalRate` is read
       // as "the corpus is failing to answer questions it should answer", and a
       // customer asking about their own invoice is asking something the corpus

@@ -22,8 +22,8 @@ export type JetStreamStream = {
  *
  * Everything NOT listed here stays on core NATS deliberately — see ADR 0041.
  * The rule is: prefer reconciliation where state exists, redelivery where it
- * does not. `document.*` is the case that proves it, reconciled by doc 49's
- * sweep without touching the transport.
+ * does not. `document.*` is the case that proves it, reconciled by
+ * `ingestion-reconcile.sweep.ts` without touching the transport.
  */
 export const JETSTREAM_STREAMS = {
   AUDIT: {

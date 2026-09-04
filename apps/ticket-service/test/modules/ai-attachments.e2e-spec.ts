@@ -126,7 +126,7 @@ describe('Attachments as model input (e2e)', () => {
   });
 
   it('**3a. a `.docx` with NO extracted text is skipped, never sent as a part**', async () => {
-    // Doc 52's premise, narrowed by doc 56. `.docx` is still out of
+    // The upload premise, narrowed by extraction. `.docx` is still out of
     // `AI_ELIGIBLE_MIME_TYPES` — the BYTES never reach the model — and now it
     // has a second chance through `extractedText`. This fixture leaves that
     // NULL, which is what a failed extraction or an ingestion-service that was
@@ -157,8 +157,8 @@ describe('Attachments as model input (e2e)', () => {
   });
 
   it('**3c. …and WITH extracted text it is sent as a part, still with no download**', async () => {
-    // Doc 56 §C row 2, and the pair that makes 3a a decision rather than a
-    // drought: 3a alone stays green for a change that never sends a `.docx`
+    // The other half of 3a, and the pair that makes it a decision rather than
+    // a drought: 3a alone stays green for a change that never sends a `.docx`
     // under any circumstances, which is the feature not working.
     //
     // **No download is the half that would go unnoticed.** The text is a
@@ -185,11 +185,11 @@ describe('Attachments as model input (e2e)', () => {
   });
 
   it('**6. an `.xlsx` reaches the model the same way — a second format on one path**', async () => {
-    // Doc 57 §1's claim, asserted rather than assumed: the plumbing doc 56 built
-    // is format-agnostic, so `.xlsx` needs one list entry and one parser and
-    // nothing else. This is the test that would go red if any of it had grown a
-    // `.docx` assumption — the feed branch keys on `extractedText`, not on the
-    // MIME type.
+    // The format-agnostic claim, asserted rather than assumed: the extraction
+    // plumbing is not format-specific, so `.xlsx` needs one list entry and one
+    // parser and nothing else. This is the test that would go red if any of it
+    // had grown a `.docx` assumption — the feed branch keys on `extractedText`,
+    // not on the MIME type.
     const ticket = await createTicket(fx.prisma, tenant);
     const message = await createMessage(fx.prisma, ticket.id);
     await attach(

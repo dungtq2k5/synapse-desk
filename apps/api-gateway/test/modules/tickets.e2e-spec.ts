@@ -483,8 +483,8 @@ describe('Tickets at the HTTP boundary (e2e)', () => {
       //
       // `bulk/status` collides because its second segment is literally
       // `status`, so `@Post(':id/status')` matches it with `id = 'bulk'`.
-      // Nothing declares `@Post(':id/priority')` — doc 47 §3 struck that route
-      // as a duplicate of `PATCH /tickets/:id` — so `bulk/priority` has no
+      // Nothing declares `@Post(':id/priority')` — that route was struck as a
+      // duplicate of `PATCH /tickets/:id` — so `bulk/priority` has no
       // parameterized route to be swallowed by, whatever the declaration order.
       //
       // Which makes declaring it early defensive rather than load-bearing, and

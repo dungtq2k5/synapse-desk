@@ -14,8 +14,8 @@ import '../../../../common/graphql/enums';
  *
  * The two filters match the REST route exactly. Nothing is added here — a
  * filter the REST list cannot express would be a second query surface with
- * different capabilities, which is what doc 42 §3's "subset, not a mirror"
- * rules out in the direction people actually drift.
+ * different capabilities, which is what the read-side rule — a subset, not a
+ * mirror — forbids in the direction people actually drift.
  */
 @ArgsType()
 export class IngestionJobsArgsGqlDto extends PageArgsGqlDto {

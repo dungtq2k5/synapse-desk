@@ -29,7 +29,8 @@ export class RoleResponseGqlDto {
    *
    * Computed by auth-service for `DELETE /roles/:id`'s guard, so it costs
    * nothing extra here. It is the TRUE total — there is no `users` edge for it
-   * to be the length of, and doc 51 §2 records why that edge is deferred.
+   * to be the length of, and `roles.resolver.ts` records why that edge is
+   * deferred.
    */
   @Field(() => Int)
   userAssigned!: number;

@@ -981,8 +981,8 @@ describe('the real-time relay (e2e)', () => {
       // count is what tells it the difference, and it has been in hand here
       // since `getAiAttachments` returned.
       //
-      // Zero parts and one skip is exactly the state doc 56 makes routine: a
-      // `.docx` whose extraction failed.
+      // Zero parts and one skip is exactly the state attachment text
+      // extraction makes routine: a `.docx` whose extraction failed.
       const author = await fx.connectClient({ sub: authorId, organizationId });
       const { subject } = controllable();
       fx.stubs.message.getAiAttachments.mockReturnValue(

@@ -373,8 +373,9 @@ export class DocumentParserService {
    * `AttachmentExtractorService`'s existing `pages.map(…).join('\n\n')` produces
    * the whole workbook with no format-specific assembly anywhere.
    *
-   * **`load()`, not the streaming `WorkbookReader` — and doc 57 §2 argued the
-   * opposite.** The streaming reader was the stated reason for choosing exceljs
+   * **`load()`, not the streaming `WorkbookReader`, which is the opposite of
+   * why this library is here.** The streaming reader was the stated reason for
+   * choosing exceljs
    * over SheetJS: `MAX_SHEET_ROWS` as an early exit, so row 501 is never built
    * and peak memory tracks the cap rather than the file. Measured against
    * 4.4.0, it also crashes:

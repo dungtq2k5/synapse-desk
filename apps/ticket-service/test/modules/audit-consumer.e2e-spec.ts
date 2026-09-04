@@ -445,7 +445,7 @@ describe('AuditConsumer over NATS (e2e)', () => {
     // The other end of the same mechanism, and the reason `MAX_DELIVER` exists.
     // AUDIT is a WorkQueue stream, so a message that is nak'd forever is not
     // merely stuck — it holds its place and everything behind it waits. This is
-    // doc 40 §3 and doc 49 §2 arriving from a third direction.
+    // ADR 0041's durable-subject rule arriving from a third direction.
     //
     // Parked rather than dropped: `term()` alone is a silent loss, and the whole
     // point of a durable subject is that nothing vanishes without a trace.

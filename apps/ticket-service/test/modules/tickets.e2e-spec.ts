@@ -1208,7 +1208,7 @@ describe('Tickets (e2e)', () => {
     });
 
     it('7. **carries no reassignments — those have their own history**', async () => {
-      // The split doc 47 §1 draws. `ticket_assignments` is richer than this
+      // The split ADR 0040 draws. `ticket_assignments` is richer than this
       // shape could be, and merging them would be one list with two meanings.
       const ticket = await createTicket(fx.prisma, tenant, {
         status: TicketStatus.OPEN,

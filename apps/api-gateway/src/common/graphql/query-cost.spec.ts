@@ -247,8 +247,9 @@ describe('Query complexity', () => {
     it('**2. and every one is weighted or explicitly exempt**', () => {
       // Written on the day the scorer shipped, this would have failed on
       // `DocumentUsage.document` and `KnowledgeGapFlag.document`. Written on
-      // the day doc 51 landed, it failed on `AgentStat.agent` — a field neither
-      // the implementation review nor the validation pass had noticed.
+      // the day the analytics edges landed, it failed on `AgentStat.agent` —
+      // a field neither the implementation review nor the validation pass had
+      // noticed.
       const unpriced = loaderBackedFields()
         .filter(
           ({ field }) =>

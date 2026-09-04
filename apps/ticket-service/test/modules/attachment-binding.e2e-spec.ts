@@ -323,11 +323,11 @@ describe('Attachments bound at message create (e2e)', () => {
     });
 
     it('**7. a corrupt workbook stores NULL and the confirm still succeeds**', async () => {
-      // Doc 57's second format through doc 56 §B2's rule, and the chain matters:
-      // exceljs THROWS on a file that is not a zip rather than yielding zero
-      // sheets. Zero sheets would produce `''`, which means "a parser ran and
-      // the file had no text" — the one state that must stay distinct from
-      // "nothing was extracted".
+      // The second format through the same NULL-versus-`''` rule, and the
+      // chain matters: exceljs THROWS on a file that is not a zip rather than
+      // yielding zero sheets. Zero sheets would produce `''`, which means "a
+      // parser ran and the file had no text" — the one state that must stay
+      // distinct from "nothing was extracted".
       //
       // The throw becomes an `INTERNAL` rpc error, which the client swallows
       // into `null`. The attachment still stores, still downloads, and the user

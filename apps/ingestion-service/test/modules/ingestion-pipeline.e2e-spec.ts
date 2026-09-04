@@ -476,7 +476,7 @@ describe('The ingestion pipeline (e2e)', () => {
     });
 
     it('**a clean re-index CLOSES the flag, as a system resolution**', async () => {
-      // Nothing else closes it. After doc 41 resolution is a human act, so an
+      // Nothing else closes it. Resolution is otherwise a human act, so an
       // unresolved flag would mean "no human has looked" rather than "pages are
       // still missing" — a worklist item nobody can action, and a warning that
       // never clears for anything reader-facing derived from it.
@@ -1372,7 +1372,7 @@ describe('The ingestion pipeline (e2e)', () => {
 
     it('17. FAILS a file type it has no parser for', async () => {
       // **`bin`, and NOT a format name.** This used to say `xlsx`, which was a
-      // fixture with an expiry date: doc 57 gave `.xlsx` a parser and the test
+      // fixture with an expiry date: `.xlsx` then got a parser and the test
       // started asserting that a working parser fails.
       //
       // `UNKNOWN_EXTENSION` cannot expire the same way. It is what confirm

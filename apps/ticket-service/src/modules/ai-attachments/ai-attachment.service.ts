@@ -100,8 +100,8 @@ export class AiAttachmentService {
       if (this.isParseEligible(row.mimeType)) {
         // **The extracted-text branch.** A `.docx` used to end here
         // unconditionally: storable, downloadable, and unreadable to the model
-        // because nothing turned it into text. Doc 56 §B turns it into text at
-        // confirm, so the bytes are no longer the only thing on offer.
+        // because nothing turned it into text. Extraction runs at confirm now,
+        // so the bytes are no longer the only thing on offer.
         //
         // Note what does NOT happen: no download. The text is a Postgres value,
         // so a parse-eligible attachment stops touching storage on every AI

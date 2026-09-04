@@ -47,7 +47,7 @@ rag-service — get no init container, because there is nothing for it to do.
 **The twenty-six objects Prisma cannot express moved here too**, out of the
 application boot hook and into `src/schema-apply.ts`, which the same container
 runs immediately after the migration. The reason is measured and is not the one
-the first draft of doc 73 gave:
+the first draft of this decision gave:
 
 ```
 no-op CREATE INDEX IF NOT EXISTS, table held by an 8-second writer
@@ -103,8 +103,8 @@ timeouts and upgrade headers is the same "two lists is two chances" hazard
 `docs/tech-stack-specs.md` §"Ingress & Proxy" reads _"Reverse proxy, SSL
 termination, strict Content Security Policy (CSP) headers, custom error
 pages."_ The Ingress takes the first two. **Measured: there is no `helmet` and
-no `contentSecurityPolicy` anywhere in this repository** — CORS was built
-(doc 66) and the security-header half never was.
+no `contentSecurityPolicy` anywhere in this repository** — CORS was built and
+the security-header half never was.
 
 That half belongs in `main.ts`, not in the proxy: `helmet` is one middleware, it
 versions with the code that decides what a page may load, and it survives a

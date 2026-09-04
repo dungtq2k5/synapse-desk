@@ -24,7 +24,7 @@ import {
  * failure is deterministic, so the generic arm's rethrow would spend the
  * queue's one slot counting the same huge range three times to reach the same
  * answer. Same shape as `BudgetExhausted` in the ingestion processor, and the
- * same distinction doc 40's validation drew for `JobNoLongerRunnableError`.
+ * same distinction `JobNoLongerRunnableError` draws.
  *
  * Carries the count, because "narrow it" is only actionable next to a number.
  */

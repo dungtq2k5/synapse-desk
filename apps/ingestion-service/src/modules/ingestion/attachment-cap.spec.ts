@@ -117,8 +117,9 @@ describe('The per-attachment character cap (unit)', () => {
 
   it('**5d. a single-page `.docx` inside the budget is untouched by any of this**', async () => {
     // The format-blindness claim, asserted rather than assumed: the page rule
-    // never fires for a one-page document, so `.docx` behaves exactly as it did
-    // before doc 57 and needs no `if (mimeType === …)` anywhere.
+    // never fires for a one-page document, so `.docx` behaves exactly as it
+    // did before `.xlsx` had a parser, and needs no `if (mimeType === …)`
+    // anywhere.
     const result = await extractWith({
       contentHash: 'x',
       pageCount: 0,

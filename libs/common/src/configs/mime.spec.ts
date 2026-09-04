@@ -93,8 +93,7 @@ describe('the MIME lists agree with each other', () => {
   });
 
   it('**`.doc` is storable, never parsed, and never fed**', async () => {
-    // Doc 56 §A, and all three clauses are load-bearing in different
-    // directions.
+    // All three clauses are load-bearing, in different directions.
     //
     // Mammoth reads OOXML. A genuine Word 97-2003 file is an OLE2 compound
     // binary and throws `Can't find end of central directory : is this a zip

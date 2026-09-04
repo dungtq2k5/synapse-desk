@@ -9,7 +9,7 @@ import { IngestionJobsResolver } from './ingestion-jobs.resolver';
  *
  * Both surfaces. The GraphQL one earns its place on the `document` edge alone:
  * the REST shape carries `documentId` and no title, so the pipeline dashboard is
- * two round trips without it (doc 51 §1). The read-side subset rule still holds
+ * two round trips without it. The read-side subset rule still holds
  * — `resolvers.spec.ts` pins the file list, so this addition was a deliberate
  * edit there too.
  */

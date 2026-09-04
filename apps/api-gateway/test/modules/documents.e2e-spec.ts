@@ -188,9 +188,9 @@ describe('Documents at the HTTP boundary (e2e)', () => {
     });
 
     it('**3b. and `.doc` is refused HERE rather than failing in the parser**', async () => {
-      // Doc 56 §A. `application/msword` was an accepted document type and could
-      // never have worked: mammoth reads OOXML, and a Word 97-2003 file is an
-      // OLE2 compound binary that throws `Can't find end of central directory :
+      // `application/msword` was an accepted document type and could never
+      // have worked: mammoth reads OOXML, and a Word 97-2003 file is an OLE2
+      // compound binary that throws `Can't find end of central directory :
       // is this a zip file ?`.
       //
       // **A bare `Error`, so it missed the deterministic-refusal arm** and cost

@@ -429,7 +429,7 @@ export class IngestionProcessor {
     if (missing.length === 0) {
       // **Not just "nothing to raise" — something to CLOSE.** A document whose
       // pages were unreadable and now are not leaves an open flag behind, and
-      // nothing else closes it: after doc 41, resolution is a human act. An
+      // nothing else closes it: resolution is otherwise a human act. An
       // unresolved flag would then mean "no human has looked", not "pages are
       // still missing" — which is a worklist item nobody can action and, for
       // any reader-facing signal derived from it, a warning that never clears.

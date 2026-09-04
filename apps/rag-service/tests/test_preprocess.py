@@ -216,7 +216,7 @@ class TestOrdering:
     async def test_a_message_that_CARRIED_a_file_is_never_a_greeting(
         self, generator, ledger, settings, budget
     ):
-        """The case doc 56 makes common, and the one nobody writes.
+        """The case text extraction makes common, and the one nobody writes.
 
         `parts` is what SURVIVED — eligibility, the size budget, and now text
         extraction. Keying the greeting short-circuit on it means the rule

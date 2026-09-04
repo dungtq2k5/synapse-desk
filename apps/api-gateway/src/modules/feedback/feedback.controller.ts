@@ -74,7 +74,8 @@ export class MessageFeedbackController {
    * superset in principle, but it filters only on `rating`, `citationAccurate`
    * and a date range — no message, no user — and it is gated on
    * `analytics.read`. So the caller who wants this cannot reach it there, which
-   * is the difference between this route and the ones doc 43 §1 struck.
+   * is the difference between this route and the subset routes struck as
+   * redundant.
    *
    * `null` and 200, never 404: a client asks this for every AI message it
    * renders, and "not rated" is the ordinary answer rather than an error.

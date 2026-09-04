@@ -264,8 +264,8 @@ export class IngestionReconcileSweep {
       // ONE row must not block the queue behind it, whatever put it there.
       //
       // `toJobData` narrows `ocrLanguages` by parsing, and parsing REFUSES
-      // rather than filters (doc 46) — so a row carrying a code the build no
-      // longer knows throws here. Uncaught, that aborts the whole sweep, and
+      // rather than filters — so a row carrying a code the build no longer
+      // knows throws here. Uncaught, that aborts the whole sweep, and
       // `createdAt asc` means the same row is hit first again next tick: every
       // stranded document behind it stays stranded forever.
       //

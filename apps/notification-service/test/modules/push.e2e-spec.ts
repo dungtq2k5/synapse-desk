@@ -30,9 +30,9 @@ import { NotificationsGrpcController } from '../../src/modules/feed/notification
  * real token or receive a real push, and the FCM SDK is mocked at the
  * `sendEachForMulticast` boundary. That means §4's error-code mapping is
  * verified against a FIXTURE rather than against Firebase: the same "the
- * premise cannot be settled from this repository" shape as doc 63's
- * `creditIssued`, and it wants the same honesty rather than a claim of
- * coverage. Getting a code wrong in the KEEP direction is harmless; wrong in
+ * premise cannot be settled from this repository" shape as the `creditIssued`
+ * assertion in `plan-change.e2e-spec.ts`, and it wants the same honesty rather
+ * than a claim of coverage. Getting a code wrong in the KEEP direction is harmless; wrong in
  * the DELETE direction silently unsubscribes a user.
  */
 describe('Push notifications (e2e)', () => {

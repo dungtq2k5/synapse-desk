@@ -220,7 +220,7 @@ describe('The OpenAPI document', () => {
 
   describe('The markdown contract reaches the client', () => {
     /**
-     * Doc 53 §A's whole deliverable.
+     * The markdown contract's whole deliverable.
      *
      * The task is a CONTRACT, not code: these fields already round-trip
      * markdown byte for byte and always have. What was missing is the promise —

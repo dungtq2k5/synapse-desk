@@ -6,13 +6,13 @@ import ts from 'typescript';
 /**
  * Every directory holding TypeScript is claimed by a typecheck.
  *
- * **Twice in three documents a new top-level directory landed outside the root
- * `tsconfig.json` include** — `scripts/seed-demo` (doc 64: a wrong enum member
- * became `undefined` at runtime and wrote 200 rows with the column default),
- * then `test/system` (1,798 lines no aggregate command compiled). Both fixes
- * were patches: one more path in the list. This is the rule the patches were
+ * **Twice in three phases a new top-level directory landed outside the root
+ * `tsconfig.json` include** — `scripts/seed-demo` (a wrong enum member became
+ * `undefined` at runtime and wrote 200 rows with the column default), then
+ * `test/system` (1,798 lines no aggregate command compiled). Both fixes were
+ * patches: one more path in the list. This is the rule the patches were
  * standing in for — the fourth directory fails here on arrival, not three
- * documents later.
+ * phases later.
  *
  * `ts-jest` and `tsx` do not close the gap: both transpile per file and
  * typecheck no program, so a green test run says nothing about the types of
@@ -43,7 +43,7 @@ describe('every TypeScript directory is inside a typecheck', () => {
   /**
    * The corpus: tracked and untracked-but-not-ignored `.ts` files.
    *
-   * `--cached --others --exclude-standard` is the doc 67 §6 correction applied
+   * `--cached --others --exclude-standard` is the corpus correction applied
    * from the start rather than retrofitted: the index alone misses a directory
    * added and not yet staged, which is precisely when a new one appears. And
    * `git` rather than a filesystem walk because `.gitignore` already excludes

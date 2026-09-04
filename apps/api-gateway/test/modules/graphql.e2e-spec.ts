@@ -1446,8 +1446,10 @@ describe('The GraphQL surface (e2e)', () => {
   });
 
   describe('The chat conversation list is a ticket query, not a second field', () => {
-    // Doc 51 §3 strikes `chatConversations` from the plan. This is the
-    // executable form of that strike — and it has to be run as an AGENT.
+    // `chatConversations` was struck from the GraphQL plan: the chat
+    // conversation list is a ticket query with a filter, not a second field.
+    // This is the executable form of that strike — and it has to be run as an
+    // AGENT.
     //
     // As a requester it passes either way: a requester sees only their own
     // tickets whatever the filter says, so the assertion would hold against a
@@ -1567,10 +1569,10 @@ describe('The GraphQL surface (e2e)', () => {
     beforeEach(() => jest.clearAllMocks());
 
     it('**1. a RETIRED code is marked, which `permissionCodes` cannot say**', async () => {
-      // The whole reason the edge exists. Doc 45 §2 named this panel as the one
-      // its own fix did not reach: with only codes, a role holding a retired
-      // permission renders identically to one holding a live permission, and an
-      // editor offers it as an option the API will refuse.
+      // The whole reason the edge exists. The role editor is the panel a
+      // retired-code fix elsewhere did not reach: with only codes, a role
+      // holding a retired permission renders identically to one holding a live
+      // permission, and an editor offers it as an option the API will refuse.
       const roleId = faker.string.uuid();
 
       fx.stubs.role.getRole.mockReturnValue(

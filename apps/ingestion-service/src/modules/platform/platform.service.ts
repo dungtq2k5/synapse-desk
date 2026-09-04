@@ -29,8 +29,8 @@ export class PlatformUsageService {
    * `groupBy` returns no row for a tenant with no documents, so a pass-through
    * would leave the caller to decide what a missing id means — and the two
    * available readings, "under the limit" and "not checked", are exactly the
-   * pair doc 59 §1 exists to keep apart. Filling here makes the sparse case
-   * unrepresentable rather than handled.
+   * pair an entitlement check must keep apart. Filling here makes the sparse
+   * case unrepresentable rather than handled.
    *
    * One query for N tenants: the projection asks about every subscriber of a
    * plan at once, and a per-tenant loop is the shape this surface replaces.

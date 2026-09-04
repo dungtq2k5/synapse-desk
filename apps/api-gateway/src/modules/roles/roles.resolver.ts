@@ -29,7 +29,7 @@ import type { GqlContext } from '../../common/graphql/loaders/loaders.factory';
  * The composition this serves is the role editor: a role and the catalogue it
  * grants from, in one round trip instead of three.
  *
- * **`Role.users` is deliberately absent** (doc 51 §2). It would need a
+ * **`Role.users` is deliberately absent.** It would need a
  * `ListUsersByRoleIds` rpc that does not exist, against a precedent —
  * `Ticket.messages` — that says not to invent a batch RPC for a query nobody
  * makes in bulk. `userAssigned` is the count, and `GET /users?roleId=` is the
@@ -104,8 +104,8 @@ export class RolesResolver {
    *
    * The edge exists for ONE field: `isRetired`. A role holding a retired code
    * renders identically to one holding a live code when all the client has is
-   * `permissionCodes`, and doc 45 §2 named that as the panel its own fix did not
-   * reach.
+   * `permissionCodes`, and the role editor is exactly the panel that a
+   * retired-code fix elsewhere did not reach.
    *
    * Filtered here rather than fetched per role, because the catalogue is one
    * list: the loader makes a page of roles one call, and the filter is a lookup

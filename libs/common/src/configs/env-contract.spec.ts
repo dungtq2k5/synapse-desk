@@ -9,8 +9,8 @@ import { stripComments } from '../testing/strip-comments';
  * registry, and this scan runs from the code toward the registry.
  *
  * **Six features in one working session added environment variables and not
- * one reached an example file** — Stripe (docs 59, 63), FCM (doc 65),
- * `WEBHOOK_ALLOW_PRIVATE_TARGETS` (doc 69). That is not carelessness; it is a
+ * one reached an example file** — Stripe twice, FCM, and
+ * `WEBHOOK_ALLOW_PRIVATE_TARGETS`. That is not carelessness; it is a
  * file maintained by memory. With this scan, a new variable is a schema edit
  * and the build fails until the example catches up.
  *

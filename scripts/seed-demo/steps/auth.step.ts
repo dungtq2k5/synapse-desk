@@ -380,7 +380,7 @@ async function writeTenant(
  *
  * **`source` is left to its default.** It defaults to `STRIPE`, and writing
  * `LOCAL` here would take the row out of the staleness ordering — the exact
- * defect doc 63's validation found in the plan-change claim.
+ * defect `billing.config.ts`'s `source` docblock records.
  */
 async function writeBillingHistory(
   tx: PrismaService,

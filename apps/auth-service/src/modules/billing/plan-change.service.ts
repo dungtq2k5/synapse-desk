@@ -32,8 +32,9 @@ import { StripeService } from './stripe.service';
  * else.
  *
  * **This route exists because Stripe's portal cannot enforce the rule.** Stripe
- * recommends the Customer Portal for self-service plan changes, and doc 59 D2
- * turned `subscription_update` off there for one reason: a change made inside
+ * recommends the Customer Portal for self-service plan changes, and
+ * `scripts/provision-stripe.mjs` turns `subscription_update` off there for one
+ * reason: a change made inside
  * Stripe's UI reaches this system only AFTER Stripe has applied it, which is
  * too late to refuse. The cost of that departure is recorded — the portal
  * setting is an enforcement point living outside this repo (known-gaps #20).
@@ -142,8 +143,8 @@ export class PlanChangeService {
    * verify → change is three round trips, and a tenant who uploads between the
    * gateway's check and this call lands over the new limit. Accepted: the
    * window is milliseconds, the tenant keeps what they have (a limit gates
-   * admission, never tenure), and doc 62's level alarm crosses 100% and tells
-   * them. What it is NOT is re-checkable here — reading storage from this
+   * admission, never tenure), and the limit alert's level alarm crosses 100%
+   * and tells them. What it is NOT is re-checkable here — reading storage from this
    * service is the edge that closes a cycle on the identity leaf.
    */
   async changePlan(

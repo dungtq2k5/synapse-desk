@@ -168,7 +168,7 @@ class PreprocessPipeline:
         # **Keyed on `carried`, not on `parts`, and that is the whole
         # correction.** `parts` is what survived — eligibility, the size budget,
         # and now extraction. Keying on it means the rule above holds only while
-        # skips are rare, and doc 56 makes a failed extraction a routine skip:
+        # skips are rare, and text extraction makes a failed one routine:
         # "hi" plus an unreadable spreadsheet would send zero parts, take this
         # short-circuit, and answer a message that carried a file with a canned
         # "Hi!". The rule is about what the user SENT.

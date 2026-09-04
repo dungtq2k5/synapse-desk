@@ -152,7 +152,7 @@ export interface ChatRequest {
    * calls that a greeting and never looks at what they sent. `pipeline.py`
    * states the rule as "a message carrying an attachment is not a greeting,
    * WHATEVER its text" -- this is what makes that true when extraction failed,
-   * which doc 56 makes the common case.
+   * which is the common case.
    *
    * Always >= the length of `attachments`. Zero means no file at all.
    */

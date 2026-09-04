@@ -144,9 +144,9 @@ describe('Spreadsheet extraction (unit)', () => {
   });
 
   it('3. **the streaming reader is NOT used, and this pins why**', async () => {
-    // Doc 57 §2 chose exceljs for `ExcelJS.stream.xlsx.WorkbookReader`: an
-    // early exit at `MAX_SHEET_ROWS`, so row 501 is never built. The original
-    // test 3 asserted exactly that.
+    // exceljs was chosen for `ExcelJS.stream.xlsx.WorkbookReader`: an early
+    // exit at `MAX_SHEET_ROWS`, so row 501 is never built. The original test 3
+    // asserted exactly that.
     //
     // **Measured against 4.4.0, the streaming reader crashes on multi-sheet
     // workbooks** — 103 failures in 200 runs on three sheets, 0 in 60 on one —
@@ -337,9 +337,9 @@ describe('Spreadsheet extraction (unit)', () => {
   });
 
   it('**an empty workbook parses to no pages rather than to an empty table**', async () => {
-    // `''` means "a parser ran and the file had no text", which doc 56 §B1
-    // keeps distinct from NULL. A sheet with no rows must not become a heading
-    // over an empty table — that reads as content.
+    // `''` means "a parser ran and the file had no text", which the extraction
+    // contract keeps distinct from NULL. A sheet with no rows must not become
+    // a heading over an empty table — that reads as content.
     const bytes = await buildXlsx([{ name: 'Blank', rows: [] }]);
 
     const pages = await parse(bytes);
