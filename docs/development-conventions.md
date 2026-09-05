@@ -902,6 +902,37 @@ scan is silence:
 
 ---
 
+### 13.9 Verify a mechanism at the mechanism, not at its neighbour
+
+A comment describes **its own half of a boundary** and is silent about the half
+that produces the behaviour. That is not carelessness — it follows from the
+architecture — which is why reading one side carefully still gets the mechanism
+wrong. Four examples, all found by review rather than by tests:
+
+| Claim, read from one side | What the other side did |
+| :---- | :---- |
+| a lazy initialiser is memoised | it assigns **only on success**, so a failed load retries every call |
+| the Worker "reports rather than retries" a 401 | it `throw`s, and throwing is what makes Cloudflare retry |
+| the at-cap path skips fusion | `reciprocal_rank_fusion` is called on **both** branches |
+| a page that parsed is a page that indexed | the chunker drops it again at a **second, smaller** bar |
+
+Two rules follow, and they are cheap:
+
+- **Read the component you are not currently thinking about.** The mechanism
+  usually lives at the boundary between two of them.
+- **Follow the failing path, not the happy one.** A lazy initialiser *looks*
+  memoised because on success it is; a boot-time check *looks* once-per-process
+  because on success it is; an error branch is unreachable when nothing is
+  wrong. The failing path is also where the reader ends up — nobody consults a
+  flow document or a docblock when things are working.
+
+**This is a different failure from the counting rule** (strip comments before
+counting anything over source, §13.8). That one catches a miscount; this one
+catches a correct count of the wrong thing.
+
+Applies to documentation as much as to tests: `docs/reference/flows/` carries
+the same two rules in its own conventions list, scoped to flow documents.
+
 ## 14. Definition of Done (pre-PR checklist)
 
 ### 14.0 Run the machine checks first

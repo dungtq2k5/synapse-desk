@@ -76,13 +76,16 @@ Append-only. A decision is never edited; superseding one means writing a new one
 
 ## `reference/` — what is true today
 
-Edited, never added to. A new feature updates one of these; it does not create a new one.
+A **fixed set**, describing what is true today — closed by intent rather than by count. A new *feature* updates one of these; a new *kind of thing* may add one, and adding one is a deliberate act with its reason recorded here. The rule exists to stop per-feature proliferation, not to freeze the shelf.
 
 | Document | Describes |
 | :---- | :---- |
 | [ai-output-contract.md](./reference/ai-output-contract.md) | Parse-site defaults and the Markdown answer contract |
 | [sys-flows.md](./reference/sys-flows.md) | The core cross-service flows, as mermaid |
 | [known-gaps.md](./reference/known-gaps.md) | What is currently broken or inconsistent, with the file that proves it |
+| [flows/](./reference/flows/) | One document per end-to-end path — what happens, which components, which edge cases |
+| [caching.md](./reference/caching.md) | What is cached, keyed how, invalidated by what |
+| [scheduling.md](./reference/scheduling.md) | The nine scheduled jobs — cadence, steps, owner, and how you know one stopped |
 | [erd/](./reference/erd/) | **Generated** — one entity-relationship diagram per service. Never hand-edit |
 
 ## Diagrams
@@ -96,9 +99,10 @@ invalidates them:
 | Kind | Where it goes | Why it cannot rot |
 | :---- | :---- | :---- |
 | Illustrates a **decision** | Inline in the ADR that owns it | ADRs are append-only, so the diagram freezes with the decision |
-| A **cross-service flow** | Inline in [sys-flows.md](./reference/sys-flows.md) — as content, never a new page | The edit that changes the prose shows you the diagram |
+| A **cross-service comparison** | Inline in [sys-flows.md](./reference/sys-flows.md) — as content, never a new page | The edit that changes the prose shows you the diagram |
+| An **end-to-end path** | Inline in its own [reference/flows/](./reference/flows/) document | Split by what invalidates them: an OCR change rewrites one flow and touches no other |
 | **Derivable from source** | Generated: `reference/erd/` today | Regenerating *is* the update |
-| Per-endpoint, per-function | **Nowhere.** 189 routes is 189 artifacts stale on arrival — Swagger already documents endpoints from the code | — |
+| Per-endpoint, per-function | **Nowhere.** There are hundreds of routes and each hand-written artifact is stale on arrival — Swagger already documents endpoints from the code. A *flow* is the unit instead: many endpoints enter one | — |
 
 **Format is mermaid in markdown, not `.drawio`.** A mermaid change is reviewable
 in a diff; a `.drawio` change is an opaque blob where you cannot tell whether an
