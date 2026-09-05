@@ -20,8 +20,12 @@ compatibility_date = "2026-01-01"
 # definition, three readers."
 #
 # **The two agreements fail in opposite directions and only one is loud.** A
-# mismatch here is a 401 on every message, which the Worker reports rather than
-# retries. A mismatch between notification-service and the gateway is silent:
+# mismatch here is a 401 on every message. The Worker DROPS each one — it
+# returns rather than throwing, because throwing is what makes Cloudflare retry
+# and no number of retries fixes a wrong secret. The durable signal is the
+# gateway's counter, `inbound_email_webhook_total{outcome="rejected_signature"}`;
+# this Worker retains nothing itself. A mismatch between notification-service
+# and the gateway is silent:
 # `parseTicketReplyToken` returns null, every customer reply opens a NEW ticket
 # instead of threading — correctly, since threading a stranger's mail onto
 # somebody else's conversation is a disclosure — and nothing logs an error. It

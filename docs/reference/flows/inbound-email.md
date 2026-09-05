@@ -51,15 +51,15 @@ without its attachments and gives the reply no way to name what was dropped.
 
 ## 2. Components
 
-| Component | Where | Owns |
-| :---- | :---- | :---- |
-| Cloudflare Email Routing | the zone | MX and SPF records, the catch-all rule |
-| Worker | `workers/email-inbound` | parse, attachment upload, signing, retry behaviour |
-| gateway — signature | `inbound-signature.guard.ts` | authenticating the Worker |
-| gateway — routing | `inbound-email.service.ts` | tenant, sender, thread, idempotency |
-| gateway — loop guards | same, step 0 | refusing mail that would loop |
-| storage-service | presign | the signed URLs the Worker uploads against |
-| ticket-service | create/append | the ticket, the message, the thread |
+| Component                | Where                        | Owns                                               |
+| :----------------------- | :--------------------------- | :------------------------------------------------- |
+| Cloudflare Email Routing | the zone                     | MX and SPF records, the catch-all rule             |
+| Worker                   | `workers/email-inbound`      | parse, attachment upload, signing, retry behaviour |
+| gateway — signature      | `inbound-signature.guard.ts` | authenticating the Worker                          |
+| gateway — routing        | `inbound-email.service.ts`   | tenant, sender, thread, idempotency                |
+| gateway — loop guards    | same, step 0                 | refusing mail that would loop                      |
+| storage-service          | presign                      | the signed URLs the Worker uploads against         |
+| ticket-service           | create/append                | the ticket, the message, the thread                |
 
 **The catch-all rule is not per-address.** The tenant lives in the local part —
 `support+{inbound_token}@…` — so every tenant shares one route
@@ -74,14 +74,14 @@ the default: enabling a tenant is setting that column.
 `INBOUND_EMAIL_SECRET` is one value in three deployment surfaces, and the two
 agreements fail in **opposite** directions:
 
-| Pair | Failure when they disagree |
-| :---- | :---- |
-| Worker → gateway (`INBOUND_SECRET`) | **401 on every message**, and retried — loud twice over (§6) |
+| Pair                                          | Failure when they disagree                                                            |
+| :-------------------------------------------- | :------------------------------------------------------------------------------------ |
+| Worker → gateway (`INBOUND_SECRET`)           | **401 on every message**, each one dropped and counted, never retried (§6)            |
 | notification-service → gateway (reply tokens) | `parseTicketReplyToken` returns `null` and the caller **opens a new ticket** — silent |
 
 The second is the one to fear. Every customer reply starts a fresh ticket,
 correctly, deliberately, with nothing in a log — and it presents weeks later as
-*"threading stopped working"*. Rotating the secret means rotating all three at
+_"threading stopped working"_. Rotating the secret means rotating all three at
 once; a partial rotation is worse than a wrong one, because two thirds of it
 keeps working.
 
@@ -102,7 +102,7 @@ between two `JSON.stringify` calls on structurally equal objects.
 Step 0 in the service, unconditionally, before tenant resolution:
 
 - **Self-addressed mail is dropped silently** — not even a rejection event.
-  Replying to ourselves *is* the loop.
+  Replying to ourselves _is_ the loop.
 - **`Auto-Submitted` and `Precedence`** are the headers a machine sets;
   `bulk`, `list` and `junk` are refused.
 
@@ -112,7 +112,7 @@ rather than after the routing.
 
 ---
 
-## 6. Idempotency, and a live defect in the retry rule
+## 6. Idempotency, and the retry rule
 
 Cloudflare retries on any thrown error, so the gateway must be safe to call
 twice with the same mail. The key is the message's own `Message-ID` — which the
@@ -123,46 +123,49 @@ constraint is `(organization_id, message_id)`.
 [ADR 0026](../../decisions/0026-stripe-webhook-idempotency.md) for Stripe: two
 concurrent retries both pass a `findFirst` and both insert.
 
-### The 401 is intended not to retry, and it does
+### The 401 does not retry, and the record is on the gateway
 
-Both branches in the Worker end in `throw`, and the comment eight lines above
-correctly says throwing is what makes Cloudflare retry. The 401 branch's only
-real difference is a better error message — while the comment directly above it
-claims *"reported and not retried"*.
+**A 401 returns; every other non-2xx throws.** An uncaught throw out of `email()`
+is what makes Cloudflare retry, and retrying a wrong `INBOUND_SECRET` is a storm
+rather than a recovery — no number of attempts fixes a secret. A 5xx still
+throws, because a transient gateway failure _is_ worth retrying and the
+`(organization_id, message_id)` constraint above is what makes that safe.
 
-So today, **a wrong `INBOUND_SECRET` means every inbound mail is retried**: the
-flood the design wanted to avoid is the current behaviour.
+This honours a decision the gateway had already made and the Worker used to
+override: `InboundSignatureGuard` answers _"401, not 400 and never 5xx. A 5xx
+tells the provider to retry"_.
 
-**The claim exists twice**, independently — in `index.ts` above the branch, and
-in `wrangler.toml`'s comment about the three holders. Correcting one leaves the
-other asserting the old behaviour.
+**The cost is that the message is dropped** — accepted by Cloudflare, never
+delivered. That is the deliberate half: a dropped message with a counted
+rejection beats an unbounded retry of one that can never be accepted.
 
-**The gateway already made the right decision and the Worker undoes it.**
-`InboundSignatureGuard` answers 401 deliberately — *"401, not 400 and never 5xx.
-A 5xx tells the provider to retry"* — so the retry storm is the Worker
-overriding a choice the gateway documented.
+**The durable record is a gateway counter, not a Worker log.** This Worker has
+no `observability` block, no tail consumer and no logpush; its one `console.error`
+is visible in a live `wrangler tail` and nowhere else. What an operator can read
+afterwards is `inbound_email_webhook_total`, incremented at all three of
+`InboundSignatureGuard`'s exits:
 
-**The obvious fix is a trap.** This Worker has no `console.*`, no
-`observability` block, no tail consumer and no logpush — the throw *is* its only
-reporting mechanism. A bare `return` stops the storm and leaves nothing: mail
-dropped indefinitely with no signal, which is the shape `wrangler.toml`'s own
-comment condemns two paragraphs later.
+| Series                    | Answers                                                                         |
+| :------------------------ | :------------------------------------------------------------------------------ |
+| `rejected_signature` > 0  | the shared secret is wrong — certain, permanent, blocks all mail                |
+| `accepted` == 0 for hours | the Worker is **not calling at all** — MX record, routing rule, deploy          |
+| `no_raw_body` > 0         | `rawBody: true` missing from the gateway's `NestFactory` — our misconfiguration |
 
-The fix therefore belongs on the gateway, which issues the 401 and already has
-scraped, alertable metrics. Tracked as **known-gaps row 30**, which carries the
-counter's shape and the ordering constraint — the counter must land before or
-with the Worker's `return`, or there is a window with exactly the silent drop
-the fix exists to prevent.
+**The second question is invisible in the first**, which is why one metric
+carries a label rather than a single rejection counter: a `rejected_signature`
+count of zero is what a healthy system and a dead Worker have in common.
 
-**Until it lands, the behaviour above is what happens.** Do not read
-`wrangler.toml`'s *"reports rather than retries"* as a description of the
-system.
+**Nothing scrapes it yet.** `docker/prometheus/` holds alert rules and there is
+no Prometheus in `docker-compose.yml` or in `k8s/`. The counter is retained and
+unread until a collector exists — strictly better than the Worker's nothing, and
+**not an alert**. Until then a wrong secret pages nobody; it is visible by
+reading `/metrics` on 9464.
 
 ---
 
 ## 7. Attachments, and the note
 
-The Worker presigns against the *resolved ticket* before the webhook runs, using
+The Worker presigns against the _resolved ticket_ before the webhook runs, using
 **the same routing resolver the webhook uses**. If the two could disagree, a
 customer's screenshot would upload under one ticket's prefix and attach to
 another's message.
@@ -172,7 +175,7 @@ still a mail worth delivering, so the Worker records what was dropped and
 carries the list forward.
 
 **The note is applied once, for both paths** — creation and reply. It was
-previously reached only on ticket creation, so an emailed *reply* carrying
+previously reached only on ticket creation, so an emailed _reply_ carrying
 attachments dropped them in silence: no file, no note, nothing in the thread
 saying anything had been left out. Survivable while mail dropped every
 attachment; not survivable once some land and some do not, because a partial
@@ -182,30 +185,30 @@ delivery with no record of the missing half is worse than a total one.
 
 ## 8. Edge cases
 
-| Situation | What happens | Why that, and not an error |
-| :---- | :---- | :---- |
-| **Mail to a tenant with `NULL` token** | not routable; no ticket | Receiving no mail is the safe default for an unconfigured tenant |
-| **Self-addressed mail** | dropped, silently | Any reply would be the next iteration of the loop |
-| **`Auto-Submitted: auto-replied`** | refused | Vacation responders are how loops start |
-| **Duplicate delivery** | second insert hits the unique constraint | Cloudflare retries; the database is the arbiter, not a prior read |
-| **Wrong shared secret** | 401 — and **retried anyway** (§6) | Intended to stop; the branch throws like every other. A live defect, with a fix planned |
-| **Gateway 5xx** | Worker throws → Cloudflare retries | Dedup makes the retry safe |
-| **Attachment upload fails** | mail still delivered, files named in the note | The mail matters more than its attachments |
-| **Attachment type declined** | same — named in the note | The customer learns what was ignored |
-| **Reply whose token is unparseable** | opens a **new ticket** | §3 — this is the silent failure to watch |
+| Situation                              | What happens                                                                  | Why that, and not an error                                                                    |
+| :------------------------------------- | :---------------------------------------------------------------------------- | :-------------------------------------------------------------------------------------------- |
+| **Mail to a tenant with `NULL` token** | not routable; no ticket                                                       | Receiving no mail is the safe default for an unconfigured tenant                              |
+| **Self-addressed mail**                | dropped, silently                                                             | Any reply would be the next iteration of the loop                                             |
+| **`Auto-Submitted: auto-replied`**     | refused                                                                       | Vacation responders are how loops start                                                       |
+| **Duplicate delivery**                 | second insert hits the unique constraint                                      | Cloudflare retries; the database is the arbiter, not a prior read                             |
+| **Wrong shared secret**                | 401; the message is **dropped, not retried**, and counted on the gateway (§6) | No number of retries fixes a wrong secret; a 5xx still retries, because that one is transient |
+| **Gateway 5xx**                        | Worker throws → Cloudflare retries                                            | Dedup makes the retry safe                                                                    |
+| **Attachment upload fails**            | mail still delivered, files named in the note                                 | The mail matters more than its attachments                                                    |
+| **Attachment type declined**           | same — named in the note                                                      | The customer learns what was ignored                                                          |
+| **Reply whose token is unparseable**   | opens a **new ticket**                                                        | §3 — this is the silent failure to watch                                                      |
 
 ---
 
 ## 9. When it misbehaves — where to look first
 
-| Symptom | Look at |
-| :---- | :---- |
-| No mail arrives at all | the MX record and the catch-all rule, then `inbound_token` on the tenant — there is no metric for this yet |
-| Every message 401s | the secret's three holders (§3). Expect a **retry storm** while it is wrong (§6) |
-| Replies open new tickets instead of threading | the **third** holder: notification-service's reply-token minter (§3) |
-| One mail became two tickets | the idempotency key — was a `Message-ID` present on that mail? |
-| Attachments missing with no note | the note path — it must be applied on the reply path too |
-| A loop is filling a mailbox | step 0's guards, and whether the sending address is self-addressed |
+| Symptom                                       | Look at                                                                                                                                                                   |
+| :-------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| No mail arrives at all                        | `inbound_email_webhook_total{outcome="accepted"}` — zero for hours means the Worker is not calling: MX record, catch-all rule, deploy. Then `inbound_token` on the tenant |
+| Every message 401s                            | the secret's three holders (§3). Mail is **dropped** while it is wrong — no storm, and no page either, because nothing scrapes the counter yet (§6)                       |
+| Replies open new tickets instead of threading | the **third** holder: notification-service's reply-token minter (§3)                                                                                                      |
+| One mail became two tickets                   | the idempotency key — was a `Message-ID` present on that mail?                                                                                                            |
+| Attachments missing with no note              | the note path — it must be applied on the reply path too                                                                                                                  |
+| A loop is filling a mailbox                   | step 0's guards, and whether the sending address is self-addressed                                                                                                        |
 
 ---
 

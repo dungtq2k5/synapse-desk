@@ -23,7 +23,7 @@
     "@faker-js/faker": "^10.5.0",
     "@types/jest": "^30.0.0",
     "@types/js-yaml": "^4.0.9",
-    "@types/node": "^26.1.1",
+    "@types/node": "^24.13.3",
     "bullmq": "^5.81.3",
     "js-yaml": "^5.2.1",
     "typescript": "^6.0.3"

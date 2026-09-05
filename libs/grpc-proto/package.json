@@ -15,7 +15,7 @@
   },
   "devDependencies": {
     "@grpc/proto-loader": "^0.8.1",
-    "@types/node": "^26.1.1",
+    "@types/node": "^24.13.3",
     "ts-proto": "^2.12.0"
   },
   "dependencies": {

@@ -97,13 +97,32 @@ export default {
     // gateway's `(organization_id, message_id)` dedup is what makes that retry
     // safe rather than duplicating a ticket.
     //
-    // A 401 is the exception: the secret is wrong, and no number of retries
-    // will fix it — so it is reported and not retried, which is why the
-    // gateway answers 401 rather than 5xx for a bad signature.
+    // **A 401 is the exception, and it RETURNS rather than throws.** The secret
+    // is wrong; no number of retries fixes it, and retrying would turn one
+    // misconfiguration into a retry storm against every inbound message. The
+    // gateway chose 401 for exactly this reason — *"401, not 400 and never
+    // 5xx. A 5xx tells the provider to retry"* — and throwing here would
+    // override a decision it documented.
+    //
+    // **The durable record is the gateway's counter, not this line.**
+    // `inbound_email_webhook_total{outcome="rejected_signature"}` is what an
+    // operator can look at later; this Worker has no `console.*` beyond the
+    // line below, no `observability` block, no tail consumer and no logpush, so
+    // the `console.error` is visible in a live `wrangler tail` and nowhere
+    // else. Do not read it as the signal.
+    //
+    // The cost of returning is that the mail is DROPPED — accepted by
+    // Cloudflare, never delivered. That is the deliberate half of the trade: a
+    // dropped message with a counted rejection beats an infinite retry of a
+    // message that can never be accepted.
     if (response.status === 401) {
-      throw new Error(
-        'The gateway rejected this Worker’s signature — INBOUND_SECRET does not match',
+      console.error(
+        'The gateway rejected this Worker’s signature — INBOUND_SECRET does not match. ' +
+          'This message is dropped and NOT retried; see ' +
+          'inbound_email_webhook_total{outcome="rejected_signature"} on the gateway.',
       );
+
+      return;
     }
 
     if (!response.ok) {

@@ -110,6 +110,36 @@ export class MetricsRegistry {
   readonly websocketEvents: Counter<'event'>;
 
   /**
+   * Inbound-email webhook requests, by outcome — **one metric, three labels,
+   * two questions.**
+   *
+   * | Series | Answers |
+   * | :--- | :--- |
+   * | `rejected_signature` > 0 | the shared secret is wrong — certain, permanent, and it blocks all mail |
+   * | `accepted` == 0 for N hours | the Worker is not calling **at all** — MX record, routing rule, or a failed deploy |
+   * | `no_raw_body` > 0 | `rawBody: true` is missing from THIS service's `NestFactory` — our misconfiguration, not a caller's |
+   *
+   * **The second question is invisible in the first**, which is why these are
+   * one metric with a label rather than a single rejection counter: a
+   * `rejected_signature` count of zero is what a healthy system and a dead
+   * Worker have in common.
+   *
+   * `no_raw_body` is separate because the guard calls it *"a CONFIGURATION
+   * failure, not a caller one"* — paging somebody about a shared secret for it
+   * would waste the alert.
+   *
+   * **This is the durable half of a bilateral failure.** The Worker receives
+   * the 401 and the gateway issues it, and only this end retains anything: the
+   * Worker has no `console.*`, no `observability` block, no tail consumer and
+   * no logpush. Note what this does NOT give you yet — **nothing scrapes
+   * `/metrics`**. There is no Prometheus in `docker-compose.yml` and none in
+   * `k8s/`; `docker/prometheus/` holds alert RULES and no collector. Until one
+   * exists this counter is retained and unread, which is still strictly better
+   * than the Worker's nothing, and is not an alert.
+   */
+  readonly inboundEmailWebhook: Counter<'outcome'>;
+
+  /**
    * **The one worth building first**.
    *
    * Specifies a staleness alert over the `job_runs` heartbeat, and
@@ -171,6 +201,15 @@ export class MetricsRegistry {
       // `event` and NOT `ticket` — the event names are a fixed enum
       // (`REALTIME_EVENTS`), so the cardinality is the size of that object.
       labelNames: ['event'],
+    });
+
+    this.inboundEmailWebhook = this.counter({
+      name: 'inbound_email_webhook_total',
+      help: 'Inbound-email webhook requests, by outcome.',
+      // Three fixed values — `accepted`, `rejected_signature`, `no_raw_body`.
+      // Cardinality three, and it cannot grow: every increment site is a
+      // literal in `InboundSignatureGuard`.
+      labelNames: ['outcome'],
     });
 
     this.jobLastSuccess = this.gauge({

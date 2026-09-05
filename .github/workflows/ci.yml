@@ -261,3 +261,11 @@ jobs:
           cache-dependency-path: workers/email-inbound/package-lock.json
       - run: npm ci
       - run: npm run typecheck
+
+      # **`node --test`, no test dependency.** Node strips TypeScript natively,
+      # so the one package deliberately outside the workspaces gains coverage
+      # without gaining a toolchain. It asserts the thing typecheck cannot: that
+      # a 401 from the gateway RESOLVES rather than throwing, because an
+      # uncaught throw here is what makes Cloudflare retry — and retrying a
+      # wrong `INBOUND_SECRET` is a storm, not a recovery.
+      - run: npm test

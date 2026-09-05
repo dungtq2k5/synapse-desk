@@ -305,6 +305,90 @@ describe('the image contract (static half)', () => {
     });
   });
 
+  // ------------------------------------------------------- the types major
+
+  describe('every `@types/node` describes the runtime that runs', () => {
+    /**
+     * The FOURTH place a Node version is named, and the only one that was
+     * unbound.
+     *
+     * `@types/node`'s major tracks the Node major — 26.x describes Node 26 —
+     * so a manifest on `^26` while `.nvmrc` says 24 typechecks the code
+     * against an API surface the runtime does not have. That compiles green
+     * and throws in the container, which is the same shape as the assertion
+     * above, arriving through the types instead of the image.
+     *
+     * **Four of five manifests were on `^26` when this was written**, and none
+     * of them by decision: `npm i -D @types/node` resolves the `latest` tag,
+     * which is the CURRENT Node line and not the LTS this repo pins. That is
+     * the whole failure mode — a default, applied four times, with nothing
+     * reading it back. The fifth (`storage-service`) was on `^24` and right,
+     * which is what a rule with no guard looks like: correct by luck in one
+     * place out of five.
+     *
+     * MAJORS only, deliberately. The minor is a types release, not a runtime
+     * one, and a caret already floats it; requiring the full version would
+     * redden on a DefinitelyTyped publish that changes nothing here.
+     *
+     * DECLARED ranges in tracked manifests, never the lockfile: `@fast-csv`
+     * carries its own pinned `@types/node@14` in a nested tree, which is that
+     * package's business and not a statement about this runtime.
+     */
+    const manifests = (): string[] =>
+      // `*` in a git pathspec is plain fnmatch and CROSSES `/`, so these two
+      // reach every depth. Verified, not assumed — the doubled-star spelling
+      // would MISS the root `package.json`, which is one of the five.
+      gitFiles('package.json').concat(gitFiles('*/package.json'));
+
+    /** `^24.13.3` -> `24`. Any range prefix (`^`, `~`, `>=`, none) is fine. */
+    const major = (range: string): string | undefined =>
+      /(\d+)\./.exec(range)?.[1];
+
+    const declarations = (): { file: string; range: string }[] =>
+      manifests().flatMap((file) => {
+        const manifest = JSON.parse(read(file)) as {
+          dependencies?: Record<string, string>;
+          devDependencies?: Record<string, string>;
+        };
+        const range =
+          manifest.devDependencies?.['@types/node'] ??
+          manifest.dependencies?.['@types/node'];
+
+        return range ? [{ file, range }] : [];
+      });
+
+    it('**1. every declared major equals `.nvmrc`**', () => {
+      const runtime = major(read('.nvmrc').trim());
+
+      expect(runtime).toBeDefined();
+
+      const wrong = declarations()
+        .filter(({ range }) => major(range) !== runtime)
+        .map(({ file, range }) => `${file}: ${range} — expected ^${runtime}.x`);
+
+      expect(wrong).toEqual([]);
+    });
+
+    it('**2. …and the check can actually SEE a mismatch**', () => {
+      // Guards the guard, with the exact value this was written for.
+      expect(major('^26.4.1')).toBe('26');
+      expect(major('^24.13.3')).toBe('24');
+      expect(major('~24.10.1')).toBe('24');
+      expect(major('>=22.12')).toBe('22');
+      expect(major('24.13.3')).toBe('24');
+    });
+
+    it('**3. the scan reaches real manifests, not an empty list**', () => {
+      // A pathspec that matches nothing exits cleanly, so test 1 would pass
+      // over zero declarations and report a compliance it never checked.
+      const found = declarations();
+
+      expect(manifests()).toContain('package.json');
+      expect(manifests()).toContain('workers/email-inbound/package.json');
+      expect(found.length).toBeGreaterThanOrEqual(5);
+    });
+  });
+
   // ------------------------------------------------------------ floating tags
 
   describe('no image reference floats', () => {
