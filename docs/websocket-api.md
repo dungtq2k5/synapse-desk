@@ -26,6 +26,12 @@ const socket = io(`${API_ORIGIN}/ws`, {
 - **Namespace: `/ws`.** Not the default namespace.
 - **`withCredentials: true` is mandatory.** Without it the browser sends no
   cookie and the handshake is refused.
+- **`transports: ['websocket']` is mandatory too**, and it is a *deployment*
+  constraint rather than a preference. Socket.IO's default list begins with HTTP
+  long-polling, whose handshake is a sequence of requests that must all reach the
+  **same** gateway replica; the Redis adapter shares broadcasts across replicas,
+  not handshake state. With more than one replica a polling client gets
+  `Session ID unknown` and reconnect-loops. Pin it, in every client.
 - The gateway's global prefix does **not** apply to the socket path.
 
 ### CORS
@@ -83,6 +89,29 @@ socket.on('connection:ready', ({ data }) => {
 it is unauthorized — intermittently, and not reproducibly on a fast machine.
 Gate every emit on `connection:ready`, and re-gate after every reconnect.
 
+### There are two frame shapes, and the destructuring above works for only one
+
+| Kind | Shape | Examples |
+| :--- | :--- | :--- |
+| **Constructed** by the gateway | enveloped — `{ data: … }` | `connection:ready`, and the frames the gateway builds itself |
+| **Relayed** from a domain event | **bare** — the event object itself | `notification:new`, `ticket:updated`, `message:new` |
+
+**Do not copy `({ data }) =>` onto a relayed event.** For most of them you get
+`undefined` and notice immediately. For **`notification:new` you do not**:
+`NotificationRealtimePayload` has its own field called `data`
+(`Record<string, unknown>`, the notification's payload blob), so the
+destructuring succeeds and hands you the wrong object. Nothing throws and nothing
+looks empty.
+
+```ts
+socket.on('notification:new', (payload) => {
+  payload.notificationId;   // ✓ the frame IS the payload
+  payload.data;             // the notification's own blob — not an envelope
+});
+```
+
+Check each event in §6 before destructuring.
+
 ---
 
 ## 4. Rooms — you do not join most of them
@@ -113,17 +142,32 @@ not a disconnect.
 
 | Event | Payload | Ack | Limit (per minute) |
 | :--- | :--- | :--- | :--- |
-| `ticket:join` | `{ ticketId }` | yes | 60 |
-| `ticket:leave` | `{ ticketId }` | yes | 120 |
+| `ticket:join` | `{ ticketId }` | **no** — wait for `ticket:joined` | 60 |
+| `ticket:leave` | `{ ticketId }` | **no** | 120 |
 | `message:send` | the message body | **yes — always read it** | 30 |
 | `typing:start` | `{ ticketId }` | no | 240 |
 | `typing:stop` | `{ ticketId }` | no | 240 |
-| `presence:update` | `{ status }` — `online \| away \| busy \| offline` | yes | 120 |
+| `presence:update` | `{ state }` — `online \| away \| busy \| offline` | yes | 120 |
 | `ai:stream:cancel` | `{ streamId }` | yes | 60 |
+
+**Exactly three events acknowledge**: `message:send`, `presence:update` and
+`ai:stream:cancel`. `emitWithAck` on any of the others waits for a callback the
+server never invokes — the same trap this section warns about for
+`message:send`, in the opposite direction. Confirm a join by listening for
+`ticket:joined` (§6).
+
+**`presence:update` takes `state`, not `status`.** The payload is validated with
+`forbidNonWhitelisted`, so `{ status: 'away' }` is refused twice over — an
+unknown property *and* a missing required one.
 
 `message:send` reaches the same service as `POST /tickets/:id/messages` and is
 metered to match it. **Read its ack**: a refusal arrives there, and a client that
 only listens for an `exception` frame will leave its spinner running forever.
+
+**The ack also carries `skippedAttachments`, and it is a different skip channel
+from the one in §6.** The ack's list is files that were never attached; the
+event's is files the model could not read. A client that surfaces only one of
+them tells the user half of what happened.
 
 ### Ack envelope
 
@@ -151,13 +195,21 @@ payload, so read `payload.pattern` when you need the distinction.
 | Event | Room | Notes |
 | :--- | :--- | :--- |
 | `ticket:created` | `org:` | |
-| `ticket:updated` | `ticket:`, `org:` | any change to the ticket's own fields |
+| `ticket:updated` | `ticket:` **always**; `org:` **only on escalation**; `user:` on assign/reassign | see the warning below |
 | `ticket:assigned` | `user:` | *personal* — a call to action, not a state change |
 | `ticket:joined` | your socket only | confirms a `ticket:join` |
 | `message:new` | `ticket:` | |
 | `message:updated` | `ticket:` or `:internal` | an edit |
 | `message:deleted` | `ticket:` or `:internal` | **carries no content** — a redaction announces only that it happened, plus the id |
 | `typing` | `ticket:`, minus the sender | see §7 |
+
+**`ticket:updated` does not reach the org room on most changes.** Measured across
+the five producing patterns: the ticket room gets all five, the org room gets
+**one** — escalation. So a queue dashboard built on `org:` alone will not
+refresh on a status change, an assignment or an unassignment, but *will* refresh
+on an escalation. Partial freshness reads as a flaky server, and it is not.
+**Build a queue view on a REST poll or on `ticket:created` plus your own
+refetch**, not on `ticket:updated` in the org room.
 
 ### AI streaming
 
@@ -223,6 +275,12 @@ Socket.IO reconnects on its own. Your responsibilities on each reconnect:
    channel of record*: every event here has a REST equivalent, and rows are
    always written before the frame is emitted. After a gap, re-read the feed and
    the thread rather than assuming continuity.
+
+   **Not everything has a REST equivalent.** `typing`, `presence:*` and the AI
+   stream chunks are socket-only — there is no presence or typing controller in
+   the gateway. Those are ephemeral by design: after a gap there is nothing to
+   refetch and nothing was lost that matters. Everything durable — tickets,
+   messages, notifications, documents — does have a REST read.
 4. **Re-authenticate first if the cookie expired.** A refused handshake is a
    hard disconnect; reconnect attempts against an expired cookie will keep
    failing until you refresh the session over REST.
@@ -241,4 +299,14 @@ Socket.IO reconnects on its own. Your responsibilities on each reconnect:
   (§6). Grouping exists server-side and is invisible if you ignore it.
 - **Ignoring the `message:send` ack** (§5). A refusal you never read is a message
   the user believes was sent.
+- **Awaiting an ack from `ticket:join`** (§5). Three events acknowledge; that is
+  not one of them, and `emitWithAck` will wait forever.
+- **Destructuring `({ data })` off a relayed event** (§3). On `notification:new`
+  this returns the notification's own `data` blob rather than failing — the one
+  case where the wrong shape yields a plausible value.
+- **Sending `{ status }` to `presence:update`** (§5). The field is `state`, and
+  `forbidNonWhitelisted` refuses the frame rather than ignoring the extra key.
+- **Reconciling an AI stream on `messageId`** (§6). It is null on the cap path,
+  where `escalated: true` and **no `message:new` follows** — so the reconciliation
+  fails in exactly the case it exists for. Branch on `escalated` first.
 - **Waiting for `typing:stop`** (§7).
