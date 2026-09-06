@@ -33,7 +33,26 @@ export class PageArgsGqlDto {
   // to replace -- asking for 10,000 rows should return the first hundred, not
   // fail the query.
   readonly first: number = DEFAULT_SEARCH.LIMIT;
+}
 
+/**
+ * `PageArgsGqlDto` plus a free-text search term.
+ *
+ * **The GraphQL half of the same split `SearchPaginationDto` makes on REST**,
+ * and made for the same reason. `searchTerm` used to live on the base, so
+ * `IngestionJobsArgsGqlDto` inherited it: `Query.ingestionJobs(searchTerm:)`
+ * was published in the schema, validated, forwarded through `toPageQuery` and
+ * then ignored by ingestion-service (known-gaps #6). The REST route refuses it
+ * now, and a base that kept handing it to every subclass would leave GraphQL
+ * advertising exactly what REST answers with a 400.
+ *
+ * A subclass opts IN by extending this, rather than opting out of a capability
+ * the base asserted — which is the direction `IngestionJobsArgsGqlDto`'s own
+ * docblock names as the one people drift in: *"a filter the REST list cannot
+ * express would be a second query surface with different capabilities."*
+ */
+@ArgsType()
+export class SearchPageArgsGqlDto extends PageArgsGqlDto {
   @Field(() => String, { nullable: true })
   @IsOptional()
   @IsString()

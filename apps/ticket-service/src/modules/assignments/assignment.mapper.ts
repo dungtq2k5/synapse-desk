@@ -22,7 +22,7 @@ export function toAssignmentResponse(
     id: assignment.id,
     ticketId: assignment.ticketId,
     assignedToId: assignment.assignedToId,
-    assignedById: assignment.assignedById ?? undefined,
+    assignedById: assignment.assignedById,
     departmentId: assignment.departmentId,
     assignedAt: toProtoTimestamp(assignment.assignedAt),
     unassignedAt: toProtoTimestamp(assignment.unassignedAt),

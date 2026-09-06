@@ -13,7 +13,11 @@ message AssignmentResponse {
   string id = 1;
   string ticket_id = 2;
   string assigned_to_id = 3;
-  optional string assigned_by_id = 4;
+  // NOT optional: `writeAssignment` is the only writer and takes an actor, so
+  // the null this used to carry had no producer (known-gaps #12). Same tag,
+  // same type, same wire bytes -- only presence semantics change, which
+  // `buf breaking` reports as FIELD_SAME_CARDINALITY.
+  string assigned_by_id = 4;
   string department_id = 5;
   google.protobuf.Timestamp assigned_at = 6;
   optional google.protobuf.Timestamp unassigned_at = 7;

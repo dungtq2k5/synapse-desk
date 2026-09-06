@@ -1,8 +1,8 @@
 import {
   AiGenerationOutcome,
   type AiModelTier,
-  AnalyticsExportKind,
-  AnalyticsExportStatus,
+  ExportKind,
+  ExportStatus,
   AnswerStatus,
   AuditAction,
   AuditResourceType,
@@ -62,8 +62,8 @@ import {
   AuditResourceType as ProtoAuditResourceType,
 } from '../generated/synapsedesk/ticket/audit';
 import {
-  AnalyticsExportKind as ProtoAnalyticsExportKind,
-  AnalyticsExportStatus as ProtoAnalyticsExportStatus,
+  ExportKind as ProtoExportKind,
+  ExportStatus as ProtoExportStatus,
 } from '../generated/synapsedesk/ticket/analytics';
 import {
   ReassignmentReason as ProtoReassignmentReason,
@@ -676,43 +676,30 @@ const auditResourceType = enumBridge<AuditResourceType, ProtoAuditResourceType>(
 export const toProtoAuditResourceType = auditResourceType.toProto;
 export const fromProtoAuditResourceType = auditResourceType.fromProto;
 
-const analyticsExportKind = enumBridge<
-  AnalyticsExportKind,
-  ProtoAnalyticsExportKind
->(
+const exportKind = enumBridge<ExportKind, ProtoExportKind>(
   {
-    [AnalyticsExportKind.TICKET_DAILY]:
-      ProtoAnalyticsExportKind.ANALYTICS_EXPORT_KIND_TICKET_DAILY,
-    [AnalyticsExportKind.AGENT_DAILY]:
-      ProtoAnalyticsExportKind.ANALYTICS_EXPORT_KIND_AGENT_DAILY,
-    [AnalyticsExportKind.TICKET]:
-      ProtoAnalyticsExportKind.ANALYTICS_EXPORT_KIND_TICKET,
-    [AnalyticsExportKind.AUDIT_LOG]:
-      ProtoAnalyticsExportKind.ANALYTICS_EXPORT_KIND_AUDIT_LOG,
+    [ExportKind.TICKET_DAILY]: ProtoExportKind.EXPORT_KIND_TICKET_DAILY,
+    [ExportKind.AGENT_DAILY]: ProtoExportKind.EXPORT_KIND_AGENT_DAILY,
+    [ExportKind.TICKET]: ProtoExportKind.EXPORT_KIND_TICKET,
+    [ExportKind.AUDIT_LOG]: ProtoExportKind.EXPORT_KIND_AUDIT_LOG,
   },
-  ProtoAnalyticsExportKind.ANALYTICS_EXPORT_KIND_UNSPECIFIED,
+  ProtoExportKind.EXPORT_KIND_UNSPECIFIED,
 );
 
-export const toProtoAnalyticsExportKind = analyticsExportKind.toProto;
-export const fromProtoAnalyticsExportKind = analyticsExportKind.fromProto;
+export const toProtoExportKind = exportKind.toProto;
+export const fromProtoExportKind = exportKind.fromProto;
 
-const analyticsExportStatus = enumBridge<
-  AnalyticsExportStatus,
-  ProtoAnalyticsExportStatus
->(
+const exportStatus = enumBridge<ExportStatus, ProtoExportStatus>(
   {
-    [AnalyticsExportStatus.PENDING]:
-      ProtoAnalyticsExportStatus.ANALYTICS_EXPORT_STATUS_PENDING,
-    [AnalyticsExportStatus.READY]:
-      ProtoAnalyticsExportStatus.ANALYTICS_EXPORT_STATUS_READY,
-    [AnalyticsExportStatus.FAILED]:
-      ProtoAnalyticsExportStatus.ANALYTICS_EXPORT_STATUS_FAILED,
+    [ExportStatus.PENDING]: ProtoExportStatus.EXPORT_STATUS_PENDING,
+    [ExportStatus.READY]: ProtoExportStatus.EXPORT_STATUS_READY,
+    [ExportStatus.FAILED]: ProtoExportStatus.EXPORT_STATUS_FAILED,
   },
-  ProtoAnalyticsExportStatus.ANALYTICS_EXPORT_STATUS_UNSPECIFIED,
+  ProtoExportStatus.EXPORT_STATUS_UNSPECIFIED,
 );
 
-export const toProtoAnalyticsExportStatus = analyticsExportStatus.toProto;
-export const fromProtoAnalyticsExportStatus = analyticsExportStatus.fromProto;
+export const toProtoExportStatus = exportStatus.toProto;
+export const fromProtoExportStatus = exportStatus.fromProto;
 
 /** `PURPOSE_POLICY` keys — what an object is stored for. */
 const storagePurpose = enumBridge<StoragePurpose, ProtoStoragePurpose>(

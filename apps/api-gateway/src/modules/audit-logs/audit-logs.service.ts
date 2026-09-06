@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { AnalyticsExportKind, RequestContext } from '@synapsedesk/common';
+import { ExportKind, RequestContext } from '@synapsedesk/common';
 import { PaginationResponseDto } from '../../common/dto/rest/pagination-response.dto';
 import { AuditLogsGrpcClient } from './audit-logs-grpc.client';
 import {
@@ -16,7 +16,7 @@ import {
   ListAuditLogsQueryDto,
 } from './dto/rest/audit-log.dto';
 import { AnalyticsService } from '../analytics/analytics.service';
-import { AnalyticsExportResponseDto } from '../analytics/dto/rest/analytics-response.dto';
+import { ExportResponseDto } from '../analytics/dto/rest/analytics-response.dto';
 
 /** The gateway's audit-trail surface. Returns REST DTOs; the wire stays in the client. */
 @Injectable()
@@ -65,10 +65,10 @@ export class AuditLogsService {
   async createExport(
     dto: CreateAuditLogExportDto,
     context: RequestContext,
-  ): Promise<AnalyticsExportResponseDto> {
+  ): Promise<ExportResponseDto> {
     return this.analytics.createExport(
       {
-        kind: AnalyticsExportKind.AUDIT_LOG,
+        kind: ExportKind.AUDIT_LOG,
         from: dto.from,
         to: dto.to,
         filters: dto.filters,
@@ -80,7 +80,7 @@ export class AuditLogsService {
   async getExport(
     id: string,
     context: RequestContext,
-  ): Promise<AnalyticsExportResponseDto> {
+  ): Promise<ExportResponseDto> {
     return this.analytics.getExport(id, context);
   }
 }

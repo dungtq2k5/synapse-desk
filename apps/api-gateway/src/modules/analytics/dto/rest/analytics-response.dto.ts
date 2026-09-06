@@ -1,5 +1,5 @@
 /**
- * The analytics response shapes. **REST only.**
+ * @file The analytics response shapes. **REST only.**
  *
  * Three of these — `RateResponseDto`, `MeanResponseDto` and `OverviewResponseDto` — have GraphQL
  * counterparts in `./graphql/`, checked against them by
@@ -15,8 +15,8 @@
 
 import {
   AiModelTier,
-  AnalyticsExportKind,
-  AnalyticsExportStatus,
+  ExportKind,
+  ExportStatus,
   DocumentFlagType,
 } from '@synapsedesk/common';
 
@@ -266,18 +266,19 @@ export class DocumentAnalyticsResponseDto {
   unavailable!: UnavailableBlockResponseDto[];
 }
 
-export class AnalyticsExportResponseDto {
+/**
+ * A download descriptor for one export.
+ *
+ * Was `AnalyticsExportResponseDto`, renamed before any client generated a type
+ * from it — the export family carries `TICKET` and `AUDIT_LOG` kinds that read
+ * live tables and are not analytics (known-gaps #9). The Swagger schema name is
+ * the one client-visible part of that rename, which is why it happened now
+ * rather than later. Part of the pre-client clearing — see `PaginationDto`.
+ */
+export class ExportResponseDto {
   id!: string;
-  /**
-   * The enums, where these were `string` with the members named in a comment.
-   *
-   * A comment listing `PENDING | READY | FAILED` is the arrangement the whole
-   * pass exists to replace: it tells a reader the vocabulary and tells the
-   * compiler nothing, and the Swagger plugin publishes `type: string` for a
-   * field with exactly three values.
-   */
-  status!: AnalyticsExportStatus | null;
-  kind!: AnalyticsExportKind | null;
+  status!: ExportStatus | null;
+  kind!: ExportKind | null;
   rowCount!: number | null;
   /**
    * The newest rollup run behind the file — the disputed-number guard.

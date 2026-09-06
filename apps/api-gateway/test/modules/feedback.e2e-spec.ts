@@ -268,6 +268,23 @@ describe('AI feedback at the HTTP boundary (e2e)', () => {
       expect(request.rating).toBe(-1);
     });
 
+    it('4b. **forwards `searchTerm` down the wire, not just into Swagger**', async () => {
+      // The gateway half of known-gaps #6: this route advertised the parameter
+      // and ticket-service ignored it. It filters on `feedbackText` now, and
+      // this asserts the only part the gateway owns — that the term survives
+      // the REST→gRPC hop and arrives on `page`, where the service reads it.
+      fx.stubs.feedback.listFeedback.mockReturnValue(
+        of({ items: [], meta: wirePage([]).meta }),
+      );
+
+      await authenticatedAgent(fx.app, {
+        permissionCodes: ['analytics.read'],
+      }).get(`${API}/feedback?searchTerm=wrong%20policy`);
+
+      const [request] = fx.stubs.feedback.listFeedback.mock.calls[0];
+      expect(request.page!.searchTerm).toBe('wrong policy');
+    });
+
     it('5. REJECTS a rating filter outside {1, -1}', async () => {
       const res = await authenticatedAgent(fx.app, {
         permissionCodes: ['analytics.read'],

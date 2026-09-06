@@ -94,6 +94,28 @@ describe('Ingestion jobs at the HTTP boundary (e2e)', () => {
       expect(fx.stubs.document.listIngestionJobs).not.toHaveBeenCalled();
     });
 
+    it('4b. **REJECTS `searchTerm` — accepted and ignored until now**', async () => {
+      // known-gaps #6. This DTO extended `SearchPaginationDto`, so `searchTerm`
+      // reached Swagger and the wire, and ingestion-service filtered on
+      // nothing: `status`, `bullmqJobId` and `errorLog` are not columns a
+      // person searches. Refusing beats swallowing, which is the same answer
+      // test 4 gives an unknown status one row up.
+      //
+      // The GraphQL surface lost the argument in the same change —
+      // `IngestionJobsArgsGqlDto` inherited it from `PageArgsGqlDto` and
+      // published `ingestionJobs(searchTerm:)`. Part of the pre-client
+      // clearing — see `PaginationDto`.
+      const res = await authenticatedAgent(fx.app, {
+        permissionCodes: ['document.read'],
+      })
+        .get(`${API}/ingestion-jobs`)
+        .query({ searchTerm: 'failed' });
+
+      expect(res.status).toBe(400);
+      expect(JSON.stringify(res.body)).toContain('searchTerm');
+      expect(fx.stubs.document.listIngestionJobs).not.toHaveBeenCalled();
+    });
+
     it('5. refuses a member without `document.read`', async () => {
       const res = await authenticatedAgent(fx.app, {
         permissionCodes: [],

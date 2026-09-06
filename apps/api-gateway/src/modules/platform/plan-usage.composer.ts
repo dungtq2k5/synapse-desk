@@ -44,18 +44,18 @@ export function enrichWithUsage(
 
     const overLimit = [...row.overLimit];
 
-    // The grants come off the projection's own `changes` map, which carries
-    // "before -> after" for every column this apply would write. Reading the
-    // AFTER value is what makes this a projection of the new plan rather than a
+    // The grants come off the projection's own `after` map, which carries the
+    // target value of every NUMERIC column this apply would write. Reading the
+    // after value is what makes this a projection of the new plan rather than a
     // report on the current one.
-    const storageLimit = afterValue(row.changes.maxStorageBytes);
+    const storageLimit = afterValue(row.after, 'maxStorageBytes');
     if (storageLimit !== null && exceedsLimit(used.usedBytes, storageLimit)) {
       overLimit.push(
         `maxStorageBytes: ${used.usedBytes} used, plan grants ${storageLimit}`,
       );
     }
 
-    const documentLimit = afterValue(row.changes.maxDocumentUploads);
+    const documentLimit = afterValue(row.after, 'maxDocumentUploads');
     if (
       documentLimit !== null &&
       exceedsLimit(used.documentCount, documentLimit)
@@ -85,17 +85,25 @@ export function enrichWithUsage(
 }
 
 /**
- * The `after` half of a `"before -> after"` change entry, or `null` when the
- * column is not changing.
+ * The target grant for one column, or `null` when the column is not changing.
  *
- * `null` and not zero: an unchanged column means this apply does not move that
- * limit, which is a different statement from a limit of zero — and zero would
- * put every tenant over.
+ * **A map read, not a parse.** This used to take the `"before -> after"` string
+ * out of `changes` and split it on `->`. The separator was a contract between
+ * two services that nothing typed: changing `" -> "` to `" → "` in
+ * `plan-admin.service.ts` dropped storage and document overruns from every dry
+ * run while all eleven `platform-plans` e2e tests stayed green (known-gaps #21).
+ * `ApplyPlanResponse` now carries the numbers, so there is nothing left to
+ * reformat.
+ *
+ * `null` and not zero: a column absent from `after` means this apply does not
+ * move that limit, which is a different statement from a limit of zero — and
+ * zero would put every tenant over.
  */
-function afterValue(change: string | undefined): number | null {
-  if (!change) return null;
+function afterValue(
+  after: Record<string, number>,
+  field: string,
+): number | null {
+  const value = after[field];
 
-  const after = Number(change.split('->').at(-1)?.trim());
-
-  return Number.isFinite(after) ? after : null;
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }

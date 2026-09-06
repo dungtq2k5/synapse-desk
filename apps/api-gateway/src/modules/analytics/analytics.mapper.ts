@@ -1,11 +1,11 @@
-/** Wire <-> REST conversions for the analytics surface. */
+/** @file Wire <-> REST conversions for the analytics surface. */
 
 import {
-  AnalyticsExportKind as ProtoAnalyticsExportKind,
-  AnalyticsExportStatus as ProtoAnalyticsExportStatus,
+  ExportKind as ProtoExportKind,
+  ExportStatus as ProtoExportStatus,
   AnalyticsRangeRequest,
-  fromProtoAnalyticsExportKind,
-  fromProtoAnalyticsExportStatus,
+  fromProtoExportKind,
+  fromProtoExportStatus,
   fromProtoTimestamp,
   type ProtoTimestamp,
   AiUsageResponse,
@@ -20,7 +20,7 @@ import { AnalyticsRangeQueryDto } from './dto/rest/analytics.dto';
 import {
   AiUsageResponseDto,
   AiUsageSliceResponseDto,
-  AnalyticsExportResponseDto,
+  ExportResponseDto,
   DeflectionResponseDto,
   MeanResponseDto,
   OverviewResponseDto,
@@ -99,21 +99,21 @@ export function toAiUsageSliceResponseDto(slice: {
  * so naming it costs nothing and makes a wrong wire shape a compile error here
  * rather than a `new Date(NaN)` in a report.
  */
-export function toAnalyticsExportResponseDto(response: {
+export function toExportResponseDto(response: {
   id: string;
-  status: ProtoAnalyticsExportStatus;
-  kind: ProtoAnalyticsExportKind;
+  status: ProtoExportStatus;
+  kind: ProtoExportKind;
   rowCount?: number;
   rollupComputedAt?: ProtoTimestamp;
   downloadUrl?: string;
   error?: string;
   createdAt?: ProtoTimestamp;
   completedAt?: ProtoTimestamp;
-}): AnalyticsExportResponseDto {
+}): ExportResponseDto {
   return {
     id: response.id,
-    status: fromProtoAnalyticsExportStatus(response.status),
-    kind: fromProtoAnalyticsExportKind(response.kind),
+    status: fromProtoExportStatus(response.status),
+    kind: fromProtoExportKind(response.kind),
     rowCount: response.rowCount ?? null,
     rollupComputedAt: fromProtoTimestamp(response.rollupComputedAt) ?? null,
     downloadUrl: response.downloadUrl ?? null,

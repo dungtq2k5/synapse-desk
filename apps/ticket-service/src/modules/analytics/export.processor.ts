@@ -2,9 +2,9 @@ import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import {
-  ANALYTICS_EXPORT_JOB_NAME,
-  ANALYTICS_EXPORT_QUEUE,
-  AnalyticsExportKind,
+  EXPORT_JOB_NAME,
+  EXPORT_QUEUE,
+  ExportKind,
   formatErrorMsg,
   MAX_EXPORT_ROWS,
   safeTimezone,
@@ -12,10 +12,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '../../generated/prisma/client';
 import { StorageReferenceService } from '../storage-client/storage-reference.service';
-import {
-  AnalyticsExportService,
-  ExportJobData,
-} from './analytics-export.service';
+import { ExportService, ExportJobData } from './export.service';
 
 /**
  * The range holds more rows than one file may contain.
@@ -65,32 +62,32 @@ type ExportRow = {
  * process that imports the app, including the test bootstraps that never
  * export anything.
  */
-@Processor(ANALYTICS_EXPORT_QUEUE, {
+@Processor(EXPORT_QUEUE, {
   // One at a time. An export is a bulk read over a range, and the whole design
   // exists so analytics does not compete with the hot path — running four at
   // once would put that competition back by a different route.
   concurrency: 1,
 })
-export class AnalyticsExportProcessor extends WorkerHost {
-  private readonly logger = new Logger(AnalyticsExportProcessor.name);
+export class ExportProcessor extends WorkerHost {
+  private readonly logger = new Logger(ExportProcessor.name);
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly exports: AnalyticsExportService,
+    private readonly exports: ExportService,
     private readonly storage: StorageReferenceService,
   ) {
     super();
   }
 
   async process(job: Job<ExportJobData>): Promise<void> {
-    if (job.name !== ANALYTICS_EXPORT_JOB_NAME) {
+    if (job.name !== EXPORT_JOB_NAME) {
       this.logger.warn(`Ignoring unknown job '${job.name}' on this queue`);
       return;
     }
 
     const { exportId } = job.data;
 
-    const row = await this.prisma.analyticsExport.findUnique({
+    const row = await this.prisma.export.findUnique({
       where: { id: exportId },
     });
     if (!row) {
@@ -155,11 +152,11 @@ export class AnalyticsExportProcessor extends WorkerHost {
     // A VarChar column, compared as a string — see the facade's note.
     const kind = row.kind;
     const { header, rows, rollupComputedAt } =
-      kind === String(AnalyticsExportKind.AGENT_DAILY)
+      kind === String(ExportKind.AGENT_DAILY)
         ? await this.agentRows(row)
-        : kind === String(AnalyticsExportKind.TICKET) // NOSONAR
+        : kind === String(ExportKind.TICKET) // NOSONAR
           ? await this.ticketExportRows(row)
-          : kind === String(AnalyticsExportKind.AUDIT_LOG) // NOSONAR
+          : kind === String(ExportKind.AUDIT_LOG) // NOSONAR
             ? await this.auditLogRows(row)
             : await this.ticketRows(row);
 

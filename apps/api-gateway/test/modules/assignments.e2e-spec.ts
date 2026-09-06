@@ -381,19 +381,18 @@ describe('Assignment at the HTTP boundary (e2e)', () => {
       expect(res.body.data[0].reason).toBe(ReassignmentReason.ESCALATION);
     });
 
-    it('3. renders an absent unassignedAt/assignedById as NULL, never missing', async () => {
+    it('3. renders an absent unassignedAt as NULL, never missing', async () => {
       // protobuf has no null, so an unset field arrives as `undefined` and
       // would vanish from the JSON — giving a client a key set that changes per
       // row. The REST contract commits to a stable shape instead.
+      //
+      // **`assignedById` used to be asserted here too, and is not any more.**
+      // It was `string | null` for a system assignment that no writer produces,
+      // and it is now `string` (known-gaps #12). `unassignedAt` is the
+      // legitimately nullable field on this shape — an assignment that is still
+      // live has no end — so it is the one that carries the test.
       fx.stubs.assignment.listAssignments.mockReturnValue(
-        of({
-          items: [
-            wireAssignment({
-              unassignedAt: undefined,
-              assignedById: undefined,
-            }),
-          ],
-        }),
+        of({ items: [wireAssignment({ unassignedAt: undefined })] }),
       );
 
       const res = await authenticatedAgent(fx.app).get(
@@ -401,7 +400,9 @@ describe('Assignment at the HTTP boundary (e2e)', () => {
       );
 
       expect(res.body.data[0]).toHaveProperty('unassignedAt', null);
-      expect(res.body.data[0]).toHaveProperty('assignedById', null);
+      // Still a string, and still present: the narrowing did not turn it into
+      // an optional key.
+      expect(typeof res.body.data[0].assignedById).toBe('string');
     });
 
     it('4. returns an EMPTY array for a ticket never assigned', async () => {

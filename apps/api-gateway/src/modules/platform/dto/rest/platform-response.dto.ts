@@ -89,6 +89,17 @@ export class PlanSubscriberProjectionResponseDto {
   /** Field name → `"before -> after"`, for the columns this apply would change. */
   readonly changes!: Record<string, string>;
   /**
+   * The AFTER value of every NUMERIC column in `changes`, keyed the same way.
+   *
+   * `changes` renders for a human; this is what a machine reads. A key absent
+   * here means the column is not changing — never "zero", which would put every
+   * tenant over. `aiModelTier` is a string and never appears.
+   *
+   * known-gaps #21: the composer used to parse the display string, and a
+   * cosmetic change to its separator silently disarmed two limit checks.
+   */
+  readonly after!: Record<string, number>;
+  /**
    * Limits this tenant is ALREADY past under the new plan.
    *
    * Reported, never enforced: a limit gates admission, never tenure. These

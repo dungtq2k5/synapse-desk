@@ -1,5 +1,5 @@
 /**
- * Tier names and per-route policy
+ * @file Tier names and per-route policy
  *
  * Here rather than in `dto.config` because they ARE the throttler's configuration:
  * `getThrottlerConfig` below registers `AUTH_THROTTLER_TIER` as a tier name, and `SmartThrottlerGuard` routes by comparing against these exact strings.
@@ -109,7 +109,7 @@ export const ROUTE_THROTTLE = {
    * model spend: a ticket export can be tens of megabytes, `EXPORT_URL_TTL`
    * expires the link and not the object, and there is no retention job. A
    * held-down button is a bucket filling up. The PENDING dedupe in
-   * `AnalyticsExportService.request` is the other half — this bounds distinct
+   * `ExportService.request` is the other half — this bounds distinct
    * requests, that one collapses identical ones.
    */
   export: { ttl: 60_000, limit: 5 },

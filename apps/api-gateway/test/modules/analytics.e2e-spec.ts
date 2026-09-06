@@ -1,7 +1,7 @@
 import {
   AiModelTier as ProtoAiModelTier,
-  AnalyticsExportKind as ProtoAnalyticsExportKind,
-  AnalyticsExportStatus as ProtoAnalyticsExportStatus,
+  ExportKind as ProtoExportKind,
+  ExportStatus as ProtoExportStatus,
 } from '@synapsedesk/grpc-proto';
 import { of, throwError } from 'rxjs';
 import { faker } from '@faker-js/faker';
@@ -612,8 +612,8 @@ describe('Analytics at the HTTP boundary (e2e)', () => {
 
     const wireExport = (overrides: Record<string, unknown> = {}) => ({
       id: exportId,
-      status: ProtoAnalyticsExportStatus.ANALYTICS_EXPORT_STATUS_PENDING,
-      kind: ProtoAnalyticsExportKind.ANALYTICS_EXPORT_KIND_TICKET_DAILY,
+      status: ProtoExportStatus.EXPORT_STATUS_PENDING,
+      kind: ProtoExportKind.EXPORT_KIND_TICKET_DAILY,
       rowCount: undefined,
       rollupComputedAt: undefined,
       downloadUrl: undefined,
@@ -652,7 +652,7 @@ describe('Analytics at the HTTP boundary (e2e)', () => {
       fx.stubs.analytics.getExport.mockReturnValue(
         of(
           wireExport({
-            status: ProtoAnalyticsExportStatus.ANALYTICS_EXPORT_STATUS_READY,
+            status: ProtoExportStatus.EXPORT_STATUS_READY,
             rowCount: 90,
             rollupComputedAt: timestamp(),
             downloadUrl: 'https://storage.example/signed-get',
@@ -677,7 +677,7 @@ describe('Analytics at the HTTP boundary (e2e)', () => {
       fx.stubs.analytics.getExport.mockReturnValue(
         of(
           wireExport({
-            status: ProtoAnalyticsExportStatus.ANALYTICS_EXPORT_STATUS_FAILED,
+            status: ProtoExportStatus.EXPORT_STATUS_FAILED,
             error: 'storage is down',
             completedAt: timestamp(),
           }),

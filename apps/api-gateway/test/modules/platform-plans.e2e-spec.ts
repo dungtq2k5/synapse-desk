@@ -220,12 +220,26 @@ describe('Platform plans (e2e)', () => {
   describe('The composed projection', () => {
     const org = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
 
-    const wireProjection = (changes: Record<string, string>) => ({
+    /**
+     * Keyed on `after` — the NUMERIC map the composer reads.
+     *
+     * `changes` is derived here rather than passed, because it is a display
+     * string the gateway no longer parses (known-gaps #21). Deriving it keeps
+     * every payload realistic and non-empty without inviting a test to assert
+     * against a format nothing reads.
+     */
+    const wireProjection = (after: Record<string, number>) => ({
       subscribers: [
         {
           organizationId: org,
           organizationName: 'Acme',
-          changes,
+          changes: Object.fromEntries(
+            Object.entries(after).map(([field, value]) => [
+              field,
+              `${value * 2} -> ${value}`,
+            ]),
+          ),
+          after,
           overLimit: [],
           skippedPinned: false,
           budgetDeferred: false,
@@ -242,7 +256,7 @@ describe('Platform plans (e2e)', () => {
 
     it('3. **`evaluatedDimensions` lists all three once ingestion answers**', async () => {
       fx.stubs.platform.applyPlan.mockReturnValue(
-        of(wireProjection({ maxStorageBytes: '1000 -> 500' })),
+        of(wireProjection({ maxStorageBytes: 500 })),
       );
       fx.stubs.ingestionPlatform.getPlatformUsage.mockReturnValue(
         of({
@@ -269,7 +283,7 @@ describe('Platform plans (e2e)', () => {
       // ingestion outage a dry run can still answer seats — and must not answer
       // "nobody affected" for two dimensions nothing looked at.
       fx.stubs.platform.applyPlan.mockReturnValue(
-        of(wireProjection({ maxStorageBytes: '1000 -> 500' })),
+        of(wireProjection({ maxStorageBytes: 500 })),
       );
       fx.stubs.ingestionPlatform.getPlatformUsage.mockReturnValue(
         throwError(() => new Error('ingestion-service is down')),
@@ -289,7 +303,7 @@ describe('Platform plans (e2e)', () => {
       // The dry-run-equals-apply guarantee, re-asserted at the layer that now
       // composes. The auth-level test cannot see this: enriching only the dry
       // run would put the divergence above it, with a green suite underneath.
-      const projection = wireProjection({ maxDocumentUploads: '9000 -> 2' });
+      const projection = wireProjection({ maxDocumentUploads: 2 });
       fx.stubs.platform.applyPlan.mockReturnValue(of(projection));
       fx.stubs.ingestionPlatform.getPlatformUsage.mockReturnValue(
         of({
@@ -318,14 +332,14 @@ describe('Platform plans (e2e)', () => {
       // and an overrun here would send an operator to a limit this apply does
       // not touch.
       //
-      // **The changes map is deliberately NON-empty**, which auth does not
+      // **The `after` map is deliberately NON-empty**, which auth does not
       // produce for a pinned tenant today. An empty one would make this test
       // pass on `afterValue` returning null for every column, exercising
       // nothing — the guard under test is `skippedPinned`, and it only matters
       // if auth ever starts reporting what a pinned subscriber WOULD have got.
       const projection = wireProjection({
-        maxStorageBytes: '1000 -> 1',
-        maxDocumentUploads: '9000 -> 1',
+        maxStorageBytes: 1,
+        maxDocumentUploads: 1,
       });
       projection.subscribers[0].skippedPinned = true;
       fx.stubs.platform.applyPlan.mockReturnValue(of(projection));
@@ -347,10 +361,10 @@ describe('Platform plans (e2e)', () => {
 
     it('3e. An UNCHANGED limit produces no overrun, however much is used', async () => {
       // The projection is about the NEW plan. A column this apply does not move
-      // has no "after" value, and treating a missing change as a limit of zero
+      // is ABSENT from `after`, and treating a missing key as a limit of zero
       // would put every tenant over every dimension.
       fx.stubs.platform.applyPlan.mockReturnValue(
-        of(wireProjection({ maxAgentSeats: '10 -> 20' })),
+        of(wireProjection({ maxAgentSeats: 20 })),
       );
       fx.stubs.ingestionPlatform.getPlatformUsage.mockReturnValue(
         of({

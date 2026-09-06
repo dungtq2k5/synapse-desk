@@ -1,20 +1,20 @@
 import { faker } from '@faker-js/faker';
 import {
-  AnalyticsExportKind as ProtoAnalyticsExportKind,
-  fromProtoAnalyticsExportStatus,
-  toProtoAnalyticsExportKind,
+  ExportKind as ProtoExportKind,
+  fromProtoExportStatus,
+  toProtoExportKind,
 } from '@synapsedesk/grpc-proto';
 import { status } from '@grpc/grpc-js';
 import { expectRpc } from '@synapsedesk/common/testing/rpc';
 import {
-  AnalyticsExportKind,
-  AnalyticsExportStatus,
+  ExportKind,
+  ExportStatus,
   compareAlphabetically,
 } from '@synapsedesk/common';
 import { E2eFixture, bootstrapE2eTest, memberContext } from '../utils';
 import { buildTenant, createTicket, TenantFixture } from '../factories';
-import { AnalyticsExportFacade } from '../../src/modules/analytics/analytics-export.facade';
-import { AnalyticsExportProcessor } from '../../src/modules/analytics/analytics-export.processor';
+import { ExportFacade } from '../../src/modules/analytics/export.facade';
+import { ExportProcessor } from '../../src/modules/analytics/export.processor';
 import { TicketRollupJob } from '../../src/modules/analytics/ticket-rollup.job';
 import { AuthReferenceService } from '../../src/modules/auth-client/auth-reference.service';
 import { StorageReferenceService } from '../../src/modules/storage-client/storage-reference.service';
@@ -33,8 +33,8 @@ import { StorageReferenceService } from '../../src/modules/storage-client/storag
  */
 describe('The analytics export (e2e)', () => {
   let fx: E2eFixture;
-  let facade: AnalyticsExportFacade;
-  let processor: AnalyticsExportProcessor;
+  let facade: ExportFacade;
+  let processor: ExportProcessor;
   let rollup: TicketRollupJob;
 
   let presignExport: jest.SpyInstance;
@@ -57,7 +57,7 @@ describe('The analytics export (e2e)', () => {
   const request = (overrides = {}) =>
     facade.create(
       {
-        kind: toProtoAnalyticsExportKind(AnalyticsExportKind.TICKET_DAILY),
+        kind: toProtoExportKind(ExportKind.TICKET_DAILY),
         from: '2026-03-01',
         to: '2026-03-31',
         filters: '',
@@ -118,8 +118,8 @@ describe('The analytics export (e2e)', () => {
 
   beforeAll(async () => {
     fx = await bootstrapE2eTest();
-    facade = fx.moduleRef.get(AnalyticsExportFacade);
-    processor = fx.moduleRef.get(AnalyticsExportProcessor);
+    facade = fx.moduleRef.get(ExportFacade);
+    processor = fx.moduleRef.get(ExportProcessor);
     rollup = fx.moduleRef.get(TicketRollupJob);
 
     jest
@@ -177,7 +177,7 @@ describe('The analytics export (e2e)', () => {
 
       const wide = await facade.create(
         {
-          kind: toProtoAnalyticsExportKind(AnalyticsExportKind.TICKET),
+          kind: toProtoExportKind(ExportKind.TICKET),
           from: '2026-03-01',
           to: '2026-03-31',
           filters: '',
@@ -186,7 +186,7 @@ describe('The analytics export (e2e)', () => {
       );
       const narrow = await facade.create(
         {
-          kind: toProtoAnalyticsExportKind(AnalyticsExportKind.TICKET),
+          kind: toProtoExportKind(ExportKind.TICKET),
           from: '2026-03-01',
           to: '2026-03-31',
           filters: '',
@@ -196,7 +196,7 @@ describe('The analytics export (e2e)', () => {
 
       expect(narrow.id).not.toBe(wide.id);
 
-      const rows = await fx.prisma.analyticsExport.findMany({
+      const rows = await fx.prisma.export.findMany({
         orderBy: { createdAt: 'asc' },
       });
       expect(rows.map((row) => row.unrestricted)).toEqual([true, false]);
@@ -220,7 +220,7 @@ describe('The analytics export (e2e)', () => {
       // an unfiltered request would otherwise match every filtered PENDING row.
       const unfiltered = await facade.create(
         {
-          kind: toProtoAnalyticsExportKind(AnalyticsExportKind.TICKET),
+          kind: toProtoExportKind(ExportKind.TICKET),
           from: '2026-03-01',
           to: '2026-03-31',
           filters: '',
@@ -229,7 +229,7 @@ describe('The analytics export (e2e)', () => {
       );
       const filtered = await facade.create(
         {
-          kind: toProtoAnalyticsExportKind(AnalyticsExportKind.TICKET),
+          kind: toProtoExportKind(ExportKind.TICKET),
           from: '2026-03-01',
           to: '2026-03-31',
           filters: JSON.stringify({ status: 'OPEN' }),
@@ -238,7 +238,7 @@ describe('The analytics export (e2e)', () => {
       );
 
       expect(filtered.id).not.toBe(unfiltered.id);
-      expect(await fx.prisma.analyticsExport.count()).toBe(2);
+      expect(await fx.prisma.export.count()).toBe(2);
     });
 
     it('**an identical PENDING request returns THAT export, not a second one**', async () => {
@@ -250,7 +250,7 @@ describe('The analytics export (e2e)', () => {
       const second = await request();
 
       expect(second.id).toBe(first.id);
-      expect(await fx.prisma.analyticsExport.count()).toBe(1);
+      expect(await fx.prisma.export.count()).toBe(1);
     });
 
     it('2. a DIFFERENT range is a different export', async () => {
@@ -259,7 +259,7 @@ describe('The analytics export (e2e)', () => {
       const second = await request({ to: '2026-04-30' });
 
       expect(second.id).not.toBe(first.id);
-      expect(await fx.prisma.analyticsExport.count()).toBe(2);
+      expect(await fx.prisma.export.count()).toBe(2);
     });
 
     it('**2b. a range longer than the span cap is refused, before any work**', async () => {
@@ -271,7 +271,7 @@ describe('The analytics export (e2e)', () => {
         status.INVALID_ARGUMENT,
       );
 
-      expect(await fx.prisma.analyticsExport.count()).toBe(0);
+      expect(await fx.prisma.export.count()).toBe(0);
     });
 
     it('2c. an INVERTED range is refused too', async () => {
@@ -310,7 +310,7 @@ describe('The analytics export (e2e)', () => {
       expect(event.resourceType).toBe('EXPORT');
       expect(event.resourceId).toBe(created.id);
       expect(event.metadata).toMatchObject({
-        kind: AnalyticsExportKind.TICKET_DAILY,
+        kind: ExportKind.TICKET_DAILY,
       });
     });
 
@@ -352,9 +352,7 @@ describe('The analytics export (e2e)', () => {
       const created = await request();
 
       expect(created.id).toBeTruthy();
-      expect(fromProtoAnalyticsExportStatus(created.status)).toBe(
-        AnalyticsExportStatus.PENDING,
-      );
+      expect(fromProtoExportStatus(created.status)).toBe(ExportStatus.PENDING);
       expect(created.downloadUrl).toBeUndefined();
       // Nothing uploaded yet.
       expect(presignExport).not.toHaveBeenCalled();
@@ -367,9 +365,7 @@ describe('The analytics export (e2e)', () => {
       await runWorker(created.id);
       const ready = await facade.get(created.id, caller());
 
-      expect(fromProtoAnalyticsExportStatus(ready.status)).toBe(
-        AnalyticsExportStatus.READY,
-      );
+      expect(fromProtoExportStatus(ready.status)).toBe(ExportStatus.READY);
       expect(ready.downloadUrl).toBe(DOWNLOAD_URL);
       expect(ready.rowCount).toBe(1);
       expect(confirmExportUpload).toHaveBeenCalledWith(
@@ -392,7 +388,7 @@ describe('The analytics export (e2e)', () => {
 
       expect(resolveExportUrl).toHaveBeenCalledTimes(2);
 
-      const row = await fx.prisma.analyticsExport.findUniqueOrThrow({
+      const row = await fx.prisma.export.findUniqueOrThrow({
         where: { id: created.id },
       });
       // The PATH is stored; the URL is not.
@@ -417,7 +413,7 @@ describe('The analytics export (e2e)', () => {
         // `'EVERYTHING'` is unexpressible now; UNRECOGNIZED is the case
         // that survives — a kind some newer build knows and this one cannot
         // produce.
-        request({ kind: ProtoAnalyticsExportKind.UNRECOGNIZED }),
+        request({ kind: ProtoExportKind.UNRECOGNIZED }),
         status.INVALID_ARGUMENT,
       );
     });
@@ -480,7 +476,7 @@ describe('The analytics export (e2e)', () => {
       );
 
       const created = await request({
-        kind: toProtoAnalyticsExportKind(AnalyticsExportKind.AGENT_DAILY),
+        kind: toProtoExportKind(ExportKind.AGENT_DAILY),
       });
       await runWorker(created.id);
 
@@ -520,9 +516,7 @@ describe('The analytics export (e2e)', () => {
       const ready = await facade.get(created.id, caller());
       const [csv] = uploadedBodies;
 
-      expect(fromProtoAnalyticsExportStatus(ready.status)).toBe(
-        AnalyticsExportStatus.READY,
-      );
+      expect(fromProtoExportStatus(ready.status)).toBe(ExportStatus.READY);
       expect(ready.rowCount).toBe(0);
       expect(csv).toContain('# generated_at=');
       expect(csv).toContain('# rollup_computed_at=none');
@@ -533,7 +527,7 @@ describe('The analytics export (e2e)', () => {
     const ticketExport = (overrides = {}) =>
       facade.create(
         {
-          kind: toProtoAnalyticsExportKind(AnalyticsExportKind.TICKET),
+          kind: toProtoExportKind(ExportKind.TICKET),
           from: '2026-03-01',
           to: '2026-03-31',
           filters: '',
@@ -597,10 +591,10 @@ describe('The analytics export (e2e)', () => {
       // assert the opposite for storage failures, which is the point.
       await expect(runWorker(created.id)).resolves.toBeUndefined();
 
-      const row = await fx.prisma.analyticsExport.findUniqueOrThrow({
+      const row = await fx.prisma.export.findUniqueOrThrow({
         where: { id: created.id },
       });
-      expect(row.status).toBe(AnalyticsExportStatus.FAILED);
+      expect(row.status).toBe(ExportStatus.FAILED);
       expect(row.errorLog).toContain('140,000');
       expect(row.errorLog).toContain('Narrow the range');
     });
@@ -622,7 +616,7 @@ describe('The analytics export (e2e)', () => {
 
       const created = await facade.create(
         {
-          kind: toProtoAnalyticsExportKind(AnalyticsExportKind.AUDIT_LOG),
+          kind: toProtoExportKind(ExportKind.AUDIT_LOG),
           from: '2026-03-01',
           to: '2026-03-31',
           filters: '',
@@ -666,7 +660,7 @@ describe('The analytics export (e2e)', () => {
 
       const created = await facade.create(
         {
-          kind: toProtoAnalyticsExportKind(AnalyticsExportKind.TICKET),
+          kind: toProtoExportKind(ExportKind.TICKET),
           from: '2026-08-01',
           to: '2026-08-31',
           filters: '',
@@ -689,7 +683,7 @@ describe('The analytics export (e2e)', () => {
         status.INVALID_ARGUMENT,
       );
 
-      expect(await fx.prisma.analyticsExport.count()).toBe(0);
+      expect(await fx.prisma.export.count()).toBe(0);
     });
 
     it('**9. an unknown filter VALUE is refused, not silently unmatched**', async () => {
@@ -755,9 +749,7 @@ describe('The analytics export (e2e)', () => {
       await expect(runWorker(created.id)).rejects.toThrow('storage is down');
 
       const failed = await facade.get(created.id, caller());
-      expect(fromProtoAnalyticsExportStatus(failed.status)).toBe(
-        AnalyticsExportStatus.FAILED,
-      );
+      expect(fromProtoExportStatus(failed.status)).toBe(ExportStatus.FAILED);
       expect(failed.error).toContain('storage is down');
       expect(failed.downloadUrl).toBeUndefined();
       expect(uploadedBodies).toHaveLength(0);
@@ -771,9 +763,7 @@ describe('The analytics export (e2e)', () => {
       await expect(runWorker(created.id)).rejects.toThrow();
 
       const failed = await facade.get(created.id, caller());
-      expect(fromProtoAnalyticsExportStatus(failed.status)).toBe(
-        AnalyticsExportStatus.FAILED,
-      );
+      expect(fromProtoExportStatus(failed.status)).toBe(ExportStatus.FAILED);
       expect(failed.error).toContain('403');
     });
 
@@ -787,18 +777,14 @@ describe('The analytics export (e2e)', () => {
       const created = await request();
       await expect(runWorker(created.id)).rejects.toThrow('transient');
       expect(
-        fromProtoAnalyticsExportStatus(
-          (await facade.get(created.id, caller())).status,
-        ),
-      ).toBe(AnalyticsExportStatus.FAILED);
+        fromProtoExportStatus((await facade.get(created.id, caller())).status),
+      ).toBe(ExportStatus.FAILED);
 
       // The retry BullMQ would perform.
       await runWorker(created.id);
 
       const ready = await facade.get(created.id, caller());
-      expect(fromProtoAnalyticsExportStatus(ready.status)).toBe(
-        AnalyticsExportStatus.READY,
-      );
+      expect(fromProtoExportStatus(ready.status)).toBe(ExportStatus.READY);
       expect(ready.error).toBeUndefined();
     });
   });

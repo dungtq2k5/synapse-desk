@@ -22,7 +22,7 @@ import {
   AI_THROTTLER_TIER,
   ROUTE_THROTTLE,
 } from '../../common/config/throttler.config';
-import { AnalyticsExportResponseDto } from '../analytics/dto/rest/analytics-response.dto';
+import { ExportResponseDto } from '../analytics/dto/rest/analytics-response.dto';
 import { AuditLogsService } from './audit-logs.service';
 import {
   AuditActionsResponseDto,
@@ -89,7 +89,7 @@ export class AuditLogsController {
    * the log it exports.
    */
   @ApiOperation({ summary: 'Request an audit-log export' })
-  @ApiWrappedResponse(AnalyticsExportResponseDto, {
+  @ApiWrappedResponse(ExportResponseDto, {
     status: HttpStatus.ACCEPTED,
   })
   @ApiFilterErrors(['400', '401', '403'])
@@ -100,20 +100,20 @@ export class AuditLogsController {
   createExport(
     @CurrentUser() context: RequestContext,
     @Body() dto: CreateAuditLogExportDto,
-  ): Promise<AnalyticsExportResponseDto> {
+  ): Promise<ExportResponseDto> {
     return this.auditLogs.createExport(dto, context);
   }
 
   /** Poll for the file. Another tenant's id answers 404, never 403. */
   @ApiOperation({ summary: 'Get an audit-log export' })
-  @ApiWrappedResponse(AnalyticsExportResponseDto)
+  @ApiWrappedResponse(ExportResponseDto)
   @ApiFilterErrors(['400', '401', '403', '404'])
   @Get('export/:id')
   @RequirePermission('audit.export')
   getExport(
     @CurrentUser() context: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
-  ): Promise<AnalyticsExportResponseDto> {
+  ): Promise<ExportResponseDto> {
     return this.auditLogs.getExport(id, context);
   }
 

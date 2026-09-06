@@ -1,9 +1,100 @@
-/** @file What an analytics export may be, and how large it may get. */
+/**
+ * @file The export family: what an export is, what it may carry, and how large
+ * it may get.
+ *
+ * **One file owns the family, which is the point of the rename.** The queue,
+ * the job name, the two enums and the URL TTL used to live in
+ * `analytics.config.ts` while the MIME, size and filter constants lived here —
+ * so a reader looking for "how exports work" found half of it under analytics,
+ * beside the rollup arithmetic it has nothing to do with (known-gaps #9).
+ */
 
 import type { MimeType } from './mime.config';
-import { AnalyticsExportKind } from './analytics.config';
 import { TICKET_PRIORITIES, TicketStatus } from './ticket.config';
 import { AuditAction, AuditResourceType } from '../contracts/audit.contract';
+
+/**
+ * The export queue and its job name, declared once.
+ *
+ * Strings, and a typo does not error — it produces a queue nobody consumes and
+ * an export that stays PENDING forever with a healthy-looking row. The same
+ * reasoning `INGESTION_QUEUE` records.
+ */
+export const EXPORT_QUEUE = 'export';
+export const EXPORT_JOB_NAME = 'generate-export';
+
+/**
+ * What an export is OVER.
+ *
+ * **Four kinds, and only two of them are analytics.** `TICKET` and `AUDIT_LOG`
+ * read `tickets` and `audit_logs` directly; the two `_DAILY` kinds read
+ * rollups. What all four share is the LIFECYCLE — one status machine, one
+ * queue, one processor, one poll route, one table — which is why they are one
+ * family rather than four features.
+ *
+ * This was `AnalyticsExportKind`, and the family was named for one of its four
+ * kinds (known-gaps #9). The TABLE is still `analytics_exports`: renaming it is
+ * a real migration under ADR 0044, where a `RENAME TABLE` in one release breaks
+ * the previous image mid-rollout, and it buys a client nothing. That asymmetry
+ * is deliberate — `@@map` on the model is where it is recorded.
+ */
+export enum ExportKind {
+  /** Daily ticket rollups: the numbers behind `overview`, `volume`, `deflection`. */
+  TICKET_DAILY = 'TICKET_DAILY',
+  /** Daily per-agent rollups. */
+  AGENT_DAILY = 'AGENT_DAILY',
+  /**
+   * One row per TICKET, not per day.
+   *
+   * The distinction that makes {@link MAX_EXPORT_ROWS} necessary: the two
+   * rollup kinds are bounded by the number of days in the range, this one by a
+   * tenant's whole history.
+   */
+  TICKET = 'TICKET',
+  /** One row per audit-log entry. Bounded the same way as `TICKET`. */
+  AUDIT_LOG = 'AUDIT_LOG',
+}
+
+/** The kinds that read LIVE tables rather than rollups. */
+// They have no `rollupComputedAt` to disclaim and no recomputation to warn
+// about, and they are the two the row cap exists for.
+export const ROW_EXPORT_KINDS = [
+  ExportKind.TICKET,
+  ExportKind.AUDIT_LOG,
+] as const satisfies readonly ExportKind[];
+
+export const EXPORT_KINDS = Object.values(ExportKind);
+
+/** Where an export is in its life. */
+export enum ExportStatus {
+  PENDING = 'PENDING',
+  READY = 'READY',
+  /**
+   * The render or the upload failed, or the range holds more rows than one file
+   * may contain. `error_log` says which.
+   *
+   * **An empty RESULT is not this.** That rule used to live here — "never an
+   * empty file" — and its premise was a ZERO-BYTE file, where "no data" and "no
+   * run" cannot be told apart. The provenance header resolves exactly that
+   * ambiguity by another route: a quiet quarter is `READY`, with `# export_id`,
+   * `# generated_at`, `# rollup_computed_at` and a column header above no rows.
+   * That is a real answer, not an error.
+   *
+   * Stated here rather than only in the processor because this enum is what a
+   * fifth export kind reads.
+   */
+  FAILED = 'FAILED',
+}
+
+/**
+ * How long a download URL lives.
+ *
+ * **A signed URL to a file containing a tenant's full ticket history is a
+ * credential.** Fifteen minutes is long enough to click a link in the response
+ * and short enough that a URL pasted into a chat log expires before anybody
+ * finds it.
+ */
+export const EXPORT_URL_TTL_SECONDS = 15 * 60;
 
 /**
  * The content types an analytics EXPORT may carry.
@@ -104,4 +195,4 @@ export const EXPORT_FILTER_KEYS = {
   AGENT_DAILY: [],
   TICKET: ['status', 'priority', 'assigneeId'],
   AUDIT_LOG: ['action', 'resourceType', 'userId'],
-} as const satisfies Record<AnalyticsExportKind, readonly string[]>;
+} as const satisfies Record<ExportKind, readonly string[]>;

@@ -1,6 +1,20 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
 import { compareContract, type DtoContract } from '../utils/dto-contract';
+import {
+  PageArgsGqlDto,
+  SearchPageArgsGqlDto,
+} from '../../src/common/dto/graphql/page-args.gql-dto';
+import { ListTicketsQueryDto } from '../../src/modules/tickets/dto/rest/ticket.dto';
+import { TicketsArgsGqlDto } from '../../src/modules/tickets/dto/graphql/tickets-args.gql-dto';
+import { ListIngestionJobsQueryDto } from '../../src/modules/ingestion-jobs/dto/rest/ingestion-job.dto';
+import { IngestionJobsArgsGqlDto } from '../../src/modules/ingestion-jobs/dto/graphql/ingestion-jobs-args.gql-dto';
+import { ListDocumentsQueryDto } from '../../src/modules/documents/dto/rest/document.dto';
+import { ListUsersQueryDto } from '../../src/modules/users/dto/rest/user-admin.dto';
+import { ListRolesQueryDto } from '../../src/modules/roles/dto/rest/role.dto';
+import { ListDepartmentsQueryDto } from '../../src/modules/departments/dto/rest/department.dto';
 
 describe('REST and GraphQL DTOs are independent but not divergent', () => {
   const SRC = join(__dirname, '../../src/modules');
@@ -296,7 +310,7 @@ describe('REST and GraphQL DTOs are independent but not divergent', () => {
     AiUsageSliceResponseDto: 'nested inside AiUsageResponseDto',
     AiUsagePointResponseDto: 'a time-series point, REST-only',
     AiUsageResponseDto: 'a time series, REST-only',
-    AnalyticsExportResponseDto: 'a download descriptor, never a query',
+    ExportResponseDto: 'a download descriptor, never a query',
     // audit logs / documents — scalar lists in a wrapper
     AuditActionsResponseDto: 'a filter vocabulary, not an entity',
     // health probes — an orchestrator calls these, never a GraphQL client
@@ -436,4 +450,104 @@ describe('REST and GraphQL DTOs are independent but not divergent', () => {
       expect(result.nullabilityMismatches).toEqual([]);
     });
   });
+});
+
+describe('`searchTerm` is advertised on both transports or neither', () => {
+  /**
+   * The invariant known-gaps #6 left behind, and the one nothing checked.
+   *
+   * `searchTerm` used to live on `PageArgsGqlDto`, so every GraphQL args class
+   * inherited it — including `IngestionJobsArgsGqlDto`, whose REST twin ignored
+   * the parameter. The schema published `ingestionJobs(searchTerm:)`, validated
+   * it, forwarded it through `toPageQuery`, and ingestion-service dropped it.
+   * Nothing failed, because no test compared the two surfaces' ARGUMENTS — the
+   * contracts above pair response shapes only.
+   *
+   * **Asked in one direction, deliberately.** The read-side rule is *a subset,
+   * not a mirror*: GraphQL offering LESS than REST is allowed and sometimes
+   * right. What is never right is GraphQL offering a filter REST refuses, which
+   * is a second query surface with different capabilities — the thing
+   * `IngestionJobsArgsGqlDto`'s own docblock names as the direction people
+   * drift in.
+   *
+   * `restOnly` below is the declared other direction, in the same shape the
+   * contract list uses: an asymmetry that is written down cannot be confused
+   * with one that was forgotten.
+   */
+  const acceptsSearchTerm = async (Dto: new () => object): Promise<boolean> => {
+    // Exactly what the global `ValidationPipe` does — `whitelist` +
+    // `forbidNonWhitelisted` is what turns an unknown property into a 400. Asked
+    // of the CLASS rather than of its source, so `OmitType`, inheritance and a
+    // hand-written field all answer the same way.
+    const errors = await validate(
+      plainToInstance(
+        Dto,
+        { searchTerm: 'x' },
+        { enableImplicitConversion: true },
+      ),
+      { whitelist: true, forbidNonWhitelisted: true },
+    );
+
+    return !errors.some((error) => error.property === 'searchTerm');
+  };
+
+  const PAIRS: readonly {
+    name: string;
+    rest: new () => object;
+    gql: new () => object;
+    /** Declared REST-only: the ALLOWED direction, and never inferred. */
+    restOnly?: boolean;
+  }[] = [
+    {
+      name: 'Ticket',
+      rest: ListTicketsQueryDto,
+      gql: TicketsArgsGqlDto,
+      // REST-only BY DECISION. `tickets.service.ts` filters on it, and
+      // `TicketsArgsGqlDto` is hand-written as a narrower surface — the allowed
+      // direction. Removing this entry should fail, not pass.
+      restOnly: true,
+    },
+    {
+      name: 'IngestionJob',
+      rest: ListIngestionJobsQueryDto,
+      gql: IngestionJobsArgsGqlDto,
+    },
+    {
+      name: 'Document',
+      rest: ListDocumentsQueryDto,
+      gql: SearchPageArgsGqlDto,
+    },
+    { name: 'User', rest: ListUsersQueryDto, gql: SearchPageArgsGqlDto },
+    { name: 'Role', rest: ListRolesQueryDto, gql: SearchPageArgsGqlDto },
+    {
+      name: 'Department',
+      rest: ListDepartmentsQueryDto,
+      gql: SearchPageArgsGqlDto,
+    },
+  ];
+
+  it('the two base classes still differ, which is what the split is', async () => {
+    // Vacuity guard. If `searchTerm` crept back onto the plain base, every
+    // assertion below would pass while checking nothing — which is exactly the
+    // state this row started in.
+    await expect(acceptsSearchTerm(PageArgsGqlDto)).resolves.toBe(false);
+    await expect(acceptsSearchTerm(SearchPageArgsGqlDto)).resolves.toBe(true);
+  });
+
+  it.each(PAIRS)(
+    '$name — GraphQL never advertises a filter REST refuses',
+    async ({ rest, gql, restOnly }) => {
+      const onRest = await acceptsSearchTerm(rest);
+      const onGql = await acceptsSearchTerm(gql);
+
+      // The direction that is always wrong.
+      expect({ onRest, onGql: onGql && !onRest }).toEqual({
+        onRest,
+        onGql: false,
+      });
+
+      // And the other direction is allowed only where it is declared.
+      if (!restOnly) expect(onGql).toBe(onRest);
+    },
+  );
 });

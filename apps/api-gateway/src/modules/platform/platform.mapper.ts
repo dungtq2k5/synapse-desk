@@ -207,6 +207,7 @@ export function toApplyPlanResponseDto(
       organizationId: row.organizationId,
       organizationName: row.organizationName,
       changes: row.changes,
+      after: row.after,
       overLimit: row.overLimit,
       skippedPinned: row.skippedPinned,
       budgetDeferred: row.budgetDeferred,

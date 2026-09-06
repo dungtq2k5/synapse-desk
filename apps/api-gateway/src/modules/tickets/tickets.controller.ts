@@ -20,7 +20,7 @@ import {
   AI_THROTTLER_TIER,
   ROUTE_THROTTLE,
 } from '../../common/config/throttler.config';
-import { AnalyticsExportResponseDto } from '../analytics/dto/rest/analytics-response.dto';
+import { ExportResponseDto } from '../analytics/dto/rest/analytics-response.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionGuard } from '../../common/guards/permission.guard';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
@@ -167,9 +167,7 @@ export class TicketsController {
     return this.tickets.update(id, dto, context);
   }
 
-  // -------------------------------------------------------------------------
-  // The state machine. Five routes, one validator in the service.
-  // -------------------------------------------------------------------------
+  // ------------------------------------------------------------------------- The state machine. Five routes, one validator in the service.
 
   /**
    * Request a ticket export. **POST and `202`**, like every export here.
@@ -187,7 +185,7 @@ export class TicketsController {
    * the widest possible leak of it.
    */
   @ApiOperation({ summary: 'Request a ticket export' })
-  @ApiWrappedResponse(AnalyticsExportResponseDto, {
+  @ApiWrappedResponse(ExportResponseDto, {
     status: HttpStatus.ACCEPTED,
   })
   @ApiFilterErrors(['400', '401', '403'])
@@ -198,20 +196,20 @@ export class TicketsController {
   createExport(
     @CurrentUser() context: RequestContext,
     @Body() dto: CreateTicketExportDto,
-  ): Promise<AnalyticsExportResponseDto> {
+  ): Promise<ExportResponseDto> {
     return this.tickets.createExport(dto, context);
   }
 
   /** Poll for the file. Another tenant's id answers 404, never 403. */
   @ApiOperation({ summary: 'Get a ticket export' })
-  @ApiWrappedResponse(AnalyticsExportResponseDto)
+  @ApiWrappedResponse(ExportResponseDto)
   @ApiFilterErrors(['400', '401', '403', '404'])
   @Get('export/:id')
   @RequirePermission('ticket.export')
   getExport(
     @CurrentUser() context: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
-  ): Promise<AnalyticsExportResponseDto> {
+  ): Promise<ExportResponseDto> {
     return this.tickets.getExport(id, context);
   }
 

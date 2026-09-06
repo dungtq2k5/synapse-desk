@@ -92,9 +92,8 @@ export type TicketAssignedEvent = TicketEventBase & {
   ticketNumber: number;
   assignedToId: string;
   departmentId: string;
-  /** null when the system assigned it — auto-routing or an escalation rule —
-   * rather than a person. */
-  assignedById: string | null;
+  /** Always a person: the only writer takes an actor (known-gaps #12). */
+  assignedById: string;
 };
 
 export type TicketReassignedEvent = TicketEventBase & {
@@ -104,7 +103,7 @@ export type TicketReassignedEvent = TicketEventBase & {
   fromAssigneeId: string | null;
   toAssigneeId: string;
   departmentId: string;
-  assignedById: string | null;
+  assignedById: string;
   reason: ReassignmentReason;
 };
 

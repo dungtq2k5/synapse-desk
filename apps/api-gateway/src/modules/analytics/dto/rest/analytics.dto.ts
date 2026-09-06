@@ -11,11 +11,11 @@ import {
   Min,
 } from 'class-validator';
 import {
-  ANALYTICS_EXPORT_KINDS,
+  EXPORT_KINDS,
   ANALYTICS_GRANULARITIES,
   ANALYTICS_TOP_N,
   AnalyticsGranularity,
-  AnalyticsExportKind,
+  ExportKind,
 } from '@synapsedesk/common';
 
 /**
@@ -81,8 +81,8 @@ export class DocumentAnalyticsQueryDto {
  * then a download URL", which is a creation whatever the verb says.
  */
 export class CreateExportDto {
-  @IsIn(ANALYTICS_EXPORT_KINDS)
-  readonly kind!: AnalyticsExportKind;
+  @IsIn(EXPORT_KINDS)
+  readonly kind!: ExportKind;
 
   @IsISO8601({ strict: true })
   readonly from!: string;

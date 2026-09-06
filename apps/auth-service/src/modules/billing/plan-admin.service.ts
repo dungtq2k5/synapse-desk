@@ -437,6 +437,7 @@ export class PlanAdminService {
         organizationId: subscriber.id,
         organizationName: subscriber.name,
         changes: {},
+        after: {},
         overLimit: [],
         skippedPinned: true,
         budgetDeferred: false,
@@ -444,9 +445,36 @@ export class PlanAdminService {
     }
 
     const changes: Record<string, string> = {};
-    const diff = (field: string, before: unknown, after: unknown): void => {
-      if (String(before) !== String(after)) {
-        changes[field] = `${String(before)} -> ${String(after)}`;
+
+    /**
+     * The same diff, as NUMBERS — what the gateway's composer actually reads.
+     *
+     * `changes` renders for a human and always will; a consumer that needs the
+     * target grant parsed `"before -> after"` out of it, and a cosmetic edit to
+     * the separator silently disarmed two limit checks (known-gaps #21). Two
+     * maps written by ONE closure is what stops them describing different
+     * columns.
+     */
+    const after: Record<string, number> = {};
+
+    const diff = (field: string, before: unknown, next: unknown): void => {
+      if (String(before) === String(next)) return;
+
+      changes[field] = `${String(before)} -> ${String(next)}`;
+
+      // **`bigint` as well as `number`, and this is the whole guard.** Four of
+      // the seven grants are Prisma `BigInt` — `maxStorageBytes`,
+      // `monthlyAiTokenBudget`, `maxDocumentBytes`, `maxAttachmentBytes` — so a
+      // `typeof next === 'number'` test alone would drop storage, the composer
+      // would read the absent key as "not changing", and the storage check
+      // would be dead. That is row 21's own defect, re-delivered by its fix.
+      //
+      // `Number()` is required either way: the generated type for `int64` is
+      // `number`, and these are byte counts far inside `MAX_SAFE_INTEGER`, so
+      // the coercion is lossless. `aiModelTier` is the one `String` grant and
+      // is excluded here rather than listed.
+      if (typeof next === 'number' || typeof next === 'bigint') {
+        after[field] = Number(next);
       }
     };
 
@@ -491,6 +519,7 @@ export class PlanAdminService {
       organizationId: subscriber.id,
       organizationName: subscriber.name,
       changes,
+      after,
       overLimit: await this.overLimit(subscriber, plan),
       skippedPinned: false,
       budgetDeferred,

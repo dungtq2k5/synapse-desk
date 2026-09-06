@@ -10,26 +10,26 @@ import { GrpcMethod, GrpcStreamMethod } from "@nestjs/microservices";
 import { Observable } from "rxjs";
 import { Timestamp } from "../../google/protobuf/timestamp";
 
-export enum AnalyticsExportKind {
-  ANALYTICS_EXPORT_KIND_UNSPECIFIED = 0,
-  /** ANALYTICS_EXPORT_KIND_TICKET_DAILY - Daily ticket rollups: the numbers behind `overview`, `volume`, `deflection`. */
-  ANALYTICS_EXPORT_KIND_TICKET_DAILY = 1,
-  ANALYTICS_EXPORT_KIND_AGENT_DAILY = 2,
-  /** ANALYTICS_EXPORT_KIND_TICKET - One row per TICKET, not per day — the distinction the row cap exists for. */
-  ANALYTICS_EXPORT_KIND_TICKET = 3,
-  ANALYTICS_EXPORT_KIND_AUDIT_LOG = 4,
+export enum ExportKind {
+  EXPORT_KIND_UNSPECIFIED = 0,
+  /** EXPORT_KIND_TICKET_DAILY - Daily ticket rollups: the numbers behind `overview`, `volume`, `deflection`. */
+  EXPORT_KIND_TICKET_DAILY = 1,
+  EXPORT_KIND_AGENT_DAILY = 2,
+  /** EXPORT_KIND_TICKET - One row per TICKET, not per day — the distinction the row cap exists for. */
+  EXPORT_KIND_TICKET = 3,
+  EXPORT_KIND_AUDIT_LOG = 4,
   UNRECOGNIZED = -1,
 }
 
-export enum AnalyticsExportStatus {
-  ANALYTICS_EXPORT_STATUS_UNSPECIFIED = 0,
-  ANALYTICS_EXPORT_STATUS_PENDING = 1,
-  ANALYTICS_EXPORT_STATUS_READY = 2,
+export enum ExportStatus {
+  EXPORT_STATUS_UNSPECIFIED = 0,
+  EXPORT_STATUS_PENDING = 1,
+  EXPORT_STATUS_READY = 2,
   /**
-   * ANALYTICS_EXPORT_STATUS_FAILED - *Reported as a failure, never as an empty file.** An empty CSV reads as
+   * EXPORT_STATUS_FAILED - *Reported as a failure, never as an empty file.** An empty CSV reads as
    * "no data", which is a wrong answer rather than an error.
    */
-  ANALYTICS_EXPORT_STATUS_FAILED = 3,
+  EXPORT_STATUS_FAILED = 3,
   UNRECOGNIZED = -1,
 }
 
@@ -266,7 +266,7 @@ export interface RunRollupResponse {
 }
 
 export interface CreateExportRequest {
-  kind: AnalyticsExportKind;
+  kind: ExportKind;
   from: string;
   to: string;
   departmentId?:
@@ -283,8 +283,8 @@ export interface CreateExportRequest {
 
 export interface ExportResponse {
   id: string;
-  status: AnalyticsExportStatus;
-  kind: AnalyticsExportKind;
+  status: ExportStatus;
+  kind: ExportKind;
   rowCount?:
     | number
     | undefined;

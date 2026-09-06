@@ -20,7 +20,7 @@ import {
   UserPageResponseGqlDto,
 } from './dto/graphql/user-response.gql-dto';
 import { DepartmentResponseGqlDto } from '../departments/dto/graphql/department-response.gql-dto';
-import { PageArgsGqlDto } from '../../common/dto/graphql/page-args.gql-dto';
+import { SearchPageArgsGqlDto } from '../../common/dto/graphql/page-args.gql-dto';
 import { toPageQuery } from '../../common/graphql/page-query';
 import type { GqlContext } from '../../common/graphql/loaders/loaders.factory';
 import { MAX_EDGE_LIST } from '../../common/config/graphql-limits.config';
@@ -94,7 +94,7 @@ export class UsersResolver {
   })
   @RequirePermission('user.read')
   async userPage(
-    @Args() args: PageArgsGqlDto,
+    @Args() args: SearchPageArgsGqlDto,
     @CurrentUser() context: RequestContext,
   ): Promise<UserPageResponseGqlDto> {
     // Both casts here were hiding the same envelope mismatch as `Query.user`,

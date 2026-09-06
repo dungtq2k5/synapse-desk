@@ -22,7 +22,7 @@ import {
 } from '@synapsedesk/grpc-proto';
 import { AnalyticsService } from './analytics.service';
 import { TicketRollupJob } from './ticket-rollup.job';
-import { AnalyticsExportFacade } from './analytics-export.facade';
+import { ExportFacade } from './export.facade';
 
 /**
  * Domain B's analytics surface.
@@ -39,7 +39,7 @@ export class AnalyticsGrpcController implements AnalyticsServiceController {
   constructor(
     private readonly analytics: AnalyticsService,
     private readonly rollup: TicketRollupJob,
-    private readonly exports: AnalyticsExportFacade,
+    private readonly exports: ExportFacade,
     private readonly jobHealth: JobHealthService,
   ) {}
 

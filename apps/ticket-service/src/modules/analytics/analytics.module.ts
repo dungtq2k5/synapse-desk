@@ -2,15 +2,15 @@ import { Module } from '@nestjs/common';
 import { JobRunsModule } from '../job-runs/job-runs.module';
 import { BullModule } from '@nestjs/bullmq';
 import { ConfigService } from '@nestjs/config';
-import { ANALYTICS_EXPORT_QUEUE } from '@synapsedesk/common';
+import { EXPORT_QUEUE } from '@synapsedesk/common';
 import { AuthClientModule } from '../auth-client/auth-client.module';
 import { StorageClientModule } from '../storage-client/storage-client.module';
 import { TicketRollupJob } from './ticket-rollup.job';
 import { AnalyticsService } from './analytics.service';
 import { AnalyticsGrpcController } from './analytics-grpc.controller';
-import { AnalyticsExportService } from './analytics-export.service';
-import { AnalyticsExportFacade } from './analytics-export.facade';
-import { AnalyticsExportProcessor } from './analytics-export.processor';
+import { ExportService } from './export.service';
+import { ExportFacade } from './export.facade';
+import { ExportProcessor } from './export.processor';
 
 /**
  * The read projection over Domain B.
@@ -45,16 +45,16 @@ import { AnalyticsExportProcessor } from './analytics-export.processor';
         },
       }),
     }),
-    BullModule.registerQueue({ name: ANALYTICS_EXPORT_QUEUE }),
+    BullModule.registerQueue({ name: EXPORT_QUEUE }),
   ],
   controllers: [AnalyticsGrpcController],
   providers: [
     TicketRollupJob,
     AnalyticsService,
-    AnalyticsExportService,
-    AnalyticsExportFacade,
-    AnalyticsExportProcessor,
+    ExportService,
+    ExportFacade,
+    ExportProcessor,
   ],
-  exports: [TicketRollupJob, AnalyticsService, AnalyticsExportService],
+  exports: [TicketRollupJob, AnalyticsService, ExportService],
 })
 export class AnalyticsModule {}

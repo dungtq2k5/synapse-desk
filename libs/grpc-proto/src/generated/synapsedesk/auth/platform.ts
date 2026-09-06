@@ -504,6 +504,23 @@ export interface PlanSubscriberProjection {
    */
   changes: { [key: string]: string };
   /**
+   * The AFTER value of every NUMERIC column in `changes`, keyed the same way.
+   * `changes` is a display string and stays one; this is what a machine reads.
+   * A key absent here means the column is not changing -- never "zero".
+   *
+   * int64 because `max_storage_bytes` is one of the keys and already exceeds
+   * int32 on every plan; ts-proto renders it `number`, as it does elsewhere in
+   * billing.proto. The producer holds four of these grants as Prisma `BigInt`,
+   * so it coerces with `Number()` -- lossless, because every one is a byte
+   * count far inside `MAX_SAFE_INTEGER`.
+   *
+   * known-gaps #21 is why this exists: the composer was parsing
+   * `"before -> after"` and a cosmetic change to the separator silently
+   * disarmed the storage and document checks while eleven e2e tests stayed
+   * green.
+   */
+  after: { [key: string]: number };
+  /**
    * *Already over a limit the new plan sets.** Not a blocker: a limit gates
    * ADMISSION and never TENURE, so these tenants keep
    * everything they have and are refused their NEXT addition. It is reported
@@ -527,6 +544,11 @@ export interface PlanSubscriberProjection {
 export interface PlanSubscriberProjection_ChangesEntry {
   key: string;
   value: string;
+}
+
+export interface PlanSubscriberProjection_AfterEntry {
+  key: string;
+  value: number;
 }
 
 export interface ApplyPlanRequest {

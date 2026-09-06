@@ -291,12 +291,18 @@ model TicketAssignment {
   /// No FK: postgres_auth. Validated at write time.
   assignedToId String @map("assigned_to_id") @db.Uuid
 
-  /// Nullable, and nothing writes a null: `writeAssignment` is the only writer
-  /// and takes `requireActor(context)`. It was meant for a system assignment —
-  /// auto-routing, escalation rules — which does not exist yet and would need
-  /// an entry point that is not this one, since `load` refuses a caller with no
-  /// identity. known-gaps #12.
-  assignedById String? @map("assigned_by_id") @db.Uuid
+  // No FK: postgres_auth. NOT nullable, and that is a fact about the write
+  // path rather than a preference: `writeAssignment` is the only writer and
+  // takes `requireActor(context)`, and `load` refuses a caller with no
+  // identity — so no assignment can happen without an actor.
+  //
+  // It was nullable for a system assignment — auto-routing, escalation rules —
+  // that does not exist. One would have to enter somewhere other than
+  // `writeAssignment` and would bring its own actor with it, and this column
+  // should be revisited then rather than left lying about a case that cannot
+  // occur. `changedById` on `TicketStatusChange` is the precedent: the same
+  // shape, decided the same way when it was added.
+  assignedById String @map("assigned_by_id") @db.Uuid
 
   /// No FK: `departments` lives in postgres_auth.
   departmentId String @map("department_id") @db.Uuid
@@ -717,7 +723,7 @@ model AgentDailyStat {
 /// "last quarter" a week apart get different numbers if a backfill ran between,
 /// so the file records when it was generated and from which rollup run — or it
 /// becomes a disputed number in a meeting with nothing to settle it.
-model AnalyticsExport {
+model Export {
   id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
 
   organizationId String @map("organization_id") @db.Uuid
@@ -726,7 +732,7 @@ model AnalyticsExport {
   /// our ticket history".
   requestedById String @map("requested_by_id") @db.Uuid
 
-  /// AnalyticsExportKind.
+  /// ExportKind.
   kind String @db.VarChar(30)
 
   /// The range, as the tenant's local dates — the same domain the rollups use.
@@ -770,7 +776,7 @@ model AnalyticsExport {
   /// DTO on the way in and never read back as `any`.
   filters Json? @db.JsonB
 
-  /// AnalyticsExportStatus.
+  /// ExportStatus.
   status String @default("PENDING") @db.VarChar(20)
 
   /// The object in storage. Absent until the file exists.
@@ -790,6 +796,15 @@ model AnalyticsExport {
   completedAt DateTime? @map("completed_at") @db.Timestamptz
 
   @@index([organizationId, createdAt(sort: Desc)])
+  /// **The model is `Export`; the TABLE keeps its old name, deliberately.**
+  ///
+  /// The family was named for one of its four kinds and was renamed in code
+  /// (known-gaps #9). Renaming the table is a different change: under ADR 0044
+  /// a `RENAME TABLE` in one release breaks the previous image mid-rollout, so
+  /// it needs an expand-and-contract of its own — and it buys a client nothing,
+  /// because no client sees a table name. It can be its own change later, or
+  /// never. Filing "the table is misnamed" as a new gap would be re-reporting
+  /// a decision, not finding one.
   @@map("analytics_exports")
 }
 

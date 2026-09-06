@@ -778,7 +778,7 @@ Conceptually a sibling of Tables 11–12 (§1.9) — a hashed, expiring, single-
 | **id** | UUID | Primary Key, gen_random_uuid() | Unique assignment record ID. |
 | **ticket_id** | UUID | NOT NULL, FK ➔ tickets.id, Indexed | Ticket being assigned. |
 | **assigned_to_id** | UUID | NOT NULL, FK ➔ users.id, Indexed | Agent receiving the assignment. |
-| **assigned_by_id** | UUID | Nullable, FK ➔ users.id, ON DELETE SET NULL | User who made the assignment (system/automation if NULL). |
+| **assigned_by_id** | UUID | **NOT NULL** | Who made the assignment. No FK (§1.13). **NOT NULL is a fact about the write path, not a preference**: `writeAssignment` is the only writer and takes `requireActor(context)`, and `load` refuses a caller with no identity — so no assignment can happen without an actor. It was nullable for a *system* assignment (auto-routing, escalation rules) **that does not exist**; one would have to enter somewhere other than `writeAssignment` and would bring its own actor with it. `ticket_status_changes.changed_by_id` is the precedent — same shape, decided the same way when it was added. |
 | **department_id** | UUID | NOT NULL, FK ➔ departments.id | Department the assigned agent belongs to. Captures which team owned the ticket at this stage (the "category" in ticket taxonomy). |
 | **assigned_at** | TIMESTAMPTZ | NOT NULL, NOW() | When the assignment was made. |
 | **unassigned_at** | TIMESTAMPTZ | Nullable | When the agent stopped owning the ticket (assignment ended). NULL = currently assigned. |
@@ -1135,7 +1135,9 @@ Separate from Table 34 rather than a wider dimension on it: an agent is a person
 
 #### **Table 37: analytics_exports**
 
-*An async analytics export.*
+*An async export — of analytics rollups, tickets, or the audit log.*
+
+> **The Prisma model is `Export`; this table keeps its old name deliberately.** The family was named for one of its four kinds and was renamed in code (known-gaps #9), but renaming the *table* is a different change: under [ADR 0044](./decisions/0044-expand-and-contract-never-in-one-release.md) a `RENAME TABLE` in one release breaks the previous image mid-rollout, so it needs an expand-and-contract of its own — and it buys a client nothing, because no client sees a table name. Grep the schema for `model Export`, not `AnalyticsExport`. The enums renamed with the model: `ExportKind` and `ExportStatus`.
 
 `GET /analytics/export` is **not a read**: it creates a job, produces a file and returns a download URL — so it needs an owner, and ticket-service owns most of the source data. An export is a **snapshot with a timestamp in it**: two people exporting "last quarter" a week apart get different numbers if a backfill ran between, so the file records when it was generated and from which rollup run, or it becomes a disputed number in a meeting with nothing to settle it.
 
@@ -1386,7 +1388,6 @@ To prevent accidental database corruption or orphaned child records:
    * webhook_deliveries ➔ webhook_endpoints (deleting an endpoint discards its delivery history with it).
 2. **ON DELETE SET NULL:**
    * deleted_by_id ➔ users.id (If an admin user account is hard-deleted, preserve the deletion timestamp while setting deleted_by_id to NULL).
-   * assigned_by_id ➔ users.id (in ticket_assignments; if the assigning user is deleted, retain the assignment record).
    * created_by_id ➔ users.id (If creator is deleted, retain the created entity).
    * related_document_id ➔ documents.id (in document_flags; if a related conflicting document is deleted, retain the flag as informational).
    * resolved_by_id ➔ users.id (in document_flags; if a Knowledge Manager is hard-deleted, retain the resolution record).

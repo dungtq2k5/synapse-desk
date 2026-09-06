@@ -186,6 +186,87 @@ describe('Ticket messages & attachments (e2e)', () => {
 
   // --------------------------------------------------------------- create
 
+  describe('searchTerm', () => {
+    it('1. **filters on `content`, case-insensitively, and the COUNT agrees**', async () => {
+      // `?searchTerm=` was on `ListMessagesQueryDto` and honoured by nobody:
+      // an agent narrowing a long thread got the whole thread back and read it
+      // as "nothing else matched" (known-gaps #6).
+      //
+      // `totalItems` is asserted because `listMessages` builds ONE `where` and
+      // hands it to both `findMany` and `count` — a filter applied to the rows
+      // alone would leave the meta describing a different query.
+      const ticket = await createTicket(fx.prisma, tenant);
+      await createMessage(fx.prisma, ticket.id, {
+        content: 'Please issue a REFUND for order 12',
+      });
+      await createMessage(fx.prisma, ticket.id, {
+        content: 'Shipping address updated',
+      });
+
+      const { items, meta } = await messages.listMessages(
+        {
+          ticketId: ticket.id,
+          // Lower case against upper-case content: the filter is
+          // `mode: 'insensitive'`, and a caller does not know how the text was
+          // typed.
+          page: pageRequest({ searchTerm: 'refund' }),
+        },
+        agent(),
+      );
+
+      expect(items).toHaveLength(1);
+      expect(items[0].content).toContain('REFUND');
+      expect(meta!.totalItems).toBe(1);
+    });
+
+    it('2. **composes with the internal-note scope rather than replacing it**', async () => {
+      // The failure worth pre-empting: a `where` rebuilt around the search term
+      // would drop `internalNoteScope`, and a non-agent searching a thread
+      // would be handed the agent-only notes that matched. Search is a filter
+      // ON TOP of the visibility boundary, never instead of it.
+      const ticket = await createTicket(fx.prisma, tenant);
+      await createMessage(fx.prisma, ticket.id, {
+        content: 'Refund requested by the customer',
+      });
+      await createMessage(fx.prisma, ticket.id, {
+        content: 'Refund abuse suspected on this account',
+        isInternalNote: true,
+      });
+
+      const asAuthor = await messages.listMessages(
+        { ticketId: ticket.id, page: pageRequest({ searchTerm: 'refund' }) },
+        author(),
+      );
+      const asAgent = await messages.listMessages(
+        { ticketId: ticket.id, page: pageRequest({ searchTerm: 'refund' }) },
+        agent(),
+      );
+
+      expect(asAuthor.items).toHaveLength(1);
+      expect(asAuthor.items[0].content).not.toContain('abuse');
+      expect(asAuthor.meta!.totalItems).toBe(1);
+
+      // Both matched the term; only one caller may see both.
+      expect(asAgent.items).toHaveLength(2);
+    });
+
+    it('3. a BLANK term is not a filter', async () => {
+      // `toSearchFilter` returns `undefined` for blank input, so an unfiltered
+      // list stays index-friendly instead of becoming a full-table `contains`
+      // on the empty string.
+      const ticket = await createTicket(fx.prisma, tenant);
+      await createMessage(fx.prisma, ticket.id);
+      await createMessage(fx.prisma, ticket.id);
+
+      const { items } = await messages.listMessages(
+        { ticketId: ticket.id, page: pageRequest({ searchTerm: '   ' }) },
+        agent(),
+      );
+
+      expect(items).toHaveLength(2);
+    });
+  });
+
   describe('createMessage', () => {
     it('1. posts and publishes ticket.message_created', async () => {
       const ticket = await createTicket(fx.prisma, tenant);

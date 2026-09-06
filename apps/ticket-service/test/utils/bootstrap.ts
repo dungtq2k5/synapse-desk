@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { obliterateQueues } from '@synapsedesk/common/testing/queues';
 import {
-  ANALYTICS_EXPORT_QUEUE,
+  EXPORT_QUEUE,
   AuditPublisher,
   MAX_ANALYTICS_RANGE_DAYS,
   MAX_ATTACHMENT_BYTES,
@@ -148,7 +148,7 @@ export async function bootstrapE2eTest(): Promise<E2eFixture> {
     // `scheduler-ticket` executes them. The export queue rides along for the
     // same reason ingestion obliterates its work queues — a leftover job is a
     // leftover job.
-    await obliterateQueues([SCHEDULER_QUEUE.ticket, ANALYTICS_EXPORT_QUEUE]);
+    await obliterateQueues([SCHEDULER_QUEUE.ticket, EXPORT_QUEUE]);
     await moduleRef.close();
   };
 

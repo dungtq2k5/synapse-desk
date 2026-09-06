@@ -11,8 +11,14 @@ export class AssignmentResponseDto {
   id!: string;
   ticketId!: string;
   assignedToId!: string;
-  /** null when the system assigned it — auto-routing or an escalation rule. */
-  assignedById!: string | null;
+  /**
+   * Who assigned it. Always a person.
+   *
+   * Was `string | null`; the null had no writer — `writeAssignment` is the only
+   * one and takes an actor (known-gaps #12). Part of the pre-client clearing —
+   * see `PaginationDto`.
+   */
+  assignedById!: string;
   departmentId!: string;
   assignedAt!: Date;
   unassignedAt!: Date | null;

@@ -26,6 +26,7 @@ import {
   RedactMessageResponse,
   toPageMeta,
   toPrismaPage,
+  toSearchFilter,
   toProtoTimestamp,
   UpdateMessageRequest,
   UploadAttachmentRequest,
@@ -139,9 +140,7 @@ export class MessagesService {
     );
   }
 
-  // -------------------------------------------------------------------------
-  // Read
-  // -------------------------------------------------------------------------
+  // ------------------------------------------------------------------------- Read
 
   async listMessages(
     request: ListMessagesRequest,
@@ -154,9 +153,17 @@ export class MessagesService {
       TICKET_MESSAGE_SORTABLE_FIELDS,
     );
 
+    // `?searchTerm=` was on this DTO and honoured by nobody — an agent
+    // narrowing a long thread got the whole thread back and read it as "no
+    // other matches" (known-gaps #6). `content` is the column, and
+    // `toSearchFilter` returns `undefined` for blank input so an unfiltered
+    // list stays index-friendly.
+    const search = toSearchFilter(page.searchTerm);
+
     const where: Prisma.TicketMessageWhereInput = {
       ticketId: ticket.id,
       ...this.access.internalNoteScope(context),
+      ...(search ? { content: search } : {}),
     };
 
     const [items, totalItems] = await Promise.all([
@@ -179,9 +186,7 @@ export class MessagesService {
     };
   }
 
-  // -------------------------------------------------------------------------
-  // Write
-  // -------------------------------------------------------------------------
+  // ------------------------------------------------------------------------- Write
 
   /**
    * Post a message, and optionally ask for an AI draft.
@@ -695,9 +700,7 @@ export class MessagesService {
     return { message: toMessageResponse(message) };
   }
 
-  // -------------------------------------------------------------------------
-  // Attachments
-  // -------------------------------------------------------------------------
+  // ------------------------------------------------------------------------- Attachments
 
   /**
    * Presign an attachment upload.

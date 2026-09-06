@@ -2,9 +2,19 @@ import { Type } from 'class-transformer';
 import { IsIn, IsISO8601, IsObject, IsOptional, IsUUID } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { AuditAction, AuditResourceType } from '@synapsedesk/common';
-import { SearchPaginationDto } from '../../../../common/dto/rest/search-pagination.dto';
+import { PaginationDto } from '../../../../common/dto/rest/pagination.dto';
 
-export class ListAuditLogsQueryDto extends SearchPaginationDto {
+// **No `searchTerm`, and that is the change.**
+//
+// It was inherited, advertised in Swagger, accepted, and never used — an audit
+// search that returned an unfiltered page reads as "nothing else matched"
+// (known-gaps #6). `action` and `resourceType` are already exact filters drawn
+// from an allowlist, so there is no free-text column here worth searching.
+//
+// Extending `PaginationDto` makes the parameter a 400 naming the property
+// rather than a silent no-op. Part of the pre-client clearing — see
+// `PaginationDto`.
+export class ListAuditLogsQueryDto extends PaginationDto {
   // `@IsIn` is load-bearing, not decoration: an unrecognized value maps to the
   // proto's UNSPECIFIED, which the service reads as "no filter" -- so
   // `?action=SOME_FUTURE_ACTION` would return EVERYTHING and read as a match.

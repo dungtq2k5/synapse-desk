@@ -90,6 +90,26 @@ describe('Audit logs at the HTTP boundary (e2e)', () => {
       expect(fx.stubs.audit.listAuditLogs).not.toHaveBeenCalled();
     });
 
+    it('3b. **REJECTS `searchTerm` — it used to be accepted and ignored**', async () => {
+      // known-gaps #6, and the same argument as test 3 one row down.
+      // `ListAuditLogsQueryDto` extended `SearchPaginationDto`, so `searchTerm`
+      // was on the wire and in Swagger, and audit-service never filtered on it:
+      // a caller narrowing the trail got the whole page back and read it as
+      // "nothing else matched". `action` and `resourceType` are exact filters
+      // from an allowlist; there is no free-text column to search.
+      //
+      // The DTO now extends `PaginationDto`, so `forbidNonWhitelisted` answers
+      // 400 naming the property. Part of the pre-client clearing — see
+      // `PaginationDto`.
+      const res = await authenticatedAgent(fx.app, {
+        permissionCodes: ['audit.read'],
+      }).get(`${API}/audit-logs?searchTerm=refund`);
+
+      expect(res.status).toBe(400);
+      expect(JSON.stringify(res.body)).toContain('searchTerm');
+      expect(fx.stubs.audit.listAuditLogs).not.toHaveBeenCalled();
+    });
+
     it('4. sends platformScope FALSE from the tenant route', async () => {
       fx.stubs.audit.listAuditLogs.mockReturnValue(
         of({ items: [], meta: wirePage([]).meta }),

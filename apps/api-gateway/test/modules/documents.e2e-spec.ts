@@ -934,6 +934,25 @@ describe('Documents at the HTTP boundary (e2e)', () => {
       expect(fx.stubs.document.listDocumentFlags).not.toHaveBeenCalled();
     });
 
+    it('5b. **rejects `searchTerm` the same way it rejects an unknown type**', async () => {
+      // known-gaps #6. `ListDocumentFlagsQueryDto` extended
+      // `SearchPaginationDto` and nothing filtered on the term — a worklist
+      // narrowed by `?searchTerm=` came back whole and read as "no other
+      // matches exist". Every filter on this route is typed, and test 5 above
+      // already refuses an unknown flag type rather than dropping it; a
+      // free-text parameter that is silently ignored is the same failure with a
+      // friendlier face.
+      //
+      // Part of the pre-client clearing — see `PaginationDto`.
+      const res = await authenticatedAgent(fx.app, {
+        permissionCodes: ['document.read'],
+      }).get(`${API}/documents/flags?searchTerm=stale`);
+
+      expect(res.status).toBe(400);
+      expect(JSON.stringify(res.body)).toContain('searchTerm');
+      expect(fx.stubs.document.listDocumentFlags).not.toHaveBeenCalled();
+    });
+
     it('6. requires document.read', async () => {
       // A flag names somebody's document as stale, unread or redundant. That is
       // a judgement about their work, and it belongs with the people who curate

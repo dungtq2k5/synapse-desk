@@ -68,9 +68,10 @@ export class TicketNotificationConsumer {
       // the realtime publisher does not read priority at all.
       priority: NotificationPriority.HIGH,
       occurredAt: event.occurredAt,
-      // Rule 1: `assignedById` is null when the system assigned it, and then
-      // there is no actor to suppress.
-      actorId: event.assignedById ?? undefined,
+      // Rule 1: the assigner is the actor to suppress — an agent who assigns a
+      // ticket to themselves does not need telling. Always present: the only
+      // writer takes an actor (known-gaps #12).
+      actorId: event.assignedById,
       ...ticketTarget(event.ticketId, event.ticketNumber),
     });
   }
@@ -97,7 +98,7 @@ export class TicketNotificationConsumer {
       // is being handed work.
       priority: NotificationPriority.HIGH,
       occurredAt: event.occurredAt,
-      actorId: event.assignedById ?? undefined,
+      actorId: event.assignedById,
       ...ticketTarget(event.ticketId, event.ticketNumber),
     });
   }

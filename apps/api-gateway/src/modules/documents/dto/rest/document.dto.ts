@@ -37,6 +37,7 @@ import {
   type DocumentFileType,
 } from '@synapsedesk/common';
 import { AtMostOneNonLatinScript } from '../../../../common/decorators/at-most-one-non-latin-script.decorator';
+import { PaginationDto } from '../../../../common/dto/rest/pagination.dto';
 import { SearchPaginationDto } from '../../../../common/dto/rest/search-pagination.dto';
 import { ToBoolean } from '../../../../common/decorators/to-boolean.decorator';
 import {
@@ -262,8 +263,14 @@ export class ResolveDocumentFlagDto {
  * `UNRETRIEVED` and `UNCITED` were once one flag under a name that fitted only
  * the first, and a filter that offered only `UNCITED` would quietly re-merge
  * them: the type nobody can select is the type nobody sees.
+ *
+ * **No `searchTerm`**, unlike `ListDocumentsQueryDto` above. Every filter here
+ * is typed — `flagType` is refused outright when unknown — and the free-text
+ * term was inherited, advertised and ignored (known-gaps #6). Refusing it is
+ * the same answer this DTO already gives an unknown flag type. Part of the
+ * pre-client clearing — see `PaginationDto`.
  */
-export class ListDocumentFlagsQueryDto extends SearchPaginationDto {
+export class ListDocumentFlagsQueryDto extends PaginationDto {
   // `detectedAt`, because the base default is `createdAt` and the service
   // allowlists exactly one sortable column here. Left unoverridden, a request
   // with NO query parameters at all — every default call from the UI — would

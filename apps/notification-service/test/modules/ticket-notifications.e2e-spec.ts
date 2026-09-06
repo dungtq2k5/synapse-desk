@@ -146,16 +146,25 @@ describe('Ticket notifications (e2e)', () => {
       await expect(recipientsOf()).resolves.toEqual([AGENT]);
     });
 
-    it('3. A SYSTEM assignment still notifies — there is no actor to suppress', async () => {
-      // `assignedById` is null for auto-routing and escalation rules. Treating
-      // null as "the actor" would silence every automatic assignment, which is
-      // most of them.
+    it('3. Suppression compares IDENTITY, not presence of an actor', async () => {
+      // **This test used to be about a null.** `assignedById` was
+      // `string | null`, null meaning "the system assigned it" — auto-routing
+      // or an escalation rule — and the risk was that a consumer read null as
+      // "the actor" and silenced every automatic assignment.
+      //
+      // That case had no writer and the column is now NOT NULL (known-gaps
+      // #12): an assignment made by a rule carries the actor that triggered it,
+      // so there is always somebody named. The property worth keeping is the
+      // one underneath — suppression is `actor === recipient`, so an assignment
+      // by ANY other identity still notifies. Here the requester's own action
+      // moved their ticket onto an agent's queue, and the agent must hear about
+      // it.
       await consumer.ticketAssigned({
         ...base,
         pattern: TICKET_PATTERNS.assigned,
         assignedToId: AGENT,
         departmentId: DEPARTMENT,
-        assignedById: null,
+        assignedById: REQUESTER,
       });
 
       await expect(recipientsOf()).resolves.toEqual([AGENT]);

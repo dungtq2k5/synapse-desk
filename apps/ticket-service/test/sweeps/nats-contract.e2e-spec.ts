@@ -278,27 +278,33 @@ describe('NATS contract sweep (e2e)', () => {
   });
 
   it('preserves a NULL optional as null, not as undefined or absent', async () => {
-    // The case a round-trip most easily corrupts. `assignedById: null` means
-    // "the system assigned it" — a real, meaningful value — and a consumer
-    // reading `undefined` instead cannot tell that from a field that was never
-    // sent.
-    const systemAssigned: TicketDomainEvent = {
-      pattern: TICKET_PATTERNS.assigned,
+    // The case a round-trip most easily corrupts.
+    //
+    // **The exemplar moved, and the test did not change its point.** It used to
+    // ride on `assignedById: null`, meaning "the system assigned it" — a case
+    // that turned out to have no writer at all, so `assignedById` is now
+    // `string` (known-gaps #12). `fromAssigneeId` is a real, meaningful null:
+    // it means the ticket was previously UNASSIGNED, and a consumer reading
+    // `undefined` instead cannot tell that from a field that was never sent.
+    const firstAssignment: TicketDomainEvent = {
+      pattern: TICKET_PATTERNS.reassigned,
       organizationId,
       ticketId,
       ticketNumber: 4211,
       occurredAt,
-      assignedToId: faker.string.uuid(),
+      fromAssigneeId: null,
+      toAssigneeId: faker.string.uuid(),
       departmentId: faker.string.uuid(),
-      assignedById: null,
+      assignedById: faker.string.uuid(),
+      reason: ReassignmentReason.ESCALATION,
     };
 
-    await publish(systemAssigned);
-    await waitUntil(() => arrivalsFor(TICKET_PATTERNS.assigned).length > 0);
+    await publish(firstAssignment);
+    await waitUntil(() => arrivalsFor(TICKET_PATTERNS.reassigned).length > 0);
 
-    const arrival = arrivalsFor(TICKET_PATTERNS.assigned)[0];
-    expect(arrival).toHaveProperty('assignedById', null);
-    expect(arrival).toEqual(systemAssigned);
+    const arrival = arrivalsFor(TICKET_PATTERNS.reassigned)[0];
+    expect(arrival).toHaveProperty('fromAssigneeId', null);
+    expect(arrival).toEqual(firstAssignment);
   });
 
   it('preserves a FALSE boolean rather than dropping it', async () => {

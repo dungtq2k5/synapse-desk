@@ -579,5 +579,45 @@ describe('AI feedback (e2e)', () => {
       expect(meta!.totalItems).toBe(items.length);
       expect(meta!.totalItems).toBe(2);
     });
+
+    it('7. **`searchTerm` filters on `feedbackText`, and a NULL row is not a match**', async () => {
+      // `?searchTerm=` was advertised on this route and honoured by nobody
+      // (known-gaps #6). `feedbackText` is the only free-text column here.
+      //
+      // **The null row is the part worth stating.** `feedbackText` is
+      // `String?` — a rating submitted with no comment stores NULL — so it
+      // cannot match a `contains`. That is correct rather than a gap: a text
+      // search is a question about text, and a row with none is not a silent
+      // omission. Asserted so the next reader does not read it as one.
+      const ticket = await createTicket(fx.prisma, tenant);
+      const seed = async (feedbackText: string | null) => {
+        const message = await createAiMessage(fx.prisma, ticket.id);
+        await fx.prisma.aiResponseFeedback.create({
+          data: {
+            ticketMessageId: message.id,
+            userId: faker.string.uuid(),
+            organizationId: tenant.organizationId,
+            rating: -1,
+            feedbackText,
+          },
+        });
+      };
+
+      await seed('The citation pointed at the WRONG policy document');
+      await seed('Answer was fine');
+      await seed(null);
+
+      const { items, meta } = await feedback.listFeedback(
+        // Lower case against upper-case text: the filter is insensitive, and a
+        // caller does not know how the comment was typed.
+        listRequest({ page: pageRequest({ searchTerm: 'wrong policy' }) }),
+        analyst(),
+      );
+
+      expect(items).toHaveLength(1);
+      expect(items[0].feedbackText).toContain('WRONG policy');
+      // The same `where` counted the same rows — three exist, one matched.
+      expect(meta!.totalItems).toBe(1);
+    });
   });
 });

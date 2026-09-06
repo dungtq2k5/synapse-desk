@@ -10,7 +10,7 @@ import {
   DepartmentResponseGqlDto,
   DepartmentPageResponseGqlDto,
 } from './dto/graphql/department-response.gql-dto';
-import { PageArgsGqlDto } from '../../common/dto/graphql/page-args.gql-dto';
+import { SearchPageArgsGqlDto } from '../../common/dto/graphql/page-args.gql-dto';
 import { toPageQuery } from '../../common/graphql/page-query';
 
 /** `Query.departments`. */
@@ -25,7 +25,7 @@ export class DepartmentsResolver {
   })
   @RequirePermission('department.read')
   async departmentPage(
-    @Args() args: PageArgsGqlDto,
+    @Args() args: SearchPageArgsGqlDto,
     @CurrentUser() context: RequestContext,
   ): Promise<DepartmentPageResponseGqlDto> {
     return await this.departments.list(

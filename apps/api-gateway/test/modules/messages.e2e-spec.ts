@@ -72,6 +72,23 @@ describe('Ticket messages at the HTTP boundary (e2e)', () => {
       expect(res.body.data.items).toHaveLength(1);
     });
 
+    it('1b. **forwards `searchTerm` down the wire, not just into Swagger**', async () => {
+      // The gateway half of known-gaps #6: this route advertised the parameter
+      // and ticket-service ignored it. It filters on `content` now, and this
+      // asserts the only part the gateway owns — that the term survives the
+      // REST→gRPC hop and arrives on `page`, where the service reads it.
+      fx.stubs.message.listMessages.mockReturnValue(
+        of({ items: [], meta: wirePage([]).meta }),
+      );
+
+      await authenticatedAgent(fx.app, { permissionCodes: [] }).get(
+        `${API}/tickets/${ticketId}/messages?searchTerm=refund`,
+      );
+
+      const [request] = fx.stubs.message.listMessages.mock.calls[0];
+      expect(request.page!.searchTerm).toBe('refund');
+    });
+
     it('2. renders an AI message with a null sender, never a missing key', async () => {
       fx.stubs.message.listMessages.mockReturnValue(
         of({

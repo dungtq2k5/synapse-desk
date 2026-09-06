@@ -15,7 +15,13 @@ export interface AssignmentResponse {
   id: string;
   ticketId: string;
   assignedToId: string;
-  assignedById?: string | undefined;
+  /**
+   * NOT optional: `writeAssignment` is the only writer and takes an actor, so
+   * the null this used to carry had no producer (known-gaps #12). Same tag,
+   * same type, same wire bytes -- only presence semantics change, which
+   * `buf breaking` reports as FIELD_SAME_CARDINALITY.
+   */
+  assignedById: string;
   departmentId: string;
   assignedAt: Timestamp | undefined;
   unassignedAt?: Timestamp | undefined;

@@ -6,25 +6,25 @@ import {
   CreateExportRequest,
   ExportResponse,
   toProtoTimestamp,
-  fromProtoAnalyticsExportKind,
-  toProtoAnalyticsExportKind,
-  toProtoAnalyticsExportStatus,
-  AnalyticsExportStatus as ProtoAnalyticsExportStatus,
+  fromProtoExportKind,
+  toProtoExportKind,
+  toProtoExportStatus,
+  ExportStatus as ProtoExportStatus,
 } from '@synapsedesk/grpc-proto';
-import { AnalyticsExportService } from './analytics-export.service';
+import { ExportService } from './export.service';
 import { StorageReferenceService } from '../storage-client/storage-reference.service';
 
 /**
  * Wire ↔ domain for the export.
  *
- * Separate from `AnalyticsExportService` because that one is also the WORKER's
+ * Separate from `ExportService` because that one is also the WORKER's
  * collaborator, and the worker has no wire types and no caller. Keeping the
  * mapping out of it is what stops a proto message reaching a background job.
  */
 @Injectable()
-export class AnalyticsExportFacade {
+export class ExportFacade {
   constructor(
-    private readonly exports: AnalyticsExportService,
+    private readonly exports: ExportService,
     private readonly storage: StorageReferenceService,
   ) {}
 
@@ -40,7 +40,7 @@ export class AnalyticsExportFacade {
     // UNSPECIFIED, meaning the caller named no kind, and UNRECOGNIZED, meaning
     // a kind some newer build knows and this one cannot produce. Neither is
     // something to answer with a file.
-    const kind = fromProtoAnalyticsExportKind(request.kind);
+    const kind = fromProtoExportKind(request.kind);
     if (!kind) {
       throw new RpcException({
         code: status.INVALID_ARGUMENT,
@@ -72,18 +72,17 @@ export class AnalyticsExportFacade {
     // Narrowed ONCE, and reused for both the link decision and the response —
     // `row.status` is a VarChar, so comparing it directly against the enum is
     // asserting the very thing being checked.
-    const status = toProtoAnalyticsExportStatus(row.status);
+    const status = toProtoExportStatus(row.status);
 
     const downloadUrl =
-      status === ProtoAnalyticsExportStatus.ANALYTICS_EXPORT_STATUS_READY &&
-      row.objectPath
+      status === ProtoExportStatus.EXPORT_STATUS_READY && row.objectPath
         ? await this.storage.resolveExportUrl(row.objectPath, organizationId)
         : null;
 
     return {
       id: row.id,
       status,
-      kind: toProtoAnalyticsExportKind(row.kind),
+      kind: toProtoExportKind(row.kind),
       rowCount: row.rowCount ?? undefined,
       rollupComputedAt: row.rollupComputedAt
         ? toProtoTimestamp(row.rollupComputedAt)

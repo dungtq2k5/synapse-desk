@@ -1,60 +1,29 @@
-import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsOptional, IsString } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import {
-  DEFAULT_SEARCH,
-  SORT_ORDER_OPTIONS,
-  type SortOrder,
-} from '@synapsedesk/common';
+import { PaginationDto } from './pagination.dto';
 
-export class SearchPaginationDto {
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  @Type(() => Number)
-  // Guaranteed that this query will always be provided even if the client does not provide it
-  /**
-   * Optional in the API and, without this, REQUIRED in the docs.
-   *
-   * The plugin derives `required` from TYPESCRIPT optionality, not from
-   * `@IsOptional()`. A field declared `page: number = 1` is non-optional to the
-   * compiler even though the validator lets a caller omit it, so the generated
-   * spec demanded it — and a generated client would refuse to send a request
-   * without one.
-   */
-  @ApiPropertyOptional()
-  readonly page: number = DEFAULT_SEARCH.PAGE;
-
-  @IsOptional()
-  @IsInt()
-  @Min(DEFAULT_SEARCH.MIN_LIMIT)
-  @Max(DEFAULT_SEARCH.MAX_LIMIT)
-  @Type(() => Number)
-  @ApiPropertyOptional()
-  readonly limit: number = DEFAULT_SEARCH.LIMIT;
-
+/**
+ * `PaginationDto` plus a free-text search term.
+ *
+ * **Extend this only where a service actually filters on it.** Seven list DTOs
+ * extended it and two reached a service that called `toSearchFilter`; the other
+ * five advertised `searchTerm` in Swagger, accepted it, and returned an
+ * unfiltered page — which a caller reads as "no other matches exist"
+ * (known-gaps #6). Two of the five gained a real filter; the remaining three
+ * now extend {@link PaginationDto} and refuse the parameter outright.
+ *
+ * The split is the guard: a route gets the field by choosing a base class, so
+ * the choice is visible in the class declaration rather than buried in whether
+ * some service happens to call `toSearchFilter`.
+ */
+export class SearchPaginationDto extends PaginationDto {
+  // `@ApiPropertyOptional` is explicit here, unlike the four inherited fields.
+  // It reached Swagger before only because the CLI plugin infers optionality
+  // from `searchTerm?: string`. The whole point of this row is that what
+  // Swagger advertises is what the route does, so the one field that claim is
+  // about should not depend on an inference.
   @IsOptional()
   @IsString()
+  @ApiPropertyOptional()
   readonly searchTerm?: string;
-
-  /**
-   * Default sort column. `createdAt` suits most resources, but NOT all —
-   * `user_departments` has `assignedAt` and no `createdAt` at all — so a list
-   * DTO whose resource differs MUST override this default.
-   *
-   * Getting it wrong is not a cosmetic problem: the service allowlists sortable
-   * columns and rejects anything else with 400, so an unoverridden default
-   * makes the endpoint fail on a request with NO query parameters at all —
-   * i.e. every default call from the UI.
-   */
-  @IsOptional()
-  @IsString()
-  @ApiPropertyOptional()
-  readonly sortBy: string = DEFAULT_SEARCH.SORT_BY;
-
-  @IsOptional()
-  @IsString()
-  @IsIn(SORT_ORDER_OPTIONS)
-  @ApiPropertyOptional()
-  readonly sortOrder: SortOrder = DEFAULT_SEARCH.SORT_ORDER;
 }

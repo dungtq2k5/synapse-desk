@@ -19,7 +19,7 @@ import {
   RolePageResponseGqlDto,
   RoleResponseGqlDto,
 } from './dto/graphql/role-response.gql-dto';
-import { PageArgsGqlDto } from '../../common/dto/graphql/page-args.gql-dto';
+import { SearchPageArgsGqlDto } from '../../common/dto/graphql/page-args.gql-dto';
 import { toPageQuery } from '../../common/graphql/page-query';
 import type { GqlContext } from '../../common/graphql/loaders/loaders.factory';
 
@@ -66,7 +66,7 @@ export class RolesResolver {
   })
   @RequirePermission('role.read')
   async rolePage(
-    @Args() args: PageArgsGqlDto,
+    @Args() args: SearchPageArgsGqlDto,
     @CurrentUser() context: RequestContext,
   ): Promise<RolePageResponseGqlDto> {
     return await this.roles.list(

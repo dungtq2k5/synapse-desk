@@ -11,6 +11,7 @@ import {
   SubmitFeedbackRequest,
   toPageMeta,
   toPrismaPage,
+  toSearchFilter,
   toProtoTimestamp,
   GetFeedbackRequest,
   GetFeedbackResponse,
@@ -211,8 +212,15 @@ export class FeedbackService {
     const from = fromProtoTimestamp(request.from);
     const to = fromProtoTimestamp(request.to);
 
+    // `?searchTerm=` was advertised on this route and honoured by nobody
+    // (known-gaps #6). `feedbackText` is the only free-text column, and it is
+    // NULLABLE — a rating left without a comment simply does not match, which
+    // is correct: a text search is a question about text.
+    const search = toSearchFilter(page.searchTerm);
+
     const where: Prisma.AiResponseFeedbackWhereInput = {
       organizationId: requireTenant(context),
+      ...(search ? { feedbackText: search } : {}),
       // 0 is the proto zero value and means "no filter" — unambiguous here
       // because the only legal ratings are 1 and -1.
       ...(request.rating ? { rating: this.requireRating(request.rating) } : {}),

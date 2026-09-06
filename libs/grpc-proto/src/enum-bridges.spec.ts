@@ -1,9 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  ANALYTICS_EXPORT_KINDS,
+  EXPORT_KINDS,
   ANSWER_STATUSES,
-  AnalyticsExportStatus,
+  ExportStatus,
   AnswerStatus,
   AuditAction,
   AI_MODEL_TIERS,
@@ -35,8 +35,8 @@ import { AnswerStatus as ProtoRagAnswerStatus } from './generated/synapsedesk/ra
 import { MessageAnswerStatus as ProtoMessageAnswerStatus } from './generated/synapsedesk/ticket/message';
 import {
   fromProtoAiGenerationOutcome,
-  fromProtoAnalyticsExportKind,
-  fromProtoAnalyticsExportStatus,
+  fromProtoExportKind,
+  fromProtoExportStatus,
   fromProtoAuditAction,
   fromProtoAuditResourceType,
   fromProtoDocumentFileType,
@@ -62,8 +62,8 @@ import {
   fromProtoTicketSource,
   fromProtoTicketStatus,
   toProtoAiGenerationOutcome,
-  toProtoAnalyticsExportKind,
-  toProtoAnalyticsExportStatus,
+  toProtoExportKind,
+  toProtoExportStatus,
   toProtoAuditAction,
   toProtoAuditResourceType,
   toProtoDocumentFileType,
@@ -182,17 +182,12 @@ describe('every enum bridge round-trips', () => {
       toProtoAuditResourceType,
       fromProtoAuditResourceType,
     ],
+    ['ExportKind', EXPORT_KINDS, toProtoExportKind, fromProtoExportKind],
     [
-      'AnalyticsExportKind',
-      ANALYTICS_EXPORT_KINDS,
-      toProtoAnalyticsExportKind,
-      fromProtoAnalyticsExportKind,
-    ],
-    [
-      'AnalyticsExportStatus',
-      Object.values(AnalyticsExportStatus),
-      toProtoAnalyticsExportStatus,
-      fromProtoAnalyticsExportStatus,
+      'ExportStatus',
+      Object.values(ExportStatus),
+      toProtoExportStatus,
+      fromProtoExportStatus,
     ],
     [
       'TicketStatus',

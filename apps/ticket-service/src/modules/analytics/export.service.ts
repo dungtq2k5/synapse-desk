@@ -4,10 +4,10 @@ import { RpcException } from '@nestjs/microservices';
 import { status } from '@grpc/grpc-js';
 import { Queue } from 'bullmq';
 import {
-  ANALYTICS_EXPORT_JOB_NAME,
-  ANALYTICS_EXPORT_QUEUE,
-  AnalyticsExportKind,
-  AnalyticsExportStatus,
+  EXPORT_JOB_NAME,
+  EXPORT_QUEUE,
+  ExportKind,
+  ExportStatus,
   AuditAction,
   AuditPublisher,
   AuditResourceType,
@@ -48,14 +48,14 @@ export type ExportJobData = {
  *     carries a retention policy.
  */
 @Injectable()
-export class AnalyticsExportService {
-  private readonly logger = new Logger(AnalyticsExportService.name);
+export class ExportService {
+  private readonly logger = new Logger(ExportService.name);
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditPublisher,
     private readonly authReference: AuthReferenceService,
-    @InjectQueue(ANALYTICS_EXPORT_QUEUE) private readonly queue: Queue,
+    @InjectQueue(EXPORT_QUEUE) private readonly queue: Queue,
   ) {}
 
   /**
@@ -109,7 +109,7 @@ export class AnalyticsExportService {
     // Matched on the whole request, not just the kind: two different ranges are
     // two different exports. Only PENDING — a RUNNING one is already reading,
     // and a READY one is a file the caller can have again.
-    const inFlight = await this.prisma.analyticsExport.findFirst({
+    const inFlight = await this.prisma.export.findFirst({
       where: {
         organizationId,
         // **The REQUESTER is part of the identity, not just the range.**
@@ -133,7 +133,7 @@ export class AnalyticsExportService {
           filters === undefined
             ? { equals: Prisma.DbNull }
             : { equals: filters },
-        status: AnalyticsExportStatus.PENDING,
+        status: ExportStatus.PENDING,
       },
     });
 
@@ -141,7 +141,7 @@ export class AnalyticsExportService {
       return { exportId: inFlight.id, status: inFlight.status };
     }
 
-    const row = await this.prisma.analyticsExport.create({
+    const row = await this.prisma.export.create({
       data: {
         organizationId,
         requestedById,
@@ -157,13 +157,13 @@ export class AnalyticsExportService {
         // to the one bit that determines it.
         unrestricted,
         timezone,
-        status: AnalyticsExportStatus.PENDING,
+        status: ExportStatus.PENDING,
       },
     });
 
     try {
       await this.queue.add(
-        ANALYTICS_EXPORT_JOB_NAME,
+        EXPORT_JOB_NAME,
         { exportId: row.id } satisfies ExportJobData,
         {
           // The row id, so a duplicated enqueue is a no-op rather than two
@@ -225,7 +225,7 @@ export class AnalyticsExportService {
     // visibility (`unrestricted`), so handing it to a colleague hands them a
     // view they may not have. Tenant scoping alone is not enough — the boundary
     // that matters here is per-user, which is why the column exists.
-    const row = await this.prisma.analyticsExport.findFirst({
+    const row = await this.prisma.export.findFirst({
       where: {
         id: exportId,
         organizationId,
@@ -252,10 +252,10 @@ export class AnalyticsExportService {
       rollupComputedAt: Date | null;
     },
   ): Promise<void> {
-    await this.prisma.analyticsExport.update({
+    await this.prisma.export.update({
       where: { id: exportId },
       data: {
-        status: AnalyticsExportStatus.READY,
+        status: ExportStatus.READY,
         objectPath: details.objectPath,
         rowCount: details.rowCount,
         rollupComputedAt: details.rollupComputedAt,
@@ -274,15 +274,15 @@ export class AnalyticsExportService {
    *
    * Called for a render or upload failure, and for a range over
    * `MAX_EXPORT_ROWS`. **Not for an empty result** — see
-   * {@link AnalyticsExportStatus.FAILED}: a quiet range is `READY` with a
+   * {@link ExportStatus.FAILED}: a quiet range is `READY` with a
    * header-only file, and the provenance header is what distinguishes it from
    * a job that never ran.
    */
   async fail(exportId: string, reason: string): Promise<void> {
-    await this.prisma.analyticsExport.update({
+    await this.prisma.export.update({
       where: { id: exportId },
       data: {
-        status: AnalyticsExportStatus.FAILED,
+        status: ExportStatus.FAILED,
         // Truncated: a driver stack trace can be kilobytes and the first line
         // is what anybody reads. Same convention as `ingestion_jobs.error_log`.
         errorLog: reason.slice(0, 1_000),
@@ -340,7 +340,7 @@ export class AnalyticsExportService {
    * a key this kind does not define.
    */
   private parseFilters(
-    kind: AnalyticsExportKind,
+    kind: ExportKind,
     raw: string | undefined,
   ): Prisma.InputJsonValue | undefined {
     if (!raw?.trim()) return undefined;
@@ -399,8 +399,8 @@ export class AnalyticsExportService {
     return parsed;
   }
 
-  private validateKind(kind: string): AnalyticsExportKind {
-    const match = Object.values(AnalyticsExportKind).find(
+  private validateKind(kind: string): ExportKind {
+    const match = Object.values(ExportKind).find(
       (value) => String(value) === kind,
     );
     if (match) return match;

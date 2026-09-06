@@ -79,6 +79,10 @@ describe('e2e bootstrap (ticket-service)', () => {
     const row = {
       ticketId: ticket.id,
       departmentId: tenant.departmentId,
+      // Required since known-gaps #12 closed. This test is about the partial
+      // unique index, not about the actor — but the column is NOT NULL now, so
+      // a row has to name one.
+      assignedById: tenant.agentId,
       isCurrent: true,
     };
 

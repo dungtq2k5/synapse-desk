@@ -23,7 +23,7 @@ export function toAssignmentResponseDto(
     id: assignment.id,
     ticketId: assignment.ticketId,
     assignedToId: assignment.assignedToId,
-    assignedById: assignment.assignedById ?? null,
+    assignedById: assignment.assignedById,
     departmentId: assignment.departmentId,
     assignedAt: requireProtoTimestamp(assignment.assignedAt, 'assignedAt'),
     unassignedAt: fromProtoTimestamp(assignment.unassignedAt) ?? null,

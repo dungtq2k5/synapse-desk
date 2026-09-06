@@ -21,7 +21,7 @@ import {
 } from './dto/graphql/document-response.gql-dto';
 import { UserSummaryResponseGqlDto } from '../users/dto/graphql/user-response.gql-dto';
 import { DepartmentResponseGqlDto } from '../departments/dto/graphql/department-response.gql-dto';
-import { PageArgsGqlDto } from '../../common/dto/graphql/page-args.gql-dto';
+import { SearchPageArgsGqlDto } from '../../common/dto/graphql/page-args.gql-dto';
 import { toPageQuery } from '../../common/graphql/page-query';
 import type { GqlContext } from '../../common/graphql/loaders/loaders.factory';
 import { MAX_EDGE_LIST } from '../../common/config/graphql-limits.config';
@@ -66,7 +66,7 @@ export class DocumentsResolver {
   })
   @RequirePermission('document.read')
   async documentPage(
-    @Args() args: PageArgsGqlDto,
+    @Args() args: SearchPageArgsGqlDto,
     @CurrentUser() context: RequestContext,
   ): Promise<DocumentPageResponseGqlDto> {
     return await this.documents.list(

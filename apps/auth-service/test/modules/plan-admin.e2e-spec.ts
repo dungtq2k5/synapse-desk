@@ -395,6 +395,50 @@ describe('The plan catalogue (e2e)', () => {
       expect(byId.get(second.id)?.overLimit).toEqual([]);
     });
 
+    it('9c. **`after` carries a BIGINT grant as a NUMBER, beside the display string**', async () => {
+      // known-gaps #21, end to end and at the only layer that can prove it.
+      //
+      // `maxStorageBytes` is a Prisma `BigInt`, so in `project()` it arrives as
+      // a runtime `bigint`. The proto field is `int64`, which ts-proto renders
+      // as `number` — so a producer guarded on `typeof next === 'number'` alone
+      // would drop this key entirely, the gateway composer would read the
+      // absent key as "this column is not changing", and the storage overrun
+      // check would be silently dead. That is the ORIGINAL defect arriving
+      // through its own fix.
+      //
+      // The gateway's own e2e cannot see this: it stubs `applyPlan`, so no
+      // `bigint` ever crosses the wire there. This is the test that watches one
+      // do it.
+      const lowered = 1024 * 1024 * 1024;
+      const plan = await buildPlan({ maxStorageBytes: 50 * lowered });
+      await subscriberOf(plan.id);
+
+      await plans.updatePlan(
+        { planId: plan.id, maxStorageBytes: lowered } as never,
+        context(),
+      );
+
+      const projected = await plans.applyPlan(
+        { planId: plan.id, dryRun: true },
+        context(),
+      );
+
+      const row = projected.subscribers[0];
+
+      // A number, not a bigint and not a string — the thing the wire type says.
+      expect(typeof row.after.maxStorageBytes).toBe('number');
+      expect(row.after.maxStorageBytes).toBe(lowered);
+
+      // And the display string is untouched: it still renders for a human, and
+      // is still the only thing that would change if somebody reformatted it.
+      expect(row.changes.maxStorageBytes).toContain(String(lowered));
+      expect(typeof row.changes.maxStorageBytes).toBe('string');
+
+      // `aiModelTier` is the one String grant. It renders, and never appears in
+      // the numeric map.
+      expect(row.after).not.toHaveProperty('aiModelTier');
+    });
+
     it('1. **The projection counts a seat the same way the GATE does**', async () => {
       // The regression this phase fixed. `overLimit` re-implemented the count
       // with `isLocked: false` while `seatsInUse` — the number that refuses an

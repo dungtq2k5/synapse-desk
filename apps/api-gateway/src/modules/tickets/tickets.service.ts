@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { AnalyticsExportKind, RequestContext } from '@synapsedesk/common';
+import { ExportKind, RequestContext } from '@synapsedesk/common';
 import {
   toProtoTicketPriority,
   toProtoTicketSource,
@@ -26,7 +26,7 @@ import {
   CreateTicketExportDto,
 } from './dto/rest/ticket.dto';
 import { AnalyticsService } from '../analytics/analytics.service';
-import { AnalyticsExportResponseDto } from '../analytics/dto/rest/analytics-response.dto';
+import { ExportResponseDto } from '../analytics/dto/rest/analytics-response.dto';
 import {
   BulkTicketPriorityResponseDto,
   MarkTicketReadResponseDto,
@@ -238,10 +238,10 @@ export class TicketsService {
   async createExport(
     dto: CreateTicketExportDto,
     context: RequestContext,
-  ): Promise<AnalyticsExportResponseDto> {
+  ): Promise<ExportResponseDto> {
     return this.analytics.createExport(
       {
-        kind: AnalyticsExportKind.TICKET,
+        kind: ExportKind.TICKET,
         from: dto.from,
         to: dto.to,
         departmentId: dto.departmentId,
@@ -254,7 +254,7 @@ export class TicketsService {
   async getExport(
     id: string,
     context: RequestContext,
-  ): Promise<AnalyticsExportResponseDto> {
+  ): Promise<ExportResponseDto> {
     return this.analytics.getExport(id, context);
   }
 }

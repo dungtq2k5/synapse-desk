@@ -288,7 +288,7 @@ type Query {
   ingestionJob(id: ID!): IngestionJob
 
   """Ingestion attempts for documents visible to the caller."""
-  ingestionJobs(documentId: String, first: Int! = 10, page: Int! = 1, searchTerm: String, status: IngestionJobStatus): IngestionJobPage!
+  ingestionJobs(documentId: String, first: Int! = 10, page: Int! = 1, status: IngestionJobStatus): IngestionJobPage!
 
   """The authenticated caller. Requires no permission."""
   me: User

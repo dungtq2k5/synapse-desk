@@ -36,7 +36,7 @@ import {
 import {
   AgentAnalyticsResponseDto,
   AiUsageResponseDto,
-  AnalyticsExportResponseDto,
+  ExportResponseDto,
   DeflectionResponseDto,
   DocumentAnalyticsResponseDto,
   KnowledgeGapsResponseDto,
@@ -182,7 +182,7 @@ export class AnalyticsController {
    * 202, because the work has been accepted and has not happened.
    */
   @ApiOperation({ summary: 'Create export' })
-  @ApiWrappedResponse(AnalyticsExportResponseDto, {
+  @ApiWrappedResponse(ExportResponseDto, {
     status: HttpStatus.ACCEPTED,
   })
   @ApiFilterErrors(['400', '401', '403'])
@@ -195,19 +195,19 @@ export class AnalyticsController {
   createExport(
     @CurrentUser() context: RequestContext,
     @Body() dto: CreateExportDto,
-  ): Promise<AnalyticsExportResponseDto> {
+  ): Promise<ExportResponseDto> {
     return this.analytics.createExport(dto, context);
   }
 
   /** Poll for the file. Another tenant's id answers 404, never 403. */
   @ApiOperation({ summary: 'Get export' })
-  @ApiWrappedResponse(AnalyticsExportResponseDto)
+  @ApiWrappedResponse(ExportResponseDto)
   @ApiFilterErrors(['400', '401', '403', '404'])
   @Get('export/:id')
   getExport(
     @CurrentUser() context: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
-  ): Promise<AnalyticsExportResponseDto> {
+  ): Promise<ExportResponseDto> {
     return this.analytics.getExport(id, context);
   }
 }

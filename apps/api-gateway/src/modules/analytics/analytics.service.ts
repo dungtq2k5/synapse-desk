@@ -1,10 +1,10 @@
 import {
-  toProtoAnalyticsExportKind,
+  toProtoExportKind,
   fromProtoDocumentFlagType,
 } from '@synapsedesk/grpc-proto';
 import {
   toAiUsageResponseDto,
-  toAnalyticsExportResponseDto,
+  toExportResponseDto,
   toAnalyticsRangeRequest,
   toDeflectionResponseDto,
   toOverviewResponseDto,
@@ -34,7 +34,7 @@ import {
   ResponseTimesResponseDto,
   SatisfactionResponseDto,
   VolumeResponseDto,
-  AnalyticsExportResponseDto,
+  ExportResponseDto,
 } from './dto/rest/analytics-response.dto';
 
 /**
@@ -353,12 +353,12 @@ export class AnalyticsService {
   async createExport(
     dto: CreateExportDto,
     context: RequestContext,
-  ): Promise<AnalyticsExportResponseDto> {
-    return toAnalyticsExportResponseDto(
+  ): Promise<ExportResponseDto> {
+    return toExportResponseDto(
       await this.client.createExport(
         {
           ...dto,
-          kind: toProtoAnalyticsExportKind(dto.kind),
+          kind: toProtoExportKind(dto.kind),
           // Serialized at the edge, validated per kind at the service. `''` is
           // "no filters" — proto3 has no null for a scalar.
           filters: dto.filters ? JSON.stringify(dto.filters) : '',
@@ -371,10 +371,8 @@ export class AnalyticsService {
   async getExport(
     id: string,
     context: RequestContext,
-  ): Promise<AnalyticsExportResponseDto> {
-    return toAnalyticsExportResponseDto(
-      await this.client.getExport(id, context),
-    );
+  ): Promise<ExportResponseDto> {
+    return toExportResponseDto(await this.client.getExport(id, context));
   }
 
   /**
