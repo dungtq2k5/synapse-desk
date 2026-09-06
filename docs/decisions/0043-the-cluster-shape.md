@@ -65,10 +65,11 @@ pod was slow to start **because of production write traffic** and made that
 traffic slower while it waited, with readiness gated behind it. In an init
 container the identical wait happens before the pod is in the endpoint list.
 
-**The boot hook keeps `assertSchemaExists()`, and that is not a leftover.** Doc
-72's finding was a schema step that could be skipped without anything noticing;
-a boot path that fell silent when the step moved would recreate it exactly. A
-service started outside Kubernetes gets no init container at all.
+**The boot hook keeps `assertSchemaExists()`, and that is not a leftover.**
+[ADR 0042](./0042-schema-reaches-production-through-migrate-deploy.md)'s finding
+was a schema step that could be skipped without anything noticing; a boot path
+that fell silent when the step moved would recreate it exactly. A service
+started outside Kubernetes gets no init container at all.
 
 **And the development path gets the same step, which is the half that is easy
 to miss.** `assertSchemaExists()` counts TABLES, and `prisma db push` creates

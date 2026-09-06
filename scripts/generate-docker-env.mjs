@@ -3,17 +3,17 @@
  * `.env` → `.env.docker`, per service: the same values with the HOST half of
  * every address swapped for its compose service name, so a locally built
  * image can run against the compose infrastructure
- * (`docker run --network synapse-desk_default …`).
+ * (`docker run --network synapsedesk-network …`).
  *
  * GENERATED and gitignored, never tracked — deliberately, and
  * `image-contract.spec.ts` pins it. A tracked `.env.docker` would be a third
  * hand-maintained value-set: it would enter the env-contract guard's
  * archive-reference corpus (which reads every tracked env file under apps) but
  * not its completeness checks (which read `.env.example` by name), so it
- * could drift from the schema with no test going red — the exact class doc
- * 70 closed for the first two files. Generation closes the class instead of
- * adding a rule to it: this file cannot drift from `.env` because it is a
- * function of it.
+ * could drift from the schema with no test going red — the exact class
+ * `env-contract.spec.ts` closed for the first two files. Generation closes the
+ * class instead of adding a rule to it: this file cannot drift from `.env`
+ * because it is a function of it.
  *
  * The inputs are the developer's own `.env` files (real local values, also
  * untracked), so the output may hold real credentials — one more reason it

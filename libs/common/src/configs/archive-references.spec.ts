@@ -37,6 +37,22 @@ describe('nothing tracked cites the archive', () => {
   const ARCHIVE_PATH = /docs\/archive/;
 
   /**
+   * The citation form when prettier has WRAPPED it.
+   *
+   * **A line scan cannot see `… the exact class doc` / ` * 70 closed …`,** and
+   * that is not hypothetical: `generate-docker-env.mjs` carried exactly this
+   * and survived the sweep this guard was written to finish. `\s` in
+   * `CITATION` spans a newline happily — what defeats it is the ` * ` comment
+   * leader that starts the next line, which is neither whitespace nor a digit.
+   *
+   * Only the CITATION form can wrap. Prettier never breaks inside a word, so
+   * `docs/archive` is always intact on one line; `doc` and `70` are two words
+   * and a break between them is ordinary.
+   */
+  const WRAPPED_HEAD = /\b[Dd]ocs?\s*$/;
+  const COMMENT_LEADER = /^\s*(?:\*|\/\/|#)\s*/;
+
+  /**
    * Files that may carry the strings, each for a stated reason.
    *
    * A whole-file exemption rather than a line-level one, because both entries
@@ -77,6 +93,13 @@ describe('nothing tracked cites the archive', () => {
         'k8s',
         'docker',
         '.github',
+        // Root-level markdown, which is otherwise in none of the directories
+        // above and is the most externally-visible text in the repository:
+        // `README.md` is what a reader outside this project sees FIRST, so an
+        // archive citation there is the one instance that reaches an audience
+        // who could never resolve it. Git de-duplicates overlapping pathspecs,
+        // so `docs/*.md` is listed once, not twice — verified, not assumed.
+        '*.md',
       ],
       { cwd: REPO_ROOT, encoding: 'utf8' },
     )
@@ -91,9 +114,21 @@ describe('nothing tracked cites the archive', () => {
   const citations = (source: string): string[] => {
     const found: string[] = [];
 
-    source.split('\n').forEach((line, index) => {
+    const lines = source.split('\n');
+
+    lines.forEach((line, index) => {
       if (CITATION.test(line) || ARCHIVE_PATH.test(line)) {
         found.push(`${index + 1}: ${line.trim()}`);
+        return;
+      }
+
+      // The wrap case, tested only after the whole-line case has MISSED — so a
+      // citation sitting entirely on the next line is reported once, at the
+      // line it is on, rather than twice.
+      const next = (lines[index + 1] ?? '').replace(COMMENT_LEADER, '');
+
+      if (WRAPPED_HEAD.test(line) && /^\d/.test(next)) {
+        found.push(`${index + 1}: ${line.trim()} ⏎ ${next.slice(0, 40)}`);
       }
     });
 
@@ -131,6 +166,25 @@ describe('nothing tracked cites the archive', () => {
     ].join('\n');
 
     expect(citations(source)).toHaveLength(4);
+  });
+
+  it('**2b. …including one prettier has wrapped**', () => {
+    // The shape that got through the first sweep, verbatim from
+    // `generate-docker-env.mjs`.
+    const wrapped = [
+      ' * could drift from the schema with no test going red — the exact class doc',
+      ' * 70 closed for the first two files. Generation closes the class instead of',
+    ].join('\n');
+
+    expect(citations(wrapped)).toHaveLength(1);
+    expect(citations(wrapped)[0]).toMatch(/^1: /);
+
+    // And a wrap that is NOT a citation stays quiet: a sentence ending in the
+    // word "doc" above a line that opens with a number is only a hit when the
+    // number is the one being cited.
+    const innocent = [' * see the doc', ' * for the rest.'].join('\n');
+
+    expect(citations(innocent)).toEqual([]);
   });
 
   it('**3. the durable forms are NOT reported**', () => {

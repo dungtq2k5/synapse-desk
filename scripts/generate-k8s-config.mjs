@@ -141,10 +141,11 @@ const SUBSTITUTIONS = [
 /**
  * What a pod needs that a developer's machine does not.
  *
- * Every entry here is on a COMMENTED line in its `.env.example` except
- * `NODE_ENV`, which is that same shape from the other side: the development
- * default is right, so it is documented rather than set, and the cluster is
- * the one place it is wrong.
+ * Most entries here are on a COMMENTED line in its `.env.example`. The two
+ * that are not — `NODE_ENV` and auth's `FIREBASE_SERVICE_ACCOUNT_PATH` — are
+ * the same shape from the other side: the development value is RIGHT and is
+ * therefore set, and the cluster is the one place it is wrong. Either way the
+ * variable must be documented in that file, which the check below enforces.
  */
 const CLUSTER = {
   '*': { NODE_ENV: 'production' },
@@ -157,6 +158,20 @@ const CLUSTER = {
   'rag-service': {
     GRPC_HOST: '0.0.0.0',
     GRPC_PORT: '50255',
+  },
+  'auth-service': {
+    // **The one path whose local and cluster answers genuinely differ.** The
+    // key is a mounted Secret at `/app/apps/auth-service/secrets`, while
+    // `npm run keys:service-account` writes it to the package root — so
+    // `.env.example` names the package root (it is the file a developer
+    // copies) and the cluster answer lives here.
+    //
+    // Not a tidy-up: the two used to be reconciled by `.env.example` carrying
+    // the CLUSTER value, which made `cp .env.example .env` produce an
+    // auth-service that could not boot. `manifest-contract.spec.ts` test 6
+    // derives the mount from this value, so getting it wrong here is red
+    // rather than a `readFileSync` at boot.
+    FIREBASE_SERVICE_ACCOUNT_PATH: './secrets/serviceAccountKey.json',
   },
   'notification-service': {
     // notification-service's Joi schema refuses `true` outside development

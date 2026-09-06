@@ -202,4 +202,86 @@ describe('the environment contract', () => {
       expect([path, ignored]).toEqual([path, true]);
     }
   });
+
+  // -------------------------------- values that must be the SAME in two files
+
+  describe('**one value, one spelling**', () => {
+    /**
+     * Variables whose whole meaning is that two services agree on them.
+     *
+     * **The placeholder is the contract here, not just an illustration.** A
+     * developer copies both `.env.example` files, and if the two carry
+     * different strings the copy PRODUCES the misconfiguration. That is what
+     * happened: `INBOUND_EMAIL_SECRET` shipped as
+     * `…-shared-with-the-worker` in the gateway and
+     * `…-shared-with-the-gateway` in notification — each half-true, together a
+     * guaranteed mismatch on step one.
+     *
+     * **And the mismatch is SILENT.** `manifest-contract.spec.ts` spells the
+     * consequence out: `parseTicketReplyToken` returns `null`, the caller opens
+     * a NEW ticket — correctly, since threading a stranger's mail onto somebody
+     * else's conversation is a disclosure — and nothing is logged. It presents
+     * weeks later as "threading stopped working".
+     *
+     * Only variables that MUST be byte-identical belong here. `DATABASE_URL`
+     * appears in every service and is legitimately different in each, so a
+     * blanket "same key, same value" rule would be wrong; this is a named list
+     * for the same reason `BUILD_INJECTED` above is.
+     */
+    const SHARED: Readonly<Record<string, readonly string[]>> = {
+      INBOUND_EMAIL_SECRET: ['api-gateway', 'notification-service'],
+      // The domain the catch-all serves. notification writes `Reply-To` at it
+      // and the gateway parses what comes back; two spellings is mail that
+      // routes out and cannot route in.
+      INBOUND_EMAIL_DOMAIN: ['api-gateway', 'notification-service'],
+    };
+
+    /** `KEY = value` from an example file, values trimmed, comments skipped. */
+    const valueOf = (service: string, key: string): string | undefined => {
+      const source = readFileSync(
+        join(REPO_ROOT, `apps/${service}/.env.example`),
+        'utf8',
+      );
+
+      return new RegExp(`^${key}\\s*=\\s*(.*)$`, 'm').exec(source)?.[1]?.trim();
+    };
+
+    it('**1. every shared variable reads the same in every example**', () => {
+      const disagreements: string[] = [];
+
+      for (const [key, holders] of Object.entries(SHARED)) {
+        const seen = holders.map((service) => ({
+          service,
+          value: valueOf(service, key),
+        }));
+
+        // Absent is a disagreement too — a shared value documented in one file
+        // and not the other is the same copy-and-diverge, one step earlier.
+        if (new Set(seen.map(({ value }) => value)).size > 1) {
+          disagreements.push(
+            `${key}: ${seen
+              .map(({ service, value }) => `${service}=${value ?? '(absent)'}`)
+              .join(' vs ')}`,
+          );
+        }
+      }
+
+      expect(disagreements).toEqual([]);
+    });
+
+    it('**2. …and the reader actually finds the values**', () => {
+      // A regex that stopped matching would report every pair as agreeing,
+      // because `undefined === undefined`. This is the floor that stops test 1
+      // passing over nothing.
+      for (const [key, holders] of Object.entries(SHARED)) {
+        for (const service of holders) {
+          expect([service, key, valueOf(service, key)]).not.toEqual([
+            service,
+            key,
+            undefined,
+          ]);
+        }
+      }
+    });
+  });
 });

@@ -389,6 +389,61 @@ describe('the image contract (static half)', () => {
     });
   });
 
+  // ------------------------------------------------------- the compose network
+
+  describe('every `--network` names the network compose creates', () => {
+    /**
+     * `docker-compose.yml` renames the default network, and two files quote
+     * that name in a command a reader is meant to paste.
+     *
+     * **It had already drifted.** `generate-docker-env.mjs` said
+     * `synapse-desk_default` — compose's *derived* default, `<dir>_<network>` —
+     * while `docker-compose.yml` sets `networks.default.name:
+     * synapsedesk-network`. The instruction failed with "network not found",
+     * which is loud, but it is the first command in the container workflow and
+     * the README now repeats it.
+     *
+     * DERIVED from the tree rather than from a list of files: a third place
+     * that quotes the flag is covered on arrival, which is the property a
+     * two-entry list would not have.
+     */
+    const composeNetwork = (): string => {
+      const match = /^networks:\n\s+default:\n\s+name:\s*(\S+)/m.exec(
+        read('docker-compose.yml'),
+      );
+
+      if (!match) throw new Error('networks.default.name not found in compose');
+      return match[1];
+    };
+
+    const mentions = (): { file: string; network: string }[] =>
+      gitFiles('*')
+        .filter((file) => /\.(mjs|ts|md|sh|ya?ml)$/.test(file))
+        .flatMap((file) =>
+          [...read(file).matchAll(/--network[= ]([A-Za-z0-9_.-]+)/g)].map(
+            ([, network]) => ({ file, network }),
+          ),
+        );
+
+    it('**1. no `--network` quotes a name compose does not create**', () => {
+      const expected = composeNetwork();
+
+      const wrong = mentions()
+        .filter(({ network }) => network !== expected)
+        .map(({ file, network }) => `${file}: --network ${network}`);
+
+      expect(wrong).toEqual([]);
+    });
+
+    it('**2. the scan finds the mentions, and the compose name**', () => {
+      // A regex that stopped matching would report a clean tree over zero
+      // occurrences — the vacuity shape this file's other scans guard the same
+      // way.
+      expect(composeNetwork()).toBe('synapsedesk-network');
+      expect(mentions().length).toBeGreaterThanOrEqual(2);
+    });
+  });
+
   // ------------------------------------------------------------ floating tags
 
   describe('no image reference floats', () => {

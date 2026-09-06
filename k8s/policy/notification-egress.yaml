@@ -11,8 +11,8 @@
 # which is the only layer that can produce a useful error message to the tenant
 # who configured the URL. What it cannot promise is completeness — a novel
 # encoding or an address class it does not enumerate would pass. A kernel-level
-# deny is what makes that gap survivable rather than fatal, which is why doc
-# 69's validation finding two holes in the guard is an argument FOR this file
+# deny is what makes that gap survivable rather than fatal, which is why the
+# two holes found in the guard after it shipped are an argument FOR this file
 # rather than against the guard.
 #
 # **`ipBlock.except` is the whole mechanism.** A NetworkPolicy has no "deny"
