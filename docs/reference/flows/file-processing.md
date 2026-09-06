@@ -74,7 +74,7 @@ observable only through the job's status.
 
 ## 3. Job status, and what each transition means
 
-```
+```text
 QUEUED → PARSING → CHUNKING → EMBEDDING → COMPLETED
                                         ↘ FAILED
                                         ↘ CANCELLED

@@ -49,7 +49,7 @@ application boot hook and into `src/schema-apply.ts`, which the same container
 runs immediately after the migration. The reason is measured and is not the one
 the first draft of this decision gave:
 
-```
+```text
 no-op CREATE INDEX IF NOT EXISTS, table held by an 8-second writer
   lock requested:     ShareLock on the table   (granted=false, waiting)
   DDL wall time:      7.08 s

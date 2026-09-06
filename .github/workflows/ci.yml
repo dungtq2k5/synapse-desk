@@ -39,7 +39,7 @@ env:
 jobs:
   # ---------------------------------------------------------------- static
   static:
-    name: static (format, lint, typecheck, proto)
+    name: static (format, lint, typecheck, proto, markdown)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -53,7 +53,16 @@ jobs:
           cache: npm
       - run: npm ci
       # `lint` is a composite: lint:models && turbo run lint && eslint over the
-      # two directories turbo does not own (scripts/seed-demo, test/system).
+      # two directories turbo does not own (scripts/seed-demo, test/system),
+      # and `lint:md`.
+      #
+      # **Markdown has no step of its own, deliberately.** A separate step here
+      # would be checked by CI and not by the command a developer actually runs,
+      # so the first time a doc fails is after the push. Chaining it into `lint`
+      # means one habit covers both — and `ci-contract.spec.ts` REQUIRES this
+      # invocation, so deleting the line is a red test rather than a silent loss
+      # of markdown coverage. Why the house config exists at all, and the
+      # before-figures that justify it, live in `.markdownlint-cli2.jsonc`.
       - run: npm run lint
       - run: npm run format:check
       - run: npm run typecheck

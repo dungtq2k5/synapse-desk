@@ -1,0 +1,58 @@
+// Markdown's share of the lint contract. `npm run lint:md`, and a step in the
+// `static` CI job beside format/lint/typecheck/proto.
+//
+// **The default ruleset is unusable here and that is a fact about this repo,
+// not about markdownlint.** Measured across the 77 tracked docs before any
+// config existed, AT THE COMMIT THIS FILE WAS ADDED: 2178 findings, of which
+// 2164 were MD013/line-length at the default 80 columns — 99.4%.
+// `rdm-specs.md` alone carried 715 of those (717 findings in that file, the
+// other two being the `<br>` pair below). The house style
+// puts a full paragraph in a table cell, so every prose doc fails that rule by
+// construction, and a signal-to-noise ratio of 1-in-155 is not a lint run
+// anybody reads.
+//
+// The 14 that were left are what this exists to keep at zero: 8 unlabelled code
+// fences (fixed — they were ASCII diagrams and state machines, now `text`), 4
+// on the generated ERDs (exempted below, next to the files), and 2 deliberate
+// `<br>` tags.
+//
+// **This is the only place those figures live.** They are a snapshot, not a
+// number anything regenerates — re-derive them and you get 2170, because the 8
+// fences are fixed, and it moves again with the next doc added. `ci.yml` used
+// to carry a second copy; ADR 0039's twenty-six-that-was-twenty-four is what
+// one prose count in several places does.
+//
+// To re-derive: BOTH configs have to move aside, this one and
+// `docs/reference/erd/.markdownlint.json`. cli2 auto-loads and merges every
+// config it finds, so moving only this one leaves the ERD exemption in force
+// and reports 2166 with zero MD041 rather than 2170 with four.
+{
+  // `.gitignore` already excludes `node_modules`, every `.venv` and
+  // `docs/archive` — the archive being the point, since it is personal working
+  // material rather than published documentation. Reusing that list beats a
+  // second `ignores` array that would drift from it.
+  "gitignore": true,
+  "globs": ["**/*.md"],
+  "config": {
+    // **Off, not widened.** A larger limit would still be arbitrary and would
+    // still fail every table, because a cell holding a sentence cannot wrap —
+    // markdown tables have no continuation line. The alternative markdownlint
+    // offers, `tables: false`, does not help either: measured, the prose
+    // paragraphs outside tables break it too, since this repo writes long
+    // sentences on one line and lets the renderer wrap them.
+    //
+    // Nothing is lost that another tool covers: prettier already governs
+    // formatting for the files it globs, and it does not reflow markdown prose.
+    "MD013": false,
+
+    // `<br>` inside a table cell, twice in `rdm-specs.md`. There is no markdown
+    // spelling for a line break in a table — the pipe syntax has no
+    // continuation — so the tag is the only way to express it and banning it
+    // would mean losing the break, not writing it differently.
+    "MD033": { "allowed_elements": ["br"] },
+
+    // MD041 is NOT disabled here. It is switched off only for
+    // `docs/reference/erd/`, in that directory's own config, so a hand-written
+    // doc still has to open with a heading.
+  },
+}

@@ -129,7 +129,7 @@ at `limit + 10%`.
 
 ## 4. Preprocessing, in the order it actually runs
 
-```
+```text
 Layer A (injection regex)
   → Layer 1 greeting regex
   → at-cap short-circuit
@@ -185,7 +185,7 @@ message with no history and no attachment is scanned once, not twice.
 `tenant_scope()` renders **one rule in two query languages**: a payload filter
 for Qdrant and a `WHERE` predicate for Postgres. Four clauses:
 
-```
+```text
 organization_id == ctx.organization_id
 AND is_deleted == False
 AND ( is_organization_wide == True

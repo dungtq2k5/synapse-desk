@@ -11,7 +11,7 @@ constant is a change to this document.
 
 ## 1. Endpoint and transport
 
-```
+```http
 POST /graphql
 Authorization: Bearer <access token>
 Content-Type: application/json
@@ -301,7 +301,7 @@ of those three, so an edge is where traversal stops.
 
 Exactly two paths in the schema nest further:
 
-```
+```text
 Ticket.messages → TicketMessage.sender
 IngestionJob.document → Document.createdBy | Document.departments
 ```

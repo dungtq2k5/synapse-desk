@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join, matchesGlob } from 'node:path';
+import ts from 'typescript';
 import { envDocumentedKeys, parseEnvFile } from '../testing/env-file';
 
 /**
@@ -171,6 +172,103 @@ describe('the CI contract', () => {
     });
   });
 
+  // ------------------------------------------------ scripts a job MUST invoke
+
+  describe('every check that must run in CI is wired into a job', () => {
+    /**
+     * The complement of `FORBIDDEN`, and the gap it closes is the mirror image.
+     *
+     * The scan above asserts that every script a workflow NAMES exists. It
+     * cannot see the other direction: deleting a step removes a name, and a
+     * check over names that are present has nothing to say about one that is
+     * gone. So `npm run typecheck` could leave `ci.yml` tomorrow and every
+     * assertion in this file would stay green.
+     *
+     * Named, with a `why` each, for the reason `FORBIDDEN` gives: an absence
+     * and an oversight look identical to whoever reads the workflow next, and
+     * only a list makes the difference visible.
+     *
+     * **`lint`, not `lint:md`.** Markdown is chained into `lint` rather than
+     * given its own step (see `//lint` in package.json), so requiring the step
+     * would demand a line whose deletion costs nothing — and requiring the
+     * script that actually carries it is what makes this assertion about
+     * coverage rather than about layout.
+     */
+    const REQUIRED: readonly { script: string; why: string }[] = [
+      {
+        script: 'format:check',
+        why: 'prettier is the formatting authority; unrun, the repo drifts one file at a time',
+      },
+      {
+        script: 'lint',
+        why: 'eslint, the model-literal check AND lint:md — the composite a developer also runs',
+      },
+      { script: 'typecheck', why: 'the only whole-repo type check' },
+      {
+        script: 'proto:lint',
+        why: 'buf naming rules; the proto package has no version suffix to fall back on',
+      },
+      {
+        script: 'test',
+        why: 'the unit suites, including every contract spec in this directory',
+      },
+    ];
+
+    /**
+     * `npm run <name>` OR `npm <name>`, and the alternation is not cosmetic.
+     *
+     * `test` is a lifecycle script, so `ci.yml` invokes it as `npm test` —
+     * measured. A matcher written only as `npm run <name>` finds five of these
+     * six and fails on the one entry that has an npm alias, which reads as a
+     * missing step rather than as a missing space.
+     *
+     * The negative lookahead stops `lint` matching `lint:md` or `lint:py`: a
+     * prefix that happens to be another script's stem would satisfy this
+     * without the required script running at all.
+     */
+    const invoked = (content: string, script: string): boolean =>
+      new RegExp(
+        `npm (?:run )?${script.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w:-])`,
+      ).test(content);
+
+    it('the REQUIRED list is not empty — the floor', () => {
+      // A truncated list passes every assertion below while checking nothing.
+      expect(REQUIRED.length).toBeGreaterThanOrEqual(5);
+    });
+
+    it('**ci.yml invokes each of them**', () => {
+      // Comments stripped first, for the reason the destructive scan records:
+      // this very list is described in the workflow's own comments, and a scan
+      // over raw text would read the documentation of a rule as its
+      // observance. Measured there on `cd.yml`, whose only `npm run` is inside
+      // a header comment.
+      const content = read('.github/workflows/ci.yml').replace(
+        /^[ \t]*#.*$/gm,
+        '',
+      );
+
+      // Pattern-fires floor: if the strip ate the file there are no steps left
+      // and every assertion below would be vacuously true.
+      expect(content).toMatch(/^\s*-\s+(run|uses):/m);
+
+      const missing = REQUIRED.filter(
+        ({ script }) => !invoked(content, script),
+      ).map(({ script, why }) => `${script}: ${why}`);
+
+      expect(missing).toEqual([]);
+    });
+
+    it('and the matcher does not accept a PREFIX of the script it wants', () => {
+      // The assertion above is only worth anything if `lint` fails on a
+      // workflow that runs `lint:md` alone. Asserted rather than assumed,
+      // because a matcher that is too generous makes the whole list vacuous.
+      expect(invoked('- run: npm run lint:md', 'lint')).toBe(false);
+      expect(invoked('- run: npm run lint', 'lint')).toBe(true);
+      expect(invoked('- run: npm test', 'test')).toBe(true);
+      expect(invoked('- run: npm run test:e2e:gateway', 'test')).toBe(false);
+    });
+  });
+
   // ------------------------------------------------- the stack's own env file
 
   it('**every variable docker-compose reads is documented in .env.example**', () => {
@@ -269,10 +367,170 @@ describe('the CI contract', () => {
 
     expect(corpus.length).toBeGreaterThanOrEqual(200);
 
-    const unmatched = corpus.filter(
-      (file) => !globs.some((glob) => matchesGlob(file, glob)),
-    );
+    /**
+     * **Prettier's `*` matches a DOTFILE; `matchesGlob` does not.** Measured on
+     * the pair this repo contains rather than argued: prettier formats
+     * `docs/reference/erd/.markdownlint.json` under `docs/**\/*.json` — proven
+     * by writing a badly-formatted `.probe.json` beside it and watching
+     * `--check` report it — while
+     * `matchesGlob(file, 'docs/**\/*.json')` is `false`.
+     *
+     * Unmodelled, that gap makes this test demand a glob for a file prettier
+     * ALREADY covers, and the natural response is to widen the glob until the
+     * red goes away — which is the test teaching the config to be wrong. The
+     * fix belongs here, because prettier is the authority and this is only a
+     * model of it.
+     *
+     * No extra pattern-fires test: that `.markdownlint.json` is in the corpus,
+     * so a regression here turns this assertion red on a real file.
+     */
+    const covered = (file: string): boolean => {
+      const dotless = file.replace(/(^|\/)\.(?=[^/]+$)/, '$1');
+
+      return globs.some(
+        (glob) => matchesGlob(file, glob) || matchesGlob(dotless, glob),
+      );
+    };
+
+    const unmatched = corpus.filter((file) => !covered(file));
 
     expect(unmatched).toEqual([]);
+  });
+
+  // ---------------------------------------------------- the markdown ruleset
+
+  describe('the markdown linter cannot go blind and stay green', () => {
+    /**
+     * `lint:md` reports `0 issues in 0 files` when it is working and when it is
+     * not.
+     *
+     * A config that matched no files, or that switched the ruleset off
+     * wholesale, prints the same line as a clean run — there is no output shape
+     * that distinguishes them. Every other scan in this directory carries a
+     * pattern-fires floor for exactly this; a linter driven by a config file
+     * gets the equivalent by asserting the config's SHAPE, because the shape is
+     * what decides whether anything is checked at all.
+     *
+     * The alternative — lint a known-bad fixture and expect a finding — is
+     * stronger and heavier: it needs a file that must stay broken, inside a
+     * corpus whose whole point is that nothing is broken. The realistic
+     * regression is an edit to this config, and this is pointed at that.
+     */
+    const CLI2_CONFIG = '.markdownlint-cli2.jsonc';
+    const ERD_CONFIG = 'docs/reference/erd/.markdownlint.json';
+
+    /**
+     * JSONC through the TypeScript parser, NOT a comment-stripper.
+     *
+     * The same choice `typecheck-coverage.spec.ts` records, for the same
+     * measured reason one file type over: `"globs": ["**\/*.md"]` contains
+     * `/*`, so a regex stripper looking for the next `*\/` eats everything
+     * between one glob and the next. Measured on this exact file with a second
+     * glob added — `["**\/*.md", "!**\/*.tmp.md"]` came back as
+     * `["***.tmp.md"]` and `JSON.parse` SUCCEEDED, so there is no error to
+     * catch and the assertions below would run against a config nobody wrote.
+     * A guard that mis-reads the file it guards is the vacuity this describe
+     * exists to prevent, arriving through the parser.
+     */
+    const readJsonc = (repoRelative: string): Record<string, unknown> => {
+      const { config, error } = ts.parseConfigFileTextToJson(
+        repoRelative,
+        read(repoRelative),
+      );
+
+      if (error)
+        throw new Error(
+          ts.flattenDiagnosticMessageText(error.messageText, '\n'),
+        );
+
+      return config as Record<string, unknown>;
+    };
+
+    it('**the house config still points at every doc, with the ruleset on**', () => {
+      const cfg = readJsonc(CLI2_CONFIG);
+
+      // `gitignore` is what excludes the ignored directories — every `.venv`,
+      // `node_modules` and the gitignored scratch tree — without a second
+      // ignore list to drift from `.gitignore`. Flipped to false, the run would
+      // lint personal working material and go red on documents nobody
+      // publishes.
+      expect(cfg.gitignore).toBe(true);
+
+      // The corpus. Narrowed to a subdirectory, the linter still exits 0 while
+      // checking almost nothing, which is the failure with no output shape.
+      expect(cfg.globs).toEqual(['**/*.md']);
+
+      const rules = (cfg.config ?? {}) as Record<string, unknown>;
+
+      // **The one key that silences everything.** `default: false` turns every
+      // rule off and leaves the run green over all 77 files.
+      expect(rules.default).not.toBe(false);
+
+      // **Exactly one rule is off, and a second is a decision.** MD013 is
+      // disabled because the house style puts paragraphs in table cells, which
+      // cannot wrap — the config says so at length. Anything else switched off
+      // wants the same paragraph, and this makes forgetting to write it a red
+      // test rather than a quiet narrowing of what CI reads.
+      const disabled = Object.entries(rules)
+        .filter(([, value]) => value === false)
+        .map(([rule]) => rule)
+        .sort();
+
+      expect(disabled).toEqual(['MD013']);
+    });
+
+    it('**`lint` still carries `lint:md` — the step CI no longer has**', () => {
+      // The hole the chaining decision opens, closed here.
+      //
+      // Markdown has no CI step of its own: `npm run lint` runs it, and the
+      // REQUIRED list above asserts `ci.yml` invokes `lint`. Neither says that
+      // `lint` still CHAINS `lint:md` — measured, deleting `&& npm run lint:md`
+      // from the composite leaves this whole file green while no markdown is
+      // checked anywhere. That is the same blindness as an empty glob, one
+      // indirection out.
+      //
+      // Asserted against `package.json` rather than against a run, because the
+      // question is whether the wiring exists, not whether the docs pass.
+      const pkg = JSON.parse(read('package.json')) as {
+        scripts: Record<string, string>;
+      };
+
+      expect(pkg.scripts['lint:md']).toBeDefined();
+      expect(pkg.scripts.lint).toMatch(/npm run lint:md(?![:\w-])/);
+    });
+
+    it('**the ERD exemption is scoped, and it is the only one**', () => {
+      // MD041 is off for four GENERATED files that open with a bare ```mermaid
+      // fence — `prisma-erd-generator` writes them and would overwrite a
+      // hand-added heading. Scoped to that directory so the rule keeps its
+      // teeth on hand-written docs; disabled at the root it would cost nothing
+      // visible and quietly stop checking all 77.
+      const erd = readJsonc(ERD_CONFIG);
+
+      expect(erd.MD041).toBe(false);
+      expect(
+        Object.keys(erd).filter((key) => key !== '//' && key !== 'MD041'),
+      ).toEqual([]);
+
+      // **`gitFiles`, not a directory walk, and not plain `git ls-files`.** The
+      // helper passes `--others --exclude-standard`, so it sees a config that
+      // is written but not yet committed — the state this very check was
+      // written in. Plain `git ls-files` would have found nothing here and
+      // passed, which is the vacuity the describe is about; a raw directory
+      // walk would instead reach the gitignored scratch tree, which is never
+      // linted and whose configs are nobody else's business.
+      // **`docs/*.markdownlint*`, and the single star is deliberate.** A git
+      // pathspec is not a shell glob: without `:(glob)` a `*` crosses `/`,
+      // while `a/**/b` demands at least one intervening component. Measured —
+      // `docs/**/.markdownlint*` finds the ERD config and MISSES a
+      // `docs/.markdownlint.json` sitting directly in `docs/`, which is
+      // precisely where a docs-wide exemption would be put. The narrower-looking
+      // pattern was the leakier one.
+      const scoped = gitFiles('docs/*.markdownlint*');
+
+      // The floor: an empty result means the pattern stopped matching, and the
+      // equality below would then be vacuously true.
+      expect(scoped).toEqual([ERD_CONFIG]);
+    });
   });
 });

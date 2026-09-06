@@ -13,7 +13,7 @@ is true today.
 
 ## The key
 
-```
+```text
 <prefix>|<organizationId>|<scope>|<k=v&k=v sorted>|@<version>
 ```
 
@@ -125,7 +125,7 @@ nothing to reconcile against.
 
 ## The read-repopulate race is accepted, not fixed
 
-```
+```text
 reader:  get (miss) ── produce() ────────────── set(stale)
 writer:                    └─ invalidate() ──┘
 ```
