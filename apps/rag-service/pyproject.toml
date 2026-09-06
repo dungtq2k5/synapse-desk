@@ -2,6 +2,18 @@
 name = "rag-service"
 version = "1.0.0"
 requires-python = ">=3.12"
+# The same SPDX identifier every `package.json` carries, and the reason is a
+# READER rather than a build: nothing installs this package — there is no
+# `[build-system]`, as the pytest note below says at length — so no wheel ever
+# carries this string. What does read it is anything that walks the repository
+# for metadata, and `[project]` already declaring `name` and `version` is
+# exactly what makes the omission legible as "licence unknown" rather than as
+# "not a package". One line, and the whole tree answers the same way.
+#
+# A PEP 639 SPDX expression (a bare string), not PEP 621's `{ text = ... }`
+# table: that form is deprecated, and this file has no build backend that would
+# care either way.
+license = "AGPL-3.0-only"
 
 [tool.ruff]
 # The Python half's answer to eslint + prettier on the TypeScript side. It

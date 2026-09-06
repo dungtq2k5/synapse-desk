@@ -1,6 +1,8 @@
 {
   "name": "@synapsedesk/grpc-proto",
   "version": "1.0.0",
+  "private": true,
+  "license": "AGPL-3.0-only",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {

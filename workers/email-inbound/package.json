@@ -2,6 +2,7 @@
   "name": "@synapsedesk/email-inbound-worker",
   "version": "0.0.0",
   "private": true,
+  "license": "AGPL-3.0-only",
   "type": "module",
   "//": "Deliberately OUTSIDE the npm workspaces (`apps/*`, `libs/*`). This is a Cloudflare Workers runtime, not a Nest app: different globals, no Nest build, and no tsconfig in the root eslint project list covers it. Install and deploy from inside this directory.",
   "scripts": {

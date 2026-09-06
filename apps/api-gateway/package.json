@@ -1,6 +1,8 @@
 {
   "name": "@synapsedesk/api-gateway",
   "version": "1.0.0",
+  "private": true,
+  "license": "AGPL-3.0-only",
   "scripts": {
     "build": "nest build",
     "start:prod": "node dist/apps/api-gateway/src/main.js",

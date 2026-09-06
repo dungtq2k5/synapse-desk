@@ -1,6 +1,8 @@
 {
   "name": "@synapsedesk/ingestion-service",
   "version": "1.0.0",
+  "private": true,
+  "license": "AGPL-3.0-only",
   "engines": {
     "node": ">=22.12"
   },
