@@ -229,6 +229,25 @@ export const envValidationSchema = Joi.object({
     .required()
     .when('NODE_ENV', {
       is: 'test',
-      otherwise: Joi.string().invalid(...PUBLISHED_SUPER_ADMIN_PASSWORDS),
+      otherwise: Joi.string()
+        .invalid(...PUBLISHED_SUPER_ADMIN_PASSWORDS)
+        // **Joi's default here is `"SUPER_ADMIN_PASSWORD" contains an invalid
+        // value`, which names no reason and no remedy.** This refusal is
+        // deliberate and correct, and it still cost a developer a debugging
+        // session: the value was fine when their `.env` was written and became
+        // invalid when this list landed two days later, so the message is the
+        // only thing standing between "the guard worked" and "something is
+        // broken". A guard whose whole purpose is loudness has to say what to
+        // do about it. `super-admin-password.spec.ts` pins the wording,
+        // because a rewrite that moves the `invalid()` call drops this block
+        // in silence and every type-level row keeps passing.
+        .messages({
+          'any.invalid':
+            'SUPER_ADMIN_PASSWORD is one of the placeholder values PUBLISHED in ' +
+            'this repository (apps/auth-service/.env.example and .env.test), so ' +
+            'anyone can read it. It is refused outside NODE_ENV=test. Set your ' +
+            'own value of 12+ characters in apps/auth-service/.env — the seeder ' +
+            'applies it only when the Super Admin account is first created.',
+        }),
     }),
 });

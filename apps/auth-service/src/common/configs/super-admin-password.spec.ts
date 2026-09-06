@@ -58,6 +58,34 @@ describe('SUPER_ADMIN_PASSWORD refuses the passwords this repo publishes', () =>
     expect(PUBLISHED).toHaveLength(2);
   });
 
+  it('**the refusal says what to do about it**', () => {
+    // **The rule fired correctly and still cost a debugging session.** Joi's
+    // default is `"SUPER_ADMIN_PASSWORD" contains an invalid value`, which
+    // names neither the reason nor the remedy — so a developer whose `.env`
+    // was written BEFORE this list landed reads a correct refusal as a broken
+    // build. The `db:push` path made that worse by surfacing it late: nothing
+    // on it validated the environment until `db:schema` was chained on.
+    //
+    // Asserted rather than trusted, because a `.messages()` block is exactly
+    // what a rewrite that moves the `invalid()` call drops in silence — the
+    // rows below would all still pass, since the TYPE is unchanged.
+    const { error } = envValidationSchema.validate(
+      { NODE_ENV: 'development', SUPER_ADMIN_PASSWORD: PUBLISHED[1] },
+      { allowUnknown: true, abortEarly: false },
+    );
+
+    const message =
+      error?.details.find((item) => item.path[0] === 'SUPER_ADMIN_PASSWORD')
+        ?.message ?? '';
+
+    expect(message).not.toContain('contains an invalid value');
+    // The three things a reader needs: which file, which escape hatch does
+    // NOT apply, and that the value is readable by anyone.
+    expect(message).toContain('apps/auth-service/.env');
+    expect(message).toContain('NODE_ENV=test');
+    expect(message).toContain('PUBLISHED');
+  });
+
   it.each([
     ['test', PUBLISHED[1], 'PASS'],
     ['production', PUBLISHED[1], 'FAIL:any.invalid'],
