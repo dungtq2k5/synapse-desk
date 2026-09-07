@@ -37,9 +37,9 @@ import {
   decryptSecret,
   encryptSecret,
   generateBackupCodes,
-  hashToken,
+  hashCode,
   normalizeBackupCode,
-  safeCompareHex,
+  verifyCode,
 } from '../../common/utils';
 
 /**
@@ -438,19 +438,24 @@ export class TwoFactorAuthService {
     const rawCodes = generateBackupCodes(this.BACKUP_CODES_PER_USER);
     const expiresAt = addDays(new Date(), this.BACKUP_CODE_TTL_DAYS);
 
+    // Salted scrypt, and all ten hashed BEFORE the transaction opens. Ten
+    // scrypts is ~0.4 s — acceptable on a deliberate "regenerate my codes"
+    // action, not acceptable holding an interactive transaction open.
+    //
+    // Fifty bits from a CSPRNG is plenty against an online guesser and not
+    // plenty against an offline one with `BACKUP_CODE_TTL_DAYS` to work: at
+    // SHA-256 speed a leaked table yields a code in about a day on one GPU.
+    const rows = await Promise.all(
+      rawCodes.map(async (code) => ({
+        userId,
+        codeHash: await hashCode(normalizeBackupCode(code)),
+        expiresAt,
+      })),
+    );
+
     await this.prisma.$transaction(async (tx) => {
       await tx.twoFactorBackupCode.deleteMany({ where: { userId } });
-      await tx.twoFactorBackupCode.createMany({
-        data: rawCodes.map((code) => ({
-          userId,
-          // SHA-256, not bcrypt: verification has to find a code by value
-          // across the set, and a randomly-salted hash would force a bcrypt
-          // compare against every row on every attempt. These are ~50 bits
-          // from a CSPRNG, so slowing an attacker down buys nothing.
-          codeHash: hashToken(normalizeBackupCode(code)),
-          expiresAt,
-        })),
-      });
+      await tx.twoFactorBackupCode.createMany({ data: rows });
 
       if (enableTwoFactor) {
         await tx.user.update({
@@ -473,16 +478,25 @@ export class TwoFactorAuthService {
     userId: string,
     candidate: string,
   ): Promise<number> {
-    const candidateHash = hashToken(normalizeBackupCode(candidate));
+    const normalized = normalizeBackupCode(candidate);
 
     const codes = await this.prisma.twoFactorBackupCode.findMany({
       where: { userId, isUsed: false, expiresAt: { gt: new Date() } },
       select: { id: true, codeHash: true },
     });
 
-    const match = codes.find((code) =>
-      safeCompareHex(code.codeHash, candidateHash),
-    );
+    // A sequential loop rather than `Array.find`, which cannot take an async
+    // predicate. Worst case is ten scrypts — ~0.4 s on a WRONG code, on a rare
+    // path behind the auth throttler. `verifyCode` also reads pre-switch
+    // SHA-256 rows, which users still hold on paper.
+    let match: (typeof codes)[number] | undefined;
+    for (const code of codes) {
+      if (await verifyCode(normalized, code.codeHash)) {
+        match = code;
+        break;
+      }
+    }
+
     if (!match) {
       throw new RpcException({
         code: status.UNAUTHENTICATED,

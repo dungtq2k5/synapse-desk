@@ -6,6 +6,7 @@ import { compareAlphabetically } from '@synapsedesk/common';
 import { E2eFixture, bootstrapE2eTest, requestOrigin } from '../utils';
 import {
   createBackupCode,
+  createLegacyBackupCode,
   createTrustedDeviceSession,
   seedTenantWithUser,
   TEST_PASSWORD,
@@ -126,6 +127,31 @@ describe('Two-factor auth (e2e)', () => {
       });
       expect(statusResponse.remaining).toBe(backupCodes.length);
       expect(JSON.stringify(statusResponse)).not.toContain(backupCodes[0]);
+    });
+
+    it('6b. stored codes are SALTED SCRYPT — service and factory alike', async () => {
+      // Fifty bits from a CSPRNG holds off an online guesser and does not hold
+      // off an offline one with `BACKUP_CODE_TTL_DAYS` — 365 in `.env.example`
+      // — to work: at SHA-256 speed a leaked table gives up a code in about a
+      // day on one GPU.
+      //
+      // The seeded half is the one that can rot silently. `verifyCode` still
+      // reads legacy SHA-256, so a `createBackupCode` quietly reverted to
+      // `hashToken` leaves every other test in this file green — measured: all
+      // nineteen of them — while the scrypt path goes uncovered.
+      const { user } = await seedTenantWithUser(fx.prisma);
+      await enrol(user.id);
+
+      const issued = await fx.prisma.twoFactorBackupCode.findMany({
+        where: { userId: user.id },
+      });
+      expect(issued.length).toBeGreaterThan(0);
+      expect(issued.every((row) => row.codeHash.startsWith('scrypt$'))).toBe(
+        true,
+      );
+
+      const { row: seeded } = await createBackupCode(fx.prisma, user.id);
+      expect(seeded.codeHash.startsWith('scrypt$')).toBe(true);
     });
   });
 
@@ -321,6 +347,60 @@ describe('Two-factor auth (e2e)', () => {
           requestOrigin(),
         ),
       ).rejects.toBeInstanceOf(RpcException);
+    });
+
+    it('9d. a LEGACY SHA-256 code still verifies — they are on paper for a year', async () => {
+      // `BACKUP_CODE_TTL_DAYS` is 365 in `.env.example`, so codes printed
+      // before the switch to scrypt outlive it by a long way. Nothing can
+      // rewrite them: a hash does not invert, and a code is single-use, so
+      // "upgrade on successful verify" would upgrade a row about to be burned.
+      // This is the one deliberate use of the legacy seeder in the suite.
+      const { user } = await seedTenantWithUser(fx.prisma);
+      await enrol(user.id);
+      const { code } = await createLegacyBackupCode(fx.prisma, user.id);
+
+      const login = await auth.login(
+        { email: user.email, password: TEST_PASSWORD },
+        requestOrigin(),
+      );
+      const result = await twoFactor.authenticateTwoFactor(
+        {
+          twoFactorToken: login.twoFactorToken!,
+          backupCode: code,
+          rememberDevice: false,
+        },
+        requestOrigin(),
+      );
+
+      expect(result.accessToken).toBeTruthy();
+    });
+
+    it('9e. an UNRECOGNIZED stored hash is an invalid code, not a server error', async () => {
+      // `verifyCode` must never throw on a stored value it cannot parse. Rows
+      // like this exist — `users.e2e-spec.ts` seeds `codeHash: 'stub-hash'` —
+      // and a throw here would surface to the caller as INTERNAL on what was
+      // only a bad code, which is both a worse error and an oracle.
+      const { user } = await seedTenantWithUser(fx.prisma);
+      await enrol(user.id);
+      const { code } = await createBackupCode(fx.prisma, user.id, {
+        codeHash: 'stub-hash',
+      });
+
+      const login = await auth.login(
+        { email: user.email, password: TEST_PASSWORD },
+        requestOrigin(),
+      );
+      await expectRpc(
+        twoFactor.authenticateTwoFactor(
+          {
+            twoFactorToken: login.twoFactorToken!,
+            backupCode: code,
+            rememberDevice: false,
+          },
+          requestOrigin(),
+        ),
+        status.UNAUTHENTICATED,
+      );
     });
   });
 

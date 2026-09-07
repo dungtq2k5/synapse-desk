@@ -448,14 +448,16 @@ export type CacheScope = (typeof CACHE_SCOPES)[keyof typeof CACHE_SCOPES];
 | `device_sessions.refresh_token_hash` | **SHA-256 hex** | VarChar(64) | `@unique`, looked up **by value** |
 | `device_sessions.device_token_hash` | **SHA-256 hex** | VarChar(64) | same |
 | `password_reset_tokens.token_hash` | **SHA-256 hex** | VarChar(64) | same |
-| `otps.code_hash` | see note | VarChar(255) | Found via `(user_id, purpose)` index, **not** by value |
-| `two_factor_backup_codes.code_hash` | see note | VarChar(255) | Found via `user_id`, not by value |
+| `otps.code_hash` | **scrypt, salted** | VarChar(255) | Found via `(user_id, purpose)` index, **not** by value |
+| `two_factor_backup_codes.code_hash` | **scrypt, salted** | VarChar(255) | Found via `user_id`, not by value |
 
 **The rule:** a randomly-salted hash (bcrypt/Argon2) produces a different digest every time, so it can never be found by an indexed equality lookup. Any secret stored in a `@unique` column that arrives from the client and must be *found* therefore uses `hashToken()` (SHA-256) — those tokens are 256 random bits, and slow KDFs exist to protect *guessable* secrets.
 
-The converse holds: `otps.code_hash` and `two_factor_backup_codes.code_hash` are not looked up by value, so they are free to use a slow KDF — and a 6-digit code is exactly the low-entropy case that warrants one. Both are `VarChar(255)` to accommodate that; today both use `hashToken()` ([known-gaps](./reference/known-gaps.md) #2).
+The converse holds: `otps.code_hash` and `two_factor_backup_codes.code_hash` are not looked up by value, so they are free to use a slow KDF — and a 6-digit code is exactly the low-entropy case that warrants one. Both use `hashCode()` (scrypt, `N=2^14, r=8, p=1`, random 16-byte salt), which is what `VarChar(255)` was sized for: the stored string is `scrypt$N=…,r=…,p=…$<salt>$<key>`, carrying its own parameters so a later change can still read older rows.
 
-Compare digests with `safeCompareHex()`, **not `===`**.
+`verifyCode()` reads both formats — a stored value with no `$` is a pre-scrypt SHA-256 digest, and backup codes issued before the switch stay valid for `BACKUP_CODE_TTL_DAYS`. It returns `false` on anything it cannot parse rather than throwing, because this runs where a throw would read as a server error on a merely wrong code.
+
+Compare digests with `safeCompareHex()` or `verifyCode()`, **never `===`**.
 
 ### 8.2 Generating secrets
 

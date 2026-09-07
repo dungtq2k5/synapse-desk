@@ -1,12 +1,15 @@
 import { ORGANIZATION_SLUG_PATTERN } from '@synapsedesk/common';
 import {
+  CODE_HASH_PARAMS,
   generateBackupCode,
   generateBackupCodes,
   generateUniqueOrganizationSlug,
+  hashCode,
   hashToken,
   maskEmail,
   normalizeBackupCode,
   safeCompareHex,
+  verifyCode,
 } from './index';
 
 /**
@@ -71,6 +74,52 @@ describe('hashToken (unit)', () => {
 
   it('produces a 64-character hex digest, matching the VarChar(64) columns', () => {
     expect(hashToken('anything')).toMatch(/^[0-9a-f]{64}$/);
+  });
+});
+
+describe('hashCode / verifyCode (unit)', () => {
+  it('round trips, and rejects a wrong code', async () => {
+    const stored = await hashCode('123456');
+
+    await expect(verifyCode('123456', stored)).resolves.toBe(true);
+    await expect(verifyCode('654321', stored)).resolves.toBe(false);
+  });
+
+  it('SALTS — two hashes of one code differ, which is the whole point', async () => {
+    // This is exactly the property `hashToken` must NOT have. It is affordable
+    // here because neither call site looks a code up by its hash: both fetch
+    // the candidate rows first and then compare.
+    expect(await hashCode('123456')).not.toBe(await hashCode('123456'));
+  });
+
+  it('stores the parameters it used, so a future change can still read old rows', async () => {
+    const { N, r, p } = CODE_HASH_PARAMS;
+
+    expect(await hashCode('123456')).toMatch(
+      new RegExp(`^scrypt\\$N=${N},r=${r},p=${p}\\$[\\w-]+\\$[\\w-]+$`),
+    );
+  });
+
+  it('verifies a LEGACY SHA-256 row — a year of backup codes is on paper', async () => {
+    // `BACKUP_CODE_TTL_DAYS` is 365 in `.env.example`. Codes issued before the
+    // switch cannot be rewritten (a hash does not invert), so this arm carries
+    // them until they expire or are regenerated.
+    await expect(verifyCode('123456', hashToken('123456'))).resolves.toBe(true);
+    await expect(verifyCode('999999', hashToken('123456'))).resolves.toBe(
+      false,
+    );
+  });
+
+  it('treats an UNRECOGNIZED stored value as no match, never a throw', async () => {
+    // A throw on this path becomes a 500 on what was only a wrong code, and
+    // stub values do reach it: `users.e2e-spec.ts` seeds `codeHash:
+    // 'stub-hash'` on a row it never verifies.
+    await expect(verifyCode('123456', 'stub-hash')).resolves.toBe(false);
+    await expect(verifyCode('123456', '')).resolves.toBe(false);
+    await expect(verifyCode('123456', 'scrypt$bogus$a$b')).resolves.toBe(false);
+    await expect(
+      verifyCode('123456', 'scrypt$N=16384,r=8,p=1$$'),
+    ).resolves.toBe(false);
   });
 });
 

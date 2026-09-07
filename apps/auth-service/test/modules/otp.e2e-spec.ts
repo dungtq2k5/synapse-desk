@@ -42,6 +42,33 @@ describe('OTP (e2e)', () => {
       ).toBe(1);
       expect(await fx.prisma.otp.count({ where: { userId: user.id } })).toBe(3);
     });
+
+    it('1b. the stored code_hash is SALTED SCRYPT — on both paths', async () => {
+      // Two assertions, and they guard different things.
+      //
+      // The issued row pins the SERVICE: a 6-digit code is ~20 bits, and at
+      // SHA-256 speed a leaked table gives every live one up instantly.
+      //
+      // The seeded row pins the FACTORY, and that is the load-bearing half.
+      // `verifyCode` still reads legacy SHA-256, so a factory quietly reverted
+      // to `hashToken` would leave every other test in this file green while
+      // exercising only the branch on its way out — this suite never calls
+      // `requestOtp`, it seeds through `createOtp` in twelve places.
+      const { user } = await seedTenantWithUser(fx.prisma, {
+        user: { isEmailVerified: false },
+      });
+
+      await otp.requestEmailVerification({ userId: user.id });
+      const issued = await fx.prisma.otp.findFirstOrThrow({
+        where: { userId: user.id, isUsed: false },
+      });
+      expect(issued.codeHash.startsWith('scrypt$')).toBe(true);
+
+      const { row: seeded } = await createOtp(fx.prisma, user.id, {
+        purpose: OtpPurpose.PHONE_VERIFICATION,
+      });
+      expect(seeded.codeHash.startsWith('scrypt$')).toBe(true);
+    });
   });
 
   describe('verifyEmail', () => {

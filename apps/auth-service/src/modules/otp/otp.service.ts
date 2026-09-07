@@ -25,9 +25,9 @@ import { NotificationPublisher } from '../notifications/notification-publisher.s
 import {
   addMinutes,
   generateNumericCode,
-  hashToken,
+  hashCode,
   maskEmail,
-  safeCompareHex,
+  verifyCode,
 } from '../../common/utils';
 
 /**
@@ -215,6 +215,10 @@ export class OtpService {
     target: string,
   ): Promise<string> {
     const code = generateNumericCode(this.OTP_LENGTH);
+    // Hashed OUTSIDE the transaction: scrypt is ~40 ms, and 40 ms of a held
+    // connection buys nothing when the value does not depend on anything the
+    // transaction reads.
+    const codeHash = await hashCode(code);
 
     await this.prisma.$transaction(async (tx) => {
       await tx.otp.updateMany({
@@ -227,10 +231,11 @@ export class OtpService {
           userId,
           purpose,
           target,
-          // SHA-256, like every other lookup-by-value secret here. A 6-digit
-          // code has only ~20 bits of entropy, so the real defence is
-          // maxAttempts plus the short expiry, not the cost of the hash.
-          codeHash: hashToken(code),
+          // Salted scrypt: the code is fetched by (user, purpose) and then
+          // compared, never looked up by hash, so a salt costs nothing here.
+          // maxAttempts plus the short expiry remain the ONLINE defence; the
+          // slow hash is what a leaked table runs into.
+          codeHash,
           maxAttempts: this.OTP_MAX_ATTEMPTS,
           expiresAt: addMinutes(new Date(), this.OTP_EXPIRY_MINUTES),
         },
@@ -261,7 +266,7 @@ export class OtpService {
       });
     }
 
-    if (safeCompareHex(otp.codeHash, hashToken(request.code))) {
+    if (await verifyCode(request.code, otp.codeHash)) {
       await this.prisma.otp.update({
         where: { id: otp.id },
         data: { isUsed: true },

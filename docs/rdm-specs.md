@@ -64,6 +64,8 @@ Refresh tokens are single-use. Each `/auth/refresh` call issues a new token and 
 
 refresh_token_hash, device_token_hash, and password_reset_tokens.token_hash are all UNIQUE columns looked up **by value** — the server receives a token and must find its row in one indexed read. bcrypt and Argon2 embed a random salt, so the same input hashes differently every time and could never be found by such an index; verification would require scanning every row and comparing one by one. SHA-256 is the correct choice here, not a compromise: these are 32 bytes of cryptographic randomness, and the slow-KDF family exists to protect *low-entropy human passwords* from offline guessing — a threat that does not apply to a 256-bit secret. users.password_hash remains Argon2/bcrypt, where that threat is real. Hex SHA-256 is fixed-width, hence VARCHAR(64).
 
+**This reasoning covers those three columns and no others.** The two columns holding a code a *human types* — otps.code_hash and two_factor_backup_codes.code_hash — are found by index and only then compared, so they are not looked up by value and use a slow KDF instead. See §2.4.
+
 ### **1.6 Standard Audit & Soft-Delete Fields Policy**
 
 To support enterprise compliance, legal hold requirements, and prevent accidental data loss:
@@ -94,11 +96,11 @@ The two conditions are kept in lockstep by a CHECK constraint (see Table 3) so a
 
 Three flows need a single-use secret that lives outside the JWT lifecycle. They are deliberately split into two tables because their delivery channel, format, and threat model differ.
 
-* **otps (numeric codes, user-typed):** A 6-digit code delivered to a channel the user must prove they control — email (purpose = EMAIL_VERIFICATION) or SMS (purpose = PHONE_VERIFICATION). Because the code is short enough to guess, the row carries its own brute-force counter: every failed verification increments attempts_count, and once it reaches max_attempts (default 5) the handler sets is_used = true, burning the code and forcing a new request. Only the SHA-256 code_hash is stored.
+* **otps (numeric codes, user-typed):** A 6-digit code delivered to a channel the user must prove they control — email (purpose = EMAIL_VERIFICATION) or SMS (purpose = PHONE_VERIFICATION). Because the code is short enough to guess, the row carries its own brute-force counter: every failed verification increments attempts_count, and once it reaches max_attempts (default 5) the handler sets is_used = true, burning the code and forcing a new request. Only code_hash is stored, never the plaintext.
 * **The target column:** The code is bound to the *exact* address or number it was sent to, stored separately from users.email / users.phone_number. This is what makes a **change-of-address** flow safe: a user requesting a new phone number gets an OTP with target = the new number, and users.phone_number / is_phone_verified are only written after that specific code verifies. A code issued for one target can never validate a different one.
 * **password_reset_tokens (opaque links, machine-generated):** A high-entropy token embedded in a reset URL, so it needs no attempt counter — guessing is infeasible. token_hash is UNIQUE, which makes lookup a single indexed read and makes token collision a database-level impossibility. ip_address and user_agent record where the reset was requested from; both are surfaced in the reset email ("this request came from Chrome on macOS") so a victim can recognize an attack, and are copied into audit_logs.
 * **Shared invariants:** Both tables are consumed once (is_used) and expire (expires_at) — a row is valid only when `is_used = false AND expires_at > NOW()`. Both hard-delete via ON DELETE CASCADE from users, since an expired secret has no historical or compliance value. A scheduled job prunes rows past expires_at. Successfully consuming a password reset revokes every device_sessions row for that user.
-* **Hashing choice differs between the two:** password_reset_tokens.token_hash is SHA-256 because it is a UNIQUE column looked up *by value* (§1.5). otps.code_hash is **not** — it is found via the (user_id, purpose) index and only then compared — so it is free to use a slow KDF, and should: a 6-digit code has ~20 bits of entropy, exactly the low-entropy case bcrypt/Argon2 exists for. The attempts_count ceiling is the online defense; a slow KDF is the offline one should the table ever leak. This is why code_hash is VARCHAR(255) rather than the fixed VARCHAR(64) of the SHA-256 columns.
+* **Hashing choice differs between the two:** password_reset_tokens.token_hash is SHA-256 because it is a UNIQUE column looked up *by value* (§1.5). otps.code_hash is **not** — it is found via the (user_id, purpose) index and only then compared — so it uses a slow KDF: **scrypt**, N=2^14, r=8, p=1, stored as `scrypt$N=…,r=…,p=…$<salt>$<key>` with the parameters in the string, so a future change verifies old rows with their own parameters. A 6-digit code has ~20 bits of entropy, exactly the low-entropy case a KDF exists for. The attempts_count ceiling is the online defense; the KDF is the offline one should the table ever leak. This is why code_hash is VARCHAR(255) rather than the fixed VARCHAR(64) of the SHA-256 columns. two_factor_backup_codes.code_hash is the same function for the same reason, compared across the user's live rows.
 * **Why not one generic tokens table?** A single table would force the numeric-code attempt counters and the URL-token provenance columns to be nullable for half its rows, and would let a low-entropy 6-digit code be presented where a high-entropy reset token is expected. Separate tables make that class of confusion unrepresentable.
 
 ### **1.10 Multi-Tenant Identity & Email Scoping**
@@ -553,9 +555,9 @@ Earlier revisions of this document specified both columns on both tables. The sc
 | :---- | :---- | :---- | :---- |
 | **id** | UUID | Primary Key, gen_random_uuid() | Unique ID for this backup code. |
 | **user_id** | UUID | NOT NULL, FK ➔ users.id, On Delete CASCADE | User who owns this backup code. |
-| **code_hash** | VARCHAR(255) | NOT NULL | Secure SHA-256 hash of the backup code. |
+| **code_hash** | VARCHAR(255) | NOT NULL | Salted scrypt hash of the normalized backup code (§2.4). Verification compares across the user's unused, unexpired rows; nothing is looked up by hash. |
 | **is_used** | BOOLEAN | NOT NULL, false | Tracks if the code has been consumed for login. |
-| **expires_at** | TIMESTAMPTZ | NOT NULL | Default 30 days after creation. |
+| **expires_at** | TIMESTAMPTZ | NOT NULL | BACKUP_CODE_TTL_DAYS after creation. |
 | **created_at** | TIMESTAMPTZ | NOT NULL, NOW() | Timestamp of code generation. |
 
 #### **Table 11: otps**
@@ -568,7 +570,7 @@ Earlier revisions of this document specified both columns on both tables. The sc
 | **user_id** | UUID | NOT NULL, FK ➔ users.id, On Delete CASCADE | User the code was issued to. |
 | **purpose** | ENUM | NOT NULL | Channel being verified: EMAIL_VERIFICATION, PHONE_VERIFICATION. |
 | **target** | VARCHAR(255) | NOT NULL | The specific email address or phone number receiving the code. Binds the code to one destination so it cannot be replayed against a different address (see §1.9). |
-| **code_hash** | VARCHAR(255) | NOT NULL | SHA-256 hash of the 6-digit code. The plaintext is never persisted. |
+| **code_hash** | VARCHAR(255) | NOT NULL | Salted scrypt hash of the 6-digit code (§2.4). The plaintext is never persisted. |
 | **attempts_count** | INT | NOT NULL, Default: 0 | Failed verification attempts against this code. |
 | **max_attempts** | INT | NOT NULL, Default: 5 | Brute-force ceiling. When attempts_count reaches this value the application sets is_used = true, burning the code. |
 | **is_used** | BOOLEAN | NOT NULL, Default: false | True once consumed successfully **or** exhausted via max_attempts. |
