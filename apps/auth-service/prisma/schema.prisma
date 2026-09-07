@@ -271,8 +271,11 @@ model User {
   id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
 
   // NULL organizationId identifies a SaaS platform Super Admin operating across
-  // tenants. Kept in lockstep with isSuperAdmin by a DB CHECK constraint added
-  // via migration: (organization_id IS NULL) = is_super_admin
+  // tenants. Kept in lockstep with isSuperAdmin by the CHECK constraint
+  // `users_super_admin_iff_no_tenant`: (organization_id IS NULL) = is_super_admin
+  //
+  // Added by the seeder's DDL block, not by a migration — ADR 0039 is why that
+  // block is the list.
   organizationId String? @map("organization_id") @db.Uuid
   isSuperAdmin   Boolean @default(false) @map("is_super_admin")
 

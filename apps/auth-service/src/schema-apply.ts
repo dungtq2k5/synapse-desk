@@ -1,7 +1,7 @@
 /**
  * @file The schema-object step, as a process rather than a boot hook.
  *
- * **Where the twenty-four objects Prisma cannot express get created.** They ran
+ * **Where the objects Prisma cannot express get created.** They ran
  * on every application boot until ADR 0043's init container existed to run them
  * instead; this is that step's entrypoint, and it has exactly two callers:
  *

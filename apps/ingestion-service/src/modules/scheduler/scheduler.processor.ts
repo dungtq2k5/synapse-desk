@@ -3,10 +3,10 @@ import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import {
   formatErrorMsg,
+  PROJECTION_LAG_MS,
   ROLLUP_TRAILING_DAYS,
   SCHEDULED_JOBS,
   SCHEDULER_QUEUE,
-  trailingWindow,
   JobRunRecorder,
 } from '@synapsedesk/common';
 import { PrismaService } from '../prisma/prisma.service';
@@ -138,17 +138,38 @@ export class SchedulerProcessor extends WorkerHost {
    *      flagging against yesterday's numbers.
    *
    * When retention is built it goes at the END of this method and nowhere else.
+   *
+   * **Steps 1 and 2 have the same re-run semantics by opposite mechanisms.**
+   * The rollup deletes and re-inserts, so recomputing an interval it already
+   * covered is free; the projection ADDS, so it cannot recompute and takes a
+   * cursor instead.
+   *
+   * **What that does NOT buy is sequencing.** `step()` catches and does not
+   * rethrow, so every step runs whatever the one before it did — a projection
+   * that throws still lets `document-flags` compute against counters this run
+   * did not write. The cursor makes those counters STALE rather than wrong,
+   * and the next run closes the gap however long the outage; nothing here
+   * makes the three steps atomic, and a reader looking for that should not
+   * infer it from the ordering above.
    */
   private async daily(): Promise<void> {
-    const window = trailingWindow(new Date(), ROLLUP_TRAILING_DAYS);
-
     await this.step('chunk-usage-projection', async () => {
-      const updated = await this.projection.project(window.since, window.until);
+      // **Cursor-driven, so it gets an upper bound and finds its own lower
+      // one.** It ADDS to the chunk counters, so an interval overlapping its
+      // predecessor counts a generation twice. The lag is what a cursor needs
+      // and a window does not: see `PROJECTION_LAG_MS`.
+      const updated = await this.projection.project(
+        new Date(Date.now() - PROJECTION_LAG_MS),
+      );
 
       return `${updated} chunk counter(s) updated`;
     });
 
     await this.step('ai-generation-rollup', async () => {
+      // Window-driven, and correctly so: this step deletes and re-inserts, so
+      // recomputing a day it already had is free and a wide window only
+      // self-heals a missed night. `AiGenerationRollupJob.run` builds the
+      // window itself from `days`.
       const outcome = await this.aiRollup.run(new Date(), ROLLUP_TRAILING_DAYS);
 
       return `${outcome.tenants} tenant(s), ${outcome.rows} row(s)`;

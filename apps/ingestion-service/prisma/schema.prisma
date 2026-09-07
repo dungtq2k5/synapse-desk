@@ -518,3 +518,32 @@ model LimitAlertGeneration {
   @@id([organizationId, dimension])
   @@map("limit_alert_generations")
 }
+
+/// How far a projection has consumed its source, so a re-run counts nothing
+/// twice. One row per projection, keyed by the step name it runs under.
+///
+/// **Written inside the projection's own transaction**, never by the job
+/// heartbeat: `job_runs.last_succeeded_at` is a finish time recorded after the
+/// fact and outside whatever transaction the step opened, so a crash between
+/// the two writes would leave a cursor that disagrees with the counters it
+/// guards — re-projecting (cursor behind) or skipping forever (cursor ahead).
+/// A cursor that can disagree with its own counters is not a cursor.
+///
+/// Its own table rather than a column on `job_runs`: that model is shared by
+/// four services through `JobRunRecorder` in `libs/common`, and teaching a
+/// heartbeat about one rollup's progress couples the two.
+model ProjectionCursor {
+  /// The step name from `scheduler.processor.ts`, so this row and the
+  /// `job_runs` heartbeat for the same step share a key a reader can join by
+  /// eye.
+  name String @id @db.VarChar(64)
+
+  /// EXCLUSIVE upper bound of the last projected interval, and the next run's
+  /// inclusive lower bound. The value the queries actually used — not the wall
+  /// clock at which they finished.
+  until DateTime @db.Timestamptz
+
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("projection_cursors")
+}

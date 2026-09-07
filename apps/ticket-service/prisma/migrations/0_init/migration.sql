@@ -64,7 +64,7 @@ CREATE TABLE "ticket_assignments" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
     "ticket_id" UUID NOT NULL,
     "assigned_to_id" UUID NOT NULL,
-    "assigned_by_id" UUID,
+    "assigned_by_id" UUID NOT NULL,
     "department_id" UUID NOT NULL,
     "assigned_at" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "unassigned_at" TIMESTAMPTZ,

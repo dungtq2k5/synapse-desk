@@ -435,7 +435,7 @@ USER node
 # the property that makes a typo'd `DATABASE_URL` fail the deploy instead of
 # provisioning an empty one.
 #
-# Then the twenty-four objects Prisma cannot express, which used to run on every
+# Then the objects Prisma cannot express, which used to run on every
 # application boot. `CREATE INDEX` takes a `ShareLock` on its table even when
 # `IF NOT EXISTS` makes it a no-op, and that lock queues behind any open write
 # transaction — measured at 7.08 s behind an 8-second writer, with every later

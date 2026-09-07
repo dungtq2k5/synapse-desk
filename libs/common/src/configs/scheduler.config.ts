@@ -175,8 +175,65 @@ export const JOB_SEQUENCES = {
  *
  * Wider than one day so a missed run self-heals on the next night, and so a
  * tenant whose local day closes after 02:00 UTC is still covered.
+ *
+ * **`AiGenerationRollupJob` only.** Not for `ChunkUsageProjection`: it ADDS to
+ * a counter rather than replacing a row, so any overlapping interval
+ * double-counts. It is cursor-driven — see {@link PROJECTION_LAG_MS}.
  */
 export const ROLLUP_TRAILING_DAYS = 3;
+
+/**
+ * How far behind `now` a cursor-driven projection stops reading.
+ *
+ * **The one subtlety a cursor has that an overlapping window did not.** Under
+ * READ COMMITTED each statement sees rows committed before *it* started, so a
+ * generation whose `created_at` is already below the projection's upper bound —
+ * but whose transaction commits a moment after the projection's statement began
+ * — is invisible to that run. A window that overlapped its predecessor picked
+ * such a row up the following night by accident. A cursor cannot: it has moved
+ * past that instant, and the row is missed **forever**.
+ *
+ * Lagging the upper bound is what buys the writer time to commit. Five minutes
+ * is generous by orders of magnitude — nothing holds an `ai_generations` insert
+ * open for seconds, let alone minutes — and the cost of being generous is only
+ * that a generation is counted on the next night instead of this one, which no
+ * reader of a lifetime total can observe.
+ */
+export const PROJECTION_LAG_MS = 5 * 60 * 1000;
+
+/**
+ * The interactive-transaction budget for one nightly projection.
+ *
+ * **An explicit number because the default is 5 s and the shape changed.** A
+ * `$transaction([...])` array is a batch with no interactive timeout; the
+ * callback form a cursor needs — the lower bound is a READ — is governed by
+ * Prisma's `timeout`, and a `P2028` mid-run rolls back the counters AND the
+ * cursor, so the next night repeats the same work and fails the same way.
+ *
+ * Sized for a night's generations, not for history: the backfill is a separate
+ * operation for exactly this reason ({@link PROJECTION_BACKFILL_WINDOW_DAYS}).
+ */
+export const PROJECTION_TRANSACTION_TIMEOUT_MS = 60 * 1000;
+
+/**
+ * How many chunk rows one reset statement zeroes.
+ *
+ * **The reset is the part that locks.** `UPDATE document_chunks SET
+ * retrieval_count = 0, citation_count = 0` with no `WHERE` rewrites and
+ * row-locks every chunk until the transaction commits — the same table
+ * `writeChunkRows` deletes from and inserts into on every upload. Batching it
+ * bounds the lock to one statement's worth of rows instead of the corpus.
+ */
+export const PROJECTION_RESET_BATCH = 5_000;
+
+/**
+ * How much of the ledger one backfill transaction consumes.
+ *
+ * The windows are half-open and disjoint, so adding across them totals the same
+ * as one pass — and each commits its own cursor, which makes an interrupted
+ * backfill resumable rather than restartable.
+ */
+export const PROJECTION_BACKFILL_WINDOW_DAYS = 7;
 
 /**
  * Which service registers and runs each schedule.

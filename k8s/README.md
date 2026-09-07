@@ -58,7 +58,7 @@ npx prisma migrate diff --from-empty --to-schema prisma/schema.prisma --script \
 
 `--to-schema`, **not** `--to-schema-datamodel` — the older spelling is what most tutorials still show and Prisma 7.9.1 removed it with an explicit error. `prisma.config.ts` already points `migrations.path` at `prisma/migrations`, which is why the file lands where the CLI looks for it.
 
-**They deliberately contain none of the twenty-four objects `schema-apply.ts` owns**, and that is structural rather than lucky: `schema.prisma` declares no `postgresqlExtensions`, so `migrate diff` cannot see `btree_gin`, and it has no syntax for a partial index at all. `schema-contract.spec.ts` check 4 keeps it that way — it derives the forbidden set from the seeders rather than carrying a list, and also refuses `CREATE EXTENSION`, `USING GIN` and any `WHERE`-clause index under a new name.
+**They deliberately contain none of the objects `schema-apply.ts` owns**, and that is structural rather than lucky: `schema.prisma` declares no `postgresqlExtensions`, so `migrate diff` cannot see `btree_gin`, and it has no syntax for a partial index at all. `schema-contract.spec.ts` check 4 keeps it that way — it derives the forbidden set from the seeders rather than carrying a list, and also refuses `CREATE EXTENSION`, `USING GIN` and any `WHERE`-clause index under a new name.
 
 **Baseline every database that already has the tables.** A development database was built by `db push` and has no `_prisma_migrations` row, so `migrate deploy` would try to run `0_init` and fail on the first `CREATE TABLE`. Record it as applied instead — this runs no SQL:
 
@@ -68,6 +68,15 @@ npx prisma migrate resolve --applied 0_init
 ```
 
 A fresh production database needs none of this; it runs `0_init` for real.
+
+**Seed the projection cursor, once per database — the other once-per-database step, and the other one nothing in the code will do for you.** `chunk-usage-projection` adds to counters over the interval since its cursor and refuses to invent one (`ProjectionCursorMissingError`), because seeding it means resetting every `document_chunks` row, and that `UPDATE` row-locks the table every upload writes to — not a thing the 02:00 job should do to live traffic. So it is an operator command, run against the ingestion database after the schema exists and before the first nightly run:
+
+```sh
+# from apps/ingestion-service, once per database
+npm run projection:backfill
+```
+
+It resets in `PROJECTION_RESET_BATCH` batches, projects in `PROJECTION_BACKFILL_WINDOW_DAYS` windows from the oldest generation, and commits a cursor per window — interrupted, it resumes; complete, it is a no-op. Until it has run, that one step fails nightly and its `job_runs` heartbeat says why; the other daily steps are unaffected.
 
 Then build the `migrate` image target, and only then apply.
 
@@ -83,7 +92,7 @@ That target is `FROM build` rather than `FROM runtime`, and it has to be: the Pr
 Two steps, one container, `&&`-chained so a failed migration never reaches the second:
 
 1. `prisma migrate deploy` — [ADR 0042](../docs/decisions/0042-schema-reaches-production-through-migrate-deploy.md).
-2. `node dist/src/schema-apply.js` — the twenty-four objects Prisma cannot express, which ran on every application boot until [ADR 0043](../docs/decisions/0043-the-cluster-shape.md) moved them here.
+2. `node dist/src/schema-apply.js` — the objects Prisma cannot express, which ran on every application boot until [ADR 0043](../docs/decisions/0043-the-cluster-shape.md) moved them here.
 
 The second step is why the app pods no longer take a `ShareLock` on their own tables during startup. Measured: that lock queues behind any open write transaction (7.08 s behind an 8-second writer) and then blocks later writers behind it, and on the boot path the wait sat in front of readiness.
 

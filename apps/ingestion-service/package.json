@@ -13,6 +13,7 @@
     "db:generate": "prisma generate",
     "db:push": "prisma db push && npm run db:schema",
     "db:schema": "nest start --entryFile schema-apply",
+    "projection:backfill": "nest start --entryFile projection-backfill",
     "db:test:push": "dotenv -e .env.test -- prisma db push",
     "db:studio": "prisma studio",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\"",

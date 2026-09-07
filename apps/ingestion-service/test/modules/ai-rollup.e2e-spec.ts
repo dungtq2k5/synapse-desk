@@ -402,10 +402,16 @@ describe('The AI generation rollup (e2e)', () => {
       const projection = fx.moduleRef.get(ChunkUsageProjection);
 
       await generation();
-      await projection.project(
-        at('2026-03-01T00:00:00.000Z'),
-        at('2026-03-04T00:00:00.000Z'),
-      );
+      // The projection finds its own lower bound in `projection_cursors`; only
+      // the exclusive upper bound is passed, and it refuses without the row —
+      // seeding it here keeps this test's interval explicit.
+      await fx.prisma.projectionCursor.create({
+        data: {
+          name: 'chunk-usage-projection',
+          until: at('2026-03-01T00:00:00.000Z'),
+        },
+      });
+      await projection.project(at('2026-03-04T00:00:00.000Z'));
       await runOver('2026-03-01', '2026-03-04');
 
       const [row] = await statsFor('2026-03-02');

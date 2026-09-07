@@ -28,24 +28,24 @@ and the manifests to run them. There is no front end here.
 A Turborepo monorepo. The npm workspaces are `apps/*` and `libs/*`; everything
 else is deliberately outside them.
 
-| Service | Port | Speaks | Owns |
-| :---- | :---- | :---- | :---- |
-| [`api-gateway`](apps/api-gateway/) | `3000` | HTTP, GraphQL, WebSocket | The only public surface. Auth, cache, rate limits, fan-out |
-| [`auth-service`](apps/auth-service/) | `5001` | gRPC | Users, organizations, roles, 2FA, invitations, billing |
-| [`ticket-service`](apps/ticket-service/) | `5002` | gRPC | Tickets, messages, assignment, SLA, analytics rollups |
-| [`storage-service`](apps/storage-service/) | `50253` | gRPC | Presigned upload/download against Firebase Storage |
-| [`ingestion-service`](apps/ingestion-service/) | `5004` | gRPC | Documents, parsing, OCR, chunking, embedding, quotas |
-| [`notification-service`](apps/notification-service/) | `5005` | gRPC | Email, SMS, push, in-app, webhooks |
-| [`rag-service`](apps/rag-service/) | `50255` | gRPC | Python. Retrieval, reranking, generation, injection defence |
+| Service                                              | Port    | Speaks                   | Owns                                                        |
+| :--------------------------------------------------- | :------ | :----------------------- | :---------------------------------------------------------- |
+| [`api-gateway`](apps/api-gateway/)                   | `3000`  | HTTP, GraphQL, WebSocket | The only public surface. Auth, cache, rate limits, fan-out  |
+| [`auth-service`](apps/auth-service/)                 | `5001`  | gRPC                     | Users, organizations, roles, 2FA, invitations, billing      |
+| [`ticket-service`](apps/ticket-service/)             | `5002`  | gRPC                     | Tickets, messages, assignment, SLA, analytics rollups       |
+| [`storage-service`](apps/storage-service/)           | `50253` | gRPC                     | Presigned upload/download against Firebase Storage          |
+| [`ingestion-service`](apps/ingestion-service/)       | `5004`  | gRPC                     | Documents, parsing, OCR, chunking, embedding, quotas        |
+| [`notification-service`](apps/notification-service/) | `5005`  | gRPC                     | Email, SMS, push, in-app, webhooks                          |
+| [`rag-service`](apps/rag-service/)                   | `50255` | gRPC                     | Python. Retrieval, reranking, generation, injection defence |
 
-| Also | What it is |
-| :---- | :---- |
-| [`libs/common`](libs/common/) | Contracts, constants and configs every Node service imports |
-| [`libs/grpc-proto`](libs/grpc-proto/) | The `.proto` files and their generated types |
+| Also                                              | What it is                                                           |
+| :------------------------------------------------ | :------------------------------------------------------------------- |
+| [`libs/common`](libs/common/)                     | Contracts, constants and configs every Node service imports          |
+| [`libs/grpc-proto`](libs/grpc-proto/)             | The `.proto` files and their generated types                         |
 | [`workers/email-inbound`](workers/email-inbound/) | A Cloudflare Worker. Parses inbound MIME and posts it to the gateway |
-| [`k8s/`](k8s/) | Deployments, Services, StatefulSets, Ingress, NetworkPolicy |
-| [`docker/`](docker/) | The two Dockerfiles and the image checks |
-| [`scripts/`](scripts/) | Key generation, seeding, schema verification, generators |
+| [`k8s/`](k8s/)                                    | Deployments, Services, StatefulSets, Ingress, NetworkPolicy          |
+| [`docker/`](docker/)                              | The two Dockerfiles and the image checks                             |
+| [`scripts/`](scripts/)                            | Key generation, seeding, schema verification, generators             |
 
 Backing services, all from `docker-compose.yml`: four Postgres instances (one
 per schema-owning service — there are no cross-service foreign keys), Redis,
@@ -56,25 +56,25 @@ NATS with JetStream, Qdrant, and the Firebase Storage emulator.
 **[`docs/README.md`](docs/README.md) is the map.** Every document there has
 exactly one job and that page says which. The entry points worth knowing:
 
-| If you want to | Read |
-| :---- | :---- |
-| Write code in this repo | [`docs/development-conventions.md`](docs/development-conventions.md) |
-| Know why something is the way it is | [`docs/decisions/`](docs/decisions/) — 44 ADRs, append-only |
-| Follow an end-to-end path | [`docs/reference/flows/`](docs/reference/flows/) |
-| Build a client | [`docs/graphql-api.md`](docs/graphql-api.md), [`docs/websocket-api.md`](docs/websocket-api.md), [`docs/webhooks.md`](docs/webhooks.md) |
-| Know what is currently broken | [`docs/reference/known-gaps.md`](docs/reference/known-gaps.md) |
-| Deploy | [`k8s/README.md`](k8s/README.md) |
+| If you want to                      | Read                                                                                                                                   |
+| :---------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------- |
+| Write code in this repo             | [`docs/development-conventions.md`](docs/development-conventions.md)                                                                   |
+| Know why something is the way it is | [`docs/decisions/`](docs/decisions/) — 44 ADRs, append-only                                                                            |
+| Follow an end-to-end path           | [`docs/reference/flows/`](docs/reference/flows/)                                                                                       |
+| Build a client                      | [`docs/graphql-api.md`](docs/graphql-api.md), [`docs/websocket-api.md`](docs/websocket-api.md), [`docs/webhooks.md`](docs/webhooks.md) |
+| Know what is currently broken       | [`docs/reference/known-gaps.md`](docs/reference/known-gaps.md)                                                                         |
+| Deploy                              | [`k8s/README.md`](k8s/README.md)                                                                                                       |
 
 ## Setup, from A to Z
 
 ### Prerequisites
 
-| Tool | Version | Why |
-| :---- | :---- | :---- |
-| Node | **24.19.0** — see `.nvmrc` | `nvm use` picks it up |
-| npm | **11.9.0** — pinned by `packageManager` | Workspaces |
-| Docker + Compose | any current | The eight backing services |
-| Python | **3.12** | `rag-service`; matches the image base |
+| Tool             | Version                                 | Why                                   |
+| :--------------- | :-------------------------------------- | :------------------------------------ |
+| Node             | **24.19.0** — see `.nvmrc`              | `nvm use` picks it up                 |
+| npm              | **11.9.0** — pinned by `packageManager` | Workspaces                            |
+| Docker + Compose | any current                             | The eight backing services            |
+| Python           | **3.12**                                | `rag-service`; matches the image base |
 
 Optional, and only for **scanned** PDFs: `poppler-utils` and `tesseract-ocr` on
 your PATH. `OcrService` probes for both at boot and degrades with a warning
@@ -124,12 +124,12 @@ npm run keys:service-account   # throwaway Firebase service-account keys
 rotating the pair invalidates every access token already issued, so it is opt-in
 via `npm run keys:generate -- --force`.
 
-| File | Who holds it |
-| :---- | :---- |
+| File                                       | Who holds it                                              |
+| :----------------------------------------- | :-------------------------------------------------------- |
 | `apps/auth-service/secrets/jwt-access.key` | auth-service — the only service that may **mint** a token |
-| `apps/auth-service/secrets/jwt-2fa.key` | auth-service |
-| `apps/api-gateway/secrets/jwt-access.pub` | api-gateway — can only **verify** |
-| `apps/api-gateway/secrets/jwt-2fa.pub` | api-gateway |
+| `apps/auth-service/secrets/jwt-2fa.key`    | auth-service                                              |
+| `apps/api-gateway/secrets/jwt-access.pub`  | api-gateway — can only **verify**                         |
+| `apps/api-gateway/secrets/jwt-2fa.pub`     | api-gateway                                               |
 
 `keys:service-account` writes `apps/storage-service/serviceAccountKey.json` and
 `apps/auth-service/serviceAccountKey.json`. These are synthetic RSA credentials,
@@ -155,10 +155,10 @@ done
 **A plain copy does not boot.** These values are placeholders, and two of them
 fail in ways worth knowing in advance:
 
-| Where | Key | Change it to | What happens otherwise |
-| :---- | :---- | :---- | :---- |
-| all four DB services | `DATABASE_URL` | user `postgres`, password `password123456789` — whatever your root `.env` says | Cannot connect. The example ships `user:password` |
-| `auth-service` | `SUPER_ADMIN_PASSWORD` | anything of your own, 12+ chars | **Boot is refused.** Both published placeholder values are on a blocklist outside `NODE_ENV=test`, so a deployment that edited every line but this one cannot get a super-admin whose password is in the repository |
+| Where                | Key                    | Change it to                                                                   | What happens otherwise                                                                                                                                                                                              |
+| :------------------- | :--------------------- | :----------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| all four DB services | `DATABASE_URL`         | user `postgres`, password `password123456789` — whatever your root `.env` says | Cannot connect. The example ships `user:password`                                                                                                                                                                   |
+| `auth-service`       | `SUPER_ADMIN_PASSWORD` | anything of your own, 12+ chars                                                | **Boot is refused.** Both published placeholder values are on a blocklist outside `NODE_ENV=test`, so a deployment that edited every line but this one cannot get a super-admin whose password is in the repository |
 
 `INBOUND_EMAIL_SECRET` needs one more thing that no single file can state: the
 **same value** must reach `api-gateway`, `notification-service` and the
@@ -198,10 +198,22 @@ point that imports `@synapsedesk/common` from `libs/common/dist`. On a fresh
 clone that directory does not exist yet.
 
 `db:push` is two steps on purpose: `prisma db push` creates every table and
-**none** of the partial indexes, so `schema-apply` follows with the 24 objects
+**none** of the partial indexes, so `schema-apply` follows with the objects
 the schema language has no syntax for — extensions, GIN indexes, and the partial
 unique indexes that make email uniqueness per-tenant. A database with the tables
 and without those looks correct and quietly permits what they refuse.
+
+Then, once per ingestion database:
+
+```sh
+npm run projection:backfill -w @synapsedesk/ingestion-service
+```
+
+The nightly chunk-usage projection adds to counters from a cursor and refuses to
+run without one, because seeding it means resetting every chunk row — a lock the
+02:00 job must not take on a live table. On an empty database this takes a
+second and seeds the cursor; skip it and that one nightly step fails until you
+run it.
 
 ### 8. Run
 
@@ -218,13 +230,13 @@ On first boot auth-service seeds itself (`SEED_ON_BOOTSTRAP = true`): permission
 the system user, and the super admin from `SUPER_ADMIN_EMAIL` /
 `SUPER_ADMIN_PASSWORD`. That account is how you log in.
 
-| Reach | At |
-| :---- | :---- |
-| REST | `http://localhost:3000/api/v1` |
-| GraphQL | `http://localhost:3000/graphql` — **not** under the prefix |
-| Swagger | `http://localhost:3000/api/v1/docs`, with `SWAGGER_ENABLED = true` |
+| Reach                          | At                                                                                                                   |
+| :----------------------------- | :------------------------------------------------------------------------------------------------------------------- |
+| REST                           | `http://localhost:3000/api/v1`                                                                                       |
+| GraphQL                        | `http://localhost:3000/graphql` — **not** under the prefix                                                           |
+| Swagger                        | `http://localhost:3000/api/v1/docs`, with `SWAGGER_ENABLED = true`                                                   |
 | Liveness / readiness / version | `/health`, `/health/ready`, `/version` — outside the prefix, because an orchestrator cannot negotiate an API version |
-| Prometheus metrics | `http://127.0.0.1:9464/metrics` |
+| Prometheus metrics             | `http://127.0.0.1:9464/metrics`                                                                                      |
 
 ### 9. Optional: billing catalogue and demo data
 
@@ -262,7 +274,7 @@ npm run test:e2e         # six suites, sequential
 
 `npm run test:system` is **destructive** and says so: it flushes the entire dev
 Redis, drops the Qdrant collection and resets the JetStream streams, in setup
-*and* teardown. Postgres is the only store it spares.
+_and_ teardown. Postgres is the only store it spares.
 
 Several of the specs under `libs/common/src/configs/` are contract guards rather
 than unit tests — they check the manifests against the application, the images
@@ -285,11 +297,11 @@ docker build -f docker/node-service.Dockerfile \
   -t api-gateway .
 ```
 
-| Target | Used by |
-| :---- | :---- |
-| `runtime` | api-gateway, auth, ticket, notification, storage |
-| `runtime-ocr` | ingestion-service — adds poppler and one Tesseract language pack per `OCR_LANGUAGES` entry |
-| `migrate` | auth, ticket, ingestion, notification. `FROM build`, not `FROM runtime` — the Prisma CLI is a devDependency and `prisma.config.ts` loads through TypeScript. 3.17 GB against runtime's 1.01 GB, and it runs for seconds in a pod's init phase |
+| Target        | Used by                                                                                                                                                                                                                                       |
+| :------------ | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `runtime`     | api-gateway, auth, ticket, notification, storage                                                                                                                                                                                              |
+| `runtime-ocr` | ingestion-service — adds poppler and one Tesseract language pack per `OCR_LANGUAGES` entry                                                                                                                                                    |
+| `migrate`     | auth, ticket, ingestion, notification. `FROM build`, not `FROM runtime` — the Prisma CLI is a devDependency and `prisma.config.ts` loads through TypeScript. 3.17 GB against runtime's 1.01 GB, and it runs for seconds in a pod's init phase |
 
 rag-service builds from `docker/rag-service.Dockerfile`; its stages genuinely
 differ. `./docker/check-images.sh` builds everything and asserts the runtime
@@ -311,7 +323,7 @@ Services, one Ingress, two StatefulSets and one NetworkPolicy; the decisions are
 
 Four things it does **not** create and will not tell you about twice: a
 namespace, a CNI that actually enforces NetworkPolicy, a default `StorageClass`,
-and an `ingress-nginx` controller. Read *Before the first apply* before the first
+and an `ingress-nginx` controller. Read _Before the first apply_ before the first
 apply — an existing database built by `db push` has no `_prisma_migrations` row
 and needs `prisma migrate resolve --applied 0_init`, or `migrate deploy` will try
 to create tables that are already there.

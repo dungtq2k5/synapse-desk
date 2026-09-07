@@ -162,6 +162,15 @@ CREATE TABLE "limit_alert_generations" (
     CONSTRAINT "limit_alert_generations_pkey" PRIMARY KEY ("organization_id","dimension")
 );
 
+-- CreateTable
+CREATE TABLE "projection_cursors" (
+    "name" VARCHAR(64) NOT NULL,
+    "until" TIMESTAMPTZ NOT NULL,
+    "updated_at" TIMESTAMPTZ NOT NULL,
+
+    CONSTRAINT "projection_cursors_pkey" PRIMARY KEY ("name")
+);
+
 -- CreateIndex
 CREATE INDEX "documents_organization_id_created_at_idx" ON "documents"("organization_id", "created_at" DESC);
 

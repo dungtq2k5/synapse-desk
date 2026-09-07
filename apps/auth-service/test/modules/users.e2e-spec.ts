@@ -15,6 +15,7 @@ import {
 import {
   addMember,
   createDepartment,
+  createOrganization,
   createRole,
   createTrustedDeviceSession,
   createUserWithPassword,
@@ -25,6 +26,7 @@ import {
 import { UsersService } from '../../src/modules/users/users.service';
 import { flattenPermissionCodes } from '../../src/common/utils';
 import { UserProjection } from '@synapsedesk/grpc-proto';
+import { DatabaseSeeder } from '../../src/modules/prisma/database.seeder';
 
 describe('Users (e2e)', () => {
   let fx: E2eFixture;
@@ -1202,6 +1204,70 @@ describe('Users (e2e)', () => {
       // And the notification-shaped field is empty, so nothing arrives by the
       // other door either.
       expect(items).toEqual([]);
+    });
+  });
+
+  // ----------------------------------------- the super-admin CHECK constraint
+
+  describe('`users_super_admin_iff_no_tenant`', () => {
+    /**
+     * **Raw inserts, deliberately.** Prisma's types already make the pair hard
+     * to get wrong from application code, and that is exactly why the test has
+     * to go under them: the question is whether the DATABASE refuses, because
+     * the guard has to hold for a psql session, a future migration and any
+     * service that reaches this table.
+     */
+    const insert = (organizationId: string | null, isSuperAdmin: boolean) =>
+      fx.prisma.$executeRawUnsafe(
+        `INSERT INTO users (email, password_hash, full_name, organization_id, is_super_admin)
+         VALUES ($1, 'x', 'Probe', $2::uuid, $3)`,
+        `probe-${randomUUID()}@example.test`,
+        organizationId,
+        isSuperAdmin,
+      );
+
+    it('**1. refuses a tenantless user who is NOT a super admin**', async () => {
+      // The row the row is about: no tenant and no platform role. Every tenant
+      // filter treats it as unreachable rather than as an error, so it is
+      // invisible until somebody goes looking for a user who cannot sign in.
+      await expect(insert(null, false)).rejects.toThrow(
+        /users_super_admin_iff_no_tenant/,
+      );
+    });
+
+    it('**2. refuses a super admin who DOES have a tenant**', async () => {
+      // The other direction, and the more dangerous one: a cross-tenant
+      // account nobody granted, sitting inside a tenant that looks ordinary.
+      const organization = await createOrganization(fx.prisma);
+
+      await expect(insert(organization.id, true)).rejects.toThrow(
+        /users_super_admin_iff_no_tenant/,
+      );
+    });
+
+    it('3. allows both legal pairs', async () => {
+      // The constraint is an `iff`, so it has to admit as well as refuse —
+      // otherwise a test suite that only checks rejections passes against
+      // `CHECK (false)`.
+      const organization = await createOrganization(fx.prisma);
+
+      await expect(insert(organization.id, false)).resolves.toBe(1);
+      await expect(insert(null, true)).resolves.toBe(1);
+    });
+
+    it('4. survives a re-seed', async () => {
+      // Applied from the SEED rather than a one-off command, because
+      // `db push --force-reset` neither creates nor preserves a hand-written
+      // constraint — a reset would silently drop it and leave a schema that
+      // looks correct. Same shape as the lock CHECK's own idempotency test.
+      const seeder = fx.moduleRef.get(DatabaseSeeder);
+      await seeder.seed();
+
+      const [{ count }] = await fx.prisma.$queryRawUnsafe<[{ count: bigint }]>(
+        `SELECT COUNT(*)::bigint AS count FROM pg_constraint
+           WHERE conname = 'users_super_admin_iff_no_tenant'`,
+      );
+      expect(Number(count)).toBe(1);
     });
   });
 });

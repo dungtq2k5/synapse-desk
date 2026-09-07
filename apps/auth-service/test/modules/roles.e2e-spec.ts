@@ -21,6 +21,8 @@ import {
   seedTenantWithUser,
 } from '../factories';
 import { RolesService } from '../../src/modules/roles/roles.service';
+import { DatabaseSeeder } from '../../src/modules/prisma/database.seeder';
+import { Logger } from '@nestjs/common';
 
 describe('Roles & Permissions (e2e)', () => {
   let fx: E2eFixture;
@@ -794,6 +796,138 @@ describe('Roles & Permissions (e2e)', () => {
           include: { roles: true },
         }),
       ).toMatchObject({ roles: [] });
+    });
+  });
+
+  // ------------------------------------------- retired codes, and who holds them
+
+  describe('the boot report names the roles holding a RETIRED code', () => {
+    /**
+     * known-gaps #10, and the reason it is latent.
+     *
+     * A code removed from `PERMISSION_CODES` is deliberately left in the
+     * `permissions` table: tenant custom roles may still reference it, and
+     * deleting the row would cascade that grant away silently (ADR 0038). The
+     * codes alone say what is dead; the report names who still grants it, which
+     * is the only form an operator can act on.
+     *
+     * **`PERMISSION_CODES` and the table match exactly today**, so the report
+     * is empty on every real boot and this is the only way to see it work — the
+     * retired row has to be manufactured.
+     */
+    /**
+     * A role granting the retired code, built in two steps.
+     *
+     * `createRole`'s `permissionCodes` is typed `PermissionCode[]`, and a
+     * retired code is by definition not one — the union is the compile-time
+     * artifact ADR 0038 makes it. So the role is created live and the dead
+     * grant is connected afterwards, which is also how a real one got there:
+     * it was legal when it was granted.
+     */
+    const grantRetired = async (
+      tenant: Awaited<ReturnType<typeof seedTenantWithUser>>,
+      name: string,
+    ) => {
+      const role = await createRole(fx.prisma, {
+        organizationId: tenant.org.id,
+        createdById: tenant.user.id,
+        overrides: { name },
+      });
+
+      return fx.prisma.role.update({
+        where: { id: role.id },
+        data: { permissions: { connect: { code: RETIRED } } },
+      });
+    };
+
+    /**
+     * The manufactured retired row, and why it has to be cleaned up by hand.
+     *
+     * `fx.reset()` truncates tenant data and deliberately LEAVES the seeded
+     * permission catalogue — the bootstrap spec asserts exactly that. So a row
+     * added here survives into every later test in the run: measured, it broke
+     * the second test in this describe on a unique-name collision and the
+     * bootstrap spec's catalogue assertion at the same time.
+     */
+    const RETIRED = 'retired.test';
+
+    afterEach(async () => {
+      await fx.prisma.permission.deleteMany({ where: { code: RETIRED } });
+    });
+
+    const seedRetiredCode = () =>
+      fx.prisma.permission.create({
+        data: { code: RETIRED, name: 'Retired (test)' },
+      });
+
+    const retiredWarnings = async (): Promise<string[]> => {
+      const lines: string[] = [];
+      const warn = jest
+        .spyOn(Logger.prototype, 'warn')
+        .mockImplementation((message: unknown) => {
+          lines.push(String(message));
+        });
+
+      try {
+        await fx.moduleRef.get(DatabaseSeeder).seed();
+      } finally {
+        warn.mockRestore();
+      }
+
+      return lines;
+    };
+
+    it('**1. names the role, its tenant and the dead code it still grants**', async () => {
+      const tenant = await seedTenantWithUser(fx.prisma);
+
+      // A code the array no longer has. `skipDuplicates` on the seeder's
+      // createMany leaves it alone; `notIn PERMISSION_CODES` is what finds it.
+      await seedRetiredCode();
+
+      const holder = await grantRetired(tenant, 'Legacy Auditor');
+
+      const lines = await retiredWarnings();
+
+      expect(lines.some((line) => line.includes(RETIRED))).toBe(true);
+
+      const named = lines.find((line) => line.includes(holder.id));
+      expect(named).toBeDefined();
+      expect(named).toContain('Legacy Auditor');
+      expect(named).toContain(tenant.org.id);
+      expect(named).toContain(RETIRED);
+    });
+
+    it('2. leaves a role holding only LIVE codes out of the report', async () => {
+      // The half that makes the first assertion mean something: a report that
+      // named every role would be as useless as one that named none.
+      const tenant = await seedTenantWithUser(fx.prisma);
+
+      await seedRetiredCode();
+
+      const holder = await grantRetired(tenant, 'Legacy Auditor');
+      const healthy = await createRole(fx.prisma, {
+        organizationId: tenant.org.id,
+        createdById: tenant.user.id,
+        permissionCodes: ['user.read'],
+        overrides: { name: 'Ordinary Agent' },
+      });
+
+      const lines = await retiredWarnings();
+
+      expect(lines.some((line) => line.includes(holder.id))).toBe(true);
+      expect(lines.some((line) => line.includes(healthy.id))).toBe(false);
+      expect(lines.some((line) => line.includes('Ordinary Agent'))).toBe(false);
+    });
+
+    it('3. says nothing at all when every code is live', async () => {
+      // The ordinary boot, which is every boot today. A report that fired on a
+      // healthy catalogue would train an operator to ignore it.
+      await seedTenantWithUser(fx.prisma);
+
+      const lines = await retiredWarnings();
+
+      expect(lines.some((line) => line.includes('still grants'))).toBe(false);
+      expect(lines.some((line) => line.includes('no longer in'))).toBe(false);
     });
   });
 });

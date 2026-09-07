@@ -113,15 +113,19 @@ export class AuditPublisher {
       // (platform acts record no tenant), and `??` would discard it in favour
       // of the actor's own organization.
       //
-      // **`??` would produce the same value today, and that is the danger.**
-      // Platform acts pass `null` and are performed by super admins, whose own
-      // `organizationId` is also `null` — so the two forms agree by
-      // coincidence. The invariant holding that coincidence up is
-      // `(organization_id IS NULL) = is_super_admin`, which `schema.prisma` and
-      // conventions §7 both describe as a CHECK constraint and which the
-      // database does not actually have (known-gaps #5). The day a platform act
-      // becomes performable by anyone with a tenant, `??` stamps the wrong
-      // organization on a platform audit row and the row looks right.
+      // **`??` produces the same value, and the reason is enforced.** Platform
+      // acts pass `null` and are performed by super admins, whose own
+      // `organizationId` is also `null`, so the two forms agree — on an
+      // invariant the database holds: `users_super_admin_iff_no_tenant`,
+      // `(organization_id IS NULL) = is_super_admin`, applied by auth-service's
+      // seeder DDL block (ADR 0039).
+      //
+      // The distinction still earns its keep, because the invariant constrains
+      // WHO can perform a platform act and not what this expression means. The
+      // day a platform act becomes performable by someone with a tenant — a
+      // support engineer acting cross-tenant, say — `??` would stamp their own
+      // organization on a platform audit row and the row would look right.
+      // `!== undefined` records the null the caller asked for either way.
       organizationId:
         event.organizationId !== undefined // NOSONAR — see above; `??` is not equivalent here
           ? event.organizationId

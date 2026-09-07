@@ -32,6 +32,21 @@ const SEED_TRANSACTION_MAX_WAIT_MS = 15_000;
 type SeedSummary = {
   permissionsCreated: number;
   retiredPermissionCodes: string[];
+  /**
+   * The roles still granting a retired code, and which ones.
+   *
+   * The codes alone tell an operator that something is dead; they do not say
+   * who is carrying it, so nobody knows which roles to edit and a role keeps
+   * advertising a capability no guard will ever satisfy (known-gaps #10).
+   * Empty while `PERMISSION_CODES` and the table match, which roles e2e test 3
+   * pins.
+   */
+  rolesHoldingRetired: {
+    id: string;
+    name: string;
+    organizationId: string | null;
+    codes: string[];
+  }[];
   systemUserCreated: boolean;
   superAdminCreated: boolean;
   rolesCreated: string[];
@@ -231,6 +246,21 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
           `PERMISSION_CODES and were left untouched: ` +
           summary.retiredPermissionCodes.join(', '),
       );
+
+      // **One line per ROLE, under the codes.** The warning above says what is
+      // dead; these say who is still handing it out, which is the only form an
+      // operator can act on — the fix is editing those roles (known-gaps #10).
+      //
+      // A retired code is never dropped from the table, because tenant custom
+      // roles may still reference it and deleting the row would cascade the
+      // grant away silently (ADR 0038). The cost of keeping it is that nothing
+      // announces the holders unless this does.
+      for (const role of summary.rolesHoldingRetired) {
+        this.logger.warn(
+          `  role "${role.name}" (${role.id}, ${role.organizationId ?? 'platform'}) ` +
+            `still grants: ${role.codes.join(', ')}`,
+        );
+      }
     }
     if (summary.systemUserCreated) {
       this.logger.log(
@@ -352,6 +382,17 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
   /**
    * Constraints Prisma cannot express.
    *
+   * Adds the two `users` CHECK constraints.
+   *
+   * **The super-admin one is what lets code reason "super admins have no
+   * tenant".** `AuditPublisher.record` is the case that depends on it: `??` and
+   * `!== undefined` agree there only while the invariant holds.
+   *
+   * It is an `iff`, not an implication, and both directions matter: a tenant
+   * row with `is_super_admin = true` is a cross-tenant account nobody granted,
+   * and a row with no tenant and `is_super_admin = false` is unreachable to
+   * every tenant filter without being an error anywhere.
+   *
    * Adds the `users` lock CHECK: `locked_until` without `is_locked` is
    * unrepresentable, so only three of the four column states are writable.
    * `true` + past is deliberately allowed — it is the converging window between
@@ -378,6 +419,15 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
           ALTER TABLE "users"
             ADD CONSTRAINT "users_locked_until_requires_lock"
             CHECK ("locked_until" IS NULL OR "is_locked");
+        END IF;
+
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint
+          WHERE conname = 'users_super_admin_iff_no_tenant'
+        ) THEN
+          ALTER TABLE "users"
+            ADD CONSTRAINT "users_super_admin_iff_no_tenant"
+            CHECK (("organization_id" IS NULL) = "is_super_admin");
         END IF;
       END $$;
     `);
@@ -485,7 +535,10 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
   private async seedPermissions(
     tx: Prisma.TransactionClient,
   ): Promise<
-    Pick<SeedSummary, 'permissionsCreated' | 'retiredPermissionCodes'>
+    Pick<
+      SeedSummary,
+      'permissionsCreated' | 'retiredPermissionCodes' | 'rolesHoldingRetired'
+    >
   > {
     const { count } = await tx.permission.createMany({
       data: PERMISSION_CODES.map((code) => ({
@@ -499,10 +552,38 @@ export class DatabaseSeeder implements OnApplicationBootstrap {
       where: { code: { notIn: [...PERMISSION_CODES] } },
       select: { code: true },
     });
+    const retiredCodes = retired.map((permission) => permission.code);
+
+    // **Who is still carrying them.** One query over the implicit
+    // `_role_permissions` junction, and only when there is something to look
+    // for — a retirement is rare and this runs on every boot.
+    //
+    // The nested `where` narrows the returned permissions to the retired ones,
+    // so a role granting forty live codes and one dead one reports the one.
+    const holders = retiredCodes.length
+      ? await tx.role.findMany({
+          where: { permissions: { some: { code: { in: retiredCodes } } } },
+          select: {
+            id: true,
+            name: true,
+            organizationId: true,
+            permissions: {
+              where: { code: { in: retiredCodes } },
+              select: { code: true },
+            },
+          },
+        })
+      : [];
 
     return {
       permissionsCreated: count,
-      retiredPermissionCodes: retired.map((p) => p.code),
+      retiredPermissionCodes: retiredCodes,
+      rolesHoldingRetired: holders.map((role) => ({
+        id: role.id,
+        name: role.name,
+        organizationId: role.organizationId,
+        codes: role.permissions.map((permission) => permission.code),
+      })),
     };
   }
 

@@ -14,6 +14,7 @@ import {
   SCOPE_FANOUT_QUEUE,
   GENERATION_MODEL_BY_TIER,
   QDRANT_PAYLOAD_FIELDS,
+  PROJECTION_LAG_MS,
   compareAlphabetically,
 } from '@synapsedesk/common';
 import { bootstrapE2eTest, CYCLE_START, E2eFixture } from '../utils';
@@ -599,6 +600,17 @@ describe('The fan-out and the scheduled jobs (e2e)', () => {
       });
     };
 
+    /**
+     * The nightly path needs a cursor; `project()` refuses without one.
+     *
+     * Seeded directly rather than through `backfill()` so each test states the
+     * interval it is about. `backfill()` has its own tests below.
+     */
+    const seedCursor = (until: Date) =>
+      fx.prisma.projectionCursor.create({
+        data: { name: 'chunk-usage-projection', until },
+      });
+
     it('6. Projects retrieval and citation counts onto the chunk rows', async () => {
       const document = await documentWithChunks(2);
       const chunks = await fx.prisma.documentChunk.findMany({
@@ -606,12 +618,10 @@ describe('The fan-out and the scheduled jobs (e2e)', () => {
         orderBy: { chunkIndex: 'asc' },
       });
 
+      await seedCursor(new Date(Date.now() - HOUR));
       await ledgerRow([chunks[0].id, chunks[1].id], [chunks[0].id]);
 
-      await projection.project(
-        new Date(Date.now() - HOUR),
-        new Date(Date.now() + HOUR),
-      );
+      await projection.project(new Date(Date.now() + HOUR));
 
       const [first, second] = await fx.prisma.documentChunk.findMany({
         where: { documentId: document.id },
@@ -627,25 +637,214 @@ describe('The fan-out and the scheduled jobs (e2e)', () => {
       expect(second.citationCount).toBe(0);
     });
 
-    it('7. Uses a HALF-OPEN window, so consecutive runs neither skip nor double-count', async () => {
+    it('7. **A generation is counted by exactly ONE run** — the cursor, not a window', async () => {
+      // The cursor makes consecutive intervals abut by construction; the
+      // boundary row belongs to exactly one run. Asserted below.
       const document = await documentWithChunks(1);
       const [chunk] = await fx.prisma.documentChunk.findMany({
         where: { documentId: document.id },
       });
 
       const boundary = new Date('2026-08-10T00:00:00.000Z');
+      await seedCursor(new Date('2026-08-09T00:00:00.000Z'));
       await ledgerRow([chunk.id], [], boundary);
 
-      // The row sits exactly on the boundary. A closed interval on both sides
-      // counts it in BOTH windows — rare enough to look like noise, frequent
-      // enough to matter over months.
-      await projection.project(new Date('2026-08-09T00:00:00.000Z'), boundary);
-      await projection.project(boundary, new Date('2026-08-11T00:00:00.000Z'));
+      // Half-open at the top: `created_at === until` belongs to the NEXT run.
+      await projection.project(boundary);
+      expect(
+        (
+          await fx.prisma.documentChunk.findUniqueOrThrow({
+            where: { id: chunk.id },
+          })
+        ).retrievalCount,
+      ).toBe(0);
+
+      // The next run's lower bound is that same instant, so the row is picked
+      // up exactly once — the property the overlapping window could not give.
+      await projection.project(new Date('2026-08-11T00:00:00.000Z'));
+      expect(
+        (
+          await fx.prisma.documentChunk.findUniqueOrThrow({
+            where: { id: chunk.id },
+          })
+        ).retrievalCount,
+      ).toBe(1);
+
+      // A third run over a later interval must not find it again.
+      await projection.project(new Date('2026-08-12T00:00:00.000Z'));
+      expect(
+        (
+          await fx.prisma.documentChunk.findUniqueOrThrow({
+            where: { id: chunk.id },
+          })
+        ).retrievalCount,
+      ).toBe(1);
+    });
+
+    it('**7a. Running twice over the same generations changes nothing**', async () => {
+      // The row's headline, at its simplest: the second call is a no-op.
+      const document = await documentWithChunks(2);
+      const chunks = await fx.prisma.documentChunk.findMany({
+        where: { documentId: document.id },
+        orderBy: { chunkIndex: 'asc' },
+      });
+
+      await seedCursor(new Date(Date.now() - HOUR));
+      await ledgerRow([chunks[0].id, chunks[1].id], [chunks[0].id]);
+      await ledgerRow([chunks[0].id], [chunks[0].id]);
+
+      const until = new Date(Date.now() + HOUR);
+      await projection.project(until);
+
+      const afterFirst = await fx.prisma.documentChunk.findMany({
+        where: { documentId: document.id },
+        orderBy: { chunkIndex: 'asc' },
+      });
+
+      await projection.project(new Date(Date.now() + 2 * HOUR));
+
+      const afterSecond = await fx.prisma.documentChunk.findMany({
+        where: { documentId: document.id },
+        orderBy: { chunkIndex: 'asc' },
+      });
+
+      expect(afterFirst.map((c) => c.retrievalCount)).toEqual([2, 1]);
+      expect(afterSecond.map((c) => c.retrievalCount)).toEqual([2, 1]);
+      expect(afterSecond.map((c) => c.citationCount)).toEqual([2, 0]);
+    });
+
+    it('**7b. A generation after the cursor is counted once; one before it never again**', async () => {
+      const document = await documentWithChunks(1);
+      const [chunk] = await fx.prisma.documentChunk.findMany({
+        where: { documentId: document.id },
+      });
+
+      await seedCursor(new Date(Date.now() - 3 * HOUR));
+      await ledgerRow([chunk.id], [chunk.id], new Date(Date.now() - 2 * HOUR));
+      const first = new Date(Date.now() - HOUR);
+      await projection.project(first);
+
+      // A second generation lands after the cursor.
+      await ledgerRow([chunk.id], [], new Date(Date.now() - HOUR / 2));
+      await projection.project(new Date(Date.now()));
 
       const projected = await fx.prisma.documentChunk.findUniqueOrThrow({
         where: { id: chunk.id },
       });
+
+      // Two retrievals total — one per generation, each counted by one run.
+      // The citation came only from the first, and the second run did not add
+      // it again.
+      expect(projected.retrievalCount).toBe(2);
+      expect(projected.citationCount).toBe(1);
+
+      const cursor = await fx.prisma.projectionCursor.findUniqueOrThrow({
+        where: { name: 'chunk-usage-projection' },
+      });
+      expect(cursor.until.getTime()).toBeGreaterThan(first.getTime());
+    });
+
+    it('**7c. The nightly run REFUSES without a cursor rather than inventing one**', async () => {
+      // A run with no lower bound would have to reset the counters and derive
+      // from the whole ledger, inside one transaction — a full-table lock on
+      // `document_chunks` while uploads wait on it. That work belongs to the
+      // backfill, which is somebody's deliberate command; the scheduled step
+      // says so instead of improvising.
+      await documentWithChunks(1);
+
+      await expect(
+        projection.project(new Date(Date.now() + HOUR)),
+      ).rejects.toThrow(/projection_cursors/);
+    });
+
+    it('**7e. The backfill resets, seeds the cursor, and re-derives**', async () => {
+      // A run that finds no cursor cannot trust the counters: nothing records
+      // what produced them, so they are not a base. 999 stands in for an
+      // untrusted value.
+      const document = await documentWithChunks(1);
+      const [chunk] = await fx.prisma.documentChunk.findMany({
+        where: { documentId: document.id },
+      });
+
+      await ledgerRow([chunk.id], [chunk.id]);
+      await fx.prisma.documentChunk.update({
+        where: { id: chunk.id },
+        data: { retrievalCount: 999, citationCount: 999 },
+      });
+
+      await projection.backfill(new Date(Date.now() + HOUR));
+
+      const projected = await fx.prisma.documentChunk.findUniqueOrThrow({
+        where: { id: chunk.id },
+      });
+
       expect(projected.retrievalCount).toBe(1);
+      expect(projected.citationCount).toBe(1);
+      // The timestamps are NOT reset — a reindex keeps them, and "when was this
+      // last retrieved" survives a recount.
+      expect(projected.lastRetrievedAt).not.toBeNull();
+
+      // And the cursor it seeded is what lets the nightly run start.
+      const cursor = await fx.prisma.projectionCursor.findUniqueOrThrow({
+        where: { name: 'chunk-usage-projection' },
+      });
+      expect(cursor.until.getTime()).toBeGreaterThan(Date.now());
+    });
+
+    it('**7f. A second backfill adds nothing** — it resumes, it does not reset', async () => {
+      // The property that makes an interrupted backfill safe to re-run: the
+      // cursor is committed per window, so a second call finds it, skips the
+      // reset, and projects an empty interval.
+      const document = await documentWithChunks(1);
+      const [chunk] = await fx.prisma.documentChunk.findMany({
+        where: { documentId: document.id },
+      });
+
+      await ledgerRow([chunk.id], [chunk.id]);
+
+      await projection.backfill(new Date(Date.now() + HOUR));
+      await projection.backfill(new Date(Date.now() + 2 * HOUR));
+
+      const projected = await fx.prisma.documentChunk.findUniqueOrThrow({
+        where: { id: chunk.id },
+      });
+
+      expect(projected.retrievalCount).toBe(1);
+      expect(projected.citationCount).toBe(1);
+    });
+
+    it('**7d. The LAG is honoured — a fresh generation waits for the next run**', async () => {
+      // The one subtlety a cursor has that an overlapping window did not. A
+      // generation committed just under the upper bound can be invisible to the
+      // statement that reads it, and a cursor moved past that instant would
+      // never look again. Lagging the bound is what buys the writer time.
+      const document = await documentWithChunks(1);
+      const [chunk] = await fx.prisma.documentChunk.findMany({
+        where: { documentId: document.id },
+      });
+
+      await seedCursor(new Date(Date.now() - HOUR));
+      await ledgerRow([chunk.id], [], new Date());
+
+      // `until` behind the generation, exactly as `daily()` computes it.
+      await projection.project(new Date(Date.now() - PROJECTION_LAG_MS));
+      expect(
+        (
+          await fx.prisma.documentChunk.findUniqueOrThrow({
+            where: { id: chunk.id },
+          })
+        ).retrievalCount,
+      ).toBe(0);
+
+      // The next run's bound has moved past it — counted, and counted once.
+      await projection.project(new Date(Date.now() + HOUR));
+      expect(
+        (
+          await fx.prisma.documentChunk.findUniqueOrThrow({
+            where: { id: chunk.id },
+          })
+        ).retrievalCount,
+      ).toBe(1);
     });
   });
 

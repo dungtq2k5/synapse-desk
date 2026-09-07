@@ -58,38 +58,38 @@ today.
 
 ---
 
-## Eleven of the twelve steps are idempotent
+## All twelve steps are re-run safe, by two different mechanisms
 
-`chunk-usage-projection` is the exception, and it is not a redelivery hazard —
-it accumulates on the **normal** daily path.
+`ai-generation-rollup` deletes and re-inserts its interval, so recomputing a
+day it already had is free — which is why it runs over a deliberately wide
+`trailingWindow(now, ROLLUP_TRAILING_DAYS)` and a missed night self-heals.
 
-It writes `SET retrieval_count = c.retrieval_count + usage.hits` (and the same
-shape for `citation_count`). Its window is `trailingWindow(now, ROLLUP_TRAILING_DAYS)`,
-`ROLLUP_TRAILING_DAYS` is 3, and `trailingWindow` subtracts `days + 1` — **a
-four-day window, recomputed every day, with nothing resetting the counters.**
-Each generation's hits are added by roughly four successive runs.
+`chunk-usage-projection` **adds** to `document_chunks.retrieval_count` /
+`citation_count`, so it cannot recompute; it takes a **cursor** instead.
+`project(until)` reads `projection_cursors` for its lower bound and writes the
+new bound last, inside the same transaction as the counters, so every
+generation is counted by exactly one run. `until` lags `now` by
+`PROJECTION_LAG_MS` so a row committed a moment after the statement began is
+picked up next night rather than skipped forever — the one subtlety a cursor
+has that a window did not.
 
-**The codebase already draws the distinction, one step later in the same
-sequence.** `AiGenerationRollupJob` uses delete-then-insert *"so a re-run
-recomputes rather than accumulates"*, because *"two rollups that behave
-differently under re-run is exactly the kind of difference nobody remembers when
-debugging a doubled number."*
+**It refuses to run without a cursor.** Seeding one means resetting every chunk
+counter, and that `UPDATE` row-locks the table every upload writes to, which is
+not something the 02:00 job should do to a live system. The step fails with
+`ProjectionCursorMissingError` until the operator runs, once per database:
 
-`trailingWindow`'s own defence — a half-open interval, so consecutive runs
-neither skip a row nor count one twice — holds for **adjacent** windows. This one
-overlaps on purpose, justified by *"a window an hour too wide re-computes a day
-that was already correct"*: true for delete-then-insert, false for `+=`. One
-helper, two jobs, opposite re-run semantics, and the safety argument written for
-the other one.
+```sh
+npm run projection:backfill -w @synapsedesk/ingestion-service
+```
 
-**What it does and does not affect:** bucketing is safe — `neverRetrieved` and
-`retrievedNeverCited` classify on zero thresholds, as do the document flags. The
-**absolute counts** in `analyticsDocuments` are inflated, and **`mostCited` is
-systematically biased against recent documents**: one cited yesterday has had one
-pass, one cited last week has had four.
+It resets in `PROJECTION_RESET_BATCH` batches, projects in
+`PROJECTION_BACKFILL_WINDOW_DAYS` windows from the oldest generation, and
+commits a cursor per window — interrupted, it resumes; complete, it is a no-op.
 
-This is a code defect, not a documentation one — tracked as **known-gaps row
-29**, which carries the options and the closing condition.
+The read side (`ai-analytics.service.ts`) has no date predicate: the counters
+are a lifetime total **since the document's last reindex**, because
+`writeChunkRows` deletes and recreates chunk rows and old generations then name
+ids that no longer exist.
 
 ---
 
@@ -139,8 +139,9 @@ would fire them does not.
 | Situation | What happens | Why |
 | :---- | :---- | :---- |
 | **Three replicas** | one schedule | Stable `jobId`; the repeat lives in Redis, not in the process |
-| **Deploy during a run** | the job is redelivered | BullMQ redelivery — but see below: **eleven of the twelve steps are idempotent, not all twelve** |
-| **A step throws** | later steps in that sequence do not run | The order is a data dependency, so continuing would read inputs that were never written |
+| **Deploy during a run** | the job is redelivered | BullMQ redelivery — safe: the rollup recomputes, the projection resumes from its cursor |
+| **A step throws** | **later steps still run** — `step()` catches and logs, it does not rethrow | One bad tenant must not cost the night's rollup. The cost is that `document-flags` may compute against counters the projection did not write this run — stale, not wrong, and the next run closes the gap |
+| **No projection cursor** | `chunk-usage-projection` fails every night with `ProjectionCursorMissingError`; the other steps run | Run `projection:backfill` once for that database — see above |
 | **Redis flushed** | every repeat entry is gone until a process re-registers | Boot re-registers; a flush between deploys is a gap nothing reports |
 | **A job is added** | compile error until cron, sequence and owner exist | Three `satisfies Record<…>` over one key set |
 | **A job is added, alerts not regenerated** | it runs, unalerted | The generator is manual — see above |
@@ -154,7 +155,7 @@ would fire them does not.
 | A rollup stopped updating | `job_runs` for that job, then whether its repeat entry still exists in Redis |
 | A job ran twice | a second repeat entry — usually a deploy that changed the `jobId` |
 | A daily figure is stale but its sibling is fresh | both dailies run at `0 2 * * *`, so this is a failure, not a lag |
-| A job runs but its later steps do not | an earlier step threw; the sequence stops rather than continuing on missing inputs |
-| `mostCited` favours old documents, or counts look too high | `chunk-usage-projection` accumulates over an overlapping window — see above |
+| A step's heartbeat is stale while its siblings are fresh | that step threw; the others ran anyway — read its `job_runs.last_error` |
+| `chunk-usage-projection` fails nightly with `ProjectionCursorMissingError` | the database was never backfilled — run `projection:backfill` once |
 | Alerts never fire | nothing scrapes the metric yet — the rules file has no reader |
 | Alerts are a job short | regenerate, and build the lib first |

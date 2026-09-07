@@ -124,6 +124,12 @@ export async function bootstrapE2eTest(): Promise<E2eFixture> {
         -- The heartbeat. Not tenant data, but a row surviving into the next
         -- test carries its consecutive_failures with it.
         "job_runs",
+        -- The projection cursor, for a sharper version of the same reason: a
+        -- surviving row is a LOWER BOUND, so the next test's projection reads
+        -- an interval that starts after its own fixtures and silently counts
+        -- nothing. Measured — it turns a projection test into a no-op with no
+        -- error anywhere.
+        "projection_cursors",
         "documents"
       RESTART IDENTITY CASCADE;
     `);

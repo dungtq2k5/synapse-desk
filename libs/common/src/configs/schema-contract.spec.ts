@@ -227,9 +227,9 @@ describe('the schema contract', () => {
       ];
     };
 
-    it('extracts twenty-three named objects plus one extension — the floor', () => {
-      // auth 8, ticket 5, ingestion 7 (six indexes and `btree_gin`),
-      // notification 4 = 24.
+    it('extracts twenty-four named objects plus one extension — the floor', () => {
+      // auth 9, ticket 5, ingestion 7 (six indexes and `btree_gin`),
+      // notification 4 = 25.
       //
       // **The prose said twenty-six for three ADRs, and this is why it is a
       // test now.** That figure came from a raw `grep -c` over the seeders,
@@ -241,8 +241,15 @@ describe('the schema contract', () => {
       //
       // ADR 0039's own thesis is that a prose enumeration of database objects
       // has no verifier. The count was the enumeration it did not think it was
-      // making. All six are corrected; this assertion is what makes the next
-      // drift a red test rather than a re-read.
+      // making — and so is THE LIST IN THE PARAGRAPH ABOVE, which names five
+      // places and there are ten: it omits ADR 0044, the root `README.md`, and
+      // the docblock at the top of all four `schema-apply.ts` files.
+      //
+      // **The number lives in two kinds of place.** The ADRs keep theirs as
+      // history — append-only, dated to their commits. No editable copy carries
+      // a digit; each says "the objects `schema-apply.ts` owns", because a
+      // bumped number only schedules this paragraph again. This assertion is
+      // the one live figure, and it is a test rather than a sentence.
       const named = withSchema().flatMap(seederObjects);
       const extensions = withSchema()
         .map((service) =>
@@ -253,7 +260,7 @@ describe('the schema contract', () => {
         .join('\n')
         .match(/CREATE EXTENSION/gi);
 
-      expect(named.length).toBe(23);
+      expect(named).toHaveLength(24);
       expect(extensions?.length).toBe(1);
     });
 
@@ -273,7 +280,7 @@ describe('the schema contract', () => {
       "%s's migrations create nothing `schema-apply` owns",
       (service) => {
         // **Check 4, and the forbidden set is DERIVED rather than listed.** The
-        // twenty-four objects have one producer today; a migration is exactly
+        // objects have one producer today; a migration is exactly
         // where a second would appear, because writing `CREATE INDEX` in SQL is
         // the obvious thing to do when you are already writing SQL. Two
         // producers are invisible until they disagree.

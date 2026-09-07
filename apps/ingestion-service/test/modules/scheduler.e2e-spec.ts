@@ -6,6 +6,7 @@ import {
   JobRunRecorder,
   repeatJobId,
   jobsOwnedBy,
+  PROJECTION_LAG_MS,
   SCHEDULE_CRON,
   SCHEDULED_JOBS,
   SCHEDULER_QUEUE,
@@ -211,8 +212,15 @@ describe('The scheduler (e2e)', () => {
     it('6. **a step that throws does not prevent the ones after it**', async () => {
       // One bad tenant's projection must not cost that night's rollup as well.
       // A sequence that aborted on the first error would turn a small fault
-      // into a missing day — and the next run only recomputes a trailing
-      // window, so a long enough outage loses data for good.
+      // into a missing day.
+      //
+      // **`step()` swallows, and that is the mechanism.** It catches and logs
+      // rather than rethrowing, so `daily()` reaches every step whatever the
+      // one before it did. The cost is that a later step reads whatever the
+      // failed one left — `document-flags` computes `UNRETRIEVED` from counters
+      // the projection may not have written this run. The cursor keeps those
+      // counters stale rather than wrong: a failed projection leaves it in
+      // place and the next run covers the gap, however long the outage.
       const rollup = jest
         .spyOn(fx.moduleRef.get(AiGenerationRollupJob), 'run')
         .mockResolvedValue({ tenants: 0, rows: 0 });
@@ -225,6 +233,56 @@ describe('The scheduler (e2e)', () => {
         runJob(SCHEDULED_JOBS.LEDGER_DAILY),
       ).resolves.toBeUndefined();
       expect(rollup).toHaveBeenCalled();
+    });
+
+    it('**6b. a later step throwing does not disturb the projection cursor**', async () => {
+      // The cursor and the counters are written in ONE transaction, so nothing
+      // downstream can move them — and because `step()` swallows, "downstream"
+      // includes a step that throws. Two runs: the cursor advances on each and
+      // never rewinds, which is what makes a failed night recoverable rather
+      // than a hole.
+      jest
+        .spyOn(fx.moduleRef.get(AiGenerationRollupJob), 'run')
+        .mockResolvedValue({ tenants: 0, rows: 0 });
+      jest
+        .spyOn(fx.moduleRef.get(DocumentFlagWriter), 'detect')
+        .mockRejectedValue(new Error('flags exploded'));
+
+      // The nightly path reads its lower bound from this row and refuses
+      // without it; the backfill is what seeds it.
+      await fx.prisma.projectionCursor.create({
+        data: {
+          name: 'chunk-usage-projection',
+          until: new Date(Date.now() - 3_600_000),
+        },
+      });
+
+      await expect(
+        runJob(SCHEDULED_JOBS.LEDGER_DAILY),
+      ).resolves.toBeUndefined();
+
+      const first = await fx.prisma.projectionCursor.findUniqueOrThrow({
+        where: { name: 'chunk-usage-projection' },
+      });
+
+      const secondRunStartedAt = Date.now();
+
+      await expect(
+        runJob(SCHEDULED_JOBS.LEDGER_DAILY),
+      ).resolves.toBeUndefined();
+
+      const second = await fx.prisma.projectionCursor.findUniqueOrThrow({
+        where: { name: 'chunk-usage-projection' },
+      });
+
+      // **Strictly after the second run STARTED, not merely `>=` the first.**
+      // A cursor that stopped moving — the regression this test is named for —
+      // leaves `second` equal to `first`, which `>=` accepts. Pinning it to the
+      // second run's own clock is what makes the assertion about that run.
+      expect(second.until.getTime()).toBeGreaterThan(first.until.getTime());
+      expect(second.until.getTime()).toBeGreaterThan(
+        secondRunStartedAt - PROJECTION_LAG_MS - 1_000,
+      );
     });
 
     it('7. asks the rollup for a TRAILING window, not just yesterday', async () => {
