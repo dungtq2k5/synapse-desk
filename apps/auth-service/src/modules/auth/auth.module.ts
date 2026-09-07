@@ -11,6 +11,7 @@ import { FirebaseModule } from '../firebase/firebase.module';
 import { OtpModule } from '../otp/otp.module';
 import { RolesModule } from '../roles/roles.module';
 import { SessionsModule } from '../sessions/sessions.module';
+import { OrganizationsModule } from '../organizations/organizations.module';
 import { StorageClientModule } from '../storage-client/storage-client.module';
 import { AuditModule } from '../audit/audit.module';
 import { readFileSync } from 'node:fs';
@@ -25,6 +26,12 @@ import { readFileSync } from 'node:fs';
     SessionsModule,
     AuditModule,
     StorageClientModule,
+    // For `alertOnSeats` — `OrganizationsService` owns `seatsInUse`, the one
+    // definition of "seats used". Domain-matched registration consumes a seat
+    // like any other path and has to fire the same alarm. No cycle:
+    // `OrganizationsModule` imports Prisma, Audit, Notifications, Sessions and
+    // LimitAlerts, none of which reaches back here.
+    OrganizationsModule,
     // Access-token defaults live here; generate2faToken() overrides them
     // per-call with the 2FA secret and TTL.
     JwtModule.registerAsync({

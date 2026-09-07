@@ -25,6 +25,7 @@ import {
   TEST_PASSWORD,
 } from '../factories';
 import { AuthService } from '../../src/modules/auth/auth.service';
+import { OrganizationsService } from '../../src/modules/organizations/organizations.service';
 import { SessionsService } from '../../src/modules/sessions/sessions.service';
 import { hashToken } from '../../src/common/utils';
 
@@ -61,6 +62,120 @@ describe('Auth core (e2e)', () => {
       );
 
       expect(result.organizationId).toBe(org.id);
+    });
+
+    describe('the seat alarm', () => {
+      /**
+       * A registration takes a seat and is never refused for one.
+       *
+       * `seatsInUse` counts every active member and every pending invitation
+       * with no agent/end-user distinction, so a domain match consumes a seat
+       * exactly as an invited agent does. The decision is that the tenant is
+       * TOLD rather than the user blocked — telling somebody their own
+       * workspace exists and will not let them in is the worse outcome for a
+       * tenant one seat over. known-gaps #19.
+       *
+       * Spied rather than asserted through `limit_alert_generations`: the
+       * question here is whether this path reports the crossing at all, and the
+       * alarm's own behaviour is already covered where it lives.
+       */
+      const spyAlarm = () =>
+        jest.spyOn(fx.moduleRef.get(OrganizationsService), 'alertOnSeats');
+
+      it('**1c. joins a FULL workspace rather than refusing**', async () => {
+        // The decision, pinned. A hard cap here would be one
+        // `RESOURCE_EXHAUSTED` throw; this asserts it is not there.
+        const org = await createOrganization(fx.prisma, {
+          allowedEmailDomains: ['acme-full.test'],
+          maxAgentSeats: 1,
+        });
+        await createUserWithPassword(fx.prisma, {
+          organizationId: org.id,
+          email: 'first@acme-full.test',
+        });
+
+        const alertOnSeats = spyAlarm().mockResolvedValue(undefined);
+
+        try {
+          const result = await auth.register(
+            {
+              email: 'second@acme-full.test',
+              password: TEST_PASSWORD,
+              fullName: 'Second',
+            },
+            requestOrigin(),
+          );
+
+          expect(result.organizationId).toBe(org.id);
+          await expect(
+            fx.prisma.user.findFirst({
+              where: { email: 'second@acme-full.test' },
+            }),
+          ).resolves.not.toBeNull();
+
+          // **…and the crossing is reported.** Without this the usage page
+          // shows `used > limit` with no event behind it, which is the half of
+          // the row that had no product cost.
+          expect(alertOnSeats).toHaveBeenCalledTimes(1);
+          expect(alertOnSeats).toHaveBeenCalledWith(org.id, 1);
+        } finally {
+          alertOnSeats.mockRestore();
+        }
+      });
+
+      it('**1d. CREATING a workspace evaluates nothing**', async () => {
+        // A founder is the first member of a free-tier tenant, so evaluating
+        // there is a query to learn that one is fewer than the cap. This is the
+        // test that keeps `seatAlarm: null` and the founder branch agreeing.
+        const alertOnSeats = spyAlarm().mockResolvedValue(undefined);
+
+        try {
+          await auth.register(
+            {
+              email: 'founder@nobody-owns-this.test',
+              password: TEST_PASSWORD,
+              fullName: 'Founder',
+            },
+            requestOrigin(),
+          );
+
+          expect(alertOnSeats).not.toHaveBeenCalled();
+        } finally {
+          alertOnSeats.mockRestore();
+        }
+      });
+
+      it('**1e. an alarm failure does not fail the registration**', async () => {
+        // `alertOnSeats` queries `seatsInUse` before it reaches `evaluate`'s
+        // internal guard, so it can reject — a pool timeout is enough — and an
+        // unhandled rejection terminates the process. This is the `.catch()`
+        // earning its place, and the assertion that turns a bare `void` back
+        // into a red test.
+        const org = await createOrganization(fx.prisma, {
+          allowedEmailDomains: ['acme-alarm-down.test'],
+          maxAgentSeats: 5,
+        });
+
+        const alertOnSeats = spyAlarm().mockRejectedValue(
+          new Error('the pool is exhausted'),
+        );
+
+        try {
+          const result = await auth.register(
+            {
+              email: 'joiner@acme-alarm-down.test',
+              password: TEST_PASSWORD,
+              fullName: 'Joiner',
+            },
+            requestOrigin(),
+          );
+
+          expect(result.organizationId).toBe(org.id);
+          expect(alertOnSeats).toHaveBeenCalled();
+        } finally {
+          alertOnSeats.mockRestore();
+        }
+      });
     });
 
     it('1b. a domain-matched joiner gets End User, not Org Admin', async () => {
@@ -858,6 +973,42 @@ describe('Auth core (e2e)', () => {
       });
       expect(created.passwordHash).toBeNull();
       expect(created.isEmailVerified).toBe(true);
+    });
+
+    it('**26b. a domain match fires the seat alarm on this path too**', async () => {
+      // Two sign-up paths that reported seat usage differently would be a
+      // difference nobody chose — the same argument the free-tier grants
+      // already make one branch over. known-gaps #19.
+      const org = await createOrganization(fx.prisma, {
+        allowedEmailDomains: ['google-seats.test'],
+        maxAgentSeats: 3,
+      });
+
+      const firebase = fx.moduleRef.get<{
+        verifyGoogleIdToken: (t: string) => Promise<unknown>;
+      }>(
+        (await import('../../src/modules/firebase/firebase.service'))
+          .FirebaseService,
+      );
+      jest.spyOn(firebase, 'verifyGoogleIdToken').mockResolvedValue({
+        email: 'joiner@google-seats.test',
+        fullName: 'Google Joiner',
+        avatarUrl: null,
+        emailVerified: true,
+      });
+
+      const alertOnSeats = jest
+        .spyOn(fx.moduleRef.get(OrganizationsService), 'alertOnSeats')
+        .mockResolvedValue(undefined);
+
+      try {
+        await auth.googleSignIn({ idToken: 'stub' }, requestOrigin());
+
+        expect(alertOnSeats).toHaveBeenCalledTimes(1);
+        expect(alertOnSeats).toHaveBeenCalledWith(org.id, 3);
+      } finally {
+        alertOnSeats.mockRestore();
+      }
     });
 
     it('a Google-created account cannot then log in with a password', async () => {

@@ -30,6 +30,7 @@ import {
   AuditResourceType,
   EmailTemplateName,
   extractEmailDomain,
+  formatErrorMsg,
   extractEmailLocalPart,
   isUniqueConstraintViolation,
   JwtPayload,
@@ -63,6 +64,7 @@ import { status } from '@grpc/grpc-js';
 import { Prisma } from '../../generated/prisma/client';
 import { toUserResponse } from '../users/user.mapper';
 import { NotificationPublisher } from '../notifications/notification-publisher.service';
+import { OrganizationsService } from '../organizations/organizations.service';
 import { OtpService } from '../otp/otp.service';
 import { RolesService } from '../roles/roles.service';
 import { SessionsService } from '../sessions/sessions.service';
@@ -125,6 +127,10 @@ export class AuthService {
     // Login and register embed a user, so they need avatars resolved too — a
     // raw object path is the same leak there as on GET /users/me.
     private readonly storage: StorageReferenceService,
+    // For `alertOnSeats` only. It owns `seatsInUse`, so a registration that
+    // takes a seat reports it through the same counter every other seat path
+    // uses rather than a second one that could disagree.
+    private readonly organizationsService: OrganizationsService,
   ) {
     this.JWT_2FA_EXPIRES_IN =
       this.configService.getOrThrow<string>('JWT_2FA_EXPIRES_IN');
@@ -161,19 +167,14 @@ export class AuthService {
    * JwtAuthGuard), so blocking login until verified would deadlock: no token
    * without verifying, no verifying without a token.
    *
-   * **KNOWN GAP — domain-matched registration takes a seat and checks
-   * nothing.** The other two paths that consume a seat (`invitations.create`
-   * and `users.create`) both compare `seatsInUse` against `maxAgentSeats` and
-   * refuse, and both fire the seat alarm afterwards. This one does neither: a
-   * tenant that lists its own domain in `allowedEmailDomains` can be taken past
-   * `maxAgentSeats` by self-registration alone, silently, and the usage page
-   * will then report `used > limit`.
-   *
-   * Pre-existing rather than introduced here, and out of scope for the
-   * notification work — closing it is a refusal, and refusing a registration
-   * needs a product answer for what the user sees (their workspace exists and
-   * will not let them in). Recorded so the next reader does not conclude the
-   * three paths agree.
+   * **A domain match consumes a seat and fires the seat alarm; it is never
+   * refused for one.** `maxAgentSeats` is a hard cap on `invitations.create`,
+   * `invitations.accept` and `users.create`, and a soft cap here: the workspace
+   * exists and a member of its own domain is let in, and the TENANT is told the
+   * cap is crossed rather than the USER told the door is shut. The alarm is
+   * what makes the crossing visible — see `fireSeatAlarm` for why it runs after
+   * the transaction and only for an existing tenant. known-gaps #19 is where a
+   * future decision to make this cap hard belongs.
    *
    * Instead the account is usable immediately but LIMITED — `isEmailVerified`
    * rides in the JWT and `EmailVerifiedGuard` in the gateway gates the routes
@@ -246,6 +247,48 @@ export class AuthService {
   }
 
   /**
+   * Fires the seat alarm for a registration that joined an EXISTING tenant.
+   *
+   * **A registration is never refused for seats, and that is the decision.**
+   * `invitations.create`, `invitations.accept` and `users.create` treat
+   * `maxAgentSeats` as a hard cap; domain-matched registration treats it as a
+   * soft one — telling the user their own workspace exists and will not let
+   * them in is a worse outcome for a tenant one seat over than the overrun is.
+   * What the path must not do is cross the limit in silence, which is what this
+   * closes: the usage page no longer shows `used > limit` with no event behind
+   * it. Making the cap hard here is one `RESOURCE_EXHAUSTED` throw at each
+   * caller, and known-gaps #19 is where that decision would be recorded.
+   *
+   * **After the transaction commits, never inside it.** `alertOnSeats` counts
+   * through `this.prisma`, so a call from inside the closure would run on a
+   * different connection and miss the row just written — the crossing is
+   * exactly what the tenant needs told.
+   *
+   * **`null` means a founder.** A registration that CREATED the workspace is
+   * the first member of a free-tier tenant, and evaluating there is a query to
+   * learn that one is fewer than the cap.
+   *
+   * **`.catch()` and not a bare `void`.** The helper queries `seatsInUse`
+   * before it reaches `evaluate`'s internal guard, so the promise can reject —
+   * a pool timeout is enough — and an unhandled rejection terminates the
+   * process. An alarm must never fail a registration; without the catch it
+   * takes the service down instead.
+   */
+  private fireSeatAlarm(
+    seatAlarm: { organizationId: string; maxAgentSeats: number } | null,
+  ): void {
+    if (!seatAlarm) return;
+
+    void this.organizationsService
+      .alertOnSeats(seatAlarm.organizationId, seatAlarm.maxAgentSeats)
+      .catch((error: unknown) =>
+        this.logger.warn(
+          `Could not evaluate the seat alarm for ${seatAlarm.organizationId}: ${formatErrorMsg(error)}`,
+        ),
+      );
+  }
+
+  /**
    * Resolves the tenant, then creates the user inside the SAME transaction.
    *
    * The order matters: the conflict check is only answerable once the tenant is
@@ -275,13 +318,16 @@ export class AuthService {
     const { email, fullName, passwordHash, emailDomain } = input;
 
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      const result = await this.prisma.$transaction(async (tx) => {
         const existingOrg = await tx.organization.findFirst({
           where: {
             allowedEmailDomains: { has: emailDomain },
             deletedAt: null,
           },
-          select: { id: true, name: true },
+          // `maxAgentSeats` for the seat alarm below. Only on the FOUND branch:
+          // the created branch is a founder, and the alarm is not evaluated
+          // there — see `fireSeatAlarm`.
+          select: { id: true, name: true, maxAgentSeats: true },
         });
 
         const org =
@@ -355,8 +401,28 @@ export class AuthService {
           },
         });
 
-        return { created, organizationName: org.name };
+        return {
+          created,
+          organizationName: org.name,
+          // **The rule, expressed where the branch is decided.** Null on the
+          // founder branch rather than re-derived at the call site, so the
+          // "only for an existing organization" condition lives next to the
+          // thing that knows which branch ran.
+          seatAlarm: existingOrg
+            ? {
+                organizationId: existingOrg.id,
+                maxAgentSeats: existingOrg.maxAgentSeats,
+              }
+            : null,
+        };
       });
+
+      this.fireSeatAlarm(result.seatAlarm);
+
+      return {
+        created: result.created,
+        organizationName: result.organizationName,
+      };
     } catch (error) {
       // The `findFirst` above IS the manual detection, and it handles every
       // non-racing case. What it cannot do is be atomic: two concurrent
@@ -1393,11 +1459,20 @@ export class AuthService {
     emailDomain: string,
   ): Promise<UserWithAccess> {
     const created = await this.prisma.$transaction(async (tx) => {
+      // **Bound to a name rather than left inline.** The seat alarm below fires
+      // only for a registration that joined an EXISTING tenant, and an inline
+      // `findFirst() || create()` discards which branch ran at the point it is
+      // produced. The password path already keeps this distinction as
+      // `isFounder`; this is the same fact under a different name.
+      const existingOrg = await tx.organization.findFirst({
+        where: { allowedEmailDomains: { has: emailDomain }, deletedAt: null },
+        // `maxAgentSeats` for the alarm. Found branch only — see
+        // `fireSeatAlarm`.
+        select: { id: true, name: true, maxAgentSeats: true },
+      });
+
       const org =
-        (await tx.organization.findFirst({
-          where: { allowedEmailDomains: { has: emailDomain }, deletedAt: null },
-          select: { id: true, name: true },
-        })) ||
+        existingOrg ||
         (await tx.organization.create({
           data: {
             // The same free tier as password registration. Two sign-up paths
@@ -1433,8 +1508,21 @@ export class AuthService {
         select: { id: true },
       });
 
-      return { userId: user.id, organizationName: org.name };
+      return {
+        userId: user.id,
+        organizationName: org.name,
+        // Same rule as the password path, decided at the same place: null when
+        // this registration created the workspace.
+        seatAlarm: existingOrg
+          ? {
+              organizationId: existingOrg.id,
+              maxAgentSeats: existingOrg.maxAgentSeats,
+            }
+          : null,
+      };
     });
+
+    this.fireSeatAlarm(created.seatAlarm);
 
     // Hydrated AFTER the transaction. Unlike the password path, the relations
     // really are needed here — buildJwtPayload reads them — so the read stays,
