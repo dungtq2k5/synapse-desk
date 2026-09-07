@@ -7,6 +7,8 @@ import {
   isUniqueConstraintViolation,
   OrgStatus,
   PlanEntitlements,
+  STRIPE_DUNNING_EVENTS,
+  STRIPE_ENTITLEMENT_EVENTS,
   STRIPE_STATUS_TO_ORG_STATUS,
 } from '@synapsedesk/common';
 import { PrismaService } from '../prisma/prisma.service';
@@ -470,15 +472,17 @@ const GRANT_COLUMNS = [
  * has no plan to derive. Two sets, one dispatch, and the narrowness of the
  * first one preserved.
  */
-// The type argument is not decoration. `Stripe.Event['type']` is a literal
-// union in the SDK, so a typo is a compile error; untyped,
+// **The `satisfies` is where the union is checked, and it is not decoration.**
+// The array lives in `libs/common`, which has no Stripe dependency, so its
+// members are bare strings there; here `Stripe.Event['type']` is a literal
+// union and `satisfies` turns a typo into a compile error. Unchecked,
 // `'invoice.payment_faild'` builds a set that matches nothing and every failed
 // payment falls silently through to "recorded but not acted on" — the same
 // fail-open shape as an unmapped price, without even the FAILED row to find
 // later.
-const DUNNING_EVENT_TYPES = new Set<Stripe.Event['type']>([
-  'invoice.payment_failed',
-]);
+const DUNNING_EVENT_TYPES = new Set<Stripe.Event['type']>(
+  STRIPE_DUNNING_EVENTS satisfies readonly Stripe.Event['type'][],
+);
 
 /**
  * The event types that carry entitlements.
@@ -487,13 +491,11 @@ const DUNNING_EVENT_TYPES = new Set<Stripe.Event['type']>([
  * `invoice.paid`, say — would apply entitlements from an object that does not
  * describe a plan.
  */
-// Typed for the same reason `DUNNING_EVENT_TYPES` is: an unchecked typo here
+// Narrowed for the same reason `DUNNING_EVENT_TYPES` is: an unchecked typo here
 // fails open silently.
-const HANDLED_EVENT_TYPES = new Set<Stripe.Event['type']>([
-  'customer.subscription.created',
-  'customer.subscription.updated',
-  'customer.subscription.deleted',
-]);
+const HANDLED_EVENT_TYPES = new Set<Stripe.Event['type']>(
+  STRIPE_ENTITLEMENT_EVENTS satisfies readonly Stripe.Event['type'][],
+);
 
 function stripeCreatedAt(event: Stripe.Event): Date {
   // Stripe's `created` is UNIX SECONDS. Reading it as milliseconds puts every

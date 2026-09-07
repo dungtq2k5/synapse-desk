@@ -1,10 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { RequestContext, type NotificationType } from '@synapsedesk/common';
+import { RequestContext } from '@synapsedesk/common';
+import { toProtoNotificationType } from '@synapsedesk/grpc-proto';
 import {
-  fromProtoNotificationType,
-  toProtoNotificationType,
-} from '@synapsedesk/grpc-proto';
-import {
+  toNotificationTypes,
   toTestWebhookResponseDto,
   toWebhookDeliveriesResponseDto,
   toWebhookEndpointResponseDto,
@@ -132,15 +130,10 @@ export class WebhookEndpointsService {
   ): Promise<WebhookEventTypesResponseDto> {
     const response = await this.client.listEventTypes(context);
 
-    // FIXME This mapping logic is identical to `toWebhookEndpointResponseDto` in `webhook-endpoint.mapper.ts`, consider extract to a dedicate function for DRY principle.
     // The catalogue is the owning service's `NOTIFICATION_TYPE_VALUES`, and
     // the enum is what carries that now — so this narrows through the bridge
     // rather than restating the guarantee as a cast.
-    return {
-      types: response.types
-        .map(fromProtoNotificationType)
-        .filter((type): type is NotificationType => type !== null),
-    };
+    return { types: toNotificationTypes(response.types) };
   }
 }
 

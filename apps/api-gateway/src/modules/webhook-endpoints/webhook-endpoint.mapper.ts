@@ -4,6 +4,7 @@ import {
   fromProtoNotificationType,
   fromProtoWebhookDeliveryStatus,
   requireProtoTimestamp,
+  NotificationType as ProtoNotificationType,
   type ListWebhookDeliveriesResponse,
   type TestWebhookEndpointResponse,
   type WebhookDeliveryResponse,
@@ -16,6 +17,29 @@ import type {
   WebhookEndpointResponseDto,
 } from './dto/rest/webhook-endpoint-response.dto';
 
+/**
+ * The wire's event types, narrowed to the vocabulary this build can name.
+ *
+ * Both webhook surfaces answer with one of these lists — an endpoint's
+ * subscription, and the catalogue behind `GET /webhook-endpoints/event-types`
+ * — so it is one function rather than the same chain written twice.
+ */
+export function toNotificationTypes(
+  values: readonly ProtoNotificationType[],
+): NotificationType[] {
+  return (
+    values
+      .map(fromProtoNotificationType)
+      // **The filter is the honest part, not a formality.** `fromProto`
+      // answers null for a value this build cannot name, and the owning
+      // service re-validates a subscription list on every write — so a null
+      // here means the vocabulary was retired under a live subscription, not
+      // that a client sent nonsense. (A delivery's `eventType` stays a
+      // `string` for the opposite reason — see the response DTO.)
+      .filter((type): type is NotificationType => type !== null)
+  );
+}
+
 export function toWebhookEndpointResponseDto(
   endpoint: WebhookEndpointResponse,
 ): WebhookEndpointResponseDto {
@@ -23,17 +47,7 @@ export function toWebhookEndpointResponseDto(
     id: endpoint.id,
     url: endpoint.url,
     description: endpoint.description ?? null,
-    // **The cast that used to be here is gone**: the wire carries the enum
-    // now, so the bridge answers what a cast used to assert. The filter is the
-    // honest part — `fromProto` answers null for a value this build cannot
-    // name, and a subscription list is re-validated on every write by the
-    // owning service, so a null here means the vocabulary was retired under a
-    // live subscription rather than that a client sent nonsense. (A delivery's
-    // `eventType` stays a `string` for the opposite reason — see the response
-    // DTO.)
-    eventTypes: endpoint.eventTypes
-      .map(fromProtoNotificationType)
-      .filter((type): type is NotificationType => type !== null),
+    eventTypes: toNotificationTypes(endpoint.eventTypes),
     isActive: endpoint.isActive,
     disabledReason: endpoint.disabledReason ?? null,
     createdAt: requireProtoTimestamp(endpoint.createdAt, 'createdAt'),

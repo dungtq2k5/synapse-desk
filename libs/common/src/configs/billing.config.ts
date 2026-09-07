@@ -60,6 +60,65 @@ export type PlanLimitDimension = (typeof PLAN_LIMIT_DIMENSIONS)[number];
  */
 export const STRIPE_API_VERSION = '2026-07-29.dahlia';
 
+/**
+ * The Stripe event types that carry ENTITLEMENTS.
+ *
+ * Narrow on purpose. Stripe sends dozens of types and acting on the wrong one —
+ * `invoice.paid`, say — would apply entitlements from an object that does not
+ * describe a plan.
+ *
+ * **Here rather than in `entitlement-writer.service.ts`, because two things
+ * need it and one of them cannot import TypeScript.** The writer decides what
+ * to act on; `scripts/provision-stripe.mjs` decides what Stripe is allowed to
+ * SEND, and a type the writer handles that the endpoint never enables is a
+ * figure that reads as zero rather than as missing. One array, both consumers.
+ *
+ * **Typed as bare strings here, and narrowed at the writer.** `libs/common` has
+ * no Stripe dependency and must not grow one, so the compile-time check lives
+ * where `Stripe.Event['type']` exists: the writer builds its `Set` with a
+ * `satisfies readonly Stripe.Event['type'][]`, which is where a typo becomes an
+ * error rather than a set that matches nothing.
+ */
+export const STRIPE_ENTITLEMENT_EVENTS = [
+  'customer.subscription.created',
+  'customer.subscription.updated',
+  'customer.subscription.deleted',
+] as const;
+
+/**
+ * The Stripe event types that carry a FAILED PAYMENT.
+ *
+ * Deliberately separate from {@link STRIPE_ENTITLEMENT_EVENTS} rather than
+ * folded in: that one is read as "types the entitlement writer acts on", and an
+ * invoice has no plan to derive. Two arrays, one dispatch, and the narrowness
+ * of the first preserved.
+ */
+export const STRIPE_DUNNING_EVENTS = ['invoice.payment_failed'] as const;
+
+/**
+ * The metadata key marking the billing-portal configuration this system owns.
+ *
+ * `scripts/provision-stripe.mjs` writes it; `BillingService.createPortalSession`
+ * resolves by it and passes that configuration EXPLICITLY, so a portal session
+ * never inherits the account default — which is a configuration anyone can
+ * create in the Dashboard and nothing here would notice.
+ */
+export const STRIPE_PORTAL_MARKER = 'synapsedesk_portal';
+
+/**
+ * How long a resolved portal configuration is trusted, in ms.
+ *
+ * A portal open is rare and a Stripe list call per open would be tolerable, but
+ * the thing being checked is CONFIGURATION — it changes on the timescale of a
+ * deploy or a Dashboard edit, not of a request.
+ *
+ * The trade, stated: a `subscription_update` flip in the Dashboard is enforced
+ * within five minutes rather than immediately, and in exchange a Stripe blip
+ * during the window keeps the last known-good answer instead of refusing every
+ * portal open. Both directions of that are deliberate.
+ */
+export const PORTAL_CONFIGURATION_TTL_MS = 5 * 60 * 1000;
+
 /** What a plan grants. Exactly the five entitlement columns, and no more. */
 export type PlanEntitlements = {
   maxAgentSeats: number;

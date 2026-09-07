@@ -251,9 +251,18 @@ npm run seed:demo                 # a populated tenant; needs the stack running
 npm run seed:demo:apply
 ```
 
-`stripe:provision` reads `STRIPE_RESTRICT_KEY` from the **root** `.env`. A
-restricted key (`rk_test_…`) scoped to Products, Prices and Billing Portal is all
-it needs — a full `sk_` reaches much further than the job.
+`stripe:provision` reads `STRIPE_RESTRICT_KEY` and `STRIPE_WEBHOOK_URL` from
+the **root** `.env`. A restricted key (`rk_test_…`) scoped to Products, Prices,
+Billing Portal and Webhook Endpoints (read **and** write — the dry run lists
+before it decides) is all it needs; a full `sk_` reaches much further than the
+job.
+
+Two things only `--apply` does, and the portal depends on the first: it creates
+the **marked** portal configuration (`metadata.synapsedesk_portal`) that
+`createPortalSession` insists on — until it exists, opening the billing portal
+is refused with a message naming this script — and it creates the Stripe
+webhook endpoint, printing its signing secret **exactly once**; put that in
+`apps/auth-service/.env` as `STRIPE_WEBHOOK_SECRET`.
 
 ## Running the tests
 

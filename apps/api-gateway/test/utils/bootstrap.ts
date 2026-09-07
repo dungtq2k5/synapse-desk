@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import cookieParser from 'cookie-parser';
+import helmet from 'helmet';
 import Redis from 'ioredis';
 import { of } from 'rxjs';
 import { OrgStatus } from '@synapsedesk/common';
@@ -18,6 +19,7 @@ import {
 import { AppModule } from '../../src/app.module';
 import { OPS_ROUTES } from '../../src/modules/health/ops-routes';
 import { setupSwagger } from '../../src/common/config/swagger.config';
+import { SECURITY_HEADERS } from '../../src/common/config/security-headers.config';
 import { AllHttpExceptionFilter } from '../../src/common/filters/all-http-exception.filter';
 import { LoggingInterceptor } from '../../src/common/interceptors/logging.interceptor';
 import { TransformInterceptor } from '../../src/common/interceptors/transform.interceptor';
@@ -108,6 +110,12 @@ export async function bootstrapE2eTest(
   app.setGlobalPrefix(configService.getOrThrow<string>('GLOBAL_PREFIX'), {
     exclude: OPS_ROUTES,
   });
+  // **The same object `main.ts` applies.** A suite that never applies the
+  // header policy cannot guard it — the argument the CORS lines below already
+  // make, one middleware over. `security-headers.e2e-spec.ts` test 4 asserts
+  // both bootstraps read this same config.
+  app.use(helmet(SECURITY_HEADERS));
+
   app.use(cookieParser());
 
   // **The CORS policy, mirrored from main.ts.** Its absence here is the reason

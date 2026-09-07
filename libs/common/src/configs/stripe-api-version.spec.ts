@@ -5,12 +5,20 @@ import { STRIPE_API_VERSION } from './billing.config';
 /**
  * The version is in THREE places and must be one number.
  *
- * `stripe.service.ts` imports the constant, but the two provisioning scripts
- * are `.mjs` run by `node` outside the TypeScript build and cannot — so they
- * carry the literal. That is the drift this pins: the scripts CREATE the
- * Products, Prices and portal configuration the service then READS, and two
- * API versions across that boundary is a shape mismatch nobody sees until a
+ * `stripe.service.ts` imports the constant; the two provisioning scripts carry
+ * the literal. That is the drift this pins: the scripts CREATE the Products,
+ * Prices, portal configuration and webhook endpoint the service then READS, and
+ * two API versions across that boundary is a shape mismatch nobody sees until a
  * field is missing from an object somebody already created.
+ *
+ * **The scripts CAN import from `libs/common/dist` — `generate-job-alerts.mjs`
+ * and `provision-stripe.mjs` both do — and they still carry the literal.** A
+ * `.mjs` file can read the built lib, so the reason is not capability: it is
+ * that this test reads the scripts as TEXT. Replace a literal with an import
+ * and the regex below matches nothing, `pinned` is `undefined`, and test 2
+ * fails by design. Whichever way that is settled, it is settled HERE first —
+ * the assertion is what keeps the copies equal, and it cannot check a value it
+ * cannot see.
  */
 describe('The pinned Stripe API version', () => {
   const REPO = join(__dirname, '../../../..');

@@ -3,10 +3,12 @@ import { AppModule } from './app.module';
 import { OPS_ROUTES } from './modules/health/ops-routes';
 import { MetricsServer } from './modules/metrics/metrics.server';
 import { setupSwagger } from './common/config/swagger.config';
+import { SECURITY_HEADERS } from './common/config/security-headers.config';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import cookieParser from 'cookie-parser';
+import helmet from 'helmet';
 import {
   CORS_ALLOWED_HEADERS,
   CORS_EXPOSED_HEADERS,
@@ -47,6 +49,14 @@ async function bootstrap() {
   // The value is a HOP COUNT: `1` means exactly one trusted proxy. Behind both
   // an ALB and Nginx it must be 2, or req.ip is Nginx's address.
   app.set('trust proxy', 1);
+
+  // **Security response headers, before anything that can answer a request.**
+  // The policy is one object shared with `test/utils/bootstrap.ts` — a suite
+  // that never applies it cannot guard it, which is the argument the CORS lines
+  // there already make. See `security-headers.config.ts` for why the CSP is
+  // written against the Swagger page and why it lives here rather than in the
+  // Ingress. known-gaps #27.
+  app.use(helmet(SECURITY_HEADERS));
 
   const configService = app.get(ConfigService);
 

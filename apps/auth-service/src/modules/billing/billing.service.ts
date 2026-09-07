@@ -14,10 +14,13 @@ import {
   toProtoAiModelTier,
   toProtoOrgStatus,
 } from '@synapsedesk/grpc-proto';
+import type Stripe from 'stripe';
 import {
   formatErrorMsg,
+  PORTAL_CONFIGURATION_TTL_MS,
   requireActor,
   requireTenant,
+  STRIPE_PORTAL_MARKER,
 } from '@synapsedesk/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { StripeService } from './stripe.service';
@@ -43,6 +46,18 @@ const MAX_INVOICE_LIMIT = 100;
 @Injectable()
 export class BillingService {
   private readonly logger = new Logger(BillingService.name);
+
+  /**
+   * The last resolved portal configuration, and when.
+   *
+   * In-process and unkeyed — there is one Stripe account. A second replica
+   * holds its own copy, which is correct: each enforces the same check against
+   * the same account within the same TTL.
+   */
+  private portalCache?: {
+    configuration: Stripe.BillingPortal.Configuration;
+    at: number;
+  };
 
   constructor(
     private readonly prisma: PrismaService,
@@ -167,16 +182,91 @@ export class BillingService {
       });
     }
 
+    // **Before the `try`, like the check above.** `asClientError` flattens an
+    // unknown Stripe failure into `UNAVAILABLE`, which is right for Stripe being
+    // down and wrong for this: a misconfigured portal is OURS, and reporting it
+    // as a transient upstream error is how it stays unfixed.
+    const configuration = await this.portalConfiguration();
+
     try {
       const session = await this.stripe.api.billingPortal.sessions.create({
         customer: organization.stripeCustomerId,
         return_url: request.returnUrl,
+        // **Explicit, never the account default.** This is the half that holds
+        // even if the check below is somehow wrong: a configuration created in
+        // the Dashboard is never the one a session opens with.
+        configuration: configuration.id,
       });
 
       return { url: session.url };
     } catch (error) {
       throw this.asClientError(error, 'open the billing portal');
     }
+  }
+
+  /**
+   * The portal configuration this system owns, resolved and checked.
+   *
+   * **`subscription_update` is the thing being checked, and why.** With it on, a
+   * tenant changes plan inside Stripe's portal; the change reaches this system
+   * as `customer.subscription.updated` AFTER Stripe has applied it, and the
+   * over-limit block in `POST /billing/plan` — the one enforcement point for
+   * "a downgrade is refused when current usage does not fit" — never runs. The
+   * tenant simply lands over a limit, with no error anywhere.
+   *
+   * That is the price of departing from Stripe's own advice, which is to let
+   * the portal handle plan changes. The departure is deliberate; this method is
+   * what makes it hold.
+   *
+   * Cached for {@link PORTAL_CONFIGURATION_TTL_MS} — see that constant for the
+   * trade. The cache holds the resolved configuration only, so a refusal is
+   * re-derived on the next open rather than pinned.
+   */
+  private async portalConfiguration(): Promise<Stripe.BillingPortal.Configuration> {
+    if (
+      this.portalCache &&
+      Date.now() - this.portalCache.at < PORTAL_CONFIGURATION_TTL_MS
+    ) {
+      return this.portalCache.configuration;
+    }
+
+    const configurations =
+      await this.stripe.api.billingPortal.configurations.list({ limit: 100 });
+    const ours = configurations.data.find(
+      (configuration) => configuration.metadata?.[STRIPE_PORTAL_MARKER],
+    );
+
+    if (!ours) {
+      this.logger.error(
+        `No billing portal configuration carries '${STRIPE_PORTAL_MARKER}'`,
+      );
+
+      throw new RpcException({
+        code: status.FAILED_PRECONDITION,
+        message:
+          'The billing portal is not provisioned for this account. ' +
+          'Run `node scripts/provision-stripe.mjs --apply`.',
+      });
+    }
+
+    if (ours.features?.subscription_update?.enabled) {
+      this.logger.error(
+        `Portal configuration ${ours.id} has subscription_update ENABLED — ` +
+          'a tenant could change plan without the over-limit check',
+      );
+
+      throw new RpcException({
+        code: status.FAILED_PRECONDITION,
+        message:
+          'The billing portal would allow a plan change that bypasses the ' +
+          'plan-limit check. Disable subscription_update on the portal ' +
+          'configuration before opening it.',
+      });
+    }
+
+    this.portalCache = { configuration: ours, at: Date.now() };
+
+    return ours;
   }
 
   /**

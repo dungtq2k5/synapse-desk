@@ -8,6 +8,7 @@ import {
   JetStreamPublisher,
   NOTIFICATION_TYPES,
   NotificationPriority,
+  STRIPE_PORTAL_MARKER,
 } from '@synapsedesk/common';
 import { fromProtoAiModelTier } from '@synapsedesk/grpc-proto';
 import {
@@ -985,6 +986,118 @@ describe('Billing and entitlements (e2e)', () => {
         ),
         status.FAILED_PRECONDITION,
       );
+    });
+
+    /**
+     * The portal is the one surface that can change a plan without passing
+     * `POST /billing/plan`, so which CONFIGURATION a session opens with is a
+     * correctness question, not a cosmetic one (known-gaps #20).
+     *
+     * Stubbed on the RESOLVED provider, not the class — `api` is an instance
+     * getter, and `jest.spyOn(StripeService, …)` finds no such property.
+     */
+    describe('the portal configuration', () => {
+      // The cache is PROCESS-lifetime by design — there is one Stripe account
+      // and no invalidation hook, so a resolved configuration outlives any
+      // single request and, here, any single test. Cleared per test so each one
+      // states its own starting point; test 8 is the one that leaves it alone
+      // and asserts the caching.
+      beforeEach(() => {
+        (billing as unknown as { portalCache?: unknown }).portalCache =
+          undefined;
+      });
+
+      const marked = (overrides = {}) => ({
+        id: 'bpc_marked',
+        metadata: { [STRIPE_PORTAL_MARKER]: 'v1' },
+        features: { subscription_update: { enabled: false } },
+        ...overrides,
+      });
+
+      const stubPortal = (configurations: unknown[]) => {
+        const list = jest.fn().mockResolvedValue({ data: configurations });
+        const create = jest
+          .fn()
+          .mockResolvedValue({ url: 'https://portal.test/s' });
+
+        jest
+          .spyOn(fx.moduleRef.get(StripeService), 'api', 'get')
+          .mockReturnValue({
+            billingPortal: { configurations: { list }, sessions: { create } },
+          } as never);
+
+        return { list, create };
+      };
+
+      const openPortal = async (organizationId: string) =>
+        billing.createPortalSession(
+          { returnUrl: 'https://app.test/settings' },
+          memberContext({ id: 'u', organizationId }),
+        );
+
+      it('**5. Opens with the MARKED configuration, not the first one**', async () => {
+        // An unmarked configuration is one anybody could have made in the
+        // Dashboard, and Stripe would use the account default if none were
+        // passed. Ordering it first is the case that catches "took [0]".
+        const organization = await subscribedOrganization('cus_portal_marked');
+        const { create } = stubPortal([
+          { id: 'bpc_someone_elses', metadata: {}, features: {} },
+          marked(),
+        ]);
+
+        await expect(openPortal(organization.id)).resolves.toEqual({
+          url: 'https://portal.test/s',
+        });
+
+        expect(create).toHaveBeenCalledWith(
+          expect.objectContaining({ configuration: 'bpc_marked' }),
+        );
+      });
+
+      it('**6. REFUSES when the marked configuration allows plan changes**', async () => {
+        // The flip the row is about. A plan change made in the portal arrives
+        // as `customer.subscription.updated` AFTER Stripe applied it, so the
+        // over-limit block never runs — refusing to open beats opening a portal
+        // that can bypass it.
+        const organization = await subscribedOrganization('cus_portal_flipped');
+        const { create } = stubPortal([
+          marked({ features: { subscription_update: { enabled: true } } }),
+        ]);
+
+        await expectRpc(
+          openPortal(organization.id),
+          status.FAILED_PRECONDITION,
+        );
+        expect(create).not.toHaveBeenCalled();
+      });
+
+      it('7. REFUSES when nothing carries the marker', async () => {
+        // Not provisioned. Opening with the account default is exactly the
+        // second-configuration hole, so this refuses and names the script.
+        const organization = await subscribedOrganization('cus_portal_bare');
+        const { create } = stubPortal([
+          { id: 'bpc_unmarked', metadata: {}, features: {} },
+        ]);
+
+        await expectRpc(
+          openPortal(organization.id),
+          status.FAILED_PRECONDITION,
+        );
+        expect(create).not.toHaveBeenCalled();
+      });
+
+      it('8. Resolves the configuration ONCE across two opens', async () => {
+        // The cache. A portal open is rare, but the thing being checked changes
+        // on the timescale of a deploy — see `PORTAL_CONFIGURATION_TTL_MS`.
+        const organization = await subscribedOrganization('cus_portal_cached');
+        const { list, create } = stubPortal([marked()]);
+
+        await openPortal(organization.id);
+        await openPortal(organization.id);
+
+        expect(create).toHaveBeenCalledTimes(2);
+        expect(list).toHaveBeenCalledTimes(1);
+      });
     });
 
     it('1. Rejects a checkout for a price the WEBHOOK could not map', async () => {
