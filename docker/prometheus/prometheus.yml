@@ -1,0 +1,33 @@
+# Development scrape config. HAND-WRITTEN — unlike `job-alerts.yml` beside it,
+# which is GENERATED from SCHEDULED_JOBS by `scripts/generate-job-alerts.mjs`
+# and carries a do-not-edit header. Edit this one; regenerate that one.
+#
+# **`host.docker.internal`, not a compose service name.** The gateway runs on
+# the HOST under `npm run dev` — compose holds infrastructure only — so the
+# scrape target is the host. Docker Desktop provides that name automatically;
+# Linux does not, which is why `docker-compose.yml` declares the `extra_hosts`
+# mapping explicitly rather than relying on a platform difference. If compose
+# ever gains application services, this becomes `api-gateway:9464` and that
+# mapping goes.
+#
+# **The gateway must be started with `METRICS_HOST = 0.0.0.0`.** Its default is
+# `127.0.0.1` and deliberately so, but a container scraping the host then
+# reaches a socket that is not listening for it — the target reads `DOWN` with
+# nothing pointing at a bind address.
+#
+# **No `alertmanager` block, by decision.** An Alertmanager is a second
+# container, a second config file and a notification decision — where does a
+# page go, on a laptop? — and it buys nothing a developer cannot already see:
+# Prometheus evaluates the rules without it and shows what is firing on its own
+# /alerts page.
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - /etc/prometheus/job-alerts.yml
+
+scrape_configs:
+  - job_name: api-gateway
+    static_configs:
+      - targets: ['host.docker.internal:9464']

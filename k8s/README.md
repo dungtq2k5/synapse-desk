@@ -154,6 +154,6 @@ Rotate all three at once. A partial rotation is worse than a wrong one, because 
 ## What is deliberately not here
 
 - **`workers/email-inbound`** — a Cloudflare Worker, deployed with `wrangler`.
-- **Prometheus.** `docker/prometheus/job-alerts.yml` is generated and tracked and nothing scrapes it. These manifests only make scraping possible, by exposing 9464 on its own listener and setting `METRICS_HOST=0.0.0.0`.
+- **Prometheus.** `docker/prometheus/job-alerts.yml` is generated and tracked, and **development** scrapes it — `docker-compose.yml` carries one behind the `observability` profile. Nothing scrapes it _here_: these manifests only make scraping possible, by exposing 9464 on its own listener and setting `METRICS_HOST=0.0.0.0`. Whether the cluster gets a managed collector or an in-cluster stack is a decision with retention, alert routing and an on-call destination attached, and it has not been taken.
 - **Postgres and Redis.** [ADR 0043](../docs/decisions/0043-the-cluster-shape.md) puts both on managed instances; their addresses arrive through `DATABASE_URL` and `REDIS_URL`, which are Secrets because they carry passwords.
 - **The Firebase Storage emulator.** `docker-compose.yml` only.

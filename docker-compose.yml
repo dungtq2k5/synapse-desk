@@ -219,6 +219,49 @@ services:
       timeout: 3s
       retries: 10
 
+  # ---------------------------------------------------------------- Observability
+  #
+  # Reads the alert rules nothing read before. **NOT started by a bare
+  # `docker compose up`** — see the profile below.
+  prometheus:
+    # Pinned — same rule as qdrant and firebase-storage above.
+    image: prom/prometheus:v3.7.3
+    container_name: synapsedesk-prometheus
+    # **The first profile in this file, so the convention is stated here.** A
+    # profiled service is opt-in: `docker compose up -d --wait` neither pulls
+    # nor starts it, which is the point — CI brings the stack up on every run
+    # and no CI job scrapes anything. `docker compose up -d prometheus` starts
+    # it (naming a profiled service activates its profile; no flag needed).
+    #
+    # **Teardown is the asymmetric half, and it is a trap.** `docker compose
+    # down` does NOT stop a profiled service: it removes the other eight,
+    # leaves this one running holding `synapsedesk-network`, prints
+    # "Resource is still in use" — and exits 0. Use
+    # `docker compose --profile observability down`.
+    profiles: [observability]
+    # The gateway runs on the HOST under `npm run dev`, so the scrape target is
+    # the host, not a compose service. Docker Desktop provides this name;
+    # Linux does not, hence the explicit mapping.
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    ports:
+      - '${PROMETHEUS_PORT}:9090'
+    # The whole directory, read-only: `prometheus.yml` and the generated
+    # `job-alerts.yml` arrive together, so regenerating the rules is picked up
+    # by a container restart with no volume edit.
+    volumes:
+      - ./docker/prometheus:/etc/prometheus:ro
+      - prometheus_data:/prometheus
+    # Not for `--wait` — the profile keeps this out of that set — but so
+    # `docker compose ps` reports something truthful, matching every other
+    # service here. `wget` is at /bin/wget in this image (busybox base,
+    # measured); `/-/healthy` is Prometheus's own endpoint.
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:9090/-/healthy']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
 volumes:
   pgdata_auth:
   pgdata_ticket:
@@ -227,6 +270,9 @@ volumes:
   redis_data:
   nats_data:
   qdrant_data:
+  # Without this the container loses its TSDB on every recreate, which makes
+  # "did that alert fire yesterday" unanswerable.
+  prometheus_data:
 
 networks:
   default:

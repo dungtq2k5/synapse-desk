@@ -503,7 +503,7 @@ describe('the image contract (static half)', () => {
         );
 
     it('finds at least twenty image references — the corpus floor', () => {
-      // Twenty-one today: eight in compose, thirteen in `k8s/`. A pathspec or a
+      // Twenty-two today: nine in compose, thirteen in `k8s/`. A pathspec or a
       // regex that stopped matching would make both assertions below vacuous,
       // which is the failure this check exists to prevent, arriving through the
       // check.

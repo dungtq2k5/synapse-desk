@@ -111,7 +111,38 @@ step 5 have to agree with whatever you put here.
 docker compose up -d --wait
 ```
 
-`--wait` waits only for services that declare a healthcheck. All eight do.
+`--wait` waits only for services that declare a healthcheck. All eight in the default set do — Prometheus sits behind the `observability` profile and is not started by this command.
+
+#### Optional: Prometheus, to read the alert rules
+
+`docker/prometheus/job-alerts.yml` is generated from `SCHEDULED_JOBS` and holds
+a staleness and a missing-series rule per job. Nothing reads it unless you start
+this, which sits behind a profile so `docker compose up -d --wait` above — and
+CI — are unaffected.
+
+```sh
+docker compose up -d prometheus                     # naming it activates its profile
+docker compose --profile observability down         # the teardown; see below
+```
+
+Then `http://localhost:9090` — `/targets`, `/rules` (18 today, 9 jobs x 2) and
+`/alerts`.
+
+**Set `METRICS_HOST = 0.0.0.0` in `apps/api-gateway/.env` first.** It defaults
+to `127.0.0.1` and should, but a container scraping the host then reaches a
+socket that is not listening for it: the target reads `DOWN` on `/targets` and
+nothing on that page points at a bind address. It is the one failure worth
+knowing in advance.
+
+**Teardown needs the flag even though startup does not.** `docker compose down`
+does **not** stop a profiled service — it removes the other eight, leaves this
+one running holding `synapsedesk-network`, prints `Resource is still in use`,
+and exits `0`. Only `--profile observability down` reaches it.
+
+On a fresh database every `ScheduledJobMissing` fires after thirty minutes,
+which is correct: no job has run. Note that it also fires when the target is
+`DOWN`, so it is not by itself evidence that anything was scraped — `/targets`
+is.
 
 ### 4. Generate credentials
 

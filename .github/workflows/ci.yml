@@ -140,6 +140,8 @@ jobs:
         run: cp .env.example .env
 
       # `--wait` waits only for services that DECLARE a healthcheck. All eight
+      # in the DEFAULT set do — the `observability` profile's Prometheus is not
+      # started here, and CI scrapes nothing.
       # now do; the three that did not (nats, qdrant, firebase-storage) were
       # added for this job, because a startup race here would look exactly like
       # known gaps #7/#13/#14 and be misfiled as one of them.

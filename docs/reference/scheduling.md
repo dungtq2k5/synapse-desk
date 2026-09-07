@@ -128,9 +128,24 @@ The build comes first because the generator reads the **built** lib; a stale one
 silently emits the old job list. Adding a member to `SCHEDULED_JOBS` leaves the
 alert file a job short until it is regenerated.
 
-**Nothing scrapes it yet.** There is no Prometheus in `docker-compose.yml` and
-none in `k8s/`. The metric is exported and the rules exist; the collector that
-would fire them does not.
+**Development has a reader; the cluster does not.** `docker-compose.yml`
+carries a Prometheus behind the `observability` profile — opt-in, so it is not
+in the default `up` set — which mounts `docker/prometheus/` and evaluates
+these rules:
+
+```sh
+docker compose --profile observability up -d prometheus   # localhost:9090
+docker compose --profile observability down               # a bare `down` leaves it running
+```
+
+It needs `METRICS_HOST = 0.0.0.0` in `apps/api-gateway/.env`: the listener
+defaults to loopback, so a container scraping the host otherwise finds nothing
+and the target reads `DOWN`.
+
+**`k8s/` has none**, deliberately — see `k8s/README.md`'s *What is
+deliberately not here*. Production collection is a decision about retention
+and on-call routing rather than a manifest, and it belongs to whoever has an
+on-call to route to.
 
 ---
 
@@ -157,5 +172,5 @@ would fire them does not.
 | A daily figure is stale but its sibling is fresh | both dailies run at `0 2 * * *`, so this is a failure, not a lag |
 | A step's heartbeat is stale while its siblings are fresh | that step threw; the others ran anyway — read its `job_runs.last_error` |
 | `chunk-usage-projection` fails nightly with `ProjectionCursorMissingError` | the database was never backfilled — run `projection:backfill` once |
-| Alerts never fire | nothing scrapes the metric yet — the rules file has no reader |
+| Alerts never fire | is Prometheus running (`--profile observability`)? Is the target `UP` on `/targets` — if `DOWN`, `METRICS_HOST` is loopback. Does `/rules` show 18? A `rule_files` path that matches nothing loads zero rules and logs success |
 | Alerts are a job short | regenerate, and build the lib first |
