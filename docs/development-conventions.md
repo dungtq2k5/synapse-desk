@@ -236,6 +236,14 @@ Order matters — Nest runs guards left to right.
 - Login is a **three-way** outcome (tokens · `requiresTenantSelection` · `requiresTwoFactor`), and **tenant selection is resolved before 2FA** — `enforce_two_factor` is per-tenant and unanswerable until the tenant is known. Any new entry point that issues a session routes through the same helper.
 - The gateway **verifies, never mints**: it holds only *public* JWT keys. Do not add a private key to the gateway.
 
+### 5.6 Versioning
+
+Routes are `/api/v1/…` because the global prefix is `api` and Nest URI versioning supplies `v1` as the default ([ADR 0045](./decisions/0045-uri-versioning-under-the-same-paths.md)). `GLOBAL_PREFIX` is the word `api`; the Joi rule refuses anything carrying a version, because a prefix of `/api/v1` under versioning serves `/api/v1/v1/…` while the probes stay green.
+
+- **A breaking change to a route is `@Version('2')` on its controller**, served beside `v1` — never an edit to the `v1` shape. ADR 0032's count was for the era before versioning existed; it is closed, not continued.
+- **Ops routes are version-neutral as well as prefix-excluded.** `HealthController` and `VersionController` declare `version: VERSION_NEUTRAL`; the two mechanisms are separate and a probe must escape both. `/v1/health` is a 404 and a test says so.
+- **One options object, three bootstraps.** `API_VERSIONING` in `ops-routes.ts` is called from `main.ts` and both e2e bootstraps; the `versioning-contract` sweep pins that, because a bootstrap that forgets it is green in e2e and 404 in production.
+
 ---
 
 ## 6. gRPC Conventions

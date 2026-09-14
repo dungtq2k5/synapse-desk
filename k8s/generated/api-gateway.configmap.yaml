@@ -24,7 +24,7 @@ data:
   CORS: 'REPLACE_ME'
   DEVICE_TOKEN_NAME: 'sd_device_token'
   EMAIL_SENDER: 'REPLACE_ME'
-  GLOBAL_PREFIX: '/api/v1'
+  GLOBAL_PREFIX: 'api'
   INBOUND_EMAIL_DOMAIN: 'REPLACE_ME'
   INGESTION_SERVICE_URL: 'ingestion-service:5004'
   JWT_2FA_NAME: 'mfa_token'

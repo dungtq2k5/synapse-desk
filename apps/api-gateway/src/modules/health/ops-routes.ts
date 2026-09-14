@@ -44,34 +44,17 @@ export const API_VERSIONING = {
 } satisfies VersioningOptions;
 
 /**
- * `GLOBAL_PREFIX` reduced to the prefix alone, with no version and no slashes.
+ * `GLOBAL_PREFIX` without its optional leading slash.
  *
- * Accepts both the legacy form, which carries the version, and the bare form.
- * The legacy form reports itself through `onDeprecated`, because applying it
- * unchanged beside {@link API_VERSIONING} would serve every route at
- * `/api/v1/v1/…`.
+ * The env schema accepts only `api` or `/api`, so this has one job: give
+ * {@link apiBasePath} a bare segment either way.
  *
  * @example
- * resolveGlobalPrefix('/api/v1'); // 'api' — and calls onDeprecated
- * resolveGlobalPrefix('api');     // 'api'
+ * resolveGlobalPrefix('/api'); // 'api'
+ * resolveGlobalPrefix('api');  // 'api'
  */
-export function resolveGlobalPrefix(
-  configured: string,
-  onDeprecated?: (message: string) => void,
-): string {
-  // FIXME Simplify this regular expression to reduce its runtime, as it has super-linear performance due to backtracking.
-  const trimmed = configured.trim().replace(/^\/+|\/+$/g, '');
-  const versionSuffix = new RegExp(`(?:^|/)v${API_VERSION}$`);
-
-  if (!versionSuffix.test(trimmed)) return trimmed;
-
-  onDeprecated?.(
-    `GLOBAL_PREFIX = ${configured} carries the API version, which URI ` +
-      `versioning now adds on its own. Set GLOBAL_PREFIX = api — the ` +
-      `versioned form will be refused at boot.`,
-  );
-
-  return trimmed.replace(versionSuffix, '');
+export function resolveGlobalPrefix(configured: string): string {
+  return configured.startsWith('/') ? configured.slice(1) : configured;
 }
 
 /**

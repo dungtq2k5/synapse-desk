@@ -69,12 +69,10 @@ async function bootstrap() {
   app.enableShutdownHooks();
 
   // The prefix, then the version — two mechanisms that render `/api/v1/…`.
-  // `resolveGlobalPrefix` accepts the legacy `/api/v1` value too: without it,
-  // that value beside versioning serves every route at `/api/v1/v1/…` while
-  // the version-neutral probes stay green.
+  // `GLOBAL_PREFIX` never carries the version; the env schema refuses one that
+  // does.
   const globalPrefix = resolveGlobalPrefix(
     configService.getOrThrow<string>('GLOBAL_PREFIX'),
-    (message) => logger.warn(message),
   );
   app.setGlobalPrefix(globalPrefix, { exclude: OPS_ROUTES });
   app.enableVersioning(API_VERSIONING);

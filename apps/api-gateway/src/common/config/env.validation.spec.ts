@@ -91,3 +91,43 @@ describe('the gateway’s inbound-email configuration', () => {
     );
   });
 });
+
+describe('`GLOBAL_PREFIX` is the prefix alone', () => {
+  /**
+   * **A versioned value is refused at boot, because it does not fail anywhere
+   * else.** Beside URI versioning, `/api/v1` boots cleanly and serves every
+   * route at `/api/v1/v1/…` — measured — while the version-neutral probes keep
+   * every pod ready. The one place that can turn that into a loud failure with
+   * the field named is this schema.
+   */
+  const env = parseEnvFile(
+    readFileSync(join(__dirname, '../../../.env.test'), 'utf8'),
+  );
+
+  const errorFor = (value: string) =>
+    envValidationSchema.validate(
+      { ...env, GLOBAL_PREFIX: value },
+      { allowUnknown: true, abortEarly: false },
+    ).error?.message;
+
+  it('1. **the files the gateway boots with carry the bare prefix**', () => {
+    for (const file of ['.env.test', '.env.example']) {
+      const values = parseEnvFile(
+        readFileSync(join(__dirname, '../../..', file), 'utf8'),
+      );
+
+      expect([file, values.GLOBAL_PREFIX]).toEqual([file, 'api']);
+    }
+  });
+
+  it.each(['api', '/api'])('2. accepts `%s`', (value) => {
+    expect(errorFor(value)).toBeUndefined();
+  });
+
+  it.each(['/api/v1', 'api/v1', '/api/v1/', '/api/v2', ''])(
+    '3. **refuses `%s`, naming the field**',
+    (value) => {
+      expect(errorFor(value)).toContain('GLOBAL_PREFIX');
+    },
+  );
+});

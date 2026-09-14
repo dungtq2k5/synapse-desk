@@ -197,7 +197,7 @@ On first boot auth-service seeds itself (`SEED_ON_BOOTSTRAP = true`): permission
 
 | Reach                          | At                                                                                                                   |
 | :----------------------------- | :------------------------------------------------------------------------------------------------------------------- |
-| REST                           | `http://localhost:3000/api/v1`                                                                                       |
+| REST                           | `http://localhost:3000/api/v1` — prefix `api` + URI version `v1`; `GLOBAL_PREFIX` is the word, not the path          |
 | GraphQL                        | `http://localhost:3000/graphql` — **not** under the prefix                                                           |
 | Swagger                        | `http://localhost:3000/api/v1/docs`, with `SWAGGER_ENABLED = true`                                                   |
 | Liveness / readiness / version | `/health`, `/health/ready`, `/version` — outside the prefix, because an orchestrator cannot negotiate an API version |

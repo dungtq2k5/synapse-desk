@@ -83,7 +83,7 @@ describe('URI versioning is applied by every composition root', () => {
       expect((await request(server).get(`/${prefix}/tickets`)).status).toBe(
         404,
       );
-      // And the legacy prefix is not applied on top of the version.
+      // And the version is not applied twice.
       expect(
         (await request(server).get(`${API}/v${API_VERSION}/tickets`)).status,
       ).toBe(404);

@@ -22,11 +22,7 @@ export const TENANT_SELECTION_COOKIE =
   process.env.TENANT_SELECTION_NAME ?? 'sd_tenant_selection';
 export const DEVICE_COOKIE = process.env.DEVICE_TOKEN_NAME ?? 'sd_device_token';
 
-/**
- * `/api/v1` — derived from `GLOBAL_PREFIX` and the version the gateway applies,
- * through the same functions `main.ts` uses, so both the legacy and the bare
- * prefix produce the path the app actually serves.
- */
+/** `/api/v1` — built from `GLOBAL_PREFIX` by the same functions `main.ts` uses. */
 export const API = apiBasePath(
   resolveGlobalPrefix(process.env.GLOBAL_PREFIX ?? 'api'),
 );

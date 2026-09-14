@@ -2,7 +2,7 @@
 
 **Scope:** every HTTP endpoint the `api-gateway` (BFF) must expose, plus the gRPC methods and NATS/WebSocket events each one is backed by.
 
-**Global prefix:** `api/v1` (set in [main.ts](../apps/api-gateway/src/main.ts)) — paths below omit it.
+**Base path:** `/api/v1` — the global prefix `api` (`GLOBAL_PREFIX`, and it must be that word) plus Nest URI versioning at `v1` ([ADR 0045](./decisions 0045-uri-versioning-under-the-same-paths.md)). Paths below omit both. A breaking change to a route is a `@Version('2')` on its controller, served beside `v1`, never an edit in place. `/health`, `/health/ready` and `/version` sit outside the prefix **and** are version-neutral.
 
 ---
 

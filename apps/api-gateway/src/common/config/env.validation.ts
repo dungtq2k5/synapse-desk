@@ -30,7 +30,15 @@ export const envValidationSchema = Joi.object({
     .required(),
 
   PORT: Joi.number().required(),
-  GLOBAL_PREFIX: Joi.string().required(),
+  // The prefix ALONE. URI versioning adds `/v1`, so a value that carries the
+  // version boots cleanly and serves every route at `/api/v1/v1/…` while the
+  // version-neutral probes keep every pod ready — refused here, loudly.
+  GLOBAL_PREFIX: Joi.string()
+    .required()
+    .pattern(/^\/?api$/)
+    .message(
+      '{{#label}} must be "api" — the version is added by URI versioning, not carried by the prefix',
+    ),
   CORS: Joi.string().required(),
 
   // `/docs` and `/docs-json`. Defaults to FALSE, so an environment that never

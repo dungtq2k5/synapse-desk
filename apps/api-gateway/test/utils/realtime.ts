@@ -128,9 +128,7 @@ export async function bootstrapRealtimeTest(
   const configService = app.get(ConfigService);
 
   app.set('trust proxy', 1);
-  // Mirrors main.ts: the prefix, then the version. No deprecation callback —
-  // `.env.test` still carries the legacy value, and a warning per bootstrap
-  // would repeat in every suite.
+  // Mirrors main.ts: the prefix, then the version.
   app.setGlobalPrefix(
     resolveGlobalPrefix(configService.getOrThrow<string>('GLOBAL_PREFIX')),
     { exclude: OPS_ROUTES },

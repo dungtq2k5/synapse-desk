@@ -129,5 +129,8 @@ export function targetIsLocal(): boolean {
   );
 }
 
-/** Prefix every REST route carries. Mirrors `GLOBAL_PREFIX` in its `.env`. */
+/**
+ * Path every REST route sits under: the gateway's `GLOBAL_PREFIX` (`api`) plus
+ * the URI version it applies (`v1`).
+ */
 export const API = '/api/v1';

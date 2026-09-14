@@ -111,9 +111,7 @@ export async function bootstrapE2eTest(
   // anonymous callers on req.ip, so without it every request in a test that
   // sets X-Forwarded-For lands in the same bucket.
   app.set('trust proxy', 1);
-  // Mirrors main.ts: the prefix, then the version. No deprecation callback —
-  // `.env.test` still carries the legacy value, and a warning per bootstrap
-  // would repeat in every suite.
+  // Mirrors main.ts: the prefix, then the version.
   app.setGlobalPrefix(
     resolveGlobalPrefix(configService.getOrThrow<string>('GLOBAL_PREFIX')),
     { exclude: OPS_ROUTES },

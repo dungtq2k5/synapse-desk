@@ -14,7 +14,7 @@ Authorization: Bearer <access token>
 Content-Type: application/json
 ```
 
-**`/graphql`, not `/api/v1/graphql`.** `GLOBAL_PREFIX` is `/api/v1` and it applies to controller routes; the Apollo driver mounts its own handler outside it. REST lives under the prefix, GraphQL does not, and the two are permanent siblings rather than one replacing the other.
+**`/graphql`, not `/api/v1/graphql`.** REST's `/api/v1` is the global prefix `api` plus URI versioning at `v1` ([ADR 0045](./decisions/0045-uri-versioning-under-the-same-paths.md)), and both apply to controller routes only; the Apollo driver mounts its own handler outside them, so GraphQL carries no version segment. REST lives under the prefix, GraphQL does not, and the two are permanent siblings rather than one replacing the other.
 
 **One public field, `version`; everything else is authenticated.** `version.resolver.ts` carries no guard and says so — *"PUBLIC, like `GET /version` — no guard"* — and the e2e sends no cookie and no header and gets `200` with real data. Every other resolver class carries `@UseGuards(JwtAuthGuard, PermissionGuard)`.
 
