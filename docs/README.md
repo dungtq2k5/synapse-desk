@@ -72,7 +72,7 @@ Append-only. A decision is never edited; superseding one means writing a new one
 | [0029](./decisions/0029-graphql-caches-entities-not-responses.md) | GraphQL caches entities, not responses, and the session key is never the token |
 | [0030](./decisions/0030-refused-turns-exclude-their-attachments.md) | A refused turn's attachments are excluded per turn, not per file |
 | [0031](./decisions/0031-narrow-dtos-at-the-gateway-boundary.md) | The gateway defines narrow DTOs; it never republishes a proto type |
-| [0032](./decisions/0032-unversioned-breaking-changes-are-counted.md) | Breaking changes ship unversioned while no client exists — and are counted |
+| [0032](./decisions/0032-unversioned-breaking-changes-are-counted.md) | Breaking changes shipped unversioned while no client existed — and were counted. **Its mechanism is superseded by [0045](./decisions 0045-uri-versioning-under-the-same-paths.md)**; the count stands as a record of that era |
 | [0033](./decisions/0033-redis-noeviction.md) | One Redis instance, `noeviction`, and three connections that stay separate |
 | [0034](./decisions/0034-read-repopulate-race-is-accepted.md) | The cache read-repopulate race is accepted, not fixed |
 | [0035](./decisions/0035-ocr-language-cap-is-a-cpu-bound.md) | The OCR language cap is four, and it is a CPU bound |
