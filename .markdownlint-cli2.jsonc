@@ -5,7 +5,7 @@
 // not about markdownlint.** Measured across the 77 tracked docs before any
 // config existed, AT THE COMMIT THIS FILE WAS ADDED: 2178 findings, of which
 // 2164 were MD013/line-length at the default 80 columns — 99.4%.
-// `rdm-specs.md` alone carried 715 of those (717 findings in that file, the
+// `rdm-spec.md` alone carried 715 of those (717 findings in that file, the
 // other two being the `<br>` pair below). The house style
 // puts a full paragraph in a table cell, so every prose doc fails that rule by
 // construction, and a signal-to-noise ratio of 1-in-155 is not a lint run
@@ -45,7 +45,7 @@
     // formatting for the files it globs, and it does not reflow markdown prose.
     "MD013": false,
 
-    // `<br>` inside a table cell, twice in `rdm-specs.md`. There is no markdown
+    // `<br>` inside a table cell, twice in `rdm-spec.md`. There is no markdown
     // spelling for a line break in a table — the pipe syntax has no
     // continuation — so the tag is the only way to express it and banning it
     // would mean losing the break, not writing it differently.

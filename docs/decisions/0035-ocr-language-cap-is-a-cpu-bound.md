@@ -6,9 +6,9 @@
 
 A document may declare at most **four** OCR languages, stored and passed **in the order given, never sorted**.
 
-## Why — measured, and the measurement reversed the guess
+## Why
 
-The design expected accuracy to degrade as languages were added and proposed a cap of 2. It does not. Rendered at 300 dpi, tesseract 5.3.4:
+**Measured — and the measurement reversed the guess.** The design expected accuracy to degrade as languages were added and proposed a cap of 2. It does not. Rendered at 300 dpi, tesseract 5.3.4:
 
 | `-l` | char error rate | time |
 | :---- | :---- | :---- |
@@ -27,8 +27,8 @@ Three findings, and only the third sets the number:
 
 So the cap is a CPU bound, not an accuracy one. Four permits every realistic document — one language, English technical terms, and a CJK script — while holding the worst case near +40% on a path that already has a per-page timeout.
 
-## The caveat that keeps this honest
+## Consequences
 
-These were clean synthetic renders of digital fonts, which is the easy case. Real scans are noisy and skewed, and language confusion grows with noise. **The numbers bound the best case**, so they are a reason not to tighten the cap rather than a licence to loosen it.
+**The measurement is a best case, and that caveat is what keeps it honest.** These were clean synthetic renders of digital fonts, which is the easy case. Real scans are noisy and skewed, and language confusion grows with noise. **The numbers bound the best case**, so they are a reason not to tighten the cap rather than a license to loosen it.
 
 Related: [0016](./0016-ocr-is-a-per-page-branch.md).

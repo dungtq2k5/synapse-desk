@@ -24,10 +24,10 @@ Per RDM §1.1, every authenticated request carries a JWT with `user_id`, `organi
 
 ### 0.3 Standard shapes
 
-- **List endpoints:** `?page=1&limit=20&sort=-createdAt&q=<search>` → `{ data: [], meta: { page, limit, total, totalPages } }`. Soft-deleted rows excluded unless `?includeDeleted=true` (requires the matching `*.manage` permission).
-- **Deletes:** `DELETE` performs a **soft delete** (sets `deleted_at` / `deleted_by_id`) on `organizations`, `departments`, `users`, `documents`, `tickets`. Hard delete is never exposed over HTTP.
-- **Restore:** soft-deletable resources get `POST /<resource>/:id/restore`.
-- **Errors:** RFC7807-ish `{ statusCode, code, message, details? }`. `GlobalRpcExceptionFilter` maps gRPC status → HTTP status.
+- **List endpoints:** `?page=1&limit=20&sortBy=createdAt&sortOrder=desc`, plus `?searchTerm=` **only** on lists that actually search — the rest refuse it with a 400 naming the property rather than silently ignoring it. The page arrives inside the standard envelope as `data: { items: [], meta: { totalItems, itemCount, itemsPerPage, totalPages, currentPage } }`. Soft-deleted rows are excluded unless `?includeDeleted=true`, which requires the module's `*.delete` permission (`department.delete`, `ticket.delete`, `user.delete`) and is checked in a guard, before the response cache.
+- **Deletes:** `DELETE` performs a **soft delete** (sets `deleted_at` / `deleted_by_id`) on the six soft-deletable tables — `organizations`, `departments`, `users`, `documents`, `tickets` and `subscription_plans` (where it is called *retiring* a plan). On every other resource `DELETE` means what the resource needs, and the row says which: a real removal (`/webhook-endpoints/:id`, `/attachments/:id`, `/notifications/devices/:id`, sessions), a **redaction** that keeps the row (`/tickets/:ticketId/messages/:messageId`), a **cancel** (`/ingestion-jobs/:id`), an **unassign** (`/tickets/:id/assign`), or clearing a value (`/users/me/avatar`, `/organizations/current/inbound-token`). There is no generic hard delete of a soft-deletable table over HTTP.
+- **Restore:** `POST /<resource>/:id/restore` exists for `departments`, `documents`, `tickets`, `users` and — platform-only — `organizations` (`POST /platform/organizations/:id/restore`). **Not** for `subscription_plans`: a retired plan is never un-retired, which is exactly why its name uniqueness is a partial index rather than a full `@unique` (RDM Table 40).
+- **Errors:** every failure has one body, `{ success: false, statusCode, path, timestamp, error }`, written by `AllHttpExceptionFilter` — the mirror of the success envelope `{ success: true, message, warning, data }`, so a client branches on `success`. A gRPC error from a backing service is mapped to the matching HTTP status through `GRPC_TO_HTTP` in the same filter. The shape is deliberately **not** RFC 7807 Problem Details: there is no `type` URI, no `title`, and the content type is plain `application/json`.
 - **Idempotency:** `POST /billing/plan` accepts an `Idempotency-Key` header and forwards it to Stripe's own idempotency — that route creates an invoice, so a retry is a second charge. The header is **aspirational** on the other mutating AI/billing-relevant endpoints (`POST /tickets/:id/messages`, document upload): nothing reads it there yet.
 - **Audit:** every non-GET endpoint marked ✎ writes an `audit_logs` row (action name given in the *Audit action* notes under each domain).
 
@@ -274,13 +274,11 @@ RDM §1.7: `organization_id IS NULL`, `is_super_admin = true`; audit rows writte
 | POST | `/platform/jobs/:name/run` | Runs a rollup now. A POST rather than a GET because it does work, and a GET is something a browser prefetch or an automatic retry can trigger with nobody asking. | SUPER |
 | POST | `/platform/jobs/:name/backfill` | Recomputes an explicit `from`..`to` range, with a **mandatory `reason`**. Safe to expose only because the jobs are idempotent and range-bounded ([ADR 0009](./decisions/0009-rollups-are-plain-tables.md)). Needed because a rollup bug fixed going forward leaves the wrong numbers in place permanently. | SUPER |
 
----
-
 ### 1.9 Billing & Subscription — `/billing`, `/webhooks/stripe`
 
-**Partly built** — the webhook, the subscription read, checkout, the portal, invoices, the tenant catalogue and the plan-change endpoint all exist. Specced here because it changes the meaning of endpoints that *are* built (§1.8's quota edits and cycle reset) and because Domain C's AI tier depends on it. Full design in [ADR 0026](./decisions/0026-stripe-webhook-idempotency.md); RDM §1.15 and Table 30.
+**Built** — every route below exists: the webhook, the subscription read, checkout, the portal, invoices, the tenant plan catalogue and the plan-change endpoint. It changes the meaning of routes elsewhere (§1.8's quota edits and cycle reset), and Domain C's AI tier depends on it. Webhook idempotency is [ADR 0026](./decisions/0026-stripe-webhook-idempotency.md); the tables are RDM §1.15, Table 30 (`billing_events`) and Tables 40–41 (the plan catalogue).
 
-**The division of labour:** Stripe owns plans, prices, cards and renewals. This system owns *entitlements* — the five columns on `organizations`. The webhook is the only thing that connects them.
+**The division of labour:** Stripe owns what a plan **costs** — prices, cards, invoices, renewals. This system owns what a plan **grants**: the catalogue in `subscription_plans`, and the eight grant columns it copies onto `organizations` (seats, storage, AI budget, model tier, document size, attachment size, document count, analytics lookback). Two paths write those columns — the Stripe webhook, and `POST /billing/plan` for a self-service change — and `entitlements_pinned` stops the webhook overwriting a grant a Super Admin set by hand.
 
 | Method | Path | Description | Auth |
 | :---- | :---- | :---- | :---- |
@@ -423,7 +421,7 @@ No `POST`/`PATCH`/`DELETE` — `audit_logs` is append-only and written internall
 
 ### 3.1 Documents — `/documents`
 
-> **Storage backend settled: Firebase Storage via `storage-service`.** These rows previously described a generic "S3" backend and offered multipart upload as the primary path with presign as an "alternative" — both now reversed. `ingestion-service` still does not exist, so nothing here is built; the wording is updated ahead of it so Domain C is implemented against the mechanism the other two consumers already use, rather than re-deciding it a third time. `purpose: DOCUMENT` is already reserved in `PURPOSE_POLICY` (25 MB cap, `application/pdf`/`text/plain`/`text/markdown`) — widen the allowlist there when the real parser lands, not here.
+> **Built.** Documents are stored in Firebase Storage through `storage-service`, using the one upload mechanism every file in this system uses — presign, `PUT` straight to the bucket, then confirm ([ADR 0024](./decisions/0024-one-upload-mechanism.md)); file bytes never pass through an application server. **The upload policy is not a second list.** `storage-service`'s `DOCUMENT` purpose reads `ALLOWED_DOCUMENT_MIME_TYPES` and `MAX_DOCUMENT_BYTES` from `libs/common` — the same two constants the gateway validates `POST /documents/presign` against — so the service that signs the URL and the route that asks for it cannot disagree about what is accepted. Change the types or the size cap in `libs/common`, and both follow.
 
 | Method | Path | Description | Auth |
 | :---- | :---- | :---- | :---- |
@@ -483,7 +481,7 @@ Direct RAG surface, independent of a ticket thread.
 
 ## 4. Analytics & Dashboards (cross-domain read layer)
 
-> **Not a domain.** Analytics owns no tables — it reads across Domains B, C and D. **RDM Domain D is *Analytics, Feedback & Compliance Audit***, which owns both the trail this section does not touch (`ai_response_feedbacks`, `audit_logs` — endpoints in §2.5 and §2.6, owned by `ticket-service`) and the rollup tables these endpoints read (`ticket_daily_stats`, `agent_daily_stats`, `ai_generation_daily_stats`, `analytics_exports`, RDM Tables 34–37). This section previously carried the "Domain D" label, which made "Domain D" mean one thing here and another in [rdm-specs.md](./rdm-specs.md).
+> **Not a domain.** Analytics owns no tables — it reads across Domains B, C and D. **RDM Domain D is *Analytics, Feedback & Compliance Audit***, which owns both the trail this section does not touch (`ai_response_feedbacks`, `audit_logs` — endpoints in §2.5 and §2.6, owned by `ticket-service`) and the rollup tables these endpoints read (`ticket_daily_stats`, `agent_daily_stats`, `ai_generation_daily_stats`, `analytics_exports`, RDM Tables 34–37). This section previously carried the "Domain D" label, which made "Domain D" mean one thing here and another in [rdm-spec.md](./rdm-spec.md).
 
 Executive dashboard (product §6.6). Read-only, Redis-cached, `perm:analytics.read` throughout. These read daily rollup tables rather than the raw OLTP tables, and there is deliberately no `analytics-service` — [ADR 0009](./decisions/0009-rollups-are-plain-tables.md).
 

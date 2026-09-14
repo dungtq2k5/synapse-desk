@@ -2,105 +2,105 @@
 
 **System Name:** SynapseDesk Backend
 
-**Database Engine:** PostgreSQL 15+
+**Database Engine:** PostgreSQL 18 — every container in `docker-compose.yml` runs `postgres:18.4-alpine`, and production uses one managed instance ([ADR 0043](./decisions/0043-the-cluster-shape.md)).
 
-**ORM Target:** Prisma ORM
+**ORM Target:** Prisma ORM **7.9+**. The floor is real, not cosmetic: every `schema.prisma` uses the `prisma-client` generator, declares its datasource with **no `url`** (the connection string lives in each service's `prisma.config.ts`), and connects through the `@prisma/adapter-pg` driver adapter. A Prisma 6 CLI does not read these schemas the same way.
 
 ## **1. Core Architecture Concepts & Clarifications**
 
 ### **1.1 Organizations vs. Departments (Multi-Tenancy Model & Request Scoping)**
 
 * **organizations (Tenant Boundary):** Represents the top-level corporate entity or customer paying for the SaaS (e.g., *Acme Corp*, *TechGlobal Inc.*). Every single record in the system (users, tickets, documents) belongs to an organization. This guarantees strict multi-tenant data isolation.
-* **Request Scoping & Data Isolation:** Every HTTP, GraphQL, or WebSocket request to the API server MUST carry an authenticated JWT token containing the organization_id and user_id. Middleware/Guards enforce that all database queries automatically scope filtering by organization_id.
-* **departments (Functional Sub-Units):** Represents internal operational groups within an organization (e.g., *IT Helpdesk*, *HR & Payroll*, *Billing*, *Legal*). Users can belong to multiple departments via the user_departments table, with one designated as their primary department. Departments are used for:
-  1. **Ticket Routing:** Directing escalated tickets to specific agent queues.
+* **Request Scoping & Data Isolation:** Every HTTP, GraphQL, or WebSocket request to the API server MUST carry an authenticated JWT token containing the `organization_id` and `user_id`. Every query must be scoped by that `organization_id` — **by hand**: services spread the shared `tenantScope()` helper into their `where`, and nothing forces them to. There is no Prisma middleware or `$extends` doing it automatically ([known-gaps #1](./reference/known-gaps.md)).
+* **departments (Functional Sub-Units):** Represents internal operational groups within an organization (e.g., *IT Helpdesk*, *HR & Payroll*, *Billing*, *Legal*). Users can belong to multiple departments via the `user_departments` table, with one designated as their primary department. Departments are used for:
+  1. **Ticket Routing:** A department *is* a queue. A ticket enters one only when it is **assigned** — the assignment records the department in `ticket_assignments.department_id` and caches it on `tickets.current_department_id`, which nothing else writes. Escalating a ticket changes its status, not its department; the AI can *suggest* a department, and an agent applies it by assigning.
   2. **Granular Knowledge Scoping:** Restricting document chunk retrieval during RAG queries based on all departments a user is affiliated with.
 
-### **1.2 Many-to-Many Document Scoping (department_documents)**
+### **1.2 Many-to-Many Document Scoping (`department_documents`)**
 
 To support flexible document access control across teams:
 
-* **Organization-Wide Access:** If a document's is_organization_wide flag is set to true, all users and RAG queries within that tenant can access it.
-* **Department-Scoped Access:** If is_organization_wide is false, the document is linked to one or more specific departments via the **department_documents** junction table.
+* **Organization-Wide Access:** If a document's `is_organization_wide` flag is set to `true`, all users and RAG queries within that tenant can access it.
+* **Department-Scoped Access:** If `is_organization_wide` is `false`, the document is linked to one or more specific departments via the **`department_documents`** junction table.
 * **RAG Retrieval Scoping Filter:** During vector retrieval in Qdrant/PostgreSQL, the system applies metadata filtering based on the organization and the user's assigned departments.
 
-### **1.3 Conversation History Engine (tickets & ticket_messages)**
+### **1.3 Conversation History Engine (`tickets` & `ticket_messages`)**
 
-All conversation threads—whether between a customer/employee and the AI assistant (Tier 1) or between an end-user and a human support agent (Tier 2)—are stored in **ticket_messages**.
+All conversation threads—whether between a customer/employee and the AI assistant (Tier 1) or between an end-user and a human support agent (Tier 2) are stored in **`ticket_messages`**.
 
-* **Tier 1 (AI Self-Service):** When a user asks a question, a lightweight ticket record is created (or retrieved). The user's prompt and the AI's response are inserted into ticket_messages with is_ai_generated = true.
-* **Tier 2 (Human Agent Escalation):** If the AI cannot resolve the issue and the user requests human help, the *same* ticket status changes to ESCALATED. When a human agent enters the thread, their replies are stored in ticket_messages with their sender_id.
+* **Tier 1 (AI Self-Service):** When a user asks a question, a lightweight ticket record is created (or retrieved). The user's prompt and the AI's response are inserted into `ticket_messages` with `is_ai_generated = true`.
+* **Tier 2 (Human Agent Escalation):** If the AI cannot resolve the issue and the user requests human help, the *same* ticket status changes to ESCALATED. When a human agent enters the thread, their replies are stored in `ticket_messages` with their `sender_id`.
 * **Unified History:** This structure ensures a single chronological timeline of every interaction, allowing agents to see exactly what the user asked the AI before human intervention.
 
-### **1.4 Relational DB vs. Vector DB (document_chunks & Citations)**
+### **1.4 Relational DB vs. Vector DB (`document_chunks` & Citations)**
 
 * **Vector DB (e.g., Qdrant):** Stores high-dimensional dense vector embeddings optimized for high-speed mathematical vector similarity search.
-* **Relational DB (document_chunks in PostgreSQL):** Stores the relational ground truth:
-  1. The raw text snippet (content_text).
-  2. Sequential position (chunk_index, page number, section header).
-  3. The link back to the parent document_id.
-  4. The vector_point_id mapping directly to Qdrant.
+* **Relational DB (`document_chunks` in PostgreSQL):** Stores the relational ground truth:
+  1. The raw text snippet (`content_text`).
+  2. Sequential position (`chunk_index`, and `page_number` for PDFs — the citation's *"page 4"*).
+  3. The link back to the parent `document_id`.
+  4. The `vector_point_id` mapping directly to Qdrant.
 
-**Why keep document_chunks in PostgreSQL?**
+**Why keep `document_chunks` in PostgreSQL?**
 
 When the AI generates an answer, it must provide accurate, clickable citations (e.g., *"Source: 2026 Employee Handbook, Page 4, Paragraph 2"*). PostgreSQL handles metadata queries, join operations, and foreign key integrity far better than a vector database.
 
-### **1.5 Purpose of device_sessions & Security Features**
+### **1.5 Purpose of `device_sessions` & Security Features**
 
-The **device_sessions** entity serves two distinct security purposes:
+The **`device_sessions`** entity serves two distinct security purposes:
 
 1. **Active Session & Refresh Token Revocation:** Stores active refresh token hashes, client IP addresses, and user agents. If a user's laptop is stolen, they can click "Log out of all devices," which invalidates these session rows.
-2. **2FA "Remember This Device" (Trusted Devices):** When a user completes Two-Factor Authentication (2FA), they can check "Remember this device for 30 days." A unique cryptographic token is issued and stored as device_token_hash with is_trusted = true. Future logins on that specific browser bypass the 2FA prompt until trusted_until is reached.
+2. **2FA "Remember This Device" (Trusted Devices):** When a user completes Two-Factor Authentication (2FA), they can check "Remember this device for 30 days." A unique cryptographic token is issued and stored as `device_token_hash` with `is_trusted = true`. Future logins on that specific browser bypass the 2FA prompt until `trusted_until` is reached.
 
-**Refresh Token Rotation & Reuse Detection (family_id + rotated_at):**
+**Refresh Token Rotation & Reuse Detection (`family_id` + `rotated_at`):**
 
-Refresh tokens are single-use. Each `/auth/refresh` call issues a new token and marks the presented row spent by setting rotated_at, while carrying family_id forward unchanged. This yields the standard OAuth 2.0 BCP replay defense:
+Refresh tokens are single-use. Each `/auth/refresh` call issues a new token and marks the presented row spent by setting `rotated_at`, while carrying `family_id` forward unchanged. This yields the standard OAuth 2.0 BCP replay defense:
 
-* **The spent row is kept, not deleted.** This is the entire mechanism. If a rotated row were deleted, a stolen token replayed later would simply look like an *unknown* token — indistinguishable from a typo or an expired login, and silently ignored. Because the row survives with rotated_at set, the server can tell "this token was genuinely issued and has already been used," which is only possible if two parties hold it.
-* **On reuse, revoke the family, not the row.** By the time a replay is observed, the legitimate client and the attacker have both been issued tokens in the same lineage, and there is no way to tell which is which. Revoking every row sharing that family_id logs both out and forces a fresh authentication that the attacker cannot complete.
-* **Trust survives rotation.** device_token_hash and trusted_until are separate columns precisely because the refresh token changes on every use while a 30-day device trust must not. Binding trust to refresh_token_hash would silently break 2FA bypass on the first refresh.
+* **The spent row is kept, not deleted.** This is the entire mechanism. If a rotated row were deleted, a stolen token replayed later would simply look like an *unknown* token — indistinguishable from a typo or an expired login, and silently ignored. Because the row survives with `rotated_at` set, the server can tell "this token was genuinely issued and has already been used," which is only possible if two parties hold it.
+* **On reuse, revoke the family, not the row.** By the time a replay is observed, the legitimate client and the attacker have both been issued tokens in the same lineage, and there is no way to tell which is which. Revoking every row sharing that `family_id` logs both out and forces a fresh authentication that the attacker cannot complete.
+* **Trust survives rotation.** `device_token_hash` and `trusted_until` are separate columns precisely because the refresh token changes on every use while a 30-day device trust must not. Binding trust to `refresh_token_hash` would silently break 2FA bypass on the first refresh.
 
 **Why SHA-256 and not bcrypt/Argon2 for these hashes:**
 
-refresh_token_hash, device_token_hash, and password_reset_tokens.token_hash are all UNIQUE columns looked up **by value** — the server receives a token and must find its row in one indexed read. bcrypt and Argon2 embed a random salt, so the same input hashes differently every time and could never be found by such an index; verification would require scanning every row and comparing one by one. SHA-256 is the correct choice here, not a compromise: these are 32 bytes of cryptographic randomness, and the slow-KDF family exists to protect *low-entropy human passwords* from offline guessing — a threat that does not apply to a 256-bit secret. users.password_hash remains Argon2/bcrypt, where that threat is real. Hex SHA-256 is fixed-width, hence VARCHAR(64).
+`refresh_token_hash`, `device_token_hash`, `password_reset_tokens.token_hash` and `user_invitations.token_hash` are all UNIQUE columns looked up **by value** — the server receives a token and must find its row in one indexed read. bcrypt and Argon2 embed a random salt, so the same input hashes differently every time and could never be found by such an index; verification would require scanning every row and comparing one by one. SHA-256 is the correct choice here, not a compromise: these are 32 bytes of cryptographic randomness, and the slow-KDF family exists to protect *low-entropy human passwords* from offline guessing — a threat that does not apply to a 256-bit secret. `users.password_hash` remains Argon2/bcrypt, where that threat is real. Hex SHA-256 is fixed-width, hence VARCHAR(64).
 
-**This reasoning covers those three columns and no others.** The two columns holding a code a *human types* — otps.code_hash and two_factor_backup_codes.code_hash — are found by index and only then compared, so they are not looked up by value and use a slow KDF instead. See §2.4.
+**This reasoning covers those four columns and no others.** The two columns holding a code a *human types* — `otps.code_hash` and `two_factor_backup_codes.code_hash` — are found by index and only then compared, so they are not looked up by value and use a slow KDF instead — salted **scrypt**, via `hashCode()`. Passwords are the third case, bcrypt. The rule behind all three is §8.1 of [development-conventions.md](./development-conventions.md): *pick the hash by how the value is looked up*.
 
 ### **1.6 Standard Audit & Soft-Delete Fields Policy**
 
 To support enterprise compliance, legal hold requirements, and prevent accidental data loss:
 
-* **Timestamps on All Tables:** Every table includes created_at (TIMESTAMPTZ) and updated_at (TIMESTAMPTZ).
-* **Soft Deletes on Core Business Entities:** Operational tables (users, documents, tickets, departments, organizations) **MUST NOT** be hard-deleted from the database via SQL DELETE. Instead, they use:
-  * deleted_at (TIMESTAMPTZ, Nullable): NULL means active; a timestamp indicates when it was soft-deleted.
-  * deleted_by_id (UUID, Nullable): FK pointing to users.id who deleted the record.
+* **Timestamps are named for the event they record, and only rows edited in place carry `updated_at`.** Most tables stamp a row's creation as `created_at`, but where the row *is* an event the column is named for that event instead — `ticket_status_changes.changed_at`, `user_departments.assigned_at`, `billing_events.processed_at`, the rollups' `computed_at`. So read a table's own dictionary below rather than assuming `created_at` exists. `updated_at` appears only where rows are edited in place: append-only tables such as `audit_logs` and `ticket_status_changes` have none because nothing updates them, and `ticket_messages` records an edit as `edited_at`. Timestamps are `TIMESTAMPTZ` with one exception — `job_runs` (Table 38).
+* **Soft Deletes on Core Business Entities:** Operational tables (`users`, `documents`, `tickets`, `departments`, `organizations`) **MUST NOT** be hard-deleted from the database via SQL DELETE. Instead, they use:
+  * `deleted_at` (TIMESTAMPTZ, Nullable): NULL means active; a timestamp indicates when it was soft-deleted.
+  * `deleted_by_id` (UUID, Nullable): FK pointing to `users.id` who deleted the record.
 * **Why Soft Delete?** If an administrator deletes a document, historical support tickets that cited that document must still preserve their relational integrity and citation logs.
 
 ### **1.7 Platform Super Admins vs. Tenant Users**
 
 The system distinguishes two classes of identity:
 
-* **Tenant User:** users.organization_id is set and is_super_admin = false. Every query is scoped to that organization_id by the middleware described in 1.1.
-* **Platform Super Admin:** users.organization_id is NULL and is_super_admin = true. Employed by the SaaS provider to operate across tenants (onboarding, suspension, platform configuration). Their actions write audit_logs rows with a NULL organization_id, since no single customer owns the event.
+* **Tenant User:** `users.organization_id` is set and `is_super_admin = false`. Every query is scoped to that `organization_id` by the middleware described in 1.1.
+* **Platform Super Admin:** `users.organization_id` is NULL and `is_super_admin = true`. Employed by the SaaS provider to operate across tenants (onboarding, suspension, platform configuration). Their actions write `audit_logs` rows with a NULL `organization_id`, since no single customer owns the event.
 
 The two conditions are kept in lockstep by a CHECK constraint (see Table 3) so an orphaned user record can never be mistaken for a platform operator.
 
 ### **1.8 Tenant Lifecycle, Quotas & Metering**
 
-* **Lifecycle:** organizations.status gates tenant-wide access — PENDING_ONBOARDING (signed up, setup incomplete), ACTIVE (normal), SUSPENDED_PAST_DUE (payment failure; read-only or blocked), FROZEN (platform maintenance or compliance hold).
-* **Seat & Storage Quotas:** max_agent_seats is checked before issuing an agent invite, counting **active agents + outstanding PENDING invitations** — counting only active agents would let an admin send 50 invites against 10 seats and blow the quota the moment they are accepted. The same total is re-checked at acceptance, since seats may have filled in the interim. Expired invitations release their reservation automatically (Table 28). max_storage_bytes is checked against the sum of documents.file_size_bytes before accepting an upload.
-* **AI Token Metering:** monthly_ai_token_budget is enforced against the tenant's spend since billing_cycle_start, summed from **`ai_generations` (Table 29)** — *not* from `ticket_messages`, which only ever sees chat answers and is blind to drafts, summaries, classifications and embeddings. Reaching the cap disables AI generation while leaving human Tier 2 support fully available; the per-surface consequences of that, and why the runtime check is a Redis counter rather than this sum, are §1.14.
-* **Security Governance:** enforce_two_factor forces every user in the tenant through 2FA enrollment at login. allowed_email_domains restricts which email domains may auto-join the tenant at signup.
+* **Lifecycle:** `organizations.status` gates tenant-wide access — PENDING_ONBOARDING (signed up, setup incomplete), ACTIVE (normal), SUSPENDED_PAST_DUE (payment failure; read-only or blocked), FROZEN (platform maintenance or compliance hold).
+* **Seat & Storage Quotas:** `max_agent_seats` is checked before issuing an agent invite, counting **active agents + outstanding PENDING invitations** — counting only active agents would let an admin send 50 invites against 10 seats and blow the quota the moment they are accepted. The same total is re-checked at acceptance, since seats may have filled in the interim. Expired invitations release their reservation automatically (Table 28). `max_storage_bytes` is checked against the sum of `documents.file_size_bytes` before accepting an upload.
+* **AI Token Metering:** `monthly_ai_token_budget` is enforced against the tenant's spend since `billing_cycle_start`, summed from **`ai_generations` (Table 29)** — *not* from `ticket_messages`, which only ever sees chat answers and is blind to drafts, summaries, classifications and embeddings. Reaching the cap disables AI generation while leaving human Tier 2 support fully available; the per-surface consequences of that, and why the runtime check is a Redis counter rather than this sum, are §1.14.
+* **Security Governance:** `enforce_two_factor` forces every user in the tenant through 2FA enrollment at login. `allowed_email_domains` restricts which email domains may auto-join the tenant at signup.
 
-### **1.9 Short-Lived Credential Flows (otps & password_reset_tokens)**
+### **1.9 Short-Lived Credential Flows (`otps` & `password_reset_tokens`)**
 
 Three flows need a single-use secret that lives outside the JWT lifecycle. They are deliberately split into two tables because their delivery channel, format, and threat model differ.
 
-* **otps (numeric codes, user-typed):** A 6-digit code delivered to a channel the user must prove they control — email (purpose = EMAIL_VERIFICATION) or SMS (purpose = PHONE_VERIFICATION). Because the code is short enough to guess, the row carries its own brute-force counter: every failed verification increments attempts_count, and once it reaches max_attempts (default 5) the handler sets is_used = true, burning the code and forcing a new request. Only code_hash is stored, never the plaintext.
-* **The target column:** The code is bound to the *exact* address or number it was sent to, stored separately from users.email / users.phone_number. This is what makes a **change-of-address** flow safe: a user requesting a new phone number gets an OTP with target = the new number, and users.phone_number / is_phone_verified are only written after that specific code verifies. A code issued for one target can never validate a different one.
-* **password_reset_tokens (opaque links, machine-generated):** A high-entropy token embedded in a reset URL, so it needs no attempt counter — guessing is infeasible. token_hash is UNIQUE, which makes lookup a single indexed read and makes token collision a database-level impossibility. ip_address and user_agent record where the reset was requested from; both are surfaced in the reset email ("this request came from Chrome on macOS") so a victim can recognize an attack, and are copied into audit_logs.
-* **Shared invariants:** Both tables are consumed once (is_used) and expire (expires_at) — a row is valid only when `is_used = false AND expires_at > NOW()`. Both hard-delete via ON DELETE CASCADE from users, since an expired secret has no historical or compliance value. A scheduled job prunes rows past expires_at. Successfully consuming a password reset revokes every device_sessions row for that user.
-* **Hashing choice differs between the two:** password_reset_tokens.token_hash is SHA-256 because it is a UNIQUE column looked up *by value* (§1.5). otps.code_hash is **not** — it is found via the (user_id, purpose) index and only then compared — so it uses a slow KDF: **scrypt**, N=2^14, r=8, p=1, stored as `scrypt$N=…,r=…,p=…$<salt>$<key>` with the parameters in the string, so a future change verifies old rows with their own parameters. A 6-digit code has ~20 bits of entropy, exactly the low-entropy case a KDF exists for. The attempts_count ceiling is the online defense; the KDF is the offline one should the table ever leak. This is why code_hash is VARCHAR(255) rather than the fixed VARCHAR(64) of the SHA-256 columns. two_factor_backup_codes.code_hash is the same function for the same reason, compared across the user's live rows.
+* **`otps` (numeric codes, user-typed):** A 6-digit code delivered to a channel the user must prove they control — email (purpose = EMAIL_VERIFICATION) or SMS (purpose = PHONE_VERIFICATION). Because the code is short enough to guess, the row carries its own brute-force counter: every failed verification increments `attempts_count`, and once it reaches `max_attempts` (default 5) the handler sets `is_used = true`, burning the code and forcing a new request. Only `code_hash` is stored, never the plaintext.
+* **The target column:** The code is bound to the *exact* address or number it was sent to, stored separately from `users.email / users.phone_number`. This is what makes a **change-of-address** flow safe: a user requesting a new phone number gets an OTP with target = the new number, and `users.phone_number / is_phone_verified` are only written after that specific code verifies. A code issued for one target can never validate a different one.
+* **`password_reset_tokens` (opaque links, machine-generated):** A high-entropy token embedded in a reset URL, so it needs no attempt counter — guessing is infeasible. `token_hash` is UNIQUE, which makes lookup a single indexed read and makes token collision a database-level impossibility. `ip_address` and `user_agent` record where the reset was requested from; both are surfaced in the reset email ("this request came from Chrome on macOS") so a victim can recognize an attack, and are copied into `audit_logs`.
+* **Shared invariants:** Both tables are consumed once (`is_used`) and expire (`expires_at`) — a row is valid only when `is_used = false AND expires_at > NOW()`. Both hard-delete via `ON DELETE CASCADE` from `users`, since an expired secret has no historical or compliance value. A scheduled job prunes rows past `expires_at`. Successfully consuming a password reset revokes every `device_sessions` row for that user.
+* **Hashing choice differs between the two:** `password_reset_tokens.token_hash` is SHA-256 because it is a UNIQUE column looked up *by value* (§1.5). `otps.code_hash` is **not** — it is found via the `(user_id, purpose)` index and only then compared — so it uses a slow KDF: **scrypt**, `N=2^14`, `r=8`, `p=1`, stored as `scrypt$N=…,r=…,p=…$<salt>$<key>` with the parameters in the string, so a future change verifies old rows with their own parameters. A 6-digit code has ~20 bits of entropy, exactly the low-entropy case a KDF exists for. The `attempts_count` ceiling is the online defense; the KDF is the offline one should the table ever leak. This is why `code_hash` is VARCHAR(255) rather than the fixed VARCHAR(64) of the SHA-256 columns. `two_factor_backup_codes.code_hash` is the same function for the same reason, compared across the user's live rows.
 * **Why not one generic tokens table?** A single table would force the numeric-code attempt counters and the URL-token provenance columns to be nullable for half its rows, and would let a low-entropy 6-digit code be presented where a high-entropy reset token is expected. Separate tables make that class of confusion unrepresentable.
 
 ### **1.10 Multi-Tenant Identity & Email Scoping**
@@ -167,7 +167,7 @@ Domain E turns a domain event into (a) a durable per-recipient feed row and (b) 
 
 ### **1.13 Cross-Service References Carry No Database Foreign Key**
 
-Every table below marked **FK ➔ users.id**, **FK ➔ departments.id**, or **FK ➔ organizations.id** is annotated that way for readability — it names the *logical* relationship — but only tables that live inside `auth-service`'s own database (`postgres_auth`) can enforce it as a real Postgres constraint. `tickets`, `ticket_messages`, `ticket_assignments` (Domain B) and `ai_response_feedbacks`, `audit_logs` (Domain D, owned by `ticket-service` per the service ownership map) live in a **separate physical database**, `postgres_ticket`. Postgres cannot enforce a foreign key across databases, full stop — this is not a gap to close later, it is the correct shape for service-per-database.
+Every table below marked **FK ➔ `users.id`**, **FK ➔ `departments.id`**, or **FK ➔ `organizations.id`** is annotated that way for readability — it names the *logical* relationship — but only tables that live inside `auth-service`'s own database (`postgres_auth`) can enforce it as a real Postgres constraint. `tickets`, `ticket_messages`, `ticket_assignments` (Domain B) and `ai_response_feedbacks`, `audit_logs` (Domain D, owned by `ticket-service` per the service ownership map) live in a **separate physical database**, `postgres_ticket`. Postgres cannot enforce a foreign key across databases, full stop — this is not a gap to close later, it is the correct shape for service-per-database.
 
 **The obligation this creates, in place of a constraint:**
 
@@ -277,15 +277,16 @@ customer.subscription.created | updated | deleted
                                   document_flags
 [ Domain D: Analytics,      ---> ai_response_feedbacks, audit_logs, ai_generations, billing_events,
     Feedback & Compliance  ]      ticket_daily_stats, agent_daily_stats, ai_generation_daily_stats,
-                                  analytics_exports, job_runs, limit_alert_generations
+                                  analytics_exports, job_runs, limit_alert_generations,
+                                  projection_cursors
 [ Domain E: Notifications ] ---> notifications, notification_deliveries, notification_preferences,
                                   inbound_auto_replies, webhook_endpoints, webhook_deliveries,
                                   device_tokens
 ```
 
-**45 tables**, across four Postgres databases — one per owning service, with no cross-database foreign keys (§1.13). Two are replicated per-service rather than shared, so a service can record its own state without a cross-service write: `job_runs` (Table 38) exists **three times**, in `postgres_auth`, `postgres_ticket` and `postgres_ingestion`; `limit_alert_generations` (Table 42) exists **twice**, in `postgres_auth` and `postgres_ingestion`.
+**46 tables**, across four Postgres databases — one per owning service, with no cross-database foreign keys (§1.13). Two are replicated per-service rather than shared, so a service can record its own state without a cross-service write: `job_runs` (Table 38) exists **four times**, once in every service database; `limit_alert_generations` (Table 42) exists **twice**, in `postgres_auth` and `postgres_ingestion`.
 
-Table numbers are **stable identifiers, not reading order** — they are cited from other documents (`api-endpoints-plan` §0.5, §1.1, §1.6, §9, §11) and from code docblocks, so a table keeps its number for life. Tables added after the original 1–25 were assigned are placed in their *domain's* section rather than at the end, which is why the sequence reads **1–12, 28, 40–41, 13–16, 26, 31–33, 17–20, 27, 21–22, 29–30, 34–38, 42, 23–25, 39, 44–45, 43**:
+Table numbers are **stable identifiers, not reading order** — they are cited from other documents (`api-endpoints-plan` §0.5, §1.1, §1.6, §9, §11) and from code docblocks, so a table keeps its number for life. Tables added after the original 1–25 were assigned are placed in their *domain's* section rather than at the end, which is why the sequence reads **1–12, 28, 40–41, 13–16, 26, 31–33, 17–20, 27, 21–22, 29–30, 34–38, 42, 46, 23–25, 39, 44–45, 43**:
 
 | Late addition | Sits in | Why it was added |
 | :---- | :---- | :---- |
@@ -309,6 +310,7 @@ Table numbers are **stable identifiers, not reading order** — they are cited f
 | **Table 43** `device_tokens` | Domain E | A push token outlives every session, so it cannot share `device_sessions`' revoke-with-the-family lifetime |
 | **Table 44** `webhook_endpoints` | Domain E | Outbound webhooks are tenant configuration, not a user preference — `WEBHOOK` is deliberately absent from `PREFERENCE_CHANNELS` |
 | **Table 45** `webhook_deliveries` | Domain E | `notification_deliveries` answers "did we tell this person"; a webhook tells an integration, and the two are anchored to different things |
+| **Table 46** `projection_cursors` | Domain D | A counter updated with `+=` is only correct if no interval is projected twice; an overlapping window had inflated chunk usage roughly fourfold |
 
 Domain membership, not the number, is what tells you where a table belongs.
 
@@ -555,7 +557,7 @@ Earlier revisions of this document specified both columns on both tables. The sc
 | :---- | :---- | :---- | :---- |
 | **id** | UUID | Primary Key, gen_random_uuid() | Unique ID for this backup code. |
 | **user_id** | UUID | NOT NULL, FK ➔ users.id, On Delete CASCADE | User who owns this backup code. |
-| **code_hash** | VARCHAR(255) | NOT NULL | Salted scrypt hash of the normalized backup code (§2.4). Verification compares across the user's unused, unexpired rows; nothing is looked up by hash. |
+| **code_hash** | VARCHAR(255) | NOT NULL | Salted scrypt hash of the normalized backup code (§1.5). Verification compares across the user's unused, unexpired rows; nothing is looked up by hash. |
 | **is_used** | BOOLEAN | NOT NULL, false | Tracks if the code has been consumed for login. |
 | **expires_at** | TIMESTAMPTZ | NOT NULL | BACKUP_CODE_TTL_DAYS after creation. |
 | **created_at** | TIMESTAMPTZ | NOT NULL, NOW() | Timestamp of code generation. |
@@ -570,7 +572,7 @@ Earlier revisions of this document specified both columns on both tables. The sc
 | **user_id** | UUID | NOT NULL, FK ➔ users.id, On Delete CASCADE | User the code was issued to. |
 | **purpose** | ENUM | NOT NULL | Channel being verified: EMAIL_VERIFICATION, PHONE_VERIFICATION. |
 | **target** | VARCHAR(255) | NOT NULL | The specific email address or phone number receiving the code. Binds the code to one destination so it cannot be replayed against a different address (see §1.9). |
-| **code_hash** | VARCHAR(255) | NOT NULL | Salted scrypt hash of the 6-digit code (§2.4). The plaintext is never persisted. |
+| **code_hash** | VARCHAR(255) | NOT NULL | Salted scrypt hash of the 6-digit code (§1.5). The plaintext is never persisted. |
 | **attempts_count** | INT | NOT NULL, Default: 0 | Failed verification attempts against this code. |
 | **max_attempts** | INT | NOT NULL, Default: 5 | Brute-force ceiling. When attempts_count reaches this value the application sets is_used = true, burning the code. |
 | **is_used** | BOOLEAN | NOT NULL, Default: false | True once consumed successfully **or** exhausted via max_attempts. |
@@ -1169,19 +1171,19 @@ Separate from Table 34 rather than a wider dimension on it: an agent is a person
 
 *The scheduled-job heartbeat. One row per job name.*
 
-Present **identically in `postgres_auth`, `postgres_ticket` and `postgres_ingestion`** — a per-service operational table, not a shared one, because a service must be able to record its own liveness without a cross-service write.
+Present **identically in all four service databases** — `postgres_auth`, `postgres_ticket`, `postgres_ingestion` and `postgres_notification` — a per-service operational table, not a shared one, because a service must be able to record its own liveness without a cross-service write.
 
 The jobs not running was never the real problem; the real problem was that nothing anywhere could tell you they were not running. A failed job at least logs. A job that never runs logs nothing at all.
 
 | Field Name | Data Type | Constraints / Default | Description & Business Logic |
 | :---- | :---- | :---- | :---- |
 | **job_name** | TEXT | **Primary Key** | The job name from `SCHEDULED_JOBS`, or a step within one. The PK, so recording a run is a single upsert with no read first. |
-| **last_started_at** | TIMESTAMPTZ | NOT NULL | When the most recent attempt began. |
-| **last_succeeded_at** | TIMESTAMPTZ | Nullable | **Preserved across a failure, deliberately.** This is what the staleness alert reads, and clearing it on failure would turn "broken since Tuesday" into "never ran", losing the one piece of information worth having. Nullable because it is null until the *first* success — which is how `checkStaleness` tells "never ran" from "stale". |
+| **last_started_at** | TIMESTAMP(3) | NOT NULL | When the most recent attempt began. **Not `TIMESTAMPTZ`** — unlike every other timestamp in this model, these three columns are a bare Prisma `DateTime` with no `@db.Timestamptz`, which Postgres stores without a zone. Prisma writes UTC, so the value is correct; a raw SQL reader comparing it with a `TIMESTAMPTZ` column must know it is UTC. |
+| **last_succeeded_at** | TIMESTAMP(3) | Nullable | **Preserved across a failure, deliberately.** This is what the staleness alert reads, and clearing it on failure would turn "broken since Tuesday" into "never ran", losing the one piece of information worth having. Nullable because it is null until the *first* success — which is how `checkStaleness` tells "never ran" from "stale". |
 | **last_duration_ms** | INT | Nullable | Duration of the last run. |
 | **last_error** | TEXT | Nullable | Truncated by `JobRunRecorder` — a driver stack trace is kilobytes and the first line is what anybody reads. |
 | **consecutive_failures** | INT | NOT NULL, Default 0 | **Reset to 0 on success.** A count that only ever grows is how a job failing every night for a month reads as one failure. |
-| **updated_at** | TIMESTAMPTZ | NOT NULL, auto-updated | Last write to this row. |
+| **updated_at** | TIMESTAMP(3) | NOT NULL, auto-updated | Last write to this row. |
 
 * See [ADR 0003](./decisions/0003-bullmq-over-nest-cron.md) for why the jobs run on BullMQ repeats.
 
@@ -1203,6 +1205,20 @@ It **cannot** live in Redis beside the alarm *level*: a flush would reset it to 
 | **updated_at** | TIMESTAMPTZ | NOT NULL, auto-updated | Last re-arm. |
 
 * **Primary key:** composite `(organization_id, dimension)`.
+
+#### **Table 46: projection_cursors**
+
+*How far a projection has consumed its source, so a re-run counts nothing twice. One row per projection.*
+
+Owned by `ingestion-service`. Today it holds one row, `chunk-usage-projection` — the step that adds generation hits to `document_chunks.retrieval_count` and `citation_count`. Those writes are `+=`, and an `+=` is only correct if no interval is ever projected twice: projecting over an overlapping trailing window instead inflated every counter roughly fourfold and biased "most cited" against recent documents ([known-gaps #29](./reference/known-gaps.md)). A cursor is what makes the addition safe — each run consumes `[until, now)` and advances `until`, so every source row falls in exactly one interval.
+
+**Its own table, not a column on `job_runs`.** `job_runs` is shared by four services through `JobRunRecorder`, and teaching a heartbeat about one rollup's progress would couple the two. More importantly, `job_runs.last_succeeded_at` is a *finish time written after the fact, outside the step's transaction* — a crash between the two writes would leave a cursor that disagrees with the counters it guards.
+
+| Field Name | Data Type | Constraints / Default | Description & Business Logic |
+| :---- | :---- | :---- | :---- |
+| **name** | VARCHAR(64) | **Primary Key** | The step name from `scheduler.processor.ts`, so this row and the `job_runs` heartbeat for the same step share a key a reader can join by eye. |
+| **until** | TIMESTAMPTZ | NOT NULL | **Exclusive** upper bound of the last projected interval, and the next run's **inclusive** lower bound. The value the queries actually used — not the wall clock at which they finished. **Written inside the projection's own transaction**, together with the counter updates it guards: a cursor that could disagree with its own counters would re-project (cursor behind) or skip forever (cursor ahead). |
+| **updated_at** | TIMESTAMPTZ | NOT NULL, auto-updated | Last advance. |
 
 ### **Domain E: Notifications & Messaging**
 

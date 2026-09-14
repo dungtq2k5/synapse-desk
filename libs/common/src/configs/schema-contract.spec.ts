@@ -8,7 +8,7 @@ import { stripComments } from '../testing/strip-comments';
  * The schema-delivery contract: what may reach a production image, and what
  * the seeder is allowed to make optional.
  *
- * Item 35 — *"not include testing databases when push to production"* — was
+ * The rule that testing databases never reach a production image was
  * already true when it was written, and true by three separate accidents of
  * configuration rather than by anything asserting it. These checks say so, so
  * that it stays true the day somebody adds a fifth service or edits a

@@ -8,8 +8,8 @@ Start here. Every document has exactly one job; this page says which.
 | :---- | :---- |
 | [development-conventions.md](./development-conventions.md) | **How to write the code.** Rules and examples only |
 | [product-overview.md](./product-overview.md) | Personas, feature scope, business metrics |
-| [tech-stack-specs.md](./tech-stack-specs.md) | Technology choices and justification |
-| [rdm-specs.md](./rdm-specs.md) | Tables, columns, constraints, cascade rules |
+| [tech-stack-spec.md](./tech-stack-spec.md) | Technology choices and justification |
+| [rdm-spec.md](./rdm-spec.md) | Tables, columns, constraints, cascade rules |
 | [api-endpoints-plan.md](./api-endpoints-plan.md) | Every endpoint, permission, WS event, NATS subject |
 
 ## Integrator references — written for someone outside this repo
@@ -18,14 +18,26 @@ Not internal specs. Each one is the **contract** a client codes against, and eac
 
 | Document | Audience | Source of truth it mirrors |
 | :---- | :---- | :---- |
+| [graphql-api.md](./graphql-api.md) | Front end | `apps/api-gateway/src/schema.gql` (the committed SDL) and the resolvers behind it |
 | [websocket-api.md](./websocket-api.md) | Front end | `realtime.config.ts` (events, limits), `realtime.gateway.ts` (handshake) |
 | [webhooks.md](./webhooks.md) | Customer integrators | `libs/common/src/contracts/webhook.contract.ts` (payload, signing, every constant) |
 
-**A change to either source file is a change to a published contract.** These are the only documents here read by people who cannot see the code, so drift in them is not a stale note — it is a receiver that verifies a signature wrongly, or a client that waits forever for an event that was renamed.
+**A change to any of those source files is a change to a published contract.** These are the only documents here read by people who cannot see the code, so drift in them is not a stale note — it is a receiver that verifies a signature wrongly, or a client that waits forever for an event that was renamed.
 
 ## `decisions/` — why, permanently
 
 Append-only. A decision is never edited; superseding one means writing a new one that links back. Docblocks and comments cite these, because their numbers do not move.
+
+**Start every new ADR from [TEMPLATE.md](./decisions/TEMPLATE.md).** Every file here follows its structure, and `adr-structure.spec.ts` fails the build when one does not:
+
+| Part | Rule |
+| :---- | :---- |
+| File name | `NNNN-kebab-case-title.md` — the next free four-digit number |
+| Line 1 | `# NNNN — Title`, where `NNNN` matches the file name |
+| Line 3 | `**Status:**` then `accepted`, or `superseded by [ADR NNNN](./NNNN-….md)` — followed by **exactly one** of `**Code:**` (the files that implement it) or `**Rule:**` (the conventions section it created). Further keys such as `**Follows:**` may come after |
+| Sections | `## Decision` first and `## Why` second; `## Consequences` last. Any other `##` section goes between `## Why` and `## Consequences`; `###` subsections are free |
+
+*"Never edited"* means the **decision** is never edited. Bringing a file into this structure, or unlinking a reference that no longer resolves, changes how a decision is presented, not what it decided.
 
 | ADR | Decides |
 | :---- | :---- |

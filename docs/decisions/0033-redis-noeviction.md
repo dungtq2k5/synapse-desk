@@ -6,7 +6,9 @@
 
 `maxmemory-policy noeviction`. When the instance fills, **every** write fails — not just the cache's.
 
-## Why every eviction policy is worse
+## Why
+
+**Every eviction policy is worse**, each for a different reason:
 
 - **`volatile-ttl` was tried and is wrong.** It evicts by nearest expiry, and the shortest expiry in the instance is **BullMQ's job lock** (`PX 30000`), not a cache entry. An evicted lock is not a cache miss — it is a job the stalled-checker returns to the queue and a second worker runs again. Every worker warns about it at boot.
 - **`allkeys-lru` / `volatile-lru` are worse still.** The AI spend counter `quota:{org}:{cycle}` is cold by design — written once per generation, read once per gate check — so recency policies discard it and reset a tenant's metered spend mid-cycle.

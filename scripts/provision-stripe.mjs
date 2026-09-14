@@ -251,9 +251,9 @@ async function main() {
       metadata: { [PORTAL_MARKER]: 'v1' },
       features: {
         // FALSE on purpose. A plan change made in Stripe's portal reaches us as
-        // `customer.subscription.updated` AFTER Stripe applied it, and todo 16.7
-        // — block a downgrade that would put a tenant over the new plan's
-        // limits — is only enforceable before that. Plan changes route through
+        // `customer.subscription.updated` AFTER Stripe applied it, and the
+        // downgrade block — refusing a change that would put a tenant over the
+        // new plan's limits — is only enforceable before that. Plan changes route through
         // our own UI; the portal keeps what it is better at.
         subscription_update: { enabled: false },
         subscription_cancel: { enabled: true, mode: 'at_period_end' },

@@ -1,5 +1,5 @@
 /**
- * The inbound-mail Worker
+ * @file The inbound-mail Worker
  *
  * Cloudflare Email Routing hands this a raw RFC 5322 stream. It parses the
  * MIME, builds the JSON `POST /webhooks/email/inbound` is written against,

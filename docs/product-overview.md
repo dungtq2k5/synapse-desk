@@ -47,15 +47,15 @@ Our platform transforms support from a reactive, high-cost bottleneck into a pro
                             |
             +---------------+---------------+
             |                               |
-  [ Resolved (70-80%) ]           [ Escalation Needed ]
+  [ Resolved (60-80%) ]           [ Escalation Needed ]
             |                               |
             v                               v
-+-----------------------+   +---------------------------+
-| Instant Satisfaction  |   | TIER 2: HUMAN AGENT + AI  |
-| Zero Support Delay    |   | - Context Auto-Summarized |
-+-----------------------+   | - AI Drafts Response      |
-                            | - Human Reviews & Approves|
-                            +---------------------------+
++-----------------------+   +----------------------------+
+| Instant Satisfaction  |   | TIER 2: HUMAN AGENT + AI   |
+| Zero Support Delay    |   | - Context Auto-Summarized  |
++-----------------------+   | - AI Drafts Response       |
+                            | - Human Reviews & Approves |
+                            +----------------------------+
 ```
 
 ### **Key Value Pillars**
@@ -86,9 +86,9 @@ Our platform transforms support from a reactive, high-cost bottleneck into a pro
 
 1. **Inquiry:** A customer encounters a specific account error: *"Getting Error 403 when trying to sync payment details."*
 2. **Initial Attempt:** The AI offers initial troubleshooting steps. The customer reports that the issue persists.
-3. **Escalation:** The customer requests human assistance. The system converts the chat into an official **Support Ticket** marked with medium priority and auto-routes to the **Billing** department queue (based on AI classification of the issue topic).
-4. **Agent Co-Pilot:** The assigned Billing agent opens the ticket. The AI has already summarized the customer's previous steps and drafted a recommended action based on account and payment logs.
-5. **Human Approval:** The agent reviews the suggested fix, modifies it with one click if necessary, and sends it to the user.
+3. **Escalation:** The customer requests human assistance. Nothing is converted — the conversation has been a **Support Ticket** since its first message, so it simply moves to *Escalated* with the whole thread intact. The AI can **suggest** a department and priority (here, **Billing**, medium) from how the ticket opened, but a suggestion is never applied on its own: an agent confirms it by assigning the ticket to the Billing queue. A model's guess never moves a ticket between teams unreviewed.
+4. **Agent Co-Pilot:** The assigned Billing agent opens the ticket. Escalating it triggered an AI summary of the conversation — what the customer asked, what they already tried, and a suggested next step. The summary is written in the background, so on a ticket escalated seconds ago it may still be arriving. The AI works only from the conversation and the company's knowledge base; it has no access to the customer's account or payment records.
+5. **Human Approval:** The agent asks the AI to draft a reply. The draft is grounded in the conversation and the relevant knowledge-base documents, with citations, and is **never sent automatically** — the agent edits it as needed and sends it themselves. Whether it was sent as written or edited first is recorded, which is how the team measures how useful the drafts are.
 6. **Outcome:** Total time to resolve is reduced from hours to under two minutes.
 
 ### **Scenario C: Cross-Department Reassignment**
@@ -97,7 +97,7 @@ Our platform transforms support from a reactive, high-cost bottleneck into a pro
 2. **Initial Investigation:** The assigned IT agent troubleshoots the VPN connection but discovers the real issue is that the customer's storage quota on the file server is 99% full—a **Finance/Operations** issue, not IT.
 3. **Smart Reassignment:** The IT agent reassigns the ticket to the Finance/Operations department with reason **"Department Change"** and a note explaining the root cause.
 4. **Seamless Handoff:** Finance/Operations receives the ticket in their queue. The full conversation history (chat thread + AI summaries) travels with the ticket. The Finance agent knows exactly what was tried and why the ticket was transferred.
-5. **Resolution:** Finance increases the customer's quota. The ticket is resolved without the customer ever knowing it moved between departments—they see only one continuous conversation thread.
+5. **Resolution:** Finance increases the customer's quota and resolves the ticket. The customer sees one continuous conversation, and **every reply in it is labelled with who wrote it** — the AI assistant, or the agent by name — so when the Finance agent takes over, the customer can see a different person is now answering. What stays internal is the *why*: the department move, the reassignment reason and the agents' internal notes are never shown to them.
 6. **Outcome:** Audit trail shows ticket touched two departments; analytics can track reassignments by reason for team planning.
 
 ## **6. Core Product Modules & Features**
@@ -111,7 +111,7 @@ Our platform transforms support from a reactive, high-cost bottleneck into a pro
 ### **6.2 Intelligent Helpdesk & Ticket Management**
 
 * **Lifecycle Tracking:** Complete status progression (*New → Open → Pending Agent → Escalated → Resolved → Closed*) with timestamp and actor recorded at each transition.
-* **Department-Based Routing & Assignment:** AI classifies tickets by issue type and automatically routes them to the appropriate department queue (IT, HR, Billing, Operations). Agents accept tickets from their department's queue and handle them. If an agent discovers the issue requires expertise from another department, they can seamlessly reassign the ticket to that department—tracked with one of seven reasons (*initial, department change, escalation, unavailable, load balancing, self-assigned, manual*).
+* **Department-Based Routing & Assignment:** AI suggests a department (IT, HR, Billing, Operations) and a priority from how a ticket opened, and an agent confirms the routing — the suggestion is never applied automatically. Agents accept tickets from their department's queue and handle them. If an agent discovers the issue requires expertise from another department, they can seamlessly reassign the ticket to that department—tracked with one of seven reasons (*initial, department change, escalation, unavailable, load balancing, self-assigned, manual*).
 * **Assignment Audit Trail:** Complete history of who held each ticket, when, and which department they were in. Supports analytics on agent productivity, escalation patterns, and reassignment frequency.
 
 ### **6.3 Agent AI Co-Pilot Workplace**
@@ -119,7 +119,7 @@ Our platform transforms support from a reactive, high-cost bottleneck into a pro
 * **Smart Summarization:** Provides agents with an immediate condensed summary of long chat histories, complex customer descriptions, and full assignment history (who handled it before, when, and why it was reassigned).
 * **Auto-Drafted Responses:** Generates pre-written, highly accurate response recommendations tailored to the specific problem, learning from past resolutions across the organization.
 * **Knowledge Recommendations:** Surface relevant articles, past ticket resolutions, and internal expertise (e.g., "Similar issue resolved by the Ops team 2 weeks ago") alongside the active ticket thread.
-* **Flexible Reassignment:** One-click reassignment to colleagues in the same or different departments—with a recorded reason (escalation, department change, load balancing, and four others) and automatic context transfer. Customers see one continuous conversation thread regardless of which agent (or department) handles the ticket behind the scenes.
+* **Flexible Reassignment:** One-click reassignment to colleagues in the same or different departments—with a recorded reason (escalation, department change, load balancing, and four others) and automatic context transfer. Customers see one continuous conversation thread in which each reply is labelled as the AI or the agent who wrote it; the routing behind it — which department, and why it moved — stays internal.
 
 ### **6.4 Unified Knowledge Management Center**
 
@@ -144,7 +144,7 @@ Our platform transforms support from a reactive, high-cost bottleneck into a pro
 * **Plan Catalogue:** Plans are data an administrator edits, not a constant in the code — each one states every limit it grants (seats, storage, AI budget, model tier, document size, attachment size, document count, analytics lookback) with no blanks, so what a tier offers is readable in one row. Pricing itself stays in Stripe: this platform owns what a plan *grants*, Stripe owns what it *costs*, and neither mirrors the other.
 * **Tenant Self-Governance:** An organization can narrow its own limits below what its plan allows — a company that knows its staff should never upload a 100 MB file sets 5 MB, so a mis-click or a compromised account cannot burn its storage. **Every layer narrows and no layer widens**: a tenant can tighten a limit, never grant itself more than it bought.
 * **Approaching-Limit Alerts:** Notifications as a workspace nears its seat, storage or document ceiling, so running out is something a customer sees coming rather than discovers when an upload fails. Alerts re-arm after a recovery, so a workspace that frees space and fills it again is told again.
-* **Safe Plan Changes:** Upgrades apply immediately. A **downgrade that would strand existing data is refused rather than silently enforced** — a workspace over the new plan's document or seat count is told what exceeds it, instead of having content become unreachable behind a limit it never agreed to.
+* **Safe Plan Changes:** A plan change takes effect immediately, in either direction, and is billed pro rata straight away. Before moving a workspace to a plan with **lower** seat, storage or document limits, the system checks whether what the workspace already uses would fit. If it would not, the change is **refused**, and the customer is told exactly which limit they are over — for example *"storage: 12 GB used, the new plan allows 10 GB"* — so they can free up space first. Nothing is ever deleted or hidden to force a downgrade through, and if current usage cannot be checked at that moment, the change is refused rather than allowed on trust.
 
 ## **7. Strategic Business Benefits & ROI**
 

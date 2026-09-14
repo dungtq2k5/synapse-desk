@@ -145,7 +145,7 @@ findOne(@CurrentUser('organizationId') orgId: string | null) { … }
 
 ### 4.4 Entitlements and limits — every layer narrows, no layer widens
 
-Four things can bound one operation: a **platform ceiling** (a code constant), the **plan grant** ([RDM Table 40](./rdm-specs.md)), the grant **denormalized onto the tenant**, and the tenant's own **override**. The effective limit is the `min()` of all of them.
+Four things can bound one operation: a **platform ceiling** (a code constant), the **plan grant** ([RDM Table 40](./rdm-spec.md)), the grant **denormalized onto the tenant**, and the tenant's own **override**. The effective limit is the `min()` of all of them.
 
 - **Read the `min()`, never one layer.** A reader that trusts the plan column alone ignores a tenant that narrowed itself; one that trusts the override alone ignores the plan. Compose at the read site.
 - **A plan may only narrow.** The platform ceiling protects a parser or a transport, and is not sellable — so a plan column is an argument to `min()`, never a replacement for it. Selling more than the platform admits must stay unexpressible.
@@ -153,7 +153,7 @@ Four things can bound one operation: a **platform ceiling** (a code constant), t
 - **A plan grant is `NOT NULL`; a tenant override is nullable.** A subscription always grants a value, so a blank grant is a bug. `NULL` on an override means "the tenant configured nothing", which is the normal state — the two nullabilities carry different meanings and must not be unified.
 - **Denormalize the grant onto the tenant row.** Enforcement paths read one row; joining the catalogue on every presign puts it in the hot path of the highest-volume route in the system.
 - **The direction of dial-out is fixed: `ingestion-service` calls `auth-service`, never the reverse.** Auth owns the limits, ingestion owns storage and document counts, and neither can produce a whole verdict — the **gateway** composes the legs and reports **which dimensions each run actually covered**. An unevaluated dimension and an evaluated-and-clear one are different answers; collapsing them lets a downgrade through on a timeout.
-- **Adding a dimension is five edits, not one:** the plan column, the denormalized tenant column, the `min()` at every read, the composer's coverage list, and [rdm-specs.md](./rdm-specs.md). A dimension added to only the first two enforces nothing.
+- **Adding a dimension is five edits, not one:** the plan column, the denormalized tenant column, the `min()` at every read, the composer's coverage list, and [rdm-spec.md](./rdm-spec.md). A dimension added to only the first two enforces nothing.
 
 ---
 
@@ -197,31 +197,11 @@ A `?` costs every layer below a branch on `undefined`. Prefer a real default plu
 
 Where absent and empty are indistinguishable on the wire — every `repeated` field, and any implicit-presence scalar — the `?` buys nothing and the default is strictly better.
 
-**A default is only a DEFAULT once the downstream branch is deleted.** Adding
-`= []` to the DTO while `dto.field ?? []` survives in the mapper gets the
-ceremony and none of the benefit: the value is supplied twice, and nothing says
-which one is doing the work. Removing the `?` is half the change — the other
-half is deleting every `??` the `?` was paying for, which is the cost the rule
-above is written to recover.
+**A default is only a DEFAULT once the downstream branch is deleted.** Adding `= []` to the DTO while `dto.field ?? []` survives in the mapper gets the ceremony and none of the benefit: the value is supplied twice, and nothing says which one is doing the work. Removing the `?` is half the change — the other half is deleting every `??` the `?` was paying for, which is the cost the rule above is written to recover.
 
-**No runtime test can see the difference**, because both arrangements put the
-same bytes on the wire. Measured: with the DTO default removed AND the mapper
-branch restored, every assertion about the outgoing message still passes. The
-guard is therefore a scan — `default-branch-pairing.spec.ts` fails when a mapper
-branches on a field its DTO already defaults. A field whose DTO carries NO
-default is none of that check's business: `clearStripeProductId` resolves its
-absent case at the mapper precisely because a default at the DTO would clear the
-column on every unrelated PATCH.
+**No runtime test can see the difference**, because both arrangements put the same bytes on the wire. Measured: with the DTO default removed AND the mapper branch restored, every assertion about the outgoing message still passes. The guard is therefore a scan — `default-branch-pairing.spec.ts` fails when a mapper branches on a field its DTO already defaults. A field whose DTO carries NO default is none of that check's business: `clearStripeProductId` resolves its absent case at the mapper precisely because a default at the DTO would clear the column on every unrelated PATCH.
 
-**A constant spread into a `create` MUST be typed to the shape it is spread
-INTO, not the shape it came from.** Object literals get excess-property checks;
-**spreads do not**. So `{ ...SOME_CONSTANT }` passed to a Prisma `create` is
-unchecked for extra fields, it compiles, and the failure surfaces at the
-database rather than at the compiler. Measured: spreading a nine-field
-entitlement constant — one field of which is a PLAN's label with no column on
-`organizations` — into an organization create broke 359 tests at runtime with a
-clean build. Derive the narrower shape (`Omit<…>`) and `satisfies` it, so a
-field added to the wider type still has to be answered on both paths.
+**A constant spread into a `create` MUST be typed to the shape it is spread INTO, not the shape it came from.** Object literals get excess-property checks; **spreads do not**. So `{ ...SOME_CONSTANT }` passed to a Prisma `create` is unchecked for extra fields, it compiles, and the failure surfaces at the database rather than at the compiler. Measured: spreading a nine-field entitlement constant — one field of which is a PLAN's label with no column on `organizations` — into an organization create broke 359 tests at runtime with a clean build. Derive the narrower shape (`Omit<…>`) and `satisfies` it, so a field added to the wider type still has to be answered on both paths.
 
 **A default is VALIDATED, so it must satisfy the field's own bounds.** `@IsOptional()` skips only `undefined` and `null`; a defaulted field always holds a value, so the validators run on it. `limit: number = 0` beside `@Min(1)` rejects every request that omits the field — a 400 on the default path, which no test that always sends the field will catch.
 
@@ -857,10 +837,7 @@ One suite, run in CI, that boots the **real** auth-service gRPC server (in-proce
 
 ### 13.8 Source scans — what they can prove, and when they are the only option
 
-A **source scan** is a test that reads the tree — the shape used by
-`limit-comparison.spec.ts`, `default-branch-pairing.spec.ts`,
-`mapper-naming.spec.ts` and `analytics-window.spec.ts`. It proves that text
-**exists**, never that it **runs**. That single limit decides where it belongs.
+A **source scan** is a test that reads the tree — the shape used by `limit-comparison.spec.ts`, `default-branch-pairing.spec.ts`, `mapper-naming.spec.ts` and `analytics-window.spec.ts`. It proves that text **exists**, never that it **runs**. That single limit decides where it belongs.
 
 Before writing one, ask **what the property actually is**:
 
@@ -870,70 +847,39 @@ Before writing one, ask **what the property actually is**:
 | Has no runtime expression at all | **The scan is the only guard.** |
 | Has a runtime expression; the scan stands in for a test | **Incomplete — write the test and drop the scan.** |
 
-**The first row is the common case here, and the one where the proxy creeps
-in:** it is easy to pick the instance, write a scan for it, and end up with
-neither guard. `limit-comparison.spec.ts` is the clean example — *"this site
-refuses a `NaN` limit"* is testable at any one of seven call sites, while
-*"every site, including the one added next year"* is not testable at all. Write
+**The first row is the common case here, and the one where the proxy creeps in:** it is easy to pick the instance, write a scan for it, and end up with neither guard. `limit-comparison.spec.ts` is the clean example — *"this site refuses a `NaN` limit"* is testable at any one of seven call sites, while *"every site, including the one added next year"* is not testable at all. Write
 both; they guard different things.
 
-**The second row is why scans exist.** `FREE_TIER_ENTITLEMENTS` referencing
-`MAX_DOCUMENTS_PER_TENANT` rather than the literal `100_000` has **no runtime
-expression** — measured, the two are indistinguishable until the constant moves,
-which is the moment nobody is looking. Same for *"the mapper branch was
-deleted"*: both arrangements put identical bytes on the wire. No test can be
-written that fails today, so the scan is not scaffolding — it is the guard.
+**The second row is why scans exist.** `FREE_TIER_ENTITLEMENTS` referencing `MAX_DOCUMENTS_PER_TENANT` rather than the literal `100_000` has **no runtime expression** — measured, the two are indistinguishable until the constant moves, which is the moment nobody is looking. Same for *"the mapper branch was deleted"*: both arrangements put identical bytes on the wire. No test can be written that fails today, so the scan is not scaffolding — it is the guard.
 
-**The third row is the ceiling.** Measured: `if (false && days > maxRangeDays)`
-still matches a source pattern looking for that comparison. A scan cannot see
-that the text does not run, so a behavioural property guarded only by a scan is
-guarded only in appearance. `analytics-window.spec.ts` moved OUT of this row
-when the two windows were unified: sharing `parseAnalyticsRange` made *"both windows
-resolve identically"* true by construction, and what was left to guard —
-*"neither service has grown a local copy back"* — has no runtime expression.
-The replacement is better because the property changed underneath it.
+**The third row is the ceiling.** Measured: `if (false && days > maxRangeDays)` still matches a source pattern looking for that comparison. A scan cannot see that the text does not run, so a behavioural property guarded only by a scan is guarded only in appearance. `analytics-window.spec.ts` moved OUT of this row when the two windows were unified: sharing `parseAnalyticsRange` made *"both windows resolve identically"* true by construction, and what was left to guard — *"neither service has grown a local copy back"* — has no runtime expression. The replacement is better because the property changed underneath it.
 
-**Every scan MUST carry its own vacuity guards**, because the failure mode of a
-scan is silence:
+**Every scan MUST carry its own vacuity guards**, because the failure mode of a scan is silence:
 
-- **A corpus floor.** A walk over zero files reports exactly what a clean repo
-  reports. Assert the file count, and name one file that must be in it.
-- **A pattern-fires test.** Assert the detector matches the shape it was written
-  for, and does NOT match the corrected form. Without it, test 2 passes for a
-  regex that matches nothing.
+- **A corpus floor.** A walk over zero files reports exactly what a clean repo reports. Assert the file count, and name one file that must be in it.
+- **A pattern-fires test.** Assert the detector matches the shape it was written for, and does NOT match the corrected form. Without it, test 2 passes for a regex that matches nothing.
 
 ---
 
 ### 13.9 Verify a mechanism at the mechanism, not at its neighbour
 
-A comment describes **its own half of a boundary** and is silent about the half
-that produces the behaviour. That is not carelessness — it follows from the
-architecture — which is why reading one side carefully still gets the mechanism
-wrong. Four examples, all found by review rather than by tests:
+A comment describes **its own half of a boundary** and is silent about the half that produces the behaviour. That is not carelessness — it follows from the architecture — which is why reading one side carefully still gets the mechanism wrong. Four examples, all found by review rather than by tests:
 
 | Claim, read from one side | What the other side did |
 | :---- | :---- |
-| a lazy initialiser is memoised | it assigns **only on success**, so a failed load retries every call |
+| a lazy initializer is memoised | it assigns **only on success**, so a failed load retries every call |
 | the Worker "reports rather than retries" a 401 | it `throw`s, and throwing is what makes Cloudflare retry |
 | the at-cap path skips fusion | `reciprocal_rank_fusion` is called on **both** branches |
 | a page that parsed is a page that indexed | the chunker drops it again at a **second, smaller** bar |
 
 Two rules follow, and they are cheap:
 
-- **Read the component you are not currently thinking about.** The mechanism
-  usually lives at the boundary between two of them.
-- **Follow the failing path, not the happy one.** A lazy initialiser *looks*
-  memoised because on success it is; a boot-time check *looks* once-per-process
-  because on success it is; an error branch is unreachable when nothing is
-  wrong. The failing path is also where the reader ends up — nobody consults a
-  flow document or a docblock when things are working.
+- **Read the component you are not currently thinking about.** The mechanism usually lives at the boundary between two of them.
+- **Follow the failing path, not the happy one.** A lazy initializer *looks* memoised because on success it is; a boot-time check *looks* once-per-process because on success it is; an error branch is unreachable when nothing is wrong. The failing path is also where the reader ends up — nobody consults a flow document or a docblock when things are working.
 
-**This is a different failure from the counting rule** (strip comments before
-counting anything over source, §13.8). That one catches a miscount; this one
-catches a correct count of the wrong thing.
+**This is a different failure from the counting rule** (strip comments before counting anything over source, §13.8). That one catches a miscount; this one catches a correct count of the wrong thing.
 
-Applies to documentation as much as to tests: `docs/reference/flows/` carries
-the same two rules in its own conventions list, scoped to flow documents.
+Applies to documentation as much as to tests: `docs/reference/flows/` carries the same two rules in its own conventions list, scoped to flow documents.
 
 ## 14. Definition of Done (pre-PR checklist)
 
@@ -1007,7 +953,7 @@ Two failure modes this ordering exists to prevent:
 - [ ] List endpoint extends `SearchPaginationDto` and returns `PaginationResponseDto<T>`.
 - [ ] New env var added to the Joi schema **and** `env.example`.
 - [ ] New permission code added to `PERMISSION_CODES` + `PERMISSION_NAMES` + role grants + [api-endpoints-plan.md §9](./api-endpoints-plan.md).
-- [ ] Endpoint documented in [api-endpoints-plan.md](./api-endpoints-plan.md); schema change reflected in [rdm-specs.md](./rdm-specs.md) — **columns, types, nullability, defaults and the enum's full value list.** A widened enum whose doc still lists the old members is the most common drift and the least visible.
+- [ ] Endpoint documented in [api-endpoints-plan.md](./api-endpoints-plan.md); schema change reflected in [rdm-spec.md](./rdm-spec.md) — **columns, types, nullability, defaults and the enum's full value list.** A widened enum whose doc still lists the old members is the most common drift and the least visible.
 - [ ] New cross-service behaviour — an ordering constraint, a dial-out direction, a consistency sweep — recorded in [reference/sys-flows.md](./reference/sys-flows.md). Anything visible inside one service does **not** go there.
 - [ ] `npm run lint` clean.
 

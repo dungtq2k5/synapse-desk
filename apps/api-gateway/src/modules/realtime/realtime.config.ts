@@ -1,15 +1,13 @@
 import { AnswerStatus } from '@synapsedesk/common';
 
-/**
- * Room names and outbound event names — the two strings a client and the server
- * must agree on exactly, declared once.
- *
- * Template-literal types rather than bare `string`: a room built as
- * `user${id}` (missing colon) or `tickets:${id}` (plural) is a compile error
- * here, where the alternative is a broadcast that reaches nobody and reports
- * nothing. There is no runtime error for emitting into a room that does not
- * exist — Socket.IO simply delivers to the zero sockets in it.
- */
+// Room names and outbound event names — the two strings a client and the server
+// must agree on exactly, declared once.
+//
+// Template-literal types rather than bare `string`: a room built as
+// `user${id}` (missing colon) or `tickets:${id}` (plural) is a compile error
+// here, where the alternative is a broadcast that reaches nobody and reports
+// nothing. There is no runtime error for emitting into a room that does not
+// exist — Socket.IO simply delivers to the zero sockets in it.
 export type UserRoom = `user:${string}`;
 export type OrgRoom = `org:${string}`;
 export type TicketRoom = `ticket:${string}`;

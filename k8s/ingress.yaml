@@ -1,4 +1,4 @@
-# The one Ingress. Item 33's routing-and-TLS half — ADR 0043.
+# The one Ingress — the routing-and-TLS half of the ingress requirement, ADR 0043.
 #
 # **`ingress-nginx`, and only the gateway.** The five gRPC services and
 # rag-service have `ClusterIP` Services and nothing else: they are reachable

@@ -80,8 +80,8 @@ index exists to refuse, with nothing red. `npm run db:push` therefore chains
 `db:schema`, which runs the same entrypoint against the same method. Two
 environments, two callers, one list — [ADR 0039](./0039-the-seeder-ddl-block-is-the-list.md).
 
-**3. `ingress-nginx` answers the ingress half of item 33. `helmet` is the other
-half and belongs in the application.**
+**3. `ingress-nginx` answers the proxying half of the ingress requirement.
+`helmet` is the other half and belongs in the application.**
 
 One controller plus one `Ingress` routing `/` to the api-gateway Service. Not a
 hand-written `nginx.conf` in front of the cluster: that is a second reverse
@@ -89,7 +89,15 @@ proxy doing what the Ingress already does, and two places to configure CORS,
 timeouts and upgrade headers is the same "two lists is two chances" hazard
 `secure-gateway.decorator.ts` names about its own CORS.
 
-## Why not the other ingress candidates
+## Why
+
+Parts 1 and 2 carry their reasons inline, beside each choice, because each is
+argued against its own specific alternative — [ADR 0022](./0022-no-cross-service-fks.md)
+for the single instance; the kubelet's ordering and the measured lock for the
+init container. What part 3 needed room for is why `ingress-nginx` and not the
+alternatives.
+
+### Why not the other ingress candidates
 
 - **GKE native Ingress** (`gce`) provisions a Google L7 load balancer that
   carries WebSockets, but closes an idle upgraded connection at a 30-second
@@ -99,9 +107,9 @@ timeouts and upgrade headers is the same "two lists is two chances" hazard
   answer in a year. Today it is a second set of CRDs for a system with one HTTP
   entry point.
 
-## Item 33 is not closed by this, and that is the point of writing it down
+## The security-header half is not closed by this, and that is the point of writing it down
 
-`docs/tech-stack-specs.md` §"Ingress & Proxy" reads _"Reverse proxy, SSL
+`docs/tech-stack-spec.md` §"Ingress & Proxy" reads _"Reverse proxy, SSL
 termination, strict Content Security Policy (CSP) headers, custom error
 pages."_ The Ingress takes the first two. **Measured: there is no `helmet` and
 no `contentSecurityPolicy` anywhere in this repository** — CORS was built and
@@ -109,8 +117,20 @@ the security-header half never was.
 
 That half belongs in `main.ts`, not in the proxy: `helmet` is one middleware, it
 versions with the code that decides what a page may load, and it survives a
-change of ingress controller. Recording it here is what stops item 33 being
-ticked off on half its meaning.
+change of ingress controller. Recording it here is what stops the requirement
+being ticked off on half its meaning.
+
+## What this does not decide
+
+- **Whether the schema objects eventually become migration SQL.** They are one
+  method called from two places now, which is a smaller thing than twenty-four
+  statements spread across migration files — but it also means `migrate deploy`
+  alone does not produce a complete schema, and a future operator reading
+  Prisma's `_prisma_migrations` table will not see them. Left open.
+- **Whether `helmet` ships with a strict or a permissive CSP.** Recorded as
+  open, not answered.
+- **Where the container images are built and pushed.** CI builds and tests; it
+  does not publish. That is still a phase of its own.
 
 ## Consequences
 
@@ -128,15 +148,3 @@ ticked off on half its meaning.
 - **`DATABASE_URL` and `REDIS_URL` are Secrets, not ConfigMap entries**, because
   they carry passwords. The four-databases shape therefore lands on the Secret
   path.
-
-## What this does not decide
-
-- **Whether the schema objects eventually become migration SQL.** They are one
-  method called from two places now, which is a smaller thing than twenty-four
-  statements spread across migration files — but it also means `migrate deploy`
-  alone does not produce a complete schema, and a future operator reading
-  Prisma's `_prisma_migrations` table will not see them. Left open.
-- **Whether `helmet` ships with a strict or a permissive CSP.** Recorded as
-  open, not answered.
-- **Where the container images are built and pushed.** CI builds and tests; it
-  does not publish. That is still a phase of its own.

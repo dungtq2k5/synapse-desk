@@ -22,8 +22,7 @@ node scripts/generate-k8s-config.mjs           # rewrite
 node scripts/generate-k8s-config.mjs --check   # verify (what the spec runs)
 ```
 
-The source is each service's **`.env.example`**, active and commented lines alike. `# METRICS_HOST = 127.0.0.1` is not a disabled setting — it is how this repository documents a default without setting it, and the cluster is the one place those defaults are wrong. A generator that read only active lines would drop `METRICS_HOST`, every `REDIS_DB` and rag-service's `GRPC_PORT`, which is
-exactly the set a pod overrides.
+The source is each service's **`.env.example`**, active and commented lines alike. `# METRICS_HOST = 127.0.0.1` is not a disabled setting — it is how this repository documents a default without setting it, and the cluster is the one place those defaults are wrong. A generator that read only active lines would drop `METRICS_HOST`, every `REDIS_DB` and rag-service's `GRPC_PORT`, which is exactly the set a pod overrides.
 
 It is deliberately **not** `scripts/generate-docker-env.mjs`'s input. That script reads the developer's untracked `.env` and says so — _"the output may hold real credentials"_. These files are tracked. What transfers is its substitution table, not its source.
 

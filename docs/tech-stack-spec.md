@@ -73,7 +73,7 @@ Parsing is **not** in the Python service, and the split is deliberate: extractio
 | Communication Pattern | Technology | Implementation Detail |
 | :---- | :---- | :---- |
 | **Sync RPC (Cross-Language)** | **gRPC + Protocol Buffers (.proto)** | Shared binary protocol specs between TS and Python services for immediate direct queries. |
-| **Async Domain Events** | **NATS + NATS JetStream** | Ultra-lightweight Go-based messaging engine. Stores and replays events (ticket.created, document.indexed). |
+| **Async Domain Events** | **NATS + NATS JetStream** | Ultra-lightweight Go-based messaging engine. Stores and replays events (`ticket.created`, `document.indexed`). |
 | **Background Work Queues** | **BullMQ + Redis** | Handles heavy, asynchronous processing jobs (e.g., file chunking, bulk embedding pipelines) with retries and concurrency limits. |
 
 ## **6. Persistence, Caching & Data Storage**
@@ -105,5 +105,5 @@ Parsing is **not** in the Python service, and the split is deliberate: extractio
 
 * **Monorepo Manager:** Turborepo / NestJS CLI Workspace.
 * **Testing:** **Jest** configured with `@swc/jest` for high-speed serial unit and integration testing.
-* **Code Formatting & Linting:** ESLint, Prettier, and Husky Git hooks for pre-commit checks.
-* **Continuous Integration:** GitHub Actions executing automated Docker multi-stage builds, unit/integration testing, license validation, and semantic tag release generation (CHANGELOG.md).
+* **Code Formatting & Linting:** ESLint (`eslint.config.mjs`), Prettier (`.prettierrc`) and `markdownlint-cli2` (`.markdownlint-cli2.jsonc`). **Enforced in CI, not by local Git hooks** — there is no Husky and no pre-commit hook; CI's `static` job runs `lint`, `format:check`, `typecheck` and `proto:lint` on every pull request, and a failure there blocks the merge. The pre-PR checklist in §14.0 of [development-conventions.md](./development-conventions.md) lists the same commands to run locally.
+* **CI/CD:** GitHub Actions, in two workflows that answer different questions. **`ci.yml`** runs on every pull request and on push to `main`: format, lint, typecheck, proto lint, build, unit tests, the e2e suites against a real stack, and the Python and email-Worker checks. License declarations are checked by a unit test (`publish-safety.spec.ts`), not a separate step. **`cd.yml`** runs only on push to `main` (never on a pull request): it builds the multi-stage Docker images, pushes them to Artifact Registry, and applies the Kubernetes manifests. There is no release tagging or CHANGELOG generation.
