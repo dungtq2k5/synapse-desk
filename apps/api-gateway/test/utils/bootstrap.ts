@@ -17,7 +17,11 @@ import {
   toProtoOrgStatus,
 } from '@synapsedesk/grpc-proto';
 import { AppModule } from '../../src/app.module';
-import { OPS_ROUTES } from '../../src/modules/health/ops-routes';
+import {
+  API_VERSIONING,
+  OPS_ROUTES,
+  resolveGlobalPrefix,
+} from '../../src/modules/health/ops-routes';
 import { setupSwagger } from '../../src/common/config/swagger.config';
 import { SECURITY_HEADERS } from '../../src/common/config/security-headers.config';
 import { AllHttpExceptionFilter } from '../../src/common/filters/all-http-exception.filter';
@@ -107,9 +111,14 @@ export async function bootstrapE2eTest(
   // anonymous callers on req.ip, so without it every request in a test that
   // sets X-Forwarded-For lands in the same bucket.
   app.set('trust proxy', 1);
-  app.setGlobalPrefix(configService.getOrThrow<string>('GLOBAL_PREFIX'), {
-    exclude: OPS_ROUTES,
-  });
+  // Mirrors main.ts: the prefix, then the version. No deprecation callback —
+  // `.env.test` still carries the legacy value, and a warning per bootstrap
+  // would repeat in every suite.
+  app.setGlobalPrefix(
+    resolveGlobalPrefix(configService.getOrThrow<string>('GLOBAL_PREFIX')),
+    { exclude: OPS_ROUTES },
+  );
+  app.enableVersioning(API_VERSIONING);
   // **The same object `main.ts` applies.** A suite that never applies the
   // header policy cannot guard it — the argument the CORS lines below already
   // make, one middleware over. `security-headers.e2e-spec.ts` test 4 asserts

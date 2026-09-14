@@ -3,7 +3,7 @@
  *
  * **Written against exactly one HTML page.** Everything this gateway serves is
  * JSON — REST under the global prefix, `/health*`, `/version`, and `/graphql`
- * with `playground: false` — except the Swagger UI at `${GLOBAL_PREFIX}/docs`,
+ * with `playground: false` — except the Swagger UI at `/api/v1/docs`,
  * which Nest renders from its own template plus `swagger-ui-dist`. So the CSP
  * below is a policy for that page; on every other route the headers cost
  * nothing and say the right thing anyway.

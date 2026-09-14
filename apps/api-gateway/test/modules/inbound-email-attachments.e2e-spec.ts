@@ -11,7 +11,7 @@ import {
   MAX_ATTACHMENTS_PER_MESSAGE,
 } from '@synapsedesk/common';
 import { OrgStatus as ProtoOrgStatus } from '@synapsedesk/grpc-proto';
-import { E2eFixture, bootstrapE2eTest } from '../utils';
+import { API, E2eFixture, bootstrapE2eTest } from '../utils';
 import { timestamp, wireCreatedMessage } from '../fixtures/wire';
 import {
   plainEmail,
@@ -53,10 +53,10 @@ describe('Inbound email attachments — the reply half (e2e)', () => {
   };
 
   const presign = (payload: Record<string, unknown>) =>
-    signedPost('/api/v1/webhooks/email/attachments', payload);
+    signedPost(`${API}/webhooks/email/attachments`, payload);
 
   const webhook = (payload: Record<string, unknown>) =>
-    signedPost('/api/v1/webhooks/email/inbound', payload);
+    signedPost(`${API}/webhooks/email/inbound`, payload);
 
   const resolvable = () => {
     fx.stubs.organization.resolveOrgByInboundToken.mockReturnValue(
@@ -399,7 +399,7 @@ describe('Inbound email attachments — the reply half (e2e)', () => {
 
     it('**needs the signature, like the webhook it precedes**', async () => {
       await request(fx.app.getHttpServer())
-        .post('/api/v1/webhooks/email/attachments')
+        .post(`${API}/webhooks/email/attachments`)
         .set('content-type', 'application/json')
         .send({ ...routing(), files: [file()] })
         .expect(401);

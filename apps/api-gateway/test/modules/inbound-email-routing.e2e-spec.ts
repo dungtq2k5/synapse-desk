@@ -16,7 +16,7 @@ import {
   generateInboundToken,
   MAX_ATTACHMENT_BYTES,
 } from '@synapsedesk/common';
-import { E2eFixture, bootstrapE2eTest } from '../utils';
+import { API, E2eFixture, bootstrapE2eTest } from '../utils';
 import { timestamp, wireCreatedMessage } from '../fixtures/wire';
 import {
   plainEmail,
@@ -45,7 +45,7 @@ describe('Inbound email routing (e2e)', () => {
     const { body, signature } = signPayload(payload, secret);
 
     return request(fx.app.getHttpServer())
-      .post('/api/v1/webhooks/email/inbound')
+      .post(`${API}/webhooks/email/inbound`)
       .set('content-type', 'application/json')
       .set('x-inbound-signature', signature)
       .send(body);

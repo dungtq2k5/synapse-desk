@@ -1,4 +1,10 @@
-import { Controller, Get, HttpStatus, Res } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  HttpStatus,
+  Res,
+  VERSION_NEUTRAL,
+} from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiFilterErrors,
@@ -22,7 +28,9 @@ import {
  * process whose auth is broken.
  */
 @ApiTags('Ops')
-@Controller('health')
+// Neutral as well as excluded from the prefix: without it, URI versioning
+// serves the probes at `/v1/health` and every pod fails readiness.
+@Controller({ path: 'health', version: VERSION_NEUTRAL })
 export class HealthController {
   constructor(
     private readonly serviceRegistry: ServiceRegistry,

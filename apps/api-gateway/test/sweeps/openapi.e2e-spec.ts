@@ -927,8 +927,8 @@ describe('The OpenAPI document', () => {
         'utf8',
       );
 
-      expect(source).toContain('`${globalPrefix}/docs`');
-      expect(source).toContain('jsonDocumentUrl: `${globalPrefix}/docs-json`');
+      expect(source).toContain('`${basePath}/docs`');
+      expect(source).toContain('jsonDocumentUrl: `${basePath}/docs-json`');
     });
   });
 });

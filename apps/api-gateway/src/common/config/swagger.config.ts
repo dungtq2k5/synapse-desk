@@ -5,6 +5,10 @@ import {
   SwaggerModule,
   type OpenAPIObject,
 } from '@nestjs/swagger';
+import {
+  apiBasePath,
+  resolveGlobalPrefix,
+} from '../../modules/health/ops-routes';
 
 /**
  * The security-scheme KEYS routes reference.
@@ -138,7 +142,12 @@ export function buildOpenApiDocument(
 }
 
 /**
- * Mounts `/docs` and `/docs-json` when config allows.
+ * Mounts `/api/v1/docs` and `/api/v1/docs-json` when config allows.
+ *
+ * **Under the version, not beside it.** The mount is built from the same
+ * `API_VERSION` the routes use, so the page and the version it documents move
+ * together. `docs-json` is the URL client SDKs are generated from, which makes
+ * its address part of the contract.
  *
  * **Gated on `SWAGGER_ENABLED`, not on an inline `NODE_ENV` check.** The plan
  * says "PUBLIC in non-prod", and `NODE_ENV !== 'production'` written at a call
@@ -157,7 +166,9 @@ export function setupSwagger(
   if (!configService.get<boolean>('SWAGGER_ENABLED')) return;
 
   const port = configService.getOrThrow<number>('PORT');
-  const globalPrefix = configService.getOrThrow<string>('GLOBAL_PREFIX');
+  const basePath = apiBasePath(
+    resolveGlobalPrefix(configService.getOrThrow<string>('GLOBAL_PREFIX')),
+  );
 
   const document = buildOpenApiDocument(app, configService);
 
@@ -168,10 +179,10 @@ export function setupSwagger(
   // that problem. Note this is the opposite choice from `OPS_ROUTES`, and for
   // the opposite reason: a probe must be findable by an orchestrator that knows
   // no prefix, while docs are read by API consumers who already use one.
-  SwaggerModule.setup(`${globalPrefix}/docs`, app, document, {
+  SwaggerModule.setup(`${basePath}/docs`, app, document, {
     // `/docs-json` is the more valuable half: it generates client SDKs and it is
     // what the contract test reads.
-    jsonDocumentUrl: `${globalPrefix}/docs-json`,
+    jsonDocumentUrl: `${basePath}/docs-json`,
     swaggerOptions: {
       // Sends the auth cookies from "Try it out".
       withCredentials: true,
@@ -181,6 +192,6 @@ export function setupSwagger(
   });
 
   logger?.log(
-    `📑 [API Gateway] Swagger docs available at http://localhost:${port}${globalPrefix}/docs`,
+    `📑 [API Gateway] Swagger docs available at http://localhost:${port}${basePath}/docs`,
   );
 }

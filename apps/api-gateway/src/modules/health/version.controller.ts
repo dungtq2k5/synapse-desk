@@ -1,4 +1,4 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, VERSION_NEUTRAL } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiFilterErrors,
@@ -31,7 +31,8 @@ import { VersionResponseDto } from './dto/rest/health-response.dto';
  * only create the possibility of them differing between two calls.
  */
 @ApiTags('Ops')
-@Controller('version')
+// Neutral for the same reason as `HealthController` — see `ops-routes.ts`.
+@Controller({ path: 'version', version: VERSION_NEUTRAL })
 export class VersionController {
   private readonly buildInfo: VersionResponseDto;
 

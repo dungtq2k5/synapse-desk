@@ -90,13 +90,17 @@ export class MessagesController {
    * `{ message, skippedAttachments }`, because a create can partially succeed
    * and a caller has to be told which files did not confirm.
    *
-   * `enableVersioning` is not switched on anywhere in this gateway, so there is
-   * no `@Version` to hang an old shape from — adding the mechanism for one
-   * endpoint would mean versioning every route to keep the surface coherent.
+   * `enableVersioning` was not switched on when this changed, so there was no
+   * `@Version` to hang an old shape from — adding the mechanism for one
+   * endpoint would have meant versioning every route to keep the surface
+   * coherent.
    * With no client shipped, breaking it now costs nothing and carrying two
    * shapes forever costs something. **Recorded here rather than left to be
    * discovered by the first client**, which is the whole point of writing it
    * down: the next breaking change does not get to make this call by default.
+   *
+   * Versioning is on at `v1` now, so that next change is `@Version('2')` on this
+   * controller rather than an edit in place.
    */
   @ApiOperation({ summary: 'Create' })
   @ApiWrappedResponse(CreateMessageResponseDto, { status: HttpStatus.CREATED })

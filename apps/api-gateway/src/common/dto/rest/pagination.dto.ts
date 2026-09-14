@@ -20,8 +20,8 @@ import {
  * **ADR 0032 — the pre-client clearing. This is the record for THREE breaking
  * changes, made once.**
  *
- * `enableVersioning` is off in this gateway, so a response-shape change is
- * unversioned by construction.
+ * When these were made `enableVersioning` was off, so a response-shape change
+ * was unversioned by construction.
  * [ADR 0032](../../../../../../docs/decisions/0032-unversioned-breaking-changes-are-counted.md)
  * permits that while no client has shipped and requires each one to be
  * recorded, because *"the count is the signal"* — a second is worth noticing, a
@@ -49,6 +49,10 @@ import {
  * turns `enableVersioning` on** rather than adding a fourth record. That is
  * what keeps this a clearing rather than a habit — a reader can tell the two
  * apart only if the boundary is written down, and this is where it is written.
+ *
+ * **Versioning is now on, at `v1`.** A breaking change to a route is
+ * `@Version('2')` on its controller, serving both shapes side by side — not an
+ * edit in place, and not another record here.
  */
 export class PaginationDto {
   @IsOptional()

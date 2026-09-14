@@ -1424,12 +1424,11 @@ describe('The GraphQL surface (e2e)', () => {
         permissionCodes: ['role.read'],
       });
       const cache = fx.app.get(CacheService);
-      const prefix = fx.app
-        .get(ConfigService)
-        .getOrThrow<string>('GLOBAL_PREFIX');
 
       fx.stubs.role.listPermissions.mockReturnValue(of({ items: catalogue }));
-      await caller.get(`${prefix}/permissions`).expect(200);
+      // `API`, not `GLOBAL_PREFIX`: the prefix alone carries neither the leading
+      // slash nor the version.
+      await caller.get(`${API}/permissions`).expect(200);
 
       const [restEntry] = await cache.mget<Record<string, unknown>>([
         { organizationId, scope: CACHE_SCOPES.permissions, params: {} },

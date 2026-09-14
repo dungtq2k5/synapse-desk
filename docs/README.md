@@ -85,6 +85,7 @@ Append-only. A decision is never edited; superseding one means writing a new one
 | [0042](./decisions/0042-schema-reaches-production-through-migrate-deploy.md) | Schema reaches production through `prisma migrate deploy` |
 | [0043](./decisions/0043-the-cluster-shape.md) | The cluster shape: one Postgres instance, an initContainer, and `ingress-nginx` |
 | [0044](./decisions/0044-expand-and-contract-never-in-one-release.md) | Expand and contract, never in one release |
+| [0045](./decisions/0045-uri-versioning-under-the-same-paths.md) | URI versioning is on at `v1`, and no path moved to turn it on |
 
 ## `reference/` — what is true today
 

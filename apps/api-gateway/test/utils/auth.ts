@@ -9,6 +9,10 @@ import type {
 } from '@synapsedesk/common';
 import { signAccessToken, signTwoFactorToken } from './tokens';
 import { Server } from 'node:http';
+import {
+  apiBasePath,
+  resolveGlobalPrefix,
+} from '../../src/modules/health/ops-routes';
 
 /** Cookie names, read from the same env the gateway reads them from. */
 export const ACCESS_COOKIE = process.env.JWT_ACCESS_NAME ?? 'access_token';
@@ -18,7 +22,14 @@ export const TENANT_SELECTION_COOKIE =
   process.env.TENANT_SELECTION_NAME ?? 'sd_tenant_selection';
 export const DEVICE_COOKIE = process.env.DEVICE_TOKEN_NAME ?? 'sd_device_token';
 
-export const API = process.env.GLOBAL_PREFIX ?? '/api/v1';
+/**
+ * `/api/v1` — derived from `GLOBAL_PREFIX` and the version the gateway applies,
+ * through the same functions `main.ts` uses, so both the legacy and the bare
+ * prefix produce the path the app actually serves.
+ */
+export const API = apiBasePath(
+  resolveGlobalPrefix(process.env.GLOBAL_PREFIX ?? 'api'),
+);
 
 /** Every field of a caller, defaulted, so a test only states what it cares about. */
 export function buildJwtPayload(

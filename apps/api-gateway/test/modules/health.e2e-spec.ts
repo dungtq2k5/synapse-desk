@@ -146,6 +146,32 @@ describe('Health probes (e2e)', () => {
     expect(response.body.data.status).toBe('UP');
   });
 
+  it('3b. **the probes answer at the ROOT only — not under a version, not under the prefix**', async () => {
+    // Two mechanisms, and a probe must escape both. `OPS_ROUTES` removes the
+    // prefix; `VERSION_NEUTRAL` removes the version. With the exclusion alone,
+    // URI versioning serves these at `/v1/health` — measured — and every pod
+    // fails readiness after a deploy that changed nothing about health.
+    const server = fx.app.getHttpServer();
+
+    for (const path of ['/health', '/health/ready']) {
+      expect([path, (await request(server).get(path)).status]).not.toEqual([
+        path,
+        404,
+      ]);
+    }
+    for (const path of [
+      '/v1/health',
+      '/v1/health/ready',
+      '/api/v1/health',
+      '/api/health',
+    ]) {
+      expect([path, (await request(server).get(path)).status]).toEqual([
+        path,
+        404,
+      ]);
+    }
+  });
+
   it('4. readiness answers WITHIN the probe timeout with peers unreachable', async () => {
     // A probe that hangs is a probe that fails: Kubernetes counts the timeout
     // as not-ready, so an unbounded check produces the same outcome as a
@@ -194,6 +220,15 @@ describe('/version (e2e)', () => {
   }, 30_000);
 
   afterAll(() => fx.close());
+
+  it('0. **answers at `/version` and nowhere versioned**', async () => {
+    // Same two mechanisms as the health probes, on the other ops controller.
+    const server = fx.app.getHttpServer();
+
+    expect((await request(server).get('/version')).status).toBe(200);
+    expect((await request(server).get('/v1/version')).status).toBe(404);
+    expect((await request(server).get('/api/v1/version')).status).toBe(404);
+  });
 
   it('1. returns the values injected at BUILD time', async () => {
     // Read from the environment, never from git at runtime: a container has no

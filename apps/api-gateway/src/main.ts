@@ -1,6 +1,11 @@
 import { NestFactory, Reflector } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { OPS_ROUTES } from './modules/health/ops-routes';
+import {
+  API_VERSIONING,
+  apiBasePath,
+  OPS_ROUTES,
+  resolveGlobalPrefix,
+} from './modules/health/ops-routes';
 import { MetricsServer } from './modules/metrics/metrics.server';
 import { setupSwagger } from './common/config/swagger.config';
 import { SECURITY_HEADERS } from './common/config/security-headers.config';
@@ -63,9 +68,16 @@ async function bootstrap() {
   // Tells Nestjs to listen for system shutdown signals (SIGNINT, SIGNTERM, etc.)
   app.enableShutdownHooks();
 
-  // Set global prefix for all routes
-  const globalPrefix = configService.getOrThrow<string>('GLOBAL_PREFIX');
+  // The prefix, then the version — two mechanisms that render `/api/v1/…`.
+  // `resolveGlobalPrefix` accepts the legacy `/api/v1` value too: without it,
+  // that value beside versioning serves every route at `/api/v1/v1/…` while
+  // the version-neutral probes stay green.
+  const globalPrefix = resolveGlobalPrefix(
+    configService.getOrThrow<string>('GLOBAL_PREFIX'),
+    (message) => logger.warn(message),
+  );
   app.setGlobalPrefix(globalPrefix, { exclude: OPS_ROUTES });
+  app.enableVersioning(API_VERSIONING);
 
   // Enable cookie parser (cookieParser is a factory — it must be invoked)
   app.use(cookieParser());
@@ -151,7 +163,7 @@ async function bootstrap() {
   const port = configService.getOrThrow<number>('PORT');
   await app.listen(port);
   logger.log(
-    `🌐 [API Gateway] running on http://localhost:${port}${globalPrefix}`,
+    `🌐 [API Gateway] running on http://localhost:${port}${apiBasePath(globalPrefix)}`,
   );
 }
 

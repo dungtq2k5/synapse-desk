@@ -22,7 +22,11 @@ import {
   TICKET_GRPC_CLIENT,
 } from '@synapsedesk/grpc-proto';
 import { AppModule } from '../../src/app.module';
-import { OPS_ROUTES } from '../../src/modules/health/ops-routes';
+import {
+  API_VERSIONING,
+  OPS_ROUTES,
+  resolveGlobalPrefix,
+} from '../../src/modules/health/ops-routes';
 import { RedisIoAdapter } from '../../src/common/adapters/redis-io.adapter';
 import { GrpcStubs, stubGrpcServices } from './grpc-stub';
 import { ACCESS_COOKIE, buildJwtPayload } from './auth';
@@ -124,9 +128,14 @@ export async function bootstrapRealtimeTest(
   const configService = app.get(ConfigService);
 
   app.set('trust proxy', 1);
-  app.setGlobalPrefix(configService.getOrThrow<string>('GLOBAL_PREFIX'), {
-    exclude: OPS_ROUTES,
-  });
+  // Mirrors main.ts: the prefix, then the version. No deprecation callback —
+  // `.env.test` still carries the legacy value, and a warning per bootstrap
+  // would repeat in every suite.
+  app.setGlobalPrefix(
+    resolveGlobalPrefix(configService.getOrThrow<string>('GLOBAL_PREFIX')),
+    { exclude: OPS_ROUTES },
+  );
+  app.enableVersioning(API_VERSIONING);
   app.use(cookieParser());
 
   // **The SAME global pipe `main.ts` installs**, and it matters more than it

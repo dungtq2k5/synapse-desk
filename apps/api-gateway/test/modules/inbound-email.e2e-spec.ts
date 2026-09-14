@@ -3,7 +3,7 @@ import request from 'supertest';
 import { of } from 'rxjs';
 import { InboundOutcome } from '../../src/modules/inbound-email/inbound-email.service';
 import { ConfigService } from '@nestjs/config';
-import { E2eFixture, bootstrapE2eTest } from '../utils';
+import { API, E2eFixture, bootstrapE2eTest } from '../utils';
 import { plainEmail, signPayload } from '../fixtures/inbound-email';
 
 /**
@@ -19,7 +19,7 @@ describe('The inbound email webhook (e2e)', () => {
   let fx: E2eFixture;
   let secret: string;
 
-  const ROUTE = '/api/v1/webhooks/email/inbound';
+  const ROUTE = `${API}/webhooks/email/inbound`;
 
   const post = (body: string, signature?: string) => {
     const req = request(fx.app.getHttpServer())
