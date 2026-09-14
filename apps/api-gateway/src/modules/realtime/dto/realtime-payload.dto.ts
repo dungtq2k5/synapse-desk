@@ -1,5 +1,5 @@
 /**
- * The `data` half of every SERVER→CLIENT frame this gateway builds itself.
+ * @file The `data` half of every SERVER→CLIENT frame this gateway builds itself.
  *
  * **Classes, like every other response shape in this service.** They carry no
  * decorators and are never instantiated — `satisfies` is erased at compile time
@@ -23,7 +23,7 @@
  */
 
 import { type FrameAnswerStatus } from '../realtime.config';
-import { Citation } from '@synapsedesk/grpc-proto';
+import { CitationResponseDto } from '../../tickets/dto/rest/message-response.dto';
 import { PresenceState } from '../realtime.config';
 
 /** `connection:ready` — the "you may start emitting" frame. */
@@ -83,7 +83,8 @@ export class AiStreamDonePayloadDto {
   ticketId!: string;
   messageId!: string | null;
   content!: string;
-  citations!: Citation[];
+  /** The same shape `GET …/messages` serves on the persisted message. */
+  citations!: CitationResponseDto[];
   /** True on the cap path — a human is now handling it, not an error. */
   escalated!: boolean;
   status!: FrameAnswerStatus;

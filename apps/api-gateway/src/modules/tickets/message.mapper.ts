@@ -20,6 +20,7 @@ import {
   AttachmentResponseDto,
   MessageResponseDto,
 } from './dto/rest/message-response.dto';
+import { toCitationResponseDto } from './citation.mapper';
 
 export function toAttachmentResponseDto(
   attachment: AttachmentResponse,
@@ -56,6 +57,11 @@ export function toMessageResponseDto(
     attachments: message.attachments.map(toAttachmentResponseDto),
     excludedFromAiContext: message.excludedFromAiContext,
     answerStatus: fromProtoMessageAnswerStatus(message.answerStatus),
+    // The wrapper's ABSENCE is the null: an AI row written before citations
+    // were stored, or a human message. Present-and-empty stays `[]`.
+    citations: message.citations
+      ? message.citations.items.map(toCitationResponseDto)
+      : null,
   };
 }
 

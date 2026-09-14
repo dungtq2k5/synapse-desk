@@ -1,11 +1,13 @@
 import {
   AttachmentResponse,
+  MessageCitations,
   MessageResponse,
   toProtoTimestamp,
   toProtoMessageAnswerStatus,
 } from '@synapsedesk/grpc-proto';
 import {
   MessageAttachment,
+  Prisma,
   TicketMessage,
 } from '../../generated/prisma/client';
 
@@ -56,5 +58,100 @@ export function toMessageResponse(
     // message must stay visible.
     excludedFromAiContext: message.excludedFromAiContext,
     answerStatus: toProtoMessageAnswerStatus(message.answerStatus),
+    citations: fromStoredCitations(message.citations),
   };
+}
+
+/**
+ * One citation as `ticket_messages.citations` stores it.
+ *
+ * Five keys on every entry, whichever path wrote the row. `pageNumber` is
+ * `null`, never absent, for a format with no pages.
+ */
+// **A STORAGE format, not the gateway's `CitationResponseDto`**, though the
+// two match field for field today. That class is in another app and cannot
+// be imported from here — ticket-service depends on `common` and `grpc-proto`
+// only. They are also separate contracts: rows already in this column must
+// keep parsing (`isStoredCitation`) whatever the REST shape does next, and
+// they already differ in scope — a draft's REST response drops
+// `vectorPointId`, which this column keeps. The proto sits between the two,
+// and each side's mapping is typechecked against it.
+export type StoredCitation = {
+  chunkId: string;
+  documentId: string;
+  documentTitle: string;
+  pageNumber: number | null;
+  vectorPointId: string;
+};
+
+/**
+ * The column value for a list of citations.
+ *
+ * Structural input, so both writers call it: `appendAiMessage` hands it the
+ * proto's `DraftCitation` (page number optional), the auto-reply hands it
+ * `AiReplyDraft`'s (page number nullable).
+ *
+ * @example
+ * toStoredCitations(request.citations.items)
+ * // [{ chunkId, documentId, documentTitle, pageNumber: null, vectorPointId }]
+ */
+export function toStoredCitations(
+  citations: ReadonlyArray<{
+    chunkId: string;
+    documentId: string;
+    documentTitle: string;
+    pageNumber?: number | null;
+    vectorPointId: string;
+  }>,
+): StoredCitation[] {
+  return citations.map((citation) => ({
+    chunkId: citation.chunkId,
+    documentId: citation.documentId,
+    documentTitle: citation.documentTitle,
+    pageNumber: citation.pageNumber ?? null,
+    vectorPointId: citation.vectorPointId,
+  }));
+}
+
+/**
+ * The wire value for a stored `citations` column, keeping NULL and `[]` apart.
+ *
+ * Returns `undefined` for a NULL column (a human message, or an AI row written
+ * before citations were stored) and `{ items: [] }` for an answer that cited
+ * nothing. An entry that is not a {@link StoredCitation} is dropped rather
+ * than filled in.
+ *
+ * @example
+ * fromStoredCitations(null); // undefined
+ * fromStoredCitations([]);   // { items: [] }
+ */
+export function fromStoredCitations(
+  value: Prisma.JsonValue | null,
+): MessageCitations | undefined {
+  if (!Array.isArray(value)) return undefined;
+
+  return {
+    items: value.filter(isStoredCitation).map((citation) => ({
+      chunkId: citation.chunkId,
+      documentId: citation.documentId,
+      documentTitle: citation.documentTitle,
+      pageNumber: citation.pageNumber ?? undefined,
+      vectorPointId: citation.vectorPointId,
+    })),
+  };
+}
+
+function isStoredCitation(value: unknown): value is StoredCitation {
+  if (typeof value !== 'object' || value === null) return false;
+
+  const candidate = value as Record<string, unknown>;
+
+  return (
+    typeof candidate.chunkId === 'string' &&
+    typeof candidate.documentId === 'string' &&
+    typeof candidate.documentTitle === 'string' &&
+    (candidate.pageNumber === null ||
+      typeof candidate.pageNumber === 'number') &&
+    typeof candidate.vectorPointId === 'string'
+  );
 }

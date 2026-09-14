@@ -4,6 +4,7 @@ package synapsedesk.ticket;
 
 import "google/protobuf/timestamp.proto";
 import "synapsedesk/auth/common.proto";
+import "synapsedesk/ticket/ai.proto";
 
 // The ticket thread, plus attachments.
 //
@@ -85,6 +86,9 @@ message MessageResponse {
   // tell a refusal from an escalation from a real answer, which was impossible
   // while the status lived only in a WebSocket frame nobody persisted.
   MessageAnswerStatus answer_status = 15;
+  // Absent for a human message and for an AI message written before citations
+  // were persisted; present (possibly empty) for every AI answer since.
+  optional MessageCitations citations = 16;
 }
 
 message CreateMessageRequest {
@@ -183,6 +187,17 @@ message AppendAiMessageRequest {
   // frame and threw it away on write, so a thread could not distinguish a
   // refusal from an answer once the socket closed.
   MessageAnswerStatus answer_status = 4;
+  // What the answer cited, persisted on the row. Absent leaves the column NULL;
+  // present with no items stores `[]`, an answer that cited nothing.
+  optional MessageCitations citations = 5;
+}
+
+// A message's citations, as a message so that ABSENT and EMPTY stay distinct.
+//
+// Do not flatten this to a bare `repeated` field: the loader runs with
+// `defaults: true`, which delivers an unset list as `[]`.
+message MessageCitations {
+  repeated DraftCitation items = 1;
 }
 
 // Marks a message as unusable for AI context.

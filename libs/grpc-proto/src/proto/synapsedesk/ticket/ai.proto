@@ -52,11 +52,18 @@ message GenerateDraftResponse {
   repeated DraftCitation citations = 6;
 }
 
+// One passage an AI answer cited, mirrored from `synapsedesk.rag` — rag types
+// are never imported into this package (see the header of `message.proto`).
+//
+// Used by a draft response and by a message's persisted `citations`.
 message DraftCitation {
   string chunk_id = 1;
   string document_id = 2;
   string document_title = 3;
   optional int32 page_number = 4;
+  // rag's `Citation.vector_point_id`. Carried on the wire and stored; the REST
+  // draft response does not serve it.
+  string vector_point_id = 5;
 }
 
 message SuggestionResponse {

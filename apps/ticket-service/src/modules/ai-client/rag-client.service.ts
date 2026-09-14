@@ -39,6 +39,8 @@ export type AiReplyDraft = {
     documentId: string;
     documentTitle: string;
     pageNumber: number | null;
+    /** rag's retrieval key for the passage; stored with the message. */
+    vectorPointId: string;
   }>;
 };
 
@@ -193,6 +195,7 @@ export class RagClientService implements OnModuleInit {
         documentId: citation.documentId,
         documentTitle: citation.documentTitle,
         pageNumber: citation.pageNumber ?? null,
+        vectorPointId: citation.vectorPointId,
       })),
     };
   }

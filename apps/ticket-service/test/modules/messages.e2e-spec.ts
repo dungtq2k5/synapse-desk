@@ -578,6 +578,10 @@ describe('Ticket messages & attachments (e2e)', () => {
         modelName: 'test-model-v1',
         promptTokens: 120,
         completionTokens: 80,
+        // The whole `AiReplyDraft`: the reply now persists its citations,
+        // so a mock without them fails the append rather than the assertion.
+        generationId: 'gen-auto-reply',
+        citations: [],
       });
 
       const ticket = await createTicket(fx.prisma, tenant);
@@ -613,6 +617,10 @@ describe('Ticket messages & attachments (e2e)', () => {
         modelName: 'test-model-v1',
         promptTokens: 10,
         completionTokens: 20,
+        // The whole `AiReplyDraft`: the reply now persists its citations,
+        // so a mock without them fails the append rather than the assertion.
+        generationId: 'gen-auto-reply',
+        citations: [],
       });
 
       const ticket = await createTicket(fx.prisma, tenant);

@@ -374,6 +374,17 @@ model TicketMessage {
   /// half that money is computed from.
   answerStatus String? @map("answer_status") @db.VarChar(30)
 
+  /// What an AI answer cited — a `StoredCitation[]` (`message.mapper.ts`).
+  ///
+  /// Always five keys per entry, whichever path wrote the row: `chunkId`,
+  /// `documentId`, `documentTitle`, `pageNumber` (null for a format with no
+  /// pages) and `vectorPointId`.
+  ///
+  /// **NULL and `[]` are different answers.** NULL is a human message, or an AI
+  /// row written before citations were stored; `[]` is an answer that cited
+  /// nothing.
+  citations Json? @db.JsonB
+
   /// A DENORMALIZED CONVENIENCE for per-message display
   ///
   /// These were token metering before the ledger existed. They are not any

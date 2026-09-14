@@ -130,7 +130,7 @@ export class ChatController {
     );
   }
 
-  @ApiOperation({ summary: 'Thread + citations per AI message' })
+  @ApiOperation({ summary: 'Get one own conversation (the ticket)' })
   @ApiWrappedResponse(TicketResponseDto)
   @ApiFilterErrors(['400', '401', '404'])
   @Get('conversations/:id')
@@ -141,7 +141,7 @@ export class ChatController {
     return this.tickets.get(id, context);
   }
 
-  @ApiOperation({ summary: 'List messages' })
+  @ApiOperation({ summary: 'List the thread, with citations per AI message' })
   @ApiWrappedResponse(Paginated(MessageResponseDto))
   @ApiFilterErrors(['400', '401', '404'])
   @Get('conversations/:id/messages')

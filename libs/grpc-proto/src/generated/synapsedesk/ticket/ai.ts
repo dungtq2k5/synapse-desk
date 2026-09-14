@@ -53,11 +53,24 @@ export interface GenerateDraftResponse {
   citations: DraftCitation[];
 }
 
+/**
+ * One passage an AI answer cited, mirrored from `synapsedesk.rag` — rag types
+ * are never imported into this package (see the header of `message.proto`).
+ *
+ * Used by a draft response and by a message's persisted `citations`.
+ */
 export interface DraftCitation {
   chunkId: string;
   documentId: string;
   documentTitle: string;
-  pageNumber?: number | undefined;
+  pageNumber?:
+    | number
+    | undefined;
+  /**
+   * rag's `Citation.vector_point_id`. Carried on the wire and stored; the REST
+   * draft response does not serve it.
+   */
+  vectorPointId: string;
 }
 
 export interface SuggestionResponse {

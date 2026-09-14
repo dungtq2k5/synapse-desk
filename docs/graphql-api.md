@@ -212,6 +212,8 @@ List edges come in three shapes and the difference is cardinality:
 | `User.departments`, `Document.departments` | cap | `MAX_EDGE_LIST` = **50** |
 | `Role.permissions` | neither — filtered from the tenant catalogue by the codes the role holds | the catalogue's size |
 
+`TicketMessage.citations` is `[Citation!]` — **nullable list, non-null items**. `null` means the message is not an AI answer or predates citation storage; `[]` means an AI answer that cited nothing. `Citation` is `{ chunkId, documentId, documentTitle, pageNumber }` — four fields, **no `vectorPointId`**: that field exists on REST so a client can reconcile the live `ai:stream:done` frame against the stored list field for field, and GraphQL has no frame to reconcile with. The parity sweep records it as REST-only.
+
 **None of these paginates, `messages` included.** The resolver hard-codes `page: 1` and the schema exposes no `page`, `offset` or `after` argument, so there is no second page to ask for: `messages(first: n)` returns the first `n` of the thread, oldest first, and **a thread longer than 100 messages is not reachable through GraphQL.** Use the REST message list for a long thread.
 
 Note the two caps are different numbers — 100 for messages, 50 for the department edges — and neither is negotiable from the client.

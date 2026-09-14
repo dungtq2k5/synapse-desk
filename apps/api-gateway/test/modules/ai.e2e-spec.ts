@@ -226,6 +226,7 @@ describe('AI Co-Pilot at the HTTP boundary (e2e)', () => {
               documentId: 'doc-1',
               documentTitle: 'Handbook',
               pageNumber: 4,
+              vectorPointId: 'point-1',
             },
           ],
         }),
@@ -262,8 +263,9 @@ describe('AI Co-Pilot at the HTTP boundary (e2e)', () => {
       // point id is an internal retrieval identifier, and publishing it in a
       // response DTO would make it part of the product surface by accident.
       //
-      // ticket-service already drops it on the way through; this pins that the
-      // gateway's DTO cannot reintroduce it.
+      // **The gateway mapper is the only place it is dropped.** ticket-service
+      // carries it now — the same citation type is persisted on messages, where
+      // the stored row keeps the key — so this is the test that holds the line.
       fx.stubs.ai.generateDraft.mockReturnValue(
         of({
           content: 'A draft',
@@ -318,6 +320,7 @@ describe('AI Co-Pilot at the HTTP boundary (e2e)', () => {
               chunkId: 'chunk-1',
               documentId: 'doc-1',
               documentTitle: 'A pasted text file',
+              vectorPointId: 'point-1',
             },
           ],
         }),

@@ -1,4 +1,6 @@
+import { PickType } from '@nestjs/swagger';
 import { TicketPriority } from '@synapsedesk/common';
+import { CitationResponseDto } from './message-response.dto';
 
 export class AiSummaryResponseDto {
   id!: string;
@@ -15,18 +17,17 @@ export class AiSummaryResponseDto {
  * One source a draft used, as the REST surface publishes it.
  *
  * Carries no `vectorPointId` — that is an internal retrieval id, narrowed away
- * in `ai.service.ts` rather than served.
+ * by the gateway's citation mapper rather than served (ADR 0031).
  */
-export class DraftCitationResponseDto {
-  chunkId!: string;
-  documentId!: string;
-  documentTitle!: string;
-  /**
-   * The page this citation points at, or `null` when the source document has no
-   * pages — a pasted text file, an HTML article.
-   */
-  pageNumber!: number | null;
-}
+export class DraftCitationResponseDto extends PickType(
+  // **`PickType`, not `OmitType`.** Omit is allow-by-default: a field added to
+  // `CitationResponseDto` would join this schema automatically, and this class
+  // exists to publish a NARROWER shape than the wire carries. Pick names what is
+  // served, so a new citation field reaches the draft only when someone adds it
+  // here — the same allowlist `toDraftCitationResponseDto` already applies.
+  CitationResponseDto,
+  ['chunkId', 'documentId', 'documentTitle', 'pageNumber'] as const,
+) {}
 
 export class AiDraftResponseDto {
   content!: string;

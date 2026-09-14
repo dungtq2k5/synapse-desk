@@ -1,4 +1,4 @@
-import { MessageAnswerStatus } from '@synapsedesk/grpc-proto';
+import { MessageAnswerStatus, SortOrder } from '@synapsedesk/grpc-proto';
 import { Logger } from '@nestjs/common';
 import { Observable, of, Subject, throwError } from 'rxjs';
 import { faker } from '@faker-js/faker';
@@ -823,6 +823,68 @@ describe('the real-time relay (e2e)', () => {
       expect((persisted as { content: string }).content).toBe(streamed);
     });
 
+    it('**citations are PERSISTED with the answer, and the frame serves the same shape**', async () => {
+      // The frame used to be the only carrier: a reload, an agent opening the
+      // thread, or a GraphQL read saw bare text. What this suite can prove is
+      // the gateway's half — the append carries the completion's citations, and
+      // the frame emits the mapped shape `GET …/messages` serves. That they come
+      // BACK from the column is ticket-service's suite, where the column is real.
+      const author = await fx.connectClient({ sub: authorId, organizationId });
+      const { subject } = controllable();
+      const cited = [
+        {
+          chunkId: 'chunk-1',
+          documentId: 'doc-1',
+          documentTitle: 'Handbook',
+          pageNumber: 4,
+          vectorPointId: 'point-1',
+        },
+        {
+          chunkId: 'chunk-2',
+          documentId: 'doc-2',
+          documentTitle: 'A pasted text file',
+          vectorPointId: 'point-2',
+        },
+      ];
+
+      const done = waitForEvent<DoneFrame>(
+        author,
+        REALTIME_EVENTS.aiStreamDone,
+      );
+      await askFrom(author);
+      subject.next(completion({ citations: cited }));
+      subject.complete();
+      const frame = await done;
+
+      const [[appended]] = fx.stubs.message.appendAiMessage.mock.calls;
+      expect((appended as { citations?: unknown }).citations).toEqual({
+        items: cited,
+      });
+
+      expect(frame.data.citations).toEqual([
+        { ...cited[0] },
+        { ...cited[1], pageNumber: null },
+      ]);
+    });
+
+    it('an answer that cited NOTHING is persisted as an empty list, not as no list', async () => {
+      // An absent wrapper leaves the column NULL — "not recorded". A real answer
+      // with no citations is a different fact, and the append must say so.
+      const author = await fx.connectClient({ sub: authorId, organizationId });
+      const { subject } = controllable();
+
+      const done = waitForEvent(author, REALTIME_EVENTS.aiStreamDone);
+      await askFrom(author);
+      subject.next(completion({ citations: [] }));
+      subject.complete();
+      await done;
+
+      const [[appended]] = fx.stubs.message.appendAiMessage.mock.calls;
+      expect((appended as { citations?: unknown }).citations).toEqual({
+        items: [],
+      });
+    });
+
     it('**a refused message is left OUT of the transcript**', async () => {
       // The filter is here rather than in ticket-service's `where` clause, and
       // That is why: the same route serves the UI, where this row must stay
@@ -860,6 +922,47 @@ describe('the real-time relay (e2e)', () => {
 
       expect(history.map((turn) => turn.content)).toEqual([
         'how much carry-over do I get?',
+      ]);
+    });
+
+    it('**the transcript is the TAIL of the thread, read oldest-first**', async () => {
+      // Page 1 of an ASCENDING list is the opening of the conversation, not
+      // its end — so a thread past the window sent the model its first forty
+      // turns and never the one it was answering. `sortOrder` decides WHICH
+      // rows page 1 holds as well as their order, and the two need opposite
+      // answers: the newest page, turned round.
+      const author = await fx.connectClient({ sub: authorId, organizationId });
+      const { subject } = controllable();
+
+      // What ticket-service returns for a DESC page: newest first.
+      fx.stubs.message.listMessages.mockReturnValue(
+        of(
+          wirePage(
+            ['turn-03', 'turn-02', 'turn-01'].map((content) =>
+              wireMessage({ content, senderId: authorId }),
+            ),
+          ),
+        ),
+      );
+
+      const done = waitForEvent(author, REALTIME_EVENTS.aiStreamDone);
+      await askFrom(author);
+      subject.next(completion());
+      subject.complete();
+      await done;
+
+      const [[listRequest]] = fx.stubs.message.listMessages.mock.calls;
+      expect(
+        (listRequest as { page?: { sortOrder?: SortOrder } }).page?.sortOrder,
+      ).toBe(SortOrder.SORT_ORDER_DESC);
+
+      const [[chatRequest]] = fx.stubs.rag.chat.mock.calls;
+      const history = (chatRequest as { history: Array<{ content: string }> })
+        .history;
+      expect(history.map((turn) => turn.content)).toEqual([
+        'turn-01',
+        'turn-02',
+        'turn-03',
       ]);
     });
 

@@ -114,6 +114,65 @@ describe('Ticket messages at the HTTP boundary (e2e)', () => {
       expect(res.body.data.items[0].promptTokens).toBe(120);
     });
 
+    it('2b. keeps "no citations recorded" (null) apart from "cited NOTHING" ([])', async () => {
+      // Three rows, three different answers. A human message and an AI row
+      // written before citations were stored carry no wrapper; an AI answer
+      // that cited nothing carries an empty one. Collapsing either direction
+      // would tell a reader something the system never said.
+      fx.stubs.message.listMessages.mockReturnValue(
+        of({
+          items: [
+            wireMessage({ content: 'human' }),
+            wireMessage({
+              content: 'cited nothing',
+              senderId: undefined,
+              isAiGenerated: true,
+              citations: { items: [] },
+            }),
+            wireMessage({
+              content: 'cited a file',
+              senderId: undefined,
+              isAiGenerated: true,
+              citations: {
+                items: [
+                  {
+                    chunkId: 'chunk-1',
+                    documentId: 'doc-1',
+                    documentTitle: 'A pasted text file',
+                    vectorPointId: 'point-1',
+                  },
+                ],
+              },
+            }),
+          ],
+          meta: wirePage([]).meta,
+        }),
+      );
+
+      const res = await authenticatedAgent(fx.app).get(
+        `${API}/tickets/${ticketId}/messages`,
+      );
+
+      expect(
+        res.body.data.items.map(
+          (item: { citations: unknown }) => item.citations,
+        ),
+      ).toEqual([
+        null,
+        [],
+        [
+          {
+            chunkId: 'chunk-1',
+            documentId: 'doc-1',
+            documentTitle: 'A pasted text file',
+            // A document with no pages is `null`, never a missing key.
+            pageNumber: null,
+            vectorPointId: 'point-1',
+          },
+        ],
+      ]);
+    });
+
     it('3. keeps a ZERO token count rather than nulling it', async () => {
       // `?? null` and not `|| null`: zero is a real reading, and erasing it into
       // "we did not measure" would quietly corrupt any cost report built on it.

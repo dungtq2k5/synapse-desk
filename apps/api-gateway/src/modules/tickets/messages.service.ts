@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { AnswerStatus, RequestContext } from '@synapsedesk/common';
 import {
+  DraftCitation,
   GetAiAttachmentsResponse,
   toPageRequest,
   toProtoMessageAnswerStatus,
@@ -89,6 +90,7 @@ export class MessagesService {
     generationId: string | undefined,
     context: RequestContext,
     answerStatus: AnswerStatus | null,
+    citations?: DraftCitation[],
   ): Promise<MessageResponseDto> {
     return toMessageResponseDto(
       await this.messagesGrpcClient.appendAi(
@@ -97,6 +99,9 @@ export class MessagesService {
           content,
           generationId,
           answerStatus: toProtoMessageAnswerStatus(answerStatus),
+          // Wrapped only when given: an omitted argument leaves the column
+          // NULL, where `{ items: [] }` would record "cited nothing".
+          citations: citations ? { items: citations } : undefined,
         },
         context,
       ),

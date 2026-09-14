@@ -74,6 +74,7 @@ erDiagram
     Boolean is_internal_note
     Boolean excluded_from_ai_context
     String answer_status "❓"
+    Json citations "❓"
     String model_name "❓"
     Int prompt_tokens "❓"
     Int completion_tokens "❓"

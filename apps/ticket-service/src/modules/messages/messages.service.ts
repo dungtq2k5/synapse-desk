@@ -66,6 +66,7 @@ import {
   MessageWithAttachments,
   toAttachmentResponse,
   toMessageResponse,
+  toStoredCitations,
 } from './message.mapper';
 
 /**
@@ -514,6 +515,11 @@ export class MessagesService {
         // held this in the completion frame and threw it away on write, so once
         // the socket closed a thread could not tell a refusal from an answer.
         answerStatus: fromProtoMessageAnswerStatus(request.answerStatus),
+        // Absent wrapper → column stays NULL. Never default it to `[]`: that
+        // would record "cited nothing" for a caller that said nothing.
+        ...(request.citations
+          ? { citations: toStoredCitations(request.citations.items) }
+          : {}),
       },
       include: { attachments: true },
     });
@@ -956,10 +962,13 @@ export class MessagesService {
         // Prisma readers, one clause each, and a refusal that reached only one
         // of them would be a defence on one surface and a delay on the other.
         where: { ticketId, excludedFromAiContext: false },
-        orderBy: { createdAt: 'asc' },
+        // NEWEST first so `take` keeps the tail; reversed below into reading
+        // order. `asc` here would take the first forty turns instead.
+        orderBy: { createdAt: 'desc' },
         select: { content: true, senderId: true, isAiGenerated: true },
         take: AI_REPLY_TRANSCRIPT_TURNS,
       });
+      history.reverse();
 
       // Same two decisions as the co-pilot path, made by the same service —
       // This one replies to a customer directly, so a screenshot it
@@ -997,8 +1006,16 @@ export class MessagesService {
           modelName: draft.modelName,
           promptTokens: draft.promptTokens,
           completionTokens: draft.completionTokens,
+          // This answer never reaches a socket, so the row is the only place
+          // its references can live.
+          citations: toStoredCitations(draft.citations),
         },
       });
+
+      // **Do not add `recordOutcome` here.** This path books its generation as
+      // `purpose=DRAFT`, inside the co-pilot acceptance rate, and its text
+      // always equals the draft — so every call would record ACCEPTED and push
+      // that rate toward 100%. See known-gaps #33.
 
       this.publishCreated(ticket, reply);
     } catch (error) {

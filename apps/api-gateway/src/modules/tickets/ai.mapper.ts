@@ -14,6 +14,7 @@ import {
   AiSummaryResponseDto,
   SimilarTicketResponseDto,
 } from './dto/rest/ai-response.dto';
+import { toDraftCitationResponseDto } from './citation.mapper';
 
 /**
  * Converts an `AiSummaryResponse` off the wire into its REST DTO.
@@ -51,12 +52,7 @@ export function toAiDraftResponseDto(
     promptTokens: response.promptTokens,
     completionTokens: response.completionTokens,
     generationId: response.generationId,
-    citations: response.citations.map((citation) => ({
-      chunkId: citation.chunkId,
-      documentId: citation.documentId,
-      documentTitle: citation.documentTitle,
-      pageNumber: citation.pageNumber ?? null,
-    })),
+    citations: response.citations.map(toDraftCitationResponseDto),
   };
 }
 

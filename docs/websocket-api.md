@@ -159,11 +159,13 @@ Named from your point of view, and deliberately **coarser than the server's own 
 | Event | Room | Notes |
 | :--- | :--- | :--- |
 | `ai:stream:chunk` | requesting socket | one token |
-| `ai:stream:done` | requesting socket | final text, citations, message id, `status` |
+| `ai:stream:done` | requesting socket | final text, citations, message id, `status`. **The citations are also stored on the message** — `GET /chat/conversations/:id/messages` and `TicketMessage.citations` return the same five-field shape, so the frame's copy can be dropped once the list refreshes |
 | `ai:stream:error` | requesting socket | |
 | `ai:stream:attachments-skipped` | requesting socket | file **names** of attachments not sent to the model. Fires **before** the answer, so show it while the user is still reading |
 
 `ai:stream:done` and `message:new` both arrive for one answer, and that is not duplication — *"your stream finished, here is the id"* versus *"a message appeared in this thread"*. Reconcile on the message id.
+
+**Citations on the frame are the mapped shape, not the raw one.** Each is `{ chunkId, documentId, documentTitle, pageNumber, vectorPointId }`, and a citation without a page number carries **`pageNumber: null`** — the key is always present. The same five fields come back on the stored message, so a client can swap the frame's list for the persisted one field for field. On the cap path (`escalated: true`, `messageId: null`) the list is `[]` and nothing is stored, because nothing was answered.
 
 `status` on `ai:stream:done` may be a value this build does not recognise, in which case it is the literal `UNSPECIFIED`. Write a default arm.
 

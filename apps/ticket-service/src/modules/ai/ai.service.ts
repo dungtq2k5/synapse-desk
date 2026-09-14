@@ -222,6 +222,7 @@ export class AiService {
         documentId: citation.documentId,
         documentTitle: citation.documentTitle,
         pageNumber: citation.pageNumber ?? undefined,
+        vectorPointId: citation.vectorPointId,
       })),
     };
   }
@@ -376,14 +377,18 @@ export class AiService {
       // thread, and the next draft's transcript hands it straight back to the
       // model — which makes the refusal a delay rather than a defence.
       where: { ticketId, excludedFromAiContext: false },
-      orderBy: { createdAt: 'asc' },
+      // NEWEST first, so `take` keeps the tail. `asc` + `take` would be the
+      // FIRST forty — and under forty messages the two return the same rows,
+      // so no short thread can show the difference.
+      orderBy: { createdAt: 'desc' },
       select: { content: true, senderId: true, isAiGenerated: true },
       // Bounded. A 300-message thread is prompt tokens charged on every draft,
       // and the tail is what the reply is actually answering.
       take: TRANSCRIPT_TURNS,
     });
 
-    return messages.map((message) => ({
+    // Back to reading order: the tail, but oldest-first within it.
+    return messages.reverse().map((message) => ({
       role: message.isAiGenerated || !message.senderId ? 'assistant' : 'user',
       content: message.content,
     }));

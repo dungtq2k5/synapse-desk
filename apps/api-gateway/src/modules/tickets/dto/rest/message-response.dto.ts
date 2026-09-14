@@ -1,5 +1,25 @@
 import { AnswerStatus } from '@synapsedesk/common';
 
+/**
+ * One passage an AI answer cited.
+ *
+ * Served on a message's `citations`, on the `ai:stream:done` frame, and on a
+ * knowledge answer. A co-pilot draft serves a narrower pick of it —
+ * `DraftCitationResponseDto`.
+ */
+export class CitationResponseDto {
+  chunkId!: string;
+  documentId!: string;
+  documentTitle!: string;
+  /**
+   * The page this citation points at, or `null` when the source document has no
+   * pages — a pasted text file, an HTML article. Never faked as 1.
+   */
+  pageNumber!: number | null;
+  /** The retrieval key the citation resolves through. */
+  vectorPointId!: string;
+}
+
 export class AttachmentResponseDto {
   id!: string;
   messageId!: string;
@@ -49,6 +69,13 @@ export class MessageResponseDto {
    * `null` for a human message, and also for a status this build cannot name.
    */
   answerStatus!: AnswerStatus | null;
+  /**
+   * What an AI answer cited.
+   *
+   * `null` for a human message and for an AI message written before citations
+   * were stored; `[]` for an answer that cited nothing.
+   */
+  citations!: CitationResponseDto[] | null;
 }
 
 /**

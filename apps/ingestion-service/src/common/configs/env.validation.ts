@@ -91,6 +91,5 @@ export const envValidationSchema = Joi.object({
   // getting this backwards is a download that 403s for a URL the client was
   // told was still good, which reads like a permissions bug rather than a
   // clock-skew one. The default leaves a 60-second margin.
-  // AKS Do we have constant for `840` to reuse it?
   DOWNLOAD_URL_TTL_SECONDS: Joi.number().default(840),
 });

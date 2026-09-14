@@ -1,6 +1,23 @@
 import { Field, ID, Int, ObjectType } from '@nestjs/graphql';
 import { AnswerStatus } from '@synapsedesk/common';
 
+/** One passage an AI answer cited, as the GraphQL schema serves it. */
+@ObjectType('Citation')
+export class CitationResponseGqlDto {
+  @Field(() => ID)
+  chunkId!: string;
+
+  @Field(() => ID)
+  documentId!: string;
+
+  @Field(() => String)
+  documentTitle!: string;
+
+  /** Null for a format with no pages. */
+  @Field(() => Int, { nullable: true })
+  pageNumber!: number | null;
+}
+
 /**
  * One message in a ticket thread, as the GraphQL schema serves it.
  *
@@ -81,4 +98,12 @@ export class TicketMessageResponseGqlDto {
   // catch. Still `@Field(() => String)`: the SDL keeps its scalar shape.
   @Field(() => String, { nullable: true })
   answerStatus!: AnswerStatus | null;
+
+  /**
+   * What an AI answer cited. Null for a human message and for an AI message
+   * written before citations were stored; empty for an answer that cited
+   * nothing.
+   */
+  @Field(() => [CitationResponseGqlDto], { nullable: true })
+  citations!: CitationResponseGqlDto[] | null;
 }

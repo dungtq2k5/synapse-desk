@@ -1,4 +1,5 @@
 import { AnswerStatus } from '@synapsedesk/common';
+import { CitationResponseDto } from '../../../tickets/dto/rest/message-response.dto';
 
 export class RetrievedChunkResponseDto {
   chunkId!: string;
@@ -27,16 +28,6 @@ export class KnowledgeSearchResponseDto {
   degraded!: 'LEXICAL_ONLY' | null;
 }
 
-export class KnowledgeCitationResponseDto {
-  chunkId!: string;
-  documentId!: string;
-  documentTitle!: string;
-  /** NULL for formats with no pages — never faked as 1. */
-  pageNumber!: number | null;
-  /** The id a citation resolves through, and the two arms' fusion key. */
-  vectorPointId!: string;
-}
-
 /**
  * One answer to a one-shot question.
  *
@@ -50,7 +41,7 @@ export class KnowledgeAskResponseDto {
   content!: string;
   /** `null` only if the peer sent a member this build does not know. */
   status!: AnswerStatus | null;
-  citations!: KnowledgeCitationResponseDto[];
+  citations!: CitationResponseDto[];
   /**
    * The `ai_generations` row this answer was billed to.
    *

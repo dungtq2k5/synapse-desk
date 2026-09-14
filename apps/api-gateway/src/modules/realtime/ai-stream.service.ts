@@ -27,6 +27,8 @@ import { WsResponse } from '../../common/interfaces/ws-response.interface';
 import { MessagesService } from '../tickets/messages.service';
 import { TicketsService } from '../tickets/tickets.service';
 import { ListMessagesQueryDto } from '../tickets/dto/rest/message.dto';
+import { CitationResponseDto } from '../tickets/dto/rest/message-response.dto';
+import { toCitationResponseDto } from '../tickets/citation.mapper';
 import { REALTIME_EVENTS } from './realtime.config';
 import {
   AiStreamAttachmentsSkippedPayloadDto,
@@ -377,6 +379,9 @@ export class AiStreamService implements OnModuleInit {
         // which leaves the column NULL rather than writing `'UNSPECIFIED'` into
         // it as a value.
         fromProtoRagAnswerStatus(completion.status),
+        // Persisted too. Always a list on this path — an answer that cited
+        // nothing stores `[]`, which is a different answer from NULL.
+        completion.citations,
       );
 
       // Carries the message id, which is the whole reason `done` and
@@ -385,7 +390,7 @@ export class AiStreamService implements OnModuleInit {
       this.done(client, streamId, ticketId, {
         messageId: message.id,
         content: completion.content,
-        citations: completion.citations,
+        citations: completion.citations.map(toCitationResponseDto),
         escalated: false,
         status: toFrameAnswerStatus(completion.status),
       });
@@ -405,7 +410,7 @@ export class AiStreamService implements OnModuleInit {
     data: {
       messageId: string | null;
       content: string;
-      citations: Citation[];
+      citations: CitationResponseDto[];
       escalated: boolean;
       status: FrameAnswerStatus;
     },
@@ -471,7 +476,8 @@ export class AiStreamService implements OnModuleInit {
   }
 
   /**
-   * The transcript, oldest first, in the roles rag-service expects.
+   * The newest turns of the transcript, oldest first, in the roles rag-service
+   * expects.
    *
    * `senderId === null` means generated: the same rule ticket-service's unary
    * path uses, kept identical so a streamed answer and a drafted one see the
@@ -485,16 +491,21 @@ export class AiStreamService implements OnModuleInit {
       page: 1,
       limit: TRANSCRIPT_TURNS,
       sortBy: 'createdAt',
-      // OLDEST first. The list route defaults to newest-first, which is right
-      // for a paged UI and backwards for a transcript — an answer generated
-      // from a reversed conversation is answering the wrong turn.
-      sortOrder: 'ASC',
+      // **NEWEST first, and it decides two things, not one.** `sortOrder` sets
+      // WHICH rows page 1 holds as well as their order: page 1 ascending is the
+      // OPENING of the thread, so a conversation past the window would send the
+      // model its first forty turns and never the one it is answering. Page 1
+      // has to be the tail — and the tail is then turned round below, because
+      // a model reading the newest turn first is answering the wrong one.
+      sortOrder: 'DESC',
     };
 
     const page = await this.messages.list(ticketId, query, context);
 
     return (
-      page.items
+      // Back to reading order. Copied first: `reverse()` mutates in place.
+      [...page.items]
+        .reverse()
         // **Filtered HERE, after the fetch — deliberately, and NOT the same
         // rule as `isInternalNote`**.
         //

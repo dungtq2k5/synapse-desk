@@ -10,6 +10,7 @@ import { GrpcMethod, GrpcStreamMethod } from "@nestjs/microservices";
 import { Observable } from "rxjs";
 import { Timestamp } from "../../google/protobuf/timestamp";
 import { PageMeta, PageRequest } from "../auth/common";
+import { DraftCitation } from "./ai";
 
 /**
  * `AnswerStatus`, mirrored from `synapsedesk.rag` rather than imported — the
@@ -98,6 +99,11 @@ export interface MessageResponse {
    * while the status lived only in a WebSocket frame nobody persisted.
    */
   answerStatus: MessageAnswerStatus;
+  /**
+   * Absent for a human message and for an AI message written before citations
+   * were persisted; present (possibly empty) for every AI answer since.
+   */
+  citations?: MessageCitations | undefined;
 }
 
 export interface CreateMessageRequest {
@@ -225,6 +231,21 @@ export interface AppendAiMessageRequest {
    * refusal from an answer once the socket closed.
    */
   answerStatus: MessageAnswerStatus;
+  /**
+   * What the answer cited, persisted on the row. Absent leaves the column NULL;
+   * present with no items stores `[]`, an answer that cited nothing.
+   */
+  citations?: MessageCitations | undefined;
+}
+
+/**
+ * A message's citations, as a message so that ABSENT and EMPTY stay distinct.
+ *
+ * Do not flatten this to a bare `repeated` field: the loader runs with
+ * `defaults: true`, which delivers an unset list as `[]`.
+ */
+export interface MessageCitations {
+  items: DraftCitation[];
 }
 
 /**

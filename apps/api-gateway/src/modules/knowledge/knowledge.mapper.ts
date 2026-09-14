@@ -11,6 +11,7 @@ import {
   KnowledgeAskResponseDto,
   KnowledgeSearchResponseDto,
 } from './dto/rest/knowledge-response.dto';
+import { toCitationResponseDto } from '../tickets/citation.mapper';
 
 /**
  * Builds a `SearchRequest` from the REST query.
@@ -84,13 +85,7 @@ export function toKnowledgeAskResponseDto(
   return {
     content: response.content,
     status: fromProtoRagAnswerStatus(response.status),
-    citations: response.citations.map((citation) => ({
-      chunkId: citation.chunkId,
-      documentId: citation.documentId,
-      documentTitle: citation.documentTitle,
-      pageNumber: citation.pageNumber ?? null,
-      vectorPointId: citation.vectorPointId,
-    })),
+    citations: response.citations.map(toCitationResponseDto),
     generationId: response.generationId,
   };
 }

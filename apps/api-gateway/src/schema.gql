@@ -36,6 +36,13 @@ type AnalyticsOverview {
   ticketsResolved: Int!
 }
 
+type Citation {
+  chunkId: ID!
+  documentId: ID!
+  documentTitle: String!
+  pageNumber: Int
+}
+
 """
 A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date-time format.
 """
@@ -422,6 +429,7 @@ type Ticket {
 
 type TicketMessage {
   answerStatus: String
+  citations: [Citation!]
   completionTokens: Int
   content: String!
   createdAt: DateTime!

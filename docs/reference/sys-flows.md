@@ -61,8 +61,10 @@ Seven RPCs on `rag-service`. They share one spine, and the useful thing to know 
 flowchart TD
   IN([gRPC request<br/>organizationId · caller context]) --> CAP{Budget:<br/>allows_embedding?}
 
-  CAP -->|no| GRACE{Escalation<br/>grace?}
-  GRACE -->|"no · six of seven surfaces"| DENY[["PERMISSION_DENIED<br/>AT_CAP_REFUSAL"]]
+  CAP -->|"no · Chat"| ATCAP[["answers with<br/>ANSWER_STATUS_AT_CAP"]]
+  CAP -->|"no · Search"| LEX[["retrieval, lexical-only<br/>SEARCH_DEGRADATION_LEXICAL_ONLY"]]
+  CAP -->|no · the other five| GRACE{Escalation<br/>grace?}
+  GRACE -->|"no"| DENY[["PERMISSION_DENIED<br/>AT_CAP_REFUSAL"]]
   GRACE -->|"yes · Summarize only"| GUARD
   CAP -->|yes| GUARD
 
@@ -86,7 +88,7 @@ flowchart TD
 
 Five things this spine is load-bearing for:
 
-- **The cap is checked before anything else.** Every one of the seven aborts with `PERMISSION_DENIED` / `AT_CAP_REFUSAL` and does no work first.
+- **The cap is checked before anything else, and what happens at it differs per surface.** `Chat` **answers** with `ANSWER_STATUS_AT_CAP` — the caller escalates to a human, because a 402 mid-conversation is a dead end for a user who cannot buy anything. `Search` **degrades** to lexical-only retrieval and never calls the embedding client — "degraded" has to mean cheaper, not merely relabelled. The other five abort with `PERMISSION_DENIED` / `AT_CAP_REFUSAL` and do no work first, `Summarize` excepted when in grace. `AT_CAP_POLICY` in `ai-pricing.config.ts` is the table; `Search` is absent from it because it books `EMBEDDING`, not a generation purpose.
 - **The grace branch exists once.** `Summarize` is the only surface that can proceed past a spent budget, and only when the caller sets `triggered_by_escalation` — the flag is not the authority, the escalation is.
 - **The guard is not on every surface**, and the reasons are recorded per RPC in the code rather than inferred — see §3 and [ADR 0015](../decisions/0015-prompt-injection-layers.md).
 - **Attachments reach retrieval, not only generation** — [ADR 0017](../decisions/0017-attachments-reach-retrieval.md). This is why `PARTS` sits before `PROMPT` and not inside it.
@@ -98,7 +100,7 @@ Five things this spine is load-bearing for:
 
 | | `Search` | `Chat` | `Ask` | `Draft` | `Summarize` | `Classify` | `Suggest` |
 | :---- | :--: | :--: | :--: | :--: | :--: | :--: | :--: |
-| Cap abort | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| At the cap | **lexical-only** | **answers `AT_CAP`** | abort | abort | abort *unless in grace* | abort | abort |
 | Escalation grace | — | — | — | — | **✓** | — | — |
 | Injection guard (A+B) | — | ✓ | ✓ | ✓ | — | — | — |
 | Greeting detection | — | **✓** | — | — | — | — | — |

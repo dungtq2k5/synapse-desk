@@ -13,6 +13,7 @@ import { memberContext } from '../utils/context';
 import { AiService } from '../../src/modules/ai/ai.service';
 import { MessagesService } from '../../src/modules/messages/messages.service';
 import { RagClientService } from '../../src/modules/ai-client/rag-client.service';
+import { LedgerClientService } from '../../src/modules/ai-client/ledger-client.service';
 
 /**
  * A refused message never reaches a later prompt.
@@ -46,6 +47,9 @@ describe('Refused messages are excluded from AI context (e2e)', () => {
       ['ticket.read.all'],
     );
 
+  /** The customer message the auto-reply builder posts, and then answers. */
+  const AUTO_REPLY_TRIGGER = 'and what about the other thing?';
+
   /** What rag-service answers with when the guard refuses — its DRAFT_REFUSAL. */
   const refusal = () =>
     new RpcException({
@@ -73,17 +77,22 @@ describe('Refused messages are excluded from AI context (e2e)', () => {
   const BUILDERS = [
     {
       name: 'the co-pilot Draft (`ai.service.ts`)',
+      // Replies to a message that is already in the thread.
+      ownTrigger: null,
       run: async (ticketId: string) => {
         await ai.generateDraft({ ticketId, instruction: undefined }, agent());
       },
     },
     {
       name: 'the `invokeAi` auto-reply (`messages.service.ts`)',
+      // Creates the message it replies to INSIDE the run, so that message is
+      // the newest turn of its own transcript.
+      ownTrigger: AUTO_REPLY_TRIGGER,
       run: async (ticketId: string) => {
         await messages.createMessage(
           {
             ticketId,
-            content: 'and what about the other thing?',
+            content: AUTO_REPLY_TRIGGER,
             isInternalNote: false,
             invokeAi: true,
             attachments: [],
@@ -150,6 +159,93 @@ describe('Refused messages are excluded from AI context (e2e)', () => {
       );
       expect(transcript).toContain('how much leave carries over?');
     });
+  });
+
+  describe('4. every transcript builder keeps the TAIL of a long thread', () => {
+    /**
+     * The window is forty turns, and it has to be the LAST forty.
+     *
+     * `asc` + `take` is the first forty, and under forty messages the two
+     * orderings return the same set — which is how every other test here stayed
+     * green while a long thread sent the model its opening lines and never the
+     * message it was answering.
+     *
+     * **`createdAt` is set per row, strictly increasing.** Measured against this
+     * database: one `createMany` with the column defaulted gives all 41 rows ONE
+     * timestamp, and `Promise.all` over `create` gives three. With ties, "first"
+     * and "last" are whatever the planner returns, so a test that left the
+     * column to its default would pass or fail on tie order.
+     */
+    const WINDOW = 40;
+
+    const seedThread = async (ticketId: string, count: number) => {
+      const start = Date.now() - 60 * 60 * 1000;
+      const contents = Array.from(
+        { length: count },
+        (_, index) => `turn-${String(index).padStart(2, '0')}`,
+      );
+
+      await fx.prisma.ticketMessage.createMany({
+        data: contents.map((content, index) => ({
+          ticketId,
+          senderId: tenant.userId,
+          content,
+          createdAt: new Date(start + index * 1000),
+        })),
+      });
+
+      return contents;
+    };
+
+    const promptOf = (): string[] => {
+      const [, history] = generateReplyDraft.mock.calls[0] as [
+        string,
+        Array<{ content: string }>,
+      ];
+
+      return history.map((turn) => turn.content);
+    };
+
+    it.each(BUILDERS)(
+      '$name sends the NEWEST forty turns, not the oldest',
+      async ({ run, ownTrigger }) => {
+        const ticket = await createTicket(fx.prisma, tenant);
+        const seeded = await seedThread(ticket.id, WINDOW + 1);
+
+        await run(ticket.id);
+
+        // **The window is not the same size for both builders.** The auto-reply
+        // posts its own trigger inside the run, so the thread is 42 long when
+        // it reads it and the first TWO seeded turns fall out. Deriving the
+        // expectation from `ownTrigger` keeps this one test honest for both,
+        // rather than encoding one builder's window as everyone's.
+        const thread = ownTrigger ? [...seeded, ownTrigger] : seeded;
+        const expected = thread.slice(-WINDOW);
+
+        expect(promptOf()).toEqual(expected);
+      },
+    );
+
+    it.each(BUILDERS)(
+      '$name keeps those turns in CHRONOLOGICAL order',
+      async ({ run }) => {
+        // The half the test above cannot see on its own: a query that took the
+        // tail newest-first and forgot to turn it round would hand the model the
+        // answer before the question. Asserted on relative position, so it
+        // names the defect even if the window size ever changes.
+        const ticket = await createTicket(fx.prisma, tenant);
+        await seedThread(ticket.id, WINDOW + 1);
+
+        await run(ticket.id);
+
+        const seededTurns = promptOf().filter((content) =>
+          content.startsWith('turn-'),
+        );
+
+        expect(seededTurns.length).toBeGreaterThan(1);
+        expect(seededTurns).toEqual([...seededTurns].sort());
+      },
+    );
   });
 
   describe('the write-back that sets the flag', () => {
@@ -253,6 +349,124 @@ describe('Refused messages are excluded from AI context (e2e)', () => {
     expect(message.answerStatus).toBe(
       MessageAnswerStatus.MESSAGE_ANSWER_STATUS_REFUSED,
     );
+  });
+
+  describe('5. citations are PERSISTED on the AI message', () => {
+    /** A citation with a page, and one from a format that has none. */
+    const cited = [
+      {
+        chunkId: faker.string.uuid(),
+        documentId: faker.string.uuid(),
+        documentTitle: 'Handbook',
+        pageNumber: 4,
+        vectorPointId: faker.string.uuid(),
+      },
+      {
+        chunkId: faker.string.uuid(),
+        documentId: faker.string.uuid(),
+        documentTitle: 'A pasted text file',
+        vectorPointId: faker.string.uuid(),
+      },
+    ];
+
+    /** The same two, as the column stores them: five keys, `null` for no page. */
+    const stored = [cited[0], { ...cited[1], pageNumber: null }];
+
+    const columnOf = (id: string) =>
+      fx.prisma.ticketMessage
+        .findUniqueOrThrow({ where: { id }, select: { citations: true } })
+        .then((row) => row.citations);
+
+    it('`appendAiMessage` writes all five keys, and the list reads them BACK', async () => {
+      // The round trip is proved here because the column is real here. The
+      // gateway suite stubs this service, so a comparison there would be a
+      // frame against a stub.
+      const ticket = await createTicket(fx.prisma, tenant);
+
+      const appended = await messages.appendAiMessage(
+        {
+          ticketId: ticket.id,
+          content: 'Carry-over is five days.',
+          generationId: undefined,
+          answerStatus: MessageAnswerStatus.MESSAGE_ANSWER_STATUS_DOC_ANSWER,
+          citations: { items: cited },
+        },
+        author(),
+      );
+
+      expect(await columnOf(appended.id)).toEqual(stored);
+
+      const page = await messages.listMessages(
+        { ticketId: ticket.id, page: undefined },
+        author(),
+      );
+      const listed = page.items.find((item) => item.id === appended.id);
+
+      expect(listed?.citations).toEqual({
+        items: [cited[0], { ...cited[1], pageNumber: undefined }],
+      });
+    });
+
+    it('an answer that cited NOTHING stores `[]`, and no wrapper stores NULL', async () => {
+      // Two different facts, and the column is the only place they both
+      // survive. `[]` is a real answer with no sources; NULL is "nothing was
+      // said about citations" — every human message, and every AI row written
+      // before this column existed.
+      const ticket = await createTicket(fx.prisma, tenant);
+      const base = {
+        ticketId: ticket.id,
+        content: 'An answer',
+        generationId: undefined,
+        answerStatus: MessageAnswerStatus.MESSAGE_ANSWER_STATUS_DOC_ANSWER,
+      };
+
+      const empty = await messages.appendAiMessage(
+        { ...base, citations: { items: [] } },
+        author(),
+      );
+      const unsaid = await messages.appendAiMessage(base, author());
+      const human = await createMessage(fx.prisma, ticket.id, {
+        senderId: tenant.userId,
+      });
+
+      expect(await columnOf(empty.id)).toEqual([]);
+      expect(await columnOf(unsaid.id)).toBeNull();
+      expect(await columnOf(human.id)).toBeNull();
+
+      // And the wire keeps them apart: an empty wrapper, and no wrapper at all.
+      expect(empty.citations).toEqual({ items: [] });
+      expect(unsaid.citations).toBeUndefined();
+    });
+
+    it("the auto-reply stores its draft's citations, and records NO outcome", async () => {
+      // The auto-reply never reaches a socket, so the row is the only place its
+      // references can live.
+      //
+      // **The negative half pins a decision.** This path books its generation as
+      // `purpose=DRAFT`; a `recordOutcome` here would record ACCEPTED on every
+      // auto-reply and inflate the co-pilot's acceptance rate (known-gaps #33).
+      // If that gap is fixed with a purpose of its own, this assertion changes
+      // on purpose — not because someone added the call in passing.
+      const recordOutcome = jest.spyOn(
+        fx.moduleRef.get(LedgerClientService),
+        'recordOutcome',
+      );
+      generateReplyDraft.mockResolvedValue({
+        ...draftAnswer,
+        citations: stored,
+      });
+      const ticket = await createTicket(fx.prisma, tenant);
+
+      await BUILDERS[1].run(ticket.id);
+
+      const reply = await fx.prisma.ticketMessage.findFirstOrThrow({
+        where: { ticketId: ticket.id, isAiGenerated: true },
+        select: { citations: true },
+      });
+
+      expect(reply.citations).toEqual(stored);
+      expect(recordOutcome).not.toHaveBeenCalled();
+    });
   });
 
   it('`excludeFromAiContext` is idempotent', async () => {

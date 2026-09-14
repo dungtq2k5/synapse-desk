@@ -69,6 +69,18 @@ describe('REST and GraphQL DTOs are independent but not divergent', () => {
       restOnly: ['attachments', 'excludedFromAiContext'],
     },
     {
+      name: 'Citation',
+      restPath: join(SRC, 'tickets/dto/rest/message-response.dto.ts'),
+      restClass: 'CitationResponseDto',
+      gqlPath: join(SRC, 'tickets/dto/graphql/message-response.gql-dto.ts'),
+      gqlClass: 'CitationResponseGqlDto',
+      // `vectorPointId` is REST-only BY DECISION. REST serves it so a client can
+      // replace the `ai:stream:done` frame's citations with the persisted ones
+      // field for field; the public schema has no frame to reconcile with, and a
+      // retrieval key is not product API there.
+      restOnly: ['vectorPointId'],
+    },
+    {
       name: 'IngestionJob',
       restPath: join(
         SRC,
@@ -338,6 +350,7 @@ describe('REST and GraphQL DTOs are independent but not divergent', () => {
     expect(CONTRACTS.map(({ name }) => name)).toEqual([
       'Ticket',
       'TicketMessage',
+      'Citation',
       'IngestionJob',
       'Role',
       'Permission',
