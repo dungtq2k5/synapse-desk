@@ -22,7 +22,10 @@ import { memberContext } from '../utils/context';
 import { buildTenant, createDocument, TenantFixture } from '../factories';
 import { ChunkUsageProjection } from '../../src/modules/scheduled/chunk-usage.projection';
 import { DiscardedDraftSweep } from '../../src/modules/scheduled/discarded-draft.sweep';
-import { QuotaReconciliationJob } from '../../src/modules/scheduled/quota-reconciliation.job';
+import {
+  QuotaReconciliationJob,
+  RECENT_SPEND_WINDOW_MS,
+} from '../../src/modules/scheduled/quota-reconciliation.job';
 import { DocumentFlagWriter } from '../../src/modules/scheduled/document-flag-writer';
 import { DocumentFlagsService } from '../../src/modules/document-flags/document-flags.service';
 import { getQueueToken } from '@nestjs/bullmq';
@@ -1211,7 +1214,14 @@ describe('The fan-out and the scheduled jobs (e2e)', () => {
      * these use two tenants with genuinely different cycles.
      */
     describe('every tenant against its OWN cycle', () => {
-      const OTHER_CYCLE = new Date(CYCLE_START.getTime() + 10 * 24 * HOUR);
+      // **Anchored to the job's window, never to the suite's fixed
+      // `CYCLE_START`.** `reconcileAll()` chooses WHO to reconcile from spend in
+      // the last `RECENT_SPEND_WINDOW_MS` of the real clock, so spend dated from
+      // a fixed day ages out of it on its own: these tests used 2026-08-01 and
+      // stopped selecting their tenants 45 days later with no code change.
+      // Derived from the window, so a change to its length cannot reopen that.
+      const FIRST_CYCLE = new Date(Date.now() - RECENT_SPEND_WINDOW_MS / 2);
+      const OTHER_CYCLE = new Date(Date.now() - RECENT_SPEND_WINDOW_MS / 4);
 
       const spend = (organizationId: string, micros: bigint, at: Date) =>
         fx.prisma.aiGeneration.create({
@@ -1232,7 +1242,7 @@ describe('The fan-out and the scheduled jobs (e2e)', () => {
         await spend(
           tenant.organizationId,
           25n,
-          new Date(CYCLE_START.getTime() + HOUR),
+          new Date(FIRST_CYCLE.getTime() + HOUR),
         );
         await spend(
           other.organizationId,
@@ -1241,25 +1251,31 @@ describe('The fan-out and the scheduled jobs (e2e)', () => {
         );
 
         // Both counters drifted.
-        await counter.charge(tenant.organizationId, CYCLE_START, 999n);
+        await counter.charge(tenant.organizationId, FIRST_CYCLE, 999n);
         await counter.charge(other.organizationId, OTHER_CYCLE, 888n);
 
-        jest
+        const cycles = jest
           .spyOn(
             fx.moduleRef.get(AuthReferenceService),
             'listOrganizationCycles',
           )
           .mockResolvedValue(
             new Map([
-              [tenant.organizationId, CYCLE_START],
+              [tenant.organizationId, FIRST_CYCLE],
               [other.organizationId, OTHER_CYCLE],
             ]),
           );
 
         await reconciliation.reconcileAll();
 
+        // Both were SELECTED. Without this, spend that fell out of the job's
+        // window reads as a wrong number rather than as nobody being looked at.
+        expect(cycles).toHaveBeenCalledWith(
+          expect.arrayContaining([tenant.organizationId, other.organizationId]),
+        );
+
         await expect(
-          counter.spentMicros(tenant.organizationId, CYCLE_START),
+          counter.spentMicros(tenant.organizationId, FIRST_CYCLE),
         ).resolves.toBe(25n);
         await expect(
           counter.spentMicros(other.organizationId, OTHER_CYCLE),
@@ -1279,7 +1295,7 @@ describe('The fan-out and the scheduled jobs (e2e)', () => {
           new Date(OTHER_CYCLE.getTime() + HOUR),
         );
 
-        jest
+        const cycles = jest
           .spyOn(
             fx.moduleRef.get(AuthReferenceService),
             'listOrganizationCycles',
@@ -1288,10 +1304,16 @@ describe('The fan-out and the scheduled jobs (e2e)', () => {
 
         await reconciliation.reconcileAll();
 
+        // Selected — or "nothing was written under the wrong key" is true only
+        // because nothing was written anywhere.
+        expect(cycles).toHaveBeenCalledWith(
+          expect.arrayContaining([other.organizationId]),
+        );
+
         // Under the OTHER tenant's cycle — the date the broken version would
         // have used for everybody — nothing was written.
         await expect(
-          counter.spentMicros(other.organizationId, CYCLE_START),
+          counter.spentMicros(other.organizationId, FIRST_CYCLE),
         ).resolves.toBe(0n);
       });
 
@@ -1302,11 +1324,11 @@ describe('The fan-out and the scheduled jobs (e2e)', () => {
         await spend(
           tenant.organizationId,
           25n,
-          new Date(CYCLE_START.getTime() + HOUR),
+          new Date(FIRST_CYCLE.getTime() + HOUR),
         );
-        await counter.charge(tenant.organizationId, CYCLE_START, 999n);
+        await counter.charge(tenant.organizationId, FIRST_CYCLE, 999n);
 
-        jest
+        const cycles = jest
           .spyOn(
             fx.moduleRef.get(AuthReferenceService),
             'listOrganizationCycles',
@@ -1315,9 +1337,16 @@ describe('The fan-out and the scheduled jobs (e2e)', () => {
 
         await expect(reconciliation.reconcileAll()).resolves.toBe(0);
 
+        // **The tenant was SELECTED and then skipped** — the behaviour under
+        // test. A tenant outside the job's window also yields `0` and untouched
+        // drift, without the skip branch ever running.
+        expect(cycles).toHaveBeenCalledWith(
+          expect.arrayContaining([tenant.organizationId]),
+        );
+
         // Untouched — still drifted, and still correctable next hour.
         await expect(
-          counter.spentMicros(tenant.organizationId, CYCLE_START),
+          counter.spentMicros(tenant.organizationId, FIRST_CYCLE),
         ).resolves.toBe(999n);
       });
     });

@@ -11,7 +11,7 @@ import { AuthReferenceService } from '../auth-client/auth-reference.service';
  * `billing_cycle_start` decides that. Wide enough that an hourly sweep cannot
  * miss a tenant between runs even after a long outage.
  */
-const RECENT_SPEND_WINDOW_MS = 45 * 24 * 60 * 60 * 1000;
+export const RECENT_SPEND_WINDOW_MS = 45 * 24 * 60 * 60 * 1000;
 
 /**
  * Re-derives spend from the LEDGER and corrects the Redis counter.
