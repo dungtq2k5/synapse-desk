@@ -7,6 +7,7 @@ import {
   lastValueFrom,
   tap,
   timeout,
+  TimeoutError,
 } from 'rxjs';
 import {
   CallerContext,
@@ -18,6 +19,7 @@ import {
   StorageServiceClient,
 } from '@synapsedesk/grpc-proto';
 import {
+  INGEST_DEADLINE_MS,
   formatErrorMsg,
   isStorageObjectPath,
   NATS_CLIENT,
@@ -106,12 +108,65 @@ export class StorageReferenceService implements OnModuleInit {
   }
 
   /**
+   * `presignAttachment`'s twin: storage-service fetches the bytes from
+   * `sourceUrl` itself and lands them under the same `pending/` path a
+   * presigned upload would use, so the returned path goes to `createMessage`
+   * like any other.
+   *
+   * **`INGEST_DEADLINE_MS`, not `GRPC_DEADLINE_MS`.** This call streams up to
+   * `MAX_ATTACHMENT_BYTES` from a third party; the standard five seconds would
+   * fail it while storage-service kept writing, leaving an object this caller
+   * had already reported as not accepted. storage-service's own socket timeout
+   * sits inside this deadline, so the inner hop fails cleanly first.
+   *
+   * No secondary owner: there is never a message yet on this path.
+   *
+   * @throws RpcException from {@link StorageReferenceService.asIngestError}.
+   */
+  async ingestAttachment(
+    input: {
+      ticketId: string;
+      contentType: string;
+      sizeBytes: number;
+      fileName: string;
+      sourceUrl: string;
+      /** The tenant's own per-file ceiling; storage cuts the stream at it. */
+      maxBytes: number;
+    },
+    context: CallerContext,
+  ): Promise<{ objectPath: string }> {
+    try {
+      const response = await firstValueFrom(
+        this.storageService
+          .ingestFromUrl(
+            {
+              purpose: ProtoStoragePurpose.STORAGE_PURPOSE_TICKET_ATTACHMENT,
+              ownerId: input.ticketId,
+              secondaryOwnerId: '',
+              contentType: input.contentType,
+              sizeBytes: input.sizeBytes,
+              originalFileName: input.fileName,
+              sourceUrl: input.sourceUrl,
+              maxBytes: input.maxBytes,
+            },
+            packRequestContext(context),
+          )
+          .pipe(timeout(INGEST_DEADLINE_MS)),
+      );
+
+      return { objectPath: response.objectPath };
+    } catch (error) {
+      throw StorageReferenceService.asIngestError(error);
+    }
+  }
+
+  /**
    * The analytics export's upload slot.
    *
    * A BACKGROUND job has no caller context: it runs from a queue, on behalf of
    * a request that finished minutes ago. So the tenant is passed explicitly and
    * a synthetic context is built here rather than threading a stale one through
-   * BullMQ — a serialised `CallerContext` sitting in Redis is an identity with
+   * BullMQ — a serialized `CallerContext` sitting in Redis is an identity with
    * no expiry, which is a worse thing to have than a slightly awkward signature.
    */
   async presignExport(
@@ -322,7 +377,35 @@ export class StorageReferenceService implements OnModuleInit {
     });
   }
 
-  /** Maps a storage failure into something the caller can act on. */
+  /**
+   * An ingest failure, with the source's verdict kept.
+   *
+   * Wider than {@link StorageReferenceService.asClientError} on purpose: for an
+   * ingest, `FAILED_PRECONDITION` (the source answered 404, redirected too often,
+   * or was larger than the tenant allows) and `DEADLINE_EXCEEDED` (the source
+   * stalled, or this call's own deadline passed) describe the SOURCE, not
+   * storage-service's health, and the caller logs them as the reason a named
+   * file was dropped. Everything else is still storage being unwell.
+   */
+  static asIngestError(error: unknown): RpcException {
+    if (error instanceof TimeoutError) {
+      return new RpcException({
+        code: status.DEADLINE_EXCEEDED,
+        message: `Ingest did not finish within ${INGEST_DEADLINE_MS} ms`,
+      });
+    }
+
+    const code = (error as { code?: number })?.code;
+    if (
+      code === status.FAILED_PRECONDITION ||
+      code === status.DEADLINE_EXCEEDED
+    ) {
+      return new RpcException({ code, message: formatErrorMsg(error) });
+    }
+
+    return StorageReferenceService.asClientError(error);
+  }
+
   static asClientError(error: unknown): RpcException {
     const code = (error as { code?: number })?.code;
 

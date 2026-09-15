@@ -181,7 +181,7 @@ describe('toMappedInboundEmail', () => {
     });
   });
 
-  describe('identity, body and attachments', () => {
+  describe('identity and body', () => {
     it('`messageId` is the top-level `message_id`; empty is absent', () => {
       expect(map().fields.messageId).toBe('<m-1@acme.test>');
       expect(map(email({ message_id: '' }))).not.toHaveProperty(
@@ -204,28 +204,140 @@ describe('toMappedInboundEmail', () => {
       expect(fields.text).toBeNull();
       expect(fields.html).toBe('<p>hi</p>');
     });
+  });
 
-    it('**attachments are dropped by name; a nameless one is still counted**', () => {
-      const attachment = {
-        size: 10,
-        content_type: 'image/png',
-        content_id: null,
-        content_disposition: 'attachment',
-      };
-      const { fields } = map(
-        email({
-          attachments: [
-            { id: 'a-1', filename: 'screenshot.png', ...attachment },
-            { id: 'a-2', filename: null, ...attachment },
-          ],
+  describe('attachments split three ways', () => {
+    const file = (
+      overrides: Partial<
+        GetReceivingEmailResponseSuccess['attachments'][number]
+      > = {},
+    ): GetReceivingEmailResponseSuccess['attachments'][number] => ({
+      id: `a-${Math.random().toString(36).slice(2)}`,
+      filename: 'screenshot.png',
+      size: 10,
+      content_type: 'image/png',
+      content_id: null,
+      content_disposition: 'attachment',
+      ...overrides,
+    });
+
+    const split = (
+      ...attachments: GetReceivingEmailResponseSuccess['attachments']
+    ) => map(email({ attachments })).fields;
+
+    it('**an allowed type becomes a remote attachment, WITHOUT a URL**', () => {
+      // The URL is fetched after routing, so the mapper never has one.
+      const png = file({ id: 'a-1' });
+      const fields = split(png);
+
+      expect(fields.remoteAttachments).toEqual([
+        {
+          id: 'a-1',
+          fileName: 'screenshot.png',
+          mimeType: 'image/png',
+          sizeBytes: 10,
+        },
+      ]);
+      expect(fields.droppedAttachments).toEqual([]);
+      expect(fields.attachments).toEqual([]);
+    });
+
+    it('a type outside the allowlist is dropped by name', () => {
+      const fields = split(
+        file({
+          filename: 'setup.exe',
+          content_type: 'application/x-msdownload',
         }),
       );
 
-      expect(fields.attachments).toEqual([]);
-      expect(fields.droppedAttachments).toEqual([
-        'screenshot.png',
-        UNNAMED_ATTACHMENT,
-      ]);
+      expect(fields.remoteAttachments).toEqual([]);
+      expect(fields.droppedAttachments).toEqual(['setup.exe']);
+    });
+
+    it('**an inline image with a `content_id` is dropped** — it is part of the HTML', () => {
+      const fields = split(
+        file({
+          filename: 'logo.png',
+          content_disposition: 'inline',
+          content_id: 'logo@x',
+        }),
+        // Inline WITHOUT a content id is not referenced by the HTML, so it is a
+        // file the sender attached.
+        file({
+          id: 'kept',
+          filename: 'photo.png',
+          content_disposition: 'inline',
+        }),
+      );
+
+      expect(fields.droppedAttachments).toEqual(['logo.png']);
+      expect(fields.remoteAttachments.map((a) => a.id)).toEqual(['kept']);
+    });
+
+    it('a null filename is `(unnamed)` on either side', () => {
+      const fields = split(
+        file({ id: 'kept', filename: null }),
+        file({ filename: null, content_type: 'application/zip' }),
+      );
+
+      expect(fields.remoteAttachments[0].fileName).toBe(UNNAMED_ATTACHMENT);
+      expect(fields.droppedAttachments).toEqual([UNNAMED_ATTACHMENT]);
+    });
+
+    it('**twenty-one eligible attachments → twenty kept, the twenty-first named**', () => {
+      const fields = split(
+        ...Array.from({ length: 21 }, (_, i) =>
+          file({ filename: `f-${i}.png` }),
+        ),
+      );
+
+      expect(fields.remoteAttachments).toHaveLength(20);
+      expect(fields.droppedAttachments).toEqual(['f-20.png']);
+    });
+
+    describe('the pre-filters, each a rule that would otherwise drop the WHOLE mail', () => {
+      it('**a parameterised `content_type` is normalised and kept**', () => {
+        const fields = split(file({ content_type: 'Image/PNG; name="a.png"' }));
+
+        expect(fields.remoteAttachments.map((a) => a.mimeType)).toEqual([
+          'image/png',
+        ]);
+      });
+
+      it('**a zero-byte file is dropped**', () => {
+        const fields = split(file({ filename: 'empty.png', size: 0 }));
+
+        expect(fields.remoteAttachments).toEqual([]);
+        expect(fields.droppedAttachments).toEqual(['empty.png']);
+      });
+
+      it('**a 256-character name is dropped, and truncated to 255 with `…` in the note**', () => {
+        const long = `${'n'.repeat(252)}.png`;
+        const fields = split(file({ filename: long }));
+
+        expect(fields.remoteAttachments).toEqual([]);
+        expect(fields.droppedAttachments).toHaveLength(1);
+        expect(fields.droppedAttachments[0]).toHaveLength(255);
+        expect(fields.droppedAttachments[0].endsWith('…')).toBe(true);
+      });
+
+      it('and a mail carrying all of them still passes validation', async () => {
+        const dto = plainToInstance(
+          InboundEmailDto,
+          map(
+            email({
+              attachments: [
+                file({ content_type: 'image/png; name="a.png"' }),
+                file({ size: 0 }),
+                file({ filename: `${'n'.repeat(300)}.png` }),
+                ...Array.from({ length: 22 }, () => file()),
+              ],
+            }),
+          ).fields,
+        );
+
+        expect(await validate(dto, VALIDATION_PIPE_OPTIONS)).toEqual([]);
+      });
     });
   });
 

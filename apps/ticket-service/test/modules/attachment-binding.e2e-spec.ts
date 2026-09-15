@@ -2,7 +2,12 @@ import { faker } from '@faker-js/faker';
 import { status } from '@grpc/grpc-js';
 import { RpcException } from '@nestjs/microservices';
 import { expectRpc } from '@synapsedesk/common/testing/rpc';
-import { MAX_ATTACHMENTS_PER_MESSAGE } from '@synapsedesk/common';
+import { NEVER, of } from 'rxjs';
+import {
+  INGEST_DEADLINE_MS,
+  MAX_ATTACHMENTS_PER_MESSAGE,
+} from '@synapsedesk/common';
+import { GRPC_DEADLINE_MS } from '@synapsedesk/grpc-proto';
 import { E2eFixture, bootstrapE2eTest } from '../utils';
 import {
   buildTenant,
@@ -14,6 +19,7 @@ import { memberContext } from '../utils/context';
 import { MessagesService } from '../../src/modules/messages/messages.service';
 import { AttachmentExtractorClient } from '../../src/modules/ai-client/attachment-extractor.client';
 import { StorageReferenceService } from '../../src/modules/storage-client/storage-reference.service';
+import { AuthReferenceService } from '../../src/modules/auth-client/auth-reference.service';
 
 /**
  * Binding attachments AT CREATE.
@@ -535,6 +541,145 @@ describe('Attachments bound at message create (e2e)', () => {
       ).rejects.toBeDefined();
 
       expect(presign).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('ingest — the same upload, fetched server-side from a URL', () => {
+    /** The storage-service gRPC client under the reference service. */
+    const storageClient = () =>
+      (
+        storage as unknown as {
+          storageService: { ingestFromUrl: (...args: unknown[]) => unknown };
+        }
+      ).storageService;
+
+    const request = (ticketId: string, overrides = {}) => ({
+      ticketId,
+      fileName: 'screenshot.png',
+      fileSizeBytes: 2048,
+      mimeType: 'image/png',
+      sourceUrl: 'https://attachments.example.test/a/screenshot.png',
+      ...overrides,
+    });
+
+    let ingestFromUrl: jest.SpyInstance;
+
+    beforeEach(() => {
+      ingestFromUrl = jest
+        .spyOn(storageClient(), 'ingestFromUrl')
+        .mockReturnValue(
+          of({
+            objectPath: `organizations/${tenant.organizationId}/tickets/t/attachments/pending/f.png`,
+            sizeBytes: 2048,
+          }),
+        );
+    });
+
+    it('**loads the ticket first: a foreign tenant’s ticket is NOT_FOUND and storage is never called**', async () => {
+      // The ticket is what authorises a write under its prefix. Without the
+      // load, anyone could have storage-service fetch into any ticket's.
+      const stranger = buildTenant();
+      const ticket = await createTicket(fx.prisma, tenant);
+
+      await expectRpc(
+        messages.ingestAttachment(
+          request(ticket.id),
+          memberContext({
+            id: stranger.userId,
+            organizationId: stranger.organizationId,
+          }),
+        ),
+        status.NOT_FOUND,
+      );
+
+      expect(ingestFromUrl).not.toHaveBeenCalled();
+    });
+
+    it('**refuses a claim over the TENANT’s maxBytes before calling storage**', async () => {
+      const ticket = await createTicket(fx.prisma, tenant);
+      jest
+        .spyOn(fx.moduleRef.get(AuthReferenceService), 'getAttachmentLimits')
+        .mockResolvedValue({ maxBytes: 1_000, maxPerMessage: 5 });
+
+      await expectRpc(
+        messages.ingestAttachment(
+          request(ticket.id, { fileSizeBytes: 1_001 }),
+          caller(),
+        ),
+        status.FAILED_PRECONDITION,
+      );
+
+      expect(ingestFromUrl).not.toHaveBeenCalled();
+    });
+
+    it('**hands the tenant’s maxBytes to storage**, so the stream is cut at the number the claim was judged against', async () => {
+      // The claim is only a claim; storage-service counts the real bytes and
+      // cuts at `max_bytes`. If this were not the tenant's number, a narrowed
+      // workspace would still receive a platform-sized file.
+      const ticket = await createTicket(fx.prisma, tenant);
+      jest
+        .spyOn(fx.moduleRef.get(AuthReferenceService), 'getAttachmentLimits')
+        .mockResolvedValue({ maxBytes: 4_096, maxPerMessage: 5 });
+
+      const { objectPath } = await messages.ingestAttachment(
+        request(ticket.id),
+        caller(),
+      );
+
+      expect(objectPath).toContain('/attachments/pending/');
+      expect(ingestFromUrl).toHaveBeenCalledWith(
+        expect.objectContaining({
+          ownerId: ticket.id,
+          secondaryOwnerId: '',
+          contentType: 'image/png',
+          sizeBytes: 2048,
+          originalFileName: 'screenshot.png',
+          sourceUrl: 'https://attachments.example.test/a/screenshot.png',
+          maxBytes: 4_096,
+        }),
+        expect.anything(),
+      );
+    });
+
+    it('**the deadline applied is INGEST_DEADLINE_MS, not the five-second default**', async () => {
+      // A client timeout does not cancel the server: at five seconds a slow
+      // fetch would be reported as failed while storage-service went on to
+      // write it. Driven on the reference service directly, with fake timers
+      // and no database in the loop.
+      ingestFromUrl.mockReturnValue(NEVER);
+      jest.useFakeTimers();
+
+      try {
+        const settled = jest.fn();
+        const attempt = storage
+          .ingestAttachment(
+            {
+              ticketId: 't',
+              contentType: 'image/png',
+              sizeBytes: 1,
+              fileName: 'f.png',
+              sourceUrl: 'https://attachments.example.test/f.png',
+              maxBytes: 1,
+            },
+            caller(),
+          )
+          .catch((error: unknown) => {
+            settled(error);
+          });
+
+        await jest.advanceTimersByTimeAsync(GRPC_DEADLINE_MS + 1);
+        expect(settled).not.toHaveBeenCalled();
+
+        await jest.advanceTimersByTimeAsync(INGEST_DEADLINE_MS);
+        await attempt;
+        expect(settled).toHaveBeenCalledTimes(1);
+        expect(settled.mock.calls[0][0]).toBeInstanceOf(RpcException);
+        expect(
+          (settled.mock.calls[0][0] as RpcException).getError(),
+        ).toMatchObject({ code: status.DEADLINE_EXCEEDED });
+      } finally {
+        jest.useRealTimers();
+      }
     });
   });
 });

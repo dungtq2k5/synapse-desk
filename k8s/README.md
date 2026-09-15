@@ -30,7 +30,7 @@ It is deliberately **not** `scripts/generate-docker-env.mjs`'s input. That scrip
 
 Nothing in `generated/` carries a real value.
 
-- **`REPLACE_ME`** in a ConfigMap is a per-deployment value: `CORS`, `APP_WEB_URL`, the sending address, the storage bucket, and so on.
+- **`REPLACE_ME`** in a ConfigMap is a per-deployment value: `CORS`, `APP_WEB_URL`, the sending address, the storage bucket, and so on. **In `policy/`, it is a CIDR** — the managed data plane (Redis, Postgres) that the egress policies' `except` lists would otherwise cut off — and it is **loud on purpose**: unfilled, the API server refuses the policy, and `cd.yml`'s apply stops at `k8s/policy/`, before any service is touched. A guessed range would let the deploy through and stop every presign and confirm in the cluster instead.
 - **`*.secret.example.yaml`** is a key list with empty values. Create the real Secret out of band — `kubectl create secret generic`, a sealed-secret controller, or your platform's secret manager. Never commit one.
 - **File Secrets** are separate from the variable Secrets above, because they are mounted rather than injected:
 
@@ -132,12 +132,14 @@ Getting this backwards is how a schema and its history stop agreeing — and not
 
 **3. The inbound route needs nothing special from the Ingress, and this is confirmed rather than assumed.** `POST /api/v1/webhooks/email/resend` sits under the ordinary prefix and reaches the gateway through the one Ingress rule. It authenticates with the Standard Webhooks signature rather than a JWT (`resend-inbound.service.ts`), and the controller carries `@SkipThrottle()` — a retry burst is Resend doing its job; throttling it drops mail. Nothing to add.
 
+**4. Attachments make storage-service an egress pod.** It fetches each inbound attachment from a signed URL Resend chose, so `policy/storage-egress.yaml` constrains it the way notification's policy constrains webhooks — same `except` list, asserted identical by `manifest-contract.spec.ts`. Its `REPLACE_ME` CIDR is the managed Redis; `PendingUploadStore` lives there, so fill it before the first apply (the `REPLACE_ME` bullet above says what happens if you do not).
+
 ## What this directory assumes already exists
 
 `kubectl apply -f k8s/` is not the whole story. Four things are created elsewhere — Terraform, `gcloud`, or by hand — and nothing here makes one of them:
 
 - **A namespace.** Nothing here sets one; apply into whichever you mean.
-- **A CNI that actually enforces NetworkPolicy.** Several do not, and the API server accepts the object either way — so `policy/notification-egress.yaml` is **silently inert** on such a cluster, which is exactly the failure known gap #26 exists to describe. Verify enforcement rather than assuming it: with the policy applied, an egress to `10.0.0.1` from the notification pod must fail.
+- **A CNI that actually enforces NetworkPolicy.** Several do not, and the API server accepts the object either way — so both policies under `policy/` — `notification-egress.yaml` and `storage-egress.yaml` — are **silently inert** on such a cluster, which is exactly the failure known gap #26 exists to describe. Verify enforcement rather than assuming it: with the policies applied, an egress to `10.0.0.1` from the notification pod and from the storage pod must fail.
 - **A `StorageClass`** the NATS and Qdrant `volumeClaimTemplates` can bind to. Without a default one, both StatefulSets sit `Pending` and nothing says why except the PVC's events.
 - **An `ingress-nginx` controller.** [ADR 0043](../docs/decisions/0043-the-cluster-shape.md) chose it; no artifact here installs it. `ingress.yaml` names `ingressClassName: nginx` and an Ingress with no controller is an object with no effect.
 

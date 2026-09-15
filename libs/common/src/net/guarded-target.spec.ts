@@ -2,7 +2,7 @@ import {
   addressIsDenied,
   deniedLiteral,
   privateTargetsAllowed,
-} from './webhook-target.guard';
+} from './guarded-target';
 
 /**
  * The deny decision, address by address — no DNS, no network.
@@ -150,20 +150,12 @@ describe('webhook target guard', () => {
     // development no matter what the variable says, so a copied .env cannot
     // carry it into production.
     expect(privateTargetsAllowed({})).toBe(false);
+    expect(privateTargetsAllowed({ flag: 'true' })).toBe(false);
     expect(
-      privateTargetsAllowed({ WEBHOOK_ALLOW_PRIVATE_TARGETS: 'true' }),
+      privateTargetsAllowed({ NODE_ENV: 'production', flag: 'true' }),
     ).toBe(false);
     expect(
-      privateTargetsAllowed({
-        NODE_ENV: 'production',
-        WEBHOOK_ALLOW_PRIVATE_TARGETS: 'true',
-      }),
-    ).toBe(false);
-    expect(
-      privateTargetsAllowed({
-        NODE_ENV: 'development',
-        WEBHOOK_ALLOW_PRIVATE_TARGETS: 'true',
-      }),
+      privateTargetsAllowed({ NODE_ENV: 'development', flag: 'true' }),
     ).toBe(true);
   });
 });

@@ -66,6 +66,35 @@ message DownloadObjectRequest { string object_path = 1; }
 // first real 200-page PDF — the worst possible place to discover a size cap.
 message DownloadObjectChunk { bytes data = 1; }
 
+// Fetch an object from a URL this service is handed and land it exactly where
+// a presigned upload of the same file would land: under `pending/`, with a
+// PendingUpload record, so the caller's existing ConfirmUpload binds it
+// unchanged. Presign and upload on the caller's behalf, not a second
+// mechanism — the one upload flow, with the PUT done by this service.
+message IngestFromUrlRequest {
+  StoragePurpose purpose = 1;
+  string owner_id = 2;
+  string secondary_owner_id = 3;
+  string content_type = 4;
+  // What the SOURCE claims. Checked against the purpose cap before any
+  // network call; the stream is counted regardless and cut at max_bytes.
+  int64 size_bytes = 5;
+  string original_file_name = 6;
+  // https only. Judged by the same SSRF control as an outbound webhook target,
+  // on every redirect hop too.
+  string source_url = 7;
+  // The caller's narrower ceiling — a tenant's own limit. Clamped to the
+  // purpose cap; never a way to raise it.
+  int64 max_bytes = 8;
+}
+
+message IngestFromUrlResponse {
+  string object_path = 1;
+  google.protobuf.Timestamp expires_at = 2;
+  // What actually arrived — the stream's count, not the request's claim.
+  int64 size_bytes = 3;
+}
+
 message GetSignedReadUrlsRequest { repeated string object_paths = 1; }
 
 // Absent key = the object no longer exists. A missing avatar is the caller's
@@ -75,6 +104,7 @@ message GetSignedReadUrlsResponse { map<string, string> urls_by_path = 1; }
 service StorageService {
   rpc PresignUpload(PresignUploadRequest) returns (PresignUploadResponse);
   rpc ConfirmUpload(ConfirmUploadRequest) returns (ConfirmUploadResponse);
+  rpc IngestFromUrl(IngestFromUrlRequest) returns (IngestFromUrlResponse);
   rpc GetSignedReadUrls(GetSignedReadUrlsRequest) returns (GetSignedReadUrlsResponse);
   rpc DownloadObject(DownloadObjectRequest) returns (stream DownloadObjectChunk);
 

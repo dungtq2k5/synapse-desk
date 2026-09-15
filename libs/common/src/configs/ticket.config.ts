@@ -345,6 +345,30 @@ export const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 export const MAX_ATTACHMENTS_PER_MESSAGE = 5;
 
 /**
+ * The socket timeout on storage-service's fetch of an attachment from a URL —
+ * the INNERMOST of three nested deadlines.
+ *
+ * Sized for {@link MAX_ATTACHMENT_BYTES}: a 10 MB file at 1 MB/s needs ten
+ * seconds, and twenty leaves room for a slow source. It is an idle timeout on
+ * the socket, not a total, so a source that keeps sending is not cut mid-file.
+ */
+export const INGEST_TIMEOUT_MS = 20_000;
+
+/**
+ * The deadline ticket-service puts on `IngestFromUrl`; the gateway allows five
+ * seconds more on `IngestAttachment` around it.
+ *
+ * **Nested, because a client timeout does not cancel the server.** With the
+ * standard five-second gRPC deadline a slow fetch failed both clients while
+ * storage-service kept writing — the ticket then said "not accepted" about an
+ * object that landed. Each outer number exceeds the inner one so the inner hop
+ * fails cleanly (record consumed, partial deleted) before the outer gives up.
+ *
+ * @example INGEST_TIMEOUT_MS < INGEST_DEADLINE_MS < INGEST_DEADLINE_MS + 5_000 // 20 s < 30 s < 35 s
+ */
+export const INGEST_DEADLINE_MS = 30_000;
+
+/**
  * The longest attachment file name a DTO accepts.
  *
  * **A contract, not a sanity bound**, and that is why it is a constant.

@@ -1,5 +1,5 @@
 import { RpcException } from '@nestjs/microservices';
-import { rpcCode } from '@synapsedesk/common/testing/rpc';
+import { expectRpc, rpcCode } from '@synapsedesk/common/testing/rpc';
 import { status } from '@grpc/grpc-js';
 import { faker } from '@faker-js/faker';
 import { StoragePurpose as ProtoStoragePurpose } from '@synapsedesk/grpc-proto';
@@ -12,8 +12,11 @@ import {
   bootstrapE2eTest,
   bytesFor,
   memberContext,
+  callerContext,
+  superAdminContext,
 } from '../utils';
 import { StorageService } from '../../src/modules/storage/storage.service';
+import { RemoteSourceFetcher } from '../../src/modules/storage/remote-source.fetcher';
 import { PURPOSE_POLICY } from '../../src/common/purpose-registry';
 import { isValidatedMimeType } from '../../src/common/content-signature';
 
@@ -122,6 +125,51 @@ describe('Storage boundary sweeps (e2e)', () => {
         );
 
         expect(urlsByPath).toEqual({});
+      },
+    );
+
+    it.each([
+      [
+        'an anonymous caller',
+        () => callerContext({ sub: null, organizationId: null }),
+        status.UNAUTHENTICATED,
+      ],
+      [
+        'a caller with no tenant',
+        () => superAdminContext(userId),
+        status.FAILED_PRECONDITION,
+      ],
+    ] as const)(
+      '**ingestFromUrl refuses %s before the source is ever judged or opened**',
+      async (_, context, code) => {
+        // The tenant IS the path prefix, so an ingest without one has nowhere
+        // it may land — and the refusal has to come before the fetcher, or an
+        // unauthenticated call could still make this service open a URL.
+        const fetcher = fx.moduleRef.get(RemoteSourceFetcher);
+        const judged = jest.spyOn(fetcher, 'judge');
+        const opened = jest.spyOn(fetcher, 'open');
+
+        await expectRpc(
+          storage.ingestFromUrl(
+            {
+              purpose: ProtoStoragePurpose.STORAGE_PURPOSE_TICKET_ATTACHMENT,
+              ownerId: faker.string.uuid(),
+              secondaryOwnerId: '',
+              contentType: 'image/png',
+              sizeBytes: 10,
+              originalFileName: 'file.png',
+              sourceUrl: 'https://attachments.example.test/file.png',
+              maxBytes: 0,
+            },
+            context(),
+          ),
+          code,
+        );
+
+        expect(judged).not.toHaveBeenCalled();
+        expect(opened).not.toHaveBeenCalled();
+        judged.mockRestore();
+        opened.mockRestore();
       },
     );
 

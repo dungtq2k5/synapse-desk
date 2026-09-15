@@ -6,7 +6,7 @@
 # which is a deployment artifact this repo does not contain."* This is that
 # artifact.
 #
-# **It does not replace `webhook-target.guard.ts`; it stands behind it.** The
+# **It does not replace `guarded-target.ts` (`libs/common`); it stands behind it.** The
 # guard resolves, checks every address and PINS the connection to a checked one,
 # which is the only layer that can produce a useful error message to the tenant
 # who configured the URL. What it cannot promise is completeness — a novel
@@ -42,6 +42,16 @@ spec:
         - podSelector:
             matchLabels:
               app.kubernetes.io/name: nats
+    # The managed data plane — Postgres (`DATABASE_URL`) and Redis (`REDIS_URL`).
+    # ADR 0043 puts both on managed instances, not pods, so no podSelector can
+    # name them, and a VPC-peered instance usually sits inside the private
+    # ranges the public rule below excludes. REPLACE_ME with that CIDR: left as
+    # is, the API server refuses the policy at apply time and `cd.yml`'s apply
+    # step stops there, before `k8s/services/` — the loud failure. A guessed
+    # range would be the silent one.
+    - to:
+        - ipBlock:
+            cidr: REPLACE_ME
     # DNS. Without this the pod cannot resolve anything at all, including the
     # webhook targets the policy exists to constrain.
     - to:

@@ -17,4 +17,5 @@ Every file — document, avatar, message attachment — uses the same presign �
 - **The quota gate runs at presign**, before signing — a tenant over `max_storage_bytes` never receives a usable upload URL rather than discovering it after uploading 25 MB.
 - **The row is created at confirm, not presign.** An abandoned presign must not leave a row pointing at an object that never arrived.
 - `storage-service` is the only holder of storage credentials, and needs no Postgres.
+- **Ingest-from-URL is presign with the PUT done by storage-service.** `IngestFromUrl` runs the presign preamble, writes the same `PendingUpload` record, fetches the bytes itself and lands them under `pending/`; confirm is unchanged and cannot tell who wrote the object. One mechanism still — the fetch replaces the client's PUT, nothing else ([ADR 0046](./0046-resend-for-both-directions.md)).
 - Tests point at the Firebase emulator, never a real bucket — the same principle as never pointing tests at the dev database. The emulator answers **501** for V4 signed URLs, so the signature itself is the one thing CI cannot cover.

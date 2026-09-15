@@ -3,6 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import { RpcException } from '@nestjs/microservices';
 import { status } from '@grpc/grpc-js';
 import { randomUUID } from 'node:crypto';
+import type { IncomingMessage } from 'node:http';
+import { pipeline } from 'node:stream/promises';
 import { Observable, throwError } from 'rxjs';
 import {
   CallerContext,
@@ -12,6 +14,8 @@ import {
   ConfirmUploadResponse,
   GetSignedReadUrlsRequest,
   GetSignedReadUrlsResponse,
+  IngestFromUrlRequest,
+  IngestFromUrlResponse,
   PresignUploadRequest,
   PresignUploadResponse,
   StoragePurpose as ProtoStoragePurpose,
@@ -33,6 +37,10 @@ import {
   SIGNATURE_SAMPLE_BYTES,
 } from '../../common/content-signature';
 import { PendingUploadStore } from './pending-upload.store';
+import {
+  RemoteSourceError,
+  RemoteSourceFetcher,
+} from './remote-source.fetcher';
 
 /**
  * Presign → upload → confirm, one mechanism for every file type.
@@ -57,6 +65,7 @@ export class StorageService {
   constructor(
     private readonly firebase: FirebaseStorageService,
     private readonly pending: PendingUploadStore,
+    private readonly fetcher: RemoteSourceFetcher,
     configService: ConfigService,
   ) {
     this.uploadTtlSeconds = configService.getOrThrow<number>(
@@ -83,46 +92,7 @@ export class StorageService {
     const purpose = this.requirePurpose(request.purpose);
     const policy = PURPOSE_POLICY[purpose];
 
-    if (!request.ownerId) {
-      throw new RpcException({
-        code: status.INVALID_ARGUMENT,
-        message: 'An owner id is required',
-      });
-    }
-    if (request.secondaryOwnerId && !policy.allowsSecondaryOwner) {
-      // The check, since inverted. It used to REQUIRE the segment for a
-      // ticket attachment, which is what made presign-before-the-message
-      // impossible; now the only error is a secondary owner on a purpose that
-      // has nowhere to put one, which would otherwise be silently discarded.
-      throw new RpcException({
-        code: status.INVALID_ARGUMENT,
-        message: `${purpose} uploads take no secondary owner id`,
-      });
-    }
-    // **Widened to `string` for the CHECK, narrow for the DECLARATION.**
-    // `mimeAllowlist` is `readonly MimeType[]` so a mistyped entry cannot be
-    // written; `contentType` is whatever a caller sent, which is precisely what
-    // this line exists to judge. Typing the input would be claiming the
-    // untrusted value is already valid.
-    if (
-      !(policy.mimeAllowlist as readonly string[]).includes(request.contentType)
-    ) {
-      // An allowlist, never a denylist — a denylist is a promise to have
-      // thought of every dangerous type, and nobody can keep that promise.
-      throw new RpcException({
-        code: status.INVALID_ARGUMENT,
-        message: `'${request.contentType}' is not an allowed type for ${purpose}`,
-      });
-    }
-    if (
-      request.sizeBytes <= 0 ||
-      exceedsLimit(request.sizeBytes, policy.maxSizeBytes)
-    ) {
-      throw new RpcException({
-        code: status.INVALID_ARGUMENT,
-        message: `${purpose} uploads must be between 1 and ${policy.maxSizeBytes} bytes`,
-      });
-    }
+    this.assertUploadable(request, purpose, policy.maxSizeBytes);
 
     const { objectPath, committedPath } = this.buildObjectPath(
       purpose,
@@ -163,6 +133,119 @@ export class StorageService {
       });
 
     return { uploadUrl, objectPath, expiresAt: toProtoTimestamp(expiresAt) };
+  }
+
+  /**
+   * Fetches an object from a URL and lands it exactly where a presigned upload
+   * of the same file lands: under `pending/`, with a `PendingUpload` record, so
+   * `confirmUpload` binds it unchanged and a caller cannot tell who wrote it.
+   *
+   * In order, so a refused request never opens a socket and a failed one leaves
+   * nothing confirmable:
+   *
+   * 1. the presign preamble — tenant and actor from the context, purpose, owner,
+   *    secondary owner, MIME allowlist, and `sizeBytes` against
+   *    `min(policy cap, maxBytes)`;
+   * 2. the URL judged by the SSRF guard (`https:`, no private literal);
+   * 3. the record written BEFORE the fetch;
+   * 4. the source opened through the guard, redirects re-judged per hop;
+   * 5. the head sniffed against the declared type when 4096 bytes have arrived
+   *    OR the body has ended — a mismatch writes nothing;
+   * 6. the body streamed into the bucket, counted, and cut one byte past the
+   *    ceiling.
+   *
+   * Every failure after step 3 consumes the record and deletes any partial
+   * object, so a refused ingest leaves neither a record nor an object behind.
+   *
+   * @throws RpcException `INVALID_ARGUMENT` for a refused request, URL, type or
+   * empty body; `FAILED_PRECONDITION` for a non-2xx source, too many redirects
+   * or an oversized body; `DEADLINE_EXCEEDED` for an idle source; `UNAVAILABLE`
+   * for an unreachable one.
+   */
+  async ingestFromUrl(
+    request: IngestFromUrlRequest,
+    context: CallerContext,
+  ): Promise<IngestFromUrlResponse> {
+    const organizationId = requireTenant(context);
+    const actorId = requireActor(context);
+    const purpose = this.requirePurpose(request.purpose);
+    const policy = PURPOSE_POLICY[purpose];
+    // The caller's ceiling narrows the policy's and can never widen it; zero
+    // (the wire default for "not set") means the policy's own.
+    const ceiling =
+      request.maxBytes > 0
+        ? Math.min(request.maxBytes, policy.maxSizeBytes)
+        : policy.maxSizeBytes;
+
+    this.assertUploadable(request, purpose, ceiling);
+
+    const source = this.asRpc(() => this.fetcher.judge(request.sourceUrl));
+
+    const { objectPath, committedPath } = this.buildObjectPath(
+      purpose,
+      organizationId,
+      request.ownerId,
+      request.secondaryOwnerId,
+      request.contentType,
+    );
+    const expiresAt = new Date(Date.now() + this.uploadTtlSeconds * 1000);
+
+    // **Before the fetch**, so a crash mid-stream leaves an orphan under
+    // `pending/` that confirm refuses — never a confirmable object nobody
+    // authorized.
+    await this.pending.put(
+      {
+        objectPath,
+        committedPath,
+        organizationId,
+        actorId,
+        contentType: request.contentType,
+        sizeBytes: request.sizeBytes,
+        originalFileName: request.originalFileName,
+      },
+      this.uploadTtlSeconds,
+    );
+
+    const file = this.firebase.bucket.file(objectPath);
+    let writeStarted = false;
+
+    try {
+      const body = await this.fetcher.open(source);
+      const sizeBytes = await this.landBody(
+        body,
+        request.contentType,
+        ceiling,
+        () => {
+          writeStarted = true;
+          return file.createWriteStream({
+            contentType: request.contentType,
+            resumable: false,
+          });
+        },
+      );
+
+      return {
+        objectPath,
+        expiresAt: toProtoTimestamp(expiresAt),
+        sizeBytes,
+      };
+    } catch (error) {
+      await this.pending.consume(objectPath);
+      // Measured on the emulator: an aborted non-resumable upload leaves no
+      // object. Real Storage is not the emulator, so the delete stays.
+      if (writeStarted) await file.delete({ ignoreNotFound: true });
+
+      if (error instanceof RpcException) throw error;
+      if (error instanceof RemoteSourceError) {
+        throw new RpcException({ code: error.code, message: error.message });
+      }
+
+      this.logger.error(`Ingest from a URL failed: ${formatErrorMsg(error)}`);
+      throw new RpcException({
+        code: status.UNAVAILABLE,
+        message: 'The source could not be stored',
+      });
+    }
   }
 
   /**
@@ -480,6 +563,159 @@ export class StorageService {
       objectPath: `${attachments}/pending/${suffix}`,
       committedPath: `${attachments}/${suffix}`,
     };
+  }
+
+  /**
+   * The checks every upload path runs before it touches anything: owner id,
+   * secondary-owner rule, MIME allowlist, and a size inside `ceiling`.
+   */
+  private assertUploadable(
+    request: Pick<
+      PresignUploadRequest,
+      'ownerId' | 'secondaryOwnerId' | 'contentType' | 'sizeBytes'
+    >,
+    purpose: StoragePurpose,
+    ceiling: number,
+  ): void {
+    const policy = PURPOSE_POLICY[purpose];
+
+    if (!request.ownerId) {
+      throw new RpcException({
+        code: status.INVALID_ARGUMENT,
+        message: 'An owner id is required',
+      });
+    }
+    if (request.secondaryOwnerId && !policy.allowsSecondaryOwner) {
+      // The check, since inverted. It used to REQUIRE the segment for a
+      // ticket attachment, which is what made presign-before-the-message
+      // impossible; now the only error is a secondary owner on a purpose that
+      // has nowhere to put one, which would otherwise be silently discarded.
+      throw new RpcException({
+        code: status.INVALID_ARGUMENT,
+        message: `${purpose} uploads take no secondary owner id`,
+      });
+    }
+    // **Widened to `string` for the CHECK, narrow for the DECLARATION.**
+    // `mimeAllowlist` is `readonly MimeType[]` so a mistyped entry cannot be
+    // written; `contentType` is whatever a caller sent, which is precisely what
+    // this line exists to judge. Typing the input would be claiming the
+    // untrusted value is already valid.
+    if (
+      !(policy.mimeAllowlist as readonly string[]).includes(request.contentType)
+    ) {
+      // An allowlist, never a denylist — a denylist is a promise to have
+      // thought of every dangerous type, and nobody can keep that promise.
+      throw new RpcException({
+        code: status.INVALID_ARGUMENT,
+        message: `'${request.contentType}' is not an allowed type for ${purpose}`,
+      });
+    }
+    if (request.sizeBytes <= 0 || exceedsLimit(request.sizeBytes, ceiling)) {
+      throw new RpcException({
+        code: status.INVALID_ARGUMENT,
+        message: `${purpose} uploads must be between 1 and ${ceiling} bytes`,
+      });
+    }
+  }
+
+  /**
+   * Sniffs, then streams a source body into the bucket; returns the bytes
+   * written.
+   *
+   * **The sniff runs when the sample fills OR the body ends** — a 100-byte text
+   * file ends first, and a sniff that waited for 4096 bytes would never run on
+   * it. Nothing is written until the head matches: a mismatch costs no write
+   * and no delete. The count is enforced on every chunk, head included, and a
+   * `Content-Length` over the ceiling is refused before the first byte — but a
+   * header under it is never trusted.
+   */
+  private async landBody(
+    body: IncomingMessage,
+    contentType: string,
+    ceiling: number,
+    openWrite: () => NodeJS.WritableStream,
+  ): Promise<number> {
+    const oversized = () =>
+      new RpcException({
+        code: status.FAILED_PRECONDITION,
+        message: `The source exceeded ${ceiling} bytes`,
+      });
+
+    const declared = Number(body.headers['content-length']);
+    if (Number.isFinite(declared) && exceedsLimit(declared, ceiling)) {
+      body.destroy();
+      throw oversized();
+    }
+
+    const chunks = body[Symbol.asyncIterator]() as AsyncIterator<Buffer>;
+    let head = Buffer.alloc(0);
+
+    try {
+      while (head.length < SIGNATURE_SAMPLE_BYTES) {
+        const next = await chunks.next();
+        if (next.done) break;
+        head = Buffer.concat([head, next.value]);
+        if (exceedsLimit(head.length, ceiling)) throw oversized();
+      }
+
+      if (head.length === 0) {
+        throw new RpcException({
+          code: status.INVALID_ARGUMENT,
+          message: 'The source was empty',
+        });
+      }
+      if (
+        !matchesDeclaredType(
+          head.subarray(0, SIGNATURE_SAMPLE_BYTES),
+          contentType,
+        )
+      ) {
+        throw new RpcException({
+          code: status.INVALID_ARGUMENT,
+          message: 'File content does not match its declared type',
+        });
+      }
+    } catch (error) {
+      body.destroy();
+      throw error;
+    }
+
+    let written = 0;
+    const counted = async function* () {
+      written += head.length;
+      yield head;
+
+      for (
+        let next = await chunks.next();
+        !next.done;
+        next = await chunks.next()
+      ) {
+        written += next.value.length;
+        if (exceedsLimit(written, ceiling)) throw oversized();
+        yield next.value;
+      }
+    };
+
+    try {
+      await pipeline(counted, openWrite());
+    } catch (error) {
+      body.destroy();
+      throw error;
+    }
+
+    return written;
+  }
+
+  /** Runs a synchronous guard check, answering its refusal as an RPC error. */
+  private asRpc<T>(check: () => T): T {
+    try {
+      return check();
+    } catch (error) {
+      if (error instanceof RemoteSourceError) {
+        throw new RpcException({ code: error.code, message: error.message });
+      }
+      throw error;
+    }
   }
 
   private requirePurpose(purpose: ProtoStoragePurpose): StoragePurpose {

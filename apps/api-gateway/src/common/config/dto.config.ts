@@ -38,6 +38,18 @@ export const MIN_DEPARTMENT_NAME_LENGTH = 2;
 export const MAX_DEPARTMENT_NAME_LENGTH = 100;
 
 /**
+ * How many attachments ONE inbound mail may carry into the webhook's DTO.
+ *
+ * **Deliberately larger than `MAX_ATTACHMENTS_PER_MESSAGE`.** A mail with eight
+ * attachments is a real mail: the eligible ones are ingested up to the tenant's
+ * per-message cap and the rest are named in the ticket's "not accepted" note.
+ * The twenty-first is where a list stops being a mail and starts being a
+ * payload, so the mapper keeps the first twenty and names every one after them
+ * — the mail itself still passes validation.
+ */
+export const MAX_PRESENTED_ATTACHMENTS = 20;
+
+/**
  * Upper bound on one "add members" call. Guards the REQUEST BODY only; the
  * tenant check on every id is what enforces correctness.
  */

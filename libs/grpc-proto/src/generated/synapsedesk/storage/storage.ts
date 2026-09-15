@@ -87,6 +87,45 @@ export interface DownloadObjectChunk {
   data: Uint8Array;
 }
 
+/**
+ * Fetch an object from a URL this service is handed and land it exactly where
+ * a presigned upload of the same file would land: under `pending/`, with a
+ * PendingUpload record, so the caller's existing ConfirmUpload binds it
+ * unchanged. Presign and upload on the caller's behalf, not a second
+ * mechanism — the one upload flow, with the PUT done by this service.
+ */
+export interface IngestFromUrlRequest {
+  purpose: StoragePurpose;
+  ownerId: string;
+  secondaryOwnerId: string;
+  contentType: string;
+  /**
+   * What the SOURCE claims. Checked against the purpose cap before any
+   * network call; the stream is counted regardless and cut at max_bytes.
+   */
+  sizeBytes: number;
+  originalFileName: string;
+  /**
+   * https only. Judged by the same SSRF control as an outbound webhook target,
+   * on every redirect hop too.
+   */
+  sourceUrl: string;
+  /**
+   * The caller's narrower ceiling — a tenant's own limit. Clamped to the
+   * purpose cap; never a way to raise it.
+   */
+  maxBytes: number;
+}
+
+export interface IngestFromUrlResponse {
+  objectPath: string;
+  expiresAt:
+    | Timestamp
+    | undefined;
+  /** What actually arrived — the stream's count, not the request's claim. */
+  sizeBytes: number;
+}
+
 export interface GetSignedReadUrlsRequest {
   objectPaths: string[];
 }
@@ -109,6 +148,8 @@ export interface StorageServiceClient {
 
   confirmUpload(request: ConfirmUploadRequest, metadata?: Metadata): Observable<ConfirmUploadResponse>;
 
+  ingestFromUrl(request: IngestFromUrlRequest, metadata?: Metadata): Observable<IngestFromUrlResponse>;
+
   getSignedReadUrls(request: GetSignedReadUrlsRequest, metadata?: Metadata): Observable<GetSignedReadUrlsResponse>;
 
   downloadObject(request: DownloadObjectRequest, metadata?: Metadata): Observable<DownloadObjectChunk>;
@@ -125,6 +166,11 @@ export interface StorageServiceController {
     metadata?: Metadata,
   ): Promise<ConfirmUploadResponse> | Observable<ConfirmUploadResponse> | ConfirmUploadResponse;
 
+  ingestFromUrl(
+    request: IngestFromUrlRequest,
+    metadata?: Metadata,
+  ): Promise<IngestFromUrlResponse> | Observable<IngestFromUrlResponse> | IngestFromUrlResponse;
+
   getSignedReadUrls(
     request: GetSignedReadUrlsRequest,
     metadata?: Metadata,
@@ -135,7 +181,13 @@ export interface StorageServiceController {
 
 export function StorageServiceControllerMethods() {
   return function (constructor: Function) {
-    const grpcMethods: string[] = ["presignUpload", "confirmUpload", "getSignedReadUrls", "downloadObject"];
+    const grpcMethods: string[] = [
+      "presignUpload",
+      "confirmUpload",
+      "ingestFromUrl",
+      "getSignedReadUrls",
+      "downloadObject",
+    ];
     for (const method of grpcMethods) {
       const descriptor: any = Reflect.getOwnPropertyDescriptor(constructor.prototype, method);
       GrpcMethod("StorageService", method)(constructor.prototype[method], method, descriptor);

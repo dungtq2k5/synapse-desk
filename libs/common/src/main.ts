@@ -50,6 +50,7 @@ export * from './configs/inbound-email.config';
 export * from './contracts/inbound-email.contract';
 export * from './utils/webhook-signature.util';
 export * from './utils/resend-errors';
+export * from './net/guarded-target';
 export * from './utils/job-staleness';
 export * from './utils/audit-publisher';
 export * from './utils/job-runs';

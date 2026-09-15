@@ -309,6 +309,29 @@ export interface UploadAttachmentRequest {
   mimeType: string;
 }
 
+/**
+ * The same upload, with the bytes fetched by storage-service from a URL the
+ * caller was handed instead of PUT by a client — an inbound mail's attachment.
+ * The object lands under `pending/` exactly as a presigned upload does, so the
+ * path in the response is handed to CreateMessage like any other. There is
+ * never a message yet on this path.
+ */
+export interface IngestAttachmentRequest {
+  ticketId: string;
+  /**
+   * 2 is left unused so the numbering mirrors UploadAttachmentRequest
+   * (message_id = 2 there); this path never has a message.
+   */
+  fileName: string;
+  fileSizeBytes: number;
+  mimeType: string;
+  sourceUrl: string;
+}
+
+export interface IngestAttachmentResponse {
+  objectPath: string;
+}
+
 export interface PresignAttachmentResponse {
   uploadUrl: string;
   objectPath: string;
@@ -408,6 +431,8 @@ export interface MessageServiceClient {
 
   uploadAttachment(request: UploadAttachmentRequest, metadata?: Metadata): Observable<PresignAttachmentResponse>;
 
+  ingestAttachment(request: IngestAttachmentRequest, metadata?: Metadata): Observable<IngestAttachmentResponse>;
+
   confirmAttachment(request: ConfirmAttachmentRequest, metadata?: Metadata): Observable<AttachmentResponse>;
 
   downloadAttachment(request: DownloadAttachmentRequest, metadata?: Metadata): Observable<DownloadAttachmentResponse>;
@@ -475,6 +500,11 @@ export interface MessageServiceController {
     metadata?: Metadata,
   ): Promise<PresignAttachmentResponse> | Observable<PresignAttachmentResponse> | PresignAttachmentResponse;
 
+  ingestAttachment(
+    request: IngestAttachmentRequest,
+    metadata?: Metadata,
+  ): Promise<IngestAttachmentResponse> | Observable<IngestAttachmentResponse> | IngestAttachmentResponse;
+
   confirmAttachment(
     request: ConfirmAttachmentRequest,
     metadata?: Metadata,
@@ -520,6 +550,7 @@ export function MessageServiceControllerMethods() {
       "redactMessage",
       "excludeFromAiContext",
       "uploadAttachment",
+      "ingestAttachment",
       "confirmAttachment",
       "downloadAttachment",
       "getAiAttachments",

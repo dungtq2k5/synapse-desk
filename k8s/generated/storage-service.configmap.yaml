@@ -21,6 +21,7 @@ data:
   FIREBASE_STORAGE_SERVICE_ACCOUNT_PATH: './serviceAccountKey.json'
   GRPC_HOST: '0.0.0.0'
   GRPC_PORT: '50253'
+  INGEST_ALLOW_PRIVATE_SOURCES: 'false'
   NATS_URL: 'nats://nats:4222'
   NODE_ENV: 'production'
   READ_URL_TTL_SECONDS: '900'

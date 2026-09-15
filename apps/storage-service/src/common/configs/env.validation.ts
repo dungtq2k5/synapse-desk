@@ -82,4 +82,20 @@ export const envValidationSchema = Joi.object({
   // to the GCS layer itself, so the second was the both-layers workaround
   // older SDKs needed, kept alive by copy-paste. `host:port`, no scheme.
   FIREBASE_STORAGE_EMULATOR_HOST: Joi.string().optional(),
+
+  // The SSRF escape hatch for fetching an inbound attachment from a localhost
+  // source. Honoured ONLY when NODE_ENV is development — `privateTargetsAllowed`
+  // in `libs/common`'s `guarded-target.ts` checks that itself, and that is the
+  // control; this rule adds loudness, refusing to boot with `true` anywhere
+  // else so a copied `.env` cannot suggest the setting works in production.
+  //
+  // `.optional()` first, so an ABSENT variable is fine everywhere. And
+  // `invalid('true')`, not `valid('false')`: Joi CONCATENATES a `when` branch
+  // onto the base, so `valid('false')` unions with `valid('true','false')` and
+  // permits exactly what it looks like it forbids. Pinned in
+  // `ingest-private-sources.spec.ts`.
+  INGEST_ALLOW_PRIVATE_SOURCES: Joi.string()
+    .valid('true', 'false')
+    .optional()
+    .when('NODE_ENV', { is: 'development', otherwise: Joi.invalid('true') }),
 });

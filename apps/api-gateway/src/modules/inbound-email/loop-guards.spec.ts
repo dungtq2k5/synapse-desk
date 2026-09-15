@@ -56,6 +56,7 @@ describe('inbound email loop guards', () => {
     // `undefined`; a literal standing in for a parsed body has to say so too.
     references: [],
     droppedAttachments: [],
+    remoteAttachments: [],
     attachments: [],
     ...overrides,
   });

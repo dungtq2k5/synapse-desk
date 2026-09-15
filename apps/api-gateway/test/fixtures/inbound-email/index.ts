@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type {
   EmailReceivedEvent,
   GetReceivingEmailResponseSuccess,
+  ListAttachmentsResponseSuccess,
 } from 'resend';
 import { generateInboundToken } from '@synapsedesk/common';
 
@@ -45,7 +46,22 @@ type InboundFixtureFields = Record<string, unknown> & {
   date?: string;
   headers?: Record<string, string>;
   droppedAttachments?: string[];
+  /** Attachments as Resend reports them — eligible or not, the mapper decides. */
+  files?: FixtureFile[];
   receivedAt?: string;
+};
+
+/** One attachment on a fixture mail, with the download URL `attachments.list` reports. */
+export type FixtureFile = {
+  id?: string;
+  filename: string | null;
+  contentType: string;
+  size: number;
+  disposition?: 'inline' | 'attachment';
+  contentId?: string;
+  downloadUrl?: string;
+  /** ISO 8601; an hour from now unless the test says otherwise. */
+  expiresAt?: string;
 };
 
 /**
@@ -62,6 +78,7 @@ type InboundFixtureFields = Record<string, unknown> & {
 export function resendDelivery(fields: InboundFixtureFields): {
   event: EmailReceivedEvent;
   email: GetReceivingEmailResponseSuccess;
+  attachmentList: ListAttachmentsResponseSuccess;
 } {
   const emailId = randomUUID();
   const to = fields.to ?? '';
@@ -78,13 +95,35 @@ export function resendDelivery(fields: InboundFixtureFields): {
     // FIXME The empty object is useless.
     ...(fields.headers ?? {}),
   };
-  const attachments = (fields.droppedAttachments ?? []).map((filename) => ({
-    id: randomUUID(),
-    filename,
-    size: 1,
-    content_type: 'application/octet-stream',
-    content_id: null,
-    content_disposition: 'attachment',
+  // A name in `droppedAttachments` becomes an attachment of a type outside the
+  // allowlist, so the mapper drops it by name exactly as the fixture says.
+  const resolved = [
+    ...(fields.droppedAttachments ?? []).map((filename): FixtureFile => ({
+      filename,
+      contentType: 'application/octet-stream',
+      size: 1,
+    })),
+    ...(fields.files ?? []),
+  ].map((file) => ({
+    id: file.id ?? randomUUID(),
+    filename: file.filename,
+    contentType: file.contentType,
+    size: file.size,
+    disposition: file.disposition ?? 'attachment',
+    contentId: file.contentId,
+    downloadUrl:
+      file.downloadUrl ??
+      `https://attachments.resend.test/${randomUUID()}?X-Signature=abc`,
+    expiresAt:
+      file.expiresAt ?? new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+  }));
+  const attachments = resolved.map((file) => ({
+    id: file.id,
+    filename: file.filename,
+    size: file.size,
+    content_type: file.contentType,
+    content_id: file.contentId ?? null,
+    content_disposition: file.disposition,
   }));
   const createdAt = fields.receivedAt ?? new Date().toISOString();
 
@@ -127,6 +166,20 @@ export function resendDelivery(fields: InboundFixtureFields): {
       headers,
       message_id: fields.messageId ?? '',
       attachments,
+    },
+    attachmentList: {
+      object: 'list',
+      has_more: false,
+      data: resolved.map((file) => ({
+        id: file.id,
+        filename: file.filename ?? undefined,
+        size: file.size,
+        content_type: file.contentType,
+        content_disposition: file.disposition,
+        content_id: file.contentId,
+        download_url: file.downloadUrl,
+        expires_at: file.expiresAt,
+      })),
     },
   };
 }

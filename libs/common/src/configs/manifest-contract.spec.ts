@@ -125,9 +125,42 @@ describe('the manifest contract', () => {
     ).toEqual(services());
     expect(byKind('Ingress')).toHaveLength(1);
     expect(byKind('StatefulSet')).toHaveLength(2);
-    expect(byKind('NetworkPolicy')).toHaveLength(1);
+    // Two: the egress controls behind the two services that connect to a URL
+    // somebody else chose — tenant webhooks and inbound attachment sources.
+    expect(
+      byKind('NetworkPolicy')
+        .map(({ doc }) => doc.metadata?.name ?? '')
+        .sort(),
+    ).toEqual(['notification-service-egress', 'storage-service-egress']);
     expect(byKind('ConfigMap')).toHaveLength(7);
     expect([...deployments().keys()].sort()).toEqual(services());
+  });
+
+  it('**both egress policies refuse the SAME private ranges**', () => {
+    // The SSRF guard lives in one file so its arithmetic cannot drift between
+    // two services. The kernel-level deny behind it is two YAML files, and a
+    // hand-copied `except` list is the same drift in a file type nothing else
+    // checks: one policy growing a hole while the other stays right.
+    const exceptsOf = (doc: Doc): string[][] =>
+      ((doc.spec as { egress?: { to?: unknown[] }[] }).egress ?? [])
+        .flatMap((rule) => rule.to ?? [])
+        .map(
+          (peer) =>
+            (peer as { ipBlock?: { except?: string[] } }).ipBlock?.except,
+        )
+        .filter((except): except is string[] => Array.isArray(except))
+        .map((except) => [...except].sort());
+
+    const [first, second] = byKind('NetworkPolicy').map(({ doc }) =>
+      exceptsOf(doc),
+    );
+
+    // Floor: each policy has exactly one `except` list, and it is not empty —
+    // a policy that lost its public rule would otherwise compare equal to
+    // another that lost it too.
+    expect(first).toHaveLength(1);
+    expect(first[0].length).toBeGreaterThan(0);
+    expect(second).toEqual(first);
   });
 
   // ------------------------------------------------------- 1. the probe ports

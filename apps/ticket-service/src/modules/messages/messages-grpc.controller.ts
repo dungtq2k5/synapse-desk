@@ -8,6 +8,8 @@ import {
   CreateMessageResponse,
   ExcludeFromAiContextRequest,
   DeleteAttachmentRequest,
+  IngestAttachmentRequest,
+  IngestAttachmentResponse,
   DeleteAttachmentResponse,
   ListAttachmentsRequest,
   ListAttachmentsResponse,
@@ -95,6 +97,20 @@ export class MessagesGrpcController implements MessageServiceController {
     metadata?: Metadata,
   ): Promise<PresignAttachmentResponse> {
     return this.messages.uploadAttachment(
+      request,
+      unpackCallerContext(metadata),
+    );
+  }
+
+  /**
+   * The same upload, with the bytes fetched server-side from a URL. Returns the
+   * object path `CreateMessage` binds.
+   */
+  ingestAttachment(
+    request: IngestAttachmentRequest,
+    metadata?: Metadata,
+  ): Promise<IngestAttachmentResponse> {
+    return this.messages.ingestAttachment(
       request,
       unpackCallerContext(metadata),
     );

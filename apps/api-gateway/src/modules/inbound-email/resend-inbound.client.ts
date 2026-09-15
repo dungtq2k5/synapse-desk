@@ -6,15 +6,19 @@ import { Resend } from 'resend';
 export const RESEND_INBOUND_CLIENT = Symbol('RESEND_INBOUND_CLIENT');
 
 /**
- * The two Resend calls the inbound webhook makes: verify the signature, fetch
- * the mail.
+ * The Resend calls the inbound webhook makes: verify the signature, fetch the
+ * mail, and list its attachments' signed download URLs.
  *
- * Narrowed to those two so a test can replace the fetch while the verifier
- * stays the SDK's own — a faked verifier would let a signing bug pass.
+ * Narrowed to those so a test can replace the fetches while the verifier stays
+ * the SDK's own — a faked verifier would let a signing bug pass.
  */
 export type ResendInboundClient = {
   webhooks: Pick<Resend['webhooks'], 'verify'>;
-  emails: { receiving: Pick<Resend['emails']['receiving'], 'get'> };
+  emails: {
+    receiving: Pick<Resend['emails']['receiving'], 'get'> & {
+      attachments: Pick<Resend['emails']['receiving']['attachments'], 'list'>;
+    };
+  };
 };
 
 /**

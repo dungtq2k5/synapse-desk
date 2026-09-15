@@ -8,6 +8,8 @@ import {
   ConfirmUploadResponse,
   GetSignedReadUrlsRequest,
   GetSignedReadUrlsResponse,
+  IngestFromUrlRequest,
+  IngestFromUrlResponse,
   PresignUploadRequest,
   PresignUploadResponse,
   StorageServiceController,
@@ -38,6 +40,13 @@ export class StorageGrpcController implements StorageServiceController {
     metadata?: Metadata,
   ): Promise<ConfirmUploadResponse> {
     return this.storage.confirmUpload(request, unpackCallerContext(metadata));
+  }
+
+  ingestFromUrl(
+    request: IngestFromUrlRequest,
+    metadata?: Metadata,
+  ): Promise<IngestFromUrlResponse> {
+    return this.storage.ingestFromUrl(request, unpackCallerContext(metadata));
   }
 
   getSignedReadUrls(

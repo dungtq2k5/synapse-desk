@@ -371,7 +371,7 @@ model WebhookEndpoint {
   /// HTTPS only, and the string here is NOT the control: the URL is validated
   /// when saved and RESOLVED when delivered to, and DNS can change in between.
   /// The real check runs at connection time on every resolved address — see
-  /// `webhook-target.guard.ts`.
+  /// `guarded-target.ts` in `libs/common`.
   url String @db.VarChar(2000)
 
   description String? @db.VarChar(500)

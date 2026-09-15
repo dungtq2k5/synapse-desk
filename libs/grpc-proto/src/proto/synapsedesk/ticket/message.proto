@@ -253,6 +253,23 @@ message UploadAttachmentRequest {
   string mime_type = 5;
 }
 
+// The same upload, with the bytes fetched by storage-service from a URL the
+// caller was handed instead of PUT by a client — an inbound mail's attachment.
+// The object lands under `pending/` exactly as a presigned upload does, so the
+// path in the response is handed to CreateMessage like any other. There is
+// never a message yet on this path.
+message IngestAttachmentRequest {
+  string ticket_id = 1;
+  // 2 is left unused so the numbering mirrors UploadAttachmentRequest
+  // (message_id = 2 there); this path never has a message.
+  string file_name = 3;
+  int64 file_size_bytes = 4;
+  string mime_type = 5;
+  string source_url = 6;
+}
+
+message IngestAttachmentResponse { string object_path = 1; }
+
 message PresignAttachmentResponse {
   string upload_url = 1;
   string object_path = 2;
@@ -328,6 +345,7 @@ service MessageService {
   // UploadAttachment is now the PRESIGN step — it returns a URL rather than a
   // stored row, because no row exists until the bytes have actually landed.
   rpc UploadAttachment(UploadAttachmentRequest) returns (PresignAttachmentResponse);
+  rpc IngestAttachment(IngestAttachmentRequest) returns (IngestAttachmentResponse);
   rpc ConfirmAttachment(ConfirmAttachmentRequest) returns (AttachmentResponse);
   rpc DownloadAttachment(DownloadAttachmentRequest) returns (DownloadAttachmentResponse);
   // The AI-eligible attachments of one message, as bytes.

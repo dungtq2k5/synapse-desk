@@ -1,0 +1,76 @@
+# The egress control behind storage-service's fetch of an inbound attachment.
+#
+# **This pod fetches a URL a third party chose.** Resend hands the gateway a
+# signed `download_url` for each inbound attachment, and storage-service opens
+# it — the second outbound path in the system to a host nobody here picked, after
+# notification-service's webhooks. Known gap #26's position applies to it
+# unchanged: *"The durable answer is egress control the process cannot bypass —
+# a NetworkPolicy or egress proxy that refuses the metadata endpoint and the
+# mesh regardless of what the application resolves."*
+#
+# **It does not replace `guarded-target.ts` (`libs/common`); it stands behind
+# it.** The guard resolves, checks every address on every redirect hop and PINS
+# the connection to a checked one, which is the only layer that can say which
+# attachment was refused and why. What it cannot promise is completeness. A
+# kernel-level deny is what makes that gap survivable.
+#
+# **The `except` list is notification-egress.yaml's, byte for byte** —
+# `manifest-contract.spec.ts` asserts the two are identical, because two
+# hand-copied lists are how one of them grows a hole. They are the ranges
+# `addressIsDenied` refuses, plus 169.254.169.254, the cloud metadata endpoint.
+#
+# **A private-IP managed Redis needs the `REPLACE_ME` block filled, or nothing in
+# the cluster can presign.** `PendingUploadStore` is Redis, and every presign and
+# confirm — not only inbound attachments — writes or reads a record there.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: storage-service-egress
+  labels:
+    app.kubernetes.io/name: storage-service
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: storage-service
+  policyTypes:
+    - Egress
+  egress:
+    # In-cluster peers it legitimately talks to: NATS, for the
+    # `storage.object.superseded` delete consumer.
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: nats
+    # The managed data plane — Redis (`REDIS_URL`). ADR 0043 puts it on a
+    # managed instance, not a pod, and a VPC-peered instance usually sits inside
+    # the private ranges the public rule below excludes. REPLACE_ME with that
+    # CIDR: left as is, the API server refuses the policy at apply time and
+    # `cd.yml`'s apply step stops there, before `k8s/services/` — the loud
+    # failure. A guessed range would be the silent one.
+    - to:
+        - ipBlock:
+            cidr: REPLACE_ME
+    # DNS. Without this the pod cannot resolve anything at all, including the
+    # sources the policy exists to constrain.
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # The public internet, minus everything private. Firebase Storage and the
+    # attachment sources both leave through here.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+              - 127.0.0.0/8
+              - 100.64.0.0/10
+              - 169.254.0.0/16

@@ -9,8 +9,8 @@ import { envValidationSchema } from './env.validation';
  * permit it everywhere else, while every structural reading of the file stayed
  * true.
  *
- * This is the NOISE, not the control. `webhook-target.guard.ts`'s
- * `privateTargetsAllowed()` is what actually refuses a private address, and it
+ * This is the NOISE, not the control. `privateTargetsAllowed()`, in
+ * `libs/common`'s `guarded-target.ts`, is what actually refuses a private address, and it
  * checks `NODE_ENV` itself: a string check is a courtesy and the enforcement
  * belongs at the socket. What the schema adds is that a
  * production `.env` carrying `=true` fails at `ConfigModule.forRoot` instead of

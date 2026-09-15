@@ -28,8 +28,11 @@ import {
 } from '@synapsedesk/grpc-proto';
 import {
   extractEmailAddress,
+  INGEST_DEADLINE_MS,
   MAX_ATTACHMENT_BYTES,
   MAX_ATTACHMENTS_PER_MESSAGE,
+  exceedsLimit,
+  formatErrorMsg,
   OrgStatus,
   parseInboundAddress,
   parseTicketReplyToken,
@@ -40,7 +43,11 @@ import {
 } from '@synapsedesk/common';
 import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
 import { InboundEmailDto } from './dto/rest/inbound-email.dto';
-import type { InboundUploadedAttachmentDto } from './dto/rest/inbound-email.dto';
+import type {
+  InboundRemoteAttachmentDto,
+  InboundUploadedAttachmentDto,
+  RemoteAttachmentSource,
+} from './dto/rest/inbound-email.dto';
 import { InboundEmailPublisher } from './inbound-email.publisher';
 import { toStoredBody } from './quoted-reply';
 
@@ -93,8 +100,9 @@ class InboundPeer extends BaseGrpcClient {
   run<T>(
     invoke: (metadata: Metadata) => Observable<T>,
     origin: RequestOrigin | RequestContext,
+    deadlineMs?: number,
   ): Promise<T> {
-    return this.call(invoke, origin);
+    return this.call(invoke, origin, deadlineMs);
   }
 }
 
@@ -156,6 +164,33 @@ type RoutingResolution =
     };
 
 /**
+ * Attachments ingested at once for one mail.
+ *
+ * **Two, not one after another and not all at once.** Every file is a fetch of
+ * up to `MAX_ATTACHMENT_BYTES` inside ONE webhook request, and a request that
+ * outlasts Resend's response timeout is redelivered — re-ingesting every file.
+ * Sequential fetches stack the time; unbounded ones would put a mail's whole
+ * attachment list on storage-service at once. The per-mail worst case is
+ * `ceil(n / INGEST_CONCURRENCY) × (INGEST_DEADLINE_MS + 5_000)`.
+ */
+export const INGEST_CONCURRENCY = 2;
+
+/** What `accept` needs from the transport beyond the mail itself. */
+export type AcceptOptions = {
+  /**
+   * The signed sources of the mail's remote attachments, by Resend id. Called
+   * at most once, and only when routing has produced a ticket.
+   */
+  fetchAttachmentUrls?: () => Promise<Map<string, RemoteAttachmentSource>>;
+};
+
+/** What ingest produced: paths for `createMessage`, and the names it refused. */
+type IngestResult = {
+  uploaded: InboundUploadedAttachmentDto[];
+  dropped: string[];
+};
+
+/**
  * The email adapter
  *
  * **The gateway is the only component that knows what an email is.** Address
@@ -208,7 +243,10 @@ export class InboundEmailService implements OnModuleInit {
       );
   }
 
-  async accept(payload: InboundEmailDto): Promise<InboundOutcome> {
+  async accept(
+    payload: InboundEmailDto,
+    options: AcceptOptions = {},
+  ): Promise<InboundOutcome> {
     // ------------------------------------------------------- 0. loop guards
     //
     // **Before anything else, and unconditionally**. A mail loop is
@@ -238,39 +276,52 @@ export class InboundEmailService implements OnModuleInit {
       );
     }
 
-    const { context, ticket, addressedToTicket } = routing;
+    const { context, ticket, addressedToTicket, limits } = routing;
 
-    // **The note is applied ONCE, for both paths** — and until now it was not.
-    //
-    // `withAttachmentNote` was only ever reached on ticket creation, so an
-    // emailed REPLY carrying attachments dropped them in silence: no file, no
-    // note, nothing in the thread saying anything had been left out. That was
-    // survivable while mail dropped every attachment, because the customer at
-    // least got the note on their first mail. It stops being survivable now
-    // that some attachments land and some do not — a partial delivery with no
-    // record of the missing half is worse than a total one.
-    const body = this.withAttachmentNote(
-      toStoredBody(payload.text, payload.html),
-      payload,
-    );
+    // **Ingest BEFORE the note is written**, because the note names what ingest
+    // refuses. On a mail that opens a ticket there is no message to attach to
+    // — `createTicket` writes a ticket row and no message — so every eligible
+    // attachment is named as dropped, alongside the ones the mapper refused.
+    const ingested: IngestResult = ticket
+      ? await this.ingestAttachments(payload, ticket, limits, context, options)
+      : {
+          uploaded: [],
+          dropped: payload.remoteAttachments.map((file) => file.fileName),
+        };
+    const storedBody = toStoredBody(payload.text, payload.html);
+    // **The note is applied on both paths**: a partial delivery with no record
+    // of the missing half is worse than a total one.
+    const dropped = [...payload.droppedAttachments, ...ingested.dropped];
     const inboundMessageId = this.idempotencyKeyFor(payload);
+    let createNote = dropped;
 
     try {
       if (ticket) {
         // The thread this mail belongs to, already resolved above.
         const appended = await this.append(
           ticket,
-          body,
+          this.withAttachmentNote(storedBody, dropped),
           inboundMessageId,
           context,
-          payload.attachments,
+          ingested.uploaded,
         );
         if (appended) return InboundOutcome.APPENDED;
+
+        // The ticket is gone after all, and a new one is created below. The
+        // files were ingested under the OLD ticket's prefix and are never
+        // attached to another ticket, so the new ticket's note names them too;
+        // their objects stay unconfirmed under `pending/`.
+        createNote = [
+          ...dropped,
+          ...ingested.uploaded.map((file) => file.fileName),
+        ];
       } else if (addressedToTicket) {
         // The token verified but the ticket is gone. A new ticket is the safe
         // direction — because the alternative is discarding a
         // customer's message.
       }
+
+      const body = this.withAttachmentNote(storedBody, createNote);
 
       await this.ticketPeer.run(
         (metadata) =>
@@ -661,10 +712,142 @@ export class InboundEmailService implements OnModuleInit {
    * do, so the omission is visible to everyone on the thread rather than only
    * in a log nobody reads.
    */
-  private withAttachmentNote(body: string, payload: InboundEmailDto): string {
-    if (!payload.droppedAttachments?.length) return body;
+  private withAttachmentNote(body: string, names: string[]): string {
+    if (names.length === 0) return body;
 
-    return `${body}\n\n---\nAttachments were not accepted by email: ${payload.droppedAttachments.join(', ')}`;
+    return `${body}\n\n---\nAttachments were not accepted by email: ${names.join(', ')}`;
+  }
+
+  /**
+   * Stores a reply's remote attachments through ticket-service and returns the
+   * object paths for `createMessage`, plus the names of every file refused.
+   *
+   * The rules, in order, with a name for everything refused — so the sixth file
+   * is named and the message is not lost:
+   *
+   * 1. **the per-message ceiling**, by count (paths already on the payload
+   *    included): `createMessage` throws over the cap rather than trimming, so
+   *    the extras are named here instead;
+   * 2. **the tenant's per-file ceiling**, on Resend's claimed size — the stream
+   *    is cut at the same number by storage-service;
+   * 3. **a source for its id**: the URL list is fetched once, here, and a file
+   *    with no usable URL (a short list, `has_more`, a URL storage could not
+   *    take) or an expiry already past is named without a call;
+   * 4. **the ingest itself**, {@link INGEST_CONCURRENCY} at a time, under a
+   *    deadline five seconds wider than ticket-service's own on storage — one
+   *    refused file is logged and named and never fails the batch or the mail.
+   *
+   * A file that passes 1 takes its slot whether or not its ingest then
+   * succeeds: with files in flight together, a slot cannot wait on another
+   * file's outcome.
+   *
+   * @throws ServiceUnavailableException when the URL list failed in a way a
+   * retry can fix — before anything was stored.
+   */
+  private async ingestAttachments(
+    payload: InboundEmailDto,
+    ticket: TicketResponse,
+    limits: { maxBytes: number; maxPerMessage: number },
+    context: RequestContext,
+    options: AcceptOptions,
+  ): Promise<IngestResult> {
+    const remote = payload.remoteAttachments;
+    const alreadyStored = payload.attachments ?? [];
+    if (remote.length === 0)
+      return { uploaded: [...alreadyStored], dropped: [] };
+
+    const sources = options.fetchAttachmentUrls
+      ? await options.fetchAttachmentUrls()
+      : new Map<string, RemoteAttachmentSource>();
+
+    const dropped: string[] = [];
+    const queued: {
+      file: InboundRemoteAttachmentDto;
+      source: RemoteAttachmentSource;
+    }[] = [];
+    const refuse = (file: InboundRemoteAttachmentDto, reason: string) => {
+      this.logger.log(
+        `Inbound attachment '${file.fileName}' not stored: ${reason}`,
+      );
+      dropped.push(file.fileName);
+    };
+
+    for (const file of remote) {
+      if (
+        exceedsLimit(
+          alreadyStored.length + queued.length + 1,
+          limits.maxPerMessage,
+        )
+      ) {
+        refuse(file, `only ${limits.maxPerMessage} attachments per message`);
+        continue;
+      }
+      if (exceedsLimit(file.sizeBytes, limits.maxBytes)) {
+        refuse(file, 'too large');
+        continue;
+      }
+
+      const source = sources.get(file.id);
+      if (!source) {
+        refuse(file, 'no usable source URL');
+        continue;
+      }
+      if (source.expiresAt.getTime() <= Date.now()) {
+        refuse(file, 'source URL expired');
+        continue;
+      }
+
+      queued.push({ file, source });
+    }
+
+    const stored: (InboundUploadedAttachmentDto | null)[] =
+      new Array<InboundUploadedAttachmentDto | null>(queued.length).fill(null);
+    let next = 0;
+
+    const worker = async (): Promise<void> => {
+      while (next < queued.length) {
+        const index = next++;
+        const { file, source } = queued[index];
+
+        try {
+          const { objectPath } = await this.ticketPeer.run(
+            (metadata) =>
+              this.messages.ingestAttachment(
+                {
+                  ticketId: ticket.id,
+                  fileName: file.fileName,
+                  fileSizeBytes: file.sizeBytes,
+                  mimeType: file.mimeType,
+                  sourceUrl: source.sourceUrl,
+                },
+                metadata,
+              ),
+            context,
+            INGEST_DEADLINE_MS + 5_000,
+          );
+          stored[index] = { objectPath, fileName: file.fileName };
+        } catch (error) {
+          refuse(file, `refused by storage: ${formatErrorMsg(error)}`);
+        }
+      }
+    };
+
+    await Promise.all(
+      Array.from(
+        { length: Math.min(INGEST_CONCURRENCY, queued.length) },
+        worker,
+      ),
+    );
+
+    return {
+      uploaded: [
+        ...alreadyStored,
+        ...stored.filter(
+          (file): file is InboundUploadedAttachmentDto => file !== null,
+        ),
+      ],
+      dropped,
+    };
   }
 
   /**

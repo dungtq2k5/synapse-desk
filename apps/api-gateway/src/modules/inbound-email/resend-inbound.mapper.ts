@@ -2,8 +2,18 @@ import type {
   EmailReceivedEvent,
   GetReceivingEmailResponseSuccess,
 } from 'resend';
-import { extractEmailAddress, extractEmailDomain } from '@synapsedesk/common';
-import type { InboundEmailDto } from './dto/rest/inbound-email.dto';
+import {
+  ALLOWED_ATTACHMENT_MIME_TYPES,
+  MAX_ATTACHMENT_FILE_NAME_LENGTH,
+  extractEmailAddress,
+  extractEmailDomain,
+  type AllowedAttachmentMimeType,
+} from '@synapsedesk/common';
+import { MAX_PRESENTED_ATTACHMENTS } from '../../common/config/dto.config';
+import type {
+  InboundEmailDto,
+  InboundRemoteAttachmentDto,
+} from './dto/rest/inbound-email.dto';
 
 /** An {@link InboundEmailDto}'s fields as a plain object, before validation. */
 export type InboundEmailFields = {
@@ -23,6 +33,9 @@ const LOOP_HEADERS = ['auto-submitted', 'precedence'] as const;
 /** What a nameless attachment is called in the ticket's dropped-files note. */
 export const UNNAMED_ATTACHMENT = '(unnamed)';
 
+/** The ellipsis a name over `MAX_ATTACHMENT_FILE_NAME_LENGTH` ends with in the note. */
+const TRUNCATION_MARK = '…';
+
 /**
  * Builds the inbound mail `accept()` takes from Resend's two objects: the
  * verified `email.received` event and the `emails.receiving.get` response.
@@ -41,8 +54,10 @@ export const UNNAMED_ATTACHMENT = '(unnamed)';
  *   from the headers, read case-insensitively; a missing header is absent.
  * - **`headers`** carries only `auto-submitted` and `precedence`: a full copy
  *   is unbounded sender-controlled data with one use.
- * - **`attachments`** is empty and every attachment's filename goes to
- *   `droppedAttachments` — inbound attachments are not stored in this release.
+ * - **attachments split three ways** ({@link splitAttachments}): eligible ones
+ *   go to `remoteAttachments` (still without a URL — that is fetched after
+ *   routing), everything else is named in `droppedAttachments`, and
+ *   `attachments` (object paths) stays empty.
  *
  * Pure: no I/O, and the output is NOT validated here — the caller validates it
  * with the `ValidationPipe`'s options, because nothing else will.
@@ -84,12 +99,80 @@ export function toMappedInboundEmail(
       ...optional('date', header('date')),
       ...(Object.keys(loopHeaders).length > 0 ? { headers: loopHeaders } : {}),
       attachments: [],
-      droppedAttachments: (email.attachments ?? []).map(
-        (attachment) => attachment.filename ?? UNNAMED_ATTACHMENT,
-      ),
+      ...splitAttachments(email.attachments ?? []),
       receivedAt: event.created_at,
     },
   };
+}
+
+/**
+ * Resend's attachments, split into the ones worth fetching and the names of the
+ * rest.
+ *
+ * **Every check here mirrors a rule on `InboundRemoteAttachmentDto`**, and runs
+ * first because a nested DTO failure is mail-fatal: the handler answers any
+ * validation failure by dropping the WHOLE mail. So an attachment that would
+ * fail a rule is named as dropped instead, and the DTO's rules stay a backstop.
+ *
+ * | Dropped when | Why |
+ * | :--- | :--- |
+ * | `inline` with a `content_id` | part of the HTML body, not a file the sender attached |
+ * | its type, parameters stripped, is not in `ALLOWED_ATTACHMENT_MIME_TYPES` | platform policy, decided once at the edge |
+ * | `size` below 1 | nothing to store |
+ * | its name exceeds `MAX_ATTACHMENT_FILE_NAME_LENGTH` | the column's bound; the note truncates it |
+ * | it comes after the first `MAX_PRESENTED_ATTACHMENTS` eligible ones | a list that long is a payload, not a mail |
+ *
+ * @example splitAttachments([{ id: 'a', filename: 'x.png', content_type: 'image/png; name="x.png"', size: 9, … }]).remoteAttachments // [{ id: 'a', fileName: 'x.png', mimeType: 'image/png', sizeBytes: 9 }]
+ */
+export function splitAttachments(
+  attachments: GetReceivingEmailResponseSuccess['attachments'],
+): Pick<InboundEmailFields, 'remoteAttachments' | 'droppedAttachments'> {
+  const remoteAttachments: InboundRemoteAttachmentDto[] = [];
+  const droppedAttachments: string[] = [];
+
+  for (const attachment of attachments) {
+    const fileName = attachment.filename || UNNAMED_ATTACHMENT;
+    const mimeType = normalizeMimeType(attachment.content_type);
+    const eligible =
+      !(attachment.content_disposition === 'inline' && attachment.content_id) &&
+      isAllowedAttachmentType(mimeType) &&
+      attachment.size >= 1 &&
+      fileName.length <= MAX_ATTACHMENT_FILE_NAME_LENGTH &&
+      remoteAttachments.length < MAX_PRESENTED_ATTACHMENTS;
+
+    if (eligible) {
+      remoteAttachments.push({
+        id: attachment.id,
+        fileName,
+        mimeType,
+        sizeBytes: attachment.size,
+      });
+    } else {
+      droppedAttachments.push(truncatedName(fileName));
+    }
+  }
+
+  return { remoteAttachments, droppedAttachments };
+}
+
+/** `Image/PNG; name="a.png"` → `image/png` — what the allowlist and the sniffer compare. */
+function normalizeMimeType(contentType: string | null): string {
+  return (contentType ?? '').split(';')[0].trim().toLowerCase();
+}
+
+function isAllowedAttachmentType(
+  mimeType: string,
+): mimeType is AllowedAttachmentMimeType {
+  return (ALLOWED_ATTACHMENT_MIME_TYPES as readonly string[]).includes(
+    mimeType,
+  );
+}
+
+/** A name that fits the note's column, ending in `…` when it was cut. */
+function truncatedName(fileName: string): string {
+  return fileName.length <= MAX_ATTACHMENT_FILE_NAME_LENGTH
+    ? fileName
+    : `${fileName.slice(0, MAX_ATTACHMENT_FILE_NAME_LENGTH - TRUNCATION_MARK.length)}${TRUNCATION_MARK}`;
 }
 
 /** A case-insensitive, trimmed lookup over Resend's header record. */

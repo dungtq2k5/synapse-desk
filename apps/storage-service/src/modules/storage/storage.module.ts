@@ -5,6 +5,7 @@ import { FirebaseStorageModule } from '../firebase/firebase-storage.module';
 import { StorageService } from './storage.service';
 import { StorageGrpcController } from './storage-grpc.controller';
 import { PendingUploadStore, STORAGE_REDIS } from './pending-upload.store';
+import { RemoteSourceFetcher } from './remote-source.fetcher';
 
 /**
  * The Redis client is provided HERE rather than globally, and closed on
@@ -21,6 +22,7 @@ import { PendingUploadStore, STORAGE_REDIS } from './pending-upload.store';
   providers: [
     StorageService,
     PendingUploadStore,
+    RemoteSourceFetcher,
     {
       provide: STORAGE_REDIS,
       useFactory: (configService: ConfigService) =>

@@ -2,18 +2,16 @@ import { request as httpsRequest } from 'node:https';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
+  DeniedTargetError,
   WEBHOOK_MAX_RESPONSE_BYTES,
   WEBHOOK_SIGNATURE_HEADER,
   WEBHOOK_TIMEOUT_MS,
-  signWebhook,
-  type WebhookEventPayload,
-} from '@synapsedesk/common';
-import {
-  DeniedTargetError,
   buildGuardedLookup,
   deniedLiteral,
   privateTargetsAllowed,
-} from './webhook-target.guard';
+  signWebhook,
+  type WebhookEventPayload,
+} from '@synapsedesk/common';
 
 /** One attempt's outcome — the row's fields, not an exception. */
 export type SendOutcome =
@@ -75,9 +73,7 @@ export class WebhookSenderService {
 
     const allowPrivate = privateTargetsAllowed({
       NODE_ENV: this.configService.get<string>('NODE_ENV'),
-      WEBHOOK_ALLOW_PRIVATE_TARGETS: this.configService.get<string>(
-        'WEBHOOK_ALLOW_PRIVATE_TARGETS',
-      ),
+      flag: this.configService.get<string>('WEBHOOK_ALLOW_PRIVATE_TARGETS'),
     });
 
     // **An IP-literal host never reaches the guarded `lookup`** — Node skips

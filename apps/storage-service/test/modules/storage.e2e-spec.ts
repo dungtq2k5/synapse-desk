@@ -1,18 +1,28 @@
+import { ConfigService } from '@nestjs/config';
 import { expectRpc } from '@synapsedesk/common/testing/rpc';
+import { faultInjector } from '@synapsedesk/common/testing/fault';
 import { status } from '@grpc/grpc-js';
 import { faker } from '@faker-js/faker';
 import { StoragePurpose as ProtoStoragePurpose } from '@synapsedesk/grpc-proto';
 import {
+  INGEST_TIMEOUT_MS,
+  MAX_ATTACHMENT_BYTES,
   compareAlphabetically,
   organizationIdFromObjectPath,
 } from '@synapsedesk/common';
 import {
   DISGUISED_BYTES,
   E2eFixture,
+  PDF_BYTES,
+  PNG_BYTES,
   bootstrapE2eTest,
   bytesFor,
   memberContext,
+  startSourceServer,
+  type SourceServer,
 } from '../utils';
+import { RemoteSourceFetcher } from '../../src/modules/storage/remote-source.fetcher';
+import { SIGNATURE_SAMPLE_BYTES } from '../../src/common/content-signature';
 import { StorageService } from '../../src/modules/storage/storage.service';
 import { PendingUploadStore } from '../../src/modules/storage/pending-upload.store';
 
@@ -776,5 +786,408 @@ describe('Ticket attachments are segregated until confirmed (e2e)', () => {
     expect(organizationIdFromObjectPath(presigned.objectPath)).toBe(
       organizationId,
     );
+  });
+});
+
+describe('Ingesting an object from a URL (e2e)', () => {
+  const faults = faultInjector();
+
+  let fx: E2eFixture;
+  let storage: StorageService;
+  let fetcher: RemoteSourceFetcher;
+  let config: ConfigService;
+  let source: SourceServer;
+
+  const organizationId = faker.string.uuid();
+  const userId = faker.string.uuid();
+  const ticketId = faker.string.uuid();
+
+  const caller = (org: string = organizationId) =>
+    memberContext({ id: userId, organizationId: org });
+
+  const ingest = (
+    overrides: Record<string, unknown> = {},
+    context = caller(),
+  ) =>
+    storage.ingestFromUrl(
+      {
+        purpose: ProtoStoragePurpose.STORAGE_PURPOSE_TICKET_ATTACHMENT,
+        ownerId: ticketId,
+        secondaryOwnerId: '',
+        contentType: 'image/png',
+        sizeBytes: PNG_BYTES.length,
+        originalFileName: 'screenshot.png',
+        sourceUrl: source.url('/file.png'),
+        maxBytes: 0,
+        ...overrides,
+      },
+      context,
+    );
+
+  /**
+   * The documented hatch, opened the documented way — PER TEST. `.env.test`
+   * says NODE_ENV=test, under which the hatch is ignored whatever the flag
+   * says, so both halves are forced; the guard rows run with it CLOSED.
+   */
+  const openHatch = () => {
+    const real = config.get.bind(config);
+    faults.replace(config, 'get', ((key: string) => {
+      if (key === 'NODE_ENV') return 'development';
+      if (key === 'INGEST_ALLOW_PRIVATE_SOURCES') return 'true';
+      return real(key);
+    }) as never);
+  };
+
+  const objects = async () =>
+    (await fx.firebase.bucket.getFiles())[0].map((file) => file.name);
+
+  beforeAll(async () => {
+    fx = await bootstrapE2eTest();
+    storage = fx.moduleRef.get(StorageService);
+    fetcher = fx.moduleRef.get(RemoteSourceFetcher);
+    config = fx.moduleRef.get(ConfigService);
+    source = await startSourceServer();
+  });
+
+  beforeEach(async () => {
+    await fx.reset();
+    source.reset();
+    fetcher.resolver = undefined;
+    fetcher.timeoutMs = INGEST_TIMEOUT_MS;
+  });
+
+  afterAll(async () => {
+    await source.close();
+    await fx.close();
+  });
+
+  // ------------------------------------------------------------ it lands
+
+  describe('a source that is what it says', () => {
+    it('**lands under `pending/` and confirms exactly like a client upload**', async () => {
+      // The segregation invariant, reached through the new door: ingest writes
+      // the same record presign does, so `confirmUpload` cannot tell who put
+      // the bytes there — and moves them out of `pending/` the same way.
+      openHatch();
+      source.route('/file.png', {
+        headers: { 'content-type': 'image/png' },
+        body: PNG_BYTES,
+      });
+
+      const ingested = await ingest();
+
+      expect(ingested.objectPath).toContain(
+        `organizations/${organizationId}/tickets/${ticketId}/attachments/pending/`,
+      );
+      expect(ingested.sizeBytes).toBe(PNG_BYTES.length);
+
+      const confirmed = await storage.confirmUpload(
+        { objectPath: ingested.objectPath },
+        caller(),
+      );
+
+      expect(confirmed.objectPath).not.toContain('/pending/');
+      expect(confirmed.contentType).toBe('image/png');
+      expect(await objects()).toEqual([confirmed.objectPath]);
+    });
+
+    it('**a 100-byte text file sniffs on END and lands**', async () => {
+      // Shorter than the 4096-byte sample: a sniff that waited for a full
+      // buffer would never run on it.
+      openHatch();
+      const text = Buffer.from('x'.repeat(99) + '\n');
+      source.route('/note.txt', { body: text });
+
+      const ingested = await ingest({
+        contentType: 'text/plain',
+        sizeBytes: text.length,
+        sourceUrl: source.url('/note.txt'),
+      });
+
+      expect(ingested.sizeBytes).toBe(100);
+      expect(await objects()).toEqual([ingested.objectPath]);
+    });
+
+    it('a body larger than the sample streams whole, and the COUNT is what is answered', async () => {
+      openHatch();
+      const big = Buffer.concat([PDF_BYTES, Buffer.alloc(300_000, 0x20)]);
+      source.route('/big.pdf', { body: big });
+
+      const ingested = await ingest({
+        contentType: 'application/pdf',
+        sizeBytes: 1,
+        sourceUrl: source.url('/big.pdf'),
+      });
+
+      // The request CLAIMED one byte; the answer is what arrived.
+      expect(ingested.sizeBytes).toBe(big.length);
+      const [metadata] = await fx.firebase.bucket
+        .file(ingested.objectPath)
+        .getMetadata();
+      expect(Number(metadata.size)).toBe(big.length);
+    });
+
+    it('**a 302 to the same server is followed**, and a second one too', async () => {
+      openHatch();
+      source.route('/one', { status: 302, headers: { location: '/two' } });
+      source.route('/two', {
+        status: 302,
+        headers: { location: source.url('/file.png') },
+      });
+      source.route('/file.png', { body: PNG_BYTES });
+
+      const ingested = await ingest({ sourceUrl: source.url('/one') });
+
+      expect(source.requests).toEqual(['/one', '/two', '/file.png']);
+      expect(await objects()).toEqual([ingested.objectPath]);
+    });
+  });
+
+  // ------------------------------------------------------ nothing is written
+
+  describe('a source that is refused writes nothing and leaves no record', () => {
+    const refused = async (
+      attempt: Promise<unknown>,
+      code: status,
+    ): Promise<void> => {
+      await expectRpc(attempt, code);
+      expect(await objects()).toEqual([]);
+      // `reset()` flushed Redis before the test, so any surviving key is the
+      // record this attempt wrote and failed to consume.
+      expect(await fx.redis.dbsize()).toBe(0);
+    };
+
+    it('**a PNG declared `image/jpeg` is refused before any write**', async () => {
+      openHatch();
+      source.route('/file.png', { body: PNG_BYTES });
+
+      await refused(
+        ingest({ contentType: 'image/jpeg' }),
+        status.INVALID_ARGUMENT,
+      );
+    });
+
+    it('an empty body is refused', async () => {
+      openHatch();
+      source.route('/empty.txt', { body: '' });
+
+      await refused(
+        ingest({
+          contentType: 'text/plain',
+          sourceUrl: source.url('/empty.txt'),
+        }),
+        status.INVALID_ARGUMENT,
+      );
+    });
+
+    it('**a body over `maxBytes` is cut, the partial deleted, the record consumed**', async () => {
+      // No Content-Length: the server streams, so only the COUNT can catch it.
+      //
+      // **The head arrives ALONE, and under the ceiling.** Sent in one write, the
+      // whole body lands as one chunk and the sniff's own buffer check refuses
+      // it — so the test would pass with the streaming count deleted (measured,
+      // by sabotage). Pausing between writes puts the overflow after the sniff,
+      // on the path the count guards.
+      openHatch();
+      const head = Buffer.concat([
+        PDF_BYTES,
+        Buffer.alloc(SIGNATURE_SAMPLE_BYTES - PDF_BYTES.length, 0x20),
+      ]);
+      source.route('/huge.pdf', (_request, response) => {
+        response.writeHead(200);
+        response.write(head);
+        setTimeout(() => response.write(Buffer.alloc(8_000, 0x20)), 150);
+        setTimeout(() => response.end(Buffer.alloc(8_000, 0x20)), 300);
+      });
+
+      await refused(
+        ingest({
+          contentType: 'application/pdf',
+          sizeBytes: 100,
+          maxBytes: 6_000,
+          sourceUrl: source.url('/huge.pdf'),
+        }),
+        status.FAILED_PRECONDITION,
+      );
+    });
+
+    it('**a `Content-Length` over the ceiling short-circuits before the body is read**', async () => {
+      openHatch();
+      let bodyWritten = false;
+      source.route('/declared.pdf', (_request, response) => {
+        response.writeHead(200, { 'content-length': '999999' });
+        response.flushHeaders();
+        setTimeout(() => {
+          bodyWritten = !response.destroyed && response.write(PDF_BYTES);
+          response.destroy();
+        }, 200);
+      });
+
+      await refused(
+        ingest({
+          contentType: 'application/pdf',
+          sizeBytes: 100,
+          maxBytes: 1_000,
+          sourceUrl: source.url('/declared.pdf'),
+        }),
+        status.FAILED_PRECONDITION,
+      );
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      // The refusal came from the header: the ingest settled before the body
+      // was ever sent.
+      expect(bodyWritten).toBe(false);
+    });
+
+    it('the claimed size over the ceiling is refused before any socket', async () => {
+      openHatch();
+      source.route('/file.png', { body: PNG_BYTES });
+
+      await refused(
+        ingest({ sizeBytes: 5_000, maxBytes: 1_000 }),
+        status.INVALID_ARGUMENT,
+      );
+      expect(source.requests).toEqual([]);
+    });
+
+    it('**`maxBytes` narrows the policy cap and can never widen it**', async () => {
+      openHatch();
+      source.route('/file.png', { body: PNG_BYTES });
+
+      await refused(
+        ingest({
+          sizeBytes: MAX_ATTACHMENT_BYTES + 1,
+          maxBytes: MAX_ATTACHMENT_BYTES * 10,
+        }),
+        status.INVALID_ARGUMENT,
+      );
+      expect(source.requests).toEqual([]);
+    });
+
+    it('a 404 source is FAILED_PRECONDITION', async () => {
+      openHatch();
+
+      await refused(
+        ingest({ sourceUrl: source.url('/missing.png') }),
+        status.FAILED_PRECONDITION,
+      );
+    });
+
+    it('**a third redirect fails**', async () => {
+      openHatch();
+      source.route('/a', { status: 302, headers: { location: '/b' } });
+      source.route('/b', { status: 302, headers: { location: '/c' } });
+      source.route('/c', { status: 302, headers: { location: '/file.png' } });
+      source.route('/file.png', { body: PNG_BYTES });
+
+      await refused(
+        ingest({ sourceUrl: source.url('/a') }),
+        status.FAILED_PRECONDITION,
+      );
+      expect(source.requests).toEqual(['/a', '/b', '/c']);
+    });
+
+    it('**a redirect to `http:` is refused at that hop** — every hop is re-judged', async () => {
+      openHatch();
+      source.route('/a', {
+        status: 302,
+        headers: { location: `http://localhost:${source.port}/file.png` },
+      });
+
+      await refused(
+        ingest({ sourceUrl: source.url('/a') }),
+        status.INVALID_ARGUMENT,
+      );
+      expect(source.requests).toEqual(['/a']);
+    });
+
+    it('**a source idle past the timeout consumes the record and writes nothing**', async () => {
+      openHatch();
+      fetcher.timeoutMs = 300;
+      source.route('/slow.pdf', (_request, response) => {
+        response.writeHead(200);
+        response.write(PDF_BYTES);
+        // …and then nothing, until the fetcher gives up.
+        setTimeout(() => response.destroy(), 2_000);
+      });
+
+      await refused(
+        ingest({
+          contentType: 'application/pdf',
+          sizeBytes: 100,
+          sourceUrl: source.url('/slow.pdf'),
+        }),
+        status.DEADLINE_EXCEEDED,
+      );
+    });
+  });
+
+  // ------------------------------------------------------------- the guard
+
+  describe('the SSRF guard, with the hatch CLOSED', () => {
+    it.each([
+      ['an `http:` URL', () => `http://localhost:${source.port}/file.png`],
+      [
+        'a `127.0.0.1` literal',
+        () => `https://127.0.0.1:${source.port}/file.png`,
+      ],
+      ['a `[::1]` literal', () => `https://[::1]:${source.port}/file.png`],
+    ])('**%s is refused before any socket**', async (_, url) => {
+      source.route('/file.png', { body: PNG_BYTES });
+
+      await expectRpc(ingest({ sourceUrl: url() }), status.INVALID_ARGUMENT);
+
+      expect(source.requests).toEqual([]);
+      expect(await fx.redis.dbsize()).toBe(0);
+    });
+
+    it('**a hostname resolving to a private address is refused before connecting**', async () => {
+      // The resolver seam: the hostname is judged inside the socket's own
+      // lookup, so the refusal lands before a connection exists.
+      source.route('/file.png', { body: PNG_BYTES });
+      fetcher.resolver = ((_host: string, _options: unknown, callback: never) =>
+        (
+          callback as (
+            e: null,
+            a: { address: string; family: number }[],
+          ) => void
+        )(null, [{ address: '127.0.0.1', family: 4 }])) as never;
+
+      await expectRpc(
+        ingest({
+          sourceUrl: `https://attachments.example.test:${source.port}/file.png`,
+        }),
+        status.INVALID_ARGUMENT,
+      );
+
+      expect(source.requests).toEqual([]);
+      expect(await objects()).toEqual([]);
+      expect(await fx.redis.dbsize()).toBe(0);
+    });
+  });
+
+  describe('the preamble presign runs', () => {
+    it('refuses a type outside the purpose allowlist before any socket', async () => {
+      openHatch();
+
+      await expectRpc(
+        ingest({ contentType: 'application/x-msdownload' }),
+        status.INVALID_ARGUMENT,
+      );
+      expect(source.requests).toEqual([]);
+    });
+
+    it('the tenant comes from the CONTEXT: the object lands under the caller’s organization', async () => {
+      openHatch();
+      source.route('/file.png', { body: PNG_BYTES });
+      const other = faker.string.uuid();
+
+      const ingested = await ingest({}, caller(other));
+
+      expect(organizationIdFromObjectPath(ingested.objectPath)).toBe(other);
+      await expectRpc(
+        storage.confirmUpload({ objectPath: ingested.objectPath }, caller()),
+        status.NOT_FOUND,
+      );
+    });
   });
 });

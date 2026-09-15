@@ -9,6 +9,8 @@ import {
   NOTIFICATION_TYPE_VALUES,
   WEBHOOK_DELIVERY_LIMIT,
   WEBHOOK_ROTATION_OVERLAP_HOURS,
+  deniedLiteral,
+  privateTargetsAllowed,
   requireTenant,
   type CallerContext,
   type NotificationType,
@@ -32,7 +34,6 @@ import type {
 } from '@synapsedesk/grpc-proto';
 import { PrismaService } from '../prisma/prisma.service';
 import { WebhookSenderService } from './webhook-sender.service';
-import { deniedLiteral, privateTargetsAllowed } from './webhook-target.guard';
 import {
   toWebhookDeliveryResponse,
   toWebhookEndpointResponse,
@@ -320,9 +321,7 @@ export class WebhookAdminService {
     // by the send.
     const allowPrivate = privateTargetsAllowed({
       NODE_ENV: this.configService.get<string>('NODE_ENV'),
-      WEBHOOK_ALLOW_PRIVATE_TARGETS: this.configService.get<string>(
-        'WEBHOOK_ALLOW_PRIVATE_TARGETS',
-      ),
+      flag: this.configService.get<string>('WEBHOOK_ALLOW_PRIVATE_TARGETS'),
     });
     const denied = allowPrivate ? null : deniedLiteral(parsed.hostname);
 

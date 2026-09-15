@@ -11,7 +11,10 @@ import { validate } from 'class-validator';
 import { formatErrorMsg, isRetryableResendError } from '@synapsedesk/common';
 import { MetricsRegistry } from '../metrics/metrics.registry';
 import { VALIDATION_PIPE_OPTIONS } from '../../common/config/validation.config';
-import { InboundEmailDto } from './dto/rest/inbound-email.dto';
+import {
+  InboundEmailDto,
+  type RemoteAttachmentSource,
+} from './dto/rest/inbound-email.dto';
 import { InboundEmailService } from './inbound-email.service';
 import {
   RESEND_INBOUND_CLIENT,
@@ -45,6 +48,12 @@ export type ResendWebhookDelivery = {
   /** Reads one request header. */
   header: (name: string) => string | undefined;
 };
+
+/**
+ * The longest signed URL passed on to storage-service — validator.js's default
+ * `isURL` bound, measured: a 2 100-character https URL is refused at it.
+ */
+export const MAX_SOURCE_URL_LENGTH = 2_084;
 
 /** The response body of every 200. */
 export type ResendWebhookAck = { received: true; outcome: string };
@@ -169,7 +178,80 @@ export class ResendInboundService {
       return this.ok(ResendWebhookOutcome.INVALID_PAYLOAD);
     }
 
-    return this.ok(await this.inbound.accept(dto));
+    return this.ok(
+      await this.inbound.accept(dto, {
+        fetchAttachmentUrls: () => this.fetchAttachmentUrls(emailId),
+      }),
+    );
+  }
+
+  /**
+   * The signed download URL of each of a mail's attachments, by Resend id.
+   *
+   * **Called by `accept` after routing, never here.** A mail that turns out to
+   * be unroutable, from a refused sender, or opening a ticket drops every
+   * attachment anyway, and a list call spent on it competes with the next mail's
+   * fetch under the account's rate limit.
+   *
+   * - **`limit: 100`**, the SDK's maximum; the default of 20 would silently miss
+   *   page two on a larger mail. If `has_more` is still true the rest are simply
+   *   absent from the map, and `accept` names them as dropped.
+   * - **A URL is only passed on if storage-service could accept it**: `https:`
+   *   and at most {@link MAX_SOURCE_URL_LENGTH} characters. Anything else is
+   *   absent from the map, which drops that file by name rather than failing.
+   * - **A list error is classified like the mail fetch.** Retryable → 503, so
+   *   Resend redelivers before anything is written; otherwise an empty map, so
+   *   every attachment is named as dropped and the mail is still delivered —
+   *   the mail matters more than its attachments.
+   *
+   * @throws ServiceUnavailableException for a retryable list error.
+   */
+  private async fetchAttachmentUrls(
+    emailId: string,
+  ): Promise<Map<string, RemoteAttachmentSource>> {
+    const { data, error } = await this.resend.emails.receiving.attachments.list(
+      { emailId, limit: 100 },
+    );
+
+    if (error || !data) {
+      const detail = error
+        ? `${error.name} (${error.statusCode ?? 'no status'})`
+        : 'an empty response';
+
+      if (error && isRetryableResendError(error)) {
+        this.logger.warn(
+          `Could not list the attachments of ${emailId}, asking Resend to retry: ${detail}`,
+        );
+        this.count(ResendWebhookOutcome.FETCH_FAILED);
+
+        throw new ServiceUnavailableException('Inbound attachment list failed');
+      }
+
+      this.logger.error(
+        `Could not list the attachments of ${emailId}; delivering the mail without them: ${detail}`,
+      );
+      return new Map();
+    }
+
+    if (data.has_more) {
+      this.logger.warn(
+        `Inbound mail ${emailId} has more attachments than one page; the rest are named as dropped`,
+      );
+    }
+
+    const sources = new Map<string, RemoteAttachmentSource>();
+    for (const attachment of data.data) {
+      const url = attachment.download_url;
+      if (!url.startsWith('https://') || url.length > MAX_SOURCE_URL_LENGTH) {
+        continue;
+      }
+      sources.set(attachment.id, {
+        sourceUrl: url,
+        expiresAt: new Date(attachment.expires_at),
+      });
+    }
+
+    return sources;
   }
 
   /** The verified event, or `null` for a missing header or a bad signature. */

@@ -16,6 +16,8 @@ import {
   DownloadAttachmentRequest,
   DownloadAttachmentResponse,
   emptyPage,
+  IngestAttachmentRequest,
+  IngestAttachmentResponse,
   ListAttachmentsRequest,
   ListAttachmentsResponse,
   ListMessagesRequest,
@@ -786,6 +788,55 @@ export class MessagesService {
     } catch (error) {
       throw StorageReferenceService.asClientError(error);
     }
+  }
+
+  /**
+   * `uploadAttachment` with the PUT done server-side: storage-service fetches the
+   * bytes from `sourceUrl` and lands them where a presigned upload would, and
+   * the returned path is handed to `CreateMessage` like a client's.
+   *
+   * The same authorisation, in the same order, because it is the same write:
+   * the ticket is LOADED first (it is what authorises a write under its prefix
+   * — skipping it would let anyone ingest into any ticket's), then the tenant's
+   * attachment limits, and a claimed size over `maxBytes` is refused before
+   * storage-service is called. The tenant's `maxBytes` is also handed on, so
+   * the stream is cut at the same number the claim was judged against.
+   *
+   * There is never a message on this path, so there is nothing to count here;
+   * `CreateMessage` enforces the per-message cap over the list it is given.
+   *
+   * This service is handed a URL and a filename and hands them on — it does not
+   * learn what an email is.
+   *
+   * @throws RpcException `NOT_FOUND` for a ticket the caller cannot see,
+   * `FAILED_PRECONDITION` for a size over the tenant's limit, and storage's own
+   * verdict otherwise (see `StorageReferenceService.asIngestError`).
+   */
+  async ingestAttachment(
+    request: IngestAttachmentRequest,
+    context: CallerContext,
+  ): Promise<IngestAttachmentResponse> {
+    const ticket = await this.tickets.load(request.ticketId, context);
+    const limits = await this.authReference.getAttachmentLimits(context);
+
+    if (exceedsLimit(request.fileSizeBytes, limits.maxBytes)) {
+      throw new RpcException({
+        code: status.FAILED_PRECONDITION,
+        message: `This workspace does not accept attachments over ${limits.maxBytes} bytes`,
+      });
+    }
+
+    return this.storage.ingestAttachment(
+      {
+        ticketId: ticket.id,
+        contentType: request.mimeType,
+        sizeBytes: request.fileSizeBytes,
+        fileName: request.fileName,
+        sourceUrl: request.sourceUrl,
+        maxBytes: limits.maxBytes,
+      },
+      context,
+    );
   }
 
   /**

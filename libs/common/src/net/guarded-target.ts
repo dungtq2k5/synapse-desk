@@ -1,15 +1,15 @@
 /**
  * @file The SSRF control — at connection time, on resolved addresses.
  *
- * A tenant-supplied URL that this server POSTs to is textbook SSRF: into the
- * service mesh, into `169.254.169.254`, into anything the pod can route to.
- * Nothing else in this repository makes outbound HTTP to a caller-supplied
- * host, so there is no prior art to copy — every existing call trusts its
- * destination by construction.
+ * A URL somebody else chose, that a server here connects to, is textbook SSRF:
+ * into the service mesh, into `169.254.169.254`, into anything the pod can
+ * route to. Two paths do that — notification-service POSTs to a tenant's
+ * webhook URL, and storage-service fetches an inbound attachment from the URL
+ * Resend hands over — and both use THIS file, so the address arithmetic exists
+ * once.
  *
- * **Registration-time validation is not the control.** The URL is validated
- * when it is saved and RESOLVED when it is delivered to, and DNS can change in
- * between. So the check runs at send time, in two prongs that between them
+ * **Validation when a URL is saved or received is not the control.** A URL is
+ * RESOLVED when it is connected to, and DNS can change in between. So the check runs at send time, in two prongs that between them
  * cover every way a host becomes an address:
  *
  * - a HOSTNAME is judged inside the socket's own `lookup`
@@ -216,26 +216,30 @@ export function deniedLiteral(urlHostname: string): string | null {
 /**
  * The development escape hatch — explicit, named, off by default.
  *
- * A localhost receiver is exactly what a developer testing an integration
- * wants and exactly what the deny list refuses. Gated on BOTH the variable and
- * the environment so a production deployment cannot inherit it from a copied
- * `.env`: outside development the variable is ignored, not honoured.
+ * A localhost server is exactly what a developer testing an integration wants
+ * and exactly what the deny list refuses. Gated on BOTH the flag and the
+ * environment so a production deployment cannot inherit it from a copied
+ * `.env`: outside development the flag is ignored, not honoured.
+ *
+ * The flag is the caller's own variable, read by the caller —
+ * `WEBHOOK_ALLOW_PRIVATE_TARGETS` in notification-service,
+ * `INGEST_ALLOW_PRIVATE_SOURCES` in storage-service — so each service's hatch
+ * opens only its own path.
+ *
+ * @example privateTargetsAllowed({ NODE_ENV: 'development', flag: 'true' }) // true
  */
 export function privateTargetsAllowed(env: {
   NODE_ENV?: string;
-  WEBHOOK_ALLOW_PRIVATE_TARGETS?: string;
+  flag?: string;
 }): boolean {
-  return (
-    env.NODE_ENV === 'development' &&
-    env.WEBHOOK_ALLOW_PRIVATE_TARGETS === 'true'
-  );
+  return env.NODE_ENV === 'development' && env.flag === 'true';
 }
 
-/** The error the sender records — names the address, never echoes a body. */
+/** The refusal a caller records — names the address, never echoes a body. */
 export class DeniedTargetError extends Error {
   constructor(hostname: string, address: string) {
     super(
-      `Refusing to deliver to ${hostname}: it resolves to ${address}, which is not a public address`,
+      `Refusing to connect to ${hostname}: it resolves to ${address}, which is not a public address`,
     );
   }
 }
