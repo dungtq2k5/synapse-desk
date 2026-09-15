@@ -4,7 +4,7 @@ import { RpcException } from '@nestjs/microservices';
 import { status } from '@grpc/grpc-js';
 import { randomUUID } from 'node:crypto';
 import type { IncomingMessage } from 'node:http';
-import { pipeline } from 'node:stream/promises';
+import { once } from 'node:events';
 import { Observable, throwError } from 'rxjs';
 import {
   CallerContext,
@@ -231,8 +231,9 @@ export class StorageService {
       };
     } catch (error) {
       await this.pending.consume(objectPath);
-      // Measured on the emulator: an aborted non-resumable upload leaves no
-      // object. Real Storage is not the emulator, so the delete stays.
+      // **Required, not defensive.** A refusal after the first byte COMPLETES
+      // the upload with a truncated body (see `landBody`), so an object exists
+      // here and must not survive the refusal.
       if (writeStarted) await file.delete({ ignoreNotFound: true });
 
       if (error instanceof RpcException) throw error;
@@ -696,11 +697,46 @@ export class StorageService {
       }
     };
 
+    const destination = openWrite();
+    let uploadError: Error | undefined;
+    // Resolves when the upload REQUEST is over, either way — the storage write
+    // stream emits `finish` only once the response has arrived.
+    const settled = new Promise<void>((resolve) => {
+      destination.once('finish', resolve);
+      destination.once('error', (error: Error) => {
+        uploadError = error;
+        resolve();
+      });
+    });
+
     try {
-      await pipeline(counted, openWrite());
+      for await (const chunk of counted()) {
+        if (uploadError) throw uploadError;
+        if (!destination.write(chunk)) {
+          await Promise.race([once(destination, 'drain'), settled]);
+        }
+      }
     } catch (error) {
       body.destroy();
+      // **Finish the upload; never abandon it.** The storage SDK has no way to
+      // abort a request it has started, resumable or not, so destroying the
+      // write stream — which is what `pipeline()` does on any failure — stops
+      // the body but leaves the POST open until the SERVER times out (five
+      // minutes on the emulator, measured). Every refusal after the first byte
+      // held a socket that long, and a process with one cannot exit. Ending the
+      // stream completes the request with what was sent; the caller deletes the
+      // truncated object.
+      destination.end();
+      await settled;
       throw error;
+    }
+
+    destination.end();
+    await settled;
+
+    if (uploadError) {
+      body.destroy();
+      throw uploadError;
     }
 
     return written;

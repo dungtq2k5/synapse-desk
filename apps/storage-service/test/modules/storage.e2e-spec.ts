@@ -1,4 +1,5 @@
 import { ConfigService } from '@nestjs/config';
+import { Socket } from 'node:net';
 import { expectRpc } from '@synapsedesk/common/testing/rpc';
 import { faultInjector } from '@synapsedesk/common/testing/fault';
 import { status } from '@grpc/grpc-js';
@@ -946,6 +947,42 @@ describe('Ingesting an object from a URL (e2e)', () => {
   // ------------------------------------------------------ nothing is written
 
   describe('a source that is refused writes nothing and leaves no record', () => {
+    /**
+     * Upload requests to the Storage emulator still open, as `METHOD path`.
+     *
+     * Reads `process._getActiveHandles()`, which is undocumented and the only
+     * view that shows a socket's endpoint and whether a request is still
+     * attached. A socket back in the keep-alive pool has no request attached,
+     * so it is not reported.
+     */
+    const openUploads = (): string[] => {
+      const port = Number(
+        (process.env.FIREBASE_STORAGE_EMULATOR_HOST ?? '').split(':').pop(),
+      );
+      // Without a port every socket filters out and the check proves nothing.
+      if (!Number.isInteger(port) || port <= 0) {
+        throw new Error('FIREBASE_STORAGE_EMULATOR_HOST has no port');
+      }
+
+      const handles = (
+        process as unknown as { _getActiveHandles(): unknown[] }
+      )._getActiveHandles();
+
+      return handles
+        .filter((handle): handle is Socket => handle instanceof Socket)
+        .filter((socket) => socket.remotePort === port)
+        .map(
+          (socket) =>
+            (
+              socket as Socket & {
+                _httpMessage?: { method: string; path: string };
+              }
+            )._httpMessage,
+        )
+        .filter((request) => request !== undefined && request !== null)
+        .map((request) => `${request.method} ${request.path}`);
+    };
+
     const refused = async (
       attempt: Promise<unknown>,
       code: status,
@@ -955,6 +992,11 @@ describe('Ingesting an object from a URL (e2e)', () => {
       // `reset()` flushed Redis before the test, so any surviving key is the
       // record this attempt wrote and failed to consume.
       expect(await fx.redis.dbsize()).toBe(0);
+      // **No upload request left open.** A refusal after the first byte used to
+      // leave its POST to Storage open until the server timed it out, five
+      // minutes later — which showed up only as Jest refusing to exit after the
+      // whole run.
+      expect(openUploads()).toEqual([]);
     };
 
     it('**a PNG declared `image/jpeg` is refused before any write**', async () => {
