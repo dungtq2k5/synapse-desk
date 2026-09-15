@@ -67,7 +67,7 @@ Our platform transforms support from a reactive, high-cost bottleneck into a pro
 ## **4. User Personas & Operational Roles**
 
 | Persona Role | Primary Goal | Key Platform Needs |
-| :---- | :---- | :---- |
+| :--- | :--- | :--- |
 | **End-User / Employee** | Fast, accurate answers to questions and quick resolution of technical or policy issues. | Self-service conversational chat, status tracking for raised issues, real-time agent communication. |
 | **Support Agent / Specialist** | Quickly address complex issues without manual searching or repetitive typing. | Prioritized ticket workspace, AI-suggested response drafts, full conversation history, real-time chat tools. |
 | **Knowledge Manager** | Keep enterprise documentation updated and ensure correct access permissions. | Simple document uploading, document visibility controls, analytics on answer accuracy. |

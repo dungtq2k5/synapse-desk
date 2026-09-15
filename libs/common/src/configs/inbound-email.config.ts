@@ -1,11 +1,10 @@
 /**
  * @file Inbound email addressing
  *
- * **One definition, three readers.** The Cloudflare Worker builds nothing but
- * forwards the recipient verbatim; the gateway parses it to find the tenant and
- * the thread; notification-service writes it into `Reply-To` on the way out. A
- * second spelling of this format in any one of them is mail that routes in
- * tests and drops in production.
+ * **One definition, two readers.** The gateway parses the recipient Resend
+ * reports to find the tenant and the thread; notification-service writes it
+ * into `Reply-To` on the way out. A second spelling of this format in either of
+ * them is mail that routes in tests and drops in production.
  */
 
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';

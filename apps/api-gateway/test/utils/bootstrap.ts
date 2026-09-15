@@ -35,6 +35,7 @@ import {
 } from '../../src/common/config/cors.config';
 import { GrpcStubs, stubGrpcServices } from './grpc-stub';
 import { Server } from 'node:http';
+import { VALIDATION_PIPE_OPTIONS } from '../../src/common/config/validation.config';
 
 export type E2eFixture = {
   app: INestApplication<Server>;
@@ -140,13 +141,7 @@ export async function bootstrapE2eTest(
   app.useGlobalFilters(new AllHttpExceptionFilter(false));
   app.useGlobalInterceptors(new LoggingInterceptor(true));
   app.useGlobalInterceptors(new TransformInterceptor(app.get(Reflector)));
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-    }),
-  );
+  app.useGlobalPipes(new ValidationPipe(VALIDATION_PIPE_OPTIONS));
 
   // `/docs` and `/docs-json`, exactly as `main.ts` mounts them.
   // **Before `init()`**, which is the whole reason it lives here rather than in

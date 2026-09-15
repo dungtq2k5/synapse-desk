@@ -105,7 +105,7 @@ export const ACK_WAIT_MS = 30 * 1000;
  *
  * **Each entry IS the `ack_wait` for that attempt**, which is the whole reason
  * none may drop below {@link ACK_WAIT_MS}. An entry of 5s would redeliver a
- * healthy handler's message 5s in — so a 20s SMTP send would be delivered again
+ * healthy handler's message 5s in — so a 20s email send would be delivered again
  * while the first is still connecting, and the duplicate is a second real email.
  *
  * Serves **both** retry paths, which fail differently and are paced separately:

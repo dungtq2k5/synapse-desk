@@ -32,20 +32,10 @@ export const MAX_DEVICE_TOKEN_LENGTH = 512;
 export const MAX_INVITATIONS_PER_BATCH = 200;
 
 export const MIN_DEPARTMENT_NAME_LENGTH = 2;
+
 /** Matches `departments.name` — `@db.VarChar(100)`. A longer value would pass
  * validation and then fail as a Postgres error, which reads as a 500. */
 export const MAX_DEPARTMENT_NAME_LENGTH = 100;
-
-/**
- * How many files ONE inbound mail may present for upload.
- *
- * **Deliberately larger than `MAX_ATTACHMENTS_PER_MESSAGE`.** A mail with eight
- * attachments is a real mail; the route accepts the list, decides which five are
- * eligible, and DECLINES the rest by name. Rejecting the whole request at six
- * would make the Worker guess the policy, and it would lose the names the
- * ticket's "attachments were not accepted" note is built from.
- */
-export const MAX_PRESENTED_ATTACHMENTS = 20;
 
 /**
  * Upper bound on one "add members" call. Guards the REQUEST BODY only; the
@@ -113,8 +103,8 @@ export const NOTIFICATION_FEED_LIMIT = {
 
 // ------------------------------------------------------- inbound email
 //
-// The webhook's caller is authenticated by signature, which proves the Worker
-// sent the body and nothing about what a stranger put in the mail. Every one of
+// The webhook is authenticated by signature, which proves Resend sent the
+// delivery and nothing about what a stranger put in the mail. Every one of
 // these bounds an attacker-controlled header.
 
 /** RFC 5321's maximum path: 64-octet local part, 255-octet domain, `@`. */

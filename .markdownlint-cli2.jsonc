@@ -33,6 +33,8 @@
   // second `ignores` array that would drift from it.
   "gitignore": true,
   "globs": ["**/*.md"],
+  // Delimiter cells are `:---` or `:---:` — see the rule's own header.
+  "customRules": ["./scripts/markdownlint-table-delimiter.mjs"],
   "config": {
     // **Off, not widened.** A larger limit would still be arbitrary and would
     // still fail every table, because a cell holding a sentence cannot wrap —
@@ -50,6 +52,13 @@
     // continuation — so the tag is the only way to express it and banning it
     // would mean losing the break, not writing it differently.
     "MD033": { "allowed_elements": ["br"] },
+
+    // Table cells are padded by ONE space, never aligned. Alignment padding
+    // moves every row of a table whenever one cell's width changes, so a
+    // one-word edit shows up as a whole-table diff. `npx markdownlint-cli2
+    // --fix` rewrites a table into this style; the dash count in the delimiter
+    // row does not matter to it.
+    "MD060": { "style": "compact" },
 
     // MD041 is NOT disabled here. It is switched off only for
     // `docs/reference/erd/`, in that directory's own config, so a hand-written

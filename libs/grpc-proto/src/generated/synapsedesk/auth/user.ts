@@ -376,7 +376,7 @@ export interface ResolveInboundSenderResponse {
 export interface UserServiceClient {
   /**
    * Unauthenticated by design — the caller is the inbound-email webhook, which
-   * holds a verified Worker signature and no user context. It cannot name a
+   * holds a verified Resend signature and no user context. It cannot name a
    * role, and it cannot reach the founder branch: see the request message.
    */
 
@@ -445,7 +445,7 @@ export interface UserServiceClient {
 export interface UserServiceController {
   /**
    * Unauthenticated by design — the caller is the inbound-email webhook, which
-   * holds a verified Worker signature and no user context. It cannot name a
+   * holds a verified Resend signature and no user context. It cannot name a
    * role, and it cannot reach the founder branch: see the request message.
    */
 

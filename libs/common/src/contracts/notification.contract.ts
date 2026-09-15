@@ -5,7 +5,7 @@
  * renamed field is a compile error here and a silent `undefined` without it.
  *
  * Notifications travel over NATS rather than gRPC because they are background
- * side effects — a caller never waits for an SMTP round trip.
+ * side effects — a caller never waits for an email provider's round trip.
  */
 
 import type { InboundRejectionReason } from './inbound-email.contract';
@@ -59,12 +59,13 @@ export type NotificationOrigin = {
 };
 
 /**
- * One email to send, discriminated by {@link EmailTemplateName}.
+ * What one email says, discriminated by {@link EmailTemplateName}.
  *
  * The `template` picks the arm, so each template's own `data` shape is checked
- * at the publish site.
+ * at the publish site. A producer writes this; the identity that makes it a
+ * {@link SendEmailCommand} is added by whoever sends it.
  */
-export type SendEmailCommand =
+export type EmailContent =
   | {
       template: EmailTemplateName.INBOUND_REJECTED;
       to: string;
@@ -198,6 +199,23 @@ export type SendEmailCommand =
         summary: string;
       };
     };
+
+/**
+ * One email to send: its {@link EmailContent} plus the identity of the send.
+ *
+ * **`sendId` is what makes a retry safe.** notification-service derives the
+ * provider idempotency key and the RFC `Message-ID` from it, so a redelivery
+ * of this command sends byte-identical headers under the same key and the
+ * provider returns the first result instead of a second mail. It is minted per
+ * ACT, never derived from the content: two identical security alerts on one
+ * day are two sends, and a content hash would collapse them into one.
+ *
+ * The auth publisher sets it to the uuid it hands JetStream as `Nats-Msg-Id`,
+ * so one value names the message on both sides of the broker.
+ *
+ * @example { sendId: '1f534452-8ae0-4367-bae9-2e4feafb73e7', template: EmailTemplateName.EMAIL_VERIFICATION, to: 'a@b.test', data: { fullName: 'A', code: '123456', expiresInMinutes: 10 } }
+ */
+export type SendEmailCommand = EmailContent & { sendId: string };
 
 export type SendSmsCommand = {
   template: SmsTemplateName.PHONE_VERIFICATION;

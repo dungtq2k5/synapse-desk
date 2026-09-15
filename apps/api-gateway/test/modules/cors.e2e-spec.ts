@@ -155,8 +155,8 @@ describe('CORS (e2e)', () => {
     }
   });
 
-  it('6. **A request with no Origin is untouched** — Stripe and the mail Worker', async () => {
-    // Stripe's webhook and the mail Worker send no `Origin`, and with a LIST
+  it('6. **A request with no Origin is untouched** — Stripe and Resend webhooks', async () => {
+    // Stripe's and Resend's webhooks send no `Origin`, and with a LIST
     // origin `cors` short-circuits on that and adds nothing. Measured, not
     // assumed: with `origin: '*'` the same request comes back carrying
     // `Access-Control-Allow-Origin: *`, so this test does fail if the config

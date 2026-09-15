@@ -13,7 +13,7 @@
 Both name the unfamiliar type, because the other side is whatever the surrounding file already is:
 
 | Direction | Named side | Example | Reads as |
-| :---- | :---- | :---- | :---- |
+| :--- | :--- | :--- | :--- |
 | `to*` | Where the value is **going** | `toProtoGender(gender: string)` | "domain → proto" |
 | `from*` | Where the value **came from** | `fromProtoGender(g: ProtoGender)` | "proto → domain" |
 | `to*` | | `toTicketResponseDto(t: TicketResponse)` | "wire → REST DTO" |

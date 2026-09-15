@@ -61,8 +61,8 @@ import { HttpMetricsInterceptor } from './modules/metrics/http-metrics.intercept
     // the consumer is a subscription the app must hold whether or not any
     // particular feature module was imported.
     CacheModule,
-    // The mail Worker's entry point. The gateway is the email
-    // adapter; no other service knows what an email is.
+    // Resend's inbound webhook. The gateway is the email adapter; no other
+    // service knows what an inbound email is.
     InboundEmailModule,
     // The single channel to ticket-service, `@Global` because Domain B's surface
     // spans several gateway modules and all of them must share one.

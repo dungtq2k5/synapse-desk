@@ -125,7 +125,7 @@ export type PullConsumerOptions<T> = {
  * A durable pull consumer, with explicit acks and a dead-letter republish.
  *
  * **Pull rather than push** (ADR 0041): a push consumer delivers at the
- * stream's pace, so a slow SMTP call becomes back-pressure the consumer has no
+ * stream's pace, so a slow email send becomes back-pressure the consumer has no
  * way to express. Pull lets the service fetch what it can finish.
  *
  * @example
@@ -235,7 +235,7 @@ export class PullConsumerRunner<T> {
    * looking at a queue depth will reach for concurrency here. Ordering within a
    * subject is worth more than throughput — two `notification.email.send`
    * commands for one recipient should arrive in the order they were published —
-   * and the per-subject runners already stop a slow SMTP send from holding up an
+   * and the per-subject runners already stop a slow email send from holding up an
    * in-app write, which is the blocking people actually fear.
    */
   private async drain(messages: ConsumerMessages): Promise<void> {

@@ -69,12 +69,10 @@ export async function recordInboundEmail(
 }
 
 // The key for a message with no `Message-ID` is SYNTHESIZED IN THE GATEWAY —
-// `idempotencyKeyFor`. A second implementation lived here, unused,
-// and keyed on `receivedAt`: the Worker stamps that fresh on every delivery
-// attempt, so a redelivery would have produced a new key, a new ticket, and
-// exactly the retry storm the fallback exists to prevent. Removed rather than
-// fixed — ticket-service receives a key and stays ignorant of email (
-// so it has no business minting one.
+// `idempotencyKeyFor`. ticket-service receives a key and stays ignorant of
+// email, so it has no business minting one — and `receivedAt`, the obvious
+// input here, describes a delivery rather than the message, so a key built
+// from it could differ between redeliveries and open a second ticket.
 
 /**
  * Runs a write, turning a redelivery into `ALREADY_EXISTS`.

@@ -26,6 +26,7 @@ import { TransformInterceptor } from './common/interceptors/transform.intercepto
 import { MicroserviceOptions } from '@nestjs/microservices';
 import { createNatsTransport, NodeEnv } from '@synapsedesk/common';
 import { RedisIoAdapter } from './common/adapters/redis-io.adapter';
+import { VALIDATION_PIPE_OPTIONS } from './common/config/validation.config';
 
 async function bootstrap() {
   const logger = new Logger(AppModule.name);
@@ -118,13 +119,7 @@ async function bootstrap() {
   app.useGlobalInterceptors(new TransformInterceptor(app.get(Reflector)));
 
   // Add validation pipe for all routes
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-    }),
-  );
+  app.useGlobalPipes(new ValidationPipe(VALIDATION_PIPE_OPTIONS));
 
   // Socket.IO over Redis pub/sub. Awaited BEFORE `useWebSocketAdapter`:
   // `createIOServer` runs synchronously the moment the first gateway

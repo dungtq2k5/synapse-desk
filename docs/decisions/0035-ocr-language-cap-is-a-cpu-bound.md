@@ -11,7 +11,7 @@ A document may declare at most **four** OCR languages, stored and passed **in th
 **Measured — and the measurement reversed the guess.** The design expected accuracy to degrade as languages were added and proposed a cap of 2. It does not. Rendered at 300 dpi, tesseract 5.3.4:
 
 | `-l` | char error rate | time |
-| :---- | :---- | :---- |
+| :--- | :--- | :--- |
 | `vie` | 0.00% | 651ms |
 | `vie+eng` | 0.00% | 699ms |
 | `vie+eng+jpn` | 0.00% | 739ms |

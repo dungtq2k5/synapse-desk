@@ -7,7 +7,7 @@
 Four subjects move to JetStream with durable pull consumers, explicit acks, `MaxDeliver` and a DLQ republish:
 
 | Stream | Subjects | Consumer |
-| :---- | :---- | :---- |
+| :--- | :--- | :--- |
 | `AUDIT` | `audit.record` | ticket-service |
 | `NOTIFICATIONS` | `notification.>` | notification-service |
 
@@ -24,7 +24,7 @@ That is the whole rule, and `document.*` is what makes it concrete. It was the h
 The subjects staying on core each have a specific reason, not an absence of one:
 
 | Subject | Why at-most-once is right |
-| :---- | :---- |
+| :--- | :--- |
 | `ticket.*` | The only consumer is the WS relay. A lost broadcast is a client that reconnects and re-reads — the state is in Postgres and the event is a hint |
 | `document.*` | The `ingestion-reconcile` sweep reconciles from state, within ten minutes |
 | `storage.object.superseded` | A lost message orphans an object. Costs storage, not correctness |

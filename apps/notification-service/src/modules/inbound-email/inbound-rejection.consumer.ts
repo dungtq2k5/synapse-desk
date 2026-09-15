@@ -1,5 +1,6 @@
 import { Controller, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { randomUUID } from 'node:crypto';
 import { EventPattern, Payload } from '@nestjs/microservices';
 import {
   EMAIL_INBOUND_PATTERNS,
@@ -75,6 +76,9 @@ export class InboundRejectionConsumer {
     }
 
     await this.email.send({
+      // Minted here: this is a core-NATS event with nothing to redeliver it, so
+      // the send id only has to name this one reply.
+      sendId: randomUUID(),
       template: EmailTemplateName.INBOUND_REJECTED,
       to: sender,
       data: {

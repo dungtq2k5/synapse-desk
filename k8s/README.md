@@ -30,16 +30,16 @@ It is deliberately **not** `scripts/generate-docker-env.mjs`'s input. That scrip
 
 Nothing in `generated/` carries a real value.
 
-- **`REPLACE_ME`** in a ConfigMap is a per-deployment value: `CORS`, `APP_WEB_URL`, the SMTP host, the storage bucket, and so on.
+- **`REPLACE_ME`** in a ConfigMap is a per-deployment value: `CORS`, `APP_WEB_URL`, the sending address, the storage bucket, and so on.
 - **`*.secret.example.yaml`** is a key list with empty values. Create the real Secret out of band — `kubectl create secret generic`, a sealed-secret controller, or your platform's secret manager. Never commit one.
 - **File Secrets** are separate from the variable Secrets above, because they are mounted rather than injected:
 
-  | Secret                       | contents                                                  | mounted at                                              |
-  | :--------------------------- | :-------------------------------------------------------- | :------------------------------------------------------ |
-  | `api-gateway-jwt-public`     | `jwt-access.pub`, `jwt-2fa.pub`                           | `/app/apps/api-gateway/secrets/`                        |
-  | `auth-service-files`         | `jwt-access.key`, `jwt-2fa.key`, `serviceAccountKey.json` | `/app/apps/auth-service/secrets/`                       |
-  | `storage-service-files`      | `serviceAccountKey.json`                                  | `/app/apps/storage-service/serviceAccountKey.json`      |
-  | `notification-service-files` | `serviceAccountKey.json` (optional — FCM)                 | `/app/apps/notification-service/serviceAccountKey.json` |
+  | Secret | contents | mounted at |
+  | :--- | :--- | :--- |
+  | `api-gateway-jwt-public` | `jwt-access.pub`, `jwt-2fa.pub` | `/app/apps/api-gateway/secrets/` |
+  | `auth-service-files` | `jwt-access.key`, `jwt-2fa.key`, `serviceAccountKey.json` | `/app/apps/auth-service/secrets/` |
+  | `storage-service-files` | `serviceAccountKey.json` | `/app/apps/storage-service/serviceAccountKey.json` |
+  | `notification-service-files` | `serviceAccountKey.json` (optional — FCM) | `/app/apps/notification-service/serviceAccountKey.json` |
 
   **Three Firebase service accounts, three variable names, two directory conventions.** auth's is under `secrets/`; storage's and notification's are at the package root. The paths above are not a convention to remember — they are each service's own `*_PATH` value resolved against `WORKDIR` (`/app/apps/${SERVICE}`), and the spec derives them the same way rather than trusting this table.
 
@@ -124,22 +124,13 @@ Getting this backwards is how a schema and its history stop agreeing — and not
 
 ## Inbound email — the cluster side
 
-The Worker's own README owns the Cloudflare sequence (Email Routing, catch-all rule, per-tenant `organizations.inbound_token`, **MX last**). Three things have to be true here first.
+[`docs/reference/flows/inbound-email.md`](../docs/reference/flows/inbound-email.md) owns the Resend sequence (receiving domain, `npm run resend:provision`, per-tenant `organizations.inbound_token`, **MX last**). Three things have to be true here first.
 
-**1. `INBOUND_EMAIL_SECRET` is one value in three places.** It is a key in the `api-gateway` and `notification-service` Secrets, and the Worker's `wrangler secret put INBOUND_SECRET`. `manifest-contract.spec.ts` asserts both Secrets carry it, and derives the list of holders from the services whose Joi schema names it — so a fourth consumer fails there rather than shipping without one.
+**1. `INBOUND_EMAIL_SECRET` is one value in two places.** It is a key in the `api-gateway` and `notification-service` Secrets. `manifest-contract.spec.ts` asserts both carry it, and derives the list of holders from the services whose Joi schema names it — so a third consumer fails there rather than shipping without one. A mismatch is **silent**: `parseTicketReplyToken` returns `null` and every reply opens a **new ticket**. Rotate both at once; a partial rotation is worse than a wrong one, because half of it keeps working.
 
-The two agreements it underwrites fail in opposite directions:
+**2. The gateway Secret carries two more values, and neither is the sending key.** `RESEND_WEBHOOK_SECRET` is what `scripts/provision-resend.mjs` printed when it created the webhook (readable back with `--print-secret`); `RESEND_GATEWAY_API_KEY` is the key the gateway fetches inbound mail with — separate from notification-service's `RESEND_API_KEY` by name and by scope. `RESEND_WEBHOOK_URL` in the root `.env` must be the real Ingress host plus `/api/v1/webhooks/email/resend` before the webhook is created, because the webhook holds a URL.
 
-| pair                   | mismatch                                                                            |
-| :--------------------- | :---------------------------------------------------------------------------------- |
-| Worker → gateway       | **401 on every message**, reported by the Worker rather than retried — loud         |
-| notification → gateway | `parseTicketReplyToken` returns `null`, every reply opens a **new ticket** — silent |
-
-Rotate all three at once. A partial rotation is worse than a wrong one, because two thirds of it keeps working.
-
-**2. `wrangler.toml`'s two URLs must become the real Ingress host.** They ship as `https://api.example.test/…` and are deliberately two values rather than one derived from the other — _"a split deployment would fail with a 404 nobody can read from a Worker log."_
-
-**3. The two inbound routes need nothing special from the Ingress, and this is confirmed rather than assumed.** `POST /api/v1/webhooks/email/{inbound,attachments}` sit under the ordinary prefix and reach the gateway through the one Ingress rule. They authenticate with `x-inbound-signature` rather than a JWT (`inbound-signature.guard.ts`), and the controller already carries `@SkipThrottle()` — _"A provider retry storm is Cloudflare doing its job; throttling it drops mail."_ Nothing to add.
+**3. The inbound route needs nothing special from the Ingress, and this is confirmed rather than assumed.** `POST /api/v1/webhooks/email/resend` sits under the ordinary prefix and reaches the gateway through the one Ingress rule. It authenticates with the Standard Webhooks signature rather than a JWT (`resend-inbound.service.ts`), and the controller carries `@SkipThrottle()` — a retry burst is Resend doing its job; throttling it drops mail. Nothing to add.
 
 ## What this directory assumes already exists
 
@@ -152,7 +143,7 @@ Rotate all three at once. A partial rotation is worse than a wrong one, because 
 
 ## What is deliberately not here
 
-- **`workers/email-inbound`** — a Cloudflare Worker, deployed with `wrangler`.
+- **The mail transport.** Resend receives and sends; the only artifacts here are the two Secrets' keys. The webhook itself is created by `scripts/provision-resend.mjs` against `RESEND_WEBHOOK_URL`, not by a manifest.
 - **Prometheus.** `docker/prometheus/job-alerts.yml` is generated and tracked, and **development** scrapes it — `docker-compose.yml` carries one behind the `observability` profile. Nothing scrapes it _here_: these manifests only make scraping possible, by exposing 9464 on its own listener and setting `METRICS_HOST=0.0.0.0`. Whether the cluster gets a managed collector or an in-cluster stack is a decision with retention, alert routing and an on-call destination attached, and it has not been taken.
 - **Postgres and Redis.** [ADR 0043](../docs/decisions/0043-the-cluster-shape.md) puts both on managed instances; their addresses arrive through `DATABASE_URL` and `REDIS_URL`, which are Secrets because they carry passwords.
 - **The Firebase Storage emulator.** `docker-compose.yml` only.

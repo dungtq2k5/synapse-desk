@@ -80,7 +80,7 @@ export class NotificationsGrpcController implements NotificationServiceControlle
    * The `In-Reply-To` fallback.
    *
    * **No caller context, and it does not need one.** The caller is the inbound
-   * webhook, which holds a verified Worker signature and no user; the tenant it
+   * webhook, which holds a verified Resend signature and no user; the tenant it
    * scopes on travels in the REQUEST, resolved from the address the mail was
    * sent to rather than from anything the message claimed.
    */

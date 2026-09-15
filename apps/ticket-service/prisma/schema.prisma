@@ -99,9 +99,9 @@ model Ticket {
 /// Inbound email idempotency
 ///
 /// **One row per accepted message, written in the SAME transaction as the
-/// ticket or message it produced.** Providers retry, and Cloudflare re-runs a
-/// Worker that errored, so a redelivery must be a duplicate-key violation
-/// rather than a second ticket.
+/// ticket or message it produced.** Resend redelivers a webhook that did not
+/// answer 2xx, so a redelivery must be a duplicate-key violation rather than a
+/// second ticket.
 ///
 /// The atomicity is the argument. Dedup recorded outside that transaction can
 /// be written by a request that then fails — and the mail is then silently lost

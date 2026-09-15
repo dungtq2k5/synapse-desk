@@ -49,7 +49,7 @@ sequenceDiagram
 ## 2. Components
 
 | Component | Module | Owns |
-| :---- | :---- | :---- |
+| :--- | :--- | :--- |
 | storage-service | the presign/confirm pair | the signed URL and the `PendingUpload` row |
 | ingestion-service | `DocumentUploadedConsumer` | turning the event into a job |
 | — the queue | `ingestion-queue.service.ts` | enqueue, retries, cancellation |
@@ -133,7 +133,7 @@ Each chunk is embedded and upserted to Qdrant with a payload carrying the four f
 ## 7. Edge cases
 
 | Situation | What happens | Why that, and not an error |
-| :---- | :---- | :---- |
+| :--- | :--- | :--- |
 | **PDF is entirely scanned** | every page is thin; OCR runs on all of them | The document is still indexable — slowly |
 | **No page yields any text** | `NoExtractableText` → job `FAILED` | Not a flag: a document with nothing in it was not indexed, and saying otherwise misleads |
 | **OCR binaries absent** | warns once at boot **and logs at `error` per document** | The run-open rule: text documents still work. The per-document line is deliberate — the boot warning *"is one line in a stream nobody re-reads, and by the time tenants are failing it has scrolled away"* |
@@ -158,7 +158,7 @@ The OCR path adds a second bound: `pdftoppm` rasterises each page to a temp file
 ## 9. When it misbehaves — where to look first
 
 | Symptom | Look at |
-| :---- | :---- |
+| :--- | :--- |
 | Job stuck in `PARSING` | OCR — a scanned document renders every thin page in sequence |
 | Job `FAILED` on a scan that looks fine | `NoExtractableText` vs `OcrUnavailable` — the first is the file, the second is the deployment |
 | Document `COMPLETED` but nothing is found | the Qdrant upsert, then the scope payload — chunk rows can exist without vectors |

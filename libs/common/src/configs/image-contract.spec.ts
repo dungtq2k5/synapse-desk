@@ -337,7 +337,7 @@ describe('the image contract (static half)', () => {
     const manifests = (): string[] =>
       // `*` in a git pathspec is plain fnmatch and CROSSES `/`, so these two
       // reach every depth. Verified, not assumed — the doubled-star spelling
-      // would MISS the root `package.json`, which is one of the five.
+      // would MISS the root `package.json`, which is one of the four.
       gitFiles('package.json').concat(gitFiles('*/package.json'));
 
     /** `^24.13.3` -> `24`. Any range prefix (`^`, `~`, `>=`, none) is fine. */
@@ -384,8 +384,12 @@ describe('the image contract (static half)', () => {
       const found = declarations();
 
       expect(manifests()).toContain('package.json');
-      expect(manifests()).toContain('workers/email-inbound/package.json');
-      expect(found.length).toBeGreaterThanOrEqual(5);
+      // Not a workspace, so reaching it proves the pathspec is not the
+      // workspace globs in disguise.
+      expect(manifests()).toContain('scripts/package.json');
+      // Four manifests declare it: the root, `libs/common`, `libs/grpc-proto`
+      // and `storage-service`.
+      expect(found.length).toBeGreaterThanOrEqual(4);
     });
   });
 

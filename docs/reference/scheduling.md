@@ -9,7 +9,7 @@ The decision behind the mechanism is [ADR 0003](../decisions/0003-bullmq-over-ne
 ## The nine
 
 | Job | Cron | Service | Steps, in order |
-| :---- | :---- | :---- | :---- |
+| :--- | :--- | :--- | :--- |
 | `LEDGER_HOURLY` | `0 * * * *` | ingestion | `discarded-draft-sweep`, `quota-reconcile` |
 | `LEDGER_DAILY` | `0 2 * * *` | ingestion | `chunk-usage-projection`, `ai-generation-rollup`, `document-flags` |
 | `ANALYTICS_DAILY` | `0 2 * * *` | ticket | `ticket-rollup` |
@@ -101,7 +101,7 @@ It needs `METRICS_HOST = 0.0.0.0` in `apps/api-gateway/.env`: the listener defau
 ## Edge cases
 
 | Situation | What happens | Why |
-| :---- | :---- | :---- |
+| :--- | :--- | :--- |
 | **Three replicas** | one schedule | Stable `jobId`; the repeat lives in Redis, not in the process |
 | **Deploy during a run** | the job is redelivered | BullMQ redelivery — safe: the rollup recomputes, the projection resumes from its cursor |
 | **A step throws** | **later steps still run** — `step()` catches and logs, it does not rethrow | One bad tenant must not cost the night's rollup. The cost is that `document-flags` may compute against counters the projection did not write this run — stale, not wrong, and the next run closes the gap |
@@ -115,7 +115,7 @@ It needs `METRICS_HOST = 0.0.0.0` in `apps/api-gateway/.env`: the listener defau
 ## When it misbehaves
 
 | Symptom | Look at |
-| :---- | :---- |
+| :--- | :--- |
 | A rollup stopped updating | `job_runs` for that job, then whether its repeat entry still exists in Redis |
 | A job ran twice | a second repeat entry — usually a deploy that changed the `jobId` |
 | A daily figure is stale but its sibling is fresh | both dailies run at `0 2 * * *`, so this is a failure, not a lag |

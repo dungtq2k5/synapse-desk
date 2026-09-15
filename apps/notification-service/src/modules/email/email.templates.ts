@@ -1,7 +1,7 @@
 import {
   EmailTemplateName,
   NotificationOrigin,
-  SendEmailCommand,
+  EmailContent,
 } from '@synapsedesk/common';
 
 /** Everything a template needs that comes from config rather than the event. */
@@ -23,11 +23,11 @@ export type RenderedEmail = {
  * Templates as functions rather than.hbs files on purpose: a templating engine
  * would need its files copied into `dist` via nest-cli assets config, and a
  * missing asset only fails at send time in production. These fail at compile
- * time instead, and the discriminated `SendEmailCommand` means each renderer can
+ * time instead, and the discriminated `EmailContent` means each renderer can
  * only reach the variables its own template actually has.
  */
 export function renderEmail(
-  command: SendEmailCommand,
+  command: EmailContent,
   branding: TemplateBranding,
 ): RenderedEmail {
   switch (command.template) {
@@ -134,7 +134,7 @@ function textOrigin(origin: NotificationOrigin, action: string): string {
 }
 
 type Data<T extends EmailTemplateName> = Extract<
-  SendEmailCommand,
+  EmailContent,
   { template: T }
 >['data'];
 
@@ -337,6 +337,7 @@ function quotaAlert(
   };
 }
 
+// ASK Why don't we just call `quotaAlert` inside since the logic is the same?
 /**
  * A seat, storage or document-count threshold crossing.
  *

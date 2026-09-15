@@ -46,7 +46,7 @@ type ConsumedOtp = {
  * Email and phone ownership challenges, backed by the `otps` table.
  *
  * The code is dispatched over NATS to notification-service — this service holds
- * no SMTP or Twilio credentials, and a mail outage must not fail the request
+ * no email-provider or Twilio credentials, and a mail outage must not fail the request
  * that asked for a code.
  */
 @Injectable()

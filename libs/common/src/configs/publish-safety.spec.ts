@@ -50,15 +50,15 @@ describe('nothing here can be published, and the licence is one string', () => {
     readFileSync(join(REPO_ROOT, repoRelative), 'utf8');
 
   /**
-   * Every tracked manifest — the root, both workspace globs, and the two
-   * packages that are deliberately outside them.
+   * Every tracked manifest — the root, both workspace globs, and the package
+   * that is deliberately outside them.
    *
    * `*` in a git pathspec is plain fnmatch and CROSSES `/`, so the
    * `*\/package.json` pathspec below reaches every depth (escaped here only
    * because an unescaped one would CLOSE this comment); `package.json` alone is
-   * the root. `workers/` and `scripts/` are NOT npm workspaces, so
-   * `--workspaces` cannot publish them — they are in the corpus anyway, because
-   * `npm publish` run from inside one still can.
+   * the root. `scripts/` is NOT an npm workspace, so `--workspaces` cannot
+   * publish it — it is in the corpus anyway, because `npm publish` run from
+   * inside it still can.
    */
   const manifests = (): string[] =>
     execFileSync('git', ['ls-files', '--', 'package.json', '*/package.json'], {
@@ -167,7 +167,9 @@ describe('nothing here can be published, and the licence is one string', () => {
     }
 
     expect(found).toContain('package.json');
-    expect(found).toContain('workers/email-inbound/package.json');
+    // Outside the workspace globs, so the scan reaching it proves the corpus is
+    // not derived from them.
+    expect(found).toContain('scripts/package.json');
     expect(found.length).toBeGreaterThanOrEqual(10);
   });
 });

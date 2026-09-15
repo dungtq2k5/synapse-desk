@@ -9,7 +9,7 @@ Extracted from `development-conventions.md` §8.5–§8.5a. The *rule* — **a m
 Every parse site returns a safe empty rather than raising, defaults toward *less* confidence, and never reaches a `throw`.
 
 | Site | Default | Why that direction |
-| :---- | :---- | :---- |
+| :--- | :--- | :--- |
 | `_json_object` / `_json_array` | **searches** for JSON, returns `{}` / `[]` | Models wrap JSON in prose and fences regardless of instructions. Searching is the correct posture; parsing the whole response is not |
 | `_confidence` | **0**, not 1 | A UI that hides low-confidence output must hide the *unreadable* ones. Defaulting to 1 promotes exactly the malformed responses |
 | `classify` → `department_id` | validated against the **candidate set** | The one whose failure is a routing error rather than an exception: an invented id files a ticket into a department that does not exist |

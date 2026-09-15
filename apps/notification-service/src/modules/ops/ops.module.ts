@@ -16,7 +16,7 @@ import { PrismaService } from '../prisma/prisma.service';
  * `grpc.health.v1.Health` and `synapsedesk.ops.OpsService`
  *
  * **Postgres and NATS**, because this service is a NATS consumer with a feed
- * table and nothing else. Notably NOT the SMTP host or the SMS provider: those
+ * table and nothing else. Notably NOT the email or SMS provider: those
  * are outbound integrations whose failure means a retry, not an inability to
  * accept work. Putting a third party in a readiness probe hands them the power
  * to take this service out of rotation.

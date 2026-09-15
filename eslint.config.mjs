@@ -17,14 +17,6 @@ export default defineConfig(
       '**/node_modules/**',
       // Prisma client output — regenerated from schema.prisma, never hand-edited.
       '**/generated/**',
-      // The Cloudflare Worker. It is deliberately outside the
-      // `apps/*` / `libs/*` workspace globs: it is a Workers runtime, not a
-      // Nest app, and no tsconfig in `parserOptions.project` covers it. Linting
-      // it here would fail with "none of those tsconfigs include this file",
-      // which is the same breakage a stray config file caused once already.
-      // It carries its own tsconfig and is checked by `npm run typecheck`
-      // inside its directory.
-      'workers/**',
       // Tooling config, the same class each app's lint glob already omits:
       // jest configs import with the explicit `.ts` extension jest's ESM
       // loading needs, which no lint project parses, and the sequencer is

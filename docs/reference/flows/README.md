@@ -4,34 +4,34 @@ Six documents, one per path through the system. Each answers the same four quest
 
 ## Find the flow by what you are asking
 
-| You are asking                                          | Read                                                                               |
-| :------------------------------------------------------ | :--------------------------------------------------------------------------------- |
-| _A customer replied by email and no ticket appeared_    | [inbound-email](./inbound-email.md)                                                |
-| _Replies keep opening new tickets instead of threading_ | [inbound-email](./inbound-email.md) §3 — three holders of one secret               |
-| _An answer cited the wrong document, or none_           | [rag-answering](./rag-answering.md) §5 — the tenant boundary                       |
-| _Answers got vaguer after a deploy_                     | [rag-answering](./rag-answering.md) §8 — the reranker row                          |
-| _Why was my question refused?_                          | [rag-answering](./rag-answering.md) §3–§4 — the cap, then the injection layers     |
-| _I uploaded a PDF and nothing is searchable_            | [file-processing](./file-processing.md)                                            |
-| _A document is `COMPLETED` but flagged_                 | [file-processing](./file-processing.md) §4 — pages that were images                |
-| _Why can't I move this ticket to that status?_          | [ticket-lifecycle](./ticket-lifecycle.md) §2 — the edges absent on purpose         |
-| _A ticket has two assignees_                            | [ticket-lifecycle](./ticket-lifecycle.md) §3                                       |
-| _Someone did not get notified_                          | [notification-delivery](./notification-delivery.md)                                |
-| _A user stopped receiving push_                         | [notification-delivery](./notification-delivery.md) §5 — the two ways a token dies |
-| _The dashboard is stale, or a block is missing_         | [analytics](./analytics.md) §4 — `dataThrough` vs `computedAt` vs `unavailable`    |
-| _An export disagrees with the dashboard_                | [analytics](./analytics.md) §5                                                     |
+| You are asking | Read |
+| :--- | :--- |
+| _A customer replied by email and no ticket appeared_ | [inbound-email](./inbound-email.md) |
+| _Replies keep opening new tickets instead of threading_ | [inbound-email](./inbound-email.md) §3 — the secret with two holders |
+| _An answer cited the wrong document, or none_ | [rag-answering](./rag-answering.md) §5 — the tenant boundary |
+| _Answers got vaguer after a deploy_ | [rag-answering](./rag-answering.md) §8 — the reranker row |
+| _Why was my question refused?_ | [rag-answering](./rag-answering.md) §3–§4 — the cap, then the injection layers |
+| _I uploaded a PDF and nothing is searchable_ | [file-processing](./file-processing.md) |
+| _A document is `COMPLETED` but flagged_ | [file-processing](./file-processing.md) §4 — pages that were images |
+| _Why can't I move this ticket to that status?_ | [ticket-lifecycle](./ticket-lifecycle.md) §2 — the edges absent on purpose |
+| _A ticket has two assignees_ | [ticket-lifecycle](./ticket-lifecycle.md) §3 |
+| _Someone did not get notified_ | [notification-delivery](./notification-delivery.md) |
+| _A user stopped receiving push_ | [notification-delivery](./notification-delivery.md) §5 — the two ways a token dies |
+| _The dashboard is stale, or a block is missing_ | [analytics](./analytics.md) §4 — `dataThrough` vs `computedAt` vs `unavailable` |
+| _An export disagrees with the dashboard_ | [analytics](./analytics.md) §5 |
 
 ## Find the flow from an endpoint
 
 Many routes enter one flow. Swagger documents what each endpoint **accepts and returns**; these documents describe what **happens** afterwards.
 
-| Route prefix                                    | Flow                                                |
-| :---------------------------------------------- | :-------------------------------------------------- |
-| `POST /webhooks/email/*`                        | [inbound-email](./inbound-email.md)                 |
-| `/tickets`, `/tickets/:id/messages`             | [ticket-lifecycle](./ticket-lifecycle.md)           |
-| `/tickets/:id/ai`, `/chat`, `/knowledge`        | [rag-answering](./rag-answering.md)                 |
-| `/documents`, `/ingestion-jobs`, `/attachments` | [file-processing](./file-processing.md)             |
-| `/notifications`, `/webhook-endpoints`          | [notification-delivery](./notification-delivery.md) |
-| `/analytics`                                    | [analytics](./analytics.md)                         |
+| Route prefix | Flow |
+| :--- | :--- |
+| `POST /webhooks/email/*` | [inbound-email](./inbound-email.md) |
+| `/tickets`, `/tickets/:id/messages` | [ticket-lifecycle](./ticket-lifecycle.md) |
+| `/tickets/:id/ai`, `/chat`, `/knowledge` | [rag-answering](./rag-answering.md) |
+| `/documents`, `/ingestion-jobs`, `/attachments` | [file-processing](./file-processing.md) |
+| `/notifications`, `/webhook-endpoints` | [notification-delivery](./notification-delivery.md) |
+| `/analytics` | [analytics](./analytics.md) |
 
 ## What is not here
 

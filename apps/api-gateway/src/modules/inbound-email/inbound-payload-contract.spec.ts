@@ -4,18 +4,19 @@ import { plainToInstance } from 'class-transformer';
 import { validateSync } from 'class-validator';
 import { InboundEmailDto } from './dto/rest/inbound-email.dto';
 
-describe('the mail Worker’s payload contract', () => {
+describe('the inbound fixture payloads satisfy InboundEmailDto', () => {
   /**
-   * The Worker's payloads satisfy the endpoint's contract.
+   * The hand-built fixture payloads are valid `InboundEmailDto`s.
    *
-   * **Both halves are ours**, unlike the Stripe route whose DTO documents
-   * somebody else's payload. The Worker cannot import the DTO — it is a Workers
-   * runtime outside the workspace — so the agreement is checked against recorded
-   * payloads rather than assumed.
+   * **JSON only — this is not a test of the Resend adapter.** The routing e2e
+   * suite delivers these fixtures through the real webhook, and a fixture the
+   * DTO refuses would turn those tests into `invalid_payload` drops that assert
+   * nothing about routing. The mapper from Resend's objects has its own spec,
+   * `resend-inbound.mapper.spec.ts`, which is where an adapter regression shows.
    *
-   * **These are hand-built, and that is a known weakness.** A synthetic fixture
-   * agrees with whatever the parser does; a recorded one can disagree, and the
-   * disagreement is the point. Replace them after the first live run.
+   * **Hand-built, and that is a known weakness.** A synthetic fixture agrees
+   * with whatever the code does; a recorded one can disagree, and the
+   * disagreement is the point. Replace them after the first live capture.
    */
   const PAYLOADS = join(
     __dirname,
@@ -51,9 +52,8 @@ describe('the mail Worker’s payload contract', () => {
 
   it('**every fixture carries `text` and `html` as KEYS**', () => {
     // The DTO requires both present and allows both null, because "no text
-    // part" and "the field was forgotten" are different facts. A Worker that
-    // omitted them would 400 on every message — and this is the assertion that
-    // says so before a live MX record does.
+    // part" and "the field was forgotten" are different facts. A fixture that
+    // omitted them would fail validation on every delivery.
     for (const name of fixtures) {
       const payload = JSON.parse(
         readFileSync(join(PAYLOADS, name), 'utf8'),
@@ -68,7 +68,7 @@ describe('the mail Worker’s payload contract', () => {
   });
 
   it('and the auto-responder fixture carries the loop headers', () => {
-    // The one shape the guards need, and the one a Worker that
+    // The one shape the loop guards need, and the one a transport that
     // forwarded only the body would silently lose.
     const payload = JSON.parse(
       readFileSync(join(PAYLOADS, 'auto-responder.json'), 'utf8'),

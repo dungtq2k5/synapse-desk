@@ -2,7 +2,7 @@
 
 **One thing happened; who hears about it, how, and where that is recorded.** A ticket was escalated, a quota crossed 80%, an invitation was sent — this document follows the path from the publish to the person's phone.
 
-What *produces* the events is elsewhere: [`ticket-lifecycle.md`](./ticket-lifecycle.md) publishes most of them. This document starts at the subject.
+What _produces_ the events is elsewhere: [`ticket-lifecycle.md`](./ticket-lifecycle.md) publishes most of them. This document starts at the subject.
 
 ---
 
@@ -16,7 +16,7 @@ sequenceDiagram
   participant NS as notification-service
   participant PG as Postgres<br/>(notification)
   participant WS as api-gateway<br/>(WebSocket)
-  participant EX as SMTP · Twilio · FCM
+  participant EX as Resend · Twilio · FCM
   participant EP as Tenant endpoint
 
   P-)JS: notification.in_app.create · email.send · sms.send
@@ -36,16 +36,16 @@ sequenceDiagram
 ## 2. Five channels, and one of them is not a user channel
 
 | Channel | Destination | Recorded in |
-| :---- | :---- | :---- |
+| :--- | :--- | :--- |
 | `IN_APP` | a row plus a WebSocket frame | `notification_deliveries` |
-| `EMAIL` | SMTP | `notification_deliveries` |
+| `EMAIL` | Resend, one API call per recipient | `notification_deliveries` |
 | `SMS` | Twilio | `notification_deliveries` |
 | `PUSH` | FCM, one row **per person** | `notification_deliveries` |
 | `WEBHOOK` | a tenant-registered endpoint | **`webhook_deliveries`** |
 
-**`WEBHOOK` is deliberately not in `PREFERENCE_CHANNELS`.** The destination belongs to the *organization*, not to a person, so a user preference has nothing to say about it — and it writes a different table, because `notification_deliveries` answers *"did we tell this person"* and a webhook does not tell a person anything.
+**`WEBHOOK` is deliberately not in `PREFERENCE_CHANNELS`.** The destination belongs to the _organization_, not to a person, so a user preference has nothing to say about it — and it writes a different table, because `notification_deliveries` answers _"did we tell this person"_ and a webhook does not tell a person anything.
 
-**`PUSH` is one delivery row per person, not per device**, and that is the design rather than a limit to work around. `notification_deliveries` is unique on `(notificationId, channel)`, and *"did we tell this person, and if not why"* has one answer however many phones they own. Per-device outcome lives on `device_tokens` — the row that actually gets deleted.
+**`PUSH` is one delivery row per person, not per device**, and that is the design rather than a limit to work around. `notification_deliveries` is unique on `(notificationId, channel)`, and _"did we tell this person, and if not why"_ has one answer however many phones they own. Per-device outcome lives on `device_tokens` — the row that actually gets deleted.
 
 ---
 
@@ -53,7 +53,7 @@ sequenceDiagram
 
 The collapse index is **partial**: `WHERE read_at IS NULL AND group_key IS NOT NULL` ([ADR 0019](../../decisions/0019-notification-grouping-is-unread-scoped.md)).
 
-Once a user has read *"3 new replies"*, the next reply is new information and starts a fresh row. Without the unread scope, a long thread produces one notification the user read on day one and never sees again.
+Once a user has read _"3 new replies"_, the next reply is new information and starts a fresh row. Without the unread scope, a long thread produces one notification the user read on day one and never sees again.
 
 This is why `unreadNotificationCount` is a first-class query rather than a `length` over a page — the count is the thing the badge needs and counting by fetching is what it exists to avoid.
 
@@ -89,14 +89,14 @@ The delivery path applies an SSRF guard at connection time on every resolved add
 ## 7. Edge cases
 
 | Situation | What happens | Why that, and not an error |
-| :---- | :---- | :---- |
+| :--- | :--- | :--- |
 | **Broker down at publish** | the originating action still succeeds | Publishes are fire-and-forget; an escalation must not depend on the broker |
 | **Consumer down** | JetStream holds the message | That is what durable means — and why these four subjects are durable |
 | **Duplicate delivery** | the consumer is idempotent per notification | JetStream is at-least-once; the consumer, not the broker, is the arbiter |
 | **User in quiet hours** | row written, transport suppressed | The feed stays complete; only the interruption is deferred |
 | **Push token unregistered** | that row deleted, others untouched | Per-device outcome, per-person delivery record |
 | **FCM outage** | delivery marked failed, **tokens kept** | Catch-and-delete would silently unsubscribe everyone |
-| **SMTP rejects** | recorded on the delivery row | The feed already has the notification; email is one channel of several |
+| **Resend refuses the send** | a 4xx is recorded on the delivery row; a 429, 5xx or network error is rethrown so JetStream redelivers | The feed already has the notification; email is one channel of several. The idempotency key (`template/sendId/recipient`) makes the redelivery safe, and the `Message-ID` is derived from that key so the retry carries the same body |
 | **No endpoint registered** | no webhook, no `webhook_deliveries` row | Absence of a destination is not a failed delivery |
 | **Tenant endpoint 5xx** | retried by the scheduler; retention sweeps old rows | `WEBHOOK_RETENTION` is one of the nine scheduled jobs |
 
@@ -105,7 +105,7 @@ The delivery path applies an SSRF guard at connection time on every resolved add
 ## 8. When it misbehaves — where to look first
 
 | Symptom | Look at |
-| :---- | :---- |
+| :--- | :--- |
 | Nothing arrives on any channel | the durable consumer first — is JetStream holding messages? |
 | In-app works, email does not | the delivery row for that `(notificationId, channel)` — the reason is on it |
 | A user stopped getting push | `device_tokens` — was the row deleted, and by which of §5's two paths? |

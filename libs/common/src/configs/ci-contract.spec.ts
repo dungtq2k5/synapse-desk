@@ -52,7 +52,6 @@ describe('the CI contract', () => {
         ...gitFiles('*/*/package.json').filter((file) =>
           /^(apps|libs)\/[^/]+\/package\.json$/.test(file),
         ),
-        'workers/email-inbound/package.json',
       ]) {
         const parsed = JSON.parse(read(manifest)) as {
           scripts?: Record<string, string>;

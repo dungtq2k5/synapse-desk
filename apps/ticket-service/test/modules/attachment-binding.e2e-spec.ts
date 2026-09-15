@@ -251,8 +251,8 @@ describe('Attachments bound at message create (e2e)', () => {
 
     it('**6. a parse-eligible attachment is extracted through THIS path**', async () => {
       // The hook is in `confirmNewAttachments`, which both attachment routes
-      // reach — and this is the nested one, which is what INBOUND EMAIL uses:
-      // the Worker presigns, PUTs the bytes and sends paths, and they are
+      // reach — and this is the nested one, the path inbound email's
+      // attachments take: objects already in storage arrive as paths and are
       // confirmed here as the message is written.
       //
       // Hooking `confirmAttachment` alone would have left every emailed office

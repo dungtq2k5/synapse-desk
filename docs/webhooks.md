@@ -11,7 +11,7 @@ Everything here mirrors the code's own declarations — `libs/common/src/contrac
 Endpoints are tenant configuration, managed over REST at `/webhook-endpoints` (gated by `organization.read` / `organization.update`):
 
 | Route | What it does |
-| --- | --- |
+| :--- | :--- |
 | `GET /webhook-endpoints` | List your endpoints. Never includes secrets. |
 | `GET /webhook-endpoints/event-types` | Every event type you can subscribe to. |
 | `GET /webhook-endpoints/:id` | One endpoint, with its subscribed types. |

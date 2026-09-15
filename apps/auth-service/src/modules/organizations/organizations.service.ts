@@ -83,7 +83,7 @@ export class OrganizationsService {
    * opposite answers.
    *
    * **No caller context, deliberately.** The webhook has no user — it holds a
-   * verified Worker signature. The token is the lookup key and grants nothing
+   * verified Resend webhook signature. The token is the lookup key and grants nothing
    * beyond naming a tenant, which is why it can be a public mail address.
    *
    * A soft-deleted tenant does not resolve. Mail addressed to a deleted

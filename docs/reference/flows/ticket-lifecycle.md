@@ -19,7 +19,7 @@ flowchart LR
   CREATE[[ticket-service<br/>create]] --> NEW([status = NEW])
 ```
 
-**A door is a paragraph; a door with its own runtime is a flow.** `WEB`, `API` and `CHAT` differ only in who calls the gateway and what the client already knows. `EMAIL` arrives through a Cloudflare Worker with its own deploy path, shared secret and idempotency rule, which is why it has a document.
+**A door is a paragraph; a door with its own runtime is a flow.** `WEB`, `API` and `CHAT` differ only in who calls the gateway and what the client already knows. `EMAIL` arrives from outside the cluster through a provider webhook, with its own secrets, retry rule and idempotency rule, which is why it has a document.
 
 Everything past `CREATE` is identical regardless of door.
 
@@ -101,7 +101,7 @@ Status changes are rows in a table, not entries in an audit trail ([ADR 0040](..
 ## 7. Edge cases
 
 | Situation | What happens | Why that, and not an error |
-| :---- | :---- | :---- |
+| :--- | :--- | :--- |
 | **Illegal transition** | rejected with the legal set named | One table, one validator; the convenience RPCs cannot drift from it |
 | **Two concurrent reassigns** | one wins, the other hits the partial unique index | The index is the control; the service check exists for the 99.99% case's error message |
 | **Re-escalation** | allowed where the table allows it; `escalatedAt` **is** reset | Unconditional on the status; analytics therefore measure from the latest |
@@ -116,7 +116,7 @@ Status changes are rows in a table, not entries in an audit trail ([ADR 0040](..
 ## 8. When it misbehaves — where to look first
 
 | Symptom | Look at |
-| :---- | :---- |
+| :--- | :--- |
 | A ticket has two assignees | `ticket_assignments_current_key` — does the index exist in this database? |
 | `resolve` works and `status` does not (or vice versa) | they share one validator; the divergence is in the caller, not the table |
 | Escalation happened but nobody was told | the publish is fire-and-forget — check the notification flow, not ticket-service |

@@ -50,11 +50,11 @@ Materialized views were rejected because Prisma cannot express them, they refres
 
 ## 3. Cadence, and why it differs
 
-| Job               | Cron        | Steps                                                           |
-| :---------------- | :---------- | :-------------------------------------------------------------- |
-| `LEDGER_HOURLY`   | `0 * * * *` | `discarded-draft-sweep`, `quota-reconcile` — **not** the rollup |
-| `LEDGER_DAILY`    | `0 2 * * *` | `ai-generation-rollup`                                          |
-| `ANALYTICS_DAILY` | `0 2 * * *` | `ticket-rollup`                                                 |
+| Job | Cron | Steps |
+| :--- | :--- | :--- |
+| `LEDGER_HOURLY` | `0 * * * *` | `discarded-draft-sweep`, `quota-reconcile` — **not** the rollup |
+| `LEDGER_DAILY` | `0 2 * * *` | `ai-generation-rollup` |
+| `ANALYTICS_DAILY` | `0 2 * * *` | `ticket-rollup` |
 
 **Both rollups run at the same time**, `0 2 * * *`, in different services. The hourly job is housekeeping — sweeping discarded drafts and reconciling the quota counter — and writes no rollup at all. Reading "hourly ledger" as "the spend figures refresh hourly" is the mistake this table exists to prevent.
 
@@ -87,28 +87,28 @@ So the diagnostic _"compare when it ran against what it covers"_ is available on
 
 ## 6. Edge cases
 
-| Situation                                     | What happens                                        | Why that, and not an error                                                       |
-| :-------------------------------------------- | :-------------------------------------------------- | :------------------------------------------------------------------------------- |
-| **Quiet tenant**                              | no rollup row for that day                          | Absence is zero; writing zero rows for every tenant every day is the alternative |
-| **Job missed a run**                          | the next run's window covers it, or `backfill` does | Idempotent by construction — that is what makes recovery routine                 |
-| **One leg behind**                            | `dataThrough` reports the stalest                   | The healthy leg must not vouch for the broken one                                |
-| **One leg unreachable**                       | `unavailable` names it; the rest is returned        | Partial figures beat no dashboard, _if_ the gap is visible                       |
-| **Retention rolls the raw rows** (when built) | rollups still answer                                | This is the reason rollups exist rather than live queries — see §2               |
-| **Re-running a day**                          | same result                                         | Idempotent; `backfill` is the supported entry point                              |
-| **Three replicas**                            | one schedule                                        | Stable BullMQ job ids, not `@Cron`                                               |
+| Situation | What happens | Why that, and not an error |
+| :--- | :--- | :--- |
+| **Quiet tenant** | no rollup row for that day | Absence is zero; writing zero rows for every tenant every day is the alternative |
+| **Job missed a run** | the next run's window covers it, or `backfill` does | Idempotent by construction — that is what makes recovery routine |
+| **One leg behind** | `dataThrough` reports the stalest | The healthy leg must not vouch for the broken one |
+| **One leg unreachable** | `unavailable` names it; the rest is returned | Partial figures beat no dashboard, _if_ the gap is visible |
+| **Retention rolls the raw rows** (when built) | rollups still answer | This is the reason rollups exist rather than live queries — see §2 |
+| **Re-running a day** | same result | Idempotent; `backfill` is the supported entry point |
+| **Three replicas** | one schedule | Stable BullMQ job ids, not `@Cron` |
 
 ---
 
 ## 7. When it misbehaves — where to look first
 
-| Symptom                                       | Look at                                                                                         |
-| :-------------------------------------------- | :---------------------------------------------------------------------------------------------- |
-| Numbers stopped updating                      | `job_runs` for the relevant job, then `dataThrough` on the response                             |
-| A dashboard shows zeroes for an active tenant | whether rollup rows exist for those days at all — absence is not zero for a _busy_ tenant       |
-| Overview is fresh, agent stats are stale      | both dailies run at `0 2 * * *`, so this is one leg **failing**, not lagging — check `job_runs` |
-| A block is missing entirely                   | `unavailable` — this is composition, not computation                                            |
-| Export disagrees with the dashboard           | they read the same rollups; a difference means one of them is reading raw rows                  |
-| Figures changed after a backfill              | expected — the backfill recomputed; check it covered the window you meant                       |
+| Symptom | Look at |
+| :--- | :--- |
+| Numbers stopped updating | `job_runs` for the relevant job, then `dataThrough` on the response |
+| A dashboard shows zeroes for an active tenant | whether rollup rows exist for those days at all — absence is not zero for a _busy_ tenant |
+| Overview is fresh, agent stats are stale | both dailies run at `0 2 * * *`, so this is one leg **failing**, not lagging — check `job_runs` |
+| A block is missing entirely | `unavailable` — this is composition, not computation |
+| Export disagrees with the dashboard | they read the same rollups; a difference means one of them is reading raw rows |
+| Figures changed after a backfill | expected — the backfill recomputed; check it covered the window you meant |
 
 ---
 

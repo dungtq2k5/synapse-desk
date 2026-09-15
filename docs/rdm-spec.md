@@ -193,7 +193,7 @@ Full reasoning: [ADR 0022](./decisions/0022-no-cross-service-fks.md).
 **Charging and recording are two operations, and only one of them may be asynchronous.** The natural implementation writes the ledger row and bumps the counter in one fire-and-forget call — and that reopens the hole the counter exists to close. If the counter increments asynchronously, N concurrent requests during a burst all read the same stale value, all pass the gate, and all spend; reconciliation discovers it afterwards, which is after the money is gone. The split:
 
 | Operation | Latency budget | Failure mode |
-| :---- | :---- | :---- |
+| :--- | :--- | :--- |
 | **Charge** — `INCRBY quota:{org}:{cycle}` | **Synchronous, awaited.** Sub-millisecond, safe on the hot path | Redis down → fail closed on the gate, not silently open |
 | **Record** — the durable `ai_generations` row | Fire-and-forget, never awaited | Swallowed and logged; reconciliation restores agreement |
 
@@ -212,7 +212,7 @@ The consequence for a service that spends: it increments Redis **directly**, not
 **Per-surface behaviour at the cap** — decided here rather than discovered at runtime:
 
 | Surface | At cap |
-| :---- | :---- |
+| :--- | :--- |
 | `POST /tickets/:id/ai/draft`, `/classify`, `/suggestions` | **402.** The agent works manually. No product change, no data loss. |
 | `POST /tickets/:id/ai/summary` — **manual** | **402.** Discretionary. |
 | `/ai/summary` — **auto-invoked on escalation** | **Allowed, inside a bounded grace of 10% over budget**, then 402 like the rest. See the compounding-failure note below. |
@@ -289,7 +289,7 @@ customer.subscription.created | updated | deleted
 Table numbers are **stable identifiers, not reading order** — they are cited from other documents (`api-endpoints-plan` §0.5, §1.1, §1.6, §9, §11) and from code docblocks, so a table keeps its number for life. Tables added after the original 1–25 were assigned are placed in their *domain's* section rather than at the end, which is why the sequence reads **1–12, 28, 40–41, 13–16, 26, 31–33, 17–20, 27, 21–22, 29–30, 34–38, 42, 46, 23–25, 39, 44–45, 43**:
 
 | Late addition | Sits in | Why it was added |
-| :---- | :---- | :---- |
+| :--- | :--- | :--- |
 | **Table 26** `ticket_assignments` | Domain B | Assignment history — who held a ticket, when, and why it moved |
 | **Table 27** `document_flags` | Domain C | Content-quality signals; replaced the un-backed `documents/stale` idea |
 | **Table 28** `user_invitations` | Domain A | Invitations had endpoints but no table |
@@ -321,7 +321,7 @@ Domain membership, not the number, is what tells you where a table belongs.
 So a row reading `UNIQUE *(among active rows)*` is enforced, just not by the column. Where:
 
 | Column | Enforced by |
-| :---- | :---- |
+| :--- | :--- |
 | `users.email` | `users_org_email_key` — `(organization_id, email) WHERE deleted_at IS NULL`, plus `users_super_admin_email_key` on `(email) WHERE organization_id IS NULL AND deleted_at IS NULL` |
 | `departments.name` | `departments_org_name_key` — `(organization_id, name) WHERE deleted_at IS NULL` |
 | `roles.name` | `@@unique([organization_id, name])` in schema, plus `roles_global_name_key` on `(name) WHERE organization_id IS NULL` |
@@ -342,7 +342,7 @@ Three of them (`ai_generations.retrieved_chunk_ids`, `ai_generations.cited_chunk
 *Top-level tenant entity representing the customer organization.*
 
 | Field Name | Data Type | Constraints / Default | Description & Business Logic |
-| :---- | :---- | :---- | :---- |
+| :--- | :--- | :--- | :--- |
 | **id** | UUID | Primary Key, gen_random_uuid() | Unique identifier for the tenant. |
 | **name** | VARCHAR(255) | NOT NULL | Legal name of the company (e.g., "Acme Corp"). Rejects **emoji only** — not non-Latin scripts. A tenant legitimately named in Japanese or Arabic must be representable; a tenant named with a pile-of-poo is a display problem in every surface that renders it. |
 | **slug** | VARCHAR(100) | NOT NULL, UNIQUE, Indexed | URL-friendly identifier (e.g., `acme-corp`), matching `^[a-z0-9]+(-[a-z0-9]+)*$`. **Lowercased before the pattern runs, deliberately** — the service has always done `.trim().toLowerCase()` here, so `ACME-CORP` was accepted and canonicalized rather than refused; validating case-sensitively would turn a request that used to succeed into a 400. `acme corp` and `acme/corp` are refused, which nothing ever fixed. Appears in URLs, so a change is a rename with consequences: a collision answers **409**, never a silent suffix. |
@@ -381,7 +381,7 @@ Three of them (`ai_generations.retrieved_chunk_ids`, `ai_generations.cited_chunk
 *Internal operational sub-units within an organization.*
 
 | Field Name | Data Type | Constraints / Default | Description & Business Logic |
-| :---- | :---- | :---- | :---- |
+| :--- | :--- | :--- | :--- |
 | **id** | UUID | Primary Key, gen_random_uuid() | Unique identifier for the department. |
 | **organization_id** | UUID | NOT NULL, FK ➔ organizations.id | Tenant isolation boundary. |
 | **name** | VARCHAR(100) | NOT NULL, **UNIQUE** *(per tenant, among active rows)* | Department title (e.g., "IT Support", "HR", "Billing"). |
@@ -396,7 +396,7 @@ Three of them (`ai_generations.retrieved_chunk_ids`, `ai_generations.cited_chunk
 *Central identity entity for end-users, agents, and system admins.*
 
 | Field Name | Data Type | Constraints / Default | Description & Business Logic |
-| :---- | :---- | :---- | :---- |
+| :--- | :--- | :--- | :--- |
 | **id** | UUID | Primary Key, gen_random_uuid() | Unique identifier for the user account. |
 | **organization_id** | UUID | Nullable, FK ➔ organizations.id | The enterprise organization the user belongs to. NULL identifies a SaaS Provider Super Admin operating across tenants. |
 | **is_super_admin** | BOOLEAN | NOT NULL, Default: false | Explicit platform-level privilege flag. Must be paired with a NULL organization_id. |
@@ -443,7 +443,7 @@ Three of them (`ai_generations.retrieved_chunk_ids`, `ai_generations.cited_chunk
 *Maps users to one or multiple departments within an organization (Many-to-Many).*
 
 | Field Name | Data Type | Constraints / Default | Description & Business Logic |
-| :---- | :---- | :---- | :---- |
+| :--- | :--- | :--- | :--- |
 | **user_id** | UUID | Primary Key, FK ➔ users.id, On Delete CASCADE | User entity being assigned to a department. |
 | **department_id** | UUID | Primary Key, FK ➔ departments.id, On Delete CASCADE | Department assigned to the user. |
 | **is_primary** | BOOLEAN | NOT NULL, Default: false | Marks whether this is the user's primary department. |
@@ -458,7 +458,7 @@ Three of them (`ai_generations.retrieved_chunk_ids`, `ai_generations.cited_chunk
 *System and tenant-level custom roles for access control.*
 
 | Field Name | Data Type | Constraints / Default | Description & Business Logic |
-| :---- | :---- | :---- | :---- |
+| :--- | :--- | :--- | :--- |
 | **id** | UUID | Primary Key, gen_random_uuid() | Unique identifier for the role. |
 | **organization_id** | UUID | Nullable, FK ➔ organizations.id | NULL = global system role shipped with the platform (Default Admin, Default Agent, Default Viewer). A UUID = custom role owned by that tenant. |
 | **name** | VARCHAR(100) | NOT NULL, **UNIQUE** *(per tenant; and among global roles)* | Role title (e.g., "Admin", "Tier 2 Agent", "Viewer"). |
@@ -477,7 +477,7 @@ Three of them (`ai_generations.retrieved_chunk_ids`, `ai_generations.cited_chunk
 *Atomic capabilities and feature authorization rules.*
 
 | Field Name | Data Type | Constraints / Default | Description & Business Logic |
-| :---- | :---- | :---- | :---- |
+| :--- | :--- | :--- | :--- |
 | **id** | UUID | Primary Key, gen_random_uuid() | Unique identifier for the permission. |
 | **name** | VARCHAR(100) | NOT NULL, UNIQUE | Human-readable title (e.g., "Delete User Accounts"). |
 | **code** | VARCHAR(100) | NOT NULL, UNIQUE, Indexed | Dot-notation string using target.action format (e.g., user.delete, ticket.escalate). |
@@ -488,7 +488,7 @@ Three of them (`ai_generations.retrieved_chunk_ids`, `ai_generations.cited_chunk
 *Maps users to their assigned roles (many-to-many).*
 
 | Field Name | Data Type | Constraints / Default | Description & Business Logic |
-| :---- | :---- | :---- | :---- |
+| :--- | :--- | :--- | :--- |
 | **user_id** | UUID | NOT NULL, FK ➔ users.id, ON DELETE CASCADE | User entity being assigned a role. |
 | **role_id** | UUID | NOT NULL, FK ➔ roles.id, ON DELETE CASCADE | Role assigned to the user. |
 
@@ -501,7 +501,7 @@ Three of them (`ai_generations.retrieved_chunk_ids`, `ai_generations.cited_chunk
 *Maps permissions to roles to establish role-based access control (many-to-many).*
 
 | Field Name | Data Type | Constraints / Default | Description & Business Logic |
-| :---- | :---- | :---- | :---- |
+| :--- | :--- | :--- | :--- |
 | **role_id** | UUID | NOT NULL, FK ➔ roles.id, ON DELETE CASCADE | Target role. |
 | **permission_id** | UUID | NOT NULL, FK ➔ permissions.id, ON DELETE CASCADE | Permission capability linked to the role. |
 
@@ -531,7 +531,7 @@ Earlier revisions of this document specified both columns on both tables. The sc
 *Manages active user sessions, rotating refresh tokens, and trusted 2FA devices.*
 
 | Field Name | Data Type | Constraints / Default | Description & Business Logic |
-| :---- | :---- | :---- | :---- |
+| :--- | :--- | :--- | :--- |
 | **id** | UUID | Primary Key, gen_random_uuid() | Unique session identifier. |
 | **user_id** | UUID | NOT NULL, FK ➔ users.id, On Delete CASCADE, Indexed | User who owns this session. |
 | **refresh_token_hash** | VARCHAR(64) | NOT NULL, UNIQUE, Indexed | **SHA-256 hex** of the opaque refresh token — deliberately not bcrypt (see §1.5). Rotated on every refresh. |
@@ -554,7 +554,7 @@ Earlier revisions of this document specified both columns on both tables. The sc
 #### **Table 10: two_factor_backup_codes**
 
 | Field Name | Data Type | Constraints / Default | Description & Business Logic |
-| :---- | :---- | :---- | :---- |
+| :--- | :--- | :--- | :--- |
 | **id** | UUID | Primary Key, gen_random_uuid() | Unique ID for this backup code. |
 | **user_id** | UUID | NOT NULL, FK ➔ users.id, On Delete CASCADE | User who owns this backup code. |
 | **code_hash** | VARCHAR(255) | NOT NULL | Salted scrypt hash of the normalized backup code (§1.5). Verification compares across the user's unused, unexpired rows; nothing is looked up by hash. |
@@ -567,7 +567,7 @@ Earlier revisions of this document specified both columns on both tables. The sc
 *Single-use numeric codes for email and phone ownership verification.*
 
 | Field Name | Data Type | Constraints / Default | Description & Business Logic |
-| :---- | :---- | :---- | :---- |
+| :--- | :--- | :--- | :--- |
 | **id** | UUID | Primary Key, gen_random_uuid() | Unique identifier for this OTP challenge. |
 | **user_id** | UUID | NOT NULL, FK ➔ users.id, On Delete CASCADE | User the code was issued to. |
 | **purpose** | ENUM | NOT NULL | Channel being verified: EMAIL_VERIFICATION, PHONE_VERIFICATION. |
@@ -590,7 +590,7 @@ Earlier revisions of this document specified both columns on both tables. The sc
 *High-entropy single-use tokens backing the forgot-password link flow.*
 
 | Field Name | Data Type | Constraints / Default | Description & Business Logic |
-| :---- | :---- | :---- | :---- |
+| :--- | :--- | :--- | :--- |
 | **id** | UUID | Primary Key, gen_random_uuid() | Unique identifier for this reset request. |
 | **user_id** | UUID | NOT NULL, FK ➔ users.id, On Delete CASCADE, Indexed | User who requested the password reset. |
 | **token_hash** | VARCHAR(64) | NOT NULL, UNIQUE, Indexed | **SHA-256 hex** of the opaque token embedded in the emailed reset URL, for the same by-value-lookup reason as device_sessions.refresh_token_hash (§1.5). The raw token exists only in the email. |
@@ -613,7 +613,7 @@ Earlier revisions of this document specified both columns on both tables. The sc
 Conceptually a sibling of Tables 11–12 (§1.9) — a hashed, expiring, single-use secret delivered out-of-band. It differs in one decisive way: the recipient **has no account yet**, so the row is keyed to an `organization_id` and an address rather than to a `user_id`.
 
 | Field Name | Data Type | Constraints / Default | Description & Business Logic |
-| :---- | :---- | :---- | :---- |
+| :--- | :--- | :--- | :--- |
 | **id** | UUID | Primary Key, gen_random_uuid() | Unique identifier for this invitation. |
 | **organization_id** | UUID | NOT NULL, FK ➔ organizations.id, On Delete CASCADE, Indexed | Tenant the invitation grants membership in. |
 | **email** | VARCHAR(255) | NOT NULL, **UNIQUE** *(per tenant, among PENDING rows)* | Address the invitation was sent to, stored lower-cased. Becomes `users.email` on acceptance. |
@@ -658,7 +658,7 @@ Conceptually a sibling of Tables 11–12 (§1.9) — a hashed, expiring, single-
 **What a plan *costs* is Stripe's, and is deliberately absent here.** Mirroring an amount is the two-sources-of-truth problem `billing.config.ts` was written to prevent, and the divergence is silent because both sides keep answering confidently.
 
 | Field Name | Data Type | Constraints / Default | Description & Business Logic |
-| :---- | :---- | :---- | :---- |
+| :--- | :--- | :--- | :--- |
 | **id** | UUID | Primary Key, gen_random_uuid() | Unique plan identifier. |
 | **name** | VARCHAR(100) | NOT NULL, **UNIQUE** *(among active rows)* | Display name — "Free", "Pro", "Enterprise". **Unique by business rule, not by `@unique`**: the table is soft-deletable, so uniqueness is a partial index `WHERE deleted_at IS NULL` (`subscription_plans_name_key`) plus the service-layer check §7.2 requires. A retired plan is **never un-retired**, so reuse is wanted — a full `@unique` would block ever creating another plan called "Pro", permanently, over a row every read filters out. The opposite conclusion from `organizations.slug`, and the deciding question is whether the row comes back. |
 | **stripe_product_id** | VARCHAR(255) | Nullable, UNIQUE | The Stripe Product. NULL for a plan **assigned rather than sold** — the negotiated agreement, invisible to self-service and legal on purpose. |
@@ -683,7 +683,7 @@ Conceptually a sibling of Tables 11–12 (§1.9) — a hashed, expiring, single-
 *One Stripe Price, and the plan it grants.*
 
 | Field Name | Data Type | Constraints / Default | Description & Business Logic |
-| :---- | :---- | :---- | :---- |
+| :--- | :--- | :--- | :--- |
 | **id** | UUID | Primary Key, gen_random_uuid() | Unique row identifier. |
 | **plan_id** | UUID | NOT NULL, FK ➔ subscription_plans.id, Indexed | The plan this price sells. |
 | **stripe_price_id** | VARCHAR(255) | NOT NULL, **UNIQUE** | The lookup the webhook performs. UNIQUE because one price belongs to exactly one plan — **and because the uniqueness is what makes an unmapped price a `FAILED` event rather than an ambiguous one.** |
@@ -698,7 +698,7 @@ Conceptually a sibling of Tables 11–12 (§1.9) — a hashed, expiring, single-
 > Lives in `postgres_ticket`. Every "FK ➔ users.id" / "FK ➔ departments.id" below (and on Tables 14, 26) is logical, not a database constraint — see §1.13.
 
 | Field Name | Data Type | Constraints / Default | Description & Business Logic |
-| :---- | :---- | :---- | :---- |
+| :--- | :--- | :--- | :--- |
 | **id** | UUID | Primary Key, gen_random_uuid() | Internal unique database key. |
 | **ticket_number** | BIGINT | NOT NULL, UNIQUE, Autoincrement | Human-friendly ticket number (e.g., #1042). |
 | **organization_id** | UUID | NOT NULL, FK ➔ organizations.id | Tenant isolation key. |
@@ -722,7 +722,7 @@ Conceptually a sibling of Tables 11–12 (§1.9) — a hashed, expiring, single-
 *Unified log storing all messages (User, AI Assistant, Human Agents).*
 
 | Field Name | Data Type | Constraints / Default | Description & Business Logic |
-| :---- | :---- | :---- | :---- |
+| :--- | :--- | :--- | :--- |
 | **id** | UUID | Primary Key, gen_random_uuid() | Unique message ID. |
 | **ticket_id** | UUID | NOT NULL, FK ➔ tickets.id, Indexed | Foreign key linking message to parent ticket thread. |
 | **sender_id** | UUID | Nullable, FK ➔ users.id | Author of message. Null if sent automatically by System/AI. |
@@ -749,7 +749,7 @@ Conceptually a sibling of Tables 11–12 (§1.9) — a hashed, expiring, single-
 *Files uploaded inside ticket chat threads (e.g., error screenshots, logs).*
 
 | Field Name | Data Type | Constraints / Default | Description & Business Logic |
-| :---- | :---- | :---- | :---- |
+| :--- | :--- | :--- | :--- |
 | **id** | UUID | Primary Key, gen_random_uuid() | Unique attachment identifier. |
 | **message_id** | UUID | NOT NULL, FK ➔ ticket_messages.id | Parent chat message containing this file. |
 | **file_name** | VARCHAR(255) | NOT NULL | Original filename uploaded by user (e.g., screenshot.png). |
@@ -764,7 +764,7 @@ Conceptually a sibling of Tables 11–12 (§1.9) — a hashed, expiring, single-
 *Stores AI Co-pilot auto-summaries generated when tickets escalate to human agents.*
 
 | Field Name | Data Type | Constraints / Default | Description & Business Logic |
-| :---- | :---- | :---- | :---- |
+| :--- | :--- | :--- | :--- |
 | **id** | UUID | Primary Key, gen_random_uuid() | Unique summary identifier. |
 | **ticket_id** | UUID | NOT NULL, UNIQUE, FK ➔ tickets.id | One-to-one relationship with active escalated ticket. |
 | **summary_text** | TEXT | NOT NULL | Concise bullet-point summary of previous user chat thread. |
@@ -779,7 +779,7 @@ Conceptually a sibling of Tables 11–12 (§1.9) — a hashed, expiring, single-
 *Assignment lifecycle tracking: who held each ticket, when, which department, and why they were reassigned.*
 
 | Field Name | Data Type | Constraints / Default | Description & Business Logic |
-| :---- | :---- | :---- | :---- |
+| :--- | :--- | :--- | :--- |
 | **id** | UUID | Primary Key, gen_random_uuid() | Unique assignment record ID. |
 | **ticket_id** | UUID | NOT NULL, FK ➔ tickets.id, Indexed | Ticket being assigned. |
 | **assigned_to_id** | UUID | NOT NULL, FK ➔ users.id, Indexed | Agent receiving the assignment. |
@@ -801,7 +801,7 @@ Conceptually a sibling of Tables 11–12 (§1.9) — a hashed, expiring, single-
 *The status path a ticket took, one row per transition.*
 
 | Field Name | Data Type | Constraints / Default | Description & Business Logic |
-| :---- | :---- | :---- | :---- |
+| :--- | :--- | :--- | :--- |
 | **id** | UUID | Primary Key, gen_random_uuid() | Unique transition record ID. |
 | **ticket_id** | UUID | NOT NULL, FK ➔ tickets.id, ON DELETE CASCADE | The ticket that moved. |
 | **organization_id** | UUID | NOT NULL | Denormalized from the parent, like every other table here: the tenant filter must not need a join to apply. |
@@ -821,7 +821,7 @@ Conceptually a sibling of Tables 11–12 (§1.9) — a hashed, expiring, single-
 A per-user **watermark**, not per-message receipts: the product wants unread badges, and receipts would be one row per participant per message to answer a question nobody asked.
 
 | Field Name | Data Type | Constraints / Default | Description & Business Logic |
-| :---- | :---- | :---- | :---- |
+| :--- | :--- | :--- | :--- |
 | **ticket_id** | UUID | NOT NULL, FK ➔ tickets.id, ON DELETE CASCADE | The thread. |
 | **user_id** | UUID | NOT NULL | The reader. No FK (§1.13). |
 | **organization_id** | UUID | NOT NULL | Denormalized so the tenant filter needs no join. |
@@ -834,10 +834,10 @@ A per-user **watermark**, not per-message receipts: the product wants unread bad
 
 *Inbound email idempotency: one row per accepted message.*
 
-Written in the **same transaction** as the ticket or message it produced. Providers retry, and Cloudflare re-runs a Worker that errored, so a redelivery must be a duplicate-key violation rather than a second ticket.
+Written in the **same transaction** as the ticket or message it produced. Providers retry — Resend redelivers a webhook on any non-2xx for hours — so a redelivery must be a duplicate-key violation rather than a second ticket.
 
 | Field Name | Data Type | Constraints / Default | Description & Business Logic |
-| :---- | :---- | :---- | :---- |
+| :--- | :--- | :--- | :--- |
 | **id** | UUID | Primary Key, gen_random_uuid() | Unique record ID. |
 | **organization_id** | UUID | NOT NULL | The receiving tenant. |
 | **message_id** | VARCHAR(255) | NOT NULL | The message's `Message-ID` header, or a synthesized digest when it had none. **255, not 998, and the unit is why**: this column is half of the unique index and Postgres refuses a btree tuple over ~2704 **bytes**, while a length validator counts **characters**. At 998 a multibyte header passes validation and then fails the insert with `index row size exceeds maximum` — not a duplicate-key error, so it surfaces as a 5xx and the provider retries it forever. The endpoint constrains the field to printable ASCII (RFC 5322 `msg-id`), which is what makes characters and bytes the same number. |
@@ -855,7 +855,7 @@ Written in the **same transaction** as the ticket or message it produced. Provid
 *Stores top-level enterprise documentation uploaded for AI knowledge indexing.*
 
 | Field Name | Data Type | Constraints / Default | Description & Business Logic |
-| :---- | :---- | :---- | :---- |
+| :--- | :--- | :--- | :--- |
 | **id** | UUID | Primary Key, gen_random_uuid() | Unique document identifier. |
 | **organization_id** | UUID | NOT NULL, FK ➔ organizations.id | Tenant isolation boundary. |
 | **created_by_id** | UUID | NOT NULL, FK ➔ users.id | Knowledge Manager or Admin who uploaded the document. |
@@ -877,7 +877,7 @@ Written in the **same transaction** as the ticket or message it produced. Provid
 *Enables Many-to-Many scoping between documents and departments.*
 
 | Field Name | Data Type | Constraints / Default | Description & Business Logic |
-| :---- | :---- | :---- | :---- |
+| :--- | :--- | :--- | :--- |
 | **id** | UUID | Primary Key, gen_random_uuid() | Primary Key. |
 | **document_id** | UUID | NOT NULL, FK ➔ documents.id, On Delete CASCADE | Referenced document. |
 | **department_id** | UUID | NOT NULL, FK ➔ departments.id, On Delete CASCADE | Department granted access to this document. |
@@ -890,7 +890,7 @@ Written in the **same transaction** as the ticket or message it produced. Provid
 *Relational text snippets and citation metadata corresponding to vector DB points.*
 
 | Field Name | Data Type | Constraints / Default | Description & Business Logic |
-| :---- | :---- | :---- | :---- |
+| :--- | :--- | :--- | :--- |
 | **id** | UUID | Primary Key, gen_random_uuid() | Internal database primary key. |
 | **document_id** | UUID | NOT NULL, FK ➔ documents.id | Parent document reference. |
 | **chunk_index** | INT | NOT NULL | Sequential chunk order in original file (0, 1, 2, 3...). |
@@ -918,7 +918,7 @@ Written in the **same transaction** as the ticket or message it produced. Provid
 *BullMQ background processing job states for asynchronous PDF chunking/embedding.*
 
 | Field Name | Data Type | Constraints / Default | Description & Business Logic |
-| :---- | :---- | :---- | :---- |
+| :--- | :--- | :--- | :--- |
 | **id** | UUID | Primary Key, gen_random_uuid() | Primary Key. |
 | **document_id** | UUID | NOT NULL, FK ➔ documents.id | Target document being processed. |
 | **organization_id** | UUID | NOT NULL | The tenant, denormalized from the parent document so a scoped worklist is one index seek rather than a join. |
@@ -934,7 +934,7 @@ Written in the **same transaction** as the ticket or message it produced. Provid
 *Quality signals and conflict detection across the knowledge base.*
 
 | Field Name | Data Type | Constraints / Default | Description & Business Logic |
-| :---- | :---- | :---- | :---- |
+| :--- | :--- | :--- | :--- |
 | **id** | UUID | Primary Key, gen_random_uuid() | Flag ID. |
 | **organization_id** | UUID | NOT NULL, FK ➔ organizations.id, Indexed | Tenant isolation. |
 | **document_id** | UUID | NOT NULL, FK ➔ documents.id, ON DELETE CASCADE | Flagged document. |
@@ -963,7 +963,7 @@ Written in the **same transaction** as the ticket or message it produced. Provid
 > Owned by `ticket-service` (service ownership map), physically in `postgres_ticket` alongside Domain B — **not** `postgres_auth`. "FK ➔ users.id" below is logical; see §1.13. Also see §1.13 for Table 22.
 
 | Field Name | Data Type | Constraints / Default | Description & Business Logic |
-| :---- | :---- | :---- | :---- |
+| :--- | :--- | :--- | :--- |
 | **id** | UUID | Primary Key, gen_random_uuid() | Feedback primary key. |
 | **ticket_message_id** | UUID | NOT NULL, Indexed — **no FK, deliberately** | The specific AI answer being evaluated. Both tables live in `postgres_ticket`, so a real FK is *possible* here, and was deliberately not added: a `CASCADE` would silently delete the feedback signal the moment the message it rated is redacted (§Table 14), and "a bad answer was reported" is exactly the fact worth surviving that. |
 | **user_id** | UUID | NOT NULL | User who provided rating. Logical reference only — `users` is in `postgres_auth` (§1.13). |
@@ -981,7 +981,7 @@ Written in the **same transaction** as the ticket or message it produced. Provid
 *Immutable security trail for administrative compliance.*
 
 | Field Name | Data Type | Constraints / Default | Description & Business Logic |
-| :---- | :---- | :---- | :---- |
+| :--- | :--- | :--- | :--- |
 | **id** | UUID | Primary Key, gen_random_uuid() | Audit log primary key. |
 | **organization_id** | UUID | Nullable, Indexed | Tenant boundary. Logical reference only (§1.13). NULL for platform-level actions taken by a Super Admin (e.g., freezing a delinquent tenant, changing platform configuration), which belong to no single customer — the consumer must never coerce this to the actor's own tenant. |
 | **user_id** | UUID | Nullable, Indexed | Actor who performed the action. Logical reference only (§1.13). NULL for system/cron actors, which have no user row acting for them. |
@@ -1004,7 +1004,7 @@ Written in the **same transaction** as the ticket or message it produced. Provid
 > Added to close a **live metering hole**, not as an audit nicety. Before this table, `monthly_ai_token_budget` was defined as `SUM(ticket_messages.prompt_tokens + completion_tokens)` — but only a **chat answer** is ever persisted as a message. Drafts, summaries, classifications, greeting-intent checks, query reformulations and embeddings were all real spend that the quota gate structurally could not see. A tenant hammering `/ai/draft` could run indefinitely while reporting well under budget.
 
 | Field Name | Data Type | Constraints / Default | Description & Business Logic |
-| :---- | :---- | :---- | :---- |
+| :--- | :--- | :--- | :--- |
 | **id** | UUID | Primary Key, gen_random_uuid() | Ledger entry id. |
 | **organization_id** | UUID | NOT NULL, Indexed | Tenant the spend belongs to. Logical reference only (§1.13). |
 | **user_id** | UUID | Nullable | Who triggered it. NULL for system-initiated work — ingestion embeddings, scheduled jobs. |
@@ -1037,7 +1037,7 @@ Written in the **same transaction** as the ticket or message it produced. Provid
 *Append-only record of every Stripe webhook the system has processed. Exists for idempotency and ordering, not for reporting.*
 
 | Field Name | Data Type | Constraints / Default | Description & Business Logic |
-| :---- | :---- | :---- | :---- |
+| :--- | :--- | :--- | :--- |
 | **id** | UUID | Primary Key, gen_random_uuid() | — |
 | **source** | VARCHAR(20) | NOT NULL, Default `STRIPE` | `BillingEventSource` — who **wrote** this row. **`STRIPE` rows order the tenant's timeline; `LOCAL` rows must not.** The monotonic guard takes the newest `PROCESSED` row as the high-water mark and compares Stripe's `created` (whole **seconds**) against it. A locally-produced claim carries `now()` to the millisecond, so without this filter a plan change's own claim makes the webhook it caused look stale — measured: the event settles `SKIPPED_STALE`, entitlements are never written, and the tenant is billed for a plan they do not hold. Defaulted to `STRIPE` because every row that existed before this column was one. |
 | **stripe_event_id** | VARCHAR(255) | NOT NULL, **UNIQUE** | Stripe's `evt_…` id. The unique constraint **is** the idempotency mechanism: a redelivered webhook is a duplicate-key violation the handler catches and acknowledges, not a second entitlement write. Webhook delivery is at-least-once, so this is not defensive — it is the normal path. |
@@ -1060,7 +1060,7 @@ Written in the **same transaction** as the ticket or message it produced. Provid
 **Why a table and not a query.** `/analytics/overview` over a quarter is an aggregation across every ticket in a tenant, **on the table serving ticket creation**. A Monday-morning dashboard load competing with the hot path is the failure mode, and no amount of endpoint design fixes it. Not a materialized view either: those cannot be expressed in Prisma, refresh whole rather than incrementally, and a `REFRESH` over a quarter is the same competition moved to a different hour. A plain table written by an idempotent daily job is testable, backfillable and incremental — see [ADR 0009](./decisions/0009-rollups-are-plain-tables.md).
 
 | Field Name | Data Type | Constraints / Default | Description & Business Logic |
-| :---- | :---- | :---- | :---- |
+| :--- | :--- | :--- | :--- |
 | **id** | UUID | Primary Key, gen_random_uuid() | Unique rollup row ID. |
 | **organization_id** | UUID | NOT NULL | The tenant. |
 | **day** | DATE | NOT NULL | A date in the **tenant's** timezone, not UTC. A tenant at UTC+7 whose Monday starts at 17:00 Sunday UTC would otherwise see every daily figure split across two rows, and no consumer could reassemble them. |
@@ -1092,7 +1092,7 @@ Written in the **same transaction** as the ticket or message it produced. Provid
 Separate from Table 34 rather than a wider dimension on it: an agent is a person and a department is a queue, and one row per `(day, department, agent)` would multiply the table by agent count for every metric that has nothing to do with agents.
 
 | Field Name | Data Type | Constraints / Default | Description & Business Logic |
-| :---- | :---- | :---- | :---- |
+| :--- | :--- | :--- | :--- |
 | **id** | UUID | Primary Key, gen_random_uuid() | Unique rollup row ID. |
 | **organization_id** | UUID | NOT NULL | The tenant. |
 | **day** | DATE | NOT NULL | A date in the tenant's timezone, as in Table 34. |
@@ -1114,7 +1114,7 @@ Separate from Table 34 rather than a wider dimension on it: an agent is a person
 **This one is not an optimisation, it is the only durable record.** `ai_generations` (Table 29) is retention-rolled: raw rows aggregate away after ~90 days, so any analytics query written against raw rows silently loses history the moment retention ships. Which makes the **ordering constraint** real — this job must run *before* ledger retention over the same window. Reversed, retention deletes rows this has not read, and every historical figure under-reports forever with nothing to recompute it from.
 
 | Field Name | Data Type | Constraints / Default | Description & Business Logic |
-| :---- | :---- | :---- | :---- |
+| :--- | :--- | :--- | :--- |
 | **id** | UUID | Primary Key, gen_random_uuid() | Unique rollup row ID. |
 | **organization_id** | UUID | NOT NULL | The tenant. |
 | **day** | DATE | NOT NULL | A date in the tenant's timezone, not UTC. |
@@ -1147,7 +1147,7 @@ Separate from Table 34 rather than a wider dimension on it: an agent is a person
 `GET /analytics/export` is **not a read**: it creates a job, produces a file and returns a download URL — so it needs an owner, and ticket-service owns most of the source data. An export is a **snapshot with a timestamp in it**: two people exporting "last quarter" a week apart get different numbers if a backfill ran between, so the file records when it was generated and from which rollup run, or it becomes a disputed number in a meeting with nothing to settle it.
 
 | Field Name | Data Type | Constraints / Default | Description & Business Logic |
-| :---- | :---- | :---- | :---- |
+| :--- | :--- | :--- | :--- |
 | **id** | UUID | Primary Key, gen_random_uuid() | Unique export job ID. |
 | **organization_id** | UUID | NOT NULL | The tenant. |
 | **requested_by_id** | UUID | NOT NULL | Who asked, so an operator can answer "who exported our ticket history". No FK (§1.13). |
@@ -1177,7 +1177,7 @@ Present **identically in all four service databases** — `postgres_auth`, `post
 The jobs not running was never the real problem; the real problem was that nothing anywhere could tell you they were not running. A failed job at least logs. A job that never runs logs nothing at all.
 
 | Field Name | Data Type | Constraints / Default | Description & Business Logic |
-| :---- | :---- | :---- | :---- |
+| :--- | :--- | :--- | :--- |
 | **job_name** | TEXT | **Primary Key** | The job name from `SCHEDULED_JOBS`, or a step within one. The PK, so recording a run is a single upsert with no read first. |
 | **last_started_at** | TIMESTAMP(3) | NOT NULL | When the most recent attempt began. **Not `TIMESTAMPTZ`** — unlike every other timestamp in this model, these three columns are a bare Prisma `DateTime` with no `@db.Timestamptz`, which Postgres stores without a zone. Prisma writes UTC, so the value is correct; a raw SQL reader comparing it with a `TIMESTAMPTZ` column must know it is UTC. |
 | **last_succeeded_at** | TIMESTAMP(3) | Nullable | **Preserved across a failure, deliberately.** This is what the staleness alert reads, and clearing it on failure would turn "broken since Tuesday" into "never ran", losing the one piece of information worth having. Nullable because it is null until the *first* success — which is how `checkStaleness` tells "never ran" from "stale". |
@@ -1199,7 +1199,7 @@ Present **identically in `postgres_auth` and `postgres_ingestion`** — like `jo
 It **cannot** live in Redis beside the alarm *level*: a flush would reset it to zero, the next crossing would republish a held id, and that dimension would stop alerting for that tenant **permanently**, from a transient failure. A counter that steps past a permanent guard must outlive it. The level stays in Redis on purpose — losing that costs at most one duplicate alert, which the durable guard then collapses.
 
 | Field Name | Data Type | Constraints / Default | Description & Business Logic |
-| :---- | :---- | :---- | :---- |
+| :--- | :--- | :--- | :--- |
 | **organization_id** | UUID | NOT NULL | The tenant. |
 | **dimension** | VARCHAR(32) | NOT NULL | `seats \| storage \| documents` — `LimitAlertDimension`, stored **verbatim in that union's own lowercase**. A string, not a Prisma enum ([ADR 0001](./decisions/0001-no-prisma-enums.md)). **Lowercase deliberately, and it must stay that way**: the same literal is a segment of `limit-alert:{org}:{dimension}` in Redis *and* of the derived event id `limit:{org}:{dimension}:{threshold}:{gen}` that Domain E dedupes on. Upper-casing this column alone would give one fact two spellings, and the id is the half that cannot be respelled without invalidating every stored `event_id`. §7.3's SCREAMING_SNAKE rule governs enumerated domain values defined for a wire or database contract; these are internal keys of a config array — the same carve-out `subscription_plan_prices.interval` documents. |
 | **generation** | INT | NOT NULL, Default 0 | **Incremented once per *recovery*, never per threshold cleared**: falling from 100% to 5% is one recovery, and a counter that skipped values would be a step counter nobody could explain later. |
@@ -1216,7 +1216,7 @@ Owned by `ingestion-service`. Today it holds one row, `chunk-usage-projection` �
 **Its own table, not a column on `job_runs`.** `job_runs` is shared by four services through `JobRunRecorder`, and teaching a heartbeat about one rollup's progress would couple the two. More importantly, `job_runs.last_succeeded_at` is a *finish time written after the fact, outside the step's transaction* — a crash between the two writes would leave a cursor that disagrees with the counters it guards.
 
 | Field Name | Data Type | Constraints / Default | Description & Business Logic |
-| :---- | :---- | :---- | :---- |
+| :--- | :--- | :--- | :--- |
 | **name** | VARCHAR(64) | **Primary Key** | The step name from `scheduler.processor.ts`, so this row and the `job_runs` heartbeat for the same step share a key a reader can join by eye. |
 | **until** | TIMESTAMPTZ | NOT NULL | **Exclusive** upper bound of the last projected interval, and the next run's **inclusive** lower bound. The value the queries actually used — not the wall clock at which they finished. **Written inside the projection's own transaction**, together with the counter updates it guards: a cursor that could disagree with its own counters would re-project (cursor behind) or skip forever (cursor ahead). |
 | **updated_at** | TIMESTAMPTZ | NOT NULL, auto-updated | Last advance. |
@@ -1228,7 +1228,7 @@ Owned by `ingestion-service`. Today it holds one row, `chunk-usage-projection` �
 *Per-recipient in-app notification feed with read/archive state and delivery tracking.*
 
 | Field Name | Data Type | Constraints / Default | Description & Business Logic |
-| :---- | :---- | :---- | :---- |
+| :--- | :--- | :--- | :--- |
 | **id** | UUID | Primary Key, gen_random_uuid() | Unique notification ID. |
 | **organization_id** | UUID | NOT NULL, FK ➔ organizations.id, Indexed | Tenant isolation. |
 | **recipient_id** | UUID | NOT NULL, FK ➔ users.id, Indexed | User receiving the notification. One row per recipient ensures efficient per-user queries. |
@@ -1258,14 +1258,14 @@ Owned by `ingestion-service`. Today it holds one row, `chunk-usage-projection` �
 *Channel-specific delivery attempts (email, SMS, in-app, webhook) with provider tracking.*
 
 | Field Name | Data Type | Constraints / Default | Description & Business Logic |
-| :---- | :---- | :---- | :---- |
+| :--- | :--- | :--- | :--- |
 | **id** | UUID | Primary Key, gen_random_uuid() | Delivery attempt ID. |
 | **notification_id** | UUID | NOT NULL, FK ➔ notifications.id, ON DELETE CASCADE | Parent notification. Cascading delete cleans up delivery records. |
 | **channel** | ENUM | NOT NULL | `IN_APP \| EMAIL \| SMS \| WEBHOOK`. Transport mechanism. |
 | **status** | ENUM | NOT NULL, Default `PENDING` | Delivery state: `PENDING \| SENT \| DELIVERED \| FAILED \| SKIPPED \| BOUNCED`. Distinct from notification.read_at; sent ≠ read. |
 | **skip_reason** | VARCHAR(100) | Nullable | Why delivery was skipped if status = SKIPPED (e.g., `USER_PREFERENCE`, `QUIET_HOURS`, `UNVERIFIED_ADDRESS`, `ALREADY_SEEN_IN_APP`, `RATE_LIMITED`). Auditable alternative to silent drops. |
 | **target** | VARCHAR(255) | Nullable | Snapshot of recipient's email/phone address at send time (same pattern as `otps.target`). Preserved if the user later changes their contact info. |
-| **provider_message_id** | VARCHAR(255) | Nullable, Indexed | The delivery provider's own id — an SMTP `Message-ID` (nodemailer) or a Twilio SID, matching what `notification-service` actually uses. Correlates a provider delivery webhook back to this row. |
+| **provider_message_id** | VARCHAR(255) | Nullable, Indexed | For `EMAIL`, the RFC `Message-ID` **this system set** on the send — derived from the send's idempotency key, not Resend's own id — so a customer reply's `In-Reply-To` matches it. For `SMS`, the Twilio SID. Correlates a reply or a provider delivery webhook back to this row. |
 | **attempts** | INT | NOT NULL, Default 0 | Retry counter. Incremented on each retry attempt. |
 | **error_log** | TEXT | Nullable | Human-readable last error. Same convention as `ingestion_jobs.error_log`. |
 | **bullmq_job_id** | VARCHAR(100) | Nullable | Background job reference for retry management via BullMQ. |
@@ -1281,7 +1281,7 @@ Owned by `ingestion-service`. Today it holds one row, `chunk-usage-projection` �
 *User opt-in/opt-out and batching settings per notification type and delivery channel.*
 
 | Field Name | Data Type | Constraints / Default | Description & Business Logic |
-| :---- | :---- | :---- | :---- |
+| :--- | :--- | :--- | :--- |
 | **id** | UUID | Primary Key, gen_random_uuid() | Preference record ID. |
 | **user_id** | UUID | NOT NULL, FK ➔ users.id, ON DELETE CASCADE | User whose preference this is. |
 | **organization_id** | UUID | NOT NULL, FK ➔ organizations.id, Indexed | Tenant denormalization; enables tenant-scoped preference queries. |
@@ -1302,7 +1302,7 @@ Owned by `ingestion-service`. Today it holds one row, `chunk-usage-projection` �
 **A table rather than Redis, and the reason is not convenience.** This service has no Redis client, and adding one for a counter would put the loop guard in a store a flush empties. A flushed limit re-opens the exchange it exists to close — and a mail loop with an auto-responder on the other end is the failure that does not stop on its own.
 
 | Field Name | Data Type | Constraints / Default | Description & Business Logic |
-| :---- | :---- | :---- | :---- |
+| :--- | :--- | :--- | :--- |
 | **organization_id** | UUID | NOT NULL | The tenant. Part of the primary key: the guard is **per tenant**, so one tenant's auto-reply cannot suppress another's to the same address. |
 | **email** | VARCHAR(320) | NOT NULL | The address that was replied to. |
 | **last_sent_at** | TIMESTAMPTZ | NOT NULL | When the last auto-reply went out. Compared against the window to decide whether to send again. |
@@ -1317,7 +1317,7 @@ Owned by `ingestion-service`. Today it holds one row, `chunk-usage-projection` �
 **Tenant configuration, not a user setting** — which is why `WEBHOOK` is absent from `PREFERENCE_CHANNELS` (Table 25) and why deliveries get their own table: `notification_deliveries` answers *"did we tell this person"*, and a webhook is not telling a person anything.
 
 | Field Name | Data Type | Constraints / Default | Description & Business Logic |
-| :---- | :---- | :---- | :---- |
+| :--- | :--- | :--- | :--- |
 | **id** | UUID | Primary Key, gen_random_uuid() | Unique endpoint identifier. |
 | **organization_id** | UUID | NOT NULL, Indexed | The owning tenant. No FK (§1.13). |
 | **url** | VARCHAR(2000) | NOT NULL | HTTPS only — and **the string here is not the control**. The URL is validated when saved and **resolved** when delivered to, and DNS can change in between. The real check runs at connection time on every resolved address, with the connection pinned to a checked one so a rebind has no second resolution to exploit ([known-gaps #26](./reference/known-gaps.md)). |
@@ -1341,7 +1341,7 @@ Owned by `ingestion-service`. Today it holds one row, `chunk-usage-projection` �
 Anchored to the **event**, not to a notification: one POST per event however many people the notification reached, so a row here is a fact about the **integration** rather than about any recipient.
 
 | Field Name | Data Type | Constraints / Default | Description & Business Logic |
-| :---- | :---- | :---- | :---- |
+| :--- | :--- | :--- | :--- |
 | **id** | UUID | Primary Key, gen_random_uuid() | Unique row identifier. |
 | **endpoint_id** | UUID | NOT NULL, FK ➔ webhook_endpoints.id, **ON DELETE CASCADE** | The receiver. Deleting an endpoint discards its delivery history with it. |
 | **event_id** | UUID | NOT NULL | The payload `id` the receiver deduplicates on. **Fixed at enqueue**, so five retries of one event send **one id five times** — the property the customer's idempotency depends on. |
@@ -1366,7 +1366,7 @@ Anchored to the **event**, not to a notification: one POST per event however man
 **In this database rather than beside `device_sessions` (Table 9) in auth, and the distinction is a lifetime.** A `DeviceSession` is keyed to a refresh-token family and is rotated and revoked with it; a push token **outlives every session**, survives logout on most platforms, and is reissued by the OS on its own schedule. Sharing a table would mean one revoke path deleting rows the other still needs.
 
 | Field Name | Data Type | Constraints / Default | Description & Business Logic |
-| :---- | :---- | :---- | :---- |
+| :--- | :--- | :--- | :--- |
 | **id** | UUID | Primary Key, gen_random_uuid() | Unique row identifier. |
 | **user_id** | UUID | NOT NULL, Indexed | Whose device. No FK (§1.13). |
 | **organization_id** | UUID | NOT NULL | The tenant. No FK (§1.13). |

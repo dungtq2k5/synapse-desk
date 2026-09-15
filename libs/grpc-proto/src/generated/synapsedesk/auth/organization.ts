@@ -467,7 +467,7 @@ export interface OrganizationServiceClient {
 
   /**
    * Unauthenticated by design: the caller is the inbound-email webhook, which
-   * has no user context — it holds a verified Worker signature instead. The
+   * has no user context — it holds a verified Resend signature instead. The
    * token IS the lookup key, and it grants nothing beyond naming a tenant.
    */
 
@@ -546,7 +546,7 @@ export interface OrganizationServiceController {
 
   /**
    * Unauthenticated by design: the caller is the inbound-email webhook, which
-   * has no user context — it holds a verified Worker signature instead. The
+   * has no user context — it holds a verified Resend signature instead. The
    * token IS the lookup key, and it grants nothing beyond naming a tenant.
    */
 

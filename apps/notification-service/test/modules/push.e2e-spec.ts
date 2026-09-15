@@ -138,7 +138,7 @@ describe('Push notifications (e2e)', () => {
     );
     listPermissionHolders.mockResolvedValue([RECIPIENT]);
     listUsersByIds.mockResolvedValue([RECIPIENT]);
-    sendEmail.mockResolvedValue({ messageId: '<smtp-1@synapsedesk>' });
+    sendEmail.mockResolvedValue({ messageId: '<sent-1@synapsedesk>' });
     sendEachForMulticast.mockResolvedValue(fcmResult([true]));
   });
 

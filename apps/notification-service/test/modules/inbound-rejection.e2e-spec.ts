@@ -125,7 +125,7 @@ describe('Inbound rejection auto-reply (e2e)', () => {
   it('**and a send failure does not kill the consumer**', async () => {
     // An unhandled rejection in a NATS handler takes the process down, and the
     // worst case here is one courtesy reply nobody receives.
-    send.mockRejectedValueOnce(new Error('SMTP is down'));
+    send.mockRejectedValueOnce(new Error('the email provider is down'));
 
     expect(() => consumer.rejected(event('stranger@acme.test'))).not.toThrow();
     await settle();

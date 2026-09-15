@@ -20,7 +20,7 @@ import { timestamp } from '../fixtures/wire';
 import { envValidationSchema } from '../../src/common/config/env.validation';
 import { buildOpenApiDocument } from '../../src/common/config/swagger.config';
 import { compareAlphabetically } from '@synapsedesk/common';
-import { INBOUND_SIGNATURE_HEADER } from '../../src/common/guards/inbound-signature.guard';
+import { RESEND_SIGNATURE_HEADERS } from '../../src/modules/inbound-email/resend-inbound.service';
 
 describe('The OpenAPI document', () => {
   let fx: E2eFixture;
@@ -448,13 +448,10 @@ describe('The OpenAPI document', () => {
           .sort(compareAlphabetically);
 
         expect(without).toEqual([
-          // Presigns an inbound mail's attachments before the webhook
-          // On the same controller and therefore under the same
-          // `@SkipThrottle()`: a Worker rate-limited mid-delivery would drop a
-          // customer's file, and the signature is what bounds this route's
-          // callers, not a counter.
-          '/api/v1/webhooks/email/attachments',
-          '/api/v1/webhooks/email/inbound',
+          // Resend's inbound webhook. `@SkipThrottle()`: a delivery
+          // rate-limited mid-burst would drop a customer's mail, and the
+          // signature is what bounds this route's callers, not a counter.
+          '/api/v1/webhooks/email/resend',
           '/api/v1/webhooks/stripe',
         ]);
       });
@@ -658,13 +655,13 @@ describe('The OpenAPI document', () => {
     const inbound = () =>
       operations().find(
         ({ method, path }) =>
-          method === 'post' && path === '/api/v1/webhooks/email/inbound',
+          method === 'post' && path === '/api/v1/webhooks/email/resend',
       );
 
     it('1. **appears in the document with a summary and a 200**', () => {
       // Named here because the tempting way to satisfy the structural
       // sweep is `@ApiExcludeEndpoint()`, which would delete the route from the
-      // spec — and the spec is the one document describing how the Worker must
+      // spec — and the spec is the one document describing how Resend must
       // call it.
       const operation = inbound()?.operation;
 
@@ -680,21 +677,24 @@ describe('The OpenAPI document', () => {
 
       expect(operation?.security).toEqual([]);
       expect(operation?.description).toContain('Not a public endpoint');
-      expect(operation?.description).toContain('x-inbound-signature');
+      expect(operation?.description).toContain('svix-signature');
     });
 
-    it('and documents 401 rather than Stripe’s 400', () => {
+    it('and documents 401 and 503 rather than Stripe’s 400', () => {
+      // No `@Body()`, so nothing answers 400: a mail that fails validation is
+      // a 200 drop. 503 is the one status that asks Resend to retry.
       const responses = inbound()?.operation.responses ?? {};
 
       expect(responses['401']).toBeDefined();
+      expect(responses['503']).toBeDefined();
       expect(responses['400']).toBeUndefined();
     });
 
     it('3. **`x-webhook` names the header the code actually reads**', () => {
       // A documented header the handler ignores is worse than none: it is a
-      // contract the Worker would be written against and the endpoint would
-      // reject. The constant is imported from the guard, so the two cannot
-      // drift.
+      // contract a caller would be written against and the endpoint would
+      // reject. The constant is imported from the service that reads the
+      // headers, so the two cannot drift.
       const extension = (
         inbound()?.operation as unknown as Record<
           string,
@@ -703,9 +703,9 @@ describe('The OpenAPI document', () => {
       )['x-webhook'];
 
       expect(extension).toEqual({
-        signatureHeader: INBOUND_SIGNATURE_HEADER,
-        idempotencyKey: 'messageId',
-        caller: 'cloudflare-email-worker',
+        signatureHeader: RESEND_SIGNATURE_HEADERS.signature,
+        idempotencyKey: 'message_id',
+        caller: 'resend',
       });
     });
   });

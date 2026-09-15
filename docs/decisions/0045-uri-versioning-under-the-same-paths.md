@@ -33,7 +33,7 @@ and a probe has to escape both.
 - **The alternative that lost: header versioning.** It keeps paths static,
   which sounds like the same property — but it makes the version invisible in
   a URL, a log line, an ingress rule and a Stripe dashboard field, and every
-  external caller here (Stripe, the Cloudflare Worker) holds a *URL*.
+  external caller here (Stripe, Resend) holds a *URL*.
 - **The alternative that lost: leave it.** Cost nothing today and made the
   first `v2` a prefix change under every client at once.
 

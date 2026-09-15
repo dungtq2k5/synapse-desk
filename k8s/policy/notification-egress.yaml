@@ -54,7 +54,7 @@ spec:
           port: 53
         - protocol: TCP
           port: 53
-    # The public internet, minus everything private. Outbound webhooks, SMTP
+    # The public internet, minus everything private. Outbound webhooks, the Resend API
     # and Twilio all leave through here.
     - to:
         - ipBlock:

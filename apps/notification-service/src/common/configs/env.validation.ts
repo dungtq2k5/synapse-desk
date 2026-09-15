@@ -77,13 +77,12 @@ export const envValidationSchema = Joi.object({
 
   // --------------------------------------------------------- 7 THIRD PARTY
 
-  // Nodemailer (Gmail SMTP by default)
-  EMAIL_HOST: Joi.string().required(),
-  EMAIL_PORT: Joi.number().required(),
-  // true for 465 (implicit TLS), false for 587 (STARTTLS).
-  EMAIL_SECURE: Joi.boolean().required(),
-  EMAIL_USER: Joi.string().required(),
-  EMAIL_PASS: Joi.string().required(),
+  // Resend, through its HTTP API. The key's `re_` shape is checked here because
+  // Resend has no free credential probe to run at boot.
+  RESEND_API_KEY: Joi.string()
+    .pattern(/^re_/)
+    .required()
+    .messages({ 'string.pattern.base': 'RESEND_API_KEY must start with re_' }),
   EMAIL_SENDER: Joi.string().required(),
 
   // Twilio. Optional as a group: SMS is only needed once phone verification is

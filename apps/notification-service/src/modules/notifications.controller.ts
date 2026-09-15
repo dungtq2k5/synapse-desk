@@ -15,7 +15,7 @@ import { SmsService } from './sms/sms.service';
  * JetStream entry point for Domain E.
  *
  * Fire-and-forget from the publisher's side: a registration must not fail
- * because SMTP is slow, and no caller has anything useful to do with a delivery
+ * because the email provider is slow, and no caller has anything useful to do with a delivery
  * receipt.
  *
  * **Plain methods, not `@EventPattern` handlers** (ADR 0041). Nest's NATS

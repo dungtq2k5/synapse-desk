@@ -110,32 +110,27 @@ export class MetricsRegistry {
   readonly websocketEvents: Counter<'event'>;
 
   /**
-   * Inbound-email webhook requests, by outcome — **one metric, three labels,
-   * two questions.**
+   * Resend inbound-webhook deliveries, by outcome — **one metric, one label,
+   * several questions.** Every exit of `ResendInboundService` counts itself
+   * once.
    *
    * | Series | Answers |
    * | :--- | :--- |
-   * | `rejected_signature` > 0 | the shared secret is wrong — certain, permanent, and it blocks all mail |
-   * | `accepted` == 0 for N hours | the Worker is not calling **at all** — MX record, routing rule, or a failed deploy |
+   * | `rejected_signature` > 0 | the webhook secret is wrong, or somebody unsigned is calling — certain, and it blocks all mail |
+   * | every series flat for N hours | Resend is not calling **at all** — MX record, webhook disabled, or a failed deploy |
+   * | `fetch_failed` > 0 | the mail could not be read back from Resend — a wrongly scoped `RESEND_GATEWAY_API_KEY` looks like this on every mail |
+   * | `invalid_payload` > 0 | a mail Resend reported failed the DTO's bounds and was dropped |
    * | `no_raw_body` > 0 | `rawBody: true` is missing from THIS service's `NestFactory` — our misconfiguration, not a caller's |
+   * | `ignored_event` | a verified event that is not `email.received` |
+   * | an `InboundOutcome` (`TICKET_CREATED`, `UNROUTABLE_ADDRESS`, …) | what `accept()` decided |
    *
    * **The second question is invisible in the first**, which is why these are
    * one metric with a label rather than a single rejection counter: a
-   * `rejected_signature` count of zero is what a healthy system and a dead
-   * Worker have in common.
+   * `rejected_signature` count of zero is what a healthy system and a silent
+   * sender have in common.
    *
-   * `no_raw_body` is separate because the guard calls it *"a CONFIGURATION
-   * failure, not a caller one"* — paging somebody about a shared secret for it
-   * would waste the alert.
-   *
-   * **This is the durable half of a bilateral failure.** The Worker receives
-   * the 401 and the gateway issues it, and only this end retains anything: the
-   * Worker has no `console.*`, no `observability` block, no tail consumer and
-   * no logpush. Note what this does NOT give you yet — **nothing scrapes
-   * `/metrics`**. There is no Prometheus in `docker-compose.yml` and none in
-   * `k8s/`; `docker/prometheus/` holds alert RULES and no collector. Until one
-   * exists this counter is retained and unread, which is still strictly better
-   * than the Worker's nothing, and is not an alert.
+   * Note what this does NOT give you by itself — a scrape. The counter is
+   * retained on `/metrics` for whatever collector reads it.
    */
   readonly inboundEmailWebhook: Counter<'outcome'>;
 
@@ -206,9 +201,9 @@ export class MetricsRegistry {
     this.inboundEmailWebhook = this.counter({
       name: 'inbound_email_webhook_total',
       help: 'Inbound-email webhook requests, by outcome.',
-      // Three fixed values — `accepted`, `rejected_signature`, `no_raw_body`.
-      // Cardinality three, and it cannot grow: every increment site is a
-      // literal in `InboundSignatureGuard`.
+      // Bounded: the five `ResendWebhookOutcome` values plus the seven
+      // `InboundOutcome` values, both enums, and every increment site is in
+      // `ResendInboundService`.
       labelNames: ['outcome'],
     });
 

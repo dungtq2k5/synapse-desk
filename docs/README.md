@@ -5,7 +5,7 @@ Start here. Every document has exactly one job; this page says which.
 ## Core — read before your first commit
 
 | Document | Authoritative for |
-| :---- | :---- |
+| :--- | :--- |
 | [development-conventions.md](./development-conventions.md) | **How to write the code.** Rules and examples only |
 | [product-overview.md](./product-overview.md) | Personas, feature scope, business metrics |
 | [tech-stack-spec.md](./tech-stack-spec.md) | Technology choices and justification |
@@ -17,7 +17,7 @@ Start here. Every document has exactly one job; this page says which.
 Not internal specs. Each one is the **contract** a client codes against, and each names the source file that wins if the two disagree.
 
 | Document | Audience | Source of truth it mirrors |
-| :---- | :---- | :---- |
+| :--- | :--- | :--- |
 | [graphql-api.md](./graphql-api.md) | Front end | `apps/api-gateway/src/schema.gql` (the committed SDL) and the resolvers behind it |
 | [websocket-api.md](./websocket-api.md) | Front end | `realtime.config.ts` (events, limits), `realtime.gateway.ts` (handshake) |
 | [webhooks.md](./webhooks.md) | Customer integrators | `libs/common/src/contracts/webhook.contract.ts` (payload, signing, every constant) |
@@ -31,7 +31,7 @@ Append-only. A decision is never edited; superseding one means writing a new one
 **Start every new ADR from [TEMPLATE.md](./decisions/TEMPLATE.md).** Every file here follows its structure, and `adr-structure.spec.ts` fails the build when one does not:
 
 | Part | Rule |
-| :---- | :---- |
+| :--- | :--- |
 | File name | `NNNN-kebab-case-title.md` — the next free four-digit number |
 | Line 1 | `# NNNN — Title`, where `NNNN` matches the file name |
 | Line 3 | `**Status:**` then `accepted`, or `superseded by [ADR NNNN](./NNNN-….md)` — followed by **exactly one** of `**Code:**` (the files that implement it) or `**Rule:**` (the conventions section it created). Further keys such as `**Follows:**` may come after |
@@ -40,7 +40,7 @@ Append-only. A decision is never edited; superseding one means writing a new one
 *"Never edited"* means the **decision** is never edited. Bringing a file into this structure, or unlinking a reference that no longer resolves, changes how a decision is presented, not what it decided.
 
 | ADR | Decides |
-| :---- | :---- |
+| :--- | :--- |
 | [0001](./decisions/0001-no-prisma-enums.md) | Enumerated columns are `String`, never a Prisma `enum` |
 | [0002](./decisions/0002-every-mocked-rpc-needs-an-owner-test.md) | Every mocked RPC needs an owner test |
 | [0003](./decisions/0003-bullmq-over-nest-cron.md) | Background jobs run on BullMQ repeats, not `@Cron` |
@@ -86,13 +86,14 @@ Append-only. A decision is never edited; superseding one means writing a new one
 | [0043](./decisions/0043-the-cluster-shape.md) | The cluster shape: one Postgres instance, an initContainer, and `ingress-nginx` |
 | [0044](./decisions/0044-expand-and-contract-never-in-one-release.md) | Expand and contract, never in one release |
 | [0045](./decisions/0045-uri-versioning-under-the-same-paths.md) | URI versioning is on at `v1`, and no path moved to turn it on |
+| [0046](./decisions/0046-resend-for-both-directions.md) | Email is Resend in both directions; only the transport changed |
 
 ## `reference/` — what is true today
 
 A **fixed set**, describing what is true today — closed by intent rather than by count. A new *feature* updates one of these; a new *kind of thing* may add one, and adding one is a deliberate act with its reason recorded here. The rule exists to stop per-feature proliferation, not to freeze the shelf.
 
 | Document | Describes |
-| :---- | :---- |
+| :--- | :--- |
 | [ai-output-contract.md](./reference/ai-output-contract.md) | Parse-site defaults and the Markdown answer contract |
 | [sys-flows.md](./reference/sys-flows.md) | The core cross-service flows, as mermaid |
 | [known-gaps.md](./reference/known-gaps.md) | What is currently broken or inconsistent, with the file that proves it |
@@ -110,7 +111,7 @@ check it. So they are sorted the same way everything else here is — by what
 invalidates them:
 
 | Kind | Where it goes | Why it cannot rot |
-| :---- | :---- | :---- |
+| :--- | :--- | :--- |
 | Illustrates a **decision** | Inline in the ADR that owns it | ADRs are append-only, so the diagram freezes with the decision |
 | A **cross-service comparison** | Inline in [sys-flows.md](./reference/sys-flows.md) — as content, never a new page | The edit that changes the prose shows you the diagram |
 | An **end-to-end path** | Inline in its own [reference/flows/](./reference/flows/) document | Split by what invalidates them: an OCR change rewrites one flow and touches no other |

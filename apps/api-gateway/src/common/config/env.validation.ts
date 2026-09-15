@@ -134,11 +134,36 @@ export const envValidationSchema = Joi.object({
     .required()
     .valid(...COOKIE_SAMESITE_OPTIONS),
 
-  // Inbound email — the gateway is the email adapter: it verifies the
-  // Worker's signature, parses the address, and runs the loop guards.
+  // Inbound email — the gateway is the email adapter: it verifies Resend's
+  // webhook signature, fetches the mail, parses the address, and runs the loop
+  // guards.
 
-  /** Shared with the Cloudflare Worker — the HMAC key over the raw body. */
+  /**
+   * Shared with notification-service — it mints the per-ticket reply token
+   * into `Reply-To`, and the gateway parses that token back out.
+   */
   INBOUND_EMAIL_SECRET: Joi.string().required(),
+
+  /**
+   * The Standard Webhooks signing secret of the Resend `email.received`
+   * webhook. Readable back later with `webhooks.get`.
+   */
+  RESEND_WEBHOOK_SECRET: Joi.string()
+    .pattern(/^whsec_/)
+    .required()
+    .messages({
+      'string.pattern.base': 'RESEND_WEBHOOK_SECRET must start with whsec_',
+    }),
+
+  /**
+   * The gateway's OWN Resend key, for `emails.receiving.get`. A different key
+   * and name from notification-service's `RESEND_API_KEY`: a leaked gateway key
+   * must not be the sending key, and a rotated sending key must not stop
+   * inbound mail.
+   */
+  RESEND_GATEWAY_API_KEY: Joi.string().pattern(/^re_/).required().messages({
+    'string.pattern.base': 'RESEND_GATEWAY_API_KEY must start with re_',
+  }),
 
   /** The mail domain the catch-all route serves, for building `Reply-To`. */
   INBOUND_EMAIL_DOMAIN: Joi.string().required(),

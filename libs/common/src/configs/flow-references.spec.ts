@@ -47,9 +47,9 @@ describe('every symbol the flow documents cite exists', () => {
    *
    * Measured before this was one list: `declaredConstants` read
    * `libs|apps` only (1,062 of 1,154 tracked source files, missing `scripts/`,
-   * `k8s/`, `workers/`, `.github/` and `docker/`), so `ATTACHMENTS_URL` — which
-   * exists only in `workers/` — failed test 4 for a constant that plainly
-   * exists. And test 5's line-number pattern covered `ts|py|mjs` while
+   * `k8s/`, `.github/` and `docker/`), so a constant declared only outside
+   * those two failed test 4 while plainly existing. And test 5's line-number
+   * pattern covered `ts|py|mjs` while
    * `FILE_CITATION` covered seven, so `` `docker-compose.yml:42` `` was
    * invisible to the WHOLE guard: too narrow for test 5, and unmatched by test 3
    * because the backtick no longer follows the extension.
@@ -71,7 +71,7 @@ describe('every symbol the flow documents cite exists', () => {
     CITED_EXTENSIONS.flatMap((extension) => gitFiles(`*.${extension}`));
 
   /**
-   * Backticked filenames — `rerank.py`, `cache.config.ts`, `wrangler.toml`.
+   * Backticked filenames — `rerank.py`, `cache.config.ts`, `docker-compose.yml`.
    *
    * Matched on BASENAME rather than path: the documents name a file to send a
    * reader to it, not to assert where it lives, and pinning the directory
@@ -97,7 +97,7 @@ describe('every symbol the flow documents cite exists', () => {
    * Constants declared anywhere in tracked source.
    *
    * **The same corpus as `trackedBasenames`**, deliberately: a document citing
-   * `wrangler.toml` and a document citing `ATTACHMENTS_URL` are asking the same
+   * `docker-compose.yml` and a document citing a constant from `scripts/` are asking the same
    * question about the same file, and answering them from two different file
    * sets is how one passes while the other fails.
    */

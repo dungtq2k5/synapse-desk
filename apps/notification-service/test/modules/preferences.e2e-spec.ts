@@ -78,7 +78,7 @@ describe('Preferences and quiet hours (e2e)', () => {
     jest.clearAllMocks();
 
     listPermissionHolders.mockResolvedValue([recipient()]);
-    sendEmail.mockResolvedValue({ messageId: '<smtp@synapsedesk>' });
+    sendEmail.mockResolvedValue({ messageId: '<sent@synapsedesk>' });
   });
 
   afterAll(async () => {

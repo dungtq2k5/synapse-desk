@@ -26,14 +26,10 @@ describe('every TypeScript directory is inside a typecheck', () => {
    *
    * **Named, never pattern-matched** — the `TWINLESS` / `NON_BROWSER_HEADERS`
    * shape. A scan that is red on arrival gets weakened to green by whoever
-   * runs it next, and `workers/` would have made this one red on arrival: it
-   * is excluded from the root include AND from eslint on purpose, with the
-   * reason recorded in `eslint.config.mjs`.
+   * runs it next; a named exemption has to be argued for, and test 3 deletes
+   * it the moment the directory it names stops holding TypeScript.
    */
   const OUTSIDE_ROOT_PROGRAM: Readonly<Record<string, string>> = {
-    workers:
-      'a Workers runtime, not a Nest app; carries its own tsconfig and is ' +
-      'typechecked inside its own directory — eslint.config.mjs records this',
     'jest.config.base.ts':
       "tooling config, excluded by the root tsconfig's own header: jest " +
       'evaluates it as ESM with an explicit .ts import extension, which tsc ' +

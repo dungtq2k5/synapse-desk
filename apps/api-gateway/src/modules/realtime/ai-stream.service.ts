@@ -141,7 +141,7 @@ export class AiStreamService implements OnModuleInit {
 
     if (attachments.skipped.length > 0) {
       // **Told, not silently dropped**, the same rule
-      // applies to email attachments the worker could not carry. "It ignored my
+      // applies to inbound email attachments that were not stored. "It ignored my
       // file" is something a user discovers before you do.
       this.notifySkipped(client, ticketId, attachments.skipped);
     }

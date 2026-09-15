@@ -296,7 +296,6 @@ describe('the manifest contract', () => {
      */
     const ALSO_CREDENTIAL: Readonly<Record<string, string>> = {
       TWILIO_SID: 'an account identifier that is half of a Basic auth pair',
-      EMAIL_USER: 'the SMTP username, the other half of EMAIL_PASS',
       TWILIO_AUTH_PHONE:
         'not secret in itself, but it travels with the pair and splitting them across two objects is how one gets rotated alone',
       INGESTION_DATABASE_URL:
@@ -472,21 +471,18 @@ describe('the manifest contract', () => {
     // the Secret satisfies "not in both" while sitting somewhere it should not.
     // The mirror failure is a key that is simply absent, and this catches that.
     //
-    // **One value, three deployment surfaces.** `inbound-email.config.ts` opens
-    // with *"One definition, three readers"*: the Worker signs with it
-    // (`wrangler secret put INBOUND_SECRET`), the gateway verifies that
-    // signature AND parses the per-ticket reply token, and notification-service
-    // MINTS that reply token into `Reply-To`.
+    // **One value, two deployment surfaces.** `inbound-email.config.ts` opens
+    // with *"One definition, two readers"*: the gateway parses the per-ticket
+    // reply token, and notification-service MINTS that reply token into
+    // `Reply-To`.
     //
-    // **The two agreements fail in opposite directions and only one is loud.** A
-    // Worker mismatch is a 401 on every message, which the Worker reports rather
-    // than retries. A notification/gateway mismatch makes
+    // **The agreement fails quietly.** A notification/gateway mismatch makes
     // `parseTicketReplyToken` return `null` and the caller open a NEW ticket —
     // correctly and deliberately, since threading a stranger's mail onto
     // somebody else's conversation is a disclosure — with nothing in a log. It
     // presents weeks later as "threading stopped working", which is the hardest
     // possible attribution, and a partial rotation is worse than a wrong one
-    // because two thirds of it keeps working.
+    // because half of it keeps working.
     const KEY = 'INBOUND_EMAIL_SECRET';
     const HOLDERS = ['api-gateway', 'notification-service'];
 

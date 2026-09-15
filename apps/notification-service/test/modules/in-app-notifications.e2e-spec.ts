@@ -133,8 +133,9 @@ describe('In-app notification delivery (e2e)', () => {
     listPermissionHolders = jest.spyOn(authReference, 'listPermissionHolders');
     listUsersByIds = jest.spyOn(authReference, 'listUsersByIds');
 
-    // SMTP is never reached. Asserting on the CAPTURED command proves what a
-    // recipient would receive without making the test depend on a mail server.
+    // The email provider is never reached. Asserting on the CAPTURED command
+    // proves what a recipient would receive without making the test depend on
+    // a mail server.
     sendEmail = jest.spyOn(fx.moduleRef.get(EmailService), 'send');
   });
 
@@ -144,7 +145,7 @@ describe('In-app notification delivery (e2e)', () => {
 
     listPermissionHolders.mockResolvedValue(ADMINS);
     listUsersByIds.mockResolvedValue(ADMINS);
-    sendEmail.mockResolvedValue({ messageId: '<smtp-1@synapsedesk>' });
+    sendEmail.mockResolvedValue({ messageId: '<sent-1@synapsedesk>' });
   });
 
   afterAll(async () => {
@@ -368,6 +369,31 @@ describe('In-app notification delivery (e2e)', () => {
       expect(command.data.detail).toContain('route to your agents');
     });
 
+    it('14b. **Each recipient’s send carries the EVENT id and its OWN user id**', async () => {
+      // The send's identity. `EmailService` derives the provider idempotency
+      // key and the `Message-ID` from `sendId` plus `recipientUserId`: the
+      // event id makes the header reproducible from the event, and the
+      // recipient keeps two people's sends of one event from sharing a key —
+      // which the provider refuses for every recipient after the first.
+      // Asserted HERE because every suite spies `send`, so the adapter's own
+      // spec cannot see what this caller passes it.
+      const command = quotaAlert(100);
+
+      await inApp.deliver(command);
+
+      const calls = sendEmail.mock.calls as unknown as [
+        { sendId: string; to: string },
+        { recipientUserId?: string },
+      ][];
+      expect(calls.map(([sent]) => sent.sendId)).toEqual([
+        command.eventId,
+        command.eventId,
+      ]);
+      expect(
+        new Set(calls.map(([, options]) => options.recipientUserId)),
+      ).toEqual(new Set(ADMINS.map((admin) => admin.userId)));
+    });
+
     it('15. Does not RE-EMAIL on a redelivery', async () => {
       // The row is the idempotency record for both channels, which is why it is
       // written first. Without this, a NATS retry storm becomes a mail storm.
@@ -381,9 +407,9 @@ describe('In-app notification delivery (e2e)', () => {
     });
 
     it('16. Still writes the ROW when the mail transport fails', async () => {
-      // The channels degrade independently. Losing SMTP must not lose the
+      // The channels degrade independently. Losing email must not lose the
       // notification — and the in-app row is the one that survives a restart.
-      sendEmail.mockRejectedValue(new Error('smtp is down'));
+      sendEmail.mockRejectedValue(new Error('the email provider is down'));
 
       const outcome = await inApp.deliver(quotaAlert(100));
 
@@ -419,14 +445,14 @@ describe('In-app notification delivery (e2e)', () => {
       });
 
       expect(delivery.status).toBe(DeliveryStatus.SENT);
-      expect(delivery.providerMessageId).toBe('<smtp-1@synapsedesk>');
+      expect(delivery.providerMessageId).toBe('<sent-1@synapsedesk>');
       // The address AT SEND TIME, snapshotted — preserved if the user later
       // changes it, so the record still says where the mail actually went.
       expect(delivery.target).toBe(ADMINS[0].email);
     });
 
     it('19. Records FAILED with the error when the transport throws', async () => {
-      sendEmail.mockRejectedValue(new Error('smtp is down'));
+      sendEmail.mockRejectedValue(new Error('the email provider is down'));
 
       await inApp.deliver(quotaAlert(100));
 
@@ -435,7 +461,7 @@ describe('In-app notification delivery (e2e)', () => {
       });
 
       expect(delivery.status).toBe(DeliveryStatus.FAILED);
-      expect(delivery.errorLog).toContain('smtp is down');
+      expect(delivery.errorLog).toContain('the email provider is down');
     });
 
     it('20. Writes SKIPPED with a REASON when a preference disables the channel', async () => {

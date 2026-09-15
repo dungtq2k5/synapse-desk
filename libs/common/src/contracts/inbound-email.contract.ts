@@ -48,7 +48,7 @@ export type InboundEmailRejectedEvent = {
    * The tempting rule is the opposite one, and it was the rule here first: no
    * tenant is exactly the case where the sender learns least, so tell them.
    * That makes this system a BACKSCATTER source. `sender` is authenticated by
-   * nothing — the signature proves the Worker sent the request and says nothing
+   * nothing — the signature proves Resend sent the delivery and says nothing
    * about whether the envelope sender is real — so mail to an address nobody
    * was issued, forged `From: victim@example.com`, would have this domain send
    * unsolicited mail to that victim. The per-address daily cap bounds volume

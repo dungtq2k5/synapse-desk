@@ -25,7 +25,7 @@ export type E2eFixture = {
  * Boots the real notification-service wiring against the TEST database.
  *
  * The collaborators that reach outside the process — auth-service over gRPC and
- * SMTP — are spied on by the suites rather than stubbed here, because what each
+ * the email provider — are spied on by the suites rather than stubbed here, because what each
  * test wants to control differs: one varies the audience, another asserts on
  * the captured mail.
  *

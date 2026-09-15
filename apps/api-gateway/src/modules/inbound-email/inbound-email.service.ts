@@ -28,7 +28,6 @@ import {
 } from '@synapsedesk/grpc-proto';
 import {
   extractEmailAddress,
-  formatErrorMsg,
   MAX_ATTACHMENT_BYTES,
   MAX_ATTACHMENTS_PER_MESSAGE,
   OrgStatus,
@@ -38,17 +37,10 @@ import {
   type RequestContext,
   type RequestOrigin,
   InboundRejectionReason,
-  exceedsLimit,
 } from '@synapsedesk/common';
 import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
 import { InboundEmailDto } from './dto/rest/inbound-email.dto';
 import type { InboundUploadedAttachmentDto } from './dto/rest/inbound-email.dto';
-import { InboundAttachmentUploadRequestDto } from './dto/rest/inbound-attachment.dto';
-import {
-  InboundAttachmentDeclinedResponseDto,
-  InboundAttachmentPresignResponseDto,
-  InboundAttachmentUploadResponseDto,
-} from './dto/rest/inbound-attachment-response.dto';
 import { InboundEmailPublisher } from './inbound-email.publisher';
 import { toStoredBody } from './quoted-reply';
 
@@ -109,11 +101,10 @@ class InboundPeer extends BaseGrpcClient {
 /**
  * The only fields routing reads.
  *
- * **Narrow on purpose.** `InboundEmailDto` satisfies it and so does the
- * Worker's presign request, which is what lets one resolver serve both — and
- * the narrowness is the documentation: nothing about the SUBJECT or the BODY
- * decides which ticket a mail threads onto, and a resolver typed to the whole
- * payload invites somebody to start reading them.
+ * **Narrow on purpose.** `InboundEmailDto` satisfies it, and the narrowness is
+ * the documentation: nothing about the SUBJECT or the BODY decides which ticket
+ * a mail threads onto, and a resolver typed to the whole payload invites
+ * somebody to start reading them.
  */
 type RoutingFacts = {
   to: string;
@@ -128,7 +119,7 @@ type RoutingFacts = {
  *
  * A discriminated result rather than a nullable one, so the three ways a mail
  * can be unroutable stay distinguishable: `accept` turns each into its own drop
- * event, and the Worker's presign route treats all three as "no".
+ * event.
  */
 type RoutingResolution =
   | {
@@ -232,11 +223,10 @@ export class InboundEmailService implements OnModuleInit {
 
     // ------------------------------------------- 1-3. tenant, sender, thread
     //
-    // **One resolver, shared with the Worker's presign route**'s
-    // reply half. The Worker presigns against a ticket BEFORE this webhook
-    // runs; if the two resolutions could disagree, a customer's screenshot
-    // would be uploaded under one ticket's prefix and attached to another's
-    // message.
+    // **One resolver, and the only place routing is decided.** Anything that
+    // later stores an attachment for this mail must resolve the ticket through
+    // it too; two resolutions that could disagree would put a customer's
+    // screenshot under one ticket's prefix and attach it to another's message.
     const routing = await this.resolveRouting(payload);
 
     if (!routing.ok) {
@@ -320,125 +310,13 @@ export class InboundEmailService implements OnModuleInit {
   }
 
   /**
-   * Presigns uploads for a mail's attachments, the reply half.
+   * The tenant, the sender and the ticket a message threads onto.
    *
-   * **Called BEFORE the webhook, by the Worker, over the same signed channel.**
-   * The bytes go from the Worker straight to storage and never touch this
-   * server, which is the property the presign flow exists to hold and the
-   * one an inbound mail most threatens: the Worker has the bytes whether anyone
-   * wanted them or not, and uploading them through the webhook would make
-   * `/webhooks/email/inbound` the only route in the system that accepts
-   * arbitrary file bytes from an unauthenticated sender.
-   *
-   * **Eligibility is decided here, not in the Worker.** The allowlist, the size
-   * cap and the per-message ceiling are policy, and a second copy of policy in a
-   * Cloudflare Worker is a copy that drifts. The Worker presents what it parsed
-   * and is told which files it may upload; the rest come back NAMED so the
-   * ticket can still say what was left out.
-   *
-   * **A mail that would CREATE a ticket declines everything**, because there is
-   * no ticket for the object path to hang under — the new-ticket half,
-   * which is blocked on a separate decision.
-   */
-  async presignAttachments(
-    request: InboundAttachmentUploadRequestDto,
-  ): Promise<InboundAttachmentUploadResponseDto> {
-    const uploads: InboundAttachmentPresignResponseDto[] = [];
-    const declined: InboundAttachmentDeclinedResponseDto[] = [];
-
-    const routing = await this.resolveRouting({
-      to: request.to,
-      from: request.from,
-      fromName: request.fromName,
-      inReplyTo: request.inReplyTo,
-      references: request.references,
-    });
-
-    if (!routing.ok || !routing.ticket) {
-      // One reason for every file, and it is the same reason: either the mail
-      // does not route, or it opens a new ticket. Neither has somewhere to put
-      // a file.
-      return {
-        uploads: [],
-        declined: request.files.map((file) => ({
-          fileName: file.fileName,
-          reason: routing.ok ? 'no ticket to attach to' : 'unroutable',
-        })),
-      };
-    }
-
-    // `min(platform, tenant)`, resolved when the tenant was — this path is
-    // reachable by anyone who can email the address, so a workspace that
-    // narrowed its attachment limit has not got the control it asked for if
-    // these two numbers stay constants.
-    const { context, ticket, limits } = routing;
-
-    for (const file of request.files) {
-      // **The per-message ceiling, applied HERE.** `createMessage` throws when
-      // the list is over the cap rather than trimming it — so a mail with eight
-      // attachments would lose the MESSAGE, not the extra files. Declining the
-      // sixth here keeps that a partial loss with a name on it.
-      if (exceedsLimit(uploads.length + 1, limits.maxPerMessage)) {
-        declined.push({
-          fileName: file.fileName,
-          reason: `only ${limits.maxPerMessage} attachments per message`,
-        });
-        continue;
-      }
-
-      if (exceedsLimit(file.sizeBytes, limits.maxBytes)) {
-        declined.push({ fileName: file.fileName, reason: 'too large' });
-        continue;
-      }
-
-      try {
-        const presigned = await this.ticketPeer.run(
-          (metadata) =>
-            this.messages.uploadAttachment(
-              {
-                ticketId: ticket.id,
-                // No message yet — it is created by the webhook that follows,
-                // and the message-first upload flow made presigning without one possible.
-                messageId: undefined,
-                fileName: file.fileName,
-                fileSizeBytes: file.sizeBytes,
-                mimeType: file.mimeType,
-              },
-              metadata,
-            ),
-          context,
-        );
-
-        uploads.push({
-          fileName: file.fileName,
-          uploadUrl: presigned.uploadUrl,
-          objectPath: presigned.objectPath,
-        });
-      } catch (error) {
-        // One refused file must not fail the batch, and must not fail the mail
-        // either — the message still lands, minus this attachment.
-        this.logger.warn(
-          `Could not presign an inbound attachment: ${formatErrorMsg(error)}`,
-        );
-        declined.push({
-          fileName: file.fileName,
-          reason: 'refused by storage',
-        });
-      }
-    }
-
-    return { uploads, declined };
-  }
-
-  /**
-   * The tenant, the sender and the ticket a message threads onto — what both
-   * `accept` and the Worker's presign route need.
-   *
-   * **Extracted rather than duplicated**, because the two must not be able to
-   * disagree. The Worker presigns against a ticket BEFORE the webhook runs, and
-   * the webhook binds the objects to whatever ticket it resolves — so a
-   * divergence would upload a customer's screenshot under one ticket's prefix
-   * and attach it to another's message.
+   * **One method, so attachment storage can share it.** An attachment stored
+   * against a ticket and a message bound to whatever ticket `accept` resolves
+   * must never disagree, or a customer's screenshot lands under one ticket's
+   * prefix and attached to another's message. `limits` is resolved here for the
+   * same reason: the tenant's attachment caps belong to the same lookup.
    *
    * **Failures come back as an OUTCOME rather than `null`**: unroutable,
    * suspended tenant and refused sender are three drop events with three
@@ -446,10 +324,11 @@ export class InboundEmailService implements OnModuleInit {
    * copy of this sequence to tell them apart.
    *
    * A `ticket` of `null` on success means the mail would CREATE a ticket — the
-   * case the Worker cannot presign for, because no ticket owns the path.
+   * case with no ticket to own an attachment path.
    *
    * **Read-only.** It may PROVISION a sender, but writes no ticket and no
-   * message, so the presign route does not half-process an unaccepted mail.
+   * message, so a caller that only needs the routing does not half-process an
+   * unaccepted mail.
    */
   private async resolveRouting(
     payload: RoutingFacts,
@@ -656,17 +535,13 @@ export class InboundEmailService implements OnModuleInit {
             isInternalNote: false,
             invokeAi: false,
             inboundMessageId,
-            // **Uploaded by the Worker before this webhook ran**.
+            // **Objects already in storage before the message exists.**
             //
             // This list is for a client that uploaded BEFORE the message
-            // existed, and inbound mail is now exactly that client: the Worker
-            // presigns against the resolved ticket, PUTs the bytes straight to
-            // storage, and sends only object paths. ticket-service confirms
-            // each one as it writes the message.
-            //
-            // Empty for a mail that opens a NEW ticket — there is no message to
-            // attach to, so the presign route declined everything and those
-            // names travel in `droppedAttachments` instead.
+            // existed; ticket-service confirms each path as it writes the
+            // message. Empty from the Resend webhook, which names every
+            // attachment in `droppedAttachments` instead, and always empty for
+            // a mail that opens a NEW ticket — there is no message to attach to.
             attachments: attachments ?? [],
           },
           metadata,
@@ -756,8 +631,8 @@ export class InboundEmailService implements OnModuleInit {
     if (messageId) return messageId;
 
     // **Every input is a property of the MESSAGE, and that is the whole point.**
-    // The first version hashed `receivedAt`, which the Worker stamps fresh on
-    // each attempt — so a redelivery produced a new key, a new ticket, and
+    // `receivedAt` describes the delivery, not the message, so a key built from
+    // it could change between redeliveries — a new key, a new ticket, and
     // exactly the retry storm the fallback exists to prevent.
     //
     // The BODY is in the digest because sender, subject and second are not
@@ -820,7 +695,7 @@ export class InboundEmailService implements OnModuleInit {
     // **Never reply to an auto-reply**. An auto-responder on the
     // other end plus a courtesy reply from us is an unbounded exchange, and
     // these two headers are the standard way a machine says it is one. They are
-    // invisible once the body is parsed, which is why the Worker forwards
+    // invisible once the body is parsed, which is why the webhook mapper copies
     // exactly them.
     if (this.isAutomated(payload)) {
       this.logger.log('No auto-reply sent: the message was machine-generated');
@@ -832,7 +707,7 @@ export class InboundEmailService implements OnModuleInit {
     // source.**
     //
     // `from` has been authenticated by nothing at this point: the signature
-    // proves the Worker sent the request, and says nothing about whether the
+    // proves Resend sent the delivery, and says nothing about whether the
     // envelope sender is real. SMTP `From` is trivially forged, so mailing an
     // unroutable address with `From: victim@example.com` would make this domain
     // send unsolicited mail to that victim — which is what puts a sending

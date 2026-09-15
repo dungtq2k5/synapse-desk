@@ -16,13 +16,22 @@ import {
   generateInboundToken,
   MAX_ATTACHMENT_BYTES,
 } from '@synapsedesk/common';
-import { API, E2eFixture, bootstrapE2eTest } from '../utils';
+import {
+  API,
+  E2eFixture,
+  bootstrapE2eTest,
+  signStandardWebhook,
+} from '../utils';
 import { timestamp, wireCreatedMessage } from '../fixtures/wire';
 import {
   plainEmail,
-  signPayload,
+  resendDelivery,
   INBOUND_DOMAIN,
 } from '../fixtures/inbound-email';
+import {
+  RESEND_INBOUND_CLIENT,
+  type ResendInboundClient,
+} from '../../src/modules/inbound-email/resend-inbound.client';
 
 /**
  * Tenant → sender → thread
@@ -35,19 +44,28 @@ import {
  */
 describe('Inbound email routing (e2e)', () => {
   let fx: E2eFixture;
+  /** `INBOUND_EMAIL_SECRET` — mints the reply tokens these tests address mail to. */
   let secret: string;
+  let webhookSecret: string;
+  let receivingGet: jest.SpyInstance;
 
   const organizationId = faker.string.uuid();
   const senderId = faker.string.uuid();
   const tenantToken = generateInboundToken();
 
+  /**
+   * Delivers a DTO-shaped mail through the real webhook: a signed
+   * `email.received` event, and a `receiving.get` that returns the same mail.
+   */
   const post = (payload: Record<string, unknown>) => {
-    const { body, signature } = signPayload(payload, secret);
+    const { event, email } = resendDelivery(payload);
+    receivingGet.mockResolvedValue({ data: email, error: null, headers: null });
+    const body = JSON.stringify(event);
 
     return request(fx.app.getHttpServer())
-      .post(`${API}/webhooks/email/inbound`)
+      .post(`${API}/webhooks/email/resend`)
       .set('content-type', 'application/json')
-      .set('x-inbound-signature', signature)
+      .set(signStandardWebhook(body, webhookSecret))
       .send(body);
   };
 
@@ -84,9 +102,15 @@ describe('Inbound email routing (e2e)', () => {
 
   beforeAll(async () => {
     fx = await bootstrapE2eTest();
-    secret = fx.app
-      .get(ConfigService)
-      .getOrThrow<string>('INBOUND_EMAIL_SECRET');
+    const config = fx.app.get(ConfigService);
+    secret = config.getOrThrow<string>('INBOUND_EMAIL_SECRET');
+    webhookSecret = config.getOrThrow<string>('RESEND_WEBHOOK_SECRET');
+    // The fetch is replaced; the signature verifier stays the SDK's own.
+    receivingGet = jest.spyOn(
+      fx.app.get<ResendInboundClient>(RESEND_INBOUND_CLIENT, { strict: false })
+        .emails.receiving,
+      'get',
+    );
   }, 30_000);
 
   beforeEach(() => jest.clearAllMocks());
@@ -431,13 +455,11 @@ describe('Inbound email routing (e2e)', () => {
     });
 
     it('5. **a message with no `Message-ID` dedups across a REAL retry**', async () => {
-      // The earlier version of this test sent the payload ONCE and asserted a
-      // key was built. That passes for a key that changes on every attempt —
-      // which is what the first implementation had, because it hashed the
-      // Worker's `receivedAt`.
+      // Sending the payload ONCE and asserting a key was built would pass for
+      // a key that changes on every attempt — one that hashed `receivedAt`, say.
       //
-      // A retry is a re-run of the Worker: same message, NEW `receivedAt`. The
-      // key must be identical across the two, or the redelivery opens a second
+      // A retry is a second delivery: same message, NEW `receivedAt`. The key
+      // must be identical across the two, or the redelivery opens a second
       // ticket.
       resolvable();
       fx.stubs.ticket.createTicket.mockReturnValue(of(wireTicket()));
@@ -505,9 +527,9 @@ describe('Inbound email routing (e2e)', () => {
     });
   });
 
-  describe('the recorded Worker payloads', () => {
-    // These are the shapes the Worker emits, run through the real
-    // endpoint — the closest this suite gets to the mail transport without one.
+  describe('the fixture payloads', () => {
+    // Hand-built mail shapes, delivered through the real webhook — the closest
+    // this suite gets to the mail transport without a live Resend account.
     const PAYLOADS = join(__dirname, '../fixtures/inbound-email/payloads');
 
     const fixture = (name: string) =>

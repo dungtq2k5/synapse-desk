@@ -112,7 +112,7 @@ describe('Ticket notifications (e2e)', () => {
       recipient(AGENT, 'agent'),
       recipient(OTHER_AGENT, 'other'),
     ]);
-    sendEmail.mockResolvedValue({ messageId: '<smtp@synapsedesk>' });
+    sendEmail.mockResolvedValue({ messageId: '<sent@synapsedesk>' });
   });
 
   afterAll(async () => {

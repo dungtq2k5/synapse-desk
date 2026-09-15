@@ -413,9 +413,9 @@ export class MessagesService {
           // **The single extraction hook, and it has to be this one.** Both
           // attachment routes reach here — a client confirming its own upload,
           // and `createMessage` writing a message that arrived with files
-          // already in storage. That second one is INBOUND EMAIL: the Worker
-          // presigns, PUTs the bytes and sends paths, and this is where they
-          // are confirmed.
+          // already in storage. That second one is the path inbound email's
+          // attachments take: objects already in storage arrive as paths, and
+          // this is where they are confirmed.
           //
           // Hooking `confirmAttachment` alone would have left every emailed
           // office attachment unextracted, permanently and silently — on the

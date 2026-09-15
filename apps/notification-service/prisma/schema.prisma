@@ -192,8 +192,9 @@ model NotificationDelivery {
   /// says where it actually went.
   target String? @db.VarChar(255)
 
-  /// The provider's own id — an SMTP `Message-ID` or a Twilio SID. Stored now
-  /// so provider delivery webhooks are additive later.
+  /// The send's id — for email, the RFC `Message-ID` header this service set
+  /// (never Resend's own id); for SMS, the Twilio SID. Stored now so provider
+  /// delivery webhooks are additive later.
   providerMessageId String? @map("provider_message_id") @db.VarChar(255)
 
   attempts Int     @default(0)

@@ -7,7 +7,8 @@ import { NotificationGrpcModule } from '../../common/grpc/notification-grpc.modu
 import { InboundEmailPublisher } from './inbound-email.publisher';
 import { InboundEmailController } from './inbound-email.controller';
 import { InboundEmailService } from './inbound-email.service';
-import { InboundSignatureGuard } from '../../common/guards/inbound-signature.guard';
+import { ResendInboundService } from './resend-inbound.service';
+import { resendInboundClientProvider } from './resend-inbound.client';
 
 /**
  * Inbound email — the gateway is the adapter, and this module is all of it.
@@ -41,7 +42,8 @@ import { InboundSignatureGuard } from '../../common/guards/inbound-signature.gua
   providers: [
     InboundEmailService,
     InboundEmailPublisher,
-    InboundSignatureGuard,
+    ResendInboundService,
+    resendInboundClientProvider,
   ],
 })
 export class InboundEmailModule {}

@@ -137,8 +137,9 @@ describe('CORS allow-lists cover the client contract', () => {
   const NON_BROWSER_HEADERS: Readonly<Record<string, string>> = {
     'stripe-signature':
       'Stripe posts server-to-server and sends no Origin; CORS never applies',
-    'auto-submitted': 'the mail Worker relays it; RFC 3834 loop suppression',
-    precedence: 'same relay, same purpose',
+    'auto-submitted':
+      'a MAIL header read from the inbound payload, not an HTTP one; RFC 3834 loop suppression',
+    precedence: 'a mail header too, read by the same loop guard',
     'user-agent':
       'a forbidden header name — the browser sets it and script cannot',
   };

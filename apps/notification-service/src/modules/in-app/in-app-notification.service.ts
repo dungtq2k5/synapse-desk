@@ -10,7 +10,7 @@ import {
   NotificationPriority,
   NotificationResourceType,
   NOTIFICATION_TYPES,
-  SendEmailCommand,
+  EmailContent,
 } from '@synapsedesk/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { WebhookDispatchService } from '../webhooks/webhook-dispatch.service';
@@ -442,9 +442,9 @@ export class InAppNotificationService {
         continue;
       }
 
-      const email = emailFor(command, recipient);
+      const content = emailFor(command, recipient);
 
-      if (!email) {
+      if (!content) {
         // A type with no email arm. Not an error and not a suppression: the
         // notification exists in the feed, and there is simply no template for
         // it — which is true of every ticket event and of `plan.changed`.
@@ -453,13 +453,22 @@ export class InAppNotificationService {
 
       try {
         const result = await this.email.send(
-          email,
-          // **A ticket notification is answerable; everything else is not** —
-          // The address carries a per-ticket token, so replying to
-          // this email appends to the thread it is about rather than opening a
-          // duplicate. A notification about anything else offers none, because
-          // there is nothing for a reply to attach to.
-          { replyTo: await this.replyAddressFor(command) },
+          // **The event id is the send id.** This loop only ever sees
+          // `newlyNotified` — recipients whose row was CREATED in this handling —
+          // so a redelivery emails nobody, and the event id makes the
+          // `Message-ID` reproducible from the event itself.
+          { ...content, sendId: command.eventId },
+          {
+            // **A ticket notification is answerable; everything else is not** —
+            // The address carries a per-ticket token, so replying to
+            // this email appends to the thread it is about rather than opening a
+            // duplicate. A notification about anything else offers none, because
+            // there is nothing for a reply to attach to.
+            replyTo: await this.replyAddressFor(command),
+            // One event, several recipients: without this every recipient
+            // after the first would reuse the first one's idempotency key.
+            recipientUserId: recipient.userId,
+          },
         );
 
         await this.deliveries.recordSent(
@@ -860,7 +869,7 @@ function quietHoursOf(recipient: Recipient) {
 function emailFor(
   command: CreateInAppNotificationCommand,
   recipient: { email: string; fullName: string },
-): SendEmailCommand | null {
+): EmailContent | null {
   switch (command.type) {
     case NOTIFICATION_TYPES.quotaThreshold:
       return {

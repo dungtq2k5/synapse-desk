@@ -65,9 +65,34 @@ describe('The publish sweep (unit)', () => {
 
       expect(client.publish).toHaveBeenCalledWith(
         NOTIFICATION_PATTERNS.sendEmail,
-        command,
+        { ...command, sendId: expect.any(String) },
         expect.any(String),
       );
+    });
+
+    it('**`sendId` is the `Nats-Msg-Id`, and DISTINCT per call**', async () => {
+      // notification-service derives the provider idempotency key and the
+      // `Message-ID` from `sendId`. The same value as the message id means one
+      // uuid names the send on both sides of the broker; distinct per call
+      // means two identical security alerts are two sends. A publisher that
+      // reused an id, or derived it from the content, would have the provider
+      // answer the second alert with the first one's result and send nothing.
+      const { publisher, client } = await build();
+
+      publisher.sendEmail(command as never);
+      publisher.sendEmail(command as never);
+
+      const calls = client.publish.mock.calls as unknown as [
+        string,
+        { sendId: string },
+        string,
+      ][];
+      expect(calls).toHaveLength(2);
+      for (const [, payload, messageId] of calls) {
+        expect(payload.sendId).toEqual(expect.any(String));
+        expect(payload.sendId).toBe(messageId);
+      }
+      expect(calls[0][1].sendId).not.toBe(calls[1][1].sendId);
     });
 
     it('a BROKER failure does not propagate to the caller', () => {

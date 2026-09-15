@@ -117,7 +117,7 @@ async function bootstrap() {
         // Derived, not named — see the note in ticket-service's main.ts.
         stream: streamFor(subject),
         // Durable names are per-SUBJECT: one consumer over `notification.>`
-        // would make a slow SMTP send hold up an in-app write behind it.
+        // would make a slow email send hold up an in-app write behind it.
         durable: `notification-service-${subject.replaceAll('.', '-')}`,
         filterSubject: subject,
         handler: handle,

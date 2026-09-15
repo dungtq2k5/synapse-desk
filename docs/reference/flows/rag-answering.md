@@ -63,7 +63,7 @@ The gateway never talks to Qdrant, Gemini or the ledger.
 ## 2. Components
 
 | Component | Module | Owns |
-| :---- | :---- | :---- |
+| :--- | :--- | :--- |
 | api-gateway | resolvers and controllers | authn, permissions, persisting the completion |
 | ticket-service | message persistence | the turn, and which attachments it carries |
 | rag-service | `RagServicer` in `server.py` | every stage below |
@@ -83,7 +83,7 @@ The gateway never talks to Qdrant, Gemini or the ledger.
 `_budget_state` is the first call in every surface, and **what happens at the cap differs per surface.** This is the single most commonly mis-stated thing about this flow:
 
 | Surface | At the cap |
-| :---- | :---- |
+| :--- | :--- |
 | `Chat` | **answers**, with `ANSWER_STATUS_AT_CAP` — never a 402 |
 | `Search` | **degrades to lexical-only** — the embedding client is not called at all |
 | `Ask`, `Draft`, `Classify` | abort with `PERMISSION_DENIED` / `AT_CAP_REFUSAL` |
@@ -211,7 +211,7 @@ The answer's shape is [`ai-output-contract.md`](../ai-output-contract.md).
 ## 8. Edge cases
 
 | Situation | What happens | Why that, and not an error |
-| :---- | :---- | :---- |
+| :--- | :--- | :--- |
 | **At the cap, `Chat`** | answers with `ANSWER_STATUS_AT_CAP` | A 402 mid-conversation is a dead end for a user who cannot buy anything |
 | **At the cap, `Search`** | lexical-only; no embedding call | Degraded must mean *cheaper*, not relabelled |
 | **At the cap, greeting or refusal** | still answered, no ledger row | Neither costs anything to produce |
@@ -233,7 +233,7 @@ The answer's shape is [`ai-output-contract.md`](../ai-output-contract.md).
 ## 9. When it misbehaves — where to look first
 
 | Symptom | Look at |
-| :---- | :---- |
+| :--- | :--- |
 | Every question is refused, or everything is `AT_CAP` | **Redis first.** The gate fails closed, so an unreadable counter looks exactly like a spent budget across the whole tenant |
 | Answers cite nothing, or the wrong tenant's document | `tenant_scope()` — was it called on **both** arms? |
 | Answers went vague after a deploy | three candidates, in order: did FlashRank load (loud, per request); was the pool ≤ `final_context_k` (silent); was `skip_rerank` set |

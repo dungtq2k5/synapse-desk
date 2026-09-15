@@ -4,7 +4,7 @@ An enterprise AI helpdesk backend: a knowledge base your users can ask questions
 
 Documents are uploaded, parsed, chunked and embedded; questions are answered by a retrieval pipeline that cites the chunks it used, refuses when the corpus does not support an answer, and hands off to a human agent when it should. Everything is multi-tenant, every AI call is metered against a plan, and inbound email becomes a ticket in the same thread the web UI writes to.
 
-**This repository is the backend only** — seven services, a Cloudflare Worker, and the manifests to run them. There is no front end here.
+**This repository is the backend only** — seven services and the manifests to run them. There is no front end here.
 
 ## Contents
 
@@ -14,31 +14,30 @@ Documents are uploaded, parsed, chunked and embedded; questions are answered by 
 - [Running the tests](#running-the-tests)
 - [Docker images](#docker-images)
 - [Kubernetes](#kubernetes)
-- [The inbound email Worker](#the-inbound-email-worker)
+- [Inbound email](#inbound-email)
 - [License](#license)
 
 ## What is in here
 
 A Turborepo monorepo. The npm workspaces are `apps/*` and `libs/*`; everything else is deliberately outside them.
 
-| Service                                              | Port    | Speaks                   | Owns                                                        |
-| :--------------------------------------------------- | :------ | :----------------------- | :---------------------------------------------------------- |
-| [`api-gateway`](apps/api-gateway/)                   | `3000`  | HTTP, GraphQL, WebSocket | The only public surface. Auth, cache, rate limits, fan-out  |
-| [`auth-service`](apps/auth-service/)                 | `5001`  | gRPC                     | Users, organizations, roles, 2FA, invitations, billing      |
-| [`ticket-service`](apps/ticket-service/)             | `5002`  | gRPC                     | Tickets, messages, assignment, SLA, analytics rollups       |
-| [`storage-service`](apps/storage-service/)           | `50253` | gRPC                     | Presigned upload/download against Firebase Storage          |
-| [`ingestion-service`](apps/ingestion-service/)       | `5004`  | gRPC                     | Documents, parsing, OCR, chunking, embedding, quotas        |
-| [`notification-service`](apps/notification-service/) | `5005`  | gRPC                     | Email, SMS, push, in-app, webhooks                          |
-| [`rag-service`](apps/rag-service/)                   | `50255` | gRPC                     | Python. Retrieval, reranking, generation, injection defence |
+| Service | Port | Speaks | Owns |
+| :--- | :--- | :--- | :--- |
+| [`api-gateway`](apps/api-gateway/) | `3000` | HTTP, GraphQL, WebSocket | The only public surface. Auth, cache, rate limits, fan-out |
+| [`auth-service`](apps/auth-service/) | `5001` | gRPC | Users, organizations, roles, 2FA, invitations, billing |
+| [`ticket-service`](apps/ticket-service/) | `5002` | gRPC | Tickets, messages, assignment, SLA, analytics rollups |
+| [`storage-service`](apps/storage-service/) | `50253` | gRPC | Presigned upload/download against Firebase Storage |
+| [`ingestion-service`](apps/ingestion-service/) | `5004` | gRPC | Documents, parsing, OCR, chunking, embedding, quotas |
+| [`notification-service`](apps/notification-service/) | `5005` | gRPC | Email, SMS, push, in-app, webhooks |
+| [`rag-service`](apps/rag-service/) | `50255` | gRPC | Python. Retrieval, reranking, generation, injection defence |
 
-| Also                                              | What it is                                                           |
-| :------------------------------------------------ | :------------------------------------------------------------------- |
-| [`libs/common`](libs/common/)                     | Contracts, constants and configs every Node service imports          |
-| [`libs/grpc-proto`](libs/grpc-proto/)             | The `.proto` files and their generated types                         |
-| [`workers/email-inbound`](workers/email-inbound/) | A Cloudflare Worker. Parses inbound MIME and posts it to the gateway |
-| [`k8s/`](k8s/)                                    | Deployments, Services, StatefulSets, Ingress, NetworkPolicy          |
-| [`docker/`](docker/)                              | The two Dockerfiles and the image checks                             |
-| [`scripts/`](scripts/)                            | Key generation, seeding, schema verification, generators             |
+| Also | What it is |
+| :--- | :--- |
+| [`libs/common`](libs/common/) | Contracts, constants and configs every Node service imports |
+| [`libs/grpc-proto`](libs/grpc-proto/) | The `.proto` files and their generated types |
+| [`k8s/`](k8s/) | Deployments, Services, StatefulSets, Ingress, NetworkPolicy |
+| [`docker/`](docker/) | The two Dockerfiles and the image checks |
+| [`scripts/`](scripts/) | Key generation, seeding, schema verification, generators |
 
 Backing services, all from `docker-compose.yml`: four Postgres instances (one per schema-owning service — there are no cross-service foreign keys), Redis, NATS with JetStream, Qdrant, and the Firebase Storage emulator.
 
@@ -46,25 +45,25 @@ Backing services, all from `docker-compose.yml`: four Postgres instances (one pe
 
 **[`docs/README.md`](docs/README.md) is the map.** Every document there has exactly one job and that page says which. The entry points worth knowing:
 
-| If you want to                      | Read                                                                                                                                   |
-| :---------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------- |
-| Write code in this repo             | [`docs/development-conventions.md`](docs/development-conventions.md)                                                                   |
-| Know why something is the way it is | [`docs/decisions/`](docs/decisions/) — 44 ADRs, append-only                                                                            |
-| Follow an end-to-end path           | [`docs/reference/flows/`](docs/reference/flows/)                                                                                       |
-| Build a client                      | [`docs/graphql-api.md`](docs/graphql-api.md), [`docs/websocket-api.md`](docs/websocket-api.md), [`docs/webhooks.md`](docs/webhooks.md) |
-| Know what is currently broken       | [`docs/reference/known-gaps.md`](docs/reference/known-gaps.md)                                                                         |
-| Deploy                              | [`k8s/README.md`](k8s/README.md)                                                                                                       |
+| If you want to | Read |
+| :--- | :--- |
+| Write code in this repo | [`docs/development-conventions.md`](docs/development-conventions.md) |
+| Know why something is the way it is | [`docs/decisions/`](docs/decisions/) — 44 ADRs, append-only |
+| Follow an end-to-end path | [`docs/reference/flows/`](docs/reference/flows/) |
+| Build a client | [`docs/graphql-api.md`](docs/graphql-api.md), [`docs/websocket-api.md`](docs/websocket-api.md), [`docs/webhooks.md`](docs/webhooks.md) |
+| Know what is currently broken | [`docs/reference/known-gaps.md`](docs/reference/known-gaps.md) |
+| Deploy | [`k8s/README.md`](k8s/README.md) |
 
 ## Setup, from A to Z
 
 ### Prerequisites
 
-| Tool             | Version                                 | Why                                   |
-| :--------------- | :-------------------------------------- | :------------------------------------ |
-| Node             | **24.19.0** — see `.nvmrc`              | `nvm use` picks it up                 |
-| npm              | **11.9.0** — pinned by `packageManager` | Workspaces                            |
-| Docker + Compose | any current                             | The eight backing services            |
-| Python           | **3.12**                                | `rag-service`; matches the image base |
+| Tool | Version | Why |
+| :--- | :--- | :--- |
+| Node | **24.19.0** — see `.nvmrc` | `nvm use` picks it up |
+| npm | **11.9.0** — pinned by `packageManager` | Workspaces |
+| Docker + Compose | any current | The eight backing services |
+| Python | **3.12** | `rag-service`; matches the image base |
 
 Optional, and only for **scanned** PDFs: `poppler-utils` and `tesseract-ocr` on your PATH. `OcrService` probes for both at boot and degrades with a warning rather than failing, so skip them until you need OCR.
 
@@ -73,8 +72,6 @@ Optional, and only for **scanned** PDFs: `poppler-utils` and `tesseract-ocr` on 
 ```sh
 npm ci
 ```
-
-`workers/email-inbound` is outside the workspaces and carries its own lockfile — it is not installed by this and does not need to be until you deploy the Worker.
 
 ### 2. The root `.env` — read by Compose, and by nothing else
 
@@ -120,12 +117,12 @@ npm run keys:service-account   # throwaway Firebase service-account keys
 
 `keys:generate` writes four files and **refuses to overwrite an existing one** — rotating the pair invalidates every access token already issued, so it is opt-in via `npm run keys:generate -- --force`.
 
-| File                                       | Who holds it                                              |
-| :----------------------------------------- | :-------------------------------------------------------- |
+| File | Who holds it |
+| :--- | :--- |
 | `apps/auth-service/secrets/jwt-access.key` | auth-service — the only service that may **mint** a token |
-| `apps/auth-service/secrets/jwt-2fa.key`    | auth-service                                              |
-| `apps/api-gateway/secrets/jwt-access.pub`  | api-gateway — can only **verify**                         |
-| `apps/api-gateway/secrets/jwt-2fa.pub`     | api-gateway                                               |
+| `apps/auth-service/secrets/jwt-2fa.key` | auth-service |
+| `apps/api-gateway/secrets/jwt-access.pub` | api-gateway — can only **verify** |
+| `apps/api-gateway/secrets/jwt-2fa.pub` | api-gateway |
 
 `keys:service-account` writes `apps/storage-service/serviceAccountKey.json` and `apps/auth-service/serviceAccountKey.json`. These are synthetic RSA credentials, not Google ones: `firebase-admin` refuses to initialize without a well-formed key, `cert()` makes no network call, and the Storage emulator never checks a signature. It is idempotent — it exits 0 when the file exists.
 
@@ -144,18 +141,19 @@ done
 
 **A plain copy does not boot.** These values are placeholders, and two of them fail in ways worth knowing in advance:
 
-| Where                | Key                    | Change it to                                                                   | What happens otherwise                                                                                                                                                                                              |
-| :------------------- | :--------------------- | :----------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| all four DB services | `DATABASE_URL`         | user `postgres`, password `password123456789` — whatever your root `.env` says | Cannot connect. The example ships `user:password`                                                                                                                                                                   |
-| `auth-service`       | `SUPER_ADMIN_PASSWORD` | anything of your own, 12+ chars                                                | **Boot is refused.** Both published placeholder values are on a blocklist outside `NODE_ENV=test`, so a deployment that edited every line but this one cannot get a super-admin whose password is in the repository |
+| Where | Key | Change it to | What happens otherwise |
+| :--- | :--- | :--- | :--- |
+| all four DB services | `DATABASE_URL` | user `postgres`, password `password123456789` — whatever your root `.env` says | Cannot connect. The example ships `user:password` |
+| `auth-service` | `SUPER_ADMIN_PASSWORD` | anything of your own, 12+ chars | **Boot is refused.** Both published placeholder values are on a blocklist outside `NODE_ENV=test`, so a deployment that edited every line but this one cannot get a super-admin whose password is in the repository |
 
-`INBOUND_EMAIL_SECRET` needs one more thing that no single file can state: the **same value** must reach `api-gateway`, `notification-service` and the Cloudflare Worker (`wrangler secret put INBOUND_SECRET`). Both examples now ship a byte-identical placeholder, and `env-contract.spec.ts` keeps them that way — because a mismatch between the gateway and notification is **silent**: `parseTicketReplyToken` returns `null` and every email reply opens a new ticket instead of threading, with nothing in a log.
+`INBOUND_EMAIL_SECRET` needs one more thing that no single file can state: the **same value** must reach `api-gateway` and `notification-service`. Both examples ship a byte-identical placeholder, and `env-contract.spec.ts` keeps them that way — because a mismatch between the gateway and notification is **silent**: `parseTicketReplyToken` returns `null` and every email reply opens a new ticket instead of threading, with nothing in a log.
 
 Also worth setting now, though nothing refuses to boot without them:
 
 - `TWO_FACTOR_MASTER_KEY` (auth-service) — 32 chars minimum.
 - `GEMINI_API_KEY` (ingestion-service **and** rag-service) — no embeddings and no generated answers without it.
-- `EMAIL_*` (notification-service) — SMTP host, user and an app password.
+- `RESEND_API_KEY` (notification-service) — a sending-only Resend key, with `EMAIL_SENDER` on a domain verified in Resend. Without a verified domain, `onboarding@resend.dev` sends only to the Resend account's own address.
+- `RESEND_GATEWAY_API_KEY` and `RESEND_WEBHOOK_SECRET` (api-gateway) — inbound mail; see [Inbound email](#inbound-email).
 - Stripe keys (auth-service) are **optional**. Without them the billing endpoints return `UNAVAILABLE` and everything else, login included, is unaffected.
 
 ### 6. The Python environment
@@ -195,13 +193,13 @@ npm run dev
 
 On first boot auth-service seeds itself (`SEED_ON_BOOTSTRAP = true`): permissions, the system user, and the super admin from `SUPER_ADMIN_EMAIL` / `SUPER_ADMIN_PASSWORD`. That account is how you log in.
 
-| Reach                          | At                                                                                                                   |
-| :----------------------------- | :------------------------------------------------------------------------------------------------------------------- |
-| REST                           | `http://localhost:3000/api/v1` — prefix `api` + URI version `v1`; `GLOBAL_PREFIX` is the word, not the path          |
-| GraphQL                        | `http://localhost:3000/graphql` — **not** under the prefix                                                           |
-| Swagger                        | `http://localhost:3000/api/v1/docs`, with `SWAGGER_ENABLED = true`                                                   |
+| Reach | At |
+| :--- | :--- |
+| REST | `http://localhost:3000/api/v1` — prefix `api` + URI version `v1`; `GLOBAL_PREFIX` is the word, not the path |
+| GraphQL | `http://localhost:3000/graphql` — **not** under the prefix |
+| Swagger | `http://localhost:3000/api/v1/docs`, with `SWAGGER_ENABLED = true` |
 | Liveness / readiness / version | `/health`, `/health/ready`, `/version` — outside the prefix, because an orchestrator cannot negotiate an API version |
-| Prometheus metrics             | `http://127.0.0.1:9464/metrics`                                                                                      |
+| Prometheus metrics | `http://127.0.0.1:9464/metrics` |
 
 ### 9. Optional: billing catalogue and demo data
 
@@ -253,11 +251,11 @@ docker build -f docker/node-service.Dockerfile \
   -t api-gateway .
 ```
 
-| Target        | Used by                                                                                                                                                                                                                                       |
-| :------------ | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `runtime`     | api-gateway, auth, ticket, notification, storage                                                                                                                                                                                              |
-| `runtime-ocr` | ingestion-service — adds poppler and one Tesseract language pack per `OCR_LANGUAGES` entry                                                                                                                                                    |
-| `migrate`     | auth, ticket, ingestion, notification. `FROM build`, not `FROM runtime` — the Prisma CLI is a devDependency and `prisma.config.ts` loads through TypeScript. 3.17 GB against runtime's 1.01 GB, and it runs for seconds in a pod's init phase |
+| Target | Used by |
+| :--- | :--- |
+| `runtime` | api-gateway, auth, ticket, notification, storage |
+| `runtime-ocr` | ingestion-service — adds poppler and one Tesseract language pack per `OCR_LANGUAGES` entry |
+| `migrate` | auth, ticket, ingestion, notification. `FROM build`, not `FROM runtime` — the Prisma CLI is a devDependency and `prisma.config.ts` loads through TypeScript. 3.17 GB against runtime's 1.01 GB, and it runs for seconds in a pod's init phase |
 
 rag-service builds from `docker/rag-service.Dockerfile`; its stages genuinely differ. `./docker/check-images.sh` builds everything and asserts the runtime trees resolve — minutes, not seconds, so run it when the Dockerfiles change.
 
@@ -280,18 +278,18 @@ Four things it does **not** create and will not tell you about twice: a namespac
 node scripts/generate-k8s-config.mjs --check
 ```
 
-## The inbound email Worker
+## Inbound email
 
-[**`workers/email-inbound/README.md`**](workers/email-inbound/README.md) owns this. It is a Cloudflare Worker, deployed with `wrangler`, not part of the cluster:
+Mail arrives through [Resend](https://resend.com): Resend receives it on `INBOUND_EMAIL_DOMAIN` and posts an `email.received` webhook to the gateway, which fetches the body with its own key. [`docs/reference/flows/inbound-email.md`](docs/reference/flows/inbound-email.md) owns the flow; [ADR 0046](docs/decisions/0046-resend-for-both-directions.md) the decision.
 
 ```sh
-cd workers/email-inbound
-npm install
-npx wrangler secret put INBOUND_SECRET   # must equal the gateway's INBOUND_EMAIL_SECRET
-npx wrangler deploy
+# root .env: RESEND_PROVISION_KEY (full access) and RESEND_WEBHOOK_URL
+npm run resend:provision                    # dry run — what it would create
+npm run resend:provision:apply              # create the webhook; prints its signing secret
+npm run resend:provision -- --print-secret  # read the secret back later
 ```
 
-Point `wrangler.toml`'s two URLs at the real gateway host, then enable Email Routing and add a **catch-all** rule — the tenant lives in the local part (`support+{token}@…`), so every tenant shares one route.
+Put the printed secret in the gateway's `.env` as `RESEND_WEBHOOK_SECRET`, beside `RESEND_GATEWAY_API_KEY` — a different key from notification-service's sending key. The tenant lives in the local part (`support+{token}@…`), so every tenant shares one receiving domain; a `.resend.app` address needs no DNS in development.
 
 **Do the MX record last.** Everything before it is testable from a recorded payload; pointing a live MX record at an unfinished endpoint means debugging business logic through a mail transport, where every iteration is an email you send yourself and wait for.
 

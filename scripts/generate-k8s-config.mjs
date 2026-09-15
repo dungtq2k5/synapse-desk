@@ -42,7 +42,7 @@ const check = process.argv.includes('--check');
 /** Services, from git rather than a literal — a new app appears by existing. */
 const services = () =>
   execFileSync(
-    'git',
+    'git', // NOSONAR
     [
       'ls-files',
       '--cached',
@@ -91,8 +91,9 @@ const SECRET = new Set([
   'GEMINI_API_KEY',
   'INBOUND_EMAIL_SECRET',
   'SUPER_ADMIN_PASSWORD',
-  'EMAIL_USER',
-  'EMAIL_PASS',
+  'RESEND_API_KEY',
+  'RESEND_GATEWAY_API_KEY',
+  'RESEND_WEBHOOK_SECRET',
   'TWILIO_SID',
   'TWILIO_AUTH_TOKEN',
   'TWILIO_AUTH_PHONE',
@@ -104,9 +105,6 @@ const SITE_SPECIFIC = new Set([
   'APP_WEB_URL',
   'INBOUND_EMAIL_DOMAIN',
   'EMAIL_SENDER',
-  'EMAIL_HOST',
-  'EMAIL_PORT',
-  'EMAIL_SECURE',
   'SUPPORT_EMAIL',
   'FIREBASE_STORAGE_BUCKET',
   'SUPER_ADMIN_EMAIL',

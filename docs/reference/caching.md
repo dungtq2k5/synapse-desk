@@ -25,7 +25,7 @@ Parameters are filtered (`undefined`, `null` and `''` dropped), then **sorted**,
 `CACHE_SCOPES` names every one, and the naming is the point: *"a scope is written in two places by nature — at the read that caches it and at the write that evicts it."* Two string literals is how a mutation invalidates `department` while the read caches `departments`, which nothing reports: the read simply never sees an eviction and serves its TTL out forever, correctly by its own lights.
 
 | Scope | Evicted by |
-| :---- | :---- |
+| :--- | :--- |
 | `departments`, and the four handlers that write a user's name or avatar | `@InvalidateCache` — **precise, and the whole story** |
 | `roles`, `organizations`, the rest of `users` | `@InvalidateCache` where a decorated mutation writes them — but see §*Two writers evict nothing* |
 | `tickets`, `documents` | NATS events from the owning service |
@@ -62,7 +62,7 @@ returns early without one — `if (!caller?.organizationId) return;`. Two real
 paths hit that branch:
 
 | Path | Why it has no tenant |
-| :---- | :---- |
+| :--- | :--- |
 | `POST /invitations/accept` | unauthenticated by design; it writes `roles.user_assigned` and carries no decorator |
 | a platform Super Admin writing into a tenant | the caller belongs to no organization, so there is no scope to drop |
 
@@ -102,7 +102,7 @@ The cache is therefore **not** the only tenant of this Redis, which is why `FLUS
 ## When it misbehaves
 
 | Symptom | Look at |
-| :---- | :---- |
+| :--- | :--- |
 | A mutation does not show up | the scope spelled at the read vs at the write — `CACHE_SCOPES` exists to make that one string |
 | A role's `userAssigned` is stale after an invitation is accepted | expected for up to `ENTITY_TTL_SECONDS` — that route is unauthenticated, so the interceptor has no tenant and evicts nothing |
 | A stale value outlives a mutation by minutes | the read-repopulate race, then the TTL — both are expected |

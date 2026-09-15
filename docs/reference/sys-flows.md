@@ -99,7 +99,7 @@ Five things this spine is load-bearing for:
 ## 3. Where the seven surfaces differ
 
 | | `Search` | `Chat` | `Ask` | `Draft` | `Summarize` | `Classify` | `Suggest` |
-| :---- | :--: | :--: | :--: | :--: | :--: | :--: | :--: |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | At the cap | **lexical-only** | **answers `AT_CAP`** | abort | abort | abort *unless in grace* | abort | **articles only**, `degraded` |
 | Escalation grace | — | — | — | — | **✓** | — | — |
 | Injection guard (A+B) | — | ✓ | ✓ | ✓ | — | — | — |
@@ -118,7 +118,7 @@ Plus the purposes booked by stages rather than surfaces: `GREETING_CLASSIFY` and
 Recorded at the guard itself, not here, so the two cannot drift:
 
 | RPC | Reason |
-| :---- | :---- |
+| :--- | :--- |
 | `Summarize` | output is a summary shown to an agent, not shaped by a question |
 | `Classify` | output is a department id and a priority — a constrained choice |
 | `Suggest` | output is a fixed set of suggested actions |
@@ -135,7 +135,7 @@ The distinction is **whether an attacker's text can steer a free-form answer to 
 Three surfaces take attachments and each selects a different message, because each is answering a different question:
 
 | Surface | Message selected | Refused turns |
-| :---- | :---- | :---- |
+| :--- | :--- | :--- |
 | `Chat` | the message being sent *(gateway fetches; the rule lives in ticket-service)* | excluded |
 | `Draft` | the newest **user** message, skipping AI replies | excluded |
 | `Classify` | the **earliest** message on the ticket | **included** |
@@ -149,7 +149,7 @@ Eligibility is decided from the row — mime type and `fileSizeBytes` — before
 Of the **12 storable** MIME types, 9 are natively AI-eligible and 2 more are *parse-eligible*. That is three branches, not two:
 
 | Attachment | What is sent |
-| :---- | :---- |
+| :--- | :--- |
 | Natively AI-eligible (`png`, `jpeg`, `webp`, `heic`, `heif`, `pdf`, `plain`, `markdown`, `csv`) | the bytes, downloaded per turn |
 | Parse-eligible (`docx`, `xlsx`) **with** `extracted_text` | the **text**, as a part — no download at all |
 | Anything else, or `extracted_text` NULL/empty | **skipped**, reported to the user by name |
@@ -258,7 +258,7 @@ flowchart TD
 Four values can bound one upload, and the effective limit is the `min()` of all of them:
 
 | Layer | Where | Can it widen? |
-| :---- | :---- | :---- |
+| :--- | :--- | :--- |
 | Platform ceiling (`MAX_DOCUMENT_BYTES`) | code constant | — it *is* the ceiling |
 | Plan grant (`subscription_plans`, Table 40) | catalogue row | **No** — a plan may only narrow |
 | Denormalized grant (`organizations.max_document_bytes`) | tenant row | copy of the above, read on the hot path |

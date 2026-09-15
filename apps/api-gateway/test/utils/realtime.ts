@@ -31,6 +31,7 @@ import { RedisIoAdapter } from '../../src/common/adapters/redis-io.adapter';
 import { GrpcStubs, stubGrpcServices } from './grpc-stub';
 import { ACCESS_COOKIE, buildJwtPayload } from './auth';
 import { signAccessToken } from './tokens';
+import { VALIDATION_PIPE_OPTIONS } from '../../src/common/config/validation.config';
 
 /**
  * The transports a client may be pinned to.
@@ -142,13 +143,7 @@ export async function bootstrapRealtimeTest(
   // than production, and the difference only shows up the day someone types a
   // `@MessageBody()` as a DTO and the pipe starts rejecting frames the tests
   // never saw it reject.
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-    }),
-  );
+  app.useGlobalPipes(new ValidationPipe(VALIDATION_PIPE_OPTIONS));
 
   // The SAME adapter main.ts installs. Using the default in-memory one here
   // would leave the Redis path — the part that only fails across replicas —

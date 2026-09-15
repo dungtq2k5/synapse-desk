@@ -29,7 +29,7 @@ import {
 import { IsPresentButNullable } from '../../../../common/decorators/is-nullable.decorator';
 
 /**
- * One object the Worker uploaded, ready to bind to the message.
+ * One object already in storage, ready to bind to the message.
  *
  * Field-for-field the shape `CreateMessageRequest.attachments` takes, because
  * that is exactly where it goes. **No size and no MIME type**: both are read
@@ -50,18 +50,18 @@ export class InboundUploadedAttachmentDto {
 }
 
 /**
- * What the mail Worker POSTs
+ * One inbound mail, as `InboundEmailService.accept` takes it.
  *
- * **This is a CONTRACT, not a description.** Stripe's DTO documents somebody
- * else's payload; here both halves are ours — the Worker in `workers/email-inbound/`
- * is the only caller and it lives in this repo. So this class is the agreement
- * between the two, and OpenAPI is where they can be checked against each other
- * rather than kept in step by hand.
+ * **Built, not received.** The Resend webhook assembles it from the verified
+ * `email.received` event and the `emails.receiving.get` response
+ * (`resend-inbound.mapper.ts`), so no `ValidationPipe` ever sees it —
+ * `ResendInboundService` validates it explicitly with the pipe's options, and
+ * every constraint below applies only because of that call.
  *
- * **Every field is bounded.** The caller is authenticated by signature, which
- * proves the Worker sent it and nothing about what a stranger put in the mail —
- * the subject, the body and the sender name are all attacker-controlled text
- * that happens to arrive over a trusted channel.
+ * **Every field is bounded.** The webhook signature proves Resend sent the
+ * delivery and nothing about what a stranger put in the mail — the subject, the
+ * body and the sender name are all attacker-controlled text that happens to
+ * arrive over a trusted channel.
  */
 export class InboundEmailDto {
   /**
@@ -134,7 +134,7 @@ export class InboundEmailDto {
    *
    * `Auto-Submitted` and `Precedence` are invisible once the body is parsed,
    * and they are what stop an auto-responder and this system replying to each
-   * other forever. The Worker forwards exactly these two rather than the whole
+   * other forever. The mapper copies exactly these two rather than the whole
    * header block: a full copy is unbounded attacker-controlled data with one
    * use.
    */
@@ -143,7 +143,8 @@ export class InboundEmailDto {
   readonly headers?: Record<string, string>;
 
   /**
-   * Filenames of attachments the Worker DROPPED.
+   * Filenames of attachments that were not stored — every one, while inbound
+   * attachments are not ingested.
    *
    * Carried so the ticket can say what was omitted. *"Attachments silently
    * vanish"* is something a customer discovers before you do.
@@ -155,21 +156,17 @@ export class InboundEmailDto {
   readonly droppedAttachments: string[] = [];
 
   /**
-   * Attachments the Worker ALREADY UPLOADED, as object paths.
+   * Attachments already in storage, as object paths.
    *
-   * **The bytes came nowhere near this server.** The Worker asked
-   * `POST /webhooks/email/attachments` which files it could store, PUT them to
-   * storage directly, and sends only the paths here — so the one route in the
-   * system that takes input from an unauthenticated sender never takes their
-   * file bytes.
+   * **Always empty from the Resend webhook today**: inbound attachments are
+   * named in `droppedAttachments` rather than stored. The field stays because
+   * `accept` already binds paths to a reply's message — each confirmed by
+   * ticket-service as the message is written, a failure skipped and named —
+   * and ingesting attachments will fill it without touching that half.
    *
    * **Only on a reply.** A mail that opens a NEW ticket has nothing to attach
    * to: `createTicket` writes a ticket row and no message, so there is no
-   * `message_attachments` parent. The presign route declines everything for
-   * that case and those names arrive in `droppedAttachments` instead.
-   *
-   * Each path is confirmed by ticket-service as the message is written;
-   * a path that fails is skipped and named, never fatal.
+   * `message_attachments` parent.
    */
   @IsOptional()
   @IsArray()
@@ -196,11 +193,11 @@ export class InboundEmailDto {
   readonly date?: string;
 
   /**
-   * When the WORKER received it, ISO 8601.
+   * When Resend received it, ISO 8601 — the webhook event's `created_at`.
    *
-   * **Never part of the idempotency key.** Cloudflare re-runs a Worker that
-   * threw, and each run stamps a new value — which is precisely the retry the
-   * key exists to collapse.
+   * **Never part of the idempotency key.** It describes the delivery, not the
+   * message, so it is not guaranteed stable across Resend's redeliveries —
+   * which are precisely the retries the key exists to collapse.
    */
   @IsISO8601({ strict: true })
   readonly receivedAt!: string;

@@ -60,7 +60,7 @@ service:   *-grpc.controller.ts ──> *.service.ts ──> PrismaService
 ### 2.2 Where a new file goes
 
 | You are adding… | Put it in |
-| :---- | :---- |
+| :--- | :--- |
 | A type or constant two services need | `libs/common/src/configs/*.config.ts` |
 | A NATS message shape | `libs/common/src/contracts/*.contract.ts` |
 | A proto enum ↔ domain enum bridge | `libs/grpc-proto/src/mappers/` |
@@ -98,7 +98,7 @@ import { toTimestamp, GRPC_DEADLINE_MS } from '@synapsedesk/grpc-proto';
 A constant array is one of two things, and the shape follows from which:
 
 | The array is | Shape | Because |
-| :---- | :---- | :---- |
+| :--- | :--- | :--- |
 | The **source** of a union type | `as const` | `(typeof X)[number]` only narrows if the literals are preserved — `PERMISSION_CODES`, `OCR_LANGUAGES` |
 | A **subset** of a union that already exists | `readonly T[]` | The union is the source; annotating with it is what makes a wrong member a compile error — `NON_LATIN_OCR_LANGUAGES: readonly OcrLanguage[]` |
 | Both — a subset whose members must also stay literal | `as const satisfies readonly T[]` | `ALLOWED_DOCUMENT_MIME_TYPES` |
@@ -210,7 +210,7 @@ Where absent and empty are indistinguishable on the wire — every `repeated` fi
 Order matters — Nest runs guards left to right.
 
 | Guard | Purpose | Put it on | **Never** put it on |
-| :---- | :---- | :---- | :---- |
+| :--- | :--- | :--- | :--- |
 | `JwtAuthGuard` | Requires a valid access token | everything authenticated | `/auth/login`, `/auth/register`, `/auth/refresh` |
 | `Jwt2faGuard` | Authorizes the 2FA challenge leg only | `/auth/login/2fa` | anything else |
 | `GuestGuard` | Rejects callers who already hold a live session | `/auth/login`, `/auth/register` | any authenticated route — it would reject 100% of traffic |
@@ -256,7 +256,7 @@ Routes are `/api/v1/…` because the global prefix is `api` and Nest URI version
 - Tooling is `buf` (an npm devDependency), **not** a system `protoc`.
 
 | Command | Does |
-| :---- | :---- |
+| :--- | :--- |
 | `npm run proto:generate` | Regenerates `src/generated/` per `buf.gen.yaml` |
 | `npm run proto:lint` | Enforces the layout + naming rules in `buf.yaml` |
 | `npm run proto:breaking` | Diffs the wire contract against `main` |
@@ -278,7 +278,7 @@ Every gateway client **MUST** `extends BaseGrpcClient`, declare `serviceName`, r
 A client speaks **proto**. A mapper turns proto into **DTO**. A service composes and returns **DTO**. The restriction is what makes each layer readable on its own, and it is enforced by imports rather than by discipline: a client that cannot import a DTO cannot drift into shaping a response.
 
 | Layer | Returns | May import |
-| :---- | :---- | :---- |
+| :--- | :--- | :--- |
 | `*-grpc.client.ts` | the generated proto message | `@synapsedesk/grpc-proto` — **never** `dto/`, **never** a mapper |
 | `*.mapper.ts` | a REST/GraphQL DTO | proto types, DTOs, `libs/` bridges |
 | `*.service.ts` | a DTO | the client and the mapper |
@@ -303,7 +303,7 @@ A client speaks **proto**. A mapper turns proto into **DTO**. A service composes
 Services throw `RpcException({ code: status.X, message })`. The gateway maps:
 
 | gRPC status | HTTP | Use for |
-| :---- | :---- | :---- |
+| :--- | :--- | :--- |
 | `INVALID_ARGUMENT` / `FAILED_PRECONDITION` / `OUT_OF_RANGE` | 400 | bad input, wrong state |
 | `UNAUTHENTICATED` | 401 | bad credentials |
 | `PERMISSION_DENIED` | 403 | authenticated but not allowed |
@@ -431,7 +431,7 @@ export type CacheScope = (typeof CACHE_SCOPES)[keyof typeof CACHE_SCOPES];
 ### 8.1 Hashing — pick by lookup pattern, not by habit
 
 | Value | Hash | Column | Why |
-| :---- | :---- | :---- | :---- |
+| :--- | :--- | :--- | :--- |
 | `users.password_hash` | **Argon2 / bcrypt** | VarChar(255) | Low-entropy human secret; slowness is the defence |
 | `device_sessions.refresh_token_hash` | **SHA-256 hex** | VarChar(64) | `@unique`, looked up **by value** |
 | `device_sessions.device_token_hash` | **SHA-256 hex** | VarChar(64) | same |
@@ -490,7 +490,7 @@ Subjects and payloads live in `libs/common/src/contracts/*.contract.ts` as **dis
 - Fire-and-forget for side effects, never request/response: `emit()` on the core transport, `JetStreamPublisher.publish()` on the durable subjects.
 - **MUST NOT** `await` a notification publish in a request path.
 - A new template means a new arm of `SendEmailCommand` with its own required `data` fields — **not** a `Record<string, unknown>` bag.
-- Publishing services hold **no** SMTP/Twilio credentials. Those belong to `notification-service` alone.
+- Publishing services hold **no** Resend or Twilio credentials. Those belong to `notification-service` alone (the gateway's receiving key is a different key with a different scope).
 
 **Two transports, and which one a subject uses is a decision, not a default.** `DURABLE_SUBJECTS` in `jetstream.config.ts` is the list; everything else is core NATS at-most-once. The rule for adding to it is [ADR 0041](./decisions/0041-durable-subjects-are-the-ones-with-nothing-to-reconcile-against.md): *prefer reconciliation where state exists, redelivery where it does not.*
 
@@ -527,7 +527,7 @@ Subjects and payloads live in `libs/common/src/contracts/*.contract.ts` as **dis
 ## 12. Naming & Layout
 
 | Thing | Convention | Example |
-| :---- | :---- | :---- |
+| :--- | :--- | :--- |
 | File | `kebab-case.<role>.ts` | `jwt-auth.guard.ts`, `user.mapper.ts` |
 | Gateway gRPC adapter | `<peer>-grpc.client.ts` | `otp-grpc.client.ts` |
 | Service gRPC entry | `<domain>-grpc.controller.ts` | `users-grpc.controller.ts` |
@@ -595,7 +595,7 @@ Two independent classes, paired by a contract spec (`<name>.contract.spec.ts`) t
 ### 12.3 Docblocks vs comments — they are different tools
 
 | | Docblock `/** */` | Comment `//` |
-| :---- | :---- | :---- |
+| :--- | :--- | :--- |
 | **Answers** | What is this, how do I use it? | What must I not get wrong *here*? |
 | **Audience** | The caller — reads it on hover, never opens the file | Whoever edits this line next |
 | **Contains** | Description, usage, `@example`, `@param`/`@returns`/`@throws`, links to related symbols | A trap, a non-obvious constraint, a reason this line is not the obvious one |
@@ -661,7 +661,7 @@ export const MAX_UPLOAD_FILE_NAME_LENGTH = 255;
 ## 13. Testing
 
 | Layer | Proves | Database | Runs in |
-| :---- | :---- | :---- | :---- |
+| :--- | :--- | :--- | :--- |
 | **Unit** | One class's logic in isolation — branches, edge cases, error paths | Never real; `PrismaService` is a mock | `*.spec.ts` beside the source |
 | **E2E — auth-service** | A service's Prisma queries against a **real** Postgres — tenant scoping, soft-delete filters, partial unique indexes, transactions | Real, reset between tests | `apps/auth-service/test/*.e2e-spec.ts` |
 | **E2E — api-gateway** | The gateway's full HTTP stack — guards, pipes, filters, interceptors, cookies, the envelope | None (gateway owns no database) | `apps/api-gateway/test/*.e2e-spec.ts` |
@@ -826,7 +826,7 @@ expect(cookies.some((c) => c.startsWith(`${twoFaCookieName}=`))).toBe(false);
 ### 13.5 What never gets mocked, and what always does
 
 | Always mock | Never mock |
-| :---- | :---- |
+| :--- | :--- |
 | `PrismaService`, in **unit** tests only | `PrismaService`, in either e2e suite — the point is the real database |
 | The gRPC peer (`AUTH_GRPC_CLIENT`), in the **gateway's** e2e tests | The gRPC peer, in **auth-service's** e2e tests |
 | `AuditPublisher`, `NotificationPublisher` — NATS side effects nothing asserts on | Pure functions: `normalizeEmail`, `hashToken`, `safeCompareHex`, every mapper |
@@ -874,9 +874,9 @@ both; they guard different things.
 A comment describes **its own half of a boundary** and is silent about the half that produces the behaviour. That is not carelessness — it follows from the architecture — which is why reading one side carefully still gets the mechanism wrong. Four examples, all found by review rather than by tests:
 
 | Claim, read from one side | What the other side did |
-| :---- | :---- |
+| :--- | :--- |
 | a lazy initializer is memoised | it assigns **only on success**, so a failed load retries every call |
-| the Worker "reports rather than retries" a 401 | it `throw`s, and throwing is what makes Cloudflare retry |
+| the inbound-mail relay "reports rather than retries" a 401 | it `throw`s, and throwing is what made its host retry |
 | the at-cap path skips fusion | `reciprocal_rank_fusion` is called on **both** branches |
 | a page that parsed is a page that indexed | the chunker drops it again at a **second, smaller** bar |
 
