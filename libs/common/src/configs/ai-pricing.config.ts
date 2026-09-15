@@ -235,7 +235,10 @@ export const AT_CAP_POLICY: Record<
   [AiSurface.CHAT_ANSWER]: { action: AtCapAction.ESCALATE, graceRatio: 0 },
   [AiSurface.DRAFT]: { action: AtCapAction.REFUSE, graceRatio: 0 },
   [AiSurface.CLASSIFY]: { action: AtCapAction.REFUSE, graceRatio: 0 },
-  [AiSurface.SUGGESTIONS]: { action: AtCapAction.REFUSE, graceRatio: 0 },
+  // The next steps are a generation and are refused; the articles beside them
+  // are keyword retrieval with a local reranker and cost nothing. So the
+  // surface answers with that free half and marks the response `degraded`.
+  [AiSurface.SUGGESTIONS]: { action: AtCapAction.DEGRADE, graceRatio: 0 },
   [AiSurface.MANUAL_SUMMARY]: { action: AtCapAction.REFUSE, graceRatio: 0 },
   [AiSurface.ESCALATION_SUMMARY]: {
     action: AtCapAction.REFUSE,

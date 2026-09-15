@@ -240,6 +240,15 @@ describe('the at-cap policy table (unit)', () => {
     );
   });
 
+  it('DEGRADES suggestions — the articles are a free half worth serving', () => {
+    // The next steps need the model; the article sidebar is keyword retrieval.
+    // Unlike Ask, the free half here IS something an agent uses on its own,
+    // which is the distinction the Ask pin below draws.
+    expect(AT_CAP_POLICY[AiSurface.SUGGESTIONS].action).toBe(
+      AtCapAction.DEGRADE,
+    );
+  });
+
   it('refuses the ASK surface even though search degrades', () => {
     // Retrieval could degrade, but the answer is a generation and there is no
     // free version of it.

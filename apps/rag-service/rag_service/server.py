@@ -45,7 +45,7 @@ from rag_service.embeddings import EmbeddingClient, GeminiEmbeddingClient
 from rag_service.enums import AiGenerationPurpose
 from rag_service.generated.synapsedesk.ops import ops_pb2, ops_pb2_grpc
 from rag_service.generated.synapsedesk.rag import rag_pb2, rag_pb2_grpc
-from rag_service.generation.copilot import CopilotService
+from rag_service.generation.copilot import CopilotService, SuggestedArticle
 from rag_service.generation.corag import (
     CoRagGenerator,
     GeneratedAnswer,
@@ -139,11 +139,12 @@ DRAFT_REFUSAL = with_http_status(
 
 #: The at-cap refusal, formed once.
 #:
-#: Five surfaces refuse identically — Ask, Draft, Summarize, Classify and
-#: Suggest — and they must keep refusing identically: the gateway matches on
-#: the `[http:402]` marker, so a message that drifted on ONE surface would turn
-#: a "buy more" into a bare 500 for that surface alone, and nothing would fail
-#: until a user hit exactly it. One binding is what makes that impossible.
+#: Four surfaces refuse identically — Ask, Draft, Summarize and Classify — and
+#: they must keep refusing identically: the gateway matches on the `[http:402]`
+#: marker, so a message that drifted on ONE surface would turn a "buy more"
+#: into a bare 500 for that surface alone, and nothing would fail until a user
+#: hit exactly it. One binding is what makes that impossible. (`Suggest`
+#: degrades at the cap instead of refusing — see its servicer.)
 AT_CAP_REFUSAL = with_http_status(402, "This workspace has used its AI allowance")
 
 
@@ -640,9 +641,24 @@ class RagServicer(rag_pb2_grpc.RagServiceServicer):
         _, settings, budget = await self._prepare(ctx, context)
 
         if not budget.allows_embedding:
-            await context.abort(
-                grpc.StatusCode.PERMISSION_DENIED,
-                AT_CAP_REFUSAL,
+            # **No generation may run on this branch.** `_spend` books the
+            # charge AFTER the model call, so the only thing keeping money inside
+            # the cap is this branch never reaching `suggest()` — it is the
+            # reason the branch exists at all.
+            #
+            # The articles still come back: keyword retrieval, no embedding, a
+            # local reranker, no ledger row — the trade `Search` makes, on the
+            # sidebar an agent is using because the tenant is busy enough to have
+            # hit the cap.
+            articles = await self._copilot.suggest_articles(
+                request.title, request.body, ctx, settings, budget
+            )
+
+            return rag_pb2.SuggestionsResponse(
+                suggestions=[],
+                generation_id="",
+                articles=[_suggested_article(article) for article in articles],
+                degraded=rag_pb2.SEARCH_DEGRADATION_LEXICAL_ONLY,
             )
 
         suggestions, generation_id, articles = await self._copilot.suggest(
@@ -671,15 +687,8 @@ class RagServicer(rag_pb2_grpc.RagServiceServicer):
                 for suggestion in suggestions
             ],
             generation_id=generation_id,
-            articles=[
-                rag_pb2.SuggestedArticle(
-                    document_id=article.document_id,
-                    document_title=article.document_title,
-                    page_number=article.page_number,
-                    score=article.score,
-                )
-                for article in articles
-            ],
+            articles=[_suggested_article(article) for article in articles],
+            degraded=rag_pb2.SEARCH_DEGRADATION_UNSPECIFIED,
         )
 
     async def _within_grace(
@@ -1105,6 +1114,20 @@ def _last_user_message(history) -> str:
             return turn.content
 
     return history[-1].content if history else ""
+
+
+def _suggested_article(article: SuggestedArticle) -> rag_pb2.SuggestedArticle:
+    """One recommended article, as the wire carries it.
+
+    Shared by both branches of `Suggest`, so the at-cap response and the normal
+    one cannot drift in what an article contains.
+    """
+    return rag_pb2.SuggestedArticle(
+        document_id=article.document_id,
+        document_title=article.document_title,
+        page_number=article.page_number,
+        score=article.score,
+    )
 
 
 def _transcript(history) -> str:

@@ -319,7 +319,7 @@ class CopilotService:
             + "\n\nJSON:"
         )
 
-        articles = await self._articles(title, body, ctx, settings, budget)
+        articles = await self.suggest_articles(title, body, ctx, settings, budget)
 
         text, generation_id = await self._spend(
             prompt,
@@ -345,7 +345,7 @@ class CopilotService:
             articles,
         )
 
-    async def _articles(
+    async def suggest_articles(
         self,
         title: str,
         body: str,
@@ -360,11 +360,11 @@ class CopilotService:
         with it — an agent gets their checklist and an empty sidebar, which is
         the same thing a tenant with no indexed documents gets.
 
-        **Still useful at the AI cap.** Retrieval degrades rather than failing:
-        the lexical arm needs no embedding, so a capped tenant gets articles
-        from keyword search plus a `lexical_only` marker instead of nothing.
-        That matters here more than on the answering path — the cap arrives when
-        a tenant is busiest, which is exactly when a sidebar is being used.
+        **Makes no paid call when `budget` allows none.** `budget` reaches
+        `retrieve()`, which then skips the embedding and searches the lexical
+        arm alone; the reranker is local. The servicer's cap branch calls this
+        on its own, and that response carries the `degraded` marker — one per
+        call, set by the branch that knows, not per article.
 
         Deduplicated by document, because retrieval returns CHUNKS: three
         passages from one handbook are one article to open, and listing it three

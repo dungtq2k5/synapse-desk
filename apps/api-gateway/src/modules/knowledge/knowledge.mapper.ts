@@ -2,7 +2,7 @@ import {
   ChatRequest,
   ChatResponse,
   fromProtoRagAnswerStatus,
-  SearchDegradation,
+  fromProtoSearchDegradation,
   SearchRequest,
   SearchResponse,
 } from '@synapsedesk/grpc-proto';
@@ -47,10 +47,7 @@ export function toKnowledgeSearchResponseDto(
       score: chunk.score,
       vectorPointId: chunk.vectorPointId,
     })),
-    degraded:
-      response.degraded === SearchDegradation.SEARCH_DEGRADATION_LEXICAL_ONLY
-        ? 'LEXICAL_ONLY'
-        : null,
+    degraded: fromProtoSearchDegradation(response.degraded),
   };
 }
 

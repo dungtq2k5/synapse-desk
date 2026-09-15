@@ -82,11 +82,12 @@ export class AiController {
   // quota is a month budget checked per request and does nothing to stop one
   // user spending the whole month in ten minutes.
   @Throttle({ [AI_THROTTLER_TIER]: ROUTE_THROTTLE.aiSummary })
-  // 402 on this and the three below: they GENERATE, so they are refused at the
-  // AI cap. It travels as `PERMISSION_DENIED` carrying an `[http:402]` marker
-  // that the exception filter obeys — undeclared, the spec would say a billing
-  // refusal is a permissions problem. `GET summary` above reads a stored row
-  // and spends nothing, so it does not carry it.
+  // 402 on this and on draft and classify below: they GENERATE, so they are
+  // refused at the AI cap. It travels as `PERMISSION_DENIED` carrying an
+  // `[http:402]` marker that the exception filter obeys — undeclared, the spec
+  // would say a billing refusal is a permissions problem. `GET summary` above
+  // reads a stored row and spends nothing, so it does not carry it; suggestions
+  // DEGRADES at the cap instead (a 200 with `degraded`), so it does not either.
   @ApiOperation({ summary: 'Generate summary' })
   @ApiWrappedResponse(AiSummaryResponseDto)
   @ApiFilterErrors(['400', '401', '402', '403', '404'])
@@ -132,7 +133,7 @@ export class AiController {
   @Throttle({ [AI_THROTTLER_TIER]: ROUTE_THROTTLE.aiSuggestions })
   @ApiOperation({ summary: 'Get suggestions' })
   @ApiWrappedResponse(AiSuggestionsResponseDto)
-  @ApiFilterErrors(['400', '401', '402', '403', '404'])
+  @ApiFilterErrors(['400', '401', '403', '404'])
   @Post('suggestions')
   @RequirePermission('ticket.ai.use')
   @HttpCode(HttpStatus.OK)

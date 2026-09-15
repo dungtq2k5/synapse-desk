@@ -1,9 +1,11 @@
 import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { of } from 'rxjs';
-import { RAG_GRPC_CLIENT } from '@synapsedesk/grpc-proto';
+import { RAG_GRPC_CLIENT, SearchDegradation } from '@synapsedesk/grpc-proto';
+import { RetrievalDegradation } from '@synapsedesk/common';
 import { memberContext } from '@synapsedesk/common/testing/context';
 import { RagClientService } from './rag-client.service';
+
 /**
  * **Populate model/token fields only where they cannot be read as the meter.**
  *
@@ -116,5 +118,59 @@ describe('RagClientService — the single metering path', () => {
 
     expect(summary.modelName).toBe(WIRE_MODEL);
     expect(summary).not.toHaveProperty('promptTokens');
+  });
+});
+
+describe('RagClientService — suggestions carry the degradation marker', () => {
+  /**
+   * The first hop that could drop it. `getSuggestions` rebuilds rag's reply
+   * field by field, and the ticket-service e2e mocks this method — so the
+   * mapping from rag's enum is exercised here or nowhere.
+   */
+  const CONTEXT = memberContext({
+    id: '11111111-1111-4111-8111-111111111111',
+    organizationId: '22222222-2222-4222-8222-222222222222',
+  });
+
+  const suggestionsFor = async (degraded: SearchDegradation) => {
+    const rag = {
+      suggest: jest
+        .fn()
+        .mockReturnValue(
+          of({ suggestions: [], generationId: '', articles: [], degraded }),
+        ),
+    };
+
+    const moduleRef = await Test.createTestingModule({
+      providers: [
+        RagClientService,
+        { provide: ConfigService, useValue: { get: () => 'localhost:50055' } },
+        { provide: RAG_GRPC_CLIENT, useValue: { getService: () => rag } },
+      ],
+    }).compile();
+
+    const service = moduleRef.get(RagClientService);
+    service.onModuleInit();
+
+    return service.getSuggestions('t-1', [], CONTEXT, {
+      title: 't',
+      body: 'b',
+    });
+  };
+
+  it('maps LEXICAL_ONLY from the wire', async () => {
+    const suggestions = await suggestionsFor(
+      SearchDegradation.SEARCH_DEGRADATION_LEXICAL_ONLY,
+    );
+
+    expect(suggestions.degraded).toBe(RetrievalDegradation.LEXICAL_ONLY);
+  });
+
+  it('maps UNSPECIFIED to null — a normal answer is not degraded', async () => {
+    const suggestions = await suggestionsFor(
+      SearchDegradation.SEARCH_DEGRADATION_UNSPECIFIED,
+    );
+
+    expect(suggestions.degraded).toBeNull();
   });
 });

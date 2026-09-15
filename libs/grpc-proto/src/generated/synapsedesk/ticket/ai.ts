@@ -11,6 +11,19 @@ import { Observable } from "rxjs";
 import { Timestamp } from "../../google/protobuf/timestamp";
 import { TicketPriority } from "./common";
 
+/**
+ * `SearchDegradation`, mirrored from `synapsedesk.rag` rather than imported —
+ * rag types are never imported into this package (see the header of
+ * `message.proto`). PREFIXED for the reason given there: ts-proto flattens every
+ * package into one barrel, and a second `SearchDegradation` would silently drop
+ * rag's. The NUMBERING is the contract.
+ */
+export enum SuggestionsDegradation {
+  SUGGESTIONS_DEGRADATION_UNSPECIFIED = 0,
+  SUGGESTIONS_DEGRADATION_LEXICAL_ONLY = 1,
+  UNRECOGNIZED = -1,
+}
+
 export interface AiSummaryResponse {
   id: string;
   ticketId: string;
@@ -86,6 +99,12 @@ export interface GetSuggestionsResponse {
    * list this endpoint already produced; these are the articles beside it.
    */
   articles: SuggestedArticleResponse[];
+  /**
+   * Carried through from rag-service's `SuggestionsResponse.degraded`.
+   * `LEXICAL_ONLY`: no next steps, because the budget could not confirm room
+   * for a generation; the articles came from keyword search.
+   */
+  degraded: SuggestionsDegradation;
 }
 
 export interface SuggestedArticleResponse {

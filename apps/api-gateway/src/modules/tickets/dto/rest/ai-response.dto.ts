@@ -1,5 +1,5 @@
 import { PickType } from '@nestjs/swagger';
-import { TicketPriority } from '@synapsedesk/common';
+import { RetrievalDegradation, TicketPriority } from '@synapsedesk/common';
 import { CitationResponseDto } from './message-response.dto';
 
 export class AiSummaryResponseDto {
@@ -68,11 +68,23 @@ export class SuggestedArticleResponseDto {
  * What `POST /tickets/:id/ai/suggestions` answers with.
  *
  * @example
- * const { nextSteps, articles } = response.data;
+ * const { nextSteps, articles, degraded } = response.data;
+ * if (degraded === 'LEXICAL_ONLY') showBudgetNotice(); // not "no suggestions"
  */
 export class AiSuggestionsResponseDto {
   nextSteps!: AiSuggestionResponseDto[];
   articles!: SuggestedArticleResponseDto[];
+  /**
+   * `LEXICAL_ONLY` when the budget could not confirm room for a generation —
+   * the workspace is at its AI allowance, or the quota counter was unreadable.
+   * Then `nextSteps` is empty because the model was never called, and
+   * `articles` came from keyword search. `null` on a normal answer, where an
+   * empty `nextSteps` means the model had nothing to add.
+   *
+   * Read it before rendering an empty `nextSteps`: without it, a client shows
+   * "no suggestions" where the truth is "allowance used".
+   */
+  degraded!: RetrievalDegradation | null;
 }
 
 export class AiSuggestionResponseDto {

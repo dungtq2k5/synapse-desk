@@ -1,6 +1,7 @@
 import { of, throwError } from 'rxjs';
 import { faker } from '@faker-js/faker';
 import { status as GrpcStatus } from '@grpc/grpc-js';
+import { SuggestionsDegradation } from '@synapsedesk/grpc-proto';
 import {
   API,
   E2eFixture,
@@ -392,6 +393,7 @@ describe('AI Co-Pilot at the HTTP boundary (e2e)', () => {
             { title: 'Check the toner', body: 'do it', confidenceScore: 0.6 },
           ],
           articles: [article],
+          degraded: SuggestionsDegradation.SUGGESTIONS_DEGRADATION_UNSPECIFIED,
         }),
       );
 
@@ -415,6 +417,7 @@ describe('AI Co-Pilot at the HTTP boundary (e2e)', () => {
         of({
           items: [],
           articles: [{ ...wireArticle(), vectorPointId: 'point-1' }],
+          degraded: SuggestionsDegradation.SUGGESTIONS_DEGRADATION_UNSPECIFIED,
         }),
       );
 
@@ -441,6 +444,7 @@ describe('AI Co-Pilot at the HTTP boundary (e2e)', () => {
               score: 0.5,
             },
           ],
+          degraded: SuggestionsDegradation.SUGGESTIONS_DEGRADATION_UNSPECIFIED,
         }),
       );
 
@@ -460,6 +464,7 @@ describe('AI Co-Pilot at the HTTP boundary (e2e)', () => {
         of({
           items: [{ title: 'Step', body: 'do it', confidenceScore: 0.5 }],
           articles: [],
+          degraded: SuggestionsDegradation.SUGGESTIONS_DEGRADATION_UNSPECIFIED,
         }),
       );
 
@@ -471,6 +476,38 @@ describe('AI Co-Pilot at the HTTP boundary (e2e)', () => {
 
       expect(res.body.data.articles).toEqual([]);
       expect(res.body.data.nextSteps).toHaveLength(1);
+      // A normal answer is not marked degraded — the control for the test below.
+      expect(res.body.data.degraded).toBeNull();
+    });
+
+    it('**at the AI cap: 200, articles, NO next steps, and `degraded` says why**', async () => {
+      // There was no cap test for this route, which is how a 402 stayed its
+      // contract by default. Suggest degrades now: next steps need the model
+      // and are refused, the articles come from keyword search. `degraded` is
+      // the only field that tells "allowance used" from "the model had nothing
+      // to add" — both arrive as an empty `nextSteps`.
+      const article = wireArticle();
+      fx.stubs.ai.getSuggestions.mockReturnValue(
+        of({
+          items: [],
+          articles: [article],
+          degraded: SuggestionsDegradation.SUGGESTIONS_DEGRADATION_LEXICAL_ONLY,
+        }),
+      );
+
+      const res = await authenticatedAgent(fx.app, {
+        permissionCodes: ['ticket.ai.use'],
+      })
+        .post(`${API}/tickets/${ticketId}/ai/suggestions`)
+        .send({});
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toEqual({
+        nextSteps: [],
+        articles: [article],
+        degraded: 'LEXICAL_ONLY',
+      });
     });
   });
 

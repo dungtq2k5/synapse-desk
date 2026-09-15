@@ -6,7 +6,10 @@ import {
   compareAlphabetically,
   withHttpStatus,
 } from '@synapsedesk/common';
-import { AnswerStatus as ProtoAnswerStatus } from '@synapsedesk/grpc-proto';
+import {
+  AnswerStatus as ProtoAnswerStatus,
+  SearchDegradation,
+} from '@synapsedesk/grpc-proto';
 import {
   API,
   E2eFixture,
@@ -162,6 +165,37 @@ describe('Knowledge ask at the HTTP boundary (e2e)', () => {
 
     expect(res.status).toBe(400);
     expect(fx.stubs.rag.ask).not.toHaveBeenCalled();
+  });
+
+  describe('POST /knowledge/search — the degradation marker', () => {
+    // The marker is the only thing telling a caller "thinner because AI spend
+    // was unavailable" from "thinner because the corpus is". No test read it
+    // at this boundary before; the mapper could answer null forever.
+    const searchWith = async (degraded: SearchDegradation) => {
+      fx.stubs.rag.search.mockReturnValue(of({ chunks: [], degraded }));
+
+      return authenticatedAgent(fx.app)
+        .post(`${API}/knowledge/search`)
+        .send({ query: 'leave policy' });
+    };
+
+    it('LEXICAL_ONLY on the wire is `LEXICAL_ONLY` in the response', async () => {
+      const res = await searchWith(
+        SearchDegradation.SEARCH_DEGRADATION_LEXICAL_ONLY,
+      );
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.degraded).toBe('LEXICAL_ONLY');
+    });
+
+    it('UNSPECIFIED on the wire is `null` — a normal search is not degraded', async () => {
+      const res = await searchWith(
+        SearchDegradation.SEARCH_DEGRADATION_UNSPECIFIED,
+      );
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.degraded).toBeNull();
+    });
   });
 
   describe('the help centre', () => {

@@ -11,6 +11,7 @@ import {
   ListSimilarTicketsResponse,
   ConversationTurn,
   TicketAiRequest,
+  toProtoSuggestionsDegradation,
   toProtoTimestamp,
   toProtoTicketPriority,
 } from '@synapsedesk/grpc-proto';
@@ -258,6 +259,9 @@ export class AiService {
         // representation per layer.
         pageNumber: article.pageNumber ?? undefined,
       })),
+      // Rebuilt field by field, so a field rag adds is dropped HERE unless it
+      // is named — which is how the at-cap marker would have gone missing.
+      degraded: toProtoSuggestionsDegradation(suggestions.degraded),
     };
   }
 
@@ -388,6 +392,7 @@ export class AiService {
     });
 
     // Back to reading order: the tail, but oldest-first within it.
+    // FIXME Move this array "reverse" operation to a separate statement or replace it with "toReversed".
     return messages.reverse().map((message) => ({
       role: message.isAiGenerated || !message.senderId ? 'assistant' : 'user',
       content: message.content,

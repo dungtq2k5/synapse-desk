@@ -3,6 +3,7 @@ import {
   ClassifyTicketResponse,
   fromProtoTicketPriority,
   GenerateDraftResponse,
+  fromProtoSuggestionsDegradation,
   GetSuggestionsResponse,
   ListSimilarTicketsResponse,
   requireProtoTimestamp,
@@ -72,6 +73,7 @@ export function toAiSuggestionsResponseDto(
       pageNumber: article.pageNumber ?? null,
       score: article.score,
     })),
+    degraded: fromProtoSuggestionsDegradation(response.degraded),
   };
 }
 

@@ -1,4 +1,4 @@
-import { AnswerStatus } from '@synapsedesk/common';
+import { AnswerStatus, RetrievalDegradation } from '@synapsedesk/common';
 import { CitationResponseDto } from '../../../tickets/dto/rest/message-response.dto';
 
 export class RetrievedChunkResponseDto {
@@ -25,7 +25,7 @@ export class KnowledgeSearchResponseDto {
   // In the RESPONSE rather than only in a log: a caller that cannot tell
   // degraded results from normal ones presents them as normal ones, and "the
   // search got worse" then gets reported as a quality problem, not a billing one.
-  degraded!: 'LEXICAL_ONLY' | null;
+  degraded!: RetrievalDegradation | null;
 }
 
 /**

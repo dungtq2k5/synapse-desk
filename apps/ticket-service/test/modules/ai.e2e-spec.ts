@@ -1,5 +1,12 @@
-import { TicketPriority, TicketStatus } from '@synapsedesk/common';
-import { fromProtoTicketPriority } from '@synapsedesk/grpc-proto';
+import {
+  RetrievalDegradation,
+  TicketPriority,
+  TicketStatus,
+} from '@synapsedesk/common';
+import {
+  fromProtoTicketPriority,
+  SuggestionsDegradation,
+} from '@synapsedesk/grpc-proto';
 import { RpcException } from '@nestjs/microservices';
 import { waitFor } from '@synapsedesk/common/testing/wait';
 import { expectRpc, rpcCode } from '@synapsedesk/common/testing/rpc';
@@ -208,6 +215,7 @@ describe('AI Co-Pilot (e2e)', () => {
         // The article sidebar. Empty here: this test is about the
         // next-step list, which arrives beside them rather than instead.
         articles: [],
+        degraded: null,
       });
       jest.spyOn(rag, 'classifyTicket').mockResolvedValue({
         suggestedDepartmentId: '',
@@ -266,6 +274,65 @@ describe('AI Co-Pilot (e2e)', () => {
   });
 
   // ------------------------------------------------------------- getSummary
+
+  describe('getSuggestions carries the at-cap marker through this hop', () => {
+    /**
+     * The gateway's suggestions route reaches rag through THIS service, which
+     * rebuilds rag's reply field by field. A marker rag sets and this service
+     * does not name is dropped here, silently — and the gateway e2e cannot see
+     * it, because it stubs this service rather than rag.
+     */
+    beforeEach(() => isAvailable.mockReturnValue(true));
+
+    const article = {
+      documentId: faker.string.uuid(),
+      documentTitle: 'Escalation runbook',
+      pageNumber: null,
+      score: 0.7,
+    };
+
+    it('1. rag says LEXICAL_ONLY → the response says LEXICAL_ONLY, with the articles', async () => {
+      jest.spyOn(rag, 'getSuggestions').mockResolvedValue({
+        items: [],
+        articles: [article],
+        degraded: RetrievalDegradation.LEXICAL_ONLY,
+      });
+      const ticket = await createTicket(fx.prisma, tenant);
+
+      const response = await ai.getSuggestions(
+        { ticketId: ticket.id },
+        agent(),
+      );
+
+      expect(response.degraded).toBe(
+        SuggestionsDegradation.SUGGESTIONS_DEGRADATION_LEXICAL_ONLY,
+      );
+      expect(response.items).toEqual([]);
+      expect(response.articles.map(({ documentId }) => documentId)).toEqual([
+        article.documentId,
+      ]);
+    });
+
+    it('2. rag reports no degradation → neither does the response', async () => {
+      // The control: without it the field passes on a rebuild that always
+      // says LEXICAL_ONLY.
+      jest.spyOn(rag, 'getSuggestions').mockResolvedValue({
+        items: [{ title: 'Step', body: 'do it', confidenceScore: 0.5 }],
+        articles: [],
+        degraded: null,
+      });
+      const ticket = await createTicket(fx.prisma, tenant);
+
+      const response = await ai.getSuggestions(
+        { ticketId: ticket.id },
+        agent(),
+      );
+
+      expect(response.degraded).toBe(
+        SuggestionsDegradation.SUGGESTIONS_DEGRADATION_UNSPECIFIED,
+      );
+    });
+  });
 
   describe('getSummary', () => {
     it('1. answers NOT_FOUND when none has been generated — not an empty object', async () => {

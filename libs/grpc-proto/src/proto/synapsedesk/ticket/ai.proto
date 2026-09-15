@@ -77,6 +77,20 @@ message GetSuggestionsResponse {
   // Carried through from rag-service. `items` is the next-step
   // list this endpoint already produced; these are the articles beside it.
   repeated SuggestedArticleResponse articles = 2;
+  // Carried through from rag-service's `SuggestionsResponse.degraded`.
+  // `LEXICAL_ONLY`: no next steps, because the budget could not confirm room
+  // for a generation; the articles came from keyword search.
+  SuggestionsDegradation degraded = 3;
+}
+
+// `SearchDegradation`, mirrored from `synapsedesk.rag` rather than imported —
+// rag types are never imported into this package (see the header of
+// `message.proto`). PREFIXED for the reason given there: ts-proto flattens every
+// package into one barrel, and a second `SearchDegradation` would silently drop
+// rag's. The NUMBERING is the contract.
+enum SuggestionsDegradation {
+  SUGGESTIONS_DEGRADATION_UNSPECIFIED = 0;
+  SUGGESTIONS_DEGRADATION_LEXICAL_ONLY = 1;
 }
 
 message SuggestedArticleResponse {

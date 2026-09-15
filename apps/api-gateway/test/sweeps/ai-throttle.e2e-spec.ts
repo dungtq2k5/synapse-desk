@@ -1,6 +1,9 @@
 import { of } from 'rxjs';
 import { OrgStatus } from '@synapsedesk/common';
-import { toProtoOrgStatus } from '@synapsedesk/grpc-proto';
+import {
+  SuggestionsDegradation,
+  toProtoOrgStatus,
+} from '@synapsedesk/grpc-proto';
 import {
   API,
   E2eFixture,
@@ -109,7 +112,12 @@ describe('AI route rate limiting (e2e)', () => {
       permissions: ['ticket.ai.use'],
       stub: (fixture: E2eFixture) =>
         fixture.stubs.ai.getSuggestions.mockReturnValue(
-          of({ items: [], articles: [] }),
+          of({
+            items: [],
+            articles: [],
+            degraded:
+              SuggestionsDegradation.SUGGESTIONS_DEGRADATION_UNSPECIFIED,
+          }),
         ),
     },
     {

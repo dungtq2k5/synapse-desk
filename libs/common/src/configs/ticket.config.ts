@@ -147,6 +147,22 @@ export enum AnswerStatus {
 
 export const ANSWER_STATUSES = Object.values(AnswerStatus);
 
+/**
+ * How a retrieval-backed answer was cheapened when AI spend was unavailable.
+ *
+ * Mirrors `synapsedesk.rag.SearchDegradation` and
+ * `synapsedesk.ticket.SuggestionsDegradation`; `enum-bridges.spec.ts` asserts
+ * both bridges round-trip. `null` on a response means no degradation.
+ */
+export enum RetrievalDegradation {
+  /**
+   * The embedding was skipped and only keyword search ran, because the budget
+   * could not confirm room for a paid call — the tenant is at the cap, or the
+   * quota counter was unreadable.
+   */
+  LEXICAL_ONLY = 'LEXICAL_ONLY',
+}
+
 // ---------------------------------------------------------------------------
 // Sortable columns — same four-way contract as Domain A's, see app.config.ts
 //

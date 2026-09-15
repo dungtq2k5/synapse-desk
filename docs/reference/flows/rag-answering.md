@@ -86,7 +86,8 @@ The gateway never talks to Qdrant, Gemini or the ledger.
 | :---- | :---- |
 | `Chat` | **answers**, with `ANSWER_STATUS_AT_CAP` — never a 402 |
 | `Search` | **degrades to lexical-only** — the embedding client is not called at all |
-| `Ask`, `Draft`, `Classify`, `Suggest` | abort with `PERMISSION_DENIED` / `AT_CAP_REFUSAL` |
+| `Ask`, `Draft`, `Classify` | abort with `PERMISSION_DENIED` / `AT_CAP_REFUSAL` |
+| `Suggest` | **articles only** — keyword retrieval, no model call, no ledger row, `degraded = LEXICAL_ONLY`; next steps are empty and the response is `200` |
 | `Summarize` | aborts *unless* in escalation grace |
 
 `Chat`'s own reasoning: *"a 402 mid-conversation is a dead end for a user who cannot buy anything."* `Search`'s: *"'degraded' has to mean CHEAPER, not merely relabelled."*

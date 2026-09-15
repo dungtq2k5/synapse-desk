@@ -240,14 +240,16 @@ class Suggestion(_message.Message):
     def __init__(self, title: _Optional[str] = ..., body: _Optional[str] = ..., confidence_score: _Optional[float] = ..., citations: _Optional[_Iterable[_Union[Citation, _Mapping]]] = ...) -> None: ...
 
 class SuggestionsResponse(_message.Message):
-    __slots__ = ("suggestions", "generation_id", "articles")
+    __slots__ = ("suggestions", "generation_id", "articles", "degraded")
     SUGGESTIONS_FIELD_NUMBER: _ClassVar[int]
     GENERATION_ID_FIELD_NUMBER: _ClassVar[int]
     ARTICLES_FIELD_NUMBER: _ClassVar[int]
+    DEGRADED_FIELD_NUMBER: _ClassVar[int]
     suggestions: _containers.RepeatedCompositeFieldContainer[Suggestion]
     generation_id: str
     articles: _containers.RepeatedCompositeFieldContainer[SuggestedArticle]
-    def __init__(self, suggestions: _Optional[_Iterable[_Union[Suggestion, _Mapping]]] = ..., generation_id: _Optional[str] = ..., articles: _Optional[_Iterable[_Union[SuggestedArticle, _Mapping]]] = ...) -> None: ...
+    degraded: SearchDegradation
+    def __init__(self, suggestions: _Optional[_Iterable[_Union[Suggestion, _Mapping]]] = ..., generation_id: _Optional[str] = ..., articles: _Optional[_Iterable[_Union[SuggestedArticle, _Mapping]]] = ..., degraded: _Optional[_Union[SearchDegradation, str]] = ...) -> None: ...
 
 class SuggestedArticle(_message.Message):
     __slots__ = ("document_id", "document_title", "page_number", "score")

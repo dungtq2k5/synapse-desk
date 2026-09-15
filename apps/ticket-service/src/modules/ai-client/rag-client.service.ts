@@ -7,6 +7,7 @@ import {
   AttachmentPart,
   CallerContext,
   ConversationTurn,
+  fromProtoSearchDegradation,
   packRequestContext,
   RAG_GRPC_CLIENT,
   RAG_SERVICE_NAME,
@@ -14,6 +15,7 @@ import {
 } from '@synapsedesk/grpc-proto';
 import {
   formatErrorMsg,
+  RetrievalDegradation,
   TICKET_PRIORITIES,
   TicketPriority,
 } from '@synapsedesk/common';
@@ -74,6 +76,12 @@ export type AiSuggestedArticle = {
 export type AiSuggestions = {
   items: AiSuggestion[];
   articles: AiSuggestedArticle[];
+  /**
+   * `LEXICAL_ONLY` when rag-service could not confirm room for a generation:
+   * `items` is empty because the model was never called, and `articles` came
+   * from keyword search. `null` on a normal answer.
+   */
+  degraded: RetrievalDegradation | null;
 };
 
 export type AiSuggestion = {
@@ -279,6 +287,7 @@ export class RagClientService implements OnModuleInit {
         pageNumber: article.pageNumber ?? null,
         score: article.score,
       })),
+      degraded: fromProtoSearchDegradation(response.degraded),
     };
   }
 

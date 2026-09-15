@@ -326,6 +326,14 @@ export interface SuggestionsResponse {
    * model change rather than a queue.
    */
   articles: SuggestedArticle[];
+  /**
+   * `LEXICAL_ONLY` when the budget could not confirm room for a generation —
+   * the tenant is at the cap, or the quota counter was unreadable. Then
+   * `suggestions` is empty because the model was never called, and `articles`
+   * came from keyword search. `UNSPECIFIED` on a normal answer, where an empty
+   * `suggestions` means the model had nothing to add.
+   */
+  degraded: SearchDegradation;
 }
 
 /**

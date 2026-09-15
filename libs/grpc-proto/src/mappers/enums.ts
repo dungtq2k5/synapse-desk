@@ -30,6 +30,7 @@ import {
   TicketPriority,
   TicketSource,
   TicketStatus,
+  RetrievalDegradation,
 } from '@synapsedesk/common';
 import {
   AiModelTier as ProtoAiModelTier,
@@ -72,7 +73,11 @@ import {
   TicketStatus as ProtoTicketStatus,
 } from '../generated/synapsedesk/ticket/common';
 import { MessageAnswerStatus as ProtoMessageAnswerStatus } from '../generated/synapsedesk/ticket/message';
-import { AnswerStatus as ProtoRagAnswerStatus } from '../generated/synapsedesk/rag/rag';
+import {
+  AnswerStatus as ProtoRagAnswerStatus,
+  SearchDegradation as ProtoSearchDegradation,
+} from '../generated/synapsedesk/rag/rag';
+import { SuggestionsDegradation as ProtoSuggestionsDegradation } from '../generated/synapsedesk/ticket/ai';
 import { StoragePurpose as ProtoStoragePurpose } from '../generated/synapsedesk/storage/storage';
 import { enumBridge } from './enum-bridge';
 
@@ -825,3 +830,38 @@ const ragAnswerStatus = enumBridge<AnswerStatus, ProtoRagAnswerStatus>(
 
 export const toProtoRagAnswerStatus = ragAnswerStatus.toProto;
 export const fromProtoRagAnswerStatus = ragAnswerStatus.fromProto;
+
+/** A retrieval degradation, against the `synapsedesk.rag` enum. */
+const searchDegradation = enumBridge<
+  RetrievalDegradation,
+  ProtoSearchDegradation
+>(
+  {
+    [RetrievalDegradation.LEXICAL_ONLY]:
+      ProtoSearchDegradation.SEARCH_DEGRADATION_LEXICAL_ONLY,
+  },
+  ProtoSearchDegradation.SEARCH_DEGRADATION_UNSPECIFIED,
+);
+
+export const toProtoSearchDegradation = searchDegradation.toProto;
+export const fromProtoSearchDegradation = searchDegradation.fromProto;
+
+/**
+ * The same degradation, against the `synapsedesk.ticket` mirror.
+ *
+ * Numbered identically to {@link toProtoSearchDegradation}'s enum, but a
+ * distinct TypeScript enum, so a value from one is not assignable to the other.
+ */
+const suggestionsDegradation = enumBridge<
+  RetrievalDegradation,
+  ProtoSuggestionsDegradation
+>(
+  {
+    [RetrievalDegradation.LEXICAL_ONLY]:
+      ProtoSuggestionsDegradation.SUGGESTIONS_DEGRADATION_LEXICAL_ONLY,
+  },
+  ProtoSuggestionsDegradation.SUGGESTIONS_DEGRADATION_UNSPECIFIED,
+);
+
+export const toProtoSuggestionsDegradation = suggestionsDegradation.toProto;
+export const fromProtoSuggestionsDegradation = suggestionsDegradation.fromProto;

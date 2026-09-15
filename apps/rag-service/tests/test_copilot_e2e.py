@@ -595,14 +595,41 @@ class TestSuggest:
 
         assert response.suggestions[0].confidence_score == 0.0
 
-    async def test_REFUSES_at_the_cap(self, servicer, tenant_a, at_cap):
-        request = rag_pb2.SuggestionsRequest(ticket_id=TICKET_ID)
-        context = FakeServicerContext(tenant_a.outsider())
+    async def test_DEGRADES_at_the_cap_rather_than_refusing(
+        self, servicer, tenant_a, generator, at_cap
+    ):
+        # Next steps need the model, so there are none; the call is not an
+        # error, because the articles half is free. `degraded` is what tells a
+        # client "no next steps because of the budget" apart from "the model had
+        # nothing to add".
+        response = await servicer.Suggest(
+            rag_pb2.SuggestionsRequest(ticket_id=TICKET_ID),
+            FakeServicerContext(tenant_a.outsider()),
+        )
 
-        with pytest.raises(FakeAbort) as raised:
-            await servicer.Suggest(request, context)
+        assert list(response.suggestions) == []
+        assert response.generation_id == ""
+        assert response.degraded == rag_pb2.SEARCH_DEGRADATION_LEXICAL_ONLY
+        assert generator.calls == []
 
-        assert "[http:402]" in raised.value.details
+    async def test_below_the_cap_the_answer_is_NOT_marked_degraded(
+        self, servicer, tenant_a, generator
+    ):
+        # The control. Without it the field passes on an implementation that
+        # always says LEXICAL_ONLY.
+        generator.answer = json.dumps(
+            [{"title": "Step", "body": "do it", "confidence": 0.5}]
+        )
+
+        response = await servicer.Suggest(
+            rag_pb2.SuggestionsRequest(
+                ticket_id=TICKET_ID, history=turns(("user", "help"))
+            ),
+            FakeServicerContext(tenant_a.outsider()),
+        )
+
+        assert response.degraded == rag_pb2.SEARCH_DEGRADATION_UNSPECIFIED
+        assert len(response.suggestions) == 1
 
 
 def _quota_key(tenant) -> str:
@@ -1010,40 +1037,62 @@ class TestSuggestedArticles:
         assert AiGenerationPurpose.EMBEDDING in purposes
         assert AiGenerationPurpose.REFORMULATION not in purposes
 
-    async def test_7_the_whole_call_is_REFUSED_at_the_cap(
-        self, servicer, tenant_a, generator, seed, at_cap
+    async def test_7_at_the_cap_articles_are_KEYWORD_ONLY_and_nothing_is_spent(
+        self,
+        servicer,
+        tenant_a,
+        tenant_b,
+        generator,
+        seed,
+        at_cap,
+        embeddings,
+        ledger,
+        redis_client,
     ):
-        """**Right about retrieval and wrong about this
-        endpoint.**
+        """At the cap: articles from keyword search, no next steps, no spend.
 
-        `retrieve()` genuinely degrades at the cap — the lexical arm needs no
-        embedding, so it returns results plus a `lexical_only` marker instead of
-        failing. But `Suggest` never reaches it: the servicer aborts on
-        `allows_embedding` before calling the co-pilot at all, exactly as
-        `Summarize`, `Classify` and `Draft` do.
+        Whether a sidebar keeps working at the cap was a decision about this
+        endpoint's contract, not a property inherited from retrieval — and it
+        has been made: `Suggest` degrades, the way `Search` does, and
+        `AT_CAP_POLICY[SUGGESTIONS]` is `DEGRADE`.
 
-        So a capped tenant gets no articles AND no next steps, and this test
-        pins that rather than the hoped-for degradation. Changing it would be a
-        product decision — "a sidebar still works at the cap" is defensible, and
-        so is "the cap means the co-pilot stops" — but it is a decision about
-        this endpoint's contract, not a property inherited from retrieval.
+        **The money assertions are the point; the shape is not.** The embedding
+        client, the generator, the ledger and the quota counter are each
+        checked, because a regression that embedded the query would book an
+        `EMBEDDING` charge that a check for a missing `SUGGESTIONS` row would
+        never see.
         """
         _ = at_cap
-        await seed(
+        mine = await seed(
             tenant_a.organization_id,
             text="Escalation runbook for the on-call rotation",
             title="Runbook",
         )
+        theirs = await seed(
+            tenant_b.organization_id,
+            text="Escalation runbook for the on-call rotation",
+            title="Someone else's runbook",
+        )
+        spent_before = await redis_client.get(_quota_key(tenant_a))
 
-        with pytest.raises(FakeAbort) as raised: # NOSONAR
-            await self._suggest(
-                servicer,
-                tenant_a.outsider(),
-                generator,
-                title="escalation runbook",
-                body="on-call",
-            )
+        response = await self._suggest(
+            servicer,
+            tenant_a.outsider(),
+            generator,
+            title="escalation runbook",
+            body="on-call",
+        )
 
-        # The same refusal every other co-pilot surface gives, which is the
-        # consistency worth keeping if the decision is revisited.
-        assert "[http:402]" in raised.value.details
+        assert response.degraded == rag_pb2.SEARCH_DEGRADATION_LEXICAL_ONLY
+        assert list(response.suggestions) == []
+        # The free half, from the seeded corpus — and still scoped to the
+        # caller: the fallback does not skip `tenant_scope()` because it is
+        # "just keyword search".
+        returned = [article.document_id for article in response.articles]
+        assert mine.document_id in returned
+        assert theirs.document_id not in returned
+
+        assert generator.calls == []
+        assert embeddings.calls == []
+        assert ledger.entries == []
+        assert await redis_client.get(_quota_key(tenant_a)) == spent_before
