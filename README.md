@@ -113,6 +113,7 @@ On a fresh database every `ScheduledJobMissing` fires after thirty minutes, whic
 ```sh
 npm run keys:generate          # RS256 keypairs: access + 2FA
 npm run keys:service-account   # throwaway Firebase service-account keys
+npm run keys:test-tls          # the self-signed pair the e2e receivers listen with
 ```
 
 `keys:generate` writes four files and **refuses to overwrite an existing one** — rotating the pair invalidates every access token already issued, so it is opt-in via `npm run keys:generate -- --force`.
@@ -125,6 +126,8 @@ npm run keys:service-account   # throwaway Firebase service-account keys
 | `apps/api-gateway/secrets/jwt-2fa.pub` | api-gateway |
 
 `keys:service-account` writes `apps/storage-service/serviceAccountKey.json` and `apps/auth-service/serviceAccountKey.json`. These are synthetic RSA credentials, not Google ones: `firebase-admin` refuses to initialize without a well-formed key, `cert()` makes no network call, and the Storage emulator never checks a signature. It is idempotent — it exits 0 when the file exists.
+
+`keys:test-tls` writes `receiver-key.pem` and `receiver-cert.pem` into `apps/notification-service/test/fixtures/` and `apps/storage-service/test/fixtures/`. Two e2e suites start a real `https` server on an ephemeral port — the outbound-webhook sender and the remote-source fetcher — and `createServer` needs the pair on disk. Nothing verifies the certificate (the sender's dev hatch relaxes that for a localhost receiver, which is self-signed by nature), so it is generated rather than committed. Skip it and `npm run test:e2e` fails with `ENOENT … receiver-key.pem` before its first assertion. Idempotent: it exits 0 unless the pair is missing or expired, and `-- --force` replaces it.
 
 Real Google credentials are needed only for real Google sign-in and a real Storage bucket, neither of which local development requires.
 

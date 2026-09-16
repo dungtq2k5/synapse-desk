@@ -52,6 +52,24 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+
+      # **Neither check below can run without the Prisma clients.** They are
+      # generated into `**/src/generated/prisma/`, which `.gitignore` excludes,
+      # so on a fresh clone — which every CI run is — they do not exist and
+      # every service that imports one fails to resolve it. Measured on a clean
+      # checkout at 88501a1: `typecheck` reported 1438 errors and `lint` 328
+      # `no-unsafe-*` findings — one missing module wearing two costumes, since
+      # a type eslint cannot resolve is `any` to every type-aware rule.
+      #
+      # `build` gets this for free — turbo's `build` task `dependsOn`
+      # `db:generate` — and neither of these two can. `typecheck` is not a
+      # turbo task at all (a root `tsc` over the whole repo), and `lint`'s
+      # turbo task declares no `dependsOn` ON PURPOSE, because eslint reads
+      # SOURCE and compiling dependencies first would be wasted work. The
+      # generated client is source too, which is the part that declaration
+      # cannot express. So the workflow is where the dependency gets said.
+      - run: npm run db:generate
+
       # `lint` is a composite: lint:models && turbo run lint && eslint over the
       # two directories turbo does not own (scripts/seed-demo, test/system),
       # and `lint:md`.
@@ -108,6 +126,20 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+
+      # The same gitignored Prisma clients `static` needs, for the same reason.
+      - run: npm run db:generate
+
+      # **And the libraries BUILT, which the mappers hide.** Every jest project
+      # resolves `@synapsedesk/common` to `libs/common/src/main.ts`, so the
+      # suites themselves need no `dist` — but two things inside the run do:
+      # the seeder specs spawn `scripts/generate-job-alerts.mjs`, a real child
+      # process where Node resolves the package by its `main`
+      # (`libs/common/dist/main.js`), and `libs/grpc-proto`'s specs need the
+      # `.d.ts` beside it for ts-jest to typecheck against. Measured on a clean
+      # checkout with the clients present and no `dist`: 3 suites failed, 100
+      # passed; with it, 103 suites / 1127 tests green.
+      - run: npm run build:libs
       - run: npm test
 
   # ------------------------------------------------------------------- e2e
@@ -158,14 +190,30 @@ jobs:
       # this job reaches Google. A real service account here would be a real
       # credential in every fork's PR environment the moment somebody relaxes
       # the trigger.
+      #
+      # **The TLS pair is here for the same reason the rest of this step is.**
+      # Two suites start a real `https` receiver and point production code at
+      # it — notification's webhook sender and storage's remote-source fetcher
+      # — and `*.pem` is gitignored, so until `keys:test-tls` existed the pair
+      # lived only on machines that had once made it by hand. Measured on a
+      # clean checkout: `webhooks.e2e-spec.ts` failed all 16 tests with ENOENT
+      # before its first assertion, while the other nine suites passed.
       - name: credentials
         run: |
           npm run keys:generate -- --force
           npm run keys:service-account
+          npm run keys:test-tls
 
       # Creates all four test databases — `prisma db push` creates a missing database on connect.
+      #
+      # It does NOT generate the clients, which is worth stating because it
+      # used to: measured on a clean checkout, `db:test:push` leaves 0 of 4
+      # present. So `db:generate` is its own step, exactly as in `static` and
+      # `unit`, rather than something this one is assumed to carry.
       - name: test databases
-        run: npm run db:test:push
+        run: |
+          npm run db:generate
+          npm run db:test:push
 
       # **`set -o pipefail` is not optional here.** GitHub Actions runs steps
       # under `bash -e` WITHOUT pipefail, so `npm run test:e2e | tee` would
@@ -234,6 +282,32 @@ jobs:
       - run: npm run setup:py
       - run: npm run lint:py
       - run: npm run typecheck:py
+
+      # **The pytest suites are not unit tests, and this job used to run them
+      # as if they were.** `conftest.py` loads `apps/rag-service/.env.test` —
+      # tracked, so the addresses were always here — and its `qdrant` and
+      # `pool` fixtures connect EAGERLY, with no skip mark to fall back on.
+      # Measured with the three stores unreachable, which is what this job was:
+      # 325 passed and 191 ERRORED, every one a refused connection rather than
+      # a failed assertion. With them up, 514 pass. A suite that cannot reach
+      # its stores does not report a smaller truth; it reports nothing, loudly.
+      #
+      # Three services, not the whole compose file: Qdrant for the vector
+      # store, `postgres-ingestion` because rag-service reads the documents
+      # ingestion owns, and Redis for the cache. The other five belong to the
+      # Node services and this job starts none of them.
+      - name: stack env
+        run: cp .env.example .env
+      - name: start the stores rag-service reads
+        run: docker compose up -d --wait qdrant postgres-ingestion redis
+
+      # `npm ci` for the Prisma CLI alone. The `pool` fixture opens with
+      # `TRUNCATE TABLE documents CASCADE`, so the ingestion TEST database has
+      # to exist AND carry the schema — and the schema belongs to
+      # ingestion-service, whose `db:test:push` both creates the database on
+      # connect and applies it.
+      - run: npm ci
+      - run: npm run db:test:push:ingestion
 
       # The key is a repository secret, so it is absent on fork pull requests
       # and the acceptance test skips there. That is acceptable ONLY because
