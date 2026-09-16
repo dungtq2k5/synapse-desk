@@ -23,8 +23,7 @@ import {
 } from '@synapsedesk/grpc-proto';
 import { AppModule } from '../../src/app.module';
 import {
-  API_VERSIONING,
-  OPS_ROUTES,
+  applyApiRouting,
   resolveGlobalPrefix,
 } from '../../src/modules/health/ops-routes';
 import { RedisIoAdapter } from '../../src/common/adapters/redis-io.adapter';
@@ -130,11 +129,10 @@ export async function bootstrapRealtimeTest(
 
   app.set('trust proxy', 1);
   // Mirrors main.ts: the prefix, then the version.
-  app.setGlobalPrefix(
+  applyApiRouting(
+    app,
     resolveGlobalPrefix(configService.getOrThrow<string>('GLOBAL_PREFIX')),
-    { exclude: OPS_ROUTES },
   );
-  app.enableVersioning(API_VERSIONING);
   app.use(cookieParser());
 
   // **The SAME global pipe `main.ts` installs**, and it matters more than it

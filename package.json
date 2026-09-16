@@ -48,6 +48,8 @@
     "db:test:push:ingestion": "npm run db:test:push -w @synapsedesk/ingestion-service",
     "db:test:push": "npm run db:test:push --workspaces --if-present",
     "build": "turbo run build",
+    "openapi:export": "turbo run build --filter=@synapsedesk/api-gateway... && node scripts/export-openapi.mjs",
+    "openapi:check": "turbo run build --filter=@synapsedesk/api-gateway... && node scripts/export-openapi.mjs --check",
     "dev:py": "npm run dev -w @synapsedesk/rag-service",
     "dev": "turbo run dev",
     "//lint": "turbo lints WORKSPACES, and `scripts/seed-demo/` and `test/system/` are not workspaces \u2014 both were invisible to this command until the trailing eslint call, the same shape as the root tsconfig include gap. The loose `.mjs` scripts stay outside: they are plain JS no lint project parses, which is the status quo this line inherits rather than a decision it makes. `lint:md` is chained here rather than left as its own CI step so that a developer running `npm run lint` cannot pass locally and fail in CI on a doc \u2014 which is the whole failure a lint command exists to prevent. CI therefore has no separate markdown step; `npm run lint` is the one that runs it, and `ci-contract.spec.ts` REQUIRES that invocation.",

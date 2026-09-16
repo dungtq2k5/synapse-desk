@@ -87,6 +87,10 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+      # The committed OpenAPI document equals what this build exports. After
+      # the build, so its turbo build is a cache hit; no stack, the gateway is
+      # created and never started.
+      - run: npm run openapi:check
 
   # ------------------------------------------------------------------ unit
   #

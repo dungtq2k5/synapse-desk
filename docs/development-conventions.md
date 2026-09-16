@@ -889,6 +889,8 @@ Two rules follow, and they are cheap:
 
 Applies to documentation as much as to tests: `docs/reference/flows/` carries the same two rules in its own conventions list, scoped to flow documents.
 
+---
+
 ## 14. Definition of Done (pre-PR checklist)
 
 ### 14.0 Run the machine checks first
@@ -901,9 +903,16 @@ npm run lint             # includes lint:models — the model-literal scan
 npm run format:check
 npm run proto:lint       # only if any .proto changed
 npm run proto:breaking   #   "     "   — reviewed, not just green
+npm run openapi:check    # builds the gateway with its libs, then compares docs/reference/openapi.json
 npm run test             # unit
 npm run test:e2e         # the suites for the services you touched
 ```
+
+`openapi:check` runs the turbo build itself: the export reads the BUILT
+gateway and the libraries' own `dist/`, and a stale build cannot be told from
+a fresh one by mtime, so the build is part of the command rather than a step
+to remember. When it reports drift, `npm run openapi:export` is the fix and
+the resulting diff belongs in the PR.
 
 Two failure modes this ordering exists to prevent:
 
@@ -961,6 +970,7 @@ Two failure modes this ordering exists to prevent:
 - [ ] List endpoint extends `SearchPaginationDto` and returns `PaginationResponseDto<T>`.
 - [ ] New env var added to the Joi schema **and** `env.example`.
 - [ ] New permission code added to `PERMISSION_CODES` + `PERMISSION_NAMES` + role grants + [api-endpoints-plan.md §9](./api-endpoints-plan.md).
+- [ ] Route, DTO or Swagger decorator changed → `npm run openapi:export`, and the diff on `docs/reference/openapi.json` is in the PR. CI's `build` job runs `openapi:check` and fails on drift.
 - [ ] Endpoint documented in [api-endpoints-plan.md](./api-endpoints-plan.md); schema change reflected in [rdm-spec.md](./rdm-spec.md) — **columns, types, nullability, defaults and the enum's full value list.** A widened enum whose doc still lists the old members is the most common drift and the least visible.
 - [ ] New cross-service behaviour — an ordering constraint, a dial-out direction, a consistency sweep — recorded in [reference/sys-flows.md](./reference/sys-flows.md). Anything visible inside one service does **not** go there.
 - [ ] `npm run lint` clean.

@@ -18,8 +18,7 @@ import {
 } from '@synapsedesk/grpc-proto';
 import { AppModule } from '../../src/app.module';
 import {
-  API_VERSIONING,
-  OPS_ROUTES,
+  applyApiRouting,
   resolveGlobalPrefix,
 } from '../../src/modules/health/ops-routes';
 import { setupSwagger } from '../../src/common/config/swagger.config';
@@ -113,11 +112,10 @@ export async function bootstrapE2eTest(
   // sets X-Forwarded-For lands in the same bucket.
   app.set('trust proxy', 1);
   // Mirrors main.ts: the prefix, then the version.
-  app.setGlobalPrefix(
+  applyApiRouting(
+    app,
     resolveGlobalPrefix(configService.getOrThrow<string>('GLOBAL_PREFIX')),
-    { exclude: OPS_ROUTES },
   );
-  app.enableVersioning(API_VERSIONING);
   // **The same object `main.ts` applies.** A suite that never applies the
   // header policy cannot guard it — the argument the CORS lines below already
   // make, one middleware over. `security-headers.e2e-spec.ts` test 4 asserts

@@ -1,4 +1,5 @@
 import { RequestMethod, VersioningType } from '@nestjs/common';
+import type { INestApplication } from '@nestjs/common';
 import type { RouteInfo, VersioningOptions } from '@nestjs/common/interfaces';
 
 /**
@@ -15,9 +16,9 @@ import type { RouteInfo, VersioningOptions } from '@nestjs/common/interfaces';
  * `VERSION_NEUTRAL` on `HealthController` and `VersionController` removes the
  * version. With only this list, the probes answer at `/v1/health`.
  *
- * Declared once and shared by `main.ts` and both test bootstraps, because the
- * failure of getting it wrong in only one of them is a suite that passes against
- * paths production does not serve.
+ * Declared once and applied through {@link applyApiRouting} by every composition
+ * root, because the failure of getting it wrong in only one of them is a suite
+ * that passes against paths production does not serve.
  */
 export const OPS_ROUTES: RouteInfo[] = [
   { path: 'health', method: RequestMethod.GET },
@@ -31,12 +32,7 @@ export const API_VERSION = '1';
 /**
  * Nest's versioning options, applied after the global prefix.
  *
- * Shared by `main.ts` and both test bootstraps for the same reason as
- * {@link OPS_ROUTES}. `versioning-contract.e2e-spec.ts` pins all three.
- *
- * @example
- * app.setGlobalPrefix(resolveGlobalPrefix(raw), { exclude: OPS_ROUTES });
- * app.enableVersioning(API_VERSIONING); // routes render /api/v1/…
+ * Applied by {@link applyApiRouting} for the same reason as {@link OPS_ROUTES}.
  */
 export const API_VERSIONING = {
   type: VersioningType.URI,
@@ -55,6 +51,28 @@ export const API_VERSIONING = {
  */
 export function resolveGlobalPrefix(configured: string): string {
   return configured.startsWith('/') ? configured.slice(1) : configured;
+}
+
+/**
+ * The **prefix**, then the **version** — the two mechanisms that render `/api/v1/…` —
+ * applied the one way every composition root applies them.
+ *
+ * **One function, four callers**: `main.ts`, both test bootstraps and
+ * `scripts/export-openapi.mjs`. The paths in the exported OpenAPI file and the
+ * paths every e2e suite requests depend on this exactly, and a root that forgot
+ * the prefix would serve `/auth/register` while the others served
+ * `/api/v1/auth/register`. `versioning-contract.e2e-spec.ts` pins that every
+ * root calls it and that this body carries both calls.
+ *
+ * Takes the prefix as a string, not a `ConfigService`, so this file stays free
+ * of configuration; it is resolved again here because resolving is idempotent
+ * and a caller passing the raw `GLOBAL_PREFIX` must still get `/api/v1/…`.
+ *
+ * @example applyApiRouting(app, resolveGlobalPrefix(config.getOrThrow('GLOBAL_PREFIX'))); // routes render /api/v1/…
+ */
+export function applyApiRouting(app: INestApplication, prefix: string): void {
+  app.setGlobalPrefix(resolveGlobalPrefix(prefix), { exclude: OPS_ROUTES });
+  app.enableVersioning(API_VERSIONING);
 }
 
 /**

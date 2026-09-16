@@ -19,7 +19,7 @@ import {
 import { timestamp } from '../fixtures/wire';
 import { envValidationSchema } from '../../src/common/config/env.validation';
 import { buildOpenApiDocument } from '../../src/common/config/swagger.config';
-import { compareAlphabetically } from '@synapsedesk/common';
+import { canonicalizeEnums, compareAlphabetically } from '@synapsedesk/common';
 import { RESEND_SIGNATURE_HEADERS } from '../../src/modules/inbound-email/resend-inbound.service';
 
 describe('The OpenAPI document', () => {
@@ -98,8 +98,6 @@ describe('The OpenAPI document', () => {
   }, 60_000);
 
   afterAll(() => fx.close());
-
-  // ------------------------------------------------------------------
 
   describe('The CLI plugin', () => {
     it('1. **every DTO schema has non-empty `properties`**', () => {
@@ -216,8 +214,6 @@ describe('The OpenAPI document', () => {
     });
   });
 
-  // ------------------------------------------------------------------
-
   describe('The markdown contract reaches the client', () => {
     /**
      * The markdown contract's whole deliverable.
@@ -264,8 +260,6 @@ describe('The OpenAPI document', () => {
       expect(unresolved).toEqual([]);
     });
   });
-
-  // ------------------------------------------------------------------
 
   describe('The response envelope', () => {
     /** A representative documented success response. */
@@ -458,8 +452,6 @@ describe('The OpenAPI document', () => {
     });
   });
 
-  // ------------------------------------------------------------------
-
   describe('Auth schemes', () => {
     it('1. an authenticated route carries a security requirement', () => {
       const operation = doc.paths['/api/v1/tickets']?.get;
@@ -503,8 +495,6 @@ describe('The OpenAPI document', () => {
       }
     });
   });
-
-  // ------------------------------------------------------------------
 
   describe('Structural assertions over all 184 routes', () => {
     it('1. **every route has a non-empty `summary`**', () => {
@@ -914,6 +904,31 @@ describe('The OpenAPI document', () => {
         ttlSeconds: 60,
         varyBy: 'caller',
       });
+    });
+
+    it('**the served document IS the committed `docs/reference/openapi.json`**', async () => {
+      // The export boots the built gateway; this suite boots through ts-jest.
+      // Equal after the export's own canonicalization — its version, sorted
+      // primitive enums — is what proves both composition roots produce one
+      // contract. Read, never regenerated: on a failure, run
+      // `npm run openapi:export` and review the diff it leaves.
+      const response = await request(fx.app.getHttpServer())
+        .get(`${API}/docs-json`)
+        .expect(200);
+      const served = response.body as OpenAPIObject;
+      const { version } = JSON.parse(
+        readFileSync(join(__dirname, '../../package.json'), 'utf8'),
+      ) as { version: string };
+      const committed = JSON.parse(
+        readFileSync(
+          join(__dirname, '../../../../docs/reference/openapi.json'),
+          'utf8',
+        ),
+      ) as OpenAPIObject;
+
+      expect(
+        canonicalizeEnums({ ...served, info: { ...served.info, version } }),
+      ).toEqual(committed);
     });
 
     it('mounts `/docs` and `/docs-json` under the SAME prefix', () => {

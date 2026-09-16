@@ -12,25 +12,33 @@ import {
  * URI versioning is applied, the same way, by every composition root.
  *
  * **Why the static half exists.** The e2e suites boot `test/utils/bootstrap.ts`
- * and `test/utils/realtime.ts`, never `main.ts`. A bootstrap that forgot
+ * and `test/utils/realtime.ts`, never `main.ts`, and the OpenAPI export boots
+ * the built gateway from `scripts/export-openapi.mjs`. A root that forgot
  * `enableVersioning` — or kept applying the raw `GLOBAL_PREFIX` — would serve
- * its own set of paths and every test against it would stay green. The CORS and
- * helmet sweeps found exactly that shape; this is the same guard for routing.
+ * its own set of paths and every test against it would stay green; the export
+ * would publish paths no client can call. The CORS and helmet sweeps found
+ * exactly that shape; this is the same guard for routing.
+ *
+ * **The property is two facts, checked separately**: every root routes through
+ * `applyApiRouting`, and `applyApiRouting`'s own body is the one place that
+ * applies the prefix and the version.
  */
 describe('URI versioning is applied by every composition root', () => {
   const SRC = join(__dirname, '../../src');
+  const REPO_ROOT = join(__dirname, '../../../..');
   const code = (path: string): string =>
     stripComments(readFileSync(path, 'utf8'));
 
-  const BOOTSTRAPS = {
+  const COMPOSITION_ROOTS = {
     'src/main.ts': join(SRC, 'main.ts'),
     'test/utils/bootstrap.ts': join(__dirname, '../utils/bootstrap.ts'),
     'test/utils/realtime.ts': join(__dirname, '../utils/realtime.ts'),
+    'scripts/export-openapi.mjs': join(REPO_ROOT, 'scripts/export-openapi.mjs'),
   };
 
-  /** What each composition root must contain, as source text. */
+  /** What `applyApiRouting`'s body must contain, as source text. */
   const REQUIRED = [
-    /app\.setGlobalPrefix\(\s*(?:globalPrefix|resolveGlobalPrefix\()/,
+    /app\.setGlobalPrefix\(\s*resolveGlobalPrefix\(/,
     /exclude:\s*OPS_ROUTES/,
     /app\.enableVersioning\(\s*API_VERSIONING\s*\)/,
   ];
@@ -38,14 +46,29 @@ describe('URI versioning is applied by every composition root', () => {
   const missing = (text: string): string[] =>
     REQUIRED.filter((pattern) => !pattern.test(text)).map(String);
 
-  it('1. **all three bootstraps resolve the prefix and enable the SAME versioning**', () => {
-    for (const [label, path] of Object.entries(BOOTSTRAPS)) {
-      expect([label, missing(code(path))]).toEqual([label, []]);
+  /** The source of `applyApiRouting`, from its signature to its closing brace. */
+  const applyApiRoutingBody = (): string => {
+    const source = code(join(SRC, 'modules/health/ops-routes.ts'));
+    const match = /export function applyApiRouting\([\s\S]*?\n\}/.exec(source);
+
+    return match?.[0] ?? '';
+  };
+
+  it('1. **every composition root routes through `applyApiRouting`, and its body applies the SAME prefix and versioning**', () => {
+    for (const [label, path] of Object.entries(COMPOSITION_ROOTS)) {
+      expect([label, /\bapplyApiRouting\(/.test(code(path))]).toEqual([
+        label,
+        true,
+      ]);
     }
 
-    // `main.ts` names its prefix `globalPrefix`, so the first pattern accepts
-    // that — this pins that the name it applies is the RESOLVED value.
-    expect(code(BOOTSTRAPS['src/main.ts'])).toMatch(
+    const body = applyApiRoutingBody();
+    expect(body).not.toBe('');
+    expect(missing(body)).toEqual([]);
+
+    // `main.ts` uses the prefix again for its banner, so it resolves once and
+    // passes the RESOLVED value — this pins that it is not the raw variable.
+    expect(code(COMPOSITION_ROOTS['src/main.ts'])).toMatch(
       /const globalPrefix = resolveGlobalPrefix\(/,
     );
   });

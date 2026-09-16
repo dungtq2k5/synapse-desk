@@ -29,7 +29,13 @@
         "tsconfig*.json",
         "nest-cli.json"
       ],
-      "outputs": ["dist/**"]
+      // The build info with the output it describes. A library's
+      // `tsconfig.build.tsbuildinfo` sits BESIDE `dist/`, so a cache hit used
+      // to restore `dist/` and leave the build info of a different build; the
+      // next real `tsc --incremental` then matched source against it and
+      // emitted nothing for the files it believed current. Measured: edit,
+      // build, revert (hit), edit again (miss) left the edit out of `dist/`.
+      "outputs": ["dist/**", "*.tsbuildinfo"]
     },
     "lint": {
       // No "dependsOn": ["^build"] — eslint's type-aware rules read each

@@ -101,6 +101,7 @@ A **fixed set**, describing what is true today — closed by intent rather than 
 | [caching.md](./reference/caching.md) | What is cached, keyed how, invalidated by what |
 | [scheduling.md](./reference/scheduling.md) | The nine scheduled jobs — cadence, steps, owner, and how you know one stopped |
 | [erd/](./reference/erd/) | **Generated** — one entity-relationship diagram per service. Never hand-edit |
+| [openapi.json](./reference/openapi.json) | **Generated** — the gateway's OpenAPI document, exported from the built gateway by `npm run openapi:export`; CI fails when it drifts. Never hand-edit |
 
 ## Diagrams
 
@@ -115,7 +116,7 @@ invalidates them:
 | Illustrates a **decision** | Inline in the ADR that owns it | ADRs are append-only, so the diagram freezes with the decision |
 | A **cross-service comparison** | Inline in [sys-flows.md](./reference/sys-flows.md) — as content, never a new page | The edit that changes the prose shows you the diagram |
 | An **end-to-end path** | Inline in its own [reference/flows/](./reference/flows/) document | Split by what invalidates them: an OCR change rewrites one flow and touches no other |
-| **Derivable from source** | Generated: `reference/erd/` today | Regenerating *is* the update |
+| **Derivable from source** | Generated: `reference/erd/` and `reference/openapi.json` | Regenerating *is* the update, and `openapi:check` fails CI until it happens |
 | Per-endpoint, per-function | **Nowhere.** There are hundreds of routes and each hand-written artifact is stale on arrival — Swagger already documents endpoints from the code. A *flow* is the unit instead: many endpoints enter one | — |
 
 **Format is mermaid in markdown, not `.drawio`.** A mermaid change is reviewable

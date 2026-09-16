@@ -1,9 +1,8 @@
 import { NestFactory, Reflector } from '@nestjs/core';
 import { AppModule } from './app.module';
 import {
-  API_VERSIONING,
   apiBasePath,
-  OPS_ROUTES,
+  applyApiRouting,
   resolveGlobalPrefix,
 } from './modules/health/ops-routes';
 import { MetricsServer } from './modules/metrics/metrics.server';
@@ -69,14 +68,14 @@ async function bootstrap() {
   // Tells Nestjs to listen for system shutdown signals (SIGNINT, SIGNTERM, etc.)
   app.enableShutdownHooks();
 
+  // ASK Since `applyApiRouting` has `resolveGlobalPrefix` inside, we can just pass the env value directly?
   // The prefix, then the version — two mechanisms that render `/api/v1/…`.
   // `GLOBAL_PREFIX` never carries the version; the env schema refuses one that
   // does.
   const globalPrefix = resolveGlobalPrefix(
     configService.getOrThrow<string>('GLOBAL_PREFIX'),
   );
-  app.setGlobalPrefix(globalPrefix, { exclude: OPS_ROUTES });
-  app.enableVersioning(API_VERSIONING);
+  applyApiRouting(app, globalPrefix);
 
   // Enable cookie parser (cookieParser is a factory — it must be invoked)
   app.use(cookieParser());
