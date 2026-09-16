@@ -140,6 +140,21 @@ jobs:
       # checkout with the clients present and no `dist`: 3 suites failed, 100
       # passed; with it, 103 suites / 1127 tests green.
       - run: npm run build:libs
+
+      # **The OCR binaries, because two suites here SPAWN them.** `ocr.spec.ts`
+      # rasterises its fixtures with poppler's `pdftoppm` and reads them with
+      # tesseract, and `test/utils/ocr-binaries.ts` skips what it can when they
+      # are absent — a gate that exists so a developer without them sees skips
+      # rather than a red suite, not so CI can go without. Skipped here is
+      # coverage nobody is getting, on the one host that can always have it.
+      #
+      # The same two packages `runtime-ocr` installs, with `apt-get` rather
+      # than `apk` and with English alone: that stage carries all eight
+      # language packs because tenants upload in eight, and no suite OCRs in
+      # anything but English. A suite that does needs its pack added here.
+      - name: OCR binaries
+        run: sudo apt-get update && sudo apt-get install -y poppler-utils tesseract-ocr tesseract-ocr-eng
+
       - run: npm test
 
   # ------------------------------------------------------------------- e2e
@@ -174,6 +189,19 @@ jobs:
       # the count as a floor, where it cannot go stale silently.)
       - name: stack env
         run: cp .env.example .env
+
+      # **The OCR binaries the ingestion pipeline spawns**, the same two the
+      # `unit` job installs — and here they change an ASSERTION, not just a
+      # skip. Test 6a of `ingestion-pipeline.e2e-spec.ts` uploads a PDF that
+      # OCRs to nothing and asserts the failure names LANGUAGE as the cause,
+      # which is the advice the uploader can act on. Without tesseract the
+      # pipeline takes its other arm — `OcrUnavailable`, "OCR is not available
+      # on this deployment" — a correct message for a DIFFERENT fault, and one
+      # the processor picks deliberately so a deployment problem is never
+      # reported to a tenant as their file's problem. The test then fails on
+      # the shape of the runner rather than on the code.
+      - name: OCR binaries
+        run: sudo apt-get update && sudo apt-get install -y poppler-utils tesseract-ocr tesseract-ocr-eng
 
       # `--wait` waits only for services that DECLARE a healthcheck. All eight
       # in the DEFAULT set do — the `observability` profile's Prometheus is not

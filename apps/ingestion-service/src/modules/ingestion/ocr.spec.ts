@@ -13,6 +13,7 @@ import {
   HAS_TESSERACT,
   OCR_SKIP_REASON,
   describeWithOcr,
+  itWithPoppler,
 } from '../../../test/utils/ocr-binaries';
 
 /**
@@ -130,30 +131,43 @@ describe('Scanned PDFs', () => {
 /**
  * The pipeline's own properties.
  *
- * These are SPY-based and run everywhere, which is fortunate: they are the ones
- * guarding cost and the offline property, and a machine without
- * tesseract is exactly where a regression in them would go unnoticed.
+ * These are SPY-based, so no tesseract, and running them everywhere is
+ * fortunate: they are the ones guarding cost and the offline property, and a
+ * machine without tesseract is exactly where a regression in them would go
+ * unnoticed.
+ *
+ * **Three of them still need poppler, for the FIXTURE rather than the code** —
+ * `buildStampedPdf`, `buildMixedPdf` and `buildScannedPdf` rasterise through
+ * `pdftoppm`. Unguarded they failed with `spawnSync pdftoppm ENOENT` on every
+ * host without it, CI included, which is the outcome `ocr-binaries.ts` exists
+ * to prevent and states it prevents. `itWithPoppler` skips those three and
+ * leaves the rest running, because `describe.skip` would take the two that
+ * hold on any machine with them.
  */
 describe('The OCR pipeline', () => {
   const ocr = new OcrService();
 
-  it('1. **a watermark-only text layer is OCR’d, not kept**', async () => {
-    // in the case that motivates the threshold. `trim().length > 0` was
-    // the wrong test: this page has 21 characters of scanner stamp and is an
-    // image. The floor is 32, measured — see `MIN_PAGE_CHARACTERS`.
-    const parser = new DocumentParserService(ocr);
-    const spy = jest.spyOn(ocr, 'recognisePage');
-    spy.mockResolvedValue({ ok: true, text: 'the recognized body text' });
+  itWithPoppler(
+    '1. **a watermark-only text layer is OCR’d, not kept**',
+    async () => {
+      // in the case that motivates the threshold. `trim().length > 0` was
+      // the wrong test: this page has 21 characters of scanner stamp and is an
+      // image. The floor is 32, measured — see `MIN_PAGE_CHARACTERS`.
+      const parser = new DocumentParserService(ocr);
+      const spy = jest.spyOn(ocr, 'recognisePage');
+      spy.mockResolvedValue({ ok: true, text: 'the recognized body text' });
 
-    const stamped = await buildStampedPdf('Scanned by CamScanner');
-    const parsed = await parser.parse(stamped, 'pdf');
+      const stamped = await buildStampedPdf('Scanned by CamScanner');
+      const parsed = await parser.parse(stamped, 'pdf');
 
-    expect(spy).toHaveBeenCalledTimes(1);
-    expect(parsed.pages[0].source).toBe('ocr');
-    expect(parsed.pages[0].markdown).toBe('the recognized body text');
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(parsed.pages[0].source).toBe('ocr');
+      expect(parsed.pages[0].markdown).toBe('the recognized body text');
 
-    spy.mockRestore();
-  }, 120_000);
+      spy.mockRestore();
+    },
+    120_000,
+  );
 
   it('3. **a born-digital PDF invokes no OCR at all**', async () => {
     // OCR on the common path is pure cost, and this is the test
@@ -168,59 +182,72 @@ describe('The OCR pipeline', () => {
     spy.mockRestore();
   }, 60_000);
 
-  it('2. **a page that times out fails that PAGE, not the document**', async () => {
-    // The blast radius decision, pinned. One pathological image must not cost
-    // the other 199 pages.
-    const parser = new DocumentParserService(ocr);
-    const spy = jest.spyOn(ocr, 'recognisePage');
-    spy.mockResolvedValue({ ok: false, reason: 'timeout' });
+  itWithPoppler(
+    '2. **a page that times out fails that PAGE, not the document**',
+    async () => {
+      // The blast radius decision, pinned. One pathological image must not cost
+      // the other 199 pages.
+      const parser = new DocumentParserService(ocr);
+      const spy = jest.spyOn(ocr, 'recognisePage');
+      spy.mockResolvedValue({ ok: false, reason: 'timeout' });
 
-    const parsed = await parser.parse(
-      await buildMixedPdf(['Born digital page one', { scanned: 'UNREADABLE' }]),
-      'pdf',
-    );
-
-    // The good page survives, the bad one is RECORDED rather than dropped —
-    // and it carries the reason it was mocked with, not a generic one.
-    expect(parsed.pages.map((page) => page.pageNumber)).toEqual([1]);
-    expect(parsed.failedPages).toEqual([{ pageNumber: 2, reason: 'timeout' }]);
-    expect(parsed.pageCount).toBe(2);
-
-    spy.mockRestore();
-  }, 120_000);
-
-  it('**the tenant’s PDF is never written to disk**', async () => {
-    // The property the offline claim rests on. Both tools take stdin and give
-    // stdout, so nothing lands: "documents never leave the deployment" reads as
-    // an empty promise if the same document is sitting in /tmp while it is read.
-    //
-    // **Asserted against the FILESYSTEM, not against an `fs` spy.** A spy would
-    // only catch this process; `pdftoppm` and `tesseract` are separate
-    // processes that could write their own temp files, and a mock of
-    // `fs.writeFile` would never see them. Pointing TMPDIR at an empty
-    // directory catches every route to disk that respects it — ours and
-    // theirs.
-    const { mkdtemp, readdir, rm } = await import('node:fs/promises');
-    const { tmpdir } = await import('node:os');
-    const { join } = await import('node:path');
-
-    const watched = await mkdtemp(join(tmpdir(), 'ocr-nodisk-'));
-    const previous = process.env.TMPDIR;
-    process.env.TMPDIR = watched;
-
-    try {
-      await new DocumentParserService(ocr).parse(
-        await buildScannedPdf(['SCANNED APPENDIX']),
+      const parsed = await parser.parse(
+        await buildMixedPdf([
+          'Born digital page one',
+          { scanned: 'UNREADABLE' },
+        ]),
         'pdf',
       );
 
-      expect(await readdir(watched)).toEqual([]);
-    } finally {
-      if (previous === undefined) delete process.env.TMPDIR;
-      else process.env.TMPDIR = previous;
-      await rm(watched, { recursive: true, force: true });
-    }
-  }, 120_000);
+      // The good page survives, the bad one is RECORDED rather than dropped —
+      // and it carries the reason it was mocked with, not a generic one.
+      expect(parsed.pages.map((page) => page.pageNumber)).toEqual([1]);
+      expect(parsed.failedPages).toEqual([
+        { pageNumber: 2, reason: 'timeout' },
+      ]);
+      expect(parsed.pageCount).toBe(2);
+
+      spy.mockRestore();
+    },
+    120_000,
+  );
+
+  itWithPoppler(
+    '**the tenant’s PDF is never written to disk**',
+    async () => {
+      // The property the offline claim rests on. Both tools take stdin and give
+      // stdout, so nothing lands: "documents never leave the deployment" reads as
+      // an empty promise if the same document is sitting in /tmp while it is read.
+      //
+      // **Asserted against the FILESYSTEM, not against an `fs` spy.** A spy would
+      // only catch this process; `pdftoppm` and `tesseract` are separate
+      // processes that could write their own temp files, and a mock of
+      // `fs.writeFile` would never see them. Pointing TMPDIR at an empty
+      // directory catches every route to disk that respects it — ours and
+      // theirs.
+      const { mkdtemp, readdir, rm } = await import('node:fs/promises');
+      const { tmpdir } = await import('node:os');
+      const { join } = await import('node:path');
+
+      const watched = await mkdtemp(join(tmpdir(), 'ocr-nodisk-'));
+      const previous = process.env.TMPDIR;
+      process.env.TMPDIR = watched;
+
+      try {
+        await new DocumentParserService(ocr).parse(
+          await buildScannedPdf(['SCANNED APPENDIX']),
+          'pdf',
+        );
+
+        expect(await readdir(watched)).toEqual([]);
+      } finally {
+        if (previous === undefined) delete process.env.TMPDIR;
+        else process.env.TMPDIR = previous;
+        await rm(watched, { recursive: true, force: true });
+      }
+    },
+    120_000,
+  );
 
   it('4. a language code with shell metacharacters is REFUSED, not dropped', () => {
     // `spawn` without a shell is the guarantee; this asserts it rather than
@@ -273,22 +300,35 @@ describe('When the binaries are missing', () => {
     expect(result).toEqual({ ok: false, reason: 'binary_missing' });
   });
 
-  it('and the page is RECORDED as failed rather than dropped', async () => {
-    // Which is what makes the failure visible: the page-count check reports it, and the
-    // Knowledge Manager sees "page 2 could not be indexed" instead of a
-    // document that is quietly one page short.
-    const ocr = new OcrService();
-    jest.spyOn(ocr, 'checkAvailability').mockResolvedValue(false);
+  itWithPoppler(
+    'and the page is RECORDED as failed rather than dropped',
+    async () => {
+      // Which is what makes the failure visible: the page-count check reports it, and the
+      // Knowledge Manager sees "page 2 could not be indexed" instead of a
+      // document that is quietly one page short.
+      //
+      // **Gated on poppler even though it is the missing-binary test**, which
+      // reads backwards until you see which binary is which: availability is
+      // MOCKED false, so tesseract is not needed — but the mixed-page fixture is
+      // rasterised for real, so poppler is. A machine lacking it used to fail
+      // this test with the very error the test is about, one layer down.
+      const ocr = new OcrService();
+      jest.spyOn(ocr, 'checkAvailability').mockResolvedValue(false);
 
-    const parsed = await new DocumentParserService(ocr).parse(
-      await buildMixedPdf(['Born digital page one', { scanned: 'UNREADABLE' }]),
-      'pdf',
-    );
+      const parsed = await new DocumentParserService(ocr).parse(
+        await buildMixedPdf([
+          'Born digital page one',
+          { scanned: 'UNREADABLE' },
+        ]),
+        'pdf',
+      );
 
-    expect(parsed.pages.map((page) => page.pageNumber)).toEqual([1]);
-    expect(parsed.failedPages).toEqual([
-      { pageNumber: 2, reason: 'binary_missing' },
-    ]);
-    expect(parsed.pageCount).toBe(2);
-  }, 120_000);
+      expect(parsed.pages.map((page) => page.pageNumber)).toEqual([1]);
+      expect(parsed.failedPages).toEqual([
+        { pageNumber: 2, reason: 'binary_missing' },
+      ]);
+      expect(parsed.pageCount).toBe(2);
+    },
+    120_000,
+  );
 });

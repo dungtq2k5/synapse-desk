@@ -71,9 +71,10 @@ export async function buildPdf(
  * it back as a full-bleed image. pdfjs then extracts **zero** text items —
  * verified, not assumed.
  *
- * **Requires poppler on the host.** Callers guard with `describeWithPoppler`;
- * this throws rather than returning a broken fixture, because a test that
- * silently received a text page would pass for the wrong reason.
+ * **Requires poppler on the host.** Callers guard with `describeWithPoppler`,
+ * or with `itWithPoppler` when only some tests in a suite build one; this
+ * throws rather than returning a broken fixture, because a test that silently
+ * received a text page would pass for the wrong reason.
  *
  * Rendering DPI is 150, not production's 300: the fixture only has to be
  * legible to tesseract, and halving the bytes speeds every test that builds one.
@@ -101,11 +102,31 @@ export async function buildScannedPdf(
 
     // 2. Rasterised through poppler — stdin to stdout, no temp file, which is
     // the same pipe route production uses.
-    const rendered = execFileSync(
-      'pdftoppm',
-      ['-f', '1', '-l', '1', '-r', '150', '-png', '-'],
-      { input: Buffer.from(await source.save()), maxBuffer: 64 * 1024 * 1024 },
-    );
+    //
+    // **Re-thrown with the remedy rather than the errno.** Bare, an unguarded
+    // caller gets `spawnSync pdftoppm ENOENT` raised three frames inside a
+    // fixture — which names the symptom, on the one machine where the cause is
+    // an absent apt package AND the fix is a gate the test forgot. Four tests
+    // reached CI in exactly that state.
+    let rendered: Buffer;
+    try {
+      rendered = execFileSync(
+        'pdftoppm',
+        ['-f', '1', '-l', '1', '-r', '150', '-png', '-'],
+        {
+          input: Buffer.from(await source.save()),
+          maxBuffer: 64 * 1024 * 1024,
+        },
+      );
+    } catch (cause) {
+      throw new Error(
+        'This fixture rasterises through poppler, which this machine cannot ' +
+          'run: sudo apt-get install -y poppler-utils. If the test should ' +
+          'instead SKIP here, guard it with `itWithPoppler` or ' +
+          '`describeWithPoppler` from `test/utils/ocr-binaries.ts`.',
+        { cause },
+      );
+    }
 
     // 3. Back into a PDF as an image, filling the page.
     const png = await out.embedPng(rendered);

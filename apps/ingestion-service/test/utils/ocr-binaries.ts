@@ -66,3 +66,16 @@ export const describeWithOcr = HAS_OCR_BINARIES
 export const describeWithPoppler = HAS_POPPLER
   ? describe
   : describe.skip.bind(describe);
+
+/**
+ * The per-TEST form, for a suite that is mostly machine-independent.
+ *
+ * `The OCR pipeline` in `ocr.spec.ts` is the case it exists for: those tests
+ * spy `recognisePage` away, so they need no tesseract and the suite is
+ * deliberately not gated on one — but three of them build their fixture with
+ * `buildStampedPdf`/`buildMixedPdf`/`buildScannedPdf`, which shell out to
+ * `pdftoppm`. Gating the whole `describe` would skip the two pure ones
+ * (`languageArgument`, and the shell-metacharacter refusal) that hold on any
+ * machine, and those are the security-shaped ones worth running everywhere.
+ */
+export const itWithPoppler = HAS_POPPLER ? it : it.skip.bind(it);
