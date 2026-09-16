@@ -45,10 +45,10 @@ export function renderEmail(
       return securityAlert(command.data, branding);
     case EmailTemplateName.INBOUND_REJECTED:
       return inboundRejected(command.data, branding);
+    // One layout for both — see `thresholdAlert`.
     case EmailTemplateName.QUOTA_ALERT:
-      return quotaAlert(command.data, branding);
     case EmailTemplateName.LIMIT_ALERT:
-      return limitAlert(command.data, branding);
+      return thresholdAlert(command.data, branding);
     case EmailTemplateName.PAYMENT_FAILED:
       return paymentFailed(command.data, branding);
     case EmailTemplateName.PLAN_CHANGED:
@@ -315,38 +315,23 @@ function inboundRejected(
 }
 
 /**
- * A budget threshold crossing.
+ * A threshold crossing — an AI budget, or a seat, storage or document count.
+ *
+ * **One renderer for both templates, because sameness is the intent.** A tenant
+ * who gets both should not have to learn two layouts for one idea, and the
+ * sentence that matters sits in the same place in each. Written twice, an edit
+ * to one was an edit only one of them got.
  *
  * Deliberately plain — the value is entirely in `detail`, which the producer
  * writes to say what happens at 100% rather than merely which percentage was
  * crossed. Decorating it would bury the one sentence that makes it actionable.
- */
-function quotaAlert(
-  data: Data<EmailTemplateName.QUOTA_ALERT>,
-  branding: TemplateBranding,
-): RenderedEmail {
-  return {
-    subject: `${branding.appName}: ${data.headline}`,
-    html: layout(
-      branding,
-      data.headline,
-      `<p style="margin:0 0 12px;">Hi ${esc(data.fullName)},</p>
-       <p style="margin:0;">${esc(data.detail)}</p>`,
-    ),
-    text: `${data.headline}\n\nHi ${data.fullName},\n\n${data.detail}`,
-  };
-}
-
-// ASK Why don't we just call `quotaAlert` inside since the logic is the same?
-/**
- * A seat, storage or document-count threshold crossing.
+ * What each `detail` should say is on the contract, per template.
  *
- * Deliberately the same shape as {@link quotaAlert}: a tenant who gets both
- * should not have to learn two layouts for one idea, and the sentence that
- * matters — what is refused at 100% — sits in the same place in each.
+ * Takes the fields rather than the command, so the day one of them grows a
+ * field of its own this becomes two functions with a visible diff.
  */
-function limitAlert(
-  data: Data<EmailTemplateName.LIMIT_ALERT>,
+function thresholdAlert(
+  data: Data<EmailTemplateName.QUOTA_ALERT | EmailTemplateName.LIMIT_ALERT>,
   branding: TemplateBranding,
 ): RenderedEmail {
   return {

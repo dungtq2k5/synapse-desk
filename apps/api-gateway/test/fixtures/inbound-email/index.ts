@@ -92,8 +92,7 @@ export function resendDelivery(fields: InboundFixtureFields): {
       ? { References: fields.references.join(' ') }
       : {}),
     ...(fields.date ? { Date: fields.date } : {}),
-    // FIXME The empty object is useless.
-    ...(fields.headers ?? {}),
+    ...fields.headers,
   };
   // A name in `droppedAttachments` becomes an attachment of a type outside the
   // allowlist, so the mapper drops it by name exactly as the fixture says.

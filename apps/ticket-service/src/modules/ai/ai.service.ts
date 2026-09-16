@@ -392,8 +392,8 @@ export class AiService {
     });
 
     // Back to reading order: the tail, but oldest-first within it.
-    // FIXME Move this array "reverse" operation to a separate statement or replace it with "toReversed".
-    return messages.reverse().map((message) => ({
+    messages.reverse();
+    return messages.map((message) => ({
       role: message.isAiGenerated || !message.senderId ? 'assistant' : 'user',
       content: message.content,
     }));

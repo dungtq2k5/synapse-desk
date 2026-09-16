@@ -68,7 +68,6 @@ async function bootstrap() {
   // Tells Nestjs to listen for system shutdown signals (SIGNINT, SIGNTERM, etc.)
   app.enableShutdownHooks();
 
-  // ASK Since `applyApiRouting` has `resolveGlobalPrefix` inside, we can just pass the env value directly?
   // The prefix, then the version — two mechanisms that render `/api/v1/…`.
   // `GLOBAL_PREFIX` never carries the version; the env schema refuses one that
   // does.
