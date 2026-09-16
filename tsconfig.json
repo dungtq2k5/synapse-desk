@@ -30,6 +30,29 @@
   "exclude": ["node_modules", "dist", "test/system/jest*.config.ts"],
   "compilerOptions": {
     "module": "commonjs",
+
+    // **Set for the SWC builds, and it is also what keeps `npm test` inside
+    // its heap.** Every service compiles with SWC, which transpiles file by
+    // file and can never see another file's types; this flag is TypeScript
+    // checking that the source is safe to compile that way. It was already
+    // satisfied when it was turned on — zero errors.
+    //
+    // The second effect is the load-bearing one. Given it, ts-jest transpiles
+    // instead of constructing a LanguageService program per suite, and
+    // `npm test` runs every project in ONE process (`--runInBand`), so
+    // that program state accumulated across 103 suites against V8's default
+    // ~4.3 GB cap. The run had been living just under it for some time and
+    // OOM'd the moment ten more tests started running in CI — "Ineffective
+    // mark-compacts near heap limit", after 70 seconds of GC thrash. Measured
+    // over the same 1127 tests: 4.68 GB peak / 35 s before, 1.74 GB / 29 s
+    // after.
+    //
+    // **No type coverage is lost, because jest was never the typechecker that
+    // counts.** THIS file is (`npm run typecheck`, the `static` job), and its
+    // `include` above covers `apps/*/test/**/*` as well as every source
+    // directory — which is the property `typecheck-coverage.spec.ts` exists to
+    // keep true. One `api-gateway` exception, argued in its own tsconfig.
+    "isolatedModules": true,
     "declaration": true,
     // Emits `.d.ts.map` beside every `.d.ts`. A library clears `paths` (see
     // `libs/*/tsconfig.json`), so an editor resolving `@synapsedesk/common` from

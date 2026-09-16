@@ -13,6 +13,7 @@
     "@apollo/server": "^5.5.1"
   },
   "scripts": {
+    "//test": "ONE process for every project in `--projects`, which is what `--runInBand` means here and why the heap is a shared budget rather than a per-suite one. It stays in-band because `test/system/jest.unit.config.ts` is in the list: `stack.spec.ts` spawns a service and asserts a timeout path, the CPU-contention flake ci.yml's e2e header documents as known gap #13, and `test:all` already exists as the parallel variant without it. What makes one heap affordable is `isolatedModules` in tsconfig.json — see the comment there for the measurement. A future OOM here is that flag being removed, not this line being wrong.",
     "test": "jest --projects apps/*/jest.config.ts libs/*/jest.config.ts scripts/jest.config.ts test/system/jest.unit.config.ts --passWithNoTests --runInBand",
     "test:all": "jest --projects apps/*/jest.config.ts libs/*/jest.config.ts scripts/jest.config.ts --passWithNoTests",
     "setup:py": "cd apps/rag-service && python3 -m venv .venv && .venv/bin/pip install -q -r requirements.txt -r requirements-dev.txt",

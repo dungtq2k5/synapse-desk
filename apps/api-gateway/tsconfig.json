@@ -1,6 +1,18 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
+    // **The one project that still needs ts-jest to build a program.**
+    // `jest.swagger-transform.cjs` runs @nestjs/swagger's CLI plugin, which
+    // takes a `program` and refuses without one, naming the cause itself: "The
+    // 'program' reference must be provided when using the CLI Plugin. This
+    // error is likely caused by the 'isolatedModules' compiler option being set
+    // to 'true'." Measured: all 25 suites in this project fail to run.
+    //
+    // It does not weaken the flag for this service's CODE. `npm run typecheck`
+    // compiles `apps/*/src` and `apps/*/test` through the ROOT tsconfig, where
+    // it stays `true`, so the SWC-safety check still covers every file here.
+    // This override reaches only what ts-jest and `nest build` read.
+    "isolatedModules": false,
     "outDir": "./dist"
   },
   "include": ["src/**/*", "test/**/*"],
