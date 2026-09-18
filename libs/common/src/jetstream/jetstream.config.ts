@@ -34,11 +34,16 @@ export const JETSTREAM_STREAMS = {
   },
   NOTIFICATIONS: {
     name: 'NOTIFICATIONS',
-    // `notification.>` rather than three literals: the in-app subject is
-    // `notification.in_app.create` and the two transactional ones are
-    // `notification.{email,sms}.send`, so one wildcard covers the family and a
-    // fourth channel needs no stream change.
-    subjects: ['notification.>'],
+    // The durable subjects themselves, never `notification.>`: a prefix also
+    // captures the CORE events that share it (`notification.created`, …), and
+    // a WorkQueue with no consumer for them keeps them forever. A fourth
+    // channel adds its constant here and to `DURABLE_SUBJECTS`; the spec fails
+    // if either is missing.
+    subjects: [
+      NOTIFICATION_PATTERNS.sendEmail,
+      NOTIFICATION_PATTERNS.sendSms,
+      IN_APP_NOTIFICATION_PATTERN,
+    ],
     workQueue: true,
   },
   /**
@@ -50,11 +55,12 @@ export const JETSTREAM_STREAMS = {
    * says it is waiting to be worked. Limits retention says what is true — these
    * are kept to be looked at, and age out.
    *
-   * **`dlq.` is a PREFIX rather than a `.dlq` suffix**, and that is not a style
-   * choice. `notification.email.send.dlq` falls under `notification.>`, so the
-   * suffix form overlaps the NOTIFICATIONS stream — which NATS rejects outright,
-   * failing the declaration at boot. The prefix keeps every parked message in
-   * one stream that overlaps nothing.
+   * **`dlq.` is a PREFIX rather than a `.dlq` suffix.** A suffix puts a parked
+   * subject inside its origin's namespace, so any stream that ever captures that
+   * namespace with a wildcard overlaps the DLQ — and NATS rejects overlapping
+   * streams outright, failing the declaration at boot. The prefix keeps every
+   * parked message in one stream that overlaps nothing, whatever the other
+   * streams declare.
    */
   DLQ: {
     name: 'DLQ',
@@ -154,9 +160,12 @@ export function nakDelayMs(
  * Whether a stream's subject declaration captures a concrete subject.
  *
  * `>` is NATS's multi-token wildcard and is only legal as the LAST token, so
- * matching it is a prefix test rather than a general glob.
+ * matching it is a prefix test rather than a general glob. The single-token `*`
+ * is NOT handled; no stream declares one, and the spec fails if one does.
+ *
+ * @example captures('notification.>', 'notification.created') // true
  */
-function captures(pattern: string, subject: string): boolean {
+export function captures(pattern: string, subject: string): boolean {
   return pattern.endsWith('.>')
     ? subject.startsWith(pattern.slice(0, -1))
     : pattern === subject;
@@ -165,7 +174,7 @@ function captures(pattern: string, subject: string): boolean {
 /**
  * Which stream carries a durable subject.
  *
- * The streams declare PATTERNS (`notification.>`) and {@link DURABLE_SUBJECTS}
+ * The streams declare PATTERNS (`dlq.>`, or literals) and {@link DURABLE_SUBJECTS}
  * lists concrete subjects, so something has to match the two — and having the
  * caller name the stream is what let them drift apart in the first place.
  *

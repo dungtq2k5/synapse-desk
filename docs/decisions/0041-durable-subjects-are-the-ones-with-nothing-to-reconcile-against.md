@@ -1,6 +1,6 @@
 # 0041 — Durable subjects are the ones with nothing to reconcile against
 
-**Status:** accepted · **Code:** `libs/common/src/configs/jetstream.config.ts`, `libs/common/src/utils/jetstream-bootstrap.ts`, `audit.consumer.ts`, `notifications.controller.ts`
+**Status:** accepted · **Code:** `libs/common/src/jetstream/jetstream.config.ts`, `libs/common/src/jetstream/jetstream-bootstrap.ts`, `audit.consumer.ts`, `notifications.controller.ts`
 
 ## Decision
 
@@ -9,9 +9,9 @@ Four subjects move to JetStream with durable pull consumers, explicit acks, `Max
 | Stream | Subjects | Consumer |
 | :--- | :--- | :--- |
 | `AUDIT` | `audit.record` | ticket-service |
-| `NOTIFICATIONS` | `notification.>` | notification-service |
+| `NOTIFICATIONS` | `notification.email.send`, `notification.sms.send`, `notification.in_app.create` | notification-service |
 
-Everything else stays on core NATS at-most-once. The core transport is untouched and still serves `ticket.*`, `document.*` and `storage.object.superseded`.
+Everything else stays on core NATS at-most-once. The core transport is untouched and still serves `ticket.*`, `document.*`, `storage.object.superseded`, `billing.entitlements_changed`, `email.inbound_rejected` and the realtime `notification.created` / `.updated` / `.read`.
 
 ## Why
 
@@ -37,9 +37,10 @@ The subjects staying on core each have a specific reason, not an absence of one:
 - **`notification.email.send` and `.sms.send` ship at-least-once with no dedupe, deliberately.** They are the transactional paths and have no `notifications` row to key on. The trade is lopsided: a password reset that never arrives locks a user out with no recovery path, while one that arrives twice carries the same token and is a nuisance. If a specific template cannot tolerate a duplicate, the cheap answer is a Redis `SET NX` on the command id at the top of the handler, not a table — `InboundAutoReply` is the precedent for adding a record only where the template demands it.
 - **Publish dedupe and consumer idempotency are different mechanisms for different failures.** `Nats-Msg-Id` inside `duplicate_window` collapses two *publishes* of one act; the unique index absorbs two *deliveries* of one message. Neither substitutes for the other, and a test of one does not cover the other.
 - **These four subjects bypass `@nestjs/microservices`.** Its NATS transport is core-only — a `@EventPattern` handler never receives a JetStream message, which is why the standing TODO asking for an explicit `nak()` could not be done where it was written: there is no message object there to nak. The alternative was owning a custom `Server` transport strategy and its ack semantics forever, to preserve a decorator whose routing, for four subjects, is a `switch`.
+- **A stream's `subjects` are the durable constants themselves, never a prefix wildcard.** `notification.>` was declared so a fourth channel would need no stream change, and it also captured the realtime `notification.created` / `.updated` / `.read`, which are core-published and have no consumer — JetStream stores a core publish to a subject a stream captures, WorkQueue deletes only on ack, and nothing acked them, so every one stayed on disk with no size or age limit. The convenience was the bug. `jetstream.config.spec.ts` now asserts the reverse of "every durable subject is captured": no subject outside `DURABLE_SUBJECTS`, from any exported `*_PATTERN(S)` constant, is captured by a WorkQueue stream. Narrowing an existing broker keeps what it already stored; `npm run nats:reset` clears it.
 - **Two streams rather than one**, because retention and volume differ by an order of magnitude and one stream makes them share limits. A burst of notifications must not age out audit records. `WorkQueue` retention because each subject has exactly one consumer, which is what that mode requires and what makes "delivered and acked" mean "done".
 - **Pull, not push.** A push consumer delivers at the stream's pace, and a slow SMTP call becomes back-pressure the consumer has no way to express.
-- **A poison message is terminated, and terminated messages go somewhere.** JetStream has no built-in dead-letter, so `MaxDeliver` is followed by a republish to a `.dlq` subject before `term()`. This is the ingestion-jobs work and the reconcile sweep arriving from a third direction: a deterministic failure retried forever blocks everything behind it. `MaxDeliver` is the JetStream spelling of the `try`/`catch` the sweep already carries.
+- **A poison message is terminated, and terminated messages go somewhere.** JetStream has no built-in dead-letter, so `MaxDeliver` is followed by a republish to a `dlq.`-prefixed subject, in a `DLQ` stream of its own, before `term()`. This is the ingestion-jobs work and the reconcile sweep arriving from a third direction: a deterministic failure retried forever blocks everything behind it. `MaxDeliver` is the JetStream spelling of the `try`/`catch` the sweep already carries.
 - **A full retry cycle must fit inside `duplicate_window`**, or a message can outlive the window that would recognise it. The first statement of this rule was `AckWait × MaxDeliver`, which described a mechanism the code did not use: with an explicit `nak()` the redeliveries are immediate and the cycle is ~0s. The real pacing is `RETRY_BACKOFF_MS`, and the arithmetic is now asserted in `jetstream.config.spec.ts` rather than written in a comment.
 - **Redelivery is paced by two mechanisms, for two failures.** `nak(ms)` paces a handler that failed and said so; the consumer's `backoff[]` paces one that died without answering. Measured, because the difference is invisible otherwise: `backoff` is accepted into the config and reported by `nats consumer info` while doing nothing to an explicit nak. Configuring only one leaves the other unpaced.
 - **Every `backoff` entry replaces `ack_wait` for its attempt**, so none may be shorter than a handler's slowest legitimate run — a 5s entry redelivers a healthy 20s SMTP send, and that duplicate is a second real email.

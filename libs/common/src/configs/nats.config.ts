@@ -36,18 +36,23 @@ export function createNatsTransport(configService: ConfigService): NatsOptions {
       // NO custom serializer/deserializer. Nest's NATS defaults are already
       // JSON, and they do one thing a hand-rolled pair does not.
       //
-      // `NatsRequestJSONDeserializer` decodes the payload and then asks whether
-      // it carries `pattern`/`data`. If it does — a Nest client published it —
-      // it passes straight through. If it does NOT, it maps the whole payload
-      // onto the SUBJECT as its pattern. That fallback is what lets a raw
-      // `nats.publish('ticket.assigned', json)` from anything at all — a test, a
-      // future Python service, a `nats` CLI probe — reach a Nest
-      // `@EventPattern` handler.
+      // `NatsRequestJSONDeserializer` decodes the payload and asks whether it
+      // is already Nest's `{pattern, data}` record: a top-level `pattern` OR
+      // `data` means yes, and the handler receives its `.data`. Only a payload
+      // with NEITHER is mapped onto the subject and arrives whole. So a raw
+      // `nats.publish` — a test, a Python service, a `nats` CLI probe — reaches
+      // an `@EventPattern` handler intact only for `storage.object.superseded`
+      // and `notification.read`:
       //
-      // The example used to be `audit.record`, which ADR 0041 moved to a
-      // JetStream pull consumer — so it reaches no Nest handler at all now, and
-      // nothing here applies to it. The core subjects this still describes are
-      // `ticket.*`, `document.*` and `storage.object.superseded`.
+      // - a `pattern` tag (`ticket.*`, `document.*`, `billing.*`,
+      //   `email.inbound_rejected`) arrives as `undefined`; the handler
+      //   throws, and the error is logged and the message dropped;
+      // - a `data` field (`notification.created`, `.updated`) arrives as that
+      //   INNER field, the wrong object, with no error at all.
+      //
+      // Anything else publishing those subjects must send
+      // `{"pattern": "<subject>", "data": <event>}`. `nats.config.spec.ts`
+      // runs the real deserializer over each shape.
       //
       // This previously declared a custom pair with `deserialize` nested INSIDE
       // `serializer`, where nothing reads it: the custom deserializer never ran

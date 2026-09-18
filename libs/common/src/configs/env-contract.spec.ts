@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { envDocumentedKeys } from '../testing/env-file';
+import { envDocumentedKeys, parseEnvFile } from '../testing/env-file';
 import { stripComments } from '../testing/strip-comments';
 
 /**
@@ -282,6 +282,140 @@ describe('the environment contract', () => {
           ]);
         }
       }
+    });
+  });
+
+  // ------------------------- values that must be DERIVED from another service
+
+  describe('**cookie lifetimes follow the tokens they carry**', () => {
+    /**
+     * Each gateway cookie against the auth-service lifetime of the token in it.
+     *
+     * The rule is the comment above the values in the gateway's
+     * `.env.example`: access, refresh and 2FA run one second past their token,
+     * device and tenant-selection equal theirs. It was written down and not
+     * checked, and `COOKIE_REFRESH_MAX_AGE` shipped as `10081000` — 2 h 48 min,
+     * against a seven-day refresh token — so an idle user was logged out while
+     * the server still honoured the token.
+     *
+     * Each file is compared with its OWN counterpart (`.env.test` with
+     * `.env.test`), so a test file that shortens a token for suite speed keeps
+     * its rows true without being forced to production values.
+     */
+    const ROWS = [
+      {
+        cookie: 'COOKIE_ACCESS_MAX_AGE',
+        token: 'JWT_ACCESS_EXPIRES_IN',
+        unit: 'duration',
+        plusMs: 1000,
+      },
+      {
+        cookie: 'COOKIE_2FA_MAX_AGE',
+        token: 'JWT_2FA_EXPIRES_IN',
+        unit: 'duration',
+        plusMs: 1000,
+      },
+      {
+        cookie: 'COOKIE_REFRESH_MAX_AGE',
+        token: 'REFRESH_TOKEN_TTL_DAYS',
+        unit: 'days',
+        plusMs: 1000,
+      },
+      {
+        cookie: 'COOKIE_DEVICE_MAX_AGE',
+        token: 'TRUSTED_DEVICE_TTL_DAYS',
+        unit: 'days',
+        plusMs: 0,
+      },
+      {
+        cookie: 'COOKIE_TENANT_SELECTION_MAX_AGE',
+        token: 'JWT_TENANT_SELECTION_EXPIRES_IN',
+        unit: 'duration',
+        plusMs: 0,
+      },
+    ] as const;
+
+    const FILES = ['.env.example', '.env.test'] as const;
+
+    const DURATION_MS = { s: 1000, m: 60_000, h: 3_600_000, d: 86_400_000 };
+    const DAY_MS = DURATION_MS.d;
+
+    /**
+     * A token lifetime in milliseconds — `15m`, `1h`, `7d`, and nothing else.
+     *
+     * **Throws on any other form** rather than returning `undefined`.
+     * jsonwebtoken also accepts `7 days` and bare numbers; a parser that
+     * skipped those would drop the row they appear in and still pass.
+     */
+    const lifetimeMs = (value: string, unit: 'duration' | 'days'): number => {
+      const match =
+        unit === 'days' ? /^(\d+)$/.exec(value) : /^(\d+)([smhd])$/.exec(value);
+
+      if (!match) {
+        throw new Error(`Unrecognised ${unit} '${value}' — extend the parser`);
+      }
+
+      return unit === 'days'
+        ? Number(match[1]) * DAY_MS
+        : Number(match[1]) * DURATION_MS[match[2] as keyof typeof DURATION_MS];
+    };
+
+    const envOf = (service: string, file: string): Record<string, string> =>
+      parseEnvFile(
+        readFileSync(join(REPO_ROOT, 'apps', service, file), 'utf8'),
+      );
+
+    it.each(FILES)(
+      '**%s: every cookie outlives or equals its token by the rule**',
+      (file) => {
+        const gateway = envOf('api-gateway', file);
+        const auth = envOf('auth-service', file);
+
+        const wrong = ROWS.flatMap(({ cookie, token, unit, plusMs }) => {
+          const expected = lifetimeMs(auth[token], unit) + plusMs;
+          const actual = Number(gateway[cookie]);
+
+          return actual === expected
+            ? []
+            : [
+                `${cookie} = ${gateway[cookie]}, expected ${expected} (${token} = ${auth[token]})`,
+              ];
+        });
+
+        expect(wrong).toEqual([]);
+      },
+    );
+
+    it('**…and all ten lookups find a value** — the pattern-fires floor', () => {
+      // A renamed key would make its row compare two absences.
+      // `Number(undefined)` is `NaN` and fails the comparison today, but only
+      // by accident of arithmetic; this states it.
+      for (const file of FILES) {
+        const gateway = envOf('api-gateway', file);
+        const auth = envOf('auth-service', file);
+
+        for (const { cookie, token } of ROWS) {
+          expect([file, cookie, gateway[cookie]]).not.toEqual([
+            file,
+            cookie,
+            undefined,
+          ]);
+          expect([file, token, auth[token]]).not.toEqual([
+            file,
+            token,
+            undefined,
+          ]);
+        }
+      }
+    });
+
+    it('the lifetime parser reads the forms in use and refuses the rest', () => {
+      expect(lifetimeMs('15m', 'duration')).toBe(900_000);
+      expect(lifetimeMs('1h', 'duration')).toBe(3_600_000);
+      expect(lifetimeMs('7', 'days')).toBe(604_800_000);
+      expect(() => lifetimeMs('7 days', 'duration')).toThrow(/unrecognised/i);
+      expect(() => lifetimeMs('900', 'duration')).toThrow(/unrecognised/i);
+      expect(() => lifetimeMs('7d', 'days')).toThrow(/unrecognised/i);
     });
   });
 });

@@ -168,7 +168,9 @@ export async function bootstrapRealtimeTest(
    * already an envelope by asking whether it has `pattern` or `data`. A raw
    * publish of a `TicketDomainEvent` therefore looks like an envelope, Nest
    * extracts its (absent) `.data`, and the handler receives `undefined` —
-   * silently, because a NATS handler that throws is logged and dropped.
+   * silently, because a NATS handler that throws is logged and dropped. A
+   * payload with its own `data` field (`NotificationRealtimePayload`) is worse:
+   * the handler receives that inner field, and nothing throws at all.
    *
    * ticket-service publishes through a ClientProxy, which nests the event under
    * `data` where it belongs. Publishing the same way here is what makes this

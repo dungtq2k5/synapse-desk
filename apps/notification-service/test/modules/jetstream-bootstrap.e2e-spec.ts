@@ -2,16 +2,22 @@ import {
   connectJetStream,
   ensureStream,
   JETSTREAM_STREAMS,
+  NOTIFICATION_PATTERNS,
+  TICKET_PATTERNS,
 } from '@synapsedesk/common';
-import { TICKET_PATTERNS } from '@synapsedesk/common';
 import type { NatsConnection } from 'nats';
 
 describe('JetStream bootstrap (e2e)', () => {
   let nc: NatsConnection;
-  const monitor = 'http://localhost:8222';
+  // From `.env.test` like every other suite, never a literal: this suite
+  // declares, updates and publishes to real streams, so the broker it reaches
+  // must be the one the environment names.
+  const monitor = process.env.NATS_MONITOR_URL ?? 'http://localhost:8222';
 
   beforeAll(async () => {
-    nc = await connectJetStream('nats://localhost:4222');
+    nc = await connectJetStream(
+      process.env.NATS_URL ?? 'nats://localhost:4222',
+    );
   }, 30_000);
 
   afterAll(async () => {
@@ -55,11 +61,11 @@ describe('JetStream bootstrap (e2e)', () => {
   it('**4. the DLQ stream overlaps neither, and takes Limits retention**', async () => {
     // Both halves are load-bearing and both were wrong in the first draft.
     //
-    // A `.dlq` SUFFIX falls under `notification.>`, and NATS rejects a stream
-    // whose subjects overlap an existing one — so the suffix form fails the
-    // declaration at boot, not at the moment something is parked. And a publish
-    // to a subject no stream captures fails with a 503, so the suffix form
-    // would also have parked nothing even if it had declared.
+    // A `.dlq` SUFFIX puts a parked subject inside its origin's namespace, so
+    // any stream capturing that namespace by wildcard overlaps it — and NATS
+    // rejects overlapping streams, failing the declaration at boot. And a
+    // publish to a subject no stream captures fails with a 503, so a DLQ that
+    // failed to declare would park nothing at all.
     //
     // Limits rather than WorkQueue because NOTHING consumes this stream. A
     // WorkQueue exists to be drained by its one reader; one with no reader holds
@@ -84,7 +90,7 @@ describe('JetStream bootstrap (e2e)', () => {
 
   it('**5. `ticket.*` still round-trips over CORE — the change is additive**', async () => {
     // ADR 0041 moved four subjects and left the rest alone, and "left alone" is
-    // a claim worth a test: `notification.>` and `ticket.*` are consumed by the
+    // a claim worth a test: the notification subjects and `ticket.*` are consumed by the
     // same process, and the durable ones moving out of Nest's transport is
     // exactly the kind of change that takes the core subscription with it.
     //
@@ -95,6 +101,7 @@ describe('JetStream bootstrap (e2e)', () => {
     const received = new Promise<string>((resolve) => {
       const subscription = nc.subscribe(TICKET_PATTERNS.assigned);
       void (async () => {
+        // FIXME Invalid loop. Its body allows only one iteration.
         for await (const message of subscription) {
           resolve(message.string());
           break;
@@ -122,10 +129,10 @@ describe('JetStream bootstrap (e2e)', () => {
     // Found by sabotage — shrinking the dedupe window made every audit test
     // fail with an error naming neither the window nor the audit stream.
     //
-    // Provoked here with an OVERLAP, which is the same failure the `.dlq` suffix
-    // design produced: a new stream claiming subjects NOTIFICATIONS already
-    // captures. `add` rejects it by name, and the point is that the rejection
-    // reaches the caller intact.
+    // Provoked here with an OVERLAP, the failure the `.dlq` suffix design once
+    // produced: a new stream claiming a subject NOTIFICATIONS already captures.
+    // `add` rejects it by name, and the point is that the rejection reaches the
+    // caller intact.
     await ensureStream(nc, JETSTREAM_STREAMS.NOTIFICATIONS, monitor);
 
     await expect(
@@ -133,7 +140,7 @@ describe('JetStream bootstrap (e2e)', () => {
         nc,
         {
           name: 'BAD_CONFIG_PROBE',
-          subjects: ['notification.email.send.dlq'],
+          subjects: [NOTIFICATION_PATTERNS.sendEmail],
           workQueue: true,
         } as never,
         monitor,

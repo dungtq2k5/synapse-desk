@@ -164,12 +164,12 @@ describe('The journey', () => {
     //
     // **Retried on a FRESH ticket, and the reason is a finding.**
     // `ticket.assigned` is a CORE NATS subject — the JetStream streams carry
-    // `audit.record` and `notification.>`, not ticket events — so it has no
-    // persistence: an event published before the subscriber attaches is gone,
-    // not queued. And `grpc.health.v1` reports SERVING as soon as the gRPC
-    // server answers, which is earlier than the NATS subscription. Measured:
-    // the same journey passed one run and timed out the next with no code
-    // change between them.
+    // `audit.record` and the three notification commands, not ticket events —
+    // so it has no persistence: an event published before the subscriber
+    // attaches is gone, not queued. And `grpc.health.v1` reports SERVING as
+    // soon as the gRPC server answers, which is earlier than the NATS
+    // subscription. Measured: the same journey passed one run and timed out
+    // the next with no code change between them.
     //
     // A retry is the honest fix at this layer. A `sleep` would be a guess, and
     // re-assigning the SAME ticket is refused with `ALREADY_EXISTS` — by
@@ -228,6 +228,28 @@ describe('The journey', () => {
 
   // ------------------------------------------------------------------ 7
 
+  /**
+   * Polls until `produce` returns something, then returns it.
+   *
+   * **A deadline, never a sleep.** A fixed wait is either too short on a busy
+   * laptop running seven node processes or too slow every other time, and its
+   * failure says nothing. This one reports what it was waiting for.
+   */
+  async function waitFor<T>( // NOSONAR
+    produce: () => Promise<T | null>,
+    onTimeout: () => string,
+  ): Promise<T> {
+    const deadline = Date.now() + CROSS_SERVICE_TIMEOUT_MS;
+
+    for (;;) {
+      const value = await produce();
+      if (value !== null) return value;
+      if (Date.now() > deadline) throw new Error(onTimeout());
+
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+  }
+
   it('7. **the ASSIGNEE reads it in their feed** — gateway to notification', async () => {
     // The far end of step 6, read back through the gateway by the person it was
     // written for. Step 6 proves the row exists; this proves it is reachable —
@@ -267,26 +289,4 @@ describe('The journey', () => {
 
     expect(count.count).toBeGreaterThan(0);
   });
-
-  /**
-   * Polls until `produce` returns something, then returns it.
-   *
-   * **A deadline, never a sleep.** A fixed wait is either too short on a busy
-   * laptop running seven node processes or too slow every other time, and its
-   * failure says nothing. This one reports what it was waiting for.
-   */
-  async function waitFor<T>(
-    produce: () => Promise<T | null>,
-    onTimeout: () => string,
-  ): Promise<T> {
-    const deadline = Date.now() + CROSS_SERVICE_TIMEOUT_MS;
-
-    for (;;) {
-      const value = await produce();
-      if (value !== null) return value;
-      if (Date.now() > deadline) throw new Error(onTimeout());
-
-      await new Promise((resolve) => setTimeout(resolve, 250));
-    }
-  }
 });

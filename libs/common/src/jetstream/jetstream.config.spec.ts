@@ -3,12 +3,15 @@ import {
   DUPLICATE_WINDOW_MS,
   MAX_DELIVER,
   RETRY_BACKOFF_MS,
+  captures,
   dlqSubject,
   nakDelayMs,
   streamFor,
   DURABLE_SUBJECTS,
   JETSTREAM_STREAMS,
 } from './jetstream.config';
+import type { JetStreamStream } from './jetstream.config';
+import * as common from '../main';
 
 /**
  * The retry constants, and the relationships between them.
@@ -85,17 +88,29 @@ describe('JetStream retry constants (unit)', () => {
   });
 
   it('**5. no DLQ subject falls inside a stream that already captures it**', () => {
-    // The bug the build hit: `notification.email.send.dlq` falls under
-    // `notification.>`, and NATS refuses a stream whose subjects overlap an
-    // existing one — so the suffix form failed at DECLARATION, not at the moment
-    // something was parked.
-    const parked = dlqSubject('notification.email.send');
-    const captured = JETSTREAM_STREAMS.NOTIFICATIONS.subjects.some((subject) =>
-      parked.startsWith(subject.replace(/\.>$/u, '.')),
-    );
+    // NATS refuses a stream whose subjects overlap an existing one, so a parked
+    // subject inside a WorkQueue stream fails at DECLARATION, not at the moment
+    // something is parked. The build hit it once, with a `.dlq` suffix under
+    // the old `notification.>` wildcard.
+    //
+    // Two rows, two breaks. A `.dlq` suffix fails the PREFIX row only: against
+    // literal stream subjects it overlaps nothing. Returning the subject
+    // unprefixed is what fails the OVERLAP row.
+    const streams: readonly JetStreamStream[] =
+      Object.values(JETSTREAM_STREAMS);
 
-    expect(captured).toBe(false);
-    expect(parked.startsWith('dlq.')).toBe(true);
+    for (const subject of DURABLE_SUBJECTS) {
+      const parked = dlqSubject(subject);
+      const inside = streams
+        .filter((stream) => stream.workQueue)
+        .filter((stream) =>
+          stream.subjects.some((pattern) => captures(pattern, parked)),
+        )
+        .map((stream) => `${parked} in ${stream.name}`);
+
+      expect(inside).toEqual([]);
+      expect(parked.startsWith('dlq.')).toBe(true);
+    }
   });
 
   it('**6. every DURABLE subject is captured by exactly one WorkQueue stream**', () => {
@@ -124,5 +139,89 @@ describe('JetStream retry constants (unit)', () => {
     // `dlq.>` would match a parked subject, and returning it would point a
     // runner at the stream that exists precisely because it has no reader.
     expect(() => streamFor(dlqSubject('audit.record'))).toThrow();
+  });
+
+  describe('**7. no subject outside DURABLE_SUBJECTS is captured by a WorkQueue stream**', () => {
+    // Test 6 runs from the registry toward the streams; this runs the other
+    // way, and the other way is the bug it was written for: `notification.>`
+    // captured `notification.{created,updated,read}` — core events for the
+    // gateway — into a WorkQueue with no consumer for them, forever.
+
+    /**
+     * Exports named like subjects that are not subjects. Named, the
+     * `BUILD_INJECTED` shape, so a hole in the filter cannot pass for one.
+     */
+    const NOT_SUBJECTS: ReadonlySet<string> = new Set([
+      'ORGANIZATION_SLUG_PATTERN',
+    ]);
+
+    /** Every subject the contracts export, from the barrel rather than a list. */
+    const families = Object.entries(common).filter(
+      ([name]) => /_PATTERNS?$/u.test(name) && !NOT_SUBJECTS.has(name),
+    );
+    const subjects = families.flatMap(([, value]) =>
+      typeof value === 'string'
+        ? [value]
+        : Object.values(value as Record<string, unknown>).filter(
+            (member): member is string => typeof member === 'string',
+          ),
+    );
+
+    const workQueues: readonly JetStreamStream[] = Object.values(
+      JETSTREAM_STREAMS,
+    ).filter((stream: JetStreamStream) => stream.workQueue);
+
+    it('captures exactly the durable subjects, and nothing else', () => {
+      const durable: ReadonlySet<string> = new Set(DURABLE_SUBJECTS);
+      const strays = subjects.flatMap((subject) =>
+        workQueues
+          .filter((stream) =>
+            stream.subjects.some((pattern) => captures(pattern, subject)),
+          )
+          .filter(() => !durable.has(subject))
+          .map((stream) => `${subject} captured by ${stream.name}`),
+      );
+
+      expect(strays).toEqual([]);
+    });
+
+    it('the corpus floor — every contract family is found', () => {
+      expect(families.map(([name]) => name).sort()).toEqual(
+        expect.arrayContaining([
+          'AUDIT_PATTERNS',
+          'BILLING_PATTERNS',
+          'DOCUMENT_PATTERNS',
+          'EMAIL_INBOUND_PATTERNS',
+          'IN_APP_NOTIFICATION_PATTERN',
+          'NOTIFICATION_PATTERNS',
+          'NOTIFICATION_REALTIME_PATTERNS',
+          'STORAGE_PATTERNS',
+          'TICKET_PATTERNS',
+        ]),
+      );
+      expect(subjects).toEqual(
+        expect.arrayContaining([
+          'notification.created',
+          'notification.in_app.create',
+          'ticket.assigned',
+        ]),
+      );
+    });
+
+    it('the pattern fires — `captures` can see a wildcard capture at all', () => {
+      expect(captures('notification.>', 'notification.created')).toBe(true);
+      expect(captures('notification.email.send', 'notification.created')).toBe(
+        false,
+      );
+    });
+
+    it('no stream declares `*`, which `captures` cannot match', () => {
+      const starred = Object.values(JETSTREAM_STREAMS).flatMap(
+        (stream: JetStreamStream) =>
+          stream.subjects.filter((pattern) => pattern.split('.').includes('*')),
+      );
+
+      expect(starred).toEqual([]);
+    });
   });
 });
