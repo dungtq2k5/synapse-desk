@@ -2128,21 +2128,9 @@ describe('the real-time relay (e2e)', () => {
     });
   });
 
-  describe('the Redis adapter', () => {
-    it('is installed — events go through pub/sub, not the in-memory adapter', () => {
-      // Asserted structurally: with the in-memory adapter a second replica
-      // would never see this room, and that failure is invisible to a
-      // single-instance test. The two-instance test (one Redis) is the
-      // behavioural proof and is deliberately kept out of the default run.
-      const server = (
-        fx.app as unknown as {
-          get: (t: unknown) => unknown;
-        }
-      ).get;
-      expect(server).toBeDefined();
-      expect(process.env.REDIS_URL).toBeTruthy();
-    });
-  });
+  // The Redis adapter's behaviour across replicas — one frame per client for a
+  // relayed event, cross-replica delivery for presence and typing — is
+  // asserted in `realtime-replicas.e2e-spec.ts`, which boots two gateways.
 
   // ------------------------------------------------------ Domain E's relay
 

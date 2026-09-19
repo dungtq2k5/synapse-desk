@@ -44,7 +44,7 @@ export class TicketEventsConsumer {
       // Tenant-wide: a new ticket appearing in the queue is what an agent's
       // dashboard is watching for, and nobody has joined its ticket room yet.
       this.gateway
-        .toRoom(orgRoom(event.organizationId))
+        .relayToRoom(orgRoom(event.organizationId))
         .emit(REALTIME_EVENTS.ticketCreated, event);
     });
   }
@@ -55,7 +55,7 @@ export class TicketEventsConsumer {
   ): void {
     this.relay(event.pattern, () => {
       this.gateway
-        .toRoom(ticketRoom(event.ticketId))
+        .relayToRoom(ticketRoom(event.ticketId))
         .emit(REALTIME_EVENTS.ticketUpdated, event);
 
       // Personal, and separate from the ticket room: the new assignee has
@@ -63,7 +63,7 @@ export class TicketEventsConsumer {
       // find out it exists — so the ticket room alone would reach everyone
       // except the one person who needs to act.
       this.gateway
-        .toRoom(userRoom(event.assignedToId))
+        .relayToRoom(userRoom(event.assignedToId))
         .emit(REALTIME_EVENTS.ticketAssigned, event);
     });
   }
@@ -74,10 +74,10 @@ export class TicketEventsConsumer {
   ): void {
     this.relay(event.pattern, () => {
       this.gateway
-        .toRoom(ticketRoom(event.ticketId))
+        .relayToRoom(ticketRoom(event.ticketId))
         .emit(REALTIME_EVENTS.ticketUpdated, event);
       this.gateway
-        .toRoom(userRoom(event.toAssigneeId))
+        .relayToRoom(userRoom(event.toAssigneeId))
         .emit(REALTIME_EVENTS.ticketAssigned, event);
 
       // The PREVIOUS assignee is told too, and told through `ticket:updated`
@@ -86,7 +86,7 @@ export class TicketEventsConsumer {
       // would put it back on their list.
       if (event.fromAssigneeId) {
         this.gateway
-          .toRoom(userRoom(event.fromAssigneeId))
+          .relayToRoom(userRoom(event.fromAssigneeId))
           .emit(REALTIME_EVENTS.ticketUpdated, event);
       }
     });
@@ -98,10 +98,10 @@ export class TicketEventsConsumer {
   ): void {
     this.relay(event.pattern, () => {
       this.gateway
-        .toRoom(ticketRoom(event.ticketId))
+        .relayToRoom(ticketRoom(event.ticketId))
         .emit(REALTIME_EVENTS.ticketUpdated, event);
       this.gateway
-        .toRoom(userRoom(event.previousAssigneeId))
+        .relayToRoom(userRoom(event.previousAssigneeId))
         .emit(REALTIME_EVENTS.ticketUpdated, event);
     });
   }
@@ -112,7 +112,7 @@ export class TicketEventsConsumer {
   ): void {
     this.relay(event.pattern, () => {
       this.gateway
-        .toRoom(ticketRoom(event.ticketId))
+        .relayToRoom(ticketRoom(event.ticketId))
         .emit(REALTIME_EVENTS.ticketUpdated, event);
     });
   }
@@ -123,12 +123,12 @@ export class TicketEventsConsumer {
   ): void {
     this.relay(event.pattern, () => {
       this.gateway
-        .toRoom(ticketRoom(event.ticketId))
+        .relayToRoom(ticketRoom(event.ticketId))
         .emit(REALTIME_EVENTS.ticketUpdated, event);
       // Also tenant-wide: an escalation is a queue event that a tier-2 agent
       // watching the dashboard must see without having opened the ticket.
       this.gateway
-        .toRoom(orgRoom(event.organizationId))
+        .relayToRoom(orgRoom(event.organizationId))
         .emit(REALTIME_EVENTS.ticketUpdated, event);
     });
   }
@@ -151,7 +151,7 @@ export class TicketEventsConsumer {
       // customer with the page open saw the agent-only note appear, and the
       // same customer after a refresh did not.
       this.gateway
-        .toRoom(this.messageRoom(event.ticketId, event.isInternalNote))
+        .relayToRoom(this.messageRoom(event.ticketId, event.isInternalNote))
         .emit(REALTIME_EVENTS.messageNew, event);
     });
   }
@@ -170,7 +170,7 @@ export class TicketEventsConsumer {
   ): void {
     this.relay(event.pattern, () => {
       this.gateway
-        .toRoom(this.messageRoom(event.ticketId, event.isInternalNote))
+        .relayToRoom(this.messageRoom(event.ticketId, event.isInternalNote))
         .emit(REALTIME_EVENTS.messageUpdated, event);
     });
   }
@@ -190,7 +190,7 @@ export class TicketEventsConsumer {
   ): void {
     this.relay(event.pattern, () => {
       this.gateway
-        .toRoom(this.messageRoom(event.ticketId, event.isInternalNote))
+        .relayToRoom(this.messageRoom(event.ticketId, event.isInternalNote))
         .emit(REALTIME_EVENTS.messageDeleted, event);
     });
   }

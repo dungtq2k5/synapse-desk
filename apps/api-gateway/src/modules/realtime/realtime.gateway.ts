@@ -397,6 +397,8 @@ export class RealtimeGateway
    *
    *   - **`client.to(room)`, not `server.to(room)`** — the sender is excluded.
    *     Echoing a user's own typing back is a frame that can only cause a bug.
+   *     Cluster-wide, like {@link broadcastToRoom}: the others in the room may
+   *     be on another replica.
    *   - **Throttled to one relay per {@link TYPING_RELAY_INTERVAL_MS} per
    *     (socket, ticket), and dropped SILENTLY.** A refusal would be noise for
    *     something nobody asked to be told about.
@@ -665,11 +667,14 @@ export class RealtimeGateway
     userId: string,
     state: PresenceState,
   ): void {
-    this.toRoom(orgRoom(organizationId)).emit(REALTIME_EVENTS.presence, {
-      success: true,
-      message: 'Presence changed',
-      data: { userId, state },
-    } satisfies WsResponse<PresencePayloadDto>);
+    this.broadcastToRoom(orgRoom(organizationId)).emit(
+      REALTIME_EVENTS.presence,
+      {
+        success: true,
+        message: 'Presence changed',
+        data: { userId, state },
+      } satisfies WsResponse<PresencePayloadDto>,
+    );
   }
 
   private async sendMessage(
@@ -870,14 +875,44 @@ export class RealtimeGateway
   }
 
   /**
-   * The one way anything else in this process emits.
+   * Emits to one room, on THIS replica's sockets only — for an event that
+   * arrived over NATS.
+   *
+   * One of three ways this process emits to a room, and the rule picks it:
+   *
+   * - **arrived over NATS → `relayToRoom` / {@link relayToRooms}.** Every
+   *   replica receives every NATS event, and every client is connected to
+   *   exactly one replica, so each replica delivering to its own sockets
+   *   delivers each event exactly once. A cluster-wide emit here delivers it
+   *   once per replica.
+   * - **started on this replica, for everyone in a room →
+   *   {@link broadcastToRoom}.** Only this replica has it, so it must cross
+   *   the Redis adapter to reach sockets on the others. Presence.
+   * - **started by one socket, for the others in its room →
+   *   `client.to(room)`.** Cluster-wide like a broadcast, with the sender
+   *   excluded. Typing.
    *
    * Returns the room-scoped emitter rather than the server, so a caller cannot
-   * accidentally broadcast to every connected socket — `server.emit()` is one
-   * missing `.to()` away, and it is not a mistake that shows up in testing
-   * because a single-client test cannot tell the difference.
+   * accidentally emit to every connected socket — `server.emit()` is one
+   * missing `.to()` away, and a single-client test cannot tell the difference.
+   *
+   * @example this.gateway.relayToRoom(orgRoom(event.organizationId)).emit(REALTIME_EVENTS.ticketCreated, event)
    */
-  toRoom(room: RealtimeRoom) {
+  relayToRoom(room: RealtimeRoom) {
+    return this.server.local.to(room);
+  }
+
+  /**
+   * Emits to one room across EVERY replica — for an event that started on this
+   * one.
+   *
+   * The second of the three ways; {@link relayToRoom} states the rule. Used for
+   * an event only this replica knows about, such as a presence change on a
+   * socket connected here. An event that arrived over NATS must not use it:
+   * every replica received that event, so each would broadcast it and every
+   * client would get one frame per replica.
+   */
+  broadcastToRoom(room: RealtimeRoom) {
     return this.server.to(room);
   }
 
@@ -893,16 +928,17 @@ export class RealtimeGateway
   }
 
   /**
-   * ONE emit addressing several rooms.
+   * ONE emit addressing several rooms, on this replica's sockets only — for an
+   * event that arrived over NATS.
    *
-   * Not a convenience wrapper around a loop, and the difference is the whole
-   * reason it exists. Socket.IO deduplicates recipients WITHIN a single emit and
-   * not across separate ones, so a socket in two of these rooms — the uploader
-   * who is also in the document's department, which is the common case —
-   * receives one frame here and two from `rooms.forEach(r => toRoom(r).emit())`.
+   * {@link relayToRoom} with several rooms, and not a convenience wrapper around
+   * a loop. Socket.IO deduplicates recipients WITHIN a single emit and not
+   * across separate ones, so a socket in two of these rooms — the uploader who
+   * is also in the document's department, which is the common case — receives
+   * one frame here and two from `rooms.forEach(r => relayToRoom(r).emit())`.
    * A client rendering one toast per frame renders two.
    */
-  toRooms(rooms: RealtimeRoom[]) {
-    return this.server.to(rooms);
+  relayToRooms(rooms: RealtimeRoom[]) {
+    return this.server.local.to(rooms);
   }
 }

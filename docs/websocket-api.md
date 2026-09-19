@@ -20,6 +20,7 @@ const socket = io(`${API_ORIGIN}/ws`, {
 - **Namespace: `/ws`.** Not the default namespace.
 - **`withCredentials: true` is mandatory.** Without it the browser sends no cookie and the handshake is refused.
 - **`transports: ['websocket']` is mandatory too**, and it is a *deployment* constraint rather than a preference. Socket.IO's default list begins with HTTP long-polling, whose handshake is a sequence of requests that must all reach the **same** gateway replica; the Redis adapter shares broadcasts across replicas, not handshake state. With more than one replica a polling client gets `Session ID unknown` and reconnect-loops. Pin it, in every client.
+- **One frame per event, however many replicas run.** Every replica receives every server event from NATS and relays it to **its own** sockets only; presence and typing, which start on one replica, are the only frames that cross replicas through the Redis adapter. A client that sees a server event twice has found a bug, not a replica — do not de-duplicate it away.
 - The gateway's global prefix does **not** apply to the socket path.
 
 ### CORS

@@ -38,7 +38,7 @@ export class NotificationEventsConsumer {
   notificationCreated(@Payload() payload: NotificationRealtimePayload): void {
     this.relay(NOTIFICATION_REALTIME_PATTERNS.created, () => {
       this.gateway
-        .toRoom(userRoom(payload.recipientId))
+        .relayToRoom(userRoom(payload.recipientId))
         .emit(REALTIME_EVENTS.notificationNew, payload);
     });
   }
@@ -49,7 +49,7 @@ export class NotificationEventsConsumer {
       // A DIFFERENT client event from `new`, so the UI updates the toast it is
       // already showing rather than stacking another.
       this.gateway
-        .toRoom(userRoom(payload.recipientId))
+        .relayToRoom(userRoom(payload.recipientId))
         .emit(REALTIME_EVENTS.notificationUpdated, payload);
     });
   }
@@ -57,7 +57,7 @@ export class NotificationEventsConsumer {
   @EventPattern(NOTIFICATION_REALTIME_PATTERNS.read)
   notificationRead(@Payload() payload: NotificationReadPayload): void {
     this.relay(NOTIFICATION_REALTIME_PATTERNS.read, () => {
-      const room = this.gateway.toRoom(userRoom(payload.recipientId));
+      const room = this.gateway.relayToRoom(userRoom(payload.recipientId));
 
       room.emit(REALTIME_EVENTS.notificationRead, payload);
       // Sent as its own event as well, so a client that only tracks the badge

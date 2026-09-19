@@ -40,11 +40,11 @@ export class DocumentEventsConsumer {
     @Payload() event: DocumentEventOf<typeof DOCUMENT_PATTERNS.indexed>,
   ): void {
     this.relay(event.pattern, () => {
-      // ONE emit over every room — see `toRooms`. A loop here would deliver
+      // ONE emit over every room — see `relayToRooms`. A loop here would deliver
       // twice to the uploader whenever they are also in the document's
       // department, which is the ordinary case rather than an edge one.
       this.gateway
-        .toRooms(this.audience(event))
+        .relayToRooms(this.audience(event))
         .emit(REALTIME_EVENTS.documentIndexed, event);
     });
   }
@@ -65,7 +65,7 @@ export class DocumentEventsConsumer {
   ): void {
     this.relay(event.pattern, () => {
       this.gateway
-        .toRoom(userRoom(event.uploaderId))
+        .relayToRoom(userRoom(event.uploaderId))
         .emit(REALTIME_EVENTS.documentFailed, event);
     });
   }
@@ -74,7 +74,7 @@ export class DocumentEventsConsumer {
    * Who may be told this document exists.
    *
    * A `Set` here only removes duplicate ROOM NAMES; removing duplicate
-   * RECIPIENTS is `toRooms`'s job, because Socket.IO deduplicates within a
+   * RECIPIENTS is `relayToRooms`'s job, because Socket.IO deduplicates within a
    * single emit and not across separate ones. Both are needed and neither
    * substitutes for the other.
    */
