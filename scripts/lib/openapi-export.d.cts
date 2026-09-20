@@ -22,3 +22,5 @@ export declare function firstDifferingLine(
   expected: string,
   actual: string,
 ): number | null;
+
+export declare function openapiViolations(document: unknown): string[];

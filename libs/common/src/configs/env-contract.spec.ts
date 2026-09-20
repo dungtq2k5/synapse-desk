@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { envDocumentedKeys, parseEnvFile } from '../testing/env-file';
 import { stripComments } from '../testing/strip-comments';
+import { withOwnEnvironment } from '../testing/service-workspaces';
 
 /**
  * The environment contract: the schema is the code, `.env.example` is the
@@ -59,9 +60,12 @@ describe('the environment contract', () => {
 
   /** apps/<service> for every workspace under apps/. */
   const services = (): string[] =>
-    gitFiles('apps/*/package.json')
-      .map((file) => file.split('/')[1])
-      .sort();
+    // `withOwnEnvironment` drops `api-gateway-java`, which shares
+    // `api-gateway`'s `.env.example` and ConfigMap rather than owning a
+    // second copy of the same values — see `SHARES_ENVIRONMENT_WITH`.
+    withOwnEnvironment(
+      gitFiles('apps/*/package.json').map((file) => file.split('/')[1]),
+    ).sort();
 
   /** service → its env.validation.ts path, from git rather than a guess. */
   const schemaFiles = (): Map<string, string> => {

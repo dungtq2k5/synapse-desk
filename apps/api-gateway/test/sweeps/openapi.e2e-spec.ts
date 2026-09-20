@@ -99,6 +99,90 @@ describe('The OpenAPI document', () => {
 
   afterAll(() => fx.close());
 
+  describe('Optional means optional, and the document stays valid', () => {
+    /**
+     * Plan 82. One property published three ways wrong at once — invalid,
+     * `string[][]`, and mandatory — because the swagger plugin infers an array
+     * of a union-literal type badly under a bare `@ApiPropertyOptional()`.
+     *
+     * **These rows are not a duplicate of the validator in the export
+     * script.** `required: ["ocrLanguages"]` is perfectly VALID OpenAPI, so no
+     * schema validator can see the third symptom: whether the document agrees
+     * with the code about what is optional is a code-versus-document question,
+     * and only a row that knows the field is optional can ask it.
+     */
+    const schema = (name: string) =>
+      (doc.components?.schemas?.[name] ?? {}) as {
+        required?: string[];
+        properties?: Record<string, Record<string, unknown>>;
+      };
+
+    it.each(['ConfirmDocumentDto', 'ReplaceDocumentDto'])(
+      '**%s.ocrLanguages is a flat array of the enum**, not an array of arrays',
+      (name) => {
+        const property = schema(name).properties?.ocrLanguages;
+
+        expect(property).toMatchObject({
+          type: 'array',
+          items: { type: 'string', enum: expect.any(Array) },
+        });
+        // The shape that shipped: `items` was itself an array, so a generated
+        // client typed the field `string[][]`.
+        expect((property?.items as { type?: string })?.type).not.toBe('array');
+        // And a BOOLEAN `required` inside `items`, which is what made the
+        // whole document invalid — `required` is an array of property names.
+        expect(
+          (property?.items as { required?: unknown })?.required,
+        ).toBeUndefined();
+      },
+    );
+
+    it.each(['ConfirmDocumentDto', 'ReplaceDocumentDto'])(
+      '**%s does not demand `ocrLanguages`** — it is `@IsOptional()` with a default',
+      (name) => {
+        expect(schema(name).required ?? []).not.toContain('ocrLanguages');
+      },
+    );
+
+    it('**a property carrying a `default` is never `required`** — across every schema', () => {
+      // The generalising row, and the rule the codebase already states at
+      // `platform.dto.ts`'s `sortBy`: the plugin derives `required` from
+      // TYPESCRIPT optionality, so a defaulted non-optional field is published
+      // as mandatory and a generated client refuses to omit it. That is what
+      // `CreatePlanDto.isActive` did until plan 82.
+      const findings: string[] = [];
+      const schemas = doc.components?.schemas ?? {};
+
+      for (const [name, value] of Object.entries(schemas)) {
+        const object = value as {
+          required?: string[];
+          properties?: Record<string, Record<string, unknown>>;
+        };
+
+        for (const key of object.required ?? []) {
+          if (object.properties?.[key] && 'default' in object.properties[key]) {
+            findings.push(`${name}.${key}`);
+          }
+        }
+      }
+
+      expect(findings).toEqual([]);
+      // A floor, so a document that stopped parsing cannot report a clean
+      // sweep: these are the schemas the rows above name.
+      expect(Object.keys(schemas).length).toBeGreaterThan(50);
+    });
+
+    // **Validity itself is asserted in the export script, not here.** This
+    // suite cannot reach `scripts/lib/`: `image-contract.spec.ts` refuses a
+    // workspace importing across a workspace boundary, which is why plan 77
+    // moved `canonicalizeEnums` into `@synapsedesk/common` rather than
+    // importing it out of `scripts/`. The validator would have to move too,
+    // and it is a devDependency of the root, used by one script. So
+    // `openapi:check` owns "is this a valid document" and these rows own "does
+    // it agree with the code about what is optional" — which is the half no
+    // validator can see anyway.
+  });
+
   describe('The CLI plugin', () => {
     it('1. **every DTO schema has non-empty `properties`**', () => {
       // Catches a `dtoFileNameSuffix` miss across the whole codebase at once

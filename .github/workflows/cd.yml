@@ -145,10 +145,35 @@ jobs:
             -t "$IMAGE_PREFIX/rag-service:$GITHUB_SHA" .
           docker push "$IMAGE_PREFIX/rag-service:$GITHUB_SHA"
 
+  # api-gateway-java builds from its own Dockerfile too, and for the same
+  # reason rag-service does: a Maven build and a JRE runtime share nothing
+  # with the node stages. The matrix step hardcodes
+  # `-f docker/node-service.Dockerfile`, so a matrix ROW could not express it.
+  build-java-gateway:
+    name: build and push (api-gateway-java)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_DEPLOY_SERVICE_ACCOUNT }}
+      - run: gcloud auth configure-docker "$REGISTRY" --quiet
+      - run: |
+          set -euo pipefail
+          docker build -f docker/java-service.Dockerfile \
+            --build-arg GIT_SHA="$GITHUB_SHA" \
+            --build-arg BUILD_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            -t "$IMAGE_PREFIX/api-gateway-java:$GITHUB_SHA" .
+          docker push "$IMAGE_PREFIX/api-gateway-java:$GITHUB_SHA"
+
   # ----------------------------------------------------------------- deploy
   deploy:
     name: apply and wait
-    needs: [build, build-rag]
+    needs: [build, build-rag, build-java-gateway]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -196,7 +221,13 @@ jobs:
       - name: set images
         run: |
           set -euo pipefail
-          for service in api-gateway auth-service ticket-service \
+          # **`api-gateway-java` is in THIS list and not in the wait list
+          # below**, and the asymmetry is the point. A Deployment missing
+          # here keeps whatever image it was last applied with — so a standby
+          # scaled up at commit 1 would come up on stale code, which is plan
+          # 78's finding I arriving through CD instead of through a stalled
+          # rollout.
+          for service in api-gateway api-gateway-java auth-service ticket-service \
                          ingestion-service notification-service \
                          storage-service rag-service; do
             kubectl set image "deployment/$service" \
@@ -217,7 +248,23 @@ jobs:
       - name: wait for every rollout
         run: |
           set -euo pipefail
-          for service in api-gateway auth-service ticket-service \
+          # **The gateway list is read from the ROLE, not written here.** A
+          # standby is never Ready by design — `/health/ready` answers 503
+          # while another implementation holds the lease — so waiting on one
+          # fails every deploy, five minutes at a time. The annotation is on
+          # the Deployment's metadata (`manifest-contract` row 9 asserts
+          # that), so reading it changes no pod and starts no rollout.
+          for service in api-gateway api-gateway-java; do
+            role=$(kubectl get "deployment/$service" \
+              -o jsonpath='{.metadata.annotations.synapsedesk\.io/gateway-role}')
+            if [ "$role" = "active" ]; then
+              kubectl rollout status "deployment/$service" --timeout=5m
+            else
+              echo "skipping rollout wait for $service (role=$role)"
+            fi
+          done
+
+          for service in auth-service ticket-service \
                          ingestion-service notification-service \
                          storage-service rag-service; do
             kubectl rollout status "deployment/$service" --timeout=5m

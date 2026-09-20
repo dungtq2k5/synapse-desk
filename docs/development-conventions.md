@@ -845,6 +845,13 @@ gateway: a peer is programmed by answering its RPC, never by
 `overrideProvider`, and an assertion about an outgoing call reads the peer's
 **recording** of the request and its metadata.
 
+**The skip list is where the Java gateway's progress is read.** Under
+`GATEWAY_IMPL=java` a row is skipped when the API tag it declares is still in
+`apps/api-gateway-java/src/test/resources/pending-apis.txt`; implementing an
+interface deletes a line there and un-skips its rows in the same commit. A
+short by-name list covers the other case — the route exists, the behaviour
+does not yet — and each entry names what it waits for.
+
 **A row here is the one the Java gateway must also pass** (plan 78), so a
 wire behaviour that only the in-process suite pins is a behaviour the second
 implementation is free to get wrong.

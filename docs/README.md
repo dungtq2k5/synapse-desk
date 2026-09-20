@@ -22,6 +22,14 @@ Not internal specs. Each one is the **contract** a client codes against, and eac
 | [websocket-api.md](./websocket-api.md) | Front end | `libs/common/src/contracts/realtime.contract.ts` (event names, rooms), `realtime.config.ts` (limits, timings), `realtime.gateway.ts` (handshake) |
 | [webhooks.md](./webhooks.md) | Customer integrators | `libs/common/src/contracts/webhook.contract.ts` (payload, signing, every constant) |
 
+**Two implementations serve these contracts, one at a time.**
+`apps/api-gateway/` (Nest) and `apps/api-gateway-java/` (Spring Boot) answer
+the same routes, schema and events; `GATEWAY_IMPL` and the Redis lease decide
+which one is serving, and a client cannot tell. The source files named above
+stay the source of truth for both — the Java side is generated from
+`docs/reference/openapi.json` and the `.proto` files rather than restating
+them — and `test/gateway-contract/` is what proves the two agree.
+
 **A change to any of those source files is a change to a published contract.** These are the only documents here read by people who cannot see the code, so drift in them is not a stale note — it is a receiver that verifies a signature wrongly, or a client that waits forever for an event that was renamed.
 
 ## `decisions/` — why, permanently

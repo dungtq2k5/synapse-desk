@@ -17,6 +17,7 @@ import { API, Session } from './client';
 import { type Gateway, GATEWAY_ENV, startGateway } from './gateway';
 import { type Peers, startPeers, TEST_KEYS } from './peers';
 import { readRunState } from './run-state';
+import { rowFor } from './pending';
 
 describe('authentication', () => {
   let gateway: Gateway;
@@ -78,107 +79,121 @@ describe('authentication', () => {
     });
   });
 
-  it('**login sets the session cookies**, with the flags a browser enforces', async () => {
-    peers.auth.on('AuthService/Login').reply({
-      requiresTwoFactor: false,
-      requiresTenantSelection: false,
-      accessToken: accessToken(),
-      refreshToken: 'refresh-token',
-      tenants: [],
-      user: wireUser(),
-    });
+  rowFor('Auth')(
+    '**login sets the session cookies**, with the flags a browser enforces',
+    async () => {
+      peers.auth.on('AuthService/Login').reply({
+        requiresTwoFactor: false,
+        requiresTenantSelection: false,
+        accessToken: accessToken(),
+        refreshToken: 'refresh-token',
+        tenants: [],
+        user: wireUser(),
+      });
 
-    const session = new Session(gateway.baseUrl);
-    const response = await session.post(`${API}/auth/login`, {
-      email: 'ada@example.com',
-      password: 'correct horse battery staple',
-    });
+      const session = new Session(gateway.baseUrl);
+      const response = await session.post(`${API}/auth/login`, {
+        email: 'ada@example.com',
+        password: 'correct horse battery staple',
+      });
 
-    expect(response.status).toBe(200);
-    expect((response.body as { success: boolean }).success).toBe(true);
+      expect(response.status).toBe(200);
+      expect((response.body as { success: boolean }).success).toBe(true);
 
-    const access = response.setCookie.find((line) =>
-      line.startsWith(`${GATEWAY_ENV.JWT_ACCESS_NAME}=`),
-    );
-    expect(access).toBeDefined();
-    expect(access).toContain('HttpOnly');
-    expect(access).toContain('Path=/');
-    expect(access?.toLowerCase()).toContain('samesite=lax');
+      const access = response.setCookie.find((line) =>
+        line.startsWith(`${GATEWAY_ENV.JWT_ACCESS_NAME}=`),
+      );
+      expect(access).toBeDefined();
+      expect(access).toContain('HttpOnly');
+      expect(access).toContain('Path=/');
+      expect(access?.toLowerCase()).toContain('samesite=lax');
 
-    // **Seconds on the wire, milliseconds in the environment.** The conversion
-    // is the one plan 78 flags for the Java binding, and the refresh cookie's
-    // two-hour bug came from exactly this slip.
-    expect(access).toContain(
-      `Max-Age=${Number(GATEWAY_ENV.COOKIE_ACCESS_MAX_AGE) / 1000}`,
-    );
+      // **Seconds on the wire, milliseconds in the environment.** The conversion
+      // is the one plan 78 flags for the Java binding, and the refresh cookie's
+      // two-hour bug came from exactly this slip.
+      expect(access).toContain(
+        `Max-Age=${Number(GATEWAY_ENV.COOKIE_ACCESS_MAX_AGE) / 1000}`,
+      );
 
-    const refresh = response.setCookie.find((line) =>
-      line.startsWith(`${GATEWAY_ENV.JWT_REFRESH_NAME}=`),
-    );
-    expect(refresh).toContain(
-      `Max-Age=${Number(GATEWAY_ENV.COOKIE_REFRESH_MAX_AGE) / 1000}`,
-    );
-  });
+      const refresh = response.setCookie.find((line) =>
+        line.startsWith(`${GATEWAY_ENV.JWT_REFRESH_NAME}=`),
+      );
+      expect(refresh).toContain(
+        `Max-Age=${Number(GATEWAY_ENV.COOKIE_REFRESH_MAX_AGE) / 1000}`,
+      );
+    },
+  );
 
-  it('the login reached the peer as a real gRPC call, with the credentials', async () => {
-    peers.auth.on('AuthService/Login').reply({
-      requiresTwoFactor: false,
-      requiresTenantSelection: false,
-      accessToken: accessToken(),
-      refreshToken: 'refresh-token',
-      tenants: [],
-      user: wireUser(),
-    });
+  rowFor('Auth')(
+    'the login reached the peer as a real gRPC call, with the credentials',
+    async () => {
+      peers.auth.on('AuthService/Login').reply({
+        requiresTwoFactor: false,
+        requiresTenantSelection: false,
+        accessToken: accessToken(),
+        refreshToken: 'refresh-token',
+        tenants: [],
+        user: wireUser(),
+      });
 
-    await new Session(gateway.baseUrl).post(`${API}/auth/login`, {
-      email: 'ada@example.com',
-      password: 'correct horse battery staple',
-    });
+      await new Session(gateway.baseUrl).post(`${API}/auth/login`, {
+        email: 'ada@example.com',
+        password: 'correct horse battery staple',
+      });
 
-    const [call] = peers.auth.calls('AuthService/Login');
-    expect(call.request).toMatchObject({ email: 'ada@example.com' });
-  });
+      const [call] = peers.auth.calls('AuthService/Login');
+      expect(call.request).toMatchObject({ email: 'ada@example.com' });
+    },
+  );
 
-  it('**an authenticated request carries the caller context** on the peer call', async () => {
-    // What `expect(stubs.user.getCurrentUser).toHaveBeenCalledWith(…)` checked
-    // in-process, checked at the network instead — the eight metadata keys are
-    // the contract every peer reads, and a Java gateway that packed seven
-    // would look correct until a peer applied the wrong tenant filter.
-    peers.auth.on('UserService/GetCurrentUser').reply({
-      user: wireUser(),
-      permissionCodes: ['ticket.read.own'],
-      departmentIds: [],
-    });
+  rowFor('Users')(
+    '**an authenticated request carries the caller context** on the peer call',
+    async () => {
+      // What `expect(stubs.user.getCurrentUser).toHaveBeenCalledWith(…)` checked
+      // in-process, checked at the network instead — the eight metadata keys are
+      // the contract every peer reads, and a Java gateway that packed seven
+      // would look correct until a peer applied the wrong tenant filter.
+      peers.auth.on('UserService/GetCurrentUser').reply({
+        user: wireUser(),
+        permissionCodes: ['ticket.read.own'],
+        departmentIds: [],
+      });
 
-    const session = new Session(gateway.baseUrl);
-    const response = await session.get(`${API}/users/me`, {
-      cookie: `${GATEWAY_ENV.JWT_ACCESS_NAME}=${accessToken()}`,
-      'user-agent': 'contract-harness/1.0',
-    });
+      const session = new Session(gateway.baseUrl);
+      const response = await session.get(`${API}/users/me`, {
+        cookie: `${GATEWAY_ENV.JWT_ACCESS_NAME}=${accessToken()}`,
+        'user-agent': 'contract-harness/1.0',
+      });
 
-    expect(response.status).toBe(200);
+      expect(response.status).toBe(200);
 
-    const [call] = peers.auth.calls('UserService/GetCurrentUser');
-    expect(call.metadata).toMatchObject({
-      user_id: USER,
-      organization_id: ORGANIZATION,
-      is_super_admin: 'false',
-      is_email_verified: 'true',
-      user_agent: 'contract-harness/1.0',
-    });
-    expect(call.metadata.ip_address).toBeDefined();
-  });
+      const [call] = peers.auth.calls('UserService/GetCurrentUser');
+      expect(call.metadata).toMatchObject({
+        user_id: USER,
+        organization_id: ORGANIZATION,
+        is_super_admin: 'false',
+        is_email_verified: 'true',
+        user_agent: 'contract-harness/1.0',
+      });
+      expect(call.metadata.ip_address).toBeDefined();
+    },
+  );
 
-  it('a request with no cookie is refused before any peer is called', async () => {
-    const response = await new Session(gateway.baseUrl).get(`${API}/users/me`);
+  rowFor('Users')(
+    'a request with no cookie is refused before any peer is called',
+    async () => {
+      const response = await new Session(gateway.baseUrl).get(
+        `${API}/users/me`,
+      );
 
-    expect(response.status).toBe(401);
-    expect(response.body).toMatchObject({
-      success: false,
-      statusCode: 401,
-      path: `${API}/users/me`,
-      error: 'Unauthorized!',
-    });
-    expect(peers.auth.calls('UserService/GetCurrentUser')).toHaveLength(0);
-  });
+      expect(response.status).toBe(401);
+      expect(response.body).toMatchObject({
+        success: false,
+        statusCode: 401,
+        path: `${API}/users/me`,
+        error: 'Unauthorized!',
+      });
+      expect(peers.auth.calls('UserService/GetCurrentUser')).toHaveLength(0);
+    },
+  );
 });

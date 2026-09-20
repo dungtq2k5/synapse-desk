@@ -31,6 +31,7 @@ import {
   userRoom,
 } from '@synapsedesk/common';
 import { SecureGateway } from '../../common/decorators/secure-gateway.decorator';
+import { GatewayLeaseService } from '../../common/lease/gateway-lease.service';
 import { clientSafeMessage } from '../../common/filters/client-safe-message';
 import { WsThrottlerService } from './ws-throttler.service';
 import {
@@ -92,6 +93,7 @@ export class RealtimeGateway
     private readonly aiStreams: AiStreamService,
     private readonly presence: PresenceService,
     private readonly metrics: MetricsRegistry,
+    private readonly lease: GatewayLeaseService,
   ) {
     this.ACCESS_COOKIE_NAME =
       this.configService.getOrThrow<string>('JWT_ACCESS_NAME');
@@ -109,6 +111,15 @@ export class RealtimeGateway
    */
   async handleConnection(client: Socket): Promise<void> {
     try {
+      // **A standby accepts no socket.** It is warm and answering `/health`,
+      // but the Service routes nothing to it and the events it would relay
+      // belong to the implementation holding the lease. Refused like any
+      // other unauthenticated socket: connect, then a hard disconnect, which
+      // a browser client does not retry.
+      if (!this.lease.isActive()) {
+        throw new WsException('This gateway instance is not serving');
+      }
+
       if (
         !(await this.wsThrottler.allowHandshake(client, RealtimeGateway.name))
       ) {
@@ -925,6 +936,18 @@ export class RealtimeGateway
    */
   broadcastToRoom(room: RealtimeRoom) {
     return this.server.to(room);
+  }
+
+  /**
+   * Disconnects every socket this process is serving — a step-down, not an
+   * error.
+   *
+   * Called when the lease is lost: the clients reconnect, the Service sends
+   * them to whichever pod is Ready, and the alternative is sockets held open
+   * by a process that has stopped consuming the events they are waiting for.
+   */
+  dropEverySocket(): void {
+    this.server.disconnectSockets(true);
   }
 
   /**

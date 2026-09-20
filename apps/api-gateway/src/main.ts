@@ -6,6 +6,8 @@ import {
   resolveGlobalPrefix,
 } from './modules/health/ops-routes';
 import { MetricsServer } from './modules/metrics/metrics.server';
+import { GatewayLeaseService } from './common/lease/gateway-lease.service';
+import { RealtimeGateway } from './modules/realtime/realtime.gateway';
 import { setupSwagger } from './common/config/swagger.config';
 import { SECURITY_HEADERS } from './common/config/security-headers.config';
 import { Logger, ValidationPipe } from '@nestjs/common';
@@ -133,10 +135,14 @@ async function bootstrap() {
   //
   // `startAllMicroservices` before `listen`, so a client connecting the instant
   // the port opens cannot find a socket layer with no event source behind it.
-  app.connectMicroservice<MicroserviceOptions>(
+  // **Connected, not started.** Consuming is what an ACTIVE gateway does, and
+  // this process is a standby until the lease says otherwise — a standby that
+  // subscribed would relay events the serving implementation is already
+  // relaying. `GatewayLeaseService` starts it, and stops it again if this
+  // process ever loses the lease.
+  const natsConsumer = app.connectMicroservice<MicroserviceOptions>(
     createNatsTransport(configService),
   );
-  await app.startAllMicroservices();
 
   // `/docs` and `/docs-json`, when config allows. Before `listen`
   // so the routes exist the moment the port opens.
@@ -150,6 +156,24 @@ async function bootstrap() {
   // from the internet" a property of this process rather than of an Nginx
   // config living in another repository.
   await app.get(MetricsServer).listen();
+
+  // **After the HTTP server is configured and before it listens.** The lease
+  // decides whether this process consumes and serves; readiness reads it, so
+  // it must have run at least once before the port opens or the first probe
+  // would find a process that has not yet asked.
+  const lease = app.get(GatewayLeaseService);
+  await lease.bind({
+    activate: async () => {
+      await natsConsumer.listen();
+    },
+    deactivate: async () => {
+      // Order matters and is the opposite of starting: stop consuming, then
+      // drop the sockets this process was serving, so no frame is relayed to
+      // a client the new owner is about to take over.
+      await natsConsumer.close();
+      app.get(RealtimeGateway).dropEverySocket();
+    },
+  });
 
   const port = configService.getOrThrow<number>('PORT');
   await app.listen(port);

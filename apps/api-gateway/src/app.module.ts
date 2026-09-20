@@ -1,3 +1,4 @@
+import { LeaseModule } from './common/lease/lease.module';
 import { Module } from '@nestjs/common';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigService, ConfigModule } from '@nestjs/config';
@@ -42,6 +43,7 @@ import { HttpMetricsInterceptor } from './modules/metrics/http-metrics.intercept
 
 @Module({
   imports: [
+    LeaseModule,
     ConfigModule.forRoot({
       isGlobal: true, // Makes ConfigService available globally
       validationSchema: envValidationSchema,

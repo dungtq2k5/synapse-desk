@@ -57507,7 +57507,7 @@
     },
     "/health/ready": {
       "get": {
-        "description": "`ready` gates on Redis and on whether this instance is draining. Peer gRPC health is REPORTED under `peers` and deliberately does not gate: every instance sees the same peer down, so gating would remove all of them and turn one service outage into a total one. A partial outage should look partial. Returns 503 when not ready — a probe reads the status line, not the body.",
+        "description": "`ready` gates on Redis, on whether this instance is draining, and on this instance holding the implementation lease — a warm STANDBY answers 503 here and 200 on `/health`. Peer gRPC health is REPORTED under `peers` and deliberately does not gate: every instance sees the same peer down, so gating would remove all of them and turn one service outage into a total one. A partial outage should look partial. Returns 503 when not ready — a probe reads the status line, not the body.",
         "operationId": "HealthController_readiness",
         "parameters": [],
         "responses": {
@@ -59989,15 +59989,11 @@
           },
           "ocrLanguages": {
             "type": "array",
+            "description": "ISO 639-1 codes for OCR, if the uploader knows them.\n\nAn advanced field: leave it empty unless the upload is known to be scanned.\n`[]` and absent are the same thing, and the parser falls back to `eng`.",
+            "default": [],
             "items": {
-              "required": false,
-              "description": "ISO 639-1 codes for OCR, if the uploader knows them.\n\nAn advanced field: leave it empty unless the upload is known to be scanned.\n`[]` and absent are the same thing, and the parser falls back to `eng`.",
-              "default": [],
-              "items": {
-                "type": "string",
-                "enum": ["de", "en", "es", "fr", "ja", "pt", "vi", "zh"]
-              },
-              "type": "array"
+              "type": "string",
+              "enum": ["de", "en", "es", "fr", "ja", "pt", "vi", "zh"]
             }
           },
           "objectPath": {
@@ -60016,7 +60012,7 @@
             "maxLength": 255
           }
         },
-        "required": ["ocrLanguages", "objectPath", "title"]
+        "required": ["objectPath", "title"]
       },
       "UpdateDocumentDto": {
         "type": "object",
@@ -60088,15 +60084,11 @@
         "properties": {
           "ocrLanguages": {
             "type": "array",
+            "description": "ISO 639-1 codes for OCR, if the uploader knows them.\n\nRe-declared rather than inherited, and NOT carried over from the document\nbeing replaced: reading a scan in the wrong language is one of the main\nreasons to replace one, so the previous value is exactly what a caller may\nbe here to change. Absent means `[]`, which is the `eng` fallback — the\nsame meaning it has on confirm.",
+            "default": [],
             "items": {
-              "required": false,
-              "description": "ISO 639-1 codes for OCR, if the uploader knows them.\n\nRe-declared rather than inherited, and NOT carried over from the document\nbeing replaced: reading a scan in the wrong language is one of the main\nreasons to replace one, so the previous value is exactly what a caller may\nbe here to change. Absent means `[]`, which is the `eng` fallback — the\nsame meaning it has on confirm.",
-              "default": [],
-              "items": {
-                "type": "string",
-                "enum": ["de", "en", "es", "fr", "ja", "pt", "vi", "zh"]
-              },
-              "type": "array"
+              "type": "string",
+              "enum": ["de", "en", "es", "fr", "ja", "pt", "vi", "zh"]
             }
           },
           "objectPath": {
@@ -60106,7 +60098,7 @@
             "maxLength": 1024
           }
         },
-        "required": ["ocrLanguages", "objectPath"]
+        "required": ["objectPath"]
       },
       "DownloadDocumentResponseDto": {
         "type": "object",
@@ -60573,6 +60565,10 @@
       "CreatePlanDto": {
         "type": "object",
         "properties": {
+          "isActive": {
+            "type": "boolean",
+            "default": true
+          },
           "prices": {
             "default": [],
             "type": "array",
@@ -60624,10 +60620,6 @@
             "type": "number",
             "minimum": 1,
             "maximum": 400
-          },
-          "isActive": {
-            "type": "boolean",
-            "default": true
           }
         },
         "required": [
@@ -60639,8 +60631,7 @@
           "maxDocumentBytes",
           "maxAttachmentBytes",
           "maxDocumentUploads",
-          "maxAnalyticsRangeDays",
-          "isActive"
+          "maxAnalyticsRangeDays"
         ]
       },
       "UpdatePlanDto": {

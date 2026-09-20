@@ -1,0 +1,44 @@
+# Generated `*Api` interfaces this gateway does NOT implement yet.
+#
+# The Java gateway's progress is read here. A path added to a tag that IS
+# implemented fails the build — the generated method is abstract, so the
+# controller no longer compiles (J3). A path added under a NEW tag cannot fail
+# that way: it makes a new interface nobody implements, which compiles fine and
+# 404s at runtime. So every generated interface must be implemented or listed
+# below, and a new tag arrives as a LINE ADDED HERE, visible in review.
+#
+# This list only ever shrinks. `GeneratedApiCoverageTest` asserts its size, so
+# removing a name is a deliberate edit and adding one is a decision somebody
+# reviewed.
+#
+# `OpsApi` is deliberately absent: `OpsController` implements it.
+AiApi
+AnalyticsApi
+AttachmentsApi
+AuditLogsApi
+AuthApi
+BillingApi
+ChatApi
+DepartmentsApi
+DocumentsApi
+FeedbackApi
+IngestionJobsApi
+InvitationsApi
+KnowledgeApi
+MessagesApi
+NotificationsApi
+OrganizationsApi
+OtpApi
+PermissionsApi
+PlatformApi
+PlatformAuditLogsApi
+PlatformJobsApi
+RolesApi
+SessionsApi
+TicketsApi
+TwoFactorAuthApi
+UserAdminApi
+UsersApi
+UserSessionsApi
+WebhookEndpointsApi
+WebhooksApi

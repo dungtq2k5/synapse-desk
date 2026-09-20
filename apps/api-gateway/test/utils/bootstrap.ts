@@ -35,11 +35,48 @@ import {
 import { GrpcStubs, stubGrpcServices } from './grpc-stub';
 import { Server } from 'node:http';
 import { VALIDATION_PIPE_OPTIONS } from '../../src/common/config/validation.config';
+import { GatewayLeaseService } from '../../src/common/lease/gateway-lease.service';
+
+/**
+ * Stands in for the implementation lease, with the answer under the suite's
+ * control.
+ *
+ * **Not the real service, and deliberately.** The real one polls Redis every
+ * ten seconds and steps down when its entry is gone — and `flushTestRedis()`
+ * removes exactly that entry, so a fixture on the real lease would drop every
+ * socket mid-suite, ten seconds after an unrelated `beforeEach`. What the
+ * fixture needs from the lease is a STEADY answer; the real claim, refresh,
+ * fence and release are exercised against a real Redis in
+ * `gateway-lease.e2e-spec.ts`, and the rows there call the real class.
+ *
+ * Active by default, because a gateway that is not serving is not what the
+ * other thirty suites are about. `setActive(false)` is how the standby rows
+ * ask for the other state.
+ */
+export type LeaseSwitch = {
+  setActive: (active: boolean) => void;
+};
+
+export const leaseSwitch = () => {
+  let active = true;
+
+  return {
+    isActive: () => active,
+    bind: () => Promise.resolve(),
+    beat: () => Promise.resolve(),
+    onApplicationShutdown: () => Promise.resolve(),
+    setActive: (next: boolean) => {
+      active = next;
+    },
+  };
+};
 
 export type E2eFixture = {
   app: INestApplication<Server>;
   moduleRef: TestingModule;
   stubs: GrpcStubs;
+  /** Flips this instance between holding the lease and standing by. */
+  lease: LeaseSwitch;
   close: () => Promise<void>;
 };
 
@@ -72,7 +109,12 @@ export async function bootstrapE2eTest(
     of({ status: toProtoOrgStatus(OrgStatus.ACTIVE), deleted: false }),
   );
 
+  const lease = leaseSwitch();
+
   const builder = Test.createTestingModule({ imports: [AppModule] })
+    // Before `configure`, so a suite can still replace it.
+    .overrideProvider(GatewayLeaseService)
+    .useValue(lease)
     // ONE stub serves ALL THREE peers. Every gRPC client in the gateway injects
     // one of these tokens and calls `getService(name)` on it — and service
     // names are unique across the three proto packages, so a single map answers
@@ -158,6 +200,7 @@ export async function bootstrapE2eTest(
     app,
     moduleRef,
     stubs,
+    lease,
     close: () => app.close(),
   };
 }

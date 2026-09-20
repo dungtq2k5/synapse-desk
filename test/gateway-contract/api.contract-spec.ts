@@ -17,6 +17,7 @@ import { API, Session } from './client';
 import { type Gateway, GATEWAY_ENV, startGateway } from './gateway';
 import { type Peers, startPeers, TEST_KEYS } from './peers';
 import { readRunState } from './run-state';
+import { rowFor } from './pending';
 
 describe('pagination, GraphQL and the webhooks', () => {
   let gateway: Gateway;
@@ -63,37 +64,21 @@ describe('pagination, GraphQL and the webhooks', () => {
     });
   });
 
-  it('**a list carries the pagination envelope**, and the query reaches the peer', async () => {
-    peers.auth.on('RoleService/ListRoles').reply({
-      items: [
-        {
-          id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
-          name: 'Agent',
-          description: 'Front line',
-          isSystem: false,
-          permissionCodes: ['ticket.read.own'],
-          createdAt: { seconds: 1_756_684_800, nanos: 0 },
-          updatedAt: { seconds: 1_756_684_800, nanos: 0 },
-        },
-      ],
-      meta: {
-        totalItems: 11,
-        itemCount: 1,
-        itemsPerPage: 10,
-        totalPages: 2,
-        currentPage: 2,
-      },
-    });
-
-    const response = await new Session(gateway.baseUrl).get(
-      `${API}/roles?page=2&limit=10`,
-      headers(['role.read']),
-    );
-
-    expect(response.status).toBe(200);
-    expect(response.body).toMatchObject({
-      success: true,
-      data: {
+  rowFor('Roles')(
+    '**a list carries the pagination envelope**, and the query reaches the peer',
+    async () => {
+      peers.auth.on('RoleService/ListRoles').reply({
+        items: [
+          {
+            id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+            name: 'Agent',
+            description: 'Front line',
+            isSystem: false,
+            permissionCodes: ['ticket.read.own'],
+            createdAt: { seconds: 1_756_684_800, nanos: 0 },
+            updatedAt: { seconds: 1_756_684_800, nanos: 0 },
+          },
+        ],
         meta: {
           totalItems: 11,
           itemCount: 1,
@@ -101,120 +86,159 @@ describe('pagination, GraphQL and the webhooks', () => {
           totalPages: 2,
           currentPage: 2,
         },
-      },
-    });
+      });
 
-    const [call] = peers.auth.calls('RoleService/ListRoles');
-    // The query DTO travels as the proto's own `page` message — the shape a
-    // Java gateway has to build too, not a flattened pair.
-    expect(call.request).toMatchObject({ page: { page: 2, limit: 10 } });
-  });
+      const response = await new Session(gateway.baseUrl).get(
+        `${API}/roles?page=2&limit=10`,
+        headers(['role.read']),
+      );
 
-  it('a page past the bounds is refused as a 400, not clamped', async () => {
-    const response = await new Session(gateway.baseUrl).get(
-      `${API}/roles?page=0`,
-      headers(['role.read']),
-    );
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({
+        success: true,
+        data: {
+          meta: {
+            totalItems: 11,
+            itemCount: 1,
+            itemsPerPage: 10,
+            totalPages: 2,
+            currentPage: 2,
+          },
+        },
+      });
 
-    expect(response.status).toBe(400);
-    expect((response.body as { error: string }).error).toContain('page');
-  });
+      const [call] = peers.auth.calls('RoleService/ListRoles');
+      // The query DTO travels as the proto's own `page` message — the shape a
+      // Java gateway has to build too, not a flattened pair.
+      expect(call.request).toMatchObject({ page: { page: 2, limit: 10 } });
+    },
+  );
 
-  it('**GraphQL answers on `/graphql`**, outside the API prefix', async () => {
-    peers.auth.on('UserService/GetCurrentUser').reply({
-      user: {
-        id: USER,
-        organizationId: ORGANIZATION,
-        fullName: 'Ada Lovelace',
-        email: 'ada@example.com',
-        isEmailVerified: true,
-        isPhoneVerified: false,
-        isLocked: false,
-        isTwoFactorEnabled: false,
-        createdAt: { seconds: 1_756_684_800, nanos: 0 },
-        updatedAt: { seconds: 1_756_684_800, nanos: 0 },
-      },
-      permissionCodes: ['role.read'],
-      departmentIds: [],
-    });
+  rowFor('Roles')(
+    'a page past the bounds is refused as a 400, not clamped',
+    async () => {
+      const response = await new Session(gateway.baseUrl).get(
+        `${API}/roles?page=0`,
+        headers(['role.read']),
+      );
 
-    const response = await new Session(gateway.baseUrl).post(
-      '/graphql',
-      { query: '{ me { id email } }' },
-      headers(['role.read']),
-    );
+      expect(response.status).toBe(400);
+      expect((response.body as { error: string }).error).toContain('page');
+    },
+  );
 
-    expect(response.status).toBe(200);
-    expect(response.body).toMatchObject({
-      data: { me: { id: USER, email: 'ada@example.com' } },
-    });
-  });
+  rowFor('Roles')(
+    '**GraphQL answers on `/graphql`**, outside the API prefix',
+    async () => {
+      peers.auth.on('UserService/GetCurrentUser').reply({
+        user: {
+          id: USER,
+          organizationId: ORGANIZATION,
+          fullName: 'Ada Lovelace',
+          email: 'ada@example.com',
+          isEmailVerified: true,
+          isPhoneVerified: false,
+          isLocked: false,
+          isTwoFactorEnabled: false,
+          createdAt: { seconds: 1_756_684_800, nanos: 0 },
+          updatedAt: { seconds: 1_756_684_800, nanos: 0 },
+        },
+        permissionCodes: ['role.read'],
+        departmentIds: [],
+      });
 
-  it('a GraphQL query the schema does not have is a GraphQL error, not a 404', async () => {
-    const response = await new Session(gateway.baseUrl).post(
-      '/graphql',
-      { query: '{ noSuchField }' },
-      headers(),
-    );
+      const response = await new Session(gateway.baseUrl).post(
+        '/graphql',
+        { query: '{ me { id email } }' },
+        headers(['role.read']),
+      );
 
-    expect(response.status).toBe(400);
-    expect(response.body).toHaveProperty('errors');
-  });
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({
+        data: { me: { id: USER, email: 'ada@example.com' } },
+      });
+    },
+  );
 
-  it('**the Stripe webhook forwards the RAW bytes and the signature**', async () => {
-    // The signature is computed over the exact body Stripe sent; the gateway
-    // buffers it (`rawBody: true`) and hands both to the peer, which verifies.
-    // A gateway that re-serialised the JSON would break verification while
-    // every visible field stayed the same.
-    peers.auth.on('BillingService/HandleStripeWebhook').reply({ status: 'ok' });
+  rowFor('Roles')(
+    'a GraphQL query the schema does not have is a GraphQL error, not a 404',
+    async () => {
+      const response = await new Session(gateway.baseUrl).post(
+        '/graphql',
+        { query: '{ noSuchField }' },
+        headers(),
+      );
 
-    const payload = '{"id":"evt_contract","type":"invoice.paid"}';
-    const timestamp = Math.floor(Date.now() / 1000);
-    const signature = createHmac('sha256', 'whsec_contract_harness') // NOSONAR
-      .update(`${timestamp}.${payload}`)
-      .digest('hex');
+      expect(response.status).toBe(400);
+      expect(response.body).toHaveProperty('errors');
+    },
+  );
 
-    const response = await fetch(`${gateway.baseUrl}${API}/webhooks/stripe`, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'stripe-signature': `t=${timestamp},v1=${signature}`,
-      },
-      body: payload,
-    });
+  rowFor('Webhooks')(
+    '**the Stripe webhook forwards the RAW bytes and the signature**',
+    async () => {
+      // The signature is computed over the exact body Stripe sent; the gateway
+      // buffers it (`rawBody: true`) and hands both to the peer, which verifies.
+      // A gateway that re-serialised the JSON would break verification while
+      // every visible field stayed the same.
+      peers.auth
+        .on('BillingService/HandleStripeWebhook')
+        .reply({ status: 'ok' });
 
-    expect(response.status).toBe(200);
+      const payload = '{"id":"evt_contract","type":"invoice.paid"}';
+      const timestamp = Math.floor(Date.now() / 1000);
+      const signature = createHmac('sha256', 'whsec_contract_harness') // NOSONAR
+        .update(`${timestamp}.${payload}`)
+        .digest('hex');
 
-    const [call] = peers.auth.calls('BillingService/HandleStripeWebhook');
-    expect(Buffer.from(call.request.payload as Uint8Array).toString()).toBe(
-      payload,
-    );
-    expect(call.request.signature).toBe(`t=${timestamp},v1=${signature}`);
-  });
+      const response = await fetch(`${gateway.baseUrl}${API}/webhooks/stripe`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'stripe-signature': `t=${timestamp},v1=${signature}`,
+        },
+        body: payload,
+      });
 
-  it('…and refuses the same body with no signature header, before the peer', async () => {
-    const response = await fetch(`${gateway.baseUrl}${API}/webhooks/stripe`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: '{"id":"evt_contract"}',
-    });
+      expect(response.status).toBe(200);
 
-    expect(response.status).toBe(400);
-    expect(peers.auth.calls('BillingService/HandleStripeWebhook')).toHaveLength(
-      0,
-    );
-  });
+      const [call] = peers.auth.calls('BillingService/HandleStripeWebhook');
+      expect(Buffer.from(call.request.payload as Uint8Array).toString()).toBe(
+        payload,
+      );
+      expect(call.request.signature).toBe(`t=${timestamp},v1=${signature}`);
+    },
+  );
 
-  it('**the Resend webhook refuses an unsigned delivery** with 401', async () => {
-    const response = await fetch(
-      `${gateway.baseUrl}${API}/webhooks/email/resend`,
-      {
+  rowFor('Webhooks')(
+    '…and refuses the same body with no signature header, before the peer',
+    async () => {
+      const response = await fetch(`${gateway.baseUrl}${API}/webhooks/stripe`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ type: 'email.received', data: {} }),
-      },
-    );
+        body: '{"id":"evt_contract"}',
+      });
 
-    expect(response.status).toBe(401);
-  });
+      expect(response.status).toBe(400);
+      expect(
+        peers.auth.calls('BillingService/HandleStripeWebhook'),
+      ).toHaveLength(0);
+    },
+  );
+
+  rowFor('Webhooks')(
+    '**the Resend webhook refuses an unsigned delivery** with 401',
+    async () => {
+      const response = await fetch(
+        `${gateway.baseUrl}${API}/webhooks/email/resend`,
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ type: 'email.received', data: {} }),
+        },
+      );
+
+      expect(response.status).toBe(401);
+    },
+  );
 });

@@ -1,0 +1,11 @@
+{
+  "name": "@synapsedesk/api-gateway-java",
+  "version": "1.0.0",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "//": "A MAVEN project with an npm manifest, for the reason rag-service's manifest gives: turbo dispatches by workspace, and a directory with no package.json is not one. It declares NO `build`, `lint` or `test`, because turbo skips a task a workspace does not define and `npm test` must stay runnable without a JDK — Maven owns those three, through `./mvnw`. `dev` goes through `scripts/gateway-impl.mjs` rather than starting Maven directly: `npm run dev` is `turbo run dev`, so a bare `dev` here would start a SECOND gateway on the same PORT beside the Node one, and both would claim the implementation lease.",
+  "scripts": {
+    "dev": "node ../../scripts/gateway-impl.mjs java",
+    "start:prod": "java -jar target/api-gateway-java-1.0.0.jar"
+  }
+}

@@ -18,6 +18,7 @@ import { API, Session } from './client';
 import { type Gateway, GATEWAY_ENV, startGateway } from './gateway';
 import { type Peers, startPeers, TEST_KEYS } from './peers';
 import { readRunState } from './run-state';
+import { rowFor } from './pending';
 
 describe('the error envelope and the edges around it', () => {
   let gateway: Gateway;
@@ -70,158 +71,186 @@ describe('the error envelope and the edges around it', () => {
 
   // ------------------------------------------------------------- the envelope
 
-  it('**an unknown route** answers the envelope, inside and outside the prefix', async () => {
-    const session = new Session(gateway.baseUrl);
+  rowFor('Ops')(
+    '**an unknown route** answers the envelope, inside and outside the prefix',
+    async () => {
+      const session = new Session(gateway.baseUrl);
 
-    for (const path of [`${API}/does-not-exist`, '/does-not-exist']) {
-      const response = await session.get(path);
+      for (const path of [`${API}/does-not-exist`, '/does-not-exist']) {
+        const response = await session.get(path);
 
-      expect(response.status).toBe(404);
-      expect(response.body).toMatchObject({
-        success: false,
-        statusCode: 404,
-        path,
-        error: `Cannot GET ${path}!`,
-      });
-      expect(response.body).toHaveProperty('timestamp');
-    }
-  });
+        expect(response.status).toBe(404);
+        expect(response.body).toMatchObject({
+          success: false,
+          statusCode: 404,
+          path,
+          error: `Cannot GET ${path}!`,
+        });
+        expect(response.body).toHaveProperty('timestamp');
+      }
+    },
+  );
 
-  it('**a DTO validation failure** joins its messages with `, ` and ends with `!`', async () => {
-    const response = await new Session(gateway.baseUrl).post(
-      `${API}/auth/login`,
-      { email: 'not-an-email', password: 5, extra: true },
-    );
-
-    expect(response.status).toBe(400);
-    expect((response.body as { error: string }).error).toBe(
-      'property extra should not exist, email must be an email, password must be a string!',
-    );
-  });
-
-  it('**a mapped gRPC error** keeps the service’s own text', async () => {
-    peers.auth
-      .on('UserService/GetCurrentUser')
-      .fail(GrpcStatus.NOT_FOUND, 'No such user');
-
-    const response = await new Session(gateway.baseUrl).get(
-      `${API}/users/me`,
-      as([]),
-    );
-
-    expect(response.status).toBe(404);
-    expect((response.body as { error: string }).error).toBe('No such user!');
-  });
-
-  it('**an unmarked transport failure** answers the fixed message, with no address', async () => {
-    // Gap 38: grpc-js generates `UNAVAILABLE` itself when a peer is down, and
-    // its details name the address. Only text a service MARKED is forwarded.
-    peers.auth
-      .on('UserService/GetCurrentUser')
-      .fail(
-        GrpcStatus.UNAVAILABLE,
-        'No connection established. Last error: connect ECONNREFUSED 10.0.3.7:50051',
+  rowFor('Auth')(
+    '**a DTO validation failure** joins its messages with `, ` and ends with `!`',
+    async () => {
+      const response = await new Session(gateway.baseUrl).post(
+        `${API}/auth/login`,
+        { email: 'not-an-email', password: 5, extra: true },
       );
 
-    const response = await new Session(gateway.baseUrl).get(
-      `${API}/users/me`,
-      as([]),
-    );
+      expect(response.status).toBe(400);
+      expect((response.body as { error: string }).error).toBe(
+        'property extra should not exist, email must be an email, password must be a string!',
+      );
+    },
+  );
 
-    expect(response.status).toBe(503);
-    expect((response.body as { error: string }).error).toBe(
-      'A service this request depends on is unavailable. Try again shortly!',
-    );
-    expect(response.text).not.toMatch(/ECONNREFUSED|10\.0\.3\.7|50051/u);
-  });
+  rowFor('Users')(
+    '**a mapped gRPC error** keeps the service’s own text',
+    async () => {
+      peers.auth
+        .on('UserService/GetCurrentUser')
+        .fail(GrpcStatus.NOT_FOUND, 'No such user');
+
+      const response = await new Session(gateway.baseUrl).get(
+        `${API}/users/me`,
+        as([]),
+      );
+
+      expect(response.status).toBe(404);
+      expect((response.body as { error: string }).error).toBe('No such user!');
+    },
+  );
+
+  rowFor('Users')(
+    '**an unmarked transport failure** answers the fixed message, with no address',
+    async () => {
+      // Gap 38: grpc-js generates `UNAVAILABLE` itself when a peer is down, and
+      // its details name the address. Only text a service MARKED is forwarded.
+      peers.auth
+        .on('UserService/GetCurrentUser')
+        .fail(
+          GrpcStatus.UNAVAILABLE,
+          'No connection established. Last error: connect ECONNREFUSED 10.0.3.7:50051',
+        );
+
+      const response = await new Session(gateway.baseUrl).get(
+        `${API}/users/me`,
+        as([]),
+      );
+
+      expect(response.status).toBe(503);
+      expect((response.body as { error: string }).error).toBe(
+        'A service this request depends on is unavailable. Try again shortly!',
+      );
+      expect(response.text).not.toMatch(/ECONNREFUSED|10\.0\.3\.7|50051/u);
+    },
+  );
 
   // ---------------------------------------------------------------- the guards
 
-  it('**a permission guard** refuses with 403 before the peer is called', async () => {
-    const response = await new Session(gateway.baseUrl).get(
-      `${API}/billing/subscription`,
-      as([]),
-    );
+  rowFor('Billing')(
+    '**a permission guard** refuses with 403 before the peer is called',
+    async () => {
+      const response = await new Session(gateway.baseUrl).get(
+        `${API}/billing/subscription`,
+        as([]),
+      );
 
-    expect(response.status).toBe(403);
-    expect(response.body).toMatchObject({ success: false, statusCode: 403 });
-    expect(peers.auth.calls('BillingService/GetSubscription')).toHaveLength(0);
-  });
+      expect(response.status).toBe(403);
+      expect(response.body).toMatchObject({ success: false, statusCode: 403 });
+      expect(peers.auth.calls('BillingService/GetSubscription')).toHaveLength(
+        0,
+      );
+    },
+  );
 
-  it('…and admits the same request when the token carries the code', async () => {
-    peers.auth.on('BillingService/GetSubscription').reply({
-      planName: 'Pro',
-      maxAgentSeats: 25,
-      maxStorageBytes: 100,
-      monthlyAiTokenBudget: 100,
-      aiModelTier: 1,
-      billingCycleStart: { seconds: 1_756_684_800, nanos: 0 },
-      status: toProtoOrgStatus(OrgStatus.ACTIVE),
-    });
+  rowFor('Billing')(
+    '…and admits the same request when the token carries the code',
+    async () => {
+      peers.auth.on('BillingService/GetSubscription').reply({
+        planName: 'Pro',
+        maxAgentSeats: 25,
+        maxStorageBytes: 100,
+        monthlyAiTokenBudget: 100,
+        aiModelTier: 1,
+        billingCycleStart: { seconds: 1_756_684_800, nanos: 0 },
+        status: toProtoOrgStatus(OrgStatus.ACTIVE),
+      });
 
-    const response = await new Session(gateway.baseUrl).get(
-      `${API}/billing/subscription`,
-      as(['organization.read']),
-    );
+      const response = await new Session(gateway.baseUrl).get(
+        `${API}/billing/subscription`,
+        as(['organization.read']),
+      );
 
-    expect(response.status).toBe(200);
-    expect(peers.auth.calls('BillingService/GetSubscription')).toHaveLength(1);
-  });
+      expect(response.status).toBe(200);
+      expect(peers.auth.calls('BillingService/GetSubscription')).toHaveLength(
+        1,
+      );
+    },
+  );
 
   // ------------------------------------------------------------------ the wire
 
-  it('**CORS exposes every rate-limit header the gateway actually sends** (gap 39)', async () => {
-    const response = await new Session(gateway.baseUrl).get('/health', {
-      origin: ORIGIN,
-    });
+  rowFor('Ops')(
+    '**CORS exposes every rate-limit header the gateway actually sends** (gap 39)',
+    async () => {
+      const response = await new Session(gateway.baseUrl).get('/health', {
+        origin: ORIGIN,
+      });
 
-    const exposed = new Set(
-      (response.headers.get('access-control-expose-headers') ?? '')
-        .toLowerCase()
-        .split(',')
-        .map((value) => value.trim()),
-    );
-    // FIXME Property 'keys' does not exist on type 'Headers'.
-    const sent = [...response.headers.keys()].filter((name) =>
-      /^(x-ratelimit-|retry-after)/u.test(name),
-    );
+      const exposed = new Set(
+        (response.headers.get('access-control-expose-headers') ?? '')
+          .toLowerCase()
+          .split(',')
+          .map((value) => value.trim()),
+      );
+      // FIXME Property 'keys' does not exist on type 'Headers'.
+      const sent = [...response.headers.keys()].filter((name) =>
+        /^(x-ratelimit-|retry-after)/u.test(name),
+      );
 
-    expect(sent.length).toBeGreaterThan(0);
-    expect(sent.filter((name) => !exposed.has(name))).toEqual([]);
-    expect(response.headers.get('access-control-allow-origin')).toBe(ORIGIN);
-    expect(response.headers.get('access-control-allow-credentials')).toBe(
-      'true',
-    );
-  });
+      expect(sent.length).toBeGreaterThan(0);
+      expect(sent.filter((name) => !exposed.has(name))).toEqual([]);
+      expect(response.headers.get('access-control-allow-origin')).toBe(ORIGIN);
+      expect(response.headers.get('access-control-allow-credentials')).toBe(
+        'true',
+      );
+    },
+  );
 
-  it('a preflight from an origin outside the list is refused', async () => {
-    const allowed = await new Session(gateway.baseUrl).request(
-      'OPTIONS',
-      `${API}/auth/login`,
-      {
-        headers: {
-          origin: ORIGIN,
-          'access-control-request-method': 'POST',
-          'access-control-request-headers': 'content-type',
+  rowFor('Auth')(
+    'a preflight from an origin outside the list is refused',
+    async () => {
+      const allowed = await new Session(gateway.baseUrl).request(
+        'OPTIONS',
+        `${API}/auth/login`,
+        {
+          headers: {
+            origin: ORIGIN,
+            'access-control-request-method': 'POST',
+            'access-control-request-headers': 'content-type',
+          },
         },
-      },
-    );
-    const refused = await new Session(gateway.baseUrl).request(
-      'OPTIONS',
-      `${API}/auth/login`,
-      {
-        headers: {
-          origin: 'http://evil.example',
-          'access-control-request-method': 'POST',
+      );
+      const refused = await new Session(gateway.baseUrl).request(
+        'OPTIONS',
+        `${API}/auth/login`,
+        {
+          headers: {
+            origin: 'http://evil.example',
+            'access-control-request-method': 'POST',
+          },
         },
-      },
-    );
+      );
 
-    expect(allowed.headers.get('access-control-allow-origin')).toBe(ORIGIN);
-    expect(refused.headers.get('access-control-allow-origin')).toBeNull();
-  });
+      expect(allowed.headers.get('access-control-allow-origin')).toBe(ORIGIN);
+      expect(refused.headers.get('access-control-allow-origin')).toBeNull();
+    },
+  );
 
-  it('the helmet header set is on every response', async () => {
+  rowFor('Ops')('the helmet header set is on every response', async () => {
     const response = await new Session(gateway.baseUrl).get('/health');
 
     expect(response.headers.get('x-frame-options')).toBe('DENY');
@@ -235,63 +264,71 @@ describe('the error envelope and the edges around it', () => {
     );
   });
 
-  it('**the login tier refuses the sixth attempt** with `Retry-After`', async () => {
-    // Five per fifteen minutes per (ip, account). This run's Redis is its own,
-    // so the bucket starts empty and the row does not depend on what ran before.
-    const session = new Session(gateway.baseUrl);
-    const attempt = () =>
-      session.post(`${API}/auth/login`, {
-        email: 'rate@example.com',
-        password: 'whatever',
+  rowFor('Auth')(
+    '**the login tier refuses the sixth attempt** with `Retry-After`',
+    async () => {
+      // Five per fifteen minutes per (ip, account). This run's Redis is its own,
+      // so the bucket starts empty and the row does not depend on what ran before.
+      const session = new Session(gateway.baseUrl);
+      const attempt = () =>
+        session.post(`${API}/auth/login`, {
+          email: 'rate@example.com',
+          password: 'whatever',
+        });
+
+      peers.auth.on('AuthService/Login').always({
+        requiresTwoFactor: true,
+        requiresTenantSelection: false,
+        tenants: [],
       });
 
-    peers.auth.on('AuthService/Login').always({
-      requiresTwoFactor: true,
-      requiresTenantSelection: false,
-      tenants: [],
-    });
+      const statuses: number[] = [];
+      for (let index = 0; index < 6; index++) {
+        statuses.push((await attempt()).status);
+      }
+      const refused = await attempt();
 
-    const statuses: number[] = [];
-    for (let index = 0; index < 6; index++) {
-      statuses.push((await attempt()).status);
-    }
-    const refused = await attempt();
-
-    expect(refused.status).toBe(429);
-    expect(refused.headers.get('retry-after')).toBe('900');
-    expect(refused.headers.get('retry-after-authtier')).toBe('900');
-    expect((refused.body as { error: string }).error).toBe(
-      'Too many requests. Try again in 15 minutes!',
-    );
-    expect(statuses.filter((code) => code === 429)).toHaveLength(1);
-  });
+      expect(refused.status).toBe(429);
+      expect(refused.headers.get('retry-after')).toBe('900');
+      expect(refused.headers.get('retry-after-authtier')).toBe('900');
+      expect((refused.body as { error: string }).error).toBe(
+        'Too many requests. Try again in 15 minutes!',
+      );
+      expect(statuses.filter((code) => code === 429)).toHaveLength(1);
+    },
+  );
 
   // ------------------------------------------------------------------- the ops
 
-  it('**`/metrics` exports the job gauge with `scheduled_job`** (gap 37)', async () => {
-    const succeededAt = { seconds: 1_756_684_800, nanos: 0 };
-    peers.ticket.on('AnalyticsService/GetJobHealth').always({
-      items: [
-        {
-          jobName: SCHEDULED_JOBS.ANALYTICS_DAILY,
-          lastSucceededAt: succeededAt,
-          consecutiveFailures: 0,
-        },
-      ],
-    });
-    peers.ingestion.on('AiLedgerService/GetAiJobHealth').always({ items: [] });
-    peers.auth.on('PlatformService/GetAuthJobHealth').always({ items: [] });
+  rowFor('Ops')(
+    '**`/metrics` exports the job gauge with `scheduled_job`** (gap 37)',
+    async () => {
+      const succeededAt = { seconds: 1_756_684_800, nanos: 0 };
+      peers.ticket.on('AnalyticsService/GetJobHealth').always({
+        items: [
+          {
+            jobName: SCHEDULED_JOBS.ANALYTICS_DAILY,
+            lastSucceededAt: succeededAt,
+            consecutiveFailures: 0,
+          },
+        ],
+      });
+      peers.ingestion
+        .on('AiLedgerService/GetAiJobHealth')
+        .always({ items: [] });
+      peers.auth.on('PlatformService/GetAuthJobHealth').always({ items: [] });
 
-    const response = await fetch(`${gateway.metricsUrl}/metrics`);
-    const body = await response.text();
+      const response = await fetch(`${gateway.metricsUrl}/metrics`);
+      const body = await response.text();
 
-    expect(response.status).toBe(200);
-    expect(body).toContain('http_requests_total');
-    expect(body).toContain(
-      `job_last_success_timestamp_seconds{scheduled_job="${SCHEDULED_JOBS.ANALYTICS_DAILY}"`,
-    );
-    expect(body).toContain('owner_service=');
-    // The label Prometheus attaches itself must not be declared by the metric.
-    expect(body).not.toMatch(/job_last_success_timestamp_seconds\{job=/u);
-  });
+      expect(response.status).toBe(200);
+      expect(body).toContain('http_requests_total');
+      expect(body).toContain(
+        `job_last_success_timestamp_seconds{scheduled_job="${SCHEDULED_JOBS.ANALYTICS_DAILY}"`,
+      );
+      expect(body).toContain('owner_service=');
+      // The label Prometheus attaches itself must not be declared by the metric.
+      expect(body).not.toMatch(/job_last_success_timestamp_seconds\{job=/u);
+    },
+  );
 });

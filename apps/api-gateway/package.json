@@ -6,7 +6,8 @@
   "scripts": {
     "build": "nest build",
     "start:prod": "node dist/apps/api-gateway/src/main.js",
-    "dev": "nest start --watch",
+    "//dev": "Through the launcher, not `nest start` directly: `npm run dev` is `turbo run dev`, so with the Java gateway also declaring `dev` two gateways would start on one PORT and both would claim the implementation lease. The launcher starts only the one `GATEWAY_IMPL` selects, and unset means node — so this is unchanged for anyone not working on the Java gateway.",
+    "dev": "node ../../scripts/gateway-impl.mjs node",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\"",
     "clean": "rimraf dist *.tsbuildinfo"
   },

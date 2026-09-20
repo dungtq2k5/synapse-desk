@@ -43,6 +43,7 @@ import {
   OPENAPI_OUTPUT,
   assignEnvFileAt,
   firstDifferingLine,
+  openapiViolations,
   missingOutputs,
 } from './lib/openapi-export.cjs';
 
@@ -97,17 +98,36 @@ async function exportDocument() {
     canonicalizeEnums(document);
 
     const options = await prettier.resolveConfig(OUTPUT);
-    return await prettier.format(JSON.stringify(document, null, 2), {
+    const actual = await prettier.format(JSON.stringify(document, null, 2), {
       ...options,
       parser: 'json',
     });
+
+    // The formatted text AND the object: the text is what is compared and
+    // written, the object is what is validated. Re-parsing the text here
+    // would validate a different value from the one just built.
+    return { actual, document };
   } finally {
     await app.close();
   }
 }
 
 try {
-  const actual = await exportDocument();
+  const { actual, document } = await exportDocument();
+
+  // **Before the write AND before the drift comparison.** An invalid document
+  // must not reach the file, and must not pass CI if it is already in the
+  // file — the second is the half that was missing, and the half that let an
+  // invalid document be the published contract.
+  const violations = openapiViolations(document);
+  if (violations.length) {
+    console.error(
+      `${OPENAPI_OUTPUT} is not a valid OpenAPI 3 document (${violations.length} problems):\n` +
+        `${violations.slice(0, 10).join('\n')}` +
+        (violations.length > 10 ? `\n…and ${violations.length - 10} more` : ''),
+    );
+    process.exit(1);
+  }
 
   if (!CHECK) {
     writeFileSync(OUTPUT, actual);

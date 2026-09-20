@@ -1,4 +1,5 @@
 import { Module, OnApplicationShutdown } from '@nestjs/common';
+import { LeaseModule } from '../../common/lease/lease.module';
 import { HealthController } from './health.controller';
 import { VersionController } from './version.controller';
 import { VersionResolver } from './version.resolver';
@@ -7,6 +8,8 @@ import { RedisHealthService } from './redis-health.service';
 import { DrainState } from './drain-state.service';
 
 @Module({
+  // Readiness reports 503 while this process is a standby.
+  imports: [LeaseModule],
   controllers: [HealthController, VersionController],
   // `RedisHealthService` owns its own connection rather than reusing the
   // throttler's or the adapter's — see the class note. A shared client queues

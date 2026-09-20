@@ -1,4 +1,10 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import {
@@ -6,6 +12,7 @@ import {
   assignEnvFile,
   firstDifferingLine,
   missingOutputs,
+  openapiViolations,
 } from './openapi-export.cjs';
 
 /**
@@ -89,6 +96,74 @@ describe('the OpenAPI export — the pure half', () => {
       ['a\n', 'a\nextra\n', 2],
     ])('%j vs %j → %s', (expected, actual, line) => {
       expect(firstDifferingLine(expected, actual)).toBe(line);
+    });
+  });
+  describe('openapiViolations', () => {
+    /** The smallest document the OAS 3 meta-schema accepts. */
+    const valid = () => ({
+      openapi: '3.0.0',
+      info: { title: 'probe', version: '1' },
+      paths: {},
+      components: { schemas: {} },
+    });
+
+    it('a valid document reports nothing', () => {
+      expect(openapiViolations(valid())).toEqual([]);
+    });
+
+    it('**a BOOLEAN `required` is reported** — the shape that shipped as the contract', () => {
+      // `required` is an array of property names. The swagger plugin wrote it
+      // as a boolean inside an `items`, every guard stayed green, and the
+      // defect surfaced only when a code generator refused the file.
+      const document = valid();
+      document.components.schemas = {
+        Probe: {
+          type: 'object',
+          properties: { codes: { type: 'array', items: { required: false } } },
+        },
+      } as never;
+
+      expect(openapiViolations(document).join('\n')).toContain(
+        '/components/schemas/Probe/properties/codes/items',
+      );
+    });
+
+    it('a missing `info` is reported — the validator checks the whole document, not one rule', () => {
+      // The argument for a real validator over rules written from the bug
+      // already had: it knows the classes nobody here has thought of.
+      const document = valid() as Record<string, unknown>;
+      delete document.info;
+
+      expect(openapiViolations(document).length).toBeGreaterThan(0);
+    });
+
+    it('**the export script actually CALLS it, before the write and the comparison**', () => {
+      // A structural row, and it has to be: with a valid document in the tree,
+      // deleting the validation call changes nothing observable — `npm run
+      // openapi:check` exits 0 either way. Measured, as a sabotage that
+      // stayed green. So the guard is that the call EXISTS and runs first;
+      // what it does when it fires is the rows above.
+      const script = readFileSync(
+        join(__dirname, '..', 'export-openapi.mjs'),
+        'utf8',
+      );
+
+      const call = script.indexOf('openapiViolations(document)');
+      expect(call).toBeGreaterThan(-1);
+      // Before the branch, so one call covers both paths rather than the
+      // write path only — the check path is the half that was missing.
+      expect(call).toBeLessThan(script.indexOf('if (!CHECK)'));
+      expect(script).toContain('process.exit(1)');
+    });
+
+    it('the findings are readable lines, not validator objects', () => {
+      const document = valid() as Record<string, unknown>;
+      delete document.paths;
+
+      for (const violation of openapiViolations(document)) {
+        expect(typeof violation).toBe('string');
+        expect(violation).toMatch(/^\/.*: .+/u);
+      }
     });
   });
 });

@@ -1,0 +1,120 @@
+# The Java gateway's static configuration.
+#
+# **Values come from the environment, never from this file.** Every entry below
+# is a reference to a variable the Node gateway already reads, so the two
+# implementations are configured by one `apps/api-gateway/.env.example` and one
+# ConfigMap. A literal spelled here would be a second source of truth, and the
+# one that wins silently.
+#
+# **This file is also the env-name registry.** Relaxed binding would reach most
+# of these by convention, but not all — `JWT_2FA_NAME` has a digit where a word
+# boundary would have to be, `TENANT_SELECTION_NAME` and `DEVICE_TOKEN_NAME`
+# sit in the `jwt` group without the prefix, and `THROTTLER_*` binds a group
+# named `throttle`. Stating every mapping is shorter than the set of rules that
+# would cover those, and `EnvBindingContractTest` reads it rather than guessing.
+#
+# Only the two keys the Node schema gives a default carry one here, spelled the
+# same: `SWAGGER_ENABLED` and `METRICS_HOST`. Everything else is absent-means-
+# refuse, enforced by `@Validated` at context refresh rather than by a
+# placeholder — a bare `${…}` only refuses for keys something reads at startup,
+# which step 2 measured on `server.port`.
+spring:
+  application:
+    name: api-gateway-java
+  data:
+    redis:
+      # The same instance the Node gateway uses, and it must be: the
+      # implementation lease is one key both sides claim against. A Java
+      # gateway pointed at a different Redis would not exclude the Node one —
+      # it would serve beside it.
+      url: ${REDIS_URL}
+  main:
+    banner-mode: 'off'
+
+server:
+  port: ${PORT}
+
+# **The scrape listener is a SEPARATE server, not a path on the public one.**
+# A distinct port is what makes "not reachable from the internet" structural
+# rather than a rule a reverse proxy has to keep enforcing correctly forever,
+# and the host defaults to loopback so a deployment that never thought about
+# it is closed. Node does the same with its own listener.
+#
+# The endpoint is remapped to `/metrics` — Actuator would serve it at
+# `/actuator/prometheus`, and the scrape config, the dashboards and the Node
+# gateway all say `/metrics`.
+management:
+  server:
+    port: ${METRICS_PORT}
+    address: ${METRICS_HOST:127.0.0.1}
+  endpoints:
+    web:
+      base-path: /
+      exposure:
+        include: prometheus
+      path-mapping:
+        prometheus: metrics
+
+runtime:
+  node-env: ${NODE_ENV}
+  port: ${PORT}
+  global-prefix: ${GLOBAL_PREFIX}
+  swagger-enabled: ${SWAGGER_ENABLED:false}
+  app-version: ${APP_VERSION}
+  build-sha: ${BUILD_SHA}
+  build-time: ${BUILD_TIME}
+
+metrics:
+  port: ${METRICS_PORT}
+  host: ${METRICS_HOST:127.0.0.1}
+
+cors:
+  origins: ${CORS}
+
+stores:
+  redis-url: ${REDIS_URL}
+  nats-url: ${NATS_URL}
+
+grpc:
+  auth-service-url: ${AUTH_SERVICE_URL}
+  ticket-service-url: ${TICKET_SERVICE_URL}
+  ingestion-service-url: ${INGESTION_SERVICE_URL}
+  notification-service-url: ${NOTIFICATION_SERVICE_URL}
+  rag-service-url: ${RAG_SERVICE_URL}
+
+jwt:
+  access-name: ${JWT_ACCESS_NAME}
+  access-public-key-path: ${JWT_ACCESS_PUBLIC_KEY_PATH}
+  refresh-name: ${JWT_REFRESH_NAME}
+  two-factor-name: ${JWT_2FA_NAME}
+  two-factor-public-key-path: ${JWT_2FA_PUBLIC_KEY_PATH}
+  tenant-selection-name: ${TENANT_SELECTION_NAME}
+  device-token-name: ${DEVICE_TOKEN_NAME}
+
+cookie:
+  access-max-age: ${COOKIE_ACCESS_MAX_AGE}
+  refresh-max-age: ${COOKIE_REFRESH_MAX_AGE}
+  two-factor-max-age: ${COOKIE_2FA_MAX_AGE}
+  device-max-age: ${COOKIE_DEVICE_MAX_AGE}
+  tenant-selection-max-age: ${COOKIE_TENANT_SELECTION_MAX_AGE}
+  same-site: ${COOKIE_SAMESITE}
+
+throttle:
+  short-ttl: ${THROTTLER_SHORT_TTL}
+  short-limit: ${THROTTLER_SHORT_LIMIT}
+  medium-ttl: ${THROTTLER_MEDIUM_TTL}
+  medium-limit: ${THROTTLER_MEDIUM_LIMIT}
+  long-ttl: ${THROTTLER_LONG_TTL}
+  long-limit: ${THROTTLER_LONG_LIMIT}
+  auth-ttl: ${THROTTLER_AUTH_TTL}
+  auth-limit: ${THROTTLER_AUTH_LIMIT}
+  ws-handshake-limit: ${WS_HANDSHAKE_LIMIT}
+  ws-handshake-ttl: ${WS_HANDSHAKE_TTL}
+  ws-handshake-block-duration: ${WS_HANDSHAKE_BLOCK_DURATION}
+
+inbound:
+  secret: ${INBOUND_EMAIL_SECRET}
+  domain: ${INBOUND_EMAIL_DOMAIN}
+  sender: ${EMAIL_SENDER}
+  resend-webhook-secret: ${RESEND_WEBHOOK_SECRET}
+  resend-api-key: ${RESEND_GATEWAY_API_KEY}

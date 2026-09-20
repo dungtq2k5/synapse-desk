@@ -1,0 +1,116 @@
+# api-gateway-java — the second implementation of the SAME gateway.
+#
+# **It answers on the Service the Node gateway answers on**, which is what
+# makes a switch invisible to a client: the `app.kubernetes.io/name:
+# api-gateway` label is the selector, and both Deployments carry it. There is
+# no Service and no Ingress in this file for that reason — they are in
+# `api-gateway.yaml`, and a second pair would be a second address.
+#
+# **At rest it is `replicas: 0` with `strategy: Recreate`.** Between switches
+# there are no standby pods to go stale; and a deploy landing mid-switch
+# replaces its pods without waiting for Ready, which a standby never is.
+# Measured on minikube (plan 78 §5): the default RollingUpdate cannot replace
+# never-Ready pods, so a standby left on it takes a new image only halfway.
+#
+# **The role is an annotation on the DEPLOYMENT's metadata**, never the pod
+# template: flipping it must change no pod spec and start no rollout. It does
+# not GRANT the role — `GatewayLeaseService` does, through Redis — it records
+# which implementation is meant to be serving, for a human and for CD.
+#
+# **No init container.** api-gateway-java owns no Prisma schema — ADR 0043.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway-java
+  labels:
+    app.kubernetes.io/name: api-gateway
+  annotations:
+    synapsedesk.io/gateway-role: standby
+spec:
+  replicas: 0
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: api-gateway
+      app.kubernetes.io/component: java
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: api-gateway
+        # The Service selects on `name` alone, so this label does not change
+        # what it routes to — it exists so `kubectl get pods -l component=java`
+        # can tell the two implementations apart during a switch.
+        app.kubernetes.io/component: java
+    spec:
+      # Longer than (readiness periodSeconds x failureThreshold) plus the
+      # in-flight drain, as the Node side's is — and it also has to cover the
+      # lease's step-down, which stops consuming before releasing its entry.
+      terminationGracePeriodSeconds: 45
+      # Nothing in this pod talks to the Kubernetes API, so the token that
+      # would otherwise be mounted is a credential with no reader and a real
+      # blast radius. Off by declaration rather than by there being no
+      # RoleBinding: an unbound token still authenticates.
+      automountServiceAccountToken: false
+      containers:
+        - name: api-gateway-java
+          # A real tag, never a placeholder — CD rewrites it per deploy. See
+          # `api-gateway.yaml` for why `:latest` is worse here than in compose.
+          image: us-central1-docker.pkg.dev/synapsedesk/services/api-gateway-java:0c1c9e9270ec82b834a0b4914990c41a28f15d16
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 3000
+            - name: metrics
+              containerPort: 9464
+          # **The SAME ConfigMap and Secret the Node gateway reads.** Not a
+          # convenience: the implementation lease excludes within ONE Redis
+          # keyspace, so two gateways given different `REDIS_URL` values both
+          # claim and neither sees the other. Measured — the first run of the
+          # two-process test had them on databases 15 and 0, and both served.
+          envFrom:
+            - configMapRef:
+                name: api-gateway-config
+            - secretRef:
+                name: api-gateway-secret
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+            # Longer than the Node side's: a JVM's startup is the cost this
+            # whole standby design exists to keep outside the switch window,
+            # and a liveness probe that fired during it would restart the pod
+            # on a loop.
+            initialDelaySeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          volumeMounts:
+            # `JWT_*_PUBLIC_KEY_PATH` is `./secrets/*.pub` and the image's
+            # WORKDIR is `/app`, so this is where those relative paths
+            # resolve. Public halves only — this gateway verifies, never mints.
+            - name: jwt-public
+              mountPath: /app/secrets
+              readOnly: true
+          resources:
+            requests:
+              cpu: 200m
+              # Higher than the Node side's: a JVM's floor is its heap plus
+              # metaspace, and an OOMKill during a switch is the failure this
+              # arrangement cannot afford.
+              memory: 768Mi
+              ephemeral-storage: 256Mi
+            limits:
+              memory: 1536Mi
+              ephemeral-storage: 1Gi
+      volumes:
+        - name: jwt-public
+          secret:
+            secretName: api-gateway-jwt-public

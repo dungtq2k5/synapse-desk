@@ -19,7 +19,7 @@
 
 import { type ChildProcess, spawn } from 'node:child_process';
 import { createServer } from 'node:net';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseEnv } from 'node:util';
 import {
@@ -86,14 +86,50 @@ function commandFor(impl: string): { command: string; args: string[] } {
     };
   }
 
+  if (impl === 'java') {
+    return { command: 'java', args: ['-jar', javaJar()] };
+  }
+
   throw new Error(
-    `GATEWAY_IMPL=${impl} is not implemented here yet. 'node' today; 'java' ` +
-      'arrives with the Java gateway (plan 78 step 3).',
+    `GATEWAY_IMPL=${impl} is unknown. 'node' and 'java' are the two there ` +
+      'will ever be — see `GATEWAY_IMPLEMENTATIONS`.',
   );
+}
+
+/**
+ * The built jar, found by glob rather than named.
+ *
+ * The version is in `pom.xml`; repeating it here would be a second place to
+ * change it, and the failure of forgetting is a harness that cannot find a
+ * jar that exists. Exactly one match is required — two jars means a stale one
+ * is lying around, and picking either is a coin toss about which code runs.
+ */
+function javaJar(): string {
+  const target = join(REPO_ROOT, 'apps/api-gateway-java/target');
+  const jars = existsSync(target)
+    ? readdirSync(target).filter(
+        (name) => name.endsWith('.jar') && !name.endsWith('-sources.jar'),
+      )
+    : [];
+
+  if (jars.length !== 1) {
+    throw new Error(
+      `Expected exactly one jar in apps/api-gateway-java/target, found ${jars.length}` +
+        `${jars.length ? `: ${jars.join(', ')}` : ''}.\n` +
+        'Build it: npm run test:contract (which builds the selected implementation).',
+    );
+  }
+
+  return join(target, jars[0]);
 }
 
 /** Refuses to start against a build that does not exist. */
 function assertBuilt(impl: string): void {
+  // The jar's absence is checked by `javaJar()` when the command is built,
+  // with the same message shape. Staleness is not checked for either
+  // implementation — `run-contract-suite.mjs` builds first, which is the only
+  // answer that works (plan 80 departure 1: absence is detectable, staleness
+  // is not).
   if (impl !== 'node') return;
 
   const missing = missingOutputs(REPO_ROOT);

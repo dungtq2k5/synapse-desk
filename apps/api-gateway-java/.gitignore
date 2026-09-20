@@ -1,0 +1,4 @@
+# Maven's build directory. The npm workspaces ignore `dist/` at the root; this
+# is the same line for the same reason, kept beside the build that writes it
+# rather than in the root file, because it is the only Maven module here.
+target/

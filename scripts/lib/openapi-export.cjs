@@ -112,6 +112,35 @@ function firstDifferingLine(expected, actual) {
   return length;
 }
 
+/**
+ * Every way the document is not a valid OpenAPI 3 document, as readable lines.
+ *
+ * **Separate from the drift check, and both are needed.** `--check` proves the
+ * file MATCHES the gateway source; it cannot see that the source produces
+ * something invalid. A document that matched the code and was invalid is
+ * exactly what shipped: the swagger plugin wrote a boolean `required` inside
+ * an `items`, every guard here stayed green, and the defect surfaced only when
+ * a code generator refused the file.
+ *
+ * A real validator rather than rules written from the bug already had — it
+ * knows the classes nobody here has thought of, which is the whole failure
+ * this had. `openapi-schema-validator` bundles the meta-schemas, so this needs
+ * no network, and it is CommonJS, so this file can require it and ts-jest can
+ * test it.
+ *
+ * Returns [] for a valid document, so a caller reads it as a finding list.
+ *
+ * @example openapiViolations({ openapi: '3.0.0' }) // ["/: must have required property 'info'", …]
+ */
+function openapiViolations(document) {
+  const Validator = require('openapi-schema-validator').default;
+  const { errors } = new Validator({ version: 3 }).validate(document);
+
+  return errors.map(
+    (error) => `${error.instancePath || '/'}: ${error.message}`,
+  );
+}
+
 module.exports = {
   OPENAPI_OUTPUT,
   EXPORT_COMMAND,
@@ -122,4 +151,5 @@ module.exports = {
   assignEnvFile,
   assignEnvFileAt,
   firstDifferingLine,
+  openapiViolations,
 };

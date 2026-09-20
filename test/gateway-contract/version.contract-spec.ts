@@ -11,6 +11,7 @@
 import { type Gateway, startGateway } from './gateway';
 import { Session } from './client';
 import { readRunState } from './run-state';
+import { rowFor } from './pending';
 
 describe('the gateway under test', () => {
   let gateway: Gateway;
@@ -24,23 +25,29 @@ describe('the gateway under test', () => {
     await gateway.stop();
   });
 
-  it('**serves `/version` outside the prefix**, over real HTTP', async () => {
-    const response = await new Session(gateway.baseUrl).get<{
-      success: boolean;
-      data: { version: string; name: string };
-    }>('/version');
+  rowFor('Ops')(
+    '**serves `/version` outside the prefix**, over real HTTP',
+    async () => {
+      const response = await new Session(gateway.baseUrl).get<{
+        success: boolean;
+        data: { version: string; name: string };
+      }>('/version');
 
-    expect(response.status).toBe(200);
-    expect(response.body.success).toBe(true);
-    expect(response.body.data.version).toMatch(/^\d+\.\d+\.\d+/u);
-  });
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.version).toMatch(/^\d+\.\d+\.\d+/u);
+    },
+  );
 
-  it('answers `/health/ready` — what the harness waited on', async () => {
-    const response = await new Session(gateway.baseUrl).get<{
-      data: { ready: boolean };
-    }>('/health/ready');
+  rowFor('Ops')(
+    'answers `/health/ready` — what the harness waited on',
+    async () => {
+      const response = await new Session(gateway.baseUrl).get<{
+        data: { ready: boolean };
+      }>('/health/ready');
 
-    expect(response.status).toBe(200);
-    expect(response.body.data.ready).toBe(true);
-  });
+      expect(response.status).toBe(200);
+      expect(response.body.data.ready).toBe(true);
+    },
+  );
 });

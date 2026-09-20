@@ -139,7 +139,13 @@ export class ConfirmDocumentDto {
   @ArrayMaxSize(MAX_OCR_LANGUAGES)
   @IsIn(OCR_LANGUAGES, { each: true })
   @AtMostOneNonLatinScript()
-  @ApiPropertyOptional()
+  // **Options, not a bare `@ApiPropertyOptional()`.** The swagger plugin infers
+  // an array of a union-literal type as a nested array and writes a BOOLEAN
+  // `required` inside `items` — invalid OpenAPI, published as `string[][]`,
+  // and mandatory despite the decorator. Naming `isArray` and `enum` is what
+  // makes the inference unnecessary; `departmentIds: string[]` beside this
+  // needs none of it, because `string` is not a union.
+  @ApiPropertyOptional({ isArray: true, enum: OCR_LANGUAGES, default: [] })
   readonly ocrLanguages: OcrLanguage[] = [];
 }
 
@@ -179,7 +185,13 @@ export class ReplaceDocumentDto {
   @ArrayMaxSize(MAX_OCR_LANGUAGES)
   @IsIn(OCR_LANGUAGES, { each: true })
   @AtMostOneNonLatinScript()
-  @ApiPropertyOptional()
+  // **Options, not a bare `@ApiPropertyOptional()`.** The swagger plugin infers
+  // an array of a union-literal type as a nested array and writes a BOOLEAN
+  // `required` inside `items` — invalid OpenAPI, published as `string[][]`,
+  // and mandatory despite the decorator. Naming `isArray` and `enum` is what
+  // makes the inference unnecessary; `departmentIds: string[]` beside this
+  // needs none of it, because `string` is not a union.
+  @ApiPropertyOptional({ isArray: true, enum: OCR_LANGUAGES, default: [] })
   readonly ocrLanguages: OcrLanguage[] = [];
 }
 

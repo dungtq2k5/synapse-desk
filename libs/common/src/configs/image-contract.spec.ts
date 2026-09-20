@@ -116,6 +116,10 @@ describe('the image contract (static half)', () => {
         'Python — pip has no workspace hoisting to hide an undeclared ' +
         'import, and requirements.txt was audited for exactly that (its ' +
         'google-genai and flashrank docblocks are that audit)',
+      'apps/api-gateway-java':
+        'Maven — dependencies are declared in pom.xml, and Maven has no ' +
+        'hoisting to hide an undeclared one: a missing <dependency> is a ' +
+        'compile error, which is the same guarantee this scan buys for npm',
     };
 
     const workspaces = (): string[] =>
@@ -468,6 +472,11 @@ describe('the image contract (static half)', () => {
       const cases = [
         ['docker/node-service.Dockerfile', 'NODE_VERSION'],
         ['docker/rag-service.Dockerfile', 'PYTHON_VERSION'],
+        // Two ARGs, because the Java image's builder and runtime are
+        // different images — a JRE is not a Maven, and pinning one would
+        // leave the other floating.
+        ['docker/java-service.Dockerfile', 'MAVEN_VERSION'],
+        ['docker/java-service.Dockerfile', 'JRE_VERSION'],
       ] as const;
 
       for (const [file, name] of cases) {

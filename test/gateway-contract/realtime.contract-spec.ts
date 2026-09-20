@@ -29,6 +29,7 @@ import { API, Session } from './client';
 import { type Gateway, GATEWAY_ENV, startGateway } from './gateway';
 import { type Peers, startPeers, TEST_KEYS } from './peers';
 import { readRunState } from './run-state';
+import { rowFor } from './pending';
 
 describe('realtime across replicas, and the cache', () => {
   const ORGANIZATION = '55555555-5555-4555-8555-555555555555';
@@ -117,75 +118,86 @@ describe('realtime across replicas, and the cache', () => {
     await peers?.stop();
   });
 
-  it('**a relayed `ticket.*` event reaches a client on EACH replica exactly once**', async () => {
-    const onFirst = await connectClient(first, ALICE);
-    const onSecond = await connectClient(second, BOB);
-    const seenFirst = counter(onFirst, REALTIME_EVENTS.ticketCreated);
-    const seenSecond = counter(onSecond, REALTIME_EVENTS.ticketCreated);
+  rowFor('Tickets')(
+    '**a relayed `ticket.*` event reaches a client on EACH replica exactly once**',
+    async () => {
+      const onFirst = await connectClient(first, ALICE);
+      const onSecond = await connectClient(second, BOB);
+      const seenFirst = counter(onFirst, REALTIME_EVENTS.ticketCreated);
+      const seenSecond = counter(onSecond, REALTIME_EVENTS.ticketCreated);
 
-    // Published as a Nest `ClientProxy` publishes: the `{pattern, data}`
-    // envelope. A raw publish of the event itself reaches the handler as
-    // `undefined` — the rule `nats.config.ts` states.
-    const event = {
-      pattern: TICKET_PATTERNS.created,
-      organizationId: ORGANIZATION,
-      ticketId: '88888888-8888-4888-8888-888888888888',
-      occurredAt: new Date().toISOString(),
-      ticketNumber: 42,
-      authorId: ALICE,
-      source: 1,
-      title: 'Printer is on fire',
-    };
-    nats.publish(
-      TICKET_PATTERNS.created,
-      JSONCodec().encode({ pattern: TICKET_PATTERNS.created, data: event }),
-    );
-    await nats.flush();
-    await settle();
+      // Published as a Nest `ClientProxy` publishes: the `{pattern, data}`
+      // envelope. A raw publish of the event itself reaches the handler as
+      // `undefined` — the rule `nats.config.ts` states.
+      const event = {
+        pattern: TICKET_PATTERNS.created,
+        organizationId: ORGANIZATION,
+        ticketId: '88888888-8888-4888-8888-888888888888',
+        occurredAt: new Date().toISOString(),
+        ticketNumber: 42,
+        authorId: ALICE,
+        source: 1,
+        title: 'Printer is on fire',
+      };
+      nats.publish(
+        TICKET_PATTERNS.created,
+        JSONCodec().encode({ pattern: TICKET_PATTERNS.created, data: event }),
+      );
+      await nats.flush();
+      await settle();
 
-    expect([seenFirst(), seenSecond()]).toEqual([1, 1]);
-  });
+      expect([seenFirst(), seenSecond()]).toEqual([1, 1]);
+    },
+  );
 
-  it('**presence still CROSSES replicas** — the row that fails if `local` is over-applied', async () => {
-    const watcher = await connectClient(second, BOB);
-    const changer = await connectClient(first, ALICE);
+  rowFor('Tickets')(
+    '**presence still CROSSES replicas** — the row that fails if `local` is over-applied',
+    async () => {
+      const watcher = await connectClient(second, BOB);
+      const changer = await connectClient(first, ALICE);
 
-    let seen = 0;
-    watcher.on(
-      REALTIME_EVENTS.presence,
-      (frame: { data: { userId: string; state: string } }) => {
-        if (frame.data.userId === ALICE && frame.data.state === 'busy') {
-          seen += 1;
-        }
-      },
-    );
+      let seen = 0;
+      watcher.on(
+        REALTIME_EVENTS.presence,
+        (frame: { data: { userId: string; state: string } }) => {
+          if (frame.data.userId === ALICE && frame.data.state === 'busy') {
+            seen += 1;
+          }
+        },
+      );
 
-    await changer.emitWithAck(CLIENT_EVENTS.presenceUpdate, { state: 'busy' });
-    await settle();
+      await changer.emitWithAck(CLIENT_EVENTS.presenceUpdate, {
+        state: 'busy',
+      });
+      await settle();
 
-    expect(seen).toBe(1);
-    // And the room it was addressed to is the tenant's, not a ticket's.
-    expect(orgRoom(ORGANIZATION)).toBe(`org:${ORGANIZATION}`);
-  });
+      expect(seen).toBe(1);
+      // And the room it was addressed to is the tenant's, not a ticket's.
+      expect(orgRoom(ORGANIZATION)).toBe(`org:${ORGANIZATION}`);
+    },
+  );
 
-  it('**a cached read does not reach the peer twice**', async () => {
-    // Half the cache class: the eviction rows — a mutation, and the NATS
-    // event — are still to write, and they assert the opposite (the peer IS
-    // called again).
-    const session = new Session(first.baseUrl);
-    const headers = {
-      cookie: `${GATEWAY_ENV.JWT_ACCESS_NAME}=${token(ALICE)}`,
-    };
-    peers.auth.on('RoleService/ListPermissions').always({
-      items: [
-        { id: '1', code: 'role.read', name: 'Read roles', group: 'role' },
-      ],
-    });
+  rowFor('Permissions')(
+    '**a cached read does not reach the peer twice**',
+    async () => {
+      // Half the cache class: the eviction rows — a mutation, and the NATS
+      // event — are still to write, and they assert the opposite (the peer IS
+      // called again).
+      const session = new Session(first.baseUrl);
+      const headers = {
+        cookie: `${GATEWAY_ENV.JWT_ACCESS_NAME}=${token(ALICE)}`,
+      };
+      peers.auth.on('RoleService/ListPermissions').always({
+        items: [
+          { id: '1', code: 'role.read', name: 'Read roles', group: 'role' },
+        ],
+      });
 
-    const firstRead = await session.get(`${API}/permissions`, headers);
-    const secondRead = await session.get(`${API}/permissions`, headers);
+      const firstRead = await session.get(`${API}/permissions`, headers);
+      const secondRead = await session.get(`${API}/permissions`, headers);
 
-    expect([firstRead.status, secondRead.status]).toEqual([200, 200]);
-    expect(peers.auth.calls('RoleService/ListPermissions')).toHaveLength(1);
-  });
+      expect([firstRead.status, secondRead.status]).toEqual([200, 200]);
+      expect(peers.auth.calls('RoleService/ListPermissions')).toHaveLength(1);
+    },
+  );
 });

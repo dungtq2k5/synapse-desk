@@ -4,6 +4,10 @@ import { join } from 'node:path';
 import { load } from 'js-yaml';
 import { envDocumentedKeys } from '../testing/env-file';
 import { stripComments } from '../testing/strip-comments';
+import {
+  SHARES_ENVIRONMENT_WITH,
+  withOwnEnvironment,
+} from '../testing/service-workspaces';
 
 /**
  * The Kubernetes manifests, checked against the application they deploy.
@@ -91,9 +95,12 @@ describe('the manifest contract', () => {
   };
 
   const services = (): string[] =>
-    gitFiles('apps/*/package.json')
-      .map((file) => file.split('/')[1])
-      .sort();
+    // `withOwnEnvironment` drops `api-gateway-java`, which shares
+    // `api-gateway`'s `.env.example` and ConfigMap rather than owning a
+    // second copy of the same values — see `SHARES_ENVIRONMENT_WITH`.
+    withOwnEnvironment(
+      gitFiles('apps/*/package.json').map((file) => file.split('/')[1]),
+    ).sort();
 
   const documented = (service: string): Set<string> =>
     envDocumentedKeys(read(`apps/${service}/.env.example`));
@@ -108,12 +115,15 @@ describe('the manifest contract', () => {
 
   // -------------------------------------------------------------- the floors
 
-  it('**the corpus is not empty** — seven Deployments, seven Services, one Ingress', () => {
+  it('**the corpus is not empty** — eight Deployments, seven Services, one Ingress', () => {
     // The pattern-fires floor every scan in this repo carries. Checks 1–6 all
     // iterate over this corpus, so a glob that matched nothing would make all
     // six vacuously green — the failure mode a check exists to prevent,
     // arriving through the check.
-    expect(byKind('Deployment')).toHaveLength(7);
+    // EIGHT, not seven: the gateway has two Deployments, one per
+    // implementation, sharing one Service. That asymmetry is the whole switch
+    // mechanism, so the count is stated rather than derived from `services()`.
+    expect(byKind('Deployment')).toHaveLength(8);
     // Nine: the seven application Services, plus `nats` and `qdrant`, which are
     // StatefulSets and need a Service each to be addressable.
     expect(byKind('Service')).toHaveLength(9);
@@ -133,7 +143,14 @@ describe('the manifest contract', () => {
         .sort(),
     ).toEqual(['notification-service-egress', 'storage-service-egress']);
     expect(byKind('ConfigMap')).toHaveLength(7);
-    expect([...deployments().keys()].sort()).toEqual(services());
+    // The services, PLUS the workspaces that share one of their
+    // environments — `api-gateway-java` is a second Deployment of the same
+    // gateway, so it has no environment of its own and is not a `service()`,
+    // but it is very much a Deployment. Derived from the same registry the
+    // env guards use, so a third implementation needs no edit here.
+    expect([...deployments().keys()].sort()).toEqual(
+      [...services(), ...Object.keys(SHARES_ENVIRONMENT_WITH)].sort(),
+    );
   });
 
   it('**both egress policies refuse the SAME private ranges**', () => {
@@ -680,5 +697,121 @@ describe('the manifest contract', () => {
     );
 
     expect([...withInit].sort()).toEqual([...withSchema].sort());
+  });
+
+  // ------------------------------------------- 9. exactly one gateway serves
+
+  it('9. **exactly one gateway Deployment is `active`**, and a standby cannot roll', () => {
+    // Plan 78 §6. The annotation does not grant the role — `GatewayLeaseService`
+    // does, through Redis — so this row guards the RECORD: the thing a human
+    // reads before a switch and the thing CD's rollout-wait branches on. Two
+    // Deployments annotated `active` would not break the exclusion; they would
+    // make CD wait for a Deployment that is standing by, which fails every
+    // deploy five minutes at a time.
+    const ROLE = 'synapsedesk.io/gateway-role';
+    const gateways = byKind('Deployment').filter(({ doc }) =>
+      (doc.metadata?.name ?? '').startsWith('api-gateway'),
+    );
+
+    // A floor, not a fixture: today Node alone, later Node and Java. Zero would
+    // mean the name changed and every assertion below ran over nothing.
+    expect(gateways.length).toBeGreaterThanOrEqual(1);
+
+    const findings: string[] = [];
+    let active = 0;
+
+    for (const { file, doc } of gateways) {
+      const metadata = doc.metadata as {
+        name?: string;
+        labels?: Record<string, string>;
+        annotations?: Record<string, string>;
+      };
+      const spec = doc.spec as {
+        replicas?: number;
+        strategy?: { type?: string };
+        template?: { metadata?: { annotations?: Record<string, string> } };
+      };
+      const role = metadata.annotations?.[ROLE];
+      const name = metadata.name ?? file;
+
+      // On the Deployment, never the pod template: an annotation in the pod
+      // template is part of the pod spec, so a role flip would roll every pod.
+      if (spec.template?.metadata?.annotations?.[ROLE] !== undefined) {
+        findings.push(`${name}: ${ROLE} is on the pod template`);
+      }
+
+      // Both halves answer on the same Service, which is what makes the switch
+      // invisible to a client.
+      if (metadata.labels?.['app.kubernetes.io/name'] !== 'api-gateway') {
+        findings.push(
+          `${name}: not labelled app.kubernetes.io/name=api-gateway`,
+        );
+      }
+
+      if (role === 'active') {
+        active += 1;
+        if (!(spec.replicas && spec.replicas > 0)) {
+          findings.push(`${name}: active with replicas=${spec.replicas}`);
+        }
+        if (spec.strategy?.type !== 'RollingUpdate') {
+          findings.push(`${name}: active with strategy=${spec.strategy?.type}`);
+        }
+      } else if (role === 'standby') {
+        // Measured on minikube (plan 78 §5): the default RollingUpdate cannot
+        // replace pods that are never Ready, so a standby left on it takes a
+        // new image only halfway and holds the rest until it becomes active.
+        if (spec.strategy?.type !== 'Recreate') {
+          findings.push(
+            `${name}: standby with strategy=${spec.strategy?.type}`,
+          );
+        }
+      } else {
+        findings.push(`${name}: ${ROLE} is ${role ?? 'absent'}`);
+      }
+    }
+
+    expect(findings).toEqual([]);
+    expect(active).toBe(1);
+  });
+
+  it('10. **both gateways read the SAME ConfigMap and Secret**', () => {
+    // The lease excludes within ONE Redis keyspace. Two gateway Deployments
+    // given different `REDIS_URL` values both claim, neither sees the other,
+    // and both serve — which is the single outcome the lease exists to
+    // prevent, arriving through an `envFrom` list rather than through the
+    // lease. Measured on the way in: the first run of the two-process test
+    // had the two implementations on Redis databases 15 and 0, and the
+    // symptom read as "the other side never claimed".
+    //
+    // Names rather than values, because the values are one indirection away
+    // and only equal at runtime — the realistic drift is a second ConfigMap.
+    const gateways = byKind('Deployment').filter(({ doc }) =>
+      (doc.metadata?.name ?? '').startsWith('api-gateway'),
+    );
+
+    expect(gateways.length).toBeGreaterThanOrEqual(2);
+
+    const sources = gateways.map(({ doc }) => {
+      const containers = containersOf(doc) as {
+        envFrom?: {
+          configMapRef?: { name?: string };
+          secretRef?: { name?: string };
+        }[];
+      }[];
+
+      return containers
+        .flatMap((container) => container.envFrom ?? [])
+        .map(
+          (source) => source.configMapRef?.name ?? source.secretRef?.name ?? '',
+        )
+        .sort();
+    });
+
+    // Every gateway's set, identical to the first one's.
+    for (const source of sources) {
+      expect(source).toEqual(sources[0]);
+    }
+    // And not empty: two Deployments with no `envFrom` at all would agree.
+    expect(sources[0].length).toBeGreaterThanOrEqual(2);
   });
 });

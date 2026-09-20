@@ -437,6 +437,10 @@ export class CreatePlanDto {
   // The transform exists for QUERY STRINGS, where everything is text.
   @IsOptional()
   @IsBoolean()
+  // The rule this file already states at `sortBy`: the plugin derives
+  // `required` from TYPESCRIPT optionality, so a defaulted non-optional field
+  // is published as mandatory and a generated client refuses to omit it.
+  @ApiPropertyOptional({ default: true })
   readonly isActive: boolean = true;
 
   // `[]`, not `?`. A `repeated` field cannot express absent-versus-empty on the
