@@ -1,6 +1,8 @@
 import { faker } from '@faker-js/faker';
 import {
+  CLIENT_EVENTS,
   DOCUMENT_PATTERNS,
+  REALTIME_EVENTS,
   TICKET_PATTERNS,
   TicketSource,
 } from '@synapsedesk/common';
@@ -8,10 +10,6 @@ import { of } from 'rxjs';
 import type { Socket as ClientSocket } from 'socket.io-client';
 import { RealtimeFixture, bootstrapRealtimeTest } from '../utils';
 import { timestamp } from '../fixtures/wire';
-import {
-  CLIENT_EVENTS,
-  REALTIME_EVENTS,
-} from '../../src/modules/realtime/realtime.config';
 
 /**
  * Two gateway replicas, one Redis, one NATS: every realtime frame arrives once.

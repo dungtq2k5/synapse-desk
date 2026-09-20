@@ -1,18 +1,16 @@
 import { Controller, Logger } from '@nestjs/common';
 import { EventPattern, Payload } from '@nestjs/microservices';
 import {
-  TICKET_PATTERNS,
-  TicketEventOf,
   formatErrorMsg,
-} from '@synapsedesk/common';
-import { RealtimeGateway } from './realtime.gateway';
-import {
   orgRoom,
   REALTIME_EVENTS,
+  TICKET_PATTERNS,
+  TicketEventOf,
   ticketInternalRoom,
   ticketRoom,
   userRoom,
-} from './realtime.config';
+} from '@synapsedesk/common';
+import { RealtimeGateway } from './realtime.gateway';
 
 /**
  * The translation layer: NATS in, WebSocket out.

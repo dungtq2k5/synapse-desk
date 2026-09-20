@@ -14,12 +14,21 @@ import { Server, Socket } from 'socket.io';
 import { isUUID, validate } from 'class-validator';
 import { plainToInstance } from 'class-transformer';
 import {
+  CLIENT_EVENTS,
+  ClientEvent,
+  deptRoom,
+  formatErrorMsg,
   isFullJwtPayload,
   JwtPayload,
   MaybeJwtPayload,
   NodeEnv,
+  orgRoom,
+  REALTIME_EVENTS,
+  RealtimeRoom,
   RequestContext,
-  formatErrorMsg,
+  ticketInternalRoom,
+  ticketRoom,
+  userRoom,
 } from '@synapsedesk/common';
 import { SecureGateway } from '../../common/decorators/secure-gateway.decorator';
 import { clientSafeMessage } from '../../common/filters/client-safe-message';
@@ -43,18 +52,9 @@ import {
   TypingPayloadDto,
 } from './dto/realtime-payload.dto';
 import {
-  CLIENT_EVENTS,
-  ClientEvent,
-  deptRoom,
   PresenceState,
-  orgRoom,
-  REALTIME_EVENTS,
-  RealtimeRoom,
-  ticketInternalRoom,
-  ticketRoom,
   TYPING_RELAY_INTERVAL_MS,
   TYPING_TTL_MS,
-  userRoom,
   WS_EVENT_LIMITS,
 } from './realtime.config';
 

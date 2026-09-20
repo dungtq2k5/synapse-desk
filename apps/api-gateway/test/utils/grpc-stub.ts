@@ -53,13 +53,15 @@ import {
  * Every proto service the gateway consumes, mocked.
  *
  * Auto-mocked via `mock<T>()` rather than hand-listed method by method: there
- * are sixteen services and well over a hundred RPCs between them, and a
+ * are twenty-three services and well over a hundred RPCs between them, and a
  * hand-written literal is a second place to update every time an RPC is added —
  * one that fails at runtime with `undefined is not a function`, several layers
  * below the test that actually broke.
  *
- * Both PEERS are covered here — auth-service's ten services and ticket-service's
- * six. They arrive at the gateway through different DI tokens
+ * Every PEER is covered here — auth-service's eleven services (billing among
+ * them), ticket-service's seven (analytics among them), ingestion-service's
+ * three, and one each for rag and notification. They arrive at the gateway
+ * through different DI tokens
  * (`AUTH_GRPC_CLIENT`, `TICKET_GRPC_CLIENT`), and `bootstrapE2eTest` overrides
  * both with this one `ClientGrpc`: the map is keyed by SERVICE name, which is
  * unique across both packages, so one stub can serve both tokens.

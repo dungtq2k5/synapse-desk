@@ -21,6 +21,7 @@ import {
 import {
   AnswerStatus as DomainAnswerStatus,
   NodeEnv,
+  REALTIME_EVENTS,
   RequestContext,
 } from '@synapsedesk/common';
 import type { ErrorResponse } from '../../common/interfaces/http-response.interface';
@@ -31,7 +32,6 @@ import { TicketsService } from '../tickets/tickets.service';
 import { ListMessagesQueryDto } from '../tickets/dto/rest/message.dto';
 import { CitationResponseDto } from '../tickets/dto/rest/message-response.dto';
 import { toCitationResponseDto } from '../tickets/citation.mapper';
-import { REALTIME_EVENTS } from './realtime.config';
 import {
   AiStreamAttachmentsSkippedPayloadDto,
   AiStreamChunkPayloadDto,

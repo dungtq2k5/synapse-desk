@@ -5,9 +5,10 @@ import {
   NOTIFICATION_REALTIME_PATTERNS,
   NotificationReadPayload,
   NotificationRealtimePayload,
+  REALTIME_EVENTS,
+  userRoom,
 } from '@synapsedesk/common';
 import { RealtimeGateway } from './realtime.gateway';
-import { REALTIME_EVENTS, userRoom } from './realtime.config';
 
 /**
  * Domain E's events → sockets.

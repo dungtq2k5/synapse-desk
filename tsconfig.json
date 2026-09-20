@@ -20,7 +20,10 @@
     // nothing — and this directory landed outside the include three documents
     // after the seeder did. `typecheck-coverage.spec.ts` is what turns this
     // list from a series of patches into a rule.
-    "test/system/**/*"
+    "test/system/**/*",
+    // The gateway contract harness, same rule: it starts a process and asserts
+    // wire shapes, so a type error in a row is a row that proves nothing.
+    "test/gateway-contract/**/*"
   ],
   // The two harness jest configs are the header's jest-config case again: they
   // import each other with the explicit `.ts` extension jest's ESM loading

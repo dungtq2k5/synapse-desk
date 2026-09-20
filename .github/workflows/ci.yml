@@ -110,6 +110,34 @@ jobs:
       # created and never started.
       - run: npm run openapi:check
 
+  # -------------------------------------------------------------- contract
+  #
+  # **The gateway as a PROCESS, with fake peers.** One suite that either
+  # implementation must pass: `GATEWAY_IMPL` selects it, and this job runs the
+  # Node one. When the Java gateway exists this becomes a matrix over that
+  # variable and the same rows run twice.
+  #
+  # Docker is all it needs — the harness starts its own Redis and NATS on
+  # ephemeral ports and stops them in teardown, so it shares no state with the
+  # `e2e` job's compose stack and the two may run concurrently.
+  contract:
+    name: contract (gateway, GATEWAY_IMPL=node)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      # `test:contract` builds the gateway itself; this keeps the build failure
+      # separate from a suite failure when one happens.
+      - run: npm run build
+      - run: npm run test:contract
+        env:
+          GATEWAY_IMPL: node
+
   # ------------------------------------------------------------------ unit
   #
   # No infrastructure, by design — `test/system/jest.config.ts` states the

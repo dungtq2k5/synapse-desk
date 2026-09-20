@@ -823,6 +823,32 @@ expect(cookies.some((c) => c.startsWith(`${twoFaCookieName}=`))).toBe(false);
 
 **Assert on the envelope**, not the raw body (§5.1). A test reaching into `res.body.data` without checking `res.body.success` will pass on an error response that happens to carry a `data` key.
 
+### 13.4b The contract harness — the gateway as a process
+
+`test/gateway-contract/` starts the **built** gateway as a separate process,
+puts real gRPC servers behind it (generated from the same `.proto` files it
+loads) and asserts only what a client can see: status, envelope, headers,
+cookies, socket frames, published NATS messages, the metrics port.
+
+**Which suite a behaviour belongs in:**
+
+| The behaviour is about | Suite |
+| :--- | :--- |
+| a wire fact — a header, a cookie flag, an envelope field, a frame, a metric name | `test/gateway-contract/` |
+| routing, guards composing, DI wiring, a mapper's shape | `apps/api-gateway/test/` (13.4) |
+| several real services together | `test/system/` |
+
+Two things follow from "as a process". It boots the build, so
+`npm run test:contract` builds first — a source edit tested against the
+previous build passes for the wrong reason. And it has no handle inside the
+gateway: a peer is programmed by answering its RPC, never by
+`overrideProvider`, and an assertion about an outgoing call reads the peer's
+**recording** of the request and its metadata.
+
+**A row here is the one the Java gateway must also pass** (plan 78), so a
+wire behaviour that only the in-process suite pins is a behaviour the second
+implementation is free to get wrong.
+
 ### 13.5 What never gets mocked, and what always does
 
 | Always mock | Never mock |

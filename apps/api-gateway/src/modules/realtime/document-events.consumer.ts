@@ -1,18 +1,16 @@
 import { Controller, Logger } from '@nestjs/common';
 import { EventPattern, Payload } from '@nestjs/microservices';
 import {
+  deptRoom,
   DOCUMENT_PATTERNS,
   DocumentEventOf,
   formatErrorMsg,
-} from '@synapsedesk/common';
-import { RealtimeGateway } from './realtime.gateway';
-import {
-  deptRoom,
   orgRoom,
   REALTIME_EVENTS,
   RealtimeRoom,
   userRoom,
-} from './realtime.config';
+} from '@synapsedesk/common';
+import { RealtimeGateway } from './realtime.gateway';
 
 /**
  * Domain C's half of the relay — Knowledge & RAG (`ingestion-service` +

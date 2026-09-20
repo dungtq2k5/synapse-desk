@@ -4,7 +4,9 @@ import { Observable, of, Subject, throwError } from 'rxjs';
 import { faker } from '@faker-js/faker';
 import { status as GrpcStatus } from '@grpc/grpc-js';
 import {
+  CLIENT_EVENTS,
   DOCUMENT_PATTERNS,
+  REALTIME_EVENTS,
   ReassignmentReason,
   TICKET_PATTERNS,
   TicketDomainEvent,
@@ -32,10 +34,7 @@ import {
   wireMessage,
   wirePage,
 } from '../fixtures/wire';
-import {
-  CLIENT_EVENTS,
-  REALTIME_EVENTS,
-} from '../../src/modules/realtime/realtime.config';
+
 import {
   AiStreamChunkPayloadDto,
   AiStreamDonePayloadDto,

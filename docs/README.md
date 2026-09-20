@@ -19,7 +19,7 @@ Not internal specs. Each one is the **contract** a client codes against, and eac
 | Document | Audience | Source of truth it mirrors |
 | :--- | :--- | :--- |
 | [graphql-api.md](./graphql-api.md) | Front end | `apps/api-gateway/src/schema.gql` (the committed SDL) and the resolvers behind it |
-| [websocket-api.md](./websocket-api.md) | Front end | `realtime.config.ts` (events, limits), `realtime.gateway.ts` (handshake) |
+| [websocket-api.md](./websocket-api.md) | Front end | `libs/common/src/contracts/realtime.contract.ts` (event names, rooms), `realtime.config.ts` (limits, timings), `realtime.gateway.ts` (handshake) |
 | [webhooks.md](./webhooks.md) | Customer integrators | `libs/common/src/contracts/webhook.contract.ts` (payload, signing, every constant) |
 
 **A change to any of those source files is a change to a published contract.** These are the only documents here read by people who cannot see the code, so drift in them is not a stale note — it is a receiver that verifies a signature wrongly, or a client that waits forever for an event that was renamed.
