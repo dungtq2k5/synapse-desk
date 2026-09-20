@@ -25,7 +25,7 @@ describe('Job staleness alerts', () => {
 
     for (const job of Object.values(SCHEDULED_JOBS)) {
       expect(rules).toContain(
-        `job_last_success_timestamp_seconds{job="${job}"}`,
+        `job_last_success_timestamp_seconds{scheduled_job="${job}"}`,
       );
     }
   });
@@ -40,7 +40,7 @@ describe('Job staleness alerts', () => {
 
     for (const job of Object.values(SCHEDULED_JOBS)) {
       expect(rules).toContain(
-        `absent(job_last_success_timestamp_seconds{job="${job}"})`,
+        `absent(job_last_success_timestamp_seconds{scheduled_job="${job}"})`,
       );
     }
   });
@@ -94,6 +94,17 @@ describe('Job staleness alerts', () => {
     ).not.toThrow();
   });
 
+  it('**1b. the selector and the summary name the job by `scheduled_job`, never `job`**', () => {
+    // `job` is the label Prometheus attaches to every scraped series (the
+    // scrape job, `api-gateway`). A selector on it matches nothing, and a
+    // summary reading `$labels.job` names the scrape target instead of the job.
+    const rules = committed();
+
+    expect(rules).not.toMatch(/\{job="/u);
+    expect(rules).not.toContain('$labels.job ');
+    expect(rules).toContain('{{ $labels.scheduled_job }}');
+  });
+
   it('5. the threshold is TWICE the interval, matching the in-app verdict', () => {
     // The Prometheus rule and `checkStaleness()` must agree, or the dashboard
     // and the pager tell an operator different stories about the same job. Two
@@ -101,8 +112,10 @@ describe('Job staleness alerts', () => {
     const rules = committed();
 
     expect(rules).toContain(
-      `job="${SCHEDULED_JOBS.ANALYTICS_DAILY}"} > 172800`,
+      `scheduled_job="${SCHEDULED_JOBS.ANALYTICS_DAILY}"} > 172800`,
     );
-    expect(rules).toContain(`job="${SCHEDULED_JOBS.LEDGER_HOURLY}"} > 7200`);
+    expect(rules).toContain(
+      `scheduled_job="${SCHEDULED_JOBS.LEDGER_HOURLY}"} > 7200`,
+    );
   });
 });

@@ -18,6 +18,7 @@ import {
   RetrievalDegradation,
   TICKET_PRIORITIES,
   TicketPriority,
+  withHttpStatus,
 } from '@synapsedesk/common';
 
 /**
@@ -345,7 +346,10 @@ export class RagClientService implements OnModuleInit {
     return Promise.reject(
       new RpcException({
         code: status.UNAVAILABLE,
-        message: 'Similar-ticket search is not yet available',
+        message: withHttpStatus(
+          503,
+          'Similar-ticket search is not yet available',
+        ),
       }),
     );
   }
@@ -358,7 +362,7 @@ export class RagClientService implements OnModuleInit {
 
       throw new RpcException({
         code: status.UNAVAILABLE,
-        message: `${capability} is not yet available`,
+        message: withHttpStatus(503, `${capability} is not yet available`),
       });
     }
 
@@ -395,7 +399,7 @@ export class RagClientService implements OnModuleInit {
 
       throw new RpcException({
         code: status.UNAVAILABLE,
-        message: 'The AI service is not responding',
+        message: withHttpStatus(503, 'The AI service is not responding'),
       });
     }
   }

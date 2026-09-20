@@ -25,6 +25,7 @@ import {
   STORAGE_PATTERNS,
   SupersededReason,
   systemContext,
+  withHttpStatus,
 } from '@synapsedesk/common';
 
 /**
@@ -275,7 +276,7 @@ export class StorageReferenceService implements OnModuleInit {
 
     return new RpcException({
       code: status.UNAVAILABLE,
-      message: 'File storage is currently unavailable',
+      message: withHttpStatus(503, 'File storage is currently unavailable'),
     });
   }
 }

@@ -10,6 +10,7 @@ import {
   isUniqueConstraintViolation,
   requireActor,
   requireTenant,
+  withHttpStatus,
 } from '@synapsedesk/common';
 import {
   toProtoAiModelTier,
@@ -154,7 +155,7 @@ export class PlanChangeService {
     // An ASSERTION, not a value — it throws when the caller has no actor. Read
     // as a leftover otherwise, which is why it is voided rather than called
     // bare: a plan change is an act somebody is accountable for.
-    void requireActor(context);
+    requireActor(context);
 
     const { organization, plan } = await this.resolve(request, context);
 
@@ -323,7 +324,7 @@ export class PlanChangeService {
     // 3 — the caller sends both ids and they must agree. Trusting `priceId`
     // alone would let a caller name Pro's plan and Starter's price; trusting
     // `planId` alone would charge them for a price the plan does not own.
-    if (!price || price.planId !== request.planId) {
+    if (price?.planId !== request.planId) {
       throw new RpcException({
         code: status.INVALID_ARGUMENT,
         message: `'${request.priceId}' is not a price on that plan`,
@@ -501,8 +502,10 @@ function planChangeFailure(error: Stripe.errors.StripeError): {
   ) {
     return {
       code: status.UNAVAILABLE,
-      message:
+      message: withHttpStatus(
+        503,
         'Your payment provider could not be reached just now — please try again shortly',
+      ),
     };
   }
 

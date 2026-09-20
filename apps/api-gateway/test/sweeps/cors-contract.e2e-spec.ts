@@ -3,7 +3,6 @@ import { stripComments } from '@synapsedesk/common/testing/strip-comments';
 import { join } from 'node:path';
 import {
   CORS_ALLOWED_HEADERS,
-  CORS_EXPOSED_HEADERS,
   CORS_METHODS,
 } from '../../src/common/config/cors.config';
 import { compareAlphabetically } from '@synapsedesk/common';
@@ -191,25 +190,11 @@ describe('CORS allow-lists cover the client contract', () => {
     expect([...exempt].filter((header) => !read.has(header))).toEqual([]);
   });
 
-  it('3. **Every rate-limit header the guard writes is exposed**', () => {
-    // `@nestjs/throttler` writes four (`headerPrefix = 'X-RateLimit'`, plus
-    // `Retry-After`) and a cross-origin client could read none of them.
-    // `Retry-After` is recovery; `X-RateLimit-Remaining` is avoidance, and it
-    // is the only one that lets a client slow down before it is refused.
-    const written = [
-      'Retry-After',
-      'X-RateLimit-Limit',
-      'X-RateLimit-Remaining',
-      'X-RateLimit-Reset',
-    ];
-    const exposed = new Set(
-      CORS_EXPOSED_HEADERS.map((header) => header.toLowerCase()),
-    );
-
-    expect(
-      written.filter((header) => !exposed.has(header.toLowerCase())),
-    ).toEqual([]);
-  });
+  // No static row for the rate-limit headers. Their names come from the
+  // throttler at runtime (`X-RateLimit-*-<tier>`), so a list here could only
+  // agree with another list — which is how four never-sent names passed while
+  // the sent ones stayed unreadable. `modules/cors.e2e-spec.ts` test 5 reads
+  // them off real responses instead.
 
   it('4. **Both bootstraps read the same four values**', () => {
     // The gap sabotage found: the e2e boots `test/utils/bootstrap.ts`, so

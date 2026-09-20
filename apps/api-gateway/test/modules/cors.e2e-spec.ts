@@ -28,7 +28,10 @@ describe('CORS (e2e)', () => {
   // proves only that the middleware honours whatever it is handed.
   //
   // These lists are the CLIENT's requirement, which is the thing that does not
-  // change when someone edits the config. The companion scan
+  // change when someone edits the config. The response headers are the
+  // exception, and test 5 reads them off the wire instead: they are whatever
+  // the throttler actually writes, and a hand list of them is how four
+  // never-sent names passed this file while the sent ones stayed unreadable. The companion scan
   // (`cors-contract.spec.ts`) derives the same requirement from the route
   // decorators, so a newly routed method is caught there rather than by
   // remembering to extend this array.
@@ -40,12 +43,6 @@ describe('CORS (e2e)', () => {
     'Idempotency-Key',
     'x-apollo-operation-name',
     'apollo-require-preflight',
-  ];
-  const REQUIRED_RESPONSE_HEADERS = [
-    'Retry-After',
-    'X-RateLimit-Limit',
-    'X-RateLimit-Remaining',
-    'X-RateLimit-Reset',
   ];
 
   beforeAll(async () => {
@@ -132,27 +129,54 @@ describe('CORS (e2e)', () => {
     }
   });
 
-  it('5. **The rate-limit headers are readable by the client**', async () => {
-    // Four are written and none was readable. `Retry-After` is recovery;
-    // `X-RateLimit-Remaining` is AVOIDANCE, and it is the only one that lets a
-    // client slow down rather than discover the limit by hitting it.
-    const response = await request(fx.app.getHttpServer())
-      .get(`${API}/health`)
-      .set('Origin', ORIGIN);
+  it('5. **Every rate-limit header the gateway SENDS is readable by the client**', async () => {
+    // Read off the wire, not from a list: whatever the throttler writes on a
+    // general route, on a named-tier route and on a refusal must be in the
+    // `Access-Control-Expose-Headers` of the same response, or a cross-origin
+    // front end cannot see it. A fresh email per run keeps the login bucket —
+    // `ip:<ip>|acct:<email>` in Redis, for 15 minutes — this run's own.
+    const email = `cors-${Date.now()}-${Math.random().toString(36).slice(2)}@example.com`; // NOSONAR
+    const login = () =>
+      request(fx.app.getHttpServer())
+        .post(`${API}/auth/login`)
+        .set('Origin', ORIGIN)
+        .send({ email, password: 'not-the-password' });
 
-    const exposed = new Set(
-      (response.headers['access-control-expose-headers'] ?? '')
-        .toLowerCase()
-        .split(',')
-        .map((value: string) => value.trim()),
-    );
+    const responses = [
+      await request(fx.app.getHttpServer())
+        .get(`${API}/health`)
+        .set('Origin', ORIGIN),
+    ];
+    for (let attempt = 0; attempt < 6; attempt++) responses.push(await login());
 
-    for (const header of REQUIRED_RESPONSE_HEADERS) {
-      expect([header, exposed.has(header.toLowerCase())]).toEqual([
-        header,
-        true,
-      ]);
+    const unreadable: string[] = [];
+    const sent = new Set<string>();
+    for (const response of responses) {
+      const exposed = new Set(
+        String(response.headers['access-control-expose-headers'] ?? '')
+          .toLowerCase()
+          .split(',')
+          .map((value) => value.trim()),
+      );
+      for (const header of Object.keys(response.headers)) {
+        if (!/^(x-ratelimit-|retry-after)/u.test(header)) continue;
+        sent.add(header);
+        if (!exposed.has(header))
+          unreadable.push(`${response.status} ${header}`);
+      }
     }
+
+    expect(unreadable).toEqual([]);
+    // The floor: the requests above did exercise a named tier and a refusal,
+    // so an empty `unreadable` is not a throttler that wrote nothing.
+    expect(responses.at(-1)?.status).toBe(429);
+    expect([...sent]).toEqual(
+      expect.arrayContaining([
+        'x-ratelimit-remaining-authtier',
+        'retry-after',
+        'retry-after-authtier',
+      ]),
+    );
   });
 
   it('6. **A request with no Origin is untouched** — Stripe and Resend webhooks', async () => {

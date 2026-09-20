@@ -3,7 +3,11 @@ import { ConfigService } from '@nestjs/config';
 import { RpcException } from '@nestjs/microservices';
 import { status } from '@grpc/grpc-js';
 import Stripe from 'stripe';
-import { formatErrorMsg, STRIPE_API_VERSION } from '@synapsedesk/common';
+import {
+  formatErrorMsg,
+  STRIPE_API_VERSION,
+  withHttpStatus,
+} from '@synapsedesk/common';
 
 /**
  * The Stripe SDK, and the ONE place the secret keys live.
@@ -79,7 +83,10 @@ export class StripeService implements OnModuleInit {
     if (!this.webhookSecret) {
       throw new RpcException({
         code: status.UNAVAILABLE,
-        message: 'Billing is not configured on this deployment',
+        message: withHttpStatus(
+          503,
+          'Billing is not configured on this deployment',
+        ),
       });
     }
 
@@ -111,7 +118,10 @@ export class StripeService implements OnModuleInit {
     if (!this.client) {
       throw new RpcException({
         code: status.UNAVAILABLE,
-        message: 'Billing is not configured on this deployment',
+        message: withHttpStatus(
+          503,
+          'Billing is not configured on this deployment',
+        ),
       });
     }
 

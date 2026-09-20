@@ -22,7 +22,7 @@ const SCRAPE_ORIGIN: RequestOrigin = {
  * rule:
  *
  * ```txt
- * time() - job_last_success_timestamp_seconds{job="ledger.daily"} > 172800
+ * time() - job_last_success_timestamp_seconds{scheduled_job="ledger.daily"} > 172800
  * ```
  *
  * Two lines instead of a bespoke alerting path — and it fires for *"it broke"*
@@ -62,7 +62,7 @@ export class JobMetricsCollector {
         if (!item.lastSucceededAt) continue;
 
         this.metrics.jobLastSuccess.set(
-          { job: item.jobName, service: item.service },
+          { scheduled_job: item.jobName, owner_service: item.service },
           new Date(item.lastSucceededAt).getTime() / 1000,
         );
       }

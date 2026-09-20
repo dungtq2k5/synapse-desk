@@ -141,14 +141,14 @@ export class MetricsRegistry {
    * exporting that table as a gauge turns it into a two-line Prometheus rule:
    *
    * ```txt
-   * time() - job_last_success_timestamp_seconds{job="ledger.daily"} > 172800
+   * time() - job_last_success_timestamp_seconds{scheduled_job="ledger.daily"} > 172800
    * ```
    *
    * which fires for *"it broke"* and *"it was never wired"* alike — the two
    * cases that were indistinguishable, and equally bad, when seven jobs sat
    * uncalled.
    */
-  readonly jobLastSuccess: Gauge<'job' | 'service'>;
+  readonly jobLastSuccess: Gauge<'scheduled_job' | 'owner_service'>;
 
   /** Latency, NOT spend. The tenant dimension lives in the ledger. */
   readonly aiGenerationDuration: Histogram<'purpose'>;
@@ -210,7 +210,7 @@ export class MetricsRegistry {
     this.jobLastSuccess = this.gauge({
       name: 'job_last_success_timestamp_seconds',
       help: 'Unix timestamp of the last successful run of a scheduled job.',
-      labelNames: ['job', 'service'],
+      labelNames: ['scheduled_job', 'owner_service'],
     });
 
     this.aiGenerationDuration = this.histogram({

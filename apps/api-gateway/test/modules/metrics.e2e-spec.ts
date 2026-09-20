@@ -189,7 +189,10 @@ describe('Metrics', () => {
     // seconds, and exporting milliseconds would put every job 55 000 years in
     // the future and silence the alert entirely.
     expect(series).toHaveLength(1);
-    expect(series[0]).toContain(`job="${SCHEDULED_JOBS.ANALYTICS_DAILY}"`);
+    expect(series[0]).toContain(
+      `scheduled_job="${SCHEDULED_JOBS.ANALYTICS_DAILY}"`,
+    );
+    expect(series[0]).toContain('owner_service="');
     expect(series[0]).toContain(String(succeededAt.getTime() / 1000));
 
     // And the ones that never ran export no series at all.

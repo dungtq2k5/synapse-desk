@@ -17,10 +17,12 @@ import {
   isFullJwtPayload,
   JwtPayload,
   MaybeJwtPayload,
+  NodeEnv,
   RequestContext,
   formatErrorMsg,
 } from '@synapsedesk/common';
 import { SecureGateway } from '../../common/decorators/secure-gateway.decorator';
+import { clientSafeMessage } from '../../common/filters/client-safe-message';
 import { WsThrottlerService } from './ws-throttler.service';
 import {
   WsAck,
@@ -79,6 +81,7 @@ export class RealtimeGateway
 
   private readonly logger = new Logger(RealtimeGateway.name);
   private readonly ACCESS_COOKIE_NAME: string;
+  private readonly isProduction: boolean;
 
   constructor(
     private readonly jwtService: JwtService,
@@ -92,6 +95,8 @@ export class RealtimeGateway
   ) {
     this.ACCESS_COOKIE_NAME =
       this.configService.getOrThrow<string>('JWT_ACCESS_NAME');
+    this.isProduction =
+      this.configService.getOrThrow<NodeEnv>('NODE_ENV') === 'production';
   }
 
   /**
@@ -492,10 +497,16 @@ export class RealtimeGateway
     try {
       return await run();
     } catch (error) {
+      // `clientSafeMessage` for everything a handler did not raise itself: a
+      // gRPC transport failure from `message:send` names the peer's address.
       const message =
         error instanceof WsException
           ? formatErrorMsg(error.getError())
-          : formatErrorMsg(error);
+          : clientSafeMessage(error, {
+              isProduction: this.isProduction,
+              logger: this.logger,
+              context: event,
+            });
 
       // Logged here because the exception filter never sees it — the throw is
       // caught, so an unexpected failure would otherwise be invisible.

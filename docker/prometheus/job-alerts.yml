@@ -11,11 +11,11 @@ groups:
     rules:
       # cron: 0 2 * * *
       - alert: ScheduledJobStale
-        expr: time() - job_last_success_timestamp_seconds{job="analytics-daily"} > 172800
+        expr: time() - job_last_success_timestamp_seconds{scheduled_job="analytics-daily"} > 172800
         for: 10m
         labels: { severity: warning }
         annotations:
-          summary: '{{ $labels.job }} has not succeeded in over 172800s'
+          summary: '{{ $labels.scheduled_job }} has not succeeded in over 172800s'
           description: >-
             The job last succeeded at {{ $value | humanizeTimestamp }}. This
             fires for "it broke" and for "the schedule was never wired" alike —
@@ -26,7 +26,7 @@ groups:
       # without this the never-wired case would look like the broken case; with
       # it, the two alert separately and get different responses.
       - alert: ScheduledJobMissing
-        expr: absent(job_last_success_timestamp_seconds{job="analytics-daily"})
+        expr: absent(job_last_success_timestamp_seconds{scheduled_job="analytics-daily"})
         for: 30m
         labels: { severity: critical }
         annotations:
@@ -37,11 +37,11 @@ groups:
 
       # cron: 0 3 * * *
       - alert: ScheduledJobStale
-        expr: time() - job_last_success_timestamp_seconds{job="auth-daily"} > 172800
+        expr: time() - job_last_success_timestamp_seconds{scheduled_job="auth-daily"} > 172800
         for: 10m
         labels: { severity: warning }
         annotations:
-          summary: '{{ $labels.job }} has not succeeded in over 172800s'
+          summary: '{{ $labels.scheduled_job }} has not succeeded in over 172800s'
           description: >-
             The job last succeeded at {{ $value | humanizeTimestamp }}. This
             fires for "it broke" and for "the schedule was never wired" alike —
@@ -52,7 +52,7 @@ groups:
       # without this the never-wired case would look like the broken case; with
       # it, the two alert separately and get different responses.
       - alert: ScheduledJobMissing
-        expr: absent(job_last_success_timestamp_seconds{job="auth-daily"})
+        expr: absent(job_last_success_timestamp_seconds{scheduled_job="auth-daily"})
         for: 30m
         labels: { severity: critical }
         annotations:
@@ -63,11 +63,11 @@ groups:
 
       # cron: 0 * * * *
       - alert: ScheduledJobStale
-        expr: time() - job_last_success_timestamp_seconds{job="auth-hourly"} > 7200
+        expr: time() - job_last_success_timestamp_seconds{scheduled_job="auth-hourly"} > 7200
         for: 10m
         labels: { severity: warning }
         annotations:
-          summary: '{{ $labels.job }} has not succeeded in over 7200s'
+          summary: '{{ $labels.scheduled_job }} has not succeeded in over 7200s'
           description: >-
             The job last succeeded at {{ $value | humanizeTimestamp }}. This
             fires for "it broke" and for "the schedule was never wired" alike —
@@ -78,7 +78,7 @@ groups:
       # without this the never-wired case would look like the broken case; with
       # it, the two alert separately and get different responses.
       - alert: ScheduledJobMissing
-        expr: absent(job_last_success_timestamp_seconds{job="auth-hourly"})
+        expr: absent(job_last_success_timestamp_seconds{scheduled_job="auth-hourly"})
         for: 30m
         labels: { severity: critical }
         annotations:
@@ -89,11 +89,11 @@ groups:
 
       # cron: 0 * * * *
       - alert: ScheduledJobStale
-        expr: time() - job_last_success_timestamp_seconds{job="billing-snapshot"} > 7200
+        expr: time() - job_last_success_timestamp_seconds{scheduled_job="billing-snapshot"} > 7200
         for: 10m
         labels: { severity: warning }
         annotations:
-          summary: '{{ $labels.job }} has not succeeded in over 7200s'
+          summary: '{{ $labels.scheduled_job }} has not succeeded in over 7200s'
           description: >-
             The job last succeeded at {{ $value | humanizeTimestamp }}. This
             fires for "it broke" and for "the schedule was never wired" alike —
@@ -104,7 +104,7 @@ groups:
       # without this the never-wired case would look like the broken case; with
       # it, the two alert separately and get different responses.
       - alert: ScheduledJobMissing
-        expr: absent(job_last_success_timestamp_seconds{job="billing-snapshot"})
+        expr: absent(job_last_success_timestamp_seconds{scheduled_job="billing-snapshot"})
         for: 30m
         labels: { severity: critical }
         annotations:
@@ -115,11 +115,11 @@ groups:
 
       # cron: */10 * * * *
       - alert: ScheduledJobStale
-        expr: time() - job_last_success_timestamp_seconds{job="ingestion-reconcile"} > 1200
+        expr: time() - job_last_success_timestamp_seconds{scheduled_job="ingestion-reconcile"} > 1200
         for: 10m
         labels: { severity: warning }
         annotations:
-          summary: '{{ $labels.job }} has not succeeded in over 1200s'
+          summary: '{{ $labels.scheduled_job }} has not succeeded in over 1200s'
           description: >-
             The job last succeeded at {{ $value | humanizeTimestamp }}. This
             fires for "it broke" and for "the schedule was never wired" alike —
@@ -130,7 +130,7 @@ groups:
       # without this the never-wired case would look like the broken case; with
       # it, the two alert separately and get different responses.
       - alert: ScheduledJobMissing
-        expr: absent(job_last_success_timestamp_seconds{job="ingestion-reconcile"})
+        expr: absent(job_last_success_timestamp_seconds{scheduled_job="ingestion-reconcile"})
         for: 30m
         labels: { severity: critical }
         annotations:
@@ -141,11 +141,11 @@ groups:
 
       # cron: 0 2 * * *
       - alert: ScheduledJobStale
-        expr: time() - job_last_success_timestamp_seconds{job="ledger-daily"} > 172800
+        expr: time() - job_last_success_timestamp_seconds{scheduled_job="ledger-daily"} > 172800
         for: 10m
         labels: { severity: warning }
         annotations:
-          summary: '{{ $labels.job }} has not succeeded in over 172800s'
+          summary: '{{ $labels.scheduled_job }} has not succeeded in over 172800s'
           description: >-
             The job last succeeded at {{ $value | humanizeTimestamp }}. This
             fires for "it broke" and for "the schedule was never wired" alike —
@@ -156,7 +156,7 @@ groups:
       # without this the never-wired case would look like the broken case; with
       # it, the two alert separately and get different responses.
       - alert: ScheduledJobMissing
-        expr: absent(job_last_success_timestamp_seconds{job="ledger-daily"})
+        expr: absent(job_last_success_timestamp_seconds{scheduled_job="ledger-daily"})
         for: 30m
         labels: { severity: critical }
         annotations:
@@ -167,11 +167,11 @@ groups:
 
       # cron: 0 * * * *
       - alert: ScheduledJobStale
-        expr: time() - job_last_success_timestamp_seconds{job="ledger-hourly"} > 7200
+        expr: time() - job_last_success_timestamp_seconds{scheduled_job="ledger-hourly"} > 7200
         for: 10m
         labels: { severity: warning }
         annotations:
-          summary: '{{ $labels.job }} has not succeeded in over 7200s'
+          summary: '{{ $labels.scheduled_job }} has not succeeded in over 7200s'
           description: >-
             The job last succeeded at {{ $value | humanizeTimestamp }}. This
             fires for "it broke" and for "the schedule was never wired" alike —
@@ -182,7 +182,7 @@ groups:
       # without this the never-wired case would look like the broken case; with
       # it, the two alert separately and get different responses.
       - alert: ScheduledJobMissing
-        expr: absent(job_last_success_timestamp_seconds{job="ledger-hourly"})
+        expr: absent(job_last_success_timestamp_seconds{scheduled_job="ledger-hourly"})
         for: 30m
         labels: { severity: critical }
         annotations:
@@ -193,11 +193,11 @@ groups:
 
       # cron: 0 * * * *
       - alert: ScheduledJobStale
-        expr: time() - job_last_success_timestamp_seconds{job="scope-reconcile"} > 7200
+        expr: time() - job_last_success_timestamp_seconds{scheduled_job="scope-reconcile"} > 7200
         for: 10m
         labels: { severity: warning }
         annotations:
-          summary: '{{ $labels.job }} has not succeeded in over 7200s'
+          summary: '{{ $labels.scheduled_job }} has not succeeded in over 7200s'
           description: >-
             The job last succeeded at {{ $value | humanizeTimestamp }}. This
             fires for "it broke" and for "the schedule was never wired" alike —
@@ -208,7 +208,7 @@ groups:
       # without this the never-wired case would look like the broken case; with
       # it, the two alert separately and get different responses.
       - alert: ScheduledJobMissing
-        expr: absent(job_last_success_timestamp_seconds{job="scope-reconcile"})
+        expr: absent(job_last_success_timestamp_seconds{scheduled_job="scope-reconcile"})
         for: 30m
         labels: { severity: critical }
         annotations:
@@ -219,11 +219,11 @@ groups:
 
       # cron: 0 4 * * *
       - alert: ScheduledJobStale
-        expr: time() - job_last_success_timestamp_seconds{job="webhook-retention"} > 172800
+        expr: time() - job_last_success_timestamp_seconds{scheduled_job="webhook-retention"} > 172800
         for: 10m
         labels: { severity: warning }
         annotations:
-          summary: '{{ $labels.job }} has not succeeded in over 172800s'
+          summary: '{{ $labels.scheduled_job }} has not succeeded in over 172800s'
           description: >-
             The job last succeeded at {{ $value | humanizeTimestamp }}. This
             fires for "it broke" and for "the schedule was never wired" alike —
@@ -234,7 +234,7 @@ groups:
       # without this the never-wired case would look like the broken case; with
       # it, the two alert separately and get different responses.
       - alert: ScheduledJobMissing
-        expr: absent(job_last_success_timestamp_seconds{job="webhook-retention"})
+        expr: absent(job_last_success_timestamp_seconds{scheduled_job="webhook-retention"})
         for: 30m
         labels: { severity: critical }
         annotations:

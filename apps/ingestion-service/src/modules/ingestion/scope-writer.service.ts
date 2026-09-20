@@ -1,7 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
 import { status } from '@grpc/grpc-js';
-import { formatErrorMsg, isRestrictingChange } from '@synapsedesk/common';
+import {
+  formatErrorMsg,
+  isRestrictingChange,
+  withHttpStatus,
+} from '@synapsedesk/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { QdrantService } from '../qdrant/qdrant.service';
 
@@ -126,8 +130,10 @@ export class ScopeWriterService {
         );
         throw new RpcException({
           code: status.UNAVAILABLE,
-          message:
+          message: withHttpStatus(
+            503,
             'The visibility change could not be applied to the search index; nothing was changed. Please try again.',
+          ),
         });
       }
 

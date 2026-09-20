@@ -1,50 +1,8 @@
-import {
-  ArgumentsHost,
-  Catch,
-  ExceptionFilter,
-  HttpException,
-  HttpStatus,
-  Logger,
-} from '@nestjs/common';
+import { ArgumentsHost, Catch, ExceptionFilter, Logger } from '@nestjs/common';
 import type { GqlContextType } from '@nestjs/graphql';
-import { status as GrpcStatus } from '@grpc/grpc-js';
 import type { Request, Response } from 'express';
-import { formatErrorMsg, readHttpStatusHint } from '@synapsedesk/common';
 import type { ErrorResponse } from '../interfaces/http-response.interface';
-
-/**
- * gRPC status -> HTTP status.
- *
- * Anything not listed here is a bug (or a genuinely unexpected failure) and is
- * deliberately collapsed to a 500 with a generic message, so internal details
- * from a downstream service never leak to the client.
- */
-const GRPC_TO_HTTP: Partial<Record<number, HttpStatus>> = {
-  [GrpcStatus.INVALID_ARGUMENT]: HttpStatus.BAD_REQUEST,
-  [GrpcStatus.FAILED_PRECONDITION]: HttpStatus.BAD_REQUEST,
-  [GrpcStatus.OUT_OF_RANGE]: HttpStatus.BAD_REQUEST,
-  [GrpcStatus.UNAUTHENTICATED]: HttpStatus.UNAUTHORIZED,
-  [GrpcStatus.PERMISSION_DENIED]: HttpStatus.FORBIDDEN,
-  [GrpcStatus.NOT_FOUND]: HttpStatus.NOT_FOUND,
-  [GrpcStatus.ALREADY_EXISTS]: HttpStatus.CONFLICT,
-  [GrpcStatus.ABORTED]: HttpStatus.CONFLICT,
-  [GrpcStatus.RESOURCE_EXHAUSTED]: HttpStatus.TOO_MANY_REQUESTS,
-  [GrpcStatus.CANCELLED]: HttpStatus.REQUEST_TIMEOUT,
-  [GrpcStatus.UNIMPLEMENTED]: HttpStatus.NOT_IMPLEMENTED,
-  [GrpcStatus.UNAVAILABLE]: HttpStatus.SERVICE_UNAVAILABLE,
-  [GrpcStatus.DEADLINE_EXCEEDED]: HttpStatus.GATEWAY_TIMEOUT,
-};
-
-type GrpcError = { code: number; details?: string; message?: string };
-
-function isGrpcError(error: unknown): error is GrpcError {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    typeof (error as GrpcError).code === 'number' &&
-    (error as GrpcError).code in GrpcStatus
-  );
-}
+import { clientSafeError } from './client-safe-message';
 
 /**
  * The gateway's single terminal error handler, across every transport it serves.
@@ -54,9 +12,9 @@ function isGrpcError(error: unknown): error is GrpcError {
  *  1. **HttpException** — raised by the gateway itself (validation, guards, the
  *     504 from a gRPC deadline). Already HTTP-shaped; pass the status through.
  *  2. **A gRPC error from a downstream service** — a status code that means
- *     nothing to HTTP. Without the mapping above, every `RpcException` reaches
- *     the client as a blanket 500 and "wrong password" is indistinguishable
- *     from a crash.
+ *     nothing to HTTP. Without the mapping in `client-safe-message.ts`, every
+ *     `RpcException` reaches the client as a blanket 500 and "wrong password"
+ *     is indistinguishable from a crash.
  *  3. **Anything else** — a genuine bug. Logged with its stack, and reported as
  *     a bare 500 in production so internals never leak.
  *
@@ -99,52 +57,12 @@ export class AllHttpExceptionFilter implements ExceptionFilter {
   private resolve(
     exception: unknown,
     host: ArgumentsHost,
-  ): { statusCode: HttpStatus; message: string } {
-    if (exception instanceof HttpException) {
-      return {
-        statusCode: exception.getStatus(),
-        message: formatErrorMsg(exception),
-      };
-    }
-
-    if (isGrpcError(exception)) {
-      const mapped = GRPC_TO_HTTP[exception.code];
-      if (mapped !== undefined) {
-        // A downstream service may override the table for the few cases where
-        // no gRPC code means the right thing — 402 Payment Required being the
-        // one that exists today. The hint rides in the details because extra
-        // fields on an RpcException do not survive the wire; see
-        // `withHttpStatus`. Unmarked messages (almost all of them) fall through
-        // to the table unchanged.
-        const hint = readHttpStatusHint(
-          formatErrorMsg(exception.details ?? exception.message),
-        );
-
-        return {
-          statusCode: hint.httpStatus ?? mapped,
-          message: hint.message,
-        };
-      }
-
-      this.logger.error(
-        `Unmapped gRPC status ${exception.code} (${GrpcStatus[exception.code]}) ` +
-          `on ${this.describe(host)}: ${exception.details ?? exception.message}`,
-      );
-    } else {
-      this.logger.error(
-        `Unhandled exception on ${this.describe(host)}`,
-        exception instanceof Error ? exception.stack : String(exception),
-      );
-    }
-
-    return {
-      statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-      // Outside production the real error is far more useful than a
-      // placeholder, and there is no untrusted client to leak it to.
-      message: this.isProduction
-        ? 'Internal server error'
-        : formatErrorMsg(exception),
-    };
+  ): { statusCode: number; message: string } {
+    return clientSafeError(exception, {
+      isProduction: this.isProduction,
+      logger: this.logger,
+      context: this.describe(host),
+    });
   }
 
   /** Best-effort request label for logs; GraphQL has no method/url. */

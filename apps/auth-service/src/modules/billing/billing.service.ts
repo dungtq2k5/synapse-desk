@@ -21,6 +21,7 @@ import {
   requireActor,
   requireTenant,
   STRIPE_PORTAL_MARKER,
+  withHttpStatus,
 } from '@synapsedesk/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { StripeService } from './stripe.service';
@@ -388,7 +389,10 @@ export class BillingService {
 
     return new RpcException({
       code: status.UNAVAILABLE,
-      message: `Could not ${action} right now. Please try again.`,
+      message: withHttpStatus(
+        503,
+        `Could not ${action} right now. Please try again.`,
+      ),
     });
   }
 }

@@ -18,6 +18,11 @@
  * ```
  */
 
+import {
+  AUTH_THROTTLER_TIER,
+  GENERAL_THROTTLER_TIERS,
+} from './throttler.config';
+
 /**
  * `*` means every origin; anything else is an exact allow-list.
  *
@@ -85,19 +90,24 @@ export const CORS_ALLOWED_HEADERS = [
 ];
 
 /**
- * Headers the browser may READ off a response.
+ * Headers the browser may READ off a response — derived from the throttler's
+ * tier names, because those are what the headers are named after.
  *
- * Four are written and none was readable. `Retry-After` is what a client uses
- * to recover from a refusal; **`X-RateLimit-Remaining` is what it uses to avoid
- * one**, and exposing only the first would leave a front end able to react to a
- * 429 and unable to prevent it.
+ * `@nestjs/throttler` suffixes every header it writes with its tier:
+ * `X-RateLimit-{Limit,Remaining,Reset}-<tier>` on each throttled response and
+ * `Retry-After-<tier>` on a refusal, with no unsuffixed `X-RateLimit-*` at all.
+ * `Retry-After` itself is what a client uses to recover from a 429;
+ * `X-RateLimit-Remaining-<tier>` is what it uses to avoid one. A tier added to
+ * the throttler is exposed here with no second edit.
  *
- * Named throttlers get a `-{name}` suffix on the three `X-RateLimit` headers,
- * so a named throttler exposed later needs its suffixed forms here too.
+ * @example CORS_EXPOSED_HEADERS.includes('X-RateLimit-Remaining-authTier') // true
  */
 export const CORS_EXPOSED_HEADERS = [
   'Retry-After',
-  'X-RateLimit-Limit',
-  'X-RateLimit-Remaining',
-  'X-RateLimit-Reset',
+  ...[...GENERAL_THROTTLER_TIERS, AUTH_THROTTLER_TIER].flatMap((tier) => [
+    `X-RateLimit-Limit-${tier}`,
+    `X-RateLimit-Remaining-${tier}`,
+    `X-RateLimit-Reset-${tier}`,
+    `Retry-After-${tier}`,
+  ]),
 ];

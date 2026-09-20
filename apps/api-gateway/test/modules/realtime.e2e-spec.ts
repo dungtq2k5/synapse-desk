@@ -27,6 +27,7 @@ import {
 import {
   grpcError,
   timestamp,
+  transportFailure,
   wireCreatedMessage,
   wireMessage,
   wirePage,
@@ -645,6 +646,23 @@ describe('the real-time relay (e2e)', () => {
       expect(ack).toMatchObject({ success: false });
       expect(fx.stubs.message.createMessage).not.toHaveBeenCalled();
     });
+
+    it('10. **a transport failure reaches the ack as the fixed message, with no address**', async () => {
+      // The ack catches the error itself, so the HTTP filter never sees it —
+      // it has to apply the same rule. A REAL grpc-js failure, whose details
+      // name the host and port it could not reach.
+      const failure = await transportFailure();
+      fx.stubs.message.createMessage.mockReturnValue(throwError(() => failure));
+      const author = await fx.connectClient({ sub: authorId, organizationId });
+
+      const ack = (await sendFrom(author)) as { error?: string };
+
+      expect(ack).toMatchObject({ success: false });
+      expect(ack.error).toBe(
+        'A service this request depends on is unavailable. Try again shortly!',
+      );
+      expect(ack.error).not.toMatch(/ECONNREFUSED|127\.0\.0\.1/u);
+    });
   });
 
   /**
@@ -1256,6 +1274,30 @@ describe('the real-time relay (e2e)', () => {
 
       expect((await failed).success).toBe(false);
       expect(fx.stubs.message.appendAiMessage).not.toHaveBeenCalled();
+    });
+
+    it('**7b. a transport failure mid-stream reaches `ai:stream:error` as the fixed message**', async () => {
+      // `AiStreamService.fail` sends its own frame, outside every filter. A
+      // rag-service that dropped mid-answer must not tell the client where it
+      // lives.
+      const failure = await transportFailure();
+      const author = await fx.connectClient({ sub: authorId, organizationId });
+      const { subject } = controllable();
+
+      const failed = waitForEvent<ErrorFrame>(
+        author,
+        REALTIME_EVENTS.aiStreamError,
+      );
+
+      await askFrom(author);
+      subject.next(token('Carry-over is '));
+      subject.error(failure);
+
+      const frame = await failed;
+      expect(frame.error).toBe(
+        'A service this request depends on is unavailable. Try again shortly!',
+      );
+      expect(frame.error).not.toMatch(/ECONNREFUSED|127\.0\.0\.1/u);
     });
 
     it('8. **a cancel for a stream this socket does not own is IGNORED**', async () => {

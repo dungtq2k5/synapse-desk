@@ -1,8 +1,9 @@
-import { ArgumentsHost, Catch, HttpException } from '@nestjs/common';
+import { ArgumentsHost, Catch, HttpException, Logger } from '@nestjs/common';
 import { BaseWsExceptionFilter, WsException } from '@nestjs/websockets';
 import { Socket } from 'socket.io';
 import { formatErrorMsg } from '@synapsedesk/common';
 import { ErrorResponse } from '../interfaces/http-response.interface';
+import { clientSafeMessage } from './client-safe-message';
 
 /**
  * The terminal error handler for every gateway, mirroring
@@ -21,6 +22,8 @@ import { ErrorResponse } from '../interfaces/http-response.interface';
  */
 @Catch()
 export class AllWsExceptionsFilter extends BaseWsExceptionFilter {
+  private readonly logger = new Logger(AllWsExceptionsFilter.name);
+
   override catch(exception: unknown, host: ArgumentsHost): void {
     const client = host.switchToWs().getClient<Socket>();
 
@@ -31,14 +34,21 @@ export class AllWsExceptionsFilter extends BaseWsExceptionFilter {
     const statusCode =
       exception instanceof HttpException ? exception.getStatus() : 400;
 
+    // Everything a handler did not raise itself goes through
+    // `clientSafeMessage`: a gRPC error IS an `Error`, and its message names
+    // the peer's address when grpc-js generated it. `NODE_ENV` is read here
+    // rather than injected because this filter is built with `new` inside
+    // `SecureGateway`, which reads `CORS` the same way.
     const message =
       exception instanceof WsException
         ? exception.getError()
         : exception instanceof HttpException // NOSONAR
           ? exception.getResponse()
-          : exception instanceof Error // NOSONAR
-            ? exception.message
-            : 'An unexpected real-time error occurred';
+          : clientSafeMessage(exception, {
+              isProduction: process.env.NODE_ENV === 'production',
+              logger: this.logger,
+              context: 'a real-time handler',
+            });
 
     client.emit('exception', {
       success: false,

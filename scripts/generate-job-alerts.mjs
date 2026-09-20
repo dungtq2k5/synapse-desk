@@ -53,11 +53,11 @@ const rules = Object.values(SCHEDULED_JOBS)
 
     return `      # cron: ${SCHEDULE_CRON[job]}
       - alert: ScheduledJobStale
-        expr: time() - job_last_success_timestamp_seconds{job="${job}"} > ${seconds}
+        expr: time() - job_last_success_timestamp_seconds{scheduled_job="${job}"} > ${seconds}
         for: 10m
         labels: { severity: warning }
         annotations:
-          summary: '{{ $labels.job }} has not succeeded in over ${seconds}s'
+          summary: '{{ $labels.scheduled_job }} has not succeeded in over ${seconds}s'
           description: >-
             The job last succeeded at {{ $value | humanizeTimestamp }}. This
             fires for "it broke" and for "the schedule was never wired" alike —
@@ -68,7 +68,7 @@ const rules = Object.values(SCHEDULED_JOBS)
       # without this the never-wired case would look like the broken case; with
       # it, the two alert separately and get different responses.
       - alert: ScheduledJobMissing
-        expr: absent(job_last_success_timestamp_seconds{job="${job}"})
+        expr: absent(job_last_success_timestamp_seconds{scheduled_job="${job}"})
         for: 30m
         labels: { severity: critical }
         annotations:

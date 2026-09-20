@@ -19,6 +19,7 @@ import {
   requireActor,
   requireTenant,
   safeTimezone,
+  withHttpStatus,
 } from '@synapsedesk/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthReferenceService } from '../auth-client/auth-reference.service';
@@ -183,7 +184,10 @@ export class ExportService {
 
       throw new RpcException({
         code: status.UNAVAILABLE,
-        message: 'Could not queue the export; please try again',
+        message: withHttpStatus(
+          503,
+          'Could not queue the export; please try again',
+        ),
       });
     }
 

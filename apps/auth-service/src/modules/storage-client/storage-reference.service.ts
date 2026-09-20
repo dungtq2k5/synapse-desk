@@ -18,6 +18,7 @@ import {
   ObjectSupersededEvent,
   STORAGE_PATTERNS,
   SupersededReason,
+  withHttpStatus,
 } from '@synapsedesk/common';
 
 export type PresignedUpload = {
@@ -214,7 +215,7 @@ export class StorageReferenceService implements OnModuleInit {
 
     return new RpcException({
       code: status.UNAVAILABLE,
-      message: 'File storage is currently unavailable',
+      message: withHttpStatus(503, 'File storage is currently unavailable'),
     });
   }
 }

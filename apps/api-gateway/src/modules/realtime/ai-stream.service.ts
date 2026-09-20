@@ -3,6 +3,7 @@ import {
   type FrameAnswerStatus,
 } from './realtime.config';
 import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { ClientGrpc } from '@nestjs/microservices';
 import { randomUUID } from 'node:crypto';
 import type { Socket } from 'socket.io';
@@ -19,10 +20,11 @@ import {
 } from '@synapsedesk/grpc-proto';
 import {
   AnswerStatus as DomainAnswerStatus,
-  formatErrorMsg,
+  NodeEnv,
   RequestContext,
 } from '@synapsedesk/common';
 import type { ErrorResponse } from '../../common/interfaces/http-response.interface';
+import { clientSafeMessage } from '../../common/filters/client-safe-message';
 import { WsResponse } from '../../common/interfaces/ws-response.interface';
 import { MessagesService } from '../tickets/messages.service';
 import { TicketsService } from '../tickets/tickets.service';
@@ -88,12 +90,17 @@ export class AiStreamService implements OnModuleInit {
   private readonly logger = new Logger(AiStreamService.name);
 
   private ragService!: RagServiceClient;
+  private readonly isProduction: boolean;
 
   constructor(
     @Inject(RAG_GRPC_CLIENT) private readonly client: ClientGrpc,
     private readonly messages: MessagesService,
     private readonly tickets: TicketsService,
-  ) {}
+    configService: ConfigService,
+  ) {
+    this.isProduction =
+      configService.getOrThrow<NodeEnv>('NODE_ENV') === 'production';
+  }
 
   onModuleInit(): void {
     this.ragService =
@@ -214,7 +221,7 @@ export class AiStreamService implements OnModuleInit {
           // written as though it were complete is worse than no answer: it
           // enters the permanent thread, is indistinguishable from a finished
           // one, and the user reads a policy that stops mid-sentence.
-          this.fail(client, streamId, ticketId, formatErrorMsg(error));
+          this.fail(client, streamId, ticketId, this.clientText(error));
         },
         complete: () => {
           this.forget(client, streamId);
@@ -399,8 +406,17 @@ export class AiStreamService implements OnModuleInit {
       // because from the client's point of view that is what happened — there
       // is no message id to reconcile against and no row for the room to
       // announce.
-      this.fail(client, streamId, ticketId, formatErrorMsg(error));
+      this.fail(client, streamId, ticketId, this.clientText(error));
     }
+  }
+
+  /** What the client may read about a failed stream; see `clientSafeMessage`. */
+  private clientText(error: unknown): string {
+    return clientSafeMessage(error, {
+      isProduction: this.isProduction,
+      logger: this.logger,
+      context: REALTIME_EVENTS.aiStreamError,
+    });
   }
 
   private done(
