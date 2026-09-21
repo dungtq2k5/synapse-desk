@@ -48,7 +48,12 @@ export class AllHttpExceptionFilter implements ExceptionFilter {
     response.status(statusCode).json({
       success: false,
       statusCode,
-      path: request.url,
+      // `originalUrl`, not `url`: Express REWRITES `url` for middleware
+      // mounted on a path, so an exception raised in middleware reported
+      // `"path": "/"` — measured, on the 415 from `JsonBodyMiddleware`. For a
+      // request that reaches a handler the two are identical, so this changes
+      // nothing else.
+      path: request.originalUrl,
       timestamp: new Date().toISOString(),
       error: message,
     } satisfies ErrorResponse);
@@ -72,6 +77,6 @@ export class AllHttpExceptionFilter implements ExceptionFilter {
     }
 
     const request = host.switchToHttp().getRequest<Request>();
-    return `${request.method} ${request.url}`;
+    return `${request.method} ${request.originalUrl}`;
   }
 }

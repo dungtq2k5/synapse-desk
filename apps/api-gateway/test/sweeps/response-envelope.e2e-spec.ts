@@ -390,6 +390,24 @@ describe('response envelope sweep (e2e)', () => {
     expect(res.body.path).toContain(PROBES[0].path);
   });
 
+  it('**…including a failure raised BEFORE routing**, where Express rewrites the url', async () => {
+    // Its own row, and not a duplicate of the 415 one in `openapi.e2e-spec`.
+    // That row asserts the STATUS; this asserts the envelope's `path`, and the
+    // two failed independently: middleware mounted on a path sees a rewritten
+    // `request.url`, so the filter reported `"path": "/"` for every exception
+    // raised before a handler. The filter reads `originalUrl` for that reason,
+    // and without a row here the property would be guarded only as a
+    // side-effect of a test about content types — which would stop guarding it
+    // the day that test moved.
+    const response = await agentFor(PROBES[0])
+      .post(`${API}${PROBES[0].path}`)
+      .set('Content-Type', 'text/plain')
+      .send('not json');
+
+    expect(response.body.path).toContain(PROBES[0].path);
+    expect(response.body.path).not.toBe('/');
+  });
+
   it('the failure `timestamp` is a parseable ISO instant', async () => {
     PROBES[0].fail(fx);
     const res = await agentFor(PROBES[0]).get(`${API}${PROBES[0].path}`);

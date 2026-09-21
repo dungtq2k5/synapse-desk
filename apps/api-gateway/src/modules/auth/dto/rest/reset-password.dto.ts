@@ -1,3 +1,4 @@
+import { ApiProperty } from '@nestjs/swagger';
 import {
   IsNotEmpty,
   IsString,
@@ -15,6 +16,12 @@ export class ResetPasswordDto {
   // string reaching a hash-and-lookup; auth-service compares the hash, which is
   // the real check.
   @MaxLength(MAX_RESET_TOKEN_LENGTH)
+  // `@IsNotEmpty` has no OpenAPI spelling of its own, so without this the
+  // document says `{"type": "string"}` and a generated client accepts `""`
+  // — a 400 here and a pass elsewhere. `minLength: 1` is the document's way
+  // to say it, and it generates `@Size(min = 1)`, which (unlike `@NotBlank`)
+  // accepts `"   "` exactly as `@IsNotEmpty` does.
+  @ApiProperty({ minLength: 1 })
   readonly token!: string;
 
   @IsString()
@@ -32,6 +39,12 @@ export class ResetPasswordDto {
 export class ChangePasswordDto {
   @IsString()
   @IsNotEmpty()
+  // `@IsNotEmpty` has no OpenAPI spelling of its own, so without this the
+  // document says `{"type": "string"}` and a generated client accepts `""`
+  // — a 400 here and a pass elsewhere. `minLength: 1` is the document's way
+  // to say it, and it generates `@Size(min = 1)`, which (unlike `@NotBlank`)
+  // accepts `"   "` exactly as `@IsNotEmpty` does.
+  @ApiProperty({ minLength: 1 })
   readonly currentPassword!: string;
 
   // Same strength rule as the reset flow. Applying a weaker one here would let

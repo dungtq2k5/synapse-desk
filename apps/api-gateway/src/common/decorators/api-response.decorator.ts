@@ -1,4 +1,6 @@
 import { applyDecorators, HttpStatus, type Type } from '@nestjs/common';
+import { ROUTE_ARGS_METADATA } from '@nestjs/common/constants';
+import { RouteParamtypes } from '@nestjs/common/enums/route-paramtypes.enum';
 import {
   ApiExtraModels,
   ApiResponse,
@@ -46,11 +48,43 @@ export const ERROR_ENVELOPE_PROPERTIES = {
   error: { type: 'string' },
 } as const satisfies Record<string, SchemaObject>;
 
+/**
+ * Whether this route reads a request BODY, asked of Nest's own metadata.
+ *
+ * **Derived, never declared.** 415 belongs on a route exactly when there is a
+ * body to reject, and that fact is already written — as `@Body()` on the
+ * handler. A `body: true` option beside `throttled` would be the same fact in
+ * two places across 88 routes, and the one that drifts is the one nobody
+ * reads.
+ *
+ * Measured: a METHOD decorator can see PARAMETER metadata, because TypeScript
+ * applies parameter decorators first. The probe reported
+ * `{"withBody": ["3:0"], "noBody": null}` — `3` being
+ * {@link RouteParamtypes.BODY}, and the key shape `paramtype:index`.
+ */
+function readsABody(target: object, key: string | symbol): boolean {
+  const args = Reflect.getMetadata(
+    ROUTE_ARGS_METADATA,
+    target.constructor,
+    key as string,
+  ) as Record<string, unknown> | undefined;
+
+  return Object.keys(args ?? {}).some(
+    (entry) => entry.split(':')[0] === String(RouteParamtypes.BODY),
+  );
+}
+
 /** What a route may declare. `500` is always added; `429` unless opted out. */
 export type ApiErrorStatus =
   '400' | '401' | '402' | '403' | '404' | '409' | '422' | '503';
 
-const ERROR_DESCRIPTIONS: Record<ApiErrorStatus | '429' | '500', string> = {
+const ERROR_DESCRIPTIONS: Record<
+  ApiErrorStatus | '415' | '429' | '500',
+  string
+> = {
+  '415':
+    'The request carried a body in something other than `application/json`. ' +
+    'Added automatically to every route that reads a body, and to no other.',
   '400': 'Validation failed, or the request is malformed.',
   '401': 'No valid session cookie, or the session has expired.',
   '402':
@@ -231,16 +265,36 @@ export function ApiFilterErrors(
   const automatic = options.throttled === false ? ['500'] : ['429', '500'];
 
   const all = [...new Set([...statuses, ...automatic])] as Array<
-    ApiErrorStatus | '429' | '500'
+    ApiErrorStatus | '415' | '429' | '500'
   >;
 
-  return applyDecorators(
-    ...[...all]
-      .sort((a, b) => Number(a) - Number(b))
-      .map((status) =>
-        ApiResponse(errorResponse(Number(status), ERROR_DESCRIPTIONS[status])),
-      ),
-  );
+  // `415` cannot be listed by hand and is not in `ApiErrorStatus`, for the
+  // same reason `429` and `500` are not: it is decided here, and a parameter
+  // that does nothing is worse than one that does not exist.
+  return (
+    target: object,
+    key?: string | symbol,
+    descriptor?: PropertyDescriptor,
+  ): void => {
+    // A CLASS-level application documents every route on the controller, and
+    // there is no single handler whose `@Body()` could be read — so no 415
+    // there. That is the honest answer rather than a guess: a route needing
+    // it carries its own method-level decorator, which is how all 88 do.
+    const forThisRoute =
+      key !== undefined && readsABody(target, key)
+        ? ([...all, '415'] as typeof all)
+        : all;
+
+    applyDecorators(
+      ...[...forThisRoute]
+        .sort((a, b) => Number(a) - Number(b))
+        .map((status) =>
+          ApiResponse(
+            errorResponse(Number(status), ERROR_DESCRIPTIONS[status]),
+          ),
+        ),
+    )(target, key as string, descriptor as PropertyDescriptor);
+  };
 }
 
 function errorResponse(

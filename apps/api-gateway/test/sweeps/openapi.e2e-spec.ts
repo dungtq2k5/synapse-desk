@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { stripComments } from '@synapsedesk/common/testing/strip-comments';
 import request from 'supertest';
 import { of } from 'rxjs';
 import Ajv from 'ajv';
@@ -89,6 +90,19 @@ describe('The OpenAPI document', () => {
     return walk(join(__dirname, '../../src'));
   };
 
+  /** Every DTO source, walked rather than listed — `controllerFiles`' reason. */
+  const dtoFiles = (): string[] => {
+    const walk = (dir: string): string[] =>
+      readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+        const path = join(dir, entry.name);
+        if (entry.isDirectory()) return walk(path);
+
+        return entry.name.endsWith('.dto.ts') ? [path] : [];
+      });
+
+    return walk(join(__dirname, '../../src'));
+  };
+
   beforeAll(async () => {
     fx = await bootstrapE2eTest();
     // The SAME builder `main.ts` calls. A test that assembled its own document
@@ -172,6 +186,125 @@ describe('The OpenAPI document', () => {
       expect(Object.keys(schemas).length).toBeGreaterThan(50);
     });
 
+    it('**`@IsNotEmpty` is spelled `minLength` in the document**', () => {
+      // Plan 83 §5a. `@IsNotEmpty` has no OpenAPI spelling of its own, so a
+      // field carrying it and nothing else publishes `{"type": "string"}` —
+      // and a generated client happily sends `""`, which this gateway answers
+      // with a 400. The divergence is invisible from either side alone: Node
+      // enforces a rule the document does not state, and a second
+      // implementation enforces the document.
+      //
+      // **From the DECORATORS toward the document**, never the reverse: a scan
+      // that read `minLength` out of the document and went looking for
+      // decorators would pass a DTO that had lost its `@IsNotEmpty` entirely.
+      //
+      // `@MinLength(n)` needs no special case: it ALWAYS emits `minLength: n`
+      // into the document, so the three sites covered that way satisfy the
+      // check by the same path as the fourteen that gained the decorator.
+      // Measured — a `!decorators.includes('@MinLength')` escape hatch was
+      // written here first and sabotage proved it dead.
+      const findings: string[] = [];
+      const seen: string[] = [];
+
+      for (const file of dtoFiles()) {
+        // Comments stripped, as conventions §13.8 requires before any
+        // TypeScript source is pattern-matched — though for THIS scan it is
+        // belt-and-braces rather than load-bearing, and sabotage says so:
+        // removing it changes no result, because only lines beginning with
+        // `@` reach the decorator buffer and a docblock's ` * ` prose never
+        // does. It stays because the next edit to this loop — matching over a
+        // window rather than a buffer — is exactly the one that would start
+        // counting `document.dto.ts`'s mention of `@IsNotEmpty` as a site.
+        const source = stripComments(readFileSync(file, 'utf8'));
+
+        let currentClass = '';
+        let decorators = '';
+
+        for (const line of source.split('\n')) {
+          const declaration = /^export class (\w+)/u.exec(line);
+          if (declaration) {
+            currentClass = declaration[1];
+            decorators = '';
+            continue;
+          }
+
+          if (line.trimStart().startsWith('@')) {
+            decorators += line;
+            continue;
+          }
+
+          const field = /^\s+(?:readonly\s+)?(\w+)[!?]?\s*:/u.exec(line);
+          if (!field) continue;
+
+          const carried = decorators.includes('@IsNotEmpty');
+          decorators = '';
+          if (!carried || !currentClass) continue;
+
+          const schema = doc.components?.schemas?.[currentClass] as
+            SchemaObject | undefined;
+          const property = schema?.properties?.[field[1]] as
+            SchemaObject | undefined;
+
+          // A DTO no route references publishes no schema, so there is
+          // nothing a client can get wrong.
+          if (!property) continue;
+
+          seen.push(`${currentClass}.${field[1]}`);
+          const spelled =
+            typeof property.minLength === 'number' && property.minLength >= 1;
+
+          if (!spelled) findings.push(`${currentClass}.${field[1]}`);
+        }
+      }
+
+      expect(findings).toEqual([]);
+      // Seventeen decorator sites, fourteen of which needed `minLength` added
+      // and three already covered by `@MinLength`. A floor, so a scan that
+      // stopped matching cannot report a compliant tree.
+      expect(seen.length).toBeGreaterThanOrEqual(14);
+    });
+
+    it('**a route documents 415 iff it takes a body**', () => {
+      // 4b's mirror. That row asserts `429` is documented exactly when the
+      // route is throttled; this asserts `415` exactly when there is a body
+      // to reject. Both directions, and the second is the one that matters:
+      // scanning from documented 415s toward handlers catches a 415 naming no
+      // body, but never a body-taking route that never got one.
+      const findings: string[] = [];
+      let bodies = 0;
+
+      for (const [path, operations] of Object.entries(doc.paths ?? {})) {
+        for (const [method, operation] of Object.entries(
+          operations as Record<
+            string,
+            { requestBody?: unknown; responses?: Record<string, unknown> }
+          >,
+        )) {
+          if (
+            !operation ||
+            typeof operation !== 'object' ||
+            !operation.responses
+          ) {
+            continue;
+          }
+
+          const takesABody = Boolean(operation.requestBody);
+          const documents415 = Boolean(operation.responses['415']);
+          if (takesABody) bodies += 1;
+
+          if (takesABody !== documents415) {
+            findings.push(
+              `${method.toUpperCase()} ${path}: body=${takesABody} 415=${documents415}`,
+            );
+          }
+        }
+      }
+
+      expect(findings).toEqual([]);
+      // A floor, so a document that stopped parsing cannot report agreement.
+      expect(bodies).toBeGreaterThanOrEqual(80);
+    });
+
     // **Validity itself is asserted in the export script, not here.** This
     // suite cannot reach `scripts/lib/`: `image-contract.spec.ts` refuses a
     // workspace importing across a workspace boundary, which is why plan 77
@@ -181,6 +314,50 @@ describe('The OpenAPI document', () => {
     // `openapi:check` owns "is this a valid document" and these rows own "does
     // it agree with the code about what is optional" — which is the half no
     // validator can see anyway.
+  });
+
+  describe('A body in the wrong content type is refused', () => {
+    /**
+     * Plan 83 §2a. Measured on the built gateway BEFORE this existed:
+     * `text/plain` was never a 415 — Express's JSON parser skips a body it
+     * does not recognise, `req.body` arrives as `{}`, and validation answers
+     * with a list of missing fields. The caller is told about the body when
+     * the problem is the header.
+     */
+    it('**`text/plain` with a JSON body is 415**, not a validation 400', async () => {
+      const response = await request(fx.app.getHttpServer())
+        .post(`${API}/auth/login`)
+        .set('Content-Type', 'text/plain')
+        .send('{"email":"a@b.com","password":"secret"}');
+
+      expect(response.status).toBe(415);
+      expect(response.body).toMatchObject({
+        success: false,
+        statusCode: 415,
+        path: `${API}/auth/login`,
+      });
+    });
+
+    it('`application/json; charset=utf-8` is accepted — a parameter is not a refusal', async () => {
+      const response = await request(fx.app.getHttpServer())
+        .post(`${API}/auth/login`)
+        .set('Content-Type', 'application/json; charset=utf-8')
+        .send('{}');
+
+      // 400, because the DTO is empty — which is the point: it reached
+      // validation rather than being refused at the header.
+      expect(response.status).toBe(400);
+    });
+
+    it('**a POST with NO body is not refused** — `logout` sends none', async () => {
+      // Refusing this would break every caller that correctly sends nothing
+      // and therefore sets no `Content-Type`.
+      const response = await request(fx.app.getHttpServer()).post(
+        `${API}/auth/logout`,
+      );
+
+      expect(response.status).not.toBe(415);
+    });
   });
 
   describe('The CLI plugin', () => {

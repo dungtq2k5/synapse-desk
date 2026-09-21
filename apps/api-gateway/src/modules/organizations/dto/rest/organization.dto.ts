@@ -1,3 +1,4 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { NoEmoji } from '../../../../common/decorators/no-emoji.decorator';
 import {
   MAX_ADMIN_REASON_LENGTH,
@@ -163,5 +164,11 @@ export class DeleteOrganizationDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(MAX_ADMIN_REASON_LENGTH)
+  // `@IsNotEmpty` has no OpenAPI spelling of its own, so without this the
+  // document says `{"type": "string"}` and a generated client accepts `""`
+  // — a 400 here and a pass elsewhere. `minLength: 1` is the document's way
+  // to say it, and it generates `@Size(min = 1)`, which (unlike `@NotBlank`)
+  // accepts `"   "` exactly as `@IsNotEmpty` does.
+  @ApiProperty({ minLength: 1 })
   readonly reason!: string;
 }

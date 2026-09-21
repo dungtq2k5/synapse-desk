@@ -141,6 +141,12 @@ describe('CORS allow-lists cover the client contract', () => {
     precedence: 'a mail header too, read by the same loop guard',
     'user-agent':
       'a forbidden header name — the browser sets it and script cannot',
+    'content-length':
+      'a forbidden header name, set by the browser from the body it sends; ' +
+      'read by `JsonBodyMiddleware` to tell a body from none, never trusted',
+    'transfer-encoding':
+      'a forbidden header name too, and the reason a chunked request has no ' +
+      'Content-Length to read — same middleware, same check',
   };
 
   it('2. **Every header a browser must send is in `CORS_ALLOWED_HEADERS`**', () => {

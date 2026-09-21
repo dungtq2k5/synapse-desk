@@ -1,6 +1,6 @@
 import { NoEmoji } from '../../../../common/decorators/no-emoji.decorator';
 import { Type } from 'class-transformer';
-import { OmitType, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, OmitType } from '@nestjs/swagger';
 import {
   ArrayMaxSize,
   IsArray,
@@ -106,6 +106,12 @@ export class LockUserDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(MAX_LOCK_REASON_LENGTH)
+  // `@IsNotEmpty` has no OpenAPI spelling of its own, so without this the
+  // document says `{"type": "string"}` and a generated client accepts `""`
+  // — a 400 here and a pass elsewhere. `minLength: 1` is the document's way
+  // to say it, and it generates `@Size(min = 1)`, which (unlike `@NotBlank`)
+  // accepts `"   "` exactly as `@IsNotEmpty` does.
+  @ApiProperty({ minLength: 1 })
   readonly reason!: string;
 
   /**

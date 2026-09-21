@@ -1,4 +1,4 @@
-import { ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   MAX_DEVICE_NAME_LENGTH,
   TOTP_CODE_LENGTH,
@@ -36,6 +36,12 @@ export class AuthenticateTwoFactorDto {
   // length is not a secret), but `BACKUP_CODE_LENGTH` lives in auth-service and
   // a second copy in the gateway is one that silently stops matching when the
   // generator changes. auth-service compares the hash, which is the real check.
+  // `@IsNotEmpty` has no OpenAPI spelling of its own, so without this the
+  // document says `{"type": "string"}` and a generated client accepts `""`
+  // — a 400 here and a pass elsewhere. `minLength: 1` is the document's way
+  // to say it, and it generates `@Size(min = 1)`, which (unlike `@NotBlank`)
+  // accepts `"   "` exactly as `@IsNotEmpty` does.
+  @ApiPropertyOptional({ minLength: 1 })
   readonly backupCode?: string;
 
   @IsOptional()
@@ -56,11 +62,23 @@ export class DisableTwoFactorDto {
 
   @IsString()
   @IsNotEmpty()
+  // `@IsNotEmpty` has no OpenAPI spelling of its own, so without this the
+  // document says `{"type": "string"}` and a generated client accepts `""`
+  // — a 400 here and a pass elsewhere. `minLength: 1` is the document's way
+  // to say it, and it generates `@Size(min = 1)`, which (unlike `@NotBlank`)
+  // accepts `"   "` exactly as `@IsNotEmpty` does.
+  @ApiProperty({ minLength: 1 })
   readonly password!: string;
 }
 
 export class RegenerateBackupCodesDto {
   @IsString()
   @IsNotEmpty()
+  // `@IsNotEmpty` has no OpenAPI spelling of its own, so without this the
+  // document says `{"type": "string"}` and a generated client accepts `""`
+  // — a 400 here and a pass elsewhere. `minLength: 1` is the document's way
+  // to say it, and it generates `@Size(min = 1)`, which (unlike `@NotBlank`)
+  // accepts `"   "` exactly as `@IsNotEmpty` does.
+  @ApiProperty({ minLength: 1 })
   readonly password!: string;
 }

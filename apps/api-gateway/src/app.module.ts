@@ -1,5 +1,6 @@
 import { LeaseModule } from './common/lease/lease.module';
-import { Module } from '@nestjs/common';
+import { JsonBodyMiddleware } from './common/middleware/json-body.middleware';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigService, ConfigModule } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
@@ -133,4 +134,14 @@ import { HttpMetricsInterceptor } from './modules/metrics/http-metrics.intercept
     { provide: APP_INTERCEPTOR, useClass: HttpMetricsInterceptor },
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  /**
+   * **Registered here rather than in a composition root**, because there are
+   * two of them — `main.ts` and `test/utils/bootstrap.ts` — and anything
+   * wired in only the first is invisible to every e2e suite. Both import this
+   * module, so both get this.
+   */
+  configure(consumer: MiddlewareConsumer): void {
+    consumer.apply(JsonBodyMiddleware).forRoutes('*');
+  }
+}
