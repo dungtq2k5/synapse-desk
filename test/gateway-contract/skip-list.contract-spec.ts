@@ -80,15 +80,17 @@ describe('the Java skip list', () => {
     // implemented, so its complement is what Java HAS — and each of those
     // must appear in some suite's declared tags, or it is served and untested.
     const pending = pendingApis();
+    // FIXME Type 'Set<string>' can only be iterated through when using the '--downlevelIteration' flag or with a '--target' of 'es2015' or higher.
     const implemented = [...realApiNames()].filter(
       (name) => !pending.has(name),
     );
     const covered = new Set(declared().map(apiNameFor));
 
     expect(implemented.filter((name) => !covered.has(name))).toEqual([]);
-    // Today: `OpsApi` alone. The floor rises as the pending list shrinks, and
-    // it is here so an empty `implemented` cannot report full coverage.
-    expect(implemented.length).toBeGreaterThanOrEqual(3);
+    // Today: Ops, Auth, Users, Feedback, Otp, Chat. The floor rises as the
+    // pending list shrinks, and it is here so an empty `implemented` cannot
+    // report full coverage.
+    expect(implemented.length).toBeGreaterThanOrEqual(6);
   });
 
   it('the pending list is read from the Java build, not copied here', () => {

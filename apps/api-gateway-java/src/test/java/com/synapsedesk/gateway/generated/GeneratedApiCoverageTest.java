@@ -114,7 +114,7 @@ class GeneratedApiCoverageTest {
     // adding a tag nobody implements — which is the case the compiler cannot
     // see and the reason this file exists.
     assertThat(generated()).hasSize(31);
-    assertThat(pending()).hasSize(28);
+    assertThat(pending()).hasSize(25);
   }
 
   @Test

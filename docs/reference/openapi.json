@@ -66274,6 +66274,10 @@
       "FeedbackResponseDto": {
         "type": "object",
         "properties": {
+          "rating": {
+            "type": "number",
+            "enum": [-1, 1]
+          },
           "id": {
             "type": "string"
           },
@@ -66305,6 +66309,7 @@
           }
         },
         "required": [
+          "rating",
           "id",
           "ticketMessageId",
           "userId",

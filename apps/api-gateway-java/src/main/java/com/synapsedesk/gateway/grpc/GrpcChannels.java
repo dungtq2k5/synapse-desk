@@ -8,7 +8,11 @@ import java.util.concurrent.TimeUnit;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import synapsedesk.auth.AuthServiceGrpc;
+import synapsedesk.auth.OtpServiceGrpc;
 import synapsedesk.auth.UserServiceGrpc;
+import synapsedesk.ticket.FeedbackServiceGrpc;
+import synapsedesk.ticket.MessageServiceGrpc;
+import synapsedesk.ticket.TicketServiceGrpc;
 
 /**
  * One channel per PEER, plaintext — the same trust boundary the Node gateway
@@ -18,16 +22,15 @@ import synapsedesk.auth.UserServiceGrpc;
  * <p>`AuthService` and `UserService` share ONE channel: both are served by the
  * same auth-service process, at the same address, so a second channel would
  * be a second TCP connection to open for no separation gRPC does not already
- * give at the service level.
- *
- * <p>Only auth-service today; a peer added later is a bean added here, not a
- * pattern invented here — Spring's own channel builder is the whole
- * abstraction this skeleton needs.
+ * give at the service level. `FeedbackService` is the first stub on a SECOND
+ * peer, ticket-service — plan 84's `Feedback` module is the one that pays for
+ * that channel, which `Chat` (also ticket-service) then reuses for free.
  */
 @Configuration
 public class GrpcChannels {
 
   private ManagedChannel authChannel;
+  private ManagedChannel ticketChannel;
 
   /** The channel, as its own bean — both stubs below depend on it, so Spring orders it first. */
   @Bean
@@ -42,6 +45,17 @@ public class GrpcChannels {
   }
 
   @Bean
+  ManagedChannel ticketServiceChannel(GrpcProperties grpc) {
+    String[] hostPort = grpc.ticketServiceUrl().split(":", 2);
+    ticketChannel =
+        NettyChannelBuilder.forAddress(hostPort[0], Integer.parseInt(hostPort[1]))
+            .usePlaintext()
+            .build();
+
+    return ticketChannel;
+  }
+
+  @Bean
   public AuthServiceGrpc.AuthServiceBlockingStub authServiceStub(ManagedChannel authServiceChannel) {
     return AuthServiceGrpc.newBlockingStub(authServiceChannel);
   }
@@ -51,10 +65,36 @@ public class GrpcChannels {
     return UserServiceGrpc.newBlockingStub(authServiceChannel);
   }
 
+  @Bean
+  public OtpServiceGrpc.OtpServiceBlockingStub otpServiceStub(ManagedChannel authServiceChannel) {
+    return OtpServiceGrpc.newBlockingStub(authServiceChannel);
+  }
+
+  @Bean
+  public FeedbackServiceGrpc.FeedbackServiceBlockingStub feedbackServiceStub(
+      ManagedChannel ticketServiceChannel) {
+    return FeedbackServiceGrpc.newBlockingStub(ticketServiceChannel);
+  }
+
+  @Bean
+  public TicketServiceGrpc.TicketServiceBlockingStub ticketServiceStub(
+      ManagedChannel ticketServiceChannel) {
+    return TicketServiceGrpc.newBlockingStub(ticketServiceChannel);
+  }
+
+  @Bean
+  public MessageServiceGrpc.MessageServiceBlockingStub messageServiceStub(
+      ManagedChannel ticketServiceChannel) {
+    return MessageServiceGrpc.newBlockingStub(ticketServiceChannel);
+  }
+
   @PreDestroy
   void shutdown() throws InterruptedException {
     if (authChannel != null) {
       authChannel.shutdown().awaitTermination(5, TimeUnit.SECONDS);
+    }
+    if (ticketChannel != null) {
+      ticketChannel.shutdown().awaitTermination(5, TimeUnit.SECONDS);
     }
   }
 }
