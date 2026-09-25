@@ -845,6 +845,16 @@ gateway: a peer is programmed by answering its RPC, never by
 `overrideProvider`, and an assertion about an outgoing call reads the peer's
 **recording** of the request and its metadata.
 
+**A cookie is asserted as an attribute set, never as a header string.**
+`parseSetCookie` in `client.ts` is what a cookie row reads: the name, the
+value and the attributes a value we authored — `Max-Age`, `Path`, `HttpOnly`,
+`Secure` — exactly, `SameSite`'s casing loosely, and attribute order and the
+`Expires` date not at all. Those three are the serializer's, and Express and
+Spring spell them differently for the same cookie. A clear is the semantic
+form: empty value **and** (`Max-Age=0` **or** a past `Expires`) **and** the
+`Path`, `HttpOnly` and `SameSite` it was set with, since a browser only
+replaces a cookie whose path matches.
+
 **The skip list is where the Java gateway's progress is read.** Under
 `GATEWAY_IMPL=java` a row is skipped when the API tag it declares is still in
 `apps/api-gateway-java/src/test/resources/pending-apis.txt`; implementing an

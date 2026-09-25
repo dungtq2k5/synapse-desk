@@ -120,6 +120,17 @@
       <artifactId>grpc-stub</artifactId>
       <version>${grpc.version}</version>
     </dependency>
+    <!--
+      RS256 verification only — the gateway never mints. Nimbus rather than
+      hand-rolled RSA/PEM parsing: signature verification is a trust-boundary
+      security path (see the repo's own no-simplify list), and this is a
+      single well-audited jar, not a framework.
+    -->
+    <dependency>
+      <groupId>com.nimbusds</groupId>
+      <artifactId>nimbus-jose-jwt</artifactId>
+      <version>10.10</version>
+    </dependency>
     <!-- `@Generated` on the generated stubs; provided, not shipped. -->
     <dependency>
       <groupId>org.apache.tomcat</groupId>

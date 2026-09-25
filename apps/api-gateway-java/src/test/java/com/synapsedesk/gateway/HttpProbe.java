@@ -39,6 +39,28 @@ public record HttpProbe(int status, String body) {
     return post(port, path, body, "application/json");
   }
 
+  /**
+   * A POST that sets NO `Content-Type` at all.
+   *
+   * <p>`java.net.http` adds none of its own, which is what makes this
+   * expressible — the row it serves is the one where a caller sends bytes
+   * without saying what they are.
+   */
+  public static HttpProbe postWithoutContentType(int port, String path, String body) {
+    try {
+      HttpResponse<String> response =
+          CLIENT.send(
+              HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + path))
+                  .POST(HttpRequest.BodyPublishers.ofString(body))
+                  .build(),
+              HttpResponse.BodyHandlers.ofString());
+
+      return new HttpProbe(response.statusCode(), response.body());
+    } catch (IOException | InterruptedException cause) {
+      throw new IllegalStateException("POST " + path + " failed", cause);
+    }
+  }
+
   /** A POST with a chosen content type — the unsupported-media-type row. */
   public static HttpProbe post(int port, String path, String body, String contentType) {
     try {

@@ -1,9 +1,5 @@
 package com.synapsedesk.gateway.generated;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
-import com.synapsedesk.gateway.GatewayApplication;
-import com.synapsedesk.gateway.config.SharedEnvironmentInitializer;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -12,11 +8,15 @@ import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.stream.Stream;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationContext;
 import org.springframework.test.context.ContextConfiguration;
+
+import com.synapsedesk.gateway.config.SharedEnvironmentInitializer;
 
 /**
  * Every generated `*Api` interface is implemented, or listed as pending.
@@ -114,7 +114,7 @@ class GeneratedApiCoverageTest {
     // adding a tag nobody implements — which is the case the compiler cannot
     // see and the reason this file exists.
     assertThat(generated()).hasSize(31);
-    assertThat(pending()).hasSize(30);
+    assertThat(pending()).hasSize(28);
   }
 
   @Test
@@ -140,6 +140,7 @@ class GeneratedApiCoverageTest {
   /** The tracked list, comments and blank lines dropped. */
   private Set<String> pending() throws IOException {
     return Files.readAllLines(PENDING).stream()
+        // FIXME Null type safety: parameter 'this' provided via method descriptor Function<String,String>.apply(String) needs unchecked conversion to conform to '@Nonnull String'
         .map(String::trim)
         .filter(line -> !line.isEmpty() && !line.startsWith("#"))
         .collect(java.util.stream.Collectors.toCollection(TreeSet::new));

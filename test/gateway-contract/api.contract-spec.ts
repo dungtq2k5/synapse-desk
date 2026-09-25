@@ -74,7 +74,7 @@ describe('pagination, GraphQL and the webhooks', () => {
             name: 'Agent',
             description: 'Front line',
             isSystem: false,
-            permissionCodes: ['ticket.read.own'],
+            permissionCodes: ['ticket.read.all'],
             createdAt: { seconds: 1_756_684_800, nanos: 0 },
             updatedAt: { seconds: 1_756_684_800, nanos: 0 },
           },

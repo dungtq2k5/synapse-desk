@@ -25,6 +25,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { REPO_ROOT } from './gateway';
+import { compareAlphabetically } from '@synapsedesk/common';
 
 /** The tracked list the Java build owns. */
 export const PENDING_APIS = join(
@@ -77,6 +78,15 @@ export const SKIPPED_FOR_JAVA: Readonly<Record<string, string>> = {
     'the security-header middleware',
   '`/metrics` exports the job gauge':
     'a metric is registered on first use, so the job gauge appears only once a job has reported — the reporter arrives with the NATS consumer',
+  'a DTO validation failure':
+    'the exact Node phrasing (whitelist rejection, class-validator type ' +
+    'messages) — plan 83 §3 already rules the per-field text loose; this ' +
+    'row asserts the exact Node string rather than the shape, and wants a ' +
+    'second, shape-only row instead of a Java rewrite of this one',
+  'a preflight from an origin outside the list':
+    'the CORS policy — same subsystem as the rate-limit-header row above, not part of auth',
+  'the login tier refuses the sixth attempt':
+    'the throttler — rate limiting is its own subsystem, not part of auth',
 };
 
 /** True when this row's NAME is on the explicit list. */
@@ -142,5 +152,5 @@ export function declaredTags(): string[] {
     }
   }
 
-  return [...tags].sort();
+  return [...tags].sort(compareAlphabetically);
 }

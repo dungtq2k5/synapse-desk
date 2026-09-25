@@ -22,6 +22,39 @@ export type ContractResponse<T = unknown> = {
 };
 
 /**
+ * One `Set-Cookie` line, split into what a row actually asserts.
+ *
+ * Attribute keys are lowercased (`SameSite` vs `samesite` is not a contract a
+ * client cares about); a bare flag (`HttpOnly`, `Secure`) maps to `true`. A
+ * line with no `=` in its first segment returns `null` rather than a cookie
+ * with an empty name — a malformed line must not silently parse into
+ * something a row can pass against.
+ */
+export function parseSetCookie(line: string): {
+  name: string;
+  value: string;
+  attributes: Record<string, string | true>;
+} | null {
+  const [pair, ...rest] = line.split(';');
+  const at = pair.indexOf('=');
+  if (at <= 0) return null;
+
+  const attributes: Record<string, string | true> = {};
+  for (const part of rest) {
+    const [key, ...valueParts] = part.split('=');
+    const name = key.trim().toLowerCase();
+    if (!name) continue;
+    attributes[name] = valueParts.length ? valueParts.join('=').trim() : true;
+  }
+
+  return {
+    name: pair.slice(0, at).trim(),
+    value: pair.slice(at + 1).trim(),
+    attributes,
+  };
+}
+
+/**
  * `/api/v1` — the prefix from the same `.env.test` the gateway is started with,
  * and the version the gateway pins.
  *

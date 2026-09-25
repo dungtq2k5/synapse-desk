@@ -88,7 +88,7 @@ describe('the Java skip list', () => {
     expect(implemented.filter((name) => !covered.has(name))).toEqual([]);
     // Today: `OpsApi` alone. The floor rises as the pending list shrinks, and
     // it is here so an empty `implemented` cannot report full coverage.
-    expect(implemented.length).toBeGreaterThanOrEqual(1);
+    expect(implemented.length).toBeGreaterThanOrEqual(3);
   });
 
   it('the pending list is read from the Java build, not copied here', () => {

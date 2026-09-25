@@ -11,12 +11,12 @@
 # removing a name is a deliberate edit and adding one is a decision somebody
 # reviewed.
 #
-# `OpsApi` is deliberately absent: `OpsController` implements it.
+# `OpsApi`, `AuthApi` and `UsersApi` are deliberately absent: their
+# controllers implement them (plan 83 step 5-7).
 AiApi
 AnalyticsApi
 AttachmentsApi
 AuditLogsApi
-AuthApi
 BillingApi
 ChatApi
 DepartmentsApi
@@ -38,7 +38,6 @@ SessionsApi
 TicketsApi
 TwoFactorAuthApi
 UserAdminApi
-UsersApi
 UserSessionsApi
 WebhookEndpointsApi
 WebhooksApi
