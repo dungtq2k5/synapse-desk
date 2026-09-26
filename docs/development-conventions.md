@@ -862,7 +862,7 @@ interface deletes a line there and un-skips its rows in the same commit. A
 short by-name list covers the other case — the route exists, the behaviour
 does not yet — and each entry names what it waits for.
 
-**A row here is the one the Java gateway must also pass** (plan 78), so a
+**A row here is the one the Java gateway must also pass**, so a
 wire behaviour that only the in-process suite pins is a behaviour the second
 implementation is free to get wrong.
 

@@ -9,7 +9,7 @@ an idempotency key on every send — the uuid the publisher already mints for
 `Nats-Msg-Id`, carried on the command as `sendId`, plus the recipient on a
 fan-out — and a caller-set RFC `Message-ID` that is the SHA-256 of that key
 at the sender's domain, stored as the delivery's provider id. Resend
-preserves the header byte for byte (measured; plan 75 §8). Inbound mail
+preserves the header byte for byte (measured). Inbound mail
 arrives as a Resend
 `email.received` webhook at the gateway, verified with the webhook signing
 secret over the raw body, with the body and headers fetched from the

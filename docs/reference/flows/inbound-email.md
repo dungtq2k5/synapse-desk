@@ -98,7 +98,7 @@ Step 0 in the routing service, unconditionally, before tenant resolution:
 - **Self-addressed mail is dropped silently** — not even a rejection event. Replying to ourselves _is_ the loop.
 - **`Auto-Submitted` and `Precedence`** are the headers a machine sets; `bulk`, `list` and `junk` are refused.
 
-The mapper forwards **only those two headers** into the DTO — a full copy is unbounded sender-controlled data with one use. Whether Resend exposes them on every mail is the open pre-flight in [plan 75](../../archive/implementations/75-resend-email.md) §8: if it does not, the guards see nothing. `node scripts/resend-preflight.mjs --inbound` lists the header **names** on the newest received mail, which is the measurement that closes it.
+The mapper forwards **only those two headers** into the DTO — a full copy is unbounded sender-controlled data with one use. Whether Resend exposes them on every mail is the open pre-flight: if it does not, the guards see nothing. `node scripts/resend-preflight.mjs --inbound` lists the header **names** on the newest received mail, which is the measurement that closes it.
 
 A mail loop is the classic way an email integration takes out a mailbox, and its blast radius is somebody else's. That is why the guards run before the work rather than after the routing.
 
@@ -141,7 +141,7 @@ A drop is a decision, not a failure, and answering it with a non-2xx would turn 
 
 **ticket-service authorises; storage-service fetches.** `IngestAttachment` loads the ticket first (that is what authorises a write under its prefix), refuses a claimed size over the tenant's limit, and hands that limit on so the stream is cut at the number the claim was judged against. `IngestFromUrl` judges the URL before any I/O (`https:` only, no private literal), writes the record **before** the fetch, opens the source through the guarded lookup with redirects followed at most twice and re-judged per hop, sniffs the head against the declared type when 4 KB have arrived or the body has ended — a mismatch writes nothing — and streams the rest, counted, cut one byte past the ceiling. Every failure after the record consumes it and deletes any partial object.
 
-**Three deadlines, nested**, so an inner hop fails cleanly before an outer one gives up on it and a timeout never leaves a confirmable orphan: the fetch's idle timeout (20 s) < ticket-service's deadline on storage (30 s) < the gateway's deadline on ticket-service (35 s). The per-mail worst case is `ceil(n / 2) × 35 s`, which is what Resend's webhook timeout (plan 76's P8, unmeasured) has to exceed.
+**Three deadlines, nested**, so an inner hop fails cleanly before an outer one gives up on it and a timeout never leaves a confirmable orphan: the fetch's idle timeout (20 s) < ticket-service's deadline on storage (30 s) < the gateway's deadline on ticket-service (35 s). The per-mail worst case is `ceil(n / 2) × 35 s`, which is what Resend's webhook timeout (unmeasured) has to exceed.
 
 **The note is applied once, for both paths** — creation and reply — from one list: the mapper's drops plus the ingest's. An emailed _reply_ carrying attachments must say in the thread what was left out, because a partial delivery with no record of the missing half is worse than a total one.
 
