@@ -14,17 +14,13 @@
 # `OpsApi`, `AuthApi` and `UsersApi` are deliberately absent: their
 # controllers implement them (plan 83 step 5-7).
 AiApi
-AnalyticsApi
-AttachmentsApi
 AuditLogsApi
 BillingApi
 DepartmentsApi
-DocumentsApi
 IngestionJobsApi
 InvitationsApi
 KnowledgeApi
 MessagesApi
-NotificationsApi
 OrganizationsApi
 PermissionsApi
 PlatformApi
@@ -34,7 +30,5 @@ RolesApi
 SessionsApi
 TicketsApi
 TwoFactorAuthApi
-UserAdminApi
-UserSessionsApi
 WebhookEndpointsApi
 WebhooksApi

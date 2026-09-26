@@ -9,14 +9,13 @@ import java.util.concurrent.TimeUnit;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
 
 import com.synapsedesk.gateway.auth.CurrentRequest;
 import com.synapsedesk.gateway.auth.CurrentUser;
 import com.synapsedesk.gateway.auth.RequestContext;
-import com.synapsedesk.gateway.config.RuntimeProperties;
 import com.synapsedesk.gateway.generated.api.FeedbackApi;
 import com.synapsedesk.gateway.generated.model.AuthControllerForgotPasswordV1202Response;
+import com.synapsedesk.gateway.generated.model.CurrentUserResponseDto.PermissionCodesEnum;
 import com.synapsedesk.gateway.generated.model.FeedbackControllerListV1200Response;
 import com.synapsedesk.gateway.generated.model.FeedbackControllerListV1200ResponseData;
 import com.synapsedesk.gateway.generated.model.FeedbackResponseDto;
@@ -24,6 +23,7 @@ import com.synapsedesk.gateway.generated.model.InvitationsControllerListV1200Res
 import com.synapsedesk.gateway.generated.model.MessageFeedbackControllerOwnV1200Response;
 import com.synapsedesk.gateway.generated.model.SubmitFeedbackDto;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
+import com.synapsedesk.gateway.security.RequirePermission;
 
 import io.grpc.stub.MetadataUtils;
 import synapsedesk.auth.Common.PageMeta;
@@ -53,38 +53,12 @@ public class FeedbackController implements FeedbackApi {
 
   private static final long DEADLINE_SECONDS = 5;
 
-  private static final String ANALYTICS_READ = "analytics.read";
-
   private final FeedbackServiceGrpc.FeedbackServiceBlockingStub stub;
   private final CurrentUser currentUser;
-  private final RuntimeProperties runtime;
 
-  public FeedbackController(
-      FeedbackServiceGrpc.FeedbackServiceBlockingStub stub,
-      CurrentUser currentUser,
-      RuntimeProperties runtime) {
+  public FeedbackController(FeedbackServiceGrpc.FeedbackServiceBlockingStub stub, CurrentUser currentUser) {
     this.stub = stub;
     this.currentUser = currentUser;
-    this.runtime = runtime;
-  }
-
-  /**
-   * `PermissionGuard`'s `@RequirePermission('analytics.read')`, reproduced for
-   * the one route that needs it — `feedback` is the tenant-wide stream, and the
-   * only permission-gated route in the Java gateway so far, so this stays a
-   * method rather than a framework nothing else uses yet.
-   */
-  private void requireAnalyticsRead(RequestContext context) {
-    if (context.isSuperAdmin() || context.permissionCodes().contains(ANALYTICS_READ)) {
-      return;
-    }
-
-    boolean production = "production".equals(runtime.nodeEnv());
-    throw new ResponseStatusException(
-        HttpStatus.FORBIDDEN,
-        production
-            ? "You do not have permission to access this resource"
-            : "Requires one of: " + ANALYTICS_READ);
   }
 
   private FeedbackServiceGrpc.FeedbackServiceBlockingStub withMetadata(RequestContext context) {
@@ -149,6 +123,7 @@ public class FeedbackController implements FeedbackApi {
   }
 
   @Override
+  @RequirePermission(PermissionCodesEnum.ANALYTICS_READ)
   public ResponseEntity<FeedbackControllerListV1200Response> feedbackControllerListV1(
       BigDecimal page,
       BigDecimal limit,
@@ -159,7 +134,6 @@ public class FeedbackController implements FeedbackApi {
       OffsetDateTime from,
       OffsetDateTime to) {
     RequestContext context = currentUser.require(CurrentRequest.request());
-    requireAnalyticsRead(context);
 
     PageRequest.Builder pageRequest =
         PageRequest.newBuilder()

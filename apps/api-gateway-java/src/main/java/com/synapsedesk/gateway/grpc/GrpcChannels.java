@@ -9,7 +9,12 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import synapsedesk.auth.AuthServiceGrpc;
 import synapsedesk.auth.OtpServiceGrpc;
+import synapsedesk.auth.SessionServiceGrpc;
 import synapsedesk.auth.UserServiceGrpc;
+import synapsedesk.ingestion.AiLedgerServiceGrpc;
+import synapsedesk.ingestion.DocumentServiceGrpc;
+import synapsedesk.notification.NotificationServiceGrpc;
+import synapsedesk.ticket.AnalyticsServiceGrpc;
 import synapsedesk.ticket.FeedbackServiceGrpc;
 import synapsedesk.ticket.MessageServiceGrpc;
 import synapsedesk.ticket.TicketServiceGrpc;
@@ -31,6 +36,8 @@ public class GrpcChannels {
 
   private ManagedChannel authChannel;
   private ManagedChannel ticketChannel;
+  private ManagedChannel ingestionChannel;
+  private ManagedChannel notificationChannel;
 
   /** The channel, as its own bean — both stubs below depend on it, so Spring orders it first. */
   @Bean
@@ -56,6 +63,28 @@ public class GrpcChannels {
   }
 
   @Bean
+  ManagedChannel ingestionServiceChannel(GrpcProperties grpc) {
+    String[] hostPort = grpc.ingestionServiceUrl().split(":", 2);
+    ingestionChannel =
+        NettyChannelBuilder.forAddress(hostPort[0], Integer.parseInt(hostPort[1]))
+            .usePlaintext()
+            .build();
+
+    return ingestionChannel;
+  }
+
+  @Bean
+  ManagedChannel notificationServiceChannel(GrpcProperties grpc) {
+    String[] hostPort = grpc.notificationServiceUrl().split(":", 2);
+    notificationChannel =
+        NettyChannelBuilder.forAddress(hostPort[0], Integer.parseInt(hostPort[1]))
+            .usePlaintext()
+            .build();
+
+    return notificationChannel;
+  }
+
+  @Bean
   public AuthServiceGrpc.AuthServiceBlockingStub authServiceStub(ManagedChannel authServiceChannel) {
     return AuthServiceGrpc.newBlockingStub(authServiceChannel);
   }
@@ -68,6 +97,11 @@ public class GrpcChannels {
   @Bean
   public OtpServiceGrpc.OtpServiceBlockingStub otpServiceStub(ManagedChannel authServiceChannel) {
     return OtpServiceGrpc.newBlockingStub(authServiceChannel);
+  }
+
+  @Bean
+  public SessionServiceGrpc.SessionServiceBlockingStub sessionServiceStub(ManagedChannel authServiceChannel) {
+    return SessionServiceGrpc.newBlockingStub(authServiceChannel);
   }
 
   @Bean
@@ -88,6 +122,30 @@ public class GrpcChannels {
     return MessageServiceGrpc.newBlockingStub(ticketServiceChannel);
   }
 
+  @Bean
+  public AnalyticsServiceGrpc.AnalyticsServiceBlockingStub analyticsServiceStub(
+      ManagedChannel ticketServiceChannel) {
+    return AnalyticsServiceGrpc.newBlockingStub(ticketServiceChannel);
+  }
+
+  @Bean
+  public AiLedgerServiceGrpc.AiLedgerServiceBlockingStub aiLedgerServiceStub(
+      ManagedChannel ingestionServiceChannel) {
+    return AiLedgerServiceGrpc.newBlockingStub(ingestionServiceChannel);
+  }
+
+  @Bean
+  public DocumentServiceGrpc.DocumentServiceBlockingStub documentServiceStub(
+      ManagedChannel ingestionServiceChannel) {
+    return DocumentServiceGrpc.newBlockingStub(ingestionServiceChannel);
+  }
+
+  @Bean
+  public NotificationServiceGrpc.NotificationServiceBlockingStub notificationServiceStub(
+      ManagedChannel notificationServiceChannel) {
+    return NotificationServiceGrpc.newBlockingStub(notificationServiceChannel);
+  }
+
   @PreDestroy
   void shutdown() throws InterruptedException {
     if (authChannel != null) {
@@ -95,6 +153,12 @@ public class GrpcChannels {
     }
     if (ticketChannel != null) {
       ticketChannel.shutdown().awaitTermination(5, TimeUnit.SECONDS);
+    }
+    if (ingestionChannel != null) {
+      ingestionChannel.shutdown().awaitTermination(5, TimeUnit.SECONDS);
+    }
+    if (notificationChannel != null) {
+      notificationChannel.shutdown().awaitTermination(5, TimeUnit.SECONDS);
     }
   }
 }

@@ -36,6 +36,7 @@ public final class UserMapper {
         .gender(fromProtoGender(user.getGender()))
         .lastLoginAt(user.hasLastLoginAt() ? toOffsetDateTime(user.getLastLoginAt()) : null)
         .isLocked(user.getIsLocked())
+        .lockedUntil(user.hasLockedUntil() ? toOffsetDateTime(user.getLockedUntil()) : null)
         .isTwoFactorEnabled(user.getIsTwoFactorEnabled())
         .createdAt(toOffsetDateTime(user.getCreatedAt()))
         .updatedAt(toOffsetDateTime(user.getUpdatedAt()));

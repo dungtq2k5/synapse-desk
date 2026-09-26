@@ -42,8 +42,26 @@ export const GENERATED_APIS = join(
 /** The implementation under test. */
 export const IMPL = process.env.GATEWAY_IMPL ?? 'node';
 
-/** `Tickets` -> `TicketsApi`, the generated interface's simple name. */
-export const apiNameFor = (tag: string): string => `${tag}Api`;
+/**
+ * `Tickets` -> `TicketsApi`, the generated interface's simple name.
+ *
+ * **Word-capitalized, not merely space-stripped.** A published tag can carry
+ * spaces (`'Audit Logs'`, `'User Sessions'`) and even an un-capitalized word
+ * (`'Webhook endpoints'` — lowercase `e`), while the generated interface never
+ * does (`AuditLogsApi`, `UserSessionsApi`, `WebhookEndpointsApi`). Stripping
+ * spaces alone would produce `WebhookendpointsApi`, which matches nothing in
+ * `pending-apis.txt` — silently treating every one of that tag's operations as
+ * unimplemented forever. Found the hard way: every `rowFor(...)` tag written
+ * so far happens to be one word, so this path had never run through THAT
+ * caller — it surfaced when `permission-coverage.contract-spec.ts` (plan 85
+ * §2) read tags straight off the published document instead, where
+ * multi-word ones already exist for modules not yet implemented.
+ */
+export const apiNameFor = (tag: string): string =>
+  `${tag
+    .split(/\s+/u)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join('')}Api`;
 
 /** Every interface the Java gateway has NOT implemented, by simple name. */
 export function pendingApis(): Set<string> {
@@ -87,6 +105,11 @@ export const SKIPPED_FOR_JAVA: Readonly<Record<string, string>> = {
     'the CORS policy — same subsystem as the rate-limit-header row above, not part of auth',
   'the login tier refuses the sixth attempt':
     'the throttler — rate limiting is its own subsystem, not part of auth',
+  '**an explicit `dob: null` clears it**':
+    '`openApiNullable` is off project-wide (pom.xml, deliberate), so the ' +
+    'generated `UpdateUserDto.dob` cannot distinguish an explicit `null` ' +
+    "from an absent key the way Node's `dto.dob === null` check can — both " +
+    'deserialize to the same Java `null`',
 };
 
 /** True when this row's NAME is on the explicit list. */
@@ -145,6 +168,7 @@ export function declaredTags(): string[] {
   )) {
     const source = readFileSync(join(here, file), 'utf8');
 
+    // FIXME Type 'IterableIterator<RegExpMatchArray>' can only be iterated through when using the '--downlevelIteration' flag or with a '--target' of 'es2015' or higher.
     for (const call of source.matchAll(/rowFor\(([^)]*)\)/gu)) {
       for (const literal of call[1].matchAll(/'([^']+)'/gu)) {
         tags.add(literal[1]);

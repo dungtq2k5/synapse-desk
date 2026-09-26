@@ -33,7 +33,7 @@ describe('the Java skip list', () => {
    * authoritative answer, since those are the interfaces the pending list
    * names. When they are not (a `node` run on a machine that has never built
    * the Java gateway), from the OpenAPI document's tags, normalised the way
-   * the generator normalises them. Both answer the same question; only the
+   * the generator normalizes them. Both answer the same question; only the
    * first is available unconditionally under `GATEWAY_IMPL=java`.
    */
   const realApiNames = (): Set<string> => {
@@ -53,8 +53,11 @@ describe('the Java skip list', () => {
     for (const path of Object.values(document.paths)) {
       for (const operation of Object.values(path)) {
         for (const tag of operation.tags ?? []) {
-          // `Two Factor Auth` -> `TwoFactorAuthApi`, as the generator writes it.
-          tags.add(apiNameFor(tag.replace(/[^A-Za-z0-9]/gu, '')));
+          // `Two Factor Auth` -> `TwoFactorAuthApi`, as the generator writes
+          // it — `apiNameFor` itself now does the word-capitalizing this line
+          // used to get wrong (`replace` alone lowercases-and-concatenates,
+          // producing `twofactorauthApi`, which matches nothing).
+          tags.add(apiNameFor(tag));
         }
       }
     }
@@ -87,10 +90,11 @@ describe('the Java skip list', () => {
     const covered = new Set(declared().map(apiNameFor));
 
     expect(implemented.filter((name) => !covered.has(name))).toEqual([]);
-    // Today: Ops, Auth, Users, Feedback, Otp, Chat. The floor rises as the
-    // pending list shrinks, and it is here so an empty `implemented` cannot
-    // report full coverage.
-    expect(implemented.length).toBeGreaterThanOrEqual(6);
+    // Today: Ops, Auth, Users, Feedback, Otp, Chat, Analytics,
+    // Notifications, User Sessions, User Admin, Documents, Attachments. The
+    // floor rises as the pending list shrinks, and it is here so an empty
+    // `implemented` cannot report full coverage.
+    expect(implemented.length).toBeGreaterThanOrEqual(12);
   });
 
   it('the pending list is read from the Java build, not copied here', () => {
