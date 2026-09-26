@@ -13,6 +13,8 @@ import com.synapsedesk.gateway.generated.model.RequestPhoneVerificationDto;
 import com.synapsedesk.gateway.generated.model.VerifyOtpDto;
 import com.synapsedesk.gateway.generated.model.VerifyOtpResponseDto;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
+import com.synapsedesk.gateway.throttle.AuthThrottle;
+import com.synapsedesk.gateway.throttle.RouteThrottle;
 import io.grpc.stub.MetadataUtils;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -42,10 +44,13 @@ import synapsedesk.auth.OtpServiceGrpc;
  * verified. Only {@link CurrentUser#require} runs — the same one full-session
  * check every other authenticated route makes.
  *
- * <p>Throttling is out of scope: the {@code otpRequest} / {@code otpVerify}
- * tier split has nothing to enforce it here yet.
+ * <p>All five routes see {@code authTier} only ({@link AuthThrottle} at class
+ * level); the two request routes and the two verify routes each carry their
+ * own {@code otpRequest}/{@code otpVerify} numbers (plan 86 §3), and
+ * `getOtpStatus` falls back to {@code authTier}'s configured default.
  */
 @RestController
+@AuthThrottle
 public class OtpController implements OtpApi {
 
   private static final long DEADLINE_SECONDS = 5;
@@ -64,6 +69,7 @@ public class OtpController implements OtpApi {
   }
 
   @Override
+  @AuthThrottle(ttlMs = RouteThrottle.OTP_REQUEST_TTL_MS, limit = RouteThrottle.OTP_REQUEST_LIMIT)
   public ResponseEntity<OtpControllerRequestEmailVerificationV1202Response> otpControllerRequestEmailVerificationV1() {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -82,6 +88,7 @@ public class OtpController implements OtpApi {
   }
 
   @Override
+  @AuthThrottle(ttlMs = RouteThrottle.OTP_VERIFY_TTL_MS, limit = RouteThrottle.OTP_VERIFY_LIMIT)
   public ResponseEntity<OtpControllerVerifyEmailV1200Response> otpControllerVerifyEmailV1(VerifyOtpDto verifyOtpDto) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -102,6 +109,7 @@ public class OtpController implements OtpApi {
   }
 
   @Override
+  @AuthThrottle(ttlMs = RouteThrottle.OTP_REQUEST_TTL_MS, limit = RouteThrottle.OTP_REQUEST_LIMIT)
   public ResponseEntity<OtpControllerRequestEmailVerificationV1202Response> otpControllerRequestPhoneVerificationV1(
       RequestPhoneVerificationDto requestPhoneVerificationDto) {
     RequestContext context = currentUser.require(CurrentRequest.request());
@@ -124,6 +132,7 @@ public class OtpController implements OtpApi {
   }
 
   @Override
+  @AuthThrottle(ttlMs = RouteThrottle.OTP_VERIFY_TTL_MS, limit = RouteThrottle.OTP_VERIFY_LIMIT)
   public ResponseEntity<OtpControllerVerifyEmailV1200Response> otpControllerVerifyPhoneV1(VerifyOtpDto verifyOtpDto) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 

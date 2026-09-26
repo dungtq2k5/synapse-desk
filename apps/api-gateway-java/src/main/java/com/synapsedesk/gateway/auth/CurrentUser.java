@@ -62,6 +62,19 @@ public class CurrentUser {
     return verifier.verifyAccess(token).isPresent();
   }
 
+  /**
+   * The caller's id, VERIFIED but not required to be a full session —
+   * `SmartThrottlerGuard.subjectFromToken`, reproduced. Deliberately not
+   * {@link #read}: the throttler's tracker keys a 2FA-pending caller by their
+   * token's `sub` too, same as Node does, since {@code verifyAccess} rejects a
+   * 2FA-challenge token by signature (separate key pair) without needing the
+   * {@code isFullSession} filter {@link #read} applies for route access.
+   */
+  public Optional<String> verifiedSubject(HttpServletRequest request) {
+    // FIXME Null type safety: parameter 'this' provided via method descriptor Function<JwtPrincipal,String>.apply(JwtPrincipal) needs unchecked conversion to conform to '@Nonnull JwtPrincipal'
+    return accessToken(request).flatMap(verifier::verifyAccess).map(JwtPrincipal::sub);
+  }
+
   Optional<String> accessToken(HttpServletRequest request) {
     if (request.getCookies() == null) {
       return Optional.empty();

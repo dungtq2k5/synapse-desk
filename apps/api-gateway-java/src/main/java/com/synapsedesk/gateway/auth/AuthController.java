@@ -30,6 +30,8 @@ import com.synapsedesk.gateway.generated.model.TenantSelectionResponseDto;
 import com.synapsedesk.gateway.generated.model.TwoFactorRequiredResponseDto;
 import com.synapsedesk.gateway.generated.model.ValidatePasswordResetTokenResponseDto;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
+import com.synapsedesk.gateway.throttle.AuthThrottle;
+import com.synapsedesk.gateway.throttle.RouteThrottle;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.math.BigDecimal;
@@ -69,6 +71,7 @@ import synapsedesk.auth.Auth.ValidatePasswordResetTokenResponse;
  * other route.
  */
 @RestController
+@AuthThrottle
 public class AuthController implements AuthApi {
 
   private static final long DEADLINE_SECONDS = 5;
@@ -104,6 +107,7 @@ public class AuthController implements AuthApi {
   }
 
   @Override
+  @AuthThrottle(ttlMs = RouteThrottle.REGISTER_TTL_MS, limit = RouteThrottle.REGISTER_LIMIT)
   public ResponseEntity<AuthControllerRegisterV1201Response> authControllerRegisterV1(
       RegisterDto registerDto) {
     HttpServletRequest request = CurrentRequest.request();
@@ -134,6 +138,7 @@ public class AuthController implements AuthApi {
   }
 
   @Override
+  @AuthThrottle(ttlMs = RouteThrottle.LOGIN_TTL_MS, limit = RouteThrottle.LOGIN_LIMIT)
   public ResponseEntity<AuthControllerLoginV1200Response> authControllerLoginV1(LoginDto loginDto) {
     HttpServletRequest request = CurrentRequest.request();
     guestCheck.requireNoActiveSession(request);
@@ -318,6 +323,7 @@ public class AuthController implements AuthApi {
   }
 
   @Override
+  @AuthThrottle(ttlMs = RouteThrottle.CHANGE_PASSWORD_TTL_MS, limit = RouteThrottle.CHANGE_PASSWORD_LIMIT)
   public ResponseEntity<AuthControllerChangePasswordV1200Response> authControllerChangePasswordV1(
       ChangePasswordDto changePasswordDto) {
     HttpServletRequest request = CurrentRequest.request();
@@ -372,6 +378,7 @@ public class AuthController implements AuthApi {
   }
 
   @Override
+  @AuthThrottle(ttlMs = RouteThrottle.FORGOT_PASSWORD_TTL_MS, limit = RouteThrottle.FORGOT_PASSWORD_LIMIT)
   public ResponseEntity<AuthControllerForgotPasswordV1202Response> authControllerForgotPasswordV1(
       ForgotPasswordDto forgotPasswordDto) {
     HttpServletRequest request = CurrentRequest.request();
