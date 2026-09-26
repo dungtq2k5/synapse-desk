@@ -16,8 +16,8 @@ import org.springframework.stereotype.Component;
  * <p>Every `set*` and `clear*` pair shares one private builder, exactly as the
  * Node side does with `setTokenCookie`/`clearTokenCookie` — so `httpOnly`,
  * `secure`, `sameSite` and `path` are written once rather than five times,
- * and the Set-Cookie parity rows (plan 83 §3) are asserting a SHARED path,
- * not five independent ones.
+ * and the Set-Cookie parity rows in `auth.contract-spec.ts` are asserting a
+ * SHARED path, not five independent ones.
  */
 @Component
 public class CookieWriter {
@@ -107,8 +107,8 @@ public class CookieWriter {
 
   /**
    * A clear — empty value, expired. `Max-Age(Duration.ZERO)` is what makes
-   * Spring write `Max-Age=0`, which plan 83 §3's parity row accepts alongside
-   * Express's `Expires`-only form as the same thing: a clear.
+   * Spring write `Max-Age=0`, which the parity row in `auth.contract-spec.ts`
+   * accepts alongside Express's `Expires`-only form as the same thing: a clear.
    */
   private void clear(HttpServletResponse response, String name) {
     response.addHeader(

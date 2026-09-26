@@ -702,7 +702,7 @@ describe('the manifest contract', () => {
   // ------------------------------------------- 9. exactly one gateway serves
 
   it('9. **exactly one gateway Deployment is `active`**, and a standby cannot roll', () => {
-    // Plan 78 §6. The annotation does not grant the role — `GatewayLeaseService`
+    // The annotation does not grant the role — `GatewayLeaseService`
     // does, through Redis — so this row guards the RECORD: the thing a human
     // reads before a switch and the thing CD's rollout-wait branches on. Two
     // Deployments annotated `active` would not break the exclusion; they would
@@ -757,7 +757,7 @@ describe('the manifest contract', () => {
           findings.push(`${name}: active with strategy=${spec.strategy?.type}`);
         }
       } else if (role === 'standby') {
-        // Measured on minikube (plan 78 §5): the default RollingUpdate cannot
+        // Measured on minikube: the default RollingUpdate cannot
         // replace pods that are never Ready, so a standby left on it takes a
         // new image only halfway and holds the rest until it becomes active.
         if (spec.strategy?.type !== 'Recreate') {

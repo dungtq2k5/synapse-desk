@@ -12,7 +12,7 @@
 # reviewed.
 #
 # `OpsApi`, `AuthApi` and `UsersApi` are deliberately absent: their
-# controllers implement them (plan 83 step 5-7).
+# controllers implement them.
 AiApi
 AuditLogsApi
 BillingApi

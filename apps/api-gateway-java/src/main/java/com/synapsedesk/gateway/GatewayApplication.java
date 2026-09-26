@@ -13,7 +13,7 @@ import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
  * gateway would be a skeleton nobody could review.
  *
  * <p><b>No {@code .env} loading, here or anywhere in this module.</b> Spring
- * does not read {@code .env} files (measured — plan 81 §9, J1), and nothing
+ * does not read {@code .env} files (measured), and nothing
  * is added to make it: under Kubernetes and Compose the values are already
  * environment variables, and locally the launcher reads the file and execs
  * this process with it. One loader, in the language that already has the

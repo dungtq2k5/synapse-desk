@@ -40,7 +40,7 @@ import synapsedesk.ticket.FeedbackServiceGrpc;
 /**
  * `FeedbackApi` — `MessageFeedbackController` and `FeedbackController` folded
  * into the one generated interface both share, against `ticket-service`'s
- * `FeedbackService`. Plan 84's `Feedback` module pays for that channel
+ * `FeedbackService`. The `Feedback` module pays for that channel
  * (`GrpcChannels.ticketServiceChannel`); `Chat` reuses it.
  *
  * <p><b>`withdraw` is a real 204 — no body.</b> A naive

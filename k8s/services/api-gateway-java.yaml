@@ -9,7 +9,7 @@
 # **At rest it is `replicas: 0` with `strategy: Recreate`.** Between switches
 # there are no standby pods to go stale; and a deploy landing mid-switch
 # replaces its pods without waiting for Ready, which a standby never is.
-# Measured on minikube (plan 78 §5): the default RollingUpdate cannot replace
+# Measured on minikube: the default RollingUpdate cannot replace
 # never-Ready pods, so a standby left on it takes a new image only halfway.
 #
 # **The role is an annotation on the DEPLOYMENT's metadata**, never the pod

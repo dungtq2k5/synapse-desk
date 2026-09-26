@@ -115,7 +115,7 @@ describe('The OpenAPI document', () => {
 
   describe('Optional means optional, and the document stays valid', () => {
     /**
-     * Plan 82. One property published three ways wrong at once — invalid,
+     * One property published three ways wrong at once — invalid,
      * `string[][]`, and mandatory — because the swagger plugin infers an array
      * of a union-literal type badly under a bare `@ApiPropertyOptional()`.
      *
@@ -163,7 +163,7 @@ describe('The OpenAPI document', () => {
       // `platform.dto.ts`'s `sortBy`: the plugin derives `required` from
       // TYPESCRIPT optionality, so a defaulted non-optional field is published
       // as mandatory and a generated client refuses to omit it. That is what
-      // `CreatePlanDto.isActive` did until plan 82.
+      // `CreatePlanDto.isActive` did until it was corrected.
       const findings: string[] = [];
       const schemas = doc.components?.schemas ?? {};
 
@@ -187,7 +187,7 @@ describe('The OpenAPI document', () => {
     });
 
     it('**`@IsNotEmpty` is spelled `minLength` in the document**', () => {
-      // Plan 83 §5a. `@IsNotEmpty` has no OpenAPI spelling of its own, so a
+      // `@IsNotEmpty` has no OpenAPI spelling of its own, so a
       // field carrying it and nothing else publishes `{"type": "string"}` —
       // and a generated client happily sends `""`, which this gateway answers
       // with a 400. The divergence is invisible from either side alone: Node
@@ -307,8 +307,8 @@ describe('The OpenAPI document', () => {
 
     // **Validity itself is asserted in the export script, not here.** This
     // suite cannot reach `scripts/lib/`: `image-contract.spec.ts` refuses a
-    // workspace importing across a workspace boundary, which is why plan 77
-    // moved `canonicalizeEnums` into `@synapsedesk/common` rather than
+    // workspace importing across a workspace boundary, which is why
+    // `canonicalizeEnums` lives in `@synapsedesk/common` rather than being
     // importing it out of `scripts/`. The validator would have to move too,
     // and it is a devDependency of the root, used by one script. So
     // `openapi:check` owns "is this a valid document" and these rows own "does
@@ -318,7 +318,7 @@ describe('The OpenAPI document', () => {
 
   describe('A body in the wrong content type is refused', () => {
     /**
-     * Plan 83 §2a. Measured on the built gateway BEFORE this existed:
+     * Measured on the built gateway BEFORE this existed:
      * `text/plain` was never a 415 — Express's JSON parser skips a body it
      * does not recognise, `req.body` arrives as `{}`, and validation answers
      * with a list of missing fields. The caller is told about the body when

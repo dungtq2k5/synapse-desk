@@ -1,5 +1,5 @@
 /**
- * @file **The guard plan 85 §2 names**: every generated operation Node gates
+ * @file **The permission-parity guard**: every generated operation Node gates
  * with `@RequirePermission` must be gated the same way in Java, for every
  * operation whose owning `*Api` tag Java has actually implemented.
  *

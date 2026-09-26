@@ -63,7 +63,7 @@ function freePort(): Promise<number> {
 /**
  * `.env.test` as the base, the harness's own values ASSIGNED over it.
  *
- * Assigned rather than loaded, plan 77's rule: `loadEnvFile` leaves a variable
+ * Assigned rather than loaded: `loadEnvFile` leaves a variable
  * already in the environment alone, so a developer's exported `REDIS_URL`
  * would otherwise point the gateway under test at their own Redis.
  */
@@ -128,8 +128,7 @@ function assertBuilt(impl: string): void {
   // The jar's absence is checked by `javaJar()` when the command is built,
   // with the same message shape. Staleness is not checked for either
   // implementation — `run-contract-suite.mjs` builds first, which is the only
-  // answer that works (plan 80 departure 1: absence is detectable, staleness
-  // is not).
+  // answer that works (absence is detectable, staleness is not).
   if (impl !== 'node') return;
 
   const missing = missingOutputs(REPO_ROOT);

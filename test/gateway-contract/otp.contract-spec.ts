@@ -10,8 +10,8 @@
  * it with a 403 that no other row would catch, since every other fixture in
  * this file signs `isEmailVerified: true`.
  *
- * **Throttling is out of scope.** `otpRequest`/`otpVerify` (plan 84 §3) wait
- * on plan 78 step 7; nothing here asserts a 429.
+ * **Throttling is out of scope.** The `otpRequest`/`otpVerify` tier split is
+ * not wired up yet; nothing here asserts a 429.
  */
 
 import { sign } from 'jsonwebtoken';
@@ -134,29 +134,34 @@ describe('otp', () => {
         userId: USER,
         phoneNumber: '+441234561234',
       });
-      expect(peers.auth.calls('OtpService/RequestEmailVerification')).toHaveLength(0);
+      expect(
+        peers.auth.calls('OtpService/RequestEmailVerification'),
+      ).toHaveLength(0);
     },
   );
 
-  rowFor('Otp')('a verified email code round-trips the peer’s answer', async () => {
-    peers.auth.on('OtpService/VerifyEmail').reply({
-      verified: true,
-      attemptsRemaining: 4,
-      mustRequestNewCode: false,
-    });
+  rowFor('Otp')(
+    'a verified email code round-trips the peer’s answer',
+    async () => {
+      peers.auth.on('OtpService/VerifyEmail').reply({
+        verified: true,
+        attemptsRemaining: 4,
+        mustRequestNewCode: false,
+      });
 
-    const response = await new Session(gateway.baseUrl).post(
-      `${API}/auth/email/verify`,
-      { code: '123456' },
-      cookie(),
-    );
+      const response = await new Session(gateway.baseUrl).post(
+        `${API}/auth/email/verify`,
+        { code: '123456' },
+        cookie(),
+      );
 
-    expect(response.status).toBe(200);
-    expect(response.body).toMatchObject({ data: { verified: true } });
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({ data: { verified: true } });
 
-    const [call] = peers.auth.calls('OtpService/VerifyEmail');
-    expect(call.request).toMatchObject({ userId: USER, code: '123456' });
-  });
+      const [call] = peers.auth.calls('OtpService/VerifyEmail');
+      expect(call.request).toMatchObject({ userId: USER, code: '123456' });
+    },
+  );
 
   rowFor('Otp')(
     '**a burned code reports `mustRequestNewCode`** on the phone route — the sibling of the email one',

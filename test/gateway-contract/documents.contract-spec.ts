@@ -94,53 +94,85 @@ describe('documents', () => {
     async () => {
       peers.ingestion.on('DocumentService/ListDocuments').reply({
         items: [wireDocument()],
-        meta: { totalItems: 1, itemCount: 1, itemsPerPage: 10, totalPages: 1, currentPage: 1 },
+        meta: {
+          totalItems: 1,
+          itemCount: 1,
+          itemsPerPage: 10,
+          totalPages: 1,
+          currentPage: 1,
+        },
       });
 
-      const first = await new Session(gateway.baseUrl).get(`${API}/documents`, cookie([]));
-      const second = await new Session(gateway.baseUrl).get(`${API}/documents`, cookie([]));
+      const first = await new Session(gateway.baseUrl).get(
+        `${API}/documents`,
+        cookie([]),
+      );
+      const second = await new Session(gateway.baseUrl).get(
+        `${API}/documents`,
+        cookie([]),
+      );
 
       expect(first.status).toBe(200);
       expect(second.status).toBe(200);
       expect(second.body).toEqual(first.body);
-      expect(peers.ingestion.calls('DocumentService/ListDocuments')).toHaveLength(1);
+      expect(
+        peers.ingestion.calls('DocumentService/ListDocuments'),
+      ).toHaveLength(1);
     },
   );
 
-  rowFor('Documents')('**presign refuses a caller without `document.create`**', async () => {
-    const response = await new Session(gateway.baseUrl).post(
-      `${API}/documents/presign`,
-      { contentType: 'application/pdf', sizeBytes: 1024, fileName: 'refund.pdf' },
-      cookie([]),
-    );
+  rowFor('Documents')(
+    '**presign refuses a caller without `document.create`**',
+    async () => {
+      const response = await new Session(gateway.baseUrl).post(
+        `${API}/documents/presign`,
+        {
+          contentType: 'application/pdf',
+          sizeBytes: 1024,
+          fileName: 'refund.pdf',
+        },
+        cookie([]),
+      );
 
-    expect(response.status).toBe(403);
-    expect(peers.ingestion.calls('DocumentService/PresignDocument')).toHaveLength(0);
-  });
+      expect(response.status).toBe(403);
+      expect(
+        peers.ingestion.calls('DocumentService/PresignDocument'),
+      ).toHaveLength(0);
+    },
+  );
 
-  rowFor('Documents')('presign forwards the content type and size, nothing is created yet (200)', async () => {
-    peers.ingestion.on('DocumentService/PresignDocument').reply({
-      uploadUrl: 'https://storage.test/upload',
-      objectPath: 'pending/documents/abc123',
-      expiresAt: { seconds: 1_756_684_800, nanos: 0 },
-    });
+  rowFor('Documents')(
+    'presign forwards the content type and size, nothing is created yet (200)',
+    async () => {
+      peers.ingestion.on('DocumentService/PresignDocument').reply({
+        uploadUrl: 'https://storage.test/upload',
+        objectPath: 'pending/documents/abc123',
+        expiresAt: { seconds: 1_756_684_800, nanos: 0 },
+      });
 
-    const response = await new Session(gateway.baseUrl).post(
-      `${API}/documents/presign`,
-      { contentType: 'application/pdf', sizeBytes: 1024, fileName: 'refund.pdf' },
-      cookie(['document.create']),
-    );
+      const response = await new Session(gateway.baseUrl).post(
+        `${API}/documents/presign`,
+        {
+          contentType: 'application/pdf',
+          sizeBytes: 1024,
+          fileName: 'refund.pdf',
+        },
+        cookie(['document.create']),
+      );
 
-    expect(response.status).toBe(200);
-    expect(response.body).toMatchObject({ data: { objectPath: 'pending/documents/abc123' } });
-  });
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({
+        data: { objectPath: 'pending/documents/abc123' },
+      });
+    },
+  );
 
   rowFor('Documents')(
     '**confirm is where the row is created (201)**, and OCR languages round-trip',
     async () => {
-      peers.ingestion.on('DocumentService/ConfirmDocument').reply(
-        wireDocument({ ocrLanguages: ['vi', 'en'] }),
-      );
+      peers.ingestion
+        .on('DocumentService/ConfirmDocument')
+        .reply(wireDocument({ ocrLanguages: ['vi', 'en'] }));
 
       const response = await new Session(gateway.baseUrl).post(
         `${API}/documents/confirm`,
@@ -153,32 +185,50 @@ describe('documents', () => {
       );
 
       expect(response.status).toBe(201);
-      expect(response.body).toMatchObject({ data: { ocrLanguages: ['vi', 'en'] } });
+      expect(response.body).toMatchObject({
+        data: { ocrLanguages: ['vi', 'en'] },
+      });
 
       const [call] = peers.ingestion.calls('DocumentService/ConfirmDocument');
-      expect(call.request).toMatchObject({ ocrLanguages: ['vi', 'en'], isOrganizationWide: true });
+      expect(call.request).toMatchObject({
+        ocrLanguages: ['vi', 'en'],
+        isOrganizationWide: true,
+      });
     },
   );
 
-  rowFor('Documents')('**get is open** — no permission required to read one document', async () => {
-    peers.ingestion.on('DocumentService/GetDocument').reply(wireDocument());
+  rowFor('Documents')(
+    '**get is open** — no permission required to read one document',
+    async () => {
+      peers.ingestion.on('DocumentService/GetDocument').reply(wireDocument());
 
-    const response = await new Session(gateway.baseUrl).get(`${API}/documents/${DOCUMENT}`, cookie([]));
+      const response = await new Session(gateway.baseUrl).get(
+        `${API}/documents/${DOCUMENT}`,
+        cookie([]),
+      );
 
-    expect(response.status).toBe(200);
-    expect(response.body).toMatchObject({ data: { id: DOCUMENT, status: 'INDEXED', fileType: 'pdf' } });
-  });
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({
+        data: { id: DOCUMENT, status: 'INDEXED', fileType: 'pdf' },
+      });
+    },
+  );
 
-  rowFor('Documents')('**update refuses a caller without `document.update`**', async () => {
-    const response = await new Session(gateway.baseUrl).request(
-      'PATCH',
-      `${API}/documents/${DOCUMENT}`,
-      { body: { title: 'Renamed' }, headers: cookie([]) },
-    );
+  rowFor('Documents')(
+    '**update refuses a caller without `document.update`**',
+    async () => {
+      const response = await new Session(gateway.baseUrl).request(
+        'PATCH',
+        `${API}/documents/${DOCUMENT}`,
+        { body: { title: 'Renamed' }, headers: cookie([]) },
+      );
 
-    expect(response.status).toBe(403);
-    expect(peers.ingestion.calls('DocumentService/UpdateDocument')).toHaveLength(0);
-  });
+      expect(response.status).toBe(403);
+      expect(
+        peers.ingestion.calls('DocumentService/UpdateDocument'),
+      ).toHaveLength(0);
+    },
+  );
 
   rowFor('Documents')(
     '**the resolution comes from the ROUTE, not the body** — one RPC, three distinct wire values',
@@ -195,25 +245,44 @@ describe('documents', () => {
       });
 
       const body = { comment: 'Reviewed, keeping it' };
-      await new Session(gateway.baseUrl).post(`${API}/documents/flags/${FLAG}/dismiss`, body, cookie(['document.update']));
-      await new Session(gateway.baseUrl).post(`${API}/documents/flags/${FLAG}/fixed`, body, cookie(['document.update']));
-      await new Session(gateway.baseUrl).post(`${API}/documents/flags/${FLAG}/replaced`, body, cookie(['document.update']));
+      await new Session(gateway.baseUrl).post(
+        `${API}/documents/flags/${FLAG}/dismiss`,
+        body,
+        cookie(['document.update']),
+      );
+      await new Session(gateway.baseUrl).post(
+        `${API}/documents/flags/${FLAG}/fixed`,
+        body,
+        cookie(['document.update']),
+      );
+      await new Session(gateway.baseUrl).post(
+        `${API}/documents/flags/${FLAG}/replaced`,
+        body,
+        cookie(['document.update']),
+      );
 
-      const calls = peers.ingestion.calls('DocumentService/ResolveDocumentFlag');
+      const calls = peers.ingestion.calls(
+        'DocumentService/ResolveDocumentFlag',
+      );
       expect(calls.map((call) => call.request.resolution)).toEqual([2, 1, 3]);
     },
   );
 
-  rowFor('Documents')('**deleting a flag requires `document.delete`, a distinct code from `document.update`**', async () => {
-    const response = await new Session(gateway.baseUrl).request(
-      'DELETE',
-      `${API}/documents/flags/${FLAG}`,
-      { headers: cookie(['document.update']) },
-    );
+  rowFor('Documents')(
+    '**deleting a flag requires `document.delete`, a distinct code from `document.update`**',
+    async () => {
+      const response = await new Session(gateway.baseUrl).request(
+        'DELETE',
+        `${API}/documents/flags/${FLAG}`,
+        { headers: cookie(['document.update']) },
+      );
 
-    expect(response.status).toBe(403);
-    expect(peers.ingestion.calls('DocumentService/DeleteDocumentFlag')).toHaveLength(0);
-  });
+      expect(response.status).toBe(403);
+      expect(
+        peers.ingestion.calls('DocumentService/DeleteDocumentFlag'),
+      ).toHaveLength(0);
+    },
+  );
 
   rowFor('Documents')(
     '**`setDepartments` needs `document.share`, distinct from `document.update`** — the sibling-code-pair case',
@@ -228,7 +297,9 @@ describe('documents', () => {
       );
 
       expect(response.status).toBe(403);
-      expect(peers.ingestion.calls('DocumentService/SetDocumentDepartments')).toHaveLength(0);
+      expect(
+        peers.ingestion.calls('DocumentService/SetDocumentDepartments'),
+      ).toHaveLength(0);
     },
   );
 
@@ -236,7 +307,10 @@ describe('documents', () => {
     'a caller WITH `document.share` sets departments, the 409-while-org-wide rule stays server-side',
     async () => {
       peers.ingestion.on('DocumentService/SetDocumentDepartments').reply(
-        wireDocument({ isOrganizationWide: false, departmentIds: ['55555555-5555-4555-8555-555555555555'] }),
+        wireDocument({
+          isOrganizationWide: false,
+          departmentIds: ['55555555-5555-4555-8555-555555555555'],
+        }),
       );
 
       const response = await new Session(gateway.baseUrl).request(
@@ -249,20 +323,27 @@ describe('documents', () => {
       );
 
       expect(response.status).toBe(200);
-      expect(response.body).toMatchObject({ data: { departmentIds: ['55555555-5555-4555-8555-555555555555'] } });
+      expect(response.body).toMatchObject({
+        data: { departmentIds: ['55555555-5555-4555-8555-555555555555'] },
+      });
     },
   );
 
-  rowFor('Documents')('**`restore` shares `remove`\'s code (`document.delete`)**', async () => {
-    const response = await new Session(gateway.baseUrl).post(
-      `${API}/documents/${DOCUMENT}/restore`,
-      {},
-      cookie(['document.update']),
-    );
+  rowFor('Documents')(
+    "**`restore` shares `remove`'s code (`document.delete`)**",
+    async () => {
+      const response = await new Session(gateway.baseUrl).post(
+        `${API}/documents/${DOCUMENT}/restore`,
+        {},
+        cookie(['document.update']),
+      );
 
-    expect(response.status).toBe(403);
-    expect(peers.ingestion.calls('DocumentService/RestoreDocument')).toHaveLength(0);
-  });
+      expect(response.status).toBe(403);
+      expect(
+        peers.ingestion.calls('DocumentService/RestoreDocument'),
+      ).toHaveLength(0);
+    },
+  );
 
   rowFor('Documents')(
     '**`reindex` needs its own distinct code (`document.reindex`)**, returns the JOB with 202',
@@ -294,54 +375,84 @@ describe('documents', () => {
     },
   );
 
-  rowFor('Documents')('replace forwards the object path and OCR languages (202)', async () => {
-    peers.ingestion.on('DocumentService/ReplaceDocument').reply(wireDocument({ ocrLanguages: ['ja'] }));
+  rowFor('Documents')(
+    'replace forwards the object path and OCR languages (202)',
+    async () => {
+      peers.ingestion
+        .on('DocumentService/ReplaceDocument')
+        .reply(wireDocument({ ocrLanguages: ['ja'] }));
 
-    const response = await new Session(gateway.baseUrl).post(
-      `${API}/documents/${DOCUMENT}/replace`,
-      { objectPath: 'pending/documents/def456', ocrLanguages: ['ja'] },
-      cookie(['document.update']),
-    );
+      const response = await new Session(gateway.baseUrl).post(
+        `${API}/documents/${DOCUMENT}/replace`,
+        { objectPath: 'pending/documents/def456', ocrLanguages: ['ja'] },
+        cookie(['document.update']),
+      );
 
-    expect(response.status).toBe(202);
-    const [call] = peers.ingestion.calls('DocumentService/ReplaceDocument');
-    expect(call.request).toMatchObject({ objectPath: 'pending/documents/def456', ocrLanguages: ['ja'] });
-  });
+      expect(response.status).toBe(202);
+      const [call] = peers.ingestion.calls('DocumentService/ReplaceDocument');
+      expect(call.request).toMatchObject({
+        objectPath: 'pending/documents/def456',
+        ocrLanguages: ['ja'],
+      });
+    },
+  );
 
-  rowFor('Documents')('**download is open**, returns a short-lived signed URL', async () => {
-    peers.ingestion.on('DocumentService/DownloadDocument').reply({
-      downloadUrl: 'https://storage.test/read/abc123',
-      expiresAt: { seconds: 1_756_684_800, nanos: 0 },
-    });
+  rowFor('Documents')(
+    '**download is open**, returns a short-lived signed URL',
+    async () => {
+      peers.ingestion.on('DocumentService/DownloadDocument').reply({
+        downloadUrl: 'https://storage.test/read/abc123',
+        expiresAt: { seconds: 1_756_684_800, nanos: 0 },
+      });
 
-    const response = await new Session(gateway.baseUrl).get(`${API}/documents/${DOCUMENT}/download`, cookie([]));
+      const response = await new Session(gateway.baseUrl).get(
+        `${API}/documents/${DOCUMENT}/download`,
+        cookie([]),
+      );
 
-    expect(response.status).toBe(200);
-    expect(response.body).toMatchObject({ data: { downloadUrl: 'https://storage.test/read/abc123' } });
-  });
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({
+        data: { downloadUrl: 'https://storage.test/read/abc123' },
+      });
+    },
+  );
 
-  rowFor('Documents')('storage usage refuses a caller without `document.read`', async () => {
-    const response = await new Session(gateway.baseUrl).get(`${API}/documents/storage`, cookie([]));
+  rowFor('Documents')(
+    'storage usage refuses a caller without `document.read`',
+    async () => {
+      const response = await new Session(gateway.baseUrl).get(
+        `${API}/documents/storage`,
+        cookie([]),
+      );
 
-    expect(response.status).toBe(403);
-    expect(peers.ingestion.calls('DocumentService/GetStorageUsage')).toHaveLength(0);
-  });
+      expect(response.status).toBe(403);
+      expect(
+        peers.ingestion.calls('DocumentService/GetStorageUsage'),
+      ).toHaveLength(0);
+    },
+  );
 
-  rowFor('Documents')('storage usage is a workspace total — the id sent to the peer is blank', async () => {
-    peers.ingestion.on('DocumentService/GetStorageUsage').reply({
-      usedBytes: 1024,
-      limitBytes: 1_073_741_824,
-      documentCount: 3,
-    });
+  rowFor('Documents')(
+    'storage usage is a workspace total — the id sent to the peer is blank',
+    async () => {
+      peers.ingestion.on('DocumentService/GetStorageUsage').reply({
+        usedBytes: 1024,
+        limitBytes: 1_073_741_824,
+        documentCount: 3,
+      });
 
-    const response = await new Session(gateway.baseUrl).get(`${API}/documents/storage`, cookie(['document.read']));
+      const response = await new Session(gateway.baseUrl).get(
+        `${API}/documents/storage`,
+        cookie(['document.read']),
+      );
 
-    expect(response.status).toBe(200);
-    expect(response.body).toMatchObject({ data: { documentCount: 3 } });
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({ data: { documentCount: 3 } });
 
-    const [call] = peers.ingestion.calls('DocumentService/GetStorageUsage');
-    expect(call.request.id).toBe('');
-  });
+      const [call] = peers.ingestion.calls('DocumentService/GetStorageUsage');
+      expect(call.request.id).toBe('');
+    },
+  );
 
   rowFor('Documents')(
     '**a chunk is open to any member who can see the parent document** — the citation deep-link target',
@@ -361,16 +472,23 @@ describe('documents', () => {
       );
 
       expect(response.status).toBe(200);
-      expect(response.body).toMatchObject({ data: { contentText: 'Refunds are processed within 5 business days.' } });
+      expect(response.body).toMatchObject({
+        data: { contentText: 'Refunds are processed within 5 business days.' },
+      });
     },
   );
 
   rowFor('Documents')(
     'a wire OCR code this build does not recognise is dropped, not surfaced as a crash',
     async () => {
-      peers.ingestion.on('DocumentService/GetDocument').reply(wireDocument({ ocrLanguages: ['vi', 'xx'] }));
+      peers.ingestion
+        .on('DocumentService/GetDocument')
+        .reply(wireDocument({ ocrLanguages: ['vi', 'xx'] }));
 
-      const response = await new Session(gateway.baseUrl).get(`${API}/documents/${DOCUMENT}`, cookie([]));
+      const response = await new Session(gateway.baseUrl).get(
+        `${API}/documents/${DOCUMENT}`,
+        cookie([]),
+      );
 
       expect(response.status).toBe(200);
       expect(response.body).toMatchObject({ data: { ocrLanguages: ['vi'] } });

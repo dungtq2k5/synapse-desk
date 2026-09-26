@@ -224,9 +224,9 @@ jobs:
           # **`api-gateway-java` is in THIS list and not in the wait list
           # below**, and the asymmetry is the point. A Deployment missing
           # here keeps whatever image it was last applied with — so a standby
-          # scaled up at commit 1 would come up on stale code, which is plan
-          # 78's finding I arriving through CD instead of through a stalled
-          # rollout.
+          # scaled up at commit 1 would come up on stale code — the
+          # stale-standby failure arriving through CD instead of through a
+          # stalled rollout.
           for service in api-gateway api-gateway-java auth-service ticket-service \
                          ingestion-service notification-service \
                          storage-service rag-service; do

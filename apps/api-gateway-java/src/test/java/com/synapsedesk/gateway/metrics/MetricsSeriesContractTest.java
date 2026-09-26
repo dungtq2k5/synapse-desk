@@ -181,7 +181,7 @@ class MetricsSeriesContractTest {
    * <p>`_bucket`, `_sum` and `_count` belong to the Prometheus histogram
    * format; `_max` is Micrometer's extra gauge per Timer, which Node has no
    * equivalent of — it is folded into the family here rather than treated as
-   * a ninth series, and plan 81 section 9 records it as a known difference.
+   * a ninth series. It is a known difference, not a parity break.
    */
   private String family(String name) {
     for (String suffix : List.of("_bucket", "_sum", "_count", "_max")) {

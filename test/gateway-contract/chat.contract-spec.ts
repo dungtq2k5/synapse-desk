@@ -37,7 +37,9 @@ describe('chat', () => {
       { algorithm: 'RS256', expiresIn: '15m' },
     );
 
-  const cookie = () => ({ cookie: `${GATEWAY_ENV.JWT_ACCESS_NAME}=${accessToken()}` });
+  const cookie = () => ({
+    cookie: `${GATEWAY_ENV.JWT_ACCESS_NAME}=${accessToken()}`,
+  });
 
   const wireTicket = (overrides: Record<string, unknown> = {}) => ({
     id: TICKET,
@@ -109,7 +111,10 @@ describe('chat', () => {
       const [call] = peers.ticket.calls('TicketService/CreateTicket');
       // 2 = TICKET_SOURCE_CHAT on the wire — the field the client cannot see
       // or set, forced at the controller rather than accepted from the body.
-      expect(call.request).toMatchObject({ source: 2, title: 'Printer is on fire' });
+      expect(call.request).toMatchObject({
+        source: 2,
+        title: 'Printer is on fire',
+      });
     },
   );
 
@@ -118,7 +123,13 @@ describe('chat', () => {
     async () => {
       peers.ticket.on('TicketService/ListTickets').reply({
         items: [wireTicket()],
-        meta: { totalItems: 1, itemCount: 1, itemsPerPage: 10, totalPages: 1, currentPage: 1 },
+        meta: {
+          totalItems: 1,
+          itemCount: 1,
+          itemsPerPage: 10,
+          totalPages: 1,
+          currentPage: 1,
+        },
       });
 
       const response = await new Session(gateway.baseUrl).get(
@@ -129,7 +140,11 @@ describe('chat', () => {
       expect(response.status).toBe(200);
 
       const [call] = peers.ticket.calls('TicketService/ListTickets');
-      expect(call.request).toMatchObject({ source: 2, authorId: USER, includeDeleted: false });
+      expect(call.request).toMatchObject({
+        source: 2,
+        authorId: USER,
+        includeDeleted: false,
+      });
     },
   );
 
@@ -142,7 +157,9 @@ describe('chat', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(response.body).toMatchObject({ data: { id: TICKET, title: 'Printer is on fire' } });
+    expect(response.body).toMatchObject({
+      data: { id: TICKET, title: 'Printer is on fire' },
+    });
   });
 
   rowFor('Chat')(
@@ -150,7 +167,13 @@ describe('chat', () => {
     async () => {
       peers.ticket.on('MessageService/ListMessages').reply({
         items: [wireMessage()],
-        meta: { totalItems: 1, itemCount: 1, itemsPerPage: 10, totalPages: 1, currentPage: 1 },
+        meta: {
+          totalItems: 1,
+          itemCount: 1,
+          itemsPerPage: 10,
+          totalPages: 1,
+          currentPage: 1,
+        },
       });
 
       const response = await new Session(gateway.baseUrl).get(
@@ -166,8 +189,8 @@ describe('chat', () => {
       // the distinction `message.mapper.ts` draws between the wrapper being
       // absent and being present-but-empty.
       expect(
-        (response.body as { data: { items: Array<{ citations: unknown }> } }).data.items[0]
-          .citations,
+        (response.body as { data: { items: Array<{ citations: unknown }> } })
+          .data.items[0].citations,
       ).toBeNull();
     },
   );
@@ -200,7 +223,10 @@ describe('chat', () => {
     '**escalate is a literal alias**, answering 200 — not 201 like a create',
     async () => {
       peers.ticket.on('TicketService/EscalateTicket').reply(
-        wireTicket({ status: 4, escalatedAt: { seconds: 1_756_684_900, nanos: 0 } }),
+        wireTicket({
+          status: 4,
+          escalatedAt: { seconds: 1_756_684_900, nanos: 0 },
+        }),
       );
 
       const response = await new Session(gateway.baseUrl).post(

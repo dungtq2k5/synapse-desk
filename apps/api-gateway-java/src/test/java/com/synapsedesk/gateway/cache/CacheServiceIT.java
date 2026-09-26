@@ -15,11 +15,11 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * The `cache:` keyspace, against a REAL Redis — plan 83 §8.
+ * The `cache:` keyspace, against a REAL Redis.
  *
  * <p>Neither gateway caches a real route yet (grep confirms Node's
  * `apps/api-gateway/src/modules/users` never calls `CacheService`/`cache.wrap`,
- * so plan 83's "GET /users/me, which is a cacheable route" is aspirational).
+ * so "GET /users/me, which is a cacheable route" is aspirational).
  * Wiring caching into just one side to make this row pass would be a worse
  * bug than the one it is meant to catch — the two implementations would then
  * answer a repeated request differently. So this proves the KEYSPACE is
@@ -30,7 +30,7 @@ import tools.jackson.databind.ObjectMapper;
  *
  * <p>An `IT`, connected the same way {@code GatewayLeaseIT} is: a real Redis
  * via `REDIS_URL`, started outside this process and outliving it — the
- * "containers outlive a gateway process" plan 83 §8 names is satisfied by not
+ * "containers outlive a gateway process" requirement is satisfied by not
  * needing a gateway process at all.
  */
 class CacheServiceIT {

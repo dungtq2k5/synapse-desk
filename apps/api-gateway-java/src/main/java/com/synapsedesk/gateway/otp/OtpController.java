@@ -42,9 +42,8 @@ import synapsedesk.auth.OtpServiceGrpc;
  * verified. Only {@link CurrentUser#require} runs — the same one full-session
  * check every other authenticated route makes.
  *
- * <p>Throttling is out of scope until plan 78 step 7: the {@code otpRequest}
- * / {@code otpVerify} tier split plan 84 §3 names has nothing to enforce it
- * here yet.
+ * <p>Throttling is out of scope: the {@code otpRequest} / {@code otpVerify}
+ * tier split has nothing to enforce it here yet.
  */
 @RestController
 public class OtpController implements OtpApi {

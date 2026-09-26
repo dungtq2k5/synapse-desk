@@ -58,8 +58,8 @@ import synapsedesk.ticket.TicketServiceGrpc;
  * `ChatApi` — a thin wrapper, exactly as `chat.controller.ts` is: every route
  * forwards to the same `TicketService`/`MessageService` RPCs `TicketsApi` and
  * `MessagesApi` would use, since a "conversation" IS a ticket with
- * {@code source = CHAT}. Reuses the `ticket-service` channel plan 84's
- * `Feedback` module paid for.
+ * {@code source = CHAT}. Reuses the `ticket-service` channel the `Feedback`
+ * module paid for.
  *
  * <p><b>{@code isInternalNote} is forced false</b> on {@link #chatControllerSendMessageV1}
  * — never read from the body — because an end-user surface has no notion of an

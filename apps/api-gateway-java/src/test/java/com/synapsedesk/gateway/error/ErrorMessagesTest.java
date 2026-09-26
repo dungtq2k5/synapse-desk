@@ -11,7 +11,8 @@ import org.junit.jupiter.params.provider.CsvSource;
  * The trailing `!` rule, which is the Node side's `formatErrorMsg`.
  *
  * <p>This text is OURS, so these rows are byte-equal contracts rather than
- * loose matches — the distinction plan 81 section 3 draws.
+ * loose matches — the distinction being that parity is held only on text
+ * this repo writes.
  */
 class ErrorMessagesTest {
 

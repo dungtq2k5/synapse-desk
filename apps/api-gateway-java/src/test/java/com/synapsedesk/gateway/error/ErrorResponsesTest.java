@@ -54,8 +54,8 @@ class ErrorResponsesTest {
      * Validation's `@Email` PASSES on null, while class-validator's
      * `@IsEmail` rejects an absent value, so a body of `{}` produced one
      * violation here and two on the Node side. The generated models get
-     * `@NotNull` from the document's `required` array, which is exactly what
-     * plan 82 corrected; this probe mirrors that.
+     * `@NotNull` from the document's `required` array, which is what the
+     * OpenAPI document was corrected to say; this probe mirrors that.
      */
     record Credentials(
         @NotNull @Email String email, @NotNull @NotBlank String password) {}

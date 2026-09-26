@@ -5,7 +5,7 @@ import { join } from 'node:path';
 /**
  * No tracked file cites `docs/archive`.
  *
- * The archive is git-ignored — `.gitignore` line 4 — so a citation of it is a
+ * The archive is git-ignored — `.gitignore` — so a citation of it is a
  * pointer to something that does not exist for anyone but the author, and
  * cannot be checked by anyone at all. It is also the one class of reference
  * that ages invisibly: the tree moves on, the archived plan does not, and
@@ -32,8 +32,18 @@ describe('nothing tracked cites the archive', () => {
    * almost every instance was; and the path itself, for a comment that spells
    * the file out. Both are matched case-insensitively on the word, because
    * `Doc` at the start of a sentence was as common as `doc` mid-sentence.
+   *
+   * **`plan` is the same word for the same thing, and it was missing.** Every
+   * file in the archive is a plan and this project calls them that as readily
+   * as it says "doc" — so the first version of this pattern held for every
+   * citation that happened to use one of the two words. Measured on
+   * 2026-09-26, after the sweep that wrote this guard: 47 live citations across
+   * 30 tracked files, led by `plan 83` (11), `plan 78` (11) and `plan 81` (8),
+   * none of which this guard could see. Same shape as the guard bugs before it
+   * — a pattern written from the instances in front of it tests the instances
+   * in front of it.
    */
-  const CITATION = /\b[Dd]ocs?\s+\d+/;
+  const CITATION = /\b(?:[Dd]ocs?|[Pp]lans?)\s+\d+/;
   const ARCHIVE_PATH = /docs\/archive/;
 
   /**
@@ -49,7 +59,7 @@ describe('nothing tracked cites the archive', () => {
    * `docs/archive` is always intact on one line; `doc` and `70` are two words
    * and a break between them is ordinary.
    */
-  const WRAPPED_HEAD = /\b[Dd]ocs?\s*$/;
+  const WRAPPED_HEAD = /\b(?:[Dd]ocs?|[Pp]lans?)\s*$/;
   const COMMENT_LEADER = /^\s*(?:\*|\/\/|#)\s*/;
 
   /**
@@ -163,9 +173,14 @@ describe('nothing tracked cites the archive', () => {
       ' * Doc 56 §A, and all three clauses matter.',
       '// Corpus discipline as established by docs 68-71.',
       '// See docs/archive/implementations/73-kubernetes.md.',
+      // The same four shapes in the other word, which is the half that used to
+      // pass unseen.
+      '// plan 86 §6a settled the cookie note.',
+      ' * Plan 83 measured it at 1438 files.',
+      '// Both plans 84-85 found a guard bug.',
     ].join('\n');
 
-    expect(citations(source)).toHaveLength(4);
+    expect(citations(source)).toHaveLength(7);
   });
 
   it('**2b. …including one prettier has wrapped**', () => {
@@ -185,6 +200,15 @@ describe('nothing tracked cites the archive', () => {
     const innocent = [' * see the doc', ' * for the rest.'].join('\n');
 
     expect(citations(innocent)).toEqual([]);
+
+    // And the wrap in the other word. Prettier breaks `plan` / `86` exactly as
+    // readily as `doc` / `70`, so the widened WRAPPED_HEAD has to carry it.
+    const wrappedPlan = [
+      ' * the cookie note this file states is the one thing plan',
+      ' * 86 settled, and the reason it is stated here instead.',
+    ].join('\n');
+
+    expect(citations(wrappedPlan)).toHaveLength(1);
   });
 
   it('**3. the durable forms are NOT reported**', () => {
@@ -197,6 +221,12 @@ describe('nothing tracked cites the archive', () => {
       '// `env-contract.spec.ts` closed that class for `.env.example`.',
       '// See docs/decisions/0043-the-cluster-shape.md.',
       '// Measured: 471 tests, 0 failures.',
+      // `plan` as an ORDINARY WORD, which is the cost of widening the pattern
+      // and the reason it is bounded by `\\s+\\d+`: the word alone is not a
+      // citation, and this repo's comments use it constantly.
+      '// That was the plan; the measurement disagreed.',
+      ' * A plan for later is not a pointer to one.',
+      '// Every plan in the archive is also a plan in the ordinary sense.',
     ].join('\n');
 
     expect(citations(source)).toEqual([]);

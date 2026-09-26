@@ -36,7 +36,7 @@ import tools.jackson.databind.ObjectMapper;
  * decided by which implementation happens to hold the lease. That is precisely
  * what the lease exists to make invisible.
  *
- * <p><b>The messages stay opaque</b>, by the rule in plan 81 §3: the refusal
+ * <p><b>The messages stay opaque</b>, deliberately: the refusal
  * text belongs to Jackson here and to V8 there, and three malformed bodies
  * produced three different V8 strings. The STATUS, the envelope and the path
  * are the contract.

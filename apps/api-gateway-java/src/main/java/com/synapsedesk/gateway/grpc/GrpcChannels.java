@@ -28,7 +28,7 @@ import synapsedesk.ticket.TicketServiceGrpc;
  * same auth-service process, at the same address, so a second channel would
  * be a second TCP connection to open for no separation gRPC does not already
  * give at the service level. `FeedbackService` is the first stub on a SECOND
- * peer, ticket-service — plan 84's `Feedback` module is the one that pays for
+ * peer, ticket-service — the `Feedback` module is the one that pays for
  * that channel, which `Chat` (also ticket-service) then reuses for free.
  */
 @Configuration

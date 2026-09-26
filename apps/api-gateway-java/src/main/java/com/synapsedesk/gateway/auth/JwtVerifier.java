@@ -140,8 +140,8 @@ public class JwtVerifier {
    *
    * <p>So both siblings are tried, in addition to the path as given, before
    * giving up. This is dead code once every environment source normalizes on
-   * one convention — plan 81 §1a names `.env.test` as the harness's own file,
-   * not one this module should have to accommodate forever.
+   * one convention — `.env.test` is the harness's own file, not one this
+   * module should have to accommodate forever.
    */
   private static Path resolve(String path) {
     List<Path> candidates =

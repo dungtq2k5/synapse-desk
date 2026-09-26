@@ -356,7 +356,7 @@ describe('the environment contract', () => {
         unit === 'days' ? /^(\d+)$/.exec(value) : /^(\d+)([smhd])$/.exec(value);
 
       if (!match) {
-        throw new Error(`Unrecognised ${unit} '${value}' — extend the parser`);
+        throw new Error(`Unrecognized ${unit} '${value}' — extend the parser`);
       }
 
       return unit === 'days'
@@ -417,9 +417,9 @@ describe('the environment contract', () => {
       expect(lifetimeMs('15m', 'duration')).toBe(900_000);
       expect(lifetimeMs('1h', 'duration')).toBe(3_600_000);
       expect(lifetimeMs('7', 'days')).toBe(604_800_000);
-      expect(() => lifetimeMs('7 days', 'duration')).toThrow(/unrecognised/i);
-      expect(() => lifetimeMs('900', 'duration')).toThrow(/unrecognised/i);
-      expect(() => lifetimeMs('7d', 'days')).toThrow(/unrecognised/i);
+      expect(() => lifetimeMs('7 days', 'duration')).toThrow(/unrecognized/i);
+      expect(() => lifetimeMs('900', 'duration')).toThrow(/unrecognized/i);
+      expect(() => lifetimeMs('7d', 'days')).toThrow(/unrecognized/i);
     });
   });
 });

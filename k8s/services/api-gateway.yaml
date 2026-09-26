@@ -22,7 +22,7 @@ metadata:
   # It does not GRANT the role — `GatewayLeaseService` does, through Redis, and
   # two Deployments both annotated `active` would still leave one standing by.
   # It is how a human and CD know which one that is meant to be, and switching
-  # it is a commit (plan 78 §6) because every deploy re-applies this file.
+  # it is a commit because every deploy re-applies this file.
   annotations:
     synapsedesk.io/gateway-role: active
 spec:

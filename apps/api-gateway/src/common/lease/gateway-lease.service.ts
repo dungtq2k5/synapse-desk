@@ -31,8 +31,8 @@ export const LEASE_REFRESH_MS = 10_000;
  * **Before the TTL, not at it.** At the TTL another implementation may claim,
  * so a holder that waited for it would still be consuming when the new owner
  * started. Two missed refreshes is the deadline; the gap to the TTL is the
- * bound on an overlap, and plan 78 §5 states why a timing bound is enough
- * here: the consequence is duplicate frames, not lost data.
+ * bound on an overlap, and a timing bound is enough here: the consequence is
+ * duplicate frames, not lost data.
  */
 export const LEASE_FENCE_MS = 20_000;
 

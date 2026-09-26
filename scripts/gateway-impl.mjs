@@ -16,7 +16,7 @@
  * for anyone not working on the Java gateway.
  *
  * **It also reads the `.env` file**, which is the other half of J1: Spring
- * does not read `.env` files (measured — plan 81 section 9), and nothing was
+ * does not read `.env` files (measured), and nothing was
  * added to make it. Under Kubernetes and Compose the values are already
  * environment variables; locally this is the one loader, in the language that
  * already has the parser.

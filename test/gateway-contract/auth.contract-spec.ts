@@ -6,8 +6,8 @@
  * `HttpOnly`, so a row that authenticated with a header would exercise a path
  * no browser takes. Each flag is asserted because each is a decision the Java
  * gateway has to reproduce exactly: a missing `HttpOnly` is an XSS-readable
- * session, and `Max-Age` is the unit trap plan 78 §5 names — the env carries
- * milliseconds and the wire carries SECONDS.
+ * session, and `Max-Age` is a unit trap — the env carries milliseconds and the
+ * wire carries SECONDS.
  */
 
 import { sign } from 'jsonwebtoken';
@@ -168,11 +168,11 @@ describe('authentication', () => {
       expect(access!.attributes.httponly).toBe(true);
       expect(access!.attributes.path).toBe('/');
       // SameSite's VALUE is case-insensitive on the wire; its presence and
-      // its attribute name are not — see plan 83 §3.
+      // its attribute name are not.
       expect(String(access!.attributes.samesite).toLowerCase()).toBe('lax');
 
       // **Seconds on the wire, milliseconds in the environment.** The conversion
-      // is the one plan 78 flags for the Java binding, and the refresh cookie's
+      // is the one the Java binding has to get right, and the refresh cookie's
       // two-hour bug came from exactly this slip.
       expect(access!.attributes['max-age']).toBe(
         String(Number(GATEWAY_ENV.COOKIE_ACCESS_MAX_AGE) / 1000),

@@ -5,7 +5,7 @@
  * every row asserts the WHOLE envelope and the headers, so `request` returns
  * the status, the parsed body **and** the headers rather than a convenience
  * shape. A harness that hid `set-cookie` could not pin a cookie's `Max-Age`,
- * which is one of the rows plan 78 §3 asks for by name.
+ * which is one of the rows `auth.contract-spec.ts` asserts by name.
  *
  * Cookies rather than a bearer token, because that is what the product does.
  */

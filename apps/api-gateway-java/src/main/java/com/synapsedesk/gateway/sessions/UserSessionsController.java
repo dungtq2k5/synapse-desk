@@ -30,8 +30,8 @@ import synapsedesk.auth.Session.SessionResponse;
 
 /**
  * `UserSessionsApi` — the admin view of ANOTHER user's sessions, against
- * auth-service's `SessionService`. Same channel as `UsersApi`/`OtpApi`
- * (plan 85 §4): auth-service is already paid for, so no new bean here.
+ * auth-service's `SessionService`. Same channel as `UsersApi`/`OtpApi`:
+ * auth-service is already paid for, so no new bean here.
  *
  * <p>`revoke`'s generated response type ({@code AuthControllerForgotPasswordV1202Response})
  * is reused structurally, not semantically — Node's own {@code @ApiWrappedResponse()}

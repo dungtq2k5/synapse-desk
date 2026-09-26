@@ -53,8 +53,8 @@ export const IMPL = process.env.GATEWAY_IMPL ?? 'node';
  * `pending-apis.txt` — silently treating every one of that tag's operations as
  * unimplemented forever. Found the hard way: every `rowFor(...)` tag written
  * so far happens to be one word, so this path had never run through THAT
- * caller — it surfaced when `permission-coverage.contract-spec.ts` (plan 85
- * §2) read tags straight off the published document instead, where
+ * caller — it surfaced when `permission-coverage.contract-spec.ts` read tags
+ * straight off the published document instead, where
  * multi-word ones already exist for modules not yet implemented.
  */
 export const apiNameFor = (tag: string): string =>
@@ -98,7 +98,7 @@ export const SKIPPED_FOR_JAVA: Readonly<Record<string, string>> = {
     'a metric is registered on first use, so the job gauge appears only once a job has reported — the reporter arrives with the NATS consumer',
   'a DTO validation failure':
     'the exact Node phrasing (whitelist rejection, class-validator type ' +
-    'messages) — plan 83 §3 already rules the per-field text loose; this ' +
+    'messages) — the per-field text is already ruled loose; this ' +
     'row asserts the exact Node string rather than the shape, and wants a ' +
     'second, shape-only row instead of a Java rewrite of this one',
   'a preflight from an origin outside the list':

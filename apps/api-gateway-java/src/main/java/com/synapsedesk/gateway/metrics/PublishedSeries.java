@@ -9,8 +9,8 @@ import java.util.Map;
  * <p><b>The names are Node's, exactly.</b> Both implementations answer on one
  * Service under one scrape job, so a switch must not move a series: a renamed
  * one makes every alert that selects it match nothing, and a dashboard of
- * empty panels reads as "quiet" rather than as "broken". That is plan 78's
- * gap 37 one layer up.
+ * empty panels reads as "quiet" rather than as "broken". That is known gap #37
+ * one layer up.
  *
  * <p>Three settings make Micrometer emit these verbatim, all measured (J5):
  * meters are NAMED with the full Prometheus name including its unit suffix,

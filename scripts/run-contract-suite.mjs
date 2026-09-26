@@ -4,11 +4,11 @@
  *   node scripts/run-contract-suite.mjs            # GATEWAY_IMPL=node
  *   GATEWAY_IMPL=java node scripts/run-contract-suite.mjs
  *
- * **The build is inside the command, deliberately** — plan 80's departure 1.
+ * **The build is inside the command, deliberately.**
  * The harness starts a BUILT gateway, so without the build a source change is
  * tested against the previous one; and a built-output check can see an ABSENT
- * build but never a stale one (plan 77 measured that mtime cannot tell them
- * apart). Paying a no-op build is the only answer that is always right.
+ * build but never a stale one (measured: mtime cannot tell them apart).
+ * Paying a no-op build is the only answer that is always right.
  *
  * Extra arguments are passed to jest, so `npm run test:contract -- auth`
  * keeps working.

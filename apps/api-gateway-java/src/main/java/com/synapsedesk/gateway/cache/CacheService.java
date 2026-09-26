@@ -20,7 +20,7 @@ import tools.jackson.databind.ser.std.StdSerializer;
  * The shared cache — `cache.service.ts`, reproduced key-for-key and
  * byte-for-byte.
  *
- * <p><b>Both halves are the risk plan 83 §1b names.</b> The KEY format
+ * <p><b>Both halves carry the risk.</b> The KEY format
  * (`cache:{org}|{scope}|{params}`) is easy to get right by eye; the VALUE
  * encoding is not — plain JSON writes an {@link OffsetDateTime} as a bare ISO
  * string, and `GraphQLISODateTime.serialize()` on the Node side reads a bare
