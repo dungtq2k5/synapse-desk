@@ -43,7 +43,6 @@ public class CurrentUser {
   public Optional<RequestContext> read(HttpServletRequest request) {
     return accessToken(request)
         .flatMap(verifier::verifyAccess)
-        // FIXME Null type safety: parameter 'this' provided via method descriptor Predicate<JwtPrincipal>.test(JwtPrincipal) needs unchecked conversion to conform to '@Nonnull JwtPrincipal'
         .filter(JwtPrincipal::isFullSession)
         .map(principal -> toContext(principal, origin(request)));
   }
@@ -71,7 +70,6 @@ public class CurrentUser {
    * {@code isFullSession} filter {@link #read} applies for route access.
    */
   public Optional<String> verifiedSubject(HttpServletRequest request) {
-    // FIXME Null type safety: parameter 'this' provided via method descriptor Function<JwtPrincipal,String>.apply(JwtPrincipal) needs unchecked conversion to conform to '@Nonnull JwtPrincipal'
     return accessToken(request).flatMap(verifier::verifyAccess).map(JwtPrincipal::sub);
   }
 

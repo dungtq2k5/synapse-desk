@@ -46,8 +46,8 @@ import synapsedesk.auth.OtpServiceGrpc;
  *
  * <p>All five routes see {@code authTier} only ({@link AuthThrottle} at class
  * level); the two request routes and the two verify routes each carry their
- * own {@code otpRequest}/{@code otpVerify} numbers (plan 86 §3), and
- * `getOtpStatus` falls back to {@code authTier}'s configured default.
+ * own {@code otpRequest}/{@code otpVerify} numbers, and `getOtpStatus` falls
+ * back to {@code authTier}'s configured default.
  */
 @RestController
 @AuthThrottle

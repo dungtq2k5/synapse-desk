@@ -83,7 +83,6 @@ describe('the Java skip list', () => {
     // implemented, so its complement is what Java HAS — and each of those
     // must appear in some suite's declared tags, or it is served and untested.
     const pending = pendingApis();
-    // FIXME Type 'Set<string>' can only be iterated through when using the '--downlevelIteration' flag or with a '--target' of 'es2015' or higher.
     const implemented = [...realApiNames()].filter(
       (name) => !pending.has(name),
     );

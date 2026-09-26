@@ -2,16 +2,16 @@ package com.synapsedesk.gateway;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ContextConfiguration;
-import com.synapsedesk.gateway.config.SharedEnvironment;
-import com.synapsedesk.gateway.config.SharedEnvironmentInitializer;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.core.env.Environment;
+import org.springframework.test.context.ContextConfiguration;
+
+import com.synapsedesk.gateway.config.SharedEnvironment;
+import com.synapsedesk.gateway.config.SharedEnvironmentInitializer;
 
 /**
  * The skeleton boots, and refuses to boot without its environment.

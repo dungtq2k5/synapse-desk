@@ -117,6 +117,7 @@ public class AnalyticsController implements AnalyticsApi {
   private static final long DEADLINE_SECONDS = 5;
   private static final long OPEN_RANGE_TTL_SECONDS = 60;
   private static final long CLOSED_RANGE_TTL_SECONDS = 24 * 60 * 60;
+  private static final String INGESTION_SERVICE = "ingestion-service";
 
   private final AnalyticsServiceGrpc.AnalyticsServiceBlockingStub analytics;
   private final AiLedgerServiceGrpc.AiLedgerServiceBlockingStub ledger;
@@ -311,9 +312,9 @@ public class AnalyticsController implements AnalyticsApi {
                 createExportDto.getFilters() == null || createExportDto.getFilters().isEmpty()
                     ? ""
                     : toJson(createExportDto.getFilters()));
-    if (createExportDto.getDepartmentId() != null) {
-      // FIXME A "NullPointerException" could be thrown; "getDepartmentId()" can return null. [+2 locations]
-      wire.setDepartmentId(createExportDto.getDepartmentId().toString());
+    UUID departmentId = createExportDto.getDepartmentId();
+    if (departmentId != null) {
+      wire.setDepartmentId(departmentId.toString());
     }
 
     ExportResponse response = analyticsWith(context).createExport(wire.build());
@@ -377,8 +378,7 @@ public class AnalyticsController implements AnalyticsApi {
         tryLeg("ticket-service", unavailable, () -> analyticsWith(context).getAgentStats(request));
     AiUsageResponse usage =
         tryLeg(
-            // FIXME Define a constant instead of duplicating this literal "ingestion-service" 3 times. [+2 locations]
-            "ingestion-service",
+            INGESTION_SERVICE,
             unavailable,
             () -> ledgerWith(context).getAiUsage(AiUsageRequest.newBuilder().setFrom(from).setTo(to).build()));
 
@@ -400,7 +400,6 @@ public class AnalyticsController implements AnalyticsApi {
 
     // Hydration last, and only when there is anything to hydrate.
     if (!items.isEmpty()) {
-      // FIXME Null type safety: parameter 'this' provided via method descriptor Function<AgentStatResponseDto,String>.apply(AgentStatResponseDto) needs unchecked conversion to conform to '@Nonnull AgentStatResponseDto'
       List<String> agentIds = items.stream().map(AgentStatResponseDto::getAgentId).toList();
       ListUsersByIdsResponse names =
           tryLeg(
@@ -465,7 +464,7 @@ public class AnalyticsController implements AnalyticsApi {
 
     KnowledgeGapsResponse gaps =
         tryLeg(
-            "ingestion-service",
+            INGESTION_SERVICE,
             unavailable,
             () ->
                 ledgerWith(context)
@@ -529,7 +528,7 @@ public class AnalyticsController implements AnalyticsApi {
 
     DocumentAnalyticsResponse documents =
         tryLeg(
-            "ingestion-service",
+            INGESTION_SERVICE,
             unavailable,
             () -> ledgerWith(context).getDocumentAnalytics(
                 synapsedesk.ingestion.Ledger.DocumentAnalyticsRequest.newBuilder()

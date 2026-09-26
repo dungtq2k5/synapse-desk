@@ -155,6 +155,24 @@
       </plugin>
 
       <!--
+        **Stated, not left to the default.** One fork, no parallel classes —
+        already true with no config at all, since neither plugin below set
+        `forkCount` before this. Left implicit, a later "speed the build up"
+        can raise it on a machine where IDE JVMs (SonarLint, the language
+        server) are already contending with Maven for memory — the exact
+        contention that produced a killed build (exit 137) earlier in this
+        module's history. Stating `1` is what stops that edit from looking
+        free.
+      -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+          <forkCount>1</forkCount>
+        </configuration>
+      </plugin>
+
+      <!--
         **`*IT` needs a real Redis; `*Test` needs nothing.** The same split the
         Node side has between `npm test` and `npm run test:e2e:gateway`: the
         lease's claim is a Lua script, and a fake that "runs" it would be a
@@ -165,6 +183,9 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-failsafe-plugin</artifactId>
+        <configuration>
+          <forkCount>1</forkCount>
+        </configuration>
         <executions>
           <execution>
             <goals>

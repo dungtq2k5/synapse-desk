@@ -109,9 +109,9 @@ public class ChatController implements ChatApi {
             // set here, never accepted from the body, so a client cannot open a
             // chat that reports itself as having arrived by another source.
             .setSource(TicketSource.TICKET_SOURCE_CHAT);
-    if (startConversationDto.getPriority() != null) {
-      // FIXME A "NullPointerException" could be thrown; "getPriority()" can return null. [+2 locations]
-      wire.setPriority(toProtoPriority(startConversationDto.getPriority().getValue()));
+    StartConversationDto.PriorityEnum priority = startConversationDto.getPriority();
+    if (priority != null) {
+      wire.setPriority(toProtoPriority(priority.getValue()));
     }
 
     TicketResponse response = ticketsWith(context).createTicket(wire.build());

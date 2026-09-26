@@ -206,7 +206,6 @@ describe('the error envelope and the edges around it', () => {
           .split(',')
           .map((value) => value.trim()),
       );
-      // FIXME Property 'keys' does not exist on type 'Headers'.
       const sent = [...response.headers.keys()].filter((name) =>
         /^(x-ratelimit-|retry-after)/u.test(name),
       );

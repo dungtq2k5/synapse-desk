@@ -59,7 +59,6 @@ public class ThrottlerInterceptor implements HandlerInterceptor {
     this.json = json;
   }
 
-  // FIXME Refactor this method to not always return the same value. [+2 locations]
   @Override
   public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
     if (!(handler instanceof HandlerMethod handlerMethod)) {
@@ -71,20 +70,14 @@ public class ThrottlerInterceptor implements HandlerInterceptor {
     String route = handlerMethod.getBeanType().getSimpleName() + "." + handlerMethod.getMethod().getName();
 
     for (String tier : tiers) {
-      evaluate(handlerMethod, tier, route, tracker, request, response);
+      evaluate(handlerMethod, tier, route, tracker, response);
     }
 
     return true;
   }
 
   private void evaluate(
-      HandlerMethod handlerMethod,
-      String tier,
-      String route,
-      String tracker,
-      // FIXME Remove this unused method parameter "request".
-      HttpServletRequest request,
-      HttpServletResponse response) {
+      HandlerMethod handlerMethod, String tier, String route, String tracker, HttpServletResponse response) {
     TierLimit limit = resolveLimit(handlerMethod, tier);
     String key = "throttle:" + route + ":" + tier + ":" + tracker;
 
@@ -165,10 +158,10 @@ public class ThrottlerInterceptor implements HandlerInterceptor {
    * The rightmost {@code X-Forwarded-For} entry — Express's own {@code trust
    * proxy 1} semantics (P6): exactly one hop is trusted, and it is the one
    * that appended the LAST entry. Spring's {@code ForwardedHeaderFilter}
-   * default (leftmost) is client-supplied and spoofable — see plan 86 §6.
-   * Scoped to the throttler's tracker only; {@code CurrentUser.origin()}'s
-   * {@code getRemoteAddr()} stays as plan 83 left it, since audit metadata
-   * never keyed a bucket.
+   * default (leftmost) is client-supplied and spoofable, which matters here
+   * because this value keys a rate-limit bucket. Scoped to the throttler's
+   * tracker only; {@code CurrentUser.origin()}'s {@code getRemoteAddr()} is
+   * unchanged, since audit metadata never keyed a bucket.
    */
   private static String clientIp(HttpServletRequest request) {
     String forwardedFor = request.getHeader("X-Forwarded-For");

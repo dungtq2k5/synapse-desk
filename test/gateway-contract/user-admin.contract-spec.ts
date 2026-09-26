@@ -160,13 +160,11 @@ describe('user admin', () => {
         }),
       );
 
-      const response = await new Session(gateway.baseUrl).get(
-        `${API}/users/${TARGET_USER}`,
-        cookie(['user.read']),
-      );
+      const response = await new Session(gateway.baseUrl).get<{
+        data: { user: { isLocked: boolean; lockedUntil: string } };
+      }>(`${API}/users/${TARGET_USER}`, cookie(['user.read']));
 
       expect(response.status).toBe(200);
-      // FIXME 'response.body' is of type 'unknown'.
       expect(response.body.data.user.isLocked).toBe(true);
       // Not an exact string match: Java's default `OffsetDateTime`
       // serialization drops the fractional seconds when they're zero
@@ -174,7 +172,6 @@ describe('user admin', () => {
       // `.000` — a harmless cross-implementation formatting difference, not
       // a value difference, so parse-and-compare rather than couple this
       // row (about the value surviving at all) to it.
-      // FIXME Unsafe argument of type error typed assigned to a parameter of type `string | number | Date`.
       expect(new Date(response.body.data.user.lockedUntil).toISOString()).toBe(
         '2026-09-02T00:00:00.000Z',
       );

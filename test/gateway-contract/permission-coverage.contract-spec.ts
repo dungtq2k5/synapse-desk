@@ -49,10 +49,9 @@ function operations(): Operation[] {
     for (const op of Object.values(methods)) {
       if (!op.operationId || !op.tags?.length) continue;
 
-      // FIXME Use the "RegExp.exec()" method instead.
       // `{Controller}_{method}_v1` — Nest's raw operationId, before
       // openapi-generator lower-cases and joins it into a Java method name.
-      const match = op.operationId.match(/^(\w+Controller)_(\w+)_v\d+$/u);
+      const match = /^(\w+Controller)_(\w+)_v\d+$/u.exec(op.operationId);
       if (!match) continue;
 
       found.push({
@@ -127,13 +126,12 @@ function nodeRequiredCodes(
   className: string,
   methodName: string,
 ): string[] | null {
-  const classMatch = source.match(
-    // FIXME `String.raw` should be used to avoid escaping `\`.
-    new RegExp(`((?:@\\w[^\\n]*\\n)*)export class ${className}\\b`, 'u'),
-  );
+  const classMatch = new RegExp(
+    String.raw`((?:@\w[^\n]*\n)*)export class ${className}\b`,
+    'u',
+  ).exec(source);
   const classDecorators = classMatch?.[1] ?? '';
-  // FIXME Use the "RegExp.exec()" method instead.
-  const classLevel = classDecorators.match(REQUIRE_PERMISSION);
+  const classLevel = REQUIRE_PERMISSION.exec(classDecorators);
 
   const bodyStart = classMatch
     ? source.indexOf(classMatch[0]) + classMatch[0].length
@@ -141,21 +139,19 @@ function nodeRequiredCodes(
   if (bodyStart < 0) return classLevel ? codesIn(classLevel[1]) : null;
 
   const rest = source.slice(bodyStart);
-  // FIXME Use the "RegExp.exec()" method instead.
   // The signature at the START of a line (this codebase's 2-space method
   // indent), optionally `async` — never a same-named call elsewhere in the
   // class (`this.users.restore(...)` must not be mistaken for `restore(`).
-  const signature = rest.match(
-    // FIXME `String.raw` should be used to avoid escaping `\`.
-    new RegExp(`\\n(\\s*)(?:async\\s+)?${methodName}\\s*\\(`, 'u'),
-  );
+  const signature = new RegExp(
+    String.raw`\n(\s*)(?:async\s+)?${methodName}\s*\(`,
+    'u',
+  ).exec(rest);
   if (!signature) return classLevel ? codesIn(classLevel[1]) : null;
 
   const beforeSignature = rest.slice(0, signature.index);
   const previousMethodEnd = beforeSignature.lastIndexOf('\n  }\n');
   const decoratorBlock = beforeSignature.slice(previousMethodEnd + 1);
-  // FIXME Use the "RegExp.exec()" method instead.
-  const methodLevel = decoratorBlock.match(REQUIRE_PERMISSION);
+  const methodLevel = REQUIRE_PERMISSION.exec(decoratorBlock);
 
   if (methodLevel) return codesIn(methodLevel[1]);
 
@@ -168,20 +164,16 @@ function javaRequiredCodes(
   methodName: string,
 ): string[] | null {
   const pattern = new RegExp(
-    // FIXME `String.raw` should be used to avoid escaping `\`.
-    `((?:@[^\\n]*\\n)*)\\s*(?:public\\s+)?ResponseEntity<[^>]*>\\s*${methodName}\\s*\\(`,
+    String.raw`((?:@[^\n]*\n)*)\s*(?:public\s+)?ResponseEntity<[^>]*>\s*${methodName}\s*\(`,
     'u',
   );
-  // FIXME Use the "RegExp.exec()" method instead.
-  const match = javaSources.match(pattern);
+  const match = pattern.exec(javaSources);
   if (!match) return null;
 
   const decorators = match[1];
-  // FIXME Use the "RegExp.exec()" method instead.
-  const found = decorators.match(/@RequirePermission\(([^)]*)\)/u);
+  const found = /@RequirePermission\(([^)]*)\)/u.exec(decorators);
   if (!found) return null;
 
-  // FIXME Type 'IterableIterator<RegExpMatchArray>' can only be iterated through when using the '--downlevelIteration' flag or with a '--target' of 'es2015' or higher.
   return [...found[1].matchAll(/PermissionCodesEnum\.(\w+)/gu)].map((m) =>
     m[1].toLowerCase().replace(/_/gu, '.'),
   );

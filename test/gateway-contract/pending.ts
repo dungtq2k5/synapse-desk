@@ -168,7 +168,6 @@ export function declaredTags(): string[] {
   )) {
     const source = readFileSync(join(here, file), 'utf8');
 
-    // FIXME Type 'IterableIterator<RegExpMatchArray>' can only be iterated through when using the '--downlevelIteration' flag or with a '--target' of 'es2015' or higher.
     for (const call of source.matchAll(/rowFor\(([^)]*)\)/gu)) {
       for (const literal of call[1].matchAll(/'([^']+)'/gu)) {
         tags.add(literal[1]);

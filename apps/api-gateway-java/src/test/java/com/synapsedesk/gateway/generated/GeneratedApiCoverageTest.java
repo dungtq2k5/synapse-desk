@@ -140,7 +140,6 @@ class GeneratedApiCoverageTest {
   /** The tracked list, comments and blank lines dropped. */
   private Set<String> pending() throws IOException {
     return Files.readAllLines(PENDING).stream()
-        // FIXME Null type safety: parameter 'this' provided via method descriptor Function<String,String>.apply(String) needs unchecked conversion to conform to '@Nonnull String'
         .map(String::trim)
         .filter(line -> !line.isEmpty() && !line.startsWith("#"))
         .collect(java.util.stream.Collectors.toCollection(TreeSet::new));

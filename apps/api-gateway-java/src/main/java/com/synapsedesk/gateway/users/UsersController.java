@@ -102,9 +102,9 @@ public class UsersController implements UsersApi {
     if (updateOwnProfileDto.getDob() != null) {
       wire.setDob(updateOwnProfileDto.getDob());
     }
-    if (updateOwnProfileDto.getGender() != null) {
-      // FIXME A "NullPointerException" could be thrown; "getGender()" can return null. [+2 locations]
-      wire.setGender(Gender.valueOf("GENDER_" + updateOwnProfileDto.getGender().getValue()));
+    UpdateOwnProfileDto.GenderEnum gender = updateOwnProfileDto.getGender();
+    if (gender != null) {
+      wire.setGender(Gender.valueOf("GENDER_" + gender.getValue()));
     }
 
     synapsedesk.auth.Common.UserResponse response =

@@ -47,6 +47,22 @@ describe('nothing tracked cites the archive', () => {
   const ARCHIVE_PATH = /docs\/archive/;
 
   /**
+   * A `FIXME` a language server or SonarLint wrote INTO the file, not one a
+   * person typed. Measured: 26 of them across 12 tracked files, none
+   * authored — the same background tooling that reorganises imports
+   * mid-sabotage and contends with `target/` deletion, writing a diagnostic
+   * into the source it was supposed to only report on.
+   *
+   * **Comment-leading, not the bare word**, which is what lets
+   * `seed-demo.spec.ts`'s own sentence about FIXMEs — *"five FIXMEs recorded
+   * a compiler that did object"* — pass unreported without an `EXEMPT`
+   * entry: that `FIXME` sits mid-sentence, never right after a comment
+   * leader, so this pattern is the exemption. Measured: 26 hits with this
+   * pattern across the corpus, 27 with the bare word.
+   */
+  const FIXME = /^\s*(?:\/\/|\*)\s*FIXME/u;
+
+  /**
    * The citation form when prettier has WRAPPED it.
    *
    * **A line scan cannot see `… the exact class doc` / ` * 70 closed …`,** and
@@ -145,6 +161,14 @@ describe('nothing tracked cites the archive', () => {
     return found;
   };
 
+  const fixmes = (source: string): string[] =>
+    source
+      .split('\n')
+      .map((line, index) =>
+        FIXME.test(line) ? `${index + 1}: ${line.trim()}` : null,
+      )
+      .filter((hit): hit is string => hit !== null);
+
   it('**1. no tracked file points at a plan nobody else can open**', () => {
     const violations: string[] = [];
 
@@ -241,5 +265,42 @@ describe('nothing tracked cites the archive', () => {
     expect(files.length).toBeGreaterThan(500);
     expect(files).toContain('docs/development-conventions.md');
     expect(files.every((file) => !EXEMPT.has(file))).toBe(true);
+  });
+
+  it('**5. no tracked file carries a `FIXME` a tool wrote, not a person**', () => {
+    const violations: string[] = [];
+
+    for (const file of corpus()) {
+      let source: string;
+      try {
+        source = readFileSync(join(REPO_ROOT, file), 'utf8');
+      } catch {
+        continue;
+      }
+
+      for (const hit of fixmes(source)) {
+        violations.push(`${file}:${hit}`);
+      }
+    }
+
+    expect(violations).toEqual([]);
+  });
+
+  it('**5b. …and the comment-leading pattern is what exempts prose about FIXMEs**', () => {
+    expect(
+      fixmes('// FIXME Use the "RegExp.exec()" method instead.'),
+    ).toHaveLength(1);
+    expect(
+      fixmes('    * FIXME A "NullPointerException" could be thrown.'),
+    ).toHaveLength(1);
+
+    // The exact seed-demo shape: `FIXME` mid-sentence, never right after the
+    // comment leader — this is the case an `EXEMPT` entry would otherwise
+    // have to carry.
+    expect(
+      fixmes(
+        '    // did object — five FIXMEs recorded a compiler that did object.',
+      ),
+    ).toEqual([]);
   });
 });

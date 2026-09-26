@@ -101,7 +101,6 @@ describe('JetStream bootstrap (e2e)', () => {
     const received = new Promise<string>((resolve) => {
       const subscription = nc.subscribe(TICKET_PATTERNS.assigned);
       void (async () => {
-        // FIXME Invalid loop. Its body allows only one iteration.
         for await (const message of subscription) {
           resolve(message.string());
           break;

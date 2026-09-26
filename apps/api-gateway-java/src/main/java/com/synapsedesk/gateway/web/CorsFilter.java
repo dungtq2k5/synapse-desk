@@ -43,6 +43,8 @@ import jakarta.servlet.http.HttpServletResponse;
 @Order(Ordered.HIGHEST_PRECEDENCE + 5)
 public class CorsFilter extends OncePerRequestFilter {
 
+  private static final String ORIGIN = "Origin";
+
   /** Mirrors `CORS_ALLOWED_HEADERS` — a browser-required superset, not a controller-read list. */
   private static final String ALLOWED_HEADERS =
       String.join(
@@ -99,8 +101,7 @@ public class CorsFilter extends OncePerRequestFilter {
   protected void doFilterInternal(
       HttpServletRequest request, HttpServletResponse response, FilterChain chain)
       throws ServletException, IOException {
-    // FIXME Define a constant instead of duplicating this literal "Origin" 3 times. [+2 locations]
-    String origin = request.getHeader("Origin");
+    String origin = request.getHeader(ORIGIN);
     boolean isPreflight =
         "OPTIONS".equalsIgnoreCase(request.getMethod())
             && request.getHeader("Access-Control-Request-Method") != null;
@@ -129,7 +130,7 @@ public class CorsFilter extends OncePerRequestFilter {
       response.setHeader("Access-Control-Allow-Credentials", "true");
       response.setHeader("Access-Control-Allow-Methods", ALLOWED_METHODS);
       response.setHeader("Access-Control-Allow-Headers", ALLOWED_HEADERS);
-      response.setHeader("Vary", "Origin");
+      response.setHeader("Vary", ORIGIN);
       response.setStatus(HttpStatus.NO_CONTENT.value());
 
       return;
@@ -139,7 +140,7 @@ public class CorsFilter extends OncePerRequestFilter {
       response.setHeader("Access-Control-Allow-Origin", origin);
       response.setHeader("Access-Control-Allow-Credentials", "true");
       response.setHeader("Access-Control-Expose-Headers", EXPOSED_HEADERS);
-      response.setHeader("Vary", "Origin");
+      response.setHeader("Vary", ORIGIN);
     }
     // Not allowed, not a preflight: Node's `cors` middleware omits the
     // headers and lets the request proceed — the browser's own same-origin
