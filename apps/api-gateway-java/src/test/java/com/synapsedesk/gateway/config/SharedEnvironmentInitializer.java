@@ -16,15 +16,16 @@ import org.springframework.core.env.MapPropertySource;
  * LOW precedence, so a row's own {@code properties = …} still wins.
  */
 public class SharedEnvironmentInitializer
-    implements ApplicationContextInitializer<ConfigurableApplicationContext> {
+  implements ApplicationContextInitializer<ConfigurableApplicationContext>
+{
 
   @Override
   public void initialize(ConfigurableApplicationContext context) {
     Map<String, Object> values = new HashMap<>(SharedEnvironment.values());
 
     context
-        .getEnvironment()
-        .getPropertySources()
-        .addLast(new MapPropertySource("shared-env-example", values));
+      .getEnvironment()
+      .getPropertySources()
+      .addLast(new MapPropertySource("shared-env-example", values));
   }
 }

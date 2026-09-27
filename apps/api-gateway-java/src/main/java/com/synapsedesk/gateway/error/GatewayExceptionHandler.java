@@ -6,8 +6,8 @@ import java.util.ArrayList;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.ErrorResponse;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -41,7 +41,9 @@ public class GatewayExceptionHandler {
   /** A failed `@Valid` body: one message per broken rule, joined as Node joins them. */
   @ExceptionHandler(MethodArgumentNotValidException.class)
   public ResponseEntity<ErrorEnvelope> onValidationFailure(
-      MethodArgumentNotValidException exception, HttpServletRequest request) {
+    MethodArgumentNotValidException exception,
+    HttpServletRequest request
+  ) {
     List<String> messages = new ArrayList<>();
 
     for (var error : exception.getBindingResult().getFieldErrors()) {
@@ -55,7 +57,11 @@ public class GatewayExceptionHandler {
       messages.add(error.getDefaultMessage());
     }
 
-    return envelope(HttpStatus.BAD_REQUEST, request, ErrorMessages.format(messages));
+    return envelope(
+      HttpStatus.BAD_REQUEST,
+      request,
+      ErrorMessages.format(messages)
+    );
   }
 
   /**
@@ -64,31 +70,42 @@ public class GatewayExceptionHandler {
    */
   @ExceptionHandler(HttpMessageNotReadableException.class)
   public ResponseEntity<ErrorEnvelope> onUnreadableBody(
-      HttpMessageNotReadableException exception, HttpServletRequest request) {
+    HttpMessageNotReadableException exception,
+    HttpServletRequest request
+  ) {
     String detail = exception.getMostSpecificCause().getMessage();
 
     return envelope(
-        HttpStatus.BAD_REQUEST,
-        request,
-        ErrorMessages.format(detail == null ? "Malformed request body" : firstLine(detail)));
+      HttpStatus.BAD_REQUEST,
+      request,
+      ErrorMessages.format(
+        detail == null ? "Malformed request body" : firstLine(detail)
+      )
+    );
   }
 
   /** No route. The message IS ours, so it is exact: `Cannot GET /api/v1/x!`. */
   @ExceptionHandler(NoResourceFoundException.class)
   public ResponseEntity<ErrorEnvelope> onNoRoute(HttpServletRequest request) {
     return envelope(
-        HttpStatus.NOT_FOUND,
-        request,
-        ErrorMessages.format("Cannot " + request.getMethod() + " " + request.getRequestURI()));
+      HttpStatus.NOT_FOUND,
+      request,
+      ErrorMessages.format(
+        "Cannot " + request.getMethod() + " " + request.getRequestURI()
+      )
+    );
   }
 
   /** A peer's failure, through the gap-38 rule. */
   @ExceptionHandler(StatusRuntimeException.class)
   public ResponseEntity<ErrorEnvelope> onPeerFailure(
-      StatusRuntimeException exception, HttpServletRequest request) {
-    GrpcStatusMapping.ClientSafe safe =
-        GrpcStatusMapping.resolve(
-            exception.getStatus().getCode(), exception.getStatus().getDescription());
+    StatusRuntimeException exception,
+    HttpServletRequest request
+  ) {
+    GrpcStatusMapping.ClientSafe safe = GrpcStatusMapping.resolve(
+      exception.getStatus().getCode(),
+      exception.getStatus().getDescription()
+    );
 
     return envelope(safe.status(), request, safe.message());
   }
@@ -96,12 +113,17 @@ public class GatewayExceptionHandler {
   /** Anything raised with a status already chosen. */
   @ExceptionHandler(ResponseStatusException.class)
   public ResponseEntity<ErrorEnvelope> onStatusException(
-      ResponseStatusException exception, HttpServletRequest request) {
+    ResponseStatusException exception,
+    HttpServletRequest request
+  ) {
     HttpStatus status = HttpStatus.valueOf(exception.getStatusCode().value());
     String reason = exception.getReason();
 
     return envelope(
-        status, request, ErrorMessages.format(reason == null ? status.getReasonPhrase() : reason));
+      status,
+      request,
+      ErrorMessages.format(reason == null ? status.getReasonPhrase() : reason)
+    );
   }
 
   /**
@@ -123,21 +145,34 @@ public class GatewayExceptionHandler {
    */
   @ExceptionHandler(Exception.class)
   public ResponseEntity<ErrorEnvelope> onAnythingElse(
-      Exception exception, HttpServletRequest request) {
+    Exception exception,
+    HttpServletRequest request
+  ) {
     if (exception instanceof ErrorResponse refusal) {
       HttpStatus status = HttpStatus.valueOf(refusal.getStatusCode().value());
 
-      return envelope(status, request, ErrorMessages.format(status.getReasonPhrase()));
+      return envelope(
+        status,
+        request,
+        ErrorMessages.format(status.getReasonPhrase())
+      );
     }
 
     return envelope(
-        HttpStatus.INTERNAL_SERVER_ERROR, request, ErrorMessages.format("Internal server error"));
+      HttpStatus.INTERNAL_SERVER_ERROR,
+      request,
+      ErrorMessages.format("Internal server error")
+    );
   }
 
   private ResponseEntity<ErrorEnvelope> envelope(
-      HttpStatus status, HttpServletRequest request, String message) {
-    return ResponseEntity.status(status)
-        .body(ErrorEnvelope.of(status.value(), request.getRequestURI(), message));
+    HttpStatus status,
+    HttpServletRequest request,
+    String message
+  ) {
+    return ResponseEntity.status(status).body(
+      ErrorEnvelope.of(status.value(), request.getRequestURI(), message)
+    );
   }
 
   /** Jackson's detail carries a location suffix over several lines; one line is enough. */

@@ -25,6 +25,7 @@ import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 // refuse, before anything listens.
 @ConfigurationPropertiesScan
 public class GatewayApplication {
+
   public static void main(String[] args) {
     SpringApplication.run(GatewayApplication.class, args);
   }

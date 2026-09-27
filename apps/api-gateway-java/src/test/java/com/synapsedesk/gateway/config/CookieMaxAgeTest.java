@@ -29,18 +29,20 @@ class CookieMaxAgeTest {
   /** name, the environment's milliseconds, the seconds a browser must see. */
   static List<Object[]> cookies() {
     return List.of(
-        new Object[] {"COOKIE_ACCESS_MAX_AGE", 901_000L, 901L},
-        new Object[] {"COOKIE_REFRESH_MAX_AGE", 604_801_000L, 604_801L},
-        new Object[] {"COOKIE_2FA_MAX_AGE", 301_000L, 301L},
-        new Object[] {"COOKIE_DEVICE_MAX_AGE", 2_592_000_000L, 2_592_000L},
-        new Object[] {"COOKIE_TENANT_SELECTION_MAX_AGE", 300_000L, 300L});
+      new Object[] { "COOKIE_ACCESS_MAX_AGE", 901_000L, 901L },
+      new Object[] { "COOKIE_REFRESH_MAX_AGE", 604_801_000L, 604_801L },
+      new Object[] { "COOKIE_2FA_MAX_AGE", 301_000L, 301L },
+      new Object[] { "COOKIE_DEVICE_MAX_AGE", 2_592_000_000L, 2_592_000L },
+      new Object[] { "COOKIE_TENANT_SELECTION_MAX_AGE", 300_000L, 300L }
+    );
   }
 
   @ParameterizedTest(name = "{0} = {1} ms is Max-Age={2}")
   @MethodSource("cookies")
   void writesSecondsOnTheWire(String key, long milliseconds, long seconds) {
-    ResponseCookie cookie =
-        ResponseCookie.from("probe", "value").maxAge(Duration.ofMillis(milliseconds)).build();
+    ResponseCookie cookie = ResponseCookie.from("probe", "value")
+      .maxAge(Duration.ofMillis(milliseconds))
+      .build();
 
     assertThat(cookie.toString()).contains("Max-Age=" + seconds);
   }
@@ -52,7 +54,11 @@ class CookieMaxAgeTest {
     // what fails instead.
     Map<String, String> environment = SharedEnvironment.values();
 
-    assertThat(environment.get("COOKIE_REFRESH_MAX_AGE")).isEqualTo("604801000");
-    assertThat(Long.parseLong(environment.get("COOKIE_ACCESS_MAX_AGE"))).isEqualTo(901_000L);
+    assertThat(environment.get("COOKIE_REFRESH_MAX_AGE")).isEqualTo(
+      "604801000"
+    );
+    assertThat(
+      Long.parseLong(environment.get("COOKIE_ACCESS_MAX_AGE"))
+    ).isEqualTo(901_000L);
   }
 }

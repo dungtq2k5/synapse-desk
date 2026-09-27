@@ -2,13 +2,13 @@ package com.synapsedesk.gateway.ops;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.synapsedesk.gateway.HttpProbe;
 import com.synapsedesk.gateway.config.SharedEnvironmentInitializer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.beans.factory.annotation.Value;
-import com.synapsedesk.gateway.HttpProbe;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.context.ContextConfiguration;
 
@@ -27,8 +27,9 @@ import org.springframework.test.context.ContextConfiguration;
 // inherit, so this is a gap in the test's synthetic environment rather than
 // in the configuration. A fixed port would also collide between suites.
 @SpringBootTest(
-    webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-    properties = "management.server.port=0")
+  webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+  properties = "management.server.port=0"
+)
 @ContextConfiguration(initializers = SharedEnvironmentInitializer.class)
 class OpsRoutesTest {
 
@@ -53,7 +54,8 @@ class OpsRoutesTest {
     org.mockito.Mockito.when(lease.isReady()).thenReturn(true);
   }
 
-  @Autowired private DrainState drain;
+  @Autowired
+  private DrainState drain;
 
   @AfterEach
   void stopDraining() {
@@ -68,12 +70,16 @@ class OpsRoutesTest {
 
     assertThat(response.status()).isEqualTo(HttpStatus.OK.value());
     assertThat(response.json()).containsEntry("success", true);
-    assertThat((String) response.data().get("version")).matches("^\\d+\\.\\d+\\.\\d+.*");
+    assertThat((String) response.data().get("version")).matches(
+      "^\\d+\\.\\d+\\.\\d+.*"
+    );
   }
 
   @Test
   void healthIs200AndReadinessIs200WhileServing() {
-    assertThat(HttpProbe.get(port, "/health").status()).isEqualTo(HttpStatus.OK.value());
+    assertThat(HttpProbe.get(port, "/health").status()).isEqualTo(
+      HttpStatus.OK.value()
+    );
 
     HttpProbe ready = HttpProbe.get(port, "/health/ready");
     assertThat(ready.status()).isEqualTo(HttpStatus.OK.value());
@@ -87,16 +93,20 @@ class OpsRoutesTest {
     // The whole shape of a graceful shutdown: the Service stops routing here
     // while in-flight requests finish, and the kubelet does not restart a pod
     // that is deliberately not taking traffic.
-    assertThat(HttpProbe.get(port, "/health/ready").status())
-        .isEqualTo(HttpStatus.SERVICE_UNAVAILABLE.value());
-    assertThat(HttpProbe.get(port, "/health").status()).isEqualTo(HttpStatus.OK.value());
+    assertThat(HttpProbe.get(port, "/health/ready").status()).isEqualTo(
+      HttpStatus.SERVICE_UNAVAILABLE.value()
+    );
+    assertThat(HttpProbe.get(port, "/health").status()).isEqualTo(
+      HttpStatus.OK.value()
+    );
   }
 
   @Test
   void theOpsRoutesAreNotUnderTheApiPrefix() {
     // A probe configured for `/api/v1/health` breaks the day the version
     // moves, and it breaks by restarting healthy pods.
-    assertThat(HttpProbe.get(port, "/api/v1/health").status())
-        .isEqualTo(HttpStatus.NOT_FOUND.value());
+    assertThat(HttpProbe.get(port, "/api/v1/health").status()).isEqualTo(
+      HttpStatus.NOT_FOUND.value()
+    );
   }
 }

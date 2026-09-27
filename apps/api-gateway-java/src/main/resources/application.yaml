@@ -30,6 +30,14 @@ spring:
       url: ${REDIS_URL}
   main:
     banner-mode: 'off'
+  graphql:
+    schema:
+      # `schema.gql` lands under `target/classes/schema/`, copied there by
+      # `pom.xml`'s `graphql-schema` resources execution — not the
+      # framework default `classpath:graphql/`, and the tracked extension is
+      # `.gql`, not in the default `.graphqls`/`.gqls` pair.
+      locations: classpath:schema/
+      file-extensions: .gql
 
 server:
   port: ${PORT}

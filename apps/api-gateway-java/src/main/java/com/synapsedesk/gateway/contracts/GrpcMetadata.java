@@ -12,12 +12,17 @@ public final class GrpcMetadata {
   private GrpcMetadata() {}
 
   /** {@code GRPC_CONTEXT_METADATA} in `libs/common`. */
-  public static final String GRPC_CONTEXT_METADATA_DEPARTMENT_IDS = "department_ids";
+  public static final String GRPC_CONTEXT_METADATA_DEPARTMENT_IDS =
+    "department_ids";
   public static final String GRPC_CONTEXT_METADATA_IP = "ip_address";
-  public static final String GRPC_CONTEXT_METADATA_IS_EMAIL_VERIFIED = "is_email_verified";
-  public static final String GRPC_CONTEXT_METADATA_IS_SUPER_ADMIN = "is_super_admin";
-  public static final String GRPC_CONTEXT_METADATA_ORGANIZATION_ID = "organization_id";
-  public static final String GRPC_CONTEXT_METADATA_PERMISSION_CODES = "permission_codes";
+  public static final String GRPC_CONTEXT_METADATA_IS_EMAIL_VERIFIED =
+    "is_email_verified";
+  public static final String GRPC_CONTEXT_METADATA_IS_SUPER_ADMIN =
+    "is_super_admin";
+  public static final String GRPC_CONTEXT_METADATA_ORGANIZATION_ID =
+    "organization_id";
+  public static final String GRPC_CONTEXT_METADATA_PERMISSION_CODES =
+    "permission_codes";
   public static final String GRPC_CONTEXT_METADATA_USER_AGENT = "user_agent";
   public static final String GRPC_CONTEXT_METADATA_USER_ID = "user_id";
 }

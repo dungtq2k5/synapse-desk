@@ -38,23 +38,26 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  */
 class EnvBindingContractTest {
 
-  private static final List<Class<? extends Record>> PROPERTIES =
-      List.of(
-          RuntimeProperties.class,
-          MetricsProperties.class,
-          CorsProperties.class,
-          StoreProperties.class,
-          GrpcProperties.class,
-          JwtProperties.class,
-          CookieProperties.class,
-          ThrottleProperties.class,
-          InboundEmailProperties.class);
+  private static final List<Class<? extends Record>> PROPERTIES = List.of(
+    RuntimeProperties.class,
+    MetricsProperties.class,
+    CorsProperties.class,
+    StoreProperties.class,
+    GrpcProperties.class,
+    JwtProperties.class,
+    CookieProperties.class,
+    ThrottleProperties.class,
+    InboundEmailProperties.class
+  );
 
-  private static final Path APPLICATION_YAML = Path.of("src/main/resources/application.yaml");
+  private static final Path APPLICATION_YAML = Path.of(
+    "src/main/resources/application.yaml"
+  );
 
   /** `runtime.node-env` -> `NODE_ENV`, read from the yaml's placeholders. */
-  private static final Pattern MAPPING =
-      Pattern.compile("^(\\s*)([a-z0-9-]+):\\s*\\$\\{([A-Z][A-Z0-9_]*)(?::[^}]*)?}\\s*$");
+  private static final Pattern MAPPING = Pattern.compile(
+    "^(\\s*)([a-z0-9-]+):\\s*\\$\\{([A-Z][A-Z0-9_]*)(?::[^}]*)?}\\s*$"
+  );
 
   private static final Pattern GROUP = Pattern.compile("^([a-z0-9-]+):\\s*$");
 
@@ -65,7 +68,9 @@ class EnvBindingContractTest {
     List<String> findings = new ArrayList<>();
 
     for (Class<? extends Record> type : PROPERTIES) {
-      String prefix = type.getAnnotation(ConfigurationProperties.class).prefix();
+      String prefix = type
+        .getAnnotation(ConfigurationProperties.class)
+        .prefix();
 
       for (RecordComponent component : type.getRecordComponents()) {
         String path = prefix + "." + kebab(component.getName());
@@ -74,10 +79,22 @@ class EnvBindingContractTest {
         if (key == null) {
           // A field with no mapping binds from nothing — it would be silently
           // null in production and is the first thing this catches.
-          findings.add(type.getSimpleName() + "." + component.getName() + ": no ${ENV} in yaml");
+          findings.add(
+            type.getSimpleName() +
+              "." +
+              component.getName() +
+              ": no ${ENV} in yaml"
+          );
         } else if (!documented.contains(key)) {
-          findings.add(type.getSimpleName() + "." + component.getName() + " -> " + key
-              + ": not in " + SharedEnvironment.ENV_EXAMPLE);
+          findings.add(
+            type.getSimpleName() +
+              "." +
+              component.getName() +
+              " -> " +
+              key +
+              ": not in " +
+              SharedEnvironment.ENV_EXAMPLE
+          );
         }
       }
     }
@@ -90,14 +107,18 @@ class EnvBindingContractTest {
     // A reflection call that stopped returning components would report a
     // compliant tree. Nine classes and 46 fields today, which is also the Joi
     // schema's key count — the two implementations bind the same environment.
-    int fields = PROPERTIES.stream().mapToInt(type -> type.getRecordComponents().length).sum();
+    int fields = PROPERTIES.stream()
+      .mapToInt(type -> type.getRecordComponents().length)
+      .sum();
 
     assertThat(PROPERTIES).hasSize(9);
     assertThat(fields).isEqualTo(46);
     // A FLOOR, not equality: a key the file publishes and Java does not yet
     // bind is correct while this is a skeleton, and equality here would turn
     // that into the reverse-direction check this suite deliberately omits.
-    assertThat(SharedEnvironment.documentedKeys().size()).isGreaterThanOrEqualTo(fields);
+    assertThat(
+      SharedEnvironment.documentedKeys().size()
+    ).isGreaterThanOrEqualTo(fields);
   }
 
   /** Flat `group.property -> ENV_NAME` pairs from `application.yaml`. */

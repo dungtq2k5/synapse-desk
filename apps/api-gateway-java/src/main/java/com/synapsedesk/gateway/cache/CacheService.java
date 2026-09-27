@@ -1,7 +1,7 @@
 package com.synapsedesk.gateway.cache;
 
+import com.synapsedesk.gateway.config.JsIsoFormat;
 import java.time.OffsetDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.Map;
 import java.util.Optional;
 import java.util.TreeMap;
@@ -20,7 +20,8 @@ import tools.jackson.databind.ser.std.StdSerializer;
  * The shared cache — `cache.service.ts`, reproduced key-for-key and
  * byte-for-byte.
  *
- * <p><b>Both halves carry the risk.</b> The KEY format
+ * <p>
+ * <b>Both halves carry the risk.</b> The KEY format
  * (`cache:{org}|{scope}|{params}`) is easy to get right by eye; the VALUE
  * encoding is not — plain JSON writes an {@link OffsetDateTime} as a bare ISO
  * string, and `GraphQLISODateTime.serialize()` on the Node side reads a bare
@@ -30,7 +31,8 @@ import tools.jackson.databind.ser.std.StdSerializer;
  * `encode()` does, which is what makes the two implementations' entries
  * interchangeable rather than merely similarly-shaped.
  *
- * <p>A Super Admin's tenant segment is the literal `no-tenant`, matching
+ * <p>
+ * A Super Admin's tenant segment is the literal `no-tenant`, matching
  * `NO_TENANT` — never an empty segment, which would collide every tenantless
  * read under `cache:|…`.
  */
@@ -39,14 +41,6 @@ public class CacheService {
 
   /** The tag a timestamp is stored under — matches `DATE_TAG` exactly. */
   static final String DATE_TAG = "__cache_date__";
-
-  /**
-   * `Date.prototype.toISOString()`, exactly: always 3 fractional digits, always
-   * `Z`. {@link java.time.Instant#toString()} drops trailing zero millis and
-   * cannot be used here — the wire bytes must match Node's, not merely parse.
-   */
-  private static final DateTimeFormatter JS_ISO =
-      DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'").withZone(java.time.ZoneOffset.UTC);
 
   private static final String PREFIX = "cache:";
   private static final String NO_TENANT = "no-tenant";
@@ -68,8 +62,14 @@ public class CacheService {
    * `buildKey` states: two spellings of the same question must be one entry,
    * not two.
    */
-  public String buildKey(String organizationId, String scope, Map<String, String> params) {
-    Map<String, String> sorted = new TreeMap<>(params == null ? Map.of() : params);
+  public String buildKey(
+    String organizationId,
+    String scope,
+    Map<String, String> params
+  ) {
+    Map<String, String> sorted = new TreeMap<>(
+      params == null ? Map.of() : params
+    );
     sorted.values().removeIf(v -> v == null || v.isEmpty());
 
     StringBuilder joined = new StringBuilder();
@@ -82,13 +82,24 @@ public class CacheService {
       first = false;
     }
 
-    String tenant = (organizationId == null || organizationId.isEmpty()) ? NO_TENANT : organizationId;
+    String tenant =
+      organizationId == null || organizationId.isEmpty()
+        ? NO_TENANT
+        : organizationId;
 
     return PREFIX + tenant + "|" + scope + "|" + joined;
   }
 
-  /** Read-through, the only read path — `wrap()`, reproduced. Fails OPEN on any Redis error. */
-  public <T> T wrap(String key, long ttlSeconds, Class<T> type, Supplier<T> produce) {
+  /**
+   * Read-through, the only read path — `wrap()`, reproduced. Fails OPEN on any
+   * Redis error.
+   */
+  public <T> T wrap(
+    String key,
+    long ttlSeconds,
+    Class<T> type,
+    Supplier<T> produce
+  ) {
     try {
       String cached = redis.opsForValue().get(key);
       if (cached != null) {
@@ -101,7 +112,13 @@ public class CacheService {
     T value = produce.get();
 
     try {
-      redis.opsForValue().set(key, json.writeValueAsString(value), java.time.Duration.ofSeconds(ttlSeconds));
+      redis
+        .opsForValue()
+        .set(
+          key,
+          json.writeValueAsString(value),
+          java.time.Duration.ofSeconds(ttlSeconds)
+        );
     } catch (RuntimeException cacheWriteFailed) {
       // Same fail-open rule on the write side.
     }
@@ -114,31 +131,52 @@ public class CacheService {
     return Optional.ofNullable(redis.opsForValue().get(key));
   }
 
-  /** For a probe writing Node's exact wire format directly, to prove Java reads it. */
+  /**
+   * For a probe writing Node's exact wire format directly, to prove Java reads
+   * it.
+   */
   public void putRaw(String key, String value, long ttlSeconds) {
-    redis.opsForValue().set(key, value, java.time.Duration.ofSeconds(ttlSeconds));
+    redis
+      .opsForValue()
+      .set(key, value, java.time.Duration.ofSeconds(ttlSeconds));
   }
 
-  private static final class TaggedDateSerializer extends StdSerializer<OffsetDateTime> {
+  private static final class TaggedDateSerializer
+    extends StdSerializer<OffsetDateTime>
+  {
+
     TaggedDateSerializer() {
       super(OffsetDateTime.class);
     }
 
     @Override
-    public void serialize(OffsetDateTime value, tools.jackson.core.JsonGenerator gen, SerializationContext ctx) {
+    public void serialize(
+      OffsetDateTime value,
+      tools.jackson.core.JsonGenerator gen,
+      SerializationContext ctx
+    ) {
       gen.writeStartObject();
-      gen.writeStringProperty(DATE_TAG, JS_ISO.format(value.toInstant()));
+      gen.writeStringProperty(
+        DATE_TAG,
+        JsIsoFormat.PATTERN.format(value.toInstant())
+      );
       gen.writeEndObject();
     }
   }
 
-  private static final class TaggedDateDeserializer extends StdDeserializer<OffsetDateTime> {
+  private static final class TaggedDateDeserializer
+    extends StdDeserializer<OffsetDateTime>
+  {
+
     TaggedDateDeserializer() {
       super(OffsetDateTime.class);
     }
 
     @Override
-    public OffsetDateTime deserialize(tools.jackson.core.JsonParser p, DeserializationContext ctx) {
+    public OffsetDateTime deserialize(
+      tools.jackson.core.JsonParser p,
+      DeserializationContext ctx
+    ) {
       JsonNode node = ctx.readTree(p);
       String iso = node.path(DATE_TAG).asString();
 

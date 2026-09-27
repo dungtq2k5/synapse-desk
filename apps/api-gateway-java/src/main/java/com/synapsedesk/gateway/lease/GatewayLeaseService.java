@@ -1,7 +1,7 @@
 package com.synapsedesk.gateway.lease;
 
-import com.synapsedesk.gateway.ops.ReadinessGate;
 import com.synapsedesk.gateway.generated.model.ReadinessDependenciesResponseDto;
+import com.synapsedesk.gateway.ops.ReadinessGate;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.List;
@@ -36,13 +36,15 @@ import org.springframework.stereotype.Component;
 @Component
 public class GatewayLeaseService implements ReadinessGate {
 
-  private static final Logger LOG = LoggerFactory.getLogger(GatewayLeaseService.class);
+  private static final Logger LOG = LoggerFactory.getLogger(
+    GatewayLeaseService.class
+  );
 
   private static final DefaultRedisScript<Long> CLAIM =
-      new DefaultRedisScript<>(GatewayLease.CLAIM, Long.class);
+    new DefaultRedisScript<>(GatewayLease.CLAIM, Long.class);
 
   private static final DefaultRedisScript<Long> EXTEND =
-      new DefaultRedisScript<>(GatewayLease.REFRESH_SCRIPT, Long.class);
+    new DefaultRedisScript<>(GatewayLease.REFRESH_SCRIPT, Long.class);
 
   /** This process's entry. Unique per pod AND per restart. */
   private final String podId;
@@ -53,19 +55,24 @@ public class GatewayLeaseService implements ReadinessGate {
   private final AtomicBoolean stopping = new AtomicBoolean();
 
   private final java.util.concurrent.ScheduledExecutorService beats =
-      java.util.concurrent.Executors.newSingleThreadScheduledExecutor(
-          runnable -> {
-            Thread thread = new Thread(runnable, "gateway-lease");
-            thread.setDaemon(true);
+    java.util.concurrent.Executors.newSingleThreadScheduledExecutor(
+      runnable -> {
+        Thread thread = new Thread(runnable, "gateway-lease");
+        thread.setDaemon(true);
 
-            return thread;
-          });
+        return thread;
+      }
+    );
   private volatile long lastRefreshAt;
 
   public GatewayLeaseService(StringRedisTemplate redis, LeaseRuntime runtime) {
     this.redis = redis;
     this.runtime = runtime;
-    this.podId = "%s:%d:%s".formatted(host(), ProcessHandle.current().pid(), shortId());
+    this.podId = "%s:%d:%s".formatted(
+      host(),
+      ProcessHandle.current().pid(),
+      shortId()
+    );
   }
 
   /** True only while this process holds the lease — what readiness reports. */
@@ -84,7 +91,10 @@ public class GatewayLeaseService implements ReadinessGate {
   }
 
   @Override
-  public void report(ReadinessDependenciesResponseDto dependencies, boolean ready) {
+  public void report(
+    ReadinessDependenciesResponseDto dependencies,
+    boolean ready
+  ) {
     // The lease does not appear under `dependencies` — that object's fields
     // come from the shared document, and adding one would mean publishing it
     // on the Node side too. `ready` already says whether to route here, which
@@ -107,7 +117,11 @@ public class GatewayLeaseService implements ReadinessGate {
   @jakarta.annotation.PostConstruct
   public void start() {
     beats.scheduleAtFixedRate(
-        this::beat, 0, GatewayLease.REFRESH.toMillis(), java.util.concurrent.TimeUnit.MILLISECONDS);
+      this::beat,
+      0,
+      GatewayLease.REFRESH.toMillis(),
+      java.util.concurrent.TimeUnit.MILLISECONDS
+    );
   }
 
   /**
@@ -144,39 +158,44 @@ public class GatewayLeaseService implements ReadinessGate {
       // consuming and holding sockets, which is what the fence is for.
       LOG.warn("Lease beat failed: {}", failure.getMessage());
 
-      if (active.get()
-          && System.currentTimeMillis() - lastRefreshAt > GatewayLease.FENCE.toMillis()) {
+      if (
+        active.get() &&
+        System.currentTimeMillis() - lastRefreshAt >
+          GatewayLease.FENCE.toMillis()
+      ) {
         LOG.error(
-            "No lease refresh for {} ms — stepping down before the TTL",
-            GatewayLease.FENCE.toMillis());
+          "No lease refresh for {} ms — stepping down before the TTL",
+          GatewayLease.FENCE.toMillis()
+        );
         stepDown();
       }
     }
   }
 
   private boolean claim(long now) {
-    Long claimed =
-        redis.execute(
-            CLAIM,
-            List.of(
-                GatewayLease.holdersKey(GatewayLease.IMPLEMENTATION),
-                GatewayLease.holdersKey(GatewayLease.OTHER)),
-            String.valueOf(now),
-            String.valueOf(now + GatewayLease.TTL.toMillis()),
-            podId,
-            String.valueOf(GatewayLease.TTL.toMillis()));
+    Long claimed = redis.execute(
+      CLAIM,
+      List.of(
+        GatewayLease.holdersKey(GatewayLease.IMPLEMENTATION),
+        GatewayLease.holdersKey(GatewayLease.OTHER)
+      ),
+      String.valueOf(now),
+      String.valueOf(now + GatewayLease.TTL.toMillis()),
+      podId,
+      String.valueOf(GatewayLease.TTL.toMillis())
+    );
 
     return Long.valueOf(1L).equals(claimed);
   }
 
   private boolean extend(long now) {
-    Long extended =
-        redis.execute(
-            EXTEND,
-            List.of(GatewayLease.holdersKey(GatewayLease.IMPLEMENTATION)),
-            String.valueOf(now + GatewayLease.TTL.toMillis()),
-            podId,
-            String.valueOf(GatewayLease.TTL.toMillis()));
+    Long extended = redis.execute(
+      EXTEND,
+      List.of(GatewayLease.holdersKey(GatewayLease.IMPLEMENTATION)),
+      String.valueOf(now + GatewayLease.TTL.toMillis()),
+      podId,
+      String.valueOf(GatewayLease.TTL.toMillis())
+    );
 
     return Long.valueOf(1L).equals(extended);
   }
@@ -185,7 +204,11 @@ public class GatewayLeaseService implements ReadinessGate {
     lastRefreshAt = System.currentTimeMillis();
     runtime.activate();
     active.set(true);
-    LOG.info("Holding the gateway lease as {} ({})", GatewayLease.IMPLEMENTATION, podId);
+    LOG.info(
+      "Holding the gateway lease as {} ({})",
+      GatewayLease.IMPLEMENTATION,
+      podId
+    );
   }
 
   /**
@@ -207,7 +230,9 @@ public class GatewayLeaseService implements ReadinessGate {
 
   private void release() {
     try {
-      redis.opsForZSet().remove(GatewayLease.holdersKey(GatewayLease.IMPLEMENTATION), podId);
+      redis
+        .opsForZSet()
+        .remove(GatewayLease.holdersKey(GatewayLease.IMPLEMENTATION), podId);
     } catch (RuntimeException failure) {
       // The entry expires on its own within the TTL; a failure here delays a
       // handover, it does not break one.

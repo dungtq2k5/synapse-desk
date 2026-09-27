@@ -21,22 +21,26 @@ class GrpcStatusMappingTest {
   @Test
   void aPeerThatIsDownTellsTheClientNothingAboutTheNetwork() {
     // The exact string the capture recorded on 2026-09-20.
-    GrpcStatusMapping.ClientSafe safe =
-        GrpcStatusMapping.resolve(
-            Status.Code.UNAVAILABLE, "UNAVAILABLE: No connection established to localhost:59999");
+    GrpcStatusMapping.ClientSafe safe = GrpcStatusMapping.resolve(
+      Status.Code.UNAVAILABLE,
+      "UNAVAILABLE: No connection established to localhost:59999"
+    );
 
     assertThat(safe.status()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
-    assertThat(safe.message())
-        .isEqualTo("A service this request depends on is unavailable. Try again shortly!");
+    assertThat(safe.message()).isEqualTo(
+      "A service this request depends on is unavailable. Try again shortly!"
+    );
     assertThat(safe.message()).doesNotContain("localhost");
     assertThat(safe.message()).doesNotContain("59999");
   }
 
   @ParameterizedTest(name = "{0} carries no peer detail")
-  @CsvSource({"UNAVAILABLE", "DEADLINE_EXCEEDED", "CANCELLED"})
+  @CsvSource({ "UNAVAILABLE", "DEADLINE_EXCEEDED", "CANCELLED" })
   void everyTransportClassCodeAnswersAFixedMessage(String code) {
-    GrpcStatusMapping.ClientSafe safe =
-        GrpcStatusMapping.resolve(Status.Code.valueOf(code), "peer at 10.1.2.3:5001 said no");
+    GrpcStatusMapping.ClientSafe safe = GrpcStatusMapping.resolve(
+      Status.Code.valueOf(code),
+      "peer at 10.1.2.3:5001 said no"
+    );
 
     assertThat(safe.message()).doesNotContain("10.1.2.3");
     assertThat(safe.message()).endsWith("!");
@@ -59,20 +63,26 @@ class GrpcStatusMappingTest {
     "DEADLINE_EXCEEDED,504",
   })
   void theCodeTableIsTheNodeTable(String code, int status) {
-    assertThat(GrpcStatusMapping.resolve(Status.Code.valueOf(code), "detail").status().value())
-        .isEqualTo(status);
+    assertThat(
+      GrpcStatusMapping.resolve(Status.Code.valueOf(code), "detail")
+        .status()
+        .value()
+    ).isEqualTo(status);
   }
 
   @Test
   void anUNKNOWNcodeIsA500RatherThanAGuess() {
-    assertThat(GrpcStatusMapping.resolve(Status.Code.UNKNOWN, "x").status())
-        .isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
+    assertThat(
+      GrpcStatusMapping.resolve(Status.Code.UNKNOWN, "x").status()
+    ).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
   }
 
   @Test
   void aMarkedMessageIsForwardedWithItsStatus() {
-    GrpcStatusMapping.ClientSafe safe =
-        GrpcStatusMapping.resolve(Status.Code.INTERNAL, "[http:402] Your plan does not include this");
+    GrpcStatusMapping.ClientSafe safe = GrpcStatusMapping.resolve(
+      Status.Code.INTERNAL,
+      "[http:402] Your plan does not include this"
+    );
 
     assertThat(safe.status()).isEqualTo(HttpStatus.PAYMENT_REQUIRED);
     assertThat(safe.message()).isEqualTo("Your plan does not include this!");
@@ -83,8 +93,10 @@ class GrpcStatusMappingTest {
     // A service that deliberately wrote text for the user, while its own peer
     // happened to be down. The marker is the only channel for that, so it has
     // to win over the fixed message.
-    GrpcStatusMapping.ClientSafe safe =
-        GrpcStatusMapping.resolve(Status.Code.UNAVAILABLE, "[http:503] The mailbox is being moved");
+    GrpcStatusMapping.ClientSafe safe = GrpcStatusMapping.resolve(
+      Status.Code.UNAVAILABLE,
+      "[http:503] The mailbox is being moved"
+    );
 
     assertThat(safe.message()).isEqualTo("The mailbox is being moved!");
   }
@@ -93,8 +105,10 @@ class GrpcStatusMappingTest {
   void anImplausibleMarkerIsOrdinaryTextRatherThanAnInstruction() {
     // A message must not be able to choose its own status code by starting
     // with `[http:999]`.
-    GrpcStatusMapping.ClientSafe safe =
-        GrpcStatusMapping.resolve(Status.Code.NOT_FOUND, "[http:999] hello");
+    GrpcStatusMapping.ClientSafe safe = GrpcStatusMapping.resolve(
+      Status.Code.NOT_FOUND,
+      "[http:999] hello"
+    );
 
     assertThat(safe.status()).isEqualTo(HttpStatus.NOT_FOUND);
     assertThat(safe.message()).isEqualTo("[http:999] hello!");

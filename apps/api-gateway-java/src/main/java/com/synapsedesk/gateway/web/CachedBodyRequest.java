@@ -52,7 +52,9 @@ public class CachedBodyRequest extends HttpServletRequestWrapper {
       public void setReadListener(ReadListener listener) {
         // Blocking reads only: Spring MVC's argument resolution is blocking,
         // and an async listener on a byte array would have nothing to wait for.
-        throw new UnsupportedOperationException("async reads are not supported");
+        throw new UnsupportedOperationException(
+          "async reads are not supported"
+        );
       }
 
       @Override
@@ -65,6 +67,7 @@ public class CachedBodyRequest extends HttpServletRequestWrapper {
   @Override
   public BufferedReader getReader() throws IOException {
     return new BufferedReader(
-        new InputStreamReader(getInputStream(), StandardCharsets.UTF_8));
+      new InputStreamReader(getInputStream(), StandardCharsets.UTF_8)
+    );
   }
 }

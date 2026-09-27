@@ -1,0 +1,12 @@
+# Root GraphQL fields this gateway does NOT resolve yet.
+#
+# The honest analogue to `pending-apis.txt`, invented for this surface: there
+# is no generated interface a missing field fails to implement, so
+# `GraphqlFieldCoverageTest` reads `schema.gql` itself — the tracked
+# contract — and asserts every `Query`/`Mutation` root field is either
+# resolved by a `@QueryMapping`/`@MutationMapping` bean or listed here.
+#
+# This list only ever shrinks. `GraphqlFieldCoverageTest` asserts its size,
+# same discipline as `pending-apis.txt`.
+#
+# Empty: every root field in the tracked schema is resolved.

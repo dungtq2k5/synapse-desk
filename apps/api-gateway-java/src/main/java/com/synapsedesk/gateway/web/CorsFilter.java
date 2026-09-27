@@ -1,23 +1,20 @@
 package com.synapsedesk.gateway.web;
 
+import com.synapsedesk.gateway.config.CorsProperties;
+import com.synapsedesk.gateway.throttle.ThrottlerTiers;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
-
-import com.synapsedesk.gateway.config.CorsProperties;
-import com.synapsedesk.gateway.throttle.ThrottlerTiers;
-
-import jakarta.servlet.FilterChain;
-import jakarta.servlet.ServletException;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
 
 /**
  * `app.enableCors(...)`, reproduced — a custom filter rather than Spring's
@@ -46,15 +43,15 @@ public class CorsFilter extends OncePerRequestFilter {
   private static final String ORIGIN = "Origin";
 
   /** Mirrors `CORS_ALLOWED_HEADERS` — a browser-required superset, not a controller-read list. */
-  private static final String ALLOWED_HEADERS =
-      String.join(
-          ", ",
-          "Content-Type",
-          "Authorization",
-          "X-Requested-With",
-          "Idempotency-Key",
-          "x-apollo-operation-name",
-          "apollo-require-preflight");
+  private static final String ALLOWED_HEADERS = String.join(
+    ", ",
+    "Content-Type",
+    "Authorization",
+    "X-Requested-With",
+    "Idempotency-Key",
+    "x-apollo-operation-name",
+    "apollo-require-preflight"
+  );
 
   /** Mirrors `CORS_METHODS` — `OPTIONS` is deliberately absent; this filter answers preflight itself. */
   private static final String ALLOWED_METHODS = "GET, POST, PUT, PATCH, DELETE";
@@ -87,7 +84,12 @@ public class CorsFilter extends OncePerRequestFilter {
   private static String buildExposedHeaders() {
     List<String> headers = new ArrayList<>();
     headers.add("Retry-After");
-    for (String tier : List.of(ThrottlerTiers.SHORT, ThrottlerTiers.MEDIUM, ThrottlerTiers.LONG, ThrottlerTiers.AUTH)) {
+    for (String tier : List.of(
+      ThrottlerTiers.SHORT,
+      ThrottlerTiers.MEDIUM,
+      ThrottlerTiers.LONG,
+      ThrottlerTiers.AUTH
+    )) {
       headers.add("X-RateLimit-Limit-" + tier);
       headers.add("X-RateLimit-Remaining-" + tier);
       headers.add("X-RateLimit-Reset-" + tier);
@@ -99,12 +101,14 @@ public class CorsFilter extends OncePerRequestFilter {
 
   @Override
   protected void doFilterInternal(
-      HttpServletRequest request, HttpServletResponse response, FilterChain chain)
-      throws ServletException, IOException {
+    HttpServletRequest request,
+    HttpServletResponse response,
+    FilterChain chain
+  ) throws ServletException, IOException {
     String origin = request.getHeader(ORIGIN);
     boolean isPreflight =
-        "OPTIONS".equalsIgnoreCase(request.getMethod())
-            && request.getHeader("Access-Control-Request-Method") != null;
+      "OPTIONS".equalsIgnoreCase(request.getMethod()) &&
+      request.getHeader("Access-Control-Request-Method") != null;
 
     if (origin == null) {
       // No Origin header: not a browser cross-origin request (curl, a peer,

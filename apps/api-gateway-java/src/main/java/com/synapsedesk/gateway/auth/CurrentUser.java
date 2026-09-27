@@ -1,13 +1,10 @@
 package com.synapsedesk.gateway.auth;
 
+import com.synapsedesk.gateway.config.JwtProperties;
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.Optional;
-
 import org.springframework.stereotype.Component;
-
-import com.synapsedesk.gateway.config.JwtProperties;
-
-import jakarta.servlet.http.HttpServletRequest;
 
 /**
  * Reads the access cookie and verifies it — the Java `@CurrentUser()` /
@@ -35,25 +32,27 @@ public class CurrentUser {
     String userAgent = request.getHeader("user-agent");
 
     return new RequestOrigin(
-        request.getRemoteAddr() == null ? "" : request.getRemoteAddr(),
-        userAgent == null ? "" : userAgent);
+      request.getRemoteAddr() == null ? "" : request.getRemoteAddr(),
+      userAgent == null ? "" : userAgent
+    );
   }
 
   /** The access cookie, verified — empty if absent, invalid, expired, or a 2FA challenge. */
   public Optional<RequestContext> read(HttpServletRequest request) {
     return accessToken(request)
-        .flatMap(verifier::verifyAccess)
-        .filter(JwtPrincipal::isFullSession)
-        .map(principal -> toContext(principal, origin(request)));
+      .flatMap(verifier::verifyAccess)
+      .filter(JwtPrincipal::isFullSession)
+      .map(principal -> toContext(principal, origin(request)));
   }
 
   /** Throws 401 with the Node message if the caller has no valid full session. */
   public RequestContext require(HttpServletRequest request) {
-    return read(request)
-        .orElseThrow(
-            () ->
-                new org.springframework.web.server.ResponseStatusException(
-                    org.springframework.http.HttpStatus.UNAUTHORIZED, "Unauthorized"));
+    return read(request).orElseThrow(() ->
+      new org.springframework.web.server.ResponseStatusException(
+        org.springframework.http.HttpStatus.UNAUTHORIZED,
+        "Unauthorized"
+      )
+    );
   }
 
   /** Cryptographic validity only — for `GuestCheck`, which does not care WHO. */
@@ -70,7 +69,9 @@ public class CurrentUser {
    * {@code isFullSession} filter {@link #read} applies for route access.
    */
   public Optional<String> verifiedSubject(HttpServletRequest request) {
-    return accessToken(request).flatMap(verifier::verifyAccess).map(JwtPrincipal::sub);
+    return accessToken(request)
+      .flatMap(verifier::verifyAccess)
+      .map(JwtPrincipal::sub);
   }
 
   Optional<String> accessToken(HttpServletRequest request) {
@@ -87,15 +88,21 @@ public class CurrentUser {
     return Optional.empty();
   }
 
-  private RequestContext toContext(JwtPrincipal principal, RequestOrigin origin) {
+  private RequestContext toContext(
+    JwtPrincipal principal,
+    RequestOrigin origin
+  ) {
     return new RequestContext(
-        principal.sub() == null ? "" : principal.sub(),
-        principal.organizationId(),
-        principal.isSuperAdmin(),
-        principal.departmentIds() == null ? List.of() : principal.departmentIds(),
-        principal.permissionCodes() == null ? List.of() : principal.permissionCodes(),
-        principal.isEmailVerified(),
-        origin.ip(),
-        origin.userAgent());
+      principal.sub() == null ? "" : principal.sub(),
+      principal.organizationId(),
+      principal.isSuperAdmin(),
+      principal.departmentIds() == null ? List.of() : principal.departmentIds(),
+      principal.permissionCodes() == null
+        ? List.of()
+        : principal.permissionCodes(),
+      principal.isEmailVerified(),
+      origin.ip(),
+      origin.userAgent()
+    );
   }
 }

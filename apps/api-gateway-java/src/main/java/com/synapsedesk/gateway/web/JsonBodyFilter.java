@@ -54,16 +54,19 @@ public class JsonBodyFilter extends OncePerRequestFilter {
   private final HandlerExceptionResolver resolver;
 
   public JsonBodyFilter(
-      ObjectMapper json,
-      @Qualifier("handlerExceptionResolver") HandlerExceptionResolver resolver) {
+    ObjectMapper json,
+    @Qualifier("handlerExceptionResolver") HandlerExceptionResolver resolver
+  ) {
     this.json = json;
     this.resolver = resolver;
   }
 
   @Override
   protected void doFilterInternal(
-      HttpServletRequest request, HttpServletResponse response, FilterChain chain)
-      throws ServletException, IOException {
+    HttpServletRequest request,
+    HttpServletResponse response,
+    FilterChain chain
+  ) throws ServletException, IOException {
     byte[] body = request.getInputStream().readAllBytes();
 
     if (body.length == 0) {
@@ -79,10 +82,11 @@ public class JsonBodyFilter extends OncePerRequestFilter {
 
     if (declared == null || !isJson(declared)) {
       refuse(
-          request,
-          response,
-          HttpStatus.UNSUPPORTED_MEDIA_TYPE,
-          "Content-Type must be application/json");
+        request,
+        response,
+        HttpStatus.UNSUPPORTED_MEDIA_TYPE,
+        "Content-Type must be application/json"
+      );
 
       return;
     }
@@ -109,12 +113,17 @@ public class JsonBodyFilter extends OncePerRequestFilter {
    * `GatewayExceptionHandler` instead.
    */
   private void refuse(
-      HttpServletRequest request,
-      HttpServletResponse response,
-      HttpStatus status,
-      String reason) {
+    HttpServletRequest request,
+    HttpServletResponse response,
+    HttpStatus status,
+    String reason
+  ) {
     resolver.resolveException(
-        request, response, null, new ResponseStatusException(status, reason));
+      request,
+      response,
+      null,
+      new ResponseStatusException(status, reason)
+    );
   }
 
   /** As the Node middleware does: a parameter or a `+json` suffix is fine. */

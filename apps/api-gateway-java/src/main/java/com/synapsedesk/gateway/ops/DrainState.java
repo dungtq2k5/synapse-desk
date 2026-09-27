@@ -30,8 +30,10 @@ public class DrainState {
    */
   @EventListener
   public void onAvailabilityChange(AvailabilityChangeEvent<?> event) {
-    if (event.getState()
-        == org.springframework.boot.availability.ReadinessState.REFUSING_TRAFFIC) {
+    if (
+      event.getState() ==
+      org.springframework.boot.availability.ReadinessState.REFUSING_TRAFFIC
+    ) {
       draining.set(true);
     }
   }

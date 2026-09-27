@@ -39,9 +39,10 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties(prefix = "cookie")
 public record CookieProperties(
-    @NotNull @DurationUnit(ChronoUnit.MILLIS) Duration accessMaxAge,
-    @NotNull @DurationUnit(ChronoUnit.MILLIS) Duration refreshMaxAge,
-    @NotNull @DurationUnit(ChronoUnit.MILLIS) Duration twoFactorMaxAge,
-    @NotNull @DurationUnit(ChronoUnit.MILLIS) Duration deviceMaxAge,
-    @NotNull @DurationUnit(ChronoUnit.MILLIS) Duration tenantSelectionMaxAge,
-    @NotBlank String sameSite) {}
+  @NotNull @DurationUnit(ChronoUnit.MILLIS) Duration accessMaxAge,
+  @NotNull @DurationUnit(ChronoUnit.MILLIS) Duration refreshMaxAge,
+  @NotNull @DurationUnit(ChronoUnit.MILLIS) Duration twoFactorMaxAge,
+  @NotNull @DurationUnit(ChronoUnit.MILLIS) Duration deviceMaxAge,
+  @NotNull @DurationUnit(ChronoUnit.MILLIS) Duration tenantSelectionMaxAge,
+  @NotBlank String sameSite
+) {}

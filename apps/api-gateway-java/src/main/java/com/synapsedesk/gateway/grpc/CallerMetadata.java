@@ -18,28 +18,38 @@ import java.util.List;
  */
 public final class CallerMetadata {
 
-  private static final Metadata.Key<String> IP =
-      Metadata.Key.of(GrpcMetadata.GRPC_CONTEXT_METADATA_IP, Metadata.ASCII_STRING_MARSHALLER);
-  private static final Metadata.Key<String> USER_AGENT =
-      Metadata.Key.of(
-          GrpcMetadata.GRPC_CONTEXT_METADATA_USER_AGENT, Metadata.ASCII_STRING_MARSHALLER);
-  private static final Metadata.Key<String> USER_ID =
-      Metadata.Key.of(GrpcMetadata.GRPC_CONTEXT_METADATA_USER_ID, Metadata.ASCII_STRING_MARSHALLER);
-  private static final Metadata.Key<String> ORGANIZATION_ID =
-      Metadata.Key.of(
-          GrpcMetadata.GRPC_CONTEXT_METADATA_ORGANIZATION_ID, Metadata.ASCII_STRING_MARSHALLER);
-  private static final Metadata.Key<String> IS_SUPER_ADMIN =
-      Metadata.Key.of(
-          GrpcMetadata.GRPC_CONTEXT_METADATA_IS_SUPER_ADMIN, Metadata.ASCII_STRING_MARSHALLER);
-  private static final Metadata.Key<String> DEPARTMENT_IDS =
-      Metadata.Key.of(
-          GrpcMetadata.GRPC_CONTEXT_METADATA_DEPARTMENT_IDS, Metadata.ASCII_STRING_MARSHALLER);
-  private static final Metadata.Key<String> PERMISSION_CODES =
-      Metadata.Key.of(
-          GrpcMetadata.GRPC_CONTEXT_METADATA_PERMISSION_CODES, Metadata.ASCII_STRING_MARSHALLER);
-  private static final Metadata.Key<String> IS_EMAIL_VERIFIED =
-      Metadata.Key.of(
-          GrpcMetadata.GRPC_CONTEXT_METADATA_IS_EMAIL_VERIFIED, Metadata.ASCII_STRING_MARSHALLER);
+  private static final Metadata.Key<String> IP = Metadata.Key.of(
+    GrpcMetadata.GRPC_CONTEXT_METADATA_IP,
+    Metadata.ASCII_STRING_MARSHALLER
+  );
+  private static final Metadata.Key<String> USER_AGENT = Metadata.Key.of(
+    GrpcMetadata.GRPC_CONTEXT_METADATA_USER_AGENT,
+    Metadata.ASCII_STRING_MARSHALLER
+  );
+  private static final Metadata.Key<String> USER_ID = Metadata.Key.of(
+    GrpcMetadata.GRPC_CONTEXT_METADATA_USER_ID,
+    Metadata.ASCII_STRING_MARSHALLER
+  );
+  private static final Metadata.Key<String> ORGANIZATION_ID = Metadata.Key.of(
+    GrpcMetadata.GRPC_CONTEXT_METADATA_ORGANIZATION_ID,
+    Metadata.ASCII_STRING_MARSHALLER
+  );
+  private static final Metadata.Key<String> IS_SUPER_ADMIN = Metadata.Key.of(
+    GrpcMetadata.GRPC_CONTEXT_METADATA_IS_SUPER_ADMIN,
+    Metadata.ASCII_STRING_MARSHALLER
+  );
+  private static final Metadata.Key<String> DEPARTMENT_IDS = Metadata.Key.of(
+    GrpcMetadata.GRPC_CONTEXT_METADATA_DEPARTMENT_IDS,
+    Metadata.ASCII_STRING_MARSHALLER
+  );
+  private static final Metadata.Key<String> PERMISSION_CODES = Metadata.Key.of(
+    GrpcMetadata.GRPC_CONTEXT_METADATA_PERMISSION_CODES,
+    Metadata.ASCII_STRING_MARSHALLER
+  );
+  private static final Metadata.Key<String> IS_EMAIL_VERIFIED = Metadata.Key.of(
+    GrpcMetadata.GRPC_CONTEXT_METADATA_IS_EMAIL_VERIFIED,
+    Metadata.ASCII_STRING_MARSHALLER
+  );
 
   private CallerMetadata() {}
 
@@ -56,7 +66,9 @@ public final class CallerMetadata {
   public static Metadata of(RequestContext context) {
     Metadata metadata = of(context.origin());
     metadata.put(USER_ID, context.sub());
-    if (context.organizationId() != null && !context.organizationId().isEmpty()) {
+    if (
+      context.organizationId() != null && !context.organizationId().isEmpty()
+    ) {
       metadata.put(ORGANIZATION_ID, context.organizationId());
     }
     metadata.put(IS_SUPER_ADMIN, String.valueOf(context.isSuperAdmin()));

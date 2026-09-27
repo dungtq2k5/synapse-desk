@@ -34,6 +34,7 @@ class GatewayLeaseIT {
 
   /** What the runtime was told to do, in order. */
   private static final class Recorder implements LeaseRuntime {
+
     final List<String> events = new java.util.ArrayList<>();
 
     @Override
@@ -49,13 +50,16 @@ class GatewayLeaseIT {
 
   @BeforeEach
   void connect() {
-    String url = SharedEnvironment.values().getOrDefault("REDIS_URL", "redis://localhost:6379");
-    connections =
-        new LettuceConnectionFactory(
-            org.springframework.data.redis.connection.RedisConfiguration.class.cast(
-                    redisStandalone(url))
-                .getClass()
-                .cast(redisStandalone(url)));
+    String url = SharedEnvironment.values().getOrDefault(
+      "REDIS_URL",
+      "redis://localhost:6379"
+    );
+    connections = new LettuceConnectionFactory(
+      org.springframework.data.redis.connection.RedisConfiguration.class
+        .cast(redisStandalone(url))
+        .getClass()
+        .cast(redisStandalone(url))
+    );
     connections.afterPropertiesSet();
     redis = new StringRedisTemplate(connections);
 
@@ -63,13 +67,15 @@ class GatewayLeaseIT {
     redis.delete(GatewayLease.holdersKey(GatewayLease.OTHER));
   }
 
-  private static org.springframework.data.redis.connection.RedisStandaloneConfiguration
-      redisStandalone(String url) {
+  private static org.springframework.data.redis.connection.RedisStandaloneConfiguration redisStandalone(
+    String url
+  ) {
     java.net.URI uri = java.net.URI.create(url);
     var configuration =
-        new org.springframework.data.redis.connection.RedisStandaloneConfiguration(
-            uri.getHost() == null ? "localhost" : uri.getHost(),
-            uri.getPort() < 0 ? 6379 : uri.getPort());
+      new org.springframework.data.redis.connection.RedisStandaloneConfiguration(
+        uri.getHost() == null ? "localhost" : uri.getHost(),
+        uri.getPort() < 0 ? 6379 : uri.getPort()
+      );
 
     String path = uri.getPath();
     if (path != null && path.length() > 1) {
@@ -109,7 +115,9 @@ class GatewayLeaseIT {
 
     assertThat(first.events).containsExactly("activate");
     assertThat(second.events).containsExactly("activate");
-    assertThat(redis.opsForZSet().size(GatewayLease.holdersKey("java"))).isEqualTo(2);
+    assertThat(
+      redis.opsForZSet().size(GatewayLease.holdersKey("java"))
+    ).isEqualTo(2);
   }
 
   @Test
@@ -117,11 +125,13 @@ class GatewayLeaseIT {
     // What a Node pod writes — the mirror of the Node suite's fake `java`
     // entry. This is check 5 at the Redis level; `NodeAndJavaIT` runs the
     // real Node gateway beside this one.
-    redis.opsForZSet()
-        .add(
-            GatewayLease.holdersKey("node"),
-            "node-pod-1:7:abcdef12",
-            System.currentTimeMillis() + GatewayLease.TTL.toMillis());
+    redis
+      .opsForZSet()
+      .add(
+        GatewayLease.holdersKey("node"),
+        "node-pod-1:7:abcdef12",
+        System.currentTimeMillis() + GatewayLease.TTL.toMillis()
+      );
 
     Recorder java = new Recorder();
     GatewayLeaseService lease = lease(java);
@@ -132,7 +142,9 @@ class GatewayLeaseIT {
     // consumed would have relayed frames the other implementation also
     // relayed.
     assertThat(java.events).isEmpty();
-    assertThat(redis.opsForZSet().size(GatewayLease.holdersKey("java"))).isZero();
+    assertThat(
+      redis.opsForZSet().size(GatewayLease.holdersKey("java"))
+    ).isZero();
   }
 
   @Test
@@ -140,15 +152,22 @@ class GatewayLeaseIT {
     // The pruning half. Without it a Node pod that was SIGKILLed — no
     // shutdown hook, so no ZREM — would hold the Java side down until
     // something else removed its entry.
-    redis.opsForZSet()
-        .add(GatewayLease.holdersKey("node"), "node-gone:7:00", System.currentTimeMillis() - 1);
+    redis
+      .opsForZSet()
+      .add(
+        GatewayLease.holdersKey("node"),
+        "node-gone:7:00",
+        System.currentTimeMillis() - 1
+      );
 
     Recorder java = new Recorder();
     GatewayLeaseService lease = lease(java);
     lease.beat();
 
     assertThat(lease.isActive()).isTrue();
-    assertThat(redis.opsForZSet().size(GatewayLease.holdersKey("node"))).isZero();
+    assertThat(
+      redis.opsForZSet().size(GatewayLease.holdersKey("node"))
+    ).isZero();
   }
 
   @Test
@@ -156,13 +175,17 @@ class GatewayLeaseIT {
     Recorder java = new Recorder();
     GatewayLeaseService lease = lease(java);
     lease.beat();
-    assertThat(redis.opsForZSet().size(GatewayLease.holdersKey("java"))).isEqualTo(1);
+    assertThat(
+      redis.opsForZSet().size(GatewayLease.holdersKey("java"))
+    ).isEqualTo(1);
 
     lease.onShutdown();
     leases.clear();
 
     assertThat(java.events).containsExactly("activate", "deactivate");
-    assertThat(redis.opsForZSet().size(GatewayLease.holdersKey("java"))).isZero();
+    assertThat(
+      redis.opsForZSet().size(GatewayLease.holdersKey("java"))
+    ).isZero();
   }
 
   @Test
@@ -186,12 +209,15 @@ class GatewayLeaseIT {
     Recorder java = new Recorder();
     GatewayLeaseService lease = lease(java);
     lease.beat();
-    var before = redis.opsForZSet().range(GatewayLease.holdersKey("java"), 0, -1);
+    var before = redis
+      .opsForZSet()
+      .range(GatewayLease.holdersKey("java"), 0, -1);
 
     lease.beat();
 
-    assertThat(redis.opsForZSet().range(GatewayLease.holdersKey("java"), 0, -1))
-        .isEqualTo(before);
+    assertThat(
+      redis.opsForZSet().range(GatewayLease.holdersKey("java"), 0, -1)
+    ).isEqualTo(before);
     assertThat(lease.isActive()).isTrue();
     assertThat(java.events).containsExactly("activate");
   }

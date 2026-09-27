@@ -15,11 +15,13 @@ public final class Subjects {
   public static final String AUDIT_RECORD = "audit.record";
 
   /** {@code BILLING_PATTERNS} in `libs/common`. */
-  public static final String BILLING_ENTITLEMENTS_CHANGED = "billing.entitlements_changed";
+  public static final String BILLING_ENTITLEMENTS_CHANGED =
+    "billing.entitlements_changed";
 
   /** {@code DOCUMENT_PATTERNS} in `libs/common`. */
   public static final String DOCUMENT_INDEXED = "document.indexed";
-  public static final String DOCUMENT_INGESTION_FAILED = "document.ingestion_failed";
+  public static final String DOCUMENT_INGESTION_FAILED =
+    "document.ingestion_failed";
   public static final String DOCUMENT_SCOPE_CHANGED = "document.scope_changed";
   public static final String DOCUMENT_UPLOADED = "document.uploaded";
 
@@ -27,23 +29,28 @@ public final class Subjects {
   public static final String EMAIL_INBOUND_REJECTED = "email.inbound_rejected";
 
   /** {@code NOTIFICATION_PATTERNS} in `libs/common`. */
-  public static final String NOTIFICATION_SEND_EMAIL = "notification.email.send";
+  public static final String NOTIFICATION_SEND_EMAIL =
+    "notification.email.send";
   public static final String NOTIFICATION_SEND_SMS = "notification.sms.send";
 
   /** {@code NOTIFICATION_REALTIME_PATTERNS} in `libs/common`. */
-  public static final String NOTIFICATION_REALTIME_CREATED = "notification.created";
+  public static final String NOTIFICATION_REALTIME_CREATED =
+    "notification.created";
   public static final String NOTIFICATION_REALTIME_READ = "notification.read";
-  public static final String NOTIFICATION_REALTIME_UPDATED = "notification.updated";
+  public static final String NOTIFICATION_REALTIME_UPDATED =
+    "notification.updated";
 
   /** {@code STORAGE_PATTERNS} in `libs/common`. */
-  public static final String STORAGE_OBJECT_SUPERSEDED = "storage.object.superseded";
+  public static final String STORAGE_OBJECT_SUPERSEDED =
+    "storage.object.superseded";
 
   /** {@code TICKET_PATTERNS} in `libs/common`. */
   public static final String TICKET_ASSIGNED = "ticket.assigned";
   public static final String TICKET_CREATED = "ticket.created";
   public static final String TICKET_ESCALATED = "ticket.escalated";
   public static final String TICKET_MESSAGE_CREATED = "ticket.message_created";
-  public static final String TICKET_MESSAGE_REDACTED = "ticket.message_redacted";
+  public static final String TICKET_MESSAGE_REDACTED =
+    "ticket.message_redacted";
   public static final String TICKET_MESSAGE_UPDATED = "ticket.message_updated";
   public static final String TICKET_REASSIGNED = "ticket.reassigned";
   public static final String TICKET_STATUS_CHANGED = "ticket.status_changed";

@@ -1,14 +1,5 @@
 package com.synapsedesk.gateway.attachments;
 
-import java.math.BigDecimal;
-import java.time.Instant;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
-import java.util.concurrent.TimeUnit;
-
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.RestController;
-
 import com.synapsedesk.gateway.auth.CurrentRequest;
 import com.synapsedesk.gateway.auth.CurrentUser;
 import com.synapsedesk.gateway.auth.RequestContext;
@@ -18,8 +9,14 @@ import com.synapsedesk.gateway.generated.model.CurrentUserResponseDto.Permission
 import com.synapsedesk.gateway.generated.model.DownloadDocumentResponseDto;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
 import com.synapsedesk.gateway.security.RequirePermission;
-
 import io.grpc.stub.MetadataUtils;
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.concurrent.TimeUnit;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.RestController;
 import synapsedesk.ticket.Message.DeleteAttachmentRequest;
 import synapsedesk.ticket.Message.DownloadAttachmentRequest;
 import synapsedesk.ticket.Message.DownloadAttachmentResponse;
@@ -44,45 +41,70 @@ public class AttachmentsController implements AttachmentsApi {
   private final MessageServiceGrpc.MessageServiceBlockingStub stub;
   private final CurrentUser currentUser;
 
-  public AttachmentsController(MessageServiceGrpc.MessageServiceBlockingStub stub, CurrentUser currentUser) {
+  public AttachmentsController(
+    MessageServiceGrpc.MessageServiceBlockingStub stub,
+    CurrentUser currentUser
+  ) {
     this.stub = stub;
     this.currentUser = currentUser;
   }
 
-  private MessageServiceGrpc.MessageServiceBlockingStub withMetadata(RequestContext context) {
-    return stub.withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
-        .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context)));
+  private MessageServiceGrpc.MessageServiceBlockingStub withMetadata(
+    RequestContext context
+  ) {
+    return stub
+      .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
+      .withInterceptors(
+        MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context))
+      );
   }
 
   @Override
-  public ResponseEntity<AuthControllerForgotPasswordV1202Response> attachmentsControllerDownloadV1(String id) {
+  public ResponseEntity<AuthControllerForgotPasswordV1202Response> attachmentsControllerDownloadV1(
+    String id
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    DownloadAttachmentResponse response =
-        withMetadata(context)
-            .downloadAttachment(DownloadAttachmentRequest.newBuilder().setAttachmentId(id).build());
+    DownloadAttachmentResponse response = withMetadata(
+      context
+    ).downloadAttachment(
+      DownloadAttachmentRequest.newBuilder().setAttachmentId(id).build()
+    );
 
     return ResponseEntity.ok(
-        new AuthControllerForgotPasswordV1202Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("OK")
-            .data(
-                new DownloadDocumentResponseDto(
-                    response.getDownloadUrl(), toOffsetDateTime(response.getExpiresAt()))));
+      new AuthControllerForgotPasswordV1202Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("OK")
+        .data(
+          new DownloadDocumentResponseDto(
+            response.getDownloadUrl(),
+            toOffsetDateTime(response.getExpiresAt())
+          )
+        )
+    );
   }
 
   @Override
   @RequirePermission(PermissionCodesEnum.TICKET_MESSAGE_MODERATE)
-  public ResponseEntity<AuthControllerForgotPasswordV1202Response> attachmentsControllerRemoveV1(String id) {
+  public ResponseEntity<AuthControllerForgotPasswordV1202Response> attachmentsControllerRemoveV1(
+    String id
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    withMetadata(context).deleteAttachment(DeleteAttachmentRequest.newBuilder().setAttachmentId(id).build());
+    withMetadata(context).deleteAttachment(
+      DeleteAttachmentRequest.newBuilder().setAttachmentId(id).build()
+    );
 
     return ResponseEntity.noContent().build();
   }
 
-  private static OffsetDateTime toOffsetDateTime(com.google.protobuf.Timestamp timestamp) {
-    return Instant.ofEpochSecond(timestamp.getSeconds(), timestamp.getNanos()).atOffset(ZoneOffset.UTC);
+  private static OffsetDateTime toOffsetDateTime(
+    com.google.protobuf.Timestamp timestamp
+  ) {
+    return Instant.ofEpochSecond(
+      timestamp.getSeconds(),
+      timestamp.getNanos()
+    ).atOffset(ZoneOffset.UTC);
   }
 }

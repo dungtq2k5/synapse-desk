@@ -22,6 +22,19 @@ node_modules/
 package-lock.json
 **/package-lock.json
 
+# Maven build output — `dist/`'s opposite number for the Java module, and it
+# only became load-bearing when `*.java`/`*.xml` entered the format globs.
+# Measured: ~470 generated sources under `target/generated-sources` (OpenAPI
+# models, protobuf and grpc stubs) plus surefire's XML reports, every one of
+# them rewritten by `./mvnw`. `**/generated/` above does NOT cover them — the
+# path component is `generated-sources`, not `generated` — and prettier does not
+# read `.gitignore`, so `apps/api-gateway-java/.gitignore` does not reach here.
+target/
+
+# pytest's JUnit report, written by `npm run test:py -- --junitxml=pytest.xml`.
+# Generated, and present on any machine that has run the Python suite once.
+**/pytest.xml
+
 # Secrets and env
 secrets/
 *.key

@@ -11,7 +11,6 @@ package com.synapsedesk.gateway.lease;
  * rather than leaving a reader to wonder whether a standby is really inert.
  */
 public interface LeaseRuntime {
-
   /** Start consuming. Called once, when the lease is claimed. */
   void activate();
 

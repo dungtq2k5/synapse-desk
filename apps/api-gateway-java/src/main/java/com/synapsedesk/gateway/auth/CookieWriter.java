@@ -26,7 +26,11 @@ public class CookieWriter {
   private final CookieProperties cookie;
   private final boolean isProduction;
 
-  public CookieWriter(JwtProperties jwt, CookieProperties cookie, RuntimeProperties runtime) {
+  public CookieWriter(
+    JwtProperties jwt,
+    CookieProperties cookie,
+    RuntimeProperties runtime
+  ) {
     this.jwt = jwt;
     this.cookie = cookie;
     this.isProduction = "production".equals(runtime.nodeEnv());
@@ -49,7 +53,12 @@ public class CookieWriter {
   }
 
   public void setTenantSelection(HttpServletResponse response, String token) {
-    set(response, jwt.tenantSelectionName(), token, cookie.tenantSelectionMaxAge());
+    set(
+      response,
+      jwt.tenantSelectionName(),
+      token,
+      cookie.tenantSelectionMaxAge()
+    );
   }
 
   public Optional<String> readRefreshToken(HttpServletRequest request) {
@@ -92,17 +101,23 @@ public class CookieWriter {
     clear(response, jwt.deviceTokenName());
   }
 
-  private void set(HttpServletResponse response, String name, String value, Duration maxAge) {
+  private void set(
+    HttpServletResponse response,
+    String name,
+    String value,
+    Duration maxAge
+  ) {
     response.addHeader(
-        "Set-Cookie",
-        ResponseCookie.from(name, value)
-            .httpOnly(true)
-            .secure(isProduction)
-            .sameSite(cookie.sameSite())
-            .path("/")
-            .maxAge(maxAge)
-            .build()
-            .toString());
+      "Set-Cookie",
+      ResponseCookie.from(name, value)
+        .httpOnly(true)
+        .secure(isProduction)
+        .sameSite(cookie.sameSite())
+        .path("/")
+        .maxAge(maxAge)
+        .build()
+        .toString()
+    );
   }
 
   /**
@@ -112,15 +127,16 @@ public class CookieWriter {
    */
   private void clear(HttpServletResponse response, String name) {
     response.addHeader(
-        "Set-Cookie",
-        ResponseCookie.from(name, "")
-            .httpOnly(true)
-            .secure(isProduction)
-            .sameSite(cookie.sameSite())
-            .path("/")
-            .maxAge(Duration.ZERO)
-            .build()
-            .toString());
+      "Set-Cookie",
+      ResponseCookie.from(name, "")
+        .httpOnly(true)
+        .secure(isProduction)
+        .sameSite(cookie.sameSite())
+        .path("/")
+        .maxAge(Duration.ZERO)
+        .build()
+        .toString()
+    );
   }
 
   private Optional<String> read(HttpServletRequest request, String name) {

@@ -1,10 +1,14 @@
 package com.synapsedesk.gateway.throttle;
 
+import com.synapsedesk.gateway.auth.CurrentUser;
+import com.synapsedesk.gateway.config.ThrottleProperties;
+import com.synapsedesk.gateway.web.CachedBodyRequest;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -13,13 +17,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.HandlerInterceptor;
-
-import com.synapsedesk.gateway.auth.CurrentUser;
-import com.synapsedesk.gateway.config.ThrottleProperties;
-import com.synapsedesk.gateway.web.CachedBodyRequest;
-
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -44,7 +41,9 @@ import tools.jackson.databind.ObjectMapper;
 @Component
 public class ThrottlerInterceptor implements HandlerInterceptor {
 
-  private static final Logger log = LoggerFactory.getLogger(ThrottlerInterceptor.class);
+  private static final Logger log = LoggerFactory.getLogger(
+    ThrottlerInterceptor.class
+  );
 
   private final StringRedisTemplate redis;
   private final ThrottleProperties throttle;
@@ -52,7 +51,11 @@ public class ThrottlerInterceptor implements HandlerInterceptor {
   private final ObjectMapper json;
 
   public ThrottlerInterceptor(
-      StringRedisTemplate redis, ThrottleProperties throttle, CurrentUser currentUser, ObjectMapper json) {
+    StringRedisTemplate redis,
+    ThrottleProperties throttle,
+    CurrentUser currentUser,
+    ObjectMapper json
+  ) {
     this.redis = redis;
     this.throttle = throttle;
     this.currentUser = currentUser;
@@ -60,14 +63,23 @@ public class ThrottlerInterceptor implements HandlerInterceptor {
   }
 
   @Override
-  public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
+  public boolean preHandle(
+    HttpServletRequest request,
+    HttpServletResponse response,
+    Object handler
+  ) {
     if (!(handler instanceof HandlerMethod handlerMethod)) {
       return true;
     }
 
-    List<String> tiers = hasAuthThrottle(handlerMethod) ? List.of(ThrottlerTiers.AUTH) : ThrottlerTiers.GENERAL;
+    List<String> tiers = hasAuthThrottle(handlerMethod)
+      ? List.of(ThrottlerTiers.AUTH)
+      : ThrottlerTiers.GENERAL;
     String tracker = tracker(request);
-    String route = handlerMethod.getBeanType().getSimpleName() + "." + handlerMethod.getMethod().getName();
+    String route =
+      handlerMethod.getBeanType().getSimpleName() +
+      "." +
+      handlerMethod.getMethod().getName();
 
     for (String tier : tiers) {
       evaluate(handlerMethod, tier, route, tracker, response);
@@ -77,7 +89,12 @@ public class ThrottlerInterceptor implements HandlerInterceptor {
   }
 
   private void evaluate(
-      HandlerMethod handlerMethod, String tier, String route, String tracker, HttpServletResponse response) {
+    HandlerMethod handlerMethod,
+    String tier,
+    String route,
+    String tracker,
+    HttpServletResponse response
+  ) {
     TierLimit limit = resolveLimit(handlerMethod, tier);
     String key = "throttle:" + route + ":" + tier + ":" + tracker;
 
@@ -89,7 +106,9 @@ public class ThrottlerInterceptor implements HandlerInterceptor {
       }
     } catch (RuntimeException redisFailure) {
       log.error(
-          "Rate-limit storage unavailable; allowing request unthrottled: {}", redisFailure.getMessage());
+        "Rate-limit storage unavailable; allowing request unthrottled: {}",
+        redisFailure.getMessage()
+      );
 
       return;
     }
@@ -101,39 +120,65 @@ public class ThrottlerInterceptor implements HandlerInterceptor {
       response.setHeader("Retry-After-" + tier, String.valueOf(resetSeconds));
 
       throw new ResponseStatusException(
-          HttpStatus.TOO_MANY_REQUESTS,
-          "Too many requests. Try again in " + describeWait(resetSeconds) + ".");
+        HttpStatus.TOO_MANY_REQUESTS,
+        "Too many requests. Try again in " + describeWait(resetSeconds) + "."
+      );
     }
 
-    response.setHeader("X-RateLimit-Limit-" + tier, String.valueOf(limit.limit()));
-    response.setHeader("X-RateLimit-Remaining-" + tier, String.valueOf(Math.max(0, limit.limit() - count)));
-    response.setHeader("X-RateLimit-Reset-" + tier, String.valueOf(resetSeconds));
+    response.setHeader(
+      "X-RateLimit-Limit-" + tier,
+      String.valueOf(limit.limit())
+    );
+    response.setHeader(
+      "X-RateLimit-Remaining-" + tier,
+      String.valueOf(Math.max(0, limit.limit() - count))
+    );
+    response.setHeader(
+      "X-RateLimit-Reset-" + tier,
+      String.valueOf(resetSeconds)
+    );
   }
 
   private long remainingTtlSeconds(String key, long ttlMs) {
     Long ttl = redis.getExpire(key, TimeUnit.SECONDS);
 
-    return (ttl == null || ttl < 0) ? Math.max(1, ttlMs / 1000) : ttl;
+    return ttl == null || ttl < 0 ? Math.max(1, ttlMs / 1000) : ttl;
   }
 
   private TierLimit resolveLimit(HandlerMethod handlerMethod, String tier) {
-    ThrottleOverride override = handlerMethod.getMethodAnnotation(ThrottleOverride.class);
+    ThrottleOverride override = handlerMethod.getMethodAnnotation(
+      ThrottleOverride.class
+    );
     if (override != null && override.tier().equals(tier)) {
       return new TierLimit(override.ttlMs(), override.limit());
     }
 
     return switch (tier) {
-      case ThrottlerTiers.SHORT -> new TierLimit(throttle.shortTtl(), throttle.shortLimit());
-      case ThrottlerTiers.MEDIUM -> new TierLimit(throttle.mediumTtl(), throttle.mediumLimit());
-      case ThrottlerTiers.LONG -> new TierLimit(throttle.longTtl(), throttle.longLimit());
-      case ThrottlerTiers.AUTH -> new TierLimit(throttle.authTtl(), throttle.authLimit());
+      case ThrottlerTiers.SHORT -> new TierLimit(
+        throttle.shortTtl(),
+        throttle.shortLimit()
+      );
+      case ThrottlerTiers.MEDIUM -> new TierLimit(
+        throttle.mediumTtl(),
+        throttle.mediumLimit()
+      );
+      case ThrottlerTiers.LONG -> new TierLimit(
+        throttle.longTtl(),
+        throttle.longLimit()
+      );
+      case ThrottlerTiers.AUTH -> new TierLimit(
+        throttle.authTtl(),
+        throttle.authLimit()
+      );
       default -> throw new IllegalStateException("Unknown tier: " + tier);
     };
   }
 
   private static boolean hasAuthThrottle(HandlerMethod handlerMethod) {
-    return handlerMethod.getMethodAnnotation(AuthThrottle.class) != null
-        || handlerMethod.getBeanType().getAnnotation(AuthThrottle.class) != null;
+    return (
+      handlerMethod.getMethodAnnotation(AuthThrottle.class) != null ||
+      handlerMethod.getBeanType().getAnnotation(AuthThrottle.class) != null
+    );
   }
 
   /**
@@ -185,8 +230,8 @@ public class ThrottlerInterceptor implements HandlerInterceptor {
       JsonNode email = node.get("email");
 
       return email != null && email.isString() && !email.asString().isEmpty()
-          ? email.asString().trim().toLowerCase()
-          : null;
+        ? email.asString().trim().toLowerCase()
+        : null;
     } catch (RuntimeException malformed) {
       return null;
     }

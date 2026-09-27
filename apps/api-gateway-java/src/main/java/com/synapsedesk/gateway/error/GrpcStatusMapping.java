@@ -28,10 +28,13 @@ public final class GrpcStatusMapping {
   private GrpcStatusMapping() {}
 
   /** The same marker `withHttpStatus` writes, and the same 100–599 guard. */
-  private static final Pattern MARKER = Pattern.compile("^\\[http:(\\d{3})]\\s*");
+  private static final Pattern MARKER = Pattern.compile(
+    "^\\[http:(\\d{3})]\\s*"
+  );
 
-  private static final Map<Status.Code, HttpStatus> TO_HTTP =
-      new EnumMap<>(Status.Code.class);
+  private static final Map<Status.Code, HttpStatus> TO_HTTP = new EnumMap<>(
+    Status.Code.class
+  );
 
   /**
    * What a client is told for a transport-class failure nobody vouched for.
@@ -39,8 +42,9 @@ public final class GrpcStatusMapping {
    * <p>No trailing punctuation here: {@link ErrorMessages#format} adds the
    * `!`, exactly as the Node side does.
    */
-  private static final Map<Status.Code, String> TRANSPORT =
-      new EnumMap<>(Status.Code.class);
+  private static final Map<Status.Code, String> TRANSPORT = new EnumMap<>(
+    Status.Code.class
+  );
 
   static {
     TO_HTTP.put(Status.Code.INVALID_ARGUMENT, HttpStatus.BAD_REQUEST);
@@ -58,13 +62,17 @@ public final class GrpcStatusMapping {
     TO_HTTP.put(Status.Code.DEADLINE_EXCEEDED, HttpStatus.GATEWAY_TIMEOUT);
 
     TRANSPORT.put(
-        Status.Code.UNAVAILABLE,
-        "A service this request depends on is unavailable. Try again shortly");
+      Status.Code.UNAVAILABLE,
+      "A service this request depends on is unavailable. Try again shortly"
+    );
     TRANSPORT.put(
-        Status.Code.DEADLINE_EXCEEDED,
-        "A service this request depends on took too long to answer. Try again shortly");
+      Status.Code.DEADLINE_EXCEEDED,
+      "A service this request depends on took too long to answer. Try again shortly"
+    );
     TRANSPORT.put(
-        Status.Code.CANCELLED, "The request was cancelled before a service answered. Try again");
+      Status.Code.CANCELLED,
+      "The request was cancelled before a service answered. Try again"
+    );
   }
 
   /** What the client is told, status and message, for one gRPC failure. */
@@ -81,11 +89,16 @@ public final class GrpcStatusMapping {
   public static ClientSafe resolve(Status.Code code, String description) {
     String text = description == null ? "" : description;
     Optional<Integer> marked = markedStatus(text);
-    HttpStatus mapped = TO_HTTP.getOrDefault(code, HttpStatus.INTERNAL_SERVER_ERROR);
+    HttpStatus mapped = TO_HTTP.getOrDefault(
+      code,
+      HttpStatus.INTERNAL_SERVER_ERROR
+    );
 
     if (marked.isPresent()) {
       return new ClientSafe(
-          HttpStatus.valueOf(marked.get()), ErrorMessages.format(stripMarker(text)));
+        HttpStatus.valueOf(marked.get()),
+        ErrorMessages.format(stripMarker(text))
+      );
     }
 
     String fixed = TRANSPORT.get(code);
@@ -108,7 +121,9 @@ public final class GrpcStatusMapping {
     // A marker outside the plausible range is ordinary text, not an
     // instruction: a message that happens to start with `[http:999]` must not
     // be able to choose its own status code.
-    return status < 100 || status > 599 ? Optional.empty() : Optional.of(status);
+    return status < 100 || status > 599
+      ? Optional.empty()
+      : Optional.of(status);
   }
 
   private static String stripMarker(String message) {

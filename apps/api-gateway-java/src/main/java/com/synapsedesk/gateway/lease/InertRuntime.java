@@ -27,7 +27,9 @@ public class InertRuntime {
     return new LeaseRuntime() {
       @Override
       public void activate() {
-        LOG.info("Lease claimed; nothing to start yet (no NATS consumer, no socket server)");
+        LOG.info(
+          "Lease claimed; nothing to start yet (no NATS consumer, no socket server)"
+        );
       }
 
       @Override

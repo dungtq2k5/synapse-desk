@@ -2,6 +2,7 @@ package com.synapsedesk.gateway.metrics;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.synapsedesk.gateway.HttpProbe;
 import com.synapsedesk.gateway.config.SharedEnvironmentInitializer;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -18,9 +19,8 @@ import java.util.regex.Pattern;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.beans.factory.annotation.Value;
-import com.synapsedesk.gateway.HttpProbe;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ContextConfiguration;
 
 /**
@@ -44,19 +44,25 @@ import org.springframework.test.context.ContextConfiguration;
 // inherit, so this is a gap in the test's synthetic environment rather than
 // in the configuration. A fixed port would also collide between suites.
 @SpringBootTest(
-    webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-    properties = "management.server.port=0")
+  webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+  properties = "management.server.port=0"
+)
 @ContextConfiguration(initializers = SharedEnvironmentInitializer.class)
 class MetricsSeriesContractTest {
 
   /** The Node registry, read where it lives. */
-  private static final Path NODE_REGISTRY =
-      Path.of("../api-gateway/src/modules/metrics/metrics.registry.ts");
+  private static final Path NODE_REGISTRY = Path.of(
+    "../api-gateway/src/modules/metrics/metrics.registry.ts"
+  );
 
   private static final Pattern NAME = Pattern.compile("name:\\s*'([a-z_]+)'");
-  private static final Pattern LABELS = Pattern.compile("labelNames:\\s*\\[([^\\]]*)]");
+  private static final Pattern LABELS = Pattern.compile(
+    "labelNames:\\s*\\[([^\\]]*)]"
+  );
 
-  @Autowired private GatewayMetrics metrics;
+  @Autowired
+  private GatewayMetrics metrics;
+
   @Value("${local.management.port}")
   private int managementPort;
 
@@ -84,7 +90,9 @@ class MetricsSeriesContractTest {
     assertThat(java.keySet()).isEqualTo(node.keySet());
 
     for (String series : new TreeSet<>(node.keySet())) {
-      assertThat(java.get(series)).as("labels of %s", series).isEqualTo(node.get(series));
+      assertThat(java.get(series))
+        .as("labels of %s", series)
+        .isEqualTo(node.get(series));
     }
   }
 
@@ -98,7 +106,9 @@ class MetricsSeriesContractTest {
     Map<String, Set<String>> node = nodeRegistry();
     Map<String, Set<String>> declared = new LinkedHashMap<>();
 
-    PublishedSeries.LABELS.forEach((series, labels) -> declared.put(series, new TreeSet<>(labels)));
+    PublishedSeries.LABELS.forEach((series, labels) ->
+      declared.put(series, new TreeSet<>(labels))
+    );
 
     assertThat(declared).isEqualTo(node);
   }
@@ -123,10 +133,14 @@ class MetricsSeriesContractTest {
     // returns nothing while the series still exists.
     String scrape = scrape();
 
-    for (double boundary : PublishedSeries.BUCKETS.get(PublishedSeries.HTTP_DURATION)) {
+    for (double boundary : PublishedSeries.BUCKETS.get(
+      PublishedSeries.HTTP_DURATION
+    )) {
       assertThat(scrape)
-          .as("bucket le=%s", boundary)
-          .containsPattern("http_request_duration_seconds_bucket\\{[^}]*le=\"" + boundary + "\"");
+        .as("bucket le=%s", boundary)
+        .containsPattern(
+          "http_request_duration_seconds_bucket\\{[^}]*le=\"" + boundary + "\""
+        );
     }
   }
 
@@ -160,7 +174,9 @@ class MetricsSeriesContractTest {
       String family = family(matcher.group(1));
       Set<String> labels = new TreeSet<>();
 
-      for (String pair : matcher.group(3) == null ? new String[0] : matcher.group(3).split(",")) {
+      for (String pair : matcher.group(3) == null
+        ? new String[0]
+        : matcher.group(3).split(",")) {
         String label = pair.split("=")[0].trim();
         // `le` is the histogram's own bucket label, not one this gateway
         // declares — Node's registry does not list it either.
@@ -169,7 +185,9 @@ class MetricsSeriesContractTest {
         }
       }
 
-      found.computeIfAbsent(family, key -> new LinkedHashSet<>()).addAll(labels);
+      found
+        .computeIfAbsent(family, key -> new LinkedHashSet<>())
+        .addAll(labels);
     }
 
     return found;
@@ -185,7 +203,10 @@ class MetricsSeriesContractTest {
    */
   private String family(String name) {
     for (String suffix : List.of("_bucket", "_sum", "_count", "_max")) {
-      if (name.endsWith(suffix) && PublishedSeries.LABELS.containsKey(trim(name, suffix))) {
+      if (
+        name.endsWith(suffix) &&
+        PublishedSeries.LABELS.containsKey(trim(name, suffix))
+      ) {
         return trim(name, suffix);
       }
     }
@@ -209,7 +230,9 @@ class MetricsSeriesContractTest {
       Set<String> found = new TreeSet<>();
 
       while (labels.find()) {
-        if (labels.start() > names.end() && labels.start() - names.end() < 400) {
+        if (
+          labels.start() > names.end() && labels.start() - names.end() < 400
+        ) {
           for (String label : labels.group(1).split(",")) {
             String cleaned = label.trim().replaceAll("['\"]", "");
             if (!cleaned.isEmpty()) {

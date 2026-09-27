@@ -22,10 +22,20 @@ import java.time.Instant;
  * @param error one message, ending in a single `!`
  */
 public record ErrorEnvelope(
-    boolean success, int statusCode, String path, String timestamp, String error) {
-
+  boolean success,
+  int statusCode,
+  String path,
+  String timestamp,
+  String error
+) {
   /** Builds the envelope for one failure. */
   public static ErrorEnvelope of(int statusCode, String path, String message) {
-    return new ErrorEnvelope(false, statusCode, path, Instant.now().toString(), message);
+    return new ErrorEnvelope(
+      false,
+      statusCode,
+      path,
+      Instant.now().toString(),
+      message
+    );
   }
 }

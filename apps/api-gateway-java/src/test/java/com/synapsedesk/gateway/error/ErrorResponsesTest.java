@@ -34,10 +34,12 @@ import org.springframework.web.bind.annotation.RestController;
  * invisible from the assertions alone.
  */
 @SpringBootTest(
-    webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-    properties = "management.server.port=0")
+  webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+  properties = "management.server.port=0"
+)
 @org.springframework.test.context.ContextConfiguration(
-    initializers = SharedEnvironmentInitializer.class)
+  initializers = SharedEnvironmentInitializer.class
+)
 @Import(ErrorResponsesTest.Probes.class)
 class ErrorResponsesTest {
 
@@ -58,7 +60,9 @@ class ErrorResponsesTest {
      * OpenAPI document was corrected to say; this probe mirrors that.
      */
     record Credentials(
-        @NotNull @Email String email, @NotNull @NotBlank String password) {}
+      @NotNull @Email String email,
+      @NotNull @NotBlank String password
+    ) {}
 
     @PostMapping("/probe/validated")
     String validated(@Valid @RequestBody Credentials body) {
@@ -68,14 +72,19 @@ class ErrorResponsesTest {
     @PostMapping("/probe/peer-down")
     String peerDown() {
       throw new StatusRuntimeException(
-          Status.UNAVAILABLE.withDescription(
-              "No connection established to localhost:59999"));
+        Status.UNAVAILABLE.withDescription(
+          "No connection established to localhost:59999"
+        )
+      );
     }
 
     @PostMapping("/probe/marked")
     String marked() {
       throw new StatusRuntimeException(
-          Status.INTERNAL.withDescription("[http:402] Your plan does not include this"));
+        Status.INTERNAL.withDescription(
+          "[http:402] Your plan does not include this"
+        )
+      );
     }
   }
 
@@ -84,14 +93,21 @@ class ErrorResponsesTest {
     Map<String, Object> body = response.json();
 
     assertThat(response.status()).isEqualTo(status);
-    assertThat(body).containsEntry("success", false).containsEntry("statusCode", status);
+    assertThat(body)
+      .containsEntry("success", false)
+      .containsEntry("statusCode", status);
     assertThat(body).containsEntry("path", path);
     assertThat(body.get("timestamp")).asString().isNotEmpty();
     assertThat(body.get("error")).asString().endsWith("!");
     // One string, never an array — the P3 capture's first property.
     assertThat(body.get("error")).isInstanceOf(String.class);
-    assertThat(new java.util.ArrayList<>(body.keySet()))
-        .containsExactly("success", "statusCode", "path", "timestamp", "error");
+    assertThat(new java.util.ArrayList<>(body.keySet())).containsExactly(
+      "success",
+      "statusCode",
+      "path",
+      "timestamp",
+      "error"
+    );
   }
 
   @Test
@@ -101,7 +117,9 @@ class ErrorResponsesTest {
     HttpProbe response = HttpProbe.get(port, "/api/v1/does-not-exist");
 
     assertEnvelope(response, 404, "/api/v1/does-not-exist");
-    assertThat(response.json().get("error")).isEqualTo("Cannot GET /api/v1/does-not-exist!");
+    assertThat(response.json().get("error")).isEqualTo(
+      "Cannot GET /api/v1/does-not-exist!"
+    );
   }
 
   @Test
@@ -110,8 +128,9 @@ class ErrorResponsesTest {
     HttpProbe response = HttpProbe.post(port, "/probe/peer-down", "{}");
 
     assertEnvelope(response, 503, "/probe/peer-down");
-    assertThat(response.json().get("error"))
-        .isEqualTo("A service this request depends on is unavailable. Try again shortly!");
+    assertThat(response.json().get("error")).isEqualTo(
+      "A service this request depends on is unavailable. Try again shortly!"
+    );
     assertThat(response.body()).doesNotContain("59999");
   }
 
@@ -120,7 +139,9 @@ class ErrorResponsesTest {
     HttpProbe response = HttpProbe.post(port, "/probe/marked", "{}");
 
     assertEnvelope(response, 402, "/probe/marked");
-    assertThat(response.json().get("error")).isEqualTo("Your plan does not include this!");
+    assertThat(response.json().get("error")).isEqualTo(
+      "Your plan does not include this!"
+    );
   }
 
   @Test
@@ -141,7 +162,9 @@ class ErrorResponsesTest {
     // writes "must be a well-formed email address" where class-validator
     // writes "must be an email", and pinning either would make one library's
     // wording the published contract.
-    assertThat(error.split(ErrorMessages.SEPARATOR)).hasSizeGreaterThanOrEqualTo(2);
+    assertThat(
+      error.split(ErrorMessages.SEPARATOR)
+    ).hasSizeGreaterThanOrEqualTo(2);
   }
 
   @Test
@@ -150,7 +173,9 @@ class ErrorResponsesTest {
     // `email` violation simply does not exist, the field name never reaches
     // the message, and "field names are the promise" quietly stops being
     // true — with every other assertion still green.
-    String error = (String) HttpProbe.post(port, "/probe/validated", "{}").json().get("error");
+    String error = (String) HttpProbe.post(port, "/probe/validated", "{}")
+      .json()
+      .get("error");
 
     assertThat(error).contains("email");
   }
@@ -168,11 +193,16 @@ class ErrorResponsesTest {
   void anUnsupportedContentTypeIsOpaque() {
     // OPAQUE for the same reason, one layer out: the refusal is the
     // framework's, and Express and Spring word it differently.
-    HttpProbe response =
-        HttpProbe.post(port, "/probe/validated", "not json", "text/plain");
+    HttpProbe response = HttpProbe.post(
+      port,
+      "/probe/validated",
+      "not json",
+      "text/plain"
+    );
 
-    assertThat(response.status())
-        .isEqualTo(HttpStatus.UNSUPPORTED_MEDIA_TYPE.value());
+    assertThat(response.status()).isEqualTo(
+      HttpStatus.UNSUPPORTED_MEDIA_TYPE.value()
+    );
     assertEnvelope(response, 415, "/probe/validated");
   }
 }

@@ -41,8 +41,9 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * it resolves arguments after the security filters.
  */
 @SpringBootTest(
-    webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-    properties = "management.server.port=0")
+  webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+  properties = "management.server.port=0"
+)
 @ContextConfiguration(initializers = SharedEnvironmentInitializer.class)
 @Import(BodyBeforeAuthTest.StandInAuth.class)
 class BodyBeforeAuthTest {
@@ -75,7 +76,7 @@ class BodyBeforeAuthTest {
     @Bean
     FilterRegistrationBean<OncePerRequestFilter> refuseEveryRequest() {
       FilterRegistrationBean<OncePerRequestFilter> registration =
-          new FilterRegistrationBean<>(standIn());
+        new FilterRegistrationBean<>(standIn());
       registration.setOrder(Ordered.HIGHEST_PRECEDENCE + 20);
 
       return registration;
@@ -85,12 +86,16 @@ class BodyBeforeAuthTest {
       return new OncePerRequestFilter() {
         @Override
         protected void doFilterInternal(
-            HttpServletRequest request, HttpServletResponse response, FilterChain chain)
-            throws ServletException, IOException {
+          HttpServletRequest request,
+          HttpServletResponse response,
+          FilterChain chain
+        ) throws ServletException, IOException {
           if (request.getRequestURI().startsWith("/probe/guarded")) {
             response.setStatus(HttpStatus.UNAUTHORIZED.value());
             response.setContentType("application/json");
-            response.getWriter().write("{\"success\":false,\"statusCode\":401}");
+            response
+              .getWriter()
+              .write("{\"success\":false,\"statusCode\":401}");
 
             return;
           }
@@ -116,10 +121,16 @@ class BodyBeforeAuthTest {
 
   @Test
   void aWrongContentTypeIsRefusedBeforeAuth() {
-    HttpProbe response =
-        HttpProbe.post(port, "/probe/guarded", "{\"name\":\"x\"}", "text/plain");
+    HttpProbe response = HttpProbe.post(
+      port,
+      "/probe/guarded",
+      "{\"name\":\"x\"}",
+      "text/plain"
+    );
 
-    assertThat(response.status()).isEqualTo(HttpStatus.UNSUPPORTED_MEDIA_TYPE.value());
+    assertThat(response.status()).isEqualTo(
+      HttpStatus.UNSUPPORTED_MEDIA_TYPE.value()
+    );
     assertThat(response.json()).containsEntry("path", "/probe/guarded");
   }
 
@@ -129,9 +140,15 @@ class BodyBeforeAuthTest {
     // two different refusals, and only the second had a row. A client that
     // sends bytes without saying what they are is not sending JSON, and
     // letting it through would hand an unparsed body to the handler.
-    HttpProbe response = HttpProbe.postWithoutContentType(port, "/probe/guarded", "{\"name\":\"x\"}");
+    HttpProbe response = HttpProbe.postWithoutContentType(
+      port,
+      "/probe/guarded",
+      "{\"name\":\"x\"}"
+    );
 
-    assertThat(response.status()).isEqualTo(HttpStatus.UNSUPPORTED_MEDIA_TYPE.value());
+    assertThat(response.status()).isEqualTo(
+      HttpStatus.UNSUPPORTED_MEDIA_TYPE.value()
+    );
   }
 
   @Test
@@ -158,8 +175,11 @@ class BodyBeforeAuthTest {
     // it would leave the handler binding an empty body, and the symptom would
     // be a validation error about fields the caller did send.
     Map<String, Object> ignored = Map.of();
-    HttpProbe response =
-        HttpProbe.post(port, "/probe/open", "{\"name\":\"kept\"}");
+    HttpProbe response = HttpProbe.post(
+      port,
+      "/probe/open",
+      "{\"name\":\"kept\"}"
+    );
 
     assertThat(ignored).isEmpty();
     assertThat(response.status()).isEqualTo(HttpStatus.OK.value());

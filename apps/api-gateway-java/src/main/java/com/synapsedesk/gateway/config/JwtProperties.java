@@ -29,19 +29,24 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties(prefix = "jwt")
 public record JwtProperties(
-    @NotBlank @Pattern(regexp = COOKIE_NAME, message = "is not a valid cookie name")
-        String accessName,
-    @NotBlank String accessPublicKeyPath,
-    @NotBlank @Pattern(regexp = COOKIE_NAME, message = "is not a valid cookie name")
-        String refreshName,
-    @NotBlank @Pattern(regexp = COOKIE_NAME, message = "is not a valid cookie name")
-        String twoFactorName,
-    @NotBlank String twoFactorPublicKeyPath,
-    @NotBlank @Pattern(regexp = COOKIE_NAME, message = "is not a valid cookie name")
-        String tenantSelectionName,
-    @NotBlank @Pattern(regexp = COOKIE_NAME, message = "is not a valid cookie name")
-        String deviceTokenName) {
-
+  @NotBlank
+  @Pattern(regexp = COOKIE_NAME, message = "is not a valid cookie name")
+  String accessName,
+  @NotBlank String accessPublicKeyPath,
+  @NotBlank
+  @Pattern(regexp = COOKIE_NAME, message = "is not a valid cookie name")
+  String refreshName,
+  @NotBlank
+  @Pattern(regexp = COOKIE_NAME, message = "is not a valid cookie name")
+  String twoFactorName,
+  @NotBlank String twoFactorPublicKeyPath,
+  @NotBlank
+  @Pattern(regexp = COOKIE_NAME, message = "is not a valid cookie name")
+  String tenantSelectionName,
+  @NotBlank
+  @Pattern(regexp = COOKIE_NAME, message = "is not a valid cookie name")
+  String deviceTokenName
+) {
   /** RFC 6265 {@code token}: the same character class the Node schema uses. */
   static final String COOKIE_NAME = "^[!#$%&'*+\\-.^_`|~0-9A-Za-z]+$";
 }

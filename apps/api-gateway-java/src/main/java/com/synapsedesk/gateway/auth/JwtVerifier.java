@@ -44,15 +44,15 @@ public class JwtVerifier {
   /** The access cookie's token. Rejects a 2FA challenge token, like `JwtStrategy.validate`. */
   public Optional<JwtPrincipal> verifyAccess(String token) {
     return verify(token, accessVerifier)
-        .filter(claims -> !isChallenge(claims))
-        .map(this::toPrincipal);
+      .filter(claims -> !isChallenge(claims))
+      .map(this::toPrincipal);
   }
 
   /** The 2FA cookie's token. Rejects anything NOT marked as a challenge. */
   public Optional<JwtPrincipal> verifyTwoFactor(String token) {
     return verify(token, twoFactorVerifier)
-        .filter(this::isChallenge)
-        .map(this::toPrincipal);
+      .filter(this::isChallenge)
+      .map(this::toPrincipal);
   }
 
   private Optional<JWTClaimsSet> verify(String token, JWSVerifier verifier) {
@@ -83,31 +83,33 @@ public class JwtVerifier {
   @SuppressWarnings("unchecked")
   private JwtPrincipal toPrincipal(JWTClaimsSet claims) {
     return new JwtPrincipal(
-        claims.getSubject(),
-        (String) claims.getClaim("organizationId"),
-        Boolean.TRUE.equals(claims.getClaim("isSuperAdmin")),
-        (List<String>) claims.getClaim("departmentIds"),
-        (List<String>) claims.getClaim("permissionCodes"),
-        Boolean.TRUE.equals(claims.getClaim("isEmailVerified")),
-        isChallenge(claims));
+      claims.getSubject(),
+      (String) claims.getClaim("organizationId"),
+      Boolean.TRUE.equals(claims.getClaim("isSuperAdmin")),
+      (List<String>) claims.getClaim("departmentIds"),
+      (List<String>) claims.getClaim("permissionCodes"),
+      Boolean.TRUE.equals(claims.getClaim("isEmailVerified")),
+      isChallenge(claims)
+    );
   }
 
   /**
    * Reads a PEM public key (`-----BEGIN PUBLIC KEY-----`) exactly as
    * `readFileSync(...)` hands Node's `jsonwebtoken` the raw bytes.
    */
-  private static JWSVerifier verifierFor(String path) throws IOException, JOSEException {
+  private static JWSVerifier verifierFor(String path)
+    throws IOException, JOSEException {
     String pem = Files.readString(resolve(path));
-    String base64 =
-        pem.replace("-----BEGIN PUBLIC KEY-----", "")
-            .replace("-----END PUBLIC KEY-----", "")
-            .replaceAll("\\s", "");
+    String base64 = pem
+      .replace("-----BEGIN PUBLIC KEY-----", "")
+      .replace("-----END PUBLIC KEY-----", "")
+      .replaceAll("\\s", "");
 
     byte[] der = Base64.getDecoder().decode(base64);
     try {
-      RSAPublicKey key =
-          (RSAPublicKey)
-              KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(der));
+      RSAPublicKey key = (RSAPublicKey) KeyFactory.getInstance(
+        "RSA"
+      ).generatePublic(new X509EncodedKeySpec(der));
 
       return new RSASSAVerifier(key);
     } catch (java.security.GeneralSecurityException notAnRsaKey) {
@@ -144,18 +146,20 @@ public class JwtVerifier {
    * module should have to accommodate forever.
    */
   private static Path resolve(String path) {
-    List<Path> candidates =
-        List.of(
-            Path.of(path),
-            Path.of("../api-gateway").resolve(path).normalize(),
-            Path.of("../..").resolve(path).normalize());
+    List<Path> candidates = List.of(
+      Path.of(path),
+      Path.of("../api-gateway").resolve(path).normalize(),
+      Path.of("../..").resolve(path).normalize()
+    );
 
-    return candidates.stream()
-        .filter(Files::exists)
-        .findFirst()
-        .orElseThrow(
-            () ->
-                new java.io.UncheckedIOException(
-                    new java.io.IOException("none of " + candidates + " exists")));
+    return candidates
+      .stream()
+      .filter(Files::exists)
+      .findFirst()
+      .orElseThrow(() ->
+        new java.io.UncheckedIOException(
+          new java.io.IOException("none of " + candidates + " exists")
+        )
+      );
   }
 }

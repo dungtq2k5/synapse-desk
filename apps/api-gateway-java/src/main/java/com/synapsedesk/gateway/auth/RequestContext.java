@@ -10,15 +10,15 @@ import java.util.List;
  * `RequestContextService.fromRequest` rejecting a 2FA-pending payload.
  */
 public record RequestContext(
-    String sub,
-    String organizationId,
-    boolean isSuperAdmin,
-    List<String> departmentIds,
-    List<String> permissionCodes,
-    boolean isEmailVerified,
-    String ip,
-    String userAgent) {
-
+  String sub,
+  String organizationId,
+  boolean isSuperAdmin,
+  List<String> departmentIds,
+  List<String> permissionCodes,
+  boolean isEmailVerified,
+  String ip,
+  String userAgent
+) {
   public RequestOrigin origin() {
     return new RequestOrigin(ip, userAgent);
   }

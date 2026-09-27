@@ -58,125 +58,159 @@ public class OtpController implements OtpApi {
   private final OtpServiceGrpc.OtpServiceBlockingStub stub;
   private final CurrentUser currentUser;
 
-  public OtpController(OtpServiceGrpc.OtpServiceBlockingStub stub, CurrentUser currentUser) {
+  public OtpController(
+    OtpServiceGrpc.OtpServiceBlockingStub stub,
+    CurrentUser currentUser
+  ) {
     this.stub = stub;
     this.currentUser = currentUser;
   }
 
-  private OtpServiceGrpc.OtpServiceBlockingStub withMetadata(RequestContext context) {
-    return stub.withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
-        .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context)));
+  private OtpServiceGrpc.OtpServiceBlockingStub withMetadata(
+    RequestContext context
+  ) {
+    return stub
+      .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
+      .withInterceptors(
+        MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context))
+      );
   }
 
   @Override
-  @AuthThrottle(ttlMs = RouteThrottle.OTP_REQUEST_TTL_MS, limit = RouteThrottle.OTP_REQUEST_LIMIT)
+  @AuthThrottle(
+    ttlMs = RouteThrottle.OTP_REQUEST_TTL_MS,
+    limit = RouteThrottle.OTP_REQUEST_LIMIT
+  )
   public ResponseEntity<OtpControllerRequestEmailVerificationV1202Response> otpControllerRequestEmailVerificationV1() {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    RequestOtpResponse response =
-        withMetadata(context)
-            .requestEmailVerification(
-                RequestEmailVerificationRequest.newBuilder().setUserId(context.sub()).build());
+    RequestOtpResponse response = withMetadata(
+      context
+    ).requestEmailVerification(
+      RequestEmailVerificationRequest.newBuilder()
+        .setUserId(context.sub())
+        .build()
+    );
 
-    return ResponseEntity.status(202)
-        .body(
-            new OtpControllerRequestEmailVerificationV1202Response()
-                .success(true)
-                .statusCode(BigDecimal.valueOf(202))
-                .message("OK")
-                .data(toRequestOtpDto(response)));
+    return ResponseEntity.status(202).body(
+      new OtpControllerRequestEmailVerificationV1202Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(202))
+        .message("OK")
+        .data(toRequestOtpDto(response))
+    );
   }
 
   @Override
-  @AuthThrottle(ttlMs = RouteThrottle.OTP_VERIFY_TTL_MS, limit = RouteThrottle.OTP_VERIFY_LIMIT)
-  public ResponseEntity<OtpControllerVerifyEmailV1200Response> otpControllerVerifyEmailV1(VerifyOtpDto verifyOtpDto) {
+  @AuthThrottle(
+    ttlMs = RouteThrottle.OTP_VERIFY_TTL_MS,
+    limit = RouteThrottle.OTP_VERIFY_LIMIT
+  )
+  public ResponseEntity<OtpControllerVerifyEmailV1200Response> otpControllerVerifyEmailV1(
+    VerifyOtpDto verifyOtpDto
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    VerifyOtpResponse response =
-        withMetadata(context)
-            .verifyEmail(
-                VerifyOtpRequest.newBuilder()
-                    .setUserId(context.sub())
-                    .setCode(verifyOtpDto.getCode())
-                    .build());
+    VerifyOtpResponse response = withMetadata(context).verifyEmail(
+      VerifyOtpRequest.newBuilder()
+        .setUserId(context.sub())
+        .setCode(verifyOtpDto.getCode())
+        .build()
+    );
 
     return ResponseEntity.ok(
-        new OtpControllerVerifyEmailV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("OK")
-            .data(toVerifyOtpDto(response)));
+      new OtpControllerVerifyEmailV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("OK")
+        .data(toVerifyOtpDto(response))
+    );
   }
 
   @Override
-  @AuthThrottle(ttlMs = RouteThrottle.OTP_REQUEST_TTL_MS, limit = RouteThrottle.OTP_REQUEST_LIMIT)
+  @AuthThrottle(
+    ttlMs = RouteThrottle.OTP_REQUEST_TTL_MS,
+    limit = RouteThrottle.OTP_REQUEST_LIMIT
+  )
   public ResponseEntity<OtpControllerRequestEmailVerificationV1202Response> otpControllerRequestPhoneVerificationV1(
-      RequestPhoneVerificationDto requestPhoneVerificationDto) {
+    RequestPhoneVerificationDto requestPhoneVerificationDto
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    RequestOtpResponse response =
-        withMetadata(context)
-            .requestPhoneVerification(
-                RequestPhoneVerificationRequest.newBuilder()
-                    .setUserId(context.sub())
-                    .setPhoneNumber(requestPhoneVerificationDto.getPhoneNumber())
-                    .build());
+    RequestOtpResponse response = withMetadata(
+      context
+    ).requestPhoneVerification(
+      RequestPhoneVerificationRequest.newBuilder()
+        .setUserId(context.sub())
+        .setPhoneNumber(requestPhoneVerificationDto.getPhoneNumber())
+        .build()
+    );
 
-    return ResponseEntity.status(202)
-        .body(
-            new OtpControllerRequestEmailVerificationV1202Response()
-                .success(true)
-                .statusCode(BigDecimal.valueOf(202))
-                .message("OK")
-                .data(toRequestOtpDto(response)));
+    return ResponseEntity.status(202).body(
+      new OtpControllerRequestEmailVerificationV1202Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(202))
+        .message("OK")
+        .data(toRequestOtpDto(response))
+    );
   }
 
   @Override
-  @AuthThrottle(ttlMs = RouteThrottle.OTP_VERIFY_TTL_MS, limit = RouteThrottle.OTP_VERIFY_LIMIT)
-  public ResponseEntity<OtpControllerVerifyEmailV1200Response> otpControllerVerifyPhoneV1(VerifyOtpDto verifyOtpDto) {
+  @AuthThrottle(
+    ttlMs = RouteThrottle.OTP_VERIFY_TTL_MS,
+    limit = RouteThrottle.OTP_VERIFY_LIMIT
+  )
+  public ResponseEntity<OtpControllerVerifyEmailV1200Response> otpControllerVerifyPhoneV1(
+    VerifyOtpDto verifyOtpDto
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    VerifyOtpResponse response =
-        withMetadata(context)
-            .verifyPhone(
-                VerifyOtpRequest.newBuilder()
-                    .setUserId(context.sub())
-                    .setCode(verifyOtpDto.getCode())
-                    .build());
+    VerifyOtpResponse response = withMetadata(context).verifyPhone(
+      VerifyOtpRequest.newBuilder()
+        .setUserId(context.sub())
+        .setCode(verifyOtpDto.getCode())
+        .build()
+    );
 
     return ResponseEntity.ok(
-        new OtpControllerVerifyEmailV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("OK")
-            .data(toVerifyOtpDto(response)));
+      new OtpControllerVerifyEmailV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("OK")
+        .data(toVerifyOtpDto(response))
+    );
   }
 
   @Override
-  public ResponseEntity<OtpControllerGetOtpStatusV1200Response> otpControllerGetOtpStatusV1(String purpose) {
+  public ResponseEntity<OtpControllerGetOtpStatusV1200Response> otpControllerGetOtpStatusV1(
+    String purpose
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    OtpStatusResponse response =
-        withMetadata(context)
-            .getOtpStatus(
-                OtpStatusRequest.newBuilder()
-                    .setUserId(context.sub())
-                    .setPurpose(toProtoPurpose(purpose))
-                    .build());
+    OtpStatusResponse response = withMetadata(context).getOtpStatus(
+      OtpStatusRequest.newBuilder()
+        .setUserId(context.sub())
+        .setPurpose(toProtoPurpose(purpose))
+        .build()
+    );
 
-    OtpStatusResponseDto data =
-        new OtpStatusResponseDto()
-            .pending(response.getPending())
-            .target(response.hasTarget() ? response.getTarget() : null)
-            .expiresAt(response.hasExpiresAt() ? toOffsetDateTime(response.getExpiresAt()) : null)
-            .attemptsRemaining(BigDecimal.valueOf(response.getAttemptsRemaining()));
+    OtpStatusResponseDto data = new OtpStatusResponseDto()
+      .pending(response.getPending())
+      .target(response.hasTarget() ? response.getTarget() : null)
+      .expiresAt(
+        response.hasExpiresAt()
+          ? toOffsetDateTime(response.getExpiresAt())
+          : null
+      )
+      .attemptsRemaining(BigDecimal.valueOf(response.getAttemptsRemaining()));
 
     return ResponseEntity.ok(
-        new OtpControllerGetOtpStatusV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("OK")
-            .data(data));
+      new OtpControllerGetOtpStatusV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("OK")
+        .data(data)
+    );
   }
 
   /**
@@ -190,24 +224,35 @@ public class OtpController implements OtpApi {
       case "EMAIL_VERIFICATION" -> OtpPurpose.OTP_PURPOSE_EMAIL_VERIFICATION;
       case "PHONE_VERIFICATION" -> OtpPurpose.OTP_PURPOSE_PHONE_VERIFICATION;
       default -> throw new ResponseStatusException(
-          org.springframework.http.HttpStatus.BAD_REQUEST, "Invalid purpose: " + purpose);
+        org.springframework.http.HttpStatus.BAD_REQUEST,
+        "Invalid purpose: " + purpose
+      );
     };
   }
 
-  private static RequestOtpResponseDto toRequestOtpDto(RequestOtpResponse response) {
+  private static RequestOtpResponseDto toRequestOtpDto(
+    RequestOtpResponse response
+  ) {
     return new RequestOtpResponseDto()
-        .target(response.getTarget())
-        .expiresInMinutes(BigDecimal.valueOf(response.getExpiresInMinutes()));
+      .target(response.getTarget())
+      .expiresInMinutes(BigDecimal.valueOf(response.getExpiresInMinutes()));
   }
 
-  private static VerifyOtpResponseDto toVerifyOtpDto(VerifyOtpResponse response) {
+  private static VerifyOtpResponseDto toVerifyOtpDto(
+    VerifyOtpResponse response
+  ) {
     return new VerifyOtpResponseDto()
-        .verified(response.getVerified())
-        .attemptsRemaining(BigDecimal.valueOf(response.getAttemptsRemaining()))
-        .mustRequestNewCode(response.getMustRequestNewCode());
+      .verified(response.getVerified())
+      .attemptsRemaining(BigDecimal.valueOf(response.getAttemptsRemaining()))
+      .mustRequestNewCode(response.getMustRequestNewCode());
   }
 
-  private static OffsetDateTime toOffsetDateTime(com.google.protobuf.Timestamp timestamp) {
-    return Instant.ofEpochSecond(timestamp.getSeconds(), timestamp.getNanos()).atOffset(ZoneOffset.UTC);
+  private static OffsetDateTime toOffsetDateTime(
+    com.google.protobuf.Timestamp timestamp
+  ) {
+    return Instant.ofEpochSecond(
+      timestamp.getSeconds(),
+      timestamp.getNanos()
+    ).atOffset(ZoneOffset.UTC);
   }
 }

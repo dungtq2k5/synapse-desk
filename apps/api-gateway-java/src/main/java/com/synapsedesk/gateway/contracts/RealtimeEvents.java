@@ -12,7 +12,8 @@ public final class RealtimeEvents {
   private RealtimeEvents() {}
 
   /** {@code CLIENT_EVENTS} in `libs/common`. */
-  public static final String CLIENT_EVENTS_AI_STREAM_CANCEL = "ai:stream:cancel";
+  public static final String CLIENT_EVENTS_AI_STREAM_CANCEL =
+    "ai:stream:cancel";
   public static final String CLIENT_EVENTS_MESSAGE_SEND = "message:send";
   public static final String CLIENT_EVENTS_PRESENCE_UPDATE = "presence:update";
   public static final String CLIENT_EVENTS_TICKET_JOIN = "ticket:join";
@@ -21,22 +22,35 @@ public final class RealtimeEvents {
   public static final String CLIENT_EVENTS_TYPING_STOP = "typing:stop";
 
   /** {@code REALTIME_EVENTS} in `libs/common`. */
-  public static final String REALTIME_EVENTS_AI_STREAM_ATTACHMENTS_SKIPPED = "ai:stream:attachments-skipped";
-  public static final String REALTIME_EVENTS_AI_STREAM_CHUNK = "ai:stream:chunk";
+  public static final String REALTIME_EVENTS_AI_STREAM_ATTACHMENTS_SKIPPED =
+    "ai:stream:attachments-skipped";
+  public static final String REALTIME_EVENTS_AI_STREAM_CHUNK =
+    "ai:stream:chunk";
   public static final String REALTIME_EVENTS_AI_STREAM_DONE = "ai:stream:done";
-  public static final String REALTIME_EVENTS_AI_STREAM_ERROR = "ai:stream:error";
-  public static final String REALTIME_EVENTS_CONNECTION_READY = "connection:ready";
-  public static final String REALTIME_EVENTS_DOCUMENT_FAILED = "document:failed";
-  public static final String REALTIME_EVENTS_DOCUMENT_INDEXED = "document:indexed";
-  public static final String REALTIME_EVENTS_MESSAGE_DELETED = "message:deleted";
+  public static final String REALTIME_EVENTS_AI_STREAM_ERROR =
+    "ai:stream:error";
+  public static final String REALTIME_EVENTS_CONNECTION_READY =
+    "connection:ready";
+  public static final String REALTIME_EVENTS_DOCUMENT_FAILED =
+    "document:failed";
+  public static final String REALTIME_EVENTS_DOCUMENT_INDEXED =
+    "document:indexed";
+  public static final String REALTIME_EVENTS_MESSAGE_DELETED =
+    "message:deleted";
   public static final String REALTIME_EVENTS_MESSAGE_NEW = "message:new";
-  public static final String REALTIME_EVENTS_MESSAGE_UPDATED = "message:updated";
-  public static final String REALTIME_EVENTS_NOTIFICATION_NEW = "notification:new";
-  public static final String REALTIME_EVENTS_NOTIFICATION_READ = "notification:read";
-  public static final String REALTIME_EVENTS_NOTIFICATION_UNREAD_COUNT = "notification:unread-count";
-  public static final String REALTIME_EVENTS_NOTIFICATION_UPDATED = "notification:updated";
+  public static final String REALTIME_EVENTS_MESSAGE_UPDATED =
+    "message:updated";
+  public static final String REALTIME_EVENTS_NOTIFICATION_NEW =
+    "notification:new";
+  public static final String REALTIME_EVENTS_NOTIFICATION_READ =
+    "notification:read";
+  public static final String REALTIME_EVENTS_NOTIFICATION_UNREAD_COUNT =
+    "notification:unread-count";
+  public static final String REALTIME_EVENTS_NOTIFICATION_UPDATED =
+    "notification:updated";
   public static final String REALTIME_EVENTS_PRESENCE = "presence";
-  public static final String REALTIME_EVENTS_TICKET_ASSIGNED = "ticket:assigned";
+  public static final String REALTIME_EVENTS_TICKET_ASSIGNED =
+    "ticket:assigned";
   public static final String REALTIME_EVENTS_TICKET_CREATED = "ticket:created";
   public static final String REALTIME_EVENTS_TICKET_JOINED = "ticket:joined";
   public static final String REALTIME_EVENTS_TICKET_UPDATED = "ticket:updated";

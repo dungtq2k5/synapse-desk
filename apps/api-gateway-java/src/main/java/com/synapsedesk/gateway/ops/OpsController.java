@@ -49,7 +49,11 @@ public class OpsController implements OpsApi {
   private final DrainState drain;
   private final List<ReadinessGate> gates;
 
-  public OpsController(RuntimeProperties runtime, DrainState drain, List<ReadinessGate> gates) {
+  public OpsController(
+    RuntimeProperties runtime,
+    DrainState drain,
+    List<ReadinessGate> gates
+  ) {
     this.runtime = runtime;
     this.drain = drain;
     this.gates = gates;
@@ -57,21 +61,24 @@ public class OpsController implements OpsApi {
 
   @Override
   public ResponseEntity<HealthControllerLiveness200Response> healthControllerLiveness() {
-    LivenessResponseDto data =
-        new LivenessResponseDto().status("ok").timestamp(OffsetDateTime.now());
+    LivenessResponseDto data = new LivenessResponseDto()
+      .status("ok")
+      .timestamp(OffsetDateTime.now());
 
     return ResponseEntity.ok(
-        new HealthControllerLiveness200Response()
-            .success(true)
-            .statusCode(OK)
-            .message("Healthy")
-            .data(data));
+      new HealthControllerLiveness200Response()
+        .success(true)
+        .statusCode(OK)
+        .message("Healthy")
+        .data(data)
+    );
   }
 
   @Override
   public ResponseEntity<HealthControllerReadiness200Response> healthControllerReadiness() {
     boolean draining = drain.isDraining();
-    ReadinessDependenciesResponseDto dependencies = new ReadinessDependenciesResponseDto();
+    ReadinessDependenciesResponseDto dependencies =
+      new ReadinessDependenciesResponseDto();
     boolean gatesReady = true;
 
     for (ReadinessGate gate : gates) {
@@ -81,39 +88,38 @@ public class OpsController implements OpsApi {
     }
 
     boolean ready = !draining && gatesReady;
-    ReadinessResponseDto data =
-        new ReadinessResponseDto()
-            .ready(ready)
-            .draining(draining)
-            .dependencies(dependencies)
-            .timestamp(OffsetDateTime.now());
+    ReadinessResponseDto data = new ReadinessResponseDto()
+      .ready(ready)
+      .draining(draining)
+      .dependencies(dependencies)
+      .timestamp(OffsetDateTime.now());
 
     HealthControllerReadiness200Response body =
-        new HealthControllerReadiness200Response()
-            .success(true)
-            .statusCode(ready ? OK : UNAVAILABLE)
-            .message(ready ? "Ready" : "Not ready")
-            .data(data);
+      new HealthControllerReadiness200Response()
+        .success(true)
+        .statusCode(ready ? OK : UNAVAILABLE)
+        .message(ready ? "Ready" : "Not ready")
+        .data(data);
 
     // A probe reads the STATUS LINE; the body is for a human reading a log.
     return ready
-        ? ResponseEntity.ok(body)
-        : ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(body);
+      ? ResponseEntity.ok(body)
+      : ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(body);
   }
 
   @Override
   public ResponseEntity<VersionControllerVersion200Response> versionControllerVersion() {
-    VersionResponseDto data =
-        new VersionResponseDto()
-            .version(runtime.appVersion())
-            .sha(runtime.buildSha())
-            .builtAt(runtime.buildTime());
+    VersionResponseDto data = new VersionResponseDto()
+      .version(runtime.appVersion())
+      .sha(runtime.buildSha())
+      .builtAt(runtime.buildTime());
 
     return ResponseEntity.ok(
-        new VersionControllerVersion200Response()
-            .success(true)
-            .statusCode(OK)
-            .message("Version")
-            .data(data));
+      new VersionControllerVersion200Response()
+        .success(true)
+        .statusCode(OK)
+        .message("Version")
+        .data(data)
+    );
   }
 }

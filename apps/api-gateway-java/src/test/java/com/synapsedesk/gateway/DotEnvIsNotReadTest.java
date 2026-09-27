@@ -51,9 +51,12 @@ class DotEnvIsNotReadTest {
   void springDoesNotReadDotEnvFiles() {
     assertThat(Files.exists(DOT_ENV)).isTrue();
 
-    SpringApplication application = new SpringApplication(GatewayApplication.class);
-    java.util.Map<String, Object> properties =
-        new java.util.HashMap<>(com.synapsedesk.gateway.config.SharedEnvironment.values());
+    SpringApplication application = new SpringApplication(
+      GatewayApplication.class
+    );
+    java.util.Map<String, Object> properties = new java.util.HashMap<>(
+      com.synapsedesk.gateway.config.SharedEnvironment.values()
+    );
     properties.put("spring.main.web-application-type", "none");
     properties.put("management.server.port", "0");
     application.setDefaultProperties(properties);

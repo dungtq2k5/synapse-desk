@@ -30,8 +30,9 @@ import org.springframework.data.redis.core.StringRedisTemplate;
  */
 class NodeAndJavaIT {
 
-  private static final Path NODE_MAIN =
-      Path.of("../api-gateway/dist/apps/api-gateway/src/main.js");
+  private static final Path NODE_MAIN = Path.of(
+    "../api-gateway/dist/apps/api-gateway/src/main.js"
+  );
 
   private StringRedisTemplate redis;
   private LettuceConnectionFactory connections;
@@ -47,13 +48,16 @@ class NodeAndJavaIT {
     // claimed" — which was true of the database Java was watching. The lease
     // excludes only within one keyspace, and nothing in the system checks
     // that the two implementations share one.
-    String url =
-        nodeEnvironment().getOrDefault("REDIS_URL", "redis://localhost:6379");
+    String url = nodeEnvironment().getOrDefault(
+      "REDIS_URL",
+      "redis://localhost:6379"
+    );
     java.net.URI uri = java.net.URI.create(url);
     RedisStandaloneConfiguration configuration =
-        new RedisStandaloneConfiguration(
-            uri.getHost() == null ? "localhost" : uri.getHost(),
-            uri.getPort() < 0 ? 6379 : uri.getPort());
+      new RedisStandaloneConfiguration(
+        uri.getHost() == null ? "localhost" : uri.getHost(),
+        uri.getPort() < 0 ? 6379 : uri.getPort()
+      );
 
     if (uri.getPath() != null && uri.getPath().length() > 1) {
       configuration.setDatabase(Integer.parseInt(uri.getPath().substring(1)));
@@ -89,20 +93,20 @@ class NodeAndJavaIT {
     // The Node gateway's own entry, written by its own lease — not a fixture.
     waitFor(() -> size("node") == 1, "the Node gateway to claim the lease");
 
-    GatewayLeaseService java =
-        new GatewayLeaseService(
-            redis,
-            new LeaseRuntime() {
-              @Override
-              public void activate() {
-                throw new AssertionError("Java activated while Node held the lease");
-              }
+    GatewayLeaseService java = new GatewayLeaseService(
+      redis,
+      new LeaseRuntime() {
+        @Override
+        public void activate() {
+          throw new AssertionError("Java activated while Node held the lease");
+        }
 
-              @Override
-              public void deactivate() {
-                // unreachable while the row passes
-              }
-            });
+        @Override
+        public void deactivate() {
+          // unreachable while the row passes
+        }
+      }
+    );
 
     java.beat();
 
@@ -121,7 +125,10 @@ class NodeAndJavaIT {
     node.destroy();
     waitFor(() -> size("node") == 0, "the Node gateway to release its entry");
 
-    GatewayLeaseService java = new GatewayLeaseService(redis, new NoopRuntime());
+    GatewayLeaseService java = new GatewayLeaseService(
+      redis,
+      new NoopRuntime()
+    );
     java.beat();
 
     assertThat(java.isActive()).isTrue();
@@ -129,6 +136,7 @@ class NodeAndJavaIT {
   }
 
   private static final class NoopRuntime implements LeaseRuntime {
+
     @Override
     public void activate() {}
 
@@ -140,16 +148,21 @@ class NodeAndJavaIT {
   private void startNodeGateway() throws Exception {
     if (!Files.exists(NODE_MAIN)) {
       throw new AssertionError(
-          NODE_MAIN.toAbsolutePath()
-              + " is absent. Build it: npx turbo run build --filter=@synapsedesk/api-gateway...");
+        NODE_MAIN.toAbsolutePath() +
+          " is absent. Build it: npx turbo run build --filter=@synapsedesk/api-gateway..."
+      );
     }
 
     Map<String, String> environment = new HashMap<>(nodeEnvironment());
-    ProcessBuilder builder =
-        new ProcessBuilder("node", "apps/api-gateway/dist/apps/api-gateway/src/main.js")
-            .directory(new File("../.."))
-            .redirectErrorStream(true)
-            .redirectOutput(ProcessBuilder.Redirect.to(new File("target/node-gateway.log")));
+    ProcessBuilder builder = new ProcessBuilder(
+      "node",
+      "apps/api-gateway/dist/apps/api-gateway/src/main.js"
+    )
+      .directory(new File("../.."))
+      .redirectErrorStream(true)
+      .redirectOutput(
+        ProcessBuilder.Redirect.to(new File("target/node-gateway.log"))
+      );
     builder.environment().putAll(environment);
 
     node = builder.start();
@@ -163,16 +176,20 @@ class NodeAndJavaIT {
   private Map<String, String> nodeEnvironment() throws Exception {
     Map<String, String> values = new HashMap<>();
 
-    for (String line : Files.readAllLines(Path.of("../api-gateway/.env.test"))) {
-      java.util.regex.Matcher matcher =
-          java.util.regex.Pattern.compile("^\\s*([A-Z][A-Z0-9_]*)\\s*=\\s*(.*?)\\s*$")
-              .matcher(line);
+    for (String line : Files.readAllLines(
+      Path.of("../api-gateway/.env.test")
+    )) {
+      java.util.regex.Matcher matcher = java.util.regex.Pattern.compile(
+        "^\\s*([A-Z][A-Z0-9_]*)\\s*=\\s*(.*?)\\s*$"
+      ).matcher(line);
 
       if (matcher.matches()) {
         String value = matcher.group(2);
-        if (value.length() >= 2
-            && ((value.startsWith("'") && value.endsWith("'"))
-                || (value.startsWith("\"") && value.endsWith("\"")))) {
+        if (
+          value.length() >= 2 &&
+          ((value.startsWith("'") && value.endsWith("'")) ||
+            (value.startsWith("\"") && value.endsWith("\"")))
+        ) {
           value = value.substring(1, value.length() - 1);
         }
         values.put(matcher.group(1), value);
@@ -189,13 +206,17 @@ class NodeAndJavaIT {
   }
 
   private long size(String implementation) {
-    Long size = redis.opsForZSet().size(GatewayLease.holdersKey(implementation));
+    Long size = redis
+      .opsForZSet()
+      .size(GatewayLease.holdersKey(implementation));
 
     return size == null ? 0 : size;
   }
 
-  private void waitFor(java.util.function.BooleanSupplier condition, String what)
-      throws InterruptedException {
+  private void waitFor(
+    java.util.function.BooleanSupplier condition,
+    String what
+  ) throws InterruptedException {
     long deadline = System.currentTimeMillis() + 60_000;
 
     while (System.currentTimeMillis() < deadline) {

@@ -28,20 +28,32 @@ import org.springframework.stereotype.Component;
  * person fixing this has in their hand.
  */
 @Component
-public class UnresolvedPlaceholderGuard implements ConfigurationPropertiesBindHandlerAdvisor {
+public class UnresolvedPlaceholderGuard
+  implements ConfigurationPropertiesBindHandlerAdvisor
+{
 
   @Override
   public BindHandler apply(BindHandler parent) {
     return new AbstractBindHandler(parent) {
       @Override
       public Object onSuccess(
-          ConfigurationPropertyName name, Bindable<?> target, BindContext context, Object result) {
-        if (result instanceof String value
-            && value.startsWith("${")
-            && value.endsWith("}")) {
+        ConfigurationPropertyName name,
+        Bindable<?> target,
+        BindContext context,
+        Object result
+      ) {
+        if (
+          result instanceof String value &&
+          value.startsWith("${") &&
+          value.endsWith("}")
+        ) {
           throw new IllegalStateException(
-              "%s is unset: nothing resolved %s. Set it in the environment — both gateways read %s."
-                  .formatted(name, value, "apps/api-gateway/.env.example"));
+            "%s is unset: nothing resolved %s. Set it in the environment — both gateways read %s.".formatted(
+              name,
+              value,
+              "apps/api-gateway/.env.example"
+            )
+          );
         }
 
         return super.onSuccess(name, target, context, result);

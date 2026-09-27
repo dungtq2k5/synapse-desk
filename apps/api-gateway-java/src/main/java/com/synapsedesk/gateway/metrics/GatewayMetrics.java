@@ -33,49 +33,71 @@ public class GatewayMetrics {
   public GatewayMetrics(MeterRegistry registry) {
     this.registry = registry;
 
-    Gauge.builder(PublishedSeries.WEBSOCKET_CONNECTIONS, websocketConnections, AtomicInteger::get)
-        .description("Currently connected WebSocket clients on this instance.")
-        .register(registry);
+    Gauge.builder(
+      PublishedSeries.WEBSOCKET_CONNECTIONS,
+      websocketConnections,
+      AtomicInteger::get
+    )
+      .description("Currently connected WebSocket clients on this instance.")
+      .register(registry);
   }
 
   /** One HTTP request, counted and timed under the same three labels. */
-  public void httpRequest(String route, String method, int status, Duration took) {
-    String[] tags = {"route", route, "method", method, "status", String.valueOf(status)};
+  public void httpRequest(
+    String route,
+    String method,
+    int status,
+    Duration took
+  ) {
+    String[] tags = {
+      "route",
+      route,
+      "method",
+      method,
+      "status",
+      String.valueOf(status),
+    };
 
-    Counter.builder(PublishedSeries.HTTP_REQUESTS).tags(tags).register(registry).increment();
-    Timer.builder(PublishedSeries.HTTP_DURATION).tags(tags).register(registry).record(took);
+    Counter.builder(PublishedSeries.HTTP_REQUESTS)
+      .tags(tags)
+      .register(registry)
+      .increment();
+    Timer.builder(PublishedSeries.HTTP_DURATION)
+      .tags(tags)
+      .register(registry)
+      .record(took);
   }
 
   /** One outbound gRPC call, by peer and status code. */
   public void grpcCall(String peer, String code, Duration took) {
     Timer.builder(PublishedSeries.GRPC_DURATION)
-        .tags("peer", peer, "code", code)
-        .register(registry)
-        .record(took);
+      .tags("peer", peer, "code", code)
+      .register(registry)
+      .record(took);
   }
 
   /** One relayed WebSocket event, by event name. */
   public void websocketEvent(String event) {
     Counter.builder(PublishedSeries.WEBSOCKET_EVENTS)
-        .tag("event", event)
-        .register(registry)
-        .increment();
+      .tag("event", event)
+      .register(registry)
+      .increment();
   }
 
   /** One inbound-email webhook request, by outcome. */
   public void inboundEmail(String outcome) {
     Counter.builder(PublishedSeries.INBOUND_EMAIL)
-        .tag("outcome", outcome)
-        .register(registry)
-        .increment();
+      .tag("outcome", outcome)
+      .register(registry)
+      .increment();
   }
 
   /** One AI generation, by purpose. NO tenant label: cardinality. */
   public void aiGeneration(String purpose, Duration took) {
     Timer.builder(PublishedSeries.AI_DURATION)
-        .tag("purpose", purpose)
-        .register(registry)
-        .record(took);
+      .tag("purpose", purpose)
+      .register(registry)
+      .record(took);
   }
 
   /**
@@ -88,12 +110,20 @@ public class GatewayMetrics {
    * the scrape config sets {@code honor_labels}. The alert then selects on a
    * label that is not there.
    */
-  public void jobSucceeded(String scheduledJob, String ownerService, long unixSeconds) {
+  public void jobSucceeded(
+    String scheduledJob,
+    String ownerService,
+    long unixSeconds
+  ) {
     lastJobSuccess.set(unixSeconds);
 
-    Gauge.builder(PublishedSeries.JOB_LAST_SUCCESS, lastJobSuccess, AtomicLong::doubleValue)
-        .tags("scheduled_job", scheduledJob, "owner_service", ownerService)
-        .register(registry);
+    Gauge.builder(
+      PublishedSeries.JOB_LAST_SUCCESS,
+      lastJobSuccess,
+      AtomicLong::doubleValue
+    )
+      .tags("scheduled_job", scheduledJob, "owner_service", ownerService)
+      .register(registry);
   }
 
   /** Tracks the live socket count this instance is serving. */

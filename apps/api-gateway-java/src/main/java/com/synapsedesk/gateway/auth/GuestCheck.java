@@ -30,12 +30,16 @@ public class GuestCheck {
    * the route can overwrite the cookie with a fresh one.
    */
   public void requireNoActiveSession(HttpServletRequest request) {
-    boolean hasValidToken =
-        currentUser.accessToken(request).map(currentUser::isValidAccessToken).orElse(false);
+    boolean hasValidToken = currentUser
+      .accessToken(request)
+      .map(currentUser::isValidAccessToken)
+      .orElse(false);
 
     if (hasValidToken) {
       throw new ResponseStatusException(
-          HttpStatus.BAD_REQUEST, "You are already logged in with an active session.");
+        HttpStatus.BAD_REQUEST,
+        "You are already logged in with an active session."
+      );
     }
   }
 }

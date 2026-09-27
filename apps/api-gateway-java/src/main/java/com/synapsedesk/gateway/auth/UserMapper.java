@@ -23,32 +23,43 @@ public final class UserMapper {
 
   public static UserResponseDto toUserResponseDto(UserResponse user) {
     return new UserResponseDto()
-        .id(UUID.fromString(user.getId()))
-        .organizationId(
-            user.hasOrganizationId() ? UUID.fromString(user.getOrganizationId()) : null)
-        .fullName(user.getFullName())
-        .avatarUrl(user.hasAvatarUrl() ? URI.create(user.getAvatarUrl()) : null)
-        .email(user.getEmail())
-        .isEmailVerified(user.getIsEmailVerified())
-        .phoneNumber(user.hasPhoneNumber() ? user.getPhoneNumber() : null)
-        .isPhoneVerified(user.getIsPhoneVerified())
-        .dob(user.hasDob() ? user.getDob() : null)
-        .gender(fromProtoGender(user.getGender()))
-        .lastLoginAt(user.hasLastLoginAt() ? toOffsetDateTime(user.getLastLoginAt()) : null)
-        .isLocked(user.getIsLocked())
-        .lockedUntil(user.hasLockedUntil() ? toOffsetDateTime(user.getLockedUntil()) : null)
-        .isTwoFactorEnabled(user.getIsTwoFactorEnabled())
-        .createdAt(toOffsetDateTime(user.getCreatedAt()))
-        .updatedAt(toOffsetDateTime(user.getUpdatedAt()));
+      .id(UUID.fromString(user.getId()))
+      .organizationId(
+        user.hasOrganizationId()
+          ? UUID.fromString(user.getOrganizationId())
+          : null
+      )
+      .fullName(user.getFullName())
+      .avatarUrl(user.hasAvatarUrl() ? URI.create(user.getAvatarUrl()) : null)
+      .email(user.getEmail())
+      .isEmailVerified(user.getIsEmailVerified())
+      .phoneNumber(user.hasPhoneNumber() ? user.getPhoneNumber() : null)
+      .isPhoneVerified(user.getIsPhoneVerified())
+      .dob(user.hasDob() ? user.getDob() : null)
+      .gender(fromProtoGender(user.getGender()))
+      .lastLoginAt(
+        user.hasLastLoginAt() ? toOffsetDateTime(user.getLastLoginAt()) : null
+      )
+      .isLocked(user.getIsLocked())
+      .lockedUntil(
+        user.hasLockedUntil() ? toOffsetDateTime(user.getLockedUntil()) : null
+      )
+      .isTwoFactorEnabled(user.getIsTwoFactorEnabled())
+      .createdAt(toOffsetDateTime(user.getCreatedAt()))
+      .updatedAt(toOffsetDateTime(user.getUpdatedAt()));
   }
 
   /** `GENDER_MALE` -> `MALE` — the REST enum is the proto one, prefix stripped. */
   private static UserResponseDto.GenderEnum fromProtoGender(Gender gender) {
-    return UserResponseDto.GenderEnum.fromValue(gender.name().substring("GENDER_".length()));
+    return UserResponseDto.GenderEnum.fromValue(
+      gender.name().substring("GENDER_".length())
+    );
   }
 
   private static OffsetDateTime toOffsetDateTime(Timestamp timestamp) {
-    return Instant.ofEpochSecond(timestamp.getSeconds(), timestamp.getNanos())
-        .atOffset(ZoneOffset.UTC);
+    return Instant.ofEpochSecond(
+      timestamp.getSeconds(),
+      timestamp.getNanos()
+    ).atOffset(ZoneOffset.UTC);
   }
 }

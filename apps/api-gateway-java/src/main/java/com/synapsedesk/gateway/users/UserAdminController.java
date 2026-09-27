@@ -46,10 +46,10 @@ import synapsedesk.auth.Common.SortOrder;
 import synapsedesk.auth.User.CreateUserRequest;
 import synapsedesk.auth.User.CreateUserResponse;
 import synapsedesk.auth.User.DeleteUserResponse;
-import synapsedesk.auth.User.LockUserRequest;
-import synapsedesk.auth.User.LockUserResponse;
 import synapsedesk.auth.User.ListUsersRequest;
 import synapsedesk.auth.User.ListUsersResponse;
+import synapsedesk.auth.User.LockUserRequest;
+import synapsedesk.auth.User.LockUserResponse;
 import synapsedesk.auth.User.ResetUserTwoFactorResponse;
 import synapsedesk.auth.User.SetUserDepartmentsRequest;
 import synapsedesk.auth.User.SetUserRolesRequest;
@@ -78,48 +78,67 @@ public class UserAdminController implements UserAdminApi {
   private final UserServiceGrpc.UserServiceBlockingStub stub;
   private final CurrentUser currentUser;
 
-  public UserAdminController(UserServiceGrpc.UserServiceBlockingStub stub, CurrentUser currentUser) {
+  public UserAdminController(
+    UserServiceGrpc.UserServiceBlockingStub stub,
+    CurrentUser currentUser
+  ) {
     this.stub = stub;
     this.currentUser = currentUser;
   }
 
-  private UserServiceGrpc.UserServiceBlockingStub withMetadata(RequestContext context) {
-    return stub.withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
-        .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context)));
+  private UserServiceGrpc.UserServiceBlockingStub withMetadata(
+    RequestContext context
+  ) {
+    return stub
+      .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
+      .withInterceptors(
+        MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context))
+      );
   }
 
   @Override
   @RequirePermission(PermissionCodesEnum.USER_READ)
   public ResponseEntity<UserAdminControllerListV1200Response> userAdminControllerListV1(
-      BigDecimal page,
-      BigDecimal limit,
-      String sortOrder,
-      String searchTerm,
-      String sortBy,
-      Boolean includeDeleted,
-      java.util.UUID departmentId,
-      java.util.UUID roleId,
-      Boolean isLocked) {
+    BigDecimal page,
+    BigDecimal limit,
+    String sortOrder,
+    String searchTerm,
+    String sortBy,
+    Boolean includeDeleted,
+    java.util.UUID departmentId,
+    java.util.UUID roleId,
+    Boolean isLocked
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     // Not expressible as a second `@RequirePermission` code: that decorator is
     // ANY-of, so adding one would WIDEN the route instead of narrowing it.
-    if (Boolean.TRUE.equals(includeDeleted) && !context.permissionCodes().contains("user.delete")) {
+    if (
+      Boolean.TRUE.equals(includeDeleted) &&
+      !context.permissionCodes().contains("user.delete")
+    ) {
       throw new ResponseStatusException(
-          HttpStatus.FORBIDDEN, "Viewing deactivated users requires the user.delete permission");
+        HttpStatus.FORBIDDEN,
+        "Viewing deactivated users requires the user.delete permission"
+      );
     }
 
-    PageRequest.Builder pageRequest =
-        PageRequest.newBuilder()
-            .setPage(page.intValue())
-            .setLimit(limit.intValue())
-            .setSortBy(sortBy)
-            .setSortOrder("DESC".equalsIgnoreCase(sortOrder) ? SortOrder.SORT_ORDER_DESC : SortOrder.SORT_ORDER_ASC);
+    PageRequest.Builder pageRequest = PageRequest.newBuilder()
+      .setPage(page.intValue())
+      .setLimit(limit.intValue())
+      .setSortBy(sortBy)
+      .setSortOrder(
+        "DESC".equalsIgnoreCase(sortOrder)
+          ? SortOrder.SORT_ORDER_DESC
+          : SortOrder.SORT_ORDER_ASC
+      );
     if (searchTerm != null) {
       pageRequest.setSearchTerm(searchTerm);
     }
 
-    ListUsersRequest.Builder wire = ListUsersRequest.newBuilder().setPage(pageRequest);
+    ListUsersRequest.Builder wire = ListUsersRequest.newBuilder().setPage(
+      pageRequest
+    );
     if (departmentId != null) {
       wire.setDepartmentId(departmentId.toString());
     }
@@ -136,24 +155,35 @@ public class UserAdminController implements UserAdminApi {
     ListUsersResponse response = withMetadata(context).listUsers(wire.build());
 
     UserAdminControllerListV1200ResponseData data =
-        new UserAdminControllerListV1200ResponseData()
-            .items(response.getItemsList().stream().map(UserAdminController::toDto).toList())
-            .meta(toMetaDto(response.getMeta()));
+      new UserAdminControllerListV1200ResponseData()
+        .items(
+          response
+            .getItemsList()
+            .stream()
+            .map(UserAdminController::toDto)
+            .toList()
+        )
+        .meta(toMetaDto(response.getMeta()));
 
     return ResponseEntity.ok(
-        new UserAdminControllerListV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("OK")
-            .data(data));
+      new UserAdminControllerListV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("OK")
+        .data(data)
+    );
   }
 
   @Override
   @RequirePermission(PermissionCodesEnum.USER_READ)
-  public ResponseEntity<UserAdminControllerCreateV1201Response> userAdminControllerGetV1(String id) {
+  public ResponseEntity<UserAdminControllerCreateV1201Response> userAdminControllerGetV1(
+    String id
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    UserSummaryResponse response = withMetadata(context).getUser(UserIdRequest.newBuilder().setId(id).build());
+    UserSummaryResponse response = withMetadata(context).getUser(
+      UserIdRequest.newBuilder().setId(id).build()
+    );
 
     return okSummary(response, "OK", HttpStatus.OK);
   }
@@ -161,36 +191,48 @@ public class UserAdminController implements UserAdminApi {
   @Override
   @RequirePermission(PermissionCodesEnum.USER_READ)
   public ResponseEntity<UserAdminControllerGetPermissionsV1200Response> userAdminControllerGetPermissionsV1(
-      String id) {
+    String id
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    var response = withMetadata(context).getUserPermissions(UserIdRequest.newBuilder().setId(id).build());
+    var response = withMetadata(context).getUserPermissions(
+      UserIdRequest.newBuilder().setId(id).build()
+    );
 
     return ResponseEntity.ok(
-        new UserAdminControllerGetPermissionsV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("OK")
-            .data(new UserPermissionsResponseDto(response.getPermissionCodesList())));
+      new UserAdminControllerGetPermissionsV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("OK")
+        .data(new UserPermissionsResponseDto(response.getPermissionCodesList()))
+    );
   }
 
   @Override
   @RequirePermission(PermissionCodesEnum.USER_CREATE)
   public ResponseEntity<UserAdminControllerCreateV1201Response> userAdminControllerCreateV1(
-      CreateUserDto createUserDto) {
+    CreateUserDto createUserDto
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    CreateUserRequest.Builder wire =
-        CreateUserRequest.newBuilder()
-            .setEmail(createUserDto.getEmail())
-            .setFullName(createUserDto.getFullName())
-            .addAllRoleIds(createUserDto.getRoleIds().stream().map(Object::toString).toList())
-            .addAllDepartmentIds(createUserDto.getDepartmentIds().stream().map(Object::toString).toList());
+    CreateUserRequest.Builder wire = CreateUserRequest.newBuilder()
+      .setEmail(createUserDto.getEmail())
+      .setFullName(createUserDto.getFullName())
+      .addAllRoleIds(
+        createUserDto.getRoleIds().stream().map(Object::toString).toList()
+      )
+      .addAllDepartmentIds(
+        createUserDto.getDepartmentIds().stream().map(Object::toString).toList()
+      );
     if (createUserDto.getPrimaryDepartmentId() != null) {
-      wire.setPrimaryDepartmentId(createUserDto.getPrimaryDepartmentId().toString());
+      wire.setPrimaryDepartmentId(
+        createUserDto.getPrimaryDepartmentId().toString()
+      );
     }
 
-    CreateUserResponse response = withMetadata(context).createUser(wire.build());
+    CreateUserResponse response = withMetadata(context).createUser(
+      wire.build()
+    );
 
     return okSummary(response.getUser(), "OK", HttpStatus.CREATED);
   }
@@ -198,7 +240,9 @@ public class UserAdminController implements UserAdminApi {
   @Override
   @RequirePermission(PermissionCodesEnum.USER_UPDATE)
   public ResponseEntity<UserAdminControllerCreateV1201Response> userAdminControllerUpdateV1(
-      String id, UpdateUserDto updateUserDto) {
+    String id,
+    UpdateUserDto updateUserDto
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     UpdateUserRequest.Builder wire = UpdateUserRequest.newBuilder().setId(id);
@@ -212,7 +256,9 @@ public class UserAdminController implements UserAdminApi {
       wire.setDob(updateUserDto.getDob());
     }
     if (updateUserDto.getGender() != null) {
-      wire.setGender(Gender.valueOf("GENDER_" + updateUserDto.getGender().getValue()));
+      wire.setGender(
+        Gender.valueOf("GENDER_" + updateUserDto.getGender().getValue())
+      );
     }
     // Node's own `update()` does `dto.phoneNumber ?? undefined`, which collapses
     // an explicit `null` to "leave unchanged" same as an absent field — so
@@ -223,32 +269,47 @@ public class UserAdminController implements UserAdminApi {
       wire.setPhoneNumber(updateUserDto.getPhoneNumber());
     }
 
-    UserSummaryResponse response = withMetadata(context).updateUser(wire.build());
+    UserSummaryResponse response = withMetadata(context).updateUser(
+      wire.build()
+    );
 
     return okSummary(response, "OK", HttpStatus.OK);
   }
 
   @Override
   @RequirePermission(PermissionCodesEnum.USER_DELETE)
-  public ResponseEntity<UserAdminControllerRemoveV1200Response> userAdminControllerRemoveV1(String id) {
+  public ResponseEntity<UserAdminControllerRemoveV1200Response> userAdminControllerRemoveV1(
+    String id
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    DeleteUserResponse response = withMetadata(context).deleteUser(UserIdRequest.newBuilder().setId(id).build());
+    DeleteUserResponse response = withMetadata(context).deleteUser(
+      UserIdRequest.newBuilder().setId(id).build()
+    );
 
     return ResponseEntity.ok(
-        new UserAdminControllerRemoveV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("User deactivated")
-            .data(new RevokedSessionCountResponseDto(BigDecimal.valueOf(response.getRevokedSessionCount()))));
+      new UserAdminControllerRemoveV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("User deactivated")
+        .data(
+          new RevokedSessionCountResponseDto(
+            BigDecimal.valueOf(response.getRevokedSessionCount())
+          )
+        )
+    );
   }
 
   @Override
   @RequirePermission(PermissionCodesEnum.USER_DELETE)
-  public ResponseEntity<UserAdminControllerCreateV1201Response> userAdminControllerRestoreV1(String id) {
+  public ResponseEntity<UserAdminControllerCreateV1201Response> userAdminControllerRestoreV1(
+    String id
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    UserSummaryResponse response = withMetadata(context).restoreUser(UserIdRequest.newBuilder().setId(id).build());
+    UserSummaryResponse response = withMetadata(context).restoreUser(
+      UserIdRequest.newBuilder().setId(id).build()
+    );
 
     return okSummary(response, "User restored", HttpStatus.OK);
   }
@@ -256,72 +317,97 @@ public class UserAdminController implements UserAdminApi {
   @Override
   @RequirePermission(PermissionCodesEnum.USER_LOCK)
   public ResponseEntity<UserAdminControllerRemoveV1200Response> userAdminControllerLockV1(
-      String id, LockUserDto lockUserDto) {
+    String id,
+    LockUserDto lockUserDto
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    LockUserRequest.Builder wire = LockUserRequest.newBuilder().setId(id).setReason(lockUserDto.getReason());
+    LockUserRequest.Builder wire = LockUserRequest.newBuilder()
+      .setId(id)
+      .setReason(lockUserDto.getReason());
     if (lockUserDto.getLockedUntil() != null) {
       Instant instant = Instant.parse(lockUserDto.getLockedUntil());
       wire.setLockedUntil(
-          com.google.protobuf.Timestamp.newBuilder()
-              .setSeconds(instant.getEpochSecond())
-              .setNanos(instant.getNano())
-              .build());
+        com.google.protobuf.Timestamp.newBuilder()
+          .setSeconds(instant.getEpochSecond())
+          .setNanos(instant.getNano())
+          .build()
+      );
     }
 
     LockUserResponse response = withMetadata(context).lockUser(wire.build());
 
     return ResponseEntity.ok(
-        new UserAdminControllerRemoveV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("User locked")
-            .data(new RevokedSessionCountResponseDto(BigDecimal.valueOf(response.getRevokedSessionCount()))));
+      new UserAdminControllerRemoveV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("User locked")
+        .data(
+          new RevokedSessionCountResponseDto(
+            BigDecimal.valueOf(response.getRevokedSessionCount())
+          )
+        )
+    );
   }
 
   @Override
   @RequirePermission(PermissionCodesEnum.USER_LOCK)
-  public ResponseEntity<AuthControllerForgotPasswordV1202Response> userAdminControllerUnlockV1(String id) {
+  public ResponseEntity<AuthControllerForgotPasswordV1202Response> userAdminControllerUnlockV1(
+    String id
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    withMetadata(context).unlockUser(UserIdRequest.newBuilder().setId(id).build());
+    withMetadata(context).unlockUser(
+      UserIdRequest.newBuilder().setId(id).build()
+    );
 
     return ResponseEntity.ok(
-        new AuthControllerForgotPasswordV1202Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("User unlocked")
-            .data(null));
+      new AuthControllerForgotPasswordV1202Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("User unlocked")
+        .data(null)
+    );
   }
 
   @Override
   @RequirePermission(PermissionCodesEnum.USER_2FA_RESET)
   public ResponseEntity<UserAdminControllerResetTwoFactorV1200Response> userAdminControllerResetTwoFactorV1(
-      String id) {
+    String id
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    ResetUserTwoFactorResponse response =
-        withMetadata(context).resetUserTwoFactor(UserIdRequest.newBuilder().setId(id).build());
+    ResetUserTwoFactorResponse response = withMetadata(
+      context
+    ).resetUserTwoFactor(UserIdRequest.newBuilder().setId(id).build());
 
     return ResponseEntity.ok(
-        new UserAdminControllerResetTwoFactorV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("Two-factor authentication reset")
-            .data(new UntrustedDeviceCountResponseDto(BigDecimal.valueOf(response.getUntrustedDeviceCount()))));
+      new UserAdminControllerResetTwoFactorV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("Two-factor authentication reset")
+        .data(
+          new UntrustedDeviceCountResponseDto(
+            BigDecimal.valueOf(response.getUntrustedDeviceCount())
+          )
+        )
+    );
   }
 
   @Override
   @RequirePermission(PermissionCodesEnum.USER_ROLE_ASSIGN)
   public ResponseEntity<UserAdminControllerCreateV1201Response> userAdminControllerSetRolesV1(
-      String id, SetUserRolesDto setUserRolesDto) {
+    String id,
+    SetUserRolesDto setUserRolesDto
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    SetUserRolesRequest wire =
-        SetUserRolesRequest.newBuilder()
-            .setId(id)
-            .addAllRoleIds(setUserRolesDto.getRoleIds().stream().map(Object::toString).toList())
-            .build();
+    SetUserRolesRequest wire = SetUserRolesRequest.newBuilder()
+      .setId(id)
+      .addAllRoleIds(
+        setUserRolesDto.getRoleIds().stream().map(Object::toString).toList()
+      )
+      .build();
 
     UserSummaryResponse response = withMetadata(context).setUserRoles(wire);
 
@@ -331,59 +417,81 @@ public class UserAdminController implements UserAdminApi {
   @Override
   @RequirePermission(PermissionCodesEnum.DEPARTMENT_MEMBER_ASSIGN)
   public ResponseEntity<UserAdminControllerCreateV1201Response> userAdminControllerSetDepartmentsV1(
-      String id, SetUserDepartmentsDto setUserDepartmentsDto) {
+    String id,
+    SetUserDepartmentsDto setUserDepartmentsDto
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    SetUserDepartmentsRequest wire =
-        SetUserDepartmentsRequest.newBuilder()
-            .setId(id)
-            .addAllDepartments(
-                setUserDepartmentsDto.getDepartments().stream().map(UserAdminController::toDepartmentAssignment).toList())
-            .build();
+    SetUserDepartmentsRequest wire = SetUserDepartmentsRequest.newBuilder()
+      .setId(id)
+      .addAllDepartments(
+        setUserDepartmentsDto
+          .getDepartments()
+          .stream()
+          .map(UserAdminController::toDepartmentAssignment)
+          .toList()
+      )
+      .build();
 
-    UserSummaryResponse response = withMetadata(context).setUserDepartments(wire);
+    UserSummaryResponse response = withMetadata(context).setUserDepartments(
+      wire
+    );
 
     return okSummary(response, "Departments updated", HttpStatus.OK);
   }
 
   private static ResponseEntity<UserAdminControllerCreateV1201Response> okSummary(
-      UserSummaryResponse response, String message, HttpStatus status) {
-    return ResponseEntity.status(status)
-        .body(
-            new UserAdminControllerCreateV1201Response()
-                .success(true)
-                .statusCode(BigDecimal.valueOf(status.value()))
-                .message(message)
-                .data(toDto(response)));
+    UserSummaryResponse response,
+    String message,
+    HttpStatus status
+  ) {
+    return ResponseEntity.status(status).body(
+      new UserAdminControllerCreateV1201Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(status.value()))
+        .message(message)
+        .data(toDto(response))
+    );
   }
 
   private static UserSummaryResponseDto toDto(UserSummaryResponse summary) {
     return new UserSummaryResponseDto(
-        UserMapper.toUserResponseDto(summary.getUser()),
-        summary.getRoleIdsList(),
-        summary.getRoleNamesList(),
-        summary.getDepartmentIdsList(),
-        summary.hasDeletedAt() ? toOffsetDateTime(summary.getDeletedAt()) : null,
-        summary.hasDeletedByName() ? summary.getDeletedByName() : null);
+      UserMapper.toUserResponseDto(summary.getUser()),
+      summary.getRoleIdsList(),
+      summary.getRoleNamesList(),
+      summary.getDepartmentIdsList(),
+      summary.hasDeletedAt() ? toOffsetDateTime(summary.getDeletedAt()) : null,
+      summary.hasDeletedByName() ? summary.getDeletedByName() : null
+    );
   }
 
-  private static synapsedesk.auth.User.DepartmentAssignment toDepartmentAssignment(DepartmentAssignmentDto dto) {
+  private static synapsedesk.auth.User.DepartmentAssignment toDepartmentAssignment(
+    DepartmentAssignmentDto dto
+  ) {
     return synapsedesk.auth.User.DepartmentAssignment.newBuilder()
-        .setDepartmentId(dto.getDepartmentId().toString())
-        .setIsPrimary(dto.getIsPrimary())
-        .build();
+      .setDepartmentId(dto.getDepartmentId().toString())
+      .setIsPrimary(dto.getIsPrimary())
+      .build();
   }
 
-  private static InvitationsControllerListV1200ResponseDataMeta toMetaDto(PageMeta meta) {
+  private static InvitationsControllerListV1200ResponseDataMeta toMetaDto(
+    PageMeta meta
+  ) {
     return new InvitationsControllerListV1200ResponseDataMeta(
-        BigDecimal.valueOf(meta.getTotalItems()),
-        BigDecimal.valueOf(meta.getItemCount()),
-        BigDecimal.valueOf(meta.getItemsPerPage()),
-        BigDecimal.valueOf(meta.getTotalPages()),
-        BigDecimal.valueOf(meta.getCurrentPage()));
+      BigDecimal.valueOf(meta.getTotalItems()),
+      BigDecimal.valueOf(meta.getItemCount()),
+      BigDecimal.valueOf(meta.getItemsPerPage()),
+      BigDecimal.valueOf(meta.getTotalPages()),
+      BigDecimal.valueOf(meta.getCurrentPage())
+    );
   }
 
-  private static OffsetDateTime toOffsetDateTime(com.google.protobuf.Timestamp timestamp) {
-    return Instant.ofEpochSecond(timestamp.getSeconds(), timestamp.getNanos()).atOffset(ZoneOffset.UTC);
+  private static OffsetDateTime toOffsetDateTime(
+    com.google.protobuf.Timestamp timestamp
+  ) {
+    return Instant.ofEpochSecond(
+      timestamp.getSeconds(),
+      timestamp.getNanos()
+    ).atOffset(ZoneOffset.UTC);
   }
 }

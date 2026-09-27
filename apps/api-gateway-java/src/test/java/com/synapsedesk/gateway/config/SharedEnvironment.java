@@ -28,8 +28,9 @@ public final class SharedEnvironment {
   /** From `apps/api-gateway-java/`, where Maven runs, to the shared file. */
   public static final Path ENV_EXAMPLE = Path.of("../api-gateway/.env.example");
 
-  private static final Pattern ACTIVE =
-      Pattern.compile("^\\s*([A-Z][A-Z0-9_]*)\\s*=\\s*(.*?)\\s*$");
+  private static final Pattern ACTIVE = Pattern.compile(
+    "^\\s*([A-Z][A-Z0-9_]*)\\s*=\\s*(.*?)\\s*$"
+  );
 
   private SharedEnvironment() {}
 
@@ -68,9 +69,11 @@ public final class SharedEnvironment {
    * The INNER quotes are part of the address and stay.
    */
   private static String unquote(String value) {
-    if (value.length() >= 2
-        && ((value.startsWith("'") && value.endsWith("'"))
-            || (value.startsWith("\"") && value.endsWith("\"")))) {
+    if (
+      value.length() >= 2 &&
+      ((value.startsWith("'") && value.endsWith("'")) ||
+        (value.startsWith("\"") && value.endsWith("\"")))
+    ) {
       return value.substring(1, value.length() - 1);
     }
 
@@ -81,7 +84,10 @@ public final class SharedEnvironment {
     try {
       return Files.readAllLines(ENV_EXAMPLE);
     } catch (IOException cause) {
-      throw new IllegalStateException("cannot read " + ENV_EXAMPLE.toAbsolutePath(), cause);
+      throw new IllegalStateException(
+        "cannot read " + ENV_EXAMPLE.toAbsolutePath(),
+        cause
+      );
     }
   }
 }

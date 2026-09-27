@@ -32,24 +32,47 @@ class PermissionInterceptorTest {
   private final HttpServletRequest request = mock(HttpServletRequest.class);
   private final HttpServletResponse response = mock(HttpServletResponse.class);
 
-  private final RuntimeProperties development =
-      new RuntimeProperties("development", 0, "/api", false, "1.0.0", "sha", "time");
-  private final RuntimeProperties production =
-      new RuntimeProperties("production", 0, "/api", false, "1.0.0", "sha", "time");
+  private final RuntimeProperties development = new RuntimeProperties(
+    "development",
+    0,
+    "/api",
+    false,
+    "1.0.0",
+    "sha",
+    "time"
+  );
+  private final RuntimeProperties production = new RuntimeProperties(
+    "production",
+    0,
+    "/api",
+    false,
+    "1.0.0",
+    "sha",
+    "time"
+  );
 
   @RequirePermission(PermissionCodesEnum.ANALYTICS_READ)
   private void singleCode() {}
 
-  @RequirePermission({PermissionCodesEnum.TICKET_ASSIGN, PermissionCodesEnum.TICKET_ASSIGN_SELF})
+  @RequirePermission({
+    PermissionCodesEnum.TICKET_ASSIGN,
+    PermissionCodesEnum.TICKET_ASSIGN_SELF,
+  })
   private void eitherCode() {}
 
   private void noAnnotation() {}
 
   @Test
-  void noAnnotationAllowsWithoutEvenReadingTheCaller() throws NoSuchMethodException {
-    PermissionInterceptor interceptor = new PermissionInterceptor(currentUser, development);
+  void noAnnotationAllowsWithoutEvenReadingTheCaller()
+    throws NoSuchMethodException {
+    PermissionInterceptor interceptor = new PermissionInterceptor(
+      currentUser,
+      new PermissionChecker(development)
+    );
 
-    assertThat(interceptor.preHandle(request, response, handlerFor("noAnnotation"))).isTrue();
+    assertThat(
+      interceptor.preHandle(request, response, handlerFor("noAnnotation"))
+    ).isTrue();
     // Not just "it allowed" — it never called `require`, so an unannotated
     // route works even with no session bound to the request, matching
     // `PermissionGuard.canActivate`'s early `return true` before it ever
@@ -58,56 +81,87 @@ class PermissionInterceptorTest {
   }
 
   @Test
-  void missingThePermissionIs403WithTheDevMessage() throws NoSuchMethodException {
-    PermissionInterceptor interceptor = new PermissionInterceptor(currentUser, development);
+  void missingThePermissionIs403WithTheDevMessage()
+    throws NoSuchMethodException {
+    PermissionInterceptor interceptor = new PermissionInterceptor(
+      currentUser,
+      new PermissionChecker(development)
+    );
     when(currentUser.require(request)).thenReturn(context(false, List.of()));
 
-    assertThatThrownBy(() -> interceptor.preHandle(request, response, handlerFor("singleCode")))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("Requires one of: analytics.read");
+    assertThatThrownBy(() ->
+      interceptor.preHandle(request, response, handlerFor("singleCode"))
+    )
+      .isInstanceOf(ResponseStatusException.class)
+      .hasMessageContaining("Requires one of: analytics.read");
   }
 
   @Test
   void theSameRefusalIsGenericInProduction() throws NoSuchMethodException {
-    PermissionInterceptor interceptor = new PermissionInterceptor(currentUser, production);
+    PermissionInterceptor interceptor = new PermissionInterceptor(
+      currentUser,
+      new PermissionChecker(production)
+    );
     when(currentUser.require(request)).thenReturn(context(false, List.of()));
 
-    assertThatThrownBy(() -> interceptor.preHandle(request, response, handlerFor("singleCode")))
-        .hasMessageContaining("You do not have permission to access this resource")
-        .hasMessageNotContaining("analytics.read");
+    assertThatThrownBy(() ->
+      interceptor.preHandle(request, response, handlerFor("singleCode"))
+    )
+      .hasMessageContaining(
+        "You do not have permission to access this resource"
+      )
+      .hasMessageNotContaining("analytics.read");
   }
 
   @Test
-  void aSuperAdminBypassesEvenHoldingNoneOfTheCodes() throws NoSuchMethodException {
-    PermissionInterceptor interceptor = new PermissionInterceptor(currentUser, development);
+  void aSuperAdminBypassesEvenHoldingNoneOfTheCodes()
+    throws NoSuchMethodException {
+    PermissionInterceptor interceptor = new PermissionInterceptor(
+      currentUser,
+      new PermissionChecker(development)
+    );
     when(currentUser.require(request)).thenReturn(context(true, List.of()));
 
-    assertThat(interceptor.preHandle(request, response, handlerFor("singleCode"))).isTrue();
+    assertThat(
+      interceptor.preHandle(request, response, handlerFor("singleCode"))
+    ).isTrue();
   }
 
   @Test
   void eitherCodeOfAnAnyOfPairGrants() throws NoSuchMethodException {
-    PermissionInterceptor interceptor = new PermissionInterceptor(currentUser, development);
+    PermissionInterceptor interceptor = new PermissionInterceptor(
+      currentUser,
+      new PermissionChecker(development)
+    );
     // Holds ONLY the second of the two codes `eitherCode` declares — a
     // guard that (wrongly) checked just the first would refuse this.
-    when(currentUser.require(request)).thenReturn(context(false, List.of("ticket.assign.self")));
+    when(currentUser.require(request)).thenReturn(
+      context(false, List.of("ticket.assign.self"))
+    );
 
-    assertThat(interceptor.preHandle(request, response, handlerFor("eitherCode"))).isTrue();
+    assertThat(
+      interceptor.preHandle(request, response, handlerFor("eitherCode"))
+    ).isTrue();
   }
 
-  private RequestContext context(boolean superAdmin, List<String> permissionCodes) {
+  private RequestContext context(
+    boolean superAdmin,
+    List<String> permissionCodes
+  ) {
     return new RequestContext(
-        "22222222-2222-4222-8222-222222222222",
-        "11111111-1111-4111-8111-111111111111",
-        superAdmin,
-        List.of(),
-        permissionCodes,
-        true,
-        "127.0.0.1",
-        "test-agent");
+      "22222222-2222-4222-8222-222222222222",
+      "11111111-1111-4111-8111-111111111111",
+      superAdmin,
+      List.of(),
+      permissionCodes,
+      true,
+      "127.0.0.1",
+      "test-agent"
+    );
   }
 
-  private HandlerMethod handlerFor(String methodName) throws NoSuchMethodException {
+  private HandlerMethod handlerFor(String methodName)
+    throws NoSuchMethodException {
     return new HandlerMethod(this, getClass().getDeclaredMethod(methodName));
   }
 }

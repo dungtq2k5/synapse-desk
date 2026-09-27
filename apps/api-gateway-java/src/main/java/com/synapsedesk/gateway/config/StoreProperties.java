@@ -16,4 +16,7 @@ import org.springframework.validation.annotation.Validated;
  */
 @Validated
 @ConfigurationProperties(prefix = "stores")
-public record StoreProperties(@NotBlank String redisUrl, @NotBlank String natsUrl) {}
+public record StoreProperties(
+  @NotBlank String redisUrl,
+  @NotBlank String natsUrl
+) {}

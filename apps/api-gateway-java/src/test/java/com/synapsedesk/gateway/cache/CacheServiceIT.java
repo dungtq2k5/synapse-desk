@@ -41,11 +41,15 @@ class CacheServiceIT {
 
   @BeforeEach
   void connect() {
-    String url = SharedEnvironment.values().getOrDefault("REDIS_URL", "redis://localhost:6379");
+    String url = SharedEnvironment.values().getOrDefault(
+      "REDIS_URL",
+      "redis://localhost:6379"
+    );
     java.net.URI uri = java.net.URI.create(url);
-    var configuration =
-        new RedisStandaloneConfiguration(
-            uri.getHost() == null ? "localhost" : uri.getHost(), uri.getPort() < 0 ? 6379 : uri.getPort());
+    var configuration = new RedisStandaloneConfiguration(
+      uri.getHost() == null ? "localhost" : uri.getHost(),
+      uri.getPort() < 0 ? 6379 : uri.getPort()
+    );
     String path = uri.getPath();
     if (path != null && path.length() > 1) {
       configuration.setDatabase(Integer.parseInt(path.substring(1)));
@@ -64,23 +68,40 @@ class CacheServiceIT {
 
   @Test
   void theKeyMatchesNodesBuildKeyFormula() {
-    String key =
-        cache.buildKey("11111111-1111-4111-8111-111111111111", "users:me", Map.of("b", "2", "a", "1"));
+    String key = cache.buildKey(
+      "11111111-1111-4111-8111-111111111111",
+      "users:me",
+      Map.of("b", "2", "a", "1")
+    );
 
     // `cache:{org}|{scope}|{sorted params}` — sorted so `a=1&b=2` is the ONE
     // spelling, not two, matching `buildKey`'s own comment on why.
-    assertThat(key).isEqualTo("cache:11111111-1111-4111-8111-111111111111|users:me|a=1&b=2");
+    assertThat(key).isEqualTo(
+      "cache:11111111-1111-4111-8111-111111111111|users:me|a=1&b=2"
+    );
   }
 
   @Test
   void aSuperAdminsTenantlessKeyUsesTheNoTenantLiteral() {
-    assertThat(cache.buildKey(null, "roles", Map.of())).isEqualTo("cache:no-tenant|roles|");
+    assertThat(cache.buildKey(null, "roles", Map.of())).isEqualTo(
+      "cache:no-tenant|roles|"
+    );
   }
 
   @Test
   void javaWritesTheExactTaggedDateShapeNodeDecodesReading() {
-    String key = "cache:it|" + getClass().getSimpleName() + "|" + System.nanoTime();
-    OffsetDateTime computedAt = OffsetDateTime.of(2024, 1, 1, 0, 0, 0, 0, ZoneOffset.UTC);
+    String key =
+      "cache:it|" + getClass().getSimpleName() + "|" + System.nanoTime();
+    OffsetDateTime computedAt = OffsetDateTime.of(
+      2024,
+      1,
+      1,
+      0,
+      0,
+      0,
+      0,
+      ZoneOffset.UTC
+    );
 
     try {
       cache.wrap(key, 30, OffsetDateTime.class, () -> computedAt);
@@ -90,7 +111,9 @@ class CacheServiceIT {
       // A byte comparison, not a parse — the whole point of this row is that
       // NODE reading this exact string must not silently return `null`
       // (`GraphQLISODateTime.serialize()` on a bare string does that).
-      assertThat(cache.raw(key)).contains("{\"__cache_date__\":\"2024-01-01T00:00:00.000Z\"}");
+      assertThat(cache.raw(key)).contains(
+        "{\"__cache_date__\":\"2024-01-01T00:00:00.000Z\"}"
+      );
     } finally {
       redis.delete(key);
     }
@@ -98,19 +121,26 @@ class CacheServiceIT {
 
   @Test
   void javaDecodesNodesExactTaggedDateShapeWritingRaw() {
-    String key = "cache:it|" + getClass().getSimpleName() + "|" + System.nanoTime();
+    String key =
+      "cache:it|" + getClass().getSimpleName() + "|" + System.nanoTime();
 
     try {
       // What Node's `encode()` writes for `new Date('2024-06-15T12:30:00.000Z')` —
       // typed by hand from `cache.service.ts`, not produced by any Java code,
       // so this half of the round trip cannot pass by both sides sharing one bug.
-      cache.putRaw(key, "{\"__cache_date__\":\"2024-06-15T12:30:00.000Z\"}", 30);
+      cache.putRaw(
+        key,
+        "{\"__cache_date__\":\"2024-06-15T12:30:00.000Z\"}",
+        30
+      );
 
       OffsetDateTime decoded = cache.wrap(key, 30, OffsetDateTime.class, () -> {
         throw new AssertionError("a hit must not fall through to produce()");
       });
 
-      assertThat(decoded).isEqualTo(OffsetDateTime.of(2024, 6, 15, 12, 30, 0, 0, ZoneOffset.UTC));
+      assertThat(decoded).isEqualTo(
+        OffsetDateTime.of(2024, 6, 15, 12, 30, 0, 0, ZoneOffset.UTC)
+      );
     } finally {
       redis.delete(key);
     }

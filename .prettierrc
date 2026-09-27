@@ -1,4 +1,5 @@
 {
+  "plugins": ["prettier-plugin-java", "@prettier/plugin-xml"],
   "singleQuote": true,
   "trailingComma": "all",
   "tabWidth": 2,

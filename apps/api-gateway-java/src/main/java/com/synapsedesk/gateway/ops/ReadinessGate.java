@@ -20,7 +20,6 @@ import com.synapsedesk.gateway.generated.model.ReadinessDependenciesResponseDto;
  * would publish it too.
  */
 public interface ReadinessGate {
-
   /** True when this condition is satisfied. */
   boolean isReady();
 

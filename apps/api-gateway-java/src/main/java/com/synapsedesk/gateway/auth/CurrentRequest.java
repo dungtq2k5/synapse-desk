@@ -25,7 +25,9 @@ public final class CurrentRequest {
   public static HttpServletResponse response() {
     HttpServletResponse response = attributes().getResponse();
     if (response == null) {
-      throw new IllegalStateException("no response bound to the current request");
+      throw new IllegalStateException(
+        "no response bound to the current request"
+      );
     }
 
     return response;

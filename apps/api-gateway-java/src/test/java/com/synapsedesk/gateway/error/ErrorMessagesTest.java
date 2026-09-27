@@ -37,17 +37,22 @@ class ErrorMessagesTest {
     // The capture: "email must be an email, password must be a string,
     // password should not be empty!" — `, ` between, one `!` at the end.
     assertThat(
-            ErrorMessages.format(
-                List.of(
-                    "email must be an email",
-                    "password must be a string",
-                    "password should not be empty")))
-        .isEqualTo("email must be an email, password must be a string, password should not be empty!");
+      ErrorMessages.format(
+        List.of(
+          "email must be an email",
+          "password must be a string",
+          "password should not be empty"
+        )
+      )
+    ).isEqualTo(
+      "email must be an email, password must be a string, password should not be empty!"
+    );
   }
 
   @Test
   void aSingleMessageIsNotDecoratedWithASeparator() {
-    assertThat(ErrorMessages.format(List.of("email must be an email")))
-        .isEqualTo("email must be an email!");
+    assertThat(
+      ErrorMessages.format(List.of("email must be an email"))
+    ).isEqualTo("email must be an email!");
   }
 }

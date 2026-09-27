@@ -362,6 +362,8 @@ describe('the CI contract', () => {
       ...gitFiles('*.ts'),
       ...gitFiles('*.mjs'),
       ...gitFiles('*.json'),
+      ...gitFiles('*.java'),
+      ...gitFiles('*.xml'),
     ].filter((file) => !isIgnored(file));
 
     expect(corpus.length).toBeGreaterThanOrEqual(200);

@@ -18,9 +18,8 @@ import java.lang.annotation.Target;
  * constants rather than a runtime-keyed map.
  */
 @Retention(RetentionPolicy.RUNTIME)
-@Target({ElementType.TYPE, ElementType.METHOD})
+@Target({ ElementType.TYPE, ElementType.METHOD })
 public @interface AuthThrottle {
-
   /** -1 means "use {@code authTier}'s configured default". */
   long ttlMs() default -1;
 

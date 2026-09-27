@@ -28,10 +28,11 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties(prefix = "runtime")
 public record RuntimeProperties(
-    @NotBlank String nodeEnv,
-    @NotNull Integer port,
-    @NotBlank String globalPrefix,
-    @NotNull Boolean swaggerEnabled,
-    @NotBlank String appVersion,
-    @NotBlank String buildSha,
-    @NotBlank String buildTime) {}
+  @NotBlank String nodeEnv,
+  @NotNull Integer port,
+  @NotBlank String globalPrefix,
+  @NotNull Boolean swaggerEnabled,
+  @NotBlank String appVersion,
+  @NotBlank String buildSha,
+  @NotBlank String buildTime
+) {}

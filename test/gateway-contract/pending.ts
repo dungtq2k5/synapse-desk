@@ -177,3 +177,43 @@ export function declaredTags(): string[] {
 
   return [...tags].sort(compareAlphabetically);
 }
+
+/**
+ * The GraphQL analogue of {@link PENDING_APIS} — invented for this surface,
+ * since `schema.gql` generates no interface a missing field could fail to
+ * implement. `GraphqlFieldCoverageTest` reads the same file and asserts it
+ * only ever shrinks.
+ */
+export const PENDING_GRAPHQL_FIELDS = join(
+  REPO_ROOT,
+  'apps/api-gateway-java/src/test/resources/pending-graphql-fields.txt',
+);
+
+/** Every root `Query`/`Mutation` field the Java gateway does NOT resolve yet. */
+export function pendingGraphqlFields(): Set<string> {
+  const lines = readFileSync(PENDING_GRAPHQL_FIELDS, 'utf8').split('\n');
+
+  return new Set(
+    lines
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0 && !line.startsWith('#')),
+  );
+}
+
+/**
+ * `it` or `it.skip`, by whether this implementation resolves these ROOT
+ * FIELDS yet — `rowFor`'s counterpart for GraphQL, keyed by the exact
+ * `Query.foo` / `Mutation.bar` name rather than by REST tag, since a field
+ * name needs no capitalization dance the way a published tag does.
+ *
+ * @example
+ * rowForField('Query.tickets')('a query at depth 7 passes', async () => { … });
+ */
+export function rowForField(...fields: string[]): jest.It {
+  if (IMPL === 'node') return it;
+
+  const pending = pendingGraphqlFields();
+  const blocked = fields.some((field) => pending.has(field));
+
+  return blocked ? it.skip : it;
+}

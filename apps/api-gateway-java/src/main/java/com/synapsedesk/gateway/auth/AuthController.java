@@ -42,7 +42,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
-import synapsedesk.auth.AuthServiceGrpc;
 import synapsedesk.auth.Auth.ChangePasswordRequest;
 import synapsedesk.auth.Auth.ForgotPasswordRequest;
 import synapsedesk.auth.Auth.GoogleSignInRequest;
@@ -56,6 +55,7 @@ import synapsedesk.auth.Auth.RegisterRequest;
 import synapsedesk.auth.Auth.ResetPasswordRequest;
 import synapsedesk.auth.Auth.ValidatePasswordResetTokenRequest;
 import synapsedesk.auth.Auth.ValidatePasswordResetTokenResponse;
+import synapsedesk.auth.AuthServiceGrpc;
 
 /**
  * `AuthApi`, implemented against auth-service over gRPC — the Node
@@ -82,10 +82,11 @@ public class AuthController implements AuthApi {
   private final GuestCheck guestCheck;
 
   public AuthController(
-      AuthServiceGrpc.AuthServiceBlockingStub stub,
-      CurrentUser currentUser,
-      CookieWriter cookies,
-      GuestCheck guestCheck) {
+    AuthServiceGrpc.AuthServiceBlockingStub stub,
+    CurrentUser currentUser,
+    CookieWriter cookies,
+    GuestCheck guestCheck
+  ) {
     this.stub = stub;
     this.currentUser = currentUser;
     this.cookies = cookies;
@@ -93,58 +94,78 @@ public class AuthController implements AuthApi {
   }
 
   private AuthServiceGrpc.AuthServiceBlockingStub withMetadata(
-      HttpServletRequest request) {
-    return stub.withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
-        .withInterceptors(
-            io.grpc.stub.MetadataUtils.newAttachHeadersInterceptor(
-                CallerMetadata.of(currentUser.origin(request))));
+    HttpServletRequest request
+  ) {
+    return stub
+      .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
+      .withInterceptors(
+        io.grpc.stub.MetadataUtils.newAttachHeadersInterceptor(
+          CallerMetadata.of(currentUser.origin(request))
+        )
+      );
   }
 
-  private AuthServiceGrpc.AuthServiceBlockingStub withMetadata(RequestContext context) {
-    return stub.withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
-        .withInterceptors(
-            io.grpc.stub.MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context)));
+  private AuthServiceGrpc.AuthServiceBlockingStub withMetadata(
+    RequestContext context
+  ) {
+    return stub
+      .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
+      .withInterceptors(
+        io.grpc.stub.MetadataUtils.newAttachHeadersInterceptor(
+          CallerMetadata.of(context)
+        )
+      );
   }
 
   @Override
-  @AuthThrottle(ttlMs = RouteThrottle.REGISTER_TTL_MS, limit = RouteThrottle.REGISTER_LIMIT)
+  @AuthThrottle(
+    ttlMs = RouteThrottle.REGISTER_TTL_MS,
+    limit = RouteThrottle.REGISTER_LIMIT
+  )
   public ResponseEntity<AuthControllerRegisterV1201Response> authControllerRegisterV1(
-      RegisterDto registerDto) {
+    RegisterDto registerDto
+  ) {
     HttpServletRequest request = CurrentRequest.request();
     guestCheck.requireNoActiveSession(request);
 
-    RegisterRequest wire =
-        RegisterRequest.newBuilder()
-            .setEmail(registerDto.getEmail())
-            .setPassword(registerDto.getPassword())
-            .setFullName(registerDto.getFullName())
-            .build();
-    synapsedesk.auth.Auth.RegisterResponse response = withMetadata(request).register(wire);
+    RegisterRequest wire = RegisterRequest.newBuilder()
+      .setEmail(registerDto.getEmail())
+      .setPassword(registerDto.getPassword())
+      .setFullName(registerDto.getFullName())
+      .build();
+    synapsedesk.auth.Auth.RegisterResponse response = withMetadata(
+      request
+    ).register(wire);
 
-    RegisterResponseDto data =
-        new RegisterResponseDto()
-            .userId(response.getUserId())
-            .organizationId(response.getOrganizationId())
-            .email(response.getEmail())
-            .requiresEmailVerification(response.getRequiresEmailVerification());
+    RegisterResponseDto data = new RegisterResponseDto()
+      .userId(response.getUserId())
+      .organizationId(response.getOrganizationId())
+      .email(response.getEmail())
+      .requiresEmailVerification(response.getRequiresEmailVerification());
 
-    return ResponseEntity.status(HttpStatus.CREATED)
-        .body(
-            new AuthControllerRegisterV1201Response()
-                .success(true)
-                .statusCode(BigDecimal.valueOf(201))
-                .message("Registered")
-                .data(data));
+    return ResponseEntity.status(HttpStatus.CREATED).body(
+      new AuthControllerRegisterV1201Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(201))
+        .message("Registered")
+        .data(data)
+    );
   }
 
   @Override
-  @AuthThrottle(ttlMs = RouteThrottle.LOGIN_TTL_MS, limit = RouteThrottle.LOGIN_LIMIT)
-  public ResponseEntity<AuthControllerLoginV1200Response> authControllerLoginV1(LoginDto loginDto) {
+  @AuthThrottle(
+    ttlMs = RouteThrottle.LOGIN_TTL_MS,
+    limit = RouteThrottle.LOGIN_LIMIT
+  )
+  public ResponseEntity<AuthControllerLoginV1200Response> authControllerLoginV1(
+    LoginDto loginDto
+  ) {
     HttpServletRequest request = CurrentRequest.request();
     guestCheck.requireNoActiveSession(request);
 
-    LoginRequest.Builder wire =
-        LoginRequest.newBuilder().setEmail(loginDto.getEmail()).setPassword(loginDto.getPassword());
+    LoginRequest.Builder wire = LoginRequest.newBuilder()
+      .setEmail(loginDto.getEmail())
+      .setPassword(loginDto.getPassword());
     if (loginDto.getDeviceName() != null) {
       wire.setDeviceName(loginDto.getDeviceName());
     }
@@ -153,60 +174,65 @@ public class AuthController implements AuthApi {
     LoginResponse response = withMetadata(request).login(wire.build());
 
     return ResponseEntity.ok(
-        new AuthControllerLoginV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("OK")
-            .data(settleLogin(response, CurrentRequest.response())));
+      new AuthControllerLoginV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("OK")
+        .data(settleLogin(response, CurrentRequest.response()))
+    );
   }
 
   @Override
   public ResponseEntity<AuthControllerLoginV1200Response> authControllerLoginWithTenantV1(
-      LoginWithTenantDto loginWithTenantDto) {
+    LoginWithTenantDto loginWithTenantDto
+  ) {
     HttpServletRequest request = CurrentRequest.request();
     HttpServletResponse httpResponse = CurrentRequest.response();
     guestCheck.requireNoActiveSession(request);
 
-    String tenantSelectionToken =
-        cookies
-            .readTenantSelectionToken(request)
-            .orElseThrow(
-                () ->
-                    new ResponseStatusException(
-                        HttpStatus.UNAUTHORIZED,
-                        "No tenant selection is in progress. Start again from login."));
+    String tenantSelectionToken = cookies
+      .readTenantSelectionToken(request)
+      .orElseThrow(() ->
+        new ResponseStatusException(
+          HttpStatus.UNAUTHORIZED,
+          "No tenant selection is in progress. Start again from login."
+        )
+      );
 
-    LoginWithTenantRequest.Builder wire =
-        LoginWithTenantRequest.newBuilder()
-            .setTenantSelectionToken(tenantSelectionToken)
-            .setOrganizationId(loginWithTenantDto.getOrganizationId().toString());
+    LoginWithTenantRequest.Builder wire = LoginWithTenantRequest.newBuilder()
+      .setTenantSelectionToken(tenantSelectionToken)
+      .setOrganizationId(loginWithTenantDto.getOrganizationId().toString());
     if (loginWithTenantDto.getDeviceName() != null) {
       wire.setDeviceName(loginWithTenantDto.getDeviceName());
     }
     cookies.readDeviceToken(request).ifPresent(wire::setDeviceToken);
 
-    LoginResponse response = withMetadata(request).loginWithTenant(wire.build());
+    LoginResponse response = withMetadata(request).loginWithTenant(
+      wire.build()
+    );
 
     // Spent either way — the token named a set of accounts, and one has now
     // been chosen.
     cookies.clearTenantSelection(httpResponse);
 
     return ResponseEntity.ok(
-        new AuthControllerLoginV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("OK")
-            .data(settleLogin(response, httpResponse)));
+      new AuthControllerLoginV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("OK")
+        .data(settleLogin(response, httpResponse))
+    );
   }
 
   @Override
   public ResponseEntity<AuthControllerLoginV1200Response> authControllerGoogleSignInV1(
-      GoogleSignInDto googleSignInDto) {
+    GoogleSignInDto googleSignInDto
+  ) {
     HttpServletRequest request = CurrentRequest.request();
     guestCheck.requireNoActiveSession(request);
 
     GoogleSignInRequest.Builder wire =
-        GoogleSignInRequest.newBuilder().setIdToken(googleSignInDto.getIdToken());
+      GoogleSignInRequest.newBuilder().setIdToken(googleSignInDto.getIdToken());
     if (googleSignInDto.getDeviceName() != null) {
       wire.setDeviceName(googleSignInDto.getDeviceName());
     }
@@ -215,11 +241,12 @@ public class AuthController implements AuthApi {
     LoginResponse response = withMetadata(request).googleSignIn(wire.build());
 
     return ResponseEntity.ok(
-        new AuthControllerLoginV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("OK")
-            .data(settleLogin(response, CurrentRequest.response())));
+      new AuthControllerLoginV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("OK")
+        .data(settleLogin(response, CurrentRequest.response()))
+    );
   }
 
   /**
@@ -229,29 +256,37 @@ public class AuthController implements AuthApi {
    * known.
    */
   private AuthControllerLoginV1200ResponseData settleLogin(
-      LoginResponse response, HttpServletResponse httpResponse) {
+    LoginResponse response,
+    HttpServletResponse httpResponse
+  ) {
     if (response.getRequiresTenantSelection()) {
-      cookies.setTenantSelection(httpResponse, response.getTenantSelectionToken());
+      cookies.setTenantSelection(
+        httpResponse,
+        response.getTenantSelectionToken()
+      );
 
-      List<TenantOptionResponseDto> tenants =
-          response.getTenantsList().stream()
-              .map(
-                  tenant ->
-                      new TenantOptionResponseDto()
-                          .organizationId(tenant.getOrganizationId())
-                          .name(tenant.getName())
-                          .slug(tenant.getSlug()))
-              .toList();
+      List<TenantOptionResponseDto> tenants = response
+        .getTenantsList()
+        .stream()
+        .map(tenant ->
+          new TenantOptionResponseDto()
+            .organizationId(tenant.getOrganizationId())
+            .name(tenant.getName())
+            .slug(tenant.getSlug())
+        )
+        .toList();
 
-      return new TenantSelectionResponseDto().requiresTenantSelection(true).tenants(tenants);
+      return new TenantSelectionResponseDto()
+        .requiresTenantSelection(true)
+        .tenants(tenants);
     }
 
     if (response.getRequiresTwoFactor()) {
       cookies.setTwoFactorToken(httpResponse, response.getTwoFactorToken());
 
       return new TwoFactorRequiredResponseDto()
-          .requiresTwoFactor(true)
-          .requiresTwoFactorSetup(response.getRequiresTwoFactorSetup());
+        .requiresTwoFactor(true)
+        .requiresTwoFactorSetup(response.getRequiresTwoFactorSetup());
     }
 
     cookies.setAccessToken(httpResponse, response.getAccessToken());
@@ -260,13 +295,14 @@ public class AuthController implements AuthApi {
     // The body carries no tokens — HttpOnly cookies are unreadable by JS,
     // which is the entire point.
     return new LoginResponseDto()
-        .user(UserMapper.toUserResponseDto(response.getUser()))
-        .requiresTwoFactor(false);
+      .user(UserMapper.toUserResponseDto(response.getUser()))
+      .requiresTwoFactor(false);
   }
 
   @Override
   public ResponseEntity<AuthControllerLogoutV1200Response> authControllerLogoutV1(
-      LogoutDto logoutDto) {
+    LogoutDto logoutDto
+  ) {
     HttpServletRequest request = CurrentRequest.request();
     HttpServletResponse httpResponse = CurrentRequest.response();
     boolean allDevices = Boolean.TRUE.equals(logoutDto.getAllDevices());
@@ -274,13 +310,16 @@ public class AuthController implements AuthApi {
     Optional<String> refreshToken = cookies.readRefreshToken(request);
     LogoutResponseDto data;
     if (refreshToken.isPresent()) {
-      LogoutRequest wire =
-          LogoutRequest.newBuilder()
-              .setRefreshToken(refreshToken.get())
-              .setAllDevices(allDevices)
-              .build();
-      synapsedesk.auth.Auth.LogoutResponse response = withMetadata(request).logout(wire);
-      data = new LogoutResponseDto().revokedSessionCount(BigDecimal.valueOf(response.getRevokedSessionCount()));
+      LogoutRequest wire = LogoutRequest.newBuilder()
+        .setRefreshToken(refreshToken.get())
+        .setAllDevices(allDevices)
+        .build();
+      synapsedesk.auth.Auth.LogoutResponse response = withMetadata(
+        request
+      ).logout(wire);
+      data = new LogoutResponseDto().revokedSessionCount(
+        BigDecimal.valueOf(response.getRevokedSessionCount())
+      );
     } else {
       data = new LogoutResponseDto().revokedSessionCount(BigDecimal.ZERO);
     }
@@ -293,11 +332,12 @@ public class AuthController implements AuthApi {
     }
 
     return ResponseEntity.ok(
-        new AuthControllerLogoutV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("OK")
-            .data(data));
+      new AuthControllerLogoutV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("OK")
+        .data(data)
+    );
   }
 
   @Override
@@ -306,46 +346,58 @@ public class AuthController implements AuthApi {
     HttpServletResponse httpResponse = CurrentRequest.response();
     RequestContext context = currentUser.require(request);
 
-    synapsedesk.auth.Auth.LogoutAllResponse response =
-        withMetadata(context).logoutAll(LogoutAllRequest.newBuilder().build());
+    synapsedesk.auth.Auth.LogoutAllResponse response = withMetadata(
+      context
+    ).logoutAll(LogoutAllRequest.newBuilder().build());
 
     cookies.clearSession(httpResponse);
     cookies.clearDeviceToken(httpResponse);
 
     return ResponseEntity.ok(
-        new AuthControllerLogoutAllV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("Signed out of all devices")
-            .data(
-                new LogoutAllResponseDto()
-                    .revokedSessionCount(BigDecimal.valueOf(response.getRevokedSessionCount()))));
+      new AuthControllerLogoutAllV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("Signed out of all devices")
+        .data(
+          new LogoutAllResponseDto().revokedSessionCount(
+            BigDecimal.valueOf(response.getRevokedSessionCount())
+          )
+        )
+    );
   }
 
   @Override
-  @AuthThrottle(ttlMs = RouteThrottle.CHANGE_PASSWORD_TTL_MS, limit = RouteThrottle.CHANGE_PASSWORD_LIMIT)
+  @AuthThrottle(
+    ttlMs = RouteThrottle.CHANGE_PASSWORD_TTL_MS,
+    limit = RouteThrottle.CHANGE_PASSWORD_LIMIT
+  )
   public ResponseEntity<AuthControllerChangePasswordV1200Response> authControllerChangePasswordV1(
-      ChangePasswordDto changePasswordDto) {
+    ChangePasswordDto changePasswordDto
+  ) {
     HttpServletRequest request = CurrentRequest.request();
     RequestContext context = currentUser.require(request);
 
-    ChangePasswordRequest.Builder wire =
-        ChangePasswordRequest.newBuilder()
-            .setCurrentPassword(changePasswordDto.getCurrentPassword())
-            .setNewPassword(changePasswordDto.getNewPassword());
+    ChangePasswordRequest.Builder wire = ChangePasswordRequest.newBuilder()
+      .setCurrentPassword(changePasswordDto.getCurrentPassword())
+      .setNewPassword(changePasswordDto.getNewPassword());
     // Identifies the session to SPARE. Read from the cookie, never the body.
     cookies.readRefreshToken(request).ifPresent(wire::setRefreshToken);
 
-    synapsedesk.auth.Auth.ChangePasswordResponse response = withMetadata(context).changePassword(wire.build());
+    synapsedesk.auth.Auth.ChangePasswordResponse response = withMetadata(
+      context
+    ).changePassword(wire.build());
 
     return ResponseEntity.ok(
-        new AuthControllerChangePasswordV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("Password changed")
-            .data(
-                new ChangePasswordResponseDto()
-                    .revokedSessionCount(BigDecimal.valueOf(response.getRevokedSessionCount()))));
+      new AuthControllerChangePasswordV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("Password changed")
+        .data(
+          new ChangePasswordResponseDto().revokedSessionCount(
+            BigDecimal.valueOf(response.getRevokedSessionCount())
+          )
+        )
+    );
   }
 
   @Override
@@ -353,81 +405,101 @@ public class AuthController implements AuthApi {
     HttpServletRequest request = CurrentRequest.request();
     HttpServletResponse httpResponse = CurrentRequest.response();
 
-    String refreshToken =
-        cookies
-            .readRefreshToken(request)
-            .orElseThrow(
-                () -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "No refresh token provided"));
+    String refreshToken = cookies
+      .readRefreshToken(request)
+      .orElseThrow(() ->
+        new ResponseStatusException(
+          HttpStatus.UNAUTHORIZED,
+          "No refresh token provided"
+        )
+      );
 
-    synapsedesk.auth.Auth.RefreshTokenResponse response =
-        withMetadata(request)
-            .refreshToken(RefreshTokenRequest.newBuilder().setRefreshToken(refreshToken).build());
+    synapsedesk.auth.Auth.RefreshTokenResponse response = withMetadata(
+      request
+    ).refreshToken(
+      RefreshTokenRequest.newBuilder().setRefreshToken(refreshToken).build()
+    );
 
     cookies.setAccessToken(httpResponse, response.getAccessToken());
     cookies.setRefreshToken(httpResponse, response.getRefreshToken());
 
     return ResponseEntity.ok(
-        new AuthControllerRefreshV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("OK")
-            .data(
-                new LoginResponseDto()
-                    .user(UserMapper.toUserResponseDto(response.getUser()))
-                    .requiresTwoFactor(false)));
+      new AuthControllerRefreshV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("OK")
+        .data(
+          new LoginResponseDto()
+            .user(UserMapper.toUserResponseDto(response.getUser()))
+            .requiresTwoFactor(false)
+        )
+    );
   }
 
   @Override
-  @AuthThrottle(ttlMs = RouteThrottle.FORGOT_PASSWORD_TTL_MS, limit = RouteThrottle.FORGOT_PASSWORD_LIMIT)
+  @AuthThrottle(
+    ttlMs = RouteThrottle.FORGOT_PASSWORD_TTL_MS,
+    limit = RouteThrottle.FORGOT_PASSWORD_LIMIT
+  )
   public ResponseEntity<AuthControllerForgotPasswordV1202Response> authControllerForgotPasswordV1(
-      ForgotPasswordDto forgotPasswordDto) {
+    ForgotPasswordDto forgotPasswordDto
+  ) {
     HttpServletRequest request = CurrentRequest.request();
-    withMetadata(request)
-        .forgotPassword(ForgotPasswordRequest.newBuilder().setEmail(forgotPasswordDto.getEmail()).build());
+    withMetadata(request).forgotPassword(
+      ForgotPasswordRequest.newBuilder()
+        .setEmail(forgotPasswordDto.getEmail())
+        .build()
+    );
 
     // Always 202 — see `ForgotPasswordResponse`'s own note: it carries no
     // state, so this cannot become an account-enumeration oracle.
-    return ResponseEntity.status(HttpStatus.ACCEPTED)
-        .body(
-            new AuthControllerForgotPasswordV1202Response()
-                .success(true)
-                .statusCode(BigDecimal.valueOf(202))
-                .message("Accepted"));
+    return ResponseEntity.status(HttpStatus.ACCEPTED).body(
+      new AuthControllerForgotPasswordV1202Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(202))
+        .message("Accepted")
+    );
   }
 
   @Override
-  public ResponseEntity<AuthControllerValidatePasswordResetTokenV1200Response>
-      authControllerValidatePasswordResetTokenV1(String token) {
+  public ResponseEntity<AuthControllerValidatePasswordResetTokenV1200Response> authControllerValidatePasswordResetTokenV1(
+    String token
+  ) {
     HttpServletRequest request = CurrentRequest.request();
-    ValidatePasswordResetTokenResponse response =
-        withMetadata(request)
-            .validatePasswordResetToken(
-                ValidatePasswordResetTokenRequest.newBuilder().setToken(token).build());
+    ValidatePasswordResetTokenResponse response = withMetadata(
+      request
+    ).validatePasswordResetToken(
+      ValidatePasswordResetTokenRequest.newBuilder().setToken(token).build()
+    );
 
     return ResponseEntity.ok(
-        new AuthControllerValidatePasswordResetTokenV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("OK")
-            .data(
-                new ValidatePasswordResetTokenResponseDto()
-                    .valid(response.getValid())
-                    .email(response.hasEmail() ? response.getEmail() : null)));
+      new AuthControllerValidatePasswordResetTokenV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("OK")
+        .data(
+          new ValidatePasswordResetTokenResponseDto()
+            .valid(response.getValid())
+            .email(response.hasEmail() ? response.getEmail() : null)
+        )
+    );
   }
 
   @Override
   public ResponseEntity<AuthControllerResetPasswordV1200Response> authControllerResetPasswordV1(
-      ResetPasswordDto resetPasswordDto) {
+    ResetPasswordDto resetPasswordDto
+  ) {
     HttpServletRequest request = CurrentRequest.request();
     HttpServletResponse httpResponse = CurrentRequest.response();
 
-    synapsedesk.auth.Auth.ResetPasswordResponse response =
-        withMetadata(request)
-            .resetPassword(
-                ResetPasswordRequest.newBuilder()
-                    .setToken(resetPasswordDto.getToken())
-                    .setNewPassword(resetPasswordDto.getNewPassword())
-                    .build());
+    synapsedesk.auth.Auth.ResetPasswordResponse response = withMetadata(
+      request
+    ).resetPassword(
+      ResetPasswordRequest.newBuilder()
+        .setToken(resetPasswordDto.getToken())
+        .setNewPassword(resetPasswordDto.getNewPassword())
+        .build()
+    );
 
     // auth-service just deleted every session for this user, trusted devices
     // included — clear the caller's cookies so the browser matches that.
@@ -436,12 +508,15 @@ public class AuthController implements AuthApi {
     cookies.clearDeviceToken(httpResponse);
 
     return ResponseEntity.ok(
-        new AuthControllerResetPasswordV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("OK")
-            .data(
-                new ResetPasswordResponseDto()
-                    .revokedSessionCount(BigDecimal.valueOf(response.getRevokedSessionCount()))));
+      new AuthControllerResetPasswordV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("OK")
+        .data(
+          new ResetPasswordResponseDto().revokedSessionCount(
+            BigDecimal.valueOf(response.getRevokedSessionCount())
+          )
+        )
+    );
   }
 }

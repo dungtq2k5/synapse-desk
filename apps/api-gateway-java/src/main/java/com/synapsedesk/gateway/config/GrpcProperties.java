@@ -20,8 +20,9 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties(prefix = "grpc")
 public record GrpcProperties(
-    @NotBlank String authServiceUrl,
-    @NotBlank String ticketServiceUrl,
-    @NotBlank String ingestionServiceUrl,
-    @NotBlank String notificationServiceUrl,
-    @NotBlank String ragServiceUrl) {}
+  @NotBlank String authServiceUrl,
+  @NotBlank String ticketServiceUrl,
+  @NotBlank String ingestionServiceUrl,
+  @NotBlank String notificationServiceUrl,
+  @NotBlank String ragServiceUrl
+) {}

@@ -21,8 +21,9 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties(prefix = "inbound")
 public record InboundEmailProperties(
-    @NotBlank String secret,
-    @NotBlank String domain,
-    @NotBlank String sender,
-    @NotBlank String resendWebhookSecret,
-    @NotBlank String resendApiKey) {}
+  @NotBlank String secret,
+  @NotBlank String domain,
+  @NotBlank String sender,
+  @NotBlank String resendWebhookSecret,
+  @NotBlank String resendApiKey
+) {}

@@ -13,14 +13,14 @@ import java.util.List;
  * is what {@link #isFullSession()} is for.
  */
 public record JwtPrincipal(
-    String sub,
-    String organizationId,
-    boolean isSuperAdmin,
-    List<String> departmentIds,
-    List<String> permissionCodes,
-    boolean isEmailVerified,
-    boolean is2faPending) {
-
+  String sub,
+  String organizationId,
+  boolean isSuperAdmin,
+  List<String> departmentIds,
+  List<String> permissionCodes,
+  boolean isEmailVerified,
+  boolean is2faPending
+) {
   /** A caller mid-2FA-challenge has none of the rest — never treat one as authenticated. */
   public boolean isFullSession() {
     return !is2faPending;

@@ -27,14 +27,15 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties(prefix = "throttle")
 public record ThrottleProperties(
-    @NotNull Long shortTtl,
-    @NotNull Integer shortLimit,
-    @NotNull Long mediumTtl,
-    @NotNull Integer mediumLimit,
-    @NotNull Long longTtl,
-    @NotNull Integer longLimit,
-    @NotNull Long authTtl,
-    @NotNull Integer authLimit,
-    @NotNull Integer wsHandshakeLimit,
-    @NotNull Long wsHandshakeTtl,
-    @NotNull Long wsHandshakeBlockDuration) {}
+  @NotNull Long shortTtl,
+  @NotNull Integer shortLimit,
+  @NotNull Long mediumTtl,
+  @NotNull Integer mediumLimit,
+  @NotNull Long longTtl,
+  @NotNull Integer longLimit,
+  @NotNull Long authTtl,
+  @NotNull Integer authLimit,
+  @NotNull Integer wsHandshakeLimit,
+  @NotNull Long wsHandshakeTtl,
+  @NotNull Long wsHandshakeBlockDuration
+) {}

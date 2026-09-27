@@ -26,7 +26,9 @@ public class MetricsConfiguration {
   /** Nothing outside {@link PublishedSeries} reaches the scrape. */
   @Bean
   MeterFilter onlyThePublishedSeries() {
-    return MeterFilter.denyUnless(id -> PublishedSeries.LABELS.containsKey(id.getName()));
+    return MeterFilter.denyUnless(id ->
+      PublishedSeries.LABELS.containsKey(id.getName())
+    );
   }
 
   /**
@@ -50,7 +52,9 @@ public class MetricsConfiguration {
     return new MeterFilter() {
       @Override
       public DistributionStatisticConfig configure(
-          Meter.Id id, DistributionStatisticConfig config) {
+        Meter.Id id,
+        DistributionStatisticConfig config
+      ) {
         double[] buckets = PublishedSeries.BUCKETS.get(id.getName());
 
         if (buckets == null) {
@@ -60,16 +64,16 @@ public class MetricsConfiguration {
         double[] inBaseUnit = new double[buckets.length];
         for (int i = 0; i < buckets.length; i++) {
           inBaseUnit[i] =
-              id.getType() == Meter.Type.TIMER
-                  ? Duration.ofNanos((long) (buckets[i] * 1_000_000_000L)).toNanos()
-                  : buckets[i];
+            id.getType() == Meter.Type.TIMER
+              ? Duration.ofNanos((long) (buckets[i] * 1_000_000_000L)).toNanos()
+              : buckets[i];
         }
 
         return DistributionStatisticConfig.builder()
-            .serviceLevelObjectives(inBaseUnit)
-            .percentilesHistogram(false)
-            .build()
-            .merge(config);
+          .serviceLevelObjectives(inBaseUnit)
+          .percentilesHistogram(false)
+          .build()
+          .merge(config);
       }
     };
   }

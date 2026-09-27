@@ -8,13 +8,16 @@ import java.util.concurrent.TimeUnit;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import synapsedesk.auth.AuthServiceGrpc;
+import synapsedesk.auth.DepartmentServiceGrpc;
 import synapsedesk.auth.OtpServiceGrpc;
+import synapsedesk.auth.RoleServiceGrpc;
 import synapsedesk.auth.SessionServiceGrpc;
 import synapsedesk.auth.UserServiceGrpc;
 import synapsedesk.ingestion.AiLedgerServiceGrpc;
 import synapsedesk.ingestion.DocumentServiceGrpc;
 import synapsedesk.notification.NotificationServiceGrpc;
 import synapsedesk.ticket.AnalyticsServiceGrpc;
+import synapsedesk.ticket.AssignmentServiceGrpc;
 import synapsedesk.ticket.FeedbackServiceGrpc;
 import synapsedesk.ticket.MessageServiceGrpc;
 import synapsedesk.ticket.TicketServiceGrpc;
@@ -43,10 +46,12 @@ public class GrpcChannels {
   @Bean
   ManagedChannel authServiceChannel(GrpcProperties grpc) {
     String[] hostPort = grpc.authServiceUrl().split(":", 2);
-    authChannel =
-        NettyChannelBuilder.forAddress(hostPort[0], Integer.parseInt(hostPort[1]))
-            .usePlaintext()
-            .build();
+    authChannel = NettyChannelBuilder.forAddress(
+      hostPort[0],
+      Integer.parseInt(hostPort[1])
+    )
+      .usePlaintext()
+      .build();
 
     return authChannel;
   }
@@ -54,10 +59,12 @@ public class GrpcChannels {
   @Bean
   ManagedChannel ticketServiceChannel(GrpcProperties grpc) {
     String[] hostPort = grpc.ticketServiceUrl().split(":", 2);
-    ticketChannel =
-        NettyChannelBuilder.forAddress(hostPort[0], Integer.parseInt(hostPort[1]))
-            .usePlaintext()
-            .build();
+    ticketChannel = NettyChannelBuilder.forAddress(
+      hostPort[0],
+      Integer.parseInt(hostPort[1])
+    )
+      .usePlaintext()
+      .build();
 
     return ticketChannel;
   }
@@ -65,10 +72,12 @@ public class GrpcChannels {
   @Bean
   ManagedChannel ingestionServiceChannel(GrpcProperties grpc) {
     String[] hostPort = grpc.ingestionServiceUrl().split(":", 2);
-    ingestionChannel =
-        NettyChannelBuilder.forAddress(hostPort[0], Integer.parseInt(hostPort[1]))
-            .usePlaintext()
-            .build();
+    ingestionChannel = NettyChannelBuilder.forAddress(
+      hostPort[0],
+      Integer.parseInt(hostPort[1])
+    )
+      .usePlaintext()
+      .build();
 
     return ingestionChannel;
   }
@@ -76,73 +85,111 @@ public class GrpcChannels {
   @Bean
   ManagedChannel notificationServiceChannel(GrpcProperties grpc) {
     String[] hostPort = grpc.notificationServiceUrl().split(":", 2);
-    notificationChannel =
-        NettyChannelBuilder.forAddress(hostPort[0], Integer.parseInt(hostPort[1]))
-            .usePlaintext()
-            .build();
+    notificationChannel = NettyChannelBuilder.forAddress(
+      hostPort[0],
+      Integer.parseInt(hostPort[1])
+    )
+      .usePlaintext()
+      .build();
 
     return notificationChannel;
   }
 
   @Bean
-  public AuthServiceGrpc.AuthServiceBlockingStub authServiceStub(ManagedChannel authServiceChannel) {
+  public AuthServiceGrpc.AuthServiceBlockingStub authServiceStub(
+    ManagedChannel authServiceChannel
+  ) {
     return AuthServiceGrpc.newBlockingStub(authServiceChannel);
   }
 
   @Bean
-  public UserServiceGrpc.UserServiceBlockingStub userServiceStub(ManagedChannel authServiceChannel) {
+  public UserServiceGrpc.UserServiceBlockingStub userServiceStub(
+    ManagedChannel authServiceChannel
+  ) {
     return UserServiceGrpc.newBlockingStub(authServiceChannel);
   }
 
   @Bean
-  public OtpServiceGrpc.OtpServiceBlockingStub otpServiceStub(ManagedChannel authServiceChannel) {
+  public DepartmentServiceGrpc.DepartmentServiceBlockingStub departmentServiceStub(
+    ManagedChannel authServiceChannel
+  ) {
+    return DepartmentServiceGrpc.newBlockingStub(authServiceChannel);
+  }
+
+  @Bean
+  public RoleServiceGrpc.RoleServiceBlockingStub roleServiceStub(
+    ManagedChannel authServiceChannel
+  ) {
+    return RoleServiceGrpc.newBlockingStub(authServiceChannel);
+  }
+
+  @Bean
+  public OtpServiceGrpc.OtpServiceBlockingStub otpServiceStub(
+    ManagedChannel authServiceChannel
+  ) {
     return OtpServiceGrpc.newBlockingStub(authServiceChannel);
   }
 
   @Bean
-  public SessionServiceGrpc.SessionServiceBlockingStub sessionServiceStub(ManagedChannel authServiceChannel) {
+  public SessionServiceGrpc.SessionServiceBlockingStub sessionServiceStub(
+    ManagedChannel authServiceChannel
+  ) {
     return SessionServiceGrpc.newBlockingStub(authServiceChannel);
   }
 
   @Bean
   public FeedbackServiceGrpc.FeedbackServiceBlockingStub feedbackServiceStub(
-      ManagedChannel ticketServiceChannel) {
+    ManagedChannel ticketServiceChannel
+  ) {
     return FeedbackServiceGrpc.newBlockingStub(ticketServiceChannel);
   }
 
   @Bean
   public TicketServiceGrpc.TicketServiceBlockingStub ticketServiceStub(
-      ManagedChannel ticketServiceChannel) {
+    ManagedChannel ticketServiceChannel
+  ) {
     return TicketServiceGrpc.newBlockingStub(ticketServiceChannel);
   }
 
   @Bean
   public MessageServiceGrpc.MessageServiceBlockingStub messageServiceStub(
-      ManagedChannel ticketServiceChannel) {
+    ManagedChannel ticketServiceChannel
+  ) {
     return MessageServiceGrpc.newBlockingStub(ticketServiceChannel);
   }
 
   @Bean
+  public AssignmentServiceGrpc.AssignmentServiceBlockingStub assignmentServiceStub(
+    ManagedChannel ticketServiceChannel
+  ) {
+    return AssignmentServiceGrpc.newBlockingStub(ticketServiceChannel);
+  }
+
+  @Bean
   public AnalyticsServiceGrpc.AnalyticsServiceBlockingStub analyticsServiceStub(
-      ManagedChannel ticketServiceChannel) {
+    ManagedChannel ticketServiceChannel
+  ) {
     return AnalyticsServiceGrpc.newBlockingStub(ticketServiceChannel);
   }
 
   @Bean
   public AiLedgerServiceGrpc.AiLedgerServiceBlockingStub aiLedgerServiceStub(
-      ManagedChannel ingestionServiceChannel) {
+    ManagedChannel ingestionServiceChannel
+  ) {
     return AiLedgerServiceGrpc.newBlockingStub(ingestionServiceChannel);
   }
 
   @Bean
   public DocumentServiceGrpc.DocumentServiceBlockingStub documentServiceStub(
-      ManagedChannel ingestionServiceChannel) {
+    ManagedChannel ingestionServiceChannel
+  ) {
     return DocumentServiceGrpc.newBlockingStub(ingestionServiceChannel);
   }
 
   @Bean
   public NotificationServiceGrpc.NotificationServiceBlockingStub notificationServiceStub(
-      ManagedChannel notificationServiceChannel) {
+    ManagedChannel notificationServiceChannel
+  ) {
     return NotificationServiceGrpc.newBlockingStub(notificationServiceChannel);
   }
 

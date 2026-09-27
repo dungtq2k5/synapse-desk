@@ -59,15 +59,14 @@ public final class GatewayLease {
    * <p>KEYS[1] mine, KEYS[2] theirs; ARGV[1] now, ARGV[2] expiry, ARGV[3] pod
    * id, ARGV[4] ttl.
    */
-  public static final String CLAIM =
-      """
-      redis.call('ZREMRANGEBYSCORE', KEYS[1], '-inf', ARGV[1])
-      redis.call('ZREMRANGEBYSCORE', KEYS[2], '-inf', ARGV[1])
-      if redis.call('ZCARD', KEYS[2]) > 0 then return 0 end
-      redis.call('ZADD', KEYS[1], ARGV[2], ARGV[3])
-      redis.call('PEXPIRE', KEYS[1], ARGV[4])
-      return 1
-      """;
+  public static final String CLAIM = """
+  redis.call('ZREMRANGEBYSCORE', KEYS[1], '-inf', ARGV[1])
+  redis.call('ZREMRANGEBYSCORE', KEYS[2], '-inf', ARGV[1])
+  if redis.call('ZCARD', KEYS[2]) > 0 then return 0 end
+  redis.call('ZADD', KEYS[1], ARGV[2], ARGV[3])
+  redis.call('PEXPIRE', KEYS[1], ARGV[4])
+  return 1
+  """;
 
   /**
    * Extends the caller's OWN entry, and only if it is still there.
@@ -76,11 +75,10 @@ public final class GatewayLease {
    * a fence, or to a pause long enough for the TTL to expire — and two owners
    * is exactly what the lease prevents. Absent means lost.
    */
-  public static final String REFRESH_SCRIPT =
-      """
-      if redis.call('ZSCORE', KEYS[1], ARGV[2]) == false then return 0 end
-      redis.call('ZADD', KEYS[1], ARGV[1], ARGV[2])
-      redis.call('PEXPIRE', KEYS[1], ARGV[3])
-      return 1
-      """;
+  public static final String REFRESH_SCRIPT = """
+  if redis.call('ZSCORE', KEYS[1], ARGV[2]) == false then return 0 end
+  redis.call('ZADD', KEYS[1], ARGV[1], ARGV[2])
+  redis.call('PEXPIRE', KEYS[1], ARGV[3])
+  return 1
+  """;
 }

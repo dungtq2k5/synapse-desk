@@ -1,12 +1,12 @@
 package com.synapsedesk.gateway;
 
-import tools.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.Map;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * A GET over real HTTP, for the rows that must not go through MockMvc.
@@ -17,16 +17,17 @@ import java.util.Map;
  * is not worth a dependency that moves.
  */
 public record HttpProbe(int status, String body) {
-
   private static final HttpClient CLIENT = HttpClient.newHttpClient();
   private static final ObjectMapper JSON = new ObjectMapper();
 
   public static HttpProbe get(int port, String path) {
     try {
-      HttpResponse<String> response =
-          CLIENT.send(
-              HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + path)).build(),
-              HttpResponse.BodyHandlers.ofString());
+      HttpResponse<String> response = CLIENT.send(
+        HttpRequest.newBuilder(
+          URI.create("http://127.0.0.1:" + port + path)
+        ).build(),
+        HttpResponse.BodyHandlers.ofString()
+      );
 
       return new HttpProbe(response.statusCode(), response.body());
     } catch (IOException | InterruptedException cause) {
@@ -46,14 +47,18 @@ public record HttpProbe(int status, String body) {
    * expressible — the row it serves is the one where a caller sends bytes
    * without saying what they are.
    */
-  public static HttpProbe postWithoutContentType(int port, String path, String body) {
+  public static HttpProbe postWithoutContentType(
+    int port,
+    String path,
+    String body
+  ) {
     try {
-      HttpResponse<String> response =
-          CLIENT.send(
-              HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + path))
-                  .POST(HttpRequest.BodyPublishers.ofString(body))
-                  .build(),
-              HttpResponse.BodyHandlers.ofString());
+      HttpResponse<String> response = CLIENT.send(
+        HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + path))
+          .POST(HttpRequest.BodyPublishers.ofString(body))
+          .build(),
+        HttpResponse.BodyHandlers.ofString()
+      );
 
       return new HttpProbe(response.statusCode(), response.body());
     } catch (IOException | InterruptedException cause) {
@@ -62,15 +67,20 @@ public record HttpProbe(int status, String body) {
   }
 
   /** A POST with a chosen content type — the unsupported-media-type row. */
-  public static HttpProbe post(int port, String path, String body, String contentType) {
+  public static HttpProbe post(
+    int port,
+    String path,
+    String body,
+    String contentType
+  ) {
     try {
-      HttpResponse<String> response =
-          CLIENT.send(
-              HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + path))
-                  .header("Content-Type", contentType)
-                  .POST(HttpRequest.BodyPublishers.ofString(body))
-                  .build(),
-              HttpResponse.BodyHandlers.ofString());
+      HttpResponse<String> response = CLIENT.send(
+        HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + path))
+          .header("Content-Type", contentType)
+          .POST(HttpRequest.BodyPublishers.ofString(body))
+          .build(),
+        HttpResponse.BodyHandlers.ofString()
+      );
 
       return new HttpProbe(response.statusCode(), response.body());
     } catch (IOException | InterruptedException cause) {
