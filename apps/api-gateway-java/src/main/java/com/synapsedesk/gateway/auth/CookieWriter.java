@@ -93,6 +93,17 @@ public class CookieWriter {
     clear(response, jwt.refreshName());
   }
 
+  /**
+   * The 2FA challenge cookie alone — {@code clear2faTokenCookie}, reproduced.
+   * Used standalone by the second leg of login: the challenge is spent before
+   * the real session cookies are set, never grouped with {@link
+   * #clearSession}, which clears access/refresh/2fa/tenant-selection together
+   * for an actual sign-out.
+   */
+  public void clearTwoFactorToken(HttpServletResponse response) {
+    clear(response, jwt.twoFactorName());
+  }
+
   public void clearTenantSelection(HttpServletResponse response) {
     clear(response, jwt.tenantSelectionName());
   }

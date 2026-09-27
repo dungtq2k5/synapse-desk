@@ -39,4 +39,16 @@ public final class RouteThrottle {
   /** Second line behind `otps.max_attempts`. */
   public static final long OTP_VERIFY_TTL_MS = 10 * 60_000;
   public static final int OTP_VERIFY_LIMIT = 10;
+
+  /** Second line behind auth-service's own attempt limit on the challenge. */
+  public static final long TWO_FACTOR_AUTHENTICATE_TTL_MS = 15 * 60_000;
+  public static final int TWO_FACTOR_AUTHENTICATE_LIMIT = 10;
+
+  /** Reads Postgres and generates nothing — the `medium` tier's own default would already cover it; this pins the number. */
+  public static final long KNOWLEDGE_SEARCH_TTL_MS = 60_000;
+  public static final int KNOWLEDGE_SEARCH_LIMIT = 30;
+
+  /** Ask GENERATES, so it costs an order of magnitude more than search. */
+  public static final long KNOWLEDGE_ASK_TTL_MS = 60_000;
+  public static final int KNOWLEDGE_ASK_LIMIT = 10;
 }

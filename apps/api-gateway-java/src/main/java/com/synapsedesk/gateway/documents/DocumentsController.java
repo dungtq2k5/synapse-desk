@@ -28,7 +28,6 @@ import com.synapsedesk.gateway.generated.model.DocumentsControllerListV1200Respo
 import com.synapsedesk.gateway.generated.model.DocumentsControllerPresignV1200Response;
 import com.synapsedesk.gateway.generated.model.DocumentsControllerReindexV1202Response;
 import com.synapsedesk.gateway.generated.model.DocumentsControllerStorageUsageV1200Response;
-import com.synapsedesk.gateway.generated.model.IngestionJobResponseDto;
 import com.synapsedesk.gateway.generated.model.InvitationsControllerListV1200ResponseDataMeta;
 import com.synapsedesk.gateway.generated.model.PresignDocumentDto;
 import com.synapsedesk.gateway.generated.model.ReplaceDocumentDto;
@@ -37,6 +36,7 @@ import com.synapsedesk.gateway.generated.model.SetDocumentDepartmentsDto;
 import com.synapsedesk.gateway.generated.model.StorageUsageResponseDto;
 import com.synapsedesk.gateway.generated.model.UpdateDocumentDto;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
+import com.synapsedesk.gateway.ingestionjobs.IngestionJobMapper;
 import com.synapsedesk.gateway.security.RequirePermission;
 import io.grpc.stub.MetadataUtils;
 import java.math.BigDecimal;
@@ -580,7 +580,7 @@ public class DocumentsController implements DocumentsApi {
         .success(true)
         .statusCode(BigDecimal.valueOf(202))
         .message("Reindex queued")
-        .data(toIngestionJobDto(response))
+        .data(IngestionJobMapper.toDto(response))
     );
   }
 
@@ -650,7 +650,7 @@ public class DocumentsController implements DocumentsApi {
           response
             .getItemsList()
             .stream()
-            .map(DocumentsController::toIngestionJobDto)
+            .map(IngestionJobMapper::toDto)
             .toList()
         )
         .meta(toMetaDto(response.getMeta()));
@@ -883,22 +883,6 @@ public class DocumentsController implements DocumentsApi {
       BigDecimal.valueOf(chunk.getTokenCount()),
       chunk.hasVectorPointId() ? chunk.getVectorPointId() : null,
       toOffsetDateTime(chunk.getCreatedAt())
-    );
-  }
-
-  private static IngestionJobResponseDto toIngestionJobDto(
-    IngestionJobResponse job
-  ) {
-    return new IngestionJobResponseDto(
-      job.getId(),
-      job.getDocumentId(),
-      job.getBullmqJobId(),
-      IngestionJobResponseDto.StatusEnum.fromValue(
-        job.getStatus().name().replace("INGESTION_JOB_STATUS_", "")
-      ),
-      job.getErrorLog(),
-      job.hasProcessedAt() ? toOffsetDateTime(job.getProcessedAt()) : null,
-      toOffsetDateTime(job.getCreatedAt())
     );
   }
 

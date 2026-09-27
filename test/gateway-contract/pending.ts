@@ -110,6 +110,24 @@ export const SKIPPED_FOR_JAVA: Readonly<Record<string, string>> = {
     'generated `UpdateUserDto.dob` cannot distinguish an explicit `null` ' +
     "from an absent key the way Node's `dto.dob === null` check can — both " +
     'deserialize to the same Java `null`',
+  '**`changePlan` succeeds without an `Idempotency-Key` header**':
+    'the published contract marks `idempotency-key` required on this route ' +
+    '(no `@ApiHeader` names it in `billing.controller.ts` — this looks like ' +
+    "the Swagger CLI plugin's own default for a bare `@Headers()` parameter, " +
+    "not a deliberate spec decision) while Node's handler treats it as " +
+    'optional (`idempotencyKey?: string`) and never enforces the header at ' +
+    'all. Java\'s generated `BillingApi` takes the published contract ' +
+    'literally (`@NotNull @RequestHeader(required = true)`), so an absent ' +
+    'header 400s before the controller runs — a genuine, pre-existing spec/' +
+    'implementation gap this port did not introduce and should not paper ' +
+    'over by deviating from the generated interface',
+  '**a relayed `ticket.*` event reaches a client on EACH replica exactly once**':
+    'the realtime WebSocket gateway. The Java gateway has no Socket.IO/' +
+    'WebSocket server at all yet; this row only started running once ' +
+    '`TicketsApi` left `pending-apis.txt`, since it shares that tag for ' +
+    'topical grouping, not because it exercises the REST interface',
+  '**presence still CROSSES replicas**':
+    'the realtime WebSocket gateway, same cause as the row above',
 };
 
 /** True when this row's NAME is on the explicit list. */

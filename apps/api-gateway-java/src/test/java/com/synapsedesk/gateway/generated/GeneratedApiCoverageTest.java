@@ -109,12 +109,12 @@ class GeneratedApiCoverageTest {
 
   @Test
   void theListOnlyEverShrinks() throws IOException {
-    // 31 tags generated, one implemented. Asserting the size makes both
-    // directions deliberate: implementing a tag is an edit here, and so is
-    // adding a tag nobody implements — which is the case the compiler cannot
-    // see and the reason this file exists.
+    // 31 tags generated. Asserting the size makes both directions
+    // deliberate: implementing a tag is an edit here, and so is adding a tag
+    // nobody implements — which is the case the compiler cannot see and the
+    // reason this file exists.
     assertThat(generated()).hasSize(31);
-    assertThat(pending()).hasSize(19);
+    assertThat(pending()).hasSize(0);
   }
 
   @Test

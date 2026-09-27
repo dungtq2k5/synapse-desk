@@ -8,15 +8,24 @@ import java.util.concurrent.TimeUnit;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import synapsedesk.auth.AuthServiceGrpc;
+import synapsedesk.auth.BillingServiceGrpc;
 import synapsedesk.auth.DepartmentServiceGrpc;
+import synapsedesk.auth.InvitationServiceGrpc;
+import synapsedesk.auth.OrganizationServiceGrpc;
 import synapsedesk.auth.OtpServiceGrpc;
+import synapsedesk.auth.PlatformServiceGrpc;
 import synapsedesk.auth.RoleServiceGrpc;
 import synapsedesk.auth.SessionServiceGrpc;
+import synapsedesk.auth.TwoFactorAuthServiceGrpc;
 import synapsedesk.auth.UserServiceGrpc;
 import synapsedesk.ingestion.AiLedgerServiceGrpc;
 import synapsedesk.ingestion.DocumentServiceGrpc;
+import synapsedesk.ingestion.IngestionPlatformServiceGrpc;
 import synapsedesk.notification.NotificationServiceGrpc;
+import synapsedesk.rag.RagServiceGrpc;
+import synapsedesk.ticket.AiServiceGrpc;
 import synapsedesk.ticket.AnalyticsServiceGrpc;
+import synapsedesk.ticket.AuditServiceGrpc;
 import synapsedesk.ticket.AssignmentServiceGrpc;
 import synapsedesk.ticket.FeedbackServiceGrpc;
 import synapsedesk.ticket.MessageServiceGrpc;
@@ -41,6 +50,7 @@ public class GrpcChannels {
   private ManagedChannel ticketChannel;
   private ManagedChannel ingestionChannel;
   private ManagedChannel notificationChannel;
+  private ManagedChannel ragChannel;
 
   /** The channel, as its own bean — both stubs below depend on it, so Spring orders it first. */
   @Bean
@@ -96,6 +106,19 @@ public class GrpcChannels {
   }
 
   @Bean
+  ManagedChannel ragServiceChannel(GrpcProperties grpc) {
+    String[] hostPort = grpc.ragServiceUrl().split(":", 2);
+    ragChannel = NettyChannelBuilder.forAddress(
+      hostPort[0],
+      Integer.parseInt(hostPort[1])
+    )
+      .usePlaintext()
+      .build();
+
+    return ragChannel;
+  }
+
+  @Bean
   public AuthServiceGrpc.AuthServiceBlockingStub authServiceStub(
     ManagedChannel authServiceChannel
   ) {
@@ -107,6 +130,20 @@ public class GrpcChannels {
     ManagedChannel authServiceChannel
   ) {
     return UserServiceGrpc.newBlockingStub(authServiceChannel);
+  }
+
+  @Bean
+  public BillingServiceGrpc.BillingServiceBlockingStub billingServiceStub(
+    ManagedChannel authServiceChannel
+  ) {
+    return BillingServiceGrpc.newBlockingStub(authServiceChannel);
+  }
+
+  @Bean
+  public PlatformServiceGrpc.PlatformServiceBlockingStub platformServiceStub(
+    ManagedChannel authServiceChannel
+  ) {
+    return PlatformServiceGrpc.newBlockingStub(authServiceChannel);
   }
 
   @Bean
@@ -124,6 +161,20 @@ public class GrpcChannels {
   }
 
   @Bean
+  public InvitationServiceGrpc.InvitationServiceBlockingStub invitationServiceStub(
+    ManagedChannel authServiceChannel
+  ) {
+    return InvitationServiceGrpc.newBlockingStub(authServiceChannel);
+  }
+
+  @Bean
+  public OrganizationServiceGrpc.OrganizationServiceBlockingStub organizationServiceStub(
+    ManagedChannel authServiceChannel
+  ) {
+    return OrganizationServiceGrpc.newBlockingStub(authServiceChannel);
+  }
+
+  @Bean
   public OtpServiceGrpc.OtpServiceBlockingStub otpServiceStub(
     ManagedChannel authServiceChannel
   ) {
@@ -131,10 +182,24 @@ public class GrpcChannels {
   }
 
   @Bean
+  public TwoFactorAuthServiceGrpc.TwoFactorAuthServiceBlockingStub twoFactorAuthServiceStub(
+    ManagedChannel authServiceChannel
+  ) {
+    return TwoFactorAuthServiceGrpc.newBlockingStub(authServiceChannel);
+  }
+
+  @Bean
   public SessionServiceGrpc.SessionServiceBlockingStub sessionServiceStub(
     ManagedChannel authServiceChannel
   ) {
     return SessionServiceGrpc.newBlockingStub(authServiceChannel);
+  }
+
+  @Bean
+  public AiServiceGrpc.AiServiceBlockingStub aiServiceStub(
+    ManagedChannel ticketServiceChannel
+  ) {
+    return AiServiceGrpc.newBlockingStub(ticketServiceChannel);
   }
 
   @Bean
@@ -166,6 +231,13 @@ public class GrpcChannels {
   }
 
   @Bean
+  public AuditServiceGrpc.AuditServiceBlockingStub auditServiceStub(
+    ManagedChannel ticketServiceChannel
+  ) {
+    return AuditServiceGrpc.newBlockingStub(ticketServiceChannel);
+  }
+
+  @Bean
   public AnalyticsServiceGrpc.AnalyticsServiceBlockingStub analyticsServiceStub(
     ManagedChannel ticketServiceChannel
   ) {
@@ -184,6 +256,20 @@ public class GrpcChannels {
     ManagedChannel ingestionServiceChannel
   ) {
     return DocumentServiceGrpc.newBlockingStub(ingestionServiceChannel);
+  }
+
+  @Bean
+  public RagServiceGrpc.RagServiceBlockingStub ragServiceStub(
+    ManagedChannel ragServiceChannel
+  ) {
+    return RagServiceGrpc.newBlockingStub(ragServiceChannel);
+  }
+
+  @Bean
+  public IngestionPlatformServiceGrpc.IngestionPlatformServiceBlockingStub ingestionPlatformServiceStub(
+    ManagedChannel ingestionServiceChannel
+  ) {
+    return IngestionPlatformServiceGrpc.newBlockingStub(ingestionServiceChannel);
   }
 
   @Bean
@@ -206,6 +292,9 @@ public class GrpcChannels {
     }
     if (notificationChannel != null) {
       notificationChannel.shutdown().awaitTermination(5, TimeUnit.SECONDS);
+    }
+    if (ragChannel != null) {
+      ragChannel.shutdown().awaitTermination(5, TimeUnit.SECONDS);
     }
   }
 }

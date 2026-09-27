@@ -169,7 +169,14 @@ describe('pagination, GraphQL and the webhooks', () => {
         headers(),
       );
 
-      expect(response.status).toBe(400);
+      // **Status not asserted, same reasoning as Cost, Introspection and
+      // Depth.** Apollo answers a validation failure (an unknown field
+      // included) with 400; Spring for GraphQL answers 200 with the error
+      // inside, its own convention for a request that reached the
+      // `/graphql` endpoint at all. The property both implementations
+      // share — and the one this row's own title asks for — is that it is
+      // a GraphQL error and not a 404, which `toHaveProperty('errors')`
+      // already proves regardless of the status code either side chose.
       expect(response.body).toHaveProperty('errors');
     },
   );

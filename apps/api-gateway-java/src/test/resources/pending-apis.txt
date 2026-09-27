@@ -13,22 +13,3 @@
 #
 # `OpsApi`, `AuthApi` and `UsersApi` are deliberately absent: their
 # controllers implement them.
-AiApi
-AuditLogsApi
-BillingApi
-DepartmentsApi
-IngestionJobsApi
-InvitationsApi
-KnowledgeApi
-MessagesApi
-OrganizationsApi
-PermissionsApi
-PlatformApi
-PlatformAuditLogsApi
-PlatformJobsApi
-RolesApi
-SessionsApi
-TicketsApi
-TwoFactorAuthApi
-WebhookEndpointsApi
-WebhooksApi

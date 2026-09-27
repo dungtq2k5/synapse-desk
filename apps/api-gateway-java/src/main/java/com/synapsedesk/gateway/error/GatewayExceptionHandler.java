@@ -2,6 +2,8 @@ package com.synapsedesk.gateway.error;
 
 import io.grpc.StatusRuntimeException;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
 import java.util.ArrayList;
 import java.util.List;
 import org.springframework.http.HttpStatus;
@@ -55,6 +57,43 @@ public class GatewayExceptionHandler {
 
     for (var error : exception.getBindingResult().getGlobalErrors()) {
       messages.add(error.getDefaultMessage());
+    }
+
+    return envelope(
+      HttpStatus.BAD_REQUEST,
+      request,
+      ErrorMessages.format(messages)
+    );
+  }
+
+  /**
+   * A failed `@RequestParam`/`@PathVariable` constraint — `page=0` against
+   * `@DecimalMin("1")`, for instance. A DIFFERENT exception from a failed
+   * `@Valid` body: the generated `*Api` interfaces carry their constraints
+   * on the INTERFACE method's parameters, so Spring validates them through
+   * Bean Validation's own `MethodValidationInterceptor` (an AOP proxy around
+   * the whole method call) rather than through the per-argument MVC pipeline
+   * that throws {@link org.springframework.web.bind.MethodArgumentNotValidException}.
+   * Uncaught, this fell through to the catch-all below as a plain
+   * {@code Exception} and answered 500 — swallowing the field name and the
+   * reason, on every route with a constrained query parameter, until the
+   * first row that actually sent an out-of-bounds one.
+   */
+  @ExceptionHandler(ConstraintViolationException.class)
+  public ResponseEntity<ErrorEnvelope> onConstraintViolation(
+    ConstraintViolationException exception,
+    HttpServletRequest request
+  ) {
+    List<String> messages = new ArrayList<>();
+
+    for (ConstraintViolation<?> violation : exception.getConstraintViolations()) {
+      // The path is `<method>.<parameter>` (e.g. `rolesControllerListV1.page`)
+      // — the method name is an implementation detail nobody asked for; the
+      // PARAMETER name is the field class-validator would have named too.
+      String path = violation.getPropertyPath().toString();
+      int lastDot = path.lastIndexOf('.');
+      String field = lastDot < 0 ? path : path.substring(lastDot + 1);
+      messages.add(field + " " + violation.getMessage());
     }
 
     return envelope(

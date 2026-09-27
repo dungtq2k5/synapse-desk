@@ -7,9 +7,11 @@ import com.synapsedesk.gateway.config.SharedEnvironmentInitializer;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import java.math.BigDecimal;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Value;
@@ -17,8 +19,11 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -46,7 +51,18 @@ class ErrorResponsesTest {
   @Value("${local.server.port}")
   private int port;
 
-  /** The smallest surface that reaches every branch of the advice. */
+  /**
+   * The smallest surface that reaches every branch of the advice.
+   *
+   * <p>
+   * {@code @Validated} at the class level, matching every generated
+   * {@code *Api} interface — that is what routes a constrained
+   * {@code @RequestParam} through Bean Validation's own AOP method
+   * interceptor rather than through the per-argument MVC pipeline, and is
+   * what makes {@link #page} exercise the SAME exception type a real
+   * paginated route does.
+   */
+  @Validated
   @TestConfiguration
   @RestController
   static class Probes {
@@ -85,6 +101,19 @@ class ErrorResponsesTest {
           "[http:402] Your plan does not include this"
         )
       );
+    }
+
+    /**
+     * Mirrors every generated `*Api`'s `@DecimalMin`-constrained page
+     * parameter — `page=0` throws {@link jakarta.validation.ConstraintViolationException}
+     * from the class-level `@Validated` proxy, not
+     * `MethodArgumentNotValidException`.
+     */
+    @GetMapping("/probe/page")
+    String page(
+      @DecimalMin("1") @RequestParam(defaultValue = "1") BigDecimal page
+    ) {
+      return "page=" + page;
     }
   }
 
@@ -178,6 +207,26 @@ class ErrorResponsesTest {
       .get("error");
 
     assertThat(error).contains("email");
+  }
+
+  @Test
+  void aConstrainedQueryParameterIsSplit() {
+    // The bug this row exists to catch: `ConstraintViolationException` (the
+    // AOP method-interceptor's exception) fell through to the catch-all
+    // `Exception` handler as a 500, "Internal server error!" — swallowing
+    // both the field name and the reason. Never exercised until the first
+    // generated `*Api` operation with a constrained query parameter actually
+    // shipped, because this suite's OWN probes only ever validated a body.
+    HttpProbe response = HttpProbe.get(port, "/probe/page?page=0");
+
+    assertEnvelope(response, 400, "/probe/page");
+    String error = (String) response.json().get("error");
+    // EXACT — ours: the field name leads the message, same as a body
+    // violation.
+    assertThat(error).startsWith("page ");
+    assertThat(error).endsWith("!");
+    // LOOSE — Bean Validation's own phrasing for `@DecimalMin`.
+    assertThat(error).contains("greater than or equal to 1");
   }
 
   @Test

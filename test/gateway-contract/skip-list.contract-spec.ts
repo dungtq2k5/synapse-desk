@@ -100,6 +100,15 @@ describe('the Java skip list', () => {
     // A file read across the workspace boundary, which `image-contract`
     // permits — it refuses relative IMPORTS that leave a workspace, not data.
     expect(existsSync(PENDING_APIS)).toBe(true);
-    expect(pendingApis().size).toBeGreaterThan(0);
+
+    // Not `toBeGreaterThan(0)`: Phase A's REST half finished with the file
+    // genuinely empty, which is the goal state, not a broken harness. The
+    // floor this row actually needs is that `pendingApis()` tracks the FILE
+    // rather than a value baked in at import time — proven by counting the
+    // file's own uncommented lines independently and comparing.
+    const declaredCount = readFileSync(PENDING_APIS, 'utf8')
+      .split('\n')
+      .filter((line) => line.trim().length > 0 && !line.trim().startsWith('#')).length;
+    expect(pendingApis().size).toBe(declaredCount);
   });
 });
