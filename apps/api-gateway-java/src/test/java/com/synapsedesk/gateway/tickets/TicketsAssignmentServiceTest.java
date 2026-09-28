@@ -26,10 +26,10 @@ import synapsedesk.ticket.Assignment.AssignTicketToSelfRequest;
 import synapsedesk.ticket.Assignment.AssignmentResponse;
 import synapsedesk.ticket.Assignment.ListAssignmentsResponse;
 import synapsedesk.ticket.AssignmentServiceGrpc;
+import synapsedesk.ticket.Common.TicketStatus;
 import synapsedesk.ticket.Ticket.MarkTicketReadRequest;
 import synapsedesk.ticket.Ticket.MarkTicketReadResponse;
 import synapsedesk.ticket.Ticket.TicketStatusChangeResponse;
-import synapsedesk.ticket.Common.TicketStatus;
 import synapsedesk.ticket.TicketServiceGrpc;
 
 /**
@@ -44,21 +44,37 @@ import synapsedesk.ticket.TicketServiceGrpc;
 class TicketsAssignmentServiceTest {
 
   private final AssignmentServiceGrpc.AssignmentServiceBlockingStub assignmentStub =
-      mock(AssignmentServiceGrpc.AssignmentServiceBlockingStub.class);
-  private final TicketServiceGrpc.TicketServiceBlockingStub ticketStub =
-      mock(TicketServiceGrpc.TicketServiceBlockingStub.class);
+    mock(AssignmentServiceGrpc.AssignmentServiceBlockingStub.class);
+  private final TicketServiceGrpc.TicketServiceBlockingStub ticketStub = mock(
+    TicketServiceGrpc.TicketServiceBlockingStub.class
+  );
   private TicketsAssignmentService service;
 
-  private static final UUID ASSIGNEE_ID = UUID.fromString("11111111-1111-4111-8111-111111111111");
-  private static final UUID DEPARTMENT_ID = UUID.fromString("22222222-2222-4222-8222-222222222222");
+  private static final UUID ASSIGNEE_ID = UUID.fromString(
+    "11111111-1111-4111-8111-111111111111"
+  );
+  private static final UUID DEPARTMENT_ID = UUID.fromString(
+    "22222222-2222-4222-8222-222222222222"
+  );
 
   private static RequestContext contextWithCodes(List<String> codes) {
-    return new RequestContext("agent-1", "org-1", false, List.of(), codes, true, "127.0.0.1", "test");
+    return new RequestContext(
+      "agent-1",
+      "org-1",
+      false,
+      List.of(),
+      codes,
+      true,
+      "127.0.0.1",
+      "test"
+    );
   }
 
   @BeforeEach
   void setUp() {
-    when(assignmentStub.withDeadlineAfter(anyLong(), any())).thenReturn(assignmentStub);
+    when(assignmentStub.withDeadlineAfter(anyLong(), any())).thenReturn(
+      assignmentStub
+    );
     when(assignmentStub.withInterceptors(any())).thenReturn(assignmentStub);
     when(ticketStub.withDeadlineAfter(anyLong(), any())).thenReturn(ticketStub);
     when(ticketStub.withInterceptors(any())).thenReturn(ticketStub);
@@ -67,25 +83,41 @@ class TicketsAssignmentServiceTest {
 
   @Test
   void assignRequiresTicketAssignNotTicketAssignSelf() {
-    assertThatThrownBy(
-            () -> service.assign(contextWithCodes(List.of("ticket.assign.self")), "ticket-1", assignDto()))
-        .isInstanceOf(ResponseStatusException.class);
+    assertThatThrownBy(() ->
+      service.assign(
+        contextWithCodes(List.of("ticket.assign.self")),
+        "ticket-1",
+        assignDto()
+      )
+    ).isInstanceOf(ResponseStatusException.class);
     verify(assignmentStub, never()).assignTicket(any());
 
     when(assignmentStub.assignTicket(any())).thenReturn(wireAssignment());
-    var response = service.assign(contextWithCodes(List.of("ticket.assign")), "ticket-1", assignDto());
+    var response = service.assign(
+      contextWithCodes(List.of("ticket.assign")),
+      "ticket-1",
+      assignDto()
+    );
     assertThat(response.getStatusCode().value()).isEqualTo(200);
   }
 
   @Test
   void reassignRequiresTicketReassignNotTicketAssign() {
-    assertThatThrownBy(
-            () -> service.reassign(contextWithCodes(List.of("ticket.assign")), "ticket-1", assignDto()))
-        .isInstanceOf(ResponseStatusException.class);
+    assertThatThrownBy(() ->
+      service.reassign(
+        contextWithCodes(List.of("ticket.assign")),
+        "ticket-1",
+        assignDto()
+      )
+    ).isInstanceOf(ResponseStatusException.class);
     verify(assignmentStub, never()).reassignTicket(any());
 
     when(assignmentStub.reassignTicket(any())).thenReturn(wireAssignment());
-    var response = service.reassign(contextWithCodes(List.of("ticket.reassign")), "ticket-1", assignDto());
+    var response = service.reassign(
+      contextWithCodes(List.of("ticket.reassign")),
+      "ticket-1",
+      assignDto()
+    );
     assertThat(response.getStatusCode().value()).isEqualTo(200);
   }
 
@@ -94,13 +126,21 @@ class TicketsAssignmentServiceTest {
     AssignTicketToSelfDto dto = new AssignTicketToSelfDto();
     dto.setDepartmentId(DEPARTMENT_ID);
 
-    assertThatThrownBy(
-            () -> service.assignToSelf(contextWithCodes(List.of("ticket.assign")), "ticket-1", dto))
-        .isInstanceOf(ResponseStatusException.class);
+    assertThatThrownBy(() ->
+      service.assignToSelf(
+        contextWithCodes(List.of("ticket.assign")),
+        "ticket-1",
+        dto
+      )
+    ).isInstanceOf(ResponseStatusException.class);
     verify(assignmentStub, never()).assignTicketToSelf(any());
 
     when(assignmentStub.assignTicketToSelf(any())).thenReturn(wireAssignment());
-    var response = service.assignToSelf(contextWithCodes(List.of("ticket.assign.self")), "ticket-1", dto);
+    var response = service.assignToSelf(
+      contextWithCodes(List.of("ticket.assign.self")),
+      "ticket-1",
+      dto
+    );
     assertThat(response.getStatusCode().value()).isEqualTo(200);
   }
 
@@ -110,29 +150,49 @@ class TicketsAssignmentServiceTest {
     AssignTicketToSelfDto dto = new AssignTicketToSelfDto();
     dto.setDepartmentId(DEPARTMENT_ID);
 
-    service.assignToSelf(contextWithCodes(List.of("ticket.assign.self")), "ticket-1", dto);
+    service.assignToSelf(
+      contextWithCodes(List.of("ticket.assign.self")),
+      "ticket-1",
+      dto
+    );
 
-    ArgumentCaptor<AssignTicketToSelfRequest> captor = ArgumentCaptor.forClass(AssignTicketToSelfRequest.class);
+    ArgumentCaptor<AssignTicketToSelfRequest> captor = ArgumentCaptor.forClass(
+      AssignTicketToSelfRequest.class
+    );
     verify(assignmentStub).assignTicketToSelf(captor.capture());
     assertThat(captor.getValue().getTicketId()).isEqualTo("ticket-1");
-    assertThat(captor.getValue().getDepartmentId()).isEqualTo(DEPARTMENT_ID.toString());
+    assertThat(captor.getValue().getDepartmentId()).isEqualTo(
+      DEPARTMENT_ID.toString()
+    );
   }
 
   @Test
   void unassignRequiresTicketAssign() {
-    assertThatThrownBy(() -> service.unassign(contextWithCodes(List.of("ticket.assign.self")), "ticket-1"))
-        .isInstanceOf(ResponseStatusException.class);
+    assertThatThrownBy(() ->
+      service.unassign(
+        contextWithCodes(List.of("ticket.assign.self")),
+        "ticket-1"
+      )
+    ).isInstanceOf(ResponseStatusException.class);
     verify(assignmentStub, never()).unassignTicket(any());
 
-    var response = service.unassign(contextWithCodes(List.of("ticket.assign")), "ticket-1");
+    var response = service.unassign(
+      contextWithCodes(List.of("ticket.assign")),
+      "ticket-1"
+    );
     assertThat(response.getStatusCode().value()).isEqualTo(204);
   }
 
   @Test
   void listAssignmentsNeedsNoPermissionCheck() {
-    when(assignmentStub.listAssignments(any())).thenReturn(ListAssignmentsResponse.getDefaultInstance());
+    when(assignmentStub.listAssignments(any())).thenReturn(
+      ListAssignmentsResponse.getDefaultInstance()
+    );
 
-    var response = service.listAssignments(contextWithCodes(List.of()), "ticket-1");
+    var response = service.listAssignments(
+      contextWithCodes(List.of()),
+      "ticket-1"
+    );
 
     assertThat(response.getStatusCode().value()).isEqualTo(200);
   }
@@ -141,27 +201,39 @@ class TicketsAssignmentServiceTest {
   void markReadForwardsAnExplicitReadAtVerbatim() {
     OffsetDateTime readAt = OffsetDateTime.parse("2026-09-01T00:00:00Z");
     when(ticketStub.markTicketRead(any())).thenReturn(
-        MarkTicketReadResponse.newBuilder().setLastReadAt(TicketsCrudService.toTimestamp(readAt)).build());
+      MarkTicketReadResponse.newBuilder()
+        .setLastReadAt(TicketsCrudService.toTimestamp(readAt))
+        .build()
+    );
     MarkTicketReadDto dto = new MarkTicketReadDto();
     dto.setReadAt(readAt);
 
     service.markRead(contextWithCodes(List.of()), "ticket-1", dto);
 
-    ArgumentCaptor<MarkTicketReadRequest> captor = ArgumentCaptor.forClass(MarkTicketReadRequest.class);
+    ArgumentCaptor<MarkTicketReadRequest> captor = ArgumentCaptor.forClass(
+      MarkTicketReadRequest.class
+    );
     verify(ticketStub).markTicketRead(captor.capture());
     assertThat(captor.getValue().hasReadAt()).isTrue();
-    assertThat(captor.getValue().getReadAt()).isEqualTo(TicketsCrudService.toTimestamp(readAt));
+    assertThat(captor.getValue().getReadAt()).isEqualTo(
+      TicketsCrudService.toTimestamp(readAt)
+    );
   }
 
   @Test
   void markReadNeverDefaultsAnAbsentReadAt() {
     when(ticketStub.markTicketRead(any())).thenReturn(
-        MarkTicketReadResponse.newBuilder().setLastReadAt(Timestamp.getDefaultInstance()).build());
+      MarkTicketReadResponse.newBuilder()
+        .setLastReadAt(Timestamp.getDefaultInstance())
+        .build()
+    );
     MarkTicketReadDto dto = new MarkTicketReadDto();
 
     service.markRead(contextWithCodes(List.of()), "ticket-1", dto);
 
-    ArgumentCaptor<MarkTicketReadRequest> captor = ArgumentCaptor.forClass(MarkTicketReadRequest.class);
+    ArgumentCaptor<MarkTicketReadRequest> captor = ArgumentCaptor.forClass(
+      MarkTicketReadRequest.class
+    );
     verify(ticketStub).markTicketRead(captor.capture());
     assertThat(captor.getValue().hasReadAt()).isFalse();
   }
@@ -169,18 +241,23 @@ class TicketsAssignmentServiceTest {
   @Test
   void listStatusChangesUsesTheIdFieldNameNotTicketId() {
     when(ticketStub.listTicketStatusChanges(any())).thenReturn(
-        synapsedesk.ticket.Ticket.ListTicketStatusChangesResponse.newBuilder()
-            .addItems(
-                TicketStatusChangeResponse.newBuilder()
-                    .setId("row-1")
-                    .setTicketId("ticket-1")
-                    .setToStatus(TicketStatus.TICKET_STATUS_OPEN)
-                    .setChangedById("agent-1")
-                    .setChangedAt(Timestamp.getDefaultInstance())
-                    .build())
-            .build());
+      synapsedesk.ticket.Ticket.ListTicketStatusChangesResponse.newBuilder()
+        .addItems(
+          TicketStatusChangeResponse.newBuilder()
+            .setId("row-1")
+            .setTicketId("ticket-1")
+            .setToStatus(TicketStatus.TICKET_STATUS_OPEN)
+            .setChangedById("agent-1")
+            .setChangedAt(Timestamp.getDefaultInstance())
+            .build()
+        )
+        .build()
+    );
 
-    var response = service.listStatusChanges(contextWithCodes(List.of()), "ticket-1");
+    var response = service.listStatusChanges(
+      contextWithCodes(List.of()),
+      "ticket-1"
+    );
 
     assertThat(response.getBody().getData()).hasSize(1);
   }
@@ -195,14 +272,14 @@ class TicketsAssignmentServiceTest {
   private static AssignmentResponse wireAssignment() {
     Timestamp now = Timestamp.newBuilder().setSeconds(1_756_684_800).build();
     return AssignmentResponse.newBuilder()
-        .setId("assignment-1")
-        .setTicketId("ticket-1")
-        .setAssignedToId(ASSIGNEE_ID.toString())
-        .setAssignedById("agent-1")
-        .setDepartmentId(DEPARTMENT_ID.toString())
-        .setAssignedAt(now)
-        .setIsCurrent(true)
-        .setCreatedAt(now)
-        .build();
+      .setId("assignment-1")
+      .setTicketId("ticket-1")
+      .setAssignedToId(ASSIGNEE_ID.toString())
+      .setAssignedById("agent-1")
+      .setDepartmentId(DEPARTMENT_ID.toString())
+      .setAssignedAt(now)
+      .setIsCurrent(true)
+      .setCreatedAt(now)
+      .build();
   }
 }

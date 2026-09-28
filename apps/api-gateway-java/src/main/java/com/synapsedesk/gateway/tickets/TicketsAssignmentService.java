@@ -21,13 +21,13 @@ import java.util.concurrent.TimeUnit;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
-import synapsedesk.ticket.AssignmentServiceGrpc;
 import synapsedesk.ticket.Assignment.AssignTicketRequest;
 import synapsedesk.ticket.Assignment.AssignTicketToSelfRequest;
 import synapsedesk.ticket.Assignment.AssignmentResponse;
 import synapsedesk.ticket.Assignment.ListAssignmentsRequest;
 import synapsedesk.ticket.Assignment.ListAssignmentsResponse;
 import synapsedesk.ticket.Assignment.UnassignTicketRequest;
+import synapsedesk.ticket.AssignmentServiceGrpc;
 import synapsedesk.ticket.Common.ReassignmentReason;
 import synapsedesk.ticket.Ticket.MarkTicketReadRequest;
 import synapsedesk.ticket.Ticket.MarkTicketReadResponse;
@@ -75,60 +75,114 @@ public class TicketsAssignmentService {
   private final TicketServiceGrpc.TicketServiceBlockingStub ticketStub;
 
   public TicketsAssignmentService(
-      AssignmentServiceGrpc.AssignmentServiceBlockingStub assignmentStub,
-      TicketServiceGrpc.TicketServiceBlockingStub ticketStub) {
+    AssignmentServiceGrpc.AssignmentServiceBlockingStub assignmentStub,
+    TicketServiceGrpc.TicketServiceBlockingStub ticketStub
+  ) {
     this.assignmentStub = assignmentStub;
     this.ticketStub = ticketStub;
   }
 
-  public ResponseEntity<TicketsControllerAssignV1200Response> assign(RequestContext context, String id, AssignTicketDto dto) {
-    TicketsCrudService.requirePermission(context, PermissionCodesEnum.TICKET_ASSIGN);
+  public ResponseEntity<TicketsControllerAssignV1200Response> assign(
+    RequestContext context,
+    String id,
+    AssignTicketDto dto
+  ) {
+    TicketsCrudService.requirePermission(
+      context,
+      PermissionCodesEnum.TICKET_ASSIGN
+    );
 
-    AssignmentResponse response = withAssignmentMetadata(context).assignTicket(toAssignTicketRequest(id, dto));
+    AssignmentResponse response = withAssignmentMetadata(context).assignTicket(
+      toAssignTicketRequest(id, dto)
+    );
 
     return ok(response, "Ticket assigned");
   }
 
-  public ResponseEntity<TicketsControllerAssignV1200Response> reassign(RequestContext context, String id, AssignTicketDto dto) {
-    TicketsCrudService.requirePermission(context, PermissionCodesEnum.TICKET_REASSIGN);
+  public ResponseEntity<TicketsControllerAssignV1200Response> reassign(
+    RequestContext context,
+    String id,
+    AssignTicketDto dto
+  ) {
+    TicketsCrudService.requirePermission(
+      context,
+      PermissionCodesEnum.TICKET_REASSIGN
+    );
 
-    AssignmentResponse response = withAssignmentMetadata(context).reassignTicket(toAssignTicketRequest(id, dto));
+    AssignmentResponse response = withAssignmentMetadata(
+      context
+    ).reassignTicket(toAssignTicketRequest(id, dto));
 
     return ok(response, "Ticket reassigned");
   }
 
   public ResponseEntity<TicketsControllerAssignV1200Response> assignToSelf(
-      RequestContext context, String id, AssignTicketToSelfDto dto) {
-    TicketsCrudService.requirePermission(context, PermissionCodesEnum.TICKET_ASSIGN_SELF);
+    RequestContext context,
+    String id,
+    AssignTicketToSelfDto dto
+  ) {
+    TicketsCrudService.requirePermission(
+      context,
+      PermissionCodesEnum.TICKET_ASSIGN_SELF
+    );
 
-    AssignmentResponse response =
-        withAssignmentMetadata(context)
-            .assignTicketToSelf(
-                AssignTicketToSelfRequest.newBuilder().setTicketId(id).setDepartmentId(dto.getDepartmentId().toString()).build());
+    AssignmentResponse response = withAssignmentMetadata(
+      context
+    ).assignTicketToSelf(
+      AssignTicketToSelfRequest.newBuilder()
+        .setTicketId(id)
+        .setDepartmentId(dto.getDepartmentId().toString())
+        .build()
+    );
 
     return ok(response, "Ticket claimed");
   }
 
-  public ResponseEntity<AuthControllerForgotPasswordV1202Response> unassign(RequestContext context, String id) {
-    TicketsCrudService.requirePermission(context, PermissionCodesEnum.TICKET_ASSIGN);
+  public ResponseEntity<AuthControllerForgotPasswordV1202Response> unassign(
+    RequestContext context,
+    String id
+  ) {
+    TicketsCrudService.requirePermission(
+      context,
+      PermissionCodesEnum.TICKET_ASSIGN
+    );
 
-    withAssignmentMetadata(context).unassignTicket(UnassignTicketRequest.newBuilder().setTicketId(id).build());
+    withAssignmentMetadata(context).unassignTicket(
+      UnassignTicketRequest.newBuilder().setTicketId(id).build()
+    );
 
-    return ResponseEntity.status(HttpStatus.NO_CONTENT)
-        .body(new AuthControllerForgotPasswordV1202Response().success(true).statusCode(BigDecimal.valueOf(204)).message("OK"));
+    return ResponseEntity.status(HttpStatus.NO_CONTENT).body(
+      new AuthControllerForgotPasswordV1202Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(204))
+        .message("OK")
+    );
   }
 
   /** No permission beyond reading the ticket — the service applies the same author-or-assignee filter it applies to the ticket itself. */
-  public ResponseEntity<TicketsControllerListAssignmentsV1200Response> listAssignments(RequestContext context, String id) {
-    ListAssignmentsResponse response =
-        withAssignmentMetadata(context).listAssignments(ListAssignmentsRequest.newBuilder().setTicketId(id).build());
+  public ResponseEntity<TicketsControllerListAssignmentsV1200Response> listAssignments(
+    RequestContext context,
+    String id
+  ) {
+    ListAssignmentsResponse response = withAssignmentMetadata(
+      context
+    ).listAssignments(
+      ListAssignmentsRequest.newBuilder().setTicketId(id).build()
+    );
 
     return ResponseEntity.ok(
-        new TicketsControllerListAssignmentsV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("OK")
-            .data(response.getItemsList().stream().map(TicketsAssignmentService::toAssignmentResponseDto).toList()));
+      new TicketsControllerListAssignmentsV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("OK")
+        .data(
+          response
+            .getItemsList()
+            .stream()
+            .map(TicketsAssignmentService::toAssignmentResponseDto)
+            .toList()
+        )
+    );
   }
 
   /**
@@ -139,95 +193,160 @@ public class TicketsAssignmentService {
    * client's render and this request — the Java port must not "helpfully"
    * default it either.
    */
-  public ResponseEntity<TicketsControllerMarkReadV1200Response> markRead(RequestContext context, String id, MarkTicketReadDto dto) {
-    MarkTicketReadRequest.Builder wire = MarkTicketReadRequest.newBuilder().setTicketId(id);
+  public ResponseEntity<TicketsControllerMarkReadV1200Response> markRead(
+    RequestContext context,
+    String id,
+    MarkTicketReadDto dto
+  ) {
+    MarkTicketReadRequest.Builder wire =
+      MarkTicketReadRequest.newBuilder().setTicketId(id);
     if (dto.getReadAt() != null) {
       wire.setReadAt(TicketsCrudService.toTimestamp(dto.getReadAt()));
     }
 
-    MarkTicketReadResponse response = withTicketMetadata(context).markTicketRead(wire.build());
+    MarkTicketReadResponse response = withTicketMetadata(
+      context
+    ).markTicketRead(wire.build());
 
     return ResponseEntity.ok(
-        new TicketsControllerMarkReadV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("Marked read")
-            .data(new MarkTicketReadResponseDto().lastReadAt(TicketsCrudService.toOffsetDateTime(response.getLastReadAt()))));
+      new TicketsControllerMarkReadV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("Marked read")
+        .data(
+          new MarkTicketReadResponseDto().lastReadAt(
+            TicketsCrudService.toOffsetDateTime(response.getLastReadAt())
+          )
+        )
+    );
   }
 
   /** Not `audit_logs` — ticket data behind the same visibility filter as the ticket itself, not an admin-gated table. */
-  public ResponseEntity<TicketsControllerListStatusChangesV1200Response> listStatusChanges(RequestContext context, String id) {
-    var response = withTicketMetadata(context).listTicketStatusChanges(TicketIdRequest.newBuilder().setId(id).build());
+  public ResponseEntity<TicketsControllerListStatusChangesV1200Response> listStatusChanges(
+    RequestContext context,
+    String id
+  ) {
+    var response = withTicketMetadata(context).listTicketStatusChanges(
+      TicketIdRequest.newBuilder().setId(id).build()
+    );
 
     return ResponseEntity.ok(
-        new TicketsControllerListStatusChangesV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("OK")
-            .data(response.getItemsList().stream().map(TicketsAssignmentService::toStatusChangeDto).toList()));
+      new TicketsControllerListStatusChangesV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("OK")
+        .data(
+          response
+            .getItemsList()
+            .stream()
+            .map(TicketsAssignmentService::toStatusChangeDto)
+            .toList()
+        )
+    );
   }
 
-  private static AssignTicketRequest toAssignTicketRequest(String id, AssignTicketDto dto) {
-    AssignTicketRequest.Builder wire =
-        AssignTicketRequest.newBuilder()
-            .setTicketId(id)
-            .setAssigneeId(dto.getAssigneeId().toString())
-            .setDepartmentId(dto.getDepartmentId().toString());
+  private static AssignTicketRequest toAssignTicketRequest(
+    String id,
+    AssignTicketDto dto
+  ) {
+    AssignTicketRequest.Builder wire = AssignTicketRequest.newBuilder()
+      .setTicketId(id)
+      .setAssigneeId(dto.getAssigneeId().toString())
+      .setDepartmentId(dto.getDepartmentId().toString());
     if (dto.getReason() != null) {
-      wire.setReason(ReassignmentReason.valueOf("REASSIGNMENT_REASON_" + dto.getReason().getValue()));
+      wire.setReason(
+        ReassignmentReason.valueOf(
+          "REASSIGNMENT_REASON_" + dto.getReason().getValue()
+        )
+      );
     }
     return wire.build();
   }
 
-  private static ResponseEntity<TicketsControllerAssignV1200Response> ok(AssignmentResponse response, String message) {
+  private static ResponseEntity<TicketsControllerAssignV1200Response> ok(
+    AssignmentResponse response,
+    String message
+  ) {
     return ResponseEntity.ok(
-        new TicketsControllerAssignV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message(message)
-            .data(toAssignmentResponseDto(response)));
+      new TicketsControllerAssignV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message(message)
+        .data(toAssignmentResponseDto(response))
+    );
   }
 
-  private static AssignmentResponseDto toAssignmentResponseDto(AssignmentResponse assignment) {
+  private static AssignmentResponseDto toAssignmentResponseDto(
+    AssignmentResponse assignment
+  ) {
     return new AssignmentResponseDto()
-        .id(assignment.getId())
-        .ticketId(assignment.getTicketId())
-        .assignedToId(assignment.getAssignedToId())
-        .assignedById(assignment.getAssignedById())
-        .departmentId(assignment.getDepartmentId())
-        .assignedAt(TicketsCrudService.toOffsetDateTime(assignment.getAssignedAt()))
-        .unassignedAt(assignment.hasUnassignedAt() ? TicketsCrudService.toOffsetDateTime(assignment.getUnassignedAt()) : null)
-        .reason(
-            assignment.getReason() == ReassignmentReason.REASSIGNMENT_REASON_UNSPECIFIED
-                ? null
-                : AssignmentResponseDto.ReasonEnum.fromValue(assignment.getReason().name().replace("REASSIGNMENT_REASON_", "")))
-        .isCurrent(assignment.getIsCurrent())
-        .createdAt(TicketsCrudService.toOffsetDateTime(assignment.getCreatedAt()));
+      .id(assignment.getId())
+      .ticketId(assignment.getTicketId())
+      .assignedToId(assignment.getAssignedToId())
+      .assignedById(assignment.getAssignedById())
+      .departmentId(assignment.getDepartmentId())
+      .assignedAt(
+        TicketsCrudService.toOffsetDateTime(assignment.getAssignedAt())
+      )
+      .unassignedAt(
+        assignment.hasUnassignedAt()
+          ? TicketsCrudService.toOffsetDateTime(assignment.getUnassignedAt())
+          : null
+      )
+      .reason(
+        assignment.getReason() ==
+          ReassignmentReason.REASSIGNMENT_REASON_UNSPECIFIED
+          ? null
+          : AssignmentResponseDto.ReasonEnum.fromValue(
+              assignment.getReason().name().replace("REASSIGNMENT_REASON_", "")
+            )
+      )
+      .isCurrent(assignment.getIsCurrent())
+      .createdAt(
+        TicketsCrudService.toOffsetDateTime(assignment.getCreatedAt())
+      );
   }
 
-  private static TicketStatusChangeResponseDto toStatusChangeDto(TicketStatusChangeResponse row) {
+  private static TicketStatusChangeResponseDto toStatusChangeDto(
+    TicketStatusChangeResponse row
+  ) {
     return new TicketStatusChangeResponseDto()
-        .id(row.getId())
-        .ticketId(row.getTicketId())
-        .fromStatus(
-            row.hasFromStatus()
-                ? TicketStatusChangeResponseDto.FromStatusEnum.fromValue(row.getFromStatus().name().replace("TICKET_STATUS_", ""))
-                : null)
-        .toStatus(TicketStatusChangeResponseDto.ToStatusEnum.fromValue(row.getToStatus().name().replace("TICKET_STATUS_", "")))
-        .changedById(row.getChangedById())
-        .reason(row.hasReason() ? row.getReason() : null)
-        .changedAt(TicketsCrudService.toOffsetDateTime(row.getChangedAt()));
+      .id(row.getId())
+      .ticketId(row.getTicketId())
+      .fromStatus(
+        row.hasFromStatus()
+          ? TicketStatusChangeResponseDto.FromStatusEnum.fromValue(
+              row.getFromStatus().name().replace("TICKET_STATUS_", "")
+            )
+          : null
+      )
+      .toStatus(
+        TicketStatusChangeResponseDto.ToStatusEnum.fromValue(
+          row.getToStatus().name().replace("TICKET_STATUS_", "")
+        )
+      )
+      .changedById(row.getChangedById())
+      .reason(row.hasReason() ? row.getReason() : null)
+      .changedAt(TicketsCrudService.toOffsetDateTime(row.getChangedAt()));
   }
 
-  private AssignmentServiceGrpc.AssignmentServiceBlockingStub withAssignmentMetadata(RequestContext context) {
+  private AssignmentServiceGrpc.AssignmentServiceBlockingStub withAssignmentMetadata(
+    RequestContext context
+  ) {
     return assignmentStub
-        .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
-        .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context)));
+      .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
+      .withInterceptors(
+        MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context))
+      );
   }
 
-  private TicketServiceGrpc.TicketServiceBlockingStub withTicketMetadata(RequestContext context) {
+  private TicketServiceGrpc.TicketServiceBlockingStub withTicketMetadata(
+    RequestContext context
+  ) {
     return ticketStub
-        .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
-        .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context)));
+      .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
+      .withInterceptors(
+        MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context))
+      );
   }
 }

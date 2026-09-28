@@ -65,7 +65,9 @@ import tools.jackson.databind.ObjectMapper;
 @Component
 public class CacheInvalidationConsumer implements LeaseRuntime {
 
-  private static final Logger LOG = LoggerFactory.getLogger(CacheInvalidationConsumer.class);
+  private static final Logger LOG = LoggerFactory.getLogger(
+    CacheInvalidationConsumer.class
+  );
 
   private static final String SCOPE_TICKETS = "tickets";
   private static final String SCOPE_DOCUMENTS = "documents";
@@ -86,7 +88,11 @@ public class CacheInvalidationConsumer implements LeaseRuntime {
 
   private volatile Connection connection;
 
-  public CacheInvalidationConsumer(StoreProperties store, CacheService cache, ObjectMapper json) {
+  public CacheInvalidationConsumer(
+    StoreProperties store,
+    CacheService cache,
+    ObjectMapper json
+  ) {
     this.store = store;
     this.cache = cache;
     this.json = json;
@@ -101,12 +107,21 @@ public class CacheInvalidationConsumer implements LeaseRuntime {
         dispatcher.subscribe(subject);
       }
       connection = opened;
-      LOG.info("Cache invalidation consumer subscribed to {} subjects", SUBJECT_SCOPES.size());
+      LOG.info(
+        "Cache invalidation consumer subscribed to {} subjects",
+        SUBJECT_SCOPES.size()
+      );
     } catch (InterruptedException failure) {
       Thread.currentThread().interrupt();
-      throw new IllegalStateException("Could not start the cache invalidation consumer", failure);
+      throw new IllegalStateException(
+        "Could not start the cache invalidation consumer",
+        failure
+      );
     } catch (IOException failure) {
-      throw new IllegalStateException("Could not start the cache invalidation consumer", failure);
+      throw new IllegalStateException(
+        "Could not start the cache invalidation consumer",
+        failure
+      );
     }
   }
 
@@ -160,10 +175,19 @@ public class CacheInvalidationConsumer implements LeaseRuntime {
     try {
       int removed = cache.invalidateScope(organizationId, scope);
       if (removed > 0) {
-        LOG.debug("Dropped {} {} entries for {}", removed, scope, organizationId);
+        LOG.debug(
+          "Dropped {} {} entries for {}",
+          removed,
+          scope,
+          organizationId
+        );
       }
     } catch (RuntimeException invalidationFailed) {
-      LOG.error("Cache invalidation failed for {}: {}", scope, invalidationFailed.getMessage());
+      LOG.error(
+        "Cache invalidation failed for {}: {}",
+        scope,
+        invalidationFailed.getMessage()
+      );
     }
   }
 
@@ -179,7 +203,10 @@ public class CacheInvalidationConsumer implements LeaseRuntime {
       return null;
     }
 
-    JsonNode event = root.get("pattern") != null || root.get("data") != null ? root.get("data") : root;
+    JsonNode event =
+      root.get("pattern") != null || root.get("data") != null
+        ? root.get("data")
+        : root;
     if (event == null) {
       return null;
     }
@@ -201,19 +228,32 @@ public class CacheInvalidationConsumer implements LeaseRuntime {
     Map<String, List<String>> map = new LinkedHashMap<>();
 
     for (String subject : List.of(
-        Subjects.TICKET_CREATED, Subjects.TICKET_ESCALATED, Subjects.TICKET_ASSIGNED, Subjects.TICKET_REASSIGNED,
-        Subjects.TICKET_UNASSIGNED, Subjects.TICKET_STATUS_CHANGED, Subjects.TICKET_MESSAGE_CREATED,
-        Subjects.TICKET_MESSAGE_UPDATED, Subjects.TICKET_MESSAGE_REDACTED)) {
+      Subjects.TICKET_CREATED,
+      Subjects.TICKET_ESCALATED,
+      Subjects.TICKET_ASSIGNED,
+      Subjects.TICKET_REASSIGNED,
+      Subjects.TICKET_UNASSIGNED,
+      Subjects.TICKET_STATUS_CHANGED,
+      Subjects.TICKET_MESSAGE_CREATED,
+      Subjects.TICKET_MESSAGE_UPDATED,
+      Subjects.TICKET_MESSAGE_REDACTED
+    )) {
       map.put(subject, List.of(SCOPE_TICKETS));
     }
 
     // `document.uploaded` is deliberately absent — see the class docblock.
     for (String subject : List.of(
-        Subjects.DOCUMENT_INDEXED, Subjects.DOCUMENT_INGESTION_FAILED, Subjects.DOCUMENT_SCOPE_CHANGED)) {
+      Subjects.DOCUMENT_INDEXED,
+      Subjects.DOCUMENT_INGESTION_FAILED,
+      Subjects.DOCUMENT_SCOPE_CHANGED
+    )) {
       map.put(subject, List.of(SCOPE_DOCUMENTS));
     }
 
-    map.put(Subjects.BILLING_ENTITLEMENTS_CHANGED, List.of(SCOPE_SETTINGS, SCOPE_ORGANIZATIONS));
+    map.put(
+      Subjects.BILLING_ENTITLEMENTS_CHANGED,
+      List.of(SCOPE_SETTINGS, SCOPE_ORGANIZATIONS)
+    );
 
     return Map.copyOf(map);
   }

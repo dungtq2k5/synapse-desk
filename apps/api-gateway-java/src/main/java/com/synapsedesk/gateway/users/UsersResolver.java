@@ -45,7 +45,10 @@ public class UsersResolver {
   private final UserServiceGrpc.UserServiceBlockingStub stub;
   private final CurrentUser currentUser;
 
-  public UsersResolver(UserServiceGrpc.UserServiceBlockingStub stub, CurrentUser currentUser) {
+  public UsersResolver(
+    UserServiceGrpc.UserServiceBlockingStub stub,
+    CurrentUser currentUser
+  ) {
     this.stub = stub;
     this.currentUser = currentUser;
   }
@@ -54,8 +57,9 @@ public class UsersResolver {
   public UserGqlDto me() {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    CurrentUserResponse response =
-        withMetadata(context).getCurrentUser(GetCurrentUserRequest.newBuilder().setUserId(context.sub()).build());
+    CurrentUserResponse response = withMetadata(context).getCurrentUser(
+      GetCurrentUserRequest.newBuilder().setUserId(context.sub()).build()
+    );
 
     return UserGqlMapper.toUserGqlDto(response);
   }
@@ -66,7 +70,9 @@ public class UsersResolver {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     try {
-      UserSummaryResponse response = withMetadata(context).getUser(UserIdRequest.newBuilder().setId(id).build());
+      UserSummaryResponse response = withMetadata(context).getUser(
+        UserIdRequest.newBuilder().setId(id).build()
+      );
       return UserGqlMapper.toUserGqlDto(response);
     } catch (StatusRuntimeException notFoundOrForbidden) {
       // Null rather than an error, matching `Query.ticket`/`Query.role`: a
@@ -77,27 +83,32 @@ public class UsersResolver {
 
   @QueryMapping(name = "users")
   @RequirePermission(PermissionCodesEnum.USER_READ)
-  public UserPageGqlDto users(@Argument int first, @Argument int page, @Argument String searchTerm) {
+  public UserPageGqlDto users(
+    @Argument int first,
+    @Argument int page,
+    @Argument String searchTerm
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    PageRequest.Builder pageRequest =
-        PageRequest.newBuilder().setPage(page).setLimit(first).setSortOrder(SortOrder.SORT_ORDER_ASC);
+    PageRequest.Builder pageRequest = PageRequest.newBuilder()
+      .setPage(page)
+      .setLimit(first)
+      .setSortOrder(SortOrder.SORT_ORDER_ASC);
     if (searchTerm != null) {
       pageRequest.setSearchTerm(searchTerm);
     }
 
-    ListUsersResponse response =
-        withMetadata(context)
-            .listUsers(
-                ListUsersRequest.newBuilder()
-                    .setPage(pageRequest)
-                    // Never deleted users, and not negotiable from here — the
-                    // same rule `DepartmentsResolver` and `DocumentsResolver`
-                    // state; the REST route gates the flag on `user.delete`
-                    // inside the controller, so a resolver is not the place to
-                    // reimplement that check.
-                    .setIncludeDeleted(false)
-                    .build());
+    ListUsersResponse response = withMetadata(context).listUsers(
+      ListUsersRequest.newBuilder()
+        .setPage(pageRequest)
+        // Never deleted users, and not negotiable from here — the
+        // same rule `DepartmentsResolver` and `DocumentsResolver`
+        // state; the REST route gates the flag on `user.delete`
+        // inside the controller, so a resolver is not the place to
+        // reimplement that check.
+        .setIncludeDeleted(false)
+        .build()
+    );
 
     return UserGqlMapper.toUserPageGqlDto(response);
   }
@@ -115,23 +126,34 @@ public class UsersResolver {
    */
   @SchemaMapping(typeName = "User", field = "departments")
   public CompletableFuture<List<DepartmentGqlDto>> departments(
-      UserGqlDto user, DataLoader<String, DepartmentGqlDto> loader) {
+    UserGqlDto user,
+    DataLoader<String, DepartmentGqlDto> loader
+  ) {
     List<String> ids = user.departmentIds();
     if (ids.isEmpty()) {
       return CompletableFuture.completedFuture(List.of());
     }
 
     RequestContext context = currentUser.require(CurrentRequest.request());
-    List<String> capped = ids.subList(0, Math.min(ids.size(), GraphqlLimits.MAX_EDGE_LIST));
+    List<String> capped = ids.subList(
+      0,
+      Math.min(ids.size(), GraphqlLimits.MAX_EDGE_LIST)
+    );
 
     return loader
-        .loadMany(capped, java.util.Collections.nCopies(capped.size(), context))
-        .thenApply(departments -> departments.stream().filter(java.util.Objects::nonNull).toList());
+      .loadMany(capped, java.util.Collections.nCopies(capped.size(), context))
+      .thenApply(departments ->
+        departments.stream().filter(java.util.Objects::nonNull).toList()
+      );
   }
 
-  private UserServiceGrpc.UserServiceBlockingStub withMetadata(RequestContext context) {
+  private UserServiceGrpc.UserServiceBlockingStub withMetadata(
+    RequestContext context
+  ) {
     return stub
-        .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
-        .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context)));
+      .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
+      .withInterceptors(
+        MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context))
+      );
   }
 }

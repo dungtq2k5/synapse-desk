@@ -39,32 +39,57 @@ import tools.jackson.databind.ObjectMapper;
 class OrganizationsControllerTest {
 
   private final OrganizationServiceGrpc.OrganizationServiceBlockingStub stub =
-      mock(OrganizationServiceGrpc.OrganizationServiceBlockingStub.class);
+    mock(OrganizationServiceGrpc.OrganizationServiceBlockingStub.class);
   private final DocumentServiceGrpc.DocumentServiceBlockingStub documentStub =
-      mock(DocumentServiceGrpc.DocumentServiceBlockingStub.class);
+    mock(DocumentServiceGrpc.DocumentServiceBlockingStub.class);
   private final CurrentUser currentUser = mock(CurrentUser.class);
   private final CacheService cache = mock(CacheService.class);
   private final InboundEmailProperties inboundEmail =
-      new InboundEmailProperties("secret", "support.example.com", "sender", "whsec", "re_key");
+    new InboundEmailProperties(
+      "secret",
+      "support.example.com",
+      "sender",
+      "whsec",
+      "re_key"
+    );
   private OrganizationsController controller;
 
   private static void requestWithBody(String json) {
     MockHttpServletRequest request = new MockHttpServletRequest();
     RequestContextHolder.setRequestAttributes(
-        new ServletRequestAttributes(new CachedBodyRequest(request, json.getBytes(StandardCharsets.UTF_8))));
+      new ServletRequestAttributes(
+        new CachedBodyRequest(request, json.getBytes(StandardCharsets.UTF_8))
+      )
+    );
   }
 
   @BeforeEach
   void setUp() {
     when(stub.withDeadlineAfter(anyLong(), any())).thenReturn(stub);
     when(stub.withInterceptors(any())).thenReturn(stub);
-    when(currentUser.require(any()))
-        .thenReturn(
-            new RequestContext(
-                "agent-1", "org-1", false, List.of(), List.of("organization.update"), true, "127.0.0.1", "test"));
-    when(cache.wrap(any(), anyLong(), any(), any()))
-        .thenAnswer(invocation -> ((Supplier<?>) invocation.getArgument(3)).get());
-    controller = new OrganizationsController(stub, documentStub, currentUser, cache, inboundEmail, new ObjectMapper());
+    when(currentUser.require(any())).thenReturn(
+      new RequestContext(
+        "agent-1",
+        "org-1",
+        false,
+        List.of(),
+        List.of("organization.update"),
+        true,
+        "127.0.0.1",
+        "test"
+      )
+    );
+    when(cache.wrap(any(), anyLong(), any(), any())).thenAnswer(invocation ->
+      ((Supplier<?>) invocation.getArgument(3)).get()
+    );
+    controller = new OrganizationsController(
+      stub,
+      documentStub,
+      currentUser,
+      cache,
+      inboundEmail,
+      new ObjectMapper()
+    );
   }
 
   @AfterEach
@@ -75,13 +100,21 @@ class OrganizationsControllerTest {
   @Test
   void anAbsentOverrideFieldLeavesTheWireRequestUntouched() {
     requestWithBody("{}");
-    when(stub.updateOrganizationSettings(any())).thenReturn(OrganizationSettingsResponse.getDefaultInstance());
+    when(stub.updateOrganizationSettings(any())).thenReturn(
+      OrganizationSettingsResponse.getDefaultInstance()
+    );
 
-    controller.organizationsControllerUpdateSettingsV1(new UpdateOrganizationSettingsDto());
+    controller.organizationsControllerUpdateSettingsV1(
+      new UpdateOrganizationSettingsDto()
+    );
 
     org.mockito.ArgumentCaptor<UpdateOrganizationSettingsRequest> captor =
-        org.mockito.ArgumentCaptor.forClass(UpdateOrganizationSettingsRequest.class);
-    org.mockito.Mockito.verify(stub).updateOrganizationSettings(captor.capture());
+      org.mockito.ArgumentCaptor.forClass(
+        UpdateOrganizationSettingsRequest.class
+      );
+    org.mockito.Mockito.verify(stub).updateOrganizationSettings(
+      captor.capture()
+    );
     assertThat(captor.getValue().hasMaxDocumentBytesOverride()).isFalse();
     assertThat(captor.getValue().getClearMaxDocumentBytesOverride()).isFalse();
     assertThat(captor.getValue().getReplaceAllowedEmailDomains()).isFalse();
@@ -93,13 +126,19 @@ class OrganizationsControllerTest {
     UpdateOrganizationSettingsDto dto = new UpdateOrganizationSettingsDto();
     // Matches what Jackson actually binds for this body: `null` either way.
     dto.setMaxDocumentBytesOverride(null);
-    when(stub.updateOrganizationSettings(any())).thenReturn(OrganizationSettingsResponse.getDefaultInstance());
+    when(stub.updateOrganizationSettings(any())).thenReturn(
+      OrganizationSettingsResponse.getDefaultInstance()
+    );
 
     controller.organizationsControllerUpdateSettingsV1(dto);
 
     org.mockito.ArgumentCaptor<UpdateOrganizationSettingsRequest> captor =
-        org.mockito.ArgumentCaptor.forClass(UpdateOrganizationSettingsRequest.class);
-    org.mockito.Mockito.verify(stub).updateOrganizationSettings(captor.capture());
+      org.mockito.ArgumentCaptor.forClass(
+        UpdateOrganizationSettingsRequest.class
+      );
+    org.mockito.Mockito.verify(stub).updateOrganizationSettings(
+      captor.capture()
+    );
     assertThat(captor.getValue().getClearMaxDocumentBytesOverride()).isTrue();
     assertThat(captor.getValue().hasMaxDocumentBytesOverride()).isFalse();
   }
@@ -109,15 +148,25 @@ class OrganizationsControllerTest {
     requestWithBody("{\"maxAttachmentsPerMessageOverride\": 5}");
     UpdateOrganizationSettingsDto dto = new UpdateOrganizationSettingsDto();
     dto.setMaxAttachmentsPerMessageOverride(java.math.BigDecimal.valueOf(5));
-    when(stub.updateOrganizationSettings(any())).thenReturn(OrganizationSettingsResponse.getDefaultInstance());
+    when(stub.updateOrganizationSettings(any())).thenReturn(
+      OrganizationSettingsResponse.getDefaultInstance()
+    );
 
     controller.organizationsControllerUpdateSettingsV1(dto);
 
     org.mockito.ArgumentCaptor<UpdateOrganizationSettingsRequest> captor =
-        org.mockito.ArgumentCaptor.forClass(UpdateOrganizationSettingsRequest.class);
-    org.mockito.Mockito.verify(stub).updateOrganizationSettings(captor.capture());
-    assertThat(captor.getValue().getMaxAttachmentsPerMessageOverride()).isEqualTo(5);
-    assertThat(captor.getValue().getClearMaxAttachmentsPerMessageOverride()).isFalse();
+      org.mockito.ArgumentCaptor.forClass(
+        UpdateOrganizationSettingsRequest.class
+      );
+    org.mockito.Mockito.verify(stub).updateOrganizationSettings(
+      captor.capture()
+    );
+    assertThat(
+      captor.getValue().getMaxAttachmentsPerMessageOverride()
+    ).isEqualTo(5);
+    assertThat(
+      captor.getValue().getClearMaxAttachmentsPerMessageOverride()
+    ).isFalse();
   }
 
   @Test
@@ -125,13 +174,19 @@ class OrganizationsControllerTest {
     requestWithBody("{\"enforceTwoFactor\": true}");
     UpdateOrganizationSettingsDto dto = new UpdateOrganizationSettingsDto();
     dto.setEnforceTwoFactor(true);
-    when(stub.updateOrganizationSettings(any())).thenReturn(OrganizationSettingsResponse.getDefaultInstance());
+    when(stub.updateOrganizationSettings(any())).thenReturn(
+      OrganizationSettingsResponse.getDefaultInstance()
+    );
 
     controller.organizationsControllerUpdateSettingsV1(dto);
 
     org.mockito.ArgumentCaptor<UpdateOrganizationSettingsRequest> captor =
-        org.mockito.ArgumentCaptor.forClass(UpdateOrganizationSettingsRequest.class);
-    org.mockito.Mockito.verify(stub).updateOrganizationSettings(captor.capture());
+      org.mockito.ArgumentCaptor.forClass(
+        UpdateOrganizationSettingsRequest.class
+      );
+    org.mockito.Mockito.verify(stub).updateOrganizationSettings(
+      captor.capture()
+    );
     assertThat(captor.getValue().getReplaceAllowedEmailDomains()).isFalse();
     assertThat(captor.getValue().getAllowedEmailDomainsList()).isEmpty();
   }
@@ -144,13 +199,19 @@ class OrganizationsControllerTest {
     requestWithBody("{\"allowedEmailDomains\": []}");
     UpdateOrganizationSettingsDto dto = new UpdateOrganizationSettingsDto();
     dto.setAllowedEmailDomains(List.of());
-    when(stub.updateOrganizationSettings(any())).thenReturn(OrganizationSettingsResponse.getDefaultInstance());
+    when(stub.updateOrganizationSettings(any())).thenReturn(
+      OrganizationSettingsResponse.getDefaultInstance()
+    );
 
     controller.organizationsControllerUpdateSettingsV1(dto);
 
     org.mockito.ArgumentCaptor<UpdateOrganizationSettingsRequest> captor =
-        org.mockito.ArgumentCaptor.forClass(UpdateOrganizationSettingsRequest.class);
-    org.mockito.Mockito.verify(stub).updateOrganizationSettings(captor.capture());
+      org.mockito.ArgumentCaptor.forClass(
+        UpdateOrganizationSettingsRequest.class
+      );
+    org.mockito.Mockito.verify(stub).updateOrganizationSettings(
+      captor.capture()
+    );
     assertThat(captor.getValue().getReplaceAllowedEmailDomains()).isTrue();
   }
 
@@ -159,7 +220,9 @@ class OrganizationsControllerTest {
     // Node's own choice, not an omission — the End User role holds zero
     // permission rows, so gating the app shell's own workspace read 403s the
     // first screen for every ordinary member.
-    Method get = OrganizationsController.class.getMethod("organizationsControllerGetV1");
+    Method get = OrganizationsController.class.getMethod(
+      "organizationsControllerGetV1"
+    );
     assertThat(get.isAnnotationPresent(RequirePermission.class)).isFalse();
   }
 }

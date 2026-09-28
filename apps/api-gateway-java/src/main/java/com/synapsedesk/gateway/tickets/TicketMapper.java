@@ -22,58 +22,79 @@ public final class TicketMapper {
 
   public static TicketGqlDto toTicketGqlDto(TicketResponse ticket) {
     return new TicketGqlDto(
-        ticket.getId(),
-        Math.toIntExact(ticket.getTicketNumber()),
-        ticket.getOrganizationId(),
-        ticket.getAuthorId(),
-        toSourceGql(ticket.getSource()),
-        toStatusGql(ticket.getStatus()),
-        toPriorityGql(ticket.getPriority()),
-        ticket.getTitle(),
-        ticket.getDescription(),
-        ticket.hasCurrentAssigneeId() ? ticket.getCurrentAssigneeId() : null,
-        ticket.hasCurrentDepartmentId() ? ticket.getCurrentDepartmentId() : null,
-        ticket.hasEscalatedAt() ? toOffsetDateTime(ticket.getEscalatedAt()) : null,
-        ticket.hasResolvedAt() ? toOffsetDateTime(ticket.getResolvedAt()) : null,
-        ticket.getUnreadCount(),
-        toOffsetDateTime(ticket.getCreatedAt()),
-        toOffsetDateTime(ticket.getUpdatedAt()),
-        ticket.hasDeletedAt() ? toOffsetDateTime(ticket.getDeletedAt()) : null,
-        ticket.hasDeletedById() ? ticket.getDeletedById() : null);
+      ticket.getId(),
+      Math.toIntExact(ticket.getTicketNumber()),
+      ticket.getOrganizationId(),
+      ticket.getAuthorId(),
+      toSourceGql(ticket.getSource()),
+      toStatusGql(ticket.getStatus()),
+      toPriorityGql(ticket.getPriority()),
+      ticket.getTitle(),
+      ticket.getDescription(),
+      ticket.hasCurrentAssigneeId() ? ticket.getCurrentAssigneeId() : null,
+      ticket.hasCurrentDepartmentId() ? ticket.getCurrentDepartmentId() : null,
+      ticket.hasEscalatedAt()
+        ? toOffsetDateTime(ticket.getEscalatedAt())
+        : null,
+      ticket.hasResolvedAt() ? toOffsetDateTime(ticket.getResolvedAt()) : null,
+      ticket.getUnreadCount(),
+      toOffsetDateTime(ticket.getCreatedAt()),
+      toOffsetDateTime(ticket.getUpdatedAt()),
+      ticket.hasDeletedAt() ? toOffsetDateTime(ticket.getDeletedAt()) : null,
+      ticket.hasDeletedById() ? ticket.getDeletedById() : null
+    );
   }
 
-  public static TicketPageGqlDto toTicketPageGqlDto(ListTicketsResponse response) {
+  public static TicketPageGqlDto toTicketPageGqlDto(
+    ListTicketsResponse response
+  ) {
     return new TicketPageGqlDto(
-        response.getItemsList().stream().map(TicketMapper::toTicketGqlDto).toList(),
-        toPageMetaGqlDto(response.getMeta()));
+      response
+        .getItemsList()
+        .stream()
+        .map(TicketMapper::toTicketGqlDto)
+        .toList(),
+      toPageMetaGqlDto(response.getMeta())
+    );
   }
 
-  public static TicketMessageGqlDto toTicketMessageGqlDto(MessageResponse message) {
+  public static TicketMessageGqlDto toTicketMessageGqlDto(
+    MessageResponse message
+  ) {
     return new TicketMessageGqlDto(
-        message.getId(),
-        message.getTicketId(),
-        message.hasSenderId() ? message.getSenderId() : null,
-        message.getContent(),
-        message.getIsAiGenerated(),
-        message.getIsInternalNote(),
-        message.hasModelName() ? message.getModelName() : null,
-        message.hasPromptTokens() ? message.getPromptTokens() : null,
-        message.hasCompletionTokens() ? message.getCompletionTokens() : null,
-        message.hasEditedAt() ? toOffsetDateTime(message.getEditedAt()) : null,
-        message.hasRedactedAt() ? toOffsetDateTime(message.getRedactedAt()) : null,
-        toOffsetDateTime(message.getCreatedAt()),
-        toAnswerStatus(message.getAnswerStatus()),
-        message.hasCitations()
-            ? message.getCitations().getItemsList().stream().map(TicketMapper::toCitationGqlDto).toList()
-            : null);
+      message.getId(),
+      message.getTicketId(),
+      message.hasSenderId() ? message.getSenderId() : null,
+      message.getContent(),
+      message.getIsAiGenerated(),
+      message.getIsInternalNote(),
+      message.hasModelName() ? message.getModelName() : null,
+      message.hasPromptTokens() ? message.getPromptTokens() : null,
+      message.hasCompletionTokens() ? message.getCompletionTokens() : null,
+      message.hasEditedAt() ? toOffsetDateTime(message.getEditedAt()) : null,
+      message.hasRedactedAt()
+        ? toOffsetDateTime(message.getRedactedAt())
+        : null,
+      toOffsetDateTime(message.getCreatedAt()),
+      toAnswerStatus(message.getAnswerStatus()),
+      message.hasCitations()
+        ? message
+            .getCitations()
+            .getItemsList()
+            .stream()
+            .map(TicketMapper::toCitationGqlDto)
+            .toList()
+        : null
+    );
   }
 
   private static CitationGqlDto toCitationGqlDto(DraftCitation citation) {
     return new CitationGqlDto(
-        citation.getChunkId(),
-        citation.getDocumentId(),
-        citation.getDocumentTitle(),
-        citation.hasPageNumber() ? citation.getPageNumber() : null);
+      citation.getChunkId(),
+      citation.getDocumentId(),
+      citation.getDocumentTitle(),
+      citation.hasPageNumber() ? citation.getPageNumber() : null
+    );
   }
 
   /** `UNSPECIFIED` -> `null`, matching Node's "a value this build cannot name answers null". */
@@ -112,20 +133,24 @@ public final class TicketMapper {
   /** `MESSAGE_ANSWER_STATUS_DOC_ANSWER` -> `"DOC_ANSWER"`; `UNSPECIFIED` -> `null`. */
   private static String toAnswerStatus(MessageAnswerStatus status) {
     return status == MessageAnswerStatus.MESSAGE_ANSWER_STATUS_UNSPECIFIED
-        ? null
-        : status.name().replace("MESSAGE_ANSWER_STATUS_", "");
+      ? null
+      : status.name().replace("MESSAGE_ANSWER_STATUS_", "");
   }
 
   private static PageMetaGqlDto toPageMetaGqlDto(PageMeta meta) {
     return new PageMetaGqlDto(
-        meta.getTotalItems(),
-        meta.getItemCount(),
-        meta.getItemsPerPage(),
-        meta.getTotalPages(),
-        meta.getCurrentPage());
+      meta.getTotalItems(),
+      meta.getItemCount(),
+      meta.getItemsPerPage(),
+      meta.getTotalPages(),
+      meta.getCurrentPage()
+    );
   }
 
   private static OffsetDateTime toOffsetDateTime(Timestamp timestamp) {
-    return Instant.ofEpochSecond(timestamp.getSeconds(), timestamp.getNanos()).atOffset(ZoneOffset.UTC);
+    return Instant.ofEpochSecond(
+      timestamp.getSeconds(),
+      timestamp.getNanos()
+    ).atOffset(ZoneOffset.UTC);
   }
 }

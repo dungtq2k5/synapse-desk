@@ -77,8 +77,9 @@ public class NotificationsController implements NotificationsApi {
    * enum bridge in this codebase uses.
    */
   /** Package-private: `NotificationsResolver` (GraphQL) reuses this same table. */
-  static final Map<NotificationType, String> TYPE_VALUES =
-    new EnumMap<>(NotificationType.class);
+  static final Map<NotificationType, String> TYPE_VALUES = new EnumMap<>(
+    NotificationType.class
+  );
 
   static {
     TYPE_VALUES.put(

@@ -37,25 +37,40 @@ import tools.jackson.databind.ObjectMapper;
 class WebhookEndpointsControllerTest {
 
   private final NotificationServiceGrpc.NotificationServiceBlockingStub stub =
-      mock(NotificationServiceGrpc.NotificationServiceBlockingStub.class);
+    mock(NotificationServiceGrpc.NotificationServiceBlockingStub.class);
   private final CurrentUser currentUser = mock(CurrentUser.class);
   private WebhookEndpointsController controller;
 
   private static void requestWithBody(String json) {
     MockHttpServletRequest request = new MockHttpServletRequest();
     RequestContextHolder.setRequestAttributes(
-        new ServletRequestAttributes(new CachedBodyRequest(request, json.getBytes(StandardCharsets.UTF_8))));
+      new ServletRequestAttributes(
+        new CachedBodyRequest(request, json.getBytes(StandardCharsets.UTF_8))
+      )
+    );
   }
 
   @BeforeEach
   void setUp() {
     when(stub.withDeadlineAfter(anyLong(), any())).thenReturn(stub);
     when(stub.withInterceptors(any())).thenReturn(stub);
-    when(currentUser.require(any()))
-        .thenReturn(
-            new RequestContext(
-                "agent-1", "org-1", false, List.of(), List.of("organization.update"), true, "127.0.0.1", "test"));
-    controller = new WebhookEndpointsController(stub, currentUser, new ObjectMapper());
+    when(currentUser.require(any())).thenReturn(
+      new RequestContext(
+        "agent-1",
+        "org-1",
+        false,
+        List.of(),
+        List.of("organization.update"),
+        true,
+        "127.0.0.1",
+        "test"
+      )
+    );
+    controller = new WebhookEndpointsController(
+      stub,
+      currentUser,
+      new ObjectMapper()
+    );
   }
 
   @AfterEach
@@ -66,12 +81,17 @@ class WebhookEndpointsControllerTest {
   @Test
   void anAbsentEventTypesLeavesSubscriptionsUntouchedOnTheWire() {
     requestWithBody("{\"isActive\": false}");
-    when(stub.updateWebhookEndpoint(any())).thenReturn(WebhookEndpointResponse.getDefaultInstance());
+    when(stub.updateWebhookEndpoint(any())).thenReturn(
+      WebhookEndpointResponse.getDefaultInstance()
+    );
 
-    controller.webhookEndpointsControllerUpdateV1("endpoint-1", new UpdateWebhookEndpointDto());
+    controller.webhookEndpointsControllerUpdateV1(
+      "endpoint-1",
+      new UpdateWebhookEndpointDto()
+    );
 
     org.mockito.ArgumentCaptor<UpdateWebhookEndpointRequest> captor =
-        org.mockito.ArgumentCaptor.forClass(UpdateWebhookEndpointRequest.class);
+      org.mockito.ArgumentCaptor.forClass(UpdateWebhookEndpointRequest.class);
     org.mockito.Mockito.verify(stub).updateWebhookEndpoint(captor.capture());
     assertThat(captor.getValue().hasEventTypes()).isFalse();
   }
@@ -89,25 +109,36 @@ class WebhookEndpointsControllerTest {
     dto.setEventTypes(List.of());
 
     org.junit.jupiter.api.Assertions.assertThrows(
-        org.springframework.web.server.ResponseStatusException.class,
-        () -> controller.webhookEndpointsControllerUpdateV1("endpoint-1", dto));
+      org.springframework.web.server.ResponseStatusException.class,
+      () -> controller.webhookEndpointsControllerUpdateV1("endpoint-1", dto)
+    );
 
-    org.mockito.Mockito.verify(stub, org.mockito.Mockito.never()).updateWebhookEndpoint(any());
+    org.mockito.Mockito.verify(
+      stub,
+      org.mockito.Mockito.never()
+    ).updateWebhookEndpoint(any());
   }
 
   @Test
   void aPresentEventTypesArraySetsTheWrapperWithValues() {
     requestWithBody("{\"eventTypes\": [\"ticket.assigned\"]}");
     UpdateWebhookEndpointDto dto = new UpdateWebhookEndpointDto();
-    dto.setEventTypes(List.of(UpdateWebhookEndpointDto.EventTypesEnum.TICKET_ASSIGNED));
-    when(stub.updateWebhookEndpoint(any())).thenReturn(WebhookEndpointResponse.getDefaultInstance());
+    dto.setEventTypes(
+      List.of(UpdateWebhookEndpointDto.EventTypesEnum.TICKET_ASSIGNED)
+    );
+    when(stub.updateWebhookEndpoint(any())).thenReturn(
+      WebhookEndpointResponse.getDefaultInstance()
+    );
 
     controller.webhookEndpointsControllerUpdateV1("endpoint-1", dto);
 
     org.mockito.ArgumentCaptor<UpdateWebhookEndpointRequest> captor =
-        org.mockito.ArgumentCaptor.forClass(UpdateWebhookEndpointRequest.class);
+      org.mockito.ArgumentCaptor.forClass(UpdateWebhookEndpointRequest.class);
     org.mockito.Mockito.verify(stub).updateWebhookEndpoint(captor.capture());
-    assertThat(captor.getValue().getEventTypes().getValuesList())
-        .containsExactly(synapsedesk.notification.Notification.NotificationType.NOTIFICATION_TYPE_TICKET_ASSIGNED);
+    assertThat(
+      captor.getValue().getEventTypes().getValuesList()
+    ).containsExactly(
+      synapsedesk.notification.Notification.NotificationType.NOTIFICATION_TYPE_TICKET_ASSIGNED
+    );
   }
 }

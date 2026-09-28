@@ -108,7 +108,9 @@ describe('the Java skip list', () => {
     // file's own uncommented lines independently and comparing.
     const declaredCount = readFileSync(PENDING_APIS, 'utf8')
       .split('\n')
-      .filter((line) => line.trim().length > 0 && !line.trim().startsWith('#')).length;
+      .filter(
+        (line) => line.trim().length > 0 && !line.trim().startsWith('#'),
+      ).length;
     expect(pendingApis().size).toBe(declaredCount);
   });
 });

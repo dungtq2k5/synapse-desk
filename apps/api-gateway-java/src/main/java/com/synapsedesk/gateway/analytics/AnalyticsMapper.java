@@ -23,57 +23,92 @@ public final class AnalyticsMapper {
   private AnalyticsMapper() {}
 
   public static RateGqlDto toRateGqlDto(RateValue value) {
-    return new RateGqlDto(value.hasRate() ? value.getRate() : null, value.getNumerator(), value.getDenominator());
+    return new RateGqlDto(
+      value.hasRate() ? value.getRate() : null,
+      value.getNumerator(),
+      value.getDenominator()
+    );
   }
 
   public static RateGqlDto toRateGqlDto(AiRateValue value) {
-    return new RateGqlDto(value.hasRate() ? value.getRate() : null, value.getNumerator(), value.getDenominator());
+    return new RateGqlDto(
+      value.hasRate() ? value.getRate() : null,
+      value.getNumerator(),
+      value.getDenominator()
+    );
   }
 
   public static MeanGqlDto toMeanGqlDto(MeanValue value) {
-    return new MeanGqlDto(value.hasMean() ? value.getMean() : null, value.getCount());
+    return new MeanGqlDto(
+      value.hasMean() ? value.getMean() : null,
+      value.getCount()
+    );
   }
 
   public static MeanGqlDto toMeanGqlDto(AiMeanValue value) {
-    return new MeanGqlDto(value.hasMean() ? value.getMean() : null, value.getCount());
+    return new MeanGqlDto(
+      value.hasMean() ? value.getMean() : null,
+      value.getCount()
+    );
   }
 
   public static RateGqlDto emptyRate() {
     return new RateGqlDto(null, 0, 0);
   }
 
-  public static AnalyticsOverviewGqlDto toOverviewGqlDto(OverviewResponse response) {
+  public static AnalyticsOverviewGqlDto toOverviewGqlDto(
+    OverviewResponse response
+  ) {
     return new AnalyticsOverviewGqlDto(
-        response.getTicketsCreated(),
-        response.getTicketsResolved(),
-        response.getTicketsEscalated(),
-        response.getOpenTickets(),
-        toRateGqlDto(response.getDeflection()),
-        toRateGqlDto(response.getCsat()),
-        toMeanGqlDto(response.getHumanFirstResponseSeconds()),
-        toMeanGqlDto(response.getAiFirstResponseSeconds()),
-        toMeanGqlDto(response.getResolutionSeconds()),
-        response.hasOpenTicketMedianAgeSeconds() ? (double) response.getOpenTicketMedianAgeSeconds() : null,
-        response.hasComputedAt() ? toOffsetDateTime(response.getComputedAt()) : null,
-        response.hasDataThrough() ? response.getDataThrough() : null);
+      response.getTicketsCreated(),
+      response.getTicketsResolved(),
+      response.getTicketsEscalated(),
+      response.getOpenTickets(),
+      toRateGqlDto(response.getDeflection()),
+      toRateGqlDto(response.getCsat()),
+      toMeanGqlDto(response.getHumanFirstResponseSeconds()),
+      toMeanGqlDto(response.getAiFirstResponseSeconds()),
+      toMeanGqlDto(response.getResolutionSeconds()),
+      response.hasOpenTicketMedianAgeSeconds()
+        ? (double) response.getOpenTicketMedianAgeSeconds()
+        : null,
+      response.hasComputedAt()
+        ? toOffsetDateTime(response.getComputedAt())
+        : null,
+      response.hasDataThrough() ? response.getDataThrough() : null
+    );
   }
 
-  public static AgentStatGqlDto toAgentStatGqlDto(AgentStat row, AiRateValue draftAcceptance) {
+  public static AgentStatGqlDto toAgentStatGqlDto(
+    AgentStat row,
+    AiRateValue draftAcceptance
+  ) {
     return new AgentStatGqlDto(
-        row.getAgentId(),
-        row.getAssigned(),
-        row.getResolved(),
-        row.getMessagesSent(),
-        toMeanGqlDto(row.getResolutionSeconds()),
-        draftAcceptance != null ? toRateGqlDto(draftAcceptance) : null);
+      row.getAgentId(),
+      row.getAssigned(),
+      row.getResolved(),
+      row.getMessagesSent(),
+      toMeanGqlDto(row.getResolutionSeconds()),
+      draftAcceptance != null ? toRateGqlDto(draftAcceptance) : null
+    );
   }
 
-  public static DocumentUsageGqlDto toDocumentUsageGqlDto(DocumentUsageStat stat) {
+  public static DocumentUsageGqlDto toDocumentUsageGqlDto(
+    DocumentUsageStat stat
+  ) {
     return new DocumentUsageGqlDto(
-        stat.getDocumentId(), stat.getTitle(), stat.getRetrievalCount(), stat.getCitationCount(), stat.getChunkCount());
+      stat.getDocumentId(),
+      stat.getTitle(),
+      stat.getRetrievalCount(),
+      stat.getCitationCount(),
+      stat.getChunkCount()
+    );
   }
 
   private static OffsetDateTime toOffsetDateTime(Timestamp timestamp) {
-    return Instant.ofEpochSecond(timestamp.getSeconds(), timestamp.getNanos()).atOffset(ZoneOffset.UTC);
+    return Instant.ofEpochSecond(
+      timestamp.getSeconds(),
+      timestamp.getNanos()
+    ).atOffset(ZoneOffset.UTC);
   }
 }

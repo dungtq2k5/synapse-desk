@@ -33,7 +33,10 @@ public final class IsoDateCheck {
     if (isValidIsoDate(value)) {
       return;
     }
-    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, field + " must be a valid ISO 8601 date string");
+    throw new ResponseStatusException(
+      HttpStatus.BAD_REQUEST,
+      field + " must be a valid ISO 8601 date string"
+    );
   }
 
   private static boolean isValidIsoDate(String value) {

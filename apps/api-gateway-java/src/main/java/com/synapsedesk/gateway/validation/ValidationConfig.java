@@ -38,9 +38,15 @@ public class ValidationConfig {
     return new LocalValidatorFactoryBean() {
       @Override
       protected void postProcessConfiguration(Configuration<?> configuration) {
-        if (configuration instanceof HibernateValidatorConfiguration hibernateConfig) {
+        if (
+          configuration instanceof
+            HibernateValidatorConfiguration hibernateConfig
+        ) {
           ConstraintMapping mapping = hibernateConfig.createConstraintMapping();
-          mapping.constraintDefinition(Size.class).includeExistingValidators(true).validatedBy(UriSizeValidator.class);
+          mapping
+            .constraintDefinition(Size.class)
+            .includeExistingValidators(true)
+            .validatedBy(UriSizeValidator.class);
           mapping
             .type(UpdateWebhookEndpointDto.class)
             .getter("eventTypes")

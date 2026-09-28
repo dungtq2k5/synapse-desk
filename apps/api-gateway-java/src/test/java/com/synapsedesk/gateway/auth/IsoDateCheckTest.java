@@ -15,17 +15,22 @@ class IsoDateCheckTest {
 
   @Test
   void refusesAMalformedDate() {
-    assertThatThrownBy(() -> IsoDateCheck.requireIsoDate("not-a-date", "from"))
-        .isInstanceOf(ResponseStatusException.class);
+    assertThatThrownBy(() ->
+      IsoDateCheck.requireIsoDate("not-a-date", "from")
+    ).isInstanceOf(ResponseStatusException.class);
   }
 
   @Test
   void acceptsABareCalendarDate() {
-    assertThatCode(() -> IsoDateCheck.requireIsoDate("2026-01-01", "from")).doesNotThrowAnyException();
+    assertThatCode(() ->
+      IsoDateCheck.requireIsoDate("2026-01-01", "from")
+    ).doesNotThrowAnyException();
   }
 
   @Test
   void acceptsAFullIsoTimestamp() {
-    assertThatCode(() -> IsoDateCheck.requireIsoDate("2026-01-01T00:00:00Z", "from")).doesNotThrowAnyException();
+    assertThatCode(() ->
+      IsoDateCheck.requireIsoDate("2026-01-01T00:00:00Z", "from")
+    ).doesNotThrowAnyException();
   }
 }

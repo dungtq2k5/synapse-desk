@@ -39,25 +39,32 @@ public class NotificationsResolver {
   private final CurrentUser currentUser;
 
   public NotificationsResolver(
-      NotificationServiceGrpc.NotificationServiceBlockingStub stub, CurrentUser currentUser) {
+    NotificationServiceGrpc.NotificationServiceBlockingStub stub,
+    CurrentUser currentUser
+  ) {
     this.stub = stub;
     this.currentUser = currentUser;
   }
 
   @QueryMapping(name = "notifications")
-  public NotificationFeedGqlDto notifications(@Argument int first, @Argument String cursor) {
+  public NotificationFeedGqlDto notifications(
+    @Argument int first,
+    @Argument String cursor
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     ListNotificationsRequest.Builder wire =
-        ListNotificationsRequest.newBuilder()
-            .setUnreadOnly(false)
-            .setIncludeArchived(false)
-            .setLimit(Math.min(first, GraphqlLimits.MAX_PAGE_SIZE));
+      ListNotificationsRequest.newBuilder()
+        .setUnreadOnly(false)
+        .setIncludeArchived(false)
+        .setLimit(Math.min(first, GraphqlLimits.MAX_PAGE_SIZE));
     if (cursor != null) {
       wire.setCursor(cursor);
     }
 
-    ListNotificationsResponse response = withMetadata(context).listNotifications(wire.build());
+    ListNotificationsResponse response = withMetadata(
+      context
+    ).listNotifications(wire.build());
 
     return NotificationMapper.toFeedGqlDto(response);
   }
@@ -68,14 +75,13 @@ public class NotificationsResolver {
 
     // Reuses `ListNotificationsRequest` — the recipient comes from metadata,
     // matching `NotificationsController`'s own REST route.
-    UnreadCountResponse response =
-        withMetadata(context)
-            .getUnreadCount(
-                ListNotificationsRequest.newBuilder()
-                    .setUnreadOnly(true)
-                    .setIncludeArchived(false)
-                    .setLimit(0)
-                    .build());
+    UnreadCountResponse response = withMetadata(context).getUnreadCount(
+      ListNotificationsRequest.newBuilder()
+        .setUnreadOnly(true)
+        .setIncludeArchived(false)
+        .setLimit(0)
+        .build()
+    );
 
     return response.getCount();
   }
@@ -83,7 +89,9 @@ public class NotificationsResolver {
   /** `Notification.actor` — who caused it. `UserSummary`, never the full profile. */
   @SchemaMapping(typeName = "Notification", field = "actor")
   public CompletableFuture<UserSummaryGqlDto> actor(
-      NotificationGqlDto notification, DataLoader<String, UserSummaryGqlDto> loader) {
+    NotificationGqlDto notification,
+    DataLoader<String, UserSummaryGqlDto> loader
+  ) {
     if (notification.actorId() == null) {
       return CompletableFuture.completedFuture(null);
     }
@@ -94,11 +102,14 @@ public class NotificationsResolver {
   }
 
   @MutationMapping
-  public MarkNotificationReadPayloadGqlDto markNotificationRead(@Argument String id) {
+  public MarkNotificationReadPayloadGqlDto markNotificationRead(
+    @Argument String id
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    MarkReadResponse response =
-        withMetadata(context).markRead(NotificationIdRequest.newBuilder().setId(id).build());
+    MarkReadResponse response = withMetadata(context).markRead(
+      NotificationIdRequest.newBuilder().setId(id).build()
+    );
 
     // The new BADGE, not the row — the client already has the row it just
     // clicked, and a locally-decremented counter is always wrong eventually
@@ -106,9 +117,13 @@ public class NotificationsResolver {
     return new MarkNotificationReadPayloadGqlDto(id, response.getUnreadCount());
   }
 
-  private NotificationServiceGrpc.NotificationServiceBlockingStub withMetadata(RequestContext context) {
+  private NotificationServiceGrpc.NotificationServiceBlockingStub withMetadata(
+    RequestContext context
+  ) {
     return stub
-        .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
-        .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context)));
+      .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
+      .withInterceptors(
+        MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context))
+      );
   }
 }

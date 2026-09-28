@@ -42,21 +42,39 @@ import tools.jackson.databind.json.JsonMapper;
  */
 class WebhooksControllerTest {
 
-  private static final String WEBHOOK_SECRET = "whsec_" + Base64.getEncoder().encodeToString("a-test-secret-32-bytes-long!!!!".getBytes(StandardCharsets.UTF_8));
+  private static final String WEBHOOK_SECRET =
+    "whsec_" +
+    Base64.getEncoder().encodeToString(
+      "a-test-secret-32-bytes-long!!!!".getBytes(StandardCharsets.UTF_8)
+    );
 
-  private final BillingServiceGrpc.BillingServiceBlockingStub stub =
-      mock(BillingServiceGrpc.BillingServiceBlockingStub.class);
+  private final BillingServiceGrpc.BillingServiceBlockingStub stub = mock(
+    BillingServiceGrpc.BillingServiceBlockingStub.class
+  );
   private final CurrentUser currentUser = mock(CurrentUser.class);
   private final InboundEmailProperties inboundEmail =
-      new InboundEmailProperties("shared-secret", "inbound.test", "noreply@test", WEBHOOK_SECRET, "re_test_key");
+    new InboundEmailProperties(
+      "shared-secret",
+      "inbound.test",
+      "noreply@test",
+      WEBHOOK_SECRET,
+      "re_test_key"
+    );
   private WebhooksController controller;
 
   @BeforeEach
   void setUp() {
     when(stub.withDeadlineAfter(anyLong(), any())).thenReturn(stub);
     when(stub.withInterceptors(any())).thenReturn(stub);
-    when(currentUser.origin(any())).thenReturn(new RequestOrigin("127.0.0.1", "test-agent"));
-    controller = new WebhooksController(stub, currentUser, inboundEmail, new JsonMapper());
+    when(currentUser.origin(any())).thenReturn(
+      new RequestOrigin("127.0.0.1", "test-agent")
+    );
+    controller = new WebhooksController(
+      stub,
+      currentUser,
+      inboundEmail,
+      new JsonMapper()
+    );
   }
 
   @AfterEach
@@ -64,31 +82,47 @@ class WebhooksControllerTest {
     RequestContextHolder.resetRequestAttributes();
   }
 
-  private static void requestWithBody(byte[] body, java.util.Map<String, String> headers) {
+  private static void requestWithBody(
+    byte[] body,
+    java.util.Map<String, String> headers
+  ) {
     MockHttpServletRequest request = new MockHttpServletRequest();
     headers.forEach(request::addHeader);
     RequestContextHolder.setRequestAttributes(
-        new ServletRequestAttributes(new CachedBodyRequest(request, body)));
+      new ServletRequestAttributes(new CachedBodyRequest(request, body))
+    );
   }
 
   private static void requestWithNoRawBody() {
     RequestContextHolder.setRequestAttributes(
-        new ServletRequestAttributes(new MockHttpServletRequest()));
+      new ServletRequestAttributes(new MockHttpServletRequest())
+    );
   }
 
   /** Independent of {@link WebhooksController#sign}, same algorithm as `standard-webhooks.ts`. */
-  private static java.util.Map<String, String> signStandardWebhook(String body, long timestampSeconds) {
+  private static java.util.Map<String, String> signStandardWebhook(
+    String body,
+    long timestampSeconds
+  ) {
     String id = "msg_" + UUID.randomUUID();
-    byte[] key = Base64.getDecoder().decode(WEBHOOK_SECRET.replaceFirst("^whsec_", ""));
+    byte[] key = Base64.getDecoder().decode(
+      WEBHOOK_SECRET.replaceFirst("^whsec_", "")
+    );
     String signedContent = id + "." + timestampSeconds + "." + body;
     try {
       Mac mac = Mac.getInstance("HmacSHA256");
       mac.init(new SecretKeySpec(key, "HmacSHA256"));
-      String digest = Base64.getEncoder().encodeToString(mac.doFinal(signedContent.getBytes(StandardCharsets.UTF_8)));
+      String digest = Base64.getEncoder().encodeToString(
+        mac.doFinal(signedContent.getBytes(StandardCharsets.UTF_8))
+      );
       return java.util.Map.of(
-          "svix-id", id,
-          "svix-timestamp", String.valueOf(timestampSeconds),
-          "svix-signature", "v1," + digest);
+        "svix-id",
+        id,
+        "svix-timestamp",
+        String.valueOf(timestampSeconds),
+        "svix-signature",
+        "v1," + digest
+      );
     } catch (NoSuchAlgorithmException | InvalidKeyException e) {
       throw new IllegalStateException(e);
     }
@@ -96,59 +130,87 @@ class WebhooksControllerTest {
 
   @Test
   void aValidSignatureForAnUnrelatedEventTypeIsIgnoredAndAnswered200() {
-    String body = "{\"type\":\"email.delivered\",\"data\":{\"email_id\":\"x\"}}";
-    requestWithBody(body.getBytes(StandardCharsets.UTF_8), signStandardWebhook(body, nowSeconds()));
+    String body =
+      "{\"type\":\"email.delivered\",\"data\":{\"email_id\":\"x\"}}";
+    requestWithBody(
+      body.getBytes(StandardCharsets.UTF_8),
+      signStandardWebhook(body, nowSeconds())
+    );
 
     var response = controller.inboundEmailControllerResendV1();
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-    assertThat(response.getBody().getData()).isEqualTo(java.util.Map.of("received", true, "outcome", "ignored_event"));
+    assertThat(response.getBody().getData()).isEqualTo(
+      java.util.Map.of("received", true, "outcome", "ignored_event")
+    );
   }
 
   @Test
   void aValidSignatureForEmailReceivedIsRefusedWithARetryable503() {
     String body = "{\"type\":\"email.received\",\"data\":{\"email_id\":\"x\"}}";
-    requestWithBody(body.getBytes(StandardCharsets.UTF_8), signStandardWebhook(body, nowSeconds()));
+    requestWithBody(
+      body.getBytes(StandardCharsets.UTF_8),
+      signStandardWebhook(body, nowSeconds())
+    );
 
-    ResponseStatusException thrown =
-        Assertions.assertThrows(ResponseStatusException.class, () -> controller.inboundEmailControllerResendV1());
+    ResponseStatusException thrown = Assertions.assertThrows(
+      ResponseStatusException.class,
+      () -> controller.inboundEmailControllerResendV1()
+    );
 
-    assertThat(thrown.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+    assertThat(thrown.getStatusCode()).isEqualTo(
+      HttpStatus.SERVICE_UNAVAILABLE
+    );
   }
 
   @Test
   void aTamperedBodyIsRefusedWith401() {
-    String signedBody = "{\"type\":\"email.delivered\",\"data\":{\"email_id\":\"x\"}}";
+    String signedBody =
+      "{\"type\":\"email.delivered\",\"data\":{\"email_id\":\"x\"}}";
     var headers = signStandardWebhook(signedBody, nowSeconds());
-    String tampered = "{\"type\":\"email.delivered\",\"data\":{\"email_id\":\"y\"}}";
+    String tampered =
+      "{\"type\":\"email.delivered\",\"data\":{\"email_id\":\"y\"}}";
     requestWithBody(tampered.getBytes(StandardCharsets.UTF_8), headers);
 
-    ResponseStatusException thrown =
-        Assertions.assertThrows(ResponseStatusException.class, () -> controller.inboundEmailControllerResendV1());
+    ResponseStatusException thrown = Assertions.assertThrows(
+      ResponseStatusException.class,
+      () -> controller.inboundEmailControllerResendV1()
+    );
 
     assertThat(thrown.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
   }
 
   @Test
   void aStaleTimestampIsRefusedWith401() {
-    String body = "{\"type\":\"email.delivered\",\"data\":{\"email_id\":\"x\"}}";
-    requestWithBody(body.getBytes(StandardCharsets.UTF_8), signStandardWebhook(body, nowSeconds() - 600));
+    String body =
+      "{\"type\":\"email.delivered\",\"data\":{\"email_id\":\"x\"}}";
+    requestWithBody(
+      body.getBytes(StandardCharsets.UTF_8),
+      signStandardWebhook(body, nowSeconds() - 600)
+    );
 
-    ResponseStatusException thrown =
-        Assertions.assertThrows(ResponseStatusException.class, () -> controller.inboundEmailControllerResendV1());
+    ResponseStatusException thrown = Assertions.assertThrows(
+      ResponseStatusException.class,
+      () -> controller.inboundEmailControllerResendV1()
+    );
 
     assertThat(thrown.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
   }
 
   @Test
   void aMissingSignatureHeaderIsRefusedWith401() {
-    String body = "{\"type\":\"email.delivered\",\"data\":{\"email_id\":\"x\"}}";
-    var headers = new java.util.HashMap<>(signStandardWebhook(body, nowSeconds()));
+    String body =
+      "{\"type\":\"email.delivered\",\"data\":{\"email_id\":\"x\"}}";
+    var headers = new java.util.HashMap<>(
+      signStandardWebhook(body, nowSeconds())
+    );
     headers.remove("svix-signature");
     requestWithBody(body.getBytes(StandardCharsets.UTF_8), headers);
 
-    ResponseStatusException thrown =
-        Assertions.assertThrows(ResponseStatusException.class, () -> controller.inboundEmailControllerResendV1());
+    ResponseStatusException thrown = Assertions.assertThrows(
+      ResponseStatusException.class,
+      () -> controller.inboundEmailControllerResendV1()
+    );
 
     assertThat(thrown.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
   }
@@ -157,8 +219,10 @@ class WebhooksControllerTest {
   void noRawBodyIsRefusedWith401() {
     requestWithNoRawBody();
 
-    ResponseStatusException thrown =
-        Assertions.assertThrows(ResponseStatusException.class, () -> controller.inboundEmailControllerResendV1());
+    ResponseStatusException thrown = Assertions.assertThrows(
+      ResponseStatusException.class,
+      () -> controller.inboundEmailControllerResendV1()
+    );
 
     assertThat(thrown.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
   }
@@ -167,15 +231,19 @@ class WebhooksControllerTest {
   void stripeForwardsTheExactRawBytesAndSignatureOverGrpc() {
     byte[] body = "{\"id\":\"evt_1\"}".getBytes(StandardCharsets.UTF_8);
     requestWithBody(body, java.util.Map.of());
-    when(stub.handleStripeWebhook(any()))
-        .thenReturn(StripeWebhookResponse.newBuilder().setStatus("applied").build());
+    when(stub.handleStripeWebhook(any())).thenReturn(
+      StripeWebhookResponse.newBuilder().setStatus("applied").build()
+    );
 
     var response = controller.webhooksControllerStripeV1("t=1,v1=abc");
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-    assertThat(response.getBody().getData()).isEqualTo(java.util.Map.of("received", true, "status", "applied"));
+    assertThat(response.getBody().getData()).isEqualTo(
+      java.util.Map.of("received", true, "status", "applied")
+    );
 
-    org.mockito.ArgumentCaptor<StripeWebhookRequest> captor = org.mockito.ArgumentCaptor.forClass(StripeWebhookRequest.class);
+    org.mockito.ArgumentCaptor<StripeWebhookRequest> captor =
+      org.mockito.ArgumentCaptor.forClass(StripeWebhookRequest.class);
     org.mockito.Mockito.verify(stub).handleStripeWebhook(captor.capture());
     assertThat(captor.getValue().getPayload().toByteArray()).isEqualTo(body);
     assertThat(captor.getValue().getSignature()).isEqualTo("t=1,v1=abc");
@@ -185,11 +253,16 @@ class WebhooksControllerTest {
   void stripeWithNoRawBodyIsRefusedWith400AndNeverCallsThePeer() {
     requestWithNoRawBody();
 
-    ResponseStatusException thrown =
-        Assertions.assertThrows(ResponseStatusException.class, () -> controller.webhooksControllerStripeV1("t=1,v1=abc"));
+    ResponseStatusException thrown = Assertions.assertThrows(
+      ResponseStatusException.class,
+      () -> controller.webhooksControllerStripeV1("t=1,v1=abc")
+    );
 
     assertThat(thrown.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-    org.mockito.Mockito.verify(stub, org.mockito.Mockito.never()).handleStripeWebhook(any());
+    org.mockito.Mockito.verify(
+      stub,
+      org.mockito.Mockito.never()
+    ).handleStripeWebhook(any());
   }
 
   private static long nowSeconds() {

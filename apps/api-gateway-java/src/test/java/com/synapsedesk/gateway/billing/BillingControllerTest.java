@@ -39,10 +39,11 @@ import synapsedesk.ingestion.DocumentServiceGrpc;
  */
 class BillingControllerTest {
 
-  private final BillingServiceGrpc.BillingServiceBlockingStub stub =
-      mock(BillingServiceGrpc.BillingServiceBlockingStub.class);
+  private final BillingServiceGrpc.BillingServiceBlockingStub stub = mock(
+    BillingServiceGrpc.BillingServiceBlockingStub.class
+  );
   private final DocumentServiceGrpc.DocumentServiceBlockingStub documentStub =
-      mock(DocumentServiceGrpc.DocumentServiceBlockingStub.class);
+    mock(DocumentServiceGrpc.DocumentServiceBlockingStub.class);
   private final CurrentUser currentUser = mock(CurrentUser.class);
   private BillingController controller;
 
@@ -54,13 +55,25 @@ class BillingControllerTest {
   void setUp() {
     when(stub.withDeadlineAfter(anyLong(), any())).thenReturn(stub);
     when(stub.withInterceptors(any())).thenReturn(stub);
-    when(documentStub.withDeadlineAfter(anyLong(), any())).thenReturn(documentStub);
+    when(documentStub.withDeadlineAfter(anyLong(), any())).thenReturn(
+      documentStub
+    );
     when(documentStub.withInterceptors(any())).thenReturn(documentStub);
-    when(currentUser.require(any()))
-        .thenReturn(
-            new RequestContext(
-                "agent-1", "org-1", false, List.of(), List.of("organization.update"), true, "127.0.0.1", "test"));
-    RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(mock(HttpServletRequest.class)));
+    when(currentUser.require(any())).thenReturn(
+      new RequestContext(
+        "agent-1",
+        "org-1",
+        false,
+        List.of(),
+        List.of("organization.update"),
+        true,
+        "127.0.0.1",
+        "test"
+      )
+    );
+    RequestContextHolder.setRequestAttributes(
+      new ServletRequestAttributes(mock(HttpServletRequest.class))
+    );
     controller = new BillingController(stub, documentStub, currentUser);
   }
 
@@ -71,25 +84,33 @@ class BillingControllerTest {
 
   @Test
   void anUnreadableUsageLegRefusesRatherThanAllows() {
-    when(stub.previewPlanChange(any()))
-        .thenReturn(
-            PlanChangePreviewResponse.newBuilder()
-                .addNarrowedDimensions("storage")
-                .setTargetMaxStorageBytes(1_000)
-                .build());
-    when(documentStub.getStorageUsage(any())).thenThrow(new StatusRuntimeException(Status.UNAVAILABLE));
+    when(stub.previewPlanChange(any())).thenReturn(
+      PlanChangePreviewResponse.newBuilder()
+        .addNarrowedDimensions("storage")
+        .setTargetMaxStorageBytes(1_000)
+        .build()
+    );
+    when(documentStub.getStorageUsage(any())).thenThrow(
+      new StatusRuntimeException(Status.UNAVAILABLE)
+    );
 
-    assertThatThrownBy(() -> controller.billingControllerChangePlanV1("key-1", dto()))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("503");
+    assertThatThrownBy(() ->
+      controller.billingControllerChangePlanV1("key-1", dto())
+    )
+      .isInstanceOf(ResponseStatusException.class)
+      .hasMessageContaining("503");
 
     verify(stub, org.mockito.Mockito.never()).changePlan(any());
   }
 
   @Test
   void aWideningChangeDialsIngestionForNothing() {
-    when(stub.previewPlanChange(any())).thenReturn(PlanChangePreviewResponse.getDefaultInstance());
-    when(stub.changePlan(any())).thenReturn(PlanChangeResponse.getDefaultInstance());
+    when(stub.previewPlanChange(any())).thenReturn(
+      PlanChangePreviewResponse.getDefaultInstance()
+    );
+    when(stub.changePlan(any())).thenReturn(
+      PlanChangeResponse.getDefaultInstance()
+    );
 
     controller.billingControllerChangePlanV1("key-1", dto());
 
@@ -99,30 +120,38 @@ class BillingControllerTest {
 
   @Test
   void usageOverTheTargetGrantRefusesBeforeStripeIsTouched() {
-    when(stub.previewPlanChange(any()))
-        .thenReturn(
-            PlanChangePreviewResponse.newBuilder()
-                .addNarrowedDimensions("storage")
-                .setTargetMaxStorageBytes(1_000)
-                .build());
-    when(documentStub.getStorageUsage(any()))
-        .thenReturn(StorageUsageResponse.newBuilder().setUsedBytes(2_000).build());
+    when(stub.previewPlanChange(any())).thenReturn(
+      PlanChangePreviewResponse.newBuilder()
+        .addNarrowedDimensions("storage")
+        .setTargetMaxStorageBytes(1_000)
+        .build()
+    );
+    when(documentStub.getStorageUsage(any())).thenReturn(
+      StorageUsageResponse.newBuilder().setUsedBytes(2_000).build()
+    );
 
-    assertThatThrownBy(() -> controller.billingControllerChangePlanV1("key-1", dto()))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("400");
+    assertThatThrownBy(() ->
+      controller.billingControllerChangePlanV1("key-1", dto())
+    )
+      .isInstanceOf(ResponseStatusException.class)
+      .hasMessageContaining("400");
 
     verify(stub, org.mockito.Mockito.never()).changePlan(any());
   }
 
   @Test
   void anOverLimitSeatCountRefusesWithoutDialingIngestionAtAll() {
-    when(stub.previewPlanChange(any()))
-        .thenReturn(PlanChangePreviewResponse.newBuilder().addOverLimit("maxAgentSeats: 12 in use, plan grants 10").build());
+    when(stub.previewPlanChange(any())).thenReturn(
+      PlanChangePreviewResponse.newBuilder()
+        .addOverLimit("maxAgentSeats: 12 in use, plan grants 10")
+        .build()
+    );
 
-    assertThatThrownBy(() -> controller.billingControllerChangePlanV1("key-1", dto()))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("400");
+    assertThatThrownBy(() ->
+      controller.billingControllerChangePlanV1("key-1", dto())
+    )
+      .isInstanceOf(ResponseStatusException.class)
+      .hasMessageContaining("400");
 
     verifyNoInteractions(documentStub);
     verify(stub, org.mockito.Mockito.never()).changePlan(any());

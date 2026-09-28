@@ -90,27 +90,45 @@ describe('tickets and analytics', () => {
   });
 
   describe('Tickets', () => {
-    rowForField('Query.ticket')('**`Query.ticket` resolves one ticket**', async () => {
-      const id = '55555555-5555-4555-8555-555555555555';
-      peers.ticket.on('TicketService/GetTicket').reply(wireTicket(id));
+    rowForField('Query.ticket')(
+      '**`Query.ticket` resolves one ticket**',
+      async () => {
+        const id = '55555555-5555-4555-8555-555555555555';
+        peers.ticket.on('TicketService/GetTicket').reply(wireTicket(id));
 
-      const response = await new Session(gateway.baseUrl).post<{
-        data: { ticket: { id: string; title: string; status: string } };
-      }>('/graphql', { query: `{ ticket(id: "${id}") { id title status } }` }, headers());
+        const response = await new Session(gateway.baseUrl).post<{
+          data: { ticket: { id: string; title: string; status: string } };
+        }>(
+          '/graphql',
+          { query: `{ ticket(id: "${id}") { id title status } }` },
+          headers(),
+        );
 
-      expect(response.status).toBe(200);
-      expect(response.body).not.toHaveProperty('errors');
-      expect(response.body.data.ticket).toEqual({ id, title: 'Broken widget', status: 'OPEN' });
-    });
+        expect(response.status).toBe(200);
+        expect(response.body).not.toHaveProperty('errors');
+        expect(response.body.data.ticket).toEqual({
+          id,
+          title: 'Broken widget',
+          status: 'OPEN',
+        });
+      },
+    );
 
     rowForField('Query.ticket')(
       '**`Query.ticket` answers null, never an error, when the peer refuses**',
       async () => {
-        peers.ticket.on('TicketService/GetTicket').fail(GrpcStatus.NOT_FOUND, 'no such ticket');
+        peers.ticket
+          .on('TicketService/GetTicket')
+          .fail(GrpcStatus.NOT_FOUND, 'no such ticket');
 
-        const response = await new Session(gateway.baseUrl).post<{ data: { ticket: null } }>(
+        const response = await new Session(gateway.baseUrl).post<{
+          data: { ticket: null };
+        }>(
           '/graphql',
-          { query: '{ ticket(id: "66666666-6666-4666-8666-666666666666") { id } }' },
+          {
+            query:
+              '{ ticket(id: "66666666-6666-4666-8666-666666666666") { id } }',
+          },
           headers(),
         );
 
@@ -144,7 +162,9 @@ describe('tickets and analytics', () => {
         });
         peers.auth.on('UserService/ListUsersByIds').reply({
           items: [],
-          summaries: [{ userId: TICKET_USER, fullName: 'Ada Lovelace', isLocked: false }],
+          summaries: [
+            { userId: TICKET_USER, fullName: 'Ada Lovelace', isLocked: false },
+          ],
         });
         peers.auth.on('DepartmentService/ListDepartmentsByIds').reply({
           items: [{ id: 'dept-1', name: 'Support' }],
@@ -172,12 +192,20 @@ describe('tickets and analytics', () => {
 
         expect(response.status).toBe(200);
         expect(response.body).not.toHaveProperty('errors');
-        expect(response.body.data.tickets.items[0].assignee).toEqual({ fullName: 'Ada Lovelace' });
-        expect(response.body.data.tickets.items[0].author).toEqual({ fullName: 'Ada Lovelace' });
-        expect(response.body.data.tickets.items[0].department).toEqual({ name: 'Support' });
+        expect(response.body.data.tickets.items[0].assignee).toEqual({
+          fullName: 'Ada Lovelace',
+        });
+        expect(response.body.data.tickets.items[0].author).toEqual({
+          fullName: 'Ada Lovelace',
+        });
+        expect(response.body.data.tickets.items[0].department).toEqual({
+          name: 'Support',
+        });
 
         const [call] = peers.ticket.calls('TicketService/ListTickets');
-        expect((call.request as { includeDeleted: boolean }).includeDeleted).toBe(false);
+        expect(
+          (call.request as { includeDeleted: boolean }).includeDeleted,
+        ).toBe(false);
       },
     );
 
@@ -205,11 +233,17 @@ describe('tickets and analytics', () => {
 
         const response = await new Session(gateway.baseUrl).post<{
           data: { ticket: { messages: { id: string; content: string }[] } };
-        }>('/graphql', { query: `{ ticket(id: "${id}") { messages { id content } } }` }, headers());
+        }>(
+          '/graphql',
+          { query: `{ ticket(id: "${id}") { messages { id content } } }` },
+          headers(),
+        );
 
         expect(response.status).toBe(200);
         expect(response.body).not.toHaveProperty('errors');
-        expect(response.body.data.ticket.messages).toEqual([{ id: 'm1', content: 'Hello' }]);
+        expect(response.body.data.ticket.messages).toEqual([
+          { id: 'm1', content: 'Hello' },
+        ]);
 
         const [call] = peers.ticket.calls('MessageService/ListMessages');
         expect((call.request as { ticketId: string }).ticketId).toBe(id);
@@ -231,10 +265,17 @@ describe('tickets and analytics', () => {
           isCurrent: true,
           createdAt: { seconds: 1_756_684_800, nanos: 0 },
         });
-        peers.ticket.on('TicketService/GetTicket').reply(wireTicket(id, { currentAssigneeId: USER }));
+        peers.ticket
+          .on('TicketService/GetTicket')
+          .reply(wireTicket(id, { currentAssigneeId: USER }));
 
         const response = await new Session(gateway.baseUrl).post<{
-          data: { assignTicket: { message: string; ticket: { id: string; currentAssigneeId: string } } };
+          data: {
+            assignTicket: {
+              message: string;
+              ticket: { id: string; currentAssigneeId: string };
+            };
+          };
         }>(
           '/graphql',
           {
@@ -256,15 +297,23 @@ describe('tickets and analytics', () => {
       '**`Mutation.escalateTicket` carries no `@RequirePermission`, matching the REST route**',
       async () => {
         const id = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa';
-        peers.ticket.on('TicketService/EscalateTicket').reply(wireTicket(id, { status: 4 }));
+        peers.ticket
+          .on('TicketService/EscalateTicket')
+          .reply(wireTicket(id, { status: 4 }));
 
         const response = await new Session(gateway.baseUrl).post<{
           data: { escalateTicket: { message: string } };
-        }>('/graphql', { query: `mutation { escalateTicket(id: "${id}") { message } }` }, headers());
+        }>(
+          '/graphql',
+          { query: `mutation { escalateTicket(id: "${id}") { message } }` },
+          headers(),
+        );
 
         expect(response.status).toBe(200);
         expect(response.body).not.toHaveProperty('errors');
-        expect(response.body.data.escalateTicket.message).toBe('Handed off to an agent');
+        expect(response.body.data.escalateTicket.message).toBe(
+          'Handed off to an agent',
+        );
       },
     );
 
@@ -272,7 +321,9 @@ describe('tickets and analytics', () => {
       '**`Mutation.transitionTicketStatus` sends the status and reason**',
       async () => {
         const id = 'bbbbbbbb-1111-4111-8111-bbbbbbbbbbbb';
-        peers.ticket.on('TicketService/ChangeTicketStatus').reply(wireTicket(id, { status: 5 }));
+        peers.ticket
+          .on('TicketService/ChangeTicketStatus')
+          .reply(wireTicket(id, { status: 5 }));
 
         const response = await new Session(gateway.baseUrl).post<{
           data: { transitionTicketStatus: { ticket: { status: string } } };
@@ -286,7 +337,9 @@ describe('tickets and analytics', () => {
 
         expect(response.status).toBe(200);
         expect(response.body).not.toHaveProperty('errors');
-        expect(response.body.data.transitionTicketStatus.ticket.status).toBe('RESOLVED');
+        expect(response.body.data.transitionTicketStatus.ticket.status).toBe(
+          'RESOLVED',
+        );
 
         const [call] = peers.ticket.calls('TicketService/ChangeTicketStatus');
         expect((call.request as { reason: string }).reason).toBe('fixed');
@@ -312,16 +365,27 @@ describe('tickets and analytics', () => {
         });
 
         const response = await new Session(gateway.baseUrl).post<{
-          data: { analyticsOverview: { ticketsCreated: number; csat: { rate: number } } };
+          data: {
+            analyticsOverview: {
+              ticketsCreated: number;
+              csat: { rate: number };
+            };
+          };
         }>(
           '/graphql',
-          { query: '{ analyticsOverview(from: "2027-01-01", to: "2027-01-01") { ticketsCreated csat { rate } } }' },
+          {
+            query:
+              '{ analyticsOverview(from: "2027-01-01", to: "2027-01-01") { ticketsCreated csat { rate } } }',
+          },
           headers(['analytics.read']),
         );
 
         expect(response.status).toBe(200);
         expect(response.body).not.toHaveProperty('errors');
-        expect(response.body.data.analyticsOverview).toEqual({ ticketsCreated: 10, csat: { rate: 0.9 } });
+        expect(response.body.data.analyticsOverview).toEqual({
+          ticketsCreated: 10,
+          csat: { rate: 0.9 },
+        });
       },
     );
 
@@ -350,11 +414,17 @@ describe('tickets and analytics', () => {
         peers.ingestion.on('AiLedgerService/GetAiUsage').reply({ points: [] });
         peers.auth.on('UserService/ListUsersByIds').reply({
           items: [],
-          summaries: [{ userId: AGENT, fullName: 'Ada Lovelace', isLocked: false }],
+          summaries: [
+            { userId: AGENT, fullName: 'Ada Lovelace', isLocked: false },
+          ],
         });
 
         const response = await new Session(gateway.baseUrl).post<{
-          data: { analyticsAgents: { items: { agentId: string; agent: { fullName: string } }[] } };
+          data: {
+            analyticsAgents: {
+              items: { agentId: string; agent: { fullName: string } }[];
+            };
+          };
         }>(
           '/graphql',
           {
@@ -366,7 +436,9 @@ describe('tickets and analytics', () => {
 
         expect(response.status).toBe(200);
         expect(response.body).not.toHaveProperty('errors');
-        expect(response.body.data.analyticsAgents.items[0].agent).toEqual({ fullName: 'Ada Lovelace' });
+        expect(response.body.data.analyticsAgents.items[0].agent).toEqual({
+          fullName: 'Ada Lovelace',
+        });
         // The whole point of `hydrateNames: false`'s Java equivalent: this
         // query never hit auth-service on its OWN leg — only the loader
         // call the `agent` edge above just made.
@@ -378,7 +450,15 @@ describe('tickets and analytics', () => {
       '**a failed leg does not fail the request** — the block is marked unavailable, not an error',
       async () => {
         peers.ticket.on('AnalyticsService/GetAgentStats').reply({
-          items: [{ agentId: USER, assigned: 1, resolved: 1, messagesSent: 1, resolutionSeconds: { count: 0 } }],
+          items: [
+            {
+              agentId: USER,
+              assigned: 1,
+              resolved: 1,
+              messagesSent: 1,
+              resolutionSeconds: { count: 0 },
+            },
+          ],
           dataThrough: '2024-01-01',
         });
         // `ingestion-service`'s leg is left unprogrammed — the fake peer
@@ -403,8 +483,12 @@ describe('tickets and analytics', () => {
 
         expect(response.status).toBe(200);
         expect(response.body).not.toHaveProperty('errors');
-        expect(response.body.data.analyticsAgents.items[0].draftAcceptance).toBeNull();
-        expect(response.body.data.analyticsAgents.unavailable).toEqual([{ source: 'ingestion-service' }]);
+        expect(
+          response.body.data.analyticsAgents.items[0].draftAcceptance,
+        ).toBeNull();
+        expect(response.body.data.analyticsAgents.unavailable).toEqual([
+          { source: 'ingestion-service' },
+        ]);
       },
     );
 
@@ -412,7 +496,15 @@ describe('tickets and analytics', () => {
       '**`Query.analyticsDocuments` merges citation accuracy from the satisfaction leg, and `DocumentUsage.document` batches through the documents loader**',
       async () => {
         peers.ingestion.on('AiLedgerService/GetDocumentAnalytics').reply({
-          mostCited: [{ documentId: 'd1', title: 'Onboarding', retrievalCount: 10, citationCount: 8, chunkCount: 4 }],
+          mostCited: [
+            {
+              documentId: 'd1',
+              title: 'Onboarding',
+              retrievalCount: 10,
+              citationCount: 8,
+              chunkCount: 4,
+            },
+          ],
           neverRetrieved: [],
           retrievedNeverCited: [],
           dataThrough: '2024-01-01',
@@ -462,8 +554,12 @@ describe('tickets and analytics', () => {
 
         expect(response.status).toBe(200);
         expect(response.body).not.toHaveProperty('errors');
-        expect(response.body.data.analyticsDocuments.citationAccuracy).toEqual({ rate: 0.75 });
-        expect(response.body.data.analyticsDocuments.mostCited[0].document).toEqual({ title: 'Onboarding' });
+        expect(response.body.data.analyticsDocuments.citationAccuracy).toEqual({
+          rate: 0.75,
+        });
+        expect(
+          response.body.data.analyticsDocuments.mostCited[0].document,
+        ).toEqual({ title: 'Onboarding' });
       },
     );
 
@@ -510,7 +606,11 @@ describe('tickets and analytics', () => {
         const response = await new Session(gateway.baseUrl).post<{
           data: {
             analyticsKnowledgeGaps: {
-              flags: { flagType: string; detail: string; document: { title: string } }[];
+              flags: {
+                flagType: string;
+                detail: string;
+                document: { title: string };
+              }[];
             };
           };
         }>(

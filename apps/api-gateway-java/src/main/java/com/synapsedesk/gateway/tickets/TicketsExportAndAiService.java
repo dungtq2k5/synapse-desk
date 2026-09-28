@@ -62,98 +62,169 @@ public class TicketsExportAndAiService {
   private final ObjectMapper json;
 
   public TicketsExportAndAiService(
-      AnalyticsServiceGrpc.AnalyticsServiceBlockingStub analyticsStub,
-      AiServiceGrpc.AiServiceBlockingStub aiStub,
-      ObjectMapper json) {
+    AnalyticsServiceGrpc.AnalyticsServiceBlockingStub analyticsStub,
+    AiServiceGrpc.AiServiceBlockingStub aiStub,
+    ObjectMapper json
+  ) {
     this.analyticsStub = analyticsStub;
     this.aiStub = aiStub;
     this.json = json;
   }
 
   public ResponseEntity<TicketsControllerCreateExportV1202Response> createExport(
-      RequestContext context, CreateTicketExportDto dto) {
-    TicketsCrudService.requirePermission(context, PermissionCodesEnum.TICKET_EXPORT);
+    RequestContext context,
+    CreateTicketExportDto dto
+  ) {
+    TicketsCrudService.requirePermission(
+      context,
+      PermissionCodesEnum.TICKET_EXPORT
+    );
     IsoDateCheck.requireIsoDate(dto.getFrom(), "from");
     IsoDateCheck.requireIsoDate(dto.getTo(), "to");
 
-    CreateExportRequest.Builder wire =
-        CreateExportRequest.newBuilder()
-            .setKind(ExportKind.EXPORT_KIND_TICKET)
-            .setFrom(dto.getFrom())
-            .setTo(dto.getTo())
-            .setFilters(dto.getFilters() == null || dto.getFilters().isEmpty() ? "" : json.writeValueAsString(dto.getFilters()));
+    CreateExportRequest.Builder wire = CreateExportRequest.newBuilder()
+      .setKind(ExportKind.EXPORT_KIND_TICKET)
+      .setFrom(dto.getFrom())
+      .setTo(dto.getTo())
+      .setFilters(
+        dto.getFilters() == null || dto.getFilters().isEmpty()
+          ? ""
+          : json.writeValueAsString(dto.getFilters())
+      );
     if (dto.getDepartmentId() != null) {
       wire.setDepartmentId(dto.getDepartmentId().toString());
     }
 
-    ExportResponse response = withAnalyticsMetadata(context).createExport(wire.build());
+    ExportResponse response = withAnalyticsMetadata(context).createExport(
+      wire.build()
+    );
 
     return new ResponseEntity<>(
-        new TicketsControllerCreateExportV1202Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(202))
-            .message("OK")
-            .data(toExportDto(response)),
-        HttpStatus.ACCEPTED);
+      new TicketsControllerCreateExportV1202Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(202))
+        .message("OK")
+        .data(toExportDto(response)),
+      HttpStatus.ACCEPTED
+    );
   }
 
-  public ResponseEntity<TicketsControllerCreateExportV1202Response> getExport(RequestContext context, String id) {
-    TicketsCrudService.requirePermission(context, PermissionCodesEnum.TICKET_EXPORT);
+  public ResponseEntity<TicketsControllerCreateExportV1202Response> getExport(
+    RequestContext context,
+    String id
+  ) {
+    TicketsCrudService.requirePermission(
+      context,
+      PermissionCodesEnum.TICKET_EXPORT
+    );
 
-    ExportResponse response = withAnalyticsMetadata(context).getExport(GetExportRequest.newBuilder().setId(id).build());
+    ExportResponse response = withAnalyticsMetadata(context).getExport(
+      GetExportRequest.newBuilder().setId(id).build()
+    );
 
     return ResponseEntity.ok(
-        new TicketsControllerCreateExportV1202Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("OK")
-            .data(toExportDto(response)));
+      new TicketsControllerCreateExportV1202Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("OK")
+        .data(toExportDto(response))
+    );
   }
 
-  public ResponseEntity<TicketsControllerListSimilarV1200Response> listSimilar(RequestContext context, String id) {
-    TicketsCrudService.requirePermission(context, PermissionCodesEnum.TICKET_READ_ALL);
+  public ResponseEntity<TicketsControllerListSimilarV1200Response> listSimilar(
+    RequestContext context,
+    String id
+  ) {
+    TicketsCrudService.requirePermission(
+      context,
+      PermissionCodesEnum.TICKET_READ_ALL
+    );
 
-    ListSimilarTicketsResponse response =
-        withAiMetadata(context).listSimilarTickets(TicketAiRequest.newBuilder().setTicketId(id).build());
+    ListSimilarTicketsResponse response = withAiMetadata(
+      context
+    ).listSimilarTickets(TicketAiRequest.newBuilder().setTicketId(id).build());
 
     return ResponseEntity.ok(
-        new TicketsControllerListSimilarV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("OK")
-            .data(response.getItemsList().stream().map(TicketsExportAndAiService::toSimilarTicketDto).toList()));
+      new TicketsControllerListSimilarV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("OK")
+        .data(
+          response
+            .getItemsList()
+            .stream()
+            .map(TicketsExportAndAiService::toSimilarTicketDto)
+            .toList()
+        )
+    );
   }
 
-  private static SimilarTicketResponseDto toSimilarTicketDto(SimilarTicketResponse item) {
+  private static SimilarTicketResponseDto toSimilarTicketDto(
+    SimilarTicketResponse item
+  ) {
     return new SimilarTicketResponseDto()
-        .ticketId(item.getTicketId())
-        .ticketNumber(BigDecimal.valueOf(item.getTicketNumber()))
-        .title(item.getTitle())
-        .similarityScore(BigDecimal.valueOf(item.getSimilarityScore()));
+      .ticketId(item.getTicketId())
+      .ticketNumber(BigDecimal.valueOf(item.getTicketNumber()))
+      .title(item.getTitle())
+      .similarityScore(BigDecimal.valueOf(item.getSimilarityScore()));
   }
 
   private static ExportResponseDto toExportDto(ExportResponse response) {
     return new ExportResponseDto()
-        .id(response.getId())
-        .status(ExportResponseDto.StatusEnum.fromValue(response.getStatus().name().replace("EXPORT_STATUS_", "")))
-        .kind(ExportResponseDto.KindEnum.fromValue(response.getKind().name().replace("EXPORT_KIND_", "")))
-        .rowCount(response.hasRowCount() ? BigDecimal.valueOf(response.getRowCount()) : null)
-        .rollupComputedAt(response.hasRollupComputedAt() ? TicketsCrudService.toOffsetDateTime(response.getRollupComputedAt()) : null)
-        .downloadUrl(response.hasDownloadUrl() ? response.getDownloadUrl() : null)
-        .error(response.hasError() ? response.getError() : null)
-        .createdAt(response.hasCreatedAt() ? TicketsCrudService.toOffsetDateTime(response.getCreatedAt()) : TicketsCrudService.toOffsetDateTime(com.google.protobuf.Timestamp.getDefaultInstance()))
-        .completedAt(response.hasCompletedAt() ? TicketsCrudService.toOffsetDateTime(response.getCompletedAt()) : null);
+      .id(response.getId())
+      .status(
+        ExportResponseDto.StatusEnum.fromValue(
+          response.getStatus().name().replace("EXPORT_STATUS_", "")
+        )
+      )
+      .kind(
+        ExportResponseDto.KindEnum.fromValue(
+          response.getKind().name().replace("EXPORT_KIND_", "")
+        )
+      )
+      .rowCount(
+        response.hasRowCount()
+          ? BigDecimal.valueOf(response.getRowCount())
+          : null
+      )
+      .rollupComputedAt(
+        response.hasRollupComputedAt()
+          ? TicketsCrudService.toOffsetDateTime(response.getRollupComputedAt())
+          : null
+      )
+      .downloadUrl(response.hasDownloadUrl() ? response.getDownloadUrl() : null)
+      .error(response.hasError() ? response.getError() : null)
+      .createdAt(
+        response.hasCreatedAt()
+          ? TicketsCrudService.toOffsetDateTime(response.getCreatedAt())
+          : TicketsCrudService.toOffsetDateTime(
+              com.google.protobuf.Timestamp.getDefaultInstance()
+            )
+      )
+      .completedAt(
+        response.hasCompletedAt()
+          ? TicketsCrudService.toOffsetDateTime(response.getCompletedAt())
+          : null
+      );
   }
 
-  private AnalyticsServiceGrpc.AnalyticsServiceBlockingStub withAnalyticsMetadata(RequestContext context) {
+  private AnalyticsServiceGrpc.AnalyticsServiceBlockingStub withAnalyticsMetadata(
+    RequestContext context
+  ) {
     return analyticsStub
-        .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
-        .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context)));
+      .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
+      .withInterceptors(
+        MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context))
+      );
   }
 
-  private AiServiceGrpc.AiServiceBlockingStub withAiMetadata(RequestContext context) {
+  private AiServiceGrpc.AiServiceBlockingStub withAiMetadata(
+    RequestContext context
+  ) {
     return aiStub
-        .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
-        .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context)));
+      .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
+      .withInterceptors(
+        MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context))
+      );
   }
 }

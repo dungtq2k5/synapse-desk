@@ -39,14 +39,27 @@ import synapsedesk.ingestion.Platform.TenantUsage;
  */
 class PlatformPlansServiceTest {
 
-  private final PlatformServiceGrpc.PlatformServiceBlockingStub stub = mock(PlatformServiceGrpc.PlatformServiceBlockingStub.class);
+  private final PlatformServiceGrpc.PlatformServiceBlockingStub stub = mock(
+    PlatformServiceGrpc.PlatformServiceBlockingStub.class
+  );
   private final IngestionPlatformServiceGrpc.IngestionPlatformServiceBlockingStub usageStub =
-      mock(IngestionPlatformServiceGrpc.IngestionPlatformServiceBlockingStub.class);
+    mock(
+      IngestionPlatformServiceGrpc.IngestionPlatformServiceBlockingStub.class
+    );
   private final SuperAdminCheck superAdminCheck = mock(SuperAdminCheck.class);
   private PlatformPlansService service;
 
   private static RequestContext context() {
-    return new RequestContext("agent-1", null, true, List.of(), List.of(), true, "127.0.0.1", "test");
+    return new RequestContext(
+      "agent-1",
+      null,
+      true,
+      List.of(),
+      List.of(),
+      true,
+      "127.0.0.1",
+      "test"
+    );
   }
 
   @BeforeEach
@@ -60,11 +73,15 @@ class PlatformPlansServiceTest {
 
   @Test
   void getPlanRefusesBeforeTouchingThePeerWhenTheCheckFails() {
-    org.mockito.Mockito.doThrow(new ResponseStatusException(org.springframework.http.HttpStatus.FORBIDDEN))
-        .when(superAdminCheck)
-        .require(any());
+    org.mockito.Mockito.doThrow(
+      new ResponseStatusException(org.springframework.http.HttpStatus.FORBIDDEN)
+    )
+      .when(superAdminCheck)
+      .require(any());
 
-    assertThatThrownBy(() -> service.getPlan(context(), "plan-1")).isInstanceOf(ResponseStatusException.class);
+    assertThatThrownBy(() -> service.getPlan(context(), "plan-1")).isInstanceOf(
+      ResponseStatusException.class
+    );
 
     verify(superAdminCheck).require(any());
     verifyNoMoreInteractions(stub);
@@ -73,62 +90,98 @@ class PlatformPlansServiceTest {
   @Test
   void anUnreachableUsageLegDegradesTheProjectionRatherThanFailingTheCall() {
     when(stub.applyPlan(any())).thenReturn(
-        ApplyPlanResponse.newBuilder()
-            .addSubscribers(subscriberOver("org-1", 5_000_000_000L))
-            .setDryRun(true)
-            .setChangedCount(0)
-            .setSkippedPinnedCount(0)
-            .setOverLimitCount(0)
-            .addEvaluatedDimensions("seats")
-            .build());
-    when(usageStub.getPlatformUsage(any())).thenThrow(new io.grpc.StatusRuntimeException(io.grpc.Status.UNAVAILABLE));
+      ApplyPlanResponse.newBuilder()
+        .addSubscribers(subscriberOver("org-1", 5_000_000_000L))
+        .setDryRun(true)
+        .setChangedCount(0)
+        .setSkippedPinnedCount(0)
+        .setOverLimitCount(0)
+        .addEvaluatedDimensions("seats")
+        .build()
+    );
+    when(usageStub.getPlatformUsage(any())).thenThrow(
+      new io.grpc.StatusRuntimeException(io.grpc.Status.UNAVAILABLE)
+    );
 
-    ApplyPlanResponseDto data = service.applyPlan(context(), "plan-1", true).getBody().getData();
+    ApplyPlanResponseDto data = service
+      .applyPlan(context(), "plan-1", true)
+      .getBody()
+      .getData();
 
     // Never refused — the call still answers 200 with what auth-service alone computed.
     assertThat(data.getEvaluatedDimensions()).containsExactly("seats");
-    assertThat(data.getEvaluatedDimensions()).doesNotContain("storage", "documents");
+    assertThat(data.getEvaluatedDimensions()).doesNotContain(
+      "storage",
+      "documents"
+    );
     assertThat(data.getSubscribers().get(0).getOverLimit()).isEmpty();
   }
 
   @Test
   void aReachableUsageLegAddsStorageAndDocumentsToEvaluatedDimensionsAndFlagsAnOverage() {
     when(stub.applyPlan(any())).thenReturn(
-        ApplyPlanResponse.newBuilder()
-            .addSubscribers(subscriberOver("org-1", 10_000_000_000L))
-            .setDryRun(true)
-            .addEvaluatedDimensions("seats")
-            .build());
+      ApplyPlanResponse.newBuilder()
+        .addSubscribers(subscriberOver("org-1", 10_000_000_000L))
+        .setDryRun(true)
+        .addEvaluatedDimensions("seats")
+        .build()
+    );
     when(usageStub.getPlatformUsage(any())).thenReturn(
-        PlatformUsageResponse.newBuilder()
-            .addUsage(TenantUsage.newBuilder().setOrganizationId("org-1").setUsedBytes(20_000_000_000L).setDocumentCount(0))
-            .build());
+      PlatformUsageResponse.newBuilder()
+        .addUsage(
+          TenantUsage.newBuilder()
+            .setOrganizationId("org-1")
+            .setUsedBytes(20_000_000_000L)
+            .setDocumentCount(0)
+        )
+        .build()
+    );
 
-    ApplyPlanResponseDto data = service.applyPlan(context(), "plan-1", true).getBody().getData();
+    ApplyPlanResponseDto data = service
+      .applyPlan(context(), "plan-1", true)
+      .getBody()
+      .getData();
 
-    assertThat(data.getEvaluatedDimensions()).contains("seats", "storage", "documents");
-    assertThat(data.getSubscribers().get(0).getOverLimit()).anyMatch(line -> line.startsWith("maxStorageBytes"));
+    assertThat(data.getEvaluatedDimensions()).contains(
+      "seats",
+      "storage",
+      "documents"
+    );
+    assertThat(data.getSubscribers().get(0).getOverLimit()).anyMatch(line ->
+      line.startsWith("maxStorageBytes")
+    );
     assertThat(data.getOverLimitCount()).isEqualTo(java.math.BigDecimal.ONE);
   }
 
   @Test
   void aPinnedSubscriberIsNeverCheckedForOverage() {
     when(stub.applyPlan(any())).thenReturn(
-        ApplyPlanResponse.newBuilder()
-            .addSubscribers(
-                PlanSubscriberProjection.newBuilder()
-                    .setOrganizationId("org-1")
-                    .setOrganizationName("Acme")
-                    .putAfter("maxStorageBytes", 1)
-                    .setSkippedPinned(true)
-                    .build())
-            .build());
+      ApplyPlanResponse.newBuilder()
+        .addSubscribers(
+          PlanSubscriberProjection.newBuilder()
+            .setOrganizationId("org-1")
+            .setOrganizationName("Acme")
+            .putAfter("maxStorageBytes", 1)
+            .setSkippedPinned(true)
+            .build()
+        )
+        .build()
+    );
     when(usageStub.getPlatformUsage(any())).thenReturn(
-        PlatformUsageResponse.newBuilder()
-            .addUsage(TenantUsage.newBuilder().setOrganizationId("org-1").setUsedBytes(999_999_999L).setDocumentCount(0))
-            .build());
+      PlatformUsageResponse.newBuilder()
+        .addUsage(
+          TenantUsage.newBuilder()
+            .setOrganizationId("org-1")
+            .setUsedBytes(999_999_999L)
+            .setDocumentCount(0)
+        )
+        .build()
+    );
 
-    ApplyPlanResponseDto data = service.applyPlan(context(), "plan-1", true).getBody().getData();
+    ApplyPlanResponseDto data = service
+      .applyPlan(context(), "plan-1", true)
+      .getBody()
+      .getData();
 
     assertThat(data.getSubscribers().get(0).getOverLimit()).isEmpty();
   }
@@ -136,13 +189,26 @@ class PlatformPlansServiceTest {
   @Test
   void usageExactlyAtTheLimitIsNotAnOverage() {
     when(stub.applyPlan(any())).thenReturn(
-        ApplyPlanResponse.newBuilder().addSubscribers(subscriberOver("org-1", 10_000_000_000L)).setDryRun(true).build());
+      ApplyPlanResponse.newBuilder()
+        .addSubscribers(subscriberOver("org-1", 10_000_000_000L))
+        .setDryRun(true)
+        .build()
+    );
     when(usageStub.getPlatformUsage(any())).thenReturn(
-        PlatformUsageResponse.newBuilder()
-            .addUsage(TenantUsage.newBuilder().setOrganizationId("org-1").setUsedBytes(10_000_000_000L).setDocumentCount(0))
-            .build());
+      PlatformUsageResponse.newBuilder()
+        .addUsage(
+          TenantUsage.newBuilder()
+            .setOrganizationId("org-1")
+            .setUsedBytes(10_000_000_000L)
+            .setDocumentCount(0)
+        )
+        .build()
+    );
 
-    ApplyPlanResponseDto data = service.applyPlan(context(), "plan-1", true).getBody().getData();
+    ApplyPlanResponseDto data = service
+      .applyPlan(context(), "plan-1", true)
+      .getBody()
+      .getData();
 
     // A limit gates the NEXT addition, not tenure at exactly the ceiling.
     assertThat(data.getSubscribers().get(0).getOverLimit()).isEmpty();
@@ -169,14 +235,19 @@ class PlatformPlansServiceTest {
     }
     dto.setPrices(prices);
 
-    assertThatThrownBy(() -> service.createPlan(context(), dto)).isInstanceOf(ResponseStatusException.class);
+    assertThatThrownBy(() -> service.createPlan(context(), dto)).isInstanceOf(
+      ResponseStatusException.class
+    );
   }
 
-  private static PlanSubscriberProjection subscriberOver(String organizationId, long storageLimit) {
+  private static PlanSubscriberProjection subscriberOver(
+    String organizationId,
+    long storageLimit
+  ) {
     return PlanSubscriberProjection.newBuilder()
-        .setOrganizationId(organizationId)
-        .setOrganizationName("Acme")
-        .putAfter("maxStorageBytes", storageLimit)
-        .build();
+      .setOrganizationId(organizationId)
+      .setOrganizationName("Acme")
+      .putAfter("maxStorageBytes", storageLimit)
+      .build();
   }
 }

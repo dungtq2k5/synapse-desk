@@ -41,11 +41,22 @@ import synapsedesk.ticket.TicketServiceGrpc;
  */
 class TicketsStatusServiceTest {
 
-  private final TicketServiceGrpc.TicketServiceBlockingStub stub = mock(TicketServiceGrpc.TicketServiceBlockingStub.class);
+  private final TicketServiceGrpc.TicketServiceBlockingStub stub = mock(
+    TicketServiceGrpc.TicketServiceBlockingStub.class
+  );
   private TicketsStatusService service;
 
   private static RequestContext contextWithCodes(List<String> codes) {
-    return new RequestContext("agent-1", "org-1", false, List.of(), codes, true, "127.0.0.1", "test");
+    return new RequestContext(
+      "agent-1",
+      "org-1",
+      false,
+      List.of(),
+      codes,
+      true,
+      "127.0.0.1",
+      "test"
+    );
   }
 
   @BeforeEach
@@ -58,27 +69,38 @@ class TicketsStatusServiceTest {
   @Test
   void bulkChangeStatusPreservesThePartialSuccessEnvelopeAtTheItemLevel() {
     when(stub.bulkChangeTicketStatus(any())).thenReturn(
-        BulkTicketStatusResponse.newBuilder()
-            .addUpdated("11111111-1111-4111-8111-111111111111")
-            .addFailed(
-                BulkTicketFailure.newBuilder()
-                    .setId("22222222-2222-4222-8222-222222222222")
-                    .setReason("already CLOSED"))
-            .build());
+      BulkTicketStatusResponse.newBuilder()
+        .addUpdated("11111111-1111-4111-8111-111111111111")
+        .addFailed(
+          BulkTicketFailure.newBuilder()
+            .setId("22222222-2222-4222-8222-222222222222")
+            .setReason("already CLOSED")
+        )
+        .build()
+    );
     BulkTicketStatusDto dto = new BulkTicketStatusDto();
     dto.setTicketIds(
-        List.of(
-            UUID.fromString("11111111-1111-4111-8111-111111111111"),
-            UUID.fromString("22222222-2222-4222-8222-222222222222")));
+      List.of(
+        UUID.fromString("11111111-1111-4111-8111-111111111111"),
+        UUID.fromString("22222222-2222-4222-8222-222222222222")
+      )
+    );
     dto.setStatus(BulkTicketStatusDto.StatusEnum.OPEN);
 
-    var response = service.bulkChangeStatus(contextWithCodes(List.of("ticket.update")), dto);
+    var response = service.bulkChangeStatus(
+      contextWithCodes(List.of("ticket.update")),
+      dto
+    );
 
     assertThat(response.getStatusCode().value()).isEqualTo(200);
     BulkTicketStatusResponseDto data = response.getBody().getData();
-    assertThat(data.getUpdated()).containsExactly("11111111-1111-4111-8111-111111111111");
+    assertThat(data.getUpdated()).containsExactly(
+      "11111111-1111-4111-8111-111111111111"
+    );
     assertThat(data.getFailed()).hasSize(1);
-    assertThat(data.getFailed().get(0).getId()).isEqualTo("22222222-2222-4222-8222-222222222222");
+    assertThat(data.getFailed().get(0).getId()).isEqualTo(
+      "22222222-2222-4222-8222-222222222222"
+    );
     assertThat(data.getFailed().get(0).getReason()).isEqualTo("already CLOSED");
   }
 
@@ -92,15 +114,18 @@ class TicketsStatusServiceTest {
     dto.setTicketIds(ids);
     dto.setStatus(BulkTicketStatusDto.StatusEnum.OPEN);
 
-    assertThatThrownBy(() -> service.bulkChangeStatus(contextWithCodes(List.of("ticket.update")), dto))
-        .isInstanceOf(ResponseStatusException.class);
+    assertThatThrownBy(() ->
+      service.bulkChangeStatus(contextWithCodes(List.of("ticket.update")), dto)
+    ).isInstanceOf(ResponseStatusException.class);
 
     verify(stub, org.mockito.Mockito.never()).bulkChangeTicketStatus(any());
   }
 
   @Test
   void bulkChangeStatusForwardsTheReasonWhenPresent() {
-    when(stub.bulkChangeTicketStatus(any())).thenReturn(BulkTicketStatusResponse.getDefaultInstance());
+    when(stub.bulkChangeTicketStatus(any())).thenReturn(
+      BulkTicketStatusResponse.getDefaultInstance()
+    );
     BulkTicketStatusDto dto = new BulkTicketStatusDto();
     dto.setTicketIds(List.of(UUID.randomUUID()));
     dto.setStatus(BulkTicketStatusDto.StatusEnum.OPEN);
@@ -108,7 +133,9 @@ class TicketsStatusServiceTest {
 
     service.bulkChangeStatus(contextWithCodes(List.of("ticket.update")), dto);
 
-    ArgumentCaptor<BulkTicketStatusRequest> captor = ArgumentCaptor.forClass(BulkTicketStatusRequest.class);
+    ArgumentCaptor<BulkTicketStatusRequest> captor = ArgumentCaptor.forClass(
+      BulkTicketStatusRequest.class
+    );
     verify(stub).bulkChangeTicketStatus(captor.capture());
     assertThat(captor.getValue().getReason()).isEqualTo("queue cleanup");
   }
@@ -119,15 +146,20 @@ class TicketsStatusServiceTest {
     dto.setTicketIds(List.of(UUID.randomUUID()));
     dto.setPriority(BulkTicketPriorityDto.PriorityEnum.HIGH);
 
-    assertThatThrownBy(() -> service.bulkChangePriority(contextWithCodes(List.of()), dto))
-        .isInstanceOf(ResponseStatusException.class);
+    assertThatThrownBy(() ->
+      service.bulkChangePriority(contextWithCodes(List.of()), dto)
+    ).isInstanceOf(ResponseStatusException.class);
   }
 
   @Test
   void escalateNeedsNoPermissionAtAll() {
     when(stub.escalateTicket(any())).thenReturn(wireTicket());
 
-    var response = service.escalate(contextWithCodes(List.of()), "ticket-1", null);
+    var response = service.escalate(
+      contextWithCodes(List.of()),
+      "ticket-1",
+      null
+    );
 
     assertThat(response.getStatusCode().value()).isEqualTo(200);
   }
@@ -136,16 +168,24 @@ class TicketsStatusServiceTest {
   void resolveRefusesForACallerHoldingOnlyTicketUpdate() {
     // `ticket.resolve` is a stronger, distinct right from `ticket.update` —
     // reopening and resolving are gated differently on purpose.
-    assertThatThrownBy(
-            () -> service.resolve(contextWithCodes(List.of("ticket.update")), "ticket-1", null))
-        .isInstanceOf(ResponseStatusException.class);
+    assertThatThrownBy(() ->
+      service.resolve(
+        contextWithCodes(List.of("ticket.update")),
+        "ticket-1",
+        null
+      )
+    ).isInstanceOf(ResponseStatusException.class);
   }
 
   @Test
   void reopenAcceptsTicketUpdateNotTicketResolve() {
     when(stub.reopenTicket(any())).thenReturn(wireTicket());
 
-    var response = service.reopen(contextWithCodes(List.of("ticket.update")), "ticket-1", null);
+    var response = service.reopen(
+      contextWithCodes(List.of("ticket.update")),
+      "ticket-1",
+      null
+    );
 
     assertThat(response.getStatusCode().value()).isEqualTo(200);
   }
@@ -153,18 +193,18 @@ class TicketsStatusServiceTest {
   private static TicketResponse wireTicket() {
     Timestamp now = Timestamp.newBuilder().setSeconds(1_756_684_800).build();
     return TicketResponse.newBuilder()
-        .setId("ticket-1")
-        .setTicketNumber(1)
-        .setOrganizationId("org-1")
-        .setAuthorId("author-1")
-        .setSource(TicketSource.TICKET_SOURCE_WEB)
-        .setStatus(TicketStatus.TICKET_STATUS_NEW)
-        .setPriority(TicketPriority.TICKET_PRIORITY_MEDIUM)
-        .setTitle("Title")
-        .setDescription("desc")
-        .setUnreadCount(0)
-        .setCreatedAt(now)
-        .setUpdatedAt(now)
-        .build();
+      .setId("ticket-1")
+      .setTicketNumber(1)
+      .setOrganizationId("org-1")
+      .setAuthorId("author-1")
+      .setSource(TicketSource.TICKET_SOURCE_WEB)
+      .setStatus(TicketStatus.TICKET_STATUS_NEW)
+      .setPriority(TicketPriority.TICKET_PRIORITY_MEDIUM)
+      .setTitle("Title")
+      .setDescription("desc")
+      .setUnreadCount(0)
+      .setCreatedAt(now)
+      .setUpdatedAt(now)
+      .build();
   }
 }

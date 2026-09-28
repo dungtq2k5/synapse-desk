@@ -1,16 +1,5 @@
 package com.synapsedesk.gateway.users;
 
-import java.math.BigDecimal;
-import java.time.Instant;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
-import java.util.concurrent.TimeUnit;
-
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
-
 import com.synapsedesk.gateway.auth.CurrentRequest;
 import com.synapsedesk.gateway.auth.CurrentUser;
 import com.synapsedesk.gateway.auth.RequestContext;
@@ -37,8 +26,16 @@ import com.synapsedesk.gateway.generated.model.UserPermissionsResponseDto;
 import com.synapsedesk.gateway.generated.model.UserSummaryResponseDto;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
 import com.synapsedesk.gateway.security.RequirePermission;
-
 import io.grpc.stub.MetadataUtils;
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.concurrent.TimeUnit;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 import synapsedesk.auth.Common.Gender;
 import synapsedesk.auth.Common.PageMeta;
 import synapsedesk.auth.Common.PageRequest;

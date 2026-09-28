@@ -9,38 +9,37 @@ import org.junit.jupiter.api.Test;
 
 class UriSizeValidatorTest {
 
-  private static final Size SIZE_2_TO_5 =
-      new Size() {
-        @Override
-        public int min() {
-          return 2;
-        }
+  private static final Size SIZE_2_TO_5 = new Size() {
+    @Override
+    public int min() {
+      return 2;
+    }
 
-        @Override
-        public int max() {
-          return 5;
-        }
+    @Override
+    public int max() {
+      return 5;
+    }
 
-        @Override
-        public String message() {
-          return "{jakarta.validation.constraints.Size.message}";
-        }
+    @Override
+    public String message() {
+      return "{jakarta.validation.constraints.Size.message}";
+    }
 
-        @Override
-        public Class<?>[] groups() {
-          return new Class<?>[0];
-        }
+    @Override
+    public Class<?>[] groups() {
+      return new Class<?>[0];
+    }
 
-        @Override
-        public Class<? extends jakarta.validation.Payload>[] payload() {
-          return new Class[0];
-        }
+    @Override
+    public Class<? extends jakarta.validation.Payload>[] payload() {
+      return new Class[0];
+    }
 
-        @Override
-        public Class<? extends Annotation> annotationType() {
-          return Size.class;
-        }
-      };
+    @Override
+    public Class<? extends Annotation> annotationType() {
+      return Size.class;
+    }
+  };
 
   private final UriSizeValidator validator = new UriSizeValidator();
 

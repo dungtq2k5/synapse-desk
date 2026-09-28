@@ -5,5 +5,5 @@ public enum TicketPriorityGql {
   LOW,
   MEDIUM,
   HIGH,
-  URGENT
+  URGENT,
 }

@@ -11,15 +11,18 @@ public final class IngestionJobMapper {
 
   private IngestionJobMapper() {}
 
-  public static IngestionJobGqlDto toIngestionJobGqlDto(IngestionJobResponse job) {
+  public static IngestionJobGqlDto toIngestionJobGqlDto(
+    IngestionJobResponse job
+  ) {
     return new IngestionJobGqlDto(
-        job.getId(),
-        job.getDocumentId(),
-        job.getBullmqJobId(),
-        toStatusGql(job.getStatus()),
-        job.getErrorLog(),
-        job.hasProcessedAt() ? toOffsetDateTime(job.getProcessedAt()) : null,
-        toOffsetDateTime(job.getCreatedAt()));
+      job.getId(),
+      job.getDocumentId(),
+      job.getBullmqJobId(),
+      toStatusGql(job.getStatus()),
+      job.getErrorLog(),
+      job.hasProcessedAt() ? toOffsetDateTime(job.getProcessedAt()) : null,
+      toOffsetDateTime(job.getCreatedAt())
+    );
   }
 
   /** `UNSPECIFIED` -> `null`: a member this build does not recognise nulls the field, not the row. */
@@ -36,7 +39,12 @@ public final class IngestionJobMapper {
     };
   }
 
-  private static OffsetDateTime toOffsetDateTime(com.google.protobuf.Timestamp timestamp) {
-    return Instant.ofEpochSecond(timestamp.getSeconds(), timestamp.getNanos()).atOffset(ZoneOffset.UTC);
+  private static OffsetDateTime toOffsetDateTime(
+    com.google.protobuf.Timestamp timestamp
+  ) {
+    return Instant.ofEpochSecond(
+      timestamp.getSeconds(),
+      timestamp.getNanos()
+    ).atOffset(ZoneOffset.UTC);
   }
 }

@@ -62,55 +62,68 @@ describe('ai', () => {
     });
   });
 
-  rowFor('Ai')('**`getSummary` needs `ticket.read.all`, not `ticket.ai.use`**', async () => {
-    peers.ticket.on('AiService/GetSummary').reply({
-      id: 'sum-1',
-      ticketId: TICKET,
-      summaryText: 'The customer wants a refund.',
-      suggestedAction: 'Issue the refund.',
-      confidenceScore: 0.9,
-      modelName: 'gpt-test',
-      createdAt: { seconds: 1_756_684_800, nanos: 0 },
-      updatedAt: { seconds: 1_756_684_800, nanos: 0 },
-    });
+  rowFor('Ai')(
+    '**`getSummary` needs `ticket.read.all`, not `ticket.ai.use`**',
+    async () => {
+      peers.ticket.on('AiService/GetSummary').reply({
+        id: 'sum-1',
+        ticketId: TICKET,
+        summaryText: 'The customer wants a refund.',
+        suggestedAction: 'Issue the refund.',
+        confidenceScore: 0.9,
+        modelName: 'gpt-test',
+        createdAt: { seconds: 1_756_684_800, nanos: 0 },
+        updatedAt: { seconds: 1_756_684_800, nanos: 0 },
+      });
 
-    const response = await new Session(gateway.baseUrl).get(
-      `${API}/tickets/${TICKET}/ai/summary`,
-      headers(['ticket.read.all']),
-    );
+      const response = await new Session(gateway.baseUrl).get(
+        `${API}/tickets/${TICKET}/ai/summary`,
+        headers(['ticket.read.all']),
+      );
 
-    expect(response.status).toBe(200);
-    expect(response.body).toMatchObject({ data: { summaryText: 'The customer wants a refund.' } });
-  });
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({
+        data: { summaryText: 'The customer wants a refund.' },
+      });
+    },
+  );
 
-  rowFor('Ai')('**`generateSummary` upserts and answers 200, not 201**', async () => {
-    peers.ticket.on('AiService/GenerateSummary').reply({
-      id: 'sum-1',
-      ticketId: TICKET,
-      summaryText: 'Regenerated summary.',
-      suggestedAction: 'Follow up.',
-      confidenceScore: 0.8,
-      modelName: 'gpt-test',
-      createdAt: { seconds: 1_756_684_800, nanos: 0 },
-      updatedAt: { seconds: 1_756_684_800, nanos: 0 },
-    });
+  rowFor('Ai')(
+    '**`generateSummary` upserts and answers 200, not 201**',
+    async () => {
+      peers.ticket.on('AiService/GenerateSummary').reply({
+        id: 'sum-1',
+        ticketId: TICKET,
+        summaryText: 'Regenerated summary.',
+        suggestedAction: 'Follow up.',
+        confidenceScore: 0.8,
+        modelName: 'gpt-test',
+        createdAt: { seconds: 1_756_684_800, nanos: 0 },
+        updatedAt: { seconds: 1_756_684_800, nanos: 0 },
+      });
 
-    const response = await new Session(gateway.baseUrl).post(
-      `${API}/tickets/${TICKET}/ai/summary`,
-      undefined,
-      headers(['ticket.ai.use']),
-    );
+      const response = await new Session(gateway.baseUrl).post(
+        `${API}/tickets/${TICKET}/ai/summary`,
+        undefined,
+        headers(['ticket.ai.use']),
+      );
 
-    expect(response.status).toBe(200);
-    expect(response.body).toMatchObject({ data: { summaryText: 'Regenerated summary.' } });
-  });
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({
+        data: { summaryText: 'Regenerated summary.' },
+      });
+    },
+  );
 
   rowFor('Ai')(
     '**`generateSummary` answers 402 when the AI allowance is exhausted — the `[http:402]` marker, resolved end to end**',
     async () => {
       peers.ticket
         .on('AiService/GenerateSummary')
-        .fail(GrpcStatus.PERMISSION_DENIED, '[http:402] Your AI allowance for this billing cycle is exhausted');
+        .fail(
+          GrpcStatus.PERMISSION_DENIED,
+          '[http:402] Your AI allowance for this billing cycle is exhausted',
+        );
 
       const response = await new Session(gateway.baseUrl).post(
         `${API}/tickets/${TICKET}/ai/summary`,
@@ -120,67 +133,97 @@ describe('ai', () => {
 
       expect(response.status).toBe(402);
       expect(response.body).toMatchObject({
-        error: expect.stringContaining('AI allowance for this billing cycle is exhausted'),
+        error: expect.stringContaining(
+          'AI allowance for this billing cycle is exhausted',
+        ),
       });
       expect(response.body.error).not.toContain('[http:402]');
     },
   );
 
-  rowFor('Ai')('**`generateDraft` forwards the optional instruction and returns citations**', async () => {
-    peers.ticket.on('AiService/GenerateDraft').reply({
-      content: 'Draft reply text.',
-      modelName: 'gpt-test',
-      promptTokens: 120,
-      completionTokens: 45,
-      generationId: 'gen-1',
-      citations: [{ chunkId: 'chunk-1', documentId: 'doc-1', documentTitle: 'Refund Policy', pageNumber: 3 }],
-    });
+  rowFor('Ai')(
+    '**`generateDraft` forwards the optional instruction and returns citations**',
+    async () => {
+      peers.ticket.on('AiService/GenerateDraft').reply({
+        content: 'Draft reply text.',
+        modelName: 'gpt-test',
+        promptTokens: 120,
+        completionTokens: 45,
+        generationId: 'gen-1',
+        citations: [
+          {
+            chunkId: 'chunk-1',
+            documentId: 'doc-1',
+            documentTitle: 'Refund Policy',
+            pageNumber: 3,
+          },
+        ],
+      });
 
-    const response = await new Session(gateway.baseUrl).post(
-      `${API}/tickets/${TICKET}/ai/draft`,
-      { instruction: 'Keep it short' },
-      headers(['ticket.ai.use']),
-    );
+      const response = await new Session(gateway.baseUrl).post(
+        `${API}/tickets/${TICKET}/ai/draft`,
+        { instruction: 'Keep it short' },
+        headers(['ticket.ai.use']),
+      );
 
-    expect(response.status).toBe(200);
-    expect(response.body).toMatchObject({
-      data: { generationId: 'gen-1', citations: [{ documentTitle: 'Refund Policy', pageNumber: 3 }] },
-    });
-    const [call] = peers.ticket.calls('AiService/GenerateDraft');
-    expect(call.request).toMatchObject({ ticketId: TICKET, instruction: 'Keep it short' });
-  });
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({
+        data: {
+          generationId: 'gen-1',
+          citations: [{ documentTitle: 'Refund Policy', pageNumber: 3 }],
+        },
+      });
+      const [call] = peers.ticket.calls('AiService/GenerateDraft');
+      expect(call.request).toMatchObject({
+        ticketId: TICKET,
+        instruction: 'Keep it short',
+      });
+    },
+  );
 
-  rowFor('Ai')('**`getSuggestions` passes a `LEXICAL_ONLY` degradation through untouched, with 200**', async () => {
-    peers.ticket.on('AiService/GetSuggestions').reply({
-      items: [],
-      articles: [{ documentId: 'doc-1', documentTitle: 'Refund Policy', score: 0.5 }],
-      degraded: 'SUGGESTIONS_DEGRADATION_LEXICAL_ONLY',
-    });
+  rowFor('Ai')(
+    '**`getSuggestions` passes a `LEXICAL_ONLY` degradation through untouched, with 200**',
+    async () => {
+      peers.ticket.on('AiService/GetSuggestions').reply({
+        items: [],
+        articles: [
+          { documentId: 'doc-1', documentTitle: 'Refund Policy', score: 0.5 },
+        ],
+        degraded: 'SUGGESTIONS_DEGRADATION_LEXICAL_ONLY',
+      });
 
-    const response = await new Session(gateway.baseUrl).post(
-      `${API}/tickets/${TICKET}/ai/suggestions`,
-      undefined,
-      headers(['ticket.ai.use']),
-    );
+      const response = await new Session(gateway.baseUrl).post(
+        `${API}/tickets/${TICKET}/ai/suggestions`,
+        undefined,
+        headers(['ticket.ai.use']),
+      );
 
-    expect(response.status).toBe(200);
-    expect(response.body).toMatchObject({ data: { degraded: 'LEXICAL_ONLY', nextSteps: [] } });
-  });
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({
+        data: { degraded: 'LEXICAL_ONLY', nextSteps: [] },
+      });
+    },
+  );
 
-  rowFor('Ai')('**`classify` narrows an unrecognized priority to `null` rather than a guess**', async () => {
-    peers.ticket.on('AiService/ClassifyTicket').reply({
-      suggestedDepartmentId: 'dept-1',
-      suggestedPriority: 'TICKET_PRIORITY_UNSPECIFIED',
-      confidenceScore: 0.4,
-    });
+  rowFor('Ai')(
+    '**`classify` narrows an unrecognized priority to `null` rather than a guess**',
+    async () => {
+      peers.ticket.on('AiService/ClassifyTicket').reply({
+        suggestedDepartmentId: 'dept-1',
+        suggestedPriority: 'TICKET_PRIORITY_UNSPECIFIED',
+        confidenceScore: 0.4,
+      });
 
-    const response = await new Session(gateway.baseUrl).post(
-      `${API}/tickets/${TICKET}/ai/classify`,
-      undefined,
-      headers(['ticket.ai.use']),
-    );
+      const response = await new Session(gateway.baseUrl).post(
+        `${API}/tickets/${TICKET}/ai/classify`,
+        undefined,
+        headers(['ticket.ai.use']),
+      );
 
-    expect(response.status).toBe(200);
-    expect(response.body).toMatchObject({ data: { suggestedDepartmentId: 'dept-1', suggestedPriority: null } });
-  });
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({
+        data: { suggestedDepartmentId: 'dept-1', suggestedPriority: null },
+      });
+    },
+  );
 });

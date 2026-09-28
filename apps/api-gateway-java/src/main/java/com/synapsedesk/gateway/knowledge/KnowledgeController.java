@@ -80,9 +80,10 @@ public class KnowledgeController implements KnowledgeApi {
   private final CurrentUser currentUser;
 
   public KnowledgeController(
-      DocumentServiceGrpc.DocumentServiceBlockingStub documentStub,
-      RagServiceGrpc.RagServiceBlockingStub ragStub,
-      CurrentUser currentUser) {
+    DocumentServiceGrpc.DocumentServiceBlockingStub documentStub,
+    RagServiceGrpc.RagServiceBlockingStub ragStub,
+    CurrentUser currentUser
+  ) {
     this.documentStub = documentStub;
     this.ragStub = ragStub;
     this.currentUser = currentUser;
@@ -90,113 +91,166 @@ public class KnowledgeController implements KnowledgeApi {
 
   @Override
   public ResponseEntity<KnowledgeControllerListArticlesV1200Response> knowledgeControllerListArticlesV1(
-      BigDecimal page, BigDecimal limit, String sortBy, String sortOrder, @Nullable String searchTerm) {
+    BigDecimal page,
+    BigDecimal limit,
+    String sortBy,
+    String sortOrder,
+    @Nullable String searchTerm
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    PageRequest.Builder pageRequest =
-        PageRequest.newBuilder()
-            .setPage(page.intValue())
-            .setLimit(limit.intValue())
-            .setSortBy(sortBy)
-            .setSortOrder("DESC".equalsIgnoreCase(sortOrder) ? SortOrder.SORT_ORDER_DESC : SortOrder.SORT_ORDER_ASC);
+    PageRequest.Builder pageRequest = PageRequest.newBuilder()
+      .setPage(page.intValue())
+      .setLimit(limit.intValue())
+      .setSortBy(sortBy)
+      .setSortOrder(
+        "DESC".equalsIgnoreCase(sortOrder)
+          ? SortOrder.SORT_ORDER_DESC
+          : SortOrder.SORT_ORDER_ASC
+      );
     if (searchTerm != null) {
       pageRequest.setSearchTerm(searchTerm);
     }
 
-    ListKnowledgeArticlesResponse response =
-        withDocumentMetadata(context).listKnowledgeArticles(
-            ListKnowledgeArticlesRequest.newBuilder().setPage(pageRequest).build());
+    ListKnowledgeArticlesResponse response = withDocumentMetadata(
+      context
+    ).listKnowledgeArticles(
+      ListKnowledgeArticlesRequest.newBuilder().setPage(pageRequest).build()
+    );
 
     KnowledgeControllerListArticlesV1200ResponseData data =
-        new KnowledgeControllerListArticlesV1200ResponseData()
-            .items(response.getItemsList().stream().map(KnowledgeMapper::toArticleDto).toList())
-            .meta(KnowledgeMapper.toMetaDto(response.getMeta()));
+      new KnowledgeControllerListArticlesV1200ResponseData()
+        .items(
+          response
+            .getItemsList()
+            .stream()
+            .map(KnowledgeMapper::toArticleDto)
+            .toList()
+        )
+        .meta(KnowledgeMapper.toMetaDto(response.getMeta()));
 
     return ResponseEntity.ok(
-        new KnowledgeControllerListArticlesV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("OK")
-            .data(data));
+      new KnowledgeControllerListArticlesV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("OK")
+        .data(data)
+    );
   }
 
   @Override
   public ResponseEntity<KnowledgeControllerGetArticleV1200Response> knowledgeControllerGetArticleV1(
-      String id, BigDecimal page, BigDecimal limit) {
+    String id,
+    BigDecimal page,
+    BigDecimal limit
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     // The service always sorts blocks by `chunkIndex` server-side regardless
     // of what this sends — Node deliberately sends an EMPTY sortBy rather
     // than a second hardcoded `"chunkIndex"` literal that must agree with
     // the service's own allowlist. Not the shared list-pagination default.
-    PageRequest blockRange =
-        PageRequest.newBuilder().setPage(page.intValue()).setLimit(limit.intValue()).setSortBy("").build();
+    PageRequest blockRange = PageRequest.newBuilder()
+      .setPage(page.intValue())
+      .setLimit(limit.intValue())
+      .setSortBy("")
+      .build();
 
-    KnowledgeArticleDetailResponse response =
-        withDocumentMetadata(context).getKnowledgeArticle(
-            GetKnowledgeArticleRequest.newBuilder().setId(id).setPage(blockRange).build());
+    KnowledgeArticleDetailResponse response = withDocumentMetadata(
+      context
+    ).getKnowledgeArticle(
+      GetKnowledgeArticleRequest.newBuilder()
+        .setId(id)
+        .setPage(blockRange)
+        .build()
+    );
 
     return ResponseEntity.ok(
-        new KnowledgeControllerGetArticleV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("OK")
-            .data(
-                KnowledgeMapper.toArticleDetailDto(
-                    response.getArticle(), response.getBlocksList(), response.getMeta(),
-                    response.getHasUnindexedPages())));
+      new KnowledgeControllerGetArticleV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("OK")
+        .data(
+          KnowledgeMapper.toArticleDetailDto(
+            response.getArticle(),
+            response.getBlocksList(),
+            response.getMeta(),
+            response.getHasUnindexedPages()
+          )
+        )
+    );
   }
 
   @Override
   @ThrottleOverride(
-      tier = ThrottlerTiers.MEDIUM, ttlMs = RouteThrottle.KNOWLEDGE_ASK_TTL_MS, limit = RouteThrottle.KNOWLEDGE_ASK_LIMIT)
-  public ResponseEntity<KnowledgeControllerAskV1200Response> knowledgeControllerAskV1(KnowledgeAskDto knowledgeAskDto) {
+    tier = ThrottlerTiers.MEDIUM,
+    ttlMs = RouteThrottle.KNOWLEDGE_ASK_TTL_MS,
+    limit = RouteThrottle.KNOWLEDGE_ASK_LIMIT
+  )
+  public ResponseEntity<KnowledgeControllerAskV1200Response> knowledgeControllerAskV1(
+    KnowledgeAskDto knowledgeAskDto
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
     String message = requireNonBlank(knowledgeAskDto.getMessage(), "message");
 
     // History/attachments are structurally omitted from `KnowledgeAskDto` —
     // an empty history and zero attachment count is what keeps rag-service's
     // ledger row a `CHAT_ANSWER` with no ticket attribution.
-    ChatRequest wire =
-        ChatRequest.newBuilder().setMessage(message).setAttachmentCount(0).build();
+    ChatRequest wire = ChatRequest.newBuilder()
+      .setMessage(message)
+      .setAttachmentCount(0)
+      .build();
 
     ChatResponse response = withRagMetadata(context).ask(wire);
 
     return ResponseEntity.ok(
-        new KnowledgeControllerAskV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("Answer generated")
-            .data(
-                KnowledgeMapper.toAskDto(
-                    response.getContent(), response.getStatus(), response.getCitationsList(),
-                    response.getGenerationId())));
+      new KnowledgeControllerAskV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("Answer generated")
+        .data(
+          KnowledgeMapper.toAskDto(
+            response.getContent(),
+            response.getStatus(),
+            response.getCitationsList(),
+            response.getGenerationId()
+          )
+        )
+    );
   }
 
   @Override
   @ThrottleOverride(
-      tier = ThrottlerTiers.MEDIUM, ttlMs = RouteThrottle.KNOWLEDGE_SEARCH_TTL_MS,
-      limit = RouteThrottle.KNOWLEDGE_SEARCH_LIMIT)
+    tier = ThrottlerTiers.MEDIUM,
+    ttlMs = RouteThrottle.KNOWLEDGE_SEARCH_TTL_MS,
+    limit = RouteThrottle.KNOWLEDGE_SEARCH_LIMIT
+  )
   public ResponseEntity<KnowledgeControllerSearchV1200Response> knowledgeControllerSearchV1(
-      KnowledgeSearchDto knowledgeSearchDto) {
+    KnowledgeSearchDto knowledgeSearchDto
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
     String query = requireNonBlank(knowledgeSearchDto.getQuery(), "query");
 
-    SearchRequest wire =
-        SearchRequest.newBuilder()
-            .setQuery(query)
-            .setLimit(knowledgeSearchDto.getLimit().intValue())
-            .setSkipRerank(Boolean.TRUE.equals(knowledgeSearchDto.getSkipRerank()))
-            .build();
+    SearchRequest wire = SearchRequest.newBuilder()
+      .setQuery(query)
+      .setLimit(knowledgeSearchDto.getLimit().intValue())
+      .setSkipRerank(Boolean.TRUE.equals(knowledgeSearchDto.getSkipRerank()))
+      .build();
 
     SearchResponse response = withRagMetadata(context).search(wire);
 
     return ResponseEntity.ok(
-        new KnowledgeControllerSearchV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("Search completed")
-            .data(KnowledgeMapper.toSearchDto(response.getChunksList(), response.getDegraded())));
+      new KnowledgeControllerSearchV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("Search completed")
+        .data(
+          KnowledgeMapper.toSearchDto(
+            response.getChunksList(),
+            response.getDegraded()
+          )
+        )
+    );
   }
 
   /**
@@ -208,20 +262,37 @@ public class KnowledgeController implements KnowledgeApi {
   private static String requireNonBlank(String value, String field) {
     String trimmed = value == null ? "" : value.trim();
     if (trimmed.isEmpty()) {
-      throw new ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST, field + " must not be blank");
+      throw new ResponseStatusException(
+        org.springframework.http.HttpStatus.BAD_REQUEST,
+        field + " must not be blank"
+      );
     }
     return trimmed;
   }
 
-  private DocumentServiceGrpc.DocumentServiceBlockingStub withDocumentMetadata(RequestContext context) {
+  private DocumentServiceGrpc.DocumentServiceBlockingStub withDocumentMetadata(
+    RequestContext context
+  ) {
     return documentStub
-        .withDeadlineAfter(DEADLINE_SECONDS, java.util.concurrent.TimeUnit.SECONDS)
-        .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context)));
+      .withDeadlineAfter(
+        DEADLINE_SECONDS,
+        java.util.concurrent.TimeUnit.SECONDS
+      )
+      .withInterceptors(
+        MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context))
+      );
   }
 
-  private RagServiceGrpc.RagServiceBlockingStub withRagMetadata(RequestContext context) {
+  private RagServiceGrpc.RagServiceBlockingStub withRagMetadata(
+    RequestContext context
+  ) {
     return ragStub
-        .withDeadlineAfter(DEADLINE_SECONDS, java.util.concurrent.TimeUnit.SECONDS)
-        .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context)));
+      .withDeadlineAfter(
+        DEADLINE_SECONDS,
+        java.util.concurrent.TimeUnit.SECONDS
+      )
+      .withInterceptors(
+        MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context))
+      );
   }
 }

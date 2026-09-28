@@ -25,8 +25,8 @@ import synapsedesk.notification.NotificationServiceGrpc;
 import synapsedesk.rag.RagServiceGrpc;
 import synapsedesk.ticket.AiServiceGrpc;
 import synapsedesk.ticket.AnalyticsServiceGrpc;
-import synapsedesk.ticket.AuditServiceGrpc;
 import synapsedesk.ticket.AssignmentServiceGrpc;
+import synapsedesk.ticket.AuditServiceGrpc;
 import synapsedesk.ticket.FeedbackServiceGrpc;
 import synapsedesk.ticket.MessageServiceGrpc;
 import synapsedesk.ticket.TicketServiceGrpc;
@@ -269,7 +269,9 @@ public class GrpcChannels {
   public IngestionPlatformServiceGrpc.IngestionPlatformServiceBlockingStub ingestionPlatformServiceStub(
     ManagedChannel ingestionServiceChannel
   ) {
-    return IngestionPlatformServiceGrpc.newBlockingStub(ingestionServiceChannel);
+    return IngestionPlatformServiceGrpc.newBlockingStub(
+      ingestionServiceChannel
+    );
   }
 
   @Bean

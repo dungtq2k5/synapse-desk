@@ -100,7 +100,7 @@ public class OrganizationsController implements OrganizationsApi {
   private static final long GET_CACHE_TTL_SECONDS = 60;
   private static final String INBOUND_LOCAL_PART = "support";
   private static final String STORAGE_UNAVAILABLE_REASON =
-      "Storage usage could not be read just now — try again shortly";
+    "Storage usage could not be read just now — try again shortly";
 
   private final OrganizationServiceGrpc.OrganizationServiceBlockingStub stub;
   private final DocumentServiceGrpc.DocumentServiceBlockingStub documentStub;
@@ -110,12 +110,13 @@ public class OrganizationsController implements OrganizationsApi {
   private final ObjectMapper json;
 
   public OrganizationsController(
-      OrganizationServiceGrpc.OrganizationServiceBlockingStub stub,
-      DocumentServiceGrpc.DocumentServiceBlockingStub documentStub,
-      CurrentUser currentUser,
-      CacheService cache,
-      InboundEmailProperties inboundEmail,
-      ObjectMapper json) {
+    OrganizationServiceGrpc.OrganizationServiceBlockingStub stub,
+    DocumentServiceGrpc.DocumentServiceBlockingStub documentStub,
+    CurrentUser currentUser,
+    CacheService cache,
+    InboundEmailProperties inboundEmail,
+    ObjectMapper json
+  ) {
     this.stub = stub;
     this.documentStub = documentStub;
     this.currentUser = currentUser;
@@ -128,40 +129,51 @@ public class OrganizationsController implements OrganizationsApi {
   public ResponseEntity<OrganizationsControllerGetV1200Response> organizationsControllerGetV1() {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    String key = cache.buildKey(context.organizationId(), CACHE_SCOPE, Map.of());
-    OrganizationsControllerGetV1200Response envelope =
-        cache.wrap(
-            key,
-            GET_CACHE_TTL_SECONDS,
-            OrganizationsControllerGetV1200Response.class,
-            () ->
-                toGetEnvelope(
-                    "OK",
-                    200,
-                    withMetadata(context)
-                        .getCurrentOrganization(GetCurrentOrganizationRequest.getDefaultInstance())));
+    String key = cache.buildKey(
+      context.organizationId(),
+      CACHE_SCOPE,
+      Map.of()
+    );
+    OrganizationsControllerGetV1200Response envelope = cache.wrap(
+      key,
+      GET_CACHE_TTL_SECONDS,
+      OrganizationsControllerGetV1200Response.class,
+      () ->
+        toGetEnvelope(
+          "OK",
+          200,
+          withMetadata(context).getCurrentOrganization(
+            GetCurrentOrganizationRequest.getDefaultInstance()
+          )
+        )
+    );
 
     return ResponseEntity.ok(envelope);
   }
 
   @Override
   @RequirePermission(PermissionCodesEnum.ORGANIZATION_UPDATE)
-  public ResponseEntity<OrganizationsControllerIssueInboundTokenV1201Response>
-      organizationsControllerIssueInboundTokenV1() {
+  public ResponseEntity<OrganizationsControllerIssueInboundTokenV1201Response> organizationsControllerIssueInboundTokenV1() {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    IssueInboundTokenResponse response =
-        withMetadata(context).issueInboundToken(IssueInboundTokenRequest.getDefaultInstance());
+    IssueInboundTokenResponse response = withMetadata(
+      context
+    ).issueInboundToken(IssueInboundTokenRequest.getDefaultInstance());
 
-    String address = INBOUND_LOCAL_PART + "+" + response.getInboundToken() + "@" + inboundEmail.domain();
+    String address =
+      INBOUND_LOCAL_PART +
+      "+" +
+      response.getInboundToken() +
+      "@" +
+      inboundEmail.domain();
 
-    return ResponseEntity.status(201)
-        .body(
-            new OrganizationsControllerIssueInboundTokenV1201Response()
-                .success(true)
-                .statusCode(BigDecimal.valueOf(201))
-                .message("OK")
-                .data(new InboundAddressResponseDto().inboundAddress(address)));
+    return ResponseEntity.status(201).body(
+      new OrganizationsControllerIssueInboundTokenV1201Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(201))
+        .message("OK")
+        .data(new InboundAddressResponseDto().inboundAddress(address))
+    );
   }
 
   @Override
@@ -169,7 +181,9 @@ public class OrganizationsController implements OrganizationsApi {
   public ResponseEntity<AuthControllerForgotPasswordV1202Response> organizationsControllerRevokeInboundTokenV1() {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    withMetadata(context).revokeInboundToken(RevokeInboundTokenRequest.getDefaultInstance());
+    withMetadata(context).revokeInboundToken(
+      RevokeInboundTokenRequest.getDefaultInstance()
+    );
 
     return ResponseEntity.noContent().build();
   }
@@ -177,10 +191,12 @@ public class OrganizationsController implements OrganizationsApi {
   @Override
   @RequirePermission(PermissionCodesEnum.ORGANIZATION_UPDATE)
   public ResponseEntity<OrganizationsControllerGetV1200Response> organizationsControllerUpdateV1(
-      UpdateOrganizationDto updateOrganizationDto) {
+    UpdateOrganizationDto updateOrganizationDto
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    UpdateOrganizationRequest.Builder wire = UpdateOrganizationRequest.newBuilder();
+    UpdateOrganizationRequest.Builder wire =
+      UpdateOrganizationRequest.newBuilder();
     if (updateOrganizationDto.getName() != null) {
       wire.setName(updateOrganizationDto.getName());
     }
@@ -191,7 +207,9 @@ public class OrganizationsController implements OrganizationsApi {
       wire.setDomain(updateOrganizationDto.getDomain());
     }
 
-    OrganizationResponse response = withMetadata(context).updateOrganization(wire.build());
+    OrganizationResponse response = withMetadata(context).updateOrganization(
+      wire.build()
+    );
 
     return ResponseEntity.ok(toGetEnvelope("OK", 200, response));
   }
@@ -201,8 +219,11 @@ public class OrganizationsController implements OrganizationsApi {
   public ResponseEntity<OrganizationsControllerGetSettingsV1200Response> organizationsControllerGetSettingsV1() {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    OrganizationSettingsResponse response =
-        withMetadata(context).getOrganizationSettings(GetOrganizationSettingsRequest.getDefaultInstance());
+    OrganizationSettingsResponse response = withMetadata(
+      context
+    ).getOrganizationSettings(
+      GetOrganizationSettingsRequest.getDefaultInstance()
+    );
 
     return ResponseEntity.ok(toSettingsEnvelope("OK", response, null));
   }
@@ -210,50 +231,66 @@ public class OrganizationsController implements OrganizationsApi {
   @Override
   @RequirePermission(PermissionCodesEnum.ORGANIZATION_UPDATE)
   public ResponseEntity<OrganizationsControllerGetSettingsV1200Response> organizationsControllerUpdateSettingsV1(
-      UpdateOrganizationSettingsDto updateOrganizationSettingsDto) {
+    UpdateOrganizationSettingsDto updateOrganizationSettingsDto
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
     JsonNode body = rawBody();
 
-    UpdateOrganizationSettingsRequest.Builder wire = UpdateOrganizationSettingsRequest.newBuilder();
+    UpdateOrganizationSettingsRequest.Builder wire =
+      UpdateOrganizationSettingsRequest.newBuilder();
     if (updateOrganizationSettingsDto.getEnforceTwoFactor() != null) {
-      wire.setEnforceTwoFactor(updateOrganizationSettingsDto.getEnforceTwoFactor());
+      wire.setEnforceTwoFactor(
+        updateOrganizationSettingsDto.getEnforceTwoFactor()
+      );
     }
 
     if (body.has("allowedEmailDomains")) {
-      wire.addAllAllowedEmailDomains(updateOrganizationSettingsDto.getAllowedEmailDomains());
+      wire.addAllAllowedEmailDomains(
+        updateOrganizationSettingsDto.getAllowedEmailDomains()
+      );
       wire.setReplaceAllowedEmailDomains(true);
     }
 
     applyLongOverride(
-        body,
-        "maxDocumentBytesOverride",
-        updateOrganizationSettingsDto.getMaxDocumentBytesOverride(),
-        wire::setMaxDocumentBytesOverride,
-        wire::setClearMaxDocumentBytesOverride);
+      body,
+      "maxDocumentBytesOverride",
+      updateOrganizationSettingsDto.getMaxDocumentBytesOverride(),
+      wire::setMaxDocumentBytesOverride,
+      wire::setClearMaxDocumentBytesOverride
+    );
     applyLongOverride(
-        body,
-        "maxAttachmentBytesOverride",
-        updateOrganizationSettingsDto.getMaxAttachmentBytesOverride(),
-        wire::setMaxAttachmentBytesOverride,
-        wire::setClearMaxAttachmentBytesOverride);
+      body,
+      "maxAttachmentBytesOverride",
+      updateOrganizationSettingsDto.getMaxAttachmentBytesOverride(),
+      wire::setMaxAttachmentBytesOverride,
+      wire::setClearMaxAttachmentBytesOverride
+    );
     if (body.has("maxAttachmentsPerMessageOverride")) {
       if (body.get("maxAttachmentsPerMessageOverride").isNull()) {
         wire.setClearMaxAttachmentsPerMessageOverride(true);
       } else {
         wire.setMaxAttachmentsPerMessageOverride(
-            updateOrganizationSettingsDto.getMaxAttachmentsPerMessageOverride().intValue());
+          updateOrganizationSettingsDto
+            .getMaxAttachmentsPerMessageOverride()
+            .intValue()
+        );
       }
     }
 
-    OrganizationSettingsResponse response = withMetadata(context).updateOrganizationSettings(wire.build());
+    OrganizationSettingsResponse response = withMetadata(
+      context
+    ).updateOrganizationSettings(wire.build());
 
     String warning =
-        response.getPublicDomainWarningsCount() > 0
-            ? "Anyone with an address at " + String.join(", ", response.getPublicDomainWarningsList())
-                + " can now join this workspace automatically."
-            : null;
+      response.getPublicDomainWarningsCount() > 0
+        ? "Anyone with an address at " +
+          String.join(", ", response.getPublicDomainWarningsList()) +
+          " can now join this workspace automatically."
+        : null;
 
-    return ResponseEntity.ok(toSettingsEnvelope("Settings updated", response, warning));
+    return ResponseEntity.ok(
+      toSettingsEnvelope("Settings updated", response, warning)
+    );
   }
 
   @Override
@@ -261,48 +298,53 @@ public class OrganizationsController implements OrganizationsApi {
   public ResponseEntity<OrganizationsControllerGetUsageV1200Response> organizationsControllerGetUsageV1() {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    OrganizationUsageResponse response =
-        withMetadata(context).getOrganizationUsage(GetOrganizationUsageRequest.getDefaultInstance());
+    OrganizationUsageResponse response = withMetadata(
+      context
+    ).getOrganizationUsage(GetOrganizationUsageRequest.getDefaultInstance());
     UsageMeterResponseDto storage = storageLeg(context);
 
-    OrganizationUsageResponseDto data =
-        new OrganizationUsageResponseDto(
-            toUsageMeterResponseDto(response.getSeats()),
-            storage,
-            toUsageMeterResponseDto(response.getAiTokens()),
-            toOffsetDateTime(response.getBillingCycleStart()),
-            toAiModelTierEnum(response.getAiModelTier()),
-            response.getPlanName(),
-            response.hasCurrentPeriodEnd() ? toOffsetDateTime(response.getCurrentPeriodEnd()) : null);
+    OrganizationUsageResponseDto data = new OrganizationUsageResponseDto(
+      toUsageMeterResponseDto(response.getSeats()),
+      storage,
+      toUsageMeterResponseDto(response.getAiTokens()),
+      toOffsetDateTime(response.getBillingCycleStart()),
+      toAiModelTierEnum(response.getAiModelTier()),
+      response.getPlanName(),
+      response.hasCurrentPeriodEnd()
+        ? toOffsetDateTime(response.getCurrentPeriodEnd())
+        : null
+    );
 
     return ResponseEntity.ok(
-        new OrganizationsControllerGetUsageV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("OK")
-            .data(data));
+      new OrganizationsControllerGetUsageV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("OK")
+        .data(data)
+    );
   }
 
   /** The id is ignored — storage usage is a WORKSPACE total, matching Node's own client. */
   private UsageMeterResponseDto storageLeg(RequestContext context) {
     try {
-      StorageUsageResponse storage =
-          documentStub
-              .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
-              .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context)))
-              .getStorageUsage(DocumentIdRequest.newBuilder().setId("").build());
+      StorageUsageResponse storage = documentStub
+        .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
+        .withInterceptors(
+          MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context))
+        )
+        .getStorageUsage(DocumentIdRequest.newBuilder().setId("").build());
 
       return new UsageMeterResponseDto()
-          .available(true)
-          .used(BigDecimal.valueOf(storage.getUsedBytes()))
-          .limit(BigDecimal.valueOf(storage.getLimitBytes()))
-          .unavailableReason(null);
+        .available(true)
+        .used(BigDecimal.valueOf(storage.getUsedBytes()))
+        .limit(BigDecimal.valueOf(storage.getLimitBytes()))
+        .unavailableReason(null);
     } catch (StatusRuntimeException failure) {
       return new UsageMeterResponseDto()
-          .available(false)
-          .used(null)
-          .limit(null)
-          .unavailableReason(STORAGE_UNAVAILABLE_REASON);
+        .available(false)
+        .used(null)
+        .limit(null)
+        .unavailableReason(STORAGE_UNAVAILABLE_REASON);
     }
   }
 
@@ -311,15 +353,17 @@ public class OrganizationsController implements OrganizationsApi {
   public ResponseEntity<OrganizationsControllerGetOnboardingV1200Response> organizationsControllerGetOnboardingV1() {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    OnboardingResponse response =
-        withMetadata(context).getOnboarding(GetOnboardingRequest.getDefaultInstance());
+    OnboardingResponse response = withMetadata(context).getOnboarding(
+      GetOnboardingRequest.getDefaultInstance()
+    );
 
     return ResponseEntity.ok(
-        new OrganizationsControllerGetOnboardingV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("OK")
-            .data(toOnboardingResponseDto(response)));
+      new OrganizationsControllerGetOnboardingV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("OK")
+        .data(toOnboardingResponseDto(response))
+    );
   }
 
   @Override
@@ -327,30 +371,44 @@ public class OrganizationsController implements OrganizationsApi {
   public ResponseEntity<OrganizationsControllerGetV1200Response> organizationsControllerCompleteOnboardingV1() {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    OrganizationResponse response =
-        withMetadata(context).completeOnboarding(CompleteOnboardingRequest.getDefaultInstance());
+    OrganizationResponse response = withMetadata(context).completeOnboarding(
+      CompleteOnboardingRequest.getDefaultInstance()
+    );
 
-    return ResponseEntity.ok(toGetEnvelope("Onboarding complete", 200, response));
+    return ResponseEntity.ok(
+      toGetEnvelope("Onboarding complete", 200, response)
+    );
   }
 
   @Override
   @RequirePermission(PermissionCodesEnum.ORGANIZATION_DELETE)
   public ResponseEntity<OrganizationsControllerRequestOffboardV1200Response> organizationsControllerRequestOffboardV1(
-      DeleteOrganizationDto deleteOrganizationDto) {
+    DeleteOrganizationDto deleteOrganizationDto
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    DeleteOrganizationResponse response =
-        withMetadata(context)
-            .deleteOrganization(
-                DeleteOrganizationRequest.newBuilder().setReason(deleteOrganizationDto.getReason()).build());
+    DeleteOrganizationResponse response = withMetadata(
+      context
+    ).deleteOrganization(
+      DeleteOrganizationRequest.newBuilder()
+        .setReason(deleteOrganizationDto.getReason())
+        .build()
+    );
 
     return ResponseEntity.ok(
-        new OrganizationsControllerRequestOffboardV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("Offboarding requested")
-            .warning("This workspace is frozen pending review. Contact support to cancel.")
-            .data(new OffboardResponseDto(BigDecimal.valueOf(response.getRevokedSessionCount()))));
+      new OrganizationsControllerRequestOffboardV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("Offboarding requested")
+        .warning(
+          "This workspace is frozen pending review. Contact support to cancel."
+        )
+        .data(
+          new OffboardResponseDto(
+            BigDecimal.valueOf(response.getRevokedSessionCount())
+          )
+        )
+    );
   }
 
   /**
@@ -359,11 +417,12 @@ public class OrganizationsController implements OrganizationsApi {
    * {@code maxAttachmentBytesOverride} share.
    */
   private static void applyLongOverride(
-      JsonNode body,
-      String field,
-      BigDecimal value,
-      java.util.function.LongConsumer setValue,
-      java.util.function.Consumer<Boolean> setClear) {
+    JsonNode body,
+    String field,
+    BigDecimal value,
+    java.util.function.LongConsumer setValue,
+    java.util.function.Consumer<Boolean> setClear
+  ) {
     if (!body.has(field)) {
       return;
     }
@@ -388,95 +447,155 @@ public class OrganizationsController implements OrganizationsApi {
   }
 
   private static OrganizationsControllerGetV1200Response toGetEnvelope(
-      String message, int status, OrganizationResponse response) {
+    String message,
+    int status,
+    OrganizationResponse response
+  ) {
     return new OrganizationsControllerGetV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(status))
-        .message(message)
-        .data(toOrganizationResponseDto(response));
+      .success(true)
+      .statusCode(BigDecimal.valueOf(status))
+      .message(message)
+      .data(toOrganizationResponseDto(response));
   }
 
   private static OrganizationsControllerGetSettingsV1200Response toSettingsEnvelope(
-      String message, OrganizationSettingsResponse response, String warning) {
+    String message,
+    OrganizationSettingsResponse response,
+    String warning
+  ) {
     return new OrganizationsControllerGetSettingsV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message(message)
-        .warning(warning)
-        .data(toOrganizationSettingsResponseDto(response));
+      .success(true)
+      .statusCode(BigDecimal.valueOf(200))
+      .message(message)
+      .warning(warning)
+      .data(toOrganizationSettingsResponseDto(response));
   }
 
-  private static OrganizationResponseDto toOrganizationResponseDto(OrganizationResponse organization) {
+  private static OrganizationResponseDto toOrganizationResponseDto(
+    OrganizationResponse organization
+  ) {
     return new OrganizationResponseDto()
-        .id(organization.getId())
-        .name(organization.getName())
-        .slug(organization.getSlug())
-        .domain(organization.hasDomain() ? organization.getDomain() : null)
-        .status(toStatusEnum(organization.getStatus()))
-        .enforceTwoFactor(organization.getEnforceTwoFactor())
-        .allowedEmailDomains(organization.getAllowedEmailDomainsList())
-        .maxAgentSeats(BigDecimal.valueOf(organization.getMaxAgentSeats()))
-        .maxStorageBytes(BigDecimal.valueOf(organization.getMaxStorageBytes()))
-        .monthlyAiTokenBudget(BigDecimal.valueOf(organization.getMonthlyAiTokenBudget()))
-        .billingCycleStart(toOffsetDateTime(organization.getBillingCycleStart()))
-        .createdAt(toOffsetDateTime(organization.getCreatedAt()))
-        .updatedAt(toOffsetDateTime(organization.getUpdatedAt()));
+      .id(organization.getId())
+      .name(organization.getName())
+      .slug(organization.getSlug())
+      .domain(organization.hasDomain() ? organization.getDomain() : null)
+      .status(toStatusEnum(organization.getStatus()))
+      .enforceTwoFactor(organization.getEnforceTwoFactor())
+      .allowedEmailDomains(organization.getAllowedEmailDomainsList())
+      .maxAgentSeats(BigDecimal.valueOf(organization.getMaxAgentSeats()))
+      .maxStorageBytes(BigDecimal.valueOf(organization.getMaxStorageBytes()))
+      .monthlyAiTokenBudget(
+        BigDecimal.valueOf(organization.getMonthlyAiTokenBudget())
+      )
+      .billingCycleStart(toOffsetDateTime(organization.getBillingCycleStart()))
+      .createdAt(toOffsetDateTime(organization.getCreatedAt()))
+      .updatedAt(toOffsetDateTime(organization.getUpdatedAt()));
   }
 
   private static OrganizationSettingsResponseDto toOrganizationSettingsResponseDto(
-      OrganizationSettingsResponse settings) {
+    OrganizationSettingsResponse settings
+  ) {
     return new OrganizationSettingsResponseDto()
-        .enforceTwoFactor(settings.getEnforceTwoFactor())
-        .allowedEmailDomains(settings.getAllowedEmailDomainsList())
-        .publicDomainWarnings(settings.getPublicDomainWarningsList())
-        .maxDocumentBytesOverride(
-            settings.hasMaxDocumentBytesOverride() ? BigDecimal.valueOf(settings.getMaxDocumentBytesOverride()) : null)
-        .maxAttachmentBytesOverride(
-            settings.hasMaxAttachmentBytesOverride()
-                ? BigDecimal.valueOf(settings.getMaxAttachmentBytesOverride())
-                : null)
-        .maxAttachmentsPerMessageOverride(
-            settings.hasMaxAttachmentsPerMessageOverride()
-                ? BigDecimal.valueOf(settings.getMaxAttachmentsPerMessageOverride())
-                : null);
+      .enforceTwoFactor(settings.getEnforceTwoFactor())
+      .allowedEmailDomains(settings.getAllowedEmailDomainsList())
+      .publicDomainWarnings(settings.getPublicDomainWarningsList())
+      .maxDocumentBytesOverride(
+        settings.hasMaxDocumentBytesOverride()
+          ? BigDecimal.valueOf(settings.getMaxDocumentBytesOverride())
+          : null
+      )
+      .maxAttachmentBytesOverride(
+        settings.hasMaxAttachmentBytesOverride()
+          ? BigDecimal.valueOf(settings.getMaxAttachmentBytesOverride())
+          : null
+      )
+      .maxAttachmentsPerMessageOverride(
+        settings.hasMaxAttachmentsPerMessageOverride()
+          ? BigDecimal.valueOf(settings.getMaxAttachmentsPerMessageOverride())
+          : null
+      );
   }
 
-  private static OnboardingResponseDto toOnboardingResponseDto(OnboardingResponse response) {
+  private static OnboardingResponseDto toOnboardingResponseDto(
+    OnboardingResponse response
+  ) {
     return new OnboardingResponseDto(
-        response.getStepsList().stream()
-            .map(step -> new OnboardingStepResponseDto(step.getKey(), step.getLabel(), step.getComplete()))
-            .toList(),
-        response.getCanComplete(),
-        toOnboardingStatusEnum(response.getStatus()));
+      response
+        .getStepsList()
+        .stream()
+        .map(step ->
+          new OnboardingStepResponseDto(
+            step.getKey(),
+            step.getLabel(),
+            step.getComplete()
+          )
+        )
+        .toList(),
+      response.getCanComplete(),
+      toOnboardingStatusEnum(response.getStatus())
+    );
   }
 
-  private static UsageMeterResponseDto toUsageMeterResponseDto(UsageMeter meter) {
+  private static UsageMeterResponseDto toUsageMeterResponseDto(
+    UsageMeter meter
+  ) {
     return new UsageMeterResponseDto()
-        .available(meter.getAvailable())
-        .used(meter.getAvailable() && meter.hasUsed() ? BigDecimal.valueOf(meter.getUsed()) : null)
-        .limit(meter.getAvailable() && meter.hasLimit() ? BigDecimal.valueOf(meter.getLimit()) : null)
-        .unavailableReason(meter.hasUnavailableReason() ? meter.getUnavailableReason() : null);
+      .available(meter.getAvailable())
+      .used(
+        meter.getAvailable() && meter.hasUsed()
+          ? BigDecimal.valueOf(meter.getUsed())
+          : null
+      )
+      .limit(
+        meter.getAvailable() && meter.hasLimit()
+          ? BigDecimal.valueOf(meter.getLimit())
+          : null
+      )
+      .unavailableReason(
+        meter.hasUnavailableReason() ? meter.getUnavailableReason() : null
+      );
   }
 
-  private static OrganizationResponseDto.StatusEnum toStatusEnum(OrgStatus status) {
-    return OrganizationResponseDto.StatusEnum.fromValue(status.name().replace("ORG_STATUS_", ""));
+  private static OrganizationResponseDto.StatusEnum toStatusEnum(
+    OrgStatus status
+  ) {
+    return OrganizationResponseDto.StatusEnum.fromValue(
+      status.name().replace("ORG_STATUS_", "")
+    );
   }
 
-  private static OnboardingResponseDto.StatusEnum toOnboardingStatusEnum(OrgStatus status) {
-    return OnboardingResponseDto.StatusEnum.fromValue(status.name().replace("ORG_STATUS_", ""));
+  private static OnboardingResponseDto.StatusEnum toOnboardingStatusEnum(
+    OrgStatus status
+  ) {
+    return OnboardingResponseDto.StatusEnum.fromValue(
+      status.name().replace("ORG_STATUS_", "")
+    );
   }
 
-  private static OrganizationUsageResponseDto.AiModelTierEnum toAiModelTierEnum(AiModelTier tier) {
-    return OrganizationUsageResponseDto.AiModelTierEnum.fromValue(tier.name().replace("AI_MODEL_TIER_", ""));
+  private static OrganizationUsageResponseDto.AiModelTierEnum toAiModelTierEnum(
+    AiModelTier tier
+  ) {
+    return OrganizationUsageResponseDto.AiModelTierEnum.fromValue(
+      tier.name().replace("AI_MODEL_TIER_", "")
+    );
   }
 
-  private static OffsetDateTime toOffsetDateTime(com.google.protobuf.Timestamp timestamp) {
-    return Instant.ofEpochSecond(timestamp.getSeconds(), timestamp.getNanos()).atOffset(ZoneOffset.UTC);
+  private static OffsetDateTime toOffsetDateTime(
+    com.google.protobuf.Timestamp timestamp
+  ) {
+    return Instant.ofEpochSecond(
+      timestamp.getSeconds(),
+      timestamp.getNanos()
+    ).atOffset(ZoneOffset.UTC);
   }
 
-  private OrganizationServiceGrpc.OrganizationServiceBlockingStub withMetadata(RequestContext context) {
+  private OrganizationServiceGrpc.OrganizationServiceBlockingStub withMetadata(
+    RequestContext context
+  ) {
     return stub
-        .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
-        .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context)));
+      .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
+      .withInterceptors(
+        MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context))
+      );
   }
 }

@@ -37,7 +37,10 @@ public class DocumentsResolver {
   private final DocumentServiceGrpc.DocumentServiceBlockingStub stub;
   private final CurrentUser currentUser;
 
-  public DocumentsResolver(DocumentServiceGrpc.DocumentServiceBlockingStub stub, CurrentUser currentUser) {
+  public DocumentsResolver(
+    DocumentServiceGrpc.DocumentServiceBlockingStub stub,
+    CurrentUser currentUser
+  ) {
     this.stub = stub;
     this.currentUser = currentUser;
   }
@@ -48,8 +51,9 @@ public class DocumentsResolver {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     try {
-      DocumentResponse response =
-          withMetadata(context).getDocument(DocumentIdRequest.newBuilder().setId(id).build());
+      DocumentResponse response = withMetadata(context).getDocument(
+        DocumentIdRequest.newBuilder().setId(id).build()
+      );
 
       return DocumentMapper.toDocumentGqlDto(response);
     } catch (StatusRuntimeException notFoundOrForbidden) {
@@ -63,33 +67,44 @@ public class DocumentsResolver {
   @QueryMapping(name = "documents")
   @RequirePermission(PermissionCodesEnum.DOCUMENT_READ)
   public DocumentPageGqlDto documents(
-      @Argument int first, @Argument int page, @Argument String searchTerm) {
+    @Argument int first,
+    @Argument int page,
+    @Argument String searchTerm
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    PageRequest.Builder pageRequest =
-        PageRequest.newBuilder()
-            .setPage(page)
-            .setLimit(first)
-            .setSortBy("createdAt")
-            .setSortOrder(SortOrder.SORT_ORDER_DESC);
+    PageRequest.Builder pageRequest = PageRequest.newBuilder()
+      .setPage(page)
+      .setLimit(first)
+      .setSortBy("createdAt")
+      .setSortOrder(SortOrder.SORT_ORDER_DESC);
     if (searchTerm != null) {
       pageRequest.setSearchTerm(searchTerm);
     }
 
-    ListDocumentsResponse response =
-        withMetadata(context)
-            .listDocuments(
-                ListDocumentsRequest.newBuilder().setPage(pageRequest).setIncludeDeleted(false).build());
+    ListDocumentsResponse response = withMetadata(context).listDocuments(
+      ListDocumentsRequest.newBuilder()
+        .setPage(pageRequest)
+        .setIncludeDeleted(false)
+        .build()
+    );
 
     return new DocumentPageGqlDto(
-        response.getItemsList().stream().map(DocumentMapper::toDocumentGqlDto).toList(),
-        DocumentMapper.toPageMetaGqlDto(response.getMeta()));
+      response
+        .getItemsList()
+        .stream()
+        .map(DocumentMapper::toDocumentGqlDto)
+        .toList(),
+      DocumentMapper.toPageMetaGqlDto(response.getMeta())
+    );
   }
 
   /** `Document.createdBy` — the uploader. */
   @SchemaMapping(typeName = "Document", field = "createdBy")
   public CompletableFuture<UserSummaryGqlDto> createdBy(
-      DocumentGqlDto document, DataLoader<String, UserSummaryGqlDto> loader) {
+    DocumentGqlDto document,
+    DataLoader<String, UserSummaryGqlDto> loader
+  ) {
     if (document.createdById() == null) {
       return CompletableFuture.completedFuture(null);
     }
@@ -114,23 +129,34 @@ public class DocumentsResolver {
    */
   @SchemaMapping(typeName = "Document", field = "departments")
   public CompletableFuture<List<DepartmentGqlDto>> departments(
-      DocumentGqlDto document, DataLoader<String, DepartmentGqlDto> loader) {
+    DocumentGqlDto document,
+    DataLoader<String, DepartmentGqlDto> loader
+  ) {
     List<String> ids = document.departmentIds();
     if (ids.isEmpty()) {
       return CompletableFuture.completedFuture(List.of());
     }
 
     RequestContext context = currentUser.require(CurrentRequest.request());
-    List<String> capped = ids.subList(0, Math.min(ids.size(), GraphqlLimits.MAX_EDGE_LIST));
+    List<String> capped = ids.subList(
+      0,
+      Math.min(ids.size(), GraphqlLimits.MAX_EDGE_LIST)
+    );
 
     return loader
-        .loadMany(capped, Collections.nCopies(capped.size(), context))
-        .thenApply(departments -> departments.stream().filter(java.util.Objects::nonNull).toList());
+      .loadMany(capped, Collections.nCopies(capped.size(), context))
+      .thenApply(departments ->
+        departments.stream().filter(java.util.Objects::nonNull).toList()
+      );
   }
 
-  private DocumentServiceGrpc.DocumentServiceBlockingStub withMetadata(RequestContext context) {
+  private DocumentServiceGrpc.DocumentServiceBlockingStub withMetadata(
+    RequestContext context
+  ) {
     return stub
-        .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
-        .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context)));
+      .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
+      .withInterceptors(
+        MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context))
+      );
   }
 }

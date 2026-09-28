@@ -39,37 +39,46 @@ public class UsersLoaderConfig {
 
   private final UserServiceGrpc.UserServiceBlockingStub stub;
 
-  public UsersLoaderConfig(BatchLoaderRegistry registry, UserServiceGrpc.UserServiceBlockingStub stub) {
+  public UsersLoaderConfig(
+    BatchLoaderRegistry registry,
+    UserServiceGrpc.UserServiceBlockingStub stub
+  ) {
     this.stub = stub;
 
     registry
-        .forTypePair(String.class, UserSummaryGqlDto.class)
-        .registerMappedBatchLoader(
-            (ids, environment) ->
-                Mono.fromCallable(() -> fetch(ids, environment))
-                    .subscribeOn(Schedulers.boundedElastic()));
+      .forTypePair(String.class, UserSummaryGqlDto.class)
+      .registerMappedBatchLoader((ids, environment) ->
+        Mono.fromCallable(() -> fetch(ids, environment)).subscribeOn(
+          Schedulers.boundedElastic()
+        )
+      );
   }
 
   private Map<String, UserSummaryGqlDto> fetch(
-      Set<String> ids, org.dataloader.BatchLoaderEnvironment environment) {
+    Set<String> ids,
+    org.dataloader.BatchLoaderEnvironment environment
+  ) {
     // Every key in one batch was loaded by the SAME request (Spring builds a
     // fresh `DataLoaderRegistry` per request), so any key's context is the
     // batch's context — there is exactly one caller to build metadata from.
-    RequestContext context =
-        (RequestContext) environment.getKeyContexts().values().iterator().next();
+    RequestContext context = (RequestContext) environment
+      .getKeyContexts()
+      .values()
+      .iterator()
+      .next();
 
-    ListUsersByIdsResponse response =
-        withMetadata(context)
-            .listUsersByIds(
-                ListUsersByIdsRequest.newBuilder()
-                    .setOrganizationId(
-                        context.organizationId() == null ? "" : context.organizationId())
-                    .addAllUserIds(ids)
-                    // `true`: a loader asks "who IS this?", never "who can act on
-                    // this?" — see the proto's own comment on the flag.
-                    .setIncludeInactive(true)
-                    .setProjection(UserProjection.USER_PROJECTION_SUMMARY)
-                    .build());
+    ListUsersByIdsResponse response = withMetadata(context).listUsersByIds(
+      ListUsersByIdsRequest.newBuilder()
+        .setOrganizationId(
+          context.organizationId() == null ? "" : context.organizationId()
+        )
+        .addAllUserIds(ids)
+        // `true`: a loader asks "who IS this?", never "who can act on
+        // this?" — see the proto's own comment on the flag.
+        .setIncludeInactive(true)
+        .setProjection(UserProjection.USER_PROJECTION_SUMMARY)
+        .build()
+    );
 
     Map<String, UserSummaryGqlDto> byId = new HashMap<>();
     for (UserSummary summary : response.getSummariesList()) {
@@ -81,20 +90,26 @@ public class UsersLoaderConfig {
 
   private static UserSummaryGqlDto toUserSummaryGqlDto(UserSummary summary) {
     return new UserSummaryGqlDto(
-        summary.getUserId(),
-        summary.getFullName(),
-        summary.hasAvatarUrl() ? summary.getAvatarUrl() : null,
-        summary.getIsLocked(),
-        summary.hasDeletedAt()
-            ? java.time.Instant.ofEpochSecond(
-                    summary.getDeletedAt().getSeconds(), summary.getDeletedAt().getNanos())
-                .atOffset(java.time.ZoneOffset.UTC)
-            : null);
+      summary.getUserId(),
+      summary.getFullName(),
+      summary.hasAvatarUrl() ? summary.getAvatarUrl() : null,
+      summary.getIsLocked(),
+      summary.hasDeletedAt()
+        ? java.time.Instant.ofEpochSecond(
+            summary.getDeletedAt().getSeconds(),
+            summary.getDeletedAt().getNanos()
+          ).atOffset(java.time.ZoneOffset.UTC)
+        : null
+    );
   }
 
-  private UserServiceGrpc.UserServiceBlockingStub withMetadata(RequestContext context) {
+  private UserServiceGrpc.UserServiceBlockingStub withMetadata(
+    RequestContext context
+  ) {
     return stub
-        .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
-        .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context)));
+      .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
+      .withInterceptors(
+        MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context))
+      );
   }
 }

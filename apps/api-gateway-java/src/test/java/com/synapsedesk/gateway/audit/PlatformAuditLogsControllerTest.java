@@ -28,17 +28,36 @@ import tools.jackson.databind.ObjectMapper;
  */
 class PlatformAuditLogsControllerTest {
 
-  private final AuditServiceGrpc.AuditServiceBlockingStub stub = mock(AuditServiceGrpc.AuditServiceBlockingStub.class);
+  private final AuditServiceGrpc.AuditServiceBlockingStub stub = mock(
+    AuditServiceGrpc.AuditServiceBlockingStub.class
+  );
   private final CurrentUser currentUser = mock(CurrentUser.class);
   private final SuperAdminCheck superAdminCheck = mock(SuperAdminCheck.class);
   private PlatformAuditLogsController controller;
 
   @BeforeEach
   void setUp() {
-    when(currentUser.require(any()))
-        .thenReturn(new RequestContext("agent-1", null, true, List.of(), List.of(), true, "127.0.0.1", "test"));
-    RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(new MockHttpServletRequest()));
-    controller = new PlatformAuditLogsController(stub, currentUser, superAdminCheck, new ObjectMapper());
+    when(currentUser.require(any())).thenReturn(
+      new RequestContext(
+        "agent-1",
+        null,
+        true,
+        List.of(),
+        List.of(),
+        true,
+        "127.0.0.1",
+        "test"
+      )
+    );
+    RequestContextHolder.setRequestAttributes(
+      new ServletRequestAttributes(new MockHttpServletRequest())
+    );
+    controller = new PlatformAuditLogsController(
+      stub,
+      currentUser,
+      superAdminCheck,
+      new ObjectMapper()
+    );
   }
 
   @AfterEach
@@ -48,27 +67,47 @@ class PlatformAuditLogsControllerTest {
 
   @Test
   void listActionsRefusesBeforeTouchingThePeerWhenTheCheckFails() {
-    doThrow(new ResponseStatusException(org.springframework.http.HttpStatus.FORBIDDEN, "Platform administration access required"))
-        .when(superAdminCheck)
-        .require(any());
+    doThrow(
+      new ResponseStatusException(
+        org.springframework.http.HttpStatus.FORBIDDEN,
+        "Platform administration access required"
+      )
+    )
+      .when(superAdminCheck)
+      .require(any());
 
-    org.assertj.core.api.Assertions.assertThatThrownBy(() -> controller.platformAuditLogsControllerListActionsV1())
-        .isInstanceOf(ResponseStatusException.class);
+    org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+      controller.platformAuditLogsControllerListActionsV1()
+    ).isInstanceOf(ResponseStatusException.class);
 
     verifyNoInteractions(stub);
   }
 
   @Test
   void listRefusesBeforeTouchingThePeerWhenTheCheckFails() {
-    doThrow(new ResponseStatusException(org.springframework.http.HttpStatus.FORBIDDEN, "Platform administration access required"))
-        .when(superAdminCheck)
-        .require(any());
+    doThrow(
+      new ResponseStatusException(
+        org.springframework.http.HttpStatus.FORBIDDEN,
+        "Platform administration access required"
+      )
+    )
+      .when(superAdminCheck)
+      .require(any());
 
-    org.assertj.core.api.Assertions.assertThatThrownBy(
-            () ->
-                controller.platformAuditLogsControllerListV1(
-                    java.math.BigDecimal.ONE, java.math.BigDecimal.TEN, "createdAt", "ASC", null, null, null, null, null, null))
-        .isInstanceOf(ResponseStatusException.class);
+    org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+      controller.platformAuditLogsControllerListV1(
+        java.math.BigDecimal.ONE,
+        java.math.BigDecimal.TEN,
+        "createdAt",
+        "ASC",
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      )
+    ).isInstanceOf(ResponseStatusException.class);
 
     verifyNoInteractions(stub);
   }

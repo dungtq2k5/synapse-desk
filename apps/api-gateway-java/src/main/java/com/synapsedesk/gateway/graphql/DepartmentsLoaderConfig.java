@@ -36,22 +36,35 @@ public class DepartmentsLoaderConfig {
   private final DepartmentServiceGrpc.DepartmentServiceBlockingStub stub;
 
   public DepartmentsLoaderConfig(
-      BatchLoaderRegistry registry, DepartmentServiceGrpc.DepartmentServiceBlockingStub stub) {
+    BatchLoaderRegistry registry,
+    DepartmentServiceGrpc.DepartmentServiceBlockingStub stub
+  ) {
     this.stub = stub;
 
     registry
-        .forTypePair(String.class, DepartmentGqlDto.class)
-        .registerMappedBatchLoader(
-            (ids, environment) ->
-                Mono.fromCallable(() -> fetch(ids, environment)).subscribeOn(Schedulers.boundedElastic()));
+      .forTypePair(String.class, DepartmentGqlDto.class)
+      .registerMappedBatchLoader((ids, environment) ->
+        Mono.fromCallable(() -> fetch(ids, environment)).subscribeOn(
+          Schedulers.boundedElastic()
+        )
+      );
   }
 
-  private Map<String, DepartmentGqlDto> fetch(Set<String> ids, BatchLoaderEnvironment environment) {
-    RequestContext context = (RequestContext) environment.getKeyContexts().values().iterator().next();
+  private Map<String, DepartmentGqlDto> fetch(
+    Set<String> ids,
+    BatchLoaderEnvironment environment
+  ) {
+    RequestContext context = (RequestContext) environment
+      .getKeyContexts()
+      .values()
+      .iterator()
+      .next();
 
-    ListDepartmentsByIdsResponse response =
-        withMetadata(context)
-            .listDepartmentsByIds(ListDepartmentsByIdsRequest.newBuilder().addAllDepartmentIds(ids).build());
+    ListDepartmentsByIdsResponse response = withMetadata(
+      context
+    ).listDepartmentsByIds(
+      ListDepartmentsByIdsRequest.newBuilder().addAllDepartmentIds(ids).build()
+    );
 
     Map<String, DepartmentGqlDto> byId = new HashMap<>();
     for (var department : response.getItemsList()) {
@@ -62,9 +75,13 @@ public class DepartmentsLoaderConfig {
     return byId;
   }
 
-  private DepartmentServiceGrpc.DepartmentServiceBlockingStub withMetadata(RequestContext context) {
+  private DepartmentServiceGrpc.DepartmentServiceBlockingStub withMetadata(
+    RequestContext context
+  ) {
     return stub
-        .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
-        .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context)));
+      .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
+      .withInterceptors(
+        MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context))
+      );
   }
 }

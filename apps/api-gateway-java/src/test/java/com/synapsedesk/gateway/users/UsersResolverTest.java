@@ -48,34 +48,37 @@ import synapsedesk.auth.UserServiceGrpc;
  */
 class UsersResolverTest {
 
-  private final UserServiceGrpc.UserServiceBlockingStub stub = mock(UserServiceGrpc.UserServiceBlockingStub.class);
+  private final UserServiceGrpc.UserServiceBlockingStub stub = mock(
+    UserServiceGrpc.UserServiceBlockingStub.class
+  );
   private final CurrentUser currentUser = mock(CurrentUser.class);
   private UsersResolver resolver;
 
   private static RequestContext context() {
     return new RequestContext(
-        "user-1",
-        "11111111-1111-4111-8111-111111111111",
-        false,
-        List.of(),
-        List.of("user.read"),
-        true,
-        "127.0.0.1",
-        "test");
+      "user-1",
+      "11111111-1111-4111-8111-111111111111",
+      false,
+      List.of(),
+      List.of("user.read"),
+      true,
+      "127.0.0.1",
+      "test"
+    );
   }
 
   private static UserResponse.Builder baseUser(String id) {
     return UserResponse.newBuilder()
-        .setId(id)
-        .setFullName("Ada Lovelace")
-        .setEmail("ada@example.com")
-        .setIsEmailVerified(true)
-        .setIsPhoneVerified(false)
-        .setGender(Gender.GENDER_FEMALE)
-        .setIsLocked(false)
-        .setIsTwoFactorEnabled(false)
-        .setCreatedAt(com.google.protobuf.Timestamp.getDefaultInstance())
-        .setUpdatedAt(com.google.protobuf.Timestamp.getDefaultInstance());
+      .setId(id)
+      .setFullName("Ada Lovelace")
+      .setEmail("ada@example.com")
+      .setIsEmailVerified(true)
+      .setIsPhoneVerified(false)
+      .setGender(Gender.GENDER_FEMALE)
+      .setIsLocked(false)
+      .setIsTwoFactorEnabled(false)
+      .setCreatedAt(com.google.protobuf.Timestamp.getDefaultInstance())
+      .setUpdatedAt(com.google.protobuf.Timestamp.getDefaultInstance());
   }
 
   @BeforeEach
@@ -84,7 +87,8 @@ class UsersResolverTest {
     when(stub.withInterceptors(any())).thenReturn(stub);
     when(currentUser.require(any())).thenReturn(context());
     RequestContextHolder.setRequestAttributes(
-        new ServletRequestAttributes(mock(HttpServletRequest.class)));
+      new ServletRequestAttributes(mock(HttpServletRequest.class))
+    );
     resolver = new UsersResolver(stub, currentUser);
   }
 
@@ -95,17 +99,19 @@ class UsersResolverTest {
 
   @Test
   void meFlattensTheCurrentUserEnvelope() {
-    when(stub.getCurrentUser(any()))
-        .thenReturn(
-            CurrentUserResponse.newBuilder()
-                .setUser(baseUser("user-1"))
-                .addDepartmentIds("dept-1")
-                .addDepartmentIds("dept-2")
-                .build());
+    when(stub.getCurrentUser(any())).thenReturn(
+      CurrentUserResponse.newBuilder()
+        .setUser(baseUser("user-1"))
+        .addDepartmentIds("dept-1")
+        .addDepartmentIds("dept-2")
+        .build()
+    );
 
     UserGqlDto result = resolver.me();
 
-    ArgumentCaptor<GetCurrentUserRequest> captor = ArgumentCaptor.forClass(GetCurrentUserRequest.class);
+    ArgumentCaptor<GetCurrentUserRequest> captor = ArgumentCaptor.forClass(
+      GetCurrentUserRequest.class
+    );
     verify(stub).getCurrentUser(captor.capture());
     assertThat(captor.getValue().getUserId()).isEqualTo("user-1");
     assertThat(result.id()).isEqualTo("user-1");
@@ -118,13 +124,18 @@ class UsersResolverTest {
 
   @Test
   void userFlattensTheSummaryEnvelope() {
-    when(stub.getUser(any()))
-        .thenReturn(
-            UserSummaryResponse.newBuilder().setUser(baseUser("user-2")).addDepartmentIds("dept-1").build());
+    when(stub.getUser(any())).thenReturn(
+      UserSummaryResponse.newBuilder()
+        .setUser(baseUser("user-2"))
+        .addDepartmentIds("dept-1")
+        .build()
+    );
 
     UserGqlDto result = resolver.user("user-2");
 
-    ArgumentCaptor<UserIdRequest> captor = ArgumentCaptor.forClass(UserIdRequest.class);
+    ArgumentCaptor<UserIdRequest> captor = ArgumentCaptor.forClass(
+      UserIdRequest.class
+    );
     verify(stub).getUser(captor.capture());
     assertThat(captor.getValue().getId()).isEqualTo("user-2");
     assertThat(result.id()).isEqualTo("user-2");
@@ -133,22 +144,26 @@ class UsersResolverTest {
 
   @Test
   void userReturnsNullWhenTheStatusIsNotOk() {
-    when(stub.getUser(any())).thenThrow(new io.grpc.StatusRuntimeException(io.grpc.Status.NOT_FOUND));
+    when(stub.getUser(any())).thenThrow(
+      new io.grpc.StatusRuntimeException(io.grpc.Status.NOT_FOUND)
+    );
 
     assertThat(resolver.user("missing")).isNull();
   }
 
   @Test
   void usersNeverAsksForDeletedUsers() {
-    when(stub.listUsers(any()))
-        .thenReturn(
-            ListUsersResponse.newBuilder()
-                .setMeta(synapsedesk.auth.Common.PageMeta.getDefaultInstance())
-                .build());
+    when(stub.listUsers(any())).thenReturn(
+      ListUsersResponse.newBuilder()
+        .setMeta(synapsedesk.auth.Common.PageMeta.getDefaultInstance())
+        .build()
+    );
 
     resolver.users(10, 1, "ada");
 
-    ArgumentCaptor<ListUsersRequest> captor = ArgumentCaptor.forClass(ListUsersRequest.class);
+    ArgumentCaptor<ListUsersRequest> captor = ArgumentCaptor.forClass(
+      ListUsersRequest.class
+    );
     verify(stub).listUsers(captor.capture());
     assertThat(captor.getValue().getIncludeDeleted()).isFalse();
     assertThat(captor.getValue().getPage().getSearchTerm()).isEqualTo("ada");
@@ -156,77 +171,147 @@ class UsersResolverTest {
 
   @Test
   void departmentCountIsTheDeclaredIdsLength() {
-    UserGqlDto user =
-        new UserGqlDto(
-            "u1", null, List.of("d1", "d2", "d3"), "Ada", null, "a@x.com", true, null, false, null,
-            GenderGql.UNSPECIFIED, null, false, null, false, null, null);
+    UserGqlDto user = new UserGqlDto(
+      "u1",
+      null,
+      List.of("d1", "d2", "d3"),
+      "Ada",
+      null,
+      "a@x.com",
+      true,
+      null,
+      false,
+      null,
+      GenderGql.UNSPECIFIED,
+      null,
+      false,
+      null,
+      false,
+      null,
+      null
+    );
 
     assertThat(resolver.departmentCount(user)).isEqualTo(3);
   }
 
   private DataLoader<String, DepartmentGqlDto> departmentsLoaderFor(
-      DepartmentServiceGrpc.DepartmentServiceBlockingStub stub) {
+    DepartmentServiceGrpc.DepartmentServiceBlockingStub stub
+  ) {
     DefaultBatchLoaderRegistry registry = new DefaultBatchLoaderRegistry();
     new DepartmentsLoaderConfig(registry, stub);
 
     DataLoaderRegistry dataLoaderRegistry = new DataLoaderRegistry();
-    registry.registerDataLoaders(dataLoaderRegistry, GraphQLContext.getDefault());
+    registry.registerDataLoaders(
+      dataLoaderRegistry,
+      GraphQLContext.getDefault()
+    );
 
     return dataLoaderRegistry.getDataLoader(DepartmentGqlDto.class.getName());
   }
 
   @Test
   void departmentsIsCappedAtMaxEdgeListBeforeTheBatchCall() throws Exception {
-    DepartmentServiceGrpc.DepartmentServiceBlockingStub departmentStub =
-        mock(DepartmentServiceGrpc.DepartmentServiceBlockingStub.class);
-    when(departmentStub.withDeadlineAfter(anyLong(), any())).thenReturn(departmentStub);
+    DepartmentServiceGrpc.DepartmentServiceBlockingStub departmentStub = mock(
+      DepartmentServiceGrpc.DepartmentServiceBlockingStub.class
+    );
+    when(departmentStub.withDeadlineAfter(anyLong(), any())).thenReturn(
+      departmentStub
+    );
     when(departmentStub.withInterceptors(any())).thenReturn(departmentStub);
-    when(departmentStub.listDepartmentsByIds(any()))
-        .thenAnswer(
-            invocation -> {
-              ListDepartmentsByIdsRequest request = invocation.getArgument(0);
-              return ListDepartmentsByIdsResponse.newBuilder()
-                  .addAllItems(
-                      request.getDepartmentIdsList().stream()
-                          .map(id -> DepartmentResponse.newBuilder().setId(id).setName(id).build())
-                          .toList())
-                  .build();
-            });
+    when(departmentStub.listDepartmentsByIds(any())).thenAnswer(invocation -> {
+      ListDepartmentsByIdsRequest request = invocation.getArgument(0);
+      return ListDepartmentsByIdsResponse.newBuilder()
+        .addAllItems(
+          request
+            .getDepartmentIdsList()
+            .stream()
+            .map(id ->
+              DepartmentResponse.newBuilder().setId(id).setName(id).build()
+            )
+            .toList()
+        )
+        .build();
+    });
 
-    List<String> overCapped =
-        java.util.stream.IntStream.range(0, com.synapsedesk.gateway.graphql.GraphqlLimits.MAX_EDGE_LIST + 10)
-            .mapToObj(i -> "dept-" + i)
-            .toList();
-    UserGqlDto user =
-        new UserGqlDto(
-            "u1", null, overCapped, "Ada", null, "a@x.com", true, null, false, null,
-            GenderGql.UNSPECIFIED, null, false, null, false, null, null);
+    List<String> overCapped = java.util.stream.IntStream.range(
+      0,
+      com.synapsedesk.gateway.graphql.GraphqlLimits.MAX_EDGE_LIST + 10
+    )
+      .mapToObj(i -> "dept-" + i)
+      .toList();
+    UserGqlDto user = new UserGqlDto(
+      "u1",
+      null,
+      overCapped,
+      "Ada",
+      null,
+      "a@x.com",
+      true,
+      null,
+      false,
+      null,
+      GenderGql.UNSPECIFIED,
+      null,
+      false,
+      null,
+      false,
+      null,
+      null
+    );
 
-    DataLoader<String, DepartmentGqlDto> loader = departmentsLoaderFor(departmentStub);
-    CompletableFuture<List<DepartmentGqlDto>> future = resolver.departments(user, loader);
+    DataLoader<String, DepartmentGqlDto> loader = departmentsLoaderFor(
+      departmentStub
+    );
+    CompletableFuture<List<DepartmentGqlDto>> future = resolver.departments(
+      user,
+      loader
+    );
     loader.dispatch();
     List<DepartmentGqlDto> result = future.get(5, TimeUnit.SECONDS);
 
-    assertThat(result).hasSize(com.synapsedesk.gateway.graphql.GraphqlLimits.MAX_EDGE_LIST);
+    assertThat(result).hasSize(
+      com.synapsedesk.gateway.graphql.GraphqlLimits.MAX_EDGE_LIST
+    );
 
     ArgumentCaptor<ListDepartmentsByIdsRequest> captor =
-        ArgumentCaptor.forClass(ListDepartmentsByIdsRequest.class);
+      ArgumentCaptor.forClass(ListDepartmentsByIdsRequest.class);
     verify(departmentStub, times(1)).listDepartmentsByIds(captor.capture());
-    assertThat(captor.getValue().getDepartmentIdsCount())
-        .isEqualTo(com.synapsedesk.gateway.graphql.GraphqlLimits.MAX_EDGE_LIST);
+    assertThat(captor.getValue().getDepartmentIdsCount()).isEqualTo(
+      com.synapsedesk.gateway.graphql.GraphqlLimits.MAX_EDGE_LIST
+    );
   }
 
   @Test
-  void departmentsIsEmptyWithNoLoaderCallWhenTheParentHasNone() throws Exception {
-    UserGqlDto user =
-        new UserGqlDto(
-            "u1", null, List.of(), "Ada", null, "a@x.com", true, null, false, null,
-            GenderGql.UNSPECIFIED, null, false, null, false, null, null);
+  void departmentsIsEmptyWithNoLoaderCallWhenTheParentHasNone()
+    throws Exception {
+    UserGqlDto user = new UserGqlDto(
+      "u1",
+      null,
+      List.of(),
+      "Ada",
+      null,
+      "a@x.com",
+      true,
+      null,
+      false,
+      null,
+      GenderGql.UNSPECIFIED,
+      null,
+      false,
+      null,
+      false,
+      null,
+      null
+    );
 
-    DataLoader<String, DepartmentGqlDto> loader =
-        departmentsLoaderFor(mock(DepartmentServiceGrpc.DepartmentServiceBlockingStub.class));
+    DataLoader<String, DepartmentGqlDto> loader = departmentsLoaderFor(
+      mock(DepartmentServiceGrpc.DepartmentServiceBlockingStub.class)
+    );
 
-    CompletableFuture<List<DepartmentGqlDto>> future = resolver.departments(user, loader);
+    CompletableFuture<List<DepartmentGqlDto>> future = resolver.departments(
+      user,
+      loader
+    );
 
     assertThat(future.get(1, TimeUnit.SECONDS)).isEmpty();
   }

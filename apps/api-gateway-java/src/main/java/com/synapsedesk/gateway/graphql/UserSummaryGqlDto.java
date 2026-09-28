@@ -9,4 +9,9 @@ import java.time.OffsetDateTime;
  * (`Ticket.assignee`, `TicketMessage.sender`, …), never fetched directly.
  */
 public record UserSummaryGqlDto(
-    String id, String fullName, String avatarUrl, boolean isLocked, OffsetDateTime deletedAt) {}
+  String id,
+  String fullName,
+  String avatarUrl,
+  boolean isLocked,
+  OffsetDateTime deletedAt
+) {}

@@ -17,35 +17,51 @@ import org.springframework.web.server.ResponseStatusException;
 class GraphqlErrorResolverTest {
 
   private final GraphqlErrorResolver resolver = new GraphqlErrorResolver();
-  private final DataFetchingEnvironment environment = mock(DataFetchingEnvironment.class);
+  private final DataFetchingEnvironment environment = mock(
+    DataFetchingEnvironment.class
+  );
 
   {
     Field field = mock(Field.class);
     when(field.getSourceLocation()).thenReturn(new SourceLocation(1, 1));
     when(environment.getField()).thenReturn(field);
-    when(environment.getExecutionStepInfo())
-        .thenReturn(mock(graphql.execution.ExecutionStepInfo.class));
+    when(environment.getExecutionStepInfo()).thenReturn(
+      mock(graphql.execution.ExecutionStepInfo.class)
+    );
   }
 
   @Test
   void forbiddenMapsToTheForbiddenErrorType() {
-    GraphQLError error =
-        resolveSingle(new ResponseStatusException(HttpStatus.FORBIDDEN, "Requires one of: department.read"));
+    GraphQLError error = resolveSingle(
+      new ResponseStatusException(
+        HttpStatus.FORBIDDEN,
+        "Requires one of: department.read"
+      )
+    );
 
     assertThat(error.getErrorType()).isEqualTo(ErrorType.FORBIDDEN);
-    assertThat(error.getMessage()).isEqualTo("Requires one of: department.read");
+    assertThat(error.getMessage()).isEqualTo(
+      "Requires one of: department.read"
+    );
   }
 
   @Test
   void unauthorizedMapsToTheUnauthorizedErrorType() {
-    GraphQLError error = resolveSingle(new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
+    GraphQLError error = resolveSingle(
+      new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Unauthorized")
+    );
 
     assertThat(error.getErrorType()).isEqualTo(ErrorType.UNAUTHORIZED);
   }
 
   @Test
   void anUnrelatedExceptionIsLeftForTheDefaultHandling() {
-    assertThat(resolver.resolveToSingleError(new IllegalStateException("boom"), environment)).isNull();
+    assertThat(
+      resolver.resolveToSingleError(
+        new IllegalStateException("boom"),
+        environment
+      )
+    ).isNull();
   }
 
   private GraphQLError resolveSingle(ResponseStatusException exception) {

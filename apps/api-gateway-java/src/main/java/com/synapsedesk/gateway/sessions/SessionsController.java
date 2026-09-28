@@ -60,7 +60,10 @@ public class SessionsController implements SessionsApi {
   private final CookieWriter cookies;
 
   public SessionsController(
-      SessionServiceGrpc.SessionServiceBlockingStub stub, CurrentUser currentUser, CookieWriter cookies) {
+    SessionServiceGrpc.SessionServiceBlockingStub stub,
+    CurrentUser currentUser,
+    CookieWriter cookies
+  ) {
     this.stub = stub;
     this.currentUser = currentUser;
     this.cookies = cookies;
@@ -72,42 +75,62 @@ public class SessionsController implements SessionsApi {
     RequestContext context = currentUser.require(request);
 
     synapsedesk.auth.Session.ListSessionsRequest.Builder wire =
-        synapsedesk.auth.Session.ListSessionsRequest.newBuilder();
+      synapsedesk.auth.Session.ListSessionsRequest.newBuilder();
     cookies.readRefreshToken(request).ifPresent(wire::setRefreshToken);
 
     var response = withMetadata(context).listSessions(wire.build());
 
     return ResponseEntity.ok(
-        new SessionsControllerListV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("OK")
-            .data(response.getItemsList().stream().map(SessionsController::toDto).toList()));
+      new SessionsControllerListV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("OK")
+        .data(
+          response
+            .getItemsList()
+            .stream()
+            .map(SessionsController::toDto)
+            .toList()
+        )
+    );
   }
 
   @Override
   public ResponseEntity<SessionsControllerRevokeAllTrustV1200Response> sessionsControllerRevokeAllTrustV1() {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    RevokeTrustResponse response = withMetadata(context).revokeAllTrust(RevokeAllTrustRequest.getDefaultInstance());
+    RevokeTrustResponse response = withMetadata(context).revokeAllTrust(
+      RevokeAllTrustRequest.getDefaultInstance()
+    );
 
     return ResponseEntity.ok(
-        new SessionsControllerRevokeAllTrustV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("Trusted devices cleared")
-            .data(new RevokeTrustResponseDto(BigDecimal.valueOf(response.getUntrustedCount()))));
+      new SessionsControllerRevokeAllTrustV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("Trusted devices cleared")
+        .data(
+          new RevokeTrustResponseDto(
+            BigDecimal.valueOf(response.getUntrustedCount())
+          )
+        )
+    );
   }
 
   @Override
-  public ResponseEntity<AuthControllerForgotPasswordV1202Response> sessionsControllerRevokeV1(String id) {
+  public ResponseEntity<AuthControllerForgotPasswordV1202Response> sessionsControllerRevokeV1(
+    String id
+  ) {
     HttpServletRequest request = CurrentRequest.request();
     RequestContext context = currentUser.require(request);
 
-    SessionIdRequest.Builder wire = SessionIdRequest.newBuilder().setSessionId(id);
+    SessionIdRequest.Builder wire = SessionIdRequest.newBuilder().setSessionId(
+      id
+    );
     cookies.readRefreshToken(request).ifPresent(wire::setRefreshToken);
 
-    RevokeSessionResponse response = withMetadata(context).revokeSession(wire.build());
+    RevokeSessionResponse response = withMetadata(context).revokeSession(
+      wire.build()
+    );
 
     if (response.getWasCurrent()) {
       cookies.clearSession(CurrentRequest.response());
@@ -115,48 +138,71 @@ public class SessionsController implements SessionsApi {
     }
 
     return ResponseEntity.ok(
-        new AuthControllerForgotPasswordV1202Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("Session revoked")
-            .data(Map.of("revokedCount", BigDecimal.valueOf(response.getRevokedCount()))));
+      new AuthControllerForgotPasswordV1202Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("Session revoked")
+        .data(
+          Map.of("revokedCount", BigDecimal.valueOf(response.getRevokedCount()))
+        )
+    );
   }
 
   @Override
-  public ResponseEntity<SessionsControllerRevokeAllTrustV1200Response> sessionsControllerRevokeTrustV1(String id) {
+  public ResponseEntity<SessionsControllerRevokeAllTrustV1200Response> sessionsControllerRevokeTrustV1(
+    String id
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    RevokeTrustResponse response =
-        withMetadata(context).revokeSessionTrust(SessionIdRequest.newBuilder().setSessionId(id).build());
+    RevokeTrustResponse response = withMetadata(context).revokeSessionTrust(
+      SessionIdRequest.newBuilder().setSessionId(id).build()
+    );
 
     return ResponseEntity.ok(
-        new SessionsControllerRevokeAllTrustV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("Device trust removed")
-            .data(new RevokeTrustResponseDto(BigDecimal.valueOf(response.getUntrustedCount()))));
+      new SessionsControllerRevokeAllTrustV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("Device trust removed")
+        .data(
+          new RevokeTrustResponseDto(
+            BigDecimal.valueOf(response.getUntrustedCount())
+          )
+        )
+    );
   }
 
   private static SessionResponseDto toDto(SessionResponse session) {
     return new SessionResponseDto(
-        session.getId(),
-        session.hasDeviceName() ? session.getDeviceName() : null,
-        session.getIpAddress(),
-        session.getUserAgent(),
-        session.getCurrent(),
-        session.getIsTrusted(),
-        session.hasTrustedUntil() ? toOffsetDateTime(session.getTrustedUntil()) : null,
-        toOffsetDateTime(session.getExpiresAt()),
-        toOffsetDateTime(session.getCreatedAt()));
+      session.getId(),
+      session.hasDeviceName() ? session.getDeviceName() : null,
+      session.getIpAddress(),
+      session.getUserAgent(),
+      session.getCurrent(),
+      session.getIsTrusted(),
+      session.hasTrustedUntil()
+        ? toOffsetDateTime(session.getTrustedUntil())
+        : null,
+      toOffsetDateTime(session.getExpiresAt()),
+      toOffsetDateTime(session.getCreatedAt())
+    );
   }
 
-  private static OffsetDateTime toOffsetDateTime(com.google.protobuf.Timestamp timestamp) {
-    return Instant.ofEpochSecond(timestamp.getSeconds(), timestamp.getNanos()).atOffset(ZoneOffset.UTC);
+  private static OffsetDateTime toOffsetDateTime(
+    com.google.protobuf.Timestamp timestamp
+  ) {
+    return Instant.ofEpochSecond(
+      timestamp.getSeconds(),
+      timestamp.getNanos()
+    ).atOffset(ZoneOffset.UTC);
   }
 
-  private SessionServiceGrpc.SessionServiceBlockingStub withMetadata(RequestContext context) {
+  private SessionServiceGrpc.SessionServiceBlockingStub withMetadata(
+    RequestContext context
+  ) {
     return stub
-        .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
-        .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context)));
+      .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
+      .withInterceptors(
+        MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context))
+      );
   }
 }

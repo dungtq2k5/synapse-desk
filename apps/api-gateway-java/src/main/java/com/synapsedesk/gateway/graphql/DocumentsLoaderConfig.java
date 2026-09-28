@@ -38,22 +38,35 @@ public class DocumentsLoaderConfig {
   private final DocumentServiceGrpc.DocumentServiceBlockingStub stub;
 
   public DocumentsLoaderConfig(
-      BatchLoaderRegistry registry, DocumentServiceGrpc.DocumentServiceBlockingStub stub) {
+    BatchLoaderRegistry registry,
+    DocumentServiceGrpc.DocumentServiceBlockingStub stub
+  ) {
     this.stub = stub;
 
     registry
-        .forTypePair(String.class, DocumentGqlDto.class)
-        .registerMappedBatchLoader(
-            (ids, environment) ->
-                Mono.fromCallable(() -> fetch(ids, environment)).subscribeOn(Schedulers.boundedElastic()));
+      .forTypePair(String.class, DocumentGqlDto.class)
+      .registerMappedBatchLoader((ids, environment) ->
+        Mono.fromCallable(() -> fetch(ids, environment)).subscribeOn(
+          Schedulers.boundedElastic()
+        )
+      );
   }
 
-  private Map<String, DocumentGqlDto> fetch(Set<String> ids, BatchLoaderEnvironment environment) {
-    RequestContext context = (RequestContext) environment.getKeyContexts().values().iterator().next();
+  private Map<String, DocumentGqlDto> fetch(
+    Set<String> ids,
+    BatchLoaderEnvironment environment
+  ) {
+    RequestContext context = (RequestContext) environment
+      .getKeyContexts()
+      .values()
+      .iterator()
+      .next();
 
-    ListDocumentsByIdsResponse response =
-        withMetadata(context)
-            .listDocumentsByIds(ListDocumentsByIdsRequest.newBuilder().addAllDocumentIds(ids).build());
+    ListDocumentsByIdsResponse response = withMetadata(
+      context
+    ).listDocumentsByIds(
+      ListDocumentsByIdsRequest.newBuilder().addAllDocumentIds(ids).build()
+    );
 
     Map<String, DocumentGqlDto> byId = new HashMap<>();
     for (var document : response.getItemsList()) {
@@ -64,9 +77,13 @@ public class DocumentsLoaderConfig {
     return byId;
   }
 
-  private DocumentServiceGrpc.DocumentServiceBlockingStub withMetadata(RequestContext context) {
+  private DocumentServiceGrpc.DocumentServiceBlockingStub withMetadata(
+    RequestContext context
+  ) {
     return stub
-        .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
-        .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context)));
+      .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
+      .withInterceptors(
+        MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context))
+      );
   }
 }

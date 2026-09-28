@@ -32,7 +32,9 @@ public class DepartmentsResolver {
   private final CurrentUser currentUser;
 
   public DepartmentsResolver(
-      DepartmentServiceGrpc.DepartmentServiceBlockingStub stub, CurrentUser currentUser) {
+    DepartmentServiceGrpc.DepartmentServiceBlockingStub stub,
+    CurrentUser currentUser
+  ) {
     this.stub = stub;
     this.currentUser = currentUser;
   }
@@ -40,35 +42,45 @@ public class DepartmentsResolver {
   @QueryMapping
   @RequirePermission(PermissionCodesEnum.DEPARTMENT_READ)
   public DepartmentPageGqlDto departments(
-      @Argument int first, @Argument int page, @Argument String searchTerm) {
+    @Argument int first,
+    @Argument int page,
+    @Argument String searchTerm
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    PageRequest.Builder pageRequest =
-        PageRequest.newBuilder()
-            .setPage(page)
-            .setLimit(first)
-            .setSortBy("name")
-            .setSortOrder(SortOrder.SORT_ORDER_ASC);
+    PageRequest.Builder pageRequest = PageRequest.newBuilder()
+      .setPage(page)
+      .setLimit(first)
+      .setSortBy("name")
+      .setSortOrder(SortOrder.SORT_ORDER_ASC);
     if (searchTerm != null) {
       pageRequest.setSearchTerm(searchTerm);
     }
 
-    ListDepartmentsResponse response =
-        withMetadata(context)
-            .listDepartments(
-                ListDepartmentsRequest.newBuilder()
-                    .setPage(pageRequest)
-                    .setIncludeDeleted(false)
-                    .build());
+    ListDepartmentsResponse response = withMetadata(context).listDepartments(
+      ListDepartmentsRequest.newBuilder()
+        .setPage(pageRequest)
+        .setIncludeDeleted(false)
+        .build()
+    );
 
     return new DepartmentPageGqlDto(
-        response.getItemsList().stream().map(DepartmentMapper::toDepartmentGqlDto).toList(),
-        DepartmentMapper.toPageMetaGqlDto(response.getMeta()));
+      response
+        .getItemsList()
+        .stream()
+        .map(DepartmentMapper::toDepartmentGqlDto)
+        .toList(),
+      DepartmentMapper.toPageMetaGqlDto(response.getMeta())
+    );
   }
 
-  private DepartmentServiceGrpc.DepartmentServiceBlockingStub withMetadata(RequestContext context) {
+  private DepartmentServiceGrpc.DepartmentServiceBlockingStub withMetadata(
+    RequestContext context
+  ) {
     return stub
-        .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
-        .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context)));
+      .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
+      .withInterceptors(
+        MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context))
+      );
   }
 }

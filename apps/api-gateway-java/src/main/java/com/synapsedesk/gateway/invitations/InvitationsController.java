@@ -86,10 +86,11 @@ public class InvitationsController implements InvitationsApi {
   private final CookieWriter cookies;
 
   public InvitationsController(
-      InvitationServiceGrpc.InvitationServiceBlockingStub stub,
-      CurrentUser currentUser,
-      GuestCheck guestCheck,
-      CookieWriter cookies) {
+    InvitationServiceGrpc.InvitationServiceBlockingStub stub,
+    CurrentUser currentUser,
+    GuestCheck guestCheck,
+    CookieWriter cookies
+  ) {
     this.stub = stub;
     this.currentUser = currentUser;
     this.guestCheck = guestCheck;
@@ -99,223 +100,311 @@ public class InvitationsController implements InvitationsApi {
   @Override
   @RequirePermission(PermissionCodesEnum.USER_INVITE)
   public ResponseEntity<InvitationsControllerCreateV1201Response> invitationsControllerCreateV1(
-      CreateInvitationsDto createInvitationsDto) {
+    CreateInvitationsDto createInvitationsDto
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
     requireEmailVerified(context);
 
-    CreateInvitationsRequest wire =
-        CreateInvitationsRequest.newBuilder()
-            .setOrganizationId(context.organizationId())
-            .setInvitedById(context.sub())
-            .addAllInvitations(
-                createInvitationsDto.getInvitations().stream().map(InvitationsController::toInviteUserInput).toList())
-            .build();
+    CreateInvitationsRequest wire = CreateInvitationsRequest.newBuilder()
+      .setOrganizationId(context.organizationId())
+      .setInvitedById(context.sub())
+      .addAllInvitations(
+        createInvitationsDto
+          .getInvitations()
+          .stream()
+          .map(InvitationsController::toInviteUserInput)
+          .toList()
+      )
+      .build();
 
-    CreateInvitationsResponse response = withMetadata(context).createInvitations(wire);
+    CreateInvitationsResponse response = withMetadata(
+      context
+    ).createInvitations(wire);
 
-    CreateInvitationsResponseDto data =
-        new CreateInvitationsResponseDto(
-            response.getCreatedList().stream().map(InvitationsController::toInvitationResponseDto).toList(),
-            response.getFailedList().stream()
-                .map(failed -> new FailedInvitationResponseDto(failed.getEmail(), failed.getReason()))
-                .toList(),
-            response.hasBatchId() ? response.getBatchId() : null);
+    CreateInvitationsResponseDto data = new CreateInvitationsResponseDto(
+      response
+        .getCreatedList()
+        .stream()
+        .map(InvitationsController::toInvitationResponseDto)
+        .toList(),
+      response
+        .getFailedList()
+        .stream()
+        .map(failed ->
+          new FailedInvitationResponseDto(failed.getEmail(), failed.getReason())
+        )
+        .toList(),
+      response.hasBatchId() ? response.getBatchId() : null
+    );
 
     boolean partial = !response.getFailedList().isEmpty();
     HttpStatus status = partial ? HttpStatus.MULTI_STATUS : HttpStatus.CREATED;
 
-    return ResponseEntity.status(status)
-        .body(
-            new InvitationsControllerCreateV1201Response()
-                .success(true)
-                .statusCode(BigDecimal.valueOf(status.value()))
-                .message("OK")
-                .warning(partial ? response.getFailedCount() + " invitation(s) could not be created" : null)
-                .data(data));
+    return ResponseEntity.status(status).body(
+      new InvitationsControllerCreateV1201Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(status.value()))
+        .message("OK")
+        .warning(
+          partial
+            ? response.getFailedCount() + " invitation(s) could not be created"
+            : null
+        )
+        .data(data)
+    );
   }
 
   @Override
   @RequirePermission(PermissionCodesEnum.USER_READ)
   public ResponseEntity<InvitationsControllerListV1200Response> invitationsControllerListV1(
-      BigDecimal page, BigDecimal limit, String sortOrder, String searchTerm, String sortBy, String status) {
+    BigDecimal page,
+    BigDecimal limit,
+    String sortOrder,
+    String searchTerm,
+    String sortBy,
+    String status
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    PageRequest.Builder pageRequest =
-        PageRequest.newBuilder()
-            .setPage(page.intValue())
-            .setLimit(limit.intValue())
-            .setSortBy(sortBy)
-            .setSortOrder("DESC".equalsIgnoreCase(sortOrder) ? SortOrder.SORT_ORDER_DESC : SortOrder.SORT_ORDER_ASC);
+    PageRequest.Builder pageRequest = PageRequest.newBuilder()
+      .setPage(page.intValue())
+      .setLimit(limit.intValue())
+      .setSortBy(sortBy)
+      .setSortOrder(
+        "DESC".equalsIgnoreCase(sortOrder)
+          ? SortOrder.SORT_ORDER_DESC
+          : SortOrder.SORT_ORDER_ASC
+      );
     if (searchTerm != null) {
       pageRequest.setSearchTerm(searchTerm);
     }
 
-    ListInvitationsRequest.Builder wire =
-        ListInvitationsRequest.newBuilder().setOrganizationId(context.organizationId()).setPage(pageRequest);
+    ListInvitationsRequest.Builder wire = ListInvitationsRequest.newBuilder()
+      .setOrganizationId(context.organizationId())
+      .setPage(pageRequest);
     if (status != null) {
       wire.setStatus(toInvitationStatus(status));
     }
 
-    ListInvitationsResponse response = withMetadata(context).listInvitations(wire.build());
+    ListInvitationsResponse response = withMetadata(context).listInvitations(
+      wire.build()
+    );
 
     InvitationsControllerListV1200ResponseData data =
-        new InvitationsControllerListV1200ResponseData(
-            response.getItemsList().stream().map(InvitationsController::toInvitationResponseDto).toList(),
-            toMetaDto(response.getMeta()));
+      new InvitationsControllerListV1200ResponseData(
+        response
+          .getItemsList()
+          .stream()
+          .map(InvitationsController::toInvitationResponseDto)
+          .toList(),
+        toMetaDto(response.getMeta())
+      );
 
     return ResponseEntity.ok(
-        new InvitationsControllerListV1200Response().success(true).statusCode(BigDecimal.valueOf(200)).message("OK").data(data));
+      new InvitationsControllerListV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("OK")
+        .data(data)
+    );
   }
 
   @Override
   @RequirePermission(PermissionCodesEnum.USER_INVITE)
-  public ResponseEntity<InvitationsControllerResendV1200Response> invitationsControllerResendV1(String id) {
+  public ResponseEntity<InvitationsControllerResendV1200Response> invitationsControllerResendV1(
+    String id
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
     requireEmailVerified(context);
 
-    InvitationResponse response =
-        withMetadata(context)
-            .resendInvitation(
-                InvitationIdRequest.newBuilder()
-                    .setOrganizationId(context.organizationId())
-                    .setInvitationId(id)
-                    .setActorId(context.sub())
-                    .build());
+    InvitationResponse response = withMetadata(context).resendInvitation(
+      InvitationIdRequest.newBuilder()
+        .setOrganizationId(context.organizationId())
+        .setInvitationId(id)
+        .setActorId(context.sub())
+        .build()
+    );
 
     return ResponseEntity.ok(
-        new InvitationsControllerResendV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("Invitation resent")
-            .data(toInvitationResponseDto(response)));
+      new InvitationsControllerResendV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("Invitation resent")
+        .data(toInvitationResponseDto(response))
+    );
   }
 
   @Override
   @RequirePermission(PermissionCodesEnum.USER_INVITE)
-  public ResponseEntity<AuthControllerForgotPasswordV1202Response> invitationsControllerRevokeV1(String id) {
+  public ResponseEntity<AuthControllerForgotPasswordV1202Response> invitationsControllerRevokeV1(
+    String id
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    withMetadata(context)
-        .revokeInvitation(
-            InvitationIdRequest.newBuilder()
-                .setOrganizationId(context.organizationId())
-                .setInvitationId(id)
-                .setActorId(context.sub())
-                .build());
+    withMetadata(context).revokeInvitation(
+      InvitationIdRequest.newBuilder()
+        .setOrganizationId(context.organizationId())
+        .setInvitationId(id)
+        .setActorId(context.sub())
+        .build()
+    );
 
     return ResponseEntity.ok(
-        new AuthControllerForgotPasswordV1202Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("Invitation revoked")
-            .data(null));
+      new AuthControllerForgotPasswordV1202Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("Invitation revoked")
+        .data(null)
+    );
   }
 
   @Override
   public ResponseEntity<InvitationsControllerPreviewByTokenV1200Response> invitationsControllerPreviewByTokenV1(
-      String token) {
+    String token
+  ) {
     HttpServletRequest request = CurrentRequest.request();
 
-    PreviewInvitationResponse response =
-        withOriginMetadata(request).previewInvitation(PreviewInvitationRequest.newBuilder().setToken(token).build());
+    PreviewInvitationResponse response = withOriginMetadata(
+      request
+    ).previewInvitation(
+      PreviewInvitationRequest.newBuilder().setToken(token).build()
+    );
 
     return ResponseEntity.ok(
-        new InvitationsControllerPreviewByTokenV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("OK")
-            .data(
-                new PreviewInvitationResponseDto(
-                    response.getValid(),
-                    response.hasOrganizationName() ? response.getOrganizationName() : null,
-                    response.hasInviterName() ? response.getInviterName() : null,
-                    response.hasEmail() ? response.getEmail() : null,
-                    response.getRoleNamesList(),
-                    response.hasExpiresAt() ? toOffsetDateTime(response.getExpiresAt()) : null)));
+      new InvitationsControllerPreviewByTokenV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("OK")
+        .data(
+          new PreviewInvitationResponseDto(
+            response.getValid(),
+            response.hasOrganizationName()
+              ? response.getOrganizationName()
+              : null,
+            response.hasInviterName() ? response.getInviterName() : null,
+            response.hasEmail() ? response.getEmail() : null,
+            response.getRoleNamesList(),
+            response.hasExpiresAt()
+              ? toOffsetDateTime(response.getExpiresAt())
+              : null
+          )
+        )
+    );
   }
 
   @Override
   public ResponseEntity<AuthControllerRefreshV1200Response> invitationsControllerAcceptV1(
-      AcceptInvitationDto acceptInvitationDto) {
+    AcceptInvitationDto acceptInvitationDto
+  ) {
     HttpServletRequest request = CurrentRequest.request();
     guestCheck.requireNoActiveSession(request);
 
-    AcceptInvitationRequest.Builder wire =
-        AcceptInvitationRequest.newBuilder()
-            .setToken(acceptInvitationDto.getToken())
-            .setFullName(acceptInvitationDto.getFullName())
-            .setPassword(acceptInvitationDto.getPassword());
+    AcceptInvitationRequest.Builder wire = AcceptInvitationRequest.newBuilder()
+      .setToken(acceptInvitationDto.getToken())
+      .setFullName(acceptInvitationDto.getFullName())
+      .setPassword(acceptInvitationDto.getPassword());
     if (acceptInvitationDto.getDeviceName() != null) {
       wire.setDeviceName(acceptInvitationDto.getDeviceName());
     }
 
-    AcceptInvitationResponse response = withOriginMetadata(request).acceptInvitation(wire.build());
+    AcceptInvitationResponse response = withOriginMetadata(
+      request
+    ).acceptInvitation(wire.build());
 
-    cookies.setAccessToken(CurrentRequest.response(), response.getAccessToken());
-    cookies.setRefreshToken(CurrentRequest.response(), response.getRefreshToken());
+    cookies.setAccessToken(
+      CurrentRequest.response(),
+      response.getAccessToken()
+    );
+    cookies.setRefreshToken(
+      CurrentRequest.response(),
+      response.getRefreshToken()
+    );
 
     boolean skipped = response.getSkippedCount() > 0;
 
     return ResponseEntity.ok(
-        new AuthControllerRefreshV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("OK")
-            .warning(
-                skipped
-                    ? response.getSkippedCount() + " role/department assignment(s) no longer exist and were skipped"
-                    : null)
-            .data(new LoginResponseDto(UserMapper.toUserResponseDto(response.getUser()), false)));
+      new AuthControllerRefreshV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("OK")
+        .warning(
+          skipped
+            ? response.getSkippedCount() +
+                " role/department assignment(s) no longer exist and were skipped"
+            : null
+        )
+        .data(
+          new LoginResponseDto(
+            UserMapper.toUserResponseDto(response.getUser()),
+            false
+          )
+        )
+    );
   }
 
   @Override
   @RequirePermission(PermissionCodesEnum.USER_INVITE)
   public ResponseEntity<InvitationsControllerPreviewBatchV1200Response> invitationsControllerPreviewBatchV1(
-      PreviewInvitationsDto previewInvitationsDto) {
+    PreviewInvitationsDto previewInvitationsDto
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    PreviewInvitationsRequest wire =
-        PreviewInvitationsRequest.newBuilder()
-            .setOrganizationId(context.organizationId())
-            .addAllInvitations(
-                previewInvitationsDto.getInvitations().stream()
-                    .map(InvitationsController::toPreviewInviteUserInput)
-                    .toList())
-            .build();
+    PreviewInvitationsRequest wire = PreviewInvitationsRequest.newBuilder()
+      .setOrganizationId(context.organizationId())
+      .addAllInvitations(
+        previewInvitationsDto
+          .getInvitations()
+          .stream()
+          .map(InvitationsController::toPreviewInviteUserInput)
+          .toList()
+      )
+      .build();
 
-    PreviewInvitationsResponse response = withMetadata(context).previewInvitations(wire);
+    PreviewInvitationsResponse response = withMetadata(
+      context
+    ).previewInvitations(wire);
 
-    PreviewInvitationsResponseDto data =
-        new PreviewInvitationsResponseDto(
-            response.getRowsList().stream().map(InvitationsController::toPreviewRowDto).toList(),
-            BigDecimal.valueOf(response.getSeatsInUse()),
-            BigDecimal.valueOf(response.getMaxAgentSeats()),
-            BigDecimal.valueOf(response.getSeatOverrun()));
+    PreviewInvitationsResponseDto data = new PreviewInvitationsResponseDto(
+      response
+        .getRowsList()
+        .stream()
+        .map(InvitationsController::toPreviewRowDto)
+        .toList(),
+      BigDecimal.valueOf(response.getSeatsInUse()),
+      BigDecimal.valueOf(response.getMaxAgentSeats()),
+      BigDecimal.valueOf(response.getSeatOverrun())
+    );
 
     return ResponseEntity.ok(
-        new InvitationsControllerPreviewBatchV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("OK")
-            .data(data));
+      new InvitationsControllerPreviewBatchV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("OK")
+        .data(data)
+    );
   }
 
   @Override
   @RequirePermission(PermissionCodesEnum.USER_READ)
-  public ResponseEntity<InvitationsControllerResendV1200Response> invitationsControllerGetV1(String id) {
+  public ResponseEntity<InvitationsControllerResendV1200Response> invitationsControllerGetV1(
+    String id
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    InvitationResponse response =
-        withMetadata(context)
-            .getInvitation(
-                GetInvitationRequest.newBuilder().setOrganizationId(context.organizationId()).setInvitationId(id).build());
+    InvitationResponse response = withMetadata(context).getInvitation(
+      GetInvitationRequest.newBuilder()
+        .setOrganizationId(context.organizationId())
+        .setInvitationId(id)
+        .build()
+    );
 
     return ResponseEntity.ok(
-        new InvitationsControllerResendV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("OK")
-            .data(toInvitationResponseDto(response)));
+      new InvitationsControllerResendV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("OK")
+        .data(toInvitationResponseDto(response))
+    );
   }
 
   /**
@@ -329,7 +418,10 @@ public class InvitationsController implements InvitationsApi {
    */
   private static void requireEmailVerified(RequestContext context) {
     if (!context.isSuperAdmin() && !context.isEmailVerified()) {
-      throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Verify your email address to use this feature.");
+      throw new ResponseStatusException(
+        HttpStatus.FORBIDDEN,
+        "Verify your email address to use this feature."
+      );
     }
   }
 
@@ -339,19 +431,22 @@ public class InvitationsController implements InvitationsApi {
       case "ACCEPTED" -> InvitationStatus.INVITATION_STATUS_ACCEPTED;
       case "REVOKED" -> InvitationStatus.INVITATION_STATUS_REVOKED;
       case "EXPIRED" -> InvitationStatus.INVITATION_STATUS_EXPIRED;
-      default ->
-          throw new ResponseStatusException(
-              HttpStatus.BAD_REQUEST, "status must be one of PENDING, ACCEPTED, REVOKED, EXPIRED");
+      default -> throw new ResponseStatusException(
+        HttpStatus.BAD_REQUEST,
+        "status must be one of PENDING, ACCEPTED, REVOKED, EXPIRED"
+      );
     };
   }
 
   private static InviteUserInput toInviteUserInput(
-      com.synapsedesk.gateway.generated.model.InviteUserDto draft) {
-    InviteUserInput.Builder wire =
-        InviteUserInput.newBuilder()
-            .setEmail(draft.getEmail())
-            .addAllRoleIds(draft.getRoleIds().stream().map(Object::toString).toList())
-            .addAllDepartmentIds(draft.getDepartmentIds().stream().map(Object::toString).toList());
+    com.synapsedesk.gateway.generated.model.InviteUserDto draft
+  ) {
+    InviteUserInput.Builder wire = InviteUserInput.newBuilder()
+      .setEmail(draft.getEmail())
+      .addAllRoleIds(draft.getRoleIds().stream().map(Object::toString).toList())
+      .addAllDepartmentIds(
+        draft.getDepartmentIds().stream().map(Object::toString).toList()
+      );
     if (draft.getPrimaryDepartmentId() != null) {
       wire.setPrimaryDepartmentId(draft.getPrimaryDepartmentId().toString());
     }
@@ -359,72 +454,100 @@ public class InvitationsController implements InvitationsApi {
   }
 
   private static InviteUserInput toPreviewInviteUserInput(
-      com.synapsedesk.gateway.generated.model.PreviewInviteUserDto draft) {
-    InviteUserInput.Builder wire =
-        InviteUserInput.newBuilder()
-            .setEmail(draft.getEmail())
-            .addAllRoleIds(draft.getRoleIds())
-            .addAllDepartmentIds(draft.getDepartmentIds());
+    com.synapsedesk.gateway.generated.model.PreviewInviteUserDto draft
+  ) {
+    InviteUserInput.Builder wire = InviteUserInput.newBuilder()
+      .setEmail(draft.getEmail())
+      .addAllRoleIds(draft.getRoleIds())
+      .addAllDepartmentIds(draft.getDepartmentIds());
     if (draft.getPrimaryDepartmentId() != null) {
       wire.setPrimaryDepartmentId(draft.getPrimaryDepartmentId());
     }
     return wire.build();
   }
 
-  private static InvitationPreviewRowResponseDto toPreviewRowDto(InvitationPreviewRow row) {
+  private static InvitationPreviewRowResponseDto toPreviewRowDto(
+    InvitationPreviewRow row
+  ) {
     return new InvitationPreviewRowResponseDto(
-        row.getEmail(),
-        row.getOk(),
-        row.hasReason() ? row.getReason() : null,
-        row.getUnknownRoleIdsList(),
-        row.getUnknownDepartmentIdsList());
+      row.getEmail(),
+      row.getOk(),
+      row.hasReason() ? row.getReason() : null,
+      row.getUnknownRoleIdsList(),
+      row.getUnknownDepartmentIdsList()
+    );
   }
 
-  private static InvitationResponseDto toInvitationResponseDto(InvitationResponse invitation) {
+  private static InvitationResponseDto toInvitationResponseDto(
+    InvitationResponse invitation
+  ) {
     return new InvitationResponseDto(
-        invitation.getId(),
-        invitation.getEmail(),
-        toStatusEnum(invitation.getStatus()),
-        invitation.getRoleIdsList(),
-        invitation.getDepartmentIdsList(),
-        invitation.hasPrimaryDepartmentId() ? invitation.getPrimaryDepartmentId() : null,
-        invitation.hasInvitedByName() ? invitation.getInvitedByName() : null,
-        BigDecimal.valueOf(invitation.getResentCount()),
-        toOffsetDateTime(invitation.getLastSentAt()),
-        toOffsetDateTime(invitation.getExpiresAt()),
-        toOffsetDateTime(invitation.getCreatedAt()));
+      invitation.getId(),
+      invitation.getEmail(),
+      toStatusEnum(invitation.getStatus()),
+      invitation.getRoleIdsList(),
+      invitation.getDepartmentIdsList(),
+      invitation.hasPrimaryDepartmentId()
+        ? invitation.getPrimaryDepartmentId()
+        : null,
+      invitation.hasInvitedByName() ? invitation.getInvitedByName() : null,
+      BigDecimal.valueOf(invitation.getResentCount()),
+      toOffsetDateTime(invitation.getLastSentAt()),
+      toOffsetDateTime(invitation.getExpiresAt()),
+      toOffsetDateTime(invitation.getCreatedAt())
+    );
   }
 
-  private static InvitationResponseDto.StatusEnum toStatusEnum(InvitationStatus status) {
+  private static InvitationResponseDto.StatusEnum toStatusEnum(
+    InvitationStatus status
+  ) {
     if (status == InvitationStatus.INVITATION_STATUS_UNSPECIFIED) {
       return InvitationResponseDto.StatusEnum.PENDING;
     }
-    return InvitationResponseDto.StatusEnum.fromValue(status.name().replace("INVITATION_STATUS_", ""));
+    return InvitationResponseDto.StatusEnum.fromValue(
+      status.name().replace("INVITATION_STATUS_", "")
+    );
   }
 
-  private static InvitationsControllerListV1200ResponseDataMeta toMetaDto(synapsedesk.auth.Common.PageMeta meta) {
+  private static InvitationsControllerListV1200ResponseDataMeta toMetaDto(
+    synapsedesk.auth.Common.PageMeta meta
+  ) {
     return new InvitationsControllerListV1200ResponseDataMeta(
-        BigDecimal.valueOf(meta.getTotalItems()),
-        BigDecimal.valueOf(meta.getItemCount()),
-        BigDecimal.valueOf(meta.getItemsPerPage()),
-        BigDecimal.valueOf(meta.getTotalPages()),
-        BigDecimal.valueOf(meta.getCurrentPage()));
+      BigDecimal.valueOf(meta.getTotalItems()),
+      BigDecimal.valueOf(meta.getItemCount()),
+      BigDecimal.valueOf(meta.getItemsPerPage()),
+      BigDecimal.valueOf(meta.getTotalPages()),
+      BigDecimal.valueOf(meta.getCurrentPage())
+    );
   }
 
-  private static OffsetDateTime toOffsetDateTime(com.google.protobuf.Timestamp timestamp) {
-    return Instant.ofEpochSecond(timestamp.getSeconds(), timestamp.getNanos()).atOffset(ZoneOffset.UTC);
+  private static OffsetDateTime toOffsetDateTime(
+    com.google.protobuf.Timestamp timestamp
+  ) {
+    return Instant.ofEpochSecond(
+      timestamp.getSeconds(),
+      timestamp.getNanos()
+    ).atOffset(ZoneOffset.UTC);
   }
 
-  private InvitationServiceGrpc.InvitationServiceBlockingStub withMetadata(RequestContext context) {
+  private InvitationServiceGrpc.InvitationServiceBlockingStub withMetadata(
+    RequestContext context
+  ) {
     return stub
-        .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
-        .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context)));
+      .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
+      .withInterceptors(
+        MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context))
+      );
   }
 
-  private InvitationServiceGrpc.InvitationServiceBlockingStub withOriginMetadata(HttpServletRequest request) {
+  private InvitationServiceGrpc.InvitationServiceBlockingStub withOriginMetadata(
+    HttpServletRequest request
+  ) {
     RequestOrigin origin = currentUser.origin(request);
     return stub
-        .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
-        .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(origin)));
+      .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
+      .withInterceptors(
+        MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(origin))
+      );
   }
 }

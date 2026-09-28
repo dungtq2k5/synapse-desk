@@ -83,7 +83,7 @@ public class TwoFactorAuthController implements TwoFactorAuthApi {
 
   private static final long DEADLINE_SECONDS = 5;
   private static final String ENROLMENT_REFUSED =
-      "Enrolling in two-factor authentication requires a valid session or a live login challenge";
+    "Enrolling in two-factor authentication requires a valid session or a live login challenge";
 
   private final TwoFactorAuthServiceGrpc.TwoFactorAuthServiceBlockingStub stub;
   private final CurrentUser currentUser;
@@ -91,10 +91,11 @@ public class TwoFactorAuthController implements TwoFactorAuthApi {
   private final CookieWriter cookies;
 
   public TwoFactorAuthController(
-      TwoFactorAuthServiceGrpc.TwoFactorAuthServiceBlockingStub stub,
-      CurrentUser currentUser,
-      com.synapsedesk.gateway.auth.JwtVerifier verifier,
-      CookieWriter cookies) {
+    TwoFactorAuthServiceGrpc.TwoFactorAuthServiceBlockingStub stub,
+    CurrentUser currentUser,
+    com.synapsedesk.gateway.auth.JwtVerifier verifier,
+    CookieWriter cookies
+  ) {
     this.stub = stub;
     this.currentUser = currentUser;
     this.verifier = verifier;
@@ -106,54 +107,69 @@ public class TwoFactorAuthController implements TwoFactorAuthApi {
     HttpServletRequest request = CurrentRequest.request();
     Enrollee enrollee = requireEnrollee(request);
 
-    GenerateTwoFactorResponse response =
-        withMetadata(enrollee.origin())
-            .generateTwoFactor(GenerateTwoFactorRequest.newBuilder().setUserId(enrollee.sub()).build());
+    GenerateTwoFactorResponse response = withMetadata(
+      enrollee.origin()
+    ).generateTwoFactor(
+      GenerateTwoFactorRequest.newBuilder().setUserId(enrollee.sub()).build()
+    );
 
     return ResponseEntity.ok(
-        new TwoFactorAuthControllerGenerateV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("OK")
-            .data(new GenerateTwoFactorResponseDto(response.getOtpauthUri(), response.getQrCodeDataUrl())));
+      new TwoFactorAuthControllerGenerateV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("OK")
+        .data(
+          new GenerateTwoFactorResponseDto(
+            response.getOtpauthUri(),
+            response.getQrCodeDataUrl()
+          )
+        )
+    );
   }
 
   @Override
   public ResponseEntity<TwoFactorAuthControllerActivateV1200Response> twoFactorAuthControllerActivateV1(
-      ActivateTwoFactorDto activateTwoFactorDto) {
+    ActivateTwoFactorDto activateTwoFactorDto
+  ) {
     HttpServletRequest request = CurrentRequest.request();
     Enrollee enrollee = requireEnrollee(request);
 
-    ActivateTwoFactorResponse response =
-        withMetadata(enrollee.origin())
-            .activateTwoFactor(
-                ActivateTwoFactorRequest.newBuilder()
-                    .setUserId(enrollee.sub())
-                    .setCode(activateTwoFactorDto.getCode())
-                    .build());
+    ActivateTwoFactorResponse response = withMetadata(
+      enrollee.origin()
+    ).activateTwoFactor(
+      ActivateTwoFactorRequest.newBuilder()
+        .setUserId(enrollee.sub())
+        .setCode(activateTwoFactorDto.getCode())
+        .build()
+    );
 
     return ResponseEntity.ok(
-        new TwoFactorAuthControllerActivateV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("OK")
-            .data(new BackupCodesResponseDto(response.getBackupCodesList())));
+      new TwoFactorAuthControllerActivateV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("OK")
+        .data(new BackupCodesResponseDto(response.getBackupCodesList()))
+    );
   }
 
   @Override
   @AuthThrottle(
-      ttlMs = RouteThrottle.TWO_FACTOR_AUTHENTICATE_TTL_MS,
-      limit = RouteThrottle.TWO_FACTOR_AUTHENTICATE_LIMIT)
+    ttlMs = RouteThrottle.TWO_FACTOR_AUTHENTICATE_TTL_MS,
+    limit = RouteThrottle.TWO_FACTOR_AUTHENTICATE_LIMIT
+  )
   public ResponseEntity<TwoFactorAuthControllerAuthenticateV1200Response> twoFactorAuthControllerAuthenticateV1(
-      AuthenticateTwoFactorDto authenticateTwoFactorDto) {
+    AuthenticateTwoFactorDto authenticateTwoFactorDto
+  ) {
     HttpServletRequest request = CurrentRequest.request();
     String twoFactorToken = requireTwoFactorToken(request);
     RequestOrigin origin = currentUser.origin(request);
 
     AuthenticateTwoFactorRequest.Builder wire =
-        AuthenticateTwoFactorRequest.newBuilder()
-            .setTwoFactorToken(twoFactorToken)
-            .setRememberDevice(Boolean.TRUE.equals(authenticateTwoFactorDto.getRememberDevice()));
+      AuthenticateTwoFactorRequest.newBuilder()
+        .setTwoFactorToken(twoFactorToken)
+        .setRememberDevice(
+          Boolean.TRUE.equals(authenticateTwoFactorDto.getRememberDevice())
+        );
     if (authenticateTwoFactorDto.getCode() != null) {
       wire.setCode(authenticateTwoFactorDto.getCode());
     }
@@ -164,93 +180,119 @@ public class TwoFactorAuthController implements TwoFactorAuthApi {
       wire.setDeviceName(authenticateTwoFactorDto.getDeviceName());
     }
 
-    AuthenticateTwoFactorResponse response = withMetadata(origin).authenticateTwoFactor(wire.build());
+    AuthenticateTwoFactorResponse response = withMetadata(
+      origin
+    ).authenticateTwoFactor(wire.build());
 
     // The challenge is spent before the real session is set, so a failure
     // between the two cannot leave a reusable challenge behind.
     cookies.clearTwoFactorToken(CurrentRequest.response());
-    cookies.setAccessToken(CurrentRequest.response(), response.getAccessToken());
-    cookies.setRefreshToken(CurrentRequest.response(), response.getRefreshToken());
+    cookies.setAccessToken(
+      CurrentRequest.response(),
+      response.getAccessToken()
+    );
+    cookies.setRefreshToken(
+      CurrentRequest.response(),
+      response.getRefreshToken()
+    );
     if (response.hasDeviceToken()) {
-      cookies.setDeviceToken(CurrentRequest.response(), response.getDeviceToken());
+      cookies.setDeviceToken(
+        CurrentRequest.response(),
+        response.getDeviceToken()
+      );
     }
 
     UserResponse user = response.getUser();
     return ResponseEntity.ok(
-        new TwoFactorAuthControllerAuthenticateV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("OK")
-            .data(
-                new TwoFactorAuthenticatedResponseDto(
-                    UserMapper.toUserResponseDto(user), response.hasWarning() ? response.getWarning() : null)));
+      new TwoFactorAuthControllerAuthenticateV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("OK")
+        .data(
+          new TwoFactorAuthenticatedResponseDto(
+            UserMapper.toUserResponseDto(user),
+            response.hasWarning() ? response.getWarning() : null
+          )
+        )
+    );
   }
 
   @Override
   public ResponseEntity<AuthControllerForgotPasswordV1202Response> twoFactorAuthControllerDisableV1(
-      DisableTwoFactorDto disableTwoFactorDto) {
+    DisableTwoFactorDto disableTwoFactorDto
+  ) {
     HttpServletRequest request = CurrentRequest.request();
     RequestContext context = currentUser.require(request);
 
-    withMetadata(context.origin())
-        .disableTwoFactor(
-            DisableTwoFactorRequest.newBuilder()
-                .setUserId(context.sub())
-                .setCode(disableTwoFactorDto.getCode())
-                .setPassword(disableTwoFactorDto.getPassword())
-                .build());
+    withMetadata(context.origin()).disableTwoFactor(
+      DisableTwoFactorRequest.newBuilder()
+        .setUserId(context.sub())
+        .setCode(disableTwoFactorDto.getCode())
+        .setPassword(disableTwoFactorDto.getPassword())
+        .build()
+    );
 
     // auth-service just un-trusted every device; drop the now-meaningless cookie.
     cookies.clearDeviceToken(CurrentRequest.response());
 
     return ResponseEntity.ok(
-        new AuthControllerForgotPasswordV1202Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("OK")
-            .data(null));
+      new AuthControllerForgotPasswordV1202Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("OK")
+        .data(null)
+    );
   }
 
   @Override
   public ResponseEntity<TwoFactorAuthControllerActivateV1200Response> twoFactorAuthControllerRegenerateBackupCodesV1(
-      RegenerateBackupCodesDto regenerateBackupCodesDto) {
+    RegenerateBackupCodesDto regenerateBackupCodesDto
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    RegenerateBackupCodesResponse response =
-        withMetadata(context.origin())
-            .regenerateBackupCodes(
-                RegenerateBackupCodesRequest.newBuilder()
-                    .setUserId(context.sub())
-                    .setPassword(regenerateBackupCodesDto.getPassword())
-                    .build());
+    RegenerateBackupCodesResponse response = withMetadata(
+      context.origin()
+    ).regenerateBackupCodes(
+      RegenerateBackupCodesRequest.newBuilder()
+        .setUserId(context.sub())
+        .setPassword(regenerateBackupCodesDto.getPassword())
+        .build()
+    );
 
     return ResponseEntity.ok(
-        new TwoFactorAuthControllerActivateV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("OK")
-            .data(new BackupCodesResponseDto(response.getBackupCodesList())));
+      new TwoFactorAuthControllerActivateV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("OK")
+        .data(new BackupCodesResponseDto(response.getBackupCodesList()))
+    );
   }
 
   @Override
-  public ResponseEntity<TwoFactorAuthControllerGetBackupCodesStatusV1200Response>
-      twoFactorAuthControllerGetBackupCodesStatusV1() {
+  public ResponseEntity<TwoFactorAuthControllerGetBackupCodesStatusV1200Response> twoFactorAuthControllerGetBackupCodesStatusV1() {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    BackupCodesStatusResponse response =
-        withMetadata(context.origin())
-            .getBackupCodesStatus(BackupCodesStatusRequest.newBuilder().setUserId(context.sub()).build());
+    BackupCodesStatusResponse response = withMetadata(
+      context.origin()
+    ).getBackupCodesStatus(
+      BackupCodesStatusRequest.newBuilder().setUserId(context.sub()).build()
+    );
 
     return ResponseEntity.ok(
-        new TwoFactorAuthControllerGetBackupCodesStatusV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("OK")
-            .data(
-                new BackupCodesStatusResponseDto(
-                    BigDecimal.valueOf(response.getRemaining()),
-                    BigDecimal.valueOf(response.getUsed()),
-                    response.hasExpiresAt() ? toOffsetDateTime(response.getExpiresAt()) : null)));
+      new TwoFactorAuthControllerGetBackupCodesStatusV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("OK")
+        .data(
+          new BackupCodesStatusResponseDto(
+            BigDecimal.valueOf(response.getRemaining()),
+            BigDecimal.valueOf(response.getUsed()),
+            response.hasExpiresAt()
+              ? toOffsetDateTime(response.getExpiresAt())
+              : null
+          )
+        )
+    );
   }
 
   /** `EnrolleeContext` — only what a full session and a mid-challenge caller share. */
@@ -269,12 +311,17 @@ public class TwoFactorAuthController implements TwoFactorAuthApi {
       return new Enrollee(full.get().sub(), full.get().origin());
     }
 
-    Optional<JwtPrincipal> challenge = cookies.readTwoFactorToken(request).flatMap(verifier::verifyTwoFactor);
+    Optional<JwtPrincipal> challenge = cookies
+      .readTwoFactorToken(request)
+      .flatMap(verifier::verifyTwoFactor);
     if (challenge.isPresent()) {
       return new Enrollee(challenge.get().sub(), currentUser.origin(request));
     }
 
-    throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, ENROLMENT_REFUSED);
+    throw new ResponseStatusException(
+      HttpStatus.UNAUTHORIZED,
+      ENROLMENT_REFUSED
+    );
   }
 
   /**
@@ -284,7 +331,9 @@ public class TwoFactorAuthController implements TwoFactorAuthApi {
    * authority that re-verifies it.
    */
   private String requireTwoFactorToken(HttpServletRequest request) {
-    String token = cookies.readTwoFactorToken(request).orElseThrow(TwoFactorAuthController::unauthorized);
+    String token = cookies
+      .readTwoFactorToken(request)
+      .orElseThrow(TwoFactorAuthController::unauthorized);
     if (verifier.verifyTwoFactor(token).isEmpty()) {
       throw unauthorized();
     }
@@ -295,13 +344,22 @@ public class TwoFactorAuthController implements TwoFactorAuthApi {
     return new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Unauthorized");
   }
 
-  private static OffsetDateTime toOffsetDateTime(com.google.protobuf.Timestamp timestamp) {
-    return Instant.ofEpochSecond(timestamp.getSeconds(), timestamp.getNanos()).atOffset(ZoneOffset.UTC);
+  private static OffsetDateTime toOffsetDateTime(
+    com.google.protobuf.Timestamp timestamp
+  ) {
+    return Instant.ofEpochSecond(
+      timestamp.getSeconds(),
+      timestamp.getNanos()
+    ).atOffset(ZoneOffset.UTC);
   }
 
-  private TwoFactorAuthServiceGrpc.TwoFactorAuthServiceBlockingStub withMetadata(RequestOrigin origin) {
+  private TwoFactorAuthServiceGrpc.TwoFactorAuthServiceBlockingStub withMetadata(
+    RequestOrigin origin
+  ) {
     return stub
-        .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
-        .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(origin)));
+      .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
+      .withInterceptors(
+        MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(origin))
+      );
   }
 }

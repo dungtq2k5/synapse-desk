@@ -12,20 +12,21 @@ import java.util.List;
  * UsersResolver}, not carried here.
  */
 public record UserGqlDto(
-    String id,
-    String organizationId,
-    List<String> departmentIds,
-    String fullName,
-    String avatarUrl,
-    String email,
-    boolean isEmailVerified,
-    String phoneNumber,
-    boolean isPhoneVerified,
-    String dob,
-    GenderGql gender,
-    OffsetDateTime lastLoginAt,
-    boolean isLocked,
-    OffsetDateTime lockedUntil,
-    boolean isTwoFactorEnabled,
-    OffsetDateTime createdAt,
-    OffsetDateTime updatedAt) {}
+  String id,
+  String organizationId,
+  List<String> departmentIds,
+  String fullName,
+  String avatarUrl,
+  String email,
+  boolean isEmailVerified,
+  String phoneNumber,
+  boolean isPhoneVerified,
+  String dob,
+  GenderGql gender,
+  OffsetDateTime lastLoginAt,
+  boolean isLocked,
+  OffsetDateTime lockedUntil,
+  boolean isTwoFactorEnabled,
+  OffsetDateTime createdAt,
+  OffsetDateTime updatedAt
+) {}

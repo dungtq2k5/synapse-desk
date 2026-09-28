@@ -48,10 +48,11 @@ public class PlatformAuditLogsController implements PlatformAuditLogsApi {
   private final ObjectMapper json;
 
   public PlatformAuditLogsController(
-      AuditServiceGrpc.AuditServiceBlockingStub stub,
-      CurrentUser currentUser,
-      SuperAdminCheck superAdminCheck,
-      ObjectMapper json) {
+    AuditServiceGrpc.AuditServiceBlockingStub stub,
+    CurrentUser currentUser,
+    SuperAdminCheck superAdminCheck,
+    ObjectMapper json
+  ) {
     this.stub = stub;
     this.currentUser = currentUser;
     this.superAdminCheck = superAdminCheck;
@@ -60,32 +61,53 @@ public class PlatformAuditLogsController implements PlatformAuditLogsApi {
 
   @Override
   public ResponseEntity<AuditLogsControllerListV1200Response> platformAuditLogsControllerListV1(
-      BigDecimal page,
-      BigDecimal limit,
-      String sortBy,
-      String sortOrder,
-      String action,
-      UUID userId,
-      String resourceType,
-      UUID resourceId,
-      OffsetDateTime from,
-      OffsetDateTime to) {
+    BigDecimal page,
+    BigDecimal limit,
+    String sortBy,
+    String sortOrder,
+    String action,
+    UUID userId,
+    String resourceType,
+    UUID resourceId,
+    OffsetDateTime from,
+    OffsetDateTime to
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
     superAdminCheck.require(context);
 
-    ListAuditLogsResponse response =
-        withMetadata(context)
-            .listAuditLogs(
-                AuditLogsController.toListAuditLogsRequest(
-                    page, limit, sortBy, sortOrder, action, userId, resourceType, resourceId, from, to, true));
+    ListAuditLogsResponse response = withMetadata(context).listAuditLogs(
+      AuditLogsController.toListAuditLogsRequest(
+        page,
+        limit,
+        sortBy,
+        sortOrder,
+        action,
+        userId,
+        resourceType,
+        resourceId,
+        from,
+        to,
+        true
+      )
+    );
 
     AuditLogsControllerListV1200ResponseData data =
-        new AuditLogsControllerListV1200ResponseData(
-            response.getItemsList().stream().map(log -> AuditLogsController.toAuditLogResponseDto(log, json)).toList(),
-            AuditLogsController.toMetaDto(response.getMeta()));
+      new AuditLogsControllerListV1200ResponseData(
+        response
+          .getItemsList()
+          .stream()
+          .map(log -> AuditLogsController.toAuditLogResponseDto(log, json))
+          .toList(),
+        AuditLogsController.toMetaDto(response.getMeta())
+      );
 
     return ResponseEntity.ok(
-        new AuditLogsControllerListV1200Response().success(true).statusCode(BigDecimal.valueOf(200)).message("OK").data(data));
+      new AuditLogsControllerListV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("OK")
+        .data(data)
+    );
   }
 
   @Override
@@ -93,20 +115,26 @@ public class PlatformAuditLogsController implements PlatformAuditLogsApi {
     RequestContext context = currentUser.require(CurrentRequest.request());
     superAdminCheck.require(context);
 
-    ListAuditActionsResponse response =
-        withMetadata(context).listAuditActions(ListAuditActionsRequest.newBuilder().setPlatformScope(true).build());
+    ListAuditActionsResponse response = withMetadata(context).listAuditActions(
+      ListAuditActionsRequest.newBuilder().setPlatformScope(true).build()
+    );
 
     return ResponseEntity.ok(
-        new AuditLogsControllerListActionsV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("OK")
-            .data(AuditLogsController.toAuditActionsResponseDto(response)));
+      new AuditLogsControllerListActionsV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("OK")
+        .data(AuditLogsController.toAuditActionsResponseDto(response))
+    );
   }
 
-  private AuditServiceGrpc.AuditServiceBlockingStub withMetadata(RequestContext context) {
+  private AuditServiceGrpc.AuditServiceBlockingStub withMetadata(
+    RequestContext context
+  ) {
     return stub
-        .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
-        .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context)));
+      .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
+      .withInterceptors(
+        MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context))
+      );
   }
 }

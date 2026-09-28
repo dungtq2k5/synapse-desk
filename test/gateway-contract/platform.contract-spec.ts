@@ -56,7 +56,10 @@ describe('platform', () => {
     )}`,
   });
 
-  const wireOrganization = (id: string, overrides: Record<string, unknown> = {}) => ({
+  const wireOrganization = (
+    id: string,
+    overrides: Record<string, unknown> = {},
+  ) => ({
     id,
     name: 'Acme',
     slug: 'acme',
@@ -72,7 +75,10 @@ describe('platform', () => {
     ...overrides,
   });
 
-  const wirePlatformOrganization = (id: string, overrides: Record<string, unknown> = {}) => ({
+  const wirePlatformOrganization = (
+    id: string,
+    overrides: Record<string, unknown> = {},
+  ) => ({
     organization: wireOrganization(id),
     userCount: 3,
     pendingInvitationCount: 0,
@@ -116,7 +122,11 @@ describe('platform', () => {
   beforeAll(async () => {
     const { redisUrl, natsUrl } = readRunState();
     peers = await startPeers();
-    gateway = await startGateway({ ...peers.env, REDIS_URL: redisUrl, NATS_URL: natsUrl });
+    gateway = await startGateway({
+      ...peers.env,
+      REDIS_URL: redisUrl,
+      NATS_URL: natsUrl,
+    });
   }, 90_000);
 
   afterAll(async () => {
@@ -126,122 +136,204 @@ describe('platform', () => {
 
   beforeEach(() => peers.reset());
 
-  rowFor('Platform')('**a tenant admin is refused — this door has no permission code**', async () => {
-    const response = await new Session(gateway.baseUrl).get(`${API}/platform/organizations`, tenantAdminHeaders());
+  rowFor('Platform')(
+    '**a tenant admin is refused — this door has no permission code**',
+    async () => {
+      const response = await new Session(gateway.baseUrl).get(
+        `${API}/platform/organizations`,
+        tenantAdminHeaders(),
+      );
 
-    expect(response.status).toBe(403);
-  });
+      expect(response.status).toBe(403);
+    },
+  );
 
   describe('organizations', () => {
-    rowFor('Platform')('**`listOrganizations` filters by status**', async () => {
-      peers.auth.on('PlatformService/ListOrganizations').reply({
-        items: [wirePlatformOrganization('org-1')],
-        meta: { totalItems: 1, itemCount: 1, itemsPerPage: 10, totalPages: 1, currentPage: 1 },
-      });
+    rowFor('Platform')(
+      '**`listOrganizations` filters by status**',
+      async () => {
+        peers.auth.on('PlatformService/ListOrganizations').reply({
+          items: [wirePlatformOrganization('org-1')],
+          meta: {
+            totalItems: 1,
+            itemCount: 1,
+            itemsPerPage: 10,
+            totalPages: 1,
+            currentPage: 1,
+          },
+        });
 
-      const response = await new Session(gateway.baseUrl).get(
-        `${API}/platform/organizations?status=ACTIVE`,
-        superAdminHeaders(),
-      );
+        const response = await new Session(gateway.baseUrl).get(
+          `${API}/platform/organizations?status=ACTIVE`,
+          superAdminHeaders(),
+        );
 
-      expect(response.status).toBe(200);
-      expect(response.body).toMatchObject({ data: { items: [{ organization: { id: 'org-1' } }] } });
-      const [call] = peers.auth.calls('PlatformService/ListOrganizations');
-      expect(call.request).toMatchObject({ status: 2 }); // ORG_STATUS_ACTIVE
-    });
+        expect(response.status).toBe(200);
+        expect(response.body).toMatchObject({
+          data: { items: [{ organization: { id: 'org-1' } }] },
+        });
+        const [call] = peers.auth.calls('PlatformService/ListOrganizations');
+        expect(call.request).toMatchObject({ status: 2 }); // ORG_STATUS_ACTIVE
+      },
+    );
 
-    rowFor('Platform')('**`createOrganization` normalizes the slug — trim and lowercase, then the pattern**', async () => {
-      peers.auth.on('PlatformService/CreateOrganization').reply({
-        organization: wirePlatformOrganization('org-2'),
-        admin: wireUser('dddddddd-3333-4333-8333-dddddddddddd'),
-      });
+    rowFor('Platform')(
+      '**`createOrganization` normalizes the slug — trim and lowercase, then the pattern**',
+      async () => {
+        peers.auth.on('PlatformService/CreateOrganization').reply({
+          organization: wirePlatformOrganization('org-2'),
+          admin: wireUser('dddddddd-3333-4333-8333-dddddddddddd'),
+        });
 
-      const response = await new Session(gateway.baseUrl).post(
-        `${API}/platform/organizations`,
-        { name: 'Acme', slug: ' ACME-CORP ', adminEmail: 'admin@acme.test', adminFullName: 'Admin Person' },
-        superAdminHeaders(),
-      );
+        const response = await new Session(gateway.baseUrl).post(
+          `${API}/platform/organizations`,
+          {
+            name: 'Acme',
+            slug: ' ACME-CORP ',
+            adminEmail: 'admin@acme.test',
+            adminFullName: 'Admin Person',
+          },
+          superAdminHeaders(),
+        );
 
-      expect(response.status).toBe(201);
-      const [call] = peers.auth.calls('PlatformService/CreateOrganization');
-      expect(call.request).toMatchObject({ slug: 'acme-corp' });
-    });
+        expect(response.status).toBe(201);
+        const [call] = peers.auth.calls('PlatformService/CreateOrganization');
+        expect(call.request).toMatchObject({ slug: 'acme-corp' });
+      },
+    );
 
-    rowFor('Platform')('**`setStatus` answers the custom "Status updated" message**', async () => {
-      peers.auth.on('PlatformService/SetOrganizationStatus').reply(wirePlatformOrganization('org-1', {
-        organization: wireOrganization('org-1', { status: 'ORG_STATUS_FROZEN' }),
-      }));
+    rowFor('Platform')(
+      '**`setStatus` answers the custom "Status updated" message**',
+      async () => {
+        peers.auth.on('PlatformService/SetOrganizationStatus').reply(
+          wirePlatformOrganization('org-1', {
+            organization: wireOrganization('org-1', {
+              status: 'ORG_STATUS_FROZEN',
+            }),
+          }),
+        );
 
-      const response = await new Session(gateway.baseUrl).post(
-        `${API}/platform/organizations/aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa/status`,
-        { status: 'FROZEN', reason: 'suspected fraud' },
-        superAdminHeaders(),
-      );
+        const response = await new Session(gateway.baseUrl).post(
+          `${API}/platform/organizations/aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa/status`,
+          { status: 'FROZEN', reason: 'suspected fraud' },
+          superAdminHeaders(),
+        );
 
-      expect(response.status).toBe(200);
-      expect(response.body).toMatchObject({ message: 'Status updated' });
-    });
+        expect(response.status).toBe(200);
+        expect(response.body).toMatchObject({ message: 'Status updated' });
+      },
+    );
 
-    rowFor('Platform')('**`resetBillingCycle` answers the full break-glass warning as its message**', async () => {
-      peers.auth.on('PlatformService/ResetBillingCycle').reply(wirePlatformOrganization('org-1'));
+    rowFor('Platform')(
+      '**`resetBillingCycle` answers the full break-glass warning as its message**',
+      async () => {
+        peers.auth
+          .on('PlatformService/ResetBillingCycle')
+          .reply(wirePlatformOrganization('org-1'));
 
-      const response = await new Session(gateway.baseUrl).post(
-        `${API}/platform/organizations/aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa/billing-cycle/reset`,
-        { reason: 'incident follow-up' },
-        superAdminHeaders(),
-      );
+        const response = await new Session(gateway.baseUrl).post(
+          `${API}/platform/organizations/aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa/billing-cycle/reset`,
+          { reason: 'incident follow-up' },
+          superAdminHeaders(),
+        );
 
-      expect(response.status).toBe(200);
-      expect(response.body).toMatchObject({
-        message: 'Billing cycle reset — this desynchronizes the quota window from the Stripe invoice period and grants a fresh AI budget',
-      });
-    });
+        expect(response.status).toBe(200);
+        expect(response.body).toMatchObject({
+          message:
+            'Billing cycle reset — this desynchronizes the quota window from the Stripe invoice period and grants a fresh AI budget',
+        });
+      },
+    );
 
-    rowFor('Platform')('**`offboard` returns the revoked session count under "Workspace offboarded"**', async () => {
-      peers.auth.on('PlatformService/OffboardOrganization').reply({ revokedSessionCount: 4 });
+    rowFor('Platform')(
+      '**`offboard` returns the revoked session count under "Workspace offboarded"**',
+      async () => {
+        peers.auth
+          .on('PlatformService/OffboardOrganization')
+          .reply({ revokedSessionCount: 4 });
 
-      const raw = await new Session(gateway.baseUrl).request('DELETE', `${API}/platform/organizations/aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa`, {
-        body: { reason: 'churn' },
-        headers: superAdminHeaders(),
-      });
+        const raw = await new Session(gateway.baseUrl).request(
+          'DELETE',
+          `${API}/platform/organizations/aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa`,
+          {
+            body: { reason: 'churn' },
+            headers: superAdminHeaders(),
+          },
+        );
 
-      expect(raw.status).toBe(200);
-      expect(raw.body).toMatchObject({ message: 'Workspace offboarded', data: { revokedSessionCount: 4 } });
-    });
+        expect(raw.status).toBe(200);
+        expect(raw.body).toMatchObject({
+          message: 'Workspace offboarded',
+          data: { revokedSessionCount: 4 },
+        });
+      },
+    );
 
-    rowFor('Platform')('**`restore` answers "Workspace restored"**', async () => {
-      peers.auth.on('PlatformService/RestoreOrganization').reply(wirePlatformOrganization('org-1'));
+    rowFor('Platform')(
+      '**`restore` answers "Workspace restored"**',
+      async () => {
+        peers.auth
+          .on('PlatformService/RestoreOrganization')
+          .reply(wirePlatformOrganization('org-1'));
 
-      const response = await new Session(gateway.baseUrl).post(
-        `${API}/platform/organizations/aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa/restore`,
-        undefined,
-        superAdminHeaders(),
-      );
+        const response = await new Session(gateway.baseUrl).post(
+          `${API}/platform/organizations/aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa/restore`,
+          undefined,
+          superAdminHeaders(),
+        );
 
-      expect(response.status).toBe(200);
-      expect(response.body).toMatchObject({ message: 'Workspace restored' });
-    });
+        expect(response.status).toBe(200);
+        expect(response.body).toMatchObject({ message: 'Workspace restored' });
+      },
+    );
   });
 
   describe('cross-tenant users and roles', () => {
-    rowFor('Platform')('**`listUsers` carries the tenant on every row**', async () => {
-      peers.auth.on('PlatformService/ListUsers').reply({
-        items: [{ user: wireUser('dddddddd-3333-4333-8333-dddddddddddd'), organizationId: 'org-1', organizationName: 'Acme', roleNames: ['Agent'] }],
-        meta: { totalItems: 1, itemCount: 1, itemsPerPage: 10, totalPages: 1, currentPage: 1 },
-      });
+    rowFor('Platform')(
+      '**`listUsers` carries the tenant on every row**',
+      async () => {
+        peers.auth.on('PlatformService/ListUsers').reply({
+          items: [
+            {
+              user: wireUser('dddddddd-3333-4333-8333-dddddddddddd'),
+              organizationId: 'org-1',
+              organizationName: 'Acme',
+              roleNames: ['Agent'],
+            },
+          ],
+          meta: {
+            totalItems: 1,
+            itemCount: 1,
+            itemsPerPage: 10,
+            totalPages: 1,
+            currentPage: 1,
+          },
+        });
 
-      const response = await new Session(gateway.baseUrl).get(`${API}/platform/users`, superAdminHeaders());
+        const response = await new Session(gateway.baseUrl).get(
+          `${API}/platform/users`,
+          superAdminHeaders(),
+        );
 
-      expect(response.status).toBe(200);
-      expect(response.body).toMatchObject({ data: { items: [{ organizationId: 'org-1' }] } });
-    });
+        expect(response.status).toBe(200);
+        expect(response.body).toMatchObject({
+          data: { items: [{ organizationId: 'org-1' }] },
+        });
+      },
+    );
 
     rowFor('Platform')(
       '**`listGlobalRoles` forwards ONLY `page` — sortBy/searchTerm/organizationId/includeDeleted never reach the peer**',
       async () => {
         peers.auth.on('PlatformService/ListGlobalRoles').reply({
           items: [],
-          meta: { totalItems: 0, itemCount: 0, itemsPerPage: 10, totalPages: 0, currentPage: 1 },
+          meta: {
+            totalItems: 0,
+            itemCount: 0,
+            itemsPerPage: 10,
+            totalPages: 0,
+            currentPage: 1,
+          },
         });
 
         const response = await new Session(gateway.baseUrl).get(
@@ -259,47 +351,58 @@ describe('platform', () => {
       },
     );
 
-    rowFor('Platform')('**`createGlobalRole` mints a role visible in every tenant**', async () => {
-      peers.auth.on('PlatformService/CreateGlobalRole').reply({
-        id: 'role-1',
-        name: 'Support',
-        isSystemRole: true,
-        userAssigned: 0,
-        permissionCodes: [],
-        createdAt: { seconds: 1_756_684_800, nanos: 0 },
-        updatedAt: { seconds: 1_756_684_800, nanos: 0 },
-      });
+    rowFor('Platform')(
+      '**`createGlobalRole` mints a role visible in every tenant**',
+      async () => {
+        peers.auth.on('PlatformService/CreateGlobalRole').reply({
+          id: 'role-1',
+          name: 'Support',
+          isSystemRole: true,
+          userAssigned: 0,
+          permissionCodes: [],
+          createdAt: { seconds: 1_756_684_800, nanos: 0 },
+          updatedAt: { seconds: 1_756_684_800, nanos: 0 },
+        });
 
-      const response = await new Session(gateway.baseUrl).post(
-        `${API}/platform/roles`,
-        { name: 'Support', permissionCodes: [] },
-        superAdminHeaders(),
-      );
+        const response = await new Session(gateway.baseUrl).post(
+          `${API}/platform/roles`,
+          { name: 'Support', permissionCodes: [] },
+          superAdminHeaders(),
+        );
 
-      expect(response.status).toBe(201);
-      expect(response.body).toMatchObject({ data: { isSystemRole: true } });
-    });
+        expect(response.status).toBe(201);
+        expect(response.body).toMatchObject({ data: { isSystemRole: true } });
+      },
+    );
   });
 
   describe('metrics and finance', () => {
-    rowFor('Platform')('**`getMetrics` is a flat, full-table snapshot**', async () => {
-      peers.auth.on('PlatformService/GetMetrics').reply({
-        totalOrganizations: 10,
-        organizationsByStatus: { ACTIVE: 8, FROZEN: 2 },
-        totalUsers: 40,
-        activeUsers: 35,
-        pendingInvitations: 2,
-        liveSessions: 5,
-        seatsAllocated: 50,
-        seatsInUse: 40,
-        generatedAt: { seconds: 1_756_684_800, nanos: 0 },
-      });
+    rowFor('Platform')(
+      '**`getMetrics` is a flat, full-table snapshot**',
+      async () => {
+        peers.auth.on('PlatformService/GetMetrics').reply({
+          totalOrganizations: 10,
+          organizationsByStatus: { ACTIVE: 8, FROZEN: 2 },
+          totalUsers: 40,
+          activeUsers: 35,
+          pendingInvitations: 2,
+          liveSessions: 5,
+          seatsAllocated: 50,
+          seatsInUse: 40,
+          generatedAt: { seconds: 1_756_684_800, nanos: 0 },
+        });
 
-      const response = await new Session(gateway.baseUrl).get(`${API}/platform/metrics`, superAdminHeaders());
+        const response = await new Session(gateway.baseUrl).get(
+          `${API}/platform/metrics`,
+          superAdminHeaders(),
+        );
 
-      expect(response.status).toBe(200);
-      expect(response.body).toMatchObject({ data: { totalOrganizations: 10 } });
-    });
+        expect(response.status).toBe(200);
+        expect(response.body).toMatchObject({
+          data: { totalOrganizations: 10 },
+        });
+      },
+    );
 
     rowFor('Platform')(
       '**a degraded finance revenue section keeps `excludes` while everything else goes null**',
@@ -308,11 +411,18 @@ describe('platform', () => {
           tenants: { total: 3, byStatus: {} },
           plans: [],
           dunning: { pastDue: 0, tenants: [] },
-          revenue: { available: false, unavailableReason: 'Stripe unreachable', excludes: ['annual prices are estimated'] },
+          revenue: {
+            available: false,
+            unavailableReason: 'Stripe unreachable',
+            excludes: ['annual prices are estimated'],
+          },
           generatedAt: { seconds: 1_756_684_800, nanos: 0 },
         });
 
-        const response = await new Session(gateway.baseUrl).get(`${API}/platform/finance`, superAdminHeaders());
+        const response = await new Session(gateway.baseUrl).get(
+          `${API}/platform/finance`,
+          superAdminHeaders(),
+        );
 
         expect(response.status).toBe(200);
         expect(response.body).toMatchObject({
@@ -330,89 +440,140 @@ describe('platform', () => {
       },
     );
 
-    rowFor('Platform')('**`listBillingEvents` refuses a malformed date**', async () => {
-      const response = await new Session(gateway.baseUrl).get(
-        `${API}/platform/finance/events?from=not-a-date&to=2026-01-31`,
-        superAdminHeaders(),
-      );
+    rowFor('Platform')(
+      '**`listBillingEvents` refuses a malformed date**',
+      async () => {
+        const response = await new Session(gateway.baseUrl).get(
+          `${API}/platform/finance/events?from=not-a-date&to=2026-01-31`,
+          superAdminHeaders(),
+        );
 
-      expect(response.status).toBe(400);
-    });
+        expect(response.status).toBe(400);
+      },
+    );
 
-    rowFor('Platform')('**`listBillingEvents` reports counts only, current-state offboarding separate from cancellation events**', async () => {
-      peers.auth.on('PlatformService/ListBillingEvents').reply({
-        points: [{ day: '2026-01-15', eventType: 'invoice.payment_failed', count: 2 }],
-        currentlyOffboarded: [{ day: '2026-01-10', eventType: 'organization.offboarded', count: 1 }],
-        observedEventTypes: ['invoice.payment_failed'],
-      });
+    rowFor('Platform')(
+      '**`listBillingEvents` reports counts only, current-state offboarding separate from cancellation events**',
+      async () => {
+        peers.auth.on('PlatformService/ListBillingEvents').reply({
+          points: [
+            {
+              day: '2026-01-15',
+              eventType: 'invoice.payment_failed',
+              count: 2,
+            },
+          ],
+          currentlyOffboarded: [
+            {
+              day: '2026-01-10',
+              eventType: 'organization.offboarded',
+              count: 1,
+            },
+          ],
+          observedEventTypes: ['invoice.payment_failed'],
+        });
 
-      const response = await new Session(gateway.baseUrl).get(
-        `${API}/platform/finance/events?from=2026-01-01&to=2026-01-31`,
-        superAdminHeaders(),
-      );
+        const response = await new Session(gateway.baseUrl).get(
+          `${API}/platform/finance/events?from=2026-01-01&to=2026-01-31`,
+          superAdminHeaders(),
+        );
 
-      expect(response.status).toBe(200);
-      expect(response.body).toMatchObject({
-        data: { points: [{ count: 2 }], currentlyOffboarded: [{ eventType: 'organization.offboarded' }] },
-      });
-    });
+        expect(response.status).toBe(200);
+        expect(response.body).toMatchObject({
+          data: {
+            points: [{ count: 2 }],
+            currentlyOffboarded: [{ eventType: 'organization.offboarded' }],
+          },
+        });
+      },
+    );
   });
 
   describe('the plan catalogue', () => {
     rowFor('Platform')('**`listPlans` reads the catalogue**', async () => {
       peers.auth.on('PlatformService/ListPlans').reply({
         items: [wirePlan('plan-1')],
-        meta: { totalItems: 1, itemCount: 1, itemsPerPage: 10, totalPages: 1, currentPage: 1 },
+        meta: {
+          totalItems: 1,
+          itemCount: 1,
+          itemsPerPage: 10,
+          totalPages: 1,
+          currentPage: 1,
+        },
       });
 
-      const response = await new Session(gateway.baseUrl).get(`${API}/platform/plans`, superAdminHeaders());
-
-      expect(response.status).toBe(200);
-      expect(response.body).toMatchObject({ data: { items: [{ id: 'plan-1' }] } });
-    });
-
-    rowFor('Platform')('**`createPlan` refuses more than twelve prices**', async () => {
-      const prices = Array.from({ length: 13 }, (_, i) => ({ stripePriceId: `price_${i}`, interval: 'month' }));
-
-      const response = await new Session(gateway.baseUrl).post(
+      const response = await new Session(gateway.baseUrl).get(
         `${API}/platform/plans`,
-        {
-          name: 'Enterprise',
-          maxAgentSeats: 10,
-          maxStorageBytes: 1_000_000,
-          monthlyAiTokenBudget: 1_000_000,
-          aiModelTier: 'FAST',
-          maxDocumentBytes: 1_000_000,
-          maxAttachmentBytes: 1_000_000,
-          maxDocumentUploads: 1000,
-          maxAnalyticsRangeDays: 90,
-          prices,
-        },
         superAdminHeaders(),
       );
 
-      expect(response.status).toBe(400);
-    });
-
-    rowFor('Platform')('**`getPlan` and `updatePlan` share the create envelope shape**', async () => {
-      peers.auth.on('PlatformService/GetPlan').reply(wirePlan('plan-1'));
-
-      const response = await new Session(gateway.baseUrl).get(`${API}/platform/plans/bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb`, superAdminHeaders());
-
       expect(response.status).toBe(200);
-      expect(response.body).toMatchObject({ data: { id: 'plan-1' } });
-    });
-
-    rowFor('Platform')('**`deletePlan` reports whether it deleted**', async () => {
-      peers.auth.on('PlatformService/DeletePlan').reply({ deleted: true });
-
-      const response = await new Session(gateway.baseUrl).request('DELETE', `${API}/platform/plans/bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb`, {
-        headers: superAdminHeaders(),
+      expect(response.body).toMatchObject({
+        data: { items: [{ id: 'plan-1' }] },
       });
-
-      expect(response.status).toBe(200);
-      expect(response.body).toMatchObject({ data: { deleted: true } });
     });
+
+    rowFor('Platform')(
+      '**`createPlan` refuses more than twelve prices**',
+      async () => {
+        const prices = Array.from({ length: 13 }, (_, i) => ({
+          stripePriceId: `price_${i}`,
+          interval: 'month',
+        }));
+
+        const response = await new Session(gateway.baseUrl).post(
+          `${API}/platform/plans`,
+          {
+            name: 'Enterprise',
+            maxAgentSeats: 10,
+            maxStorageBytes: 1_000_000,
+            monthlyAiTokenBudget: 1_000_000,
+            aiModelTier: 'FAST',
+            maxDocumentBytes: 1_000_000,
+            maxAttachmentBytes: 1_000_000,
+            maxDocumentUploads: 1000,
+            maxAnalyticsRangeDays: 90,
+            prices,
+          },
+          superAdminHeaders(),
+        );
+
+        expect(response.status).toBe(400);
+      },
+    );
+
+    rowFor('Platform')(
+      '**`getPlan` and `updatePlan` share the create envelope shape**',
+      async () => {
+        peers.auth.on('PlatformService/GetPlan').reply(wirePlan('plan-1'));
+
+        const response = await new Session(gateway.baseUrl).get(
+          `${API}/platform/plans/bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb`,
+          superAdminHeaders(),
+        );
+
+        expect(response.status).toBe(200);
+        expect(response.body).toMatchObject({ data: { id: 'plan-1' } });
+      },
+    );
+
+    rowFor('Platform')(
+      '**`deletePlan` reports whether it deleted**',
+      async () => {
+        peers.auth.on('PlatformService/DeletePlan').reply({ deleted: true });
+
+        const response = await new Session(gateway.baseUrl).request(
+          'DELETE',
+          `${API}/platform/plans/bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb`,
+          {
+            headers: superAdminHeaders(),
+          },
+        );
+
+        expect(response.status).toBe(200);
+        expect(response.body).toMatchObject({ data: { deleted: true } });
+      },
+    );
 
     rowFor('Platform')(
       '**`applyPlan` folds ingestion usage into the projection and flags an overage**',
@@ -436,7 +597,13 @@ describe('platform', () => {
           evaluatedDimensions: ['seats'],
         });
         peers.ingestion.on('IngestionPlatformService/GetPlatformUsage').reply({
-          usage: [{ organizationId: 'org-1', usedBytes: '20000000000', documentCount: 0 }],
+          usage: [
+            {
+              organizationId: 'org-1',
+              usedBytes: '20000000000',
+              documentCount: 0,
+            },
+          ],
         });
 
         const response = await new Session(gateway.baseUrl).post(
@@ -448,8 +615,14 @@ describe('platform', () => {
         expect(response.status).toBe(200);
         expect(response.body).toMatchObject({
           data: {
-            evaluatedDimensions: expect.arrayContaining(['seats', 'storage', 'documents']),
-            subscribers: [{ overLimit: [expect.stringContaining('maxStorageBytes')] }],
+            evaluatedDimensions: expect.arrayContaining([
+              'seats',
+              'storage',
+              'documents',
+            ]),
+            subscribers: [
+              { overLimit: [expect.stringContaining('maxStorageBytes')] },
+            ],
           },
         });
       },
@@ -487,10 +660,13 @@ describe('platform', () => {
         );
 
         expect(response.status).toBe(200);
-        expect(response.body).toMatchObject({ data: { evaluatedDimensions: ['seats'] } });
-        expect((response.body as { data: { evaluatedDimensions: string[] } }).data.evaluatedDimensions).not.toEqual(
-          expect.arrayContaining(['storage']),
-        );
+        expect(response.body).toMatchObject({
+          data: { evaluatedDimensions: ['seats'] },
+        });
+        expect(
+          (response.body as { data: { evaluatedDimensions: string[] } }).data
+            .evaluatedDimensions,
+        ).not.toEqual(expect.arrayContaining(['storage']));
       },
     );
   });

@@ -25,6 +25,7 @@ import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
 import org.springframework.graphql.data.method.annotation.SchemaMapping;
 import org.springframework.stereotype.Controller;
+import synapsedesk.ingestion.AiLedgerServiceGrpc;
 import synapsedesk.ingestion.Ledger.AiUsageRequest;
 import synapsedesk.ingestion.Ledger.AiUsageResponse;
 import synapsedesk.ingestion.Ledger.DocumentAnalyticsRequest;
@@ -32,7 +33,6 @@ import synapsedesk.ingestion.Ledger.DocumentAnalyticsResponse;
 import synapsedesk.ingestion.Ledger.KnowledgeGapDocumentFlag;
 import synapsedesk.ingestion.Ledger.KnowledgeGapsRequest;
 import synapsedesk.ingestion.Ledger.KnowledgeGapsResponse;
-import synapsedesk.ingestion.AiLedgerServiceGrpc;
 import synapsedesk.ticket.Analytics.AgentStat;
 import synapsedesk.ticket.Analytics.AgentStatsResponse;
 import synapsedesk.ticket.Analytics.AnalyticsRangeRequest;
@@ -72,10 +72,11 @@ public class AnalyticsResolver {
   private final CacheService cache;
 
   public AnalyticsResolver(
-      AnalyticsServiceGrpc.AnalyticsServiceBlockingStub analytics,
-      AiLedgerServiceGrpc.AiLedgerServiceBlockingStub ledger,
-      CurrentUser currentUser,
-      CacheService cache) {
+    AnalyticsServiceGrpc.AnalyticsServiceBlockingStub analytics,
+    AiLedgerServiceGrpc.AiLedgerServiceBlockingStub ledger,
+    CurrentUser currentUser,
+    CacheService cache
+  ) {
     this.analytics = analytics;
     this.ledger = ledger;
     this.currentUser = currentUser;
@@ -84,65 +85,89 @@ public class AnalyticsResolver {
 
   @QueryMapping
   @RequirePermission(PermissionCodesEnum.ANALYTICS_READ)
-  public AnalyticsOverviewGqlDto analyticsOverview(@Argument String from, @Argument String to) {
+  public AnalyticsOverviewGqlDto analyticsOverview(
+    @Argument String from,
+    @Argument String to
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     return cached(
-        "overview",
-        rangeParams(from, to),
-        to,
-        context,
-        AnalyticsOverviewGqlDto.class,
-        () -> {
-          OverviewResponse response =
-              withMetadata(analytics, context)
-                  .getOverview(AnalyticsRangeRequest.newBuilder().setFrom(from).setTo(to).build());
-          return AnalyticsMapper.toOverviewGqlDto(response);
-        });
+      "overview",
+      rangeParams(from, to),
+      to,
+      context,
+      AnalyticsOverviewGqlDto.class,
+      () -> {
+        OverviewResponse response = withMetadata(
+          analytics,
+          context
+        ).getOverview(
+          AnalyticsRangeRequest.newBuilder().setFrom(from).setTo(to).build()
+        );
+        return AnalyticsMapper.toOverviewGqlDto(response);
+      }
+    );
   }
 
   @QueryMapping
   @RequirePermission(PermissionCodesEnum.ANALYTICS_READ)
-  public AgentAnalyticsGqlDto analyticsAgents(@Argument String from, @Argument String to) {
+  public AgentAnalyticsGqlDto analyticsAgents(
+    @Argument String from,
+    @Argument String to
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     return cached(
-        "agents", rangeParams(from, to), to, context, AgentAnalyticsGqlDto.class, () -> agents(from, to, context));
+      "agents",
+      rangeParams(from, to),
+      to,
+      context,
+      AgentAnalyticsGqlDto.class,
+      () -> agents(from, to, context)
+    );
   }
 
-  private AgentAnalyticsGqlDto agents(String from, String to, RequestContext context) {
+  private AgentAnalyticsGqlDto agents(
+    String from,
+    String to,
+    RequestContext context
+  ) {
     List<UnavailableBlockGqlDto> unavailable = new ArrayList<>();
 
-    AgentStatsResponse stats =
-        tryLeg(
-            TICKET_SERVICE,
-            unavailable,
-            () ->
-                withMetadata(analytics, context)
-                    .getAgentStats(AnalyticsRangeRequest.newBuilder().setFrom(from).setTo(to).build()));
+    AgentStatsResponse stats = tryLeg(TICKET_SERVICE, unavailable, () ->
+      withMetadata(analytics, context).getAgentStats(
+        AnalyticsRangeRequest.newBuilder().setFrom(from).setTo(to).build()
+      )
+    );
     // `hydrateNames: false`'s Java equivalent: the users leg is simply never
     // called. `AgentStat.agent` resolves through the users loader instead,
     // on demand, batched with every other user on the request.
-    AiUsageResponse usage =
-        tryLeg(
-            INGESTION_SERVICE,
-            unavailable,
-            () -> withMetadata(ledger, context).getAiUsage(AiUsageRequest.newBuilder().setFrom(from).setTo(to).build()));
+    AiUsageResponse usage = tryLeg(INGESTION_SERVICE, unavailable, () ->
+      withMetadata(ledger, context).getAiUsage(
+        AiUsageRequest.newBuilder().setFrom(from).setTo(to).build()
+      )
+    );
 
     List<AgentStatGqlDto> items = new ArrayList<>();
     if (stats != null) {
       for (AgentStat row : stats.getItemsList()) {
         items.add(
-            AnalyticsMapper.toAgentStatGqlDto(row, usage != null ? usage.getDraftAcceptance() : null));
+          AnalyticsMapper.toAgentStatGqlDto(
+            row,
+            usage != null ? usage.getDraftAcceptance() : null
+          )
+        );
       }
     }
 
     return new AgentAnalyticsGqlDto(
-        items,
-        unavailable,
-        stalest(
-            stats != null && stats.hasDataThrough() ? stats.getDataThrough() : null,
-            usage != null && usage.hasDataThrough() ? usage.getDataThrough() : null));
+      items,
+      unavailable,
+      stalest(
+        stats != null && stats.hasDataThrough() ? stats.getDataThrough() : null,
+        usage != null && usage.hasDataThrough() ? usage.getDataThrough() : null
+      )
+    );
   }
 
   @QueryMapping
@@ -158,53 +183,88 @@ public class AnalyticsResolver {
     params.put("limit", String.valueOf(effectiveLimit));
 
     return cached(
-        "documents", params, "", context, DocumentAnalyticsGqlDto.class, () -> documents(effectiveLimit, context));
+      "documents",
+      params,
+      "",
+      context,
+      DocumentAnalyticsGqlDto.class,
+      () -> documents(effectiveLimit, context)
+    );
   }
 
   private DocumentAnalyticsGqlDto documents(int limit, RequestContext context) {
     List<UnavailableBlockGqlDto> unavailable = new ArrayList<>();
 
-    DocumentAnalyticsResponse documents =
-        tryLeg(
-            INGESTION_SERVICE,
-            unavailable,
-            () -> withMetadata(ledger, context).getDocumentAnalytics(
-                DocumentAnalyticsRequest.newBuilder().setLimit(limit).build()));
+    DocumentAnalyticsResponse documents = tryLeg(
+      INGESTION_SERVICE,
+      unavailable,
+      () ->
+        withMetadata(ledger, context).getDocumentAnalytics(
+          DocumentAnalyticsRequest.newBuilder().setLimit(limit).build()
+        )
+    );
 
     // Citation accuracy over a trailing year — a wide range so the figure
     // means something.
     LocalDate today = LocalDate.now(ZoneOffset.UTC);
     String yearFrom = today.minusYears(1).toString();
     String yearTo = today.toString();
-    SatisfactionResponse satisfaction =
-        tryLeg(
-            TICKET_SERVICE,
-            unavailable,
-            () ->
-                withMetadata(analytics, context)
-                    .getSatisfaction(AnalyticsRangeRequest.newBuilder().setFrom(yearFrom).setTo(yearTo).build()));
+    SatisfactionResponse satisfaction = tryLeg(
+      TICKET_SERVICE,
+      unavailable,
+      () ->
+        withMetadata(analytics, context).getSatisfaction(
+          AnalyticsRangeRequest.newBuilder()
+            .setFrom(yearFrom)
+            .setTo(yearTo)
+            .build()
+        )
+    );
 
     return new DocumentAnalyticsGqlDto(
-        satisfaction != null ? AnalyticsMapper.toRateGqlDto(satisfaction.getCitationAccuracyTotal()) : null,
-        stalest(
-            documents != null && documents.hasDataThrough() ? documents.getDataThrough() : null,
-            satisfaction != null && satisfaction.hasDataThrough() ? satisfaction.getDataThrough() : null),
-        documents != null
-            ? documents.getMostCitedList().stream().map(AnalyticsMapper::toDocumentUsageGqlDto).toList()
-            : List.of(),
-        documents != null
-            ? documents.getNeverRetrievedList().stream().map(AnalyticsMapper::toDocumentUsageGqlDto).toList()
-            : List.of(),
-        documents != null
-            ? documents.getRetrievedNeverCitedList().stream().map(AnalyticsMapper::toDocumentUsageGqlDto).toList()
-            : List.of(),
-        unavailable);
+      satisfaction != null
+        ? AnalyticsMapper.toRateGqlDto(satisfaction.getCitationAccuracyTotal())
+        : null,
+      stalest(
+        documents != null && documents.hasDataThrough()
+          ? documents.getDataThrough()
+          : null,
+        satisfaction != null && satisfaction.hasDataThrough()
+          ? satisfaction.getDataThrough()
+          : null
+      ),
+      documents != null
+        ? documents
+            .getMostCitedList()
+            .stream()
+            .map(AnalyticsMapper::toDocumentUsageGqlDto)
+            .toList()
+        : List.of(),
+      documents != null
+        ? documents
+            .getNeverRetrievedList()
+            .stream()
+            .map(AnalyticsMapper::toDocumentUsageGqlDto)
+            .toList()
+        : List.of(),
+      documents != null
+        ? documents
+            .getRetrievedNeverCitedList()
+            .stream()
+            .map(AnalyticsMapper::toDocumentUsageGqlDto)
+            .toList()
+        : List.of(),
+      unavailable
+    );
   }
 
   @QueryMapping
   @RequirePermission(PermissionCodesEnum.ANALYTICS_READ)
   public KnowledgeGapsGqlDto analyticsKnowledgeGaps(
-      @Argument String from, @Argument String to, @Argument Integer limit) {
+    @Argument String from,
+    @Argument String to,
+    @Argument Integer limit
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
     int effectiveLimit = limit != null ? limit : ANALYTICS_TOP_N_DEFAULT;
 
@@ -212,65 +272,88 @@ public class AnalyticsResolver {
     params.put("limit", String.valueOf(effectiveLimit));
 
     return cached(
-        "knowledge-gaps",
-        params,
-        to,
-        context,
-        KnowledgeGapsGqlDto.class,
-        () -> knowledgeGaps(from, to, effectiveLimit, context));
+      "knowledge-gaps",
+      params,
+      to,
+      context,
+      KnowledgeGapsGqlDto.class,
+      () -> knowledgeGaps(from, to, effectiveLimit, context)
+    );
   }
 
-  private KnowledgeGapsGqlDto knowledgeGaps(String from, String to, int limit, RequestContext context) {
+  private KnowledgeGapsGqlDto knowledgeGaps(
+    String from,
+    String to,
+    int limit,
+    RequestContext context
+  ) {
     List<UnavailableBlockGqlDto> unavailable = new ArrayList<>();
 
-    KnowledgeGapsResponse gaps =
-        tryLeg(
-            INGESTION_SERVICE,
-            unavailable,
-            () ->
-                withMetadata(ledger, context)
-                    .getKnowledgeGaps(
-                        KnowledgeGapsRequest.newBuilder().setFrom(from).setTo(to).setLimit(limit).build()));
+    KnowledgeGapsResponse gaps = tryLeg(INGESTION_SERVICE, unavailable, () ->
+      withMetadata(ledger, context).getKnowledgeGaps(
+        KnowledgeGapsRequest.newBuilder()
+          .setFrom(from)
+          .setTo(to)
+          .setLimit(limit)
+          .build()
+      )
+    );
 
     List<KnowledgeGapFlagGqlDto> flags = new ArrayList<>();
     if (gaps != null) {
       for (KnowledgeGapDocumentFlag flag : gaps.getFlagsList()) {
         flags.add(
-            new KnowledgeGapFlagGqlDto(
-                flag.getDocumentId(), flag.getDocumentTitle(), toFlagType(flag.getFlagType()), flag.getDetail()));
+          new KnowledgeGapFlagGqlDto(
+            flag.getDocumentId(),
+            flag.getDocumentTitle(),
+            toFlagType(flag.getFlagType()),
+            flag.getDetail()
+          )
+        );
       }
     }
 
     return new KnowledgeGapsGqlDto(
-        gaps != null ? gaps.getAnsweringGenerations() : 0,
-        gaps != null ? gaps.getAttachmentEmptyRetrievals() : 0,
-        gaps != null ? AnalyticsMapper.toRateGqlDto(gaps.getAttachmentGroundedRate()) : AnalyticsMapper.emptyRate(),
-        gaps != null && gaps.hasDataThrough() ? gaps.getDataThrough() : null,
-        gaps != null ? AnalyticsMapper.toRateGqlDto(gaps.getEmptyRetrievalRate()) : AnalyticsMapper.emptyRate(),
-        gaps != null ? gaps.getEmptyRetrievals() : 0,
-        flags,
-        unavailable);
+      gaps != null ? gaps.getAnsweringGenerations() : 0,
+      gaps != null ? gaps.getAttachmentEmptyRetrievals() : 0,
+      gaps != null
+        ? AnalyticsMapper.toRateGqlDto(gaps.getAttachmentGroundedRate())
+        : AnalyticsMapper.emptyRate(),
+      gaps != null && gaps.hasDataThrough() ? gaps.getDataThrough() : null,
+      gaps != null
+        ? AnalyticsMapper.toRateGqlDto(gaps.getEmptyRetrievalRate())
+        : AnalyticsMapper.emptyRate(),
+      gaps != null ? gaps.getEmptyRetrievals() : 0,
+      flags,
+      unavailable
+    );
   }
 
   // ------------------------------------------------------------- edges
 
   @SchemaMapping(typeName = "AgentStat", field = "agent")
   public CompletableFuture<UserSummaryGqlDto> agent(
-      AgentStatGqlDto stat, DataLoader<String, UserSummaryGqlDto> loader) {
+    AgentStatGqlDto stat,
+    DataLoader<String, UserSummaryGqlDto> loader
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
     return loader.load(stat.agentId(), context);
   }
 
   @SchemaMapping(typeName = "DocumentUsage", field = "document")
   public CompletableFuture<DocumentGqlDto> documentUsageDocument(
-      DocumentUsageGqlDto usage, DataLoader<String, DocumentGqlDto> loader) {
+    DocumentUsageGqlDto usage,
+    DataLoader<String, DocumentGqlDto> loader
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
     return loader.load(usage.documentId(), context);
   }
 
   @SchemaMapping(typeName = "KnowledgeGapFlag", field = "document")
   public CompletableFuture<DocumentGqlDto> knowledgeGapFlagDocument(
-      KnowledgeGapFlagGqlDto flag, DataLoader<String, DocumentGqlDto> loader) {
+    KnowledgeGapFlagGqlDto flag,
+    DataLoader<String, DocumentGqlDto> loader
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
     return loader.load(flag.documentId(), context);
   }
@@ -278,20 +361,27 @@ public class AnalyticsResolver {
   // --------------------------------------------------------------------- caching
 
   private <T> T cached(
-      String endpoint,
-      Map<String, String> params,
-      String to,
-      RequestContext context,
-      Class<T> type,
-      Supplier<T> produce) {
-    String key = cache.buildKey(context.organizationId(), CACHE_SCOPE_PREFIX + endpoint, params);
+    String endpoint,
+    Map<String, String> params,
+    String to,
+    RequestContext context,
+    Class<T> type,
+    Supplier<T> produce
+  ) {
+    String key = cache.buildKey(
+      context.organizationId(),
+      CACHE_SCOPE_PREFIX + endpoint,
+      params
+    );
 
     return cache.wrap(key, ttlSecondsFor(to), type, produce);
   }
 
   private static long ttlSecondsFor(String to) {
     String today = LocalDate.now(ZoneOffset.UTC).toString();
-    return to != null && !to.isEmpty() && to.compareTo(today) < 0 ? CLOSED_RANGE_TTL_SECONDS : OPEN_RANGE_TTL_SECONDS;
+    return to != null && !to.isEmpty() && to.compareTo(today) < 0
+      ? CLOSED_RANGE_TTL_SECONDS
+      : OPEN_RANGE_TTL_SECONDS;
   }
 
   private static Map<String, String> rangeParams(String from, String to) {
@@ -304,14 +394,19 @@ public class AnalyticsResolver {
   // -------------------------------------------------------- partial-failure legs
 
   /** A leg that may fail WITHOUT failing the request — `tryLeg`, reproduced. */
-  private static <T> T tryLeg(String source, List<UnavailableBlockGqlDto> unavailable, Supplier<T> call) {
+  private static <T> T tryLeg(
+    String source,
+    List<UnavailableBlockGqlDto> unavailable,
+    Supplier<T> call
+  ) {
     try {
       return call.get();
     } catch (RuntimeException failure) {
       String reason =
-          failure instanceof StatusRuntimeException statusFailure && statusFailure.getStatus().getDescription() != null
-              ? statusFailure.getStatus().getDescription()
-              : String.valueOf(failure.getMessage());
+        failure instanceof StatusRuntimeException statusFailure &&
+        statusFailure.getStatus().getDescription() != null
+          ? statusFailure.getStatus().getDescription()
+          : String.valueOf(failure.getMessage());
       unavailable.add(new UnavailableBlockGqlDto(source, reason));
 
       return null;
@@ -325,15 +420,23 @@ public class AnalyticsResolver {
     return a.compareTo(b) < 0 ? a : b;
   }
 
-  private static String toFlagType(synapsedesk.ingestion.Document.DocumentFlagType flagType) {
-    return flagType == synapsedesk.ingestion.Document.DocumentFlagType.DOCUMENT_FLAG_TYPE_UNSPECIFIED
-        ? null
-        : flagType.name().replace("DOCUMENT_FLAG_TYPE_", "");
+  private static String toFlagType(
+    synapsedesk.ingestion.Document.DocumentFlagType flagType
+  ) {
+    return flagType ==
+      synapsedesk.ingestion.Document.DocumentFlagType.DOCUMENT_FLAG_TYPE_UNSPECIFIED
+      ? null
+      : flagType.name().replace("DOCUMENT_FLAG_TYPE_", "");
   }
 
-  private static <S extends io.grpc.stub.AbstractBlockingStub<S>> S withMetadata(S stub, RequestContext context) {
+  private static <S extends io.grpc.stub.AbstractBlockingStub<S>> S withMetadata(
+    S stub,
+    RequestContext context
+  ) {
     return stub
-        .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
-        .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context)));
+      .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
+      .withInterceptors(
+        MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context))
+      );
   }
 }

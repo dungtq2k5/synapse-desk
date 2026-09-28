@@ -37,11 +37,16 @@ describe('sessions', () => {
   const headers = (refreshToken?: string) => ({
     cookie: [
       `${GATEWAY_ENV.JWT_ACCESS_NAME}=${accessCookie()}`,
-      ...(refreshToken ? [`${GATEWAY_ENV.JWT_REFRESH_NAME}=${refreshToken}`] : []),
+      ...(refreshToken
+        ? [`${GATEWAY_ENV.JWT_REFRESH_NAME}=${refreshToken}`]
+        : []),
     ].join('; '),
   });
 
-  const wireSession = (id: string, overrides: Record<string, unknown> = {}) => ({
+  const wireSession = (
+    id: string,
+    overrides: Record<string, unknown> = {},
+  ) => ({
     id,
     ipAddress: '127.0.0.1',
     userAgent: 'test',
@@ -75,51 +80,90 @@ describe('sessions', () => {
     });
   });
 
-  rowFor('Sessions')('**`list` forwards the presented refresh token to mark `current`**', async () => {
-    peers.auth.on('SessionService/ListSessions').reply({
-      items: [wireSession('s1', { current: true })],
-    });
-
-    const response = await new Session(gateway.baseUrl).get(`${API}/auth/sessions`, headers('refresh-abc'));
-
-    expect(response.status).toBe(200);
-    expect(response.body).toMatchObject({ data: [{ id: 's1', current: true }] });
-    const [call] = peers.auth.calls('SessionService/ListSessions');
-    expect(call.request).toMatchObject({ refreshToken: 'refresh-abc' });
-  });
-
-  rowFor('Sessions')('**`list` still answers when no refresh cookie is presented**', async () => {
-    peers.auth.on('SessionService/ListSessions').reply({ items: [wireSession('s2')] });
-
-    const response = await new Session(gateway.baseUrl).get(`${API}/auth/sessions`, headers());
-
-    expect(response.status).toBe(200);
-    expect(response.body).toMatchObject({ data: [{ id: 's2', current: false }] });
-  });
-
-  rowFor('Sessions')('**`revokeAllTrust` answers with the fixed message and the untrusted count**', async () => {
-    peers.auth.on('SessionService/RevokeAllTrust').reply({ untrustedCount: 3 });
-
-    const response = await new Session(gateway.baseUrl).request('DELETE', `${API}/auth/sessions/trusted`, {
-      headers: headers(),
-    });
-
-    expect(response.status).toBe(200);
-    expect(response.body).toMatchObject({ message: 'Trusted devices cleared', data: { untrustedCount: 3 } });
-  });
-
   rowFor('Sessions')(
-    '**`revoke` clears every session cookie plus the device-token cookie when the family was the caller\'s own**',
+    '**`list` forwards the presented refresh token to mark `current`**',
     async () => {
-      const id = '11111111-9999-4999-8999-111111111111';
-      peers.auth.on('SessionService/RevokeSession').reply({ wasCurrent: true, revokedCount: 2 });
-
-      const response = await new Session(gateway.baseUrl).request('DELETE', `${API}/auth/sessions/${id}`, {
-        headers: headers('refresh-xyz'),
+      peers.auth.on('SessionService/ListSessions').reply({
+        items: [wireSession('s1', { current: true })],
       });
 
+      const response = await new Session(gateway.baseUrl).get(
+        `${API}/auth/sessions`,
+        headers('refresh-abc'),
+      );
+
       expect(response.status).toBe(200);
-      expect(response.body).toMatchObject({ message: 'Session revoked', data: { revokedCount: 2 } });
+      expect(response.body).toMatchObject({
+        data: [{ id: 's1', current: true }],
+      });
+      const [call] = peers.auth.calls('SessionService/ListSessions');
+      expect(call.request).toMatchObject({ refreshToken: 'refresh-abc' });
+    },
+  );
+
+  rowFor('Sessions')(
+    '**`list` still answers when no refresh cookie is presented**',
+    async () => {
+      peers.auth
+        .on('SessionService/ListSessions')
+        .reply({ items: [wireSession('s2')] });
+
+      const response = await new Session(gateway.baseUrl).get(
+        `${API}/auth/sessions`,
+        headers(),
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({
+        data: [{ id: 's2', current: false }],
+      });
+    },
+  );
+
+  rowFor('Sessions')(
+    '**`revokeAllTrust` answers with the fixed message and the untrusted count**',
+    async () => {
+      peers.auth
+        .on('SessionService/RevokeAllTrust')
+        .reply({ untrustedCount: 3 });
+
+      const response = await new Session(gateway.baseUrl).request(
+        'DELETE',
+        `${API}/auth/sessions/trusted`,
+        {
+          headers: headers(),
+        },
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({
+        message: 'Trusted devices cleared',
+        data: { untrustedCount: 3 },
+      });
+    },
+  );
+
+  rowFor('Sessions')(
+    "**`revoke` clears every session cookie plus the device-token cookie when the family was the caller's own**",
+    async () => {
+      const id = '11111111-9999-4999-8999-111111111111';
+      peers.auth
+        .on('SessionService/RevokeSession')
+        .reply({ wasCurrent: true, revokedCount: 2 });
+
+      const response = await new Session(gateway.baseUrl).request(
+        'DELETE',
+        `${API}/auth/sessions/${id}`,
+        {
+          headers: headers('refresh-xyz'),
+        },
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({
+        message: 'Session revoked',
+        data: { revokedCount: 2 },
+      });
       const names = response.setCookie.map((line) => line.split('=')[0]);
       expect(names).toEqual(
         expect.arrayContaining([
@@ -131,36 +175,57 @@ describe('sessions', () => {
         ]),
       );
       const [call] = peers.auth.calls('SessionService/RevokeSession');
-      expect(call.request).toMatchObject({ sessionId: id, refreshToken: 'refresh-xyz' });
+      expect(call.request).toMatchObject({
+        sessionId: id,
+        refreshToken: 'refresh-xyz',
+      });
     },
   );
 
   rowFor('Sessions')(
-    '**`revoke` clears no cookies when the revoked family was NOT the caller\'s own**',
+    "**`revoke` clears no cookies when the revoked family was NOT the caller's own**",
     async () => {
       const id = '22222222-9999-4999-8999-222222222222';
-      peers.auth.on('SessionService/RevokeSession').reply({ wasCurrent: false, revokedCount: 1 });
+      peers.auth
+        .on('SessionService/RevokeSession')
+        .reply({ wasCurrent: false, revokedCount: 1 });
 
-      const response = await new Session(gateway.baseUrl).request('DELETE', `${API}/auth/sessions/${id}`, {
-        headers: headers(),
-      });
+      const response = await new Session(gateway.baseUrl).request(
+        'DELETE',
+        `${API}/auth/sessions/${id}`,
+        {
+          headers: headers(),
+        },
+      );
 
       expect(response.status).toBe(200);
       expect(response.setCookie).toHaveLength(0);
     },
   );
 
-  rowFor('Sessions')('**`revokeTrust` drops device trust and answers with the fixed message**', async () => {
-    const id = '33333333-9999-4999-8999-333333333333';
-    peers.auth.on('SessionService/RevokeSessionTrust').reply({ untrustedCount: 1 });
+  rowFor('Sessions')(
+    '**`revokeTrust` drops device trust and answers with the fixed message**',
+    async () => {
+      const id = '33333333-9999-4999-8999-333333333333';
+      peers.auth
+        .on('SessionService/RevokeSessionTrust')
+        .reply({ untrustedCount: 1 });
 
-    const response = await new Session(gateway.baseUrl).request('DELETE', `${API}/auth/sessions/${id}/trust`, {
-      headers: headers(),
-    });
+      const response = await new Session(gateway.baseUrl).request(
+        'DELETE',
+        `${API}/auth/sessions/${id}/trust`,
+        {
+          headers: headers(),
+        },
+      );
 
-    expect(response.status).toBe(200);
-    expect(response.body).toMatchObject({ message: 'Device trust removed', data: { untrustedCount: 1 } });
-    const [call] = peers.auth.calls('SessionService/RevokeSessionTrust');
-    expect(call.request).toMatchObject({ sessionId: id });
-  });
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({
+        message: 'Device trust removed',
+        data: { untrustedCount: 1 },
+      });
+      const [call] = peers.auth.calls('SessionService/RevokeSessionTrust');
+      expect(call.request).toMatchObject({ sessionId: id });
+    },
+  );
 });

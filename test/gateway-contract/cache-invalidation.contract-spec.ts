@@ -77,14 +77,18 @@ describe('cache invalidation — one gateway, the four scope-drop rules', () => 
   let redis: Redis;
 
   const publish = (subject: string, event: Record<string, unknown>) => {
-    nats.publish(subject, JSONCodec().encode({ pattern: subject, data: event }));
+    nats.publish(
+      subject,
+      JSONCodec().encode({ pattern: subject, data: event }),
+    );
   };
 
   const warm = async (scope: string) => {
     await redis.set(cacheKey(scope), '"warm"', 'EX', 60);
   };
 
-  const isWarm = async (scope: string) => (await redis.exists(cacheKey(scope))) === 1;
+  const isWarm = async (scope: string) =>
+    (await redis.exists(cacheKey(scope))) === 1;
 
   beforeAll(async () => {
     const { redisUrl, natsUrl } = readRunState();
@@ -93,7 +97,11 @@ describe('cache invalidation — one gateway, the four scope-drop rules', () => 
       status: toProtoOrgStatus(OrgStatus.ACTIVE),
       deleted: false,
     });
-    gateway = await startGateway({ ...peers.env, REDIS_URL: redisUrl, NATS_URL: natsUrl });
+    gateway = await startGateway({
+      ...peers.env,
+      REDIS_URL: redisUrl,
+      NATS_URL: natsUrl,
+    });
     nats = await connect({ servers: natsUrl });
     redis = new Redis(redisUrl);
   }, 90_000);
@@ -106,10 +114,15 @@ describe('cache invalidation — one gateway, the four scope-drop rules', () => 
   });
 
   beforeEach(async () => {
-    await redis.del(cacheKey('tickets'), cacheKey('documents'), cacheKey('settings'), cacheKey('organizations'));
+    await redis.del(
+      cacheKey('tickets'),
+      cacheKey('documents'),
+      cacheKey('settings'),
+      cacheKey('organizations'),
+    );
   });
 
-  it('**a `ticket.*` event drops the tenant\'s `tickets` scope**', async () => {
+  it("**a `ticket.*` event drops the tenant's `tickets` scope**", async () => {
     await warm('tickets');
     publish(TICKET_PATTERNS.created, {
       organizationId: ORGANIZATION,
@@ -129,7 +142,9 @@ describe('cache invalidation — one gateway, the four scope-drop rules', () => 
   it('**`billing.entitlements_changed` drops `settings` AND `organizations`, asserted separately**', async () => {
     await warm('settings');
     await warm('organizations');
-    publish(BILLING_PATTERNS.entitlementsChanged, { organizationId: ORGANIZATION });
+    publish(BILLING_PATTERNS.entitlementsChanged, {
+      organizationId: ORGANIZATION,
+    });
     await nats.flush();
     await settle();
 
@@ -207,7 +222,9 @@ describe('cache invalidation — active vs. standby, cross-implementation', () =
       status: toProtoOrgStatus(OrgStatus.ACTIVE),
       deleted: false,
     });
-    peers.auth.on('OrganizationService/GetCurrentOrganization').always(wireOrganization());
+    peers.auth
+      .on('OrganizationService/GetCurrentOrganization')
+      .always(wireOrganization());
 
     const env = { ...peers.env, REDIS_URL: redisUrl, NATS_URL: natsUrl };
 
@@ -245,7 +262,10 @@ describe('cache invalidation — active vs. standby, cross-implementation', () =
 
     // Warmed through THIS arm's own HTTP surface — a standby still answers
     // ordinary requests; only its NATS consumer and its readiness are gated.
-    const response = await new Session(standby.baseUrl).get(`${API}/organizations/current`, headers());
+    const response = await new Session(standby.baseUrl).get(
+      `${API}/organizations/current`,
+      headers(),
+    );
     expect(response.status).toBe(200);
     expect(await redis.exists(cacheKey('organizations'))).toBe(1);
 

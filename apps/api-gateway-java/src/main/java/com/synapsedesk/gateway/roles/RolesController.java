@@ -73,7 +73,10 @@ public class RolesController implements RolesApi {
   private final CacheService cache;
 
   public RolesController(
-      RoleServiceGrpc.RoleServiceBlockingStub stub, CurrentUser currentUser, CacheService cache) {
+    RoleServiceGrpc.RoleServiceBlockingStub stub,
+    CurrentUser currentUser,
+    CacheService cache
+  ) {
     this.stub = stub;
     this.currentUser = currentUser;
     this.cache = cache;
@@ -82,67 +85,87 @@ public class RolesController implements RolesApi {
   @Override
   @RequirePermission(PermissionCodesEnum.ROLE_READ)
   public ResponseEntity<RolesControllerListV1200Response> rolesControllerListV1(
-      BigDecimal page, BigDecimal limit, String sortOrder, String searchTerm, String sortBy, Boolean includeSystem) {
+    BigDecimal page,
+    BigDecimal limit,
+    String sortOrder,
+    String searchTerm,
+    String sortBy,
+    Boolean includeSystem
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     Map<String, String> rawParams = new TreeMap<>();
     CurrentRequest.request()
-        .getParameterMap()
-        .forEach(
-            (name, values) -> {
-              if (values.length > 0 && !values[0].isEmpty()) {
-                rawParams.put(name, values[0]);
-              }
-            });
+      .getParameterMap()
+      .forEach((name, values) -> {
+        if (values.length > 0 && !values[0].isEmpty()) {
+          rawParams.put(name, values[0]);
+        }
+      });
 
-    String key = cache.buildKey(context.organizationId(), CACHE_SCOPE, rawParams);
+    String key = cache.buildKey(
+      context.organizationId(),
+      CACHE_SCOPE,
+      rawParams
+    );
 
-    RolesControllerListV1200Response envelope =
-        cache.wrap(
-            key,
-            LIST_CACHE_TTL_SECONDS,
-            RolesControllerListV1200Response.class,
-            () -> {
-              PageRequest.Builder pageRequest =
-                  PageRequest.newBuilder()
-                      .setPage(page.intValue())
-                      .setLimit(limit.intValue())
-                      .setSortBy(sortBy)
-                      .setSortOrder(
-                          "DESC".equalsIgnoreCase(sortOrder) ? SortOrder.SORT_ORDER_DESC : SortOrder.SORT_ORDER_ASC);
-              if (searchTerm != null) {
-                pageRequest.setSearchTerm(searchTerm);
-              }
+    RolesControllerListV1200Response envelope = cache.wrap(
+      key,
+      LIST_CACHE_TTL_SECONDS,
+      RolesControllerListV1200Response.class,
+      () -> {
+        PageRequest.Builder pageRequest = PageRequest.newBuilder()
+          .setPage(page.intValue())
+          .setLimit(limit.intValue())
+          .setSortBy(sortBy)
+          .setSortOrder(
+            "DESC".equalsIgnoreCase(sortOrder)
+              ? SortOrder.SORT_ORDER_DESC
+              : SortOrder.SORT_ORDER_ASC
+          );
+        if (searchTerm != null) {
+          pageRequest.setSearchTerm(searchTerm);
+        }
 
-              ListRolesResponse response =
-                  withMetadata(context)
-                      .listRoles(
-                          ListRolesRequest.newBuilder()
-                              .setPage(pageRequest)
-                              .setIncludeSystem(Boolean.TRUE.equals(includeSystem))
-                              .build());
+        ListRolesResponse response = withMetadata(context).listRoles(
+          ListRolesRequest.newBuilder()
+            .setPage(pageRequest)
+            .setIncludeSystem(Boolean.TRUE.equals(includeSystem))
+            .build()
+        );
 
-              RolesControllerListV1200ResponseData data =
-                  new RolesControllerListV1200ResponseData()
-                      .items(response.getItemsList().stream().map(RolesController::toRoleResponseDto).toList())
-                      .meta(toMetaDto(response.getMeta()));
+        RolesControllerListV1200ResponseData data =
+          new RolesControllerListV1200ResponseData()
+            .items(
+              response
+                .getItemsList()
+                .stream()
+                .map(RolesController::toRoleResponseDto)
+                .toList()
+            )
+            .meta(toMetaDto(response.getMeta()));
 
-              return new RolesControllerListV1200Response()
-                  .success(true)
-                  .statusCode(BigDecimal.valueOf(200))
-                  .message("OK")
-                  .data(data);
-            });
+        return new RolesControllerListV1200Response()
+          .success(true)
+          .statusCode(BigDecimal.valueOf(200))
+          .message("OK")
+          .data(data);
+      }
+    );
 
     return ResponseEntity.ok(envelope);
   }
 
   @Override
   @RequirePermission(PermissionCodesEnum.ROLE_READ)
-  public ResponseEntity<RolesControllerCreateV1201Response> rolesControllerGetV1(String id) {
+  public ResponseEntity<RolesControllerCreateV1201Response> rolesControllerGetV1(
+    String id
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    RoleResponse response = withMetadata(context).getRole(RoleIdRequest.newBuilder().setId(id).build());
+    RoleResponse response = withMetadata(context).getRole(
+      RoleIdRequest.newBuilder().setId(id).build()
+    );
 
     return okRole(response, "OK", 200);
   }
@@ -156,14 +179,20 @@ public class RolesController implements RolesApi {
    */
   @Override
   @RequirePermission(PermissionCodesEnum.ROLE_CREATE)
-  public ResponseEntity<RolesControllerCreateV1201Response> rolesControllerCreateV1(CreateRoleDto createRoleDto) {
+  public ResponseEntity<RolesControllerCreateV1201Response> rolesControllerCreateV1(
+    CreateRoleDto createRoleDto
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    CreateRoleRequest.Builder wire =
-        CreateRoleRequest.newBuilder()
-            .setName(createRoleDto.getName())
-            .addAllPermissionCodes(
-                createRoleDto.getPermissionCodes().stream().map(Object::toString).toList());
+    CreateRoleRequest.Builder wire = CreateRoleRequest.newBuilder()
+      .setName(createRoleDto.getName())
+      .addAllPermissionCodes(
+        createRoleDto
+          .getPermissionCodes()
+          .stream()
+          .map(Object::toString)
+          .toList()
+      );
     if (createRoleDto.getDescription() != null) {
       wire.setDescription(createRoleDto.getDescription());
     }
@@ -176,7 +205,9 @@ public class RolesController implements RolesApi {
   @Override
   @RequirePermission(PermissionCodesEnum.ROLE_UPDATE)
   public ResponseEntity<RolesControllerCreateV1201Response> rolesControllerUpdateV1(
-      String id, UpdateRoleDto updateRoleDto) {
+    String id,
+    UpdateRoleDto updateRoleDto
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     UpdateRoleRequest.Builder wire = UpdateRoleRequest.newBuilder().setId(id);
@@ -194,31 +225,42 @@ public class RolesController implements RolesApi {
 
   @Override
   @RequirePermission(PermissionCodesEnum.ROLE_DELETE)
-  public ResponseEntity<AuthControllerForgotPasswordV1202Response> rolesControllerRemoveV1(String id) {
+  public ResponseEntity<AuthControllerForgotPasswordV1202Response> rolesControllerRemoveV1(
+    String id
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    withMetadata(context).deleteRole(RoleIdRequest.newBuilder().setId(id).build());
+    withMetadata(context).deleteRole(
+      RoleIdRequest.newBuilder().setId(id).build()
+    );
 
     return ResponseEntity.ok(
-        new AuthControllerForgotPasswordV1202Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("Role deleted")
-            .data(null));
+      new AuthControllerForgotPasswordV1202Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("Role deleted")
+        .data(null)
+    );
   }
 
   @Override
   @RequirePermission(PermissionCodesEnum.ROLE_PERMISSION_ASSIGN)
   public ResponseEntity<RolesControllerCreateV1201Response> rolesControllerSetPermissionsV1(
-      String id, SetRolePermissionsDto setRolePermissionsDto) {
+    String id,
+    SetRolePermissionsDto setRolePermissionsDto
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    SetRolePermissionsRequest wire =
-        SetRolePermissionsRequest.newBuilder()
-            .setId(id)
-            .addAllPermissionCodes(
-                setRolePermissionsDto.getPermissionCodes().stream().map(Object::toString).toList())
-            .build();
+    SetRolePermissionsRequest wire = SetRolePermissionsRequest.newBuilder()
+      .setId(id)
+      .addAllPermissionCodes(
+        setRolePermissionsDto
+          .getPermissionCodes()
+          .stream()
+          .map(Object::toString)
+          .toList()
+      )
+      .build();
 
     RoleResponse response = withMetadata(context).setRolePermissions(wire);
 
@@ -228,14 +270,17 @@ public class RolesController implements RolesApi {
   @Override
   @RequirePermission(PermissionCodesEnum.USER_ROLE_ASSIGN)
   public ResponseEntity<RolesControllerCreateV1201Response> rolesControllerAssignUsersV1(
-      String id, AssignRoleUsersDto assignRoleUsersDto) {
+    String id,
+    AssignRoleUsersDto assignRoleUsersDto
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    AssignRoleUsersRequest wire =
-        AssignRoleUsersRequest.newBuilder()
-            .setRoleId(id)
-            .addAllUserIds(assignRoleUsersDto.getUserIds().stream().map(Object::toString).toList())
-            .build();
+    AssignRoleUsersRequest wire = AssignRoleUsersRequest.newBuilder()
+      .setRoleId(id)
+      .addAllUserIds(
+        assignRoleUsersDto.getUserIds().stream().map(Object::toString).toList()
+      )
+      .build();
 
     RoleResponse response = withMetadata(context).assignRoleUsers(wire);
 
@@ -244,56 +289,79 @@ public class RolesController implements RolesApi {
 
   @Override
   @RequirePermission(PermissionCodesEnum.USER_ROLE_ASSIGN)
-  public ResponseEntity<RolesControllerCreateV1201Response> rolesControllerRevokeUserV1(String id, String userId) {
+  public ResponseEntity<RolesControllerCreateV1201Response> rolesControllerRevokeUserV1(
+    String id,
+    String userId
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    RoleResponse response =
-        withMetadata(context)
-            .revokeRoleUser(RevokeRoleUserRequest.newBuilder().setRoleId(id).setUserId(userId).build());
+    RoleResponse response = withMetadata(context).revokeRoleUser(
+      RevokeRoleUserRequest.newBuilder().setRoleId(id).setUserId(userId).build()
+    );
 
     return okRole(response, "Role revoked", 200);
   }
 
   private static ResponseEntity<RolesControllerCreateV1201Response> okRole(
-      RoleResponse response, String message, int status) {
-    return ResponseEntity.status(status)
-        .body(
-            new RolesControllerCreateV1201Response()
-                .success(true)
-                .statusCode(BigDecimal.valueOf(status))
-                .message(message)
-                .data(toRoleResponseDto(response)));
+    RoleResponse response,
+    String message,
+    int status
+  ) {
+    return ResponseEntity.status(status).body(
+      new RolesControllerCreateV1201Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(status))
+        .message(message)
+        .data(toRoleResponseDto(response))
+    );
   }
 
   private static RoleResponseDto toRoleResponseDto(RoleResponse role) {
     return new RoleResponseDto()
-        .id(role.getId())
-        .name(role.getName())
-        .description(role.hasDescription() ? role.getDescription() : null)
-        .isSystemRole(role.getIsSystemRole())
-        .userAssigned(BigDecimal.valueOf(role.getUserAssigned()))
-        .permissionCodes(
-            role.getPermissionCodesList().stream().map(RoleResponseDto.PermissionCodesEnum::fromValue).toList())
-        .createdAt(toOffsetDateTime(role.getCreatedAt()))
-        .updatedAt(toOffsetDateTime(role.getUpdatedAt()));
+      .id(role.getId())
+      .name(role.getName())
+      .description(role.hasDescription() ? role.getDescription() : null)
+      .isSystemRole(role.getIsSystemRole())
+      .userAssigned(BigDecimal.valueOf(role.getUserAssigned()))
+      .permissionCodes(
+        role
+          .getPermissionCodesList()
+          .stream()
+          .map(RoleResponseDto.PermissionCodesEnum::fromValue)
+          .toList()
+      )
+      .createdAt(toOffsetDateTime(role.getCreatedAt()))
+      .updatedAt(toOffsetDateTime(role.getUpdatedAt()));
   }
 
-  private static InvitationsControllerListV1200ResponseDataMeta toMetaDto(synapsedesk.auth.Common.PageMeta meta) {
+  private static InvitationsControllerListV1200ResponseDataMeta toMetaDto(
+    synapsedesk.auth.Common.PageMeta meta
+  ) {
     return new InvitationsControllerListV1200ResponseDataMeta(
-        BigDecimal.valueOf(meta.getTotalItems()),
-        BigDecimal.valueOf(meta.getItemCount()),
-        BigDecimal.valueOf(meta.getItemsPerPage()),
-        BigDecimal.valueOf(meta.getTotalPages()),
-        BigDecimal.valueOf(meta.getCurrentPage()));
+      BigDecimal.valueOf(meta.getTotalItems()),
+      BigDecimal.valueOf(meta.getItemCount()),
+      BigDecimal.valueOf(meta.getItemsPerPage()),
+      BigDecimal.valueOf(meta.getTotalPages()),
+      BigDecimal.valueOf(meta.getCurrentPage())
+    );
   }
 
-  private static OffsetDateTime toOffsetDateTime(com.google.protobuf.Timestamp timestamp) {
-    return Instant.ofEpochSecond(timestamp.getSeconds(), timestamp.getNanos()).atOffset(ZoneOffset.UTC);
+  private static OffsetDateTime toOffsetDateTime(
+    com.google.protobuf.Timestamp timestamp
+  ) {
+    return Instant.ofEpochSecond(
+      timestamp.getSeconds(),
+      timestamp.getNanos()
+    ).atOffset(ZoneOffset.UTC);
   }
 
-  private RoleServiceGrpc.RoleServiceBlockingStub withMetadata(RequestContext context) {
+  private RoleServiceGrpc.RoleServiceBlockingStub withMetadata(
+    RequestContext context
+  ) {
     return stub
-        .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
-        .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context)));
+      .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
+      .withInterceptors(
+        MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context))
+      );
   }
 }

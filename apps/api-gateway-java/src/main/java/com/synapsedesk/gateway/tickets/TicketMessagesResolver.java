@@ -30,7 +30,9 @@ public class TicketMessagesResolver {
 
   @SchemaMapping(typeName = "TicketMessage", field = "sender")
   public CompletableFuture<UserSummaryGqlDto> sender(
-      TicketMessageGqlDto message, DataLoader<String, UserSummaryGqlDto> loader) {
+    TicketMessageGqlDto message,
+    DataLoader<String, UserSummaryGqlDto> loader
+  ) {
     if (message.senderId() == null) {
       // No user wrote this message — an AI-generated one — and no loader
       // call for it either, matching Node's own `if (!message.senderId)

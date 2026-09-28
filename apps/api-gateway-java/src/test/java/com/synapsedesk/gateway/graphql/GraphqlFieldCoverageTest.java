@@ -170,7 +170,8 @@ class GraphqlFieldCoverageTest {
       // reflection — this scan went blind on `DepartmentsResolver` the day
       // the aspect started proxying it, the same "wrong direction" shape as
       // every other guard bug this project has found.
-      Class<?> targetClass = org.springframework.aop.support.AopUtils.getTargetClass(bean);
+      Class<?> targetClass =
+        org.springframework.aop.support.AopUtils.getTargetClass(bean);
 
       for (Method method : targetClass.getMethods()) {
         QueryMapping query = method.getAnnotation(QueryMapping.class);

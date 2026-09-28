@@ -39,11 +39,25 @@ import synapsedesk.ticket.TicketServiceGrpc;
  */
 class TicketsCrudServiceTest {
 
-  private final TicketServiceGrpc.TicketServiceBlockingStub stub = mock(TicketServiceGrpc.TicketServiceBlockingStub.class);
+  private final TicketServiceGrpc.TicketServiceBlockingStub stub = mock(
+    TicketServiceGrpc.TicketServiceBlockingStub.class
+  );
   private TicketsCrudService service;
 
-  private static RequestContext contextWithCodes(boolean superAdmin, List<String> codes) {
-    return new RequestContext("agent-1", "org-1", superAdmin, List.of(), codes, true, "127.0.0.1", "test");
+  private static RequestContext contextWithCodes(
+    boolean superAdmin,
+    List<String> codes
+  ) {
+    return new RequestContext(
+      "agent-1",
+      "org-1",
+      superAdmin,
+      List.of(),
+      codes,
+      true,
+      "127.0.0.1",
+      "test"
+    );
   }
 
   @BeforeEach
@@ -57,50 +71,105 @@ class TicketsCrudServiceTest {
   void includeDeletedIsRefusedForACallerWithoutTicketDelete() {
     RequestContext context = contextWithCodes(false, List.of());
 
-    assertThatThrownBy(
-            () ->
-                service.list(
-                    context, java.math.BigDecimal.ONE, java.math.BigDecimal.TEN, "ASC", null, "createdAt", true, null,
-                    null, null, null, null, null))
-        .isInstanceOf(ResponseStatusException.class);
+    assertThatThrownBy(() ->
+      service.list(
+        context,
+        java.math.BigDecimal.ONE,
+        java.math.BigDecimal.TEN,
+        "ASC",
+        null,
+        "createdAt",
+        true,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      )
+    ).isInstanceOf(ResponseStatusException.class);
 
     verify(stub, org.mockito.Mockito.never()).listTickets(any());
   }
 
   @Test
   void includeDeletedIsAllowedForACallerHoldingTicketDelete() {
-    when(stub.listTickets(any())).thenReturn(ListTicketsResponse.getDefaultInstance());
+    when(stub.listTickets(any())).thenReturn(
+      ListTicketsResponse.getDefaultInstance()
+    );
     RequestContext context = contextWithCodes(false, List.of("ticket.delete"));
 
     service.list(
-        context, java.math.BigDecimal.ONE, java.math.BigDecimal.TEN, "ASC", null, "createdAt", true, null, null, null,
-        null, null, null);
+      context,
+      java.math.BigDecimal.ONE,
+      java.math.BigDecimal.TEN,
+      "ASC",
+      null,
+      "createdAt",
+      true,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    );
 
-    ArgumentCaptor<ListTicketsRequest> captor = ArgumentCaptor.forClass(ListTicketsRequest.class);
+    ArgumentCaptor<ListTicketsRequest> captor = ArgumentCaptor.forClass(
+      ListTicketsRequest.class
+    );
     verify(stub).listTickets(captor.capture());
     assertThat(captor.getValue().getIncludeDeleted()).isTrue();
   }
 
   @Test
   void includeDeletedIsAllowedForASuperAdminWithNoTicketPermissions() {
-    when(stub.listTickets(any())).thenReturn(ListTicketsResponse.getDefaultInstance());
+    when(stub.listTickets(any())).thenReturn(
+      ListTicketsResponse.getDefaultInstance()
+    );
     RequestContext context = contextWithCodes(true, List.of());
 
     service.list(
-        context, java.math.BigDecimal.ONE, java.math.BigDecimal.TEN, "ASC", null, "createdAt", true, null, null, null,
-        null, null, null);
+      context,
+      java.math.BigDecimal.ONE,
+      java.math.BigDecimal.TEN,
+      "ASC",
+      null,
+      "createdAt",
+      true,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    );
 
     verify(stub).listTickets(any());
   }
 
   @Test
   void includeDeletedFalseNeedsNoPermissionAtAll() {
-    when(stub.listTickets(any())).thenReturn(ListTicketsResponse.getDefaultInstance());
+    when(stub.listTickets(any())).thenReturn(
+      ListTicketsResponse.getDefaultInstance()
+    );
     RequestContext context = contextWithCodes(false, List.of());
 
     service.list(
-        context, java.math.BigDecimal.ONE, java.math.BigDecimal.TEN, "ASC", null, "createdAt", false, null, null,
-        null, null, null, null);
+      context,
+      java.math.BigDecimal.ONE,
+      java.math.BigDecimal.TEN,
+      "ASC",
+      null,
+      "createdAt",
+      false,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    );
 
     verify(stub).listTickets(any());
   }
@@ -114,9 +183,13 @@ class TicketsCrudServiceTest {
 
     service.update(context, "ticket-1", dto);
 
-    ArgumentCaptor<UpdateTicketRequest> captor = ArgumentCaptor.forClass(UpdateTicketRequest.class);
+    ArgumentCaptor<UpdateTicketRequest> captor = ArgumentCaptor.forClass(
+      UpdateTicketRequest.class
+    );
     verify(stub).updateTicket(captor.capture());
-    assertThat(captor.getValue().getPriority()).isEqualTo(TicketPriority.TICKET_PRIORITY_UNSPECIFIED);
+    assertThat(captor.getValue().getPriority()).isEqualTo(
+      TicketPriority.TICKET_PRIORITY_UNSPECIFIED
+    );
     assertThat(captor.getValue().getTitle()).isEqualTo("New title");
     assertThat(captor.getValue().hasDescription()).isFalse();
   }
@@ -126,7 +199,9 @@ class TicketsCrudServiceTest {
     RequestContext context = contextWithCodes(false, List.of());
     UpdateTicketDto dto = new UpdateTicketDto();
 
-    assertThatThrownBy(() -> service.update(context, "ticket-1", dto)).isInstanceOf(ResponseStatusException.class);
+    assertThatThrownBy(() ->
+      service.update(context, "ticket-1", dto)
+    ).isInstanceOf(ResponseStatusException.class);
 
     verify(stub, org.mockito.Mockito.never()).updateTicket(any());
   }
@@ -135,29 +210,40 @@ class TicketsCrudServiceTest {
   void anUnrecognizedStatusFilterIsRefused() {
     RequestContext context = contextWithCodes(false, List.of());
 
-    assertThatThrownBy(
-            () ->
-                service.list(
-                    context, java.math.BigDecimal.ONE, java.math.BigDecimal.TEN, "ASC", null, "createdAt", false,
-                    "NOT_A_REAL_STATUS", null, null, null, null, null))
-        .isInstanceOf(ResponseStatusException.class);
+    assertThatThrownBy(() ->
+      service.list(
+        context,
+        java.math.BigDecimal.ONE,
+        java.math.BigDecimal.TEN,
+        "ASC",
+        null,
+        "createdAt",
+        false,
+        "NOT_A_REAL_STATUS",
+        null,
+        null,
+        null,
+        null,
+        null
+      )
+    ).isInstanceOf(ResponseStatusException.class);
   }
 
   private static TicketResponse wireTicket() {
     Timestamp now = Timestamp.newBuilder().setSeconds(1_756_684_800).build();
     return TicketResponse.newBuilder()
-        .setId("ticket-1")
-        .setTicketNumber(1)
-        .setOrganizationId("org-1")
-        .setAuthorId("author-1")
-        .setSource(TicketSource.TICKET_SOURCE_WEB)
-        .setStatus(TicketStatus.TICKET_STATUS_NEW)
-        .setPriority(TicketPriority.TICKET_PRIORITY_MEDIUM)
-        .setTitle("New title")
-        .setDescription("desc")
-        .setUnreadCount(0)
-        .setCreatedAt(now)
-        .setUpdatedAt(now)
-        .build();
+      .setId("ticket-1")
+      .setTicketNumber(1)
+      .setOrganizationId("org-1")
+      .setAuthorId("author-1")
+      .setSource(TicketSource.TICKET_SOURCE_WEB)
+      .setStatus(TicketStatus.TICKET_STATUS_NEW)
+      .setPriority(TicketPriority.TICKET_PRIORITY_MEDIUM)
+      .setTitle("New title")
+      .setDescription("desc")
+      .setUnreadCount(0)
+      .setCreatedAt(now)
+      .setUpdatedAt(now)
+      .build();
   }
 }

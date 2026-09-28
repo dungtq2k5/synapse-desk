@@ -25,7 +25,10 @@ describe('roles and users', () => {
   const ORGANIZATION = '11111111-1111-4111-8111-111111111111';
   const USER = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 
-  const headers = (permissionCodes: string[] = [], organizationId = ORGANIZATION) => ({
+  const headers = (
+    permissionCodes: string[] = [],
+    organizationId = ORGANIZATION,
+  ) => ({
     cookie: `${GATEWAY_ENV.JWT_ACCESS_NAME}=${sign(
       {
         sub: USER,
@@ -52,7 +55,10 @@ describe('roles and users', () => {
     ...overrides,
   });
 
-  const wirePermission = (code: string, overrides: Record<string, unknown> = {}) => ({
+  const wirePermission = (
+    code: string,
+    overrides: Record<string, unknown> = {},
+  ) => ({
     id: `perm-${code}`,
     code,
     name: code,
@@ -108,33 +114,45 @@ describe('roles and users', () => {
   });
 
   describe('Roles', () => {
-    rowForField('Query.role')('**`Query.role` resolves one role**', async () => {
-      const id = '55555555-5555-4555-8555-555555555555';
-      peers.auth.on('RoleService/GetRole').reply(wireRole(id));
+    rowForField('Query.role')(
+      '**`Query.role` resolves one role**',
+      async () => {
+        const id = '55555555-5555-4555-8555-555555555555';
+        peers.auth.on('RoleService/GetRole').reply(wireRole(id));
 
-      const response = await new Session(gateway.baseUrl).post<{
-        data: { role: { id: string; name: string; userAssigned: number } };
-      }>(
-        '/graphql',
-        { query: `{ role(id: "${id}") { id name userAssigned } }` },
-        headers(['role.read']),
-      );
+        const response = await new Session(gateway.baseUrl).post<{
+          data: { role: { id: string; name: string; userAssigned: number } };
+        }>(
+          '/graphql',
+          { query: `{ role(id: "${id}") { id name userAssigned } }` },
+          headers(['role.read']),
+        );
 
-      expect(response.status).toBe(200);
-      expect(response.body).not.toHaveProperty('errors');
-      expect(response.body.data.role).toEqual({ id, name: 'Agent', userAssigned: 3 });
-    });
+        expect(response.status).toBe(200);
+        expect(response.body).not.toHaveProperty('errors');
+        expect(response.body.data.role).toEqual({
+          id,
+          name: 'Agent',
+          userAssigned: 3,
+        });
+      },
+    );
 
     rowForField('Query.role')(
       '**`Query.role` answers null, never an error, when the peer refuses**',
       async () => {
-        peers.auth.on('RoleService/GetRole').fail(GrpcStatus.NOT_FOUND, 'no such role');
+        peers.auth
+          .on('RoleService/GetRole')
+          .fail(GrpcStatus.NOT_FOUND, 'no such role');
 
         const response = await new Session(gateway.baseUrl).post<{
           data: { role: null };
         }>(
           '/graphql',
-          { query: '{ role(id: "66666666-6666-4666-8666-666666666666") { id } }' },
+          {
+            query:
+              '{ role(id: "66666666-6666-4666-8666-666666666666") { id } }',
+          },
           headers(['role.read']),
         );
 
@@ -147,7 +165,9 @@ describe('roles and users', () => {
     rowForField('Query.roles')(
       '**`Query.roles` never asks for system roles**',
       async () => {
-        peers.auth.on('RoleService/ListRoles').reply({ items: [wireRole('r1')], meta: page(1) });
+        peers.auth
+          .on('RoleService/ListRoles')
+          .reply({ items: [wireRole('r1')], meta: page(1) });
 
         const response = await new Session(gateway.baseUrl).post<{
           data: { roles: { items: { id: string }[] } };
@@ -161,7 +181,9 @@ describe('roles and users', () => {
         expect(response.body).not.toHaveProperty('errors');
 
         const [call] = peers.auth.calls('RoleService/ListRoles');
-        expect((call.request as { includeSystem: boolean }).includeSystem).toBe(false);
+        expect((call.request as { includeSystem: boolean }).includeSystem).toBe(
+          false,
+        );
       },
     );
 
@@ -169,12 +191,19 @@ describe('roles and users', () => {
       '**`Query.permissions` returns the whole catalogue, including retired codes**',
       async () => {
         peers.auth.on('RoleService/ListPermissions').reply({
-          items: [wirePermission('ticket.read'), wirePermission('ticket.write', { isRetired: true })],
+          items: [
+            wirePermission('ticket.read'),
+            wirePermission('ticket.write', { isRetired: true }),
+          ],
         });
 
         const response = await new Session(gateway.baseUrl).post<{
           data: { permissions: { code: string; isRetired: boolean }[] };
-        }>('/graphql', { query: '{ permissions { code isRetired } }' }, headers(['role.read']));
+        }>(
+          '/graphql',
+          { query: '{ permissions { code isRetired } }' },
+          headers(['role.read']),
+        );
 
         expect(response.status).toBe(200);
         expect(response.body).not.toHaveProperty('errors');
@@ -201,14 +230,20 @@ describe('roles and users', () => {
           meta: page(10),
         });
         peers.auth.on('RoleService/ListPermissions').reply({
-          items: [wirePermission('ticket.read'), wirePermission('ticket.write')],
+          items: [
+            wirePermission('ticket.read'),
+            wirePermission('ticket.write'),
+          ],
         });
 
         const response = await new Session(gateway.baseUrl).post<{
           data: { roles: { items: { permissions: { code: string }[] }[] } };
         }>(
           '/graphql',
-          { query: '{ roles(first: 10, page: 1) { items { permissions { code } } } }' },
+          {
+            query:
+              '{ roles(first: 10, page: 1) { items { permissions { code } } } }',
+          },
           headers(['role.read'], TENANT),
         );
 
@@ -235,7 +270,11 @@ describe('roles and users', () => {
 
         const response = await new Session(gateway.baseUrl).post<{
           data: { me: { id: string; departmentIds: string[]; gender: string } };
-        }>('/graphql', { query: '{ me { id departmentIds gender } }' }, headers());
+        }>(
+          '/graphql',
+          { query: '{ me { id departmentIds gender } }' },
+          headers(),
+        );
 
         expect(response.status).toBe(200);
         expect(response.body).not.toHaveProperty('errors');
@@ -268,20 +307,28 @@ describe('roles and users', () => {
 
         expect(response.status).toBe(200);
         expect(response.body).not.toHaveProperty('errors');
-        expect(response.body.data.user).toEqual({ id, departmentIds: ['dept-1'] });
+        expect(response.body.data.user).toEqual({
+          id,
+          departmentIds: ['dept-1'],
+        });
       },
     );
 
     rowForField('Query.user')(
       '**`Query.user` answers null, never an error, when the peer refuses**',
       async () => {
-        peers.auth.on('UserService/GetUser').fail(GrpcStatus.NOT_FOUND, 'no such user');
+        peers.auth
+          .on('UserService/GetUser')
+          .fail(GrpcStatus.NOT_FOUND, 'no such user');
 
         const response = await new Session(gateway.baseUrl).post<{
           data: { user: null };
         }>(
           '/graphql',
-          { query: '{ user(id: "88888888-8888-4888-8888-888888888888") { id } }' },
+          {
+            query:
+              '{ user(id: "88888888-8888-4888-8888-888888888888") { id } }',
+          },
           headers(['user.read']),
         );
 
@@ -295,7 +342,14 @@ describe('roles and users', () => {
       '**`Query.users` never asks for deleted users**',
       async () => {
         peers.auth.on('UserService/ListUsers').reply({
-          items: [{ user: wireUser('u1'), roleIds: [], roleNames: [], departmentIds: [] }],
+          items: [
+            {
+              user: wireUser('u1'),
+              roleIds: [],
+              roleNames: [],
+              departmentIds: [],
+            },
+          ],
           meta: page(1),
         });
 
@@ -311,7 +365,9 @@ describe('roles and users', () => {
         expect(response.body).not.toHaveProperty('errors');
 
         const [call] = peers.auth.calls('UserService/ListUsers');
-        expect((call.request as { includeDeleted: boolean }).includeDeleted).toBe(false);
+        expect(
+          (call.request as { includeDeleted: boolean }).includeDeleted,
+        ).toBe(false);
       },
     );
 
@@ -322,7 +378,8 @@ describe('roles and users', () => {
         const MAX_EDGE_LIST = 50;
         const departmentIds = Array.from(
           { length: 251 },
-          (_, index) => `cccccccc-cccc-4ccc-8ccc-${String(index).padStart(12, '0')}`,
+          (_, index) =>
+            `cccccccc-cccc-4ccc-8ccc-${String(index).padStart(12, '0')}`,
         );
         peers.auth.on('UserService/GetUser').reply({
           user: wireUser(id),
@@ -339,10 +396,14 @@ describe('roles and users', () => {
         });
 
         const response = await new Session(gateway.baseUrl).post<{
-          data: { user: { departments: { id: string }[]; departmentCount: number } };
+          data: {
+            user: { departments: { id: string }[]; departmentCount: number };
+          };
         }>(
           '/graphql',
-          { query: `{ user(id: "${id}") { departments { id } departmentCount } }` },
+          {
+            query: `{ user(id: "${id}") { departments { id } departmentCount } }`,
+          },
           headers(['user.read']),
         );
 
@@ -351,10 +412,12 @@ describe('roles and users', () => {
         expect(response.body.data.user.departments).toHaveLength(MAX_EDGE_LIST);
         expect(response.body.data.user.departmentCount).toBe(251);
 
-        const [call] = peers.auth.calls('DepartmentService/ListDepartmentsByIds');
-        expect((call.request as { departmentIds: string[] }).departmentIds).toHaveLength(
-          MAX_EDGE_LIST,
+        const [call] = peers.auth.calls(
+          'DepartmentService/ListDepartmentsByIds',
         );
+        expect(
+          (call.request as { departmentIds: string[] }).departmentIds,
+        ).toHaveLength(MAX_EDGE_LIST);
       },
     );
   });

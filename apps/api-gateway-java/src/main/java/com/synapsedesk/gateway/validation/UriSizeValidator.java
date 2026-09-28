@@ -35,7 +35,10 @@ public class UriSizeValidator implements ConstraintValidator<Size, URI> {
   }
 
   @Override
-  public boolean isValid(URI value, jakarta.validation.ConstraintValidatorContext context) {
+  public boolean isValid(
+    URI value,
+    jakarta.validation.ConstraintValidatorContext context
+  ) {
     // `@NotNull` is a separate constraint; a `@Size`-only field is optional,
     // and Bean Validation's own convention is that every constraint but
     // `@NotNull` passes on null — the same reason `@Email` does.

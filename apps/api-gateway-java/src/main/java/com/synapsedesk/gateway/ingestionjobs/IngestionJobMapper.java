@@ -33,13 +33,16 @@ public final class IngestionJobMapper {
 
   public static IngestionJobResponseDto toDto(IngestionJobResponse job) {
     return new IngestionJobResponseDto(
-        job.getId(),
-        job.getDocumentId(),
-        job.getBullmqJobId(),
-        IngestionJobResponseDto.StatusEnum.fromValue(job.getStatus().name().replace("INGESTION_JOB_STATUS_", "")),
-        toErrorLog(job.getErrorLog()),
-        job.hasProcessedAt() ? toOffsetDateTime(job.getProcessedAt()) : null,
-        toOffsetDateTime(job.getCreatedAt()));
+      job.getId(),
+      job.getDocumentId(),
+      job.getBullmqJobId(),
+      IngestionJobResponseDto.StatusEnum.fromValue(
+        job.getStatus().name().replace("INGESTION_JOB_STATUS_", "")
+      ),
+      toErrorLog(job.getErrorLog()),
+      job.hasProcessedAt() ? toOffsetDateTime(job.getProcessedAt()) : null,
+      toOffsetDateTime(job.getCreatedAt())
+    );
   }
 
   /** {@code ""} on the wire is proto3's absent scalar; REST commits to {@code null}. */
@@ -47,10 +50,17 @@ public final class IngestionJobMapper {
     if (errorLog == null || errorLog.isEmpty()) {
       return null;
     }
-    return errorLog.length() > ERROR_LOG_MAX_CHARS ? errorLog.substring(0, ERROR_LOG_MAX_CHARS) + "…" : errorLog;
+    return errorLog.length() > ERROR_LOG_MAX_CHARS
+      ? errorLog.substring(0, ERROR_LOG_MAX_CHARS) + "…"
+      : errorLog;
   }
 
-  private static OffsetDateTime toOffsetDateTime(com.google.protobuf.Timestamp timestamp) {
-    return Instant.ofEpochSecond(timestamp.getSeconds(), timestamp.getNanos()).atOffset(ZoneOffset.UTC);
+  private static OffsetDateTime toOffsetDateTime(
+    com.google.protobuf.Timestamp timestamp
+  ) {
+    return Instant.ofEpochSecond(
+      timestamp.getSeconds(),
+      timestamp.getNanos()
+    ).atOffset(ZoneOffset.UTC);
   }
 }

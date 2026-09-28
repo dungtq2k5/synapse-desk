@@ -5,5 +5,5 @@ public enum GenderGql {
   FEMALE,
   MALE,
   OTHER,
-  UNSPECIFIED
+  UNSPECIFIED,
 }

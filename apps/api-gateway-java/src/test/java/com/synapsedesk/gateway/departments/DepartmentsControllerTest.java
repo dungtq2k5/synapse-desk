@@ -38,18 +38,29 @@ import synapsedesk.auth.DepartmentServiceGrpc;
  */
 class DepartmentsControllerTest {
 
-  private final DepartmentServiceGrpc.DepartmentServiceBlockingStub stub =
-      mock(DepartmentServiceGrpc.DepartmentServiceBlockingStub.class);
+  private final DepartmentServiceGrpc.DepartmentServiceBlockingStub stub = mock(
+    DepartmentServiceGrpc.DepartmentServiceBlockingStub.class
+  );
   private final CurrentUser currentUser = mock(CurrentUser.class);
   private final CacheService cache = mock(CacheService.class);
   private DepartmentsController controller;
 
   private static RequestContext contextWith(List<String> permissionCodes) {
     return new RequestContext(
-        "agent-1", "org-1", false, List.of(), permissionCodes, true, "127.0.0.1", "test");
+      "agent-1",
+      "org-1",
+      false,
+      List.of(),
+      permissionCodes,
+      true,
+      "127.0.0.1",
+      "test"
+    );
   }
 
-  private static MockHttpServletRequest requestWithQuery(String includeDeleted) {
+  private static MockHttpServletRequest requestWithQuery(
+    String includeDeleted
+  ) {
     MockHttpServletRequest request = new MockHttpServletRequest();
     if (includeDeleted != null) {
       request.setParameter("includeDeleted", includeDeleted);
@@ -61,8 +72,9 @@ class DepartmentsControllerTest {
   void setUp() {
     when(stub.withDeadlineAfter(anyLong(), any())).thenReturn(stub);
     when(stub.withInterceptors(any())).thenReturn(stub);
-    when(cache.wrap(any(), anyLong(), any(), any()))
-        .thenAnswer(invocation -> ((Supplier<?>) invocation.getArgument(3)).get());
+    when(cache.wrap(any(), anyLong(), any(), any())).thenAnswer(invocation ->
+      ((Supplier<?>) invocation.getArgument(3)).get()
+    );
     controller = new DepartmentsController(stub, currentUser, cache);
   }
 
@@ -73,11 +85,23 @@ class DepartmentsControllerTest {
 
   @Test
   void includeDeletedWithoutThePermissionIsRefusedBeforeTheCacheIsTouched() {
-    RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(requestWithQuery("true")));
-    when(currentUser.require(any())).thenReturn(contextWith(List.of("department.read")));
+    RequestContextHolder.setRequestAttributes(
+      new ServletRequestAttributes(requestWithQuery("true"))
+    );
+    when(currentUser.require(any())).thenReturn(
+      contextWith(List.of("department.read"))
+    );
 
-    assertThatThrownBy(() -> controller.departmentsControllerListV1(BigDecimalOf(1), BigDecimalOf(10), "ASC", null, "createdAt", true))
-        .isInstanceOf(ResponseStatusException.class);
+    assertThatThrownBy(() ->
+      controller.departmentsControllerListV1(
+        BigDecimalOf(1),
+        BigDecimalOf(10),
+        "ASC",
+        null,
+        "createdAt",
+        true
+      )
+    ).isInstanceOf(ResponseStatusException.class);
 
     verifyNoInteractions(cache);
     verifyNoInteractions(stub);
@@ -85,36 +109,58 @@ class DepartmentsControllerTest {
 
   @Test
   void includeDeletedWithThePermissionReachesThePeer() {
-    RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(requestWithQuery("true")));
-    when(currentUser.require(any())).thenReturn(contextWith(List.of("department.read", "department.delete")));
-    when(stub.listDepartments(any()))
-        .thenReturn(
-            ListDepartmentsResponse.newBuilder()
-                .setMeta(synapsedesk.auth.Common.PageMeta.getDefaultInstance())
-                .build());
+    RequestContextHolder.setRequestAttributes(
+      new ServletRequestAttributes(requestWithQuery("true"))
+    );
+    when(currentUser.require(any())).thenReturn(
+      contextWith(List.of("department.read", "department.delete"))
+    );
+    when(stub.listDepartments(any())).thenReturn(
+      ListDepartmentsResponse.newBuilder()
+        .setMeta(synapsedesk.auth.Common.PageMeta.getDefaultInstance())
+        .build()
+    );
 
-    controller.departmentsControllerListV1(BigDecimalOf(1), BigDecimalOf(10), "ASC", null, "createdAt", true);
+    controller.departmentsControllerListV1(
+      BigDecimalOf(1),
+      BigDecimalOf(10),
+      "ASC",
+      null,
+      "createdAt",
+      true
+    );
 
     org.mockito.ArgumentCaptor<ListDepartmentsRequest> captor =
-        org.mockito.ArgumentCaptor.forClass(ListDepartmentsRequest.class);
+      org.mockito.ArgumentCaptor.forClass(ListDepartmentsRequest.class);
     verify(stub).listDepartments(captor.capture());
     assertThat(captor.getValue().getIncludeDeleted()).isTrue();
   }
 
   @Test
   void anAbsentIncludeDeletedNeverTriggersTheGate() {
-    RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(requestWithQuery(null)));
-    when(currentUser.require(any())).thenReturn(contextWith(List.of("department.read")));
-    when(stub.listDepartments(any()))
-        .thenReturn(
-            ListDepartmentsResponse.newBuilder()
-                .setMeta(synapsedesk.auth.Common.PageMeta.getDefaultInstance())
-                .build());
+    RequestContextHolder.setRequestAttributes(
+      new ServletRequestAttributes(requestWithQuery(null))
+    );
+    when(currentUser.require(any())).thenReturn(
+      contextWith(List.of("department.read"))
+    );
+    when(stub.listDepartments(any())).thenReturn(
+      ListDepartmentsResponse.newBuilder()
+        .setMeta(synapsedesk.auth.Common.PageMeta.getDefaultInstance())
+        .build()
+    );
 
-    controller.departmentsControllerListV1(BigDecimalOf(1), BigDecimalOf(10), "ASC", null, "createdAt", false);
+    controller.departmentsControllerListV1(
+      BigDecimalOf(1),
+      BigDecimalOf(10),
+      "ASC",
+      null,
+      "createdAt",
+      false
+    );
 
     org.mockito.ArgumentCaptor<ListDepartmentsRequest> captor =
-        org.mockito.ArgumentCaptor.forClass(ListDepartmentsRequest.class);
+      org.mockito.ArgumentCaptor.forClass(ListDepartmentsRequest.class);
     verify(stub).listDepartments(captor.capture());
     assertThat(captor.getValue().getIncludeDeleted()).isFalse();
   }
@@ -123,15 +169,26 @@ class DepartmentsControllerTest {
   void includeDeletedFalseAsRawStringIsNotAnAsk() {
     // Matches Node's `isRequested`: `?includeDeleted=false` is present but
     // false-ish, so it never demands the permission at all.
-    RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(requestWithQuery("false")));
-    when(currentUser.require(any())).thenReturn(contextWith(List.of("department.read")));
-    when(stub.listDepartments(any()))
-        .thenReturn(
-            ListDepartmentsResponse.newBuilder()
-                .setMeta(synapsedesk.auth.Common.PageMeta.getDefaultInstance())
-                .build());
+    RequestContextHolder.setRequestAttributes(
+      new ServletRequestAttributes(requestWithQuery("false"))
+    );
+    when(currentUser.require(any())).thenReturn(
+      contextWith(List.of("department.read"))
+    );
+    when(stub.listDepartments(any())).thenReturn(
+      ListDepartmentsResponse.newBuilder()
+        .setMeta(synapsedesk.auth.Common.PageMeta.getDefaultInstance())
+        .build()
+    );
 
-    controller.departmentsControllerListV1(BigDecimalOf(1), BigDecimalOf(10), "ASC", null, "createdAt", false);
+    controller.departmentsControllerListV1(
+      BigDecimalOf(1),
+      BigDecimalOf(10),
+      "ASC",
+      null,
+      "createdAt",
+      false
+    );
 
     verify(stub).listDepartments(any());
   }

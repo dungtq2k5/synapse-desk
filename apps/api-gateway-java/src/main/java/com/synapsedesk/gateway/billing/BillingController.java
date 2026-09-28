@@ -90,9 +90,10 @@ public class BillingController implements BillingApi {
   private final CurrentUser currentUser;
 
   public BillingController(
-      BillingServiceGrpc.BillingServiceBlockingStub stub,
-      DocumentServiceGrpc.DocumentServiceBlockingStub documentStub,
-      CurrentUser currentUser) {
+    BillingServiceGrpc.BillingServiceBlockingStub stub,
+    DocumentServiceGrpc.DocumentServiceBlockingStub documentStub,
+    CurrentUser currentUser
+  ) {
     this.stub = stub;
     this.documentStub = documentStub;
     this.currentUser = currentUser;
@@ -103,79 +104,92 @@ public class BillingController implements BillingApi {
   public ResponseEntity<BillingControllerGetSubscriptionV1200Response> billingControllerGetSubscriptionV1() {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    SubscriptionResponse response = withMetadata(context).getSubscription(BillingEmptyRequest.getDefaultInstance());
+    SubscriptionResponse response = withMetadata(context).getSubscription(
+      BillingEmptyRequest.getDefaultInstance()
+    );
 
     return ResponseEntity.ok(
-        new BillingControllerGetSubscriptionV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("OK")
-            .data(toSubscriptionResponseDto(response)));
+      new BillingControllerGetSubscriptionV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("OK")
+        .data(toSubscriptionResponseDto(response))
+    );
   }
 
   @Override
   @RequirePermission(PermissionCodesEnum.ORGANIZATION_UPDATE)
-  public ResponseEntity<BillingControllerCreateCheckoutSessionV1200Response>
-      billingControllerCreateCheckoutSessionV1(CreateCheckoutSessionDto createCheckoutSessionDto) {
+  public ResponseEntity<BillingControllerCreateCheckoutSessionV1200Response> billingControllerCreateCheckoutSessionV1(
+    CreateCheckoutSessionDto createCheckoutSessionDto
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    var response =
-        withStripeMetadata(context)
-            .createCheckoutSession(
-                CreateCheckoutSessionRequest.newBuilder()
-                    .setPriceId(createCheckoutSessionDto.getPriceId())
-                    .setSuccessUrl(createCheckoutSessionDto.getSuccessUrl().toString())
-                    .setCancelUrl(createCheckoutSessionDto.getCancelUrl().toString())
-                    .build());
+    var response = withStripeMetadata(context).createCheckoutSession(
+      CreateCheckoutSessionRequest.newBuilder()
+        .setPriceId(createCheckoutSessionDto.getPriceId())
+        .setSuccessUrl(createCheckoutSessionDto.getSuccessUrl().toString())
+        .setCancelUrl(createCheckoutSessionDto.getCancelUrl().toString())
+        .build()
+    );
 
     return ResponseEntity.ok(
-        new BillingControllerCreateCheckoutSessionV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("OK")
-            .data(new CheckoutSessionResponseDto(response.getUrl())));
+      new BillingControllerCreateCheckoutSessionV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("OK")
+        .data(new CheckoutSessionResponseDto(response.getUrl()))
+    );
   }
 
   @Override
   @RequirePermission(PermissionCodesEnum.ORGANIZATION_UPDATE)
   public ResponseEntity<BillingControllerCreatePortalSessionV1200Response> billingControllerCreatePortalSessionV1(
-      CreatePortalSessionDto createPortalSessionDto) {
+    CreatePortalSessionDto createPortalSessionDto
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    var response =
-        withStripeMetadata(context)
-            .createPortalSession(
-                CreatePortalSessionRequest.newBuilder()
-                    .setReturnUrl(createPortalSessionDto.getReturnUrl().toString())
-                    .build());
+    var response = withStripeMetadata(context).createPortalSession(
+      CreatePortalSessionRequest.newBuilder()
+        .setReturnUrl(createPortalSessionDto.getReturnUrl().toString())
+        .build()
+    );
 
     return ResponseEntity.ok(
-        new BillingControllerCreatePortalSessionV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("OK")
-            .data(new PortalSessionResponseDto(response.getUrl())));
+      new BillingControllerCreatePortalSessionV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("OK")
+        .data(new PortalSessionResponseDto(response.getUrl()))
+    );
   }
 
   @Override
   @RequirePermission(PermissionCodesEnum.ORGANIZATION_UPDATE)
-  public ResponseEntity<BillingControllerListInvoicesV1200Response> billingControllerListInvoicesV1(String limit) {
+  public ResponseEntity<BillingControllerListInvoicesV1200Response> billingControllerListInvoicesV1(
+    String limit
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    int limitValue = limit == null || limit.isEmpty() ? 0 : Integer.parseInt(limit);
+    int limitValue =
+      limit == null || limit.isEmpty() ? 0 : Integer.parseInt(limit);
 
-    ListInvoicesResponse response =
-        withStripeMetadata(context)
-            .listInvoices(ListInvoicesRequest.newBuilder().setLimit(limitValue).build());
+    ListInvoicesResponse response = withStripeMetadata(context).listInvoices(
+      ListInvoicesRequest.newBuilder().setLimit(limitValue).build()
+    );
 
-    List<InvoiceResponseDto> data = response.getItemsList().stream().map(BillingController::toInvoiceResponseDto).toList();
+    List<InvoiceResponseDto> data = response
+      .getItemsList()
+      .stream()
+      .map(BillingController::toInvoiceResponseDto)
+      .toList();
 
     return ResponseEntity.ok(
-        new BillingControllerListInvoicesV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("OK")
-            .data(data));
+      new BillingControllerListInvoicesV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("OK")
+        .data(data)
+    );
   }
 
   @Override
@@ -183,55 +197,64 @@ public class BillingController implements BillingApi {
   public ResponseEntity<BillingControllerListPlansV1200Response> billingControllerListPlansV1() {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    var response = withMetadata(context).listTenantPlans(BillingEmptyRequest.getDefaultInstance());
+    var response = withMetadata(context).listTenantPlans(
+      BillingEmptyRequest.getDefaultInstance()
+    );
 
-    List<TenantPlanResponseDto> data =
-        response.getItemsList().stream().map(BillingController::toTenantPlanResponseDto).toList();
+    List<TenantPlanResponseDto> data = response
+      .getItemsList()
+      .stream()
+      .map(BillingController::toTenantPlanResponseDto)
+      .toList();
 
     return ResponseEntity.ok(
-        new BillingControllerListPlansV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("OK")
-            .data(data));
+      new BillingControllerListPlansV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("OK")
+        .data(data)
+    );
   }
 
   @Override
   @RequirePermission(PermissionCodesEnum.ORGANIZATION_UPDATE)
   public ResponseEntity<BillingControllerChangePlanV1200Response> billingControllerChangePlanV1(
-      String idempotencyKey, ChangePlanDto changePlanDto) {
+    String idempotencyKey,
+    ChangePlanDto changePlanDto
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    PlanChangePreviewResponse preview =
-        withMetadata(context)
-            .previewPlanChange(
-                PlanChangeRequest.newBuilder()
-                    .setPlanId(changePlanDto.getPlanId().toString())
-                    .setPriceId(changePlanDto.getPriceId())
-                    .build());
+    PlanChangePreviewResponse preview = withMetadata(context).previewPlanChange(
+      PlanChangeRequest.newBuilder()
+        .setPlanId(changePlanDto.getPlanId().toString())
+        .setPriceId(changePlanDto.getPriceId())
+        .build()
+    );
 
     enforcePlanChangeFits(preview, context);
 
-    PlanChangeResponse response =
-        withStripeMetadata(context)
-            .changePlan(
-                PlanChangeRequest.newBuilder()
-                    .setPlanId(changePlanDto.getPlanId().toString())
-                    .setPriceId(changePlanDto.getPriceId())
-                    .setIdempotencyKey(idempotencyKey)
-                    .build());
+    PlanChangeResponse response = withStripeMetadata(context).changePlan(
+      PlanChangeRequest.newBuilder()
+        .setPlanId(changePlanDto.getPlanId().toString())
+        .setPriceId(changePlanDto.getPriceId())
+        .setIdempotencyKey(idempotencyKey)
+        .build()
+    );
 
     return ResponseEntity.ok(
-        new BillingControllerChangePlanV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("Plan change submitted")
-            .data(
-                new PlanChangeResponseDto(
-                    response.getPlanId(),
-                    response.getPlanName(),
-                    toOffsetDateTime(response.getEffectiveAt()),
-                    response.hasCreditIssued() ? response.getCreditIssued() : null)));
+      new BillingControllerChangePlanV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("Plan change submitted")
+        .data(
+          new PlanChangeResponseDto(
+            response.getPlanId(),
+            response.getPlanName(),
+            toOffsetDateTime(response.getEffectiveAt()),
+            response.hasCreditIssued() ? response.getCreditIssued() : null
+          )
+        )
+    );
   }
 
   /**
@@ -241,11 +264,16 @@ public class BillingController implements BillingApi {
    * the tenant's live usage and refuses (503) rather than allows when that
    * read fails — a gate may not degrade.
    */
-  private void enforcePlanChangeFits(PlanChangePreviewResponse preview, RequestContext context) {
+  private void enforcePlanChangeFits(
+    PlanChangePreviewResponse preview,
+    RequestContext context
+  ) {
     if (preview.getOverLimitCount() > 0) {
       throw new ResponseStatusException(
-          HttpStatus.BAD_REQUEST,
-          "This plan does not fit your current usage — " + String.join("; ", preview.getOverLimitList()));
+        HttpStatus.BAD_REQUEST,
+        "This plan does not fit your current usage — " +
+          String.join("; ", preview.getOverLimitList())
+      );
     }
 
     if (preview.getNarrowedDimensionsCount() == 0) {
@@ -254,103 +282,162 @@ public class BillingController implements BillingApi {
 
     StorageUsageResponse usage;
     try {
-      usage =
-          documentStub
-              .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
-              .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context)))
-              .getStorageUsage(DocumentIdRequest.newBuilder().setId("").build());
+      usage = documentStub
+        .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
+        .withInterceptors(
+          MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context))
+        )
+        .getStorageUsage(DocumentIdRequest.newBuilder().setId("").build());
     } catch (StatusRuntimeException failure) {
       throw new ResponseStatusException(
-          HttpStatus.SERVICE_UNAVAILABLE,
-          String.join(" and ", preview.getNarrowedDimensionsList())
-              + " usage could not be checked just now — please try again shortly");
+        HttpStatus.SERVICE_UNAVAILABLE,
+        String.join(" and ", preview.getNarrowedDimensionsList()) +
+          " usage could not be checked just now — please try again shortly"
+      );
     }
 
     List<String> overLimit = new ArrayList<>();
-    if (preview.getNarrowedDimensionsList().contains("storage")
-        && usage.getUsedBytes() > preview.getTargetMaxStorageBytes()) {
+    if (
+      preview.getNarrowedDimensionsList().contains("storage") &&
+      usage.getUsedBytes() > preview.getTargetMaxStorageBytes()
+    ) {
       overLimit.add(
-          "maxStorageBytes: " + usage.getUsedBytes() + " used, plan grants " + preview.getTargetMaxStorageBytes());
+        "maxStorageBytes: " +
+          usage.getUsedBytes() +
+          " used, plan grants " +
+          preview.getTargetMaxStorageBytes()
+      );
     }
-    if (preview.getNarrowedDimensionsList().contains("documents")
-        && usage.getDocumentCount() > preview.getTargetMaxDocumentUploads()) {
+    if (
+      preview.getNarrowedDimensionsList().contains("documents") &&
+      usage.getDocumentCount() > preview.getTargetMaxDocumentUploads()
+    ) {
       overLimit.add(
-          "maxDocumentUploads: " + usage.getDocumentCount() + " held, plan grants "
-              + preview.getTargetMaxDocumentUploads());
+        "maxDocumentUploads: " +
+          usage.getDocumentCount() +
+          " held, plan grants " +
+          preview.getTargetMaxDocumentUploads()
+      );
     }
 
     if (!overLimit.isEmpty()) {
       throw new ResponseStatusException(
-          HttpStatus.BAD_REQUEST, "This plan does not fit your current usage — " + String.join("; ", overLimit));
+        HttpStatus.BAD_REQUEST,
+        "This plan does not fit your current usage — " +
+          String.join("; ", overLimit)
+      );
     }
   }
 
-  private static SubscriptionResponseDto toSubscriptionResponseDto(SubscriptionResponse response) {
+  private static SubscriptionResponseDto toSubscriptionResponseDto(
+    SubscriptionResponse response
+  ) {
     return new SubscriptionResponseDto(
-        response.hasStripeCustomerId() ? response.getStripeCustomerId() : null,
-        response.hasStripeSubscriptionId() ? response.getStripeSubscriptionId() : null,
-        response.getPlanName(),
-        BigDecimal.valueOf(response.getMaxAgentSeats()),
-        BigDecimal.valueOf(response.getMaxStorageBytes()),
-        BigDecimal.valueOf(response.getMonthlyAiTokenBudget()),
-        toAiModelTierEnum(response.getAiModelTier()),
-        toOffsetDateTime(response.getBillingCycleStart()),
-        toStatusEnum(response.getStatus()));
+      response.hasStripeCustomerId() ? response.getStripeCustomerId() : null,
+      response.hasStripeSubscriptionId()
+        ? response.getStripeSubscriptionId()
+        : null,
+      response.getPlanName(),
+      BigDecimal.valueOf(response.getMaxAgentSeats()),
+      BigDecimal.valueOf(response.getMaxStorageBytes()),
+      BigDecimal.valueOf(response.getMonthlyAiTokenBudget()),
+      toAiModelTierEnum(response.getAiModelTier()),
+      toOffsetDateTime(response.getBillingCycleStart()),
+      toStatusEnum(response.getStatus())
+    );
   }
 
-  private static InvoiceResponseDto toInvoiceResponseDto(InvoiceResponse invoice) {
+  private static InvoiceResponseDto toInvoiceResponseDto(
+    InvoiceResponse invoice
+  ) {
     return new InvoiceResponseDto(
-        invoice.getId(),
-        invoice.getNumber(),
-        BigDecimal.valueOf(invoice.getAmountDue()),
-        invoice.getCurrency(),
-        invoice.getStatus(),
-        toOffsetDateTime(invoice.getCreated()),
-        invoice.getHostedInvoiceUrl());
+      invoice.getId(),
+      invoice.getNumber(),
+      BigDecimal.valueOf(invoice.getAmountDue()),
+      invoice.getCurrency(),
+      invoice.getStatus(),
+      toOffsetDateTime(invoice.getCreated()),
+      invoice.getHostedInvoiceUrl()
+    );
   }
 
-  private static TenantPlanResponseDto toTenantPlanResponseDto(TenantPlanResponse plan) {
+  private static TenantPlanResponseDto toTenantPlanResponseDto(
+    TenantPlanResponse plan
+  ) {
     return new TenantPlanResponseDto(
-        plan.getId(),
-        plan.getName(),
-        BigDecimal.valueOf(plan.getMaxAgentSeats()),
-        BigDecimal.valueOf(plan.getMaxStorageBytes()),
-        BigDecimal.valueOf(plan.getMonthlyAiTokenBudget()),
-        toTenantPlanAiModelTierEnum(plan.getAiModelTier()),
-        BigDecimal.valueOf(plan.getMaxDocumentBytes()),
-        BigDecimal.valueOf(plan.getMaxAttachmentBytes()),
-        BigDecimal.valueOf(plan.getMaxDocumentUploads()),
-        BigDecimal.valueOf(plan.getMaxAnalyticsRangeDays()),
-        plan.getPricesList().stream()
-            .map(price -> new TenantPlanPriceResponseDto(price.getStripePriceId(), price.getInterval()))
-            .toList());
+      plan.getId(),
+      plan.getName(),
+      BigDecimal.valueOf(plan.getMaxAgentSeats()),
+      BigDecimal.valueOf(plan.getMaxStorageBytes()),
+      BigDecimal.valueOf(plan.getMonthlyAiTokenBudget()),
+      toTenantPlanAiModelTierEnum(plan.getAiModelTier()),
+      BigDecimal.valueOf(plan.getMaxDocumentBytes()),
+      BigDecimal.valueOf(plan.getMaxAttachmentBytes()),
+      BigDecimal.valueOf(plan.getMaxDocumentUploads()),
+      BigDecimal.valueOf(plan.getMaxAnalyticsRangeDays()),
+      plan
+        .getPricesList()
+        .stream()
+        .map(price ->
+          new TenantPlanPriceResponseDto(
+            price.getStripePriceId(),
+            price.getInterval()
+          )
+        )
+        .toList()
+    );
   }
 
-  private static SubscriptionResponseDto.StatusEnum toStatusEnum(OrgStatus status) {
-    return SubscriptionResponseDto.StatusEnum.fromValue(status.name().replace("ORG_STATUS_", ""));
+  private static SubscriptionResponseDto.StatusEnum toStatusEnum(
+    OrgStatus status
+  ) {
+    return SubscriptionResponseDto.StatusEnum.fromValue(
+      status.name().replace("ORG_STATUS_", "")
+    );
   }
 
-  private static SubscriptionResponseDto.AiModelTierEnum toAiModelTierEnum(AiModelTier tier) {
-    return SubscriptionResponseDto.AiModelTierEnum.fromValue(tier.name().replace("AI_MODEL_TIER_", ""));
+  private static SubscriptionResponseDto.AiModelTierEnum toAiModelTierEnum(
+    AiModelTier tier
+  ) {
+    return SubscriptionResponseDto.AiModelTierEnum.fromValue(
+      tier.name().replace("AI_MODEL_TIER_", "")
+    );
   }
 
-  private static TenantPlanResponseDto.AiModelTierEnum toTenantPlanAiModelTierEnum(AiModelTier tier) {
-    return TenantPlanResponseDto.AiModelTierEnum.fromValue(tier.name().replace("AI_MODEL_TIER_", ""));
+  private static TenantPlanResponseDto.AiModelTierEnum toTenantPlanAiModelTierEnum(
+    AiModelTier tier
+  ) {
+    return TenantPlanResponseDto.AiModelTierEnum.fromValue(
+      tier.name().replace("AI_MODEL_TIER_", "")
+    );
   }
 
-  private static OffsetDateTime toOffsetDateTime(com.google.protobuf.Timestamp timestamp) {
-    return Instant.ofEpochSecond(timestamp.getSeconds(), timestamp.getNanos()).atOffset(ZoneOffset.UTC);
+  private static OffsetDateTime toOffsetDateTime(
+    com.google.protobuf.Timestamp timestamp
+  ) {
+    return Instant.ofEpochSecond(
+      timestamp.getSeconds(),
+      timestamp.getNanos()
+    ).atOffset(ZoneOffset.UTC);
   }
 
-  private BillingServiceGrpc.BillingServiceBlockingStub withMetadata(RequestContext context) {
+  private BillingServiceGrpc.BillingServiceBlockingStub withMetadata(
+    RequestContext context
+  ) {
     return stub
-        .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
-        .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context)));
+      .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
+      .withInterceptors(
+        MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context))
+      );
   }
 
-  private BillingServiceGrpc.BillingServiceBlockingStub withStripeMetadata(RequestContext context) {
+  private BillingServiceGrpc.BillingServiceBlockingStub withStripeMetadata(
+    RequestContext context
+  ) {
     return stub
-        .withDeadlineAfter(STRIPE_DEADLINE_SECONDS, TimeUnit.SECONDS)
-        .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context)));
+      .withDeadlineAfter(STRIPE_DEADLINE_SECONDS, TimeUnit.SECONDS)
+      .withInterceptors(
+        MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context))
+      );
   }
 }

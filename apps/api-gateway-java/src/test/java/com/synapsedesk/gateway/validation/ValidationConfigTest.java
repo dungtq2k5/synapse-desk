@@ -21,7 +21,8 @@ import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 class ValidationConfigTest {
 
   private Validator validator() {
-    LocalValidatorFactoryBean factory = new ValidationConfig().defaultValidator();
+    LocalValidatorFactoryBean factory =
+      new ValidationConfig().defaultValidator();
     factory.afterPropertiesSet();
     return factory;
   }
@@ -30,7 +31,8 @@ class ValidationConfigTest {
   void eventTypesDefaultingToEmptyDoesNotViolateSizeMinOne() {
     UpdateWebhookEndpointDto dto = new UpdateWebhookEndpointDto();
 
-    Set<ConstraintViolation<UpdateWebhookEndpointDto>> violations = validator().validate(dto);
+    Set<ConstraintViolation<UpdateWebhookEndpointDto>> violations =
+      validator().validate(dto);
 
     assertThat(violations).isEmpty();
   }
@@ -40,9 +42,12 @@ class ValidationConfigTest {
     UpdateWebhookEndpointDto dto = new UpdateWebhookEndpointDto();
     dto.setUrl(URI.create("https://example.com/" + "a".repeat(2000)));
 
-    Set<ConstraintViolation<UpdateWebhookEndpointDto>> violations = validator().validate(dto);
+    Set<ConstraintViolation<UpdateWebhookEndpointDto>> violations =
+      validator().validate(dto);
 
     assertThat(violations).hasSize(1);
-    assertThat(violations.iterator().next().getPropertyPath()).hasToString("url");
+    assertThat(violations.iterator().next().getPropertyPath()).hasToString(
+      "url"
+    );
   }
 }

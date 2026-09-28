@@ -30,72 +30,112 @@ class CacheInvalidationConsumerTest {
   private static final ObjectMapper JSON = new ObjectMapper();
 
   private final CacheService cache = mock(CacheService.class);
-  private final StoreProperties store = new StoreProperties("redis://localhost:6379", "nats://localhost:4222");
-  private final CacheInvalidationConsumer consumer = new CacheInvalidationConsumer(store, cache, JSON);
+  private final StoreProperties store = new StoreProperties(
+    "redis://localhost:6379",
+    "nats://localhost:4222"
+  );
+  private final CacheInvalidationConsumer consumer =
+    new CacheInvalidationConsumer(store, cache, JSON);
 
   @Test
   void everyTicketPatternDropsTheTicketsScope() {
     List<String> ticketSubjects = List.of(
-        "ticket.created", "ticket.escalated", "ticket.assigned", "ticket.reassigned", "ticket.unassigned",
-        "ticket.status_changed", "ticket.message_created", "ticket.message_updated", "ticket.message_redacted");
+      "ticket.created",
+      "ticket.escalated",
+      "ticket.assigned",
+      "ticket.reassigned",
+      "ticket.unassigned",
+      "ticket.status_changed",
+      "ticket.message_created",
+      "ticket.message_updated",
+      "ticket.message_redacted"
+    );
 
-    assertThat(CacheInvalidationConsumer.SUBJECT_SCOPES.keySet()).containsAll(ticketSubjects);
+    assertThat(CacheInvalidationConsumer.SUBJECT_SCOPES.keySet()).containsAll(
+      ticketSubjects
+    );
     for (String subject : ticketSubjects) {
-      assertThat(CacheInvalidationConsumer.SUBJECT_SCOPES.get(subject)).containsExactly("tickets");
+      assertThat(
+        CacheInvalidationConsumer.SUBJECT_SCOPES.get(subject)
+      ).containsExactly("tickets");
     }
   }
 
   @Test
   void documentUploadedIsDeliberatelyAbsentFromTheSubscribedSet() {
-    assertThat(CacheInvalidationConsumer.SUBJECT_SCOPES).doesNotContainKey("document.uploaded");
-    assertThat(CacheInvalidationConsumer.SUBJECT_SCOPES.get("document.indexed")).containsExactly("documents");
-    assertThat(CacheInvalidationConsumer.SUBJECT_SCOPES.get("document.ingestion_failed")).containsExactly("documents");
-    assertThat(CacheInvalidationConsumer.SUBJECT_SCOPES.get("document.scope_changed")).containsExactly("documents");
+    assertThat(CacheInvalidationConsumer.SUBJECT_SCOPES).doesNotContainKey(
+      "document.uploaded"
+    );
+    assertThat(
+      CacheInvalidationConsumer.SUBJECT_SCOPES.get("document.indexed")
+    ).containsExactly("documents");
+    assertThat(
+      CacheInvalidationConsumer.SUBJECT_SCOPES.get("document.ingestion_failed")
+    ).containsExactly("documents");
+    assertThat(
+      CacheInvalidationConsumer.SUBJECT_SCOPES.get("document.scope_changed")
+    ).containsExactly("documents");
   }
 
   @Test
   void entitlementsChangedDropsBothSettingsAndOrganizations() {
-    assertThat(CacheInvalidationConsumer.SUBJECT_SCOPES.get("billing.entitlements_changed"))
-        .containsExactlyInAnyOrder("settings", "organizations");
+    assertThat(
+      CacheInvalidationConsumer.SUBJECT_SCOPES.get(
+        "billing.entitlements_changed"
+      )
+    ).containsExactlyInAnyOrder("settings", "organizations");
   }
 
   @Test
   void aRawPayloadWithNoEnvelopeIsReadAsTheEventItself() {
-    byte[] payload = "{\"organizationId\":\"org-1\"}".getBytes(StandardCharsets.UTF_8);
+    byte[] payload = "{\"organizationId\":\"org-1\"}".getBytes(
+      StandardCharsets.UTF_8
+    );
 
-    assertThat(CacheInvalidationConsumer.organizationIdOf(JSON, payload)).isEqualTo("org-1");
+    assertThat(
+      CacheInvalidationConsumer.organizationIdOf(JSON, payload)
+    ).isEqualTo("org-1");
   }
 
   @Test
   void aNestEnvelopeWithPatternAndDataIsUnwrappedToItsDataField() {
     byte[] payload =
-        "{\"pattern\":\"ticket.created\",\"data\":{\"organizationId\":\"org-2\",\"pattern\":\"ticket.created\"}}"
-            .getBytes(StandardCharsets.UTF_8);
+      "{\"pattern\":\"ticket.created\",\"data\":{\"organizationId\":\"org-2\",\"pattern\":\"ticket.created\"}}".getBytes(
+        StandardCharsets.UTF_8
+      );
 
-    assertThat(CacheInvalidationConsumer.organizationIdOf(JSON, payload)).isEqualTo("org-2");
+    assertThat(
+      CacheInvalidationConsumer.organizationIdOf(JSON, payload)
+    ).isEqualTo("org-2");
   }
 
   @Test
   void aTenantlessEventReturnsNullRatherThanThrowing() {
     byte[] payload = "{\"ticketId\":\"t-1\"}".getBytes(StandardCharsets.UTF_8);
 
-    assertThat(CacheInvalidationConsumer.organizationIdOf(JSON, payload)).isNull();
+    assertThat(
+      CacheInvalidationConsumer.organizationIdOf(JSON, payload)
+    ).isNull();
   }
 
   @Test
   void malformedJsonReturnsNullRatherThanThrowing() {
     byte[] payload = "not json".getBytes(StandardCharsets.UTF_8);
 
-    assertThat(CacheInvalidationConsumer.organizationIdOf(JSON, payload)).isNull();
+    assertThat(
+      CacheInvalidationConsumer.organizationIdOf(JSON, payload)
+    ).isNull();
   }
 
   @Test
   void onMessageDropsTheMappedScopeForTheEventsTenant() {
     Message message = mock(Message.class);
     when(message.getSubject()).thenReturn("ticket.created");
-    when(message.getData())
-        .thenReturn("{\"pattern\":\"ticket.created\",\"data\":{\"organizationId\":\"org-3\"}}"
-            .getBytes(StandardCharsets.UTF_8));
+    when(message.getData()).thenReturn(
+      "{\"pattern\":\"ticket.created\",\"data\":{\"organizationId\":\"org-3\"}}".getBytes(
+        StandardCharsets.UTF_8
+      )
+    );
     when(cache.invalidateScope(anyString(), anyString())).thenReturn(0);
 
     consumer.onMessage(message);
@@ -107,9 +147,11 @@ class CacheInvalidationConsumerTest {
   void onMessageDropsBothScopesForEntitlementsChanged() {
     Message message = mock(Message.class);
     when(message.getSubject()).thenReturn("billing.entitlements_changed");
-    when(message.getData())
-        .thenReturn("{\"pattern\":\"billing.entitlements_changed\",\"data\":{\"organizationId\":\"org-4\"}}"
-            .getBytes(StandardCharsets.UTF_8));
+    when(message.getData()).thenReturn(
+      "{\"pattern\":\"billing.entitlements_changed\",\"data\":{\"organizationId\":\"org-4\"}}".getBytes(
+        StandardCharsets.UTF_8
+      )
+    );
     when(cache.invalidateScope(anyString(), anyString())).thenReturn(0);
 
     consumer.onMessage(message);
@@ -132,7 +174,9 @@ class CacheInvalidationConsumerTest {
   void onMessageForATenantlessEventNeverCallsInvalidate() {
     Message message = mock(Message.class);
     when(message.getSubject()).thenReturn("ticket.created");
-    when(message.getData()).thenReturn("{\"ticketId\":\"t-1\"}".getBytes(StandardCharsets.UTF_8));
+    when(message.getData()).thenReturn(
+      "{\"ticketId\":\"t-1\"}".getBytes(StandardCharsets.UTF_8)
+    );
 
     consumer.onMessage(message);
 
@@ -143,9 +187,12 @@ class CacheInvalidationConsumerTest {
   void aCacheFailureDuringDropDoesNotEscapeOnMessage() {
     Message message = mock(Message.class);
     when(message.getSubject()).thenReturn("ticket.created");
-    when(message.getData())
-        .thenReturn("{\"organizationId\":\"org-5\"}".getBytes(StandardCharsets.UTF_8));
-    when(cache.invalidateScope(anyString(), anyString())).thenThrow(new RuntimeException("redis down"));
+    when(message.getData()).thenReturn(
+      "{\"organizationId\":\"org-5\"}".getBytes(StandardCharsets.UTF_8)
+    );
+    when(cache.invalidateScope(anyString(), anyString())).thenThrow(
+      new RuntimeException("redis down")
+    );
 
     consumer.onMessage(message);
   }

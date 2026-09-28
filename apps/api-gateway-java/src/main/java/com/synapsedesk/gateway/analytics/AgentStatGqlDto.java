@@ -7,4 +7,10 @@ package com.synapsedesk.gateway.analytics;
  * to auth-service at all.
  */
 public record AgentStatGqlDto(
-    String agentId, int assigned, int resolved, int messagesSent, MeanGqlDto resolutionSeconds, RateGqlDto draftAcceptance) {}
+  String agentId,
+  int assigned,
+  int resolved,
+  int messagesSent,
+  MeanGqlDto resolutionSeconds,
+  RateGqlDto draftAcceptance
+) {}

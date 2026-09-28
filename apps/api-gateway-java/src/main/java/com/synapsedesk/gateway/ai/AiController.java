@@ -64,150 +64,208 @@ public class AiController implements AiApi {
   private final AiServiceGrpc.AiServiceBlockingStub stub;
   private final CurrentUser currentUser;
 
-  public AiController(AiServiceGrpc.AiServiceBlockingStub stub, CurrentUser currentUser) {
+  public AiController(
+    AiServiceGrpc.AiServiceBlockingStub stub,
+    CurrentUser currentUser
+  ) {
     this.stub = stub;
     this.currentUser = currentUser;
   }
 
   @Override
   @RequirePermission(PermissionCodesEnum.TICKET_READ_ALL)
-  public ResponseEntity<AiControllerGetSummaryV1200Response> aiControllerGetSummaryV1(String ticketId) {
+  public ResponseEntity<AiControllerGetSummaryV1200Response> aiControllerGetSummaryV1(
+    String ticketId
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    AiSummaryResponse response =
-        withMetadata(context).getSummary(TicketAiRequest.newBuilder().setTicketId(ticketId).build());
+    AiSummaryResponse response = withMetadata(context).getSummary(
+      TicketAiRequest.newBuilder().setTicketId(ticketId).build()
+    );
 
     return ResponseEntity.ok(
-        new AiControllerGetSummaryV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("OK")
-            .data(toAiSummaryResponseDto(response)));
+      new AiControllerGetSummaryV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("OK")
+        .data(toAiSummaryResponseDto(response))
+    );
   }
 
   @Override
   @RequirePermission(PermissionCodesEnum.TICKET_AI_USE)
-  public ResponseEntity<AiControllerGetSummaryV1200Response> aiControllerGenerateSummaryV1(String ticketId) {
+  public ResponseEntity<AiControllerGetSummaryV1200Response> aiControllerGenerateSummaryV1(
+    String ticketId
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    AiSummaryResponse response =
-        withMetadata(context).generateSummary(TicketAiRequest.newBuilder().setTicketId(ticketId).build());
+    AiSummaryResponse response = withMetadata(context).generateSummary(
+      TicketAiRequest.newBuilder().setTicketId(ticketId).build()
+    );
 
     return ResponseEntity.ok(
-        new AiControllerGetSummaryV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("OK")
-            .data(toAiSummaryResponseDto(response)));
+      new AiControllerGetSummaryV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("OK")
+        .data(toAiSummaryResponseDto(response))
+    );
   }
 
   @Override
   @RequirePermission(PermissionCodesEnum.TICKET_AI_USE)
   public ResponseEntity<AiControllerGenerateDraftV1200Response> aiControllerGenerateDraftV1(
-      String ticketId, GenerateDraftDto generateDraftDto) {
+    String ticketId,
+    GenerateDraftDto generateDraftDto
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    GenerateDraftRequest.Builder wire = GenerateDraftRequest.newBuilder().setTicketId(ticketId);
+    GenerateDraftRequest.Builder wire =
+      GenerateDraftRequest.newBuilder().setTicketId(ticketId);
     if (generateDraftDto.getInstruction() != null) {
       wire.setInstruction(generateDraftDto.getInstruction());
     }
 
-    GenerateDraftResponse response = withMetadata(context).generateDraft(wire.build());
+    GenerateDraftResponse response = withMetadata(context).generateDraft(
+      wire.build()
+    );
 
-    AiDraftResponseDto data =
-        new AiDraftResponseDto(
-            response.getContent(),
-            response.getModelName(),
-            BigDecimal.valueOf(response.getPromptTokens()),
-            BigDecimal.valueOf(response.getCompletionTokens()),
-            response.getGenerationId(),
-            response.getCitationsList().stream().map(AiController::toDraftCitationResponseDto).toList());
+    AiDraftResponseDto data = new AiDraftResponseDto(
+      response.getContent(),
+      response.getModelName(),
+      BigDecimal.valueOf(response.getPromptTokens()),
+      BigDecimal.valueOf(response.getCompletionTokens()),
+      response.getGenerationId(),
+      response
+        .getCitationsList()
+        .stream()
+        .map(AiController::toDraftCitationResponseDto)
+        .toList()
+    );
 
     return ResponseEntity.ok(
-        new AiControllerGenerateDraftV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("OK")
-            .data(data));
+      new AiControllerGenerateDraftV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("OK")
+        .data(data)
+    );
   }
 
   @Override
   @RequirePermission(PermissionCodesEnum.TICKET_AI_USE)
-  public ResponseEntity<AiControllerGetSuggestionsV1200Response> aiControllerGetSuggestionsV1(String ticketId) {
+  public ResponseEntity<AiControllerGetSuggestionsV1200Response> aiControllerGetSuggestionsV1(
+    String ticketId
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    GetSuggestionsResponse response =
-        withMetadata(context).getSuggestions(TicketAiRequest.newBuilder().setTicketId(ticketId).build());
+    GetSuggestionsResponse response = withMetadata(context).getSuggestions(
+      TicketAiRequest.newBuilder().setTicketId(ticketId).build()
+    );
 
-    AiSuggestionsResponseDto data =
-        new AiSuggestionsResponseDto(
-            response.getItemsList().stream().map(AiController::toAiSuggestionResponseDto).toList(),
-            response.getArticlesList().stream().map(AiController::toSuggestedArticleResponseDto).toList(),
-            toDegradedEnum(response.getDegraded()));
+    AiSuggestionsResponseDto data = new AiSuggestionsResponseDto(
+      response
+        .getItemsList()
+        .stream()
+        .map(AiController::toAiSuggestionResponseDto)
+        .toList(),
+      response
+        .getArticlesList()
+        .stream()
+        .map(AiController::toSuggestedArticleResponseDto)
+        .toList(),
+      toDegradedEnum(response.getDegraded())
+    );
 
     return ResponseEntity.ok(
-        new AiControllerGetSuggestionsV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("OK")
-            .data(data));
+      new AiControllerGetSuggestionsV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("OK")
+        .data(data)
+    );
   }
 
   @Override
   @RequirePermission(PermissionCodesEnum.TICKET_AI_USE)
-  public ResponseEntity<AiControllerClassifyV1200Response> aiControllerClassifyV1(String ticketId) {
+  public ResponseEntity<AiControllerClassifyV1200Response> aiControllerClassifyV1(
+    String ticketId
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    ClassifyTicketResponse response =
-        withMetadata(context).classifyTicket(TicketAiRequest.newBuilder().setTicketId(ticketId).build());
+    ClassifyTicketResponse response = withMetadata(context).classifyTicket(
+      TicketAiRequest.newBuilder().setTicketId(ticketId).build()
+    );
 
-    AiClassificationResponseDto data =
-        new AiClassificationResponseDto(
-            response.getSuggestedDepartmentId(),
-            toSuggestedPriorityEnum(response.getSuggestedPriority()),
-            BigDecimal.valueOf(response.getConfidenceScore()));
+    AiClassificationResponseDto data = new AiClassificationResponseDto(
+      response.getSuggestedDepartmentId(),
+      toSuggestedPriorityEnum(response.getSuggestedPriority()),
+      BigDecimal.valueOf(response.getConfidenceScore())
+    );
 
     return ResponseEntity.ok(
-        new AiControllerClassifyV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("OK")
-            .data(data));
+      new AiControllerClassifyV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("OK")
+        .data(data)
+    );
   }
 
-  private static AiSummaryResponseDto toAiSummaryResponseDto(AiSummaryResponse summary) {
+  private static AiSummaryResponseDto toAiSummaryResponseDto(
+    AiSummaryResponse summary
+  ) {
     return new AiSummaryResponseDto(
-        summary.getId(),
-        summary.getTicketId(),
-        summary.getSummaryText(),
-        summary.getSuggestedAction(),
-        BigDecimal.valueOf(summary.getConfidenceScore()),
-        summary.getModelName(),
-        toOffsetDateTime(summary.getCreatedAt()),
-        toOffsetDateTime(summary.getUpdatedAt()));
+      summary.getId(),
+      summary.getTicketId(),
+      summary.getSummaryText(),
+      summary.getSuggestedAction(),
+      BigDecimal.valueOf(summary.getConfidenceScore()),
+      summary.getModelName(),
+      toOffsetDateTime(summary.getCreatedAt()),
+      toOffsetDateTime(summary.getUpdatedAt())
+    );
   }
 
-  private static DraftCitationResponseDto toDraftCitationResponseDto(DraftCitation citation) {
+  private static DraftCitationResponseDto toDraftCitationResponseDto(
+    DraftCitation citation
+  ) {
     return new DraftCitationResponseDto(
-        citation.getChunkId(),
-        citation.getDocumentId(),
-        citation.getDocumentTitle(),
-        citation.hasPageNumber() ? BigDecimal.valueOf(citation.getPageNumber()) : null);
+      citation.getChunkId(),
+      citation.getDocumentId(),
+      citation.getDocumentTitle(),
+      citation.hasPageNumber()
+        ? BigDecimal.valueOf(citation.getPageNumber())
+        : null
+    );
   }
 
-  private static AiSuggestionResponseDto toAiSuggestionResponseDto(SuggestionResponse item) {
-    return new AiSuggestionResponseDto(item.getTitle(), item.getBody(), BigDecimal.valueOf(item.getConfidenceScore()));
+  private static AiSuggestionResponseDto toAiSuggestionResponseDto(
+    SuggestionResponse item
+  ) {
+    return new AiSuggestionResponseDto(
+      item.getTitle(),
+      item.getBody(),
+      BigDecimal.valueOf(item.getConfidenceScore())
+    );
   }
 
-  private static SuggestedArticleResponseDto toSuggestedArticleResponseDto(SuggestedArticleResponse article) {
+  private static SuggestedArticleResponseDto toSuggestedArticleResponseDto(
+    SuggestedArticleResponse article
+  ) {
     return new SuggestedArticleResponseDto(
-        article.getDocumentId(),
-        article.getDocumentTitle(),
-        article.hasPageNumber() ? BigDecimal.valueOf(article.getPageNumber()) : null,
-        BigDecimal.valueOf(article.getScore()));
+      article.getDocumentId(),
+      article.getDocumentTitle(),
+      article.hasPageNumber()
+        ? BigDecimal.valueOf(article.getPageNumber())
+        : null,
+      BigDecimal.valueOf(article.getScore())
+    );
   }
 
-  private static AiSuggestionsResponseDto.DegradedEnum toDegradedEnum(SuggestionsDegradation degradation) {
+  private static AiSuggestionsResponseDto.DegradedEnum toDegradedEnum(
+    SuggestionsDegradation degradation
+  ) {
     return switch (degradation) {
       case SUGGESTIONS_DEGRADATION_LEXICAL_ONLY -> AiSuggestionsResponseDto.DegradedEnum.LEXICAL_ONLY;
       default -> null;
@@ -215,7 +273,9 @@ public class AiController implements AiApi {
   }
 
   /** `TICKET_PRIORITY_HIGH` -> `HIGH`; `UNSPECIFIED`/anything unrecognized -> `null`. */
-  private static AiClassificationResponseDto.SuggestedPriorityEnum toSuggestedPriorityEnum(TicketPriority priority) {
+  private static AiClassificationResponseDto.SuggestedPriorityEnum toSuggestedPriorityEnum(
+    TicketPriority priority
+  ) {
     return switch (priority) {
       case TICKET_PRIORITY_LOW -> AiClassificationResponseDto.SuggestedPriorityEnum.LOW;
       case TICKET_PRIORITY_MEDIUM -> AiClassificationResponseDto.SuggestedPriorityEnum.MEDIUM;
@@ -225,13 +285,22 @@ public class AiController implements AiApi {
     };
   }
 
-  private static OffsetDateTime toOffsetDateTime(com.google.protobuf.Timestamp timestamp) {
-    return Instant.ofEpochSecond(timestamp.getSeconds(), timestamp.getNanos()).atOffset(ZoneOffset.UTC);
+  private static OffsetDateTime toOffsetDateTime(
+    com.google.protobuf.Timestamp timestamp
+  ) {
+    return Instant.ofEpochSecond(
+      timestamp.getSeconds(),
+      timestamp.getNanos()
+    ).atOffset(ZoneOffset.UTC);
   }
 
-  private AiServiceGrpc.AiServiceBlockingStub withMetadata(RequestContext context) {
+  private AiServiceGrpc.AiServiceBlockingStub withMetadata(
+    RequestContext context
+  ) {
     return stub
-        .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
-        .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context)));
+      .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
+      .withInterceptors(
+        MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context))
+      );
   }
 }

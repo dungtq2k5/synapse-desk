@@ -29,7 +29,9 @@ import synapsedesk.ticket.Common.TicketPriority;
  */
 class AiControllerTest {
 
-  private final AiServiceGrpc.AiServiceBlockingStub stub = mock(AiServiceGrpc.AiServiceBlockingStub.class);
+  private final AiServiceGrpc.AiServiceBlockingStub stub = mock(
+    AiServiceGrpc.AiServiceBlockingStub.class
+  );
   private final CurrentUser currentUser = mock(CurrentUser.class);
   private AiController controller;
 
@@ -37,11 +39,21 @@ class AiControllerTest {
   void setUp() {
     when(stub.withDeadlineAfter(anyLong(), any())).thenReturn(stub);
     when(stub.withInterceptors(any())).thenReturn(stub);
-    when(currentUser.require(any()))
-        .thenReturn(
-            new RequestContext(
-                "agent-1", "org-1", false, List.of(), List.of("ticket.ai.use"), true, "127.0.0.1", "test"));
-    RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(new MockHttpServletRequest()));
+    when(currentUser.require(any())).thenReturn(
+      new RequestContext(
+        "agent-1",
+        "org-1",
+        false,
+        List.of(),
+        List.of("ticket.ai.use"),
+        true,
+        "127.0.0.1",
+        "test"
+      )
+    );
+    RequestContextHolder.setRequestAttributes(
+      new ServletRequestAttributes(new MockHttpServletRequest())
+    );
     controller = new AiController(stub, currentUser);
   }
 
@@ -52,12 +64,12 @@ class AiControllerTest {
 
   @Test
   void anUnspecifiedSuggestedPriorityMapsToNull() {
-    when(stub.classifyTicket(any()))
-        .thenReturn(
-            ClassifyTicketResponse.newBuilder()
-                .setSuggestedDepartmentId("dept-1")
-                .setSuggestedPriority(TicketPriority.TICKET_PRIORITY_UNSPECIFIED)
-                .build());
+    when(stub.classifyTicket(any())).thenReturn(
+      ClassifyTicketResponse.newBuilder()
+        .setSuggestedDepartmentId("dept-1")
+        .setSuggestedPriority(TicketPriority.TICKET_PRIORITY_UNSPECIFIED)
+        .build()
+    );
 
     var response = controller.aiControllerClassifyV1("ticket-1");
 
@@ -66,26 +78,27 @@ class AiControllerTest {
 
   @Test
   void aRecognizedSuggestedPriorityMapsThrough() {
-    when(stub.classifyTicket(any()))
-        .thenReturn(
-            ClassifyTicketResponse.newBuilder()
-                .setSuggestedDepartmentId("dept-1")
-                .setSuggestedPriority(TicketPriority.TICKET_PRIORITY_URGENT)
-                .build());
+    when(stub.classifyTicket(any())).thenReturn(
+      ClassifyTicketResponse.newBuilder()
+        .setSuggestedDepartmentId("dept-1")
+        .setSuggestedPriority(TicketPriority.TICKET_PRIORITY_URGENT)
+        .build()
+    );
 
     var response = controller.aiControllerClassifyV1("ticket-1");
 
-    assertThat(response.getBody().getData().getSuggestedPriority())
-        .isEqualTo(com.synapsedesk.gateway.generated.model.AiClassificationResponseDto.SuggestedPriorityEnum.URGENT);
+    assertThat(response.getBody().getData().getSuggestedPriority()).isEqualTo(
+      com.synapsedesk.gateway.generated.model.AiClassificationResponseDto.SuggestedPriorityEnum.URGENT
+    );
   }
 
   @Test
   void anUnspecifiedDegradationMapsToNull() {
-    when(stub.getSuggestions(any()))
-        .thenReturn(
-            GetSuggestionsResponse.newBuilder()
-                .setDegraded(SuggestionsDegradation.SUGGESTIONS_DEGRADATION_UNSPECIFIED)
-                .build());
+    when(stub.getSuggestions(any())).thenReturn(
+      GetSuggestionsResponse.newBuilder()
+        .setDegraded(SuggestionsDegradation.SUGGESTIONS_DEGRADATION_UNSPECIFIED)
+        .build()
+    );
 
     var response = controller.aiControllerGetSuggestionsV1("ticket-1");
 
@@ -94,15 +107,18 @@ class AiControllerTest {
 
   @Test
   void aLexicalOnlyDegradationMapsThrough() {
-    when(stub.getSuggestions(any()))
-        .thenReturn(
-            GetSuggestionsResponse.newBuilder()
-                .setDegraded(SuggestionsDegradation.SUGGESTIONS_DEGRADATION_LEXICAL_ONLY)
-                .build());
+    when(stub.getSuggestions(any())).thenReturn(
+      GetSuggestionsResponse.newBuilder()
+        .setDegraded(
+          SuggestionsDegradation.SUGGESTIONS_DEGRADATION_LEXICAL_ONLY
+        )
+        .build()
+    );
 
     var response = controller.aiControllerGetSuggestionsV1("ticket-1");
 
-    assertThat(response.getBody().getData().getDegraded())
-        .isEqualTo(com.synapsedesk.gateway.generated.model.AiSuggestionsResponseDto.DegradedEnum.LEXICAL_ONLY);
+    assertThat(response.getBody().getData().getDegraded()).isEqualTo(
+      com.synapsedesk.gateway.generated.model.AiSuggestionsResponseDto.DegradedEnum.LEXICAL_ONLY
+    );
   }
 }

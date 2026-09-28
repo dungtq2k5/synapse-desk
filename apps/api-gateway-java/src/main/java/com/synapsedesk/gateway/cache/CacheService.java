@@ -122,13 +122,20 @@ public class CacheService {
    * @return how many keys were removed, for a caller that only logs on a hit
    */
   public int invalidateScope(String organizationId, String scope) {
-    String tenant = organizationId == null || organizationId.isEmpty() ? NO_TENANT : organizationId;
+    String tenant =
+      organizationId == null || organizationId.isEmpty()
+        ? NO_TENANT
+        : organizationId;
     String pattern = PREFIX + tenant + "|" + scope + "[|:]*";
 
     int removed = 0;
     try {
       List<String> batch = new ArrayList<>(SCAN_BATCH);
-      try (Cursor<String> cursor = redis.scan(ScanOptions.scanOptions().match(pattern).count(SCAN_BATCH).build())) {
+      try (
+        Cursor<String> cursor = redis.scan(
+          ScanOptions.scanOptions().match(pattern).count(SCAN_BATCH).build()
+        )
+      ) {
         while (cursor.hasNext()) {
           batch.add(cursor.next());
           if (batch.size() >= SCAN_BATCH) {
@@ -141,7 +148,11 @@ public class CacheService {
         removed += deleteBatch(batch);
       }
     } catch (RuntimeException scanFailed) {
-      LOG.error("Cache scope invalidation failed for {}: {}", pattern, scanFailed.getMessage());
+      LOG.error(
+        "Cache scope invalidation failed for {}: {}",
+        pattern,
+        scanFailed.getMessage()
+      );
     }
 
     return removed;

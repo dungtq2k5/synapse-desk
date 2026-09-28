@@ -87,206 +87,271 @@ public class MessagesController implements MessagesApi {
   private final MessageServiceGrpc.MessageServiceBlockingStub stub;
   private final CurrentUser currentUser;
 
-  public MessagesController(MessageServiceGrpc.MessageServiceBlockingStub stub, CurrentUser currentUser) {
+  public MessagesController(
+    MessageServiceGrpc.MessageServiceBlockingStub stub,
+    CurrentUser currentUser
+  ) {
     this.stub = stub;
     this.currentUser = currentUser;
   }
 
   @Override
   public ResponseEntity<MessagesControllerListV1200Response> messagesControllerListV1(
-      String ticketId, BigDecimal page, BigDecimal limit, String sortBy, String sortOrder, String searchTerm) {
+    String ticketId,
+    BigDecimal page,
+    BigDecimal limit,
+    String sortBy,
+    String sortOrder,
+    String searchTerm
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    PageRequest.Builder pageRequest =
-        PageRequest.newBuilder()
-            .setPage(page.intValue())
-            .setLimit(limit.intValue())
-            .setSortBy(sortBy)
-            .setSortOrder("DESC".equalsIgnoreCase(sortOrder) ? SortOrder.SORT_ORDER_DESC : SortOrder.SORT_ORDER_ASC);
+    PageRequest.Builder pageRequest = PageRequest.newBuilder()
+      .setPage(page.intValue())
+      .setLimit(limit.intValue())
+      .setSortBy(sortBy)
+      .setSortOrder(
+        "DESC".equalsIgnoreCase(sortOrder)
+          ? SortOrder.SORT_ORDER_DESC
+          : SortOrder.SORT_ORDER_ASC
+      );
     if (searchTerm != null) {
       pageRequest.setSearchTerm(searchTerm);
     }
 
-    ListMessagesResponse response =
-        withMetadata(context)
-            .listMessages(ListMessagesRequest.newBuilder().setTicketId(ticketId).setPage(pageRequest).build());
+    ListMessagesResponse response = withMetadata(context).listMessages(
+      ListMessagesRequest.newBuilder()
+        .setTicketId(ticketId)
+        .setPage(pageRequest)
+        .build()
+    );
 
     MessagesControllerListV1200ResponseData data =
-        new MessagesControllerListV1200ResponseData(
-            response.getItemsList().stream().map(MessagesController::toMessageResponseDto).toList(),
-            toMetaDto(response.getMeta()));
+      new MessagesControllerListV1200ResponseData(
+        response
+          .getItemsList()
+          .stream()
+          .map(MessagesController::toMessageResponseDto)
+          .toList(),
+        toMetaDto(response.getMeta())
+      );
 
     return ResponseEntity.ok(
-        new MessagesControllerListV1200Response().success(true).statusCode(BigDecimal.valueOf(200)).message("OK").data(data));
+      new MessagesControllerListV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("OK")
+        .data(data)
+    );
   }
 
   @Override
   public ResponseEntity<MessagesControllerCreateV1201Response> messagesControllerCreateV1(
-      String ticketId, CreateMessageDto createMessageDto) {
+    String ticketId,
+    CreateMessageDto createMessageDto
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    CreateMessageRequest.Builder wire =
-        CreateMessageRequest.newBuilder()
-            .setTicketId(ticketId)
-            .setContent(createMessageDto.getContent())
-            .setIsInternalNote(Boolean.TRUE.equals(createMessageDto.getIsInternalNote()))
-            .setInvokeAi(Boolean.TRUE.equals(createMessageDto.getInvokeAi()))
-            .addAllAttachments(
-                createMessageDto.getAttachments().stream()
-                    .map(
-                        attachment ->
-                            NewAttachment.newBuilder()
-                                .setObjectPath(attachment.getObjectPath())
-                                .setFileName(attachment.getFileName())
-                                .build())
-                    .toList());
+    CreateMessageRequest.Builder wire = CreateMessageRequest.newBuilder()
+      .setTicketId(ticketId)
+      .setContent(createMessageDto.getContent())
+      .setIsInternalNote(
+        Boolean.TRUE.equals(createMessageDto.getIsInternalNote())
+      )
+      .setInvokeAi(Boolean.TRUE.equals(createMessageDto.getInvokeAi()))
+      .addAllAttachments(
+        createMessageDto
+          .getAttachments()
+          .stream()
+          .map(attachment ->
+            NewAttachment.newBuilder()
+              .setObjectPath(attachment.getObjectPath())
+              .setFileName(attachment.getFileName())
+              .build()
+          )
+          .toList()
+      );
     if (createMessageDto.getGeneratedFromId() != null) {
       wire.setGeneratedFromId(createMessageDto.getGeneratedFromId().toString());
     }
 
-    CreateMessageResponse response = withMetadata(context).createMessage(wire.build());
+    CreateMessageResponse response = withMetadata(context).createMessage(
+      wire.build()
+    );
 
-    CreateMessageResponseDto data =
-        new CreateMessageResponseDto(toMessageResponseDto(response.getMessage()), response.getSkippedAttachmentsList());
+    CreateMessageResponseDto data = new CreateMessageResponseDto(
+      toMessageResponseDto(response.getMessage()),
+      response.getSkippedAttachmentsList()
+    );
 
-    return ResponseEntity.status(HttpStatus.CREATED)
-        .body(
-            new MessagesControllerCreateV1201Response()
-                .success(true)
-                .statusCode(BigDecimal.valueOf(201))
-                .message("Message posted")
-                .data(data));
+    return ResponseEntity.status(HttpStatus.CREATED).body(
+      new MessagesControllerCreateV1201Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(201))
+        .message("Message posted")
+        .data(data)
+    );
   }
 
   @Override
   public ResponseEntity<MessagesControllerRedactV1200Response> messagesControllerUpdateV1(
-      String ticketId, String messageId, UpdateMessageDto updateMessageDto) {
+    String ticketId,
+    String messageId,
+    UpdateMessageDto updateMessageDto
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    MessageResponse response =
-        withMetadata(context)
-            .updateMessage(
-                UpdateMessageRequest.newBuilder()
-                    .setTicketId(ticketId)
-                    .setMessageId(messageId)
-                    .setContent(updateMessageDto.getContent())
-                    .build());
+    MessageResponse response = withMetadata(context).updateMessage(
+      UpdateMessageRequest.newBuilder()
+        .setTicketId(ticketId)
+        .setMessageId(messageId)
+        .setContent(updateMessageDto.getContent())
+        .build()
+    );
 
     return ResponseEntity.ok(
-        new MessagesControllerRedactV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("Message updated")
-            .data(toMessageResponseDto(response)));
+      new MessagesControllerRedactV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("Message updated")
+        .data(toMessageResponseDto(response))
+    );
   }
 
   @Override
   @RequirePermission(PermissionCodesEnum.TICKET_MESSAGE_MODERATE)
   public ResponseEntity<MessagesControllerRedactV1200Response> messagesControllerRedactV1(
-      String ticketId, String messageId) {
+    String ticketId,
+    String messageId
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    RedactMessageResponse response =
-        withMetadata(context)
-            .redactMessage(RedactMessageRequest.newBuilder().setTicketId(ticketId).setMessageId(messageId).build());
+    RedactMessageResponse response = withMetadata(context).redactMessage(
+      RedactMessageRequest.newBuilder()
+        .setTicketId(ticketId)
+        .setMessageId(messageId)
+        .build()
+    );
 
     return ResponseEntity.ok(
-        new MessagesControllerRedactV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("Message redacted")
-            .data(toMessageResponseDto(response.getMessage())));
+      new MessagesControllerRedactV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("Message redacted")
+        .data(toMessageResponseDto(response.getMessage()))
+    );
   }
 
   @Override
   public ResponseEntity<AuthControllerForgotPasswordV1202Response> messagesControllerPresignNewAttachmentV1(
-      String ticketId, UploadAttachmentDto uploadAttachmentDto) {
+    String ticketId,
+    UploadAttachmentDto uploadAttachmentDto
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    PresignAttachmentResponse response =
-        withMetadata(context)
-            .uploadAttachment(
-                UploadAttachmentRequest.newBuilder()
-                    .setTicketId(ticketId)
-                    .setFileName(uploadAttachmentDto.getFileName())
-                    .setFileSizeBytes(uploadAttachmentDto.getFileSizeBytes().longValue())
-                    .setMimeType(uploadAttachmentDto.getMimeType().getValue())
-                    .build());
+    PresignAttachmentResponse response = withMetadata(context).uploadAttachment(
+      UploadAttachmentRequest.newBuilder()
+        .setTicketId(ticketId)
+        .setFileName(uploadAttachmentDto.getFileName())
+        .setFileSizeBytes(uploadAttachmentDto.getFileSizeBytes().longValue())
+        .setMimeType(uploadAttachmentDto.getMimeType().getValue())
+        .build()
+    );
 
     return ResponseEntity.ok(
-        new AuthControllerForgotPasswordV1202Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("OK")
-            .data(toPresignData(response)));
+      new AuthControllerForgotPasswordV1202Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("OK")
+        .data(toPresignData(response))
+    );
   }
 
   @Override
   public ResponseEntity<AuthControllerForgotPasswordV1202Response> messagesControllerPresignAttachmentV1(
-      String ticketId, String messageId, UploadAttachmentDto uploadAttachmentDto) {
+    String ticketId,
+    String messageId,
+    UploadAttachmentDto uploadAttachmentDto
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    PresignAttachmentResponse response =
-        withMetadata(context)
-            .uploadAttachment(
-                UploadAttachmentRequest.newBuilder()
-                    .setTicketId(ticketId)
-                    .setMessageId(messageId)
-                    .setFileName(uploadAttachmentDto.getFileName())
-                    .setFileSizeBytes(uploadAttachmentDto.getFileSizeBytes().longValue())
-                    .setMimeType(uploadAttachmentDto.getMimeType().getValue())
-                    .build());
+    PresignAttachmentResponse response = withMetadata(context).uploadAttachment(
+      UploadAttachmentRequest.newBuilder()
+        .setTicketId(ticketId)
+        .setMessageId(messageId)
+        .setFileName(uploadAttachmentDto.getFileName())
+        .setFileSizeBytes(uploadAttachmentDto.getFileSizeBytes().longValue())
+        .setMimeType(uploadAttachmentDto.getMimeType().getValue())
+        .build()
+    );
 
     return ResponseEntity.ok(
-        new AuthControllerForgotPasswordV1202Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("OK")
-            .data(toPresignData(response)));
+      new AuthControllerForgotPasswordV1202Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("OK")
+        .data(toPresignData(response))
+    );
   }
 
   @Override
   public ResponseEntity<MessagesControllerConfirmAttachmentV1201Response> messagesControllerConfirmAttachmentV1(
-      String ticketId, String messageId, ConfirmAttachmentDto confirmAttachmentDto) {
+    String ticketId,
+    String messageId,
+    ConfirmAttachmentDto confirmAttachmentDto
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    AttachmentResponse response =
-        withMetadata(context)
-            .confirmAttachment(
-                ConfirmAttachmentRequest.newBuilder()
-                    .setTicketId(ticketId)
-                    .setMessageId(messageId)
-                    .setObjectPath(confirmAttachmentDto.getObjectPath())
-                    .setFileName(confirmAttachmentDto.getFileName())
-                    .build());
+    AttachmentResponse response = withMetadata(context).confirmAttachment(
+      ConfirmAttachmentRequest.newBuilder()
+        .setTicketId(ticketId)
+        .setMessageId(messageId)
+        .setObjectPath(confirmAttachmentDto.getObjectPath())
+        .setFileName(confirmAttachmentDto.getFileName())
+        .build()
+    );
 
-    return ResponseEntity.status(HttpStatus.CREATED)
-        .body(
-            new MessagesControllerConfirmAttachmentV1201Response()
-                .success(true)
-                .statusCode(BigDecimal.valueOf(201))
-                .message("Attachment added")
-                .data(toAttachmentResponseDto(response)));
+    return ResponseEntity.status(HttpStatus.CREATED).body(
+      new MessagesControllerConfirmAttachmentV1201Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(201))
+        .message("Attachment added")
+        .data(toAttachmentResponseDto(response))
+    );
   }
 
   @Override
   public ResponseEntity<MessagesControllerListAttachmentsV1200Response> messagesControllerListAttachmentsV1(
-      String ticketId, String messageId) {
+    String ticketId,
+    String messageId
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    var response =
-        withMetadata(context)
-            .listAttachments(ListAttachmentsRequest.newBuilder().setTicketId(ticketId).setMessageId(messageId).build());
+    var response = withMetadata(context).listAttachments(
+      ListAttachmentsRequest.newBuilder()
+        .setTicketId(ticketId)
+        .setMessageId(messageId)
+        .build()
+    );
 
     return ResponseEntity.ok(
-        new MessagesControllerListAttachmentsV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("OK")
-            .data(response.getItemsList().stream().map(MessagesController::toAttachmentResponseDto).toList()));
+      new MessagesControllerListAttachmentsV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("OK")
+        .data(
+          response
+            .getItemsList()
+            .stream()
+            .map(MessagesController::toAttachmentResponseDto)
+            .toList()
+        )
+    );
   }
 
-  private static Map<String, Object> toPresignData(PresignAttachmentResponse response) {
+  private static Map<String, Object> toPresignData(
+    PresignAttachmentResponse response
+  ) {
     Map<String, Object> data = new LinkedHashMap<>();
     data.put("uploadUrl", response.getUploadUrl());
     data.put("objectPath", response.getObjectPath());
@@ -294,49 +359,77 @@ public class MessagesController implements MessagesApi {
     return data;
   }
 
-  private static MessageResponseDto toMessageResponseDto(MessageResponse message) {
+  private static MessageResponseDto toMessageResponseDto(
+    MessageResponse message
+  ) {
     return new MessageResponseDto(
-        message.getId(),
-        message.getTicketId(),
-        message.hasSenderId() ? message.getSenderId() : null,
-        message.getContent(),
-        message.getIsAiGenerated(),
-        message.getIsInternalNote(),
-        message.hasModelName() ? message.getModelName() : null,
-        message.hasPromptTokens() ? BigDecimal.valueOf(message.getPromptTokens()) : null,
-        message.hasCompletionTokens() ? BigDecimal.valueOf(message.getCompletionTokens()) : null,
-        message.hasEditedAt() ? toOffsetDateTime(message.getEditedAt()) : null,
-        message.hasRedactedAt() ? toOffsetDateTime(message.getRedactedAt()) : null,
-        toOffsetDateTime(message.getCreatedAt()),
-        message.getAttachmentsList().stream().map(MessagesController::toAttachmentResponseDto).toList(),
-        message.getExcludedFromAiContext(),
-        toAnswerStatusEnum(message.getAnswerStatus()),
-        message.hasCitations()
-            ? message.getCitations().getItemsList().stream().map(MessagesController::toCitationResponseDto).toList()
-            : null);
+      message.getId(),
+      message.getTicketId(),
+      message.hasSenderId() ? message.getSenderId() : null,
+      message.getContent(),
+      message.getIsAiGenerated(),
+      message.getIsInternalNote(),
+      message.hasModelName() ? message.getModelName() : null,
+      message.hasPromptTokens()
+        ? BigDecimal.valueOf(message.getPromptTokens())
+        : null,
+      message.hasCompletionTokens()
+        ? BigDecimal.valueOf(message.getCompletionTokens())
+        : null,
+      message.hasEditedAt() ? toOffsetDateTime(message.getEditedAt()) : null,
+      message.hasRedactedAt()
+        ? toOffsetDateTime(message.getRedactedAt())
+        : null,
+      toOffsetDateTime(message.getCreatedAt()),
+      message
+        .getAttachmentsList()
+        .stream()
+        .map(MessagesController::toAttachmentResponseDto)
+        .toList(),
+      message.getExcludedFromAiContext(),
+      toAnswerStatusEnum(message.getAnswerStatus()),
+      message.hasCitations()
+        ? message
+            .getCitations()
+            .getItemsList()
+            .stream()
+            .map(MessagesController::toCitationResponseDto)
+            .toList()
+        : null
+    );
   }
 
-  private static AttachmentResponseDto toAttachmentResponseDto(AttachmentResponse attachment) {
+  private static AttachmentResponseDto toAttachmentResponseDto(
+    AttachmentResponse attachment
+  ) {
     return new AttachmentResponseDto(
-        attachment.getId(),
-        attachment.getMessageId(),
-        attachment.getFileName(),
-        attachment.getFileUrl(),
-        BigDecimal.valueOf(attachment.getFileSizeBytes()),
-        attachment.getMimeType(),
-        toOffsetDateTime(attachment.getCreatedAt()));
+      attachment.getId(),
+      attachment.getMessageId(),
+      attachment.getFileName(),
+      attachment.getFileUrl(),
+      BigDecimal.valueOf(attachment.getFileSizeBytes()),
+      attachment.getMimeType(),
+      toOffsetDateTime(attachment.getCreatedAt())
+    );
   }
 
-  private static CitationResponseDto toCitationResponseDto(DraftCitation citation) {
+  private static CitationResponseDto toCitationResponseDto(
+    DraftCitation citation
+  ) {
     return new CitationResponseDto(
-        citation.getChunkId(),
-        citation.getDocumentId(),
-        citation.getDocumentTitle(),
-        citation.hasPageNumber() ? BigDecimal.valueOf(citation.getPageNumber()) : null,
-        citation.getVectorPointId());
+      citation.getChunkId(),
+      citation.getDocumentId(),
+      citation.getDocumentTitle(),
+      citation.hasPageNumber()
+        ? BigDecimal.valueOf(citation.getPageNumber())
+        : null,
+      citation.getVectorPointId()
+    );
   }
 
-  private static MessageResponseDto.AnswerStatusEnum toAnswerStatusEnum(MessageAnswerStatus status) {
+  private static MessageResponseDto.AnswerStatusEnum toAnswerStatusEnum(
+    MessageAnswerStatus status
+  ) {
     return switch (status) {
       case MESSAGE_ANSWER_STATUS_DOC_ANSWER -> MessageResponseDto.AnswerStatusEnum.DOC_ANSWER;
       case MESSAGE_ANSWER_STATUS_DOC_MISSING -> MessageResponseDto.AnswerStatusEnum.DOC_MISSING;
@@ -347,22 +440,34 @@ public class MessagesController implements MessagesApi {
     };
   }
 
-  private static InvitationsControllerListV1200ResponseDataMeta toMetaDto(synapsedesk.auth.Common.PageMeta meta) {
+  private static InvitationsControllerListV1200ResponseDataMeta toMetaDto(
+    synapsedesk.auth.Common.PageMeta meta
+  ) {
     return new InvitationsControllerListV1200ResponseDataMeta(
-        BigDecimal.valueOf(meta.getTotalItems()),
-        BigDecimal.valueOf(meta.getItemCount()),
-        BigDecimal.valueOf(meta.getItemsPerPage()),
-        BigDecimal.valueOf(meta.getTotalPages()),
-        BigDecimal.valueOf(meta.getCurrentPage()));
+      BigDecimal.valueOf(meta.getTotalItems()),
+      BigDecimal.valueOf(meta.getItemCount()),
+      BigDecimal.valueOf(meta.getItemsPerPage()),
+      BigDecimal.valueOf(meta.getTotalPages()),
+      BigDecimal.valueOf(meta.getCurrentPage())
+    );
   }
 
-  private static OffsetDateTime toOffsetDateTime(com.google.protobuf.Timestamp timestamp) {
-    return Instant.ofEpochSecond(timestamp.getSeconds(), timestamp.getNanos()).atOffset(ZoneOffset.UTC);
+  private static OffsetDateTime toOffsetDateTime(
+    com.google.protobuf.Timestamp timestamp
+  ) {
+    return Instant.ofEpochSecond(
+      timestamp.getSeconds(),
+      timestamp.getNanos()
+    ).atOffset(ZoneOffset.UTC);
   }
 
-  private MessageServiceGrpc.MessageServiceBlockingStub withMetadata(RequestContext context) {
+  private MessageServiceGrpc.MessageServiceBlockingStub withMetadata(
+    RequestContext context
+  ) {
     return stub
-        .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
-        .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context)));
+      .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
+      .withInterceptors(
+        MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context))
+      );
   }
 }

@@ -38,21 +38,38 @@ import tools.jackson.databind.ObjectMapper;
 class TicketsExportAndAiServiceTest {
 
   private final AnalyticsServiceGrpc.AnalyticsServiceBlockingStub analyticsStub =
-      mock(AnalyticsServiceGrpc.AnalyticsServiceBlockingStub.class);
-  private final AiServiceGrpc.AiServiceBlockingStub aiStub = mock(AiServiceGrpc.AiServiceBlockingStub.class);
+    mock(AnalyticsServiceGrpc.AnalyticsServiceBlockingStub.class);
+  private final AiServiceGrpc.AiServiceBlockingStub aiStub = mock(
+    AiServiceGrpc.AiServiceBlockingStub.class
+  );
   private TicketsExportAndAiService service;
 
   private static RequestContext contextWithCodes(List<String> codes) {
-    return new RequestContext("agent-1", "org-1", false, List.of(), codes, true, "127.0.0.1", "test");
+    return new RequestContext(
+      "agent-1",
+      "org-1",
+      false,
+      List.of(),
+      codes,
+      true,
+      "127.0.0.1",
+      "test"
+    );
   }
 
   @BeforeEach
   void setUp() {
-    when(analyticsStub.withDeadlineAfter(anyLong(), any())).thenReturn(analyticsStub);
+    when(analyticsStub.withDeadlineAfter(anyLong(), any())).thenReturn(
+      analyticsStub
+    );
     when(analyticsStub.withInterceptors(any())).thenReturn(analyticsStub);
     when(aiStub.withDeadlineAfter(anyLong(), any())).thenReturn(aiStub);
     when(aiStub.withInterceptors(any())).thenReturn(aiStub);
-    service = new TicketsExportAndAiService(analyticsStub, aiStub, new ObjectMapper());
+    service = new TicketsExportAndAiService(
+      analyticsStub,
+      aiStub,
+      new ObjectMapper()
+    );
   }
 
   @Test
@@ -61,8 +78,9 @@ class TicketsExportAndAiServiceTest {
     dto.setFrom("not-a-date");
     dto.setTo("2026-09-01");
 
-    assertThatThrownBy(() -> service.createExport(contextWithCodes(List.of("ticket.export")), dto))
-        .isInstanceOf(ResponseStatusException.class);
+    assertThatThrownBy(() ->
+      service.createExport(contextWithCodes(List.of("ticket.export")), dto)
+    ).isInstanceOf(ResponseStatusException.class);
     verify(analyticsStub, never()).createExport(any());
   }
 
@@ -73,7 +91,10 @@ class TicketsExportAndAiServiceTest {
     dto.setFrom("2026-01-01");
     dto.setTo("2026-09-01");
 
-    var response = service.createExport(contextWithCodes(List.of("ticket.export")), dto);
+    var response = service.createExport(
+      contextWithCodes(List.of("ticket.export")),
+      dto
+    );
 
     assertThat(response.getStatusCode().value()).isEqualTo(202);
   }
@@ -85,7 +106,10 @@ class TicketsExportAndAiServiceTest {
     dto.setFrom("2026-01-01T00:00:00Z");
     dto.setTo("2026-09-01T23:59:59Z");
 
-    var response = service.createExport(contextWithCodes(List.of("ticket.export")), dto);
+    var response = service.createExport(
+      contextWithCodes(List.of("ticket.export")),
+      dto
+    );
 
     assertThat(response.getStatusCode().value()).isEqualTo(202);
   }
@@ -100,9 +124,13 @@ class TicketsExportAndAiServiceTest {
 
     service.createExport(contextWithCodes(List.of("ticket.export")), dto);
 
-    ArgumentCaptor<CreateExportRequest> captor = ArgumentCaptor.forClass(CreateExportRequest.class);
+    ArgumentCaptor<CreateExportRequest> captor = ArgumentCaptor.forClass(
+      CreateExportRequest.class
+    );
     verify(analyticsStub).createExport(captor.capture());
-    assertThat(captor.getValue().getKind()).isEqualTo(ExportKind.EXPORT_KIND_TICKET);
+    assertThat(captor.getValue().getKind()).isEqualTo(
+      ExportKind.EXPORT_KIND_TICKET
+    );
     assertThat(captor.getValue().getFilters()).contains("OPEN");
   }
 
@@ -112,38 +140,50 @@ class TicketsExportAndAiServiceTest {
     dto.setFrom("2026-01-01");
     dto.setTo("2026-09-01");
 
-    assertThatThrownBy(() -> service.createExport(contextWithCodes(List.of()), dto))
-        .isInstanceOf(ResponseStatusException.class);
+    assertThatThrownBy(() ->
+      service.createExport(contextWithCodes(List.of()), dto)
+    ).isInstanceOf(ResponseStatusException.class);
   }
 
   @Test
   void listSimilarRequiresTicketReadAllNotAnAiCode() {
-    assertThatThrownBy(() -> service.listSimilar(contextWithCodes(List.of("ticket.ai.use")), "ticket-1"))
-        .isInstanceOf(ResponseStatusException.class);
+    assertThatThrownBy(() ->
+      service.listSimilar(
+        contextWithCodes(List.of("ticket.ai.use")),
+        "ticket-1"
+      )
+    ).isInstanceOf(ResponseStatusException.class);
     verify(aiStub, never()).listSimilarTickets(any());
 
     when(aiStub.listSimilarTickets(any())).thenReturn(
-        ListSimilarTicketsResponse.newBuilder()
-            .addItems(
-                SimilarTicketResponse.newBuilder()
-                    .setTicketId("ticket-2")
-                    .setTicketNumber(42)
-                    .setTitle("Similar")
-                    .setSimilarityScore(0.9)
-                    .build())
-            .build());
+      ListSimilarTicketsResponse.newBuilder()
+        .addItems(
+          SimilarTicketResponse.newBuilder()
+            .setTicketId("ticket-2")
+            .setTicketNumber(42)
+            .setTitle("Similar")
+            .setSimilarityScore(0.9)
+            .build()
+        )
+        .build()
+    );
 
-    var response = service.listSimilar(contextWithCodes(List.of("ticket.read.all")), "ticket-1");
+    var response = service.listSimilar(
+      contextWithCodes(List.of("ticket.read.all")),
+      "ticket-1"
+    );
 
     assertThat(response.getBody().getData()).hasSize(1);
-    assertThat(response.getBody().getData().get(0).getTicketId()).isEqualTo("ticket-2");
+    assertThat(response.getBody().getData().get(0).getTicketId()).isEqualTo(
+      "ticket-2"
+    );
   }
 
   private static ExportResponse wireExport() {
     return ExportResponse.newBuilder()
-        .setId("export-1")
-        .setStatus(ExportStatus.EXPORT_STATUS_PENDING)
-        .setKind(ExportKind.EXPORT_KIND_TICKET)
-        .build();
+      .setId("export-1")
+      .setStatus(ExportStatus.EXPORT_STATUS_PENDING)
+      .setKind(ExportKind.EXPORT_KIND_TICKET)
+      .build();
   }
 }

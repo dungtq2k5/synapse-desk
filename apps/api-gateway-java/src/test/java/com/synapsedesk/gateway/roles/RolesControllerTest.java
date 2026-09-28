@@ -36,33 +36,46 @@ import synapsedesk.auth.RoleServiceGrpc;
 /** `RolesApi` — the request each write builds, and `create`'s single-code gate. */
 class RolesControllerTest {
 
-  private final RoleServiceGrpc.RoleServiceBlockingStub stub = mock(RoleServiceGrpc.RoleServiceBlockingStub.class);
+  private final RoleServiceGrpc.RoleServiceBlockingStub stub = mock(
+    RoleServiceGrpc.RoleServiceBlockingStub.class
+  );
   private final CurrentUser currentUser = mock(CurrentUser.class);
   private final CacheService cache = mock(CacheService.class);
   private RolesController controller;
 
   private static RoleResponse.Builder baseRole(String id) {
     return RoleResponse.newBuilder()
-        .setId(id)
-        .setName("Agent")
-        .setIsSystemRole(false)
-        .setUserAssigned(3)
-        .addPermissionCodes("ticket.read.all")
-        .setCreatedAt(Timestamp.getDefaultInstance())
-        .setUpdatedAt(Timestamp.getDefaultInstance());
+      .setId(id)
+      .setName("Agent")
+      .setIsSystemRole(false)
+      .setUserAssigned(3)
+      .addPermissionCodes("ticket.read.all")
+      .setCreatedAt(Timestamp.getDefaultInstance())
+      .setUpdatedAt(Timestamp.getDefaultInstance());
   }
 
   @BeforeEach
   void setUp() {
     when(stub.withDeadlineAfter(anyLong(), any())).thenReturn(stub);
     when(stub.withInterceptors(any())).thenReturn(stub);
-    when(currentUser.require(any()))
-        .thenReturn(
-            new RequestContext(
-                "agent-1", "org-1", false, List.of(), List.of("role.create"), true, "127.0.0.1", "test"));
-    when(cache.wrap(any(), anyLong(), any(), any()))
-        .thenAnswer(invocation -> ((Supplier<?>) invocation.getArgument(3)).get());
-    RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(mock(HttpServletRequest.class)));
+    when(currentUser.require(any())).thenReturn(
+      new RequestContext(
+        "agent-1",
+        "org-1",
+        false,
+        List.of(),
+        List.of("role.create"),
+        true,
+        "127.0.0.1",
+        "test"
+      )
+    );
+    when(cache.wrap(any(), anyLong(), any(), any())).thenAnswer(invocation ->
+      ((Supplier<?>) invocation.getArgument(3)).get()
+    );
+    RequestContextHolder.setRequestAttributes(
+      new ServletRequestAttributes(mock(HttpServletRequest.class))
+    );
     controller = new RolesController(stub, currentUser, cache);
   }
 
@@ -74,17 +87,22 @@ class RolesControllerTest {
   @Test
   void createSendsNameDescriptionAndPermissionCodes() {
     when(stub.createRole(any())).thenReturn(baseRole("r1").build());
-    CreateRoleDto dto =
-        new CreateRoleDto("Agent", List.of(CreateRoleDto.PermissionCodesEnum.TICKET_READ_ALL))
-            .description("Front line");
+    CreateRoleDto dto = new CreateRoleDto(
+      "Agent",
+      List.of(CreateRoleDto.PermissionCodesEnum.TICKET_READ_ALL)
+    ).description("Front line");
 
     var response = controller.rolesControllerCreateV1(dto);
 
-    ArgumentCaptor<CreateRoleRequest> captor = ArgumentCaptor.forClass(CreateRoleRequest.class);
+    ArgumentCaptor<CreateRoleRequest> captor = ArgumentCaptor.forClass(
+      CreateRoleRequest.class
+    );
     verify(stub).createRole(captor.capture());
     assertThat(captor.getValue().getName()).isEqualTo("Agent");
     assertThat(captor.getValue().getDescription()).isEqualTo("Front line");
-    assertThat(captor.getValue().getPermissionCodesList()).containsExactly("ticket.read.all");
+    assertThat(captor.getValue().getPermissionCodesList()).containsExactly(
+      "ticket.read.all"
+    );
     assertThat(response.getStatusCode().value()).isEqualTo(201);
     assertThat(response.getBody().getData().getId()).isEqualTo("r1");
   }
@@ -96,7 +114,9 @@ class RolesControllerTest {
 
     controller.rolesControllerUpdateV1("r1", dto);
 
-    ArgumentCaptor<UpdateRoleRequest> captor = ArgumentCaptor.forClass(UpdateRoleRequest.class);
+    ArgumentCaptor<UpdateRoleRequest> captor = ArgumentCaptor.forClass(
+      UpdateRoleRequest.class
+    );
     verify(stub).updateRole(captor.capture());
     assertThat(captor.getValue().getId()).isEqualTo("r1");
     assertThat(captor.getValue().hasName()).isTrue();
@@ -107,7 +127,9 @@ class RolesControllerTest {
   void removeSendsTheRoleId() {
     controller.rolesControllerRemoveV1("r1");
 
-    ArgumentCaptor<RoleIdRequest> captor = ArgumentCaptor.forClass(RoleIdRequest.class);
+    ArgumentCaptor<RoleIdRequest> captor = ArgumentCaptor.forClass(
+      RoleIdRequest.class
+    );
     verify(stub).deleteRole(captor.capture());
     assertThat(captor.getValue().getId()).isEqualTo("r1");
   }
@@ -115,15 +137,20 @@ class RolesControllerTest {
   @Test
   void setPermissionsReplacesTheWholeSet() {
     when(stub.setRolePermissions(any())).thenReturn(baseRole("r1").build());
-    SetRolePermissionsDto dto =
-        new SetRolePermissionsDto(List.of(SetRolePermissionsDto.PermissionCodesEnum.ROLE_READ));
+    SetRolePermissionsDto dto = new SetRolePermissionsDto(
+      List.of(SetRolePermissionsDto.PermissionCodesEnum.ROLE_READ)
+    );
 
     controller.rolesControllerSetPermissionsV1("r1", dto);
 
-    ArgumentCaptor<SetRolePermissionsRequest> captor = ArgumentCaptor.forClass(SetRolePermissionsRequest.class);
+    ArgumentCaptor<SetRolePermissionsRequest> captor = ArgumentCaptor.forClass(
+      SetRolePermissionsRequest.class
+    );
     verify(stub).setRolePermissions(captor.capture());
     assertThat(captor.getValue().getId()).isEqualTo("r1");
-    assertThat(captor.getValue().getPermissionCodesList()).containsExactly("role.read");
+    assertThat(captor.getValue().getPermissionCodesList()).containsExactly(
+      "role.read"
+    );
   }
 
   @Test
@@ -135,10 +162,15 @@ class RolesControllerTest {
 
     controller.rolesControllerAssignUsersV1("r1", dto);
 
-    ArgumentCaptor<AssignRoleUsersRequest> captor = ArgumentCaptor.forClass(AssignRoleUsersRequest.class);
+    ArgumentCaptor<AssignRoleUsersRequest> captor = ArgumentCaptor.forClass(
+      AssignRoleUsersRequest.class
+    );
     verify(stub).assignRoleUsers(captor.capture());
     assertThat(captor.getValue().getRoleId()).isEqualTo("r1");
-    assertThat(captor.getValue().getUserIdsList()).containsExactly(u1.toString(), u2.toString());
+    assertThat(captor.getValue().getUserIdsList()).containsExactly(
+      u1.toString(),
+      u2.toString()
+    );
   }
 
   @Test
@@ -147,7 +179,9 @@ class RolesControllerTest {
 
     controller.rolesControllerRevokeUserV1("r1", "u1");
 
-    ArgumentCaptor<RevokeRoleUserRequest> captor = ArgumentCaptor.forClass(RevokeRoleUserRequest.class);
+    ArgumentCaptor<RevokeRoleUserRequest> captor = ArgumentCaptor.forClass(
+      RevokeRoleUserRequest.class
+    );
     verify(stub).revokeRoleUser(captor.capture());
     assertThat(captor.getValue().getRoleId()).isEqualTo("r1");
     assertThat(captor.getValue().getUserId()).isEqualTo("u1");

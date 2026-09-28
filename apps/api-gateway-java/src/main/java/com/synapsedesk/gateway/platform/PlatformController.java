@@ -52,10 +52,11 @@ public class PlatformController implements PlatformApi {
   private final PlatformPlansService plans;
 
   public PlatformController(
-      CurrentUser currentUser,
-      PlatformOrganizationsService organizations,
-      PlatformUsersRolesFinanceService usersRolesFinance,
-      PlatformPlansService plans) {
+    CurrentUser currentUser,
+    PlatformOrganizationsService organizations,
+    PlatformUsersRolesFinanceService usersRolesFinance,
+    PlatformPlansService plans
+  ) {
     this.currentUser = currentUser;
     this.organizations = organizations;
     this.usersRolesFinance = usersRolesFinance;
@@ -68,69 +69,134 @@ public class PlatformController implements PlatformApi {
 
   @Override
   public ResponseEntity<PlatformControllerListOrganizationsV1200Response> platformControllerListOrganizationsV1(
-      BigDecimal page, BigDecimal limit, String sortOrder, String searchTerm, String sortBy, Boolean includeDeleted,
-      String status) {
-    return organizations.listOrganizations(context(), page, limit, sortOrder, searchTerm, sortBy, includeDeleted, status);
+    BigDecimal page,
+    BigDecimal limit,
+    String sortOrder,
+    String searchTerm,
+    String sortBy,
+    Boolean includeDeleted,
+    String status
+  ) {
+    return organizations.listOrganizations(
+      context(),
+      page,
+      limit,
+      sortOrder,
+      searchTerm,
+      sortBy,
+      includeDeleted,
+      status
+    );
   }
 
   @Override
   public ResponseEntity<PlatformControllerCreateOrganizationV1201Response> platformControllerCreateOrganizationV1(
-      CreatePlatformOrganizationDto createPlatformOrganizationDto) {
-    return organizations.createOrganization(context(), createPlatformOrganizationDto);
+    CreatePlatformOrganizationDto createPlatformOrganizationDto
+  ) {
+    return organizations.createOrganization(
+      context(),
+      createPlatformOrganizationDto
+    );
   }
 
   @Override
-  public ResponseEntity<PlatformControllerGetOrganizationV1200Response> platformControllerGetOrganizationV1(String id) {
+  public ResponseEntity<PlatformControllerGetOrganizationV1200Response> platformControllerGetOrganizationV1(
+    String id
+  ) {
     return organizations.getOrganization(context(), id);
   }
 
   @Override
   public ResponseEntity<PlatformControllerGetOrganizationV1200Response> platformControllerUpdateOrganizationV1(
-      String id, UpdatePlatformOrganizationDto updatePlatformOrganizationDto) {
-    return organizations.updateOrganization(context(), id, updatePlatformOrganizationDto);
+    String id,
+    UpdatePlatformOrganizationDto updatePlatformOrganizationDto
+  ) {
+    return organizations.updateOrganization(
+      context(),
+      id,
+      updatePlatformOrganizationDto
+    );
   }
 
   @Override
   public ResponseEntity<PlatformControllerGetOrganizationV1200Response> platformControllerSetStatusV1(
-      String id, SetOrganizationStatusDto setOrganizationStatusDto) {
+    String id,
+    SetOrganizationStatusDto setOrganizationStatusDto
+  ) {
     return organizations.setStatus(context(), id, setOrganizationStatusDto);
   }
 
   @Override
   public ResponseEntity<PlatformControllerGetOrganizationV1200Response> platformControllerResetBillingCycleV1(
-      String id, ResetBillingCycleDto resetBillingCycleDto) {
+    String id,
+    ResetBillingCycleDto resetBillingCycleDto
+  ) {
     return organizations.resetBillingCycle(context(), id, resetBillingCycleDto);
   }
 
   @Override
   public ResponseEntity<OrganizationsControllerRequestOffboardV1200Response> platformControllerOffboardV1(
-      String id, OffboardOrganizationDto offboardOrganizationDto) {
+    String id,
+    OffboardOrganizationDto offboardOrganizationDto
+  ) {
     return organizations.offboard(context(), id, offboardOrganizationDto);
   }
 
   @Override
-  public ResponseEntity<PlatformControllerGetOrganizationV1200Response> platformControllerRestoreV1(String id) {
+  public ResponseEntity<PlatformControllerGetOrganizationV1200Response> platformControllerRestoreV1(
+    String id
+  ) {
     return organizations.restore(context(), id);
   }
 
   @Override
   public ResponseEntity<PlatformControllerListUsersV1200Response> platformControllerListUsersV1(
-      BigDecimal page, BigDecimal limit, String sortOrder, String searchTerm, String sortBy, Boolean includeDeleted,
-      UUID organizationId) {
-    return usersRolesFinance.listUsers(context(), page, limit, sortOrder, searchTerm, sortBy, includeDeleted, organizationId);
+    BigDecimal page,
+    BigDecimal limit,
+    String sortOrder,
+    String searchTerm,
+    String sortBy,
+    Boolean includeDeleted,
+    UUID organizationId
+  ) {
+    return usersRolesFinance.listUsers(
+      context(),
+      page,
+      limit,
+      sortOrder,
+      searchTerm,
+      sortBy,
+      includeDeleted,
+      organizationId
+    );
   }
 
   @Override
   public ResponseEntity<RolesControllerListV1200Response> platformControllerListGlobalRolesV1(
-      BigDecimal page, BigDecimal limit, String sortOrder, String searchTerm, String sortBy, Boolean includeDeleted,
-      UUID organizationId) {
+    BigDecimal page,
+    BigDecimal limit,
+    String sortOrder,
+    String searchTerm,
+    String sortBy,
+    Boolean includeDeleted,
+    UUID organizationId
+  ) {
     return usersRolesFinance.listGlobalRoles(
-        context(), page, limit, sortOrder, searchTerm, sortBy, includeDeleted, organizationId);
+      context(),
+      page,
+      limit,
+      sortOrder,
+      searchTerm,
+      sortBy,
+      includeDeleted,
+      organizationId
+    );
   }
 
   @Override
   public ResponseEntity<RolesControllerCreateV1201Response> platformControllerCreateGlobalRoleV1(
-      CreateGlobalRoleDto createGlobalRoleDto) {
+    CreateGlobalRoleDto createGlobalRoleDto
+  ) {
     return usersRolesFinance.createGlobalRole(context(), createGlobalRoleDto);
   }
 
@@ -146,40 +212,68 @@ public class PlatformController implements PlatformApi {
 
   @Override
   public ResponseEntity<PlatformControllerListBillingEventsV1200Response> platformControllerListBillingEventsV1(
-      String from, String to) {
+    String from,
+    String to
+  ) {
     return usersRolesFinance.listBillingEvents(context(), from, to);
   }
 
   @Override
   public ResponseEntity<PlatformControllerListPlansV1200Response> platformControllerListPlansV1(
-      BigDecimal page, BigDecimal limit, String sortOrder, String searchTerm, String sortBy, Boolean includeInactive,
-      Boolean includeDeleted) {
-    return plans.listPlans(context(), page, limit, sortOrder, searchTerm, sortBy, includeInactive, includeDeleted);
+    BigDecimal page,
+    BigDecimal limit,
+    String sortOrder,
+    String searchTerm,
+    String sortBy,
+    Boolean includeInactive,
+    Boolean includeDeleted
+  ) {
+    return plans.listPlans(
+      context(),
+      page,
+      limit,
+      sortOrder,
+      searchTerm,
+      sortBy,
+      includeInactive,
+      includeDeleted
+    );
   }
 
   @Override
-  public ResponseEntity<PlatformControllerCreatePlanV1201Response> platformControllerCreatePlanV1(CreatePlanDto createPlanDto) {
+  public ResponseEntity<PlatformControllerCreatePlanV1201Response> platformControllerCreatePlanV1(
+    CreatePlanDto createPlanDto
+  ) {
     return plans.createPlan(context(), createPlanDto);
   }
 
   @Override
-  public ResponseEntity<PlatformControllerCreatePlanV1201Response> platformControllerGetPlanV1(String id) {
+  public ResponseEntity<PlatformControllerCreatePlanV1201Response> platformControllerGetPlanV1(
+    String id
+  ) {
     return plans.getPlan(context(), id);
   }
 
   @Override
   public ResponseEntity<PlatformControllerCreatePlanV1201Response> platformControllerUpdatePlanV1(
-      String id, UpdatePlanDto updatePlanDto) {
+    String id,
+    UpdatePlanDto updatePlanDto
+  ) {
     return plans.updatePlan(context(), id, updatePlanDto);
   }
 
   @Override
-  public ResponseEntity<PlatformControllerDeletePlanV1200Response> platformControllerDeletePlanV1(String id) {
+  public ResponseEntity<PlatformControllerDeletePlanV1200Response> platformControllerDeletePlanV1(
+    String id
+  ) {
     return plans.deletePlan(context(), id);
   }
 
   @Override
-  public ResponseEntity<PlatformControllerApplyPlanV1200Response> platformControllerApplyPlanV1(String id, Boolean dryRun) {
+  public ResponseEntity<PlatformControllerApplyPlanV1200Response> platformControllerApplyPlanV1(
+    String id,
+    Boolean dryRun
+  ) {
     return plans.applyPlan(context(), id, dryRun);
   }
 }

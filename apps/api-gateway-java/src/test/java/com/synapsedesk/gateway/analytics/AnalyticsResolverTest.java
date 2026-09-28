@@ -42,22 +42,31 @@ import synapsedesk.ticket.AnalyticsServiceGrpc;
 class AnalyticsResolverTest {
 
   private final AnalyticsServiceGrpc.AnalyticsServiceBlockingStub analyticsStub =
-      mock(AnalyticsServiceGrpc.AnalyticsServiceBlockingStub.class);
+    mock(AnalyticsServiceGrpc.AnalyticsServiceBlockingStub.class);
   private final AiLedgerServiceGrpc.AiLedgerServiceBlockingStub ledgerStub =
-      mock(AiLedgerServiceGrpc.AiLedgerServiceBlockingStub.class);
+    mock(AiLedgerServiceGrpc.AiLedgerServiceBlockingStub.class);
   private final CurrentUser currentUser = mock(CurrentUser.class);
   private final CacheService cache = mock(CacheService.class);
   private AnalyticsResolver resolver;
 
   private static RequestContext context() {
     return new RequestContext(
-        "agent-1", "11111111-1111-4111-8111-111111111111", false, List.of(), List.of("analytics.read"), true,
-        "127.0.0.1", "test");
+      "agent-1",
+      "11111111-1111-4111-8111-111111111111",
+      false,
+      List.of(),
+      List.of("analytics.read"),
+      true,
+      "127.0.0.1",
+      "test"
+    );
   }
 
   @BeforeEach
   void setUp() {
-    when(analyticsStub.withDeadlineAfter(anyLong(), any())).thenReturn(analyticsStub);
+    when(analyticsStub.withDeadlineAfter(anyLong(), any())).thenReturn(
+      analyticsStub
+    );
     when(analyticsStub.withInterceptors(any())).thenReturn(analyticsStub);
     when(ledgerStub.withDeadlineAfter(anyLong(), any())).thenReturn(ledgerStub);
     when(ledgerStub.withInterceptors(any())).thenReturn(ledgerStub);
@@ -66,10 +75,19 @@ class AnalyticsResolverTest {
     // not the caching, which `AnalyticsCacheRoundTripIT` already covers
     // against a real Redis.
     when(cache.buildKey(any(), any(), any())).thenReturn("key");
-    when(cache.<Object>wrap(any(), anyLong(), any(), any()))
-        .thenAnswer(invocation -> ((java.util.function.Supplier<?>) invocation.getArgument(3)).get());
-    RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(mock(HttpServletRequest.class)));
-    resolver = new AnalyticsResolver(analyticsStub, ledgerStub, currentUser, cache);
+    when(cache.<Object>wrap(any(), anyLong(), any(), any())).thenAnswer(
+      invocation ->
+        ((java.util.function.Supplier<?>) invocation.getArgument(3)).get()
+    );
+    RequestContextHolder.setRequestAttributes(
+      new ServletRequestAttributes(mock(HttpServletRequest.class))
+    );
+    resolver = new AnalyticsResolver(
+      analyticsStub,
+      ledgerStub,
+      currentUser,
+      cache
+    );
   }
 
   @AfterEach
@@ -79,91 +97,139 @@ class AnalyticsResolverTest {
 
   @Test
   void overviewMapsTheWireResponse() {
-    when(analyticsStub.getOverview(any()))
-        .thenReturn(
-            OverviewResponse.newBuilder()
-                .setTicketsCreated(10)
-                .setTicketsResolved(8)
-                .setTicketsEscalated(2)
-                .setOpenTickets(3)
-                .setDeflection(RateValue.newBuilder().setRate(0.4f).setNumerator(4).setDenominator(10).build())
-                .setCsat(RateValue.newBuilder().setNumerator(0).setDenominator(0).build())
-                .setHumanFirstResponseSeconds(MeanValue.newBuilder().setMean(30f).setCount(5).build())
-                .setAiFirstResponseSeconds(MeanValue.newBuilder().setCount(0).build())
-                .setResolutionSeconds(MeanValue.newBuilder().setMean(600f).setCount(5).build())
-                .build());
+    when(analyticsStub.getOverview(any())).thenReturn(
+      OverviewResponse.newBuilder()
+        .setTicketsCreated(10)
+        .setTicketsResolved(8)
+        .setTicketsEscalated(2)
+        .setOpenTickets(3)
+        .setDeflection(
+          RateValue.newBuilder()
+            .setRate(0.4f)
+            .setNumerator(4)
+            .setDenominator(10)
+            .build()
+        )
+        .setCsat(
+          RateValue.newBuilder().setNumerator(0).setDenominator(0).build()
+        )
+        .setHumanFirstResponseSeconds(
+          MeanValue.newBuilder().setMean(30f).setCount(5).build()
+        )
+        .setAiFirstResponseSeconds(MeanValue.newBuilder().setCount(0).build())
+        .setResolutionSeconds(
+          MeanValue.newBuilder().setMean(600f).setCount(5).build()
+        )
+        .build()
+    );
 
-    AnalyticsOverviewGqlDto result = resolver.analyticsOverview("2026-01-01", "2026-01-31");
+    AnalyticsOverviewGqlDto result = resolver.analyticsOverview(
+      "2026-01-01",
+      "2026-01-31"
+    );
 
     assertThat(result.ticketsCreated()).isEqualTo(10);
-    assertThat(result.deflection().rate()).isEqualTo(0.4f, org.assertj.core.data.Offset.offset(0.0001));
+    assertThat(result.deflection().rate()).isEqualTo(
+      0.4f,
+      org.assertj.core.data.Offset.offset(0.0001)
+    );
     assertThat(result.csat().rate()).isNull();
     assertThat(result.aiFirstResponseSeconds().mean()).isNull();
   }
 
   @Test
   void agentsNeverCallsAuthServiceAndReturnsBothLegsWhenBothSucceed() {
-    when(analyticsStub.getAgentStats(any()))
-        .thenReturn(
-            AgentStatsResponse.newBuilder()
-                .addItems(
-                    AgentStat.newBuilder()
-                        .setAgentId("agent-1")
-                        .setAssigned(5)
-                        .setResolved(4)
-                        .setMessagesSent(12)
-                        .setResolutionSeconds(MeanValue.newBuilder().setMean(200f).setCount(4).build())
-                        .build())
-                .build());
-    when(ledgerStub.getAiUsage(any()))
-        .thenReturn(
-            AiUsageResponse.newBuilder()
-                .setDraftAcceptance(
-                    synapsedesk.ingestion.Ledger.AiRateValue.newBuilder()
-                        .setRate(0.75f)
-                        .setNumerator(3)
-                        .setDenominator(4)
-                        .build())
-                .build());
+    when(analyticsStub.getAgentStats(any())).thenReturn(
+      AgentStatsResponse.newBuilder()
+        .addItems(
+          AgentStat.newBuilder()
+            .setAgentId("agent-1")
+            .setAssigned(5)
+            .setResolved(4)
+            .setMessagesSent(12)
+            .setResolutionSeconds(
+              MeanValue.newBuilder().setMean(200f).setCount(4).build()
+            )
+            .build()
+        )
+        .build()
+    );
+    when(ledgerStub.getAiUsage(any())).thenReturn(
+      AiUsageResponse.newBuilder()
+        .setDraftAcceptance(
+          synapsedesk.ingestion.Ledger.AiRateValue.newBuilder()
+            .setRate(0.75f)
+            .setNumerator(3)
+            .setDenominator(4)
+            .build()
+        )
+        .build()
+    );
 
-    AgentAnalyticsGqlDto result = resolver.analyticsAgents("2026-01-01", "2026-01-31");
+    AgentAnalyticsGqlDto result = resolver.analyticsAgents(
+      "2026-01-01",
+      "2026-01-31"
+    );
 
     assertThat(result.items()).hasSize(1);
-    assertThat(result.items().get(0).draftAcceptance().rate()).isEqualTo(0.75f, org.assertj.core.data.Offset.offset(0.0001));
+    assertThat(result.items().get(0).draftAcceptance().rate()).isEqualTo(
+      0.75f,
+      org.assertj.core.data.Offset.offset(0.0001)
+    );
     assertThat(result.unavailable()).isEmpty();
   }
 
   @Test
   void agentsMarksTheFailingLegUnavailableAndKeepsTheOther() {
-    when(analyticsStub.getAgentStats(any()))
-        .thenReturn(
-            AgentStatsResponse.newBuilder()
-                .addItems(
-                    AgentStat.newBuilder()
-                        .setAgentId("agent-1")
-                        .setAssigned(5)
-                        .setResolved(4)
-                        .setMessagesSent(12)
-                        .setResolutionSeconds(MeanValue.newBuilder().setMean(200f).setCount(4).build())
-                        .build())
-                .build());
-    when(ledgerStub.getAiUsage(any()))
-        .thenThrow(new StatusRuntimeException(Status.UNAVAILABLE.withDescription("ingestion-service is down")));
+    when(analyticsStub.getAgentStats(any())).thenReturn(
+      AgentStatsResponse.newBuilder()
+        .addItems(
+          AgentStat.newBuilder()
+            .setAgentId("agent-1")
+            .setAssigned(5)
+            .setResolved(4)
+            .setMessagesSent(12)
+            .setResolutionSeconds(
+              MeanValue.newBuilder().setMean(200f).setCount(4).build()
+            )
+            .build()
+        )
+        .build()
+    );
+    when(ledgerStub.getAiUsage(any())).thenThrow(
+      new StatusRuntimeException(
+        Status.UNAVAILABLE.withDescription("ingestion-service is down")
+      )
+    );
 
-    AgentAnalyticsGqlDto result = resolver.analyticsAgents("2026-01-01", "2026-01-31");
+    AgentAnalyticsGqlDto result = resolver.analyticsAgents(
+      "2026-01-01",
+      "2026-01-31"
+    );
 
     assertThat(result.items()).hasSize(1);
     assertThat(result.items().get(0).draftAcceptance()).isNull();
     assertThat(result.unavailable()).hasSize(1);
-    assertThat(result.unavailable().get(0).source()).isEqualTo("ingestion-service");
+    assertThat(result.unavailable().get(0).source()).isEqualTo(
+      "ingestion-service"
+    );
   }
 
   @Test
   void agentEdgeLoadsThroughTheUsersLoader() {
-    AgentStatGqlDto stat = new AgentStatGqlDto("agent-1", 5, 4, 12, new MeanGqlDto(200.0, 4), null);
+    AgentStatGqlDto stat = new AgentStatGqlDto(
+      "agent-1",
+      5,
+      4,
+      12,
+      new MeanGqlDto(200.0, 4),
+      null
+    );
     @SuppressWarnings("unchecked")
     DataLoader<String, UserSummaryGqlDto> loader = mock(DataLoader.class);
-    when(loader.load(any(), any())).thenReturn(CompletableFuture.completedFuture(null));
+    when(loader.load(any(), any())).thenReturn(
+      CompletableFuture.completedFuture(null)
+    );
 
     resolver.agent(stat, loader);
 
@@ -172,10 +238,18 @@ class AnalyticsResolverTest {
 
   @Test
   void documentUsageEdgeLoadsThroughTheDocumentsLoader() {
-    DocumentUsageGqlDto usage = new DocumentUsageGqlDto("doc-1", "Handbook", 10, 3, 4);
+    DocumentUsageGqlDto usage = new DocumentUsageGqlDto(
+      "doc-1",
+      "Handbook",
+      10,
+      3,
+      4
+    );
     @SuppressWarnings("unchecked")
     DataLoader<String, DocumentGqlDto> loader = mock(DataLoader.class);
-    when(loader.load(any(), any())).thenReturn(CompletableFuture.completedFuture(null));
+    when(loader.load(any(), any())).thenReturn(
+      CompletableFuture.completedFuture(null)
+    );
 
     resolver.documentUsageDocument(usage, loader);
 
@@ -184,10 +258,17 @@ class AnalyticsResolverTest {
 
   @Test
   void knowledgeGapFlagEdgeLoadsThroughTheDocumentsLoader() {
-    KnowledgeGapFlagGqlDto flag = new KnowledgeGapFlagGqlDto("doc-2", "Policy", "EMPTY_RETRIEVAL", "no hits");
+    KnowledgeGapFlagGqlDto flag = new KnowledgeGapFlagGqlDto(
+      "doc-2",
+      "Policy",
+      "EMPTY_RETRIEVAL",
+      "no hits"
+    );
     @SuppressWarnings("unchecked")
     DataLoader<String, DocumentGqlDto> loader = mock(DataLoader.class);
-    when(loader.load(any(), any())).thenReturn(CompletableFuture.completedFuture(null));
+    when(loader.load(any(), any())).thenReturn(
+      CompletableFuture.completedFuture(null)
+    );
 
     resolver.knowledgeGapFlagDocument(flag, loader);
 

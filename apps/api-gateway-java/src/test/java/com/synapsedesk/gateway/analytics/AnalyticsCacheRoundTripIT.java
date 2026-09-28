@@ -33,11 +33,15 @@ class AnalyticsCacheRoundTripIT {
 
   @BeforeEach
   void connect() {
-    String url = SharedEnvironment.values().getOrDefault("REDIS_URL", "redis://localhost:6379");
+    String url = SharedEnvironment.values().getOrDefault(
+      "REDIS_URL",
+      "redis://localhost:6379"
+    );
     java.net.URI uri = java.net.URI.create(url);
-    var configuration =
-        new RedisStandaloneConfiguration(
-            uri.getHost() == null ? "localhost" : uri.getHost(), uri.getPort() < 0 ? 6379 : uri.getPort());
+    var configuration = new RedisStandaloneConfiguration(
+      uri.getHost() == null ? "localhost" : uri.getHost(),
+      uri.getPort() < 0 ? 6379 : uri.getPort()
+    );
     String path = uri.getPath();
     if (path != null && path.length() > 1) {
       configuration.setDatabase(Integer.parseInt(path.substring(1)));
@@ -56,42 +60,42 @@ class AnalyticsCacheRoundTripIT {
 
   @Test
   void anOverviewSurvivesARealRedisRoundTrip() {
-    AnalyticsOverviewGqlDto original =
-        new AnalyticsOverviewGqlDto(
-            10,
-            8,
-            2,
-            5,
-            new RateGqlDto(0.4, 4, 10),
-            new RateGqlDto(null, 0, 0),
-            new MeanGqlDto(120.5, 8),
-            new MeanGqlDto(30.0, 8),
-            new MeanGqlDto(600.0, 8),
-            3600.0,
-            OffsetDateTime.parse("2026-09-27T00:00:00Z"),
-            "2026-09-26");
+    AnalyticsOverviewGqlDto original = new AnalyticsOverviewGqlDto(
+      10,
+      8,
+      2,
+      5,
+      new RateGqlDto(0.4, 4, 10),
+      new RateGqlDto(null, 0, 0),
+      new MeanGqlDto(120.5, 8),
+      new MeanGqlDto(30.0, 8),
+      new MeanGqlDto(600.0, 8),
+      3600.0,
+      OffsetDateTime.parse("2026-09-27T00:00:00Z"),
+      "2026-09-26"
+    );
 
     String key = "cache-test:" + System.nanoTime();
     AtomicInteger produced = new AtomicInteger();
 
-    AnalyticsOverviewGqlDto first =
-        cache.wrap(
-            key,
-            60,
-            AnalyticsOverviewGqlDto.class,
-            () -> {
-              produced.incrementAndGet();
-              return original;
-            });
-    AnalyticsOverviewGqlDto second =
-        cache.wrap(
-            key,
-            60,
-            AnalyticsOverviewGqlDto.class,
-            () -> {
-              produced.incrementAndGet();
-              return original;
-            });
+    AnalyticsOverviewGqlDto first = cache.wrap(
+      key,
+      60,
+      AnalyticsOverviewGqlDto.class,
+      () -> {
+        produced.incrementAndGet();
+        return original;
+      }
+    );
+    AnalyticsOverviewGqlDto second = cache.wrap(
+      key,
+      60,
+      AnalyticsOverviewGqlDto.class,
+      () -> {
+        produced.incrementAndGet();
+        return original;
+      }
+    );
 
     assertThat(first).isEqualTo(original);
     // The SECOND call read Redis rather than recomputing — proving the value
@@ -103,20 +107,35 @@ class AnalyticsCacheRoundTripIT {
 
   @Test
   void aNestedListOfRecordsSurvivesARealRedisRoundTrip() {
-    AgentAnalyticsGqlDto original =
-        new AgentAnalyticsGqlDto(
-            List.of(
-                new AgentStatGqlDto("agent-1", 5, 4, 12, new MeanGqlDto(200.0, 4), new RateGqlDto(0.75, 3, 4)),
-                new AgentStatGqlDto("agent-2", 2, 2, 6, new MeanGqlDto(null, 0), null)),
-            List.of(new UnavailableBlockGqlDto("ingestion-service", "unavailable")),
-            "2026-09-26");
+    AgentAnalyticsGqlDto original = new AgentAnalyticsGqlDto(
+      List.of(
+        new AgentStatGqlDto(
+          "agent-1",
+          5,
+          4,
+          12,
+          new MeanGqlDto(200.0, 4),
+          new RateGqlDto(0.75, 3, 4)
+        ),
+        new AgentStatGqlDto("agent-2", 2, 2, 6, new MeanGqlDto(null, 0), null)
+      ),
+      List.of(new UnavailableBlockGqlDto("ingestion-service", "unavailable")),
+      "2026-09-26"
+    );
 
     String key = "cache-test:" + System.nanoTime();
     cache.wrap(key, 60, AgentAnalyticsGqlDto.class, () -> original);
 
-    AgentAnalyticsGqlDto readBack = cache.wrap(key, 60, AgentAnalyticsGqlDto.class, () -> {
-      throw new AssertionError("should have read the cached value, not recomputed");
-    });
+    AgentAnalyticsGqlDto readBack = cache.wrap(
+      key,
+      60,
+      AgentAnalyticsGqlDto.class,
+      () -> {
+        throw new AssertionError(
+          "should have read the cached value, not recomputed"
+        );
+      }
+    );
 
     assertThat(readBack).isEqualTo(original);
   }

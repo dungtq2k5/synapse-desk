@@ -116,8 +116,9 @@ function nodeRootFieldCodes(
       searchFrom = closeParen + 1;
 
       const rest = source.slice(closeParen + 1, closeParen + 401);
-      const signature =
-        /\n(?:\s*@[^\n]*\n)*\s*(?:async\s+)?(\w+)\s*\(/u.exec(rest);
+      const signature = /\n(?:\s*@[^\n]*\n)*\s*(?:async\s+)?(\w+)\s*\(/u.exec(
+        rest,
+      );
       if (!signature) continue;
 
       const named = new RegExp(String.raw`name:\s*'${fieldName}'`, 'u').test(
@@ -252,7 +253,9 @@ describe('GraphQL permission coverage — every gated Node field stays gated in 
         // a return here checked only that Node matched the exception list
         // and never looked at Java at all, so a `@RequirePermission` added
         // to the Java side of a deliberately-ungated field passed silently.
-        expect(javaRootFieldCodes(javaSourcesConcatenated, field.name)).toBeNull();
+        expect(
+          javaRootFieldCodes(javaSourcesConcatenated, field.name),
+        ).toBeNull();
 
         return;
       }

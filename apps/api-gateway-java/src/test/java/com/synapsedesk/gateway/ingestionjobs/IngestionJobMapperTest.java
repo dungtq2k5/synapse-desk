@@ -20,23 +20,27 @@ class IngestionJobMapperTest {
   private static IngestionJobResponse.Builder wire() {
     Timestamp now = Timestamp.newBuilder().setSeconds(1_756_684_800).build();
     return IngestionJobResponse.newBuilder()
-        .setId("job-1")
-        .setDocumentId("doc-1")
-        .setBullmqJobId("bullmq-1")
-        .setStatus(IngestionJobStatus.INGESTION_JOB_STATUS_FAILED)
-        .setCreatedAt(now);
+      .setId("job-1")
+      .setDocumentId("doc-1")
+      .setBullmqJobId("bullmq-1")
+      .setStatus(IngestionJobStatus.INGESTION_JOB_STATUS_FAILED)
+      .setCreatedAt(now);
   }
 
   @Test
   void anEmptyErrorLogBecomesNull() {
-    IngestionJobResponseDto dto = IngestionJobMapper.toDto(wire().setErrorLog("").build());
+    IngestionJobResponseDto dto = IngestionJobMapper.toDto(
+      wire().setErrorLog("").build()
+    );
 
     assertThat(dto.getErrorLog()).isNull();
   }
 
   @Test
   void aShortErrorLogPassesThroughUntouched() {
-    IngestionJobResponseDto dto = IngestionJobMapper.toDto(wire().setErrorLog("parse failed").build());
+    IngestionJobResponseDto dto = IngestionJobMapper.toDto(
+      wire().setErrorLog("parse failed").build()
+    );
 
     assertThat(dto.getErrorLog()).isEqualTo("parse failed");
   }
@@ -45,7 +49,9 @@ class IngestionJobMapperTest {
   void aLongErrorLogIsCutAt500CharsWithAnEllipsis() {
     String raw = "x".repeat(600);
 
-    IngestionJobResponseDto dto = IngestionJobMapper.toDto(wire().setErrorLog(raw).build());
+    IngestionJobResponseDto dto = IngestionJobMapper.toDto(
+      wire().setErrorLog(raw).build()
+    );
 
     assertThat(dto.getErrorLog()).hasSize(501);
     assertThat(dto.getErrorLog()).startsWith("x".repeat(500));
@@ -56,7 +62,9 @@ class IngestionJobMapperTest {
   void anExactly500CharErrorLogIsNotTruncated() {
     String raw = "x".repeat(500);
 
-    IngestionJobResponseDto dto = IngestionJobMapper.toDto(wire().setErrorLog(raw).build());
+    IngestionJobResponseDto dto = IngestionJobMapper.toDto(
+      wire().setErrorLog(raw).build()
+    );
 
     assertThat(dto.getErrorLog()).isEqualTo(raw);
   }

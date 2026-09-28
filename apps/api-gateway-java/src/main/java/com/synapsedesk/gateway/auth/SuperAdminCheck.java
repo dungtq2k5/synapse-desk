@@ -23,7 +23,10 @@ public class SuperAdminCheck {
 
   public void require(RequestContext context) {
     if (!context.isSuperAdmin() || context.organizationId() != null) {
-      throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Platform administration access required");
+      throw new ResponseStatusException(
+        HttpStatus.FORBIDDEN,
+        "Platform administration access required"
+      );
     }
   }
 }

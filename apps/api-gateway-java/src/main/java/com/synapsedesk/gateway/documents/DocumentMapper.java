@@ -15,28 +15,34 @@ public final class DocumentMapper {
 
   public static DocumentGqlDto toDocumentGqlDto(DocumentResponse document) {
     return new DocumentGqlDto(
-        document.getId(),
-        document.getOrganizationId(),
-        document.getCreatedById(),
-        document.getTitle(),
-        document.getFileType().name().replace("DOCUMENT_FILE_TYPE_", "").toLowerCase(java.util.Locale.ROOT),
-        Math.toIntExact(document.getFileSizeBytes()),
-        document.getIsOrganizationWide(),
-        toStatusGql(document.getStatus()),
-        document.getDepartmentIdsList(),
-        document.getChunkCount(),
-        toOffsetDateTime(document.getCreatedAt()),
-        toOffsetDateTime(document.getUpdatedAt()),
-        document.hasDeletedAt() ? toOffsetDateTime(document.getDeletedAt()) : null);
+      document.getId(),
+      document.getOrganizationId(),
+      document.getCreatedById(),
+      document.getTitle(),
+      document
+        .getFileType()
+        .name()
+        .replace("DOCUMENT_FILE_TYPE_", "")
+        .toLowerCase(java.util.Locale.ROOT),
+      Math.toIntExact(document.getFileSizeBytes()),
+      document.getIsOrganizationWide(),
+      toStatusGql(document.getStatus()),
+      document.getDepartmentIdsList(),
+      document.getChunkCount(),
+      toOffsetDateTime(document.getCreatedAt()),
+      toOffsetDateTime(document.getUpdatedAt()),
+      document.hasDeletedAt() ? toOffsetDateTime(document.getDeletedAt()) : null
+    );
   }
 
   public static PageMetaGqlDto toPageMetaGqlDto(PageMeta meta) {
     return new PageMetaGqlDto(
-        meta.getTotalItems(),
-        meta.getItemCount(),
-        meta.getItemsPerPage(),
-        meta.getTotalPages(),
-        meta.getCurrentPage());
+      meta.getTotalItems(),
+      meta.getItemCount(),
+      meta.getItemsPerPage(),
+      meta.getTotalPages(),
+      meta.getCurrentPage()
+    );
   }
 
   /** `UNSPECIFIED` -> `null`, matching Node's "a value this build cannot name answers null". */
@@ -50,7 +56,12 @@ public final class DocumentMapper {
     };
   }
 
-  private static OffsetDateTime toOffsetDateTime(com.google.protobuf.Timestamp timestamp) {
-    return Instant.ofEpochSecond(timestamp.getSeconds(), timestamp.getNanos()).atOffset(ZoneOffset.UTC);
+  private static OffsetDateTime toOffsetDateTime(
+    com.google.protobuf.Timestamp timestamp
+  ) {
+    return Instant.ofEpochSecond(
+      timestamp.getSeconds(),
+      timestamp.getNanos()
+    ).atOffset(ZoneOffset.UTC);
   }
 }

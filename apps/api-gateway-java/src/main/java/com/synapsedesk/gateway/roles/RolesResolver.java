@@ -44,7 +44,10 @@ public class RolesResolver {
   private final RoleServiceGrpc.RoleServiceBlockingStub stub;
   private final CurrentUser currentUser;
 
-  public RolesResolver(RoleServiceGrpc.RoleServiceBlockingStub stub, CurrentUser currentUser) {
+  public RolesResolver(
+    RoleServiceGrpc.RoleServiceBlockingStub stub,
+    CurrentUser currentUser
+  ) {
     this.stub = stub;
     this.currentUser = currentUser;
   }
@@ -55,7 +58,9 @@ public class RolesResolver {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     try {
-      RoleResponse response = withMetadata(context).getRole(RoleIdRequest.newBuilder().setId(id).build());
+      RoleResponse response = withMetadata(context).getRole(
+        RoleIdRequest.newBuilder().setId(id).build()
+      );
       return RoleMapper.toRoleGqlDto(response);
     } catch (StatusRuntimeException notFoundOrForbidden) {
       // Null rather than an error, matching `Query.role`'s own schema
@@ -67,26 +72,31 @@ public class RolesResolver {
 
   @QueryMapping(name = "roles")
   @RequirePermission(PermissionCodesEnum.ROLE_READ)
-  public RolePageGqlDto roles(@Argument int first, @Argument int page, @Argument String searchTerm) {
+  public RolePageGqlDto roles(
+    @Argument int first,
+    @Argument int page,
+    @Argument String searchTerm
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    PageRequest.Builder pageRequest =
-        PageRequest.newBuilder().setPage(page).setLimit(first).setSortOrder(SortOrder.SORT_ORDER_ASC);
+    PageRequest.Builder pageRequest = PageRequest.newBuilder()
+      .setPage(page)
+      .setLimit(first)
+      .setSortOrder(SortOrder.SORT_ORDER_ASC);
     if (searchTerm != null) {
       pageRequest.setSearchTerm(searchTerm);
     }
 
-    ListRolesResponse response =
-        withMetadata(context)
-            .listRoles(
-                ListRolesRequest.newBuilder()
-                    .setPage(pageRequest)
-                    // Matching the REST default, not the schema's convenience —
-                    // Node's own reasoning: a caller who wants system roles has
-                    // to ask, and this surface does not offer that as an
-                    // argument.
-                    .setIncludeSystem(false)
-                    .build());
+    ListRolesResponse response = withMetadata(context).listRoles(
+      ListRolesRequest.newBuilder()
+        .setPage(pageRequest)
+        // Matching the REST default, not the schema's convenience —
+        // Node's own reasoning: a caller who wants system roles has
+        // to ask, and this surface does not offer that as an
+        // argument.
+        .setIncludeSystem(false)
+        .build()
+    );
 
     return RoleMapper.toRolePageGqlDto(response);
   }
@@ -94,12 +104,16 @@ public class RolesResolver {
   @QueryMapping
   @RequirePermission(PermissionCodesEnum.ROLE_READ)
   public CompletableFuture<List<PermissionGqlDto>> permissions(
-      DataLoader<String, PermissionCatalogueGqlDto> loader) {
+    DataLoader<String, PermissionCatalogueGqlDto> loader
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     return loader
-        .load(context.organizationId() == null ? "" : context.organizationId(), context)
-        .thenApply(PermissionCatalogueGqlDto::items);
+      .load(
+        context.organizationId() == null ? "" : context.organizationId(),
+        context
+      )
+      .thenApply(PermissionCatalogueGqlDto::items);
   }
 
   /**
@@ -109,7 +123,9 @@ public class RolesResolver {
    */
   @SchemaMapping(typeName = "Role", field = "permissions")
   public CompletableFuture<List<PermissionGqlDto>> permissions(
-      RoleGqlDto role, DataLoader<String, PermissionCatalogueGqlDto> loader) {
+    RoleGqlDto role,
+    DataLoader<String, PermissionCatalogueGqlDto> loader
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
     Set<String> held = new HashSet<>(role.permissionCodes());
 
@@ -117,14 +133,26 @@ public class RolesResolver {
     // catalogue, and passing the role id would reinstate the N calls this
     // loader exists to collapse.
     return loader
-        .load(context.organizationId() == null ? "" : context.organizationId(), context)
-        .thenApply(
-            catalogue -> catalogue.items().stream().filter(p -> held.contains(p.code())).toList());
+      .load(
+        context.organizationId() == null ? "" : context.organizationId(),
+        context
+      )
+      .thenApply(catalogue ->
+        catalogue
+          .items()
+          .stream()
+          .filter(p -> held.contains(p.code()))
+          .toList()
+      );
   }
 
-  private RoleServiceGrpc.RoleServiceBlockingStub withMetadata(RequestContext context) {
+  private RoleServiceGrpc.RoleServiceBlockingStub withMetadata(
+    RequestContext context
+  ) {
     return stub
-        .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
-        .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context)));
+      .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
+      .withInterceptors(
+        MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context))
+      );
   }
 }

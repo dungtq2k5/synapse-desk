@@ -63,110 +63,195 @@ public class TicketsStatusService {
 
   private final TicketServiceGrpc.TicketServiceBlockingStub stub;
 
-  public TicketsStatusService(TicketServiceGrpc.TicketServiceBlockingStub stub) {
+  public TicketsStatusService(
+    TicketServiceGrpc.TicketServiceBlockingStub stub
+  ) {
     this.stub = stub;
   }
 
   public ResponseEntity<TicketsControllerBulkChangeStatusV1200Response> bulkChangeStatus(
-      RequestContext context, BulkTicketStatusDto dto) {
-    TicketsCrudService.requirePermission(context, PermissionCodesEnum.TICKET_UPDATE);
+    RequestContext context,
+    BulkTicketStatusDto dto
+  ) {
+    TicketsCrudService.requirePermission(
+      context,
+      PermissionCodesEnum.TICKET_UPDATE
+    );
     requireWithinBulkLimit(dto.getTicketIds());
 
-    BulkTicketStatusRequest.Builder wire =
-        BulkTicketStatusRequest.newBuilder()
-            .addAllTicketIds(dto.getTicketIds().stream().map(Object::toString).toList())
-            .setStatus(TicketsCrudService.toProtoTicketStatus(dto.getStatus().getValue()));
+    BulkTicketStatusRequest.Builder wire = BulkTicketStatusRequest.newBuilder()
+      .addAllTicketIds(
+        dto.getTicketIds().stream().map(Object::toString).toList()
+      )
+      .setStatus(
+        TicketsCrudService.toProtoTicketStatus(dto.getStatus().getValue())
+      );
     if (dto.getReason() != null) {
       wire.setReason(dto.getReason());
     }
 
-    BulkTicketStatusResponse response = withMetadata(context).bulkChangeTicketStatus(wire.build());
+    BulkTicketStatusResponse response = withMetadata(
+      context
+    ).bulkChangeTicketStatus(wire.build());
 
     return ResponseEntity.ok(
-        new TicketsControllerBulkChangeStatusV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("Bulk status change processed")
-            .data(
-                new BulkTicketStatusResponseDto()
-                    .updated(response.getUpdatedList())
-                    .failed(response.getFailedList().stream().map(TicketsStatusService::toFailureDto).toList())));
+      new TicketsControllerBulkChangeStatusV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("Bulk status change processed")
+        .data(
+          new BulkTicketStatusResponseDto()
+            .updated(response.getUpdatedList())
+            .failed(
+              response
+                .getFailedList()
+                .stream()
+                .map(TicketsStatusService::toFailureDto)
+                .toList()
+            )
+        )
+    );
   }
 
   public ResponseEntity<TicketsControllerBulkChangePriorityV1200Response> bulkChangePriority(
-      RequestContext context, BulkTicketPriorityDto dto) {
-    TicketsCrudService.requirePermission(context, PermissionCodesEnum.TICKET_UPDATE);
+    RequestContext context,
+    BulkTicketPriorityDto dto
+  ) {
+    TicketsCrudService.requirePermission(
+      context,
+      PermissionCodesEnum.TICKET_UPDATE
+    );
     requireWithinBulkLimit(dto.getTicketIds());
 
-    BulkTicketPriorityRequest wire =
-        BulkTicketPriorityRequest.newBuilder()
-            .addAllTicketIds(dto.getTicketIds().stream().map(Object::toString).toList())
-            .setPriority(TicketsCrudService.toProtoTicketPriority(dto.getPriority().getValue()))
-            .build();
+    BulkTicketPriorityRequest wire = BulkTicketPriorityRequest.newBuilder()
+      .addAllTicketIds(
+        dto.getTicketIds().stream().map(Object::toString).toList()
+      )
+      .setPriority(
+        TicketsCrudService.toProtoTicketPriority(dto.getPriority().getValue())
+      )
+      .build();
 
-    BulkTicketPriorityResponse response = withMetadata(context).bulkChangeTicketPriority(wire);
+    BulkTicketPriorityResponse response = withMetadata(
+      context
+    ).bulkChangeTicketPriority(wire);
 
     return ResponseEntity.ok(
-        new TicketsControllerBulkChangePriorityV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("Bulk priority change processed")
-            .data(
-                new BulkTicketPriorityResponseDto()
-                    .updated(response.getUpdatedList())
-                    .failed(response.getFailedList().stream().map(TicketsStatusService::toFailureDto).toList())));
+      new TicketsControllerBulkChangePriorityV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("Bulk priority change processed")
+        .data(
+          new BulkTicketPriorityResponseDto()
+            .updated(response.getUpdatedList())
+            .failed(
+              response
+                .getFailedList()
+                .stream()
+                .map(TicketsStatusService::toFailureDto)
+                .toList()
+            )
+        )
+    );
   }
 
   public ResponseEntity<TicketsControllerCreateV1201Response> changeStatus(
-      RequestContext context, String id, ChangeTicketStatusDto dto) {
-    TicketsCrudService.requirePermission(context, PermissionCodesEnum.TICKET_UPDATE);
+    RequestContext context,
+    String id,
+    ChangeTicketStatusDto dto
+  ) {
+    TicketsCrudService.requirePermission(
+      context,
+      PermissionCodesEnum.TICKET_UPDATE
+    );
 
     ChangeTicketStatusRequest.Builder wire =
-        ChangeTicketStatusRequest.newBuilder()
-            .setId(id)
-            .setStatus(TicketsCrudService.toProtoTicketStatus(dto.getStatus().getValue()));
+      ChangeTicketStatusRequest.newBuilder()
+        .setId(id)
+        .setStatus(
+          TicketsCrudService.toProtoTicketStatus(dto.getStatus().getValue())
+        );
     if (dto.getReason() != null) {
       wire.setReason(dto.getReason());
     }
 
-    TicketResponse response = withMetadata(context).changeTicketStatus(wire.build());
+    TicketResponse response = withMetadata(context).changeTicketStatus(
+      wire.build()
+    );
 
     return ok(response, "Ticket status changed");
   }
 
   /** Not permission-gated — a correction, not an omission; see the class docblock family in {@link TicketsCrudService}. */
-  public ResponseEntity<TicketsControllerCreateV1201Response> escalate(RequestContext context, String id, TicketStatusActionDto dto) {
-    TicketResponse response = withMetadata(context).escalateTicket(toActionRequest(id, dto));
+  public ResponseEntity<TicketsControllerCreateV1201Response> escalate(
+    RequestContext context,
+    String id,
+    TicketStatusActionDto dto
+  ) {
+    TicketResponse response = withMetadata(context).escalateTicket(
+      toActionRequest(id, dto)
+    );
 
     return ok(response, "Ticket escalated");
   }
 
-  public ResponseEntity<TicketsControllerCreateV1201Response> resolve(RequestContext context, String id, TicketStatusActionDto dto) {
-    TicketsCrudService.requirePermission(context, PermissionCodesEnum.TICKET_RESOLVE);
+  public ResponseEntity<TicketsControllerCreateV1201Response> resolve(
+    RequestContext context,
+    String id,
+    TicketStatusActionDto dto
+  ) {
+    TicketsCrudService.requirePermission(
+      context,
+      PermissionCodesEnum.TICKET_RESOLVE
+    );
 
-    TicketResponse response = withMetadata(context).resolveTicket(toActionRequest(id, dto));
+    TicketResponse response = withMetadata(context).resolveTicket(
+      toActionRequest(id, dto)
+    );
 
     return ok(response, "Ticket resolved");
   }
 
-  public ResponseEntity<TicketsControllerCreateV1201Response> reopen(RequestContext context, String id, TicketStatusActionDto dto) {
-    TicketsCrudService.requirePermission(context, PermissionCodesEnum.TICKET_UPDATE);
+  public ResponseEntity<TicketsControllerCreateV1201Response> reopen(
+    RequestContext context,
+    String id,
+    TicketStatusActionDto dto
+  ) {
+    TicketsCrudService.requirePermission(
+      context,
+      PermissionCodesEnum.TICKET_UPDATE
+    );
 
-    TicketResponse response = withMetadata(context).reopenTicket(toActionRequest(id, dto));
+    TicketResponse response = withMetadata(context).reopenTicket(
+      toActionRequest(id, dto)
+    );
 
     return ok(response, "Ticket reopened");
   }
 
-  public ResponseEntity<TicketsControllerCreateV1201Response> close(RequestContext context, String id, TicketStatusActionDto dto) {
-    TicketsCrudService.requirePermission(context, PermissionCodesEnum.TICKET_RESOLVE);
+  public ResponseEntity<TicketsControllerCreateV1201Response> close(
+    RequestContext context,
+    String id,
+    TicketStatusActionDto dto
+  ) {
+    TicketsCrudService.requirePermission(
+      context,
+      PermissionCodesEnum.TICKET_RESOLVE
+    );
 
-    TicketResponse response = withMetadata(context).closeTicket(toActionRequest(id, dto));
+    TicketResponse response = withMetadata(context).closeTicket(
+      toActionRequest(id, dto)
+    );
 
     return ok(response, "Ticket closed");
   }
 
-  private static TicketStatusActionRequest toActionRequest(String id, TicketStatusActionDto dto) {
-    TicketStatusActionRequest.Builder wire = TicketStatusActionRequest.newBuilder().setTicketId(id);
+  private static TicketStatusActionRequest toActionRequest(
+    String id,
+    TicketStatusActionDto dto
+  ) {
+    TicketStatusActionRequest.Builder wire =
+      TicketStatusActionRequest.newBuilder().setTicketId(id);
     if (dto != null && dto.getReason() != null) {
       wire.setReason(dto.getReason());
     }
@@ -176,26 +261,42 @@ public class TicketsStatusService {
   private static void requireWithinBulkLimit(List<?> ticketIds) {
     if (ticketIds != null && ticketIds.size() > MAX_BULK_TICKET_IDS) {
       throw new ResponseStatusException(
-          HttpStatus.BAD_REQUEST, "ticketIds must contain no more than " + MAX_BULK_TICKET_IDS + " elements");
+        HttpStatus.BAD_REQUEST,
+        "ticketIds must contain no more than " +
+          MAX_BULK_TICKET_IDS +
+          " elements"
+      );
     }
   }
 
-  private static BulkTicketFailureResponseDto toFailureDto(synapsedesk.ticket.Ticket.BulkTicketFailure failure) {
-    return new BulkTicketFailureResponseDto().id(failure.getId()).reason(failure.getReason());
+  private static BulkTicketFailureResponseDto toFailureDto(
+    synapsedesk.ticket.Ticket.BulkTicketFailure failure
+  ) {
+    return new BulkTicketFailureResponseDto()
+      .id(failure.getId())
+      .reason(failure.getReason());
   }
 
-  private static ResponseEntity<TicketsControllerCreateV1201Response> ok(TicketResponse response, String message) {
+  private static ResponseEntity<TicketsControllerCreateV1201Response> ok(
+    TicketResponse response,
+    String message
+  ) {
     return ResponseEntity.ok(
-        new TicketsControllerCreateV1201Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message(message)
-            .data(TicketsCrudService.toTicketResponseDto(response)));
+      new TicketsControllerCreateV1201Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message(message)
+        .data(TicketsCrudService.toTicketResponseDto(response))
+    );
   }
 
-  private TicketServiceGrpc.TicketServiceBlockingStub withMetadata(RequestContext context) {
+  private TicketServiceGrpc.TicketServiceBlockingStub withMetadata(
+    RequestContext context
+  ) {
     return stub
-        .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
-        .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context)));
+      .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
+      .withInterceptors(
+        MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context))
+      );
   }
 }

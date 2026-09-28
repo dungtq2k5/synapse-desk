@@ -57,10 +57,11 @@ public class TicketsResolver {
   private final CurrentUser currentUser;
 
   public TicketsResolver(
-      TicketServiceGrpc.TicketServiceBlockingStub ticketStub,
-      MessageServiceGrpc.MessageServiceBlockingStub messageStub,
-      AssignmentServiceGrpc.AssignmentServiceBlockingStub assignmentStub,
-      CurrentUser currentUser) {
+    TicketServiceGrpc.TicketServiceBlockingStub ticketStub,
+    MessageServiceGrpc.MessageServiceBlockingStub messageStub,
+    AssignmentServiceGrpc.AssignmentServiceBlockingStub assignmentStub,
+    CurrentUser currentUser
+  ) {
     this.ticketStub = ticketStub;
     this.messageStub = messageStub;
     this.assignmentStub = assignmentStub;
@@ -72,8 +73,9 @@ public class TicketsResolver {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     try {
-      TicketResponse response =
-          withMetadata(ticketStub, context).getTicket(GetTicketRequest.newBuilder().setId(id).build());
+      TicketResponse response = withMetadata(ticketStub, context).getTicket(
+        GetTicketRequest.newBuilder().setId(id).build()
+      );
       return TicketMapper.toTicketGqlDto(response);
     } catch (StatusRuntimeException notFoundOrForbidden) {
       // Not found, another tenant, or not visible to this caller —
@@ -85,34 +87,38 @@ public class TicketsResolver {
 
   @QueryMapping(name = "tickets")
   public TicketPageGqlDto tickets(
-      @Argument int first,
-      @Argument int page,
-      @Argument String sortBy,
-      @Argument TicketStatusGql status,
-      @Argument TicketPriorityGql priority,
-      @Argument TicketSourceGql source,
-      @Argument String assigneeId,
-      @Argument String departmentId,
-      @Argument String authorId) {
+    @Argument int first,
+    @Argument int page,
+    @Argument String sortBy,
+    @Argument TicketStatusGql status,
+    @Argument TicketPriorityGql priority,
+    @Argument TicketSourceGql source,
+    @Argument String assigneeId,
+    @Argument String departmentId,
+    @Argument String authorId
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    PageRequest.Builder pageRequest =
-        PageRequest.newBuilder()
-            .setPage(page)
-            // Clamped, not rejected — matching Node's own reasoning: an
-            // unbounded list multiplies every nested field beneath it, but
-            // refusing `first: 500` would be a breaking change for a client
-            // that worked yesterday.
-            .setLimit(Math.min(first, GraphqlLimits.MAX_PAGE_SIZE))
-            .setSortBy(sortBy != null ? sortBy : "createdAt")
-            .setSortOrder(SortOrder.SORT_ORDER_DESC);
+    PageRequest.Builder pageRequest = PageRequest.newBuilder()
+      .setPage(page)
+      // Clamped, not rejected — matching Node's own reasoning: an
+      // unbounded list multiplies every nested field beneath it, but
+      // refusing `first: 500` would be a breaking change for a client
+      // that worked yesterday.
+      .setLimit(Math.min(first, GraphqlLimits.MAX_PAGE_SIZE))
+      .setSortBy(sortBy != null ? sortBy : "createdAt")
+      .setSortOrder(SortOrder.SORT_ORDER_DESC);
 
-    ListTicketsRequest.Builder wire = ListTicketsRequest.newBuilder().setPage(pageRequest).setIncludeDeleted(false);
+    ListTicketsRequest.Builder wire = ListTicketsRequest.newBuilder()
+      .setPage(pageRequest)
+      .setIncludeDeleted(false);
     if (status != null) {
       wire.setStatus(TicketStatus.valueOf("TICKET_STATUS_" + status.name()));
     }
     if (priority != null) {
-      wire.setPriority(TicketPriority.valueOf("TICKET_PRIORITY_" + priority.name()));
+      wire.setPriority(
+        TicketPriority.valueOf("TICKET_PRIORITY_" + priority.name())
+      );
     }
     if (source != null) {
       wire.setSource(TicketSource.valueOf("TICKET_SOURCE_" + source.name()));
@@ -127,7 +133,10 @@ public class TicketsResolver {
       wire.setAuthorId(authorId);
     }
 
-    ListTicketsResponse response = withMetadata(ticketStub, context).listTickets(wire.build());
+    ListTicketsResponse response = withMetadata(
+      ticketStub,
+      context
+    ).listTickets(wire.build());
 
     return TicketMapper.toTicketPageGqlDto(response);
   }
@@ -137,7 +146,9 @@ public class TicketsResolver {
   /** `Ticket.assignee` — loader-backed, never a direct call; null for an unassigned ticket. */
   @SchemaMapping(typeName = "Ticket", field = "assignee")
   public CompletableFuture<UserSummaryGqlDto> assignee(
-      TicketGqlDto ticket, DataLoader<String, UserSummaryGqlDto> loader) {
+    TicketGqlDto ticket,
+    DataLoader<String, UserSummaryGqlDto> loader
+  ) {
     if (ticket.currentAssigneeId() == null) {
       return CompletableFuture.completedFuture(null);
     }
@@ -149,7 +160,9 @@ public class TicketsResolver {
   /** `Ticket.author` — the SAME loader instance as {@link #assignee}. */
   @SchemaMapping(typeName = "Ticket", field = "author")
   public CompletableFuture<UserSummaryGqlDto> author(
-      TicketGqlDto ticket, DataLoader<String, UserSummaryGqlDto> loader) {
+    TicketGqlDto ticket,
+    DataLoader<String, UserSummaryGqlDto> loader
+  ) {
     if (ticket.authorId() == null) {
       return CompletableFuture.completedFuture(null);
     }
@@ -160,7 +173,9 @@ public class TicketsResolver {
 
   @SchemaMapping(typeName = "Ticket", field = "department")
   public CompletableFuture<DepartmentGqlDto> department(
-      TicketGqlDto ticket, DataLoader<String, DepartmentGqlDto> loader) {
+    TicketGqlDto ticket,
+    DataLoader<String, DepartmentGqlDto> loader
+  ) {
     if (ticket.currentDepartmentId() == null) {
       return CompletableFuture.completedFuture(null);
     }
@@ -176,23 +191,33 @@ public class TicketsResolver {
    * why the cost scorer weights this field and `first` is clamped above it.
    */
   @SchemaMapping(typeName = "Ticket", field = "messages")
-  public List<TicketMessageGqlDto> messages(TicketGqlDto ticket, @Argument int first) {
+  public List<TicketMessageGqlDto> messages(
+    TicketGqlDto ticket,
+    @Argument int first
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    ListMessagesResponse response =
-        withMetadata(messageStub, context)
-            .listMessages(
-                ListMessagesRequest.newBuilder()
-                    .setTicketId(ticket.id())
-                    .setPage(
-                        PageRequest.newBuilder()
-                            .setPage(1)
-                            .setLimit(Math.min(first, GraphqlLimits.MAX_PAGE_SIZE))
-                            .setSortBy("createdAt")
-                            .setSortOrder(SortOrder.SORT_ORDER_ASC))
-                    .build());
+    ListMessagesResponse response = withMetadata(
+      messageStub,
+      context
+    ).listMessages(
+      ListMessagesRequest.newBuilder()
+        .setTicketId(ticket.id())
+        .setPage(
+          PageRequest.newBuilder()
+            .setPage(1)
+            .setLimit(Math.min(first, GraphqlLimits.MAX_PAGE_SIZE))
+            .setSortBy("createdAt")
+            .setSortOrder(SortOrder.SORT_ORDER_ASC)
+        )
+        .build()
+    );
 
-    return response.getItemsList().stream().map(TicketMapper::toTicketMessageGqlDto).toList();
+    return response
+      .getItemsList()
+      .stream()
+      .map(TicketMapper::toTicketMessageGqlDto)
+      .toList();
   }
 
   // ---------------------------------------------------------- mutations
@@ -200,21 +225,28 @@ public class TicketsResolver {
   @MutationMapping
   @RequirePermission(PermissionCodesEnum.TICKET_ASSIGN)
   public TicketMutationPayloadGqlDto assignTicket(
-      @Argument String id, @Argument String assigneeId, @Argument String departmentId) {
+    @Argument String id,
+    @Argument String assigneeId,
+    @Argument String departmentId
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    withMetadata(assignmentStub, context)
-        .assignTicket(
-            AssignTicketRequest.newBuilder()
-                .setTicketId(id)
-                .setAssigneeId(assigneeId)
-                .setDepartmentId(departmentId)
-                .build());
+    withMetadata(assignmentStub, context).assignTicket(
+      AssignTicketRequest.newBuilder()
+        .setTicketId(id)
+        .setAssigneeId(assigneeId)
+        .setDepartmentId(departmentId)
+        .build()
+    );
 
-    TicketResponse ticket =
-        withMetadata(ticketStub, context).getTicket(GetTicketRequest.newBuilder().setId(id).build());
+    TicketResponse ticket = withMetadata(ticketStub, context).getTicket(
+      GetTicketRequest.newBuilder().setId(id).build()
+    );
 
-    return new TicketMutationPayloadGqlDto(TicketMapper.toTicketGqlDto(ticket), "Ticket assigned");
+    return new TicketMutationPayloadGqlDto(
+      TicketMapper.toTicketGqlDto(ticket),
+      "Ticket assigned"
+    );
   }
 
   @MutationMapping
@@ -225,35 +257,52 @@ public class TicketsResolver {
     // needs it.
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    TicketResponse ticket =
-        withMetadata(ticketStub, context)
-            .escalateTicket(TicketStatusActionRequest.newBuilder().setTicketId(id).build());
+    TicketResponse ticket = withMetadata(ticketStub, context).escalateTicket(
+      TicketStatusActionRequest.newBuilder().setTicketId(id).build()
+    );
 
-    return new TicketMutationPayloadGqlDto(TicketMapper.toTicketGqlDto(ticket), "Handed off to an agent");
+    return new TicketMutationPayloadGqlDto(
+      TicketMapper.toTicketGqlDto(ticket),
+      "Handed off to an agent"
+    );
   }
 
   @MutationMapping
   @RequirePermission(PermissionCodesEnum.TICKET_UPDATE)
   public TicketMutationPayloadGqlDto transitionTicketStatus(
-      @Argument String id, @Argument TicketStatusGql status, @Argument String reason) {
+    @Argument String id,
+    @Argument TicketStatusGql status,
+    @Argument String reason
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     ChangeTicketStatusRequest.Builder wire =
-        ChangeTicketStatusRequest.newBuilder()
-            .setId(id)
-            .setStatus(TicketStatus.valueOf("TICKET_STATUS_" + status.name()));
+      ChangeTicketStatusRequest.newBuilder()
+        .setId(id)
+        .setStatus(TicketStatus.valueOf("TICKET_STATUS_" + status.name()));
     if (reason != null) {
       wire.setReason(reason);
     }
 
-    TicketResponse ticket = withMetadata(ticketStub, context).changeTicketStatus(wire.build());
+    TicketResponse ticket = withMetadata(
+      ticketStub,
+      context
+    ).changeTicketStatus(wire.build());
 
-    return new TicketMutationPayloadGqlDto(TicketMapper.toTicketGqlDto(ticket), "Status set to " + status);
+    return new TicketMutationPayloadGqlDto(
+      TicketMapper.toTicketGqlDto(ticket),
+      "Status set to " + status
+    );
   }
 
-  private static <S extends io.grpc.stub.AbstractBlockingStub<S>> S withMetadata(S stub, RequestContext context) {
+  private static <S extends io.grpc.stub.AbstractBlockingStub<S>> S withMetadata(
+    S stub,
+    RequestContext context
+  ) {
     return stub
-        .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
-        .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context)));
+      .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
+      .withInterceptors(
+        MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context))
+      );
   }
 }

@@ -36,8 +36,9 @@ import synapsedesk.auth.InvitationServiceGrpc;
  */
 class InvitationsControllerTest {
 
-  private final InvitationServiceGrpc.InvitationServiceBlockingStub stub =
-      mock(InvitationServiceGrpc.InvitationServiceBlockingStub.class);
+  private final InvitationServiceGrpc.InvitationServiceBlockingStub stub = mock(
+    InvitationServiceGrpc.InvitationServiceBlockingStub.class
+  );
   private final CurrentUser currentUser = mock(CurrentUser.class);
   private final GuestCheck guestCheck = mock(GuestCheck.class);
   private final CookieWriter cookies = mock(CookieWriter.class);
@@ -52,8 +53,17 @@ class InvitationsControllerTest {
     when(stub.withDeadlineAfter(anyLong(), any())).thenReturn(stub);
     when(stub.withInterceptors(any())).thenReturn(stub);
     RequestContextHolder.setRequestAttributes(
-        new ServletRequestAttributes(requestWithResponse(), mock(HttpServletResponse.class)));
-    controller = new InvitationsController(stub, currentUser, guestCheck, cookies);
+      new ServletRequestAttributes(
+        requestWithResponse(),
+        mock(HttpServletResponse.class)
+      )
+    );
+    controller = new InvitationsController(
+      stub,
+      currentUser,
+      guestCheck,
+      cookies
+    );
   }
 
   @AfterEach
@@ -64,81 +74,132 @@ class InvitationsControllerTest {
   @Test
   void acceptRefusesAnActiveSessionBeforeTouchingThePeer() {
     org.mockito.Mockito.doThrow(
-            new ResponseStatusException(
-                org.springframework.http.HttpStatus.BAD_REQUEST, "You are already logged in with an active session."))
-        .when(guestCheck)
-        .requireNoActiveSession(any());
+      new ResponseStatusException(
+        org.springframework.http.HttpStatus.BAD_REQUEST,
+        "You are already logged in with an active session."
+      )
+    )
+      .when(guestCheck)
+      .requireNoActiveSession(any());
 
-    AcceptInvitationDto dto = new AcceptInvitationDto("tok", "Ada Lovelace", "pw12345678");
+    AcceptInvitationDto dto = new AcceptInvitationDto(
+      "tok",
+      "Ada Lovelace",
+      "pw12345678"
+    );
 
-    assertThatThrownBy(() -> controller.invitationsControllerAcceptV1(dto)).isInstanceOf(ResponseStatusException.class);
+    assertThatThrownBy(() ->
+      controller.invitationsControllerAcceptV1(dto)
+    ).isInstanceOf(ResponseStatusException.class);
 
     verifyNoInteractions(stub);
   }
 
   @Test
   void acceptSignsInOnSuccessAndSurfacesSkippedAssignmentsAsAWarning() {
-    when(currentUser.origin(any())).thenReturn(new com.synapsedesk.gateway.auth.RequestOrigin("127.0.0.1", "test"));
-    when(stub.acceptInvitation(any()))
-        .thenReturn(
-            AcceptInvitationResponse.newBuilder()
-                .setAccessToken("access-1")
-                .setRefreshToken("refresh-1")
-                .setUser(
-                    synapsedesk.auth.Common.UserResponse.newBuilder()
-                        .setId(java.util.UUID.randomUUID().toString())
-                        .setEmail("a@b.com")
-                        .setFullName("Ada Lovelace")
-                        .build())
-                .addSkipped("role-1")
-                .build());
+    when(currentUser.origin(any())).thenReturn(
+      new com.synapsedesk.gateway.auth.RequestOrigin("127.0.0.1", "test")
+    );
+    when(stub.acceptInvitation(any())).thenReturn(
+      AcceptInvitationResponse.newBuilder()
+        .setAccessToken("access-1")
+        .setRefreshToken("refresh-1")
+        .setUser(
+          synapsedesk.auth.Common.UserResponse.newBuilder()
+            .setId(java.util.UUID.randomUUID().toString())
+            .setEmail("a@b.com")
+            .setFullName("Ada Lovelace")
+            .build()
+        )
+        .addSkipped("role-1")
+        .build()
+    );
 
-    AcceptInvitationDto dto = new AcceptInvitationDto("tok", "Ada Lovelace", "pw12345678");
+    AcceptInvitationDto dto = new AcceptInvitationDto(
+      "tok",
+      "Ada Lovelace",
+      "pw12345678"
+    );
 
     var response = controller.invitationsControllerAcceptV1(dto);
 
-    verify(cookies).setAccessToken(any(), org.mockito.ArgumentMatchers.eq("access-1"));
-    verify(cookies).setRefreshToken(any(), org.mockito.ArgumentMatchers.eq("refresh-1"));
-    assertThat(response.getBody().getWarning()).contains("1 role/department assignment(s)");
+    verify(cookies).setAccessToken(
+      any(),
+      org.mockito.ArgumentMatchers.eq("access-1")
+    );
+    verify(cookies).setRefreshToken(
+      any(),
+      org.mockito.ArgumentMatchers.eq("refresh-1")
+    );
+    assertThat(response.getBody().getWarning()).contains(
+      "1 role/department assignment(s)"
+    );
   }
 
   @Test
-  void previewByTokenAndAcceptCarryNoPermissionRequirement() throws NoSuchMethodException {
-    Method previewByToken =
-        InvitationsController.class.getMethod("invitationsControllerPreviewByTokenV1", String.class);
-    Method accept =
-        InvitationsController.class.getMethod(
-            "invitationsControllerAcceptV1", com.synapsedesk.gateway.generated.model.AcceptInvitationDto.class);
+  void previewByTokenAndAcceptCarryNoPermissionRequirement()
+    throws NoSuchMethodException {
+    Method previewByToken = InvitationsController.class.getMethod(
+      "invitationsControllerPreviewByTokenV1",
+      String.class
+    );
+    Method accept = InvitationsController.class.getMethod(
+      "invitationsControllerAcceptV1",
+      com.synapsedesk.gateway.generated.model.AcceptInvitationDto.class
+    );
 
-    assertThat(previewByToken.isAnnotationPresent(RequirePermission.class)).isFalse();
+    assertThat(
+      previewByToken.isAnnotationPresent(RequirePermission.class)
+    ).isFalse();
     assertThat(accept.isAnnotationPresent(RequirePermission.class)).isFalse();
   }
 
   @Test
   void createRefusesAnUnverifiedEmailBeforeTouchingThePeer() {
-    when(currentUser.require(any()))
-        .thenReturn(
-            new RequestContext(
-                "agent-1", "org-1", false, List.of(), List.of("user.invite"), false, "127.0.0.1", "test"));
+    when(currentUser.require(any())).thenReturn(
+      new RequestContext(
+        "agent-1",
+        "org-1",
+        false,
+        List.of(),
+        List.of("user.invite"),
+        false,
+        "127.0.0.1",
+        "test"
+      )
+    );
 
     com.synapsedesk.gateway.generated.model.CreateInvitationsDto dto =
-        new com.synapsedesk.gateway.generated.model.CreateInvitationsDto();
+      new com.synapsedesk.gateway.generated.model.CreateInvitationsDto();
     dto.setInvitations(List.of());
 
-    assertThatThrownBy(() -> controller.invitationsControllerCreateV1(dto)).isInstanceOf(ResponseStatusException.class);
+    assertThatThrownBy(() ->
+      controller.invitationsControllerCreateV1(dto)
+    ).isInstanceOf(ResponseStatusException.class);
 
     verifyNoInteractions(stub);
   }
 
   @Test
   void createAllowsASuperAdminWithNoEmailVerificationFlow() {
-    when(currentUser.require(any()))
-        .thenReturn(new RequestContext("agent-1", "org-1", true, List.of(), List.of(), false, "127.0.0.1", "test"));
-    when(stub.createInvitations(any()))
-        .thenReturn(synapsedesk.auth.Invitation.CreateInvitationsResponse.getDefaultInstance());
+    when(currentUser.require(any())).thenReturn(
+      new RequestContext(
+        "agent-1",
+        "org-1",
+        true,
+        List.of(),
+        List.of(),
+        false,
+        "127.0.0.1",
+        "test"
+      )
+    );
+    when(stub.createInvitations(any())).thenReturn(
+      synapsedesk.auth.Invitation.CreateInvitationsResponse.getDefaultInstance()
+    );
 
     com.synapsedesk.gateway.generated.model.CreateInvitationsDto dto =
-        new com.synapsedesk.gateway.generated.model.CreateInvitationsDto();
+      new com.synapsedesk.gateway.generated.model.CreateInvitationsDto();
     dto.setInvitations(List.of());
 
     controller.invitationsControllerCreateV1(dto);
@@ -148,16 +209,29 @@ class InvitationsControllerTest {
 
   @Test
   void listRefusesAnUnrecognizedStatusValue() {
-    when(currentUser.require(any()))
-        .thenReturn(
-            new RequestContext(
-                "agent-1", "org-1", false, List.of(), List.of("user.read"), true, "127.0.0.1", "test"));
+    when(currentUser.require(any())).thenReturn(
+      new RequestContext(
+        "agent-1",
+        "org-1",
+        false,
+        List.of(),
+        List.of("user.read"),
+        true,
+        "127.0.0.1",
+        "test"
+      )
+    );
 
-    assertThatThrownBy(
-            () ->
-                controller.invitationsControllerListV1(
-                    java.math.BigDecimal.ONE, java.math.BigDecimal.TEN, "ASC", null, "createdAt", "BOGUS"))
-        .isInstanceOf(ResponseStatusException.class);
+    assertThatThrownBy(() ->
+      controller.invitationsControllerListV1(
+        java.math.BigDecimal.ONE,
+        java.math.BigDecimal.TEN,
+        "ASC",
+        null,
+        "createdAt",
+        "BOGUS"
+      )
+    ).isInstanceOf(ResponseStatusException.class);
 
     verifyNoInteractions(stub);
   }

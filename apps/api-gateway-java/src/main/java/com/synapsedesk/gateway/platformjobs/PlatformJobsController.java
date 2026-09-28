@@ -34,11 +34,11 @@ import org.springframework.web.server.ResponseStatusException;
 import synapsedesk.auth.Platform.AuthJobHealthRequest;
 import synapsedesk.auth.Platform.AuthJobHealthResponse;
 import synapsedesk.auth.PlatformServiceGrpc;
+import synapsedesk.ingestion.AiLedgerServiceGrpc;
 import synapsedesk.ingestion.Ledger.AiJobHealthRequest;
 import synapsedesk.ingestion.Ledger.AiJobHealthResponse;
 import synapsedesk.ingestion.Ledger.RunAiRollupRequest;
 import synapsedesk.ingestion.Ledger.RunAiRollupResponse;
-import synapsedesk.ingestion.AiLedgerServiceGrpc;
 import synapsedesk.notification.Notification.NotificationJobHealthRequest;
 import synapsedesk.notification.Notification.NotificationJobHealthResponse;
 import synapsedesk.notification.NotificationServiceGrpc;
@@ -76,7 +76,9 @@ import synapsedesk.ticket.AnalyticsServiceGrpc;
 @RestController
 public class PlatformJobsController implements PlatformJobsApi {
 
-  private static final Logger LOG = LoggerFactory.getLogger(PlatformJobsController.class);
+  private static final Logger LOG = LoggerFactory.getLogger(
+    PlatformJobsController.class
+  );
 
   private static final long DEADLINE_SECONDS = 5;
   private static final long STALENESS_FACTOR = 2;
@@ -131,12 +133,13 @@ public class PlatformJobsController implements PlatformJobsApi {
   private final SuperAdminCheck superAdminCheck;
 
   public PlatformJobsController(
-      AnalyticsServiceGrpc.AnalyticsServiceBlockingStub analyticsStub,
-      AiLedgerServiceGrpc.AiLedgerServiceBlockingStub ledgerStub,
-      PlatformServiceGrpc.PlatformServiceBlockingStub platformStub,
-      NotificationServiceGrpc.NotificationServiceBlockingStub notificationStub,
-      CurrentUser currentUser,
-      SuperAdminCheck superAdminCheck) {
+    AnalyticsServiceGrpc.AnalyticsServiceBlockingStub analyticsStub,
+    AiLedgerServiceGrpc.AiLedgerServiceBlockingStub ledgerStub,
+    PlatformServiceGrpc.PlatformServiceBlockingStub platformStub,
+    NotificationServiceGrpc.NotificationServiceBlockingStub notificationStub,
+    CurrentUser currentUser,
+    SuperAdminCheck superAdminCheck
+  ) {
     this.analyticsStub = analyticsStub;
     this.ledgerStub = ledgerStub;
     this.platformStub = platformStub;
@@ -152,10 +155,22 @@ public class PlatformJobsController implements PlatformJobsApi {
 
     List<String> unavailable = new ArrayList<>();
     List<HeartbeatRow> rows = new ArrayList<>();
-    rows.addAll(tryLeg("ticket-service", unavailable, () -> ticketHeartbeats(context)));
-    rows.addAll(tryLeg("ingestion-service", unavailable, () -> ingestionHeartbeats(context)));
-    rows.addAll(tryLeg("auth-service", unavailable, () -> authHeartbeats(context)));
-    rows.addAll(tryLeg("notification-service", unavailable, () -> notificationHeartbeats(context)));
+    rows.addAll(
+      tryLeg("ticket-service", unavailable, () -> ticketHeartbeats(context))
+    );
+    rows.addAll(
+      tryLeg("ingestion-service", unavailable, () ->
+        ingestionHeartbeats(context)
+      )
+    );
+    rows.addAll(
+      tryLeg("auth-service", unavailable, () -> authHeartbeats(context))
+    );
+    rows.addAll(
+      tryLeg("notification-service", unavailable, () ->
+        notificationHeartbeats(context)
+      )
+    );
 
     List<String> reachable = SCHEDULED_JOBS.stream()
       .filter(name -> !unavailable.contains(JOB_SERVICE.get(name)))
@@ -183,7 +198,14 @@ public class PlatformJobsController implements PlatformJobsApi {
     List<JobRunStatusResponseDto> items = new ArrayList<>();
     for (String name : reachable) {
       HeartbeatRow row = byName.get(name);
-      items.add(toStatusDto(JOB_SERVICE.get(name), name, row, verdicts.getOrDefault(name, "healthy")));
+      items.add(
+        toStatusDto(
+          JOB_SERVICE.get(name),
+          name,
+          row,
+          verdicts.getOrDefault(name, "healthy")
+        )
+      );
     }
 
     // Per-step rows the schedulers also record — never judged for staleness,
@@ -203,12 +225,19 @@ public class PlatformJobsController implements PlatformJobsApi {
         .success(true)
         .statusCode(BigDecimal.valueOf(200))
         .message("OK")
-        .data(new JobHealthResponseDto().items(items).degraded(degraded).unavailable(unavailable))
+        .data(
+          new JobHealthResponseDto()
+            .items(items)
+            .degraded(degraded)
+            .unavailable(unavailable)
+        )
     );
   }
 
   @Override
-  public ResponseEntity<PlatformJobsControllerRunV1200Response> platformJobsControllerRunV1(String name) {
+  public ResponseEntity<PlatformJobsControllerRunV1200Response> platformJobsControllerRunV1(
+    String name
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
     superAdminCheck.require(context);
 
@@ -225,14 +254,19 @@ public class PlatformJobsController implements PlatformJobsApi {
 
   @Override
   public ResponseEntity<PlatformJobsControllerRunV1200Response> platformJobsControllerBackfillV1(
-      String name, BackfillJobDto backfillJobDto) {
+    String name,
+    BackfillJobDto backfillJobDto
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
     superAdminCheck.require(context);
 
     IsoDateCheck.requireIsoDate(backfillJobDto.getFrom(), "from");
     IsoDateCheck.requireIsoDate(backfillJobDto.getTo(), "to");
     if (backfillJobDto.getFrom().compareTo(backfillJobDto.getTo()) > 0) {
-      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "from must not be after to");
+      throw new ResponseStatusException(
+        HttpStatus.BAD_REQUEST,
+        "from must not be after to"
+      );
     }
 
     LOG.warn(
@@ -241,9 +275,15 @@ public class PlatformJobsController implements PlatformJobsApi {
       backfillJobDto.getFrom(),
       backfillJobDto.getTo(),
       context.sub(),
-      backfillJobDto.getReason());
+      backfillJobDto.getReason()
+    );
 
-    JobRunResultResponseDto data = dispatch(name, context, backfillJobDto.getFrom(), backfillJobDto.getTo());
+    JobRunResultResponseDto data = dispatch(
+      name,
+      context,
+      backfillJobDto.getFrom(),
+      backfillJobDto.getTo()
+    );
 
     return ResponseEntity.ok(
       new PlatformJobsControllerRunV1200Response()
@@ -254,7 +294,12 @@ public class PlatformJobsController implements PlatformJobsApi {
     );
   }
 
-  private JobRunResultResponseDto dispatch(String jobName, RequestContext context, String from, String to) {
+  private JobRunResultResponseDto dispatch(
+    String jobName,
+    RequestContext context,
+    String from,
+    String to
+  ) {
     if (ANALYTICS_DAILY.equals(jobName)) {
       RunRollupRequest.Builder wire = RunRollupRequest.newBuilder();
       if (from != null) {
@@ -263,13 +308,19 @@ public class PlatformJobsController implements PlatformJobsApi {
       if (to != null) {
         wire.setTo(to);
       }
-      RunRollupResponse response = withAnalyticsMetadata(context).runRollup(wire.build());
+      RunRollupResponse response = withAnalyticsMetadata(context).runRollup(
+        wire.build()
+      );
 
       return new JobRunResultResponseDto()
         .service(JobRunResultResponseDto.ServiceEnum.TICKET_SERVICE)
         .jobName(JobRunResultResponseDto.JobNameEnum.ANALYTICS_DAILY)
         .tenants(BigDecimal.valueOf(response.getTenants()))
-        .rows(BigDecimal.valueOf((long) response.getTicketRows() + response.getAgentRows()));
+        .rows(
+          BigDecimal.valueOf(
+            (long) response.getTicketRows() + response.getAgentRows()
+          )
+        );
     }
 
     if (LEDGER_DAILY.equals(jobName)) {
@@ -280,7 +331,9 @@ public class PlatformJobsController implements PlatformJobsApi {
       if (to != null) {
         wire.setTo(to);
       }
-      RunAiRollupResponse response = withLedgerMetadata(context).runAiRollup(wire.build());
+      RunAiRollupResponse response = withLedgerMetadata(context).runAiRollup(
+        wire.build()
+      );
 
       return new JobRunResultResponseDto()
         .service(JobRunResultResponseDto.ServiceEnum.INGESTION_SERVICE)
@@ -292,10 +345,16 @@ public class PlatformJobsController implements PlatformJobsApi {
     // Named rather than silently ignored: a typo'd job name that returned 200
     // with zeros is indistinguishable from a job that ran and found nothing.
     throw new ResponseStatusException(
-      HttpStatus.BAD_REQUEST, "'" + jobName + "' is not a job that can be triggered by hand");
+      HttpStatus.BAD_REQUEST,
+      "'" + jobName + "' is not a job that can be triggered by hand"
+    );
   }
 
-  private List<HeartbeatRow> tryLeg(String source, List<String> unavailable, Supplier<List<HeartbeatRow>> leg) {
+  private List<HeartbeatRow> tryLeg(
+    String source,
+    List<String> unavailable,
+    Supplier<List<HeartbeatRow>> leg
+  ) {
     try {
       return leg.get();
     } catch (RuntimeException e) {
@@ -306,75 +365,131 @@ public class PlatformJobsController implements PlatformJobsApi {
   }
 
   private List<HeartbeatRow> ticketHeartbeats(RequestContext context) {
-    JobHealthResponse response = withAnalyticsMetadata(context).getJobHealth(JobHealthRequest.getDefaultInstance());
+    JobHealthResponse response = withAnalyticsMetadata(context).getJobHealth(
+      JobHealthRequest.getDefaultInstance()
+    );
 
-    return response.getItemsList().stream()
-      .map(item -> new HeartbeatRow(
-        "ticket-service",
-        item.getJobName(),
-        item.hasLastStartedAt() ? toInstant(item.getLastStartedAt()) : null,
-        item.hasLastSucceededAt() ? toInstant(item.getLastSucceededAt()) : null,
-        item.hasLastDurationMs() ? item.getLastDurationMs() : null,
-        item.hasLastError() ? item.getLastError() : null,
-        item.getConsecutiveFailures()))
+    return response
+      .getItemsList()
+      .stream()
+      .map(item ->
+        new HeartbeatRow(
+          "ticket-service",
+          item.getJobName(),
+          item.hasLastStartedAt() ? toInstant(item.getLastStartedAt()) : null,
+          item.hasLastSucceededAt()
+            ? toInstant(item.getLastSucceededAt())
+            : null,
+          item.hasLastDurationMs() ? item.getLastDurationMs() : null,
+          item.hasLastError() ? item.getLastError() : null,
+          item.getConsecutiveFailures()
+        )
+      )
       .toList();
   }
 
   private List<HeartbeatRow> ingestionHeartbeats(RequestContext context) {
-    AiJobHealthResponse response = withLedgerMetadata(context).getAiJobHealth(AiJobHealthRequest.getDefaultInstance());
+    AiJobHealthResponse response = withLedgerMetadata(context).getAiJobHealth(
+      AiJobHealthRequest.getDefaultInstance()
+    );
 
-    return response.getItemsList().stream()
-      .map(item -> new HeartbeatRow(
-        "ingestion-service",
-        item.getJobName(),
-        item.hasLastStartedAt() ? toInstant(item.getLastStartedAt()) : null,
-        item.hasLastSucceededAt() ? toInstant(item.getLastSucceededAt()) : null,
-        item.hasLastDurationMs() ? item.getLastDurationMs() : null,
-        item.hasLastError() ? item.getLastError() : null,
-        item.getConsecutiveFailures()))
+    return response
+      .getItemsList()
+      .stream()
+      .map(item ->
+        new HeartbeatRow(
+          "ingestion-service",
+          item.getJobName(),
+          item.hasLastStartedAt() ? toInstant(item.getLastStartedAt()) : null,
+          item.hasLastSucceededAt()
+            ? toInstant(item.getLastSucceededAt())
+            : null,
+          item.hasLastDurationMs() ? item.getLastDurationMs() : null,
+          item.hasLastError() ? item.getLastError() : null,
+          item.getConsecutiveFailures()
+        )
+      )
       .toList();
   }
 
   private List<HeartbeatRow> authHeartbeats(RequestContext context) {
-    AuthJobHealthResponse response = withPlatformMetadata(context).getAuthJobHealth(AuthJobHealthRequest.getDefaultInstance());
+    AuthJobHealthResponse response = withPlatformMetadata(
+      context
+    ).getAuthJobHealth(AuthJobHealthRequest.getDefaultInstance());
 
-    return response.getItemsList().stream()
-      .map(item -> new HeartbeatRow(
-        "auth-service",
-        item.getJobName(),
-        item.hasLastStartedAt() ? toInstant(item.getLastStartedAt()) : null,
-        item.hasLastSucceededAt() ? toInstant(item.getLastSucceededAt()) : null,
-        item.hasLastDurationMs() ? item.getLastDurationMs() : null,
-        item.hasLastError() ? item.getLastError() : null,
-        item.getConsecutiveFailures()))
+    return response
+      .getItemsList()
+      .stream()
+      .map(item ->
+        new HeartbeatRow(
+          "auth-service",
+          item.getJobName(),
+          item.hasLastStartedAt() ? toInstant(item.getLastStartedAt()) : null,
+          item.hasLastSucceededAt()
+            ? toInstant(item.getLastSucceededAt())
+            : null,
+          item.hasLastDurationMs() ? item.getLastDurationMs() : null,
+          item.hasLastError() ? item.getLastError() : null,
+          item.getConsecutiveFailures()
+        )
+      )
       .toList();
   }
 
   private List<HeartbeatRow> notificationHeartbeats(RequestContext context) {
-    NotificationJobHealthResponse response =
-      withNotificationMetadata(context).getNotificationJobHealth(NotificationJobHealthRequest.getDefaultInstance());
+    NotificationJobHealthResponse response = withNotificationMetadata(
+      context
+    ).getNotificationJobHealth(
+      NotificationJobHealthRequest.getDefaultInstance()
+    );
 
-    return response.getItemsList().stream()
-      .map(item -> new HeartbeatRow(
-        "notification-service",
-        item.getJobName(),
-        item.hasLastStartedAt() ? toInstant(item.getLastStartedAt()) : null,
-        item.hasLastSucceededAt() ? toInstant(item.getLastSucceededAt()) : null,
-        item.hasLastDurationMs() ? item.getLastDurationMs() : null,
-        item.hasLastError() ? item.getLastError() : null,
-        item.getConsecutiveFailures()))
+    return response
+      .getItemsList()
+      .stream()
+      .map(item ->
+        new HeartbeatRow(
+          "notification-service",
+          item.getJobName(),
+          item.hasLastStartedAt() ? toInstant(item.getLastStartedAt()) : null,
+          item.hasLastSucceededAt()
+            ? toInstant(item.getLastSucceededAt())
+            : null,
+          item.hasLastDurationMs() ? item.getLastDurationMs() : null,
+          item.hasLastError() ? item.getLastError() : null,
+          item.getConsecutiveFailures()
+        )
+      )
       .toList();
   }
 
-  private static JobRunStatusResponseDto toStatusDto(String service, String jobName, HeartbeatRow row, String health) {
+  private static JobRunStatusResponseDto toStatusDto(
+    String service,
+    String jobName,
+    HeartbeatRow row,
+    String health
+  ) {
     return new JobRunStatusResponseDto()
       .service(JobRunStatusResponseDto.ServiceEnum.fromValue(service))
       .jobName(jobName)
-      .lastStartedAt(row != null && row.lastStartedAt() != null ? JsIsoFormat.PATTERN.format(row.lastStartedAt()) : null)
-      .lastSucceededAt(row != null && row.lastSucceededAt() != null ? JsIsoFormat.PATTERN.format(row.lastSucceededAt()) : null)
-      .lastDurationMs(row != null && row.lastDurationMs() != null ? BigDecimal.valueOf(row.lastDurationMs()) : null)
+      .lastStartedAt(
+        row != null && row.lastStartedAt() != null
+          ? JsIsoFormat.PATTERN.format(row.lastStartedAt())
+          : null
+      )
+      .lastSucceededAt(
+        row != null && row.lastSucceededAt() != null
+          ? JsIsoFormat.PATTERN.format(row.lastSucceededAt())
+          : null
+      )
+      .lastDurationMs(
+        row != null && row.lastDurationMs() != null
+          ? BigDecimal.valueOf(row.lastDurationMs())
+          : null
+      )
       .lastError(row != null ? row.lastError() : null)
-      .consecutiveFailures(BigDecimal.valueOf(row != null ? row.consecutiveFailures() : 0))
+      .consecutiveFailures(
+        BigDecimal.valueOf(row != null ? row.consecutiveFailures() : 0)
+      )
       .health(JobRunStatusResponseDto.HealthEnum.fromValue(health));
   }
 
@@ -382,28 +497,44 @@ public class PlatformJobsController implements PlatformJobsApi {
     return Instant.ofEpochSecond(timestamp.getSeconds(), timestamp.getNanos());
   }
 
-  private AnalyticsServiceGrpc.AnalyticsServiceBlockingStub withAnalyticsMetadata(RequestContext context) {
+  private AnalyticsServiceGrpc.AnalyticsServiceBlockingStub withAnalyticsMetadata(
+    RequestContext context
+  ) {
     return analyticsStub
       .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
-      .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context)));
+      .withInterceptors(
+        MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context))
+      );
   }
 
-  private AiLedgerServiceGrpc.AiLedgerServiceBlockingStub withLedgerMetadata(RequestContext context) {
+  private AiLedgerServiceGrpc.AiLedgerServiceBlockingStub withLedgerMetadata(
+    RequestContext context
+  ) {
     return ledgerStub
       .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
-      .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context)));
+      .withInterceptors(
+        MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context))
+      );
   }
 
-  private PlatformServiceGrpc.PlatformServiceBlockingStub withPlatformMetadata(RequestContext context) {
+  private PlatformServiceGrpc.PlatformServiceBlockingStub withPlatformMetadata(
+    RequestContext context
+  ) {
     return platformStub
       .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
-      .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context)));
+      .withInterceptors(
+        MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context))
+      );
   }
 
-  private NotificationServiceGrpc.NotificationServiceBlockingStub withNotificationMetadata(RequestContext context) {
+  private NotificationServiceGrpc.NotificationServiceBlockingStub withNotificationMetadata(
+    RequestContext context
+  ) {
     return notificationStub
       .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
-      .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context)));
+      .withInterceptors(
+        MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context))
+      );
   }
 
   /** One heartbeat row, service-agnostic — the four generated `*JobRunStatus` types collapse into this. */
@@ -414,5 +545,6 @@ public class PlatformJobsController implements PlatformJobsApi {
     Instant lastSucceededAt,
     Integer lastDurationMs,
     String lastError,
-    int consecutiveFailures) {}
+    int consecutiveFailures
+  ) {}
 }

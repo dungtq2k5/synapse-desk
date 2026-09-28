@@ -116,7 +116,7 @@ export const SKIPPED_FOR_JAVA: Readonly<Record<string, string>> = {
     "the Swagger CLI plugin's own default for a bare `@Headers()` parameter, " +
     "not a deliberate spec decision) while Node's handler treats it as " +
     'optional (`idempotencyKey?: string`) and never enforces the header at ' +
-    'all. Java\'s generated `BillingApi` takes the published contract ' +
+    "all. Java's generated `BillingApi` takes the published contract " +
     'literally (`@NotNull @RequestHeader(required = true)`), so an absent ' +
     'header 400s before the controller runs — a genuine, pre-existing spec/' +
     'implementation gap this port did not introduce and should not paper ' +

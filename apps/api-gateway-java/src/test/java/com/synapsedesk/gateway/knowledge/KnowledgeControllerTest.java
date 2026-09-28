@@ -45,23 +45,38 @@ import synapsedesk.rag.RagServiceGrpc;
 class KnowledgeControllerTest {
 
   private final DocumentServiceGrpc.DocumentServiceBlockingStub documentStub =
-      mock(DocumentServiceGrpc.DocumentServiceBlockingStub.class);
-  private final RagServiceGrpc.RagServiceBlockingStub ragStub = mock(RagServiceGrpc.RagServiceBlockingStub.class);
+    mock(DocumentServiceGrpc.DocumentServiceBlockingStub.class);
+  private final RagServiceGrpc.RagServiceBlockingStub ragStub = mock(
+    RagServiceGrpc.RagServiceBlockingStub.class
+  );
   private final CurrentUser currentUser = mock(CurrentUser.class);
   private KnowledgeController controller;
 
   @BeforeEach
   void setUp() {
-    when(documentStub.withDeadlineAfter(anyLong(), any())).thenReturn(documentStub);
+    when(documentStub.withDeadlineAfter(anyLong(), any())).thenReturn(
+      documentStub
+    );
     when(documentStub.withInterceptors(any())).thenReturn(documentStub);
     when(ragStub.withDeadlineAfter(anyLong(), any())).thenReturn(ragStub);
     when(ragStub.withInterceptors(any())).thenReturn(ragStub);
     when(currentUser.require(any())).thenReturn(
-        new com.synapsedesk.gateway.auth.RequestContext(
-            "agent-1", "org-1", false, java.util.List.of(), java.util.List.of(), true, "127.0.0.1", "test"));
+      new com.synapsedesk.gateway.auth.RequestContext(
+        "agent-1",
+        "org-1",
+        false,
+        java.util.List.of(),
+        java.util.List.of(),
+        true,
+        "127.0.0.1",
+        "test"
+      )
+    );
     controller = new KnowledgeController(documentStub, ragStub, currentUser);
 
-    RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(new MockHttpServletRequest()));
+    RequestContextHolder.setRequestAttributes(
+      new ServletRequestAttributes(new MockHttpServletRequest())
+    );
   }
 
   @AfterEach
@@ -73,9 +88,15 @@ class KnowledgeControllerTest {
   void getArticleSendsAnExplicitEmptySortByOnTheBlockRange() {
     when(documentStub.getKnowledgeArticle(any())).thenReturn(wireDetail());
 
-    controller.knowledgeControllerGetArticleV1("article-1", BigDecimal.ONE, BigDecimal.TEN);
+    controller.knowledgeControllerGetArticleV1(
+      "article-1",
+      BigDecimal.ONE,
+      BigDecimal.TEN
+    );
 
-    ArgumentCaptor<GetKnowledgeArticleRequest> captor = ArgumentCaptor.forClass(GetKnowledgeArticleRequest.class);
+    ArgumentCaptor<GetKnowledgeArticleRequest> captor = ArgumentCaptor.forClass(
+      GetKnowledgeArticleRequest.class
+    );
     verify(documentStub).getKnowledgeArticle(captor.capture());
     assertThat(captor.getValue().getPage().getSortBy()).isEmpty();
   }
@@ -85,26 +106,33 @@ class KnowledgeControllerTest {
     KnowledgeAskDto dto = new KnowledgeAskDto();
     dto.setMessage("   ");
 
-    assertThatThrownBy(() -> controller.knowledgeControllerAskV1(dto)).isInstanceOf(ResponseStatusException.class);
+    assertThatThrownBy(() ->
+      controller.knowledgeControllerAskV1(dto)
+    ).isInstanceOf(ResponseStatusException.class);
     verify(ragStub, never()).ask(any());
   }
 
   @Test
   void askForwardsTheTrimmedMessageWithEmptyHistoryAndZeroAttachments() {
     when(ragStub.ask(any())).thenReturn(
-        ChatResponse.newBuilder()
-            .setContent("answer")
-            .setStatus(AnswerStatus.ANSWER_STATUS_DOC_ANSWER)
-            .setGenerationId("gen-1")
-            .build());
+      ChatResponse.newBuilder()
+        .setContent("answer")
+        .setStatus(AnswerStatus.ANSWER_STATUS_DOC_ANSWER)
+        .setGenerationId("gen-1")
+        .build()
+    );
     KnowledgeAskDto dto = new KnowledgeAskDto();
     dto.setMessage("  what is the refund policy?  ");
 
     controller.knowledgeControllerAskV1(dto);
 
-    ArgumentCaptor<ChatRequest> captor = ArgumentCaptor.forClass(ChatRequest.class);
+    ArgumentCaptor<ChatRequest> captor = ArgumentCaptor.forClass(
+      ChatRequest.class
+    );
     verify(ragStub).ask(captor.capture());
-    assertThat(captor.getValue().getMessage()).isEqualTo("what is the refund policy?");
+    assertThat(captor.getValue().getMessage()).isEqualTo(
+      "what is the refund policy?"
+    );
     assertThat(captor.getValue().getHistoryList()).isEmpty();
     assertThat(captor.getValue().getAttachmentsList()).isEmpty();
     assertThat(captor.getValue().getAttachmentCount()).isEqualTo(0);
@@ -116,7 +144,9 @@ class KnowledgeControllerTest {
     dto.setQuery("   ");
     dto.setLimit(BigDecimal.ZERO);
 
-    assertThatThrownBy(() -> controller.knowledgeControllerSearchV1(dto)).isInstanceOf(ResponseStatusException.class);
+    assertThatThrownBy(() ->
+      controller.knowledgeControllerSearchV1(dto)
+    ).isInstanceOf(ResponseStatusException.class);
     verify(ragStub, never()).search(any());
   }
 
@@ -130,7 +160,9 @@ class KnowledgeControllerTest {
 
     controller.knowledgeControllerSearchV1(dto);
 
-    ArgumentCaptor<SearchRequest> captor = ArgumentCaptor.forClass(SearchRequest.class);
+    ArgumentCaptor<SearchRequest> captor = ArgumentCaptor.forClass(
+      SearchRequest.class
+    );
     verify(ragStub).search(captor.capture());
     assertThat(captor.getValue().getQuery()).isEqualTo("refund policy");
     assertThat(captor.getValue().getLimit()).isEqualTo(20);
@@ -140,14 +172,15 @@ class KnowledgeControllerTest {
   private static KnowledgeArticleDetailResponse wireDetail() {
     Timestamp now = Timestamp.newBuilder().setSeconds(1_756_684_800).build();
     return KnowledgeArticleDetailResponse.newBuilder()
-        .setArticle(
-            KnowledgeArticleResponse.newBuilder()
-                .setId("article-1")
-                .setTitle("Title")
-                .setUpdatedAt(now)
-                .setChunkCount(3)
-                .build())
-        .setHasUnindexedPages(false)
-        .build();
+      .setArticle(
+        KnowledgeArticleResponse.newBuilder()
+          .setId("article-1")
+          .setTitle("Title")
+          .setUpdatedAt(now)
+          .setChunkCount(3)
+          .build()
+      )
+      .setHasUnindexedPages(false)
+      .build();
   }
 }

@@ -32,8 +32,9 @@ import synapsedesk.auth.SessionServiceGrpc;
  */
 class SessionsControllerTest {
 
-  private final SessionServiceGrpc.SessionServiceBlockingStub stub =
-      mock(SessionServiceGrpc.SessionServiceBlockingStub.class);
+  private final SessionServiceGrpc.SessionServiceBlockingStub stub = mock(
+    SessionServiceGrpc.SessionServiceBlockingStub.class
+  );
   private final CurrentUser currentUser = mock(CurrentUser.class);
   private final CookieWriter cookies = mock(CookieWriter.class);
   private SessionsController controller;
@@ -42,11 +43,25 @@ class SessionsControllerTest {
   void setUp() {
     when(stub.withDeadlineAfter(anyLong(), any())).thenReturn(stub);
     when(stub.withInterceptors(any())).thenReturn(stub);
-    when(currentUser.require(any()))
-        .thenReturn(new RequestContext("agent-1", "org-1", false, List.of(), List.of(), true, "127.0.0.1", "test"));
+    when(currentUser.require(any())).thenReturn(
+      new RequestContext(
+        "agent-1",
+        "org-1",
+        false,
+        List.of(),
+        List.of(),
+        true,
+        "127.0.0.1",
+        "test"
+      )
+    );
     when(cookies.readRefreshToken(any())).thenReturn(Optional.empty());
     RequestContextHolder.setRequestAttributes(
-        new ServletRequestAttributes(new MockHttpServletRequest(), mock(HttpServletResponse.class)));
+      new ServletRequestAttributes(
+        new MockHttpServletRequest(),
+        mock(HttpServletResponse.class)
+      )
+    );
     controller = new SessionsController(stub, currentUser, cookies);
   }
 
@@ -57,8 +72,12 @@ class SessionsControllerTest {
 
   @Test
   void revokingTheCurrentSessionClearsBothCookieGroups() {
-    when(stub.revokeSession(any()))
-        .thenReturn(RevokeSessionResponse.newBuilder().setWasCurrent(true).setRevokedCount(2).build());
+    when(stub.revokeSession(any())).thenReturn(
+      RevokeSessionResponse.newBuilder()
+        .setWasCurrent(true)
+        .setRevokedCount(2)
+        .build()
+    );
 
     controller.sessionsControllerRevokeV1("session-1");
 
@@ -68,8 +87,12 @@ class SessionsControllerTest {
 
   @Test
   void revokingAnotherSessionClearsNoCookies() {
-    when(stub.revokeSession(any()))
-        .thenReturn(RevokeSessionResponse.newBuilder().setWasCurrent(false).setRevokedCount(1).build());
+    when(stub.revokeSession(any())).thenReturn(
+      RevokeSessionResponse.newBuilder()
+        .setWasCurrent(false)
+        .setRevokedCount(1)
+        .build()
+    );
 
     controller.sessionsControllerRevokeV1("session-2");
 
@@ -80,15 +103,25 @@ class SessionsControllerTest {
   @Test
   void listForwardsThePresentedRefreshTokenToMarkCurrent() {
     HttpServletRequest request = mock(HttpServletRequest.class);
-    RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request, mock(HttpServletResponse.class)));
-    when(cookies.readRefreshToken(request)).thenReturn(Optional.of("refresh-abc"));
-    when(stub.listSessions(any())).thenReturn(synapsedesk.auth.Session.ListSessionsResponse.getDefaultInstance());
+    RequestContextHolder.setRequestAttributes(
+      new ServletRequestAttributes(request, mock(HttpServletResponse.class))
+    );
+    when(cookies.readRefreshToken(request)).thenReturn(
+      Optional.of("refresh-abc")
+    );
+    when(stub.listSessions(any())).thenReturn(
+      synapsedesk.auth.Session.ListSessionsResponse.getDefaultInstance()
+    );
 
     controller.sessionsControllerListV1();
 
     org.mockito.ArgumentCaptor<synapsedesk.auth.Session.ListSessionsRequest> captor =
-        org.mockito.ArgumentCaptor.forClass(synapsedesk.auth.Session.ListSessionsRequest.class);
+      org.mockito.ArgumentCaptor.forClass(
+        synapsedesk.auth.Session.ListSessionsRequest.class
+      );
     verify(stub).listSessions(captor.capture());
-    org.assertj.core.api.Assertions.assertThat(captor.getValue().getRefreshToken()).isEqualTo("refresh-abc");
+    org.assertj.core.api.Assertions.assertThat(
+      captor.getValue().getRefreshToken()
+    ).isEqualTo("refresh-abc");
   }
 }

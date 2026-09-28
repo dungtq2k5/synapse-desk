@@ -35,7 +35,9 @@ public class IngestionJobsResolver {
   private final CurrentUser currentUser;
 
   public IngestionJobsResolver(
-      DocumentServiceGrpc.DocumentServiceBlockingStub stub, CurrentUser currentUser) {
+    DocumentServiceGrpc.DocumentServiceBlockingStub stub,
+    CurrentUser currentUser
+  ) {
     this.stub = stub;
     this.currentUser = currentUser;
   }
@@ -46,8 +48,9 @@ public class IngestionJobsResolver {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     try {
-      IngestionJobResponse response =
-          withMetadata(context).getIngestionJob(IngestionJobIdRequest.newBuilder().setId(id).build());
+      IngestionJobResponse response = withMetadata(context).getIngestionJob(
+        IngestionJobIdRequest.newBuilder().setId(id).build()
+      );
 
       return IngestionJobMapper.toIngestionJobGqlDto(response);
     } catch (StatusRuntimeException notFoundOrForbidden) {
@@ -60,46 +63,70 @@ public class IngestionJobsResolver {
   @QueryMapping(name = "ingestionJobs")
   @RequirePermission(PermissionCodesEnum.DOCUMENT_READ)
   public IngestionJobPageGqlDto ingestionJobs(
-      @Argument String documentId,
-      @Argument int first,
-      @Argument int page,
-      @Argument IngestionJobStatusGql status) {
+    @Argument String documentId,
+    @Argument int first,
+    @Argument int page,
+    @Argument IngestionJobStatusGql status
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    PageRequest pageRequest =
-        PageRequest.newBuilder().setPage(page).setLimit(first).setSortOrder(SortOrder.SORT_ORDER_DESC).build();
+    PageRequest pageRequest = PageRequest.newBuilder()
+      .setPage(page)
+      .setLimit(first)
+      .setSortOrder(SortOrder.SORT_ORDER_DESC)
+      .build();
 
     ListIngestionJobsRequest.Builder wire =
-        ListIngestionJobsRequest.newBuilder().setPage(pageRequest);
+      ListIngestionJobsRequest.newBuilder().setPage(pageRequest);
     if (documentId != null) {
       wire.setDocumentId(documentId);
     }
     if (status != null) {
-      wire.setStatus(IngestionJobStatus.valueOf("INGESTION_JOB_STATUS_" + status.name()));
+      wire.setStatus(
+        IngestionJobStatus.valueOf("INGESTION_JOB_STATUS_" + status.name())
+      );
     }
 
-    ListIngestionJobsResponse response = withMetadata(context).listIngestionJobs(wire.build());
+    ListIngestionJobsResponse response = withMetadata(
+      context
+    ).listIngestionJobs(wire.build());
 
     var meta = response.getMeta();
 
     return new IngestionJobPageGqlDto(
-        response.getItemsList().stream().map(IngestionJobMapper::toIngestionJobGqlDto).toList(),
-        new com.synapsedesk.gateway.graphql.PageMetaGqlDto(
-            meta.getTotalItems(), meta.getItemCount(), meta.getItemsPerPage(), meta.getTotalPages(), meta.getCurrentPage()));
+      response
+        .getItemsList()
+        .stream()
+        .map(IngestionJobMapper::toIngestionJobGqlDto)
+        .toList(),
+      new com.synapsedesk.gateway.graphql.PageMetaGqlDto(
+        meta.getTotalItems(),
+        meta.getItemCount(),
+        meta.getItemsPerPage(),
+        meta.getTotalPages(),
+        meta.getCurrentPage()
+      )
+    );
   }
 
   /** `IngestionJob.document` — what this job is ingesting. */
   @SchemaMapping(typeName = "IngestionJob", field = "document")
   public CompletableFuture<DocumentGqlDto> document(
-      IngestionJobGqlDto job, DataLoader<String, DocumentGqlDto> loader) {
+    IngestionJobGqlDto job,
+    DataLoader<String, DocumentGqlDto> loader
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     return loader.load(job.documentId(), context);
   }
 
-  private DocumentServiceGrpc.DocumentServiceBlockingStub withMetadata(RequestContext context) {
+  private DocumentServiceGrpc.DocumentServiceBlockingStub withMetadata(
+    RequestContext context
+  ) {
     return stub
-        .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
-        .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context)));
+      .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
+      .withInterceptors(
+        MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context))
+      );
   }
 }

@@ -54,12 +54,19 @@ class CacheInvalidationConsumerIT {
     connections.afterPropertiesSet();
     redis = new StringRedisTemplate(connections);
     cache = new CacheService(redis, new ObjectMapper());
-    consumer = new CacheInvalidationConsumer(new StoreProperties(redisUrl, natsUrl), cache, new ObjectMapper());
+    consumer = new CacheInvalidationConsumer(
+      new StoreProperties(redisUrl, natsUrl),
+      cache,
+      new ObjectMapper()
+    );
 
     try {
       publisherConnection = Nats.connect(natsUrl);
     } catch (IOException | InterruptedException failure) {
-      throw new IllegalStateException("Could not connect to NATS for this IT", failure);
+      throw new IllegalStateException(
+        "Could not connect to NATS for this IT",
+        failure
+      );
     }
   }
 
@@ -81,8 +88,9 @@ class CacheInvalidationConsumerIT {
     consumer.activate();
     publish("ticket.created", tenant);
 
-    await().atMost(Duration.ofSeconds(5)).untilAsserted(
-        () -> assertThat(cache.raw(key)).isEmpty());
+    await()
+      .atMost(Duration.ofSeconds(5))
+      .untilAsserted(() -> assertThat(cache.raw(key)).isEmpty());
   }
 
   @Test
@@ -99,13 +107,22 @@ class CacheInvalidationConsumerIT {
     // No assertion can prove a negative instantly — settle past the window
     // an active consumer would have evicted within, then confirm the key
     // survived. `awaitility`'s own idiom for "stayed true": poll, invert.
-    await().pollDelay(Duration.ofSeconds(2)).atMost(Duration.ofSeconds(3)).untilAsserted(
-        () -> assertThat(cache.raw(key)).isPresent());
+    await()
+      .pollDelay(Duration.ofSeconds(2))
+      .atMost(Duration.ofSeconds(3))
+      .untilAsserted(() -> assertThat(cache.raw(key)).isPresent());
   }
 
   private void publish(String subject, String tenant) {
     String payload =
-        "{\"pattern\":\"" + subject + "\",\"data\":{\"organizationId\":\"" + tenant + "\"}}";
-    publisherConnection.publish(subject, payload.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+      "{\"pattern\":\"" +
+      subject +
+      "\",\"data\":{\"organizationId\":\"" +
+      tenant +
+      "\"}}";
+    publisherConnection.publish(
+      subject,
+      payload.getBytes(java.nio.charset.StandardCharsets.UTF_8)
+    );
   }
 }

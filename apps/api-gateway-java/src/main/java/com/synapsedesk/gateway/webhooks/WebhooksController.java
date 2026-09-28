@@ -107,7 +107,9 @@ public class WebhooksController implements WebhooksApi {
     StripeWebhookResponse response = stub
       .withDeadlineAfter(STRIPE_DEADLINE_SECONDS, TimeUnit.SECONDS)
       .withInterceptors(
-        MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(currentUser.origin(request)))
+        MetadataUtils.newAttachHeadersInterceptor(
+          CallerMetadata.of(currentUser.origin(request))
+        )
       )
       .handleStripeWebhook(wire);
 
@@ -152,11 +154,17 @@ public class WebhooksController implements WebhooksApi {
     // The `accept()` pipeline (mail fetch, routing, attachment ingestion) is
     // not yet ported — see the class docblock for why 503, not 200, is the
     // correct placeholder.
-    throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Inbound mail fetch failed");
+    throw new ResponseStatusException(
+      HttpStatus.SERVICE_UNAVAILABLE,
+      "Inbound mail fetch failed"
+    );
   }
 
   private ResponseStatusException rejectedSignature() {
-    return new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Signature could not be verified");
+    return new ResponseStatusException(
+      HttpStatus.UNAUTHORIZED,
+      "Signature could not be verified"
+    );
   }
 
   /**
@@ -166,14 +174,22 @@ public class WebhooksController implements WebhooksApi {
    * Reproduced from {@code test/utils/standard-webhooks.ts}'s signer, which is
    * itself independent of the provider's own verifier.
    */
-  private boolean verifySignature(byte[] body, String id, String timestamp, String signatureHeader) {
+  private boolean verifySignature(
+    byte[] body,
+    String id,
+    String timestamp,
+    String signatureHeader
+  ) {
     long timestampSeconds;
     try {
       timestampSeconds = Long.parseLong(timestamp);
     } catch (NumberFormatException e) {
       return false;
     }
-    if (Math.abs(java.time.Instant.now().getEpochSecond() - timestampSeconds) > SVIX_TOLERANCE_SECONDS) {
+    if (
+      Math.abs(java.time.Instant.now().getEpochSecond() - timestampSeconds) >
+      SVIX_TOLERANCE_SECONDS
+    ) {
       return false;
     }
 
@@ -185,7 +201,9 @@ public class WebhooksController implements WebhooksApi {
       }
       byte[] candidate;
       try {
-        candidate = Base64.getDecoder().decode(token.substring(SVIX_SIGNATURE_SCHEME.length()));
+        candidate = Base64.getDecoder().decode(
+          token.substring(SVIX_SIGNATURE_SCHEME.length())
+        );
       } catch (IllegalArgumentException e) {
         continue;
       }
@@ -198,8 +216,12 @@ public class WebhooksController implements WebhooksApi {
   }
 
   private byte[] sign(byte[] body, String id, String timestamp) {
-    byte[] key = Base64.getDecoder().decode(inboundEmail.resendWebhookSecret().replaceFirst("^whsec_", ""));
-    byte[] signedContent = (id + "." + timestamp + ".").getBytes(StandardCharsets.UTF_8);
+    byte[] key = Base64.getDecoder().decode(
+      inboundEmail.resendWebhookSecret().replaceFirst("^whsec_", "")
+    );
+    byte[] signedContent = (id + "." + timestamp + ".").getBytes(
+      StandardCharsets.UTF_8
+    );
     byte[] content = new byte[signedContent.length + body.length];
     System.arraycopy(signedContent, 0, content, 0, signedContent.length);
     System.arraycopy(body, 0, content, signedContent.length, body.length);

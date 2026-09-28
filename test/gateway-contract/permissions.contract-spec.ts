@@ -99,7 +99,13 @@ describe('permissions', () => {
       expect(
         (first.body as { data: { code: string; isRetired: boolean }[] }).data,
       ).toEqual([
-        { id: 'p1', code: 'ticket.read.all', name: 'Read all tickets', group: 'ticket', isRetired: false },
+        {
+          id: 'p1',
+          code: 'ticket.read.all',
+          name: 'Read all tickets',
+          group: 'ticket',
+          isRetired: false,
+        },
       ]);
       expect(peers.auth.calls('RoleService/ListPermissions')).toHaveLength(1);
     },

@@ -60,7 +60,9 @@ import tools.jackson.databind.ObjectMapper;
 @RestController
 public class AuditLogsController implements AuditLogsApi {
 
-  private static final Logger LOG = LoggerFactory.getLogger(AuditLogsController.class);
+  private static final Logger LOG = LoggerFactory.getLogger(
+    AuditLogsController.class
+  );
   private static final long DEADLINE_SECONDS = 5;
 
   private final AuditServiceGrpc.AuditServiceBlockingStub stub;
@@ -69,10 +71,11 @@ public class AuditLogsController implements AuditLogsApi {
   private final ObjectMapper json;
 
   public AuditLogsController(
-      AuditServiceGrpc.AuditServiceBlockingStub stub,
-      AnalyticsServiceGrpc.AnalyticsServiceBlockingStub analytics,
-      CurrentUser currentUser,
-      ObjectMapper json) {
+    AuditServiceGrpc.AuditServiceBlockingStub stub,
+    AnalyticsServiceGrpc.AnalyticsServiceBlockingStub analytics,
+    CurrentUser currentUser,
+    ObjectMapper json
+  ) {
     this.stub = stub;
     this.analytics = analytics;
     this.currentUser = currentUser;
@@ -82,30 +85,52 @@ public class AuditLogsController implements AuditLogsApi {
   @Override
   @RequirePermission(PermissionCodesEnum.AUDIT_READ)
   public ResponseEntity<AuditLogsControllerListV1200Response> auditLogsControllerListV1(
-      BigDecimal page,
-      BigDecimal limit,
-      String sortBy,
-      String sortOrder,
-      String action,
-      UUID userId,
-      String resourceType,
-      UUID resourceId,
-      OffsetDateTime from,
-      OffsetDateTime to) {
+    BigDecimal page,
+    BigDecimal limit,
+    String sortBy,
+    String sortOrder,
+    String action,
+    UUID userId,
+    String resourceType,
+    UUID resourceId,
+    OffsetDateTime from,
+    OffsetDateTime to
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    ListAuditLogsResponse response =
-        withMetadata(context)
-            .listAuditLogs(
-                toListAuditLogsRequest(page, limit, sortBy, sortOrder, action, userId, resourceType, resourceId, from, to, false));
+    ListAuditLogsResponse response = withMetadata(context).listAuditLogs(
+      toListAuditLogsRequest(
+        page,
+        limit,
+        sortBy,
+        sortOrder,
+        action,
+        userId,
+        resourceType,
+        resourceId,
+        from,
+        to,
+        false
+      )
+    );
 
     AuditLogsControllerListV1200ResponseData data =
-        new AuditLogsControllerListV1200ResponseData(
-            response.getItemsList().stream().map(log -> toAuditLogResponseDto(log, json)).toList(),
-            toMetaDto(response.getMeta()));
+      new AuditLogsControllerListV1200ResponseData(
+        response
+          .getItemsList()
+          .stream()
+          .map(log -> toAuditLogResponseDto(log, json))
+          .toList(),
+        toMetaDto(response.getMeta())
+      );
 
     return ResponseEntity.ok(
-        new AuditLogsControllerListV1200Response().success(true).statusCode(BigDecimal.valueOf(200)).message("OK").data(data));
+      new AuditLogsControllerListV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("OK")
+        .data(data)
+    );
   }
 
   @Override
@@ -113,86 +138,101 @@ public class AuditLogsController implements AuditLogsApi {
   public ResponseEntity<AuditLogsControllerListActionsV1200Response> auditLogsControllerListActionsV1() {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    ListAuditActionsResponse response =
-        withMetadata(context).listAuditActions(ListAuditActionsRequest.newBuilder().setPlatformScope(false).build());
+    ListAuditActionsResponse response = withMetadata(context).listAuditActions(
+      ListAuditActionsRequest.newBuilder().setPlatformScope(false).build()
+    );
 
     return ResponseEntity.ok(
-        new AuditLogsControllerListActionsV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("OK")
-            .data(toAuditActionsResponseDto(response)));
+      new AuditLogsControllerListActionsV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("OK")
+        .data(toAuditActionsResponseDto(response))
+    );
   }
 
   @Override
   @RequirePermission(PermissionCodesEnum.AUDIT_EXPORT)
   public ResponseEntity<TicketsControllerCreateExportV1202Response> auditLogsControllerCreateExportV1(
-      CreateAuditLogExportDto createAuditLogExportDto) {
+    CreateAuditLogExportDto createAuditLogExportDto
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
     IsoDateCheck.requireIsoDate(createAuditLogExportDto.getFrom(), "from");
     IsoDateCheck.requireIsoDate(createAuditLogExportDto.getTo(), "to");
 
-    CreateExportRequest.Builder wire =
-        CreateExportRequest.newBuilder()
-            .setKind(synapsedesk.ticket.Analytics.ExportKind.EXPORT_KIND_AUDIT_LOG)
-            .setFrom(createAuditLogExportDto.getFrom())
-            .setTo(createAuditLogExportDto.getTo())
-            .setFilters(
-                createAuditLogExportDto.getFilters() == null || createAuditLogExportDto.getFilters().isEmpty()
-                    ? ""
-                    : json.writeValueAsString(createAuditLogExportDto.getFilters()));
+    CreateExportRequest.Builder wire = CreateExportRequest.newBuilder()
+      .setKind(synapsedesk.ticket.Analytics.ExportKind.EXPORT_KIND_AUDIT_LOG)
+      .setFrom(createAuditLogExportDto.getFrom())
+      .setTo(createAuditLogExportDto.getTo())
+      .setFilters(
+        createAuditLogExportDto.getFilters() == null ||
+          createAuditLogExportDto.getFilters().isEmpty()
+          ? ""
+          : json.writeValueAsString(createAuditLogExportDto.getFilters())
+      );
 
-    ExportResponse response = withAnalyticsMetadata(context).createExport(wire.build());
+    ExportResponse response = withAnalyticsMetadata(context).createExport(
+      wire.build()
+    );
 
     return new ResponseEntity<>(
-        new TicketsControllerCreateExportV1202Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(202))
-            .message("OK")
-            .data(toExportDto(response)),
-        HttpStatus.ACCEPTED);
+      new TicketsControllerCreateExportV1202Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(202))
+        .message("OK")
+        .data(toExportDto(response)),
+      HttpStatus.ACCEPTED
+    );
   }
 
   @Override
   @RequirePermission(PermissionCodesEnum.AUDIT_EXPORT)
-  public ResponseEntity<TicketsControllerCreateExportV1202Response> auditLogsControllerGetExportV1(String id) {
+  public ResponseEntity<TicketsControllerCreateExportV1202Response> auditLogsControllerGetExportV1(
+    String id
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    ExportResponse response = withAnalyticsMetadata(context).getExport(GetExportRequest.newBuilder().setId(id).build());
+    ExportResponse response = withAnalyticsMetadata(context).getExport(
+      GetExportRequest.newBuilder().setId(id).build()
+    );
 
     return ResponseEntity.ok(
-        new TicketsControllerCreateExportV1202Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("OK")
-            .data(toExportDto(response)));
+      new TicketsControllerCreateExportV1202Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("OK")
+        .data(toExportDto(response))
+    );
   }
 
   static ListAuditLogsRequest toListAuditLogsRequest(
-      BigDecimal page,
-      BigDecimal limit,
-      String sortBy,
-      String sortOrder,
-      String action,
-      UUID userId,
-      String resourceType,
-      UUID resourceId,
-      OffsetDateTime from,
-      OffsetDateTime to,
-      boolean platformScope) {
-    PageRequest.Builder pageRequest =
-        PageRequest.newBuilder()
-            .setPage(page.intValue())
-            .setLimit(limit.intValue())
-            .setSortBy(sortBy)
-            .setSortOrder("DESC".equalsIgnoreCase(sortOrder) ? SortOrder.SORT_ORDER_DESC : SortOrder.SORT_ORDER_ASC);
+    BigDecimal page,
+    BigDecimal limit,
+    String sortBy,
+    String sortOrder,
+    String action,
+    UUID userId,
+    String resourceType,
+    UUID resourceId,
+    OffsetDateTime from,
+    OffsetDateTime to,
+    boolean platformScope
+  ) {
+    PageRequest.Builder pageRequest = PageRequest.newBuilder()
+      .setPage(page.intValue())
+      .setLimit(limit.intValue())
+      .setSortBy(sortBy)
+      .setSortOrder(
+        "DESC".equalsIgnoreCase(sortOrder)
+          ? SortOrder.SORT_ORDER_DESC
+          : SortOrder.SORT_ORDER_ASC
+      );
 
-    ListAuditLogsRequest.Builder wire =
-        ListAuditLogsRequest.newBuilder()
-            .setPage(pageRequest)
-            .setAction(toAuditActionFilter(action))
-            .setResourceType(toResourceTypeFilter(resourceType))
-            .setPlatformScope(platformScope);
+    ListAuditLogsRequest.Builder wire = ListAuditLogsRequest.newBuilder()
+      .setPage(pageRequest)
+      .setAction(toAuditActionFilter(action))
+      .setResourceType(toResourceTypeFilter(resourceType))
+      .setPlatformScope(platformScope);
     if (userId != null) {
       wire.setUserId(userId.toString());
     }
@@ -219,7 +259,10 @@ public class AuditLogsController implements AuditLogsApi {
       }
       return parsed;
     } catch (IllegalArgumentException notARealAction) {
-      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "action is not a recognized audit action");
+      throw new ResponseStatusException(
+        HttpStatus.BAD_REQUEST,
+        "action is not a recognized audit action"
+      );
     }
   }
 
@@ -228,32 +271,45 @@ public class AuditLogsController implements AuditLogsApi {
       return AuditResourceType.AUDIT_RESOURCE_TYPE_UNSPECIFIED;
     }
     try {
-      AuditResourceType parsed = AuditResourceType.valueOf("AUDIT_RESOURCE_TYPE_" + resourceType);
+      AuditResourceType parsed = AuditResourceType.valueOf(
+        "AUDIT_RESOURCE_TYPE_" + resourceType
+      );
       if (parsed == AuditResourceType.AUDIT_RESOURCE_TYPE_UNSPECIFIED) {
         throw new IllegalArgumentException(resourceType);
       }
       return parsed;
     } catch (IllegalArgumentException notARealResourceType) {
-      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "resourceType is not a recognized resource type");
+      throw new ResponseStatusException(
+        HttpStatus.BAD_REQUEST,
+        "resourceType is not a recognized resource type"
+      );
     }
   }
 
-  static AuditLogResponseDto toAuditLogResponseDto(AuditLogResponse log, ObjectMapper json) {
+  static AuditLogResponseDto toAuditLogResponseDto(
+    AuditLogResponse log,
+    ObjectMapper json
+  ) {
     return new AuditLogResponseDto(
-        log.getId(),
-        log.hasOrganizationId() ? log.getOrganizationId() : null,
-        log.hasUserId() ? log.getUserId() : null,
-        toActionEnum(log.getAction()),
-        toResourceTypeEnum(log.getResourceType()),
-        log.hasResourceId() ? log.getResourceId() : null,
-        log.hasIpAddress() ? log.getIpAddress() : null,
-        log.hasUserAgent() ? log.getUserAgent() : null,
-        parseMetadata(log.getMetadata(), log.getId(), json),
-        toOffsetDateTime(log.getCreatedAt()));
+      log.getId(),
+      log.hasOrganizationId() ? log.getOrganizationId() : null,
+      log.hasUserId() ? log.getUserId() : null,
+      toActionEnum(log.getAction()),
+      toResourceTypeEnum(log.getResourceType()),
+      log.hasResourceId() ? log.getResourceId() : null,
+      log.hasIpAddress() ? log.getIpAddress() : null,
+      log.hasUserAgent() ? log.getUserAgent() : null,
+      parseMetadata(log.getMetadata(), log.getId(), json),
+      toOffsetDateTime(log.getCreatedAt())
+    );
   }
 
   @SuppressWarnings("unchecked")
-  private static Map<String, Object> parseMetadata(String raw, String logId, ObjectMapper json) {
+  private static Map<String, Object> parseMetadata(
+    String raw,
+    String logId,
+    ObjectMapper json
+  ) {
     if (raw == null || raw.isEmpty()) {
       return Map.of();
     }
@@ -265,78 +321,144 @@ public class AuditLogsController implements AuditLogsApi {
     }
   }
 
-  static AuditActionsResponseDto toAuditActionsResponseDto(ListAuditActionsResponse response) {
+  static AuditActionsResponseDto toAuditActionsResponseDto(
+    ListAuditActionsResponse response
+  ) {
     return new AuditActionsResponseDto(
-        response.getActionsList().stream().map(AuditLogsController::toActionsEnum).filter(java.util.Objects::nonNull).toList());
+      response
+        .getActionsList()
+        .stream()
+        .map(AuditLogsController::toActionsEnum)
+        .filter(java.util.Objects::nonNull)
+        .toList()
+    );
   }
 
   static AuditLogResponseDto.ActionEnum toActionEnum(AuditAction action) {
-    if (action == AuditAction.AUDIT_ACTION_UNSPECIFIED || action == AuditAction.UNRECOGNIZED) {
+    if (
+      action == AuditAction.AUDIT_ACTION_UNSPECIFIED ||
+      action == AuditAction.UNRECOGNIZED
+    ) {
       return null;
     }
-    return AuditLogResponseDto.ActionEnum.fromValue(action.name().replace("AUDIT_ACTION_", ""));
+    return AuditLogResponseDto.ActionEnum.fromValue(
+      action.name().replace("AUDIT_ACTION_", "")
+    );
   }
 
   static AuditActionsResponseDto.ActionsEnum toActionsEnum(AuditAction action) {
-    if (action == AuditAction.AUDIT_ACTION_UNSPECIFIED || action == AuditAction.UNRECOGNIZED) {
+    if (
+      action == AuditAction.AUDIT_ACTION_UNSPECIFIED ||
+      action == AuditAction.UNRECOGNIZED
+    ) {
       return null;
     }
-    return AuditActionsResponseDto.ActionsEnum.fromValue(action.name().replace("AUDIT_ACTION_", ""));
+    return AuditActionsResponseDto.ActionsEnum.fromValue(
+      action.name().replace("AUDIT_ACTION_", "")
+    );
   }
 
-  static AuditLogResponseDto.ResourceTypeEnum toResourceTypeEnum(AuditResourceType resourceType) {
-    if (resourceType == AuditResourceType.AUDIT_RESOURCE_TYPE_UNSPECIFIED
-        || resourceType == AuditResourceType.UNRECOGNIZED) {
+  static AuditLogResponseDto.ResourceTypeEnum toResourceTypeEnum(
+    AuditResourceType resourceType
+  ) {
+    if (
+      resourceType == AuditResourceType.AUDIT_RESOURCE_TYPE_UNSPECIFIED ||
+      resourceType == AuditResourceType.UNRECOGNIZED
+    ) {
       return null;
     }
-    return AuditLogResponseDto.ResourceTypeEnum.fromValue(resourceType.name().replace("AUDIT_RESOURCE_TYPE_", ""));
+    return AuditLogResponseDto.ResourceTypeEnum.fromValue(
+      resourceType.name().replace("AUDIT_RESOURCE_TYPE_", "")
+    );
   }
 
-  static InvitationsControllerListV1200ResponseDataMeta toMetaDto(synapsedesk.auth.Common.PageMeta meta) {
+  static InvitationsControllerListV1200ResponseDataMeta toMetaDto(
+    synapsedesk.auth.Common.PageMeta meta
+  ) {
     return new InvitationsControllerListV1200ResponseDataMeta(
-        BigDecimal.valueOf(meta.getTotalItems()),
-        BigDecimal.valueOf(meta.getItemCount()),
-        BigDecimal.valueOf(meta.getItemsPerPage()),
-        BigDecimal.valueOf(meta.getTotalPages()),
-        BigDecimal.valueOf(meta.getCurrentPage()));
+      BigDecimal.valueOf(meta.getTotalItems()),
+      BigDecimal.valueOf(meta.getItemCount()),
+      BigDecimal.valueOf(meta.getItemsPerPage()),
+      BigDecimal.valueOf(meta.getTotalPages()),
+      BigDecimal.valueOf(meta.getCurrentPage())
+    );
   }
 
   private static ExportResponseDto toExportDto(ExportResponse response) {
     return new ExportResponseDto()
-        .id(response.getId())
-        .status(ExportResponseDto.StatusEnum.fromValue(response.getStatus().name().replace("EXPORT_STATUS_", "")))
-        .kind(ExportResponseDto.KindEnum.fromValue(response.getKind().name().replace("EXPORT_KIND_", "")))
-        .rowCount(response.hasRowCount() ? BigDecimal.valueOf(response.getRowCount()) : null)
-        .rollupComputedAt(response.hasRollupComputedAt() ? toOffsetDateTime(response.getRollupComputedAt()) : null)
-        .downloadUrl(response.hasDownloadUrl() ? response.getDownloadUrl() : null)
-        .error(response.hasError() ? response.getError() : null)
-        .createdAt(response.hasCreatedAt() ? toOffsetDateTime(response.getCreatedAt()) : toOffsetDateTime(0))
-        .completedAt(response.hasCompletedAt() ? toOffsetDateTime(response.getCompletedAt()) : null);
+      .id(response.getId())
+      .status(
+        ExportResponseDto.StatusEnum.fromValue(
+          response.getStatus().name().replace("EXPORT_STATUS_", "")
+        )
+      )
+      .kind(
+        ExportResponseDto.KindEnum.fromValue(
+          response.getKind().name().replace("EXPORT_KIND_", "")
+        )
+      )
+      .rowCount(
+        response.hasRowCount()
+          ? BigDecimal.valueOf(response.getRowCount())
+          : null
+      )
+      .rollupComputedAt(
+        response.hasRollupComputedAt()
+          ? toOffsetDateTime(response.getRollupComputedAt())
+          : null
+      )
+      .downloadUrl(response.hasDownloadUrl() ? response.getDownloadUrl() : null)
+      .error(response.hasError() ? response.getError() : null)
+      .createdAt(
+        response.hasCreatedAt()
+          ? toOffsetDateTime(response.getCreatedAt())
+          : toOffsetDateTime(0)
+      )
+      .completedAt(
+        response.hasCompletedAt()
+          ? toOffsetDateTime(response.getCompletedAt())
+          : null
+      );
   }
 
   private static OffsetDateTime toOffsetDateTime(long epochSecond) {
     return Instant.ofEpochSecond(epochSecond).atOffset(ZoneOffset.UTC);
   }
 
-
-  static OffsetDateTime toOffsetDateTime(com.google.protobuf.Timestamp timestamp) {
-    return Instant.ofEpochSecond(timestamp.getSeconds(), timestamp.getNanos()).atOffset(ZoneOffset.UTC);
+  static OffsetDateTime toOffsetDateTime(
+    com.google.protobuf.Timestamp timestamp
+  ) {
+    return Instant.ofEpochSecond(
+      timestamp.getSeconds(),
+      timestamp.getNanos()
+    ).atOffset(ZoneOffset.UTC);
   }
 
   static com.google.protobuf.Timestamp toTimestamp(OffsetDateTime dateTime) {
     Instant instant = dateTime.toInstant();
-    return com.google.protobuf.Timestamp.newBuilder().setSeconds(instant.getEpochSecond()).setNanos(instant.getNano()).build();
+    return com.google.protobuf.Timestamp.newBuilder()
+      .setSeconds(instant.getEpochSecond())
+      .setNanos(instant.getNano())
+      .build();
   }
 
-  private AuditServiceGrpc.AuditServiceBlockingStub withMetadata(RequestContext context) {
+  private AuditServiceGrpc.AuditServiceBlockingStub withMetadata(
+    RequestContext context
+  ) {
     return stub
-        .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
-        .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context)));
+      .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
+      .withInterceptors(
+        MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context))
+      );
   }
 
-  private AnalyticsServiceGrpc.AnalyticsServiceBlockingStub withAnalyticsMetadata(RequestContext context) {
+  private AnalyticsServiceGrpc.AnalyticsServiceBlockingStub withAnalyticsMetadata(
+    RequestContext context
+  ) {
     return analytics
-        .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
-        .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context)));
+      .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
+      .withInterceptors(
+        MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context))
+      );
   }
 }

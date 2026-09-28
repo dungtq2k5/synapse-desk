@@ -36,7 +36,10 @@ describe('departments', () => {
     )}`,
   });
 
-  const wireDepartment = (id: string, overrides: Record<string, unknown> = {}) => ({
+  const wireDepartment = (
+    id: string,
+    overrides: Record<string, unknown> = {},
+  ) => ({
     id,
     name: 'Support',
     description: 'Front line',
@@ -82,20 +85,31 @@ describe('departments', () => {
     });
   });
 
-  rowFor('Departments')('**`list` carries the pagination envelope**', async () => {
-    peers.auth.on('DepartmentService/ListDepartments').reply({
-      items: [wireDepartment('d1')],
-      meta: { totalItems: 1, itemCount: 1, itemsPerPage: 10, totalPages: 1, currentPage: 1 },
-    });
+  rowFor('Departments')(
+    '**`list` carries the pagination envelope**',
+    async () => {
+      peers.auth.on('DepartmentService/ListDepartments').reply({
+        items: [wireDepartment('d1')],
+        meta: {
+          totalItems: 1,
+          itemCount: 1,
+          itemsPerPage: 10,
+          totalPages: 1,
+          currentPage: 1,
+        },
+      });
 
-    const response = await new Session(gateway.baseUrl).get(
-      `${API}/departments?page=1&limit=10`,
-      headers(['department.read']),
-    );
+      const response = await new Session(gateway.baseUrl).get(
+        `${API}/departments?page=1&limit=10`,
+        headers(['department.read']),
+      );
 
-    expect(response.status).toBe(200);
-    expect(response.body).toMatchObject({ data: { items: [{ id: 'd1', name: 'Support' }] } });
-  });
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({
+        data: { items: [{ id: 'd1', name: 'Support' }] },
+      });
+    },
+  );
 
   rowFor('Departments')(
     '**`?includeDeleted=true` without `department.delete` is refused, and never reaches the peer**',
@@ -106,7 +120,9 @@ describe('departments', () => {
       );
 
       expect(response.status).toBe(403);
-      expect(peers.auth.calls('DepartmentService/ListDepartments')).toHaveLength(0);
+      expect(
+        peers.auth.calls('DepartmentService/ListDepartments'),
+      ).toHaveLength(0);
     },
   );
 
@@ -114,8 +130,18 @@ describe('departments', () => {
     '**`?includeDeleted=true` WITH `department.delete` reaches the peer with the flag set**',
     async () => {
       peers.auth.on('DepartmentService/ListDepartments').reply({
-        items: [wireDepartment('d2', { deletedAt: { seconds: 1_756_684_800, nanos: 0 } })],
-        meta: { totalItems: 1, itemCount: 1, itemsPerPage: 10, totalPages: 1, currentPage: 1 },
+        items: [
+          wireDepartment('d2', {
+            deletedAt: { seconds: 1_756_684_800, nanos: 0 },
+          }),
+        ],
+        meta: {
+          totalItems: 1,
+          itemCount: 1,
+          itemsPerPage: 10,
+          totalPages: 1,
+          currentPage: 1,
+        },
       });
 
       const response = await new Session(gateway.baseUrl).get(
@@ -125,7 +151,9 @@ describe('departments', () => {
 
       expect(response.status).toBe(200);
       const [call] = peers.auth.calls('DepartmentService/ListDepartments');
-      expect((call.request as { includeDeleted: boolean }).includeDeleted).toBe(true);
+      expect((call.request as { includeDeleted: boolean }).includeDeleted).toBe(
+        true,
+      );
     },
   );
 
@@ -162,19 +190,35 @@ describe('departments', () => {
       );
 
       peers.auth.on('DepartmentService/ListDepartments').reply({
-        items: [wireDepartment('deleted-1', { deletedAt: { seconds: 1_756_684_800, nanos: 0 } })],
-        meta: { totalItems: 1, itemCount: 1, itemsPerPage: 10, totalPages: 1, currentPage: 1 },
+        items: [
+          wireDepartment('deleted-1', {
+            deletedAt: { seconds: 1_756_684_800, nanos: 0 },
+          }),
+        ],
+        meta: {
+          totalItems: 1,
+          itemCount: 1,
+          itemsPerPage: 10,
+          totalPages: 1,
+          currentPage: 1,
+        },
       });
 
       const session = new Session(gateway.baseUrl);
-      const warmed = await session.get(`${API}/departments?includeDeleted=true`, {
-        cookie: `${GATEWAY_ENV.JWT_ACCESS_NAME}=${privileged}`,
-      });
+      const warmed = await session.get(
+        `${API}/departments?includeDeleted=true`,
+        {
+          cookie: `${GATEWAY_ENV.JWT_ACCESS_NAME}=${privileged}`,
+        },
+      );
       expect(warmed.status).toBe(200);
 
-      const refused = await session.get(`${API}/departments?includeDeleted=true`, {
-        cookie: `${GATEWAY_ENV.JWT_ACCESS_NAME}=${unprivileged}`,
-      });
+      const refused = await session.get(
+        `${API}/departments?includeDeleted=true`,
+        {
+          cookie: `${GATEWAY_ENV.JWT_ACCESS_NAME}=${unprivileged}`,
+        },
+      );
 
       expect(refused.status).toBe(403);
     },
@@ -184,114 +228,175 @@ describe('departments', () => {
     const id = 'cccccccc-1111-4111-8111-cccccccccccc';
     peers.auth.on('DepartmentService/GetDepartment').reply(wireDepartment(id));
 
-    const response = await new Session(gateway.baseUrl).get(`${API}/departments/${id}`, headers(['department.read']));
+    const response = await new Session(gateway.baseUrl).get(
+      `${API}/departments/${id}`,
+      headers(['department.read']),
+    );
 
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({ data: { id, name: 'Support' } });
   });
 
-  rowFor('Departments')('**`create` forwards the name and description**', async () => {
-    peers.auth.on('DepartmentService/CreateDepartment').reply(wireDepartment('dddddddd-1111-4111-8111-dddddddddddd'));
+  rowFor('Departments')(
+    '**`create` forwards the name and description**',
+    async () => {
+      peers.auth
+        .on('DepartmentService/CreateDepartment')
+        .reply(wireDepartment('dddddddd-1111-4111-8111-dddddddddddd'));
 
-    const response = await new Session(gateway.baseUrl).post(
-      `${API}/departments`,
-      { name: 'Support', description: 'Front line' },
-      headers(['department.create']),
-    );
+      const response = await new Session(gateway.baseUrl).post(
+        `${API}/departments`,
+        { name: 'Support', description: 'Front line' },
+        headers(['department.create']),
+      );
 
-    expect(response.status).toBe(201);
-    const [call] = peers.auth.calls('DepartmentService/CreateDepartment');
-    expect(call.request).toMatchObject({ name: 'Support', description: 'Front line' });
-  });
+      expect(response.status).toBe(201);
+      const [call] = peers.auth.calls('DepartmentService/CreateDepartment');
+      expect(call.request).toMatchObject({
+        name: 'Support',
+        description: 'Front line',
+      });
+    },
+  );
 
-  rowFor('Departments')('**`update` sends only the fields present in the body**', async () => {
-    const id = 'eeeeeeee-1111-4111-8111-eeeeeeeeeeee';
-    peers.auth.on('DepartmentService/UpdateDepartment').reply(wireDepartment(id, { name: 'Customer Support' }));
+  rowFor('Departments')(
+    '**`update` sends only the fields present in the body**',
+    async () => {
+      const id = 'eeeeeeee-1111-4111-8111-eeeeeeeeeeee';
+      peers.auth
+        .on('DepartmentService/UpdateDepartment')
+        .reply(wireDepartment(id, { name: 'Customer Support' }));
 
-    const response = await new Session(gateway.baseUrl).request('PATCH', `${API}/departments/${id}`, {
-      body: { name: 'Customer Support' },
-      headers: headers(['department.update']),
-    });
-
-    expect(response.status).toBe(200);
-    const [call] = peers.auth.calls('DepartmentService/UpdateDepartment');
-    expect(call.request).toMatchObject({ id, name: 'Customer Support' });
-    expect(call.request).not.toHaveProperty('description');
-  });
-
-  rowFor('Departments')('**`remove` answers with the fixed message**', async () => {
-    const id = 'ffffffff-1111-4111-8111-ffffffffffff';
-    peers.auth.on('DepartmentService/DeleteDepartment').reply({});
-
-    const response = await new Session(gateway.baseUrl).request('DELETE', `${API}/departments/${id}`, {
-      headers: headers(['department.delete']),
-    });
-
-    expect(response.status).toBe(200);
-    expect(response.body).toMatchObject({ message: 'Department deleted' });
-  });
-
-  rowFor('Departments')('**`restore` answers with the fixed message**', async () => {
-    const id = '11111111-8888-4888-8888-111111111111';
-    peers.auth.on('DepartmentService/RestoreDepartment').reply(wireDepartment(id));
-
-    const response = await new Session(gateway.baseUrl).post(
-      `${API}/departments/${id}/restore`,
-      undefined,
-      headers(['department.delete']),
-    );
-
-    expect(response.status).toBe(200);
-    expect(response.body).toMatchObject({ message: 'Department restored' });
-  });
-
-  rowFor('Departments')('**`listMembers` nests the full user, flagging `isPrimary`**', async () => {
-    const id = '22222222-8888-4888-8888-222222222222';
-    peers.auth.on('DepartmentService/ListDepartmentMembers').reply({
-      items: [
+      const response = await new Session(gateway.baseUrl).request(
+        'PATCH',
+        `${API}/departments/${id}`,
         {
-          user: wireUser(USER),
-          isPrimary: true,
-          assignedAt: { seconds: 1_756_684_800, nanos: 0 },
+          body: { name: 'Customer Support' },
+          headers: headers(['department.update']),
         },
-      ],
-      meta: { totalItems: 1, itemCount: 1, itemsPerPage: 10, totalPages: 1, currentPage: 1 },
-    });
+      );
 
-    const response = await new Session(gateway.baseUrl).get(
-      `${API}/departments/${id}/members`,
-      headers(['department.read']),
-    );
+      expect(response.status).toBe(200);
+      const [call] = peers.auth.calls('DepartmentService/UpdateDepartment');
+      expect(call.request).toMatchObject({ id, name: 'Customer Support' });
+      expect(call.request).not.toHaveProperty('description');
+    },
+  );
 
-    expect(response.status).toBe(200);
-    expect(response.body).toMatchObject({
-      data: { items: [{ user: { id: USER, fullName: 'Ada Lovelace' }, isPrimary: true }] },
-    });
-  });
+  rowFor('Departments')(
+    '**`remove` answers with the fixed message**',
+    async () => {
+      const id = 'ffffffff-1111-4111-8111-ffffffffffff';
+      peers.auth.on('DepartmentService/DeleteDepartment').reply({});
 
-  rowFor('Departments')('**`addMembers` forwards the user ids and `isPrimary`**', async () => {
-    const id = '33333333-8888-4888-8888-333333333333';
-    peers.auth.on('DepartmentService/AddDepartmentMembers').reply({ addedCount: 1, updatedCount: 0 });
+      const response = await new Session(gateway.baseUrl).request(
+        'DELETE',
+        `${API}/departments/${id}`,
+        {
+          headers: headers(['department.delete']),
+        },
+      );
 
-    const response = await new Session(gateway.baseUrl).post(
-      `${API}/departments/${id}/members`,
-      { userIds: [USER], isPrimary: true },
-      headers(['department.member.assign']),
-    );
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({ message: 'Department deleted' });
+    },
+  );
 
-    expect(response.status).toBe(200);
-    expect(response.body).toMatchObject({ message: 'Members assigned', data: { addedCount: 1, updatedCount: 0 } });
-    const [call] = peers.auth.calls('DepartmentService/AddDepartmentMembers');
-    expect(call.request).toMatchObject({ departmentId: id, userIds: [USER], isPrimary: true });
-  });
+  rowFor('Departments')(
+    '**`restore` answers with the fixed message**',
+    async () => {
+      const id = '11111111-8888-4888-8888-111111111111';
+      peers.auth
+        .on('DepartmentService/RestoreDepartment')
+        .reply(wireDepartment(id));
+
+      const response = await new Session(gateway.baseUrl).post(
+        `${API}/departments/${id}/restore`,
+        undefined,
+        headers(['department.delete']),
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({ message: 'Department restored' });
+    },
+  );
+
+  rowFor('Departments')(
+    '**`listMembers` nests the full user, flagging `isPrimary`**',
+    async () => {
+      const id = '22222222-8888-4888-8888-222222222222';
+      peers.auth.on('DepartmentService/ListDepartmentMembers').reply({
+        items: [
+          {
+            user: wireUser(USER),
+            isPrimary: true,
+            assignedAt: { seconds: 1_756_684_800, nanos: 0 },
+          },
+        ],
+        meta: {
+          totalItems: 1,
+          itemCount: 1,
+          itemsPerPage: 10,
+          totalPages: 1,
+          currentPage: 1,
+        },
+      });
+
+      const response = await new Session(gateway.baseUrl).get(
+        `${API}/departments/${id}/members`,
+        headers(['department.read']),
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({
+        data: {
+          items: [
+            { user: { id: USER, fullName: 'Ada Lovelace' }, isPrimary: true },
+          ],
+        },
+      });
+    },
+  );
+
+  rowFor('Departments')(
+    '**`addMembers` forwards the user ids and `isPrimary`**',
+    async () => {
+      const id = '33333333-8888-4888-8888-333333333333';
+      peers.auth
+        .on('DepartmentService/AddDepartmentMembers')
+        .reply({ addedCount: 1, updatedCount: 0 });
+
+      const response = await new Session(gateway.baseUrl).post(
+        `${API}/departments/${id}/members`,
+        { userIds: [USER], isPrimary: true },
+        headers(['department.member.assign']),
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({
+        message: 'Members assigned',
+        data: { addedCount: 1, updatedCount: 0 },
+      });
+      const [call] = peers.auth.calls('DepartmentService/AddDepartmentMembers');
+      expect(call.request).toMatchObject({
+        departmentId: id,
+        userIds: [USER],
+        isPrimary: true,
+      });
+    },
+  );
 
   rowFor('Departments')('**`removeMember` sends both ids**', async () => {
     const id = '44444444-8888-4888-8888-444444444444';
     peers.auth.on('DepartmentService/RemoveDepartmentMember').reply({});
 
-    const response = await new Session(gateway.baseUrl).request('DELETE', `${API}/departments/${id}/members/${USER}`, {
-      headers: headers(['department.member.assign']),
-    });
+    const response = await new Session(gateway.baseUrl).request(
+      'DELETE',
+      `${API}/departments/${id}/members/${USER}`,
+      {
+        headers: headers(['department.member.assign']),
+      },
+    );
 
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({ message: 'Member removed' });

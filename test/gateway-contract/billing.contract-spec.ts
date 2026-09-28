@@ -60,63 +60,90 @@ describe('billing', () => {
     });
   });
 
-  rowFor('Billing')('**`getSubscription` maps the entitlements and status**', async () => {
-    peers.auth.on('BillingService/GetSubscription').reply({
-      stripeCustomerId: 'cus_123',
-      stripeSubscriptionId: 'sub_123',
-      planName: 'Pro',
-      maxAgentSeats: 10,
-      maxStorageBytes: '1000000000',
-      monthlyAiTokenBudget: '5000000',
-      aiModelTier: 'AI_MODEL_TIER_FAST',
-      billingCycleStart: { seconds: 1_756_684_800, nanos: 0 },
-      status: toProtoOrgStatus(OrgStatus.ACTIVE),
-    });
+  rowFor('Billing')(
+    '**`getSubscription` maps the entitlements and status**',
+    async () => {
+      peers.auth.on('BillingService/GetSubscription').reply({
+        stripeCustomerId: 'cus_123',
+        stripeSubscriptionId: 'sub_123',
+        planName: 'Pro',
+        maxAgentSeats: 10,
+        maxStorageBytes: '1000000000',
+        monthlyAiTokenBudget: '5000000',
+        aiModelTier: 'AI_MODEL_TIER_FAST',
+        billingCycleStart: { seconds: 1_756_684_800, nanos: 0 },
+        status: toProtoOrgStatus(OrgStatus.ACTIVE),
+      });
 
-    const response = await new Session(gateway.baseUrl).get(
-      `${API}/billing/subscription`,
-      headers(['organization.read']),
-    );
+      const response = await new Session(gateway.baseUrl).get(
+        `${API}/billing/subscription`,
+        headers(['organization.read']),
+      );
 
-    expect(response.status).toBe(200);
-    expect(response.body).toMatchObject({
-      data: { stripeCustomerId: 'cus_123', planName: 'Pro', maxAgentSeats: 10 },
-    });
-  });
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({
+        data: {
+          stripeCustomerId: 'cus_123',
+          planName: 'Pro',
+          maxAgentSeats: 10,
+        },
+      });
+    },
+  );
 
-  rowFor('Billing')('**`createCheckoutSession` forwards the price and URLs, returns the Stripe URL**', async () => {
-    peers.auth.on('BillingService/CreateCheckoutSession').reply({ url: 'https://checkout.stripe.com/abc' });
+  rowFor('Billing')(
+    '**`createCheckoutSession` forwards the price and URLs, returns the Stripe URL**',
+    async () => {
+      peers.auth
+        .on('BillingService/CreateCheckoutSession')
+        .reply({ url: 'https://checkout.stripe.com/abc' });
 
-    const response = await new Session(gateway.baseUrl).post(
-      `${API}/billing/checkout-session`,
-      { priceId: 'price_123', successUrl: 'https://app.test/success', cancelUrl: 'https://app.test/cancel' },
-      headers(['organization.update']),
-    );
+      const response = await new Session(gateway.baseUrl).post(
+        `${API}/billing/checkout-session`,
+        {
+          priceId: 'price_123',
+          successUrl: 'https://app.test/success',
+          cancelUrl: 'https://app.test/cancel',
+        },
+        headers(['organization.update']),
+      );
 
-    expect(response.status).toBe(200);
-    expect(response.body).toMatchObject({ data: { url: 'https://checkout.stripe.com/abc' } });
-    const [call] = peers.auth.calls('BillingService/CreateCheckoutSession');
-    expect(call.request).toMatchObject({
-      priceId: 'price_123',
-      successUrl: 'https://app.test/success',
-      cancelUrl: 'https://app.test/cancel',
-    });
-  });
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({
+        data: { url: 'https://checkout.stripe.com/abc' },
+      });
+      const [call] = peers.auth.calls('BillingService/CreateCheckoutSession');
+      expect(call.request).toMatchObject({
+        priceId: 'price_123',
+        successUrl: 'https://app.test/success',
+        cancelUrl: 'https://app.test/cancel',
+      });
+    },
+  );
 
-  rowFor('Billing')('**`createPortalSession` forwards the return URL**', async () => {
-    peers.auth.on('BillingService/CreatePortalSession').reply({ url: 'https://billing.stripe.com/xyz' });
+  rowFor('Billing')(
+    '**`createPortalSession` forwards the return URL**',
+    async () => {
+      peers.auth
+        .on('BillingService/CreatePortalSession')
+        .reply({ url: 'https://billing.stripe.com/xyz' });
 
-    const response = await new Session(gateway.baseUrl).post(
-      `${API}/billing/portal-session`,
-      { returnUrl: 'https://app.test/settings' },
-      headers(['organization.update']),
-    );
+      const response = await new Session(gateway.baseUrl).post(
+        `${API}/billing/portal-session`,
+        { returnUrl: 'https://app.test/settings' },
+        headers(['organization.update']),
+      );
 
-    expect(response.status).toBe(200);
-    expect(response.body).toMatchObject({ data: { url: 'https://billing.stripe.com/xyz' } });
-    const [call] = peers.auth.calls('BillingService/CreatePortalSession');
-    expect(call.request).toMatchObject({ returnUrl: 'https://app.test/settings' });
-  });
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({
+        data: { url: 'https://billing.stripe.com/xyz' },
+      });
+      const [call] = peers.auth.calls('BillingService/CreatePortalSession');
+      expect(call.request).toMatchObject({
+        returnUrl: 'https://app.test/settings',
+      });
+    },
+  );
 
   rowFor('Billing')('**`listInvoices` forwards the limit**', async () => {
     peers.auth.on('BillingService/ListInvoices').reply({
@@ -139,37 +166,51 @@ describe('billing', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(response.body).toMatchObject({ data: [{ id: 'in_1', amountDue: 1000, status: 'paid' }] });
+    expect(response.body).toMatchObject({
+      data: [{ id: 'in_1', amountDue: 1000, status: 'paid' }],
+    });
     const [call] = peers.auth.calls('BillingService/ListInvoices');
     expect(call.request).toMatchObject({ limit: 5 });
   });
 
-  rowFor('Billing')('**`listPlans` returns the tenant-visible catalogue with prices**', async () => {
-    peers.auth.on('BillingService/ListTenantPlans').reply({
-      items: [
-        {
-          id: 'plan_pro',
-          name: 'Pro',
-          maxAgentSeats: 10,
-          maxStorageBytes: '1000000000',
-          monthlyAiTokenBudget: '5000000',
-          aiModelTier: 'AI_MODEL_TIER_FAST',
-          maxDocumentBytes: '104857600',
-          maxAttachmentBytes: '10485760',
-          maxDocumentUploads: 1000,
-          maxAnalyticsRangeDays: 90,
-          prices: [{ stripePriceId: 'price_123', interval: 'month' }],
-        },
-      ],
-    });
+  rowFor('Billing')(
+    '**`listPlans` returns the tenant-visible catalogue with prices**',
+    async () => {
+      peers.auth.on('BillingService/ListTenantPlans').reply({
+        items: [
+          {
+            id: 'plan_pro',
+            name: 'Pro',
+            maxAgentSeats: 10,
+            maxStorageBytes: '1000000000',
+            monthlyAiTokenBudget: '5000000',
+            aiModelTier: 'AI_MODEL_TIER_FAST',
+            maxDocumentBytes: '104857600',
+            maxAttachmentBytes: '10485760',
+            maxDocumentUploads: 1000,
+            maxAnalyticsRangeDays: 90,
+            prices: [{ stripePriceId: 'price_123', interval: 'month' }],
+          },
+        ],
+      });
 
-    const response = await new Session(gateway.baseUrl).get(`${API}/billing/plans`, headers(['organization.read']));
+      const response = await new Session(gateway.baseUrl).get(
+        `${API}/billing/plans`,
+        headers(['organization.read']),
+      );
 
-    expect(response.status).toBe(200);
-    expect(response.body).toMatchObject({
-      data: [{ id: 'plan_pro', name: 'Pro', prices: [{ stripePriceId: 'price_123', interval: 'month' }] }],
-    });
-  });
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({
+        data: [
+          {
+            id: 'plan_pro',
+            name: 'Pro',
+            prices: [{ stripePriceId: 'price_123', interval: 'month' }],
+          },
+        ],
+      });
+    },
+  );
 
   rowFor('Billing')(
     '**`changePlan`: a widening change dials nothing else and reaches Stripe**',
@@ -188,12 +229,21 @@ describe('billing', () => {
 
       const response = await new Session(gateway.baseUrl).post(
         `${API}/billing/plan`,
-        { planId: '11111111-1111-4111-8111-111111111111', priceId: 'price_123' },
-        { ...headers(['organization.update']), 'idempotency-key': 'idem-widen' },
+        {
+          planId: '11111111-1111-4111-8111-111111111111',
+          priceId: 'price_123',
+        },
+        {
+          ...headers(['organization.update']),
+          'idempotency-key': 'idem-widen',
+        },
       );
 
       expect(response.status).toBe(200);
-      expect(response.body).toMatchObject({ message: 'Plan change submitted', data: { planId: 'plan_pro' } });
+      expect(response.body).toMatchObject({
+        message: 'Plan change submitted',
+        data: { planId: 'plan_pro' },
+      });
       const [call] = peers.auth.calls('BillingService/ChangePlan');
       expect(call.request).toMatchObject({ idempotencyKey: 'idem-widen' });
     },
@@ -210,13 +260,21 @@ describe('billing', () => {
 
       const response = await new Session(gateway.baseUrl).post(
         `${API}/billing/plan`,
-        { planId: '22222222-1111-4111-8111-222222222222', priceId: 'price_starter' },
-        { ...headers(['organization.update']), 'idempotency-key': 'idem-seats' },
+        {
+          planId: '22222222-1111-4111-8111-222222222222',
+          priceId: 'price_starter',
+        },
+        {
+          ...headers(['organization.update']),
+          'idempotency-key': 'idem-seats',
+        },
       );
 
       expect(response.status).toBe(400);
       expect(peers.auth.calls('BillingService/ChangePlan')).toHaveLength(0);
-      expect(peers.ingestion.calls('DocumentService/GetStorageUsage')).toHaveLength(0);
+      expect(
+        peers.ingestion.calls('DocumentService/GetStorageUsage'),
+      ).toHaveLength(0);
     },
   );
 
@@ -230,7 +288,9 @@ describe('billing', () => {
         planName: 'Starter',
       });
       peers.ingestion.on('DocumentService/GetStorageUsage').reply({
-        usedBytes: '500000000', limitBytes: '2000000000', documentCount: 4,
+        usedBytes: '500000000',
+        limitBytes: '2000000000',
+        documentCount: 4,
       });
       peers.auth.on('BillingService/ChangePlan').reply({
         planId: 'plan_starter',
@@ -240,7 +300,10 @@ describe('billing', () => {
 
       const response = await new Session(gateway.baseUrl).post(
         `${API}/billing/plan`,
-        { planId: '33333333-1111-4111-8111-333333333333', priceId: 'price_starter' },
+        {
+          planId: '33333333-1111-4111-8111-333333333333',
+          priceId: 'price_starter',
+        },
         { ...headers(['organization.update']), 'idempotency-key': 'idem-fits' },
       );
 
@@ -258,13 +321,21 @@ describe('billing', () => {
         planName: 'Starter',
       });
       peers.ingestion.on('DocumentService/GetStorageUsage').reply({
-        usedBytes: '5000000000', limitBytes: '10000000000', documentCount: 4,
+        usedBytes: '5000000000',
+        limitBytes: '10000000000',
+        documentCount: 4,
       });
 
       const response = await new Session(gateway.baseUrl).post(
         `${API}/billing/plan`,
-        { planId: '44444444-1111-4111-8111-444444444444', priceId: 'price_starter' },
-        { ...headers(['organization.update']), 'idempotency-key': 'idem-overusage' },
+        {
+          planId: '44444444-1111-4111-8111-444444444444',
+          priceId: 'price_starter',
+        },
+        {
+          ...headers(['organization.update']),
+          'idempotency-key': 'idem-overusage',
+        },
       );
 
       expect(response.status).toBe(400);
@@ -281,12 +352,20 @@ describe('billing', () => {
         targetMaxDocumentUploads: 100,
         planName: 'Starter',
       });
-      peers.ingestion.on('DocumentService/GetStorageUsage').fail(GrpcStatus.UNAVAILABLE, 'ingestion unavailable');
+      peers.ingestion
+        .on('DocumentService/GetStorageUsage')
+        .fail(GrpcStatus.UNAVAILABLE, 'ingestion unavailable');
 
       const response = await new Session(gateway.baseUrl).post(
         `${API}/billing/plan`,
-        { planId: '55555555-1111-4111-8111-555555555555', priceId: 'price_starter' },
-        { ...headers(['organization.update']), 'idempotency-key': 'idem-unverifiable' },
+        {
+          planId: '55555555-1111-4111-8111-555555555555',
+          priceId: 'price_starter',
+        },
+        {
+          ...headers(['organization.update']),
+          'idempotency-key': 'idem-unverifiable',
+        },
       );
 
       expect(response.status).toBe(503);
@@ -294,20 +373,28 @@ describe('billing', () => {
     },
   );
 
-  rowFor('Billing')('**`changePlan` succeeds without an `Idempotency-Key` header**', async () => {
-    peers.auth.on('BillingService/PreviewPlanChange').reply({ overLimit: [], narrowedDimensions: [], planName: 'Pro' });
-    peers.auth.on('BillingService/ChangePlan').reply({
-      planId: 'plan_pro',
-      planName: 'Pro',
-      effectiveAt: { seconds: 1_756_684_800, nanos: 0 },
-    });
+  rowFor('Billing')(
+    '**`changePlan` succeeds without an `Idempotency-Key` header**',
+    async () => {
+      peers.auth
+        .on('BillingService/PreviewPlanChange')
+        .reply({ overLimit: [], narrowedDimensions: [], planName: 'Pro' });
+      peers.auth.on('BillingService/ChangePlan').reply({
+        planId: 'plan_pro',
+        planName: 'Pro',
+        effectiveAt: { seconds: 1_756_684_800, nanos: 0 },
+      });
 
-    const response = await new Session(gateway.baseUrl).post(
-      `${API}/billing/plan`,
-      { planId: '66666666-1111-4111-8111-666666666666', priceId: 'price_123' },
-      headers(['organization.update']),
-    );
+      const response = await new Session(gateway.baseUrl).post(
+        `${API}/billing/plan`,
+        {
+          planId: '66666666-1111-4111-8111-666666666666',
+          priceId: 'price_123',
+        },
+        headers(['organization.update']),
+      );
 
-    expect(response.status).toBe(200);
-  });
+      expect(response.status).toBe(200);
+    },
+  );
 });

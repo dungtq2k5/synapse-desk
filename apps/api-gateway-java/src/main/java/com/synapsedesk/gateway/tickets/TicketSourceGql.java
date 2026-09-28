@@ -5,5 +5,5 @@ public enum TicketSourceGql {
   WEB,
   CHAT,
   EMAIL,
-  API
+  API,
 }

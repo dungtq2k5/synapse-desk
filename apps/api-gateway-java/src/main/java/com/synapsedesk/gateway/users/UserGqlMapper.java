@@ -33,29 +33,38 @@ public final class UserGqlMapper {
 
   public static UserPageGqlDto toUserPageGqlDto(ListUsersResponse response) {
     return new UserPageGqlDto(
-        response.getItemsList().stream().map(UserGqlMapper::toUserGqlDto).toList(),
-        toPageMetaGqlDto(response.getMeta()));
+      response
+        .getItemsList()
+        .stream()
+        .map(UserGqlMapper::toUserGqlDto)
+        .toList(),
+      toPageMetaGqlDto(response.getMeta())
+    );
   }
 
-  private static UserGqlDto toUserGqlDto(UserResponse user, List<String> departmentIds) {
+  private static UserGqlDto toUserGqlDto(
+    UserResponse user,
+    List<String> departmentIds
+  ) {
     return new UserGqlDto(
-        user.getId(),
-        user.hasOrganizationId() ? user.getOrganizationId() : null,
-        departmentIds,
-        user.getFullName(),
-        user.hasAvatarUrl() ? user.getAvatarUrl() : null,
-        user.getEmail(),
-        user.getIsEmailVerified(),
-        user.hasPhoneNumber() ? user.getPhoneNumber() : null,
-        user.getIsPhoneVerified(),
-        user.hasDob() ? user.getDob() : null,
-        fromProtoGender(user.getGender()),
-        user.hasLastLoginAt() ? toOffsetDateTime(user.getLastLoginAt()) : null,
-        user.getIsLocked(),
-        user.hasLockedUntil() ? toOffsetDateTime(user.getLockedUntil()) : null,
-        user.getIsTwoFactorEnabled(),
-        toOffsetDateTime(user.getCreatedAt()),
-        toOffsetDateTime(user.getUpdatedAt()));
+      user.getId(),
+      user.hasOrganizationId() ? user.getOrganizationId() : null,
+      departmentIds,
+      user.getFullName(),
+      user.hasAvatarUrl() ? user.getAvatarUrl() : null,
+      user.getEmail(),
+      user.getIsEmailVerified(),
+      user.hasPhoneNumber() ? user.getPhoneNumber() : null,
+      user.getIsPhoneVerified(),
+      user.hasDob() ? user.getDob() : null,
+      fromProtoGender(user.getGender()),
+      user.hasLastLoginAt() ? toOffsetDateTime(user.getLastLoginAt()) : null,
+      user.getIsLocked(),
+      user.hasLockedUntil() ? toOffsetDateTime(user.getLockedUntil()) : null,
+      user.getIsTwoFactorEnabled(),
+      toOffsetDateTime(user.getCreatedAt()),
+      toOffsetDateTime(user.getUpdatedAt())
+    );
   }
 
   /** `GENDER_MALE` -> `MALE` — the same prefix strip as {@code UserMapper.fromProtoGender}. */
@@ -65,14 +74,18 @@ public final class UserGqlMapper {
 
   private static PageMetaGqlDto toPageMetaGqlDto(PageMeta meta) {
     return new PageMetaGqlDto(
-        meta.getTotalItems(),
-        meta.getItemCount(),
-        meta.getItemsPerPage(),
-        meta.getTotalPages(),
-        meta.getCurrentPage());
+      meta.getTotalItems(),
+      meta.getItemCount(),
+      meta.getItemsPerPage(),
+      meta.getTotalPages(),
+      meta.getCurrentPage()
+    );
   }
 
   private static OffsetDateTime toOffsetDateTime(Timestamp timestamp) {
-    return Instant.ofEpochSecond(timestamp.getSeconds(), timestamp.getNanos()).atOffset(ZoneOffset.UTC);
+    return Instant.ofEpochSecond(
+      timestamp.getSeconds(),
+      timestamp.getNanos()
+    ).atOffset(ZoneOffset.UTC);
   }
 }

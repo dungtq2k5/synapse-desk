@@ -38,7 +38,10 @@ describe('messages', () => {
     )}`,
   });
 
-  const wireMessage = (id: string, overrides: Record<string, unknown> = {}) => ({
+  const wireMessage = (
+    id: string,
+    overrides: Record<string, unknown> = {},
+  ) => ({
     id,
     ticketId: TICKET,
     content: 'Hello, I need a refund.',
@@ -74,17 +77,29 @@ describe('messages', () => {
     });
   });
 
-  rowFor('Messages')('**`list` needs no permission at all — a caller with zero codes is still served**', async () => {
-    peers.ticket.on('MessageService/ListMessages').reply({
-      items: [wireMessage('m1')],
-      meta: { totalItems: 1, itemCount: 1, itemsPerPage: 10, totalPages: 1, currentPage: 1 },
-    });
+  rowFor('Messages')(
+    '**`list` needs no permission at all — a caller with zero codes is still served**',
+    async () => {
+      peers.ticket.on('MessageService/ListMessages').reply({
+        items: [wireMessage('m1')],
+        meta: {
+          totalItems: 1,
+          itemCount: 1,
+          itemsPerPage: 10,
+          totalPages: 1,
+          currentPage: 1,
+        },
+      });
 
-    const response = await new Session(gateway.baseUrl).get(`${API}/tickets/${TICKET}/messages`, headers([]));
+      const response = await new Session(gateway.baseUrl).get(
+        `${API}/tickets/${TICKET}/messages`,
+        headers([]),
+      );
 
-    expect(response.status).toBe(200);
-    expect(response.body).toMatchObject({ data: { items: [{ id: 'm1' }] } });
-  });
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({ data: { items: [{ id: 'm1' }] } });
+    },
+  );
 
   rowFor('Messages')(
     '**`create` needs no permission, forwards `isInternalNote`/`generatedFromId`/attachments, and answers 201**',
@@ -100,7 +115,9 @@ describe('messages', () => {
           content: 'Internal note',
           isInternalNote: true,
           generatedFromId: '11111111-1111-4111-8111-111111111111',
-          attachments: [{ objectPath: 'pending/abc', fileName: 'screenshot.png' }],
+          attachments: [
+            { objectPath: 'pending/abc', fileName: 'screenshot.png' },
+          ],
         },
         headers([]),
       );
@@ -108,25 +125,36 @@ describe('messages', () => {
       expect(response.status).toBe(201);
       expect(response.body).toMatchObject({
         message: 'Message posted',
-        data: { message: { isInternalNote: true }, skippedAttachments: ['bad-upload.png'] },
+        data: {
+          message: { isInternalNote: true },
+          skippedAttachments: ['bad-upload.png'],
+        },
       });
       const [call] = peers.ticket.calls('MessageService/CreateMessage');
       expect(call.request).toMatchObject({
         isInternalNote: true,
         generatedFromId: '11111111-1111-4111-8111-111111111111',
-        attachments: [{ objectPath: 'pending/abc', fileName: 'screenshot.png' }],
+        attachments: [
+          { objectPath: 'pending/abc', fileName: 'screenshot.png' },
+        ],
       });
     },
   );
 
   rowFor('Messages')('**`update` needs no permission**', async () => {
     const id = '22222222-1111-4111-8111-222222222222';
-    peers.ticket.on('MessageService/UpdateMessage').reply(wireMessage(id, { content: 'Edited text' }));
+    peers.ticket
+      .on('MessageService/UpdateMessage')
+      .reply(wireMessage(id, { content: 'Edited text' }));
 
-    const response = await new Session(gateway.baseUrl).request('PATCH', `${API}/tickets/${TICKET}/messages/${id}`, {
-      body: { content: 'Edited text' },
-      headers: headers([]),
-    });
+    const response = await new Session(gateway.baseUrl).request(
+      'PATCH',
+      `${API}/tickets/${TICKET}/messages/${id}`,
+      {
+        body: { content: 'Edited text' },
+        headers: headers([]),
+      },
+    );
 
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({ data: { content: 'Edited text' } });
@@ -137,88 +165,128 @@ describe('messages', () => {
     async () => {
       const id = '33333333-1111-4111-8111-333333333333';
 
-      const response = await new Session(gateway.baseUrl).request('DELETE', `${API}/tickets/${TICKET}/messages/${id}`, {
-        headers: headers([]),
-      });
+      const response = await new Session(gateway.baseUrl).request(
+        'DELETE',
+        `${API}/tickets/${TICKET}/messages/${id}`,
+        {
+          headers: headers([]),
+        },
+      );
 
       expect(response.status).toBe(403);
-      expect(peers.ticket.calls('MessageService/RedactMessage')).toHaveLength(0);
+      expect(peers.ticket.calls('MessageService/RedactMessage')).toHaveLength(
+        0,
+      );
     },
   );
 
-  rowFor('Messages')('**`redact` succeeds with `ticket.message.moderate` and returns 200, not 204**', async () => {
-    const id = '44444444-1111-4111-8111-444444444444';
-    peers.ticket.on('MessageService/RedactMessage').reply({
-      message: wireMessage(id, { content: '[redacted]', redactedAt: { seconds: 1_756_684_800, nanos: 0 } }),
-    });
+  rowFor('Messages')(
+    '**`redact` succeeds with `ticket.message.moderate` and returns 200, not 204**',
+    async () => {
+      const id = '44444444-1111-4111-8111-444444444444';
+      peers.ticket.on('MessageService/RedactMessage').reply({
+        message: wireMessage(id, {
+          content: '[redacted]',
+          redactedAt: { seconds: 1_756_684_800, nanos: 0 },
+        }),
+      });
 
-    const response = await new Session(gateway.baseUrl).request('DELETE', `${API}/tickets/${TICKET}/messages/${id}`, {
-      headers: headers(['ticket.message.moderate']),
-    });
+      const response = await new Session(gateway.baseUrl).request(
+        'DELETE',
+        `${API}/tickets/${TICKET}/messages/${id}`,
+        {
+          headers: headers(['ticket.message.moderate']),
+        },
+      );
 
-    expect(response.status).toBe(200);
-    expect(response.body).toMatchObject({ message: 'Message redacted', data: { content: '[redacted]' } });
-  });
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({
+        message: 'Message redacted',
+        data: { content: '[redacted]' },
+      });
+    },
+  );
 
-  rowFor('Messages')('**`presignNewAttachment` needs no permission and sends no `messageId`**', async () => {
-    peers.ticket.on('MessageService/UploadAttachment').reply({
-      uploadUrl: 'https://storage.test/upload',
-      objectPath: 'pending/xyz',
-      expiresAt: { seconds: 1_756_685_400, nanos: 0 },
-    });
+  rowFor('Messages')(
+    '**`presignNewAttachment` needs no permission and sends no `messageId`**',
+    async () => {
+      peers.ticket.on('MessageService/UploadAttachment').reply({
+        uploadUrl: 'https://storage.test/upload',
+        objectPath: 'pending/xyz',
+        expiresAt: { seconds: 1_756_685_400, nanos: 0 },
+      });
 
-    const response = await new Session(gateway.baseUrl).post(
-      `${API}/tickets/${TICKET}/messages/attachments/upload-url`,
-      { fileName: 'screenshot.png', mimeType: 'image/png', fileSizeBytes: 1024 },
-      headers([]),
-    );
+      const response = await new Session(gateway.baseUrl).post(
+        `${API}/tickets/${TICKET}/messages/attachments/upload-url`,
+        {
+          fileName: 'screenshot.png',
+          mimeType: 'image/png',
+          fileSizeBytes: 1024,
+        },
+        headers([]),
+      );
 
-    expect(response.status).toBe(200);
-    expect(response.body).toMatchObject({ data: { uploadUrl: 'https://storage.test/upload', objectPath: 'pending/xyz' } });
-    const [call] = peers.ticket.calls('MessageService/UploadAttachment');
-    expect(call.request).not.toHaveProperty('messageId');
-  });
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({
+        data: {
+          uploadUrl: 'https://storage.test/upload',
+          objectPath: 'pending/xyz',
+        },
+      });
+      const [call] = peers.ticket.calls('MessageService/UploadAttachment');
+      expect(call.request).not.toHaveProperty('messageId');
+    },
+  );
 
-  rowFor('Messages')('**`presignAttachment` needs no permission and sends the `messageId`**', async () => {
-    const id = '55555555-1111-4111-8111-555555555555';
-    peers.ticket.on('MessageService/UploadAttachment').reply({
-      uploadUrl: 'https://storage.test/upload2',
-      objectPath: 'pending/abc',
-      expiresAt: { seconds: 1_756_685_400, nanos: 0 },
-    });
+  rowFor('Messages')(
+    '**`presignAttachment` needs no permission and sends the `messageId`**',
+    async () => {
+      const id = '55555555-1111-4111-8111-555555555555';
+      peers.ticket.on('MessageService/UploadAttachment').reply({
+        uploadUrl: 'https://storage.test/upload2',
+        objectPath: 'pending/abc',
+        expiresAt: { seconds: 1_756_685_400, nanos: 0 },
+      });
 
-    const response = await new Session(gateway.baseUrl).post(
-      `${API}/tickets/${TICKET}/messages/${id}/attachments/upload-url`,
-      { fileName: 'log.txt', mimeType: 'text/plain', fileSizeBytes: 512 },
-      headers([]),
-    );
+      const response = await new Session(gateway.baseUrl).post(
+        `${API}/tickets/${TICKET}/messages/${id}/attachments/upload-url`,
+        { fileName: 'log.txt', mimeType: 'text/plain', fileSizeBytes: 512 },
+        headers([]),
+      );
 
-    expect(response.status).toBe(200);
-    const [call] = peers.ticket.calls('MessageService/UploadAttachment');
-    expect(call.request).toMatchObject({ messageId: id });
-  });
+      expect(response.status).toBe(200);
+      const [call] = peers.ticket.calls('MessageService/UploadAttachment');
+      expect(call.request).toMatchObject({ messageId: id });
+    },
+  );
 
-  rowFor('Messages')('**`confirmAttachment` needs no permission and answers 201**', async () => {
-    const id = '66666666-1111-4111-8111-666666666666';
-    peers.ticket.on('MessageService/ConfirmAttachment').reply({
-      id: 'att-1',
-      messageId: id,
-      fileName: 'screenshot.png',
-      fileUrl: 'https://storage.test/screenshot.png',
-      fileSizeBytes: 1024,
-      mimeType: 'image/png',
-      createdAt: { seconds: 1_756_684_800, nanos: 0 },
-    });
+  rowFor('Messages')(
+    '**`confirmAttachment` needs no permission and answers 201**',
+    async () => {
+      const id = '66666666-1111-4111-8111-666666666666';
+      peers.ticket.on('MessageService/ConfirmAttachment').reply({
+        id: 'att-1',
+        messageId: id,
+        fileName: 'screenshot.png',
+        fileUrl: 'https://storage.test/screenshot.png',
+        fileSizeBytes: 1024,
+        mimeType: 'image/png',
+        createdAt: { seconds: 1_756_684_800, nanos: 0 },
+      });
 
-    const response = await new Session(gateway.baseUrl).post(
-      `${API}/tickets/${TICKET}/messages/${id}/attachments/confirm`,
-      { objectPath: 'pending/xyz', fileName: 'screenshot.png' },
-      headers([]),
-    );
+      const response = await new Session(gateway.baseUrl).post(
+        `${API}/tickets/${TICKET}/messages/${id}/attachments/confirm`,
+        { objectPath: 'pending/xyz', fileName: 'screenshot.png' },
+        headers([]),
+      );
 
-    expect(response.status).toBe(201);
-    expect(response.body).toMatchObject({ message: 'Attachment added', data: { id: 'att-1' } });
-  });
+      expect(response.status).toBe(201);
+      expect(response.body).toMatchObject({
+        message: 'Attachment added',
+        data: { id: 'att-1' },
+      });
+    },
+  );
 
   rowFor('Messages')('**`listAttachments` needs no permission**', async () => {
     const id = '77777777-1111-4111-8111-777777777777';
@@ -242,6 +310,8 @@ describe('messages', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(response.body).toMatchObject({ data: [{ id: 'att-2', fileName: 'notes.txt' }] });
+    expect(response.body).toMatchObject({
+      data: [{ id: 'att-2', fileName: 'notes.txt' }],
+    });
   });
 });

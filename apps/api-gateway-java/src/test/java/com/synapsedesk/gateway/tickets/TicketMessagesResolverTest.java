@@ -39,50 +39,80 @@ class TicketMessagesResolverTest {
 
   private static RequestContext context() {
     return new RequestContext(
-        "agent-1",
-        "11111111-1111-4111-8111-111111111111",
-        false,
-        List.of(),
-        List.of(),
-        true,
-        "127.0.0.1",
-        "test");
+      "agent-1",
+      "11111111-1111-4111-8111-111111111111",
+      false,
+      List.of(),
+      List.of(),
+      true,
+      "127.0.0.1",
+      "test"
+    );
   }
 
   private static TicketMessageGqlDto message(String id, String senderId) {
     return new TicketMessageGqlDto(
-        id, "ticket-1", senderId, "content", false, false, null, null, null, null, null, null, null, null);
+      id,
+      "ticket-1",
+      senderId,
+      "content",
+      false,
+      false,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    );
   }
 
-  private DataLoader<String, UserSummaryGqlDto> loaderFor(UserServiceGrpc.UserServiceBlockingStub stub) {
+  private DataLoader<String, UserSummaryGqlDto> loaderFor(
+    UserServiceGrpc.UserServiceBlockingStub stub
+  ) {
     DefaultBatchLoaderRegistry registry = new DefaultBatchLoaderRegistry();
     new UsersLoaderConfig(registry, stub);
 
     DataLoaderRegistry dataLoaderRegistry = new DataLoaderRegistry();
-    registry.registerDataLoaders(dataLoaderRegistry, GraphQLContext.getDefault());
+    registry.registerDataLoaders(
+      dataLoaderRegistry,
+      GraphQLContext.getDefault()
+    );
 
     return dataLoaderRegistry.getDataLoader(UserSummaryGqlDto.class.getName());
   }
 
   @Test
-  void threeMessagesFromDifferentSendersProduceExactlyOneBatchCall() throws Exception {
+  void threeMessagesFromDifferentSendersProduceExactlyOneBatchCall()
+    throws Exception {
     RequestContextHolder.setRequestAttributes(
-        new ServletRequestAttributes(mock(HttpServletRequest.class)));
+      new ServletRequestAttributes(mock(HttpServletRequest.class))
+    );
     try {
-      UserServiceGrpc.UserServiceBlockingStub stub = mock(UserServiceGrpc.UserServiceBlockingStub.class);
+      UserServiceGrpc.UserServiceBlockingStub stub = mock(
+        UserServiceGrpc.UserServiceBlockingStub.class
+      );
       when(stub.withDeadlineAfter(anyLong(), any())).thenReturn(stub);
       when(stub.withInterceptors(any())).thenReturn(stub);
-      when(stub.listUsersByIds(any()))
-          .thenAnswer(
-              invocation -> {
-                ListUsersByIdsRequest request = invocation.getArgument(0);
-                return ListUsersByIdsResponse.newBuilder()
-                    .addAllSummaries(
-                        request.getUserIdsList().stream()
-                            .map(id -> UserSummary.newBuilder().setUserId(id).setFullName("Ada").build())
-                            .toList())
-                    .build();
-              });
+      when(stub.listUsersByIds(any())).thenAnswer(invocation -> {
+        ListUsersByIdsRequest request = invocation.getArgument(0);
+        return ListUsersByIdsResponse.newBuilder()
+          .addAllSummaries(
+            request
+              .getUserIdsList()
+              .stream()
+              .map(id ->
+                UserSummary.newBuilder()
+                  .setUserId(id)
+                  .setFullName("Ada")
+                  .build()
+              )
+              .toList()
+          )
+          .build();
+      });
 
       DataLoader<String, UserSummaryGqlDto> loader = loaderFor(stub);
       CurrentUser currentUser = mock(CurrentUser.class);
@@ -90,17 +120,19 @@ class TicketMessagesResolverTest {
 
       TicketMessagesResolver resolver = new TicketMessagesResolver(currentUser);
 
-      List<CompletableFuture<UserSummaryGqlDto>> futures =
-          List.of(
-              resolver.sender(message("m1", "agent-1"), loader),
-              resolver.sender(message("m2", "agent-2"), loader),
-              resolver.sender(message("m3", "agent-3"), loader));
+      List<CompletableFuture<UserSummaryGqlDto>> futures = List.of(
+        resolver.sender(message("m1", "agent-1"), loader),
+        resolver.sender(message("m2", "agent-2"), loader),
+        resolver.sender(message("m3", "agent-3"), loader)
+      );
       loader.dispatch();
       for (var future : futures) {
         assertThat(future.get(5, TimeUnit.SECONDS).fullName()).isEqualTo("Ada");
       }
 
-      ArgumentCaptor<ListUsersByIdsRequest> captor = ArgumentCaptor.forClass(ListUsersByIdsRequest.class);
+      ArgumentCaptor<ListUsersByIdsRequest> captor = ArgumentCaptor.forClass(
+        ListUsersByIdsRequest.class
+      );
       verify(stub, times(1)).listUsersByIds(captor.capture());
       assertThat(captor.getValue().getUserIdsList()).hasSize(3);
     } finally {
@@ -110,12 +142,18 @@ class TicketMessagesResolverTest {
 
   @Test
   void aNullSenderIdResolvesNullWithNoLoaderCall() throws Exception {
-    UserServiceGrpc.UserServiceBlockingStub stub = mock(UserServiceGrpc.UserServiceBlockingStub.class);
+    UserServiceGrpc.UserServiceBlockingStub stub = mock(
+      UserServiceGrpc.UserServiceBlockingStub.class
+    );
     DataLoader<String, UserSummaryGqlDto> loader = loaderFor(stub);
-    TicketMessagesResolver resolver = new TicketMessagesResolver(mock(CurrentUser.class));
+    TicketMessagesResolver resolver = new TicketMessagesResolver(
+      mock(CurrentUser.class)
+    );
 
-    CompletableFuture<UserSummaryGqlDto> result =
-        resolver.sender(message("m1", null), loader);
+    CompletableFuture<UserSummaryGqlDto> result = resolver.sender(
+      message("m1", null),
+      loader
+    );
 
     assertThat(result.get(1, TimeUnit.SECONDS)).isNull();
     verifyNoInteractions(stub);

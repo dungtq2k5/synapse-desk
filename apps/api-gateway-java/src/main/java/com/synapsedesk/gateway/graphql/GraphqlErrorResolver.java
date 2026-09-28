@@ -29,19 +29,29 @@ import org.springframework.web.server.ResponseStatusException;
 public class GraphqlErrorResolver extends DataFetcherExceptionResolverAdapter {
 
   @Override
-  protected GraphQLError resolveToSingleError(Throwable exception, DataFetchingEnvironment environment) {
+  protected GraphQLError resolveToSingleError(
+    Throwable exception,
+    DataFetchingEnvironment environment
+  ) {
     if (!(exception instanceof ResponseStatusException statusException)) {
       return null;
     }
 
     ErrorType errorType = errorTypeFor(statusException.getStatusCode());
     String message =
-        statusException.getReason() != null ? statusException.getReason() : statusException.getMessage();
+      statusException.getReason() != null
+        ? statusException.getReason()
+        : statusException.getMessage();
 
-    return GraphqlErrorBuilder.newError(environment).message(message).errorType(errorType).build();
+    return GraphqlErrorBuilder.newError(environment)
+      .message(message)
+      .errorType(errorType)
+      .build();
   }
 
-  private static ErrorType errorTypeFor(org.springframework.http.HttpStatusCode status) {
+  private static ErrorType errorTypeFor(
+    org.springframework.http.HttpStatusCode status
+  ) {
     if (status.equals(HttpStatus.FORBIDDEN)) {
       return ErrorType.FORBIDDEN;
     }

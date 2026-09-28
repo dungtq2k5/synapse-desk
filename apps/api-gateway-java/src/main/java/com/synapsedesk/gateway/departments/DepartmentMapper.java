@@ -9,19 +9,23 @@ public final class DepartmentMapper {
 
   private DepartmentMapper() {}
 
-  public static DepartmentGqlDto toDepartmentGqlDto(DepartmentResponse department) {
+  public static DepartmentGqlDto toDepartmentGqlDto(
+    DepartmentResponse department
+  ) {
     return new DepartmentGqlDto(
-        department.getId(),
-        department.getName(),
-        department.hasDescription() ? department.getDescription() : null);
+      department.getId(),
+      department.getName(),
+      department.hasDescription() ? department.getDescription() : null
+    );
   }
 
   public static PageMetaGqlDto toPageMetaGqlDto(PageMeta meta) {
     return new PageMetaGqlDto(
-        meta.getTotalItems(),
-        meta.getItemCount(),
-        meta.getItemsPerPage(),
-        meta.getTotalPages(),
-        meta.getCurrentPage());
+      meta.getTotalItems(),
+      meta.getItemCount(),
+      meta.getItemsPerPage(),
+      meta.getTotalPages(),
+      meta.getCurrentPage()
+    );
   }
 }

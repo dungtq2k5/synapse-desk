@@ -55,7 +55,10 @@ public class IngestionJobsController implements IngestionJobsApi {
   private final DocumentServiceGrpc.DocumentServiceBlockingStub stub;
   private final CurrentUser currentUser;
 
-  public IngestionJobsController(DocumentServiceGrpc.DocumentServiceBlockingStub stub, CurrentUser currentUser) {
+  public IngestionJobsController(
+    DocumentServiceGrpc.DocumentServiceBlockingStub stub,
+    CurrentUser currentUser
+  ) {
     this.stub = stub;
     this.currentUser = currentUser;
   }
@@ -63,19 +66,28 @@ public class IngestionJobsController implements IngestionJobsApi {
   @Override
   @RequirePermission(PermissionCodesEnum.DOCUMENT_READ)
   public ResponseEntity<DocumentsControllerListIngestionJobsV1200Response> ingestionJobsControllerListV1(
-      BigDecimal page, BigDecimal limit, String sortBy, String sortOrder, @Nullable String status,
-      @Nullable UUID documentId) {
+    BigDecimal page,
+    BigDecimal limit,
+    String sortBy,
+    String sortOrder,
+    @Nullable String status,
+    @Nullable UUID documentId
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    PageRequest pageRequest =
-        PageRequest.newBuilder()
-            .setPage(page.intValue())
-            .setLimit(limit.intValue())
-            .setSortBy(sortBy)
-            .setSortOrder("DESC".equalsIgnoreCase(sortOrder) ? SortOrder.SORT_ORDER_DESC : SortOrder.SORT_ORDER_ASC)
-            .build();
+    PageRequest pageRequest = PageRequest.newBuilder()
+      .setPage(page.intValue())
+      .setLimit(limit.intValue())
+      .setSortBy(sortBy)
+      .setSortOrder(
+        "DESC".equalsIgnoreCase(sortOrder)
+          ? SortOrder.SORT_ORDER_DESC
+          : SortOrder.SORT_ORDER_ASC
+      )
+      .build();
 
-    ListIngestionJobsRequest.Builder wire = ListIngestionJobsRequest.newBuilder().setPage(pageRequest);
+    ListIngestionJobsRequest.Builder wire =
+      ListIngestionJobsRequest.newBuilder().setPage(pageRequest);
     if (status != null) {
       wire.setStatus(ingestionJobStatusOf(status));
     }
@@ -83,60 +95,83 @@ public class IngestionJobsController implements IngestionJobsApi {
       wire.setDocumentId(documentId.toString());
     }
 
-    ListIngestionJobsResponse response = withMetadata(context).listIngestionJobs(wire.build());
+    ListIngestionJobsResponse response = withMetadata(
+      context
+    ).listIngestionJobs(wire.build());
 
     DocumentsControllerListIngestionJobsV1200ResponseData data =
-        new DocumentsControllerListIngestionJobsV1200ResponseData()
-            .items(response.getItemsList().stream().map(IngestionJobMapper::toDto).toList())
-            .meta(toMetaDto(response.getMeta()));
+      new DocumentsControllerListIngestionJobsV1200ResponseData()
+        .items(
+          response
+            .getItemsList()
+            .stream()
+            .map(IngestionJobMapper::toDto)
+            .toList()
+        )
+        .meta(toMetaDto(response.getMeta()));
 
     return ResponseEntity.ok(
-        new DocumentsControllerListIngestionJobsV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("OK")
-            .data(data));
+      new DocumentsControllerListIngestionJobsV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("OK")
+        .data(data)
+    );
   }
 
   @Override
   @RequirePermission(PermissionCodesEnum.DOCUMENT_READ)
-  public ResponseEntity<DocumentsControllerReindexV1202Response> ingestionJobsControllerGetV1(String id) {
+  public ResponseEntity<DocumentsControllerReindexV1202Response> ingestionJobsControllerGetV1(
+    String id
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    var response = withMetadata(context).getIngestionJob(IngestionJobIdRequest.newBuilder().setId(id).build());
+    var response = withMetadata(context).getIngestionJob(
+      IngestionJobIdRequest.newBuilder().setId(id).build()
+    );
 
     return ResponseEntity.ok(
-        new DocumentsControllerReindexV1202Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("OK")
-            .data(IngestionJobMapper.toDto(response)));
+      new DocumentsControllerReindexV1202Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("OK")
+        .data(IngestionJobMapper.toDto(response))
+    );
   }
 
   @Override
   @RequirePermission(PermissionCodesEnum.DOCUMENT_REINDEX)
-  public ResponseEntity<DocumentsControllerReindexV1202Response> ingestionJobsControllerRetryV1(String id) {
+  public ResponseEntity<DocumentsControllerReindexV1202Response> ingestionJobsControllerRetryV1(
+    String id
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    var response = withMetadata(context).retryIngestionJob(IngestionJobIdRequest.newBuilder().setId(id).build());
+    var response = withMetadata(context).retryIngestionJob(
+      IngestionJobIdRequest.newBuilder().setId(id).build()
+    );
 
     return ResponseEntity.ok(
-        new DocumentsControllerReindexV1202Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("Ingestion retry queued")
-            .data(IngestionJobMapper.toDto(response)));
+      new DocumentsControllerReindexV1202Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("Ingestion retry queued")
+        .data(IngestionJobMapper.toDto(response))
+    );
   }
 
   @Override
   @RequirePermission(PermissionCodesEnum.DOCUMENT_REINDEX)
-  public ResponseEntity<AuthControllerForgotPasswordV1202Response> ingestionJobsControllerCancelV1(String id) {
+  public ResponseEntity<AuthControllerForgotPasswordV1202Response> ingestionJobsControllerCancelV1(
+    String id
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     // `cancelled` is discarded: the only false it could carry is a failure,
     // and a failure arrives as an exception — same pattern as
     // `documentsControllerDeleteFlagV1`'s discarded `deleted`.
-    withMetadata(context).cancelIngestionJob(IngestionJobIdRequest.newBuilder().setId(id).build());
+    withMetadata(context).cancelIngestionJob(
+      IngestionJobIdRequest.newBuilder().setId(id).build()
+    );
 
     return ResponseEntity.noContent().build();
   }
@@ -146,21 +181,31 @@ public class IngestionJobsController implements IngestionJobsApi {
       return IngestionJobStatus.valueOf("INGESTION_JOB_STATUS_" + value);
     } catch (IllegalArgumentException e) {
       throw new ResponseStatusException(
-          org.springframework.http.HttpStatus.BAD_REQUEST, "status must be a recognized ingestion job status");
+        org.springframework.http.HttpStatus.BAD_REQUEST,
+        "status must be a recognized ingestion job status"
+      );
     }
   }
 
-  private static InvitationsControllerListV1200ResponseDataMeta toMetaDto(PageMeta meta) {
+  private static InvitationsControllerListV1200ResponseDataMeta toMetaDto(
+    PageMeta meta
+  ) {
     return new InvitationsControllerListV1200ResponseDataMeta(
-        BigDecimal.valueOf(meta.getTotalItems()),
-        BigDecimal.valueOf(meta.getItemCount()),
-        BigDecimal.valueOf(meta.getItemsPerPage()),
-        BigDecimal.valueOf(meta.getTotalPages()),
-        BigDecimal.valueOf(meta.getCurrentPage()));
+      BigDecimal.valueOf(meta.getTotalItems()),
+      BigDecimal.valueOf(meta.getItemCount()),
+      BigDecimal.valueOf(meta.getItemsPerPage()),
+      BigDecimal.valueOf(meta.getTotalPages()),
+      BigDecimal.valueOf(meta.getCurrentPage())
+    );
   }
 
-  private DocumentServiceGrpc.DocumentServiceBlockingStub withMetadata(RequestContext context) {
-    return stub.withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
-        .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context)));
+  private DocumentServiceGrpc.DocumentServiceBlockingStub withMetadata(
+    RequestContext context
+  ) {
+    return stub
+      .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
+      .withInterceptors(
+        MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context))
+      );
   }
 }

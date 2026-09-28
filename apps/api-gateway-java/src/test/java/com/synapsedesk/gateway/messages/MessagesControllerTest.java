@@ -22,24 +22,25 @@ import org.junit.jupiter.api.Test;
  */
 class MessagesControllerTest {
 
-  private static final List<String> UNGATED_METHODS =
-      List.of(
-          "messagesControllerListV1",
-          "messagesControllerCreateV1",
-          "messagesControllerUpdateV1",
-          "messagesControllerPresignNewAttachmentV1",
-          "messagesControllerPresignAttachmentV1",
-          "messagesControllerConfirmAttachmentV1",
-          "messagesControllerListAttachmentsV1");
+  private static final List<String> UNGATED_METHODS = List.of(
+    "messagesControllerListV1",
+    "messagesControllerCreateV1",
+    "messagesControllerUpdateV1",
+    "messagesControllerPresignNewAttachmentV1",
+    "messagesControllerPresignAttachmentV1",
+    "messagesControllerConfirmAttachmentV1",
+    "messagesControllerListAttachmentsV1"
+  );
 
   private static final String GATED_METHOD = "messagesControllerRedactV1";
 
   @Test
   void exactlyRedactCarriesARequirePermissionAnnotation() {
-    List<Method> gated =
-        java.util.Arrays.stream(MessagesController.class.getDeclaredMethods())
-            .filter(m -> m.isAnnotationPresent(RequirePermission.class))
-            .toList();
+    List<Method> gated = java.util.Arrays.stream(
+      MessagesController.class.getDeclaredMethods()
+    )
+      .filter(m -> m.isAnnotationPresent(RequirePermission.class))
+      .toList();
 
     assertThat(gated).hasSize(1);
     assertThat(gated.get(0).getName()).isEqualTo(GATED_METHOD);
@@ -47,28 +48,34 @@ class MessagesControllerTest {
 
   @Test
   void redactRequiresTicketMessageModerate() throws NoSuchMethodException {
-    Method redact =
-        java.util.Arrays.stream(MessagesController.class.getDeclaredMethods())
-            .filter(m -> m.getName().equals(GATED_METHOD))
-            .findFirst()
-            .orElseThrow();
+    Method redact = java.util.Arrays.stream(
+      MessagesController.class.getDeclaredMethods()
+    )
+      .filter(m -> m.getName().equals(GATED_METHOD))
+      .findFirst()
+      .orElseThrow();
 
-    RequirePermission annotation = redact.getAnnotation(RequirePermission.class);
+    RequirePermission annotation = redact.getAnnotation(
+      RequirePermission.class
+    );
     assertThat(annotation).isNotNull();
-    assertThat(annotation.value())
-        .containsExactly(
-            com.synapsedesk.gateway.generated.model.CurrentUserResponseDto.PermissionCodesEnum.TICKET_MESSAGE_MODERATE);
+    assertThat(annotation.value()).containsExactly(
+      com.synapsedesk.gateway.generated.model.CurrentUserResponseDto.PermissionCodesEnum.TICKET_MESSAGE_MODERATE
+    );
   }
 
   @Test
   void noneOfTheSevenOrdinaryRoutesCarryAPermissionRequirement() {
     for (String name : UNGATED_METHODS) {
-      boolean anyGated =
-          java.util.Arrays.stream(MessagesController.class.getDeclaredMethods())
-              .filter(m -> m.getName().equals(name))
-              .anyMatch(m -> m.isAnnotationPresent(RequirePermission.class));
+      boolean anyGated = java.util.Arrays.stream(
+        MessagesController.class.getDeclaredMethods()
+      )
+        .filter(m -> m.getName().equals(name))
+        .anyMatch(m -> m.isAnnotationPresent(RequirePermission.class));
 
-      assertThat(anyGated).as("%s must carry no @RequirePermission", name).isFalse();
+      assertThat(anyGated)
+        .as("%s must carry no @RequirePermission", name)
+        .isFalse();
     }
   }
 }

@@ -40,7 +40,7 @@ import synapsedesk.auth.TwoFactorAuthServiceGrpc;
 class TwoFactorAuthControllerTest {
 
   private final TwoFactorAuthServiceGrpc.TwoFactorAuthServiceBlockingStub stub =
-      mock(TwoFactorAuthServiceGrpc.TwoFactorAuthServiceBlockingStub.class);
+    mock(TwoFactorAuthServiceGrpc.TwoFactorAuthServiceBlockingStub.class);
   private final CurrentUser currentUser = mock(CurrentUser.class);
   private final JwtVerifier verifier = mock(JwtVerifier.class);
   private final CookieWriter cookies = mock(CookieWriter.class);
@@ -51,8 +51,17 @@ class TwoFactorAuthControllerTest {
     when(stub.withDeadlineAfter(anyLong(), any())).thenReturn(stub);
     when(stub.withInterceptors(any())).thenReturn(stub);
     RequestContextHolder.setRequestAttributes(
-        new ServletRequestAttributes(new MockHttpServletRequest(), mock(HttpServletResponse.class)));
-    controller = new TwoFactorAuthController(stub, currentUser, verifier, cookies);
+      new ServletRequestAttributes(
+        new MockHttpServletRequest(),
+        mock(HttpServletResponse.class)
+      )
+    );
+    controller = new TwoFactorAuthController(
+      stub,
+      currentUser,
+      verifier,
+      cookies
+    );
   }
 
   @AfterEach
@@ -62,17 +71,32 @@ class TwoFactorAuthControllerTest {
 
   @Test
   void enrolmentTriesTheFullSessionFirst() {
-    when(currentUser.read(any()))
-        .thenReturn(
-            Optional.of(
-                new RequestContext("user-1", "org-1", false, List.of(), List.of(), true, "127.0.0.1", "test")));
-    when(stub.activateTwoFactor(any()))
-        .thenReturn(ActivateTwoFactorResponse.newBuilder().addBackupCodes("code-1").build());
+    when(currentUser.read(any())).thenReturn(
+      Optional.of(
+        new RequestContext(
+          "user-1",
+          "org-1",
+          false,
+          List.of(),
+          List.of(),
+          true,
+          "127.0.0.1",
+          "test"
+        )
+      )
+    );
+    when(stub.activateTwoFactor(any())).thenReturn(
+      ActivateTwoFactorResponse.newBuilder().addBackupCodes("code-1").build()
+    );
 
-    controller.twoFactorAuthControllerActivateV1(new ActivateTwoFactorDto("123456"));
+    controller.twoFactorAuthControllerActivateV1(
+      new ActivateTwoFactorDto("123456")
+    );
 
     org.mockito.ArgumentCaptor<synapsedesk.auth.TwoFactor.ActivateTwoFactorRequest> captor =
-        org.mockito.ArgumentCaptor.forClass(synapsedesk.auth.TwoFactor.ActivateTwoFactorRequest.class);
+      org.mockito.ArgumentCaptor.forClass(
+        synapsedesk.auth.TwoFactor.ActivateTwoFactorRequest.class
+      );
     verify(stub).activateTwoFactor(captor.capture());
     assertThat(captor.getValue().getUserId()).isEqualTo("user-1");
     verify(verifier, never()).verifyTwoFactor(any());
@@ -81,17 +105,37 @@ class TwoFactorAuthControllerTest {
   @Test
   void enrolmentFallsBackToAVerifiedChallengeCookie() {
     when(currentUser.read(any())).thenReturn(Optional.empty());
-    when(cookies.readTwoFactorToken(any())).thenReturn(Optional.of("challenge-tok"));
-    when(verifier.verifyTwoFactor("challenge-tok"))
-        .thenReturn(Optional.of(new JwtPrincipal("user-2", null, false, List.of(), List.of(), false, true)));
-    when(currentUser.origin(any())).thenReturn(new RequestOrigin("127.0.0.1", "test"));
-    when(stub.activateTwoFactor(any()))
-        .thenReturn(ActivateTwoFactorResponse.newBuilder().addBackupCodes("code-1").build());
+    when(cookies.readTwoFactorToken(any())).thenReturn(
+      Optional.of("challenge-tok")
+    );
+    when(verifier.verifyTwoFactor("challenge-tok")).thenReturn(
+      Optional.of(
+        new JwtPrincipal(
+          "user-2",
+          null,
+          false,
+          List.of(),
+          List.of(),
+          false,
+          true
+        )
+      )
+    );
+    when(currentUser.origin(any())).thenReturn(
+      new RequestOrigin("127.0.0.1", "test")
+    );
+    when(stub.activateTwoFactor(any())).thenReturn(
+      ActivateTwoFactorResponse.newBuilder().addBackupCodes("code-1").build()
+    );
 
-    controller.twoFactorAuthControllerActivateV1(new ActivateTwoFactorDto("123456"));
+    controller.twoFactorAuthControllerActivateV1(
+      new ActivateTwoFactorDto("123456")
+    );
 
     org.mockito.ArgumentCaptor<synapsedesk.auth.TwoFactor.ActivateTwoFactorRequest> captor =
-        org.mockito.ArgumentCaptor.forClass(synapsedesk.auth.TwoFactor.ActivateTwoFactorRequest.class);
+      org.mockito.ArgumentCaptor.forClass(
+        synapsedesk.auth.TwoFactor.ActivateTwoFactorRequest.class
+      );
     verify(stub).activateTwoFactor(captor.capture());
     assertThat(captor.getValue().getUserId()).isEqualTo("user-2");
   }
@@ -101,9 +145,15 @@ class TwoFactorAuthControllerTest {
     when(currentUser.read(any())).thenReturn(Optional.empty());
     when(cookies.readTwoFactorToken(any())).thenReturn(Optional.empty());
 
-    assertThatThrownBy(() -> controller.twoFactorAuthControllerActivateV1(new ActivateTwoFactorDto("123456")))
-        .isInstanceOf(ResponseStatusException.class)
-        .hasMessageContaining("requires a valid session or a live login challenge");
+    assertThatThrownBy(() ->
+      controller.twoFactorAuthControllerActivateV1(
+        new ActivateTwoFactorDto("123456")
+      )
+    )
+      .isInstanceOf(ResponseStatusException.class)
+      .hasMessageContaining(
+        "requires a valid session or a live login challenge"
+      );
 
     verify(stub, never()).activateTwoFactor(any());
   }
@@ -117,8 +167,9 @@ class TwoFactorAuthControllerTest {
     AuthenticateTwoFactorDto dto = new AuthenticateTwoFactorDto();
     dto.setCode("123456");
 
-    assertThatThrownBy(() -> controller.twoFactorAuthControllerAuthenticateV1(dto))
-        .isInstanceOf(ResponseStatusException.class);
+    assertThatThrownBy(() ->
+      controller.twoFactorAuthControllerAuthenticateV1(dto)
+    ).isInstanceOf(ResponseStatusException.class);
 
     verify(stub, never()).authenticateTwoFactor(any());
     verify(currentUser, never()).read(any());
@@ -126,36 +177,55 @@ class TwoFactorAuthControllerTest {
 
   @Test
   void authenticateRefusesATokenThatFailsCryptographicVerification() {
-    when(cookies.readTwoFactorToken(any())).thenReturn(Optional.of("forged-tok"));
+    when(cookies.readTwoFactorToken(any())).thenReturn(
+      Optional.of("forged-tok")
+    );
     when(verifier.verifyTwoFactor("forged-tok")).thenReturn(Optional.empty());
 
     AuthenticateTwoFactorDto dto = new AuthenticateTwoFactorDto();
     dto.setCode("123456");
 
-    assertThatThrownBy(() -> controller.twoFactorAuthControllerAuthenticateV1(dto))
-        .isInstanceOf(ResponseStatusException.class);
+    assertThatThrownBy(() ->
+      controller.twoFactorAuthControllerAuthenticateV1(dto)
+    ).isInstanceOf(ResponseStatusException.class);
 
     verify(stub, never()).authenticateTwoFactor(any());
   }
 
   @Test
   void authenticateClearsTheChallengeCookieBeforeSettingTheSessionOnes() {
-    when(cookies.readTwoFactorToken(any())).thenReturn(Optional.of("valid-tok"));
-    when(verifier.verifyTwoFactor("valid-tok"))
-        .thenReturn(Optional.of(new JwtPrincipal("user-3", null, false, List.of(), List.of(), false, true)));
-    when(currentUser.origin(any())).thenReturn(new RequestOrigin("127.0.0.1", "test"));
-    when(stub.authenticateTwoFactor(any()))
-        .thenReturn(
-            AuthenticateTwoFactorResponse.newBuilder()
-                .setAccessToken("access-1")
-                .setRefreshToken("refresh-1")
-                .setUser(
-                    synapsedesk.auth.Common.UserResponse.newBuilder()
-                        .setId(java.util.UUID.randomUUID().toString())
-                        .setEmail("a@b.com")
-                        .setFullName("Ada Lovelace")
-                        .build())
-                .build());
+    when(cookies.readTwoFactorToken(any())).thenReturn(
+      Optional.of("valid-tok")
+    );
+    when(verifier.verifyTwoFactor("valid-tok")).thenReturn(
+      Optional.of(
+        new JwtPrincipal(
+          "user-3",
+          null,
+          false,
+          List.of(),
+          List.of(),
+          false,
+          true
+        )
+      )
+    );
+    when(currentUser.origin(any())).thenReturn(
+      new RequestOrigin("127.0.0.1", "test")
+    );
+    when(stub.authenticateTwoFactor(any())).thenReturn(
+      AuthenticateTwoFactorResponse.newBuilder()
+        .setAccessToken("access-1")
+        .setRefreshToken("refresh-1")
+        .setUser(
+          synapsedesk.auth.Common.UserResponse.newBuilder()
+            .setId(java.util.UUID.randomUUID().toString())
+            .setEmail("a@b.com")
+            .setFullName("Ada Lovelace")
+            .build()
+        )
+        .build()
+    );
 
     AuthenticateTwoFactorDto dto = new AuthenticateTwoFactorDto();
     dto.setCode("123456");
@@ -164,8 +234,12 @@ class TwoFactorAuthControllerTest {
 
     org.mockito.InOrder order = org.mockito.Mockito.inOrder(cookies);
     order.verify(cookies).clearTwoFactorToken(any());
-    order.verify(cookies).setAccessToken(any(), org.mockito.ArgumentMatchers.eq("access-1"));
-    order.verify(cookies).setRefreshToken(any(), org.mockito.ArgumentMatchers.eq("refresh-1"));
+    order
+      .verify(cookies)
+      .setAccessToken(any(), org.mockito.ArgumentMatchers.eq("access-1"));
+    order
+      .verify(cookies)
+      .setRefreshToken(any(), org.mockito.ArgumentMatchers.eq("refresh-1"));
     verify(cookies, never()).setDeviceToken(any(), any());
   }
 }

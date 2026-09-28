@@ -10,16 +10,17 @@ import java.util.List;
  * publishing the raw path here would advertise the storage layout.
  */
 public record DocumentGqlDto(
-    String id,
-    String organizationId,
-    String createdById,
-    String title,
-    String fileType,
-    int fileSizeBytes,
-    boolean isOrganizationWide,
-    DocumentStatusGql status,
-    List<String> departmentIds,
-    int chunkCount,
-    OffsetDateTime createdAt,
-    OffsetDateTime updatedAt,
-    OffsetDateTime deletedAt) {}
+  String id,
+  String organizationId,
+  String createdById,
+  String title,
+  String fileType,
+  int fileSizeBytes,
+  boolean isOrganizationWide,
+  DocumentStatusGql status,
+  List<String> departmentIds,
+  int chunkCount,
+  OffsetDateTime createdAt,
+  OffsetDateTime updatedAt,
+  OffsetDateTime deletedAt
+) {}

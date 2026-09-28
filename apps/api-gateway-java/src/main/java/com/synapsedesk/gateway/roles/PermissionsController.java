@@ -44,7 +44,10 @@ public class PermissionsController implements PermissionsApi {
   private final CacheService cache;
 
   public PermissionsController(
-      RoleServiceGrpc.RoleServiceBlockingStub stub, CurrentUser currentUser, CacheService cache) {
+    RoleServiceGrpc.RoleServiceBlockingStub stub,
+    CurrentUser currentUser,
+    CacheService cache
+  ) {
     this.stub = stub;
     this.currentUser = currentUser;
     this.cache = cache;
@@ -55,40 +58,54 @@ public class PermissionsController implements PermissionsApi {
   public ResponseEntity<PermissionsControllerListV1200Response> permissionsControllerListV1() {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    String key = cache.buildKey(context.organizationId(), "permissions", Map.of());
-    PermissionResponseDto[] data =
-        cache.wrap(
-            key,
-            TTL_SECONDS,
-            PermissionResponseDto[].class,
-            () -> {
-              ListPermissionsResponse response =
-                  withMetadata(context).listPermissions(ListPermissionsRequest.getDefaultInstance());
-              return response.getItemsList().stream()
-                  .map(PermissionsController::toPermissionResponseDto)
-                  .toArray(PermissionResponseDto[]::new);
-            });
+    String key = cache.buildKey(
+      context.organizationId(),
+      "permissions",
+      Map.of()
+    );
+    PermissionResponseDto[] data = cache.wrap(
+      key,
+      TTL_SECONDS,
+      PermissionResponseDto[].class,
+      () -> {
+        ListPermissionsResponse response = withMetadata(
+          context
+        ).listPermissions(ListPermissionsRequest.getDefaultInstance());
+        return response
+          .getItemsList()
+          .stream()
+          .map(PermissionsController::toPermissionResponseDto)
+          .toArray(PermissionResponseDto[]::new);
+      }
+    );
 
     return ResponseEntity.ok(
-        new PermissionsControllerListV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("OK")
-            .data(List.of(data)));
+      new PermissionsControllerListV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("OK")
+        .data(List.of(data))
+    );
   }
 
-  private static PermissionResponseDto toPermissionResponseDto(synapsedesk.auth.Role.PermissionResponse permission) {
+  private static PermissionResponseDto toPermissionResponseDto(
+    synapsedesk.auth.Role.PermissionResponse permission
+  ) {
     return new PermissionResponseDto()
-        .id(permission.getId())
-        .code(PermissionResponseDto.CodeEnum.fromValue(permission.getCode()))
-        .name(permission.getName())
-        .group(permission.getGroup())
-        .isRetired(permission.getIsRetired());
+      .id(permission.getId())
+      .code(PermissionResponseDto.CodeEnum.fromValue(permission.getCode()))
+      .name(permission.getName())
+      .group(permission.getGroup())
+      .isRetired(permission.getIsRetired());
   }
 
-  private RoleServiceGrpc.RoleServiceBlockingStub withMetadata(RequestContext context) {
+  private RoleServiceGrpc.RoleServiceBlockingStub withMetadata(
+    RequestContext context
+  ) {
     return stub
-        .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
-        .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context)));
+      .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
+      .withInterceptors(
+        MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context))
+      );
   }
 }

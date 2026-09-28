@@ -83,7 +83,10 @@ public class DepartmentsController implements DepartmentsApi {
   private final CacheService cache;
 
   public DepartmentsController(
-      DepartmentServiceGrpc.DepartmentServiceBlockingStub stub, CurrentUser currentUser, CacheService cache) {
+    DepartmentServiceGrpc.DepartmentServiceBlockingStub stub,
+    CurrentUser currentUser,
+    CacheService cache
+  ) {
     this.stub = stub;
     this.currentUser = currentUser;
     this.cache = cache;
@@ -92,7 +95,13 @@ public class DepartmentsController implements DepartmentsApi {
   @Override
   @RequirePermission(PermissionCodesEnum.DEPARTMENT_READ)
   public ResponseEntity<DepartmentsControllerListV1200Response> departmentsControllerListV1(
-      BigDecimal page, BigDecimal limit, String sortOrder, String searchTerm, String sortBy, Boolean includeDeleted) {
+    BigDecimal page,
+    BigDecimal limit,
+    String sortOrder,
+    String searchTerm,
+    String sortBy,
+    Boolean includeDeleted
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     // `RequirePermissionForQuery`, ported: `includeDeleted` gates the whole
@@ -100,70 +109,91 @@ public class DepartmentsController implements DepartmentsApi {
     // it is checked separately — and BEFORE the cache read below, or a
     // caller without `department.delete` could be served an entry a
     // privileged caller's request warmed.
-    if (isRequested(CurrentRequest.request(), "includeDeleted") && !context.isSuperAdmin()
-        && !context.permissionCodes().contains("department.delete")) {
+    if (
+      isRequested(CurrentRequest.request(), "includeDeleted") &&
+      !context.isSuperAdmin() &&
+      !context.permissionCodes().contains("department.delete")
+    ) {
       throw new ResponseStatusException(
-          HttpStatus.FORBIDDEN, "Using 'includeDeleted' requires the department.delete permission");
+        HttpStatus.FORBIDDEN,
+        "Using 'includeDeleted' requires the department.delete permission"
+      );
     }
 
     Map<String, String> rawParams = new TreeMap<>();
     CurrentRequest.request()
-        .getParameterMap()
-        .forEach(
-            (name, values) -> {
-              if (values.length > 0 && !values[0].isEmpty()) {
-                rawParams.put(name, values[0]);
-              }
-            });
+      .getParameterMap()
+      .forEach((name, values) -> {
+        if (values.length > 0 && !values[0].isEmpty()) {
+          rawParams.put(name, values[0]);
+        }
+      });
 
-    String key = cache.buildKey(context.organizationId(), CACHE_SCOPE, rawParams);
+    String key = cache.buildKey(
+      context.organizationId(),
+      CACHE_SCOPE,
+      rawParams
+    );
 
-    DepartmentsControllerListV1200Response envelope =
-        cache.wrap(
-            key,
-            LIST_CACHE_TTL_SECONDS,
-            DepartmentsControllerListV1200Response.class,
-            () -> {
-              PageRequest.Builder pageRequest =
-                  PageRequest.newBuilder()
-                      .setPage(page.intValue())
-                      .setLimit(limit.intValue())
-                      .setSortBy(sortBy)
-                      .setSortOrder(
-                          "DESC".equalsIgnoreCase(sortOrder) ? SortOrder.SORT_ORDER_DESC : SortOrder.SORT_ORDER_ASC);
-              if (searchTerm != null) {
-                pageRequest.setSearchTerm(searchTerm);
-              }
+    DepartmentsControllerListV1200Response envelope = cache.wrap(
+      key,
+      LIST_CACHE_TTL_SECONDS,
+      DepartmentsControllerListV1200Response.class,
+      () -> {
+        PageRequest.Builder pageRequest = PageRequest.newBuilder()
+          .setPage(page.intValue())
+          .setLimit(limit.intValue())
+          .setSortBy(sortBy)
+          .setSortOrder(
+            "DESC".equalsIgnoreCase(sortOrder)
+              ? SortOrder.SORT_ORDER_DESC
+              : SortOrder.SORT_ORDER_ASC
+          );
+        if (searchTerm != null) {
+          pageRequest.setSearchTerm(searchTerm);
+        }
 
-              ListDepartmentsResponse response =
-                  withMetadata(context)
-                      .listDepartments(
-                          ListDepartmentsRequest.newBuilder()
-                              .setPage(pageRequest)
-                              .setIncludeDeleted(Boolean.TRUE.equals(includeDeleted))
-                              .build());
+        ListDepartmentsResponse response = withMetadata(
+          context
+        ).listDepartments(
+          ListDepartmentsRequest.newBuilder()
+            .setPage(pageRequest)
+            .setIncludeDeleted(Boolean.TRUE.equals(includeDeleted))
+            .build()
+        );
 
-              DepartmentsControllerListV1200ResponseData data =
-                  new DepartmentsControllerListV1200ResponseData()
-                      .items(response.getItemsList().stream().map(DepartmentsController::toDepartmentResponseDto).toList())
-                      .meta(toMetaDto(response.getMeta()));
+        DepartmentsControllerListV1200ResponseData data =
+          new DepartmentsControllerListV1200ResponseData()
+            .items(
+              response
+                .getItemsList()
+                .stream()
+                .map(DepartmentsController::toDepartmentResponseDto)
+                .toList()
+            )
+            .meta(toMetaDto(response.getMeta()));
 
-              return new DepartmentsControllerListV1200Response()
-                  .success(true)
-                  .statusCode(BigDecimal.valueOf(200))
-                  .message("OK")
-                  .data(data);
-            });
+        return new DepartmentsControllerListV1200Response()
+          .success(true)
+          .statusCode(BigDecimal.valueOf(200))
+          .message("OK")
+          .data(data);
+      }
+    );
 
     return ResponseEntity.ok(envelope);
   }
 
   @Override
   @RequirePermission(PermissionCodesEnum.DEPARTMENT_READ)
-  public ResponseEntity<DepartmentsControllerCreateV1201Response> departmentsControllerGetV1(String id) {
+  public ResponseEntity<DepartmentsControllerCreateV1201Response> departmentsControllerGetV1(
+    String id
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    DepartmentResponse response = withMetadata(context).getDepartment(GetDepartmentRequest.newBuilder().setId(id).build());
+    DepartmentResponse response = withMetadata(context).getDepartment(
+      GetDepartmentRequest.newBuilder().setId(id).build()
+    );
 
     return okDepartment(response, "OK", 200);
   }
@@ -171,15 +201,21 @@ public class DepartmentsController implements DepartmentsApi {
   @Override
   @RequirePermission(PermissionCodesEnum.DEPARTMENT_CREATE)
   public ResponseEntity<DepartmentsControllerCreateV1201Response> departmentsControllerCreateV1(
-      CreateDepartmentDto createDepartmentDto) {
+    CreateDepartmentDto createDepartmentDto
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    CreateDepartmentRequest.Builder wire = CreateDepartmentRequest.newBuilder().setName(createDepartmentDto.getName());
+    CreateDepartmentRequest.Builder wire =
+      CreateDepartmentRequest.newBuilder().setName(
+        createDepartmentDto.getName()
+      );
     if (createDepartmentDto.getDescription() != null) {
       wire.setDescription(createDepartmentDto.getDescription());
     }
 
-    DepartmentResponse response = withMetadata(context).createDepartment(wire.build());
+    DepartmentResponse response = withMetadata(context).createDepartment(
+      wire.build()
+    );
 
     return okDepartment(response, "OK", 201);
   }
@@ -187,10 +223,13 @@ public class DepartmentsController implements DepartmentsApi {
   @Override
   @RequirePermission(PermissionCodesEnum.DEPARTMENT_UPDATE)
   public ResponseEntity<DepartmentsControllerCreateV1201Response> departmentsControllerUpdateV1(
-      String id, UpdateDepartmentDto updateDepartmentDto) {
+    String id,
+    UpdateDepartmentDto updateDepartmentDto
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    UpdateDepartmentRequest.Builder wire = UpdateDepartmentRequest.newBuilder().setId(id);
+    UpdateDepartmentRequest.Builder wire =
+      UpdateDepartmentRequest.newBuilder().setId(id);
     if (updateDepartmentDto.getName() != null) {
       wire.setName(updateDepartmentDto.getName());
     }
@@ -198,33 +237,43 @@ public class DepartmentsController implements DepartmentsApi {
       wire.setDescription(updateDepartmentDto.getDescription());
     }
 
-    DepartmentResponse response = withMetadata(context).updateDepartment(wire.build());
+    DepartmentResponse response = withMetadata(context).updateDepartment(
+      wire.build()
+    );
 
     return okDepartment(response, "OK", 200);
   }
 
   @Override
   @RequirePermission(PermissionCodesEnum.DEPARTMENT_DELETE)
-  public ResponseEntity<AuthControllerForgotPasswordV1202Response> departmentsControllerRemoveV1(String id) {
+  public ResponseEntity<AuthControllerForgotPasswordV1202Response> departmentsControllerRemoveV1(
+    String id
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    withMetadata(context).deleteDepartment(DepartmentIdRequest.newBuilder().setId(id).build());
+    withMetadata(context).deleteDepartment(
+      DepartmentIdRequest.newBuilder().setId(id).build()
+    );
 
     return ResponseEntity.ok(
-        new AuthControllerForgotPasswordV1202Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("Department deleted")
-            .data(null));
+      new AuthControllerForgotPasswordV1202Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("Department deleted")
+        .data(null)
+    );
   }
 
   @Override
   @RequirePermission(PermissionCodesEnum.DEPARTMENT_DELETE)
-  public ResponseEntity<DepartmentsControllerCreateV1201Response> departmentsControllerRestoreV1(String id) {
+  public ResponseEntity<DepartmentsControllerCreateV1201Response> departmentsControllerRestoreV1(
+    String id
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    DepartmentResponse response =
-        withMetadata(context).restoreDepartment(DepartmentIdRequest.newBuilder().setId(id).build());
+    DepartmentResponse response = withMetadata(context).restoreDepartment(
+      DepartmentIdRequest.newBuilder().setId(id).build()
+    );
 
     return okDepartment(response, "Department restored", 200);
   }
@@ -232,77 +281,115 @@ public class DepartmentsController implements DepartmentsApi {
   @Override
   @RequirePermission(PermissionCodesEnum.DEPARTMENT_READ)
   public ResponseEntity<DepartmentsControllerListMembersV1200Response> departmentsControllerListMembersV1(
-      String id, BigDecimal page, BigDecimal limit, String sortOrder, String searchTerm, String sortBy) {
+    String id,
+    BigDecimal page,
+    BigDecimal limit,
+    String sortOrder,
+    String searchTerm,
+    String sortBy
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    PageRequest.Builder pageRequest =
-        PageRequest.newBuilder()
-            .setPage(page.intValue())
-            .setLimit(limit.intValue())
-            .setSortBy(sortBy)
-            .setSortOrder("DESC".equalsIgnoreCase(sortOrder) ? SortOrder.SORT_ORDER_DESC : SortOrder.SORT_ORDER_ASC);
+    PageRequest.Builder pageRequest = PageRequest.newBuilder()
+      .setPage(page.intValue())
+      .setLimit(limit.intValue())
+      .setSortBy(sortBy)
+      .setSortOrder(
+        "DESC".equalsIgnoreCase(sortOrder)
+          ? SortOrder.SORT_ORDER_DESC
+          : SortOrder.SORT_ORDER_ASC
+      );
     if (searchTerm != null) {
       pageRequest.setSearchTerm(searchTerm);
     }
 
-    ListDepartmentMembersResponse response =
-        withMetadata(context)
-            .listDepartmentMembers(
-                ListDepartmentMembersRequest.newBuilder().setDepartmentId(id).setPage(pageRequest).build());
+    ListDepartmentMembersResponse response = withMetadata(
+      context
+    ).listDepartmentMembers(
+      ListDepartmentMembersRequest.newBuilder()
+        .setDepartmentId(id)
+        .setPage(pageRequest)
+        .build()
+    );
 
     DepartmentsControllerListMembersV1200ResponseData data =
-        new DepartmentsControllerListMembersV1200ResponseData()
-            .items(response.getItemsList().stream().map(DepartmentsController::toDepartmentMemberResponseDto).toList())
-            .meta(toMetaDto(response.getMeta()));
+      new DepartmentsControllerListMembersV1200ResponseData()
+        .items(
+          response
+            .getItemsList()
+            .stream()
+            .map(DepartmentsController::toDepartmentMemberResponseDto)
+            .toList()
+        )
+        .meta(toMetaDto(response.getMeta()));
 
     return ResponseEntity.ok(
-        new DepartmentsControllerListMembersV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("OK")
-            .data(data));
+      new DepartmentsControllerListMembersV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("OK")
+        .data(data)
+    );
   }
 
   @Override
   @RequirePermission(PermissionCodesEnum.DEPARTMENT_MEMBER_ASSIGN)
   public ResponseEntity<DepartmentsControllerAddMembersV1200Response> departmentsControllerAddMembersV1(
-      String id, AddDepartmentMembersDto addDepartmentMembersDto) {
+    String id,
+    AddDepartmentMembersDto addDepartmentMembersDto
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    AddDepartmentMembersRequest wire =
-        AddDepartmentMembersRequest.newBuilder()
-            .setDepartmentId(id)
-            .addAllUserIds(addDepartmentMembersDto.getUserIds().stream().map(Object::toString).toList())
-            .setIsPrimary(Boolean.TRUE.equals(addDepartmentMembersDto.getIsPrimary()))
-            .build();
+    AddDepartmentMembersRequest wire = AddDepartmentMembersRequest.newBuilder()
+      .setDepartmentId(id)
+      .addAllUserIds(
+        addDepartmentMembersDto
+          .getUserIds()
+          .stream()
+          .map(Object::toString)
+          .toList()
+      )
+      .setIsPrimary(Boolean.TRUE.equals(addDepartmentMembersDto.getIsPrimary()))
+      .build();
 
     var response = withMetadata(context).addDepartmentMembers(wire);
 
     return ResponseEntity.ok(
-        new DepartmentsControllerAddMembersV1200Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("Members assigned")
-            .data(
-                new AddDepartmentMembersResponseDto(
-                    BigDecimal.valueOf(response.getAddedCount()), BigDecimal.valueOf(response.getUpdatedCount()))));
+      new DepartmentsControllerAddMembersV1200Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("Members assigned")
+        .data(
+          new AddDepartmentMembersResponseDto(
+            BigDecimal.valueOf(response.getAddedCount()),
+            BigDecimal.valueOf(response.getUpdatedCount())
+          )
+        )
+    );
   }
 
   @Override
   @RequirePermission(PermissionCodesEnum.DEPARTMENT_MEMBER_ASSIGN)
   public ResponseEntity<AuthControllerForgotPasswordV1202Response> departmentsControllerRemoveMemberV1(
-      String id, String userId) {
+    String id,
+    String userId
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
-    withMetadata(context)
-        .removeDepartmentMember(RemoveDepartmentMemberRequest.newBuilder().setDepartmentId(id).setUserId(userId).build());
+    withMetadata(context).removeDepartmentMember(
+      RemoveDepartmentMemberRequest.newBuilder()
+        .setDepartmentId(id)
+        .setUserId(userId)
+        .build()
+    );
 
     return ResponseEntity.ok(
-        new AuthControllerForgotPasswordV1202Response()
-            .success(true)
-            .statusCode(BigDecimal.valueOf(200))
-            .message("Member removed")
-            .data(null));
+      new AuthControllerForgotPasswordV1202Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(200))
+        .message("Member removed")
+        .data(null)
+    );
   }
 
   /**
@@ -314,61 +401,94 @@ public class DepartmentsController implements DepartmentsApi {
    * valid string a client could have sent explicitly, but the RAW absence is
    * what Node's guard actually distinguishes).
    */
-  private static boolean isRequested(jakarta.servlet.http.HttpServletRequest request, String name) {
+  private static boolean isRequested(
+    jakarta.servlet.http.HttpServletRequest request,
+    String name
+  ) {
     String value = request.getParameter(name);
     if (value == null) {
       return false;
     }
-    return !List.of("false", "0", "").contains(value.toLowerCase(java.util.Locale.ROOT));
+    return !List.of("false", "0", "").contains(
+      value.toLowerCase(java.util.Locale.ROOT)
+    );
   }
 
   private static ResponseEntity<DepartmentsControllerCreateV1201Response> okDepartment(
-      DepartmentResponse response, String message, int status) {
-    return ResponseEntity.status(status)
-        .body(
-            new DepartmentsControllerCreateV1201Response()
-                .success(true)
-                .statusCode(BigDecimal.valueOf(status))
-                .message(message)
-                .data(toDepartmentResponseDto(response)));
+    DepartmentResponse response,
+    String message,
+    int status
+  ) {
+    return ResponseEntity.status(status).body(
+      new DepartmentsControllerCreateV1201Response()
+        .success(true)
+        .statusCode(BigDecimal.valueOf(status))
+        .message(message)
+        .data(toDepartmentResponseDto(response))
+    );
   }
 
-  private static DepartmentResponseDto toDepartmentResponseDto(DepartmentResponse department) {
+  private static DepartmentResponseDto toDepartmentResponseDto(
+    DepartmentResponse department
+  ) {
     return new DepartmentResponseDto()
-        .id(department.getId())
-        .name(department.getName())
-        .description(department.hasDescription() ? department.getDescription() : null)
-        .memberCount(BigDecimal.valueOf(department.getMemberCount()))
-        .deletedAt(department.hasDeletedAt() ? toOffsetDateTime(department.getDeletedAt()) : null)
-        .deletedByName(department.hasDeletedByName() ? department.getDeletedByName() : null)
-        .createdAt(toOffsetDateTime(department.getCreatedAt()))
-        .updatedAt(toOffsetDateTime(department.getUpdatedAt()));
+      .id(department.getId())
+      .name(department.getName())
+      .description(
+        department.hasDescription() ? department.getDescription() : null
+      )
+      .memberCount(BigDecimal.valueOf(department.getMemberCount()))
+      .deletedAt(
+        department.hasDeletedAt()
+          ? toOffsetDateTime(department.getDeletedAt())
+          : null
+      )
+      .deletedByName(
+        department.hasDeletedByName() ? department.getDeletedByName() : null
+      )
+      .createdAt(toOffsetDateTime(department.getCreatedAt()))
+      .updatedAt(toOffsetDateTime(department.getUpdatedAt()));
   }
 
-  private static DepartmentMemberResponseDto toDepartmentMemberResponseDto(DepartmentMemberResponse member) {
+  private static DepartmentMemberResponseDto toDepartmentMemberResponseDto(
+    DepartmentMemberResponse member
+  ) {
     return new DepartmentMemberResponseDto(
-        UserMapper.toUserResponseDto(member.getUser()),
-        member.getIsPrimary(),
-        member.hasAssignedByName() ? member.getAssignedByName() : null,
-        toOffsetDateTime(member.getAssignedAt()));
+      UserMapper.toUserResponseDto(member.getUser()),
+      member.getIsPrimary(),
+      member.hasAssignedByName() ? member.getAssignedByName() : null,
+      toOffsetDateTime(member.getAssignedAt())
+    );
   }
 
-  private static InvitationsControllerListV1200ResponseDataMeta toMetaDto(synapsedesk.auth.Common.PageMeta meta) {
+  private static InvitationsControllerListV1200ResponseDataMeta toMetaDto(
+    synapsedesk.auth.Common.PageMeta meta
+  ) {
     return new InvitationsControllerListV1200ResponseDataMeta(
-        BigDecimal.valueOf(meta.getTotalItems()),
-        BigDecimal.valueOf(meta.getItemCount()),
-        BigDecimal.valueOf(meta.getItemsPerPage()),
-        BigDecimal.valueOf(meta.getTotalPages()),
-        BigDecimal.valueOf(meta.getCurrentPage()));
+      BigDecimal.valueOf(meta.getTotalItems()),
+      BigDecimal.valueOf(meta.getItemCount()),
+      BigDecimal.valueOf(meta.getItemsPerPage()),
+      BigDecimal.valueOf(meta.getTotalPages()),
+      BigDecimal.valueOf(meta.getCurrentPage())
+    );
   }
 
-  private static OffsetDateTime toOffsetDateTime(com.google.protobuf.Timestamp timestamp) {
-    return Instant.ofEpochSecond(timestamp.getSeconds(), timestamp.getNanos()).atOffset(ZoneOffset.UTC);
+  private static OffsetDateTime toOffsetDateTime(
+    com.google.protobuf.Timestamp timestamp
+  ) {
+    return Instant.ofEpochSecond(
+      timestamp.getSeconds(),
+      timestamp.getNanos()
+    ).atOffset(ZoneOffset.UTC);
   }
 
-  private DepartmentServiceGrpc.DepartmentServiceBlockingStub withMetadata(RequestContext context) {
+  private DepartmentServiceGrpc.DepartmentServiceBlockingStub withMetadata(
+    RequestContext context
+  ) {
     return stub
-        .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
-        .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context)));
+      .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
+      .withInterceptors(
+        MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context))
+      );
   }
 }

@@ -18,22 +18,40 @@ class SuperAdminCheckTest {
 
   private final SuperAdminCheck check = new SuperAdminCheck();
 
-  private static RequestContext contextOf(boolean isSuperAdmin, String organizationId) {
-    return new RequestContext("agent-1", organizationId, isSuperAdmin, List.of(), List.of(), true, "127.0.0.1", "test");
+  private static RequestContext contextOf(
+    boolean isSuperAdmin,
+    String organizationId
+  ) {
+    return new RequestContext(
+      "agent-1",
+      organizationId,
+      isSuperAdmin,
+      List.of(),
+      List.of(),
+      true,
+      "127.0.0.1",
+      "test"
+    );
   }
 
   @Test
   void aGenuineSuperAdminWithNoOrganizationPasses() {
-    assertThatCode(() -> check.require(contextOf(true, null))).doesNotThrowAnyException();
+    assertThatCode(() ->
+      check.require(contextOf(true, null))
+    ).doesNotThrowAnyException();
   }
 
   @Test
   void anOrdinaryUserIsRefused() {
-    assertThatThrownBy(() -> check.require(contextOf(false, "org-1"))).isInstanceOf(ResponseStatusException.class);
+    assertThatThrownBy(() ->
+      check.require(contextOf(false, "org-1"))
+    ).isInstanceOf(ResponseStatusException.class);
   }
 
   @Test
   void theSuperAdminFlagAloneIsNotEnoughWithAnOrganizationIdStillPresent() {
-    assertThatThrownBy(() -> check.require(contextOf(true, "org-1"))).isInstanceOf(ResponseStatusException.class);
+    assertThatThrownBy(() ->
+      check.require(contextOf(true, "org-1"))
+    ).isInstanceOf(ResponseStatusException.class);
   }
 }

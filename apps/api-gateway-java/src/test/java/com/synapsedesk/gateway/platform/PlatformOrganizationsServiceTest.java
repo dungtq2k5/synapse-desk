@@ -19,6 +19,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.web.server.ResponseStatusException;
+import synapsedesk.auth.Common.Gender;
 import synapsedesk.auth.Common.OrgStatus;
 import synapsedesk.auth.Organization.OrganizationResponse;
 import synapsedesk.auth.Platform.CreatePlatformOrganizationRequest;
@@ -26,7 +27,6 @@ import synapsedesk.auth.Platform.CreatePlatformOrganizationResponse;
 import synapsedesk.auth.Platform.PlatformOrganizationResponse;
 import synapsedesk.auth.Platform.UpdatePlatformOrganizationRequest;
 import synapsedesk.auth.PlatformServiceGrpc;
-import synapsedesk.auth.Common.Gender;
 
 /**
  * `PlatformApi`'s organizations group (group 1 of 3). Sharpest properties:
@@ -38,13 +38,23 @@ import synapsedesk.auth.Common.Gender;
  */
 class PlatformOrganizationsServiceTest {
 
-  private final PlatformServiceGrpc.PlatformServiceBlockingStub stub =
-      mock(PlatformServiceGrpc.PlatformServiceBlockingStub.class);
+  private final PlatformServiceGrpc.PlatformServiceBlockingStub stub = mock(
+    PlatformServiceGrpc.PlatformServiceBlockingStub.class
+  );
   private final SuperAdminCheck superAdminCheck = mock(SuperAdminCheck.class);
   private PlatformOrganizationsService service;
 
   private static RequestContext context() {
-    return new RequestContext("agent-1", null, true, List.of(), List.of(), true, "127.0.0.1", "test");
+    return new RequestContext(
+      "agent-1",
+      null,
+      true,
+      List.of(),
+      List.of(),
+      true,
+      "127.0.0.1",
+      "test"
+    );
   }
 
   @BeforeEach
@@ -56,11 +66,15 @@ class PlatformOrganizationsServiceTest {
 
   @Test
   void getOrganizationRefusesBeforeTouchingThePeerWhenTheCheckFails() {
-    org.mockito.Mockito.doThrow(new ResponseStatusException(org.springframework.http.HttpStatus.FORBIDDEN))
-        .when(superAdminCheck)
-        .require(any());
+    org.mockito.Mockito.doThrow(
+      new ResponseStatusException(org.springframework.http.HttpStatus.FORBIDDEN)
+    )
+      .when(superAdminCheck)
+      .require(any());
 
-    assertThatThrownBy(() -> service.getOrganization(context(), "org-1")).isInstanceOf(ResponseStatusException.class);
+    assertThatThrownBy(() ->
+      service.getOrganization(context(), "org-1")
+    ).isInstanceOf(ResponseStatusException.class);
 
     verify(superAdminCheck).require(any());
     verifyNoMoreInteractions(stub);
@@ -69,10 +83,15 @@ class PlatformOrganizationsServiceTest {
   @Test
   void aSlugIsLowercasedAndTrimmedBeforeThePatternRuns() {
     when(stub.createOrganization(any())).thenReturn(
-        CreatePlatformOrganizationResponse.newBuilder()
-            .setOrganization(PlatformOrganizationResponse.newBuilder().setOrganization(wireOrganization("org-1")))
-            .setAdmin(wireAdmin())
-            .build());
+      CreatePlatformOrganizationResponse.newBuilder()
+        .setOrganization(
+          PlatformOrganizationResponse.newBuilder().setOrganization(
+            wireOrganization("org-1")
+          )
+        )
+        .setAdmin(wireAdmin())
+        .build()
+    );
 
     CreatePlatformOrganizationDto dto = new CreatePlatformOrganizationDto();
     dto.setName("Acme");
@@ -83,7 +102,7 @@ class PlatformOrganizationsServiceTest {
     service.createOrganization(context(), dto);
 
     ArgumentCaptor<CreatePlatformOrganizationRequest> captor =
-        ArgumentCaptor.forClass(CreatePlatformOrganizationRequest.class);
+      ArgumentCaptor.forClass(CreatePlatformOrganizationRequest.class);
     verify(stub).createOrganization(captor.capture());
     assertThat(captor.getValue().getSlug()).isEqualTo("acme-corp");
   }
@@ -96,7 +115,9 @@ class PlatformOrganizationsServiceTest {
     dto.setAdminEmail("admin@acme.test");
     dto.setAdminFullName("Admin Person");
 
-    assertThatThrownBy(() -> service.createOrganization(context(), dto)).isInstanceOf(ResponseStatusException.class);
+    assertThatThrownBy(() ->
+      service.createOrganization(context(), dto)
+    ).isInstanceOf(ResponseStatusException.class);
   }
 
   @Test
@@ -112,13 +133,18 @@ class PlatformOrganizationsServiceTest {
     }
     dto.setAllowedEmailDomains(domains);
 
-    assertThatThrownBy(() -> service.createOrganization(context(), dto)).isInstanceOf(ResponseStatusException.class);
+    assertThatThrownBy(() ->
+      service.createOrganization(context(), dto)
+    ).isInstanceOf(ResponseStatusException.class);
   }
 
   @Test
   void anAbsentQuotaFieldIsNeverSentAsZero() {
     when(stub.updateOrganization(any())).thenReturn(
-        PlatformOrganizationResponse.newBuilder().setOrganization(wireOrganization("org-1")).build());
+      PlatformOrganizationResponse.newBuilder()
+        .setOrganization(wireOrganization("org-1"))
+        .build()
+    );
 
     UpdatePlatformOrganizationDto dto = new UpdatePlatformOrganizationDto();
     dto.setName("Renamed");
@@ -126,7 +152,7 @@ class PlatformOrganizationsServiceTest {
     service.updateOrganization(context(), "org-1", dto);
 
     ArgumentCaptor<UpdatePlatformOrganizationRequest> captor =
-        ArgumentCaptor.forClass(UpdatePlatformOrganizationRequest.class);
+      ArgumentCaptor.forClass(UpdatePlatformOrganizationRequest.class);
     verify(stub).updateOrganization(captor.capture());
     assertThat(captor.getValue().hasMaxAgentSeats()).isFalse();
     assertThat(captor.getValue().hasMaxStorageBytes()).isFalse();
@@ -138,50 +164,56 @@ class PlatformOrganizationsServiceTest {
     // The `status` query param is generated as a plain String (unlike the
     // SetOrganizationStatusDto body field, which IS a Bean-Validated enum),
     // so this mapping is the only thing refusing an unrecognized literal.
-    assertThatThrownBy(
-            () ->
-                service.listOrganizations(
-                    context(),
-                    java.math.BigDecimal.ONE,
-                    java.math.BigDecimal.TEN,
-                    "ASC",
-                    null,
-                    "createdAt",
-                    false,
-                    "NOT_A_REAL_STATUS"))
-        .isInstanceOf(ResponseStatusException.class);
+    assertThatThrownBy(() ->
+      service.listOrganizations(
+        context(),
+        java.math.BigDecimal.ONE,
+        java.math.BigDecimal.TEN,
+        "ASC",
+        null,
+        "createdAt",
+        false,
+        "NOT_A_REAL_STATUS"
+      )
+    ).isInstanceOf(ResponseStatusException.class);
   }
 
   private static OrganizationResponse wireOrganization(String id) {
-    com.google.protobuf.Timestamp now = com.google.protobuf.Timestamp.newBuilder().setSeconds(1_756_684_800).build();
-    return OrganizationResponse.newBuilder()
-        .setId(id)
-        .setName("Acme")
-        .setSlug("acme")
-        .setStatus(OrgStatus.ORG_STATUS_ACTIVE)
-        .setEnforceTwoFactor(false)
-        .setMaxAgentSeats(5)
-        .setMaxStorageBytes(1000)
-        .setMonthlyAiTokenBudget(1000)
-        .setBillingCycleStart(now)
-        .setCreatedAt(now)
-        .setUpdatedAt(now)
+    com.google.protobuf.Timestamp now =
+      com.google.protobuf.Timestamp.newBuilder()
+        .setSeconds(1_756_684_800)
         .build();
+    return OrganizationResponse.newBuilder()
+      .setId(id)
+      .setName("Acme")
+      .setSlug("acme")
+      .setStatus(OrgStatus.ORG_STATUS_ACTIVE)
+      .setEnforceTwoFactor(false)
+      .setMaxAgentSeats(5)
+      .setMaxStorageBytes(1000)
+      .setMonthlyAiTokenBudget(1000)
+      .setBillingCycleStart(now)
+      .setCreatedAt(now)
+      .setUpdatedAt(now)
+      .build();
   }
 
   private static synapsedesk.auth.Common.UserResponse wireAdmin() {
-    com.google.protobuf.Timestamp now = com.google.protobuf.Timestamp.newBuilder().setSeconds(1_756_684_800).build();
-    return synapsedesk.auth.Common.UserResponse.newBuilder()
-        .setId("11111111-1111-4111-8111-111111111111")
-        .setFullName("Admin Person")
-        .setEmail("admin@acme.test")
-        .setIsEmailVerified(false)
-        .setIsPhoneVerified(false)
-        .setGender(Gender.GENDER_UNSPECIFIED)
-        .setIsLocked(false)
-        .setIsTwoFactorEnabled(false)
-        .setCreatedAt(now)
-        .setUpdatedAt(now)
+    com.google.protobuf.Timestamp now =
+      com.google.protobuf.Timestamp.newBuilder()
+        .setSeconds(1_756_684_800)
         .build();
+    return synapsedesk.auth.Common.UserResponse.newBuilder()
+      .setId("11111111-1111-4111-8111-111111111111")
+      .setFullName("Admin Person")
+      .setEmail("admin@acme.test")
+      .setIsEmailVerified(false)
+      .setIsPhoneVerified(false)
+      .setGender(Gender.GENDER_UNSPECIFIED)
+      .setIsLocked(false)
+      .setIsTwoFactorEnabled(false)
+      .setCreatedAt(now)
+      .setUpdatedAt(now)
+      .build();
   }
 }

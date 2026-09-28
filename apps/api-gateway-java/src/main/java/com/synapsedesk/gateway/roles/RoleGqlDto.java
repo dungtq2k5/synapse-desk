@@ -9,11 +9,12 @@ import java.util.List;
  * it), matching `role-response.gql-dto.ts`'s flat shape exactly.
  */
 public record RoleGqlDto(
-    String id,
-    String name,
-    String description,
-    boolean isSystemRole,
-    int userAssigned,
-    List<String> permissionCodes,
-    OffsetDateTime createdAt,
-    OffsetDateTime updatedAt) {}
+  String id,
+  String name,
+  String description,
+  boolean isSystemRole,
+  int userAssigned,
+  List<String> permissionCodes,
+  OffsetDateTime createdAt,
+  OffsetDateTime updatedAt
+) {}

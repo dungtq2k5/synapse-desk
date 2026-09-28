@@ -8,5 +8,5 @@ public enum IngestionJobStatusGql {
   EMBEDDING,
   FAILED,
   PARSING,
-  QUEUED
+  QUEUED,
 }

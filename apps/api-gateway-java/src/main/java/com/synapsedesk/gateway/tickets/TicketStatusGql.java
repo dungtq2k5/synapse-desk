@@ -7,5 +7,5 @@ public enum TicketStatusGql {
   PENDING_AGENT,
   ESCALATED,
   RESOLVED,
-  CLOSED
+  CLOSED,
 }

@@ -44,26 +44,39 @@ public class PermissionCatalogueLoaderConfig {
   private final RoleServiceGrpc.RoleServiceBlockingStub stub;
 
   public PermissionCatalogueLoaderConfig(
-      BatchLoaderRegistry registry, RoleServiceGrpc.RoleServiceBlockingStub stub) {
+    BatchLoaderRegistry registry,
+    RoleServiceGrpc.RoleServiceBlockingStub stub
+  ) {
     this.stub = stub;
 
     registry
-        .forTypePair(String.class, PermissionCatalogueGqlDto.class)
-        .registerMappedBatchLoader(
-            (organizationIds, environment) ->
-                Mono.fromCallable(() -> fetch(organizationIds, environment))
-                    .subscribeOn(Schedulers.boundedElastic()));
+      .forTypePair(String.class, PermissionCatalogueGqlDto.class)
+      .registerMappedBatchLoader((organizationIds, environment) ->
+        Mono.fromCallable(() ->
+          fetch(organizationIds, environment)
+        ).subscribeOn(Schedulers.boundedElastic())
+      );
   }
 
   private Map<String, PermissionCatalogueGqlDto> fetch(
-      Set<String> organizationIds, BatchLoaderEnvironment environment) {
-    RequestContext context = (RequestContext) environment.getKeyContexts().values().iterator().next();
+    Set<String> organizationIds,
+    BatchLoaderEnvironment environment
+  ) {
+    RequestContext context = (RequestContext) environment
+      .getKeyContexts()
+      .values()
+      .iterator()
+      .next();
 
-    ListPermissionsResponse response =
-        withMetadata(context).listPermissions(ListPermissionsRequest.getDefaultInstance());
+    ListPermissionsResponse response = withMetadata(context).listPermissions(
+      ListPermissionsRequest.getDefaultInstance()
+    );
 
-    List<PermissionGqlDto> catalogue =
-        response.getItemsList().stream().map(RoleMapper::toPermissionGqlDto).toList();
+    List<PermissionGqlDto> catalogue = response
+      .getItemsList()
+      .stream()
+      .map(RoleMapper::toPermissionGqlDto)
+      .toList();
     PermissionCatalogueGqlDto value = new PermissionCatalogueGqlDto(catalogue);
 
     // One entry per requested key: every key in this batch is the same
@@ -75,9 +88,13 @@ public class PermissionCatalogueLoaderConfig {
     return byOrganizationId;
   }
 
-  private RoleServiceGrpc.RoleServiceBlockingStub withMetadata(RequestContext context) {
+  private RoleServiceGrpc.RoleServiceBlockingStub withMetadata(
+    RequestContext context
+  ) {
     return stub
-        .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
-        .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context)));
+      .withDeadlineAfter(DEADLINE_SECONDS, TimeUnit.SECONDS)
+      .withInterceptors(
+        MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context))
+      );
   }
 }

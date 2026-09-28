@@ -36,7 +36,9 @@ function signStandardWebhook(
   id = `msg_${randomUUID()}`,
 ) {
   const key = Buffer.from(secret.replace(/^whsec_/, ''), 'base64');
-  const digest = createHmac('sha256', key).update(`${id}.${timestampSeconds}.${body}`).digest('base64');
+  const digest = createHmac('sha256', key)
+    .update(`${id}.${timestampSeconds}.${body}`)
+    .digest('base64');
 
   return {
     'svix-id': id,
@@ -50,7 +52,11 @@ describe('webhooks', () => {
   let peers: Peers;
 
   /** Raw `fetch`, bypassing `Session` — these rows sign the EXACT bytes sent, and `Session.request` always re-`JSON.stringify`s its body. */
-  const postRaw = async (path: string, body: string, headers: Record<string, string> = {}) => {
+  const postRaw = async (
+    path: string,
+    body: string,
+    headers: Record<string, string> = {},
+  ) => {
     const response = await fetch(`${gateway.baseUrl}${path}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', ...headers },
@@ -58,13 +64,20 @@ describe('webhooks', () => {
     });
     const text = await response.text();
 
-    return { status: response.status, body: text ? JSON.parse(text) : undefined };
+    return {
+      status: response.status,
+      body: text ? JSON.parse(text) : undefined,
+    };
   };
 
   beforeAll(async () => {
     const { redisUrl, natsUrl } = readRunState();
     peers = await startPeers();
-    gateway = await startGateway({ ...peers.env, REDIS_URL: redisUrl, NATS_URL: natsUrl });
+    gateway = await startGateway({
+      ...peers.env,
+      REDIS_URL: redisUrl,
+      NATS_URL: natsUrl,
+    });
   }, 90_000);
 
   afterAll(async () => {
@@ -78,100 +91,170 @@ describe('webhooks', () => {
     rowFor('Webhooks')(
       '**forwards the exact raw bytes and signature header to auth-service, verbatim**',
       async () => {
-        peers.auth.on('BillingService/HandleStripeWebhook').reply({ status: 'applied' });
+        peers.auth
+          .on('BillingService/HandleStripeWebhook')
+          .reply({ status: 'applied' });
         const body = '{"id":"evt_1","type":"invoice.paid"}';
 
-        const response = await postRaw(`${API}/webhooks/stripe`, body, { 'stripe-signature': 't=1,v1=abc' });
+        const response = await postRaw(`${API}/webhooks/stripe`, body, {
+          'stripe-signature': 't=1,v1=abc',
+        });
 
         expect(response.status).toBe(200);
-        expect(response.body).toMatchObject({ data: { received: true, status: 'applied' } });
+        expect(response.body).toMatchObject({
+          data: { received: true, status: 'applied' },
+        });
         const [call] = peers.auth.calls('BillingService/HandleStripeWebhook');
         expect(call.request.signature).toBe('t=1,v1=abc');
         expect(Buffer.from(call.request.payload).toString('utf8')).toBe(body);
       },
     );
 
-    rowFor('Webhooks')('**an event type nothing acts on is still 200, with an empty status**', async () => {
-      peers.auth.on('BillingService/HandleStripeWebhook').reply({ status: '' });
+    rowFor('Webhooks')(
+      '**an event type nothing acts on is still 200, with an empty status**',
+      async () => {
+        peers.auth
+          .on('BillingService/HandleStripeWebhook')
+          .reply({ status: '' });
 
-      const response = await postRaw(`${API}/webhooks/stripe`, '{"id":"evt_2"}', {
-        'stripe-signature': 't=1,v1=abc',
-      });
+        const response = await postRaw(
+          `${API}/webhooks/stripe`,
+          '{"id":"evt_2"}',
+          {
+            'stripe-signature': 't=1,v1=abc',
+          },
+        );
 
-      expect(response.status).toBe(200);
-      expect(response.body).toMatchObject({ data: { received: true, status: '' } });
-    });
+        expect(response.status).toBe(200);
+        expect(response.body).toMatchObject({
+          data: { received: true, status: '' },
+        });
+      },
+    );
 
-    rowFor('Webhooks')('**a signature auth-service rejects is a non-2xx, never masked as 200**', async () => {
-      peers.auth
-        .on('BillingService/HandleStripeWebhook')
-        .fail(GrpcStatus.INVALID_ARGUMENT, 'signature verification failed');
+    rowFor('Webhooks')(
+      '**a signature auth-service rejects is a non-2xx, never masked as 200**',
+      async () => {
+        peers.auth
+          .on('BillingService/HandleStripeWebhook')
+          .fail(GrpcStatus.INVALID_ARGUMENT, 'signature verification failed');
 
-      const response = await postRaw(`${API}/webhooks/stripe`, '{"id":"evt_3"}', {
-        'stripe-signature': 'tampered',
-      });
+        const response = await postRaw(
+          `${API}/webhooks/stripe`,
+          '{"id":"evt_3"}',
+          {
+            'stripe-signature': 'tampered',
+          },
+        );
 
-      expect(response.status).toBeGreaterThanOrEqual(400);
-    });
+        expect(response.status).toBeGreaterThanOrEqual(400);
+      },
+    );
   });
 
   describe('resend', () => {
     const secret = GATEWAY_ENV.RESEND_WEBHOOK_SECRET;
 
-    rowFor('Webhooks')('**a verified event that is not `email.received` is 200 and calls no peer**', async () => {
-      const body = JSON.stringify({ type: 'email.delivered', data: { email_id: 'not-inbound' } });
+    rowFor('Webhooks')(
+      '**a verified event that is not `email.received` is 200 and calls no peer**',
+      async () => {
+        const body = JSON.stringify({
+          type: 'email.delivered',
+          data: { email_id: 'not-inbound' },
+        });
 
-      const response = await postRaw(`${API}/webhooks/email/resend`, body, signStandardWebhook(body, secret));
+        const response = await postRaw(
+          `${API}/webhooks/email/resend`,
+          body,
+          signStandardWebhook(body, secret),
+        );
 
-      expect(response.status).toBe(200);
-      expect(response.body).toMatchObject({ data: { received: true, outcome: 'ignored_event' } });
-      expect(peers.auth.calls()).toHaveLength(0);
-      expect(peers.notification.calls()).toHaveLength(0);
-    });
+        expect(response.status).toBe(200);
+        expect(response.body).toMatchObject({
+          data: { received: true, outcome: 'ignored_event' },
+        });
+        expect(peers.auth.calls()).toHaveLength(0);
+        expect(peers.notification.calls()).toHaveLength(0);
+      },
+    );
 
-    rowFor('Webhooks')('**a tampered body is 401, and nothing is logged from it**', async () => {
-      const body = JSON.stringify({ type: 'email.delivered', data: { email_id: 'x' } });
-      const headers = signStandardWebhook(body, secret);
-      const tampered = JSON.stringify({ type: 'email.delivered', data: { email_id: 'y' } });
-
-      const response = await postRaw(`${API}/webhooks/email/resend`, tampered, headers);
-
-      expect(response.status).toBe(401);
-    });
-
-    rowFor('Webhooks')('**a wrong secret is 401, never 5xx**', async () => {
-      const body = JSON.stringify({ type: 'email.delivered', data: { email_id: 'x' } });
-      const wrong = `whsec_${Buffer.from('a-different-secret-entirely-000').toString('base64')}`;
-
-      const response = await postRaw(`${API}/webhooks/email/resend`, body, signStandardWebhook(body, wrong));
-
-      expect(response.status).toBe(401);
-    });
-
-    rowFor('Webhooks').each([['svix-id'], ['svix-timestamp'], ['svix-signature']] as const)(
-      'and a missing `%s` header is 401 too',
-      async (name) => {
-        const body = JSON.stringify({ type: 'email.delivered', data: { email_id: 'x' } });
+    rowFor('Webhooks')(
+      '**a tampered body is 401, and nothing is logged from it**',
+      async () => {
+        const body = JSON.stringify({
+          type: 'email.delivered',
+          data: { email_id: 'x' },
+        });
         const headers = signStandardWebhook(body, secret);
-        delete (headers as Record<string, string>)[name];
+        const tampered = JSON.stringify({
+          type: 'email.delivered',
+          data: { email_id: 'y' },
+        });
 
-        const response = await postRaw(`${API}/webhooks/email/resend`, body, headers);
+        const response = await postRaw(
+          `${API}/webhooks/email/resend`,
+          tampered,
+          headers,
+        );
 
         expect(response.status).toBe(401);
       },
     );
 
-    rowFor('Webhooks')('**a delivery signed more than five minutes ago is 401**', async () => {
-      const body = JSON.stringify({ type: 'email.delivered', data: { email_id: 'x' } });
-      const tenMinutesAgo = Math.floor(Date.now() / 1000) - 600;
+    rowFor('Webhooks')('**a wrong secret is 401, never 5xx**', async () => {
+      const body = JSON.stringify({
+        type: 'email.delivered',
+        data: { email_id: 'x' },
+      });
+      const wrong = `whsec_${Buffer.from('a-different-secret-entirely-000').toString('base64')}`;
 
       const response = await postRaw(
         `${API}/webhooks/email/resend`,
         body,
-        signStandardWebhook(body, secret, tenMinutesAgo),
+        signStandardWebhook(body, wrong),
       );
 
       expect(response.status).toBe(401);
     });
+
+    rowFor('Webhooks').each([
+      ['svix-id'],
+      ['svix-timestamp'],
+      ['svix-signature'],
+    ] as const)('and a missing `%s` header is 401 too', async (name) => {
+      const body = JSON.stringify({
+        type: 'email.delivered',
+        data: { email_id: 'x' },
+      });
+      const headers = signStandardWebhook(body, secret);
+      delete (headers as Record<string, string>)[name];
+
+      const response = await postRaw(
+        `${API}/webhooks/email/resend`,
+        body,
+        headers,
+      );
+
+      expect(response.status).toBe(401);
+    });
+
+    rowFor('Webhooks')(
+      '**a delivery signed more than five minutes ago is 401**',
+      async () => {
+        const body = JSON.stringify({
+          type: 'email.delivered',
+          data: { email_id: 'x' },
+        });
+        const tenMinutesAgo = Math.floor(Date.now() / 1000) - 600;
+
+        const response = await postRaw(
+          `${API}/webhooks/email/resend`,
+          body,
+          signStandardWebhook(body, secret, tenMinutesAgo),
+        );
+
+        expect(response.status).toBe(401);
+      },
+    );
   });
 });

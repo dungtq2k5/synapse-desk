@@ -40,7 +40,10 @@ describe('documents, ingestion jobs and notifications', () => {
     )}`,
   });
 
-  const wireDocument = (id: string, overrides: Record<string, unknown> = {}) => ({
+  const wireDocument = (
+    id: string,
+    overrides: Record<string, unknown> = {},
+  ) => ({
     id,
     organizationId: ORGANIZATION,
     createdById: USER,
@@ -94,7 +97,9 @@ describe('documents, ingestion jobs and notifications', () => {
       '**`Query.document` resolves one document**',
       async () => {
         const id = '55555555-5555-4555-8555-555555555555';
-        peers.ingestion.on('DocumentService/GetDocument').reply(wireDocument(id));
+        peers.ingestion
+          .on('DocumentService/GetDocument')
+          .reply(wireDocument(id));
 
         const response = await new Session(gateway.baseUrl).post<{
           data: { document: { id: string; title: string; fileType: string } };
@@ -124,12 +129,16 @@ describe('documents, ingestion jobs and notifications', () => {
         });
         peers.auth.on('UserService/ListUsersByIds').reply({
           items: [],
-          summaries: [{ userId: USER, fullName: 'Ada Lovelace', isLocked: false }],
+          summaries: [
+            { userId: USER, fullName: 'Ada Lovelace', isLocked: false },
+          ],
         });
 
         const response = await new Session(gateway.baseUrl).post<{
           data: {
-            documents: { items: { id: string; createdBy: { fullName: string } }[] };
+            documents: {
+              items: { id: string; createdBy: { fullName: string } }[];
+            };
           };
         }>(
           '/graphql',
@@ -154,11 +163,12 @@ describe('documents, ingestion jobs and notifications', () => {
         const id = '77777777-7777-4777-8777-777777777777';
         const departmentIds = Array.from(
           { length: 251 },
-          (_, index) => `88888888-8888-4888-8888-${String(index).padStart(12, '0')}`,
+          (_, index) =>
+            `88888888-8888-4888-8888-${String(index).padStart(12, '0')}`,
         );
-        peers.ingestion.on('DocumentService/GetDocument').reply(
-          wireDocument(id, { departmentIds }),
-        );
+        peers.ingestion
+          .on('DocumentService/GetDocument')
+          .reply(wireDocument(id, { departmentIds }));
         // Sliced BEFORE the batch, so the peer receives exactly the first 50.
         peers.auth.on('DepartmentService/ListDepartmentsByIds').reply({
           items: departmentIds.slice(0, MAX_EDGE_LIST).map((deptId) => ({
@@ -170,7 +180,10 @@ describe('documents, ingestion jobs and notifications', () => {
 
         const response = await new Session(gateway.baseUrl).post<{
           data: {
-            document: { departments: { id: string }[]; departmentCount: number };
+            document: {
+              departments: { id: string }[];
+              departmentCount: number;
+            };
           };
         }>(
           '/graphql',
@@ -182,13 +195,17 @@ describe('documents, ingestion jobs and notifications', () => {
 
         expect(response.status).toBe(200);
         expect(response.body).not.toHaveProperty('errors');
-        expect(response.body.data.document.departments).toHaveLength(MAX_EDGE_LIST);
-        expect(response.body.data.document.departmentCount).toBe(251);
-
-        const [call] = peers.auth.calls('DepartmentService/ListDepartmentsByIds');
-        expect((call.request as { departmentIds: string[] }).departmentIds).toHaveLength(
+        expect(response.body.data.document.departments).toHaveLength(
           MAX_EDGE_LIST,
         );
+        expect(response.body.data.document.departmentCount).toBe(251);
+
+        const [call] = peers.auth.calls(
+          'DepartmentService/ListDepartmentsByIds',
+        );
+        expect(
+          (call.request as { departmentIds: string[] }).departmentIds,
+        ).toHaveLength(MAX_EDGE_LIST);
       },
     );
   });
@@ -219,7 +236,10 @@ describe('documents, ingestion jobs and notifications', () => {
 
         expect(response.status).toBe(200);
         expect(response.body).not.toHaveProperty('errors');
-        expect(response.body.data.ingestionJob).toEqual({ id, status: 'COMPLETED' });
+        expect(response.body.data.ingestionJob).toEqual({
+          id,
+          status: 'COMPLETED',
+        });
       },
     );
 
@@ -228,7 +248,8 @@ describe('documents, ingestion jobs and notifications', () => {
       async () => {
         const documentIds = Array.from(
           { length: 25 },
-          (_, index) => `bbbbbbbb-bbbb-4bbb-8bbb-${String(index).padStart(12, '0')}`,
+          (_, index) =>
+            `bbbbbbbb-bbbb-4bbb-8bbb-${String(index).padStart(12, '0')}`,
         );
         peers.ingestion.on('DocumentService/ListIngestionJobs').reply({
           items: documentIds.map((documentId, index) => ({
@@ -243,11 +264,17 @@ describe('documents, ingestion jobs and notifications', () => {
           meta: page(25),
         });
         peers.ingestion.on('DocumentService/ListDocumentsByIds').reply({
-          items: documentIds.map((id) => wireDocument(id, { title: `Doc ${id.slice(0, 8)}` })),
+          items: documentIds.map((id) =>
+            wireDocument(id, { title: `Doc ${id.slice(0, 8)}` }),
+          ),
         });
 
         const response = await new Session(gateway.baseUrl).post<{
-          data: { ingestionJobs: { items: { id: string; document: { title: string } }[] } };
+          data: {
+            ingestionJobs: {
+              items: { id: string; document: { title: string } }[];
+            };
+          };
         }>(
           '/graphql',
           {
@@ -297,13 +324,19 @@ describe('documents, ingestion jobs and notifications', () => {
         });
         peers.auth.on('UserService/ListUsersByIds').reply({
           items: [],
-          summaries: [{ userId: USER, fullName: 'Ada Lovelace', isLocked: false }],
+          summaries: [
+            { userId: USER, fullName: 'Ada Lovelace', isLocked: false },
+          ],
         });
 
         const response = await new Session(gateway.baseUrl).post<{
           data: {
             notifications: {
-              items: { id: string; title: string; actor: { fullName: string } }[];
+              items: {
+                id: string;
+                title: string;
+                actor: { fullName: string };
+              }[];
               hasMore: boolean;
             };
           };
@@ -327,7 +360,9 @@ describe('documents, ingestion jobs and notifications', () => {
     rowForField('Query.unreadNotificationCount')(
       '**`Query.unreadNotificationCount` resolves a number, not a list**',
       async () => {
-        peers.notification.on('NotificationService/GetUnreadCount').reply({ count: 4 });
+        peers.notification
+          .on('NotificationService/GetUnreadCount')
+          .reply({ count: 4 });
 
         const response = await new Session(gateway.baseUrl).post<{
           data: { unreadNotificationCount: number };

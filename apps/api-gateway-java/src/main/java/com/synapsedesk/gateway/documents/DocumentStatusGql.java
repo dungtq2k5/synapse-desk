@@ -5,5 +5,5 @@ public enum DocumentStatusGql {
   PENDING,
   PROCESSING,
   INDEXED,
-  FAILED
+  FAILED,
 }

@@ -27,94 +27,135 @@ final class KnowledgeMapper {
 
   private KnowledgeMapper() {}
 
-  static KnowledgeArticleResponseDto toArticleDto(KnowledgeArticleResponse article) {
+  static KnowledgeArticleResponseDto toArticleDto(
+    KnowledgeArticleResponse article
+  ) {
     return new KnowledgeArticleResponseDto()
-        .id(article.getId())
-        .title(article.getTitle())
-        .updatedAt(toOffsetDateTime(article.getUpdatedAt()))
-        .chunkCount(BigDecimal.valueOf(article.getChunkCount()));
+      .id(article.getId())
+      .title(article.getTitle())
+      .updatedAt(toOffsetDateTime(article.getUpdatedAt()))
+      .chunkCount(BigDecimal.valueOf(article.getChunkCount()));
   }
 
-  static KnowledgeArticleBlockResponseDto toBlockDto(KnowledgeArticleBlockResponse block) {
+  static KnowledgeArticleBlockResponseDto toBlockDto(
+    KnowledgeArticleBlockResponse block
+  ) {
     return new KnowledgeArticleBlockResponseDto()
-        .chunkIndex(BigDecimal.valueOf(block.getChunkIndex()))
-        .pageNumber(block.hasPageNumber() ? BigDecimal.valueOf(block.getPageNumber()) : null)
-        .contentText(block.getContentText());
+      .chunkIndex(BigDecimal.valueOf(block.getChunkIndex()))
+      .pageNumber(
+        block.hasPageNumber() ? BigDecimal.valueOf(block.getPageNumber()) : null
+      )
+      .contentText(block.getContentText());
   }
 
   static KnowledgeArticleDetailResponseDto toArticleDetailDto(
-      KnowledgeArticleResponse article, List<KnowledgeArticleBlockResponse> blocks, PageMeta meta,
-      boolean hasUnindexedPages) {
+    KnowledgeArticleResponse article,
+    List<KnowledgeArticleBlockResponse> blocks,
+    PageMeta meta,
+    boolean hasUnindexedPages
+  ) {
     return new KnowledgeArticleDetailResponseDto()
-        .article(toArticleDto(article))
-        .blocks(blocks.stream().map(KnowledgeMapper::toBlockDto).toList())
-        .meta(toPaginationMetaDto(meta))
-        .hasUnindexedPages(hasUnindexedPages);
+      .article(toArticleDto(article))
+      .blocks(blocks.stream().map(KnowledgeMapper::toBlockDto).toList())
+      .meta(toPaginationMetaDto(meta))
+      .hasUnindexedPages(hasUnindexedPages);
   }
 
-  static KnowledgeAskResponseDto toAskDto(String content, AnswerStatus status, List<Citation> citations,
-      String generationId) {
+  static KnowledgeAskResponseDto toAskDto(
+    String content,
+    AnswerStatus status,
+    List<Citation> citations,
+    String generationId
+  ) {
     return new KnowledgeAskResponseDto()
-        .content(content)
-        .status(
-            status == AnswerStatus.UNRECOGNIZED || status == AnswerStatus.ANSWER_STATUS_UNSPECIFIED
-                ? null
-                : KnowledgeAskResponseDto.StatusEnum.fromValue(status.name().replace("ANSWER_STATUS_", "")))
-        .citations(citations.stream().map(KnowledgeMapper::toCitationDto).toList())
-        .generationId(generationId);
+      .content(content)
+      .status(
+        status == AnswerStatus.UNRECOGNIZED ||
+          status == AnswerStatus.ANSWER_STATUS_UNSPECIFIED
+          ? null
+          : KnowledgeAskResponseDto.StatusEnum.fromValue(
+              status.name().replace("ANSWER_STATUS_", "")
+            )
+      )
+      .citations(
+        citations.stream().map(KnowledgeMapper::toCitationDto).toList()
+      )
+      .generationId(generationId);
   }
 
-  static KnowledgeSearchResponseDto toSearchDto(List<RetrievedChunk> chunks, SearchDegradation degraded) {
+  static KnowledgeSearchResponseDto toSearchDto(
+    List<RetrievedChunk> chunks,
+    SearchDegradation degraded
+  ) {
     return new KnowledgeSearchResponseDto()
-        .chunks(chunks.stream().map(KnowledgeMapper::toChunkDto).toList())
-        .degraded(
-            degraded == SearchDegradation.SEARCH_DEGRADATION_UNSPECIFIED
-                    || degraded == SearchDegradation.UNRECOGNIZED
-                ? null
-                : KnowledgeSearchResponseDto.DegradedEnum.fromValue(
-                    degraded.name().replace("SEARCH_DEGRADATION_", "")));
+      .chunks(chunks.stream().map(KnowledgeMapper::toChunkDto).toList())
+      .degraded(
+        degraded == SearchDegradation.SEARCH_DEGRADATION_UNSPECIFIED ||
+          degraded == SearchDegradation.UNRECOGNIZED
+          ? null
+          : KnowledgeSearchResponseDto.DegradedEnum.fromValue(
+              degraded.name().replace("SEARCH_DEGRADATION_", "")
+            )
+      );
   }
 
   private static CitationResponseDto toCitationDto(Citation citation) {
     return new CitationResponseDto()
-        .chunkId(citation.getChunkId())
-        .documentId(citation.getDocumentId())
-        .documentTitle(citation.getDocumentTitle())
-        .pageNumber(citation.hasPageNumber() ? BigDecimal.valueOf(citation.getPageNumber()) : null)
-        .vectorPointId(citation.getVectorPointId());
+      .chunkId(citation.getChunkId())
+      .documentId(citation.getDocumentId())
+      .documentTitle(citation.getDocumentTitle())
+      .pageNumber(
+        citation.hasPageNumber()
+          ? BigDecimal.valueOf(citation.getPageNumber())
+          : null
+      )
+      .vectorPointId(citation.getVectorPointId());
   }
 
   private static RetrievedChunkResponseDto toChunkDto(RetrievedChunk chunk) {
     return new RetrievedChunkResponseDto()
-        .chunkId(chunk.getChunkId())
-        .documentId(chunk.getDocumentId())
-        .documentTitle(chunk.getDocumentTitle())
-        .pageNumber(chunk.hasPageNumber() ? BigDecimal.valueOf(chunk.getPageNumber()) : null)
-        .chunkIndex(BigDecimal.valueOf(chunk.getChunkIndex()))
-        .contentText(chunk.getContentText())
-        .score(BigDecimal.valueOf(chunk.getScore()))
-        .vectorPointId(chunk.getVectorPointId());
+      .chunkId(chunk.getChunkId())
+      .documentId(chunk.getDocumentId())
+      .documentTitle(chunk.getDocumentTitle())
+      .pageNumber(
+        chunk.hasPageNumber() ? BigDecimal.valueOf(chunk.getPageNumber()) : null
+      )
+      .chunkIndex(BigDecimal.valueOf(chunk.getChunkIndex()))
+      .contentText(chunk.getContentText())
+      .score(BigDecimal.valueOf(chunk.getScore()))
+      .vectorPointId(chunk.getVectorPointId());
   }
 
-  static InvitationsControllerListV1200ResponseDataMeta toMetaDto(PageMeta meta) {
+  static InvitationsControllerListV1200ResponseDataMeta toMetaDto(
+    PageMeta meta
+  ) {
     return new InvitationsControllerListV1200ResponseDataMeta(
-        BigDecimal.valueOf(meta.getTotalItems()),
-        BigDecimal.valueOf(meta.getItemCount()),
-        BigDecimal.valueOf(meta.getItemsPerPage()),
-        BigDecimal.valueOf(meta.getTotalPages()),
-        BigDecimal.valueOf(meta.getCurrentPage()));
+      BigDecimal.valueOf(meta.getTotalItems()),
+      BigDecimal.valueOf(meta.getItemCount()),
+      BigDecimal.valueOf(meta.getItemsPerPage()),
+      BigDecimal.valueOf(meta.getTotalPages()),
+      BigDecimal.valueOf(meta.getCurrentPage())
+    );
   }
 
-  private static PaginationMetaDataResponseDto toPaginationMetaDto(PageMeta meta) {
+  private static PaginationMetaDataResponseDto toPaginationMetaDto(
+    PageMeta meta
+  ) {
     return new PaginationMetaDataResponseDto(
-        BigDecimal.valueOf(meta.getTotalItems()),
-        BigDecimal.valueOf(meta.getItemCount()),
-        BigDecimal.valueOf(meta.getItemsPerPage()),
-        BigDecimal.valueOf(meta.getTotalPages()),
-        BigDecimal.valueOf(meta.getCurrentPage()));
+      BigDecimal.valueOf(meta.getTotalItems()),
+      BigDecimal.valueOf(meta.getItemCount()),
+      BigDecimal.valueOf(meta.getItemsPerPage()),
+      BigDecimal.valueOf(meta.getTotalPages()),
+      BigDecimal.valueOf(meta.getCurrentPage())
+    );
   }
 
-  private static OffsetDateTime toOffsetDateTime(com.google.protobuf.Timestamp timestamp) {
-    return Instant.ofEpochSecond(timestamp.getSeconds(), timestamp.getNanos()).atOffset(ZoneOffset.UTC);
+  private static OffsetDateTime toOffsetDateTime(
+    com.google.protobuf.Timestamp timestamp
+  ) {
+    return Instant.ofEpochSecond(
+      timestamp.getSeconds(),
+      timestamp.getNanos()
+    ).atOffset(ZoneOffset.UTC);
   }
 }
