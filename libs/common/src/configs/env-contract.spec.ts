@@ -42,6 +42,10 @@ describe('the environment contract', () => {
     'APP_VERSION',
     'BUILD_SHA',
     'BUILD_TIME',
+    // The Java gateway's `/socket.io` listener — Node's socket.io shares
+    // `PORT` and never reads this; only `RealtimeProperties` on the Java
+    // side binds it.
+    'WS_PORT',
   ]);
 
   /**

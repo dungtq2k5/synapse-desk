@@ -24,7 +24,7 @@ import org.springframework.test.context.ContextConfiguration;
  */
 @SpringBootTest(
   webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-  properties = { "PORT=0", "management.server.port=0" }
+  properties = { "PORT=0", "management.server.port=0", "realtime.port=0" }
 )
 // Every `@ConfigurationProperties` record is bound and VALIDATED at refresh,
 // so a context needs the whole shared environment, not just a port.

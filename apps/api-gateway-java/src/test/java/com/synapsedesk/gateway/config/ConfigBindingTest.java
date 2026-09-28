@@ -12,7 +12,7 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.context.ConfigurableApplicationContext;
 
 /**
- * The nine properties classes bind the shared environment, and refuse without
+ * The ten properties classes bind the shared environment, and refuse without
  * it.
  *
  * <p><b>Two refusal mechanisms, and they cover different faults</b> — worth
@@ -67,6 +67,9 @@ class ConfigBindingTest {
       assertThat(
         context.getBean(InboundEmailProperties.class).sender()
       ).isEqualTo("\"SynapseDesk\" <noreply@example.com>");
+      assertThat(context.getBean(RealtimeProperties.class).port()).isEqualTo(
+        3001
+      );
     }
   }
 

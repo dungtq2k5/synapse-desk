@@ -121,13 +121,6 @@ export const SKIPPED_FOR_JAVA: Readonly<Record<string, string>> = {
     'header 400s before the controller runs — a genuine, pre-existing spec/' +
     'implementation gap this port did not introduce and should not paper ' +
     'over by deviating from the generated interface',
-  '**a relayed `ticket.*` event reaches a client on EACH replica exactly once**':
-    'the realtime WebSocket gateway. The Java gateway has no Socket.IO/' +
-    'WebSocket server at all yet; this row only started running once ' +
-    '`TicketsApi` left `pending-apis.txt`, since it shares that tag for ' +
-    'topical grouping, not because it exercises the REST interface',
-  '**presence still CROSSES replicas**':
-    'the realtime WebSocket gateway, same cause as the row above',
 };
 
 /** True when this row's NAME is on the explicit list. */

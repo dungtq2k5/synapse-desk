@@ -47,7 +47,8 @@ class EnvBindingContractTest {
     JwtProperties.class,
     CookieProperties.class,
     ThrottleProperties.class,
-    InboundEmailProperties.class
+    InboundEmailProperties.class,
+    RealtimeProperties.class
   );
 
   private static final Path APPLICATION_YAML = Path.of(
@@ -105,14 +106,15 @@ class EnvBindingContractTest {
   @Test
   void theScanReachesEveryFieldRatherThanAnEmptyList() {
     // A reflection call that stopped returning components would report a
-    // compliant tree. Nine classes and 46 fields today, which is also the Joi
-    // schema's key count — the two implementations bind the same environment.
+    // compliant tree. Ten classes and 47 fields today — one more than the Joi
+    // schema's key count, since `WS_PORT` is a key Node never reads (see
+    // `RealtimeProperties`'s own docblock).
     int fields = PROPERTIES.stream()
       .mapToInt(type -> type.getRecordComponents().length)
       .sum();
 
-    assertThat(PROPERTIES).hasSize(9);
-    assertThat(fields).isEqualTo(46);
+    assertThat(PROPERTIES).hasSize(10);
+    assertThat(fields).isEqualTo(47);
     // A FLOOR, not equality: a key the file publishes and Java does not yet
     // bind is correct while this is a skeleton, and equality here would turn
     // that into the reverse-direction check this suite deliberately omits.

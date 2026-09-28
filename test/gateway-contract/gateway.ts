@@ -33,6 +33,13 @@ export const REPO_ROOT = join(__dirname, '../..');
 export type Gateway = {
   /** `http://127.0.0.1:<port>` — no prefix; `client.ts` adds `/api/v1`. */
   baseUrl: string;
+  /**
+   * Where `/ws` (a Socket.IO NAMESPACE, not a path — the wire path is
+   * `/socket.io`) actually answers. Equal to `baseUrl` for Node, which shares
+   * one `http.Server` for everything; a separate port for Java, whose
+   * netty-socketio listener cannot bind the port Tomcat already holds.
+   */
+  wsUrl: string;
   metricsUrl: string;
   stop: () => Promise<void>;
 };
@@ -165,6 +172,7 @@ export async function startGateway(
 
   const port = await freePort();
   const metricsPort = await freePort();
+  const wsPort = await freePort();
   const { command, args } = commandFor(impl);
 
   const child = spawn(command, args, {
@@ -176,6 +184,9 @@ export async function startGateway(
       PORT: String(port),
       METRICS_PORT: String(metricsPort),
       METRICS_HOST: '127.0.0.1',
+      // Node ignores this (its env schema allows unknown keys) — only the
+      // Java implementation's netty-socketio listener binds it.
+      WS_PORT: String(wsPort),
     }),
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -187,6 +198,7 @@ export async function startGateway(
   const baseUrl = `http://127.0.0.1:${port}`;
   const gateway: Gateway = {
     baseUrl,
+    wsUrl: impl === 'java' ? `http://127.0.0.1:${wsPort}` : baseUrl,
     metricsUrl: `http://127.0.0.1:${metricsPort}`,
     stop: () => stop(child),
   };

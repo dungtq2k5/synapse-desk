@@ -76,6 +76,9 @@ metrics:
   port: ${METRICS_PORT}
   host: ${METRICS_HOST:127.0.0.1}
 
+realtime:
+  port: ${WS_PORT}
+
 cors:
   origins: ${CORS}
 

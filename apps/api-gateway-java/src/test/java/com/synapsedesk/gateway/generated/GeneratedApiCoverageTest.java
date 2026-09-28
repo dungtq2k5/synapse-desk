@@ -40,7 +40,9 @@ import com.synapsedesk.gateway.config.SharedEnvironmentInitializer;
  * a class exists: a controller that is not a component serves nothing, and
  * that is exactly the mistake this would otherwise miss.
  */
-@SpringBootTest(properties = "management.server.port=0")
+@SpringBootTest(
+  properties = { "management.server.port=0", "realtime.port=0" }
+)
 @ContextConfiguration(initializers = SharedEnvironmentInitializer.class)
 class GeneratedApiCoverageTest {
 

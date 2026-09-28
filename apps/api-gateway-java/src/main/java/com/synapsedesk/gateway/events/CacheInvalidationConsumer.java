@@ -3,20 +3,19 @@ package com.synapsedesk.gateway.events;
 import com.synapsedesk.gateway.cache.CacheService;
 import com.synapsedesk.gateway.config.StoreProperties;
 import com.synapsedesk.gateway.contracts.Subjects;
-import com.synapsedesk.gateway.lease.LeaseRuntime;
+import com.synapsedesk.gateway.lease.LeaseParticipant;
 import io.nats.client.Connection;
 import io.nats.client.Dispatcher;
 import io.nats.client.Message;
 import io.nats.client.Nats;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
-import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /**
@@ -63,7 +62,8 @@ import tools.jackson.databind.ObjectMapper;
  * documented rule exactly, on the reading side.
  */
 @Component
-public class CacheInvalidationConsumer implements LeaseRuntime {
+@Order(0)
+public class CacheInvalidationConsumer implements LeaseParticipant {
 
   private static final Logger LOG = LoggerFactory.getLogger(
     CacheInvalidationConsumer.class
@@ -193,31 +193,11 @@ public class CacheInvalidationConsumer implements LeaseRuntime {
 
   /**
    * The tenant on a domain event, unwrapping the Nest envelope first if the
-   * payload carries one. See the class docblock's item 4.
+   * payload carries one. See the class docblock's item 4 — now
+   * {@link NatsEnvelope}'s own logic, shared with the realtime consumers.
    */
   static String organizationIdOf(ObjectMapper json, byte[] payload) {
-    JsonNode root;
-    try {
-      root = json.readTree(new String(payload, StandardCharsets.UTF_8));
-    } catch (RuntimeException malformed) {
-      return null;
-    }
-
-    JsonNode event =
-      root.get("pattern") != null || root.get("data") != null
-        ? root.get("data")
-        : root;
-    if (event == null) {
-      return null;
-    }
-
-    JsonNode organizationId = event.get("organizationId");
-    if (organizationId == null || !organizationId.isString()) {
-      return null;
-    }
-
-    String value = organizationId.asString();
-    return value.isEmpty() ? null : value;
+    return NatsEnvelope.organizationIdOf(NatsEnvelope.unwrap(json, payload));
   }
 
   private String organizationIdOf(byte[] payload) {

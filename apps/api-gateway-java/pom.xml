@@ -148,6 +148,38 @@
     </dependency>
 
     <!--
+      Realtime. A pre-flight spike measured netty-socketio 2.0.14 against the
+      repo's own `socket.io-client` 4.8.3 and passed, with three settings
+      pinned — see `RealtimeServerConfig`. The NATS-sourced consumers relay
+      LOCAL-ONLY (every replica already gets every event over NATS, no queue
+      group, the same "each replica relays its own sockets" rule the
+      cache-invalidation consumer already follows) — `RealtimeRelay` never
+      touches netty-socketio's own store for that path.
+    -->
+    <dependency>
+      <groupId>com.corundumstudio.socketio</groupId>
+      <artifactId>netty-socketio</artifactId>
+      <version>2.0.14</version>
+    </dependency>
+
+    <!--
+      Presence and typing are the opposite of the relay above: they start on
+      whichever replica a socket happens to be connected to and must reach
+      every OTHER replica's sockets too — the genuinely cross-replica half
+      `RealtimeRelay`'s docblock always said would need this. netty-socketio
+      is not on Maven Central with Redisson bundled (checked the resolved
+      dependency tree — it pulls nothing under `org.redisson`), so this is
+      declared explicitly rather than inherited. `RealtimeServerConfig`
+      wires a `RedissonStoreFactory` from it, pointed at the same Redis the
+      lease and cache already use.
+    -->
+    <dependency>
+      <groupId>org.redisson</groupId>
+      <artifactId>redisson</artifactId>
+      <version>4.7.0</version>
+    </dependency>
+
+    <!--
       The five gRPC peers. Blocking stubs only: the gateway's calls are
       request/response inside one HTTP request, and a reactive stub would add
       a second concurrency model to a process that already has one.

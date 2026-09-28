@@ -40,7 +40,7 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @SpringBootTest(
   webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-  properties = "management.server.port=0"
+  properties = { "management.server.port=0", "realtime.port=0" }
 )
 @org.springframework.test.context.ContextConfiguration(
   initializers = SharedEnvironmentInitializer.class

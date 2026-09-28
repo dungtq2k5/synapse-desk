@@ -59,6 +59,7 @@ class DotEnvIsNotReadTest {
     );
     properties.put("spring.main.web-application-type", "none");
     properties.put("management.server.port", "0");
+    properties.put("realtime.port", "0");
     application.setDefaultProperties(properties);
 
     try (ConfigurableApplicationContext context = application.run()) {

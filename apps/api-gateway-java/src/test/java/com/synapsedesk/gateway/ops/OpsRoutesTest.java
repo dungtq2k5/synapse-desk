@@ -28,7 +28,7 @@ import org.springframework.test.context.ContextConfiguration;
 // in the configuration. A fixed port would also collide between suites.
 @SpringBootTest(
   webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-  properties = "management.server.port=0"
+  properties = { "management.server.port=0", "realtime.port=0" }
 )
 @ContextConfiguration(initializers = SharedEnvironmentInitializer.class)
 class OpsRoutesTest {
