@@ -145,11 +145,22 @@ function assertBuilt(impl: string): void {
  *
  * @param overrides environment on top of `.env.test` — the peer URLs, and
  * anything a row needs to change about the implementation under test.
+ * @param options.impl forces a specific implementation rather than reading
+ * `GATEWAY_IMPL` — only for the cross-implementation cache-invalidation row,
+ * which needs ONE Node and ONE Java process in the same test. Every other
+ * caller leaves this unset and gets the arm the suite is running.
+ * @param options.probe `'ready'` (the default) waits for `/health/ready` —
+ * wrong for a process this row DELIBERATELY starts as a standby, since a
+ * standby's `/health/ready` stays 503 for as long as the other implementation
+ * holds the lease and the poll would time out. `'live'` waits for `/health`
+ * instead, which answers 200 while standing by — the gateway's own
+ * liveness-vs-readiness split, documented on `OpsController`.
  */
 export async function startGateway(
   overrides: Record<string, string> = {},
+  options: { impl?: string; probe?: 'ready' | 'live' } = {},
 ): Promise<Gateway> {
-  const impl = process.env.GATEWAY_IMPL ?? 'node';
+  const impl = options.impl ?? process.env.GATEWAY_IMPL ?? 'node';
   assertBuilt(impl);
 
   const port = await freePort();
@@ -180,7 +191,7 @@ export async function startGateway(
     stop: () => stop(child),
   };
 
-  await waitUntilReady(baseUrl, child, output);
+  await waitUntilReady(baseUrl, child, output, options.probe ?? 'ready');
 
   return gateway;
 }
@@ -189,7 +200,9 @@ async function waitUntilReady(
   baseUrl: string,
   child: ChildProcess,
   output: string[],
+  probe: 'ready' | 'live',
 ): Promise<void> {
+  const path = probe === 'live' ? '/health' : '/health/ready';
   const deadline = Date.now() + READY_TIMEOUT_MS;
 
   while (Date.now() < deadline) {
@@ -200,7 +213,7 @@ async function waitUntilReady(
     }
 
     try {
-      const response = await fetch(`${baseUrl}/health/ready`);
+      const response = await fetch(`${baseUrl}${path}`);
       if (response.ok) return;
     } catch {
       // Not listening yet.
@@ -211,7 +224,7 @@ async function waitUntilReady(
 
   await stop(child);
   throw new Error(
-    `The gateway was not ready within ${READY_TIMEOUT_MS} ms:\n${output.join('')}`,
+    `The gateway did not answer ${path} within ${READY_TIMEOUT_MS} ms:\n${output.join('')}`,
   );
 }
 

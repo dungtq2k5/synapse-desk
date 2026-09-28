@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.synapsedesk.gateway.config.SharedEnvironment;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -116,6 +117,56 @@ class CacheServiceIT {
       );
     } finally {
       redis.delete(key);
+    }
+  }
+
+  @Test
+  void invalidateScopeDropsOnlyTheMatchingTenantAndScope() {
+    String tenant = "it-" + System.nanoTime();
+    String otherTenant = "it-other-" + System.nanoTime();
+    List<String> written = new java.util.ArrayList<>();
+
+    try {
+      written.add(cache.buildKey(tenant, "tickets", Map.of("page", "1")));
+      written.add(cache.buildKey(tenant, "tickets", Map.of("page", "2")));
+      written.add(cache.buildKey(tenant, "documents", Map.of()));
+      written.add(cache.buildKey(otherTenant, "tickets", Map.of()));
+      for (String key : written) {
+        cache.putRaw(key, "\"value\"", 60);
+      }
+
+      int removed = cache.invalidateScope(tenant, "tickets");
+
+      assertThat(removed).isEqualTo(2);
+      assertThat(cache.raw(written.get(0))).isEmpty();
+      assertThat(cache.raw(written.get(1))).isEmpty();
+      assertThat(cache.raw(written.get(2))).isPresent();
+      assertThat(cache.raw(written.get(3))).isPresent();
+    } finally {
+      redis.delete(written);
+    }
+  }
+
+  @Test
+  void invalidateScopeDoesNotDropADifferentlyNamedScopeSharingAPrefix() {
+    String tenant = "it-prefix-" + System.nanoTime();
+    List<String> written = new java.util.ArrayList<>();
+
+    try {
+      // `analytics` vs `analytics-graphql`-shaped collision, the reason the
+      // pattern's `[|:]` character class exists.
+      written.add(cache.buildKey(tenant, "tickets", Map.of()));
+      written.add(cache.buildKey(tenant, "ticketsExtended", Map.of()));
+      for (String key : written) {
+        cache.putRaw(key, "\"value\"", 60);
+      }
+
+      cache.invalidateScope(tenant, "tickets");
+
+      assertThat(cache.raw(written.get(0))).isEmpty();
+      assertThat(cache.raw(written.get(1))).isPresent();
+    } finally {
+      redis.delete(written);
     }
   }
 

@@ -134,6 +134,20 @@
     </dependency>
 
     <!--
+      The first NATS consumer. `io.nats:jnats` directly rather than Spring's
+      messaging abstraction — the same reasoning as the gRPC stubs being
+      blocking: one concurrency model, and a jnats `Dispatcher`'s
+      subscribe/close lifecycle is explicit rather than inferred through a
+      framework layer. No dependency here before this consumer; `Subjects
+      .java` was only constants.
+    -->
+    <dependency>
+      <groupId>io.nats</groupId>
+      <artifactId>jnats</artifactId>
+      <version>2.26.3</version>
+    </dependency>
+
+    <!--
       The five gRPC peers. Blocking stubs only: the gateway's calls are
       request/response inside one HTTP request, and a reactive stub would add
       a second concurrency model to a process that already has one.

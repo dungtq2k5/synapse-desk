@@ -2,10 +2,16 @@ package com.synapsedesk.gateway.cache;
 
 import com.synapsedesk.gateway.config.JsIsoFormat;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.TreeMap;
 import java.util.function.Supplier;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.data.redis.core.Cursor;
+import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.DeserializationContext;
@@ -39,11 +45,16 @@ import tools.jackson.databind.ser.std.StdSerializer;
 @Service
 public class CacheService {
 
+  private static final Logger LOG = LoggerFactory.getLogger(CacheService.class);
+
   /** The tag a timestamp is stored under — matches `DATE_TAG` exactly. */
   static final String DATE_TAG = "__cache_date__";
 
   private static final String PREFIX = "cache:";
   private static final String NO_TENANT = "no-tenant";
+
+  /** Matches Node's own `SCAN ... COUNT`, and the batch size a `DEL` is issued at. */
+  private static final int SCAN_BATCH = 200;
 
   private final StringRedisTemplate redis;
   private final ObjectMapper json;
@@ -88,6 +99,57 @@ public class CacheService {
         : organizationId;
 
     return PREFIX + tenant + "|" + scope + "|" + joined;
+  }
+
+  /**
+   * `invalidateScope`, reproduced: a `SCAN`-based drop of every key under one
+   * tenant's scope, never `KEYS` — a scope can hold thousands of parameter
+   * combinations, and `KEYS` blocks the whole Redis event loop for the
+   * duration.
+   *
+   * <p><b>The pattern's {@code [|:]} character class is load-bearing.</b> A
+   * bare {@code scope*} glob would also delete a DIFFERENT, longer-named
+   * scope that happens to share this one's prefix (Node's own example:
+   * {@code analytics} vs. {@code analytics-graphql}). Matching the character
+   * immediately after the scope name against either `|` (a bare scope, no
+   * params) or `:` (a scope this project nests, e.g. `users:me`) is what
+   * keeps the two apart — copied byte-for-byte from `scopePattern`.
+   *
+   * <p>Fails OPEN, same rule as {@link #wrap}: a scan or delete failure costs
+   * stale entries until their TTL, never an exception a NATS handler would
+   * have to catch.
+   *
+   * @return how many keys were removed, for a caller that only logs on a hit
+   */
+  public int invalidateScope(String organizationId, String scope) {
+    String tenant = organizationId == null || organizationId.isEmpty() ? NO_TENANT : organizationId;
+    String pattern = PREFIX + tenant + "|" + scope + "[|:]*";
+
+    int removed = 0;
+    try {
+      List<String> batch = new ArrayList<>(SCAN_BATCH);
+      try (Cursor<String> cursor = redis.scan(ScanOptions.scanOptions().match(pattern).count(SCAN_BATCH).build())) {
+        while (cursor.hasNext()) {
+          batch.add(cursor.next());
+          if (batch.size() >= SCAN_BATCH) {
+            removed += deleteBatch(batch);
+            batch.clear();
+          }
+        }
+      }
+      if (!batch.isEmpty()) {
+        removed += deleteBatch(batch);
+      }
+    } catch (RuntimeException scanFailed) {
+      LOG.error("Cache scope invalidation failed for {}: {}", pattern, scanFailed.getMessage());
+    }
+
+    return removed;
+  }
+
+  private int deleteBatch(List<String> keys) {
+    Long count = redis.delete(keys);
+    return count == null ? 0 : count.intValue();
   }
 
   /**
