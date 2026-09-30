@@ -13,6 +13,8 @@
     "@apollo/server": "^5.5.1"
   },
   "scripts": {
+    "//prepare": "`simple-git-hooks` writes `.git/hooks/pre-commit` from the `simple-git-hooks` block below on every `npm install` — local to this checkout, never itself committed. `npx`, not a bare binary name, inside that block: a git hook's shell has no `node_modules/.bin` on its `PATH`, only what `npx` resolves from the local install.",
+    "prepare": "simple-git-hooks",
     "//test": "ONE process for every project in `--projects`, which is what `--runInBand` means here and why the heap is a shared budget rather than a per-suite one. It stays in-band because `test/system/jest.unit.config.ts` is in the list: `stack.spec.ts` spawns a service and asserts a timeout path, the CPU-contention flake ci.yml's e2e header documents as known gap #13, and `test:all` already exists as the parallel variant without it. What makes one heap affordable is `isolatedModules` in tsconfig.json — see the comment there for the measurement. A future OOM here is that flag being removed, not this line being wrong.",
     "test": "jest --projects apps/*/jest.config.ts libs/*/jest.config.ts scripts/jest.config.ts test/system/jest.unit.config.ts --passWithNoTests --runInBand",
     "test:all": "jest --projects apps/*/jest.config.ts libs/*/jest.config.ts scripts/jest.config.ts --passWithNoTests",
@@ -99,6 +101,21 @@
     "proto:lint": "npm run proto:lint -w @synapsedesk/grpc-proto",
     "proto:breaking": "npm run proto:breaking -w @synapsedesk/grpc-proto"
   },
+  "//simple-git-hooks": "`*.java` goes through `prettier --write` here too — this repo already formats Java with `prettier-plugin-java` (see `format`/`format:check` above), not Spotless, so the hook uses the tool this repo already has rather than one it doesn't.",
+  "simple-git-hooks": {
+    "pre-commit": "npx lint-staged"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,mjs,cjs}": [
+      "eslint --fix"
+    ],
+    "*.{ts,tsx,js,mjs,cjs,json,java,xml}": [
+      "prettier --write"
+    ],
+    "*.md": [
+      "markdownlint-cli2 --fix"
+    ]
+  },
   "devDependencies": {
     "@bufbuild/buf": "^1.72.0",
     "@eslint/js": "^10.0.1",
@@ -113,12 +130,14 @@
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.6",
     "globals": "^17.7.0",
+    "lint-staged": "^17.6.0",
     "markdownlint-cli2": "^0.23.2",
     "openapi-schema-validator": "^12.1.3",
     "prettier": "^3.9.6",
     "prettier-plugin-java": "^2.11.0",
     "prisma-erd-generator": "^2.4.4",
     "rimraf": "^6.1.3",
+    "simple-git-hooks": "^2.14.0",
     "tsx": "^4.23.13",
     "turbo": "^2.10.9",
     "typescript": "^6.0.3",
