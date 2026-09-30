@@ -1,5 +1,6 @@
 {
   "$schema": "https://turborepo.com/schema.json",
+  // "concurrency": "11",
   "tasks": {
     // The Prisma client, generated into `src/generated/prisma` — which is
     // gitignored, so on a fresh clone it does not exist and every service that
