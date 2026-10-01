@@ -21,7 +21,7 @@ import java.util.*;
  * TenantSelectionResponseDto
  */
 
-public class TenantSelectionResponseDto implements AuthControllerLoginV1200ResponseData {
+public class TenantSelectionResponseDto {
 
   private Boolean requiresTenantSelection;
 

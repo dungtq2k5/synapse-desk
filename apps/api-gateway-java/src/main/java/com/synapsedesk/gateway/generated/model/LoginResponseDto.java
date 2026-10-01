@@ -21,7 +21,7 @@ import java.util.*;
  * LoginResponseDto
  */
 
-public class LoginResponseDto implements AuthControllerLoginV1200ResponseData {
+public class LoginResponseDto {
 
   private UserResponseDto user;
 

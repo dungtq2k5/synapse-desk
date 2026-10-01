@@ -20,7 +20,7 @@ import java.util.*;
  * TwoFactorRequiredResponseDto
  */
 
-public class TwoFactorRequiredResponseDto implements AuthControllerLoginV1200ResponseData {
+public class TwoFactorRequiredResponseDto {
 
   private Boolean requiresTwoFactor;
 

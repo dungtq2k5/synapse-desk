@@ -84,9 +84,7 @@ import synapsedesk.rag.RagServiceGrpc;
  * maps that marker generically, so nothing route-specific is needed here.
  * `search` instead returns 200 with {@code degraded: LEXICAL_ONLY} set.
  *
- * <p><b>Migrated off `KnowledgeApi`.</b> `listArticles`'s meta bypasses
- * `KnowledgeMapper.toMetaDto` (the artifact-adjacent borrowed type) in
- * favor of {@link PageMeta#from}.
+ * <p>`listArticles`'s meta is {@link PageMeta#from}.
  */
 @Tag(name = "Knowledge")
 @RestController

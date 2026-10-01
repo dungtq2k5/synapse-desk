@@ -1,7 +1,6 @@
 package com.synapsedesk.gateway.knowledge;
 
 import com.synapsedesk.gateway.generated.model.CitationResponseDto;
-import com.synapsedesk.gateway.generated.model.InvitationsControllerListV1200ResponseDataMeta;
 import com.synapsedesk.gateway.generated.model.KnowledgeArticleBlockResponseDto;
 import com.synapsedesk.gateway.generated.model.KnowledgeArticleDetailResponseDto;
 import com.synapsedesk.gateway.generated.model.KnowledgeArticleResponseDto;
@@ -124,18 +123,6 @@ final class KnowledgeMapper {
       .contentText(chunk.getContentText())
       .score(BigDecimal.valueOf(chunk.getScore()))
       .vectorPointId(chunk.getVectorPointId());
-  }
-
-  static InvitationsControllerListV1200ResponseDataMeta toMetaDto(
-    PageMeta meta
-  ) {
-    return new InvitationsControllerListV1200ResponseDataMeta(
-      BigDecimal.valueOf(meta.getTotalItems()),
-      BigDecimal.valueOf(meta.getItemCount()),
-      BigDecimal.valueOf(meta.getItemsPerPage()),
-      BigDecimal.valueOf(meta.getTotalPages()),
-      BigDecimal.valueOf(meta.getCurrentPage())
-    );
   }
 
   private static PaginationMetaDataResponseDto toPaginationMetaDto(
