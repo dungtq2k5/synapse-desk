@@ -1,6 +1,7 @@
 package com.synapsedesk.gateway.grpc;
 
 import com.synapsedesk.gateway.config.GrpcProperties;
+import com.synapsedesk.gateway.metrics.GatewayMetrics;
 import io.grpc.ManagedChannel;
 import io.grpc.netty.shaded.io.grpc.netty.NettyChannelBuilder;
 import jakarta.annotation.PreDestroy;
@@ -52,68 +53,78 @@ public class GrpcChannels {
   private ManagedChannel notificationChannel;
   private ManagedChannel ragChannel;
 
-  /** The channel, as its own bean — both stubs below depend on it, so Spring orders it first. */
-  @Bean
-  ManagedChannel authServiceChannel(GrpcProperties grpc) {
-    String[] hostPort = grpc.authServiceUrl().split(":", 2);
-    authChannel = NettyChannelBuilder.forAddress(
+  /** Every peer's channel records its calls' duration; see {@link GrpcDurationInterceptor}. */
+  private static ManagedChannel channel(
+    String url,
+    String peer,
+    GatewayMetrics metrics
+  ) {
+    String[] hostPort = url.split(":", 2);
+
+    return NettyChannelBuilder.forAddress(
       hostPort[0],
       Integer.parseInt(hostPort[1])
     )
       .usePlaintext()
+      .intercept(new GrpcDurationInterceptor(peer, metrics))
       .build();
+  }
+
+  /** The channel, as its own bean — both stubs below depend on it, so Spring orders it first. */
+  @Bean
+  ManagedChannel authServiceChannel(
+    GrpcProperties grpc,
+    GatewayMetrics metrics
+  ) {
+    authChannel = channel(grpc.authServiceUrl(), "auth-service", metrics);
 
     return authChannel;
   }
 
   @Bean
-  ManagedChannel ticketServiceChannel(GrpcProperties grpc) {
-    String[] hostPort = grpc.ticketServiceUrl().split(":", 2);
-    ticketChannel = NettyChannelBuilder.forAddress(
-      hostPort[0],
-      Integer.parseInt(hostPort[1])
-    )
-      .usePlaintext()
-      .build();
+  ManagedChannel ticketServiceChannel(
+    GrpcProperties grpc,
+    GatewayMetrics metrics
+  ) {
+    ticketChannel = channel(grpc.ticketServiceUrl(), "ticket-service", metrics);
 
     return ticketChannel;
   }
 
   @Bean
-  ManagedChannel ingestionServiceChannel(GrpcProperties grpc) {
-    String[] hostPort = grpc.ingestionServiceUrl().split(":", 2);
-    ingestionChannel = NettyChannelBuilder.forAddress(
-      hostPort[0],
-      Integer.parseInt(hostPort[1])
-    )
-      .usePlaintext()
-      .build();
+  ManagedChannel ingestionServiceChannel(
+    GrpcProperties grpc,
+    GatewayMetrics metrics
+  ) {
+    ingestionChannel = channel(
+      grpc.ingestionServiceUrl(),
+      "ingestion-service",
+      metrics
+    );
 
     return ingestionChannel;
   }
 
   @Bean
-  ManagedChannel notificationServiceChannel(GrpcProperties grpc) {
-    String[] hostPort = grpc.notificationServiceUrl().split(":", 2);
-    notificationChannel = NettyChannelBuilder.forAddress(
-      hostPort[0],
-      Integer.parseInt(hostPort[1])
-    )
-      .usePlaintext()
-      .build();
+  ManagedChannel notificationServiceChannel(
+    GrpcProperties grpc,
+    GatewayMetrics metrics
+  ) {
+    notificationChannel = channel(
+      grpc.notificationServiceUrl(),
+      "notification-service",
+      metrics
+    );
 
     return notificationChannel;
   }
 
   @Bean
-  ManagedChannel ragServiceChannel(GrpcProperties grpc) {
-    String[] hostPort = grpc.ragServiceUrl().split(":", 2);
-    ragChannel = NettyChannelBuilder.forAddress(
-      hostPort[0],
-      Integer.parseInt(hostPort[1])
-    )
-      .usePlaintext()
-      .build();
+  ManagedChannel ragServiceChannel(
+    GrpcProperties grpc,
+    GatewayMetrics metrics
+  ) {
+    ragChannel = channel(grpc.ragServiceUrl(), "rag-service", metrics);
 
     return ragChannel;
   }
