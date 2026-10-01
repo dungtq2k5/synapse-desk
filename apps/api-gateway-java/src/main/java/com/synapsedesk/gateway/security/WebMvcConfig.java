@@ -52,12 +52,12 @@ public class WebMvcConfig implements WebMvcConfigurer {
     // time.
     registry.addInterceptor(throttlerInterceptor);
     registry.addInterceptor(permissionInterceptor);
-    // After the guards and before the metrics, as Node's gate sits: a request that
-    // lacks a permission is refused for THAT without the gate asking about the
-    // tenant, and a request the gate refuses is never counted.
+    // After the permission check, as Node's gate sits: a request that lacks a
+    // permission is refused for THAT without the gate asking about the tenant.
     registry.addInterceptor(organizationLifecycleInterceptor);
-    // LAST: a request a guard refused above never reaches it, which is what makes
-    // the counter count only requests that reach a handler, as Node's does.
+    // Order does not decide what is counted: a refusal a guard-equivalent makes
+    // is marked ({@code GuardRefusal}) and the recorder skips marked requests,
+    // whichever interceptor ran first.
     registry.addInterceptor(httpMetricsInterceptor);
   }
 }
