@@ -13,6 +13,7 @@ import com.synapsedesk.gateway.generated.model.ResetBillingCycleDto;
 import com.synapsedesk.gateway.generated.model.SetOrganizationStatusDto;
 import com.synapsedesk.gateway.generated.model.UpdatePlatformOrganizationDto;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
+import com.synapsedesk.gateway.lifecycle.OrganizationStatusService;
 import com.synapsedesk.gateway.web.ApiResponse;
 import com.synapsedesk.gateway.web.PageMeta;
 import com.synapsedesk.gateway.web.PagedData;
@@ -82,13 +83,16 @@ public class PlatformOrganizationsService {
 
   private final PlatformServiceGrpc.PlatformServiceBlockingStub stub;
   private final SuperAdminCheck superAdminCheck;
+  private final OrganizationStatusService statuses;
 
   public PlatformOrganizationsService(
     PlatformServiceGrpc.PlatformServiceBlockingStub stub,
-    SuperAdminCheck superAdminCheck
+    SuperAdminCheck superAdminCheck,
+    OrganizationStatusService statuses
   ) {
     this.stub = stub;
     this.superAdminCheck = superAdminCheck;
+    this.statuses = statuses;
   }
 
   public ResponseEntity<
@@ -247,6 +251,7 @@ public class PlatformOrganizationsService {
       context
     ).updateOrganization(wire.build());
 
+    statuses.invalidate(id);
     // Known gap 42 (see class docblock): no cache eviction here either.
     return ok200(toPlatformOrganizationResponseDto(response), "OK");
   }
@@ -268,6 +273,7 @@ public class PlatformOrganizationsService {
         .build()
     );
 
+    statuses.invalidate(id);
     // Known gap 42 (see class docblock): no cache eviction here either.
     return ok200(toPlatformOrganizationResponseDto(response), "Status updated");
   }
@@ -312,6 +318,7 @@ public class PlatformOrganizationsService {
         .build()
     );
 
+    statuses.invalidate(id);
     // Known gap 42 (see class docblock): no cache eviction here either.
     return ResponseEntity.ok(
       ApiResponse.of(
@@ -336,6 +343,7 @@ public class PlatformOrganizationsService {
       PlatformOrganizationIdRequest.newBuilder().setOrganizationId(id).build()
     );
 
+    statuses.invalidate(id);
     // Known gap 42 (see class docblock): no cache eviction here either.
     return ok200(
       toPlatformOrganizationResponseDto(response),

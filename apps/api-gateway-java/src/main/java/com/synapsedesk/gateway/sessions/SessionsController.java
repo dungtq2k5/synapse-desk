@@ -7,6 +7,8 @@ import com.synapsedesk.gateway.auth.RequestContext;
 import com.synapsedesk.gateway.generated.model.RevokeTrustResponseDto;
 import com.synapsedesk.gateway.generated.model.SessionResponseDto;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
+import com.synapsedesk.gateway.lifecycle.OrgAccess;
+import com.synapsedesk.gateway.lifecycle.OrgAccessKind;
 import com.synapsedesk.gateway.openapi.ApiErrors;
 import com.synapsedesk.gateway.web.ApiPaths;
 import com.synapsedesk.gateway.web.ApiResponse;
@@ -62,6 +64,8 @@ import synapsedesk.auth.SessionServiceGrpc;
 @Tag(name = "Sessions")
 @RestController
 @RequestMapping(ApiPaths.V1)
+// Sign-in and session routes are never gated: a member of a frozen workspace must still be able to sign in and be told why.
+@OrgAccessKind(OrgAccess.AUTH)
 @Validated
 public class SessionsController {
 

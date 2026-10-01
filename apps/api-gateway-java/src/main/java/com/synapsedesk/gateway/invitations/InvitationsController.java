@@ -19,6 +19,8 @@ import com.synapsedesk.gateway.generated.model.PreviewInvitationResponseDto;
 import com.synapsedesk.gateway.generated.model.PreviewInvitationsDto;
 import com.synapsedesk.gateway.generated.model.PreviewInvitationsResponseDto;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
+import com.synapsedesk.gateway.lifecycle.OrgAccess;
+import com.synapsedesk.gateway.lifecycle.OrgAccessKind;
 import com.synapsedesk.gateway.metrics.GuardRefusal;
 import com.synapsedesk.gateway.openapi.ApiErrors;
 import com.synapsedesk.gateway.security.RequirePermission;
@@ -312,6 +314,8 @@ public class InvitationsController {
     return ResponseEntity.ok(ApiResponse.of(200, "Invitation revoked", null));
   }
 
+  // Public: the invitee has no workspace yet.
+  @OrgAccessKind(OrgAccess.AUTH)
   @GetMapping(
     value = "/users/invitations/token/{token}",
     produces = { "application/json" }
@@ -354,6 +358,8 @@ public class InvitationsController {
     );
   }
 
+  // Public: the invitee has no workspace yet.
+  @OrgAccessKind(OrgAccess.AUTH)
   @PostMapping(
     value = "/users/invitations/accept",
     produces = { "application/json" },

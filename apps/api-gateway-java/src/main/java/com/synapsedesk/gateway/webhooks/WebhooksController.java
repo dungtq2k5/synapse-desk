@@ -4,6 +4,8 @@ import com.synapsedesk.gateway.auth.CurrentRequest;
 import com.synapsedesk.gateway.auth.CurrentUser;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
 import com.synapsedesk.gateway.inbound.ResendInboundService;
+import com.synapsedesk.gateway.lifecycle.OrgAccess;
+import com.synapsedesk.gateway.lifecycle.OrgAccessKind;
 import com.synapsedesk.gateway.openapi.ApiErrors;
 import com.synapsedesk.gateway.web.ApiPaths;
 import com.synapsedesk.gateway.web.ApiResponse;
@@ -57,6 +59,8 @@ import synapsedesk.auth.BillingServiceGrpc;
 @Tag(name = "Webhooks")
 @RestController
 @RequestMapping(ApiPaths.V1)
+// Public intakes, authenticated by their own signature: Node's JwtAuthGuard never runs here, so its lifecycle gate never does either.
+@OrgAccessKind(OrgAccess.AUTH)
 @Validated
 public class WebhooksController {
 

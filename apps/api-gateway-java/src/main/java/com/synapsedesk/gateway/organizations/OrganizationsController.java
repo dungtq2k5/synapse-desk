@@ -18,6 +18,8 @@ import com.synapsedesk.gateway.generated.model.UpdateOrganizationDto;
 import com.synapsedesk.gateway.generated.model.UpdateOrganizationSettingsDto;
 import com.synapsedesk.gateway.generated.model.UsageMeterResponseDto;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
+import com.synapsedesk.gateway.lifecycle.OrgAccess;
+import com.synapsedesk.gateway.lifecycle.OrgAccessKind;
 import com.synapsedesk.gateway.openapi.ApiErrors;
 import com.synapsedesk.gateway.security.RequirePermission;
 import com.synapsedesk.gateway.web.ApiPaths;
@@ -143,6 +145,8 @@ public class OrganizationsController {
     this.json = json;
   }
 
+  // The workspace's own record, which the billing screens read.
+  @OrgAccessKind(OrgAccess.BILLING)
   @GetMapping(
     value = "/organizations/current",
     produces = { "application/json" }
@@ -351,6 +355,8 @@ public class OrganizationsController {
     );
   }
 
+  // Usage against the plan, read by the billing screens.
+  @OrgAccessKind(OrgAccess.BILLING)
   @GetMapping(
     value = "/organizations/current/usage",
     produces = { "application/json" }
@@ -406,6 +412,8 @@ public class OrganizationsController {
     }
   }
 
+  // The onboarding checklist.
+  @OrgAccessKind(OrgAccess.ONBOARDING)
   @GetMapping(
     value = "/organizations/current/onboarding",
     produces = { "application/json" }
@@ -426,6 +434,8 @@ public class OrganizationsController {
     );
   }
 
+  // Completing onboarding.
+  @OrgAccessKind(OrgAccess.ONBOARDING)
   @PostMapping(
     value = "/organizations/current/onboarding/complete",
     produces = { "application/json" }

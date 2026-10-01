@@ -15,6 +15,8 @@ import com.synapsedesk.gateway.generated.model.SubscriptionResponseDto;
 import com.synapsedesk.gateway.generated.model.TenantPlanPriceResponseDto;
 import com.synapsedesk.gateway.generated.model.TenantPlanResponseDto;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
+import com.synapsedesk.gateway.lifecycle.OrgAccess;
+import com.synapsedesk.gateway.lifecycle.OrgAccessKind;
 import com.synapsedesk.gateway.openapi.ApiErrors;
 import com.synapsedesk.gateway.security.RequirePermission;
 import com.synapsedesk.gateway.web.ApiPaths;
@@ -96,6 +98,8 @@ import synapsedesk.ingestion.DocumentServiceGrpc;
 @Tag(name = "Billing")
 @RestController
 @RequestMapping(ApiPaths.V1)
+// Every billing route stays reachable while the workspace is suspended for non-payment, which is how it is settled.
+@OrgAccessKind(OrgAccess.BILLING)
 @Validated
 public class BillingController {
 

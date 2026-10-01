@@ -5,6 +5,8 @@ import com.synapsedesk.gateway.generated.model.LivenessResponseDto;
 import com.synapsedesk.gateway.generated.model.ReadinessDependenciesResponseDto;
 import com.synapsedesk.gateway.generated.model.ReadinessResponseDto;
 import com.synapsedesk.gateway.generated.model.VersionResponseDto;
+import com.synapsedesk.gateway.lifecycle.OrgAccess;
+import com.synapsedesk.gateway.lifecycle.OrgAccessKind;
 import com.synapsedesk.gateway.web.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.OffsetDateTime;
@@ -41,6 +43,8 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @Tag(name = "Ops")
 @RestController
+// Public: Node's JwtAuthGuard never runs here, so its lifecycle gate never does either.
+@OrgAccessKind(OrgAccess.AUTH)
 @Validated
 public class OpsController {
 

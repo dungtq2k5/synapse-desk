@@ -19,6 +19,8 @@ import com.synapsedesk.gateway.generated.model.TenantSelectionResponseDto;
 import com.synapsedesk.gateway.generated.model.TwoFactorRequiredResponseDto;
 import com.synapsedesk.gateway.generated.model.ValidatePasswordResetTokenResponseDto;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
+import com.synapsedesk.gateway.lifecycle.OrgAccess;
+import com.synapsedesk.gateway.lifecycle.OrgAccessKind;
 import com.synapsedesk.gateway.openapi.ApiErrors;
 import com.synapsedesk.gateway.throttle.AuthThrottle;
 import com.synapsedesk.gateway.throttle.RouteThrottle;
@@ -103,6 +105,8 @@ import synapsedesk.auth.AuthServiceGrpc;
 @Tag(name = "Auth")
 @RestController
 @RequestMapping(ApiPaths.V1)
+// Sign-in and session routes are never gated: a member of a frozen workspace must still be able to sign in and be told why.
+@OrgAccessKind(OrgAccess.AUTH)
 @Validated
 @AuthThrottle
 public class AuthController {

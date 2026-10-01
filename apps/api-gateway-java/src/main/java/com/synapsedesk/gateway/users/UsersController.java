@@ -12,6 +12,8 @@ import com.synapsedesk.gateway.generated.model.PresignAvatarResponseDto;
 import com.synapsedesk.gateway.generated.model.UpdateOwnProfileDto;
 import com.synapsedesk.gateway.generated.model.UserResponseDto;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
+import com.synapsedesk.gateway.lifecycle.OrgAccess;
+import com.synapsedesk.gateway.lifecycle.OrgAccessKind;
 import com.synapsedesk.gateway.openapi.ApiErrors;
 import com.synapsedesk.gateway.web.ApiPaths;
 import com.synapsedesk.gateway.web.ApiResponse;
@@ -81,6 +83,8 @@ public class UsersController {
       );
   }
 
+  // The caller's own profile: how a frozen member is told why they cannot proceed.
+  @OrgAccessKind(OrgAccess.AUTH)
   @GetMapping(value = "/users/me", produces = { "application/json" })
   @ApiErrors({ "401" })
   public ResponseEntity<

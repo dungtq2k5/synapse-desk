@@ -1,5 +1,6 @@
 package com.synapsedesk.gateway.security;
 
+import com.synapsedesk.gateway.lifecycle.OrganizationLifecycleInterceptor;
 import com.synapsedesk.gateway.metrics.HttpMetricsInterceptor;
 import com.synapsedesk.gateway.throttle.ThrottlerInterceptor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
@@ -28,15 +29,18 @@ public class WebMvcConfig implements WebMvcConfigurer {
   private final PermissionInterceptor permissionInterceptor;
   private final ThrottlerInterceptor throttlerInterceptor;
   private final HttpMetricsInterceptor httpMetricsInterceptor;
+  private final OrganizationLifecycleInterceptor organizationLifecycleInterceptor;
 
   public WebMvcConfig(
     PermissionInterceptor permissionInterceptor,
     ThrottlerInterceptor throttlerInterceptor,
-    HttpMetricsInterceptor httpMetricsInterceptor
+    HttpMetricsInterceptor httpMetricsInterceptor,
+    OrganizationLifecycleInterceptor organizationLifecycleInterceptor
   ) {
     this.permissionInterceptor = permissionInterceptor;
     this.throttlerInterceptor = throttlerInterceptor;
     this.httpMetricsInterceptor = httpMetricsInterceptor;
+    this.organizationLifecycleInterceptor = organizationLifecycleInterceptor;
   }
 
   @Override
@@ -48,6 +52,10 @@ public class WebMvcConfig implements WebMvcConfigurer {
     // time.
     registry.addInterceptor(throttlerInterceptor);
     registry.addInterceptor(permissionInterceptor);
+    // After the guards and before the metrics, as Node's gate sits: a request that
+    // lacks a permission is refused for THAT without the gate asking about the
+    // tenant, and a request the gate refuses is never counted.
+    registry.addInterceptor(organizationLifecycleInterceptor);
     // LAST: a request a guard refused above never reaches it, which is what makes
     // the counter count only requests that reach a handler, as Node's does.
     registry.addInterceptor(httpMetricsInterceptor);

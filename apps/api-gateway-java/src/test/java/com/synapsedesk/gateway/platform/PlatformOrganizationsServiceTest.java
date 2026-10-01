@@ -13,6 +13,7 @@ import com.synapsedesk.gateway.auth.RequestContext;
 import com.synapsedesk.gateway.auth.SuperAdminCheck;
 import com.synapsedesk.gateway.generated.model.CreatePlatformOrganizationDto;
 import com.synapsedesk.gateway.generated.model.UpdatePlatformOrganizationDto;
+import com.synapsedesk.gateway.lifecycle.OrganizationStatusService;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,6 +43,9 @@ class PlatformOrganizationsServiceTest {
     PlatformServiceGrpc.PlatformServiceBlockingStub.class
   );
   private final SuperAdminCheck superAdminCheck = mock(SuperAdminCheck.class);
+  private final OrganizationStatusService statuses = mock(
+    OrganizationStatusService.class
+  );
   private PlatformOrganizationsService service;
 
   private static RequestContext context() {
@@ -61,7 +65,7 @@ class PlatformOrganizationsServiceTest {
   void setUp() {
     when(stub.withDeadlineAfter(anyLong(), any())).thenReturn(stub);
     when(stub.withInterceptors(any())).thenReturn(stub);
-    service = new PlatformOrganizationsService(stub, superAdminCheck);
+    service = new PlatformOrganizationsService(stub, superAdminCheck, statuses);
   }
 
   @Test
@@ -215,5 +219,85 @@ class PlatformOrganizationsServiceTest {
       .setCreatedAt(now)
       .setUpdatedAt(now)
       .build();
+  }
+
+  // A freeze that waited out the cached decision would be the wrong direction for the
+  // one action an operator takes when something is going wrong right now.
+
+  private static PlatformOrganizationResponse reply() {
+    return PlatformOrganizationResponse.newBuilder()
+      .setOrganization(wireOrganization("org-9"))
+      .build();
+  }
+
+  @Test
+  void updatingAnOrganizationDropsItsCachedStatus() {
+    when(stub.updateOrganization(any())).thenReturn(reply());
+
+    service.updateOrganization(
+      context(),
+      "org-9",
+      new com.synapsedesk.gateway.generated.model.UpdatePlatformOrganizationDto()
+    );
+
+    verify(statuses).invalidate("org-9");
+  }
+
+  @Test
+  void settingAStatusDropsItsCachedStatus() {
+    when(stub.setOrganizationStatus(any())).thenReturn(reply());
+    var dto =
+      new com.synapsedesk.gateway.generated.model.SetOrganizationStatusDto();
+    dto.setStatus(
+      com.synapsedesk.gateway.generated.model.SetOrganizationStatusDto.StatusEnum.FROZEN
+    );
+    dto.setReason("suspected fraud");
+
+    service.setStatus(context(), "org-9", dto);
+
+    verify(statuses).invalidate("org-9");
+  }
+
+  @Test
+  void offboardingDropsItsCachedStatus() {
+    when(stub.offboardOrganization(any())).thenReturn(
+      synapsedesk.auth.Platform.OffboardOrganizationResponse.getDefaultInstance()
+    );
+
+    var dto =
+      new com.synapsedesk.gateway.generated.model.OffboardOrganizationDto();
+    dto.setReason("contract ended");
+
+    service.offboard(context(), "org-9", dto);
+
+    verify(statuses).invalidate("org-9");
+  }
+
+  @Test
+  void restoringDropsItsCachedStatus() {
+    when(stub.restoreOrganization(any())).thenReturn(reply());
+
+    service.restore(context(), "org-9");
+
+    verify(statuses).invalidate("org-9");
+  }
+
+  @Test
+  void aMutationThatFailedDropsNothingBecauseNothingChanged() {
+    when(stub.setOrganizationStatus(any())).thenThrow(
+      io.grpc.Status.FAILED_PRECONDITION.asRuntimeException()
+    );
+    var dto =
+      new com.synapsedesk.gateway.generated.model.SetOrganizationStatusDto();
+    dto.setStatus(
+      com.synapsedesk.gateway.generated.model.SetOrganizationStatusDto.StatusEnum.FROZEN
+    );
+    dto.setReason("suspected fraud");
+
+    assertThatThrownBy(() ->
+      service.setStatus(context(), "org-9", dto)
+    ).isInstanceOf(io.grpc.StatusRuntimeException.class);
+
+    verify(statuses, org.mockito.Mockito.never()).invalidate(any());
   }
 }

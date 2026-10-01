@@ -1,5 +1,6 @@
 package com.synapsedesk.gateway.metrics;
 
+import com.synapsedesk.gateway.web.ApplicationRoutes;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.time.Duration;
@@ -98,13 +99,7 @@ public class HttpMetricsInterceptor implements HandlerInterceptor {
 
   /** Whether a request answered by {@code handler} is one Node would count. */
   static boolean counts(Object handler) {
-    if (!(handler instanceof HandlerMethod method)) return false;
-
-    String bean = method.getBeanType().getName();
-
-    return (
-      !bean.startsWith("org.springdoc.") && !bean.contains("ErrorController")
-    );
+    return ApplicationRoutes.isApplicationHandler(handler);
   }
 
   /** {@code /api/v1/tickets/{id}} as Express labels it: {@code /api/v1/tickets/:id}. */
