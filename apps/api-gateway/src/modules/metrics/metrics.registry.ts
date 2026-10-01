@@ -150,9 +150,6 @@ export class MetricsRegistry {
    */
   readonly jobLastSuccess: Gauge<'scheduled_job' | 'owner_service'>;
 
-  /** Latency, NOT spend. The tenant dimension lives in the ledger. */
-  readonly aiGenerationDuration: Histogram<'purpose'>;
-
   constructor() {
     // Process-level metrics: heap, event-loop lag, GC. Cheap, fixed
     // cardinality, and the first thing anyone wants when a pod is misbehaving.
@@ -211,13 +208,6 @@ export class MetricsRegistry {
       name: 'job_last_success_timestamp_seconds',
       help: 'Unix timestamp of the last successful run of a scheduled job.',
       labelNames: ['scheduled_job', 'owner_service'],
-    });
-
-    this.aiGenerationDuration = this.histogram({
-      name: 'ai_generation_duration_seconds',
-      help: 'AI generation latency, by purpose. NO tenant label: cardinality.',
-      labelNames: ['purpose'],
-      buckets: [0.5, 1, 2, 3, 5, 8, 13, 21, 34],
     });
 
     // **The one static wiring in the gateway**, here rather than threaded

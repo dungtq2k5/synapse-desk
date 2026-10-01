@@ -14,7 +14,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.springframework.stereotype.Component;
 
 /**
- * The eight series, and the only way this codebase records to them.
+ * The seven series, and the only way this codebase records to them.
  *
  * <p>A class rather than {@code MeterRegistry} injected everywhere, for the
  * reason the Node registry gives: a metric created at a call site is a metric
@@ -100,14 +100,6 @@ public class GatewayMetrics {
       .tag("outcome", outcome)
       .register(registry)
       .increment();
-  }
-
-  /** One AI generation, by purpose. NO tenant label: cardinality. */
-  public void aiGeneration(String purpose, Duration took) {
-    Timer.builder(PublishedSeries.AI_DURATION)
-      .tag("purpose", purpose)
-      .register(registry)
-      .record(took);
   }
 
   /** One scheduled job's last success: who owns it, and when, as a Unix timestamp. */
