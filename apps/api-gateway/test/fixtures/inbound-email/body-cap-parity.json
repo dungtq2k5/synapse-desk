@@ -1,0 +1,283 @@
+{
+  "max": 50000,
+  "rows": [
+    [null, null],
+    [
+      [],
+      {
+        "length": 0,
+        "tail": "",
+        "truncated": false
+      }
+    ],
+    [
+      [["a", 1]],
+      {
+        "length": 1,
+        "tail": "a",
+        "truncated": false
+      }
+    ],
+    [
+      [["a", 49999]],
+      {
+        "length": 49999,
+        "tail": "aaaa",
+        "truncated": false
+      }
+    ],
+    [
+      [["a", 50000]],
+      {
+        "length": 50000,
+        "tail": "aaaa",
+        "truncated": false
+      }
+    ],
+    [
+      [["a", 50001]],
+      {
+        "length": 50000,
+        "tail": "aaaa",
+        "truncated": true
+      }
+    ],
+    [
+      [["a", 50002]],
+      {
+        "length": 50000,
+        "tail": "aaaa",
+        "truncated": true
+      }
+    ],
+    [
+      [["a", 200000]],
+      {
+        "length": 50000,
+        "tail": "aaaa",
+        "truncated": true
+      }
+    ],
+    [
+      [
+        ["a", 49998],
+        ["😀", 1]
+      ],
+      {
+        "length": 50000,
+        "tail": "aa😀",
+        "truncated": false
+      }
+    ],
+    [
+      [
+        ["a", 49999],
+        ["😀", 1]
+      ],
+      {
+        "length": 49999,
+        "tail": "aaaa",
+        "truncated": true
+      }
+    ],
+    [
+      [
+        ["a", 49999],
+        ["😀", 1],
+        ["b", 5]
+      ],
+      {
+        "length": 49999,
+        "tail": "aaaa",
+        "truncated": true
+      }
+    ],
+    [
+      [
+        ["a", 49997],
+        ["😀", 1],
+        ["b", 5]
+      ],
+      {
+        "length": 50000,
+        "tail": "a😀b",
+        "truncated": true
+      }
+    ],
+    [
+      [
+        ["a", 49998],
+        ["😀", 1],
+        ["b", 1]
+      ],
+      {
+        "length": 50000,
+        "tail": "aa😀",
+        "truncated": true
+      }
+    ],
+    [
+      [
+        ["a", 49999],
+        ["\ud83d", 1],
+        ["b", 3]
+      ],
+      {
+        "length": 50000,
+        "tail": "aaa\ud83d",
+        "truncated": true
+      }
+    ],
+    [
+      [
+        ["a", 49999],
+        ["\ud83d", 1]
+      ],
+      {
+        "length": 50000,
+        "tail": "aaa\ud83d",
+        "truncated": false
+      }
+    ],
+    [
+      [
+        ["a", 49999],
+        ["\ude00", 1],
+        ["b", 3]
+      ],
+      {
+        "length": 50000,
+        "tail": "aaa\ude00",
+        "truncated": true
+      }
+    ],
+    [
+      [
+        ["a", 50000],
+        ["\ude00", 1]
+      ],
+      {
+        "length": 50000,
+        "tail": "aaaa",
+        "truncated": true
+      }
+    ],
+    [
+      [
+        ["a", 49999],
+        ["\ud83d\ud83d", 1],
+        ["b", 1]
+      ],
+      {
+        "length": 50000,
+        "tail": "aaa\ud83d",
+        "truncated": true
+      }
+    ],
+    [
+      [
+        ["a", 49999],
+        ["\ude00\ude00", 1]
+      ],
+      {
+        "length": 50000,
+        "tail": "aaa\ude00",
+        "truncated": true
+      }
+    ],
+    [
+      [["😀", 25000]],
+      {
+        "length": 50000,
+        "tail": "😀😀",
+        "truncated": false
+      }
+    ],
+    [
+      [["😀", 25001]],
+      {
+        "length": 50000,
+        "tail": "😀😀",
+        "truncated": true
+      }
+    ],
+    [
+      [
+        ["x", 1],
+        ["😀", 25000]
+      ],
+      {
+        "length": 49999,
+        "tail": "😀😀",
+        "truncated": true
+      }
+    ],
+    [
+      [
+        ["x", 1],
+        ["😀", 25005]
+      ],
+      {
+        "length": 49999,
+        "tail": "😀😀",
+        "truncated": true
+      }
+    ],
+    [
+      [["é", 50010]],
+      {
+        "length": 50000,
+        "tail": "éééé",
+        "truncated": true
+      }
+    ],
+    [
+      [["é", 50000]],
+      {
+        "length": 50000,
+        "tail": "éé",
+        "truncated": true
+      }
+    ],
+    [
+      [["\u0000", 50003]],
+      {
+        "length": 50000,
+        "tail": "\u0000\u0000\u0000\u0000",
+        "truncated": true
+      }
+    ],
+    [
+      [["\r\n", 50000]],
+      {
+        "length": 50000,
+        "tail": "\r\n\r\n",
+        "truncated": true
+      }
+    ],
+    [
+      [[" ", 50001]],
+      {
+        "length": 50000,
+        "tail": "    ",
+        "truncated": true
+      }
+    ],
+    [
+      [["﻿", 50001]],
+      {
+        "length": 50000,
+        "tail": "﻿﻿﻿﻿",
+        "truncated": true
+      }
+    ],
+    [
+      [["<b ", 16667]],
+      {
+        "length": 50000,
+        "tail": "b <b",
+        "truncated": true
+      }
+    ]
+  ]
+}

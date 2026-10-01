@@ -48,6 +48,41 @@ public final class InboundLimits {
   public static final int MAX_HEADER_LINE_LENGTH = 998;
   public static final int MAX_DATE_HEADER_LENGTH = 255;
 
+  /**
+   * {@code MAX_INBOUND_BODY_LENGTH}: the longest body, in UTF-16 code units, that
+   * is read at all; the rest is cut off where the mail enters, before anything
+   * scans it.
+   *
+   * <p>The patterns that strip quoted history and HTML rescan to the end of the
+   * input from every unterminated opener, so a body of unclosed tags costs time
+   * proportional to the SQUARE of its length. Measured on the worst shape ({@code
+   * <div } repeated, no {@code >}), through {@code toStoredBody}:
+   *
+   * <table>
+   *   <caption>Worst-case time by length</caption>
+   *   <tr><th>Length</th><th>Node (regular expressions)</th><th>Java (scanners)</th></tr>
+   *   <tr><td>20 000</td><td>~90 ms</td><td>under 10 ms</td></tr>
+   *   <tr><td>50 000</td><td>540 ms</td><td>~10 ms</td></tr>
+   *   <tr><td>100 000</td><td>2 132 ms</td><td>~15 ms</td></tr>
+   *   <tr><td>800 000</td><td>~two minutes</td><td>~90 ms</td></tr>
+   * </table>
+   *
+   * <p>Java's patterns are scanners ({@link HtmlScan}) and linear: the same shape
+   * took its regular expressions 4.3 s at 50 000 and about ten minutes at 800 000,
+   * eight times worse than Node's, which was a divergence the port introduced. So
+   * the number that bounds the cost is now Node's: at 50 000 one hostile mail costs
+   * a Node request thread about half a second, where uncapped it was unbounded.
+   *
+   * <p><b>Why not lower.</b> HTML from some clients carries a large {@code <style>}
+   * head before the message, and a cut that lands before the message loses what the
+   * customer wrote — a worse failure than half a second of CPU on a hostile mail.
+   *
+   * <p>Truncated, not rejected: a long forwarded thread is a legitimate mail, and
+   * what was written last is at the top. Counted in code units because that is
+   * {@code String.length} in both gateways.
+   */
+  public static final int MAX_INBOUND_BODY_LENGTH = 50000;
+
   /** RFC 5322 {@code msg-id} characters: printable ASCII, no space. */
   public static final String PRINTABLE_ASCII = "^[\\x21-\\x7E]+$";
 

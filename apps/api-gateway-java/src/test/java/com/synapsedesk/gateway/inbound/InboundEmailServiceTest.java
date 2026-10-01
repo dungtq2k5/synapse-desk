@@ -522,6 +522,47 @@ class InboundEmailServiceTest {
   }
 
   @Test
+  void aShortenedBodySaysSoInTheTicketAndAFullOneDoesNot() {
+    routable();
+    when(tickets.createTicket(any())).thenReturn(
+      ticket(TicketStatus.TICKET_STATUS_NEW)
+    );
+    InboundEmail whole = mail();
+    InboundEmail cut = new InboundEmail(
+      whole.messageId(),
+      whole.to(),
+      whole.from(),
+      null,
+      whole.subject(),
+      whole.text(),
+      null,
+      null,
+      List.of(),
+      null,
+      List.of(),
+      List.of(),
+      List.of(),
+      null,
+      whole.receivedAt(),
+      true
+    );
+
+    service.accept(whole, AcceptOptions.none());
+    service.accept(cut, AcceptOptions.none());
+
+    ArgumentCaptor<CreateTicketRequest> sent = ArgumentCaptor.forClass(
+      CreateTicketRequest.class
+    );
+    verify(tickets, times(2)).createTicket(sent.capture());
+    assertThat(sent.getAllValues().get(0).getDescription()).isEqualTo(
+      "Please help"
+    );
+    assertThat(sent.getAllValues().get(1).getDescription()).isEqualTo(
+      "Please help\n\n---\nThis message was longer than 50000 characters and has been shortened."
+    );
+  }
+
+  @Test
   void aBlankSubjectBecomesNoSubject() {
     routable();
     when(tickets.createTicket(any())).thenReturn(

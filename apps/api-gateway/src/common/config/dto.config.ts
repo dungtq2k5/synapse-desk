@@ -154,6 +154,42 @@ export const PRINTABLE_ASCII = /^[\x21-\x7E]+$/;
 export const MAX_DATE_HEADER_LENGTH = 255;
 
 /**
+ * Longest inbound mail body, in UTF-16 code units, that is read at all. The rest
+ * is cut off where the mail enters, before anything scans it.
+ *
+ * **The basis is a measurement, not a round number.** The patterns that strip
+ * quoted history and HTML (`<[^>]+>`, `<script…</script>`, `<div[^>]*class=…`)
+ * rescan to the end of the input from every unterminated opener, so a body of
+ * unclosed tags costs time proportional to the SQUARE of its length. Measured on
+ * the worst shape (`<div ` repeated, no `>`), through `toStoredBody`:
+ *
+ * | Length | Node (regular expressions) | Java (scanners) |
+ * | ---: | ---: | ---: |
+ * | 20 000 | ~90 ms | under 10 ms |
+ * | 50 000 | 540 ms | ~10 ms |
+ * | 100 000 | 2 132 ms | ~15 ms |
+ * | 800 000 | ~two minutes | ~90 ms |
+ *
+ * Java's patterns are scanners and linear (its regular expressions took 4.3 s at
+ * 50 000 and about ten minutes at 800 000, which was a divergence the port
+ * introduced), so the number that bounds the cost is Node's: at 50 000 one
+ * hostile mail costs a request thread about half a second, where uncapped it was
+ * unbounded.
+ *
+ * **Why not lower.** HTML from some clients carries a large `<style>` head
+ * before the message, and a cut that lands before the message loses what the
+ * customer wrote — a worse failure than half a second of CPU on a hostile mail.
+ *
+ * **Truncated, not rejected.** A long forwarded thread is a legitimate mail, and
+ * what the sender wrote last is at the top, which survives the cut. The ticket
+ * says the body was shortened ({@link InboundEmailDto.bodyTruncated}).
+ *
+ * Counted in code units because that is `String.length` in both gateways: a byte
+ * cap would depend on how each encodes a lone surrogate.
+ */
+export const MAX_INBOUND_BODY_LENGTH = 50000;
+
+/**
  * Most results one knowledge search may ask for.
  *
  * A request-body bound, not a retrieval policy: rag-service clamps to its own

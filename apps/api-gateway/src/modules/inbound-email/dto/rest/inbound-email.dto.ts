@@ -3,6 +3,7 @@ import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
+  IsBoolean,
   IsEmail,
   IsIn,
   IsInt,
@@ -158,6 +159,16 @@ export class InboundEmailDto {
   @IsPresentButNullable()
   @IsString()
   readonly html!: string | null;
+
+  /**
+   * Whether `text` or `html` was cut at {@link MAX_INBOUND_BODY_LENGTH} by the
+   * mapper. Carried so the ticket can say the body was shortened: a support agent
+   * reading half a customer's message with nothing saying so is worse than a long
+   * one.
+   */
+  @IsOptional()
+  @IsBoolean()
+  readonly bodyTruncated: boolean = false;
 
   /** `In-Reply-To`, for the threading fallback. */
   @IsOptional()

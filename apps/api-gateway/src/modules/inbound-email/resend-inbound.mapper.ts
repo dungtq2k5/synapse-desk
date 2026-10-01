@@ -9,7 +9,10 @@ import {
   extractEmailDomain,
   type AllowedAttachmentMimeType,
 } from '@synapsedesk/common';
-import { MAX_PRESENTED_ATTACHMENTS } from '../../common/config/dto.config';
+import {
+  MAX_INBOUND_BODY_LENGTH,
+  MAX_PRESENTED_ATTACHMENTS,
+} from '../../common/config/dto.config';
 import type {
   InboundEmailDto,
   InboundRemoteAttachmentDto,
@@ -83,6 +86,8 @@ export function toMappedInboundEmail(
   );
   const references = header('references')?.split(/\s+/).filter(Boolean);
   const fromName = displayNameOf(email.from);
+  const text = capBody(email.text ?? null);
+  const html = capBody(email.html ?? null);
 
   return {
     tenantRecipientCount: recipients.length,
@@ -91,8 +96,9 @@ export function toMappedInboundEmail(
       from: extractEmailAddress(email.from),
       ...(fromName ? { fromName } : {}),
       subject: email.subject ?? '',
-      text: email.text ?? null,
-      html: email.html ?? null,
+      text: text.value,
+      html: html.value,
+      bodyTruncated: text.truncated || html.truncated,
       ...(email.message_id ? { messageId: email.message_id } : {}),
       ...optional('inReplyTo', header('in-reply-to')),
       references: references ?? [],
@@ -103,6 +109,38 @@ export function toMappedInboundEmail(
       receivedAt: event.created_at,
     },
   };
+}
+
+/**
+ * A body, cut to {@link MAX_INBOUND_BODY_LENGTH} code units, and whether it was.
+ *
+ * **Applied here, where the fetched mail enters**, because the point is to bound
+ * what the quadratic patterns downstream are given: a cap beside the DTO's other
+ * constraints would run after they had already scanned it.
+ *
+ * Never splits a surrogate pair: a cut that lands between the two halves of an
+ * astral character is moved one unit earlier, so the result is always well
+ * formed. The Java gateway cuts the same way, and the key it hashes from the body
+ * is the same in both.
+ *
+ * @example capBody('a'.repeat(50001)).truncated // true
+ */
+export function capBody(value: string | null): {
+  value: string | null;
+  truncated: boolean;
+} {
+  if (value === null || value.length <= MAX_INBOUND_BODY_LENGTH) {
+    return { value, truncated: false };
+  }
+
+  let end = MAX_INBOUND_BODY_LENGTH;
+  const last = value.charCodeAt(end - 1);
+  const next = value.charCodeAt(end);
+  const splitsAPair =
+    last >= 0xd800 && last <= 0xdbff && next >= 0xdc00 && next <= 0xdfff;
+  if (splitsAPair) end -= 1;
+
+  return { value: value.slice(0, end), truncated: true };
 }
 
 /**

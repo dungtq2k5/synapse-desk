@@ -10,6 +10,7 @@ import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { formatErrorMsg, isRetryableResendError } from '@synapsedesk/common';
 import { MetricsRegistry } from '../metrics/metrics.registry';
+import { MAX_INBOUND_BODY_LENGTH } from '../../common/config/dto.config';
 import { VALIDATION_PIPE_OPTIONS } from '../../common/config/validation.config';
 import {
   InboundEmailDto,
@@ -160,6 +161,12 @@ export class ResendInboundService {
     if (mapped.tenantRecipientCount > 1) {
       this.logger.warn(
         `Inbound mail ${emailId} reached ${mapped.tenantRecipientCount} tenant addresses; routing by the first`,
+      );
+    }
+
+    if (mapped.fields.bodyTruncated) {
+      this.logger.warn(
+        `Inbound mail ${emailId} had a body over ${MAX_INBOUND_BODY_LENGTH} characters; it was shortened`,
       );
     }
 

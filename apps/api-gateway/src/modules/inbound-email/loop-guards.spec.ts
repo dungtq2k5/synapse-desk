@@ -55,6 +55,7 @@ describe('inbound email loop guards', () => {
     // Present because the DTO now defaults them rather than leaving them
     // `undefined`; a literal standing in for a parsed body has to say so too.
     references: [],
+    bodyTruncated: false,
     droppedAttachments: [],
     remoteAttachments: [],
     attachments: [],

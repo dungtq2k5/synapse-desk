@@ -53,7 +53,8 @@ public record InboundEmail(
   @Size(max = InboundLimits.MAX_ATTACHMENTS_PER_MESSAGE)
   List<@Valid UploadedAttachment> attachments,
   @Size(max = InboundLimits.MAX_DATE_HEADER_LENGTH) String date,
-  @NotNull @StrictIso8601 String receivedAt
+  @NotNull @StrictIso8601 String receivedAt,
+  Boolean bodyTruncated
 ) {
   public InboundEmail {
     references = references == null ? List.of() : references;
@@ -62,6 +63,53 @@ public record InboundEmail(
     remoteAttachments =
       remoteAttachments == null ? List.of() : remoteAttachments;
     attachments = attachments == null ? List.of() : attachments;
+    // Boxed, and normalised here: a mapper that never says it cut a body, and a
+    // fixture that omits the key, both mean it did not. A primitive would make
+    // Jackson refuse the absent key.
+    bodyTruncated = Boolean.TRUE.equals(bodyTruncated);
+  }
+
+  /**
+   * A mail whose body was NOT cut — the shape every caller that has not met the
+   * cap builds. {@code bodyTruncated} says {@code text} or {@code html} was cut at
+   * {@link InboundLimits#MAX_INBOUND_BODY_LENGTH} by the mapper, so the ticket can
+   * say the body was shortened.
+   */
+  public InboundEmail(
+    String messageId,
+    String to,
+    String from,
+    String fromName,
+    String subject,
+    String text,
+    String html,
+    String inReplyTo,
+    List<String> references,
+    Map<String, String> headers,
+    List<String> droppedAttachments,
+    List<RemoteAttachment> remoteAttachments,
+    List<UploadedAttachment> attachments,
+    String date,
+    String receivedAt
+  ) {
+    this(
+      messageId,
+      to,
+      from,
+      fromName,
+      subject,
+      text,
+      html,
+      inReplyTo,
+      references,
+      headers,
+      droppedAttachments,
+      remoteAttachments,
+      attachments,
+      date,
+      receivedAt,
+      false
+    );
   }
 
   /** An attachment still to be fetched — it has no URL yet; that is read after routing. */

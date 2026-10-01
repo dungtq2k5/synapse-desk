@@ -42,6 +42,7 @@ import {
   InboundRejectionReason,
 } from '@synapsedesk/common';
 import { BaseGrpcClient } from '../../common/grpc/base-grpc.client';
+import { MAX_INBOUND_BODY_LENGTH } from '../../common/config/dto.config';
 import { InboundEmailDto } from './dto/rest/inbound-email.dto';
 import type {
   InboundRemoteAttachmentDto,
@@ -288,7 +289,10 @@ export class InboundEmailService implements OnModuleInit {
           uploaded: [],
           dropped: payload.remoteAttachments.map((file) => file.fileName),
         };
-    const storedBody = toStoredBody(payload.text, payload.html);
+    const storedBody = this.withTruncationNote(
+      toStoredBody(payload.text, payload.html),
+      payload.bodyTruncated,
+    );
     // **The note is applied on both paths**: a partial delivery with no record
     // of the missing half is worse than a total one.
     const dropped = [...payload.droppedAttachments, ...ingested.dropped];
@@ -703,6 +707,18 @@ export class InboundEmailService implements OnModuleInit {
       .digest('hex');
 
     return `synthesized:${digest}`;
+  }
+
+  /**
+   * Says the body was cut at {@link MAX_INBOUND_BODY_LENGTH}, in the body.
+   *
+   * Visible to everyone on the thread for the same reason the dropped-attachment
+   * note is: half a message that looks whole is worse than a long one.
+   */
+  private withTruncationNote(body: string, truncated: boolean): string {
+    if (!truncated) return body;
+
+    return `${body}\n\n---\nThis message was longer than ${MAX_INBOUND_BODY_LENGTH} characters and has been shortened.`;
   }
 
   /**

@@ -91,6 +91,8 @@ public final class ResendInboundMapper {
     String referencesHeader = headerValue(byName, "references");
     String from = email.from() == null ? "" : email.from();
     String fromName = displayNameOf(from);
+    Capped text = capBody(email.text());
+    Capped html = capBody(email.html());
     Split split = splitAttachments(
       email.attachments() == null ? List.of() : email.attachments()
     );
@@ -104,8 +106,8 @@ public final class ResendInboundMapper {
         EmailAddresses.extractEmailAddress(from),
         fromName,
         email.subject() == null ? "" : email.subject(),
-        email.text(),
-        email.html(),
+        text.value(),
+        html.value(),
         headerValue(byName, "in-reply-to"),
         referencesHeader == null
           ? List.of()
@@ -115,10 +117,44 @@ public final class ResendInboundMapper {
         split.remoteAttachments(),
         List.of(),
         headerValue(byName, "date"),
-        event.createdAt()
+        event.createdAt(),
+        text.truncated() || html.truncated()
       ),
       recipients.size()
     );
+  }
+
+  /** A body, and whether {@link #capBody} cut it. */
+  public record Capped(String value, boolean truncated) {}
+
+  /**
+   * A body cut to {@link InboundLimits#MAX_INBOUND_BODY_LENGTH} UTF-16 code units,
+   * and whether it was.
+   *
+   * <p><b>Applied here, where the fetched mail enters</b>, because the point is to
+   * bound what the quadratic patterns downstream are given: a cap beside the
+   * constraints on {@link InboundEmail} would run after they had already scanned
+   * it.
+   *
+   * <p>Never splits a surrogate pair: a cut that lands between the two halves of an
+   * astral character is moved one unit earlier, so the result is always well
+   * formed. The Node gateway cuts the same way, and the key hashed from the body is
+   * the same in both.
+   */
+  public static Capped capBody(String value) {
+    if (
+      value == null || value.length() <= InboundLimits.MAX_INBOUND_BODY_LENGTH
+    ) {
+      return new Capped(value, false);
+    }
+
+    int end = InboundLimits.MAX_INBOUND_BODY_LENGTH;
+    boolean splitsAPair =
+      Character.isHighSurrogate(value.charAt(end - 1)) &&
+      Character.isLowSurrogate(value.charAt(end));
+    if (splitsAPair) end -= 1;
+
+    return new Capped(value.substring(0, end), true);
   }
 
   /** Resend's attachments, split into the ones worth fetching and the names of the rest. */

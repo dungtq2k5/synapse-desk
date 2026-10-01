@@ -456,6 +456,58 @@ describe('the inbound-email webhook', () => {
       },
     );
 
+    const createsTicketFor = (mail: ReturnType<typeof resendMail>) => {
+      resolveOrganization();
+      peers.auth
+        .on('UserService/ResolveInboundSender')
+        .reply({ userId: SENDER, created: false });
+      peers.ticket
+        .on('TicketService/CreateTicket')
+        .reply({ id: TICKET, ticketNumber: 1 });
+      programMail(mail);
+    };
+
+    rowFor('Webhooks')(
+      '**a body over the cap is shortened and the ticket says so — the rest of the mail is not lost, and a reader is not misled**',
+      async () => {
+        const mail = resendMail({ text: 'x'.repeat(120_000) });
+        createsTicketFor(mail);
+
+        const { response } = await run(mail);
+
+        expect(response.status).toBe(200);
+        expect(response.body?.data.outcome).toBe('TICKET_CREATED');
+        const note =
+          '\n\n---\nThis message was longer than 50000 characters and has been shortened.';
+        const { description } = peers.ticket.calls(
+          'TicketService/CreateTicket',
+        )[0].request as { description: string };
+        expect(description).toBe('x'.repeat(50_000) + note);
+      },
+    );
+
+    rowFor('Webhooks')(
+      '**a hostile body of unclosed tags is answered promptly — the patterns that read it are quadratic, and uncapped this is minutes of a request thread**',
+      async () => {
+        const mail = resendMail({
+          text: null,
+          html: '<p>' + '<div '.repeat(120_000),
+        });
+        createsTicketFor(mail);
+
+        const started = Date.now();
+        const { response } = await run(mail);
+
+        expect(response.status).toBe(200);
+        expect(response.body?.data.outcome).toBe('TICKET_CREATED');
+        // About 0.5 s in Node at the cap (Java's scanners are linear, ~10 ms);
+        // uncapped Node is ~35 s here. A bound on the ORDER, not a benchmark.
+
+        expect(Date.now() - started).toBeLessThan(30_000);
+      },
+      60_000,
+    );
+
     /** Waits for the publish, which is fire-and-forget and lands after the response. */
     const published = async (count: number) => {
       const deadline = Date.now() + 4_000;

@@ -187,6 +187,14 @@ public class ResendInboundService {
       );
     }
 
+    if (mapped.fields().bodyTruncated()) {
+      LOG.warn(
+        "Inbound mail {} had a body over {} characters; it was shortened",
+        emailId,
+        InboundLimits.MAX_INBOUND_BODY_LENGTH
+      );
+    }
+
     // Validated by hand, because nothing else will: this object is built here, not
     // received as a request body, so no framework binder ever sees it.
     Set<ConstraintViolation<InboundEmail>> violations = validator.validate(

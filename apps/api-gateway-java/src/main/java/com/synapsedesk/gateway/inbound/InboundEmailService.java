@@ -236,9 +236,9 @@ public class InboundEmailService {
               .map(RemoteAttachment::fileName)
               .toList()
           );
-    String storedBody = QuotedReply.toStoredBody(
-      payload.text(),
-      payload.html()
+    String storedBody = withTruncationNote(
+      QuotedReply.toStoredBody(payload.text(), payload.html()),
+      payload.bodyTruncated()
     );
     // The note is applied on both paths: a partial delivery with no record of the
     // missing half is worse than a total one.
@@ -640,6 +640,23 @@ public class InboundEmailService {
     }
 
     return fixed == null ? value : fixed.toString();
+  }
+
+  /**
+   * Says the body was cut at {@link InboundLimits#MAX_INBOUND_BODY_LENGTH}, in the
+   * body — visible to everyone on the thread for the same reason the
+   * dropped-attachment note is: half a message that looks whole is worse than a
+   * long one.
+   */
+  private static String withTruncationNote(String body, boolean truncated) {
+    if (!truncated) return body;
+
+    return (
+      body +
+      "\n\n---\nThis message was longer than " +
+      InboundLimits.MAX_INBOUND_BODY_LENGTH +
+      " characters and has been shortened."
+    );
   }
 
   /**
