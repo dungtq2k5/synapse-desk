@@ -32,8 +32,9 @@ public class PresenceService {
   );
 
   private static final Duration TTL = Duration.ofSeconds(60);
+  private static final String ONLINE = "online";
   private static final Set<String> STATES = Set.of(
-    "online",
+    ONLINE,
     "away",
     "busy",
     "offline"
@@ -62,9 +63,9 @@ public class PresenceService {
     try {
       Boolean written = redis
         .opsForValue()
-        .setIfAbsent(key, encode("online"), TTL);
+        .setIfAbsent(key, encode(ONLINE), TTL);
       if (Boolean.TRUE.equals(written)) {
-        return "online";
+        return ONLINE;
       }
 
       // Something was already there — refresh its TTL without touching its
@@ -72,7 +73,7 @@ public class PresenceService {
       redis.expire(key, TTL);
       String existing = read(organizationId, userId);
 
-      return existing != null ? existing : "online";
+      return existing != null ? existing : ONLINE;
     } catch (RuntimeException failure) {
       LOG.error("Presence connect failed: {}", failure.getMessage());
 
@@ -88,9 +89,7 @@ public class PresenceService {
   public Update set(String organizationId, String userId, String state) {
     try {
       String previous = read(organizationId, userId);
-      redis
-        .opsForValue()
-        .set(key(organizationId, userId), encode(state), TTL);
+      redis.opsForValue().set(key(organizationId, userId), encode(state), TTL);
 
       return new Update(!Objects.equals(previous, state), state);
     } catch (RuntimeException failure) {
@@ -109,11 +108,10 @@ public class PresenceService {
     }
 
     try {
-      JsonNode record = json.readTree(raw);
-      JsonNode state = record.get("state");
-      String value = state != null && state.isString()
-        ? state.asString()
-        : null;
+      JsonNode presenceNode = json.readTree(raw);
+      JsonNode state = presenceNode.get("state");
+      String value =
+        state != null && state.isString() ? state.asString() : null;
 
       return STATES.contains(value) ? value : null;
     } catch (RuntimeException malformed) {

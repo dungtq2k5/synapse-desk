@@ -4,21 +4,11 @@ import com.synapsedesk.gateway.auth.CurrentRequest;
 import com.synapsedesk.gateway.auth.CurrentUser;
 import com.synapsedesk.gateway.auth.RequestContext;
 import com.synapsedesk.gateway.cache.CacheService;
-import com.synapsedesk.gateway.generated.api.AnalyticsApi;
 import com.synapsedesk.gateway.generated.model.AgentAnalyticsResponseDto;
 import com.synapsedesk.gateway.generated.model.AgentStatResponseDto;
 import com.synapsedesk.gateway.generated.model.AiUsagePointResponseDto;
 import com.synapsedesk.gateway.generated.model.AiUsageResponseDto;
 import com.synapsedesk.gateway.generated.model.AiUsageSliceResponseDto;
-import com.synapsedesk.gateway.generated.model.AnalyticsControllerAgentsV1200Response;
-import com.synapsedesk.gateway.generated.model.AnalyticsControllerAiUsageV1200Response;
-import com.synapsedesk.gateway.generated.model.AnalyticsControllerDeflectionV1200Response;
-import com.synapsedesk.gateway.generated.model.AnalyticsControllerDocumentsV1200Response;
-import com.synapsedesk.gateway.generated.model.AnalyticsControllerKnowledgeGapsV1200Response;
-import com.synapsedesk.gateway.generated.model.AnalyticsControllerOverviewV1200Response;
-import com.synapsedesk.gateway.generated.model.AnalyticsControllerResponseTimesV1200Response;
-import com.synapsedesk.gateway.generated.model.AnalyticsControllerSatisfactionV1200Response;
-import com.synapsedesk.gateway.generated.model.AnalyticsControllerVolumeV1200Response;
 import com.synapsedesk.gateway.generated.model.CreateExportDto;
 import com.synapsedesk.gateway.generated.model.CurrentUserResponseDto.PermissionCodesEnum;
 import com.synapsedesk.gateway.generated.model.DeflectionPointResponseDto;
@@ -35,15 +25,22 @@ import com.synapsedesk.gateway.generated.model.ResponseTimePointResponseDto;
 import com.synapsedesk.gateway.generated.model.ResponseTimesResponseDto;
 import com.synapsedesk.gateway.generated.model.SatisfactionPointResponseDto;
 import com.synapsedesk.gateway.generated.model.SatisfactionResponseDto;
-import com.synapsedesk.gateway.generated.model.TicketsControllerCreateExportV1202Response;
 import com.synapsedesk.gateway.generated.model.UnavailableBlockResponseDto;
 import com.synapsedesk.gateway.generated.model.VolumeBreakdownResponseDto;
 import com.synapsedesk.gateway.generated.model.VolumePointResponseDto;
 import com.synapsedesk.gateway.generated.model.VolumeResponseDto;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
+import com.synapsedesk.gateway.openapi.ApiErrors;
 import com.synapsedesk.gateway.security.RequirePermission;
+import com.synapsedesk.gateway.web.ApiPaths;
+import com.synapsedesk.gateway.web.ApiResponse;
 import io.grpc.StatusRuntimeException;
 import io.grpc.stub.MetadataUtils;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -58,6 +55,15 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.lang.Nullable;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import synapsedesk.auth.User.ListUsersByIdsRequest;
 import synapsedesk.auth.User.ListUsersByIdsResponse;
@@ -110,9 +116,19 @@ import synapsedesk.ticket.AnalyticsServiceGrpc;
  * nothing observable from outside (the response shape, the partial-failure
  * behaviour) depends on wall-clock overlap. Move to `CompletableFuture` if a
  * latency budget ever makes this endpoint's p99 the thing to fix.
+ *
+ * <p><b>Migrated off `AnalyticsApi`.</b> {@code cachedGetDto} caches the raw
+ * DTO, not the {@code ApiResponse} envelope — the DTOs here carry no generic
+ * type parameters of their own, so a bare {@code Class<T>} loses nothing on
+ * a cache HIT and {@code wrapTyped} is not needed, unlike the paginated
+ * `list` routes elsewhere in this port. {@code createExport} answers 202 —
+ * {@code @ResponseStatus} is what tells springdoc that.
  */
+@Tag(name = "Analytics")
 @RestController
-public class AnalyticsController implements AnalyticsApi {
+@RequestMapping(ApiPaths.V1)
+@Validated
+public class AnalyticsController {
 
   private static final long DEADLINE_SECONDS = 5;
   private static final long OPEN_RANGE_TTL_SECONDS = 60;
@@ -171,13 +187,22 @@ public class AnalyticsController implements AnalyticsApi {
 
   // ------------------------------------------------------- the six range reads
 
-  @Override
+  @GetMapping(value = "/analytics/overview", produces = { "application/json" })
+  @ApiErrors({ "401", "403" })
   @RequirePermission(PermissionCodesEnum.ANALYTICS_READ)
-  public ResponseEntity<AnalyticsControllerOverviewV1200Response> analyticsControllerOverviewV1(
-    String from,
-    String to,
-    UUID departmentId,
-    String granularity
+  public ResponseEntity<
+    ApiResponse<OverviewResponseDto>
+  > analyticsControllerOverviewV1(
+    @NotNull @Valid @RequestParam(value = "from", required = true) String from,
+    @NotNull @Valid @RequestParam(value = "to", required = true) String to,
+    @Valid @RequestParam(
+      value = "departmentId",
+      required = false
+    ) @Nullable UUID departmentId,
+    @Valid @RequestParam(
+      value = "granularity",
+      required = false
+    ) @Nullable String granularity
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
     OverviewResponseDto data = cachedGetDto(
@@ -194,22 +219,28 @@ public class AnalyticsController implements AnalyticsApi {
         )
     );
 
-    return ResponseEntity.ok(
-      new AnalyticsControllerOverviewV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(data)
-    );
+    return ResponseEntity.ok(ApiResponse.of(200, "OK", data));
   }
 
-  @Override
+  @GetMapping(
+    value = "/analytics/deflection",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "401", "403" })
   @RequirePermission(PermissionCodesEnum.ANALYTICS_READ)
-  public ResponseEntity<AnalyticsControllerDeflectionV1200Response> analyticsControllerDeflectionV1(
-    String from,
-    String to,
-    UUID departmentId,
-    String granularity
+  public ResponseEntity<
+    ApiResponse<DeflectionResponseDto>
+  > analyticsControllerDeflectionV1(
+    @NotNull @Valid @RequestParam(value = "from", required = true) String from,
+    @NotNull @Valid @RequestParam(value = "to", required = true) String to,
+    @Valid @RequestParam(
+      value = "departmentId",
+      required = false
+    ) @Nullable UUID departmentId,
+    @Valid @RequestParam(
+      value = "granularity",
+      required = false
+    ) @Nullable String granularity
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
     DeflectionResponseDto data = cachedGetDto(
@@ -226,22 +257,28 @@ public class AnalyticsController implements AnalyticsApi {
         )
     );
 
-    return ResponseEntity.ok(
-      new AnalyticsControllerDeflectionV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(data)
-    );
+    return ResponseEntity.ok(ApiResponse.of(200, "OK", data));
   }
 
-  @Override
+  @GetMapping(
+    value = "/analytics/response-times",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "401", "403" })
   @RequirePermission(PermissionCodesEnum.ANALYTICS_READ)
-  public ResponseEntity<AnalyticsControllerResponseTimesV1200Response> analyticsControllerResponseTimesV1(
-    String from,
-    String to,
-    UUID departmentId,
-    String granularity
+  public ResponseEntity<
+    ApiResponse<ResponseTimesResponseDto>
+  > analyticsControllerResponseTimesV1(
+    @NotNull @Valid @RequestParam(value = "from", required = true) String from,
+    @NotNull @Valid @RequestParam(value = "to", required = true) String to,
+    @Valid @RequestParam(
+      value = "departmentId",
+      required = false
+    ) @Nullable UUID departmentId,
+    @Valid @RequestParam(
+      value = "granularity",
+      required = false
+    ) @Nullable String granularity
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
     ResponseTimesResponseDto data = cachedGetDto(
@@ -258,22 +295,25 @@ public class AnalyticsController implements AnalyticsApi {
         )
     );
 
-    return ResponseEntity.ok(
-      new AnalyticsControllerResponseTimesV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(data)
-    );
+    return ResponseEntity.ok(ApiResponse.of(200, "OK", data));
   }
 
-  @Override
+  @GetMapping(value = "/analytics/volume", produces = { "application/json" })
+  @ApiErrors({ "401", "403" })
   @RequirePermission(PermissionCodesEnum.ANALYTICS_READ)
-  public ResponseEntity<AnalyticsControllerVolumeV1200Response> analyticsControllerVolumeV1(
-    String from,
-    String to,
-    UUID departmentId,
-    String granularity
+  public ResponseEntity<
+    ApiResponse<VolumeResponseDto>
+  > analyticsControllerVolumeV1(
+    @NotNull @Valid @RequestParam(value = "from", required = true) String from,
+    @NotNull @Valid @RequestParam(value = "to", required = true) String to,
+    @Valid @RequestParam(
+      value = "departmentId",
+      required = false
+    ) @Nullable UUID departmentId,
+    @Valid @RequestParam(
+      value = "granularity",
+      required = false
+    ) @Nullable String granularity
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
     VolumeResponseDto data = cachedGetDto(
@@ -290,22 +330,28 @@ public class AnalyticsController implements AnalyticsApi {
         )
     );
 
-    return ResponseEntity.ok(
-      new AnalyticsControllerVolumeV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(data)
-    );
+    return ResponseEntity.ok(ApiResponse.of(200, "OK", data));
   }
 
-  @Override
+  @GetMapping(
+    value = "/analytics/satisfaction",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "401", "403" })
   @RequirePermission(PermissionCodesEnum.ANALYTICS_READ)
-  public ResponseEntity<AnalyticsControllerSatisfactionV1200Response> analyticsControllerSatisfactionV1(
-    String from,
-    String to,
-    UUID departmentId,
-    String granularity
+  public ResponseEntity<
+    ApiResponse<SatisfactionResponseDto>
+  > analyticsControllerSatisfactionV1(
+    @NotNull @Valid @RequestParam(value = "from", required = true) String from,
+    @NotNull @Valid @RequestParam(value = "to", required = true) String to,
+    @Valid @RequestParam(
+      value = "departmentId",
+      required = false
+    ) @Nullable UUID departmentId,
+    @Valid @RequestParam(
+      value = "granularity",
+      required = false
+    ) @Nullable String granularity
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
     SatisfactionResponseDto data = cachedGetDto(
@@ -322,22 +368,25 @@ public class AnalyticsController implements AnalyticsApi {
         )
     );
 
-    return ResponseEntity.ok(
-      new AnalyticsControllerSatisfactionV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(data)
-    );
+    return ResponseEntity.ok(ApiResponse.of(200, "OK", data));
   }
 
-  @Override
+  @GetMapping(value = "/analytics/ai-usage", produces = { "application/json" })
+  @ApiErrors({ "401", "403" })
   @RequirePermission(PermissionCodesEnum.ANALYTICS_READ)
-  public ResponseEntity<AnalyticsControllerAiUsageV1200Response> analyticsControllerAiUsageV1(
-    String from,
-    String to,
-    UUID departmentId,
-    String granularity
+  public ResponseEntity<
+    ApiResponse<AiUsageResponseDto>
+  > analyticsControllerAiUsageV1(
+    @NotNull @Valid @RequestParam(value = "from", required = true) String from,
+    @NotNull @Valid @RequestParam(value = "to", required = true) String to,
+    @Valid @RequestParam(
+      value = "departmentId",
+      required = false
+    ) @Nullable UUID departmentId,
+    @Valid @RequestParam(
+      value = "granularity",
+      required = false
+    ) @Nullable String granularity
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
     AiUsageRequest.Builder wire = AiUsageRequest.newBuilder()
@@ -356,22 +405,24 @@ public class AnalyticsController implements AnalyticsApi {
       () -> toAiUsageDto(ledgerWith(context).getAiUsage(wire.build()))
     );
 
-    return ResponseEntity.ok(
-      new AnalyticsControllerAiUsageV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(data)
-    );
+    return ResponseEntity.ok(ApiResponse.of(200, "OK", data));
   }
 
   // -------------------------------------------------------------- the export
   // pair
 
-  @Override
+  @PostMapping(
+    value = "/analytics/export",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403" })
+  @ResponseStatus(HttpStatus.ACCEPTED)
   @RequirePermission(PermissionCodesEnum.ANALYTICS_READ)
-  public ResponseEntity<TicketsControllerCreateExportV1202Response> analyticsControllerCreateExportV1(
-    CreateExportDto createExportDto
+  public ResponseEntity<
+    ApiResponse<ExportResponseDto>
+  > analyticsControllerCreateExportV1(
+    @Valid @RequestBody CreateExportDto createExportDto
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -393,45 +444,48 @@ public class AnalyticsController implements AnalyticsApi {
     ExportResponse response = analyticsWith(context).createExport(wire.build());
 
     return new ResponseEntity<>(
-      new TicketsControllerCreateExportV1202Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(202))
-        .message("OK")
-        .data(toExportDto(response)),
+      ApiResponse.of(202, "OK", toExportDto(response)),
       HttpStatus.ACCEPTED
     );
   }
 
-  @Override
+  @GetMapping(
+    value = "/analytics/export/{id}",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.ANALYTICS_READ)
-  public ResponseEntity<TicketsControllerCreateExportV1202Response> analyticsControllerGetExportV1(
-    String id
-  ) {
+  public ResponseEntity<
+    ApiResponse<ExportResponseDto>
+  > analyticsControllerGetExportV1(@PathVariable("id") String id) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     ExportResponse response = analyticsWith(context).getExport(
       GetExportRequest.newBuilder().setId(id).build()
     );
 
-    return ResponseEntity.ok(
-      new TicketsControllerCreateExportV1202Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(toExportDto(response))
-    );
+    return ResponseEntity.ok(ApiResponse.of(200, "OK", toExportDto(response)));
   }
 
   // ------------------------------------------------------ the three composed
   // reads
 
-  @Override
+  @GetMapping(value = "/analytics/agents", produces = { "application/json" })
+  @ApiErrors({ "401", "403" })
   @RequirePermission(PermissionCodesEnum.ANALYTICS_READ)
-  public ResponseEntity<AnalyticsControllerAgentsV1200Response> analyticsControllerAgentsV1(
-    String from,
-    String to,
-    UUID departmentId,
-    String granularity
+  public ResponseEntity<
+    ApiResponse<AgentAnalyticsResponseDto>
+  > analyticsControllerAgentsV1(
+    @NotNull @Valid @RequestParam(value = "from", required = true) String from,
+    @NotNull @Valid @RequestParam(value = "to", required = true) String to,
+    @Valid @RequestParam(
+      value = "departmentId",
+      required = false
+    ) @Nullable UUID departmentId,
+    @Valid @RequestParam(
+      value = "granularity",
+      required = false
+    ) @Nullable String granularity
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -444,13 +498,7 @@ public class AnalyticsController implements AnalyticsApi {
       () -> agents(from, to, departmentId, granularity, context)
     );
 
-    return ResponseEntity.ok(
-      new AnalyticsControllerAgentsV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(data)
-    );
+    return ResponseEntity.ok(ApiResponse.of(200, "OK", data));
   }
 
   private AgentAnalyticsResponseDto agents(
@@ -541,14 +589,30 @@ public class AnalyticsController implements AnalyticsApi {
       .unavailable(unavailable);
   }
 
-  @Override
+  @GetMapping(
+    value = "/analytics/knowledge-gaps",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "401", "403" })
   @RequirePermission(PermissionCodesEnum.ANALYTICS_READ)
-  public ResponseEntity<AnalyticsControllerKnowledgeGapsV1200Response> analyticsControllerKnowledgeGapsV1(
-    String from,
-    String to,
-    BigDecimal limit,
-    UUID departmentId,
-    String granularity
+  public ResponseEntity<
+    ApiResponse<KnowledgeGapsResponseDto>
+  > analyticsControllerKnowledgeGapsV1(
+    @NotNull @Valid @RequestParam(value = "from", required = true) String from,
+    @NotNull @Valid @RequestParam(value = "to", required = true) String to,
+    @DecimalMin(value = "1") @DecimalMax(value = "100") @Valid @RequestParam(
+      value = "limit",
+      required = false,
+      defaultValue = "20"
+    ) BigDecimal limit,
+    @Valid @RequestParam(
+      value = "departmentId",
+      required = false
+    ) @Nullable UUID departmentId,
+    @Valid @RequestParam(
+      value = "granularity",
+      required = false
+    ) @Nullable String granularity
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -569,13 +633,7 @@ public class AnalyticsController implements AnalyticsApi {
       () -> knowledgeGaps(from, to, limit, context)
     );
 
-    return ResponseEntity.ok(
-      new AnalyticsControllerKnowledgeGapsV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(data)
-    );
+    return ResponseEntity.ok(ApiResponse.of(200, "OK", data));
   }
 
   private KnowledgeGapsResponseDto knowledgeGaps(
@@ -634,10 +692,17 @@ public class AnalyticsController implements AnalyticsApi {
       .unavailable(unavailable);
   }
 
-  @Override
+  @GetMapping(value = "/analytics/documents", produces = { "application/json" })
+  @ApiErrors({ "401", "403" })
   @RequirePermission(PermissionCodesEnum.ANALYTICS_READ)
-  public ResponseEntity<AnalyticsControllerDocumentsV1200Response> analyticsControllerDocumentsV1(
-    BigDecimal limit
+  public ResponseEntity<
+    ApiResponse<DocumentAnalyticsResponseDto>
+  > analyticsControllerDocumentsV1(
+    @DecimalMin(value = "1") @DecimalMax(value = "100") @Valid @RequestParam(
+      value = "limit",
+      required = false,
+      defaultValue = "20"
+    ) BigDecimal limit
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -653,13 +718,7 @@ public class AnalyticsController implements AnalyticsApi {
       () -> documents(limit, context)
     );
 
-    return ResponseEntity.ok(
-      new AnalyticsControllerDocumentsV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(data)
-    );
+    return ResponseEntity.ok(ApiResponse.of(200, "OK", data));
   }
 
   private DocumentAnalyticsResponseDto documents(

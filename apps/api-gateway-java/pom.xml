@@ -75,6 +75,20 @@
       <artifactId>spring-boot-starter-web</artifactId>
     </dependency>
     <!--
+      The document this gateway now PRODUCES, from the annotated controllers
+      — the flip the OpenAPI-generator plugin's own comment below anticipates
+      ("the flip is the moment the first document stops existing"). No `-ui`:
+      this gateway has no browsable page to serve, only `/v3/api-docs` for
+      `openapi:check` and, later, a real front end to read. Version read from
+      `springdoc-openapi-starter-webmvc-api`'s own `maven-metadata.xml`
+      (3.1.1) — the first line to track Spring Boot 4 / Spring Framework 7.
+    -->
+    <dependency>
+      <groupId>org.springdoc</groupId>
+      <artifactId>springdoc-openapi-starter-webmvc-api</artifactId>
+      <version>3.1.1</version>
+    </dependency>
+    <!--
       Schema-first: `schema.gql` is the tracked contract, copied
       into `target/classes/schema/` by the resources execution below and
       loaded from there — never regenerated. Node writes it from decorators;

@@ -3,21 +3,25 @@ package com.synapsedesk.gateway.sessions;
 import com.synapsedesk.gateway.auth.CurrentRequest;
 import com.synapsedesk.gateway.auth.CurrentUser;
 import com.synapsedesk.gateway.auth.RequestContext;
-import com.synapsedesk.gateway.generated.api.UserSessionsApi;
-import com.synapsedesk.gateway.generated.model.AuthControllerForgotPasswordV1202Response;
 import com.synapsedesk.gateway.generated.model.CurrentUserResponseDto.PermissionCodesEnum;
 import com.synapsedesk.gateway.generated.model.SessionResponseDto;
-import com.synapsedesk.gateway.generated.model.SessionsControllerListV1200Response;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
+import com.synapsedesk.gateway.openapi.ApiErrors;
 import com.synapsedesk.gateway.security.RequirePermission;
+import com.synapsedesk.gateway.web.ApiPaths;
+import com.synapsedesk.gateway.web.ApiResponse;
 import io.grpc.stub.MetadataUtils;
-import java.math.BigDecimal;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import synapsedesk.auth.Session.ListUserSessionsRequest;
 import synapsedesk.auth.Session.RevokeUserSessionsRequest;
@@ -30,17 +34,18 @@ import synapsedesk.auth.SessionServiceGrpc;
  * auth-service's `SessionService`. Same channel as `UsersApi`/`OtpApi`:
  * auth-service is already paid for, so no new bean here.
  *
- * <p>`revoke`'s generated response type ({@code AuthControllerForgotPasswordV1202Response})
- * is reused structurally, not semantically — Node's own {@code @ApiWrappedResponse()}
- * declares no model for this route, so the generator gave it whatever
- * identically-shaped envelope it had already generated elsewhere. The real
- * Node handler still returns {@code {revokedCount}} inside `data`
- * (`TransformInterceptor` wraps whatever the handler returns, regardless of
- * what the decorator declared), so this mirrors that rather than the
- * generated type's name.
+ * <p><b>Migrated off `UserSessionsApi`.</b> `revoke`'s {@code data} was
+ * already an ad-hoc {@code {revokedCount}} map, not a real generated model —
+ * Node's own {@code @ApiWrappedResponse()} declares no model for this route,
+ * and the generator only supplied a same-shaped envelope borrowed from
+ * elsewhere. {@code ApiResponse<Object>} names that honestly instead of
+ * reusing another route's generated class.
  */
+@Tag(name = "User Sessions")
 @RestController
-public class UserSessionsController implements UserSessionsApi {
+@RequestMapping(ApiPaths.V1)
+@Validated
+public class UserSessionsController {
 
   private static final long DEADLINE_SECONDS = 5;
 
@@ -65,11 +70,15 @@ public class UserSessionsController implements UserSessionsApi {
       );
   }
 
-  @Override
+  @GetMapping(
+    value = "/users/{userId}/sessions",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.USER_SESSION_READ)
-  public ResponseEntity<SessionsControllerListV1200Response> userSessionsControllerListV1(
-    String userId
-  ) {
+  public ResponseEntity<
+    ApiResponse<java.util.List<SessionResponseDto>>
+  > userSessionsControllerListV1(@PathVariable("userId") String userId) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     var response = withMetadata(context).listUserSessions(
@@ -77,25 +86,27 @@ public class UserSessionsController implements UserSessionsApi {
     );
 
     return ResponseEntity.ok(
-      new SessionsControllerListV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(
-          response
-            .getItemsList()
-            .stream()
-            .map(UserSessionsController::toDto)
-            .toList()
-        )
+      ApiResponse.of(
+        200,
+        "OK",
+        response
+          .getItemsList()
+          .stream()
+          .map(UserSessionsController::toDto)
+          .toList()
+      )
     );
   }
 
-  @Override
+  @DeleteMapping(
+    value = "/users/{userId}/sessions",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.USER_SESSION_REVOKE)
-  public ResponseEntity<AuthControllerForgotPasswordV1202Response> userSessionsControllerRevokeV1(
-    String userId
-  ) {
+  public ResponseEntity<
+    ApiResponse<RevokedCountDto>
+  > userSessionsControllerRevokeV1(@PathVariable("userId") String userId) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     RevokeUserSessionsResponse response = withMetadata(
@@ -105,13 +116,11 @@ public class UserSessionsController implements UserSessionsApi {
     );
 
     return ResponseEntity.ok(
-      new AuthControllerForgotPasswordV1202Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("Sessions revoked")
-        .data(
-          Map.of("revokedCount", BigDecimal.valueOf(response.getRevokedCount()))
-        )
+      ApiResponse.of(
+        200,
+        "Sessions revoked",
+        new RevokedCountDto(response.getRevokedCount())
+      )
     );
   }
 

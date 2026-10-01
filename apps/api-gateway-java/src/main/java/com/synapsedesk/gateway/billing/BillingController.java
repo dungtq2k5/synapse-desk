@@ -3,13 +3,6 @@ package com.synapsedesk.gateway.billing;
 import com.synapsedesk.gateway.auth.CurrentRequest;
 import com.synapsedesk.gateway.auth.CurrentUser;
 import com.synapsedesk.gateway.auth.RequestContext;
-import com.synapsedesk.gateway.generated.api.BillingApi;
-import com.synapsedesk.gateway.generated.model.BillingControllerChangePlanV1200Response;
-import com.synapsedesk.gateway.generated.model.BillingControllerCreateCheckoutSessionV1200Response;
-import com.synapsedesk.gateway.generated.model.BillingControllerCreatePortalSessionV1200Response;
-import com.synapsedesk.gateway.generated.model.BillingControllerGetSubscriptionV1200Response;
-import com.synapsedesk.gateway.generated.model.BillingControllerListInvoicesV1200Response;
-import com.synapsedesk.gateway.generated.model.BillingControllerListPlansV1200Response;
 import com.synapsedesk.gateway.generated.model.ChangePlanDto;
 import com.synapsedesk.gateway.generated.model.CheckoutSessionResponseDto;
 import com.synapsedesk.gateway.generated.model.CreateCheckoutSessionDto;
@@ -22,9 +15,15 @@ import com.synapsedesk.gateway.generated.model.SubscriptionResponseDto;
 import com.synapsedesk.gateway.generated.model.TenantPlanPriceResponseDto;
 import com.synapsedesk.gateway.generated.model.TenantPlanResponseDto;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
+import com.synapsedesk.gateway.openapi.ApiErrors;
 import com.synapsedesk.gateway.security.RequirePermission;
+import com.synapsedesk.gateway.web.ApiPaths;
+import com.synapsedesk.gateway.web.ApiResponse;
 import io.grpc.StatusRuntimeException;
 import io.grpc.stub.MetadataUtils;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -34,6 +33,14 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.lang.Nullable;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 import synapsedesk.auth.Billing.BillingEmptyRequest;
@@ -78,9 +85,19 @@ import synapsedesk.ingestion.DocumentServiceGrpc;
  * ingestion for the tenant's live usage — a widening change dials nothing and
  * so cannot be blocked by an unrelated outage. An unreadable usage leg
  * refuses (503) rather than allowing the dimension through unchecked.
+ *
+ * <p><b>Migrated off `BillingApi`.</b> `changePlan`'s {@code
+ * idempotency-key} header stays REQUIRED, matching the generated
+ * interface exactly — the published contract marks it required while
+ * Node's own handler treats it as optional, a pre-existing spec/
+ * implementation gap this port does not paper over (the corresponding
+ * `SKIPPED_FOR_JAVA` entry in the harness names this same deviation).
  */
+@Tag(name = "Billing")
 @RestController
-public class BillingController implements BillingApi {
+@RequestMapping(ApiPaths.V1)
+@Validated
+public class BillingController {
 
   private static final long DEADLINE_SECONDS = 5;
   private static final long STRIPE_DEADLINE_SECONDS = 20;
@@ -99,9 +116,15 @@ public class BillingController implements BillingApi {
     this.currentUser = currentUser;
   }
 
-  @Override
+  @GetMapping(
+    value = "/billing/subscription",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "401", "403" })
   @RequirePermission(PermissionCodesEnum.ORGANIZATION_READ)
-  public ResponseEntity<BillingControllerGetSubscriptionV1200Response> billingControllerGetSubscriptionV1() {
+  public ResponseEntity<
+    ApiResponse<SubscriptionResponseDto>
+  > billingControllerGetSubscriptionV1() {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     SubscriptionResponse response = withMetadata(context).getSubscription(
@@ -109,18 +132,21 @@ public class BillingController implements BillingApi {
     );
 
     return ResponseEntity.ok(
-      new BillingControllerGetSubscriptionV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(toSubscriptionResponseDto(response))
+      ApiResponse.of(200, "OK", toSubscriptionResponseDto(response))
     );
   }
 
-  @Override
+  @PostMapping(
+    value = "/billing/checkout-session",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403" })
   @RequirePermission(PermissionCodesEnum.ORGANIZATION_UPDATE)
-  public ResponseEntity<BillingControllerCreateCheckoutSessionV1200Response> billingControllerCreateCheckoutSessionV1(
-    CreateCheckoutSessionDto createCheckoutSessionDto
+  public ResponseEntity<
+    ApiResponse<CheckoutSessionResponseDto>
+  > billingControllerCreateCheckoutSessionV1(
+    @Valid @RequestBody CreateCheckoutSessionDto createCheckoutSessionDto
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -133,18 +159,25 @@ public class BillingController implements BillingApi {
     );
 
     return ResponseEntity.ok(
-      new BillingControllerCreateCheckoutSessionV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(new CheckoutSessionResponseDto(response.getUrl()))
+      ApiResponse.of(
+        200,
+        "OK",
+        new CheckoutSessionResponseDto(response.getUrl())
+      )
     );
   }
 
-  @Override
+  @PostMapping(
+    value = "/billing/portal-session",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403" })
   @RequirePermission(PermissionCodesEnum.ORGANIZATION_UPDATE)
-  public ResponseEntity<BillingControllerCreatePortalSessionV1200Response> billingControllerCreatePortalSessionV1(
-    CreatePortalSessionDto createPortalSessionDto
+  public ResponseEntity<
+    ApiResponse<PortalSessionResponseDto>
+  > billingControllerCreatePortalSessionV1(
+    @Valid @RequestBody CreatePortalSessionDto createPortalSessionDto
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -155,18 +188,20 @@ public class BillingController implements BillingApi {
     );
 
     return ResponseEntity.ok(
-      new BillingControllerCreatePortalSessionV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(new PortalSessionResponseDto(response.getUrl()))
+      ApiResponse.of(200, "OK", new PortalSessionResponseDto(response.getUrl()))
     );
   }
 
-  @Override
+  @GetMapping(value = "/billing/invoices", produces = { "application/json" })
+  @ApiErrors({ "401", "403" })
   @RequirePermission(PermissionCodesEnum.ORGANIZATION_UPDATE)
-  public ResponseEntity<BillingControllerListInvoicesV1200Response> billingControllerListInvoicesV1(
-    String limit
+  public ResponseEntity<
+    ApiResponse<List<InvoiceResponseDto>>
+  > billingControllerListInvoicesV1(
+    @Valid @RequestParam(
+      value = "limit",
+      required = false
+    ) @Nullable String limit
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -183,18 +218,15 @@ public class BillingController implements BillingApi {
       .map(BillingController::toInvoiceResponseDto)
       .toList();
 
-    return ResponseEntity.ok(
-      new BillingControllerListInvoicesV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(data)
-    );
+    return ResponseEntity.ok(ApiResponse.of(200, "OK", data));
   }
 
-  @Override
+  @GetMapping(value = "/billing/plans", produces = { "application/json" })
+  @ApiErrors({ "401", "403" })
   @RequirePermission(PermissionCodesEnum.ORGANIZATION_READ)
-  public ResponseEntity<BillingControllerListPlansV1200Response> billingControllerListPlansV1() {
+  public ResponseEntity<
+    ApiResponse<List<TenantPlanResponseDto>>
+  > billingControllerListPlansV1() {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     var response = withMetadata(context).listTenantPlans(
@@ -207,20 +239,24 @@ public class BillingController implements BillingApi {
       .map(BillingController::toTenantPlanResponseDto)
       .toList();
 
-    return ResponseEntity.ok(
-      new BillingControllerListPlansV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(data)
-    );
+    return ResponseEntity.ok(ApiResponse.of(200, "OK", data));
   }
 
-  @Override
+  @PostMapping(
+    value = "/billing/plan",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403", "404", "409", "503" })
   @RequirePermission(PermissionCodesEnum.ORGANIZATION_UPDATE)
-  public ResponseEntity<BillingControllerChangePlanV1200Response> billingControllerChangePlanV1(
-    String idempotencyKey,
-    ChangePlanDto changePlanDto
+  public ResponseEntity<
+    ApiResponse<PlanChangeResponseDto>
+  > billingControllerChangePlanV1(
+    @NotNull @RequestHeader(
+      value = "idempotency-key",
+      required = true
+    ) String idempotencyKey,
+    @Valid @RequestBody ChangePlanDto changePlanDto
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -242,18 +278,16 @@ public class BillingController implements BillingApi {
     );
 
     return ResponseEntity.ok(
-      new BillingControllerChangePlanV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("Plan change submitted")
-        .data(
-          new PlanChangeResponseDto(
-            response.getPlanId(),
-            response.getPlanName(),
-            toOffsetDateTime(response.getEffectiveAt()),
-            response.hasCreditIssued() ? response.getCreditIssued() : null
-          )
+      ApiResponse.of(
+        200,
+        "Plan change submitted",
+        new PlanChangeResponseDto(
+          response.getPlanId(),
+          response.getPlanName(),
+          toOffsetDateTime(response.getEffectiveAt()),
+          response.hasCreditIssued() ? response.getCreditIssued() : null
         )
+      )
     );
   }
 

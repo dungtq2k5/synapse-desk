@@ -12,7 +12,7 @@ import com.synapsedesk.gateway.auth.CurrentUser;
 import com.synapsedesk.gateway.auth.RequestContext;
 import com.synapsedesk.gateway.cache.CacheService;
 import com.synapsedesk.gateway.generated.model.PermissionResponseDto;
-import com.synapsedesk.gateway.generated.model.PermissionsControllerListV1200Response;
+import com.synapsedesk.gateway.web.ApiResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.function.Supplier;
@@ -85,7 +85,7 @@ class PermissionsControllerTest {
         .build()
     );
 
-    ResponseEntity<PermissionsControllerListV1200Response> response =
+    ResponseEntity<ApiResponse<List<PermissionResponseDto>>> response =
       controller.permissionsControllerListV1();
 
     // The scope string and the (empty) params map both have to match the
@@ -96,7 +96,7 @@ class PermissionsControllerTest {
       "permissions",
       java.util.Map.of()
     );
-    List<PermissionResponseDto> data = response.getBody().getData();
+    List<PermissionResponseDto> data = response.getBody().data();
     assertThat(data).hasSize(1);
     assertThat(data.get(0).getCode()).isEqualTo(
       PermissionResponseDto.CodeEnum.ROLE_READ

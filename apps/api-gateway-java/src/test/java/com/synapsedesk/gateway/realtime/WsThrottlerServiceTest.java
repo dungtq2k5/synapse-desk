@@ -23,10 +23,12 @@ import org.springframework.data.redis.core.ValueOperations;
 class WsThrottlerServiceTest {
 
   private final StringRedisTemplate redis = mock(StringRedisTemplate.class);
+
   @SuppressWarnings("unchecked")
   private final ValueOperations<String, String> values = mock(
     ValueOperations.class
   );
+
   private final ThrottleProperties throttle = new ThrottleProperties(
     1000L,
     10,
@@ -36,9 +38,9 @@ class WsThrottlerServiceTest {
     10,
     1000L,
     10,
-    /* wsHandshakeLimit */5,
-    /* wsHandshakeTtl */60_000L,
-    /* wsHandshakeBlockDuration */300_000L
+    /* wsHandshakeLimit */ 5,
+    /* wsHandshakeTtl */ 60_000L,
+    /* wsHandshakeBlockDuration */ 300_000L
   );
   private final WsThrottlerService throttler = new WsThrottlerService(
     redis,
@@ -51,7 +53,9 @@ class WsThrottlerServiceTest {
 
   @Test
   void allowHandshakeUsesThisImplementationsOwnIdentityNeverNodesClassName() {
-    when(values.increment("ws_handshake:java-realtime-gateway:1.2.3.4")).thenReturn(1L);
+    when(
+      values.increment("ws_handshake:java-realtime-gateway:1.2.3.4")
+    ).thenReturn(1L);
 
     assertThat(throttler.allowHandshake("1.2.3.4")).isTrue();
     verify(values).increment("ws_handshake:java-realtime-gateway:1.2.3.4");
@@ -73,7 +77,9 @@ class WsThrottlerServiceTest {
   @Test
   void eventKeyIsExactlyEventColonSubjectShared() {
     when(
-      values.increment("ws_event:" + RealtimeEvents.CLIENT_EVENTS_TYPING_START + ":user-1")
+      values.increment(
+        "ws_event:" + RealtimeEvents.CLIENT_EVENTS_TYPING_START + ":user-1"
+      )
     ).thenReturn(1L);
 
     assertThat(

@@ -3,12 +3,7 @@ package com.synapsedesk.gateway.ai;
 import com.synapsedesk.gateway.auth.CurrentRequest;
 import com.synapsedesk.gateway.auth.CurrentUser;
 import com.synapsedesk.gateway.auth.RequestContext;
-import com.synapsedesk.gateway.generated.api.AiApi;
 import com.synapsedesk.gateway.generated.model.AiClassificationResponseDto;
-import com.synapsedesk.gateway.generated.model.AiControllerClassifyV1200Response;
-import com.synapsedesk.gateway.generated.model.AiControllerGenerateDraftV1200Response;
-import com.synapsedesk.gateway.generated.model.AiControllerGetSuggestionsV1200Response;
-import com.synapsedesk.gateway.generated.model.AiControllerGetSummaryV1200Response;
 import com.synapsedesk.gateway.generated.model.AiDraftResponseDto;
 import com.synapsedesk.gateway.generated.model.AiSuggestionResponseDto;
 import com.synapsedesk.gateway.generated.model.AiSuggestionsResponseDto;
@@ -18,14 +13,25 @@ import com.synapsedesk.gateway.generated.model.DraftCitationResponseDto;
 import com.synapsedesk.gateway.generated.model.GenerateDraftDto;
 import com.synapsedesk.gateway.generated.model.SuggestedArticleResponseDto;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
+import com.synapsedesk.gateway.openapi.ApiErrors;
 import com.synapsedesk.gateway.security.RequirePermission;
+import com.synapsedesk.gateway.web.ApiPaths;
+import com.synapsedesk.gateway.web.ApiResponse;
 import io.grpc.stub.MetadataUtils;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.concurrent.TimeUnit;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import synapsedesk.ticket.Ai.AiSummaryResponse;
 import synapsedesk.ticket.Ai.ClassifyTicketResponse;
@@ -55,9 +61,17 @@ import synapsedesk.ticket.Common.TicketPriority;
  * as a gRPC `PERMISSION_DENIED` carrying a {@code [http:402]} marker, which
  * {@link com.synapsedesk.gateway.error.GrpcStatusMapping} already resolves
  * generically — no route-specific handling needed here.
+ *
+ * <p><b>Migrated off `AiApi`.</b> `getSummary`/`generateSummary` shared ONE
+ * generated response class for two different routes — the dedup this
+ * whole flip retires — and now each just returns {@code
+ * ApiResponse<AiSummaryResponseDto>}.
  */
+@Tag(name = "Ai")
 @RestController
-public class AiController implements AiApi {
+@RequestMapping(ApiPaths.V1)
+@Validated
+public class AiController {
 
   private static final long DEADLINE_SECONDS = 5;
 
@@ -72,11 +86,15 @@ public class AiController implements AiApi {
     this.currentUser = currentUser;
   }
 
-  @Override
+  @GetMapping(
+    value = "/tickets/{ticketId}/ai/summary",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.TICKET_READ_ALL)
-  public ResponseEntity<AiControllerGetSummaryV1200Response> aiControllerGetSummaryV1(
-    String ticketId
-  ) {
+  public ResponseEntity<
+    ApiResponse<AiSummaryResponseDto>
+  > aiControllerGetSummaryV1(@PathVariable("ticketId") String ticketId) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     AiSummaryResponse response = withMetadata(context).getSummary(
@@ -84,19 +102,19 @@ public class AiController implements AiApi {
     );
 
     return ResponseEntity.ok(
-      new AiControllerGetSummaryV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(toAiSummaryResponseDto(response))
+      ApiResponse.of(200, "OK", toAiSummaryResponseDto(response))
     );
   }
 
-  @Override
+  @PostMapping(
+    value = "/tickets/{ticketId}/ai/summary",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "402", "403", "404" })
   @RequirePermission(PermissionCodesEnum.TICKET_AI_USE)
-  public ResponseEntity<AiControllerGetSummaryV1200Response> aiControllerGenerateSummaryV1(
-    String ticketId
-  ) {
+  public ResponseEntity<
+    ApiResponse<AiSummaryResponseDto>
+  > aiControllerGenerateSummaryV1(@PathVariable("ticketId") String ticketId) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     AiSummaryResponse response = withMetadata(context).generateSummary(
@@ -104,19 +122,22 @@ public class AiController implements AiApi {
     );
 
     return ResponseEntity.ok(
-      new AiControllerGetSummaryV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(toAiSummaryResponseDto(response))
+      ApiResponse.of(200, "OK", toAiSummaryResponseDto(response))
     );
   }
 
-  @Override
+  @PostMapping(
+    value = "/tickets/{ticketId}/ai/draft",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "402", "403", "404" })
   @RequirePermission(PermissionCodesEnum.TICKET_AI_USE)
-  public ResponseEntity<AiControllerGenerateDraftV1200Response> aiControllerGenerateDraftV1(
-    String ticketId,
-    GenerateDraftDto generateDraftDto
+  public ResponseEntity<
+    ApiResponse<AiDraftResponseDto>
+  > aiControllerGenerateDraftV1(
+    @PathVariable("ticketId") String ticketId,
+    @Valid @RequestBody GenerateDraftDto generateDraftDto
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -143,20 +164,18 @@ public class AiController implements AiApi {
         .toList()
     );
 
-    return ResponseEntity.ok(
-      new AiControllerGenerateDraftV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(data)
-    );
+    return ResponseEntity.ok(ApiResponse.of(200, "OK", data));
   }
 
-  @Override
+  @PostMapping(
+    value = "/tickets/{ticketId}/ai/suggestions",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.TICKET_AI_USE)
-  public ResponseEntity<AiControllerGetSuggestionsV1200Response> aiControllerGetSuggestionsV1(
-    String ticketId
-  ) {
+  public ResponseEntity<
+    ApiResponse<AiSuggestionsResponseDto>
+  > aiControllerGetSuggestionsV1(@PathVariable("ticketId") String ticketId) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     GetSuggestionsResponse response = withMetadata(context).getSuggestions(
@@ -177,20 +196,18 @@ public class AiController implements AiApi {
       toDegradedEnum(response.getDegraded())
     );
 
-    return ResponseEntity.ok(
-      new AiControllerGetSuggestionsV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(data)
-    );
+    return ResponseEntity.ok(ApiResponse.of(200, "OK", data));
   }
 
-  @Override
+  @PostMapping(
+    value = "/tickets/{ticketId}/ai/classify",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "402", "403", "404" })
   @RequirePermission(PermissionCodesEnum.TICKET_AI_USE)
-  public ResponseEntity<AiControllerClassifyV1200Response> aiControllerClassifyV1(
-    String ticketId
-  ) {
+  public ResponseEntity<
+    ApiResponse<AiClassificationResponseDto>
+  > aiControllerClassifyV1(@PathVariable("ticketId") String ticketId) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     ClassifyTicketResponse response = withMetadata(context).classifyTicket(
@@ -203,13 +220,7 @@ public class AiController implements AiApi {
       BigDecimal.valueOf(response.getConfidenceScore())
     );
 
-    return ResponseEntity.ok(
-      new AiControllerClassifyV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(data)
-    );
+    return ResponseEntity.ok(ApiResponse.of(200, "OK", data));
   }
 
   private static AiSummaryResponseDto toAiSummaryResponseDto(

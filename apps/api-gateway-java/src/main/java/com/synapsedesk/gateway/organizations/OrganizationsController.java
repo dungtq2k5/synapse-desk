@@ -5,8 +5,6 @@ import com.synapsedesk.gateway.auth.CurrentUser;
 import com.synapsedesk.gateway.auth.RequestContext;
 import com.synapsedesk.gateway.cache.CacheService;
 import com.synapsedesk.gateway.config.InboundEmailProperties;
-import com.synapsedesk.gateway.generated.api.OrganizationsApi;
-import com.synapsedesk.gateway.generated.model.AuthControllerForgotPasswordV1202Response;
 import com.synapsedesk.gateway.generated.model.CurrentUserResponseDto.PermissionCodesEnum;
 import com.synapsedesk.gateway.generated.model.DeleteOrganizationDto;
 import com.synapsedesk.gateway.generated.model.InboundAddressResponseDto;
@@ -16,27 +14,36 @@ import com.synapsedesk.gateway.generated.model.OnboardingStepResponseDto;
 import com.synapsedesk.gateway.generated.model.OrganizationResponseDto;
 import com.synapsedesk.gateway.generated.model.OrganizationSettingsResponseDto;
 import com.synapsedesk.gateway.generated.model.OrganizationUsageResponseDto;
-import com.synapsedesk.gateway.generated.model.OrganizationsControllerGetOnboardingV1200Response;
-import com.synapsedesk.gateway.generated.model.OrganizationsControllerGetSettingsV1200Response;
-import com.synapsedesk.gateway.generated.model.OrganizationsControllerGetUsageV1200Response;
-import com.synapsedesk.gateway.generated.model.OrganizationsControllerGetV1200Response;
-import com.synapsedesk.gateway.generated.model.OrganizationsControllerIssueInboundTokenV1201Response;
-import com.synapsedesk.gateway.generated.model.OrganizationsControllerRequestOffboardV1200Response;
 import com.synapsedesk.gateway.generated.model.UpdateOrganizationDto;
 import com.synapsedesk.gateway.generated.model.UpdateOrganizationSettingsDto;
 import com.synapsedesk.gateway.generated.model.UsageMeterResponseDto;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
+import com.synapsedesk.gateway.openapi.ApiErrors;
 import com.synapsedesk.gateway.security.RequirePermission;
+import com.synapsedesk.gateway.web.ApiPaths;
+import com.synapsedesk.gateway.web.ApiResponse;
 import com.synapsedesk.gateway.web.CachedBodyRequest;
 import io.grpc.StatusRuntimeException;
 import io.grpc.stub.MetadataUtils;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import synapsedesk.auth.Common.AiModelTier;
 import synapsedesk.auth.Common.OrgStatus;
@@ -91,9 +98,20 @@ import tools.jackson.databind.ObjectMapper;
  * <p>
  * No write here evicts the cache — known gap 42, same as every other
  * {@code @Cacheable} route ported so far.
+ *
+ * <p><b>Migrated off `OrganizationsApi`.</b> {@code get}'s cache goes
+ * through {@link CacheService#wrapTyped} — a bare {@code Class<T>} would
+ * erase {@code ApiResponse<OrganizationResponseDto>}'s own type argument on
+ * a cache HIT, the same defect fixed in {@code RolesController.list} and
+ * {@code DepartmentsController.list}. {@code issueInboundToken} answers
+ * 201, {@code revokeInboundToken} answers 204 —
+ * {@code @ResponseStatus} is what tells springdoc that.
  */
+@Tag(name = "Organizations")
 @RestController
-public class OrganizationsController implements OrganizationsApi {
+@RequestMapping(ApiPaths.V1)
+@Validated
+public class OrganizationsController {
 
   private static final long DEADLINE_SECONDS = 5;
   private static final String CACHE_SCOPE = "organizations";
@@ -125,8 +143,14 @@ public class OrganizationsController implements OrganizationsApi {
     this.json = json;
   }
 
-  @Override
-  public ResponseEntity<OrganizationsControllerGetV1200Response> organizationsControllerGetV1() {
+  @GetMapping(
+    value = "/organizations/current",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "401" })
+  public ResponseEntity<
+    ApiResponse<OrganizationResponseDto>
+  > organizationsControllerGetV1() {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     String key = cache.buildKey(
@@ -134,10 +158,12 @@ public class OrganizationsController implements OrganizationsApi {
       CACHE_SCOPE,
       Map.of()
     );
-    OrganizationsControllerGetV1200Response envelope = cache.wrap(
+    ApiResponse<OrganizationResponseDto> envelope = cache.wrapTyped(
       key,
       GET_CACHE_TTL_SECONDS,
-      OrganizationsControllerGetV1200Response.class,
+      new tools.jackson.core.type.TypeReference<
+        ApiResponse<OrganizationResponseDto>
+      >() {},
       () ->
         toGetEnvelope(
           "OK",
@@ -151,9 +177,16 @@ public class OrganizationsController implements OrganizationsApi {
     return ResponseEntity.ok(envelope);
   }
 
-  @Override
+  @PostMapping(
+    value = "/organizations/current/inbound-token",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "401", "403" })
+  @ResponseStatus(HttpStatus.CREATED)
   @RequirePermission(PermissionCodesEnum.ORGANIZATION_UPDATE)
-  public ResponseEntity<OrganizationsControllerIssueInboundTokenV1201Response> organizationsControllerIssueInboundTokenV1() {
+  public ResponseEntity<
+    ApiResponse<InboundAddressResponseDto>
+  > organizationsControllerIssueInboundTokenV1() {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     IssueInboundTokenResponse response = withMetadata(
@@ -168,17 +201,22 @@ public class OrganizationsController implements OrganizationsApi {
       inboundEmail.domain();
 
     return ResponseEntity.status(201).body(
-      new OrganizationsControllerIssueInboundTokenV1201Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(201))
-        .message("OK")
-        .data(new InboundAddressResponseDto().inboundAddress(address))
+      ApiResponse.of(
+        201,
+        "OK",
+        new InboundAddressResponseDto().inboundAddress(address)
+      )
     );
   }
 
-  @Override
+  @DeleteMapping(
+    value = "/organizations/current/inbound-token",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "401", "403" })
+  @ResponseStatus(HttpStatus.NO_CONTENT)
   @RequirePermission(PermissionCodesEnum.ORGANIZATION_UPDATE)
-  public ResponseEntity<AuthControllerForgotPasswordV1202Response> organizationsControllerRevokeInboundTokenV1() {
+  public ResponseEntity<Void> organizationsControllerRevokeInboundTokenV1() {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     withMetadata(context).revokeInboundToken(
@@ -188,10 +226,17 @@ public class OrganizationsController implements OrganizationsApi {
     return ResponseEntity.noContent().build();
   }
 
-  @Override
+  @PatchMapping(
+    value = "/organizations/current",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403" })
   @RequirePermission(PermissionCodesEnum.ORGANIZATION_UPDATE)
-  public ResponseEntity<OrganizationsControllerGetV1200Response> organizationsControllerUpdateV1(
-    UpdateOrganizationDto updateOrganizationDto
+  public ResponseEntity<
+    ApiResponse<OrganizationResponseDto>
+  > organizationsControllerUpdateV1(
+    @Valid @RequestBody UpdateOrganizationDto updateOrganizationDto
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -214,9 +259,15 @@ public class OrganizationsController implements OrganizationsApi {
     return ResponseEntity.ok(toGetEnvelope("OK", 200, response));
   }
 
-  @Override
+  @GetMapping(
+    value = "/organizations/current/settings",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "401", "403" })
   @RequirePermission(PermissionCodesEnum.ORGANIZATION_READ)
-  public ResponseEntity<OrganizationsControllerGetSettingsV1200Response> organizationsControllerGetSettingsV1() {
+  public ResponseEntity<
+    ApiResponse<OrganizationSettingsResponseDto>
+  > organizationsControllerGetSettingsV1() {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     OrganizationSettingsResponse response = withMetadata(
@@ -228,10 +279,17 @@ public class OrganizationsController implements OrganizationsApi {
     return ResponseEntity.ok(toSettingsEnvelope("OK", response, null));
   }
 
-  @Override
+  @PatchMapping(
+    value = "/organizations/current/settings",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403" })
   @RequirePermission(PermissionCodesEnum.ORGANIZATION_UPDATE)
-  public ResponseEntity<OrganizationsControllerGetSettingsV1200Response> organizationsControllerUpdateSettingsV1(
-    UpdateOrganizationSettingsDto updateOrganizationSettingsDto
+  public ResponseEntity<
+    ApiResponse<OrganizationSettingsResponseDto>
+  > organizationsControllerUpdateSettingsV1(
+    @Valid @RequestBody UpdateOrganizationSettingsDto updateOrganizationSettingsDto
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
     JsonNode body = rawBody();
@@ -293,9 +351,15 @@ public class OrganizationsController implements OrganizationsApi {
     );
   }
 
-  @Override
+  @GetMapping(
+    value = "/organizations/current/usage",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "401", "403" })
   @RequirePermission(PermissionCodesEnum.ORGANIZATION_READ)
-  public ResponseEntity<OrganizationsControllerGetUsageV1200Response> organizationsControllerGetUsageV1() {
+  public ResponseEntity<
+    ApiResponse<OrganizationUsageResponseDto>
+  > organizationsControllerGetUsageV1() {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     OrganizationUsageResponse response = withMetadata(
@@ -315,13 +379,7 @@ public class OrganizationsController implements OrganizationsApi {
         : null
     );
 
-    return ResponseEntity.ok(
-      new OrganizationsControllerGetUsageV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(data)
-    );
+    return ResponseEntity.ok(ApiResponse.of(200, "OK", data));
   }
 
   /** The id is ignored — storage usage is a WORKSPACE total, matching Node's own client. */
@@ -348,9 +406,15 @@ public class OrganizationsController implements OrganizationsApi {
     }
   }
 
-  @Override
+  @GetMapping(
+    value = "/organizations/current/onboarding",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "401", "403" })
   @RequirePermission(PermissionCodesEnum.ORGANIZATION_READ)
-  public ResponseEntity<OrganizationsControllerGetOnboardingV1200Response> organizationsControllerGetOnboardingV1() {
+  public ResponseEntity<
+    ApiResponse<OnboardingResponseDto>
+  > organizationsControllerGetOnboardingV1() {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     OnboardingResponse response = withMetadata(context).getOnboarding(
@@ -358,17 +422,19 @@ public class OrganizationsController implements OrganizationsApi {
     );
 
     return ResponseEntity.ok(
-      new OrganizationsControllerGetOnboardingV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(toOnboardingResponseDto(response))
+      ApiResponse.of(200, "OK", toOnboardingResponseDto(response))
     );
   }
 
-  @Override
+  @PostMapping(
+    value = "/organizations/current/onboarding/complete",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "401", "403" })
   @RequirePermission(PermissionCodesEnum.ORGANIZATION_UPDATE)
-  public ResponseEntity<OrganizationsControllerGetV1200Response> organizationsControllerCompleteOnboardingV1() {
+  public ResponseEntity<
+    ApiResponse<OrganizationResponseDto>
+  > organizationsControllerCompleteOnboardingV1() {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     OrganizationResponse response = withMetadata(context).completeOnboarding(
@@ -380,10 +446,17 @@ public class OrganizationsController implements OrganizationsApi {
     );
   }
 
-  @Override
+  @DeleteMapping(
+    value = "/organizations/current",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403" })
   @RequirePermission(PermissionCodesEnum.ORGANIZATION_DELETE)
-  public ResponseEntity<OrganizationsControllerRequestOffboardV1200Response> organizationsControllerRequestOffboardV1(
-    DeleteOrganizationDto deleteOrganizationDto
+  public ResponseEntity<
+    ApiResponse<OffboardResponseDto>
+  > organizationsControllerRequestOffboardV1(
+    @Valid @RequestBody DeleteOrganizationDto deleteOrganizationDto
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -396,18 +469,14 @@ public class OrganizationsController implements OrganizationsApi {
     );
 
     return ResponseEntity.ok(
-      new OrganizationsControllerRequestOffboardV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("Offboarding requested")
-        .warning(
-          "This workspace is frozen pending review. Contact support to cancel."
+      ApiResponse.of(
+        200,
+        "Offboarding requested",
+        "This workspace is frozen pending review. Contact support to cancel.",
+        new OffboardResponseDto(
+          BigDecimal.valueOf(response.getRevokedSessionCount())
         )
-        .data(
-          new OffboardResponseDto(
-            BigDecimal.valueOf(response.getRevokedSessionCount())
-          )
-        )
+      )
     );
   }
 
@@ -426,7 +495,7 @@ public class OrganizationsController implements OrganizationsApi {
     if (!body.has(field)) {
       return;
     }
-    if (body.get(field).isNull()) {
+    if (body.get(field).isNull() || value == null) {
       setClear.accept(true);
     } else {
       setValue.accept(value.longValue());
@@ -446,29 +515,25 @@ public class OrganizationsController implements OrganizationsApi {
     return json.readTree("{}");
   }
 
-  private static OrganizationsControllerGetV1200Response toGetEnvelope(
+  private static ApiResponse<OrganizationResponseDto> toGetEnvelope(
     String message,
     int status,
     OrganizationResponse response
   ) {
-    return new OrganizationsControllerGetV1200Response()
-      .success(true)
-      .statusCode(BigDecimal.valueOf(status))
-      .message(message)
-      .data(toOrganizationResponseDto(response));
+    return ApiResponse.of(status, message, toOrganizationResponseDto(response));
   }
 
-  private static OrganizationsControllerGetSettingsV1200Response toSettingsEnvelope(
+  private static ApiResponse<OrganizationSettingsResponseDto> toSettingsEnvelope(
     String message,
     OrganizationSettingsResponse response,
     String warning
   ) {
-    return new OrganizationsControllerGetSettingsV1200Response()
-      .success(true)
-      .statusCode(BigDecimal.valueOf(200))
-      .message(message)
-      .warning(warning)
-      .data(toOrganizationSettingsResponseDto(response));
+    return ApiResponse.of(
+      200,
+      message,
+      warning,
+      toOrganizationSettingsResponseDto(response)
+    );
   }
 
   private static OrganizationResponseDto toOrganizationResponseDto(

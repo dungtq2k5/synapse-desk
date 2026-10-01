@@ -4,20 +4,23 @@ import com.synapsedesk.gateway.auth.CurrentRequest;
 import com.synapsedesk.gateway.auth.CurrentUser;
 import com.synapsedesk.gateway.auth.IsoDateCheck;
 import com.synapsedesk.gateway.auth.RequestContext;
-import com.synapsedesk.gateway.generated.api.AuditLogsApi;
 import com.synapsedesk.gateway.generated.model.AuditActionsResponseDto;
 import com.synapsedesk.gateway.generated.model.AuditLogResponseDto;
-import com.synapsedesk.gateway.generated.model.AuditLogsControllerListActionsV1200Response;
-import com.synapsedesk.gateway.generated.model.AuditLogsControllerListV1200Response;
-import com.synapsedesk.gateway.generated.model.AuditLogsControllerListV1200ResponseData;
 import com.synapsedesk.gateway.generated.model.CreateAuditLogExportDto;
 import com.synapsedesk.gateway.generated.model.CurrentUserResponseDto.PermissionCodesEnum;
 import com.synapsedesk.gateway.generated.model.ExportResponseDto;
-import com.synapsedesk.gateway.generated.model.InvitationsControllerListV1200ResponseDataMeta;
-import com.synapsedesk.gateway.generated.model.TicketsControllerCreateExportV1202Response;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
+import com.synapsedesk.gateway.openapi.ApiErrors;
 import com.synapsedesk.gateway.security.RequirePermission;
+import com.synapsedesk.gateway.web.ApiPaths;
+import com.synapsedesk.gateway.web.ApiResponse;
+import com.synapsedesk.gateway.web.PageMeta;
+import com.synapsedesk.gateway.web.PagedData;
 import io.grpc.stub.MetadataUtils;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -28,8 +31,18 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.lang.Nullable;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 import synapsedesk.auth.Common.PageRequest;
@@ -56,9 +69,21 @@ import tools.jackson.databind.ObjectMapper;
  * second copy of the machinery, so it dials `AnalyticsServiceGrpc` directly
  * with {@code EXPORT_KIND_AUDIT_LOG} rather than duplicating the export
  * state machine.
+ *
+ * <p><b>Migrated off `AuditLogsApi`.</b> `createExport` answers 202 —
+ * {@code @ResponseStatus} is what tells springdoc that. {@code
+ * PlatformAuditLogsController} still reuses {@link #toListAuditLogsRequest},
+ * {@link #toAuditLogResponseDto} and {@link #toAuditActionsResponseDto} as
+ * package-visible statics — signatures unchanged, so that reuse survives
+ * this migration unaffected. {@code toMetaDto} is gone: this class's own
+ * list route now builds its {@code meta} via {@link PageMeta#from}, the
+ * same factory `PlatformAuditLogsController` already bypassed it with.
  */
+@Tag(name = "Audit Logs")
 @RestController
-public class AuditLogsController implements AuditLogsApi {
+@RequestMapping(ApiPaths.V1)
+@Validated
+public class AuditLogsController {
 
   private static final Logger LOG = LoggerFactory.getLogger(
     AuditLogsController.class
@@ -82,19 +107,54 @@ public class AuditLogsController implements AuditLogsApi {
     this.json = json;
   }
 
-  @Override
+  @GetMapping(value = "/audit-logs", produces = { "application/json" })
+  @ApiErrors({ "401", "403" })
   @RequirePermission(PermissionCodesEnum.AUDIT_READ)
-  public ResponseEntity<AuditLogsControllerListV1200Response> auditLogsControllerListV1(
-    BigDecimal page,
-    BigDecimal limit,
-    String sortBy,
-    String sortOrder,
-    String action,
-    UUID userId,
-    String resourceType,
-    UUID resourceId,
-    OffsetDateTime from,
-    OffsetDateTime to
+  public ResponseEntity<
+    ApiResponse<PagedData<AuditLogResponseDto>>
+  > auditLogsControllerListV1(
+    @DecimalMin(value = "1") @Valid @RequestParam(
+      value = "page",
+      required = false,
+      defaultValue = "1"
+    ) BigDecimal page,
+    @DecimalMin(value = "1") @DecimalMax(value = "100") @Valid @RequestParam(
+      value = "limit",
+      required = false,
+      defaultValue = "10"
+    ) BigDecimal limit,
+    @Valid @RequestParam(
+      value = "sortBy",
+      required = false,
+      defaultValue = "createdAt"
+    ) String sortBy,
+    @Valid @RequestParam(
+      value = "sortOrder",
+      required = false,
+      defaultValue = "ASC"
+    ) String sortOrder,
+    @Valid @RequestParam(
+      value = "action",
+      required = false
+    ) @Nullable String action,
+    @Valid @RequestParam(
+      value = "userId",
+      required = false
+    ) @Nullable UUID userId,
+    @Valid @RequestParam(
+      value = "resourceType",
+      required = false
+    ) @Nullable String resourceType,
+    @Valid @RequestParam(
+      value = "resourceId",
+      required = false
+    ) @Nullable UUID resourceId,
+    @Valid @RequestParam(value = "from", required = false) @DateTimeFormat(
+      iso = DateTimeFormat.ISO.DATE_TIME
+    ) @Nullable OffsetDateTime from,
+    @Valid @RequestParam(value = "to", required = false) @DateTimeFormat(
+      iso = DateTimeFormat.ISO.DATE_TIME
+    ) @Nullable OffsetDateTime to
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -114,28 +174,24 @@ public class AuditLogsController implements AuditLogsApi {
       )
     );
 
-    AuditLogsControllerListV1200ResponseData data =
-      new AuditLogsControllerListV1200ResponseData(
-        response
-          .getItemsList()
-          .stream()
-          .map(log -> toAuditLogResponseDto(log, json))
-          .toList(),
-        toMetaDto(response.getMeta())
-      );
-
-    return ResponseEntity.ok(
-      new AuditLogsControllerListV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(data)
+    PagedData<AuditLogResponseDto> data = new PagedData<>(
+      response
+        .getItemsList()
+        .stream()
+        .map(log -> toAuditLogResponseDto(log, json))
+        .toList(),
+      PageMeta.from(response.getMeta())
     );
+
+    return ResponseEntity.ok(ApiResponse.of(200, "OK", data));
   }
 
-  @Override
+  @GetMapping(value = "/audit-logs/actions", produces = { "application/json" })
+  @ApiErrors({ "401", "403" })
   @RequirePermission(PermissionCodesEnum.AUDIT_READ)
-  public ResponseEntity<AuditLogsControllerListActionsV1200Response> auditLogsControllerListActionsV1() {
+  public ResponseEntity<
+    ApiResponse<AuditActionsResponseDto>
+  > auditLogsControllerListActionsV1() {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     ListAuditActionsResponse response = withMetadata(context).listAuditActions(
@@ -143,18 +199,22 @@ public class AuditLogsController implements AuditLogsApi {
     );
 
     return ResponseEntity.ok(
-      new AuditLogsControllerListActionsV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(toAuditActionsResponseDto(response))
+      ApiResponse.of(200, "OK", toAuditActionsResponseDto(response))
     );
   }
 
-  @Override
+  @PostMapping(
+    value = "/audit-logs/export",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403" })
+  @ResponseStatus(HttpStatus.ACCEPTED)
   @RequirePermission(PermissionCodesEnum.AUDIT_EXPORT)
-  public ResponseEntity<TicketsControllerCreateExportV1202Response> auditLogsControllerCreateExportV1(
-    CreateAuditLogExportDto createAuditLogExportDto
+  public ResponseEntity<
+    ApiResponse<ExportResponseDto>
+  > auditLogsControllerCreateExportV1(
+    @Valid @RequestBody CreateAuditLogExportDto createAuditLogExportDto
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
     IsoDateCheck.requireIsoDate(createAuditLogExportDto.getFrom(), "from");
@@ -176,33 +236,27 @@ public class AuditLogsController implements AuditLogsApi {
     );
 
     return new ResponseEntity<>(
-      new TicketsControllerCreateExportV1202Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(202))
-        .message("OK")
-        .data(toExportDto(response)),
+      ApiResponse.of(202, "OK", toExportDto(response)),
       HttpStatus.ACCEPTED
     );
   }
 
-  @Override
+  @GetMapping(
+    value = "/audit-logs/export/{id}",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.AUDIT_EXPORT)
-  public ResponseEntity<TicketsControllerCreateExportV1202Response> auditLogsControllerGetExportV1(
-    String id
-  ) {
+  public ResponseEntity<
+    ApiResponse<ExportResponseDto>
+  > auditLogsControllerGetExportV1(@PathVariable("id") String id) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     ExportResponse response = withAnalyticsMetadata(context).getExport(
       GetExportRequest.newBuilder().setId(id).build()
     );
 
-    return ResponseEntity.ok(
-      new TicketsControllerCreateExportV1202Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(toExportDto(response))
-    );
+    return ResponseEntity.ok(ApiResponse.of(200, "OK", toExportDto(response)));
   }
 
   static ListAuditLogsRequest toListAuditLogsRequest(
@@ -369,18 +423,6 @@ public class AuditLogsController implements AuditLogsApi {
     }
     return AuditLogResponseDto.ResourceTypeEnum.fromValue(
       resourceType.name().replace("AUDIT_RESOURCE_TYPE_", "")
-    );
-  }
-
-  static InvitationsControllerListV1200ResponseDataMeta toMetaDto(
-    synapsedesk.auth.Common.PageMeta meta
-  ) {
-    return new InvitationsControllerListV1200ResponseDataMeta(
-      BigDecimal.valueOf(meta.getTotalItems()),
-      BigDecimal.valueOf(meta.getItemCount()),
-      BigDecimal.valueOf(meta.getItemsPerPage()),
-      BigDecimal.valueOf(meta.getTotalPages()),
-      BigDecimal.valueOf(meta.getCurrentPage())
     );
   }
 

@@ -58,15 +58,15 @@ class RealtimeGatewayTest {
   private final GatewayMetrics metrics = mock(GatewayMetrics.class);
   private final PresenceService presence = mock(PresenceService.class);
   private final RealtimeBroadcast broadcast = mock(RealtimeBroadcast.class);
-  private final WsThrottlerService wsThrottler = mock(
-    WsThrottlerService.class
-  );
+  private final WsThrottlerService wsThrottler = mock(WsThrottlerService.class);
   private final TicketAccessService ticketAccess = mock(
     TicketAccessService.class
   );
   private final AiStreamService aiStreams = mock(AiStreamService.class);
   private final synapsedesk.ticket.MessageServiceGrpc.MessageServiceBlockingStub messagesStub =
-    mock(synapsedesk.ticket.MessageServiceGrpc.MessageServiceBlockingStub.class);
+    mock(
+      synapsedesk.ticket.MessageServiceGrpc.MessageServiceBlockingStub.class
+    );
 
   private final ArgumentCaptor<ConnectListener> connectCaptor =
     ArgumentCaptor.forClass(ConnectListener.class);
@@ -101,9 +101,7 @@ class RealtimeGatewayTest {
       messagesStub
     );
     verify(realtimeNamespace).addConnectListener(connectCaptor.capture());
-    verify(realtimeNamespace).addDisconnectListener(
-      disconnectCaptor.capture()
-    );
+    verify(realtimeNamespace).addDisconnectListener(disconnectCaptor.capture());
   }
 
   private static SocketIOClient clientWithCookie(String cookieHeader) {
@@ -329,10 +327,11 @@ class RealtimeGatewayTest {
     String event,
     Class<T> bodyType
   ) {
-    ArgumentCaptor<com.corundumstudio.socketio.listener.DataListener<T>> captor =
-      ArgumentCaptor.forClass(
-        com.corundumstudio.socketio.listener.DataListener.class
-      );
+    ArgumentCaptor<
+      com.corundumstudio.socketio.listener.DataListener<T>
+    > captor = ArgumentCaptor.forClass(
+      com.corundumstudio.socketio.listener.DataListener.class
+    );
     verify(realtimeNamespace).addEventListener(
       eq(event),
       eq(bodyType),
@@ -386,9 +385,7 @@ class RealtimeGatewayTest {
       eq(RealtimeEvents.REALTIME_EVENTS_PRESENCE),
       any()
     );
-    verify(ack).sendAckData(
-      (Object[]) any()
-    );
+    verify(ack).sendAckData((Object[]) any());
   }
 
   @Test
@@ -645,7 +642,10 @@ class RealtimeGatewayTest {
     verify(messagesStub).createMessage(captor.capture());
     assertThat(captor.getValue().getInvokeAi()).isFalse();
     verify(aiStreams, never()).start(any(), any(), any(), any(), any());
-    verify(client, never()).sendEvent(eq(RealtimeEvents.REALTIME_EVENTS_MESSAGE_NEW), any());
+    verify(client, never()).sendEvent(
+      eq(RealtimeEvents.REALTIME_EVENTS_MESSAGE_NEW),
+      any()
+    );
     verify(ack).sendAckData((Object[]) any());
   }
 
@@ -677,7 +677,8 @@ class RealtimeGatewayTest {
   }
 
   @Test
-  void messageSendStartsTheAnswerStreamOnlyWhenInvokeAiIsTrue() throws Exception {
+  void messageSendStartsTheAnswerStreamOnlyWhenInvokeAiIsTrue()
+    throws Exception {
     JwtPrincipal principal = new JwtPrincipal(
       "u1",
       "o1",
@@ -697,7 +698,13 @@ class RealtimeGatewayTest {
         .build()
     );
     when(
-      aiStreams.start(eq(client), eq("t1"), eq("hello"), eq(principal), eq("m1"))
+      aiStreams.start(
+        eq(client),
+        eq("t1"),
+        eq("hello"),
+        eq(principal),
+        eq("m1")
+      )
     ).thenReturn("stream-1");
 
     capturedListener(

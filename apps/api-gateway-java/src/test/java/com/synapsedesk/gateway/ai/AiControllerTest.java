@@ -73,7 +73,7 @@ class AiControllerTest {
 
     var response = controller.aiControllerClassifyV1("ticket-1");
 
-    assertThat(response.getBody().getData().getSuggestedPriority()).isNull();
+    assertThat(response.getBody().data().getSuggestedPriority()).isNull();
   }
 
   @Test
@@ -87,7 +87,7 @@ class AiControllerTest {
 
     var response = controller.aiControllerClassifyV1("ticket-1");
 
-    assertThat(response.getBody().getData().getSuggestedPriority()).isEqualTo(
+    assertThat(response.getBody().data().getSuggestedPriority()).isEqualTo(
       com.synapsedesk.gateway.generated.model.AiClassificationResponseDto.SuggestedPriorityEnum.URGENT
     );
   }
@@ -102,7 +102,7 @@ class AiControllerTest {
 
     var response = controller.aiControllerGetSuggestionsV1("ticket-1");
 
-    assertThat(response.getBody().getData().getDegraded()).isNull();
+    assertThat(response.getBody().data().getDegraded()).isNull();
   }
 
   @Test
@@ -117,7 +117,7 @@ class AiControllerTest {
 
     var response = controller.aiControllerGetSuggestionsV1("ticket-1");
 
-    assertThat(response.getBody().getData().getDegraded()).isEqualTo(
+    assertThat(response.getBody().data().getDegraded()).isEqualTo(
       com.synapsedesk.gateway.generated.model.AiSuggestionsResponseDto.DegradedEnum.LEXICAL_ONLY
     );
   }

@@ -3,24 +3,28 @@ package com.synapsedesk.gateway.webhooks;
 import com.synapsedesk.gateway.auth.CurrentRequest;
 import com.synapsedesk.gateway.auth.CurrentUser;
 import com.synapsedesk.gateway.config.InboundEmailProperties;
-import com.synapsedesk.gateway.generated.api.WebhooksApi;
-import com.synapsedesk.gateway.generated.model.AuthControllerForgotPasswordV1202Response;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
+import com.synapsedesk.gateway.openapi.ApiErrors;
+import com.synapsedesk.gateway.web.ApiPaths;
+import com.synapsedesk.gateway.web.ApiResponse;
 import com.synapsedesk.gateway.web.CachedBodyRequest;
 import io.grpc.stub.MetadataUtils;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
-import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Base64;
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 import synapsedesk.auth.Billing.StripeWebhookRequest;
@@ -54,9 +58,19 @@ import tools.jackson.databind.ObjectMapper;
  * for roughly 17 hours, so the mail is only delayed, not lost, once that
  * pipeline lands. A 200 here would tell Resend the mail was handled and it
  * would never be redelivered.
+ *
+ * <p><b>Migrated off `WebhooksApi`.</b> Neither route had a real generated
+ * DTO for `data` — the published contract borrows an unrelated route's
+ * envelope for both, the same reused-wrapper shape the flip retires
+ * elsewhere. {@link StripeWebhookAcknowledgementDto} and {@link
+ * ResendWebhookAcknowledgementDto} name what each handler actually returns
+ * instead — Node's own return-type annotations, not this port's invention.
  */
+@Tag(name = "Webhooks")
 @RestController
-public class WebhooksController implements WebhooksApi {
+@RequestMapping(ApiPaths.V1)
+@Validated
+public class WebhooksController {
 
   private static final long STRIPE_DEADLINE_SECONDS = 20;
 
@@ -84,9 +98,15 @@ public class WebhooksController implements WebhooksApi {
     this.json = json;
   }
 
-  @Override
-  public ResponseEntity<AuthControllerForgotPasswordV1202Response> webhooksControllerStripeV1(
-    String stripeSignature
+  @PostMapping(value = "/webhooks/stripe", produces = { "application/json" })
+  @ApiErrors({ "400" })
+  public ResponseEntity<
+    ApiResponse<StripeWebhookAcknowledgementDto>
+  > webhooksControllerStripeV1(
+    @RequestHeader(
+      value = "stripe-signature",
+      required = true
+    ) String stripeSignature
   ) {
     HttpServletRequest request = CurrentRequest.request();
     if (!(request instanceof CachedBodyRequest cached)) {
@@ -114,16 +134,22 @@ public class WebhooksController implements WebhooksApi {
       .handleStripeWebhook(wire);
 
     return ResponseEntity.ok(
-      new AuthControllerForgotPasswordV1202Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(Map.of("received", true, "status", response.getStatus()))
+      ApiResponse.of(
+        200,
+        "OK",
+        new StripeWebhookAcknowledgementDto(true, response.getStatus())
+      )
     );
   }
 
-  @Override
-  public ResponseEntity<AuthControllerForgotPasswordV1202Response> inboundEmailControllerResendV1() {
+  @PostMapping(
+    value = "/webhooks/email/resend",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "401", "503" })
+  public ResponseEntity<
+    ApiResponse<ResendWebhookAcknowledgementDto>
+  > inboundEmailControllerResendV1() {
     HttpServletRequest request = CurrentRequest.request();
     if (!(request instanceof CachedBodyRequest cached)) {
       throw rejectedSignature();
@@ -143,11 +169,11 @@ public class WebhooksController implements WebhooksApi {
     String eventType = eventType(cached.body());
     if (!EMAIL_RECEIVED_EVENT_TYPE.equals(eventType)) {
       return ResponseEntity.ok(
-        new AuthControllerForgotPasswordV1202Response()
-          .success(true)
-          .statusCode(BigDecimal.valueOf(200))
-          .message("OK")
-          .data(Map.of("received", true, "outcome", "ignored_event"))
+        ApiResponse.of(
+          200,
+          "OK",
+          new ResendWebhookAcknowledgementDto(true, "ignored_event")
+        )
       );
     }
 

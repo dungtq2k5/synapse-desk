@@ -131,7 +131,7 @@ class InvitationsControllerTest {
       any(),
       org.mockito.ArgumentMatchers.eq("refresh-1")
     );
-    assertThat(response.getBody().getWarning()).contains(
+    assertThat(response.getBody().warning()).contains(
       "1 role/department assignment(s)"
     );
   }

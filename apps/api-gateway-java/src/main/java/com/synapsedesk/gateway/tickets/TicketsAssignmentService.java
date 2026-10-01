@@ -4,19 +4,14 @@ import com.synapsedesk.gateway.auth.RequestContext;
 import com.synapsedesk.gateway.generated.model.AssignTicketDto;
 import com.synapsedesk.gateway.generated.model.AssignTicketToSelfDto;
 import com.synapsedesk.gateway.generated.model.AssignmentResponseDto;
-import com.synapsedesk.gateway.generated.model.AuthControllerForgotPasswordV1202Response;
 import com.synapsedesk.gateway.generated.model.CurrentUserResponseDto.PermissionCodesEnum;
 import com.synapsedesk.gateway.generated.model.MarkTicketReadDto;
 import com.synapsedesk.gateway.generated.model.MarkTicketReadResponseDto;
 import com.synapsedesk.gateway.generated.model.TicketStatusChangeResponseDto;
-import com.synapsedesk.gateway.generated.model.TicketsControllerAssignV1200Response;
-import com.synapsedesk.gateway.generated.model.TicketsControllerListAssignmentsV1200Response;
-import com.synapsedesk.gateway.generated.model.TicketsControllerListStatusChangesV1200Response;
-import com.synapsedesk.gateway.generated.model.TicketsControllerMarkReadV1200Response;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
+import com.synapsedesk.gateway.web.ApiResponse;
 import io.grpc.stub.MetadataUtils;
-import java.math.BigDecimal;
-import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -82,7 +77,7 @@ public class TicketsAssignmentService {
     this.ticketStub = ticketStub;
   }
 
-  public ResponseEntity<TicketsControllerAssignV1200Response> assign(
+  public ResponseEntity<ApiResponse<AssignmentResponseDto>> assign(
     RequestContext context,
     String id,
     AssignTicketDto dto
@@ -99,7 +94,7 @@ public class TicketsAssignmentService {
     return ok(response, "Ticket assigned");
   }
 
-  public ResponseEntity<TicketsControllerAssignV1200Response> reassign(
+  public ResponseEntity<ApiResponse<AssignmentResponseDto>> reassign(
     RequestContext context,
     String id,
     AssignTicketDto dto
@@ -116,7 +111,7 @@ public class TicketsAssignmentService {
     return ok(response, "Ticket reassigned");
   }
 
-  public ResponseEntity<TicketsControllerAssignV1200Response> assignToSelf(
+  public ResponseEntity<ApiResponse<AssignmentResponseDto>> assignToSelf(
     RequestContext context,
     String id,
     AssignTicketToSelfDto dto
@@ -138,7 +133,7 @@ public class TicketsAssignmentService {
     return ok(response, "Ticket claimed");
   }
 
-  public ResponseEntity<AuthControllerForgotPasswordV1202Response> unassign(
+  public ResponseEntity<ApiResponse<Void>> unassign(
     RequestContext context,
     String id
   ) {
@@ -152,18 +147,14 @@ public class TicketsAssignmentService {
     );
 
     return ResponseEntity.status(HttpStatus.NO_CONTENT).body(
-      new AuthControllerForgotPasswordV1202Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(204))
-        .message("OK")
+      ApiResponse.of(204, "OK", null)
     );
   }
 
   /** No permission beyond reading the ticket — the service applies the same author-or-assignee filter it applies to the ticket itself. */
-  public ResponseEntity<TicketsControllerListAssignmentsV1200Response> listAssignments(
-    RequestContext context,
-    String id
-  ) {
+  public ResponseEntity<
+    ApiResponse<List<AssignmentResponseDto>>
+  > listAssignments(RequestContext context, String id) {
     ListAssignmentsResponse response = withAssignmentMetadata(
       context
     ).listAssignments(
@@ -171,17 +162,15 @@ public class TicketsAssignmentService {
     );
 
     return ResponseEntity.ok(
-      new TicketsControllerListAssignmentsV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(
-          response
-            .getItemsList()
-            .stream()
-            .map(TicketsAssignmentService::toAssignmentResponseDto)
-            .toList()
-        )
+      ApiResponse.of(
+        200,
+        "OK",
+        response
+          .getItemsList()
+          .stream()
+          .map(TicketsAssignmentService::toAssignmentResponseDto)
+          .toList()
+      )
     );
   }
 
@@ -193,7 +182,7 @@ public class TicketsAssignmentService {
    * client's render and this request — the Java port must not "helpfully"
    * default it either.
    */
-  public ResponseEntity<TicketsControllerMarkReadV1200Response> markRead(
+  public ResponseEntity<ApiResponse<MarkTicketReadResponseDto>> markRead(
     RequestContext context,
     String id,
     MarkTicketReadDto dto
@@ -209,39 +198,34 @@ public class TicketsAssignmentService {
     ).markTicketRead(wire.build());
 
     return ResponseEntity.ok(
-      new TicketsControllerMarkReadV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("Marked read")
-        .data(
-          new MarkTicketReadResponseDto().lastReadAt(
-            TicketsCrudService.toOffsetDateTime(response.getLastReadAt())
-          )
+      ApiResponse.of(
+        200,
+        "Marked read",
+        new MarkTicketReadResponseDto().lastReadAt(
+          TicketsCrudService.toOffsetDateTime(response.getLastReadAt())
         )
+      )
     );
   }
 
   /** Not `audit_logs` — ticket data behind the same visibility filter as the ticket itself, not an admin-gated table. */
-  public ResponseEntity<TicketsControllerListStatusChangesV1200Response> listStatusChanges(
-    RequestContext context,
-    String id
-  ) {
+  public ResponseEntity<
+    ApiResponse<List<TicketStatusChangeResponseDto>>
+  > listStatusChanges(RequestContext context, String id) {
     var response = withTicketMetadata(context).listTicketStatusChanges(
       TicketIdRequest.newBuilder().setId(id).build()
     );
 
     return ResponseEntity.ok(
-      new TicketsControllerListStatusChangesV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(
-          response
-            .getItemsList()
-            .stream()
-            .map(TicketsAssignmentService::toStatusChangeDto)
-            .toList()
-        )
+      ApiResponse.of(
+        200,
+        "OK",
+        response
+          .getItemsList()
+          .stream()
+          .map(TicketsAssignmentService::toStatusChangeDto)
+          .toList()
+      )
     );
   }
 
@@ -253,26 +237,21 @@ public class TicketsAssignmentService {
       .setTicketId(id)
       .setAssigneeId(dto.getAssigneeId().toString())
       .setDepartmentId(dto.getDepartmentId().toString());
-    if (dto.getReason() != null) {
+    var reason = dto.getReason();
+    if (reason != null) {
       wire.setReason(
-        ReassignmentReason.valueOf(
-          "REASSIGNMENT_REASON_" + dto.getReason().getValue()
-        )
+        ReassignmentReason.valueOf("REASSIGNMENT_REASON_" + reason.getValue())
       );
     }
     return wire.build();
   }
 
-  private static ResponseEntity<TicketsControllerAssignV1200Response> ok(
+  private static ResponseEntity<ApiResponse<AssignmentResponseDto>> ok(
     AssignmentResponse response,
     String message
   ) {
     return ResponseEntity.ok(
-      new TicketsControllerAssignV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message(message)
-        .data(toAssignmentResponseDto(response))
+      ApiResponse.of(200, message, toAssignmentResponseDto(response))
     );
   }
 

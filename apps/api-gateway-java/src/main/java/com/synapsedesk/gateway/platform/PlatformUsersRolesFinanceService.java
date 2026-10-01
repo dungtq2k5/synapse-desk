@@ -1,6 +1,5 @@
 package com.synapsedesk.gateway.platform;
 
-import com.synapsedesk.gateway.auth.CurrentUser;
 import com.synapsedesk.gateway.auth.IsoDateCheck;
 import com.synapsedesk.gateway.auth.RequestContext;
 import com.synapsedesk.gateway.auth.SuperAdminCheck;
@@ -14,25 +13,18 @@ import com.synapsedesk.gateway.generated.model.FinancePlanMixResponseDto;
 import com.synapsedesk.gateway.generated.model.FinanceRevenueResponseDto;
 import com.synapsedesk.gateway.generated.model.FinanceSnapshotResponseDto;
 import com.synapsedesk.gateway.generated.model.FinanceTenantCountsResponseDto;
-import com.synapsedesk.gateway.generated.model.InvitationsControllerListV1200ResponseDataMeta;
-import com.synapsedesk.gateway.generated.model.PlatformControllerGetFinanceSnapshotV1200Response;
-import com.synapsedesk.gateway.generated.model.PlatformControllerGetMetricsV1200Response;
-import com.synapsedesk.gateway.generated.model.PlatformControllerListBillingEventsV1200Response;
-import com.synapsedesk.gateway.generated.model.PlatformControllerListUsersV1200Response;
-import com.synapsedesk.gateway.generated.model.PlatformControllerListUsersV1200ResponseData;
 import com.synapsedesk.gateway.generated.model.PlatformMetricsResponseDto;
 import com.synapsedesk.gateway.generated.model.PlatformUserResponseDto;
 import com.synapsedesk.gateway.generated.model.RoleResponseDto;
-import com.synapsedesk.gateway.generated.model.RolesControllerCreateV1201Response;
-import com.synapsedesk.gateway.generated.model.RolesControllerListV1200Response;
-import com.synapsedesk.gateway.generated.model.RolesControllerListV1200ResponseData;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
+import com.synapsedesk.gateway.web.ApiResponse;
+import com.synapsedesk.gateway.web.PageMeta;
+import com.synapsedesk.gateway.web.PagedData;
 import io.grpc.stub.MetadataUtils;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -95,7 +87,9 @@ public class PlatformUsersRolesFinanceService {
     this.superAdminCheck = superAdminCheck;
   }
 
-  public ResponseEntity<PlatformControllerListUsersV1200Response> listUsers(
+  public ResponseEntity<
+    ApiResponse<PagedData<PlatformUserResponseDto>>
+  > listUsers(
     RequestContext context,
     BigDecimal page,
     BigDecimal limit,
@@ -119,27 +113,22 @@ public class PlatformUsersRolesFinanceService {
       wire.build()
     );
 
-    PlatformControllerListUsersV1200ResponseData data =
-      new PlatformControllerListUsersV1200ResponseData(
-        response
-          .getItemsList()
-          .stream()
-          .map(PlatformUsersRolesFinanceService::toPlatformUserResponseDto)
-          .toList(),
-        toMetaDto(response.getMeta())
-      );
-
-    return ResponseEntity.ok(
-      new PlatformControllerListUsersV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(data)
+    PagedData<PlatformUserResponseDto> data = new PagedData<>(
+      response
+        .getItemsList()
+        .stream()
+        .map(PlatformUsersRolesFinanceService::toPlatformUserResponseDto)
+        .toList(),
+      PageMeta.from(response.getMeta())
     );
+
+    return ResponseEntity.ok(ApiResponse.of(200, "OK", data));
   }
 
   /** Only `page` reaches the wire — see the class docblock. */
-  public ResponseEntity<RolesControllerListV1200Response> listGlobalRoles(
+  public ResponseEntity<
+    ApiResponse<PagedData<RoleResponseDto>>
+  > listGlobalRoles(
     RequestContext context,
     BigDecimal page,
     BigDecimal limit,
@@ -159,26 +148,19 @@ public class PlatformUsersRolesFinanceService {
       wire
     );
 
-    RolesControllerListV1200ResponseData data =
-      new RolesControllerListV1200ResponseData(
-        response
-          .getItemsList()
-          .stream()
-          .map(PlatformUsersRolesFinanceService::toRoleResponseDto)
-          .toList(),
-        toMetaDto(response.getMeta())
-      );
-
-    return ResponseEntity.ok(
-      new RolesControllerListV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(data)
+    PagedData<RoleResponseDto> data = new PagedData<>(
+      response
+        .getItemsList()
+        .stream()
+        .map(PlatformUsersRolesFinanceService::toRoleResponseDto)
+        .toList(),
+      PageMeta.from(response.getMeta())
     );
+
+    return ResponseEntity.ok(ApiResponse.of(200, "OK", data));
   }
 
-  public ResponseEntity<RolesControllerCreateV1201Response> createGlobalRole(
+  public ResponseEntity<ApiResponse<RoleResponseDto>> createGlobalRole(
     RequestContext context,
     CreateGlobalRoleDto dto
   ) {
@@ -187,13 +169,11 @@ public class PlatformUsersRolesFinanceService {
     CreateGlobalRoleRequest.Builder wire = CreateGlobalRoleRequest.newBuilder()
       .setName(dto.getName())
       .addAllPermissionCodes(
-        dto.getPermissionCodes() == null
-          ? List.of()
-          : dto
-              .getPermissionCodes()
-              .stream()
-              .map(CreateGlobalRoleDto.PermissionCodesEnum::getValue)
-              .toList()
+        dto
+          .getPermissionCodes()
+          .stream()
+          .map(CreateGlobalRoleDto.PermissionCodesEnum::getValue)
+          .toList()
       );
     if (dto.getDescription() != null) {
       wire.setDescription(dto.getDescription());
@@ -204,15 +184,11 @@ public class PlatformUsersRolesFinanceService {
     );
 
     return ResponseEntity.status(HttpStatus.CREATED).body(
-      new RolesControllerCreateV1201Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(201))
-        .message("OK")
-        .data(toRoleResponseDto(response))
+      ApiResponse.of(201, "OK", toRoleResponseDto(response))
     );
   }
 
-  public ResponseEntity<PlatformControllerGetMetricsV1200Response> getMetrics(
+  public ResponseEntity<ApiResponse<PlatformMetricsResponseDto>> getMetrics(
     RequestContext context
   ) {
     superAdminCheck.require(context);
@@ -242,18 +218,12 @@ public class PlatformUsersRolesFinanceService {
       .seatsInUse(BigDecimal.valueOf(response.getSeatsInUse()))
       .generatedAt(toOffsetDateTime(response.getGeneratedAt()));
 
-    return ResponseEntity.ok(
-      new PlatformControllerGetMetricsV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(data)
-    );
+    return ResponseEntity.ok(ApiResponse.of(200, "OK", data));
   }
 
-  public ResponseEntity<PlatformControllerGetFinanceSnapshotV1200Response> getFinanceSnapshot(
-    RequestContext context
-  ) {
+  public ResponseEntity<
+    ApiResponse<FinanceSnapshotResponseDto>
+  > getFinanceSnapshot(RequestContext context) {
     superAdminCheck.require(context);
 
     FinanceSnapshotResponse response = withMetadata(context).getFinanceSnapshot(
@@ -261,19 +231,13 @@ public class PlatformUsersRolesFinanceService {
     );
 
     return ResponseEntity.ok(
-      new PlatformControllerGetFinanceSnapshotV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(toFinanceSnapshotResponseDto(response))
+      ApiResponse.of(200, "OK", toFinanceSnapshotResponseDto(response))
     );
   }
 
-  public ResponseEntity<PlatformControllerListBillingEventsV1200Response> listBillingEvents(
-    RequestContext context,
-    String from,
-    String to
-  ) {
+  public ResponseEntity<
+    ApiResponse<BillingEventsResponseDto>
+  > listBillingEvents(RequestContext context, String from, String to) {
     superAdminCheck.require(context);
 
     IsoDateCheck.requireIsoDate(from, "from");
@@ -302,13 +266,7 @@ public class PlatformUsersRolesFinanceService {
       )
       .observedEventTypes(response.getObservedEventTypesList());
 
-    return ResponseEntity.ok(
-      new PlatformControllerListBillingEventsV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(data)
-    );
+    return ResponseEntity.ok(ApiResponse.of(200, "OK", data));
   }
 
   private static PageRequest toPageRequest(
@@ -458,18 +416,6 @@ public class PlatformUsersRolesFinanceService {
       .day(point.getDay())
       .eventType(point.getEventType())
       .count(BigDecimal.valueOf(point.getCount()));
-  }
-
-  private static InvitationsControllerListV1200ResponseDataMeta toMetaDto(
-    synapsedesk.auth.Common.PageMeta meta
-  ) {
-    return new InvitationsControllerListV1200ResponseDataMeta(
-      BigDecimal.valueOf(meta.getTotalItems()),
-      BigDecimal.valueOf(meta.getItemCount()),
-      BigDecimal.valueOf(meta.getItemsPerPage()),
-      BigDecimal.valueOf(meta.getTotalPages()),
-      BigDecimal.valueOf(meta.getCurrentPage())
-    );
   }
 
   private static OffsetDateTime toOffsetDateTime(

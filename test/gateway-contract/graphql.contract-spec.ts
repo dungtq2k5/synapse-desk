@@ -32,6 +32,15 @@ import { type Peers, startPeers, TEST_KEYS } from './peers';
 import { readRunState } from './run-state';
 import { rowForField } from './pending';
 
+/**
+ * The parts of a GraphQL response these rows read. `data` is whatever tree the
+ * row's own query asked for, so it is not modelled further.
+ */
+type GraphqlResponse = {
+  data?: any;
+  errors?: Array<{ message: string }>;
+};
+
 describe('the GraphQL limits and guards', () => {
   let gateway: Gateway;
   let peers: Peers;
@@ -41,7 +50,6 @@ describe('the GraphQL limits and guards', () => {
 
   /** Mirrors `graphql-limits.config.ts` — not importable across the workspace boundary. */
   const MAX_QUERY_DEPTH = 7;
-  const MAX_QUERY_COMPLEXITY = 2_000;
   const MAX_EDGE_LIST = 50;
 
   const headers = (permissionCodes: string[] = []) => ({
@@ -182,7 +190,9 @@ describe('the GraphQL limits and guards', () => {
     rowForField('Query.departments')(
       '**refuses without `department.read`, before the peer is called**',
       async () => {
-        const response = await new Session(gateway.baseUrl).post(
+        const response = await new Session(
+          gateway.baseUrl,
+        ).post<GraphqlResponse>(
           '/graphql',
           { query: '{ departments(first: 10, page: 1) { items { id } } }' },
           headers([]),
@@ -318,7 +328,9 @@ describe('the GraphQL limits and guards', () => {
     rowForField('Query.tickets')(
       '**one ticket more, scoring just over 2 000, is refused before the peer is called**',
       async () => {
-        const response = await new Session(gateway.baseUrl).post(
+        const response = await new Session(
+          gateway.baseUrl,
+        ).post<GraphqlResponse>(
           '/graphql',
           {
             query:
@@ -357,7 +369,7 @@ describe('the GraphQL limits and guards', () => {
           headers([]),
         );
 
-        const graph = await new Session(gateway.baseUrl).post(
+        const graph = await new Session(gateway.baseUrl).post<GraphqlResponse>(
           '/graphql',
           { query: `{ user(id: "${targetId}") { email } }` },
           headers([]),
@@ -436,7 +448,9 @@ describe('the GraphQL limits and guards', () => {
         });
 
         try {
-          const response = await new Session(production.baseUrl).post(
+          const response = await new Session(
+            production.baseUrl,
+          ).post<GraphqlResponse>(
             '/graphql',
             { query: '{ __schema { queryType { name } } }' },
             headers(),
@@ -499,7 +513,9 @@ describe('the GraphQL limits and guards', () => {
           })),
         });
 
-        const response = await new Session(gateway.baseUrl).post(
+        const response = await new Session(
+          gateway.baseUrl,
+        ).post<GraphqlResponse>(
           '/graphql',
           {
             query: `{ user(id: "${targetId}") { departments { id } departmentCount } }`,

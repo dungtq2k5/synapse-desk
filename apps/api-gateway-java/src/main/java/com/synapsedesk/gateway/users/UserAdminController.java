@@ -4,40 +4,52 @@ import com.synapsedesk.gateway.auth.CurrentRequest;
 import com.synapsedesk.gateway.auth.CurrentUser;
 import com.synapsedesk.gateway.auth.RequestContext;
 import com.synapsedesk.gateway.auth.UserMapper;
-import com.synapsedesk.gateway.generated.api.UserAdminApi;
-import com.synapsedesk.gateway.generated.model.AuthControllerForgotPasswordV1202Response;
 import com.synapsedesk.gateway.generated.model.CreateUserDto;
 import com.synapsedesk.gateway.generated.model.CurrentUserResponseDto.PermissionCodesEnum;
 import com.synapsedesk.gateway.generated.model.DepartmentAssignmentDto;
-import com.synapsedesk.gateway.generated.model.InvitationsControllerListV1200ResponseDataMeta;
 import com.synapsedesk.gateway.generated.model.LockUserDto;
 import com.synapsedesk.gateway.generated.model.RevokedSessionCountResponseDto;
 import com.synapsedesk.gateway.generated.model.SetUserDepartmentsDto;
 import com.synapsedesk.gateway.generated.model.SetUserRolesDto;
 import com.synapsedesk.gateway.generated.model.UntrustedDeviceCountResponseDto;
 import com.synapsedesk.gateway.generated.model.UpdateUserDto;
-import com.synapsedesk.gateway.generated.model.UserAdminControllerCreateV1201Response;
-import com.synapsedesk.gateway.generated.model.UserAdminControllerGetPermissionsV1200Response;
-import com.synapsedesk.gateway.generated.model.UserAdminControllerListV1200Response;
-import com.synapsedesk.gateway.generated.model.UserAdminControllerListV1200ResponseData;
-import com.synapsedesk.gateway.generated.model.UserAdminControllerRemoveV1200Response;
-import com.synapsedesk.gateway.generated.model.UserAdminControllerResetTwoFactorV1200Response;
 import com.synapsedesk.gateway.generated.model.UserPermissionsResponseDto;
 import com.synapsedesk.gateway.generated.model.UserSummaryResponseDto;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
+import com.synapsedesk.gateway.openapi.ApiErrors;
 import com.synapsedesk.gateway.security.RequirePermission;
+import com.synapsedesk.gateway.web.ApiPaths;
+import com.synapsedesk.gateway.web.ApiResponse;
+import com.synapsedesk.gateway.web.PageMeta;
+import com.synapsedesk.gateway.web.PagedData;
 import io.grpc.stub.MetadataUtils;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.lang.Nullable;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 import synapsedesk.auth.Common.Gender;
-import synapsedesk.auth.Common.PageMeta;
 import synapsedesk.auth.Common.PageRequest;
 import synapsedesk.auth.Common.SortOrder;
 import synapsedesk.auth.User.CreateUserRequest;
@@ -66,9 +78,15 @@ import synapsedesk.auth.UserServiceGrpc;
  * turns `ABORTED`/`ALREADY_EXISTS` into 409). The one guard that IS gateway
  * code is `includeDeleted`, because it widens a route past what
  * `@RequirePermission`'s OR semantics can express.
+ *
+ * <p><b>Migrated off `UserAdminApi`.</b> `create` answers 201 —
+ * {@code @ResponseStatus} is what tells springdoc that.
  */
+@Tag(name = "User Admin")
 @RestController
-public class UserAdminController implements UserAdminApi {
+@RequestMapping(ApiPaths.V1)
+@Validated
+public class UserAdminController {
 
   private static final long DEADLINE_SECONDS = 5;
 
@@ -93,18 +111,53 @@ public class UserAdminController implements UserAdminApi {
       );
   }
 
-  @Override
+  @GetMapping(value = "/users", produces = { "application/json" })
+  @ApiErrors({ "401", "403" })
   @RequirePermission(PermissionCodesEnum.USER_READ)
-  public ResponseEntity<UserAdminControllerListV1200Response> userAdminControllerListV1(
-    BigDecimal page,
-    BigDecimal limit,
-    String sortOrder,
-    String searchTerm,
-    String sortBy,
-    Boolean includeDeleted,
-    java.util.UUID departmentId,
-    java.util.UUID roleId,
-    Boolean isLocked
+  public ResponseEntity<
+    ApiResponse<PagedData<UserSummaryResponseDto>>
+  > userAdminControllerListV1(
+    @DecimalMin(value = "1") @Valid @RequestParam(
+      value = "page",
+      required = false,
+      defaultValue = "1"
+    ) BigDecimal page,
+    @DecimalMin(value = "1") @DecimalMax(value = "100") @Valid @RequestParam(
+      value = "limit",
+      required = false,
+      defaultValue = "10"
+    ) BigDecimal limit,
+    @Valid @RequestParam(
+      value = "sortOrder",
+      required = false,
+      defaultValue = "ASC"
+    ) String sortOrder,
+    @Valid @RequestParam(
+      value = "searchTerm",
+      required = false
+    ) @Nullable String searchTerm,
+    @Valid @RequestParam(
+      value = "sortBy",
+      required = false,
+      defaultValue = "createdAt"
+    ) String sortBy,
+    @Valid @RequestParam(
+      value = "includeDeleted",
+      required = false,
+      defaultValue = "false"
+    ) Boolean includeDeleted,
+    @Valid @RequestParam(
+      value = "departmentId",
+      required = false
+    ) @Nullable UUID departmentId,
+    @Valid @RequestParam(
+      value = "roleId",
+      required = false
+    ) @Nullable UUID roleId,
+    @Valid @RequestParam(
+      value = "isLocked",
+      required = false
+    ) @Nullable Boolean isLocked
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -151,67 +204,63 @@ public class UserAdminController implements UserAdminApi {
 
     ListUsersResponse response = withMetadata(context).listUsers(wire.build());
 
-    UserAdminControllerListV1200ResponseData data =
-      new UserAdminControllerListV1200ResponseData()
-        .items(
-          response
-            .getItemsList()
-            .stream()
-            .map(UserAdminController::toDto)
-            .toList()
-        )
-        .meta(toMetaDto(response.getMeta()));
-
-    return ResponseEntity.ok(
-      new UserAdminControllerListV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(data)
+    PagedData<UserSummaryResponseDto> data = new PagedData<>(
+      response.getItemsList().stream().map(UserAdminController::toDto).toList(),
+      PageMeta.from(response.getMeta())
     );
+
+    return ResponseEntity.ok(ApiResponse.of(200, "OK", data));
   }
 
-  @Override
+  @GetMapping(value = "/users/{id}", produces = { "application/json" })
+  @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.USER_READ)
-  public ResponseEntity<UserAdminControllerCreateV1201Response> userAdminControllerGetV1(
-    String id
-  ) {
+  public ResponseEntity<
+    ApiResponse<UserSummaryResponseDto>
+  > userAdminControllerGetV1(@PathVariable("id") String id) {
     RequestContext context = currentUser.require(CurrentRequest.request());
-
     UserSummaryResponse response = withMetadata(context).getUser(
       UserIdRequest.newBuilder().setId(id).build()
     );
-
     return okSummary(response, "OK", HttpStatus.OK);
   }
 
-  @Override
+  @GetMapping(
+    value = "/users/{id}/permissions",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.USER_READ)
-  public ResponseEntity<UserAdminControllerGetPermissionsV1200Response> userAdminControllerGetPermissionsV1(
-    String id
-  ) {
+  public ResponseEntity<
+    ApiResponse<UserPermissionsResponseDto>
+  > userAdminControllerGetPermissionsV1(@PathVariable("id") String id) {
     RequestContext context = currentUser.require(CurrentRequest.request());
-
     var response = withMetadata(context).getUserPermissions(
       UserIdRequest.newBuilder().setId(id).build()
     );
-
     return ResponseEntity.ok(
-      new UserAdminControllerGetPermissionsV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(new UserPermissionsResponseDto(response.getPermissionCodesList()))
+      ApiResponse.of(
+        200,
+        "OK",
+        new UserPermissionsResponseDto(response.getPermissionCodesList())
+      )
     );
   }
 
-  @Override
+  @PostMapping(
+    value = "/users",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403" })
+  @ResponseStatus(HttpStatus.CREATED)
   @RequirePermission(PermissionCodesEnum.USER_CREATE)
-  public ResponseEntity<UserAdminControllerCreateV1201Response> userAdminControllerCreateV1(
-    CreateUserDto createUserDto
+  public ResponseEntity<
+    ApiResponse<UserSummaryResponseDto>
+  > userAdminControllerCreateV1(
+    @Valid @RequestBody CreateUserDto createUserDto
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
-
     CreateUserRequest.Builder wire = CreateUserRequest.newBuilder()
       .setEmail(createUserDto.getEmail())
       .setFullName(createUserDto.getFullName())
@@ -221,27 +270,30 @@ public class UserAdminController implements UserAdminApi {
       .addAllDepartmentIds(
         createUserDto.getDepartmentIds().stream().map(Object::toString).toList()
       );
-    if (createUserDto.getPrimaryDepartmentId() != null) {
-      wire.setPrimaryDepartmentId(
-        createUserDto.getPrimaryDepartmentId().toString()
-      );
+    UUID primaryDepartmentId = createUserDto.getPrimaryDepartmentId();
+    if (primaryDepartmentId != null) {
+      wire.setPrimaryDepartmentId(primaryDepartmentId.toString());
     }
-
     CreateUserResponse response = withMetadata(context).createUser(
       wire.build()
     );
-
     return okSummary(response.getUser(), "OK", HttpStatus.CREATED);
   }
 
-  @Override
+  @PatchMapping(
+    value = "/users/{id}",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.USER_UPDATE)
-  public ResponseEntity<UserAdminControllerCreateV1201Response> userAdminControllerUpdateV1(
-    String id,
-    UpdateUserDto updateUserDto
+  public ResponseEntity<
+    ApiResponse<UserSummaryResponseDto>
+  > userAdminControllerUpdateV1(
+    @PathVariable("id") String id,
+    @Valid @RequestBody UpdateUserDto updateUserDto
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
-
     UpdateUserRequest.Builder wire = UpdateUserRequest.newBuilder().setId(id);
     if (updateUserDto.getFullName() != null) {
       wire.setFullName(updateUserDto.getFullName());
@@ -252,10 +304,9 @@ public class UserAdminController implements UserAdminApi {
     if (updateUserDto.getDob() != null) {
       wire.setDob(updateUserDto.getDob());
     }
-    if (updateUserDto.getGender() != null) {
-      wire.setGender(
-        Gender.valueOf("GENDER_" + updateUserDto.getGender().getValue())
-      );
+    var gender = updateUserDto.getGender();
+    if (gender != null) {
+      wire.setGender(Gender.valueOf("GENDER_" + gender.getValue()));
     }
     // Node's own `update()` does `dto.phoneNumber ?? undefined`, which collapses
     // an explicit `null` to "leave unchanged" same as an absent field — so
@@ -265,60 +316,60 @@ public class UserAdminController implements UserAdminApi {
     if (updateUserDto.getPhoneNumber() != null) {
       wire.setPhoneNumber(updateUserDto.getPhoneNumber());
     }
-
     UserSummaryResponse response = withMetadata(context).updateUser(
       wire.build()
     );
-
     return okSummary(response, "OK", HttpStatus.OK);
   }
 
-  @Override
+  @DeleteMapping(value = "/users/{id}", produces = { "application/json" })
+  @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.USER_DELETE)
-  public ResponseEntity<UserAdminControllerRemoveV1200Response> userAdminControllerRemoveV1(
-    String id
-  ) {
+  public ResponseEntity<
+    ApiResponse<RevokedSessionCountResponseDto>
+  > userAdminControllerRemoveV1(@PathVariable("id") String id) {
     RequestContext context = currentUser.require(CurrentRequest.request());
-
     DeleteUserResponse response = withMetadata(context).deleteUser(
       UserIdRequest.newBuilder().setId(id).build()
     );
-
     return ResponseEntity.ok(
-      new UserAdminControllerRemoveV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("User deactivated")
-        .data(
-          new RevokedSessionCountResponseDto(
-            BigDecimal.valueOf(response.getRevokedSessionCount())
-          )
+      ApiResponse.of(
+        200,
+        "User deactivated",
+        new RevokedSessionCountResponseDto(
+          BigDecimal.valueOf(response.getRevokedSessionCount())
         )
+      )
     );
   }
 
-  @Override
+  @PostMapping(value = "/users/{id}/restore", produces = { "application/json" })
+  @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.USER_DELETE)
-  public ResponseEntity<UserAdminControllerCreateV1201Response> userAdminControllerRestoreV1(
-    String id
-  ) {
+  public ResponseEntity<
+    ApiResponse<UserSummaryResponseDto>
+  > userAdminControllerRestoreV1(@PathVariable("id") String id) {
     RequestContext context = currentUser.require(CurrentRequest.request());
-
     UserSummaryResponse response = withMetadata(context).restoreUser(
       UserIdRequest.newBuilder().setId(id).build()
     );
-
     return okSummary(response, "User restored", HttpStatus.OK);
   }
 
-  @Override
+  @PostMapping(
+    value = "/users/{id}/lock",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.USER_LOCK)
-  public ResponseEntity<UserAdminControllerRemoveV1200Response> userAdminControllerLockV1(
-    String id,
-    LockUserDto lockUserDto
+  public ResponseEntity<
+    ApiResponse<RevokedSessionCountResponseDto>
+  > userAdminControllerLockV1(
+    @PathVariable("id") String id,
+    @Valid @RequestBody LockUserDto lockUserDto
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
-
     LockUserRequest.Builder wire = LockUserRequest.newBuilder()
       .setId(id)
       .setReason(lockUserDto.getReason());
@@ -331,94 +382,93 @@ public class UserAdminController implements UserAdminApi {
           .build()
       );
     }
-
     LockUserResponse response = withMetadata(context).lockUser(wire.build());
-
     return ResponseEntity.ok(
-      new UserAdminControllerRemoveV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("User locked")
-        .data(
-          new RevokedSessionCountResponseDto(
-            BigDecimal.valueOf(response.getRevokedSessionCount())
-          )
+      ApiResponse.of(
+        200,
+        "User locked",
+        new RevokedSessionCountResponseDto(
+          BigDecimal.valueOf(response.getRevokedSessionCount())
         )
+      )
     );
   }
 
-  @Override
+  @PostMapping(value = "/users/{id}/unlock", produces = { "application/json" })
+  @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.USER_LOCK)
-  public ResponseEntity<AuthControllerForgotPasswordV1202Response> userAdminControllerUnlockV1(
-    String id
+  public ResponseEntity<ApiResponse<Void>> userAdminControllerUnlockV1(
+    @PathVariable("id") String id
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
-
     withMetadata(context).unlockUser(
       UserIdRequest.newBuilder().setId(id).build()
     );
-
-    return ResponseEntity.ok(
-      new AuthControllerForgotPasswordV1202Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("User unlocked")
-        .data(null)
-    );
+    return ResponseEntity.ok(ApiResponse.of(200, "User unlocked", null));
   }
 
-  @Override
+  @PostMapping(
+    value = "/users/{id}/2fa/reset",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.USER_2FA_RESET)
-  public ResponseEntity<UserAdminControllerResetTwoFactorV1200Response> userAdminControllerResetTwoFactorV1(
-    String id
-  ) {
+  public ResponseEntity<
+    ApiResponse<UntrustedDeviceCountResponseDto>
+  > userAdminControllerResetTwoFactorV1(@PathVariable("id") String id) {
     RequestContext context = currentUser.require(CurrentRequest.request());
-
     ResetUserTwoFactorResponse response = withMetadata(
       context
     ).resetUserTwoFactor(UserIdRequest.newBuilder().setId(id).build());
-
     return ResponseEntity.ok(
-      new UserAdminControllerResetTwoFactorV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("Two-factor authentication reset")
-        .data(
-          new UntrustedDeviceCountResponseDto(
-            BigDecimal.valueOf(response.getUntrustedDeviceCount())
-          )
+      ApiResponse.of(
+        200,
+        "Two-factor authentication reset",
+        new UntrustedDeviceCountResponseDto(
+          BigDecimal.valueOf(response.getUntrustedDeviceCount())
         )
+      )
     );
   }
 
-  @Override
+  @PutMapping(
+    value = "/users/{id}/roles",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.USER_ROLE_ASSIGN)
-  public ResponseEntity<UserAdminControllerCreateV1201Response> userAdminControllerSetRolesV1(
-    String id,
-    SetUserRolesDto setUserRolesDto
+  public ResponseEntity<
+    ApiResponse<UserSummaryResponseDto>
+  > userAdminControllerSetRolesV1(
+    @PathVariable("id") String id,
+    @Valid @RequestBody SetUserRolesDto setUserRolesDto
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
-
     SetUserRolesRequest wire = SetUserRolesRequest.newBuilder()
       .setId(id)
       .addAllRoleIds(
         setUserRolesDto.getRoleIds().stream().map(Object::toString).toList()
       )
       .build();
-
     UserSummaryResponse response = withMetadata(context).setUserRoles(wire);
-
     return okSummary(response, "Roles updated", HttpStatus.OK);
   }
 
-  @Override
+  @PutMapping(
+    value = "/users/{id}/departments",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.DEPARTMENT_MEMBER_ASSIGN)
-  public ResponseEntity<UserAdminControllerCreateV1201Response> userAdminControllerSetDepartmentsV1(
-    String id,
-    SetUserDepartmentsDto setUserDepartmentsDto
+  public ResponseEntity<
+    ApiResponse<UserSummaryResponseDto>
+  > userAdminControllerSetDepartmentsV1(
+    @PathVariable("id") String id,
+    @Valid @RequestBody SetUserDepartmentsDto setUserDepartmentsDto
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
-
     SetUserDepartmentsRequest wire = SetUserDepartmentsRequest.newBuilder()
       .setId(id)
       .addAllDepartments(
@@ -429,25 +479,19 @@ public class UserAdminController implements UserAdminApi {
           .toList()
       )
       .build();
-
     UserSummaryResponse response = withMetadata(context).setUserDepartments(
       wire
     );
-
     return okSummary(response, "Departments updated", HttpStatus.OK);
   }
 
-  private static ResponseEntity<UserAdminControllerCreateV1201Response> okSummary(
+  private static ResponseEntity<ApiResponse<UserSummaryResponseDto>> okSummary(
     UserSummaryResponse response,
     String message,
     HttpStatus status
   ) {
     return ResponseEntity.status(status).body(
-      new UserAdminControllerCreateV1201Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(status.value()))
-        .message(message)
-        .data(toDto(response))
+      ApiResponse.of(status.value(), message, toDto(response))
     );
   }
 
@@ -469,18 +513,6 @@ public class UserAdminController implements UserAdminApi {
       .setDepartmentId(dto.getDepartmentId().toString())
       .setIsPrimary(dto.getIsPrimary())
       .build();
-  }
-
-  private static InvitationsControllerListV1200ResponseDataMeta toMetaDto(
-    PageMeta meta
-  ) {
-    return new InvitationsControllerListV1200ResponseDataMeta(
-      BigDecimal.valueOf(meta.getTotalItems()),
-      BigDecimal.valueOf(meta.getItemCount()),
-      BigDecimal.valueOf(meta.getItemsPerPage()),
-      BigDecimal.valueOf(meta.getTotalPages()),
-      BigDecimal.valueOf(meta.getCurrentPage())
-    );
   }
 
   private static OffsetDateTime toOffsetDateTime(

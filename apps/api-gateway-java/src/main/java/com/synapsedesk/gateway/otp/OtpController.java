@@ -3,25 +3,37 @@ package com.synapsedesk.gateway.otp;
 import com.synapsedesk.gateway.auth.CurrentRequest;
 import com.synapsedesk.gateway.auth.CurrentUser;
 import com.synapsedesk.gateway.auth.RequestContext;
-import com.synapsedesk.gateway.generated.api.OtpApi;
-import com.synapsedesk.gateway.generated.model.OtpControllerGetOtpStatusV1200Response;
-import com.synapsedesk.gateway.generated.model.OtpControllerRequestEmailVerificationV1202Response;
-import com.synapsedesk.gateway.generated.model.OtpControllerVerifyEmailV1200Response;
 import com.synapsedesk.gateway.generated.model.OtpStatusResponseDto;
 import com.synapsedesk.gateway.generated.model.RequestOtpResponseDto;
 import com.synapsedesk.gateway.generated.model.RequestPhoneVerificationDto;
 import com.synapsedesk.gateway.generated.model.VerifyOtpDto;
 import com.synapsedesk.gateway.generated.model.VerifyOtpResponseDto;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
+import com.synapsedesk.gateway.openapi.ApiErrors;
 import com.synapsedesk.gateway.throttle.AuthThrottle;
 import com.synapsedesk.gateway.throttle.RouteThrottle;
+import com.synapsedesk.gateway.throttle.ThrottleOverride;
+import com.synapsedesk.gateway.throttle.ThrottlerTiers;
+import com.synapsedesk.gateway.web.ApiPaths;
+import com.synapsedesk.gateway.web.ApiResponse;
 import io.grpc.stub.MetadataUtils;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.concurrent.TimeUnit;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 import synapsedesk.auth.Otp.OtpPurpose;
@@ -48,10 +60,16 @@ import synapsedesk.auth.OtpServiceGrpc;
  * level); the two request routes and the two verify routes each carry their
  * own {@code otpRequest}/{@code otpVerify} numbers, and `getOtpStatus` falls
  * back to {@code authTier}'s configured default.
+ *
+ * <p><b>Migrated off `OtpApi`.</b> The two request routes answer 202, not
+ * 200 — {@code @ResponseStatus} is what tells springdoc that.
  */
+@Tag(name = "Otp")
 @RestController
+@RequestMapping(ApiPaths.V1)
+@Validated
 @AuthThrottle
-public class OtpController implements OtpApi {
+public class OtpController {
 
   private static final long DEADLINE_SECONDS = 5;
 
@@ -76,12 +94,20 @@ public class OtpController implements OtpApi {
       );
   }
 
-  @Override
-  @AuthThrottle(
+  @PostMapping(
+    value = "/auth/email/verify/request",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "401" })
+  @ResponseStatus(HttpStatus.ACCEPTED)
+  @ThrottleOverride(
+    tier = ThrottlerTiers.AUTH,
     ttlMs = RouteThrottle.OTP_REQUEST_TTL_MS,
     limit = RouteThrottle.OTP_REQUEST_LIMIT
   )
-  public ResponseEntity<OtpControllerRequestEmailVerificationV1202Response> otpControllerRequestEmailVerificationV1() {
+  public ResponseEntity<
+    ApiResponse<RequestOtpResponseDto>
+  > otpControllerRequestEmailVerificationV1() {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     RequestOtpResponse response = withMetadata(
@@ -93,22 +119,24 @@ public class OtpController implements OtpApi {
     );
 
     return ResponseEntity.status(202).body(
-      new OtpControllerRequestEmailVerificationV1202Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(202))
-        .message("OK")
-        .data(toRequestOtpDto(response))
+      ApiResponse.of(202, "OK", toRequestOtpDto(response))
     );
   }
 
-  @Override
-  @AuthThrottle(
+  @PostMapping(
+    value = "/auth/email/verify",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401" })
+  @ThrottleOverride(
+    tier = ThrottlerTiers.AUTH,
     ttlMs = RouteThrottle.OTP_VERIFY_TTL_MS,
     limit = RouteThrottle.OTP_VERIFY_LIMIT
   )
-  public ResponseEntity<OtpControllerVerifyEmailV1200Response> otpControllerVerifyEmailV1(
-    VerifyOtpDto verifyOtpDto
-  ) {
+  public ResponseEntity<
+    ApiResponse<VerifyOtpResponseDto>
+  > otpControllerVerifyEmailV1(@Valid @RequestBody VerifyOtpDto verifyOtpDto) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     VerifyOtpResponse response = withMetadata(context).verifyEmail(
@@ -119,21 +147,26 @@ public class OtpController implements OtpApi {
     );
 
     return ResponseEntity.ok(
-      new OtpControllerVerifyEmailV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(toVerifyOtpDto(response))
+      ApiResponse.of(200, "OK", toVerifyOtpDto(response))
     );
   }
 
-  @Override
-  @AuthThrottle(
+  @PostMapping(
+    value = "/auth/phone/verify/request",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401" })
+  @ResponseStatus(HttpStatus.ACCEPTED)
+  @ThrottleOverride(
+    tier = ThrottlerTiers.AUTH,
     ttlMs = RouteThrottle.OTP_REQUEST_TTL_MS,
     limit = RouteThrottle.OTP_REQUEST_LIMIT
   )
-  public ResponseEntity<OtpControllerRequestEmailVerificationV1202Response> otpControllerRequestPhoneVerificationV1(
-    RequestPhoneVerificationDto requestPhoneVerificationDto
+  public ResponseEntity<
+    ApiResponse<RequestOtpResponseDto>
+  > otpControllerRequestPhoneVerificationV1(
+    @Valid @RequestBody RequestPhoneVerificationDto requestPhoneVerificationDto
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -147,22 +180,24 @@ public class OtpController implements OtpApi {
     );
 
     return ResponseEntity.status(202).body(
-      new OtpControllerRequestEmailVerificationV1202Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(202))
-        .message("OK")
-        .data(toRequestOtpDto(response))
+      ApiResponse.of(202, "OK", toRequestOtpDto(response))
     );
   }
 
-  @Override
-  @AuthThrottle(
+  @PostMapping(
+    value = "/auth/phone/verify",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401" })
+  @ThrottleOverride(
+    tier = ThrottlerTiers.AUTH,
     ttlMs = RouteThrottle.OTP_VERIFY_TTL_MS,
     limit = RouteThrottle.OTP_VERIFY_LIMIT
   )
-  public ResponseEntity<OtpControllerVerifyEmailV1200Response> otpControllerVerifyPhoneV1(
-    VerifyOtpDto verifyOtpDto
-  ) {
+  public ResponseEntity<
+    ApiResponse<VerifyOtpResponseDto>
+  > otpControllerVerifyPhoneV1(@Valid @RequestBody VerifyOtpDto verifyOtpDto) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     VerifyOtpResponse response = withMetadata(context).verifyPhone(
@@ -173,17 +208,19 @@ public class OtpController implements OtpApi {
     );
 
     return ResponseEntity.ok(
-      new OtpControllerVerifyEmailV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(toVerifyOtpDto(response))
+      ApiResponse.of(200, "OK", toVerifyOtpDto(response))
     );
   }
 
-  @Override
-  public ResponseEntity<OtpControllerGetOtpStatusV1200Response> otpControllerGetOtpStatusV1(
-    String purpose
+  @GetMapping(value = "/auth/otp/status", produces = { "application/json" })
+  @ApiErrors({ "401" })
+  public ResponseEntity<
+    ApiResponse<OtpStatusResponseDto>
+  > otpControllerGetOtpStatusV1(
+    @NotNull @Valid @RequestParam(
+      value = "purpose",
+      required = true
+    ) String purpose
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -204,13 +241,7 @@ public class OtpController implements OtpApi {
       )
       .attemptsRemaining(BigDecimal.valueOf(response.getAttemptsRemaining()));
 
-    return ResponseEntity.ok(
-      new OtpControllerGetOtpStatusV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(data)
-    );
+    return ResponseEntity.ok(ApiResponse.of(200, "OK", data));
   }
 
   /**
@@ -224,7 +255,7 @@ public class OtpController implements OtpApi {
       case "EMAIL_VERIFICATION" -> OtpPurpose.OTP_PURPOSE_EMAIL_VERIFICATION;
       case "PHONE_VERIFICATION" -> OtpPurpose.OTP_PURPOSE_PHONE_VERIFICATION;
       default -> throw new ResponseStatusException(
-        org.springframework.http.HttpStatus.BAD_REQUEST,
+        HttpStatus.BAD_REQUEST,
         "Invalid purpose: " + purpose
       );
     };

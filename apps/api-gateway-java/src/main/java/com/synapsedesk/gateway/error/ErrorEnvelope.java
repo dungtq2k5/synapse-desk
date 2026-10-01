@@ -13,7 +13,7 @@ import java.time.Instant;
  * </pre>
  *
  * <p>Field ORDER is part of it: a client reading the raw body sees the same
- * shape from either implementation. Records serialise in declaration order.
+ * shape from either implementation. Records serialize in declaration order.
  *
  * @param success always false here; the success envelope is a different type
  * @param statusCode repeated in the body because clients read it there

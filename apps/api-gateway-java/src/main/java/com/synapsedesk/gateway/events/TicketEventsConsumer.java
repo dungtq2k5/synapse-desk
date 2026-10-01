@@ -84,7 +84,10 @@ public class TicketEventsConsumer implements LeaseParticipant {
         dispatcher.subscribe(subject);
       }
       connection = opened;
-      LOG.info("Ticket events consumer subscribed to {} subjects", SUBJECTS.size());
+      LOG.info(
+        "Ticket events consumer subscribed to {} subjects",
+        SUBJECTS.size()
+      );
     } catch (InterruptedException failure) {
       Thread.currentThread().interrupt();
       throw new IllegalStateException(

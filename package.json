@@ -62,6 +62,8 @@
     "build:libs": "turbo run build --filter=./libs/*",
     "openapi:export": "turbo run build --filter=@synapsedesk/api-gateway... && node scripts/export-openapi.mjs",
     "openapi:check": "turbo run build --filter=@synapsedesk/api-gateway... && node scripts/export-openapi.mjs --check",
+    "//openapi:check:java": "The Java half of the dual-running OpenAPI check, beside `openapi:check` (Node's export against the committed file, byte for byte) — which it does NOT replace. It deletes any previous output first and produces a fresh one inside the same command, because a check that reads a file a previous run left behind can see an absent document but never a stale one; `OpenApiDocumentExportIT` writes it from a real Spring context, so no hand-booted gateway holds ports against the suite's own. It then compares routing and status codes against the committed document, holding the 5 explained divergences in `scripts/lib/openapi-known-divergences.json` to an exact match in both directions. Needs Docker (the IT starts against real Redis) and a JDK; NOT in CI, which has no Java job yet.",
+    "openapi:check:java": "rm -f apps/api-gateway-java/target/openapi-java.json && cd apps/api-gateway-java && ./mvnw -q verify -Dtest=NoSuchTest -Dsurefire.failIfNoSpecifiedTests=false -Dit.test=OpenApiDocumentExportIT && cd ../.. && node scripts/diff-java-openapi.mjs --file apps/api-gateway-java/target/openapi-java.json",
     "//java:contracts": "The Java gateway's shared vocabulary, generated from the BUILT `libs/common` — the same artifact the services load, so what it publishes is what runs. Tracked output: the Java build compiles these files, so a drifted one is a compile error or a wrong string, never a missing file. It builds the library first for the reason `openapi:export` does: absence is detectable, staleness is not.",
     "java:contracts": "npm run build:libs && node scripts/export-java-contracts.mjs",
     "java:contracts:check": "npm run build:libs && node scripts/export-java-contracts.mjs --check",
@@ -102,11 +104,13 @@
     "proto:breaking": "npm run proto:breaking -w @synapsedesk/grpc-proto"
   },
   "//simple-git-hooks": "`*.java` goes through `prettier --write` here too — this repo already formats Java with `prettier-plugin-java` (see `format`/`format:check` above), not Spotless, so the hook uses the tool this repo already has rather than one it doesn't.",
+  "//simple-git-hooks.heap": "`NODE_OPTIONS` raises Node's heap for this one command. `eslint --fix` type-checks, and measured on a commit touching 13 TypeScript files across four projects it peaks at 4.2 GB against Node's 4 GB default — an out-of-memory crash that `lint-staged` reports only as a failed task and then reverts to the original state.",
   "simple-git-hooks": {
-    "pre-commit": "npx lint-staged"
+    "pre-commit": "NODE_OPTIONS=--max-old-space-size=6144 npx lint-staged"
   },
+  "//lint-staged": "`eslint` runs only on what `npm run lint` covers: the workspaces, `scripts/seed-demo`, `test/system` and `test/gateway-contract`. The loose `scripts/*.mjs`, `*.cjs` and the scripts specs are in NO lint project (see `//lint`), so a glob over every TypeScript and JavaScript file made any commit touching one fail with a parsing error instead of a finding.",
   "lint-staged": {
-    "*.{ts,tsx,js,mjs,cjs}": [
+    "{apps,libs,scripts/seed-demo,test/system,test/gateway-contract}/**/*.ts": [
       "eslint --fix"
     ],
     "*.{ts,tsx,js,mjs,cjs,json,java,xml}": [

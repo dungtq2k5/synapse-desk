@@ -32,7 +32,9 @@ public final class NatsEnvelope {
       return null;
     }
 
-    return root.get("pattern") != null || root.get("data") != null ? root.get("data") : root;
+    return root.get("pattern") != null || root.get("data") != null
+      ? root.get("data")
+      : root;
   }
 
   /** {@code event.organizationId}, or {@code null} if absent, blank, or the event itself is null. */

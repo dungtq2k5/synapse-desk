@@ -3,6 +3,8 @@ package com.synapsedesk.gateway.cache;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.synapsedesk.gateway.config.SharedEnvironment;
+import com.synapsedesk.gateway.sessions.RevokedCountDto;
+import com.synapsedesk.gateway.web.ApiResponse;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -13,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 
 /**
@@ -192,6 +195,55 @@ class CacheServiceIT {
       assertThat(decoded).isEqualTo(
         OffsetDateTime.of(2024, 6, 15, 12, 30, 0, 0, ZoneOffset.UTC)
       );
+    } finally {
+      redis.delete(key);
+    }
+  }
+
+  /**
+   * `wrapTyped`'s own reason to exist, proven on a real cache HIT rather
+   * than assumed. Measured the hard way on `RolesController.list`: {@code
+   * wrap(key, ttl, ApiResponse.class, ...)} compiles — {@code Class<T>}
+   * accepts the raw type — but a HIT then deserializes `data` as an
+   * untyped {@code LinkedHashMap}, not a {@link RevokedCountDto}, because
+   * `Class<ApiResponse>` erases the `<RevokedCountDto>` argument before
+   * Jackson ever sees it. No mocked unit test catches this: a mock's
+   * `wrap`/`wrapTyped` stub just invokes the supplier and returns whatever
+   * it built, never round-tripping through JSON at all. Only a real Redis
+   * HIT — bytes in, bytes back out — exercises the deserialization path
+   * where the bug actually lives.
+   */
+  @Test
+  void wrapTypedSurvivesAGenericRoundTripOnARealCacheHit() {
+    String key =
+      "cache:it|" + getClass().getSimpleName() + "|" + System.nanoTime();
+
+    try {
+      ApiResponse<RevokedCountDto> written = ApiResponse.of(
+        200,
+        "OK",
+        new RevokedCountDto(3)
+      );
+      cache.wrapTyped(
+        key,
+        30,
+        new TypeReference<ApiResponse<RevokedCountDto>>() {},
+        () -> written
+      );
+
+      ApiResponse<RevokedCountDto> hit = cache.wrapTyped(
+        key,
+        30,
+        new TypeReference<ApiResponse<RevokedCountDto>>() {},
+        () -> {
+          throw new AssertionError("a hit must not fall through to produce()");
+        }
+      );
+
+      // The assertion that actually fails on the bug: `data()` typed as
+      // `RevokedCountDto` and its field readable directly, not a map needing
+      // `.get("revokedCount")`.
+      assertThat(hit.data().revokedCount()).isEqualTo(3);
     } finally {
       redis.delete(key);
     }

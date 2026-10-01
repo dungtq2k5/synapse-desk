@@ -21,7 +21,6 @@ package com.synapsedesk.gateway.lease;
  * honours. Every implementer must carry it there, on the class.
  */
 public interface LeaseParticipant {
-
   /** Start. Called once, when the lease is claimed. */
   void activate();
 

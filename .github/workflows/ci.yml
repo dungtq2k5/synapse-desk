@@ -114,8 +114,9 @@ jobs:
   #
   # **The gateway as a PROCESS, with fake peers.** One suite that either
   # implementation must pass: `GATEWAY_IMPL` selects it, and this job runs the
-  # Node one. When the Java gateway exists this becomes a matrix over that
-  # variable and the same rows run twice.
+  # Node one. The same rows run against the Java one in `contract-java` below —
+  # a sibling rather than a matrix leg, because that arm needs a JDK, a
+  # compose-provided Redis and NATS, and two extra checks.
   #
   # Docker is all it needs — the harness starts its own Redis and NATS on
   # ephemeral ports and stops them in teardown, so it shares no state with the
@@ -137,6 +138,75 @@ jobs:
       - run: npm run test:contract
         env:
           GATEWAY_IMPL: node
+
+  # ------------------------------------------------------- contract (java)
+  #
+  # **The Java gateway on a runner that has never seen it.** Until this job
+  # existed every Java result — the contract rows, `mvnw verify`, the ITs —
+  # came from one developer's machine, where `apps/api-gateway/dist`, a warm
+  # `~/.m2` and a running compose stack were all already there. A broken Java
+  # gateway passed CI, and once the Node one is removed a broken anything
+  # would.
+  #
+  # A sibling of `contract`, not a matrix leg of it: this arm needs a JDK,
+  # needs Redis and NATS on their default ports for `openapi:check:java`'s IT,
+  # and runs two checks the Node arm has no counterpart for.
+  #
+  # **`npm run build` is for the OTHER gateway.** The lease row in
+  # `cache-invalidation.contract-spec.ts` starts both implementations against
+  # one broker and asserts only one of them serves, so the Java arm needs the
+  # Node gateway built too. Found on a clean checkout: it was invisible
+  # locally, where an earlier build had always left `dist/` behind.
+  #
+  # **Java 21, not whatever the runner defaults to.** It is what `pom.xml`
+  # targets; every local run used a newer JDK, which compiles `--release 21`
+  # fine and would never notice an API used beyond it.
+  contract-java:
+    name: contract (gateway, GATEWAY_IMPL=java)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: apps/api-gateway-java/pom.xml
+      - run: npm ci
+      - run: npm run build
+
+      # **Minted per run, as the e2e job does.** `JwtVerifier` reads the public
+      # half from `apps/api-gateway/secrets/`, which is gitignored — so on a
+      # runner every Spring context refuses to start, unit tests included.
+      # Found on a clean checkout, where 38 contexts failed on this one file;
+      # locally it had always simply been there.
+      - name: JWT keys
+        run: npm run keys:generate -- --force
+
+      # The contract harness starts its own Redis and NATS on ephemeral ports.
+      # The ITs `openapi:check:java` runs do not: they read `.env.example`'s
+      # `localhost:6379` / `localhost:4222`, so those two — and only those two,
+      # as the rag job does for its stores — come from compose.
+      - name: stack env
+        run: cp .env.example .env
+      - name: start the stores the ITs read
+        run: docker compose up -d --wait redis nats
+
+      - run: npm run test:contract:java
+        env:
+          GATEWAY_IMPL: java
+      - run: npm run openapi:check:java
+
+      # **Surefire's unit rows AND failsafe's ITs** — the suites that, before
+      # this, only ran on a laptop. The ITs read the compose-provided Redis and
+      # NATS above. Last, because it is the slowest and the two checks before
+      # it say more about a contract break than a failing unit row does.
+      - run: npm run test:e2e:gateway-java
 
   # ------------------------------------------------------------------ unit
   #

@@ -5,20 +5,17 @@ import com.synapsedesk.gateway.auth.SuperAdminCheck;
 import com.synapsedesk.gateway.auth.UserMapper;
 import com.synapsedesk.gateway.generated.model.CreatePlatformOrganizationDto;
 import com.synapsedesk.gateway.generated.model.CreatePlatformOrganizationResponseDto;
-import com.synapsedesk.gateway.generated.model.InvitationsControllerListV1200ResponseDataMeta;
 import com.synapsedesk.gateway.generated.model.OffboardOrganizationDto;
 import com.synapsedesk.gateway.generated.model.OffboardResponseDto;
 import com.synapsedesk.gateway.generated.model.OrganizationResponseDto;
-import com.synapsedesk.gateway.generated.model.OrganizationsControllerRequestOffboardV1200Response;
-import com.synapsedesk.gateway.generated.model.PlatformControllerCreateOrganizationV1201Response;
-import com.synapsedesk.gateway.generated.model.PlatformControllerGetOrganizationV1200Response;
-import com.synapsedesk.gateway.generated.model.PlatformControllerListOrganizationsV1200Response;
-import com.synapsedesk.gateway.generated.model.PlatformControllerListOrganizationsV1200ResponseData;
 import com.synapsedesk.gateway.generated.model.PlatformOrganizationResponseDto;
 import com.synapsedesk.gateway.generated.model.ResetBillingCycleDto;
 import com.synapsedesk.gateway.generated.model.SetOrganizationStatusDto;
 import com.synapsedesk.gateway.generated.model.UpdatePlatformOrganizationDto;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
+import com.synapsedesk.gateway.web.ApiResponse;
+import com.synapsedesk.gateway.web.PageMeta;
+import com.synapsedesk.gateway.web.PagedData;
 import io.grpc.stub.MetadataUtils;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -98,7 +95,9 @@ public class PlatformOrganizationsService {
     this.superAdminCheck = superAdminCheck;
   }
 
-  public ResponseEntity<PlatformControllerListOrganizationsV1200Response> listOrganizations(
+  public ResponseEntity<
+    ApiResponse<PagedData<PlatformOrganizationResponseDto>>
+  > listOrganizations(
     RequestContext context,
     BigDecimal page,
     BigDecimal limit,
@@ -135,26 +134,21 @@ public class PlatformOrganizationsService {
       context
     ).listOrganizations(wire.build());
 
-    PlatformControllerListOrganizationsV1200ResponseData data =
-      new PlatformControllerListOrganizationsV1200ResponseData(
-        response
-          .getItemsList()
-          .stream()
-          .map(PlatformOrganizationsService::toPlatformOrganizationResponseDto)
-          .toList(),
-        toMetaDto(response.getMeta())
-      );
-
-    return ResponseEntity.ok(
-      new PlatformControllerListOrganizationsV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(data)
+    PagedData<PlatformOrganizationResponseDto> data = new PagedData<>(
+      response
+        .getItemsList()
+        .stream()
+        .map(PlatformOrganizationsService::toPlatformOrganizationResponseDto)
+        .toList(),
+      PageMeta.from(response.getMeta())
     );
+
+    return ResponseEntity.ok(ApiResponse.of(200, "OK", data));
   }
 
-  public ResponseEntity<PlatformControllerCreateOrganizationV1201Response> createOrganization(
+  public ResponseEntity<
+    ApiResponse<CreatePlatformOrganizationResponseDto>
+  > createOrganization(
     RequestContext context,
     CreatePlatformOrganizationDto dto
   ) {
@@ -175,14 +169,17 @@ public class PlatformOrganizationsService {
     if (dto.getDomain() != null) {
       wire.setDomain(dto.getDomain());
     }
-    if (dto.getMaxAgentSeats() != null) {
-      wire.setMaxAgentSeats(dto.getMaxAgentSeats().intValue());
+    BigDecimal maxAgentSeats = dto.getMaxAgentSeats();
+    if (maxAgentSeats != null) {
+      wire.setMaxAgentSeats(maxAgentSeats.intValue());
     }
-    if (dto.getMaxStorageBytes() != null) {
-      wire.setMaxStorageBytes(dto.getMaxStorageBytes().longValue());
+    BigDecimal maxStorageBytes = dto.getMaxStorageBytes();
+    if (maxStorageBytes != null) {
+      wire.setMaxStorageBytes(maxStorageBytes.longValue());
     }
-    if (dto.getMonthlyAiTokenBudget() != null) {
-      wire.setMonthlyAiTokenBudget(dto.getMonthlyAiTokenBudget().longValue());
+    BigDecimal monthlyAiTokenBudget = dto.getMonthlyAiTokenBudget();
+    if (monthlyAiTokenBudget != null) {
+      wire.setMonthlyAiTokenBudget(monthlyAiTokenBudget.longValue());
     }
 
     CreatePlatformOrganizationResponse response = withMetadata(
@@ -190,24 +187,21 @@ public class PlatformOrganizationsService {
     ).createOrganization(wire.build());
 
     return ResponseEntity.status(HttpStatus.CREATED).body(
-      new PlatformControllerCreateOrganizationV1201Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(201))
-        .message("OK")
-        .data(
-          new CreatePlatformOrganizationResponseDto()
-            .organization(
-              toPlatformOrganizationResponseDto(response.getOrganization())
-            )
-            .admin(UserMapper.toUserResponseDto(response.getAdmin()))
-        )
+      ApiResponse.of(
+        201,
+        "OK",
+        new CreatePlatformOrganizationResponseDto()
+          .organization(
+            toPlatformOrganizationResponseDto(response.getOrganization())
+          )
+          .admin(UserMapper.toUserResponseDto(response.getAdmin()))
+      )
     );
   }
 
-  public ResponseEntity<PlatformControllerGetOrganizationV1200Response> getOrganization(
-    RequestContext context,
-    String id
-  ) {
+  public ResponseEntity<
+    ApiResponse<PlatformOrganizationResponseDto>
+  > getOrganization(RequestContext context, String id) {
     superAdminCheck.require(context);
 
     PlatformOrganizationResponse response = withMetadata(
@@ -219,7 +213,9 @@ public class PlatformOrganizationsService {
     return ok200(toPlatformOrganizationResponseDto(response), "OK");
   }
 
-  public ResponseEntity<PlatformControllerGetOrganizationV1200Response> updateOrganization(
+  public ResponseEntity<
+    ApiResponse<PlatformOrganizationResponseDto>
+  > updateOrganization(
     RequestContext context,
     String id,
     UpdatePlatformOrganizationDto dto
@@ -231,20 +227,24 @@ public class PlatformOrganizationsService {
     if (dto.getName() != null) {
       wire.setName(dto.getName());
     }
-    if (dto.getSlug() != null) {
-      wire.setSlug(requireSlug(dto.getSlug()));
+    String slug = dto.getSlug();
+    if (slug != null) {
+      wire.setSlug(requireSlug(slug));
     }
     if (dto.getDomain() != null) {
       wire.setDomain(dto.getDomain());
     }
-    if (dto.getMaxAgentSeats() != null) {
-      wire.setMaxAgentSeats(dto.getMaxAgentSeats().intValue());
+    BigDecimal updatedMaxAgentSeats = dto.getMaxAgentSeats();
+    if (updatedMaxAgentSeats != null) {
+      wire.setMaxAgentSeats(updatedMaxAgentSeats.intValue());
     }
-    if (dto.getMaxStorageBytes() != null) {
-      wire.setMaxStorageBytes(dto.getMaxStorageBytes().longValue());
+    BigDecimal updatedMaxStorageBytes = dto.getMaxStorageBytes();
+    if (updatedMaxStorageBytes != null) {
+      wire.setMaxStorageBytes(updatedMaxStorageBytes.longValue());
     }
-    if (dto.getMonthlyAiTokenBudget() != null) {
-      wire.setMonthlyAiTokenBudget(dto.getMonthlyAiTokenBudget().longValue());
+    BigDecimal updatedMonthlyAiTokenBudget = dto.getMonthlyAiTokenBudget();
+    if (updatedMonthlyAiTokenBudget != null) {
+      wire.setMonthlyAiTokenBudget(updatedMonthlyAiTokenBudget.longValue());
     }
 
     PlatformOrganizationResponse response = withMetadata(
@@ -255,7 +255,7 @@ public class PlatformOrganizationsService {
     return ok200(toPlatformOrganizationResponseDto(response), "OK");
   }
 
-  public ResponseEntity<PlatformControllerGetOrganizationV1200Response> setStatus(
+  public ResponseEntity<ApiResponse<PlatformOrganizationResponseDto>> setStatus(
     RequestContext context,
     String id,
     SetOrganizationStatusDto dto
@@ -276,7 +276,9 @@ public class PlatformOrganizationsService {
     return ok200(toPlatformOrganizationResponseDto(response), "Status updated");
   }
 
-  public ResponseEntity<PlatformControllerGetOrganizationV1200Response> resetBillingCycle(
+  public ResponseEntity<
+    ApiResponse<PlatformOrganizationResponseDto>
+  > resetBillingCycle(
     RequestContext context,
     String id,
     ResetBillingCycleDto dto
@@ -298,7 +300,7 @@ public class PlatformOrganizationsService {
     );
   }
 
-  public ResponseEntity<OrganizationsControllerRequestOffboardV1200Response> offboard(
+  public ResponseEntity<ApiResponse<OffboardResponseDto>> offboard(
     RequestContext context,
     String id,
     OffboardOrganizationDto dto
@@ -316,19 +318,17 @@ public class PlatformOrganizationsService {
 
     // Known gap 42 (see class docblock): no cache eviction here either.
     return ResponseEntity.ok(
-      new OrganizationsControllerRequestOffboardV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("Workspace offboarded")
-        .data(
-          new OffboardResponseDto().revokedSessionCount(
-            BigDecimal.valueOf(response.getRevokedSessionCount())
-          )
+      ApiResponse.of(
+        200,
+        "Workspace offboarded",
+        new OffboardResponseDto().revokedSessionCount(
+          BigDecimal.valueOf(response.getRevokedSessionCount())
         )
+      )
     );
   }
 
-  public ResponseEntity<PlatformControllerGetOrganizationV1200Response> restore(
+  public ResponseEntity<ApiResponse<PlatformOrganizationResponseDto>> restore(
     RequestContext context,
     String id
   ) {
@@ -347,17 +347,10 @@ public class PlatformOrganizationsService {
     );
   }
 
-  private static ResponseEntity<PlatformControllerGetOrganizationV1200Response> ok200(
-    PlatformOrganizationResponseDto data,
-    String message
-  ) {
-    return ResponseEntity.ok(
-      new PlatformControllerGetOrganizationV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message(message)
-        .data(data)
-    );
+  private static ResponseEntity<
+    ApiResponse<PlatformOrganizationResponseDto>
+  > ok200(PlatformOrganizationResponseDto data, String message) {
+    return ResponseEntity.ok(ApiResponse.of(200, message, data));
   }
 
   /** Node's `.trim().toLowerCase()` normalization, THEN the pattern — same order, so `ACME-CORP` still succeeds. */
@@ -434,18 +427,6 @@ public class PlatformOrganizationsService {
       .billingCycleStart(toOffsetDateTime(organization.getBillingCycleStart()))
       .createdAt(toOffsetDateTime(organization.getCreatedAt()))
       .updatedAt(toOffsetDateTime(organization.getUpdatedAt()));
-  }
-
-  private static InvitationsControllerListV1200ResponseDataMeta toMetaDto(
-    synapsedesk.auth.Common.PageMeta meta
-  ) {
-    return new InvitationsControllerListV1200ResponseDataMeta(
-      BigDecimal.valueOf(meta.getTotalItems()),
-      BigDecimal.valueOf(meta.getItemCount()),
-      BigDecimal.valueOf(meta.getItemsPerPage()),
-      BigDecimal.valueOf(meta.getTotalPages()),
-      BigDecimal.valueOf(meta.getCurrentPage())
-    );
   }
 
   private static OffsetDateTime toOffsetDateTime(

@@ -22,7 +22,9 @@ class CompositeLeaseRuntimeTest {
     LeaseParticipant first = mock(LeaseParticipant.class);
     LeaseParticipant second = mock(LeaseParticipant.class);
     LeaseParticipant third = mock(LeaseParticipant.class);
-    CompositeLeaseRuntime composite = new CompositeLeaseRuntime(List.of(first, second, third));
+    CompositeLeaseRuntime composite = new CompositeLeaseRuntime(
+      List.of(first, second, third)
+    );
 
     composite.activate();
 

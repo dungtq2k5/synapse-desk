@@ -7,22 +7,22 @@ import java.lang.annotation.Target;
 
 /**
  * Marks a controller or method as security-sensitive — `@AuthThrottle()`,
- * reproduced. {@link SmartThrottlerInterceptor} evaluates {@code authTier}
- * ONLY for a marked route and skips it entirely for everything else; a route
+ * reproduced. {@link ThrottlerInterceptor} evaluates {@code authTier} ONLY
+ * for a marked route and skips it entirely for everything else; a route
  * never sees both the strict tier and the general backstop.
  *
- * <p>Class-level covers every handler; method-level marks one. An explicit
- * {@link #ttlMs()}/{@link #limit()} overrides {@code authTier}'s configured
- * default for that one route — {@code ROUTE_THROTTLE}'s per-route entries,
- * reproduced as annotation arguments since Java annotations need compile-time
- * constants rather than a runtime-keyed map.
+ * <p>Class-level covers every handler; method-level marks one.
+ *
+ * <p><b>A pure marker — no {@code ttlMs}/{@code limit} of its own.</b> A
+ * route that needs {@code authTier}'s numbers tightened carries {@link
+ * ThrottleOverride} as well (`tier = ThrottlerTiers.AUTH`), the same
+ * mechanism {@code medium} and the other general tiers already use.
+ * {@link ThrottlerInterceptor#resolveLimit} reads one override mechanism,
+ * not two: two spellings of the same per-route number is what let
+ * `RouteThrottle`'s login/register/OTP figures sit on this annotation,
+ * unread, while every AUTH-tier route silently evaluated the coarse global
+ * default instead.
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ ElementType.TYPE, ElementType.METHOD })
-public @interface AuthThrottle {
-  /** -1 means "use {@code authTier}'s configured default". */
-  long ttlMs() default -1;
-
-  /** -1 means "use {@code authTier}'s configured default". */
-  int limit() default -1;
-}
+public @interface AuthThrottle {}

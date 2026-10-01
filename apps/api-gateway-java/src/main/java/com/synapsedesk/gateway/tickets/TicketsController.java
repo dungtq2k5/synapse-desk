@@ -3,49 +3,61 @@ package com.synapsedesk.gateway.tickets;
 import com.synapsedesk.gateway.auth.CurrentRequest;
 import com.synapsedesk.gateway.auth.CurrentUser;
 import com.synapsedesk.gateway.auth.RequestContext;
-import com.synapsedesk.gateway.generated.api.TicketsApi;
 import com.synapsedesk.gateway.generated.model.AssignTicketDto;
 import com.synapsedesk.gateway.generated.model.AssignTicketToSelfDto;
-import com.synapsedesk.gateway.generated.model.AuthControllerForgotPasswordV1202Response;
+import com.synapsedesk.gateway.generated.model.AssignmentResponseDto;
 import com.synapsedesk.gateway.generated.model.BulkTicketPriorityDto;
+import com.synapsedesk.gateway.generated.model.BulkTicketPriorityResponseDto;
 import com.synapsedesk.gateway.generated.model.BulkTicketStatusDto;
+import com.synapsedesk.gateway.generated.model.BulkTicketStatusResponseDto;
 import com.synapsedesk.gateway.generated.model.ChangeTicketStatusDto;
 import com.synapsedesk.gateway.generated.model.CreateTicketDto;
 import com.synapsedesk.gateway.generated.model.CreateTicketExportDto;
 import com.synapsedesk.gateway.generated.model.CurrentUserResponseDto.PermissionCodesEnum;
+import com.synapsedesk.gateway.generated.model.ExportResponseDto;
 import com.synapsedesk.gateway.generated.model.MarkTicketReadDto;
+import com.synapsedesk.gateway.generated.model.MarkTicketReadResponseDto;
+import com.synapsedesk.gateway.generated.model.SimilarTicketResponseDto;
+import com.synapsedesk.gateway.generated.model.TicketResponseDto;
 import com.synapsedesk.gateway.generated.model.TicketStatusActionDto;
-import com.synapsedesk.gateway.generated.model.TicketsControllerAssignV1200Response;
-import com.synapsedesk.gateway.generated.model.TicketsControllerBulkChangePriorityV1200Response;
-import com.synapsedesk.gateway.generated.model.TicketsControllerBulkChangeStatusV1200Response;
-import com.synapsedesk.gateway.generated.model.TicketsControllerCreateExportV1202Response;
-import com.synapsedesk.gateway.generated.model.TicketsControllerCreateV1201Response;
-import com.synapsedesk.gateway.generated.model.TicketsControllerListAssignmentsV1200Response;
-import com.synapsedesk.gateway.generated.model.TicketsControllerListSimilarV1200Response;
-import com.synapsedesk.gateway.generated.model.TicketsControllerListStatusChangesV1200Response;
-import com.synapsedesk.gateway.generated.model.TicketsControllerListV1200Response;
-import com.synapsedesk.gateway.generated.model.TicketsControllerMarkReadV1200Response;
+import com.synapsedesk.gateway.generated.model.TicketStatusChangeResponseDto;
 import com.synapsedesk.gateway.generated.model.UpdateTicketDto;
+import com.synapsedesk.gateway.openapi.ApiErrors;
 import com.synapsedesk.gateway.security.RequirePermission;
+import com.synapsedesk.gateway.web.ApiPaths;
+import com.synapsedesk.gateway.web.ApiResponse;
+import com.synapsedesk.gateway.web.PagedData;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.UUID;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.lang.Nullable;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * `TicketsApi` — the routed assembly of all 24 ticket operations, delegating
+ * `TicketsApi` — the routed assembly of all 23 ticket operations, delegating
  * to the four group-scoped services this interface was ported across:
  * {@link TicketsCrudService} (CRUD + plain reads, 7 ops), {@link
  * TicketsStatusService} (status state machine + bulk ops, 7 ops), {@link
  * TicketsAssignmentService} (assignment triple + read-state/history, 7
  * ops), and {@link TicketsExportAndAiService} (export + AI-similar, 3
- * ops). {@code implements TicketsApi} lives here, and only here, because a
- * generated interface's 24 abstract methods all need an implementation
- * before Spring can register any route on it — the four services above
- * carried real, sabotage-tested logic with no route attached until this
- * class existed, matching {@code PlatformController}'s own assembly
- * pattern for {@code PlatformApi}.
+ * ops). The hand-declared {@code @RequestMapping}s live here, and only
+ * here, matching {@code PlatformController}'s own assembly pattern.
  *
  * <p><b>{@code @RequirePermission} lives here, not only in the services.</b>
  * The four group services call {@code TicketsCrudService.requirePermission}
@@ -59,9 +71,20 @@ import org.springframework.web.bind.annotation.RestController;
  * service-layer checks stay: they are what each group's own sabotage tests
  * exercise directly, and a second, redundant guard on the HTTP path costs
  * nothing.
+ *
+ * <p><b>Migrated off `TicketsApi`.</b> {@code create} answers 201; {@code
+ * createExport} answers 202; {@code remove} and {@code unassign} answer
+ * 204 — {@code @ResponseStatus} is what tells springdoc that. {@code
+ * assign}/{@code reassign}/{@code assignToSelf}/{@code unassign} keep
+ * their four independent, non-shared {@code @RequirePermission} codes
+ * exactly as before — the sibling-code risk this whole group split existed
+ * for, unchanged by the flip.
  */
+@Tag(name = "Tickets")
 @RestController
-public class TicketsController implements TicketsApi {
+@RequestMapping(ApiPaths.V1)
+@Validated
+public class TicketsController {
 
   private final CurrentUser currentUser;
   private final TicketsCrudService crud;
@@ -87,20 +110,64 @@ public class TicketsController implements TicketsApi {
     return currentUser.require(CurrentRequest.request());
   }
 
-  @Override
-  public ResponseEntity<TicketsControllerListV1200Response> ticketsControllerListV1(
-    BigDecimal page,
-    BigDecimal limit,
-    String sortOrder,
-    @Nullable String searchTerm,
-    String sortBy,
-    Boolean includeDeleted,
-    @Nullable String status,
-    @Nullable String priority,
-    @Nullable String source,
-    @Nullable UUID assigneeId,
-    @Nullable UUID departmentId,
-    @Nullable UUID authorId
+  @GetMapping(value = "/tickets", produces = { "application/json" })
+  @ApiErrors({ "401" })
+  public ResponseEntity<
+    ApiResponse<PagedData<TicketResponseDto>>
+  > ticketsControllerListV1(
+    @DecimalMin(value = "1") @Valid @RequestParam(
+      value = "page",
+      required = false,
+      defaultValue = "1"
+    ) BigDecimal page,
+    @DecimalMin(value = "1") @DecimalMax(value = "100") @Valid @RequestParam(
+      value = "limit",
+      required = false,
+      defaultValue = "10"
+    ) BigDecimal limit,
+    @Valid @RequestParam(
+      value = "sortOrder",
+      required = false,
+      defaultValue = "ASC"
+    ) String sortOrder,
+    @Valid @RequestParam(
+      value = "searchTerm",
+      required = false
+    ) @Nullable String searchTerm,
+    @Valid @RequestParam(
+      value = "sortBy",
+      required = false,
+      defaultValue = "createdAt"
+    ) String sortBy,
+    @Valid @RequestParam(
+      value = "includeDeleted",
+      required = false,
+      defaultValue = "false"
+    ) Boolean includeDeleted,
+    @Valid @RequestParam(
+      value = "status",
+      required = false
+    ) @Nullable String status,
+    @Valid @RequestParam(
+      value = "priority",
+      required = false
+    ) @Nullable String priority,
+    @Valid @RequestParam(
+      value = "source",
+      required = false
+    ) @Nullable String source,
+    @Valid @RequestParam(
+      value = "assigneeId",
+      required = false
+    ) @Nullable UUID assigneeId,
+    @Valid @RequestParam(
+      value = "departmentId",
+      required = false
+    ) @Nullable UUID departmentId,
+    @Valid @RequestParam(
+      value = "authorId",
+      required = false
+    ) @Nullable UUID authorId
   ) {
     return crud.list(
       context(),
@@ -119,191 +186,322 @@ public class TicketsController implements TicketsApi {
     );
   }
 
-  @Override
-  public ResponseEntity<TicketsControllerCreateV1201Response> ticketsControllerGetByNumberV1(
-    BigDecimal ticketNumber
+  @GetMapping(
+    value = "/tickets/by-number/{ticketNumber}",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "404" })
+  public ResponseEntity<
+    ApiResponse<TicketResponseDto>
+  > ticketsControllerGetByNumberV1(
+    @PathVariable("ticketNumber") BigDecimal ticketNumber
   ) {
     return crud.getByNumber(context(), ticketNumber);
   }
 
-  @Override
-  public ResponseEntity<TicketsControllerCreateV1201Response> ticketsControllerGetV1(
-    String id
+  @GetMapping(value = "/tickets/{id}", produces = { "application/json" })
+  @ApiErrors({ "400", "401", "404" })
+  public ResponseEntity<ApiResponse<TicketResponseDto>> ticketsControllerGetV1(
+    @PathVariable("id") String id
   ) {
     return crud.get(context(), id);
   }
 
-  @Override
+  @PostMapping(
+    value = "/tickets",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403" })
+  @ResponseStatus(HttpStatus.CREATED)
   @RequirePermission(PermissionCodesEnum.TICKET_CREATE)
-  public ResponseEntity<TicketsControllerCreateV1201Response> ticketsControllerCreateV1(
-    CreateTicketDto createTicketDto
+  public ResponseEntity<
+    ApiResponse<TicketResponseDto>
+  > ticketsControllerCreateV1(
+    @Valid @RequestBody CreateTicketDto createTicketDto
   ) {
     return crud.create(context(), createTicketDto);
   }
 
-  @Override
+  @PatchMapping(
+    value = "/tickets/{id}",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.TICKET_UPDATE)
-  public ResponseEntity<TicketsControllerCreateV1201Response> ticketsControllerUpdateV1(
-    String id,
-    UpdateTicketDto updateTicketDto
+  public ResponseEntity<
+    ApiResponse<TicketResponseDto>
+  > ticketsControllerUpdateV1(
+    @PathVariable("id") String id,
+    @Valid @RequestBody UpdateTicketDto updateTicketDto
   ) {
     return crud.update(context(), id, updateTicketDto);
   }
 
-  @Override
+  @DeleteMapping(value = "/tickets/{id}", produces = { "application/json" })
+  @ApiErrors({ "400", "401", "403", "404" })
+  @ResponseStatus(HttpStatus.NO_CONTENT)
   @RequirePermission(PermissionCodesEnum.TICKET_DELETE)
-  public ResponseEntity<AuthControllerForgotPasswordV1202Response> ticketsControllerRemoveV1(
-    String id
+  public ResponseEntity<ApiResponse<Void>> ticketsControllerRemoveV1(
+    @PathVariable("id") String id
   ) {
     return crud.remove(context(), id);
   }
 
-  @Override
+  @PostMapping(
+    value = "/tickets/{id}/restore",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.TICKET_DELETE)
-  public ResponseEntity<TicketsControllerCreateV1201Response> ticketsControllerRestoreV1(
-    String id
-  ) {
+  public ResponseEntity<
+    ApiResponse<TicketResponseDto>
+  > ticketsControllerRestoreV1(@PathVariable("id") String id) {
     return crud.restore(context(), id);
   }
 
-  @Override
+  @PostMapping(
+    value = "/tickets/bulk/status",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403" })
   @RequirePermission(PermissionCodesEnum.TICKET_UPDATE)
-  public ResponseEntity<TicketsControllerBulkChangeStatusV1200Response> ticketsControllerBulkChangeStatusV1(
-    BulkTicketStatusDto bulkTicketStatusDto
+  public ResponseEntity<
+    ApiResponse<BulkTicketStatusResponseDto>
+  > ticketsControllerBulkChangeStatusV1(
+    @Valid @RequestBody BulkTicketStatusDto bulkTicketStatusDto
   ) {
     return status.bulkChangeStatus(context(), bulkTicketStatusDto);
   }
 
-  @Override
+  @PostMapping(
+    value = "/tickets/bulk/priority",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403" })
   @RequirePermission(PermissionCodesEnum.TICKET_UPDATE)
-  public ResponseEntity<TicketsControllerBulkChangePriorityV1200Response> ticketsControllerBulkChangePriorityV1(
-    BulkTicketPriorityDto bulkTicketPriorityDto
+  public ResponseEntity<
+    ApiResponse<BulkTicketPriorityResponseDto>
+  > ticketsControllerBulkChangePriorityV1(
+    @Valid @RequestBody BulkTicketPriorityDto bulkTicketPriorityDto
   ) {
     return status.bulkChangePriority(context(), bulkTicketPriorityDto);
   }
 
-  @Override
+  @PostMapping(
+    value = "/tickets/{id}/status",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.TICKET_UPDATE)
-  public ResponseEntity<TicketsControllerCreateV1201Response> ticketsControllerChangeStatusV1(
-    String id,
-    ChangeTicketStatusDto changeTicketStatusDto
+  public ResponseEntity<
+    ApiResponse<TicketResponseDto>
+  > ticketsControllerChangeStatusV1(
+    @PathVariable("id") String id,
+    @Valid @RequestBody ChangeTicketStatusDto changeTicketStatusDto
   ) {
     return status.changeStatus(context(), id, changeTicketStatusDto);
   }
 
-  @Override
-  public ResponseEntity<TicketsControllerCreateV1201Response> ticketsControllerEscalateV1(
-    String id,
-    TicketStatusActionDto ticketStatusActionDto
+  @PostMapping(
+    value = "/tickets/{id}/escalate",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "404" })
+  public ResponseEntity<
+    ApiResponse<TicketResponseDto>
+  > ticketsControllerEscalateV1(
+    @PathVariable("id") String id,
+    @Valid @RequestBody TicketStatusActionDto ticketStatusActionDto
   ) {
     return status.escalate(context(), id, ticketStatusActionDto);
   }
 
-  @Override
+  @PostMapping(
+    value = "/tickets/{id}/resolve",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.TICKET_RESOLVE)
-  public ResponseEntity<TicketsControllerCreateV1201Response> ticketsControllerResolveV1(
-    String id,
-    TicketStatusActionDto ticketStatusActionDto
+  public ResponseEntity<
+    ApiResponse<TicketResponseDto>
+  > ticketsControllerResolveV1(
+    @PathVariable("id") String id,
+    @Valid @RequestBody TicketStatusActionDto ticketStatusActionDto
   ) {
     return status.resolve(context(), id, ticketStatusActionDto);
   }
 
-  @Override
+  @PostMapping(
+    value = "/tickets/{id}/reopen",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.TICKET_UPDATE)
-  public ResponseEntity<TicketsControllerCreateV1201Response> ticketsControllerReopenV1(
-    String id,
-    TicketStatusActionDto ticketStatusActionDto
+  public ResponseEntity<
+    ApiResponse<TicketResponseDto>
+  > ticketsControllerReopenV1(
+    @PathVariable("id") String id,
+    @Valid @RequestBody TicketStatusActionDto ticketStatusActionDto
   ) {
     return status.reopen(context(), id, ticketStatusActionDto);
   }
 
-  @Override
+  @PostMapping(
+    value = "/tickets/{id}/close",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.TICKET_RESOLVE)
-  public ResponseEntity<TicketsControllerCreateV1201Response> ticketsControllerCloseV1(
-    String id,
-    TicketStatusActionDto ticketStatusActionDto
+  public ResponseEntity<
+    ApiResponse<TicketResponseDto>
+  > ticketsControllerCloseV1(
+    @PathVariable("id") String id,
+    @Valid @RequestBody TicketStatusActionDto ticketStatusActionDto
   ) {
     return status.close(context(), id, ticketStatusActionDto);
   }
 
-  @Override
+  @PostMapping(
+    value = "/tickets/{id}/assign",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.TICKET_ASSIGN)
-  public ResponseEntity<TicketsControllerAssignV1200Response> ticketsControllerAssignV1(
-    String id,
-    AssignTicketDto assignTicketDto
+  public ResponseEntity<
+    ApiResponse<AssignmentResponseDto>
+  > ticketsControllerAssignV1(
+    @PathVariable("id") String id,
+    @Valid @RequestBody AssignTicketDto assignTicketDto
   ) {
     return assignment.assign(context(), id, assignTicketDto);
   }
 
-  @Override
+  @PostMapping(
+    value = "/tickets/{id}/reassign",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.TICKET_REASSIGN)
-  public ResponseEntity<TicketsControllerAssignV1200Response> ticketsControllerReassignV1(
-    String id,
-    AssignTicketDto assignTicketDto
+  public ResponseEntity<
+    ApiResponse<AssignmentResponseDto>
+  > ticketsControllerReassignV1(
+    @PathVariable("id") String id,
+    @Valid @RequestBody AssignTicketDto assignTicketDto
   ) {
     return assignment.reassign(context(), id, assignTicketDto);
   }
 
-  @Override
+  @PostMapping(
+    value = "/tickets/{id}/assign/self",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.TICKET_ASSIGN_SELF)
-  public ResponseEntity<TicketsControllerAssignV1200Response> ticketsControllerAssignToSelfV1(
-    String id,
-    AssignTicketToSelfDto assignTicketToSelfDto
+  public ResponseEntity<
+    ApiResponse<AssignmentResponseDto>
+  > ticketsControllerAssignToSelfV1(
+    @PathVariable("id") String id,
+    @Valid @RequestBody AssignTicketToSelfDto assignTicketToSelfDto
   ) {
     return assignment.assignToSelf(context(), id, assignTicketToSelfDto);
   }
 
-  @Override
+  @DeleteMapping(
+    value = "/tickets/{id}/assign",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403", "404" })
+  @ResponseStatus(HttpStatus.NO_CONTENT)
   @RequirePermission(PermissionCodesEnum.TICKET_ASSIGN)
-  public ResponseEntity<AuthControllerForgotPasswordV1202Response> ticketsControllerUnassignV1(
-    String id
+  public ResponseEntity<ApiResponse<Void>> ticketsControllerUnassignV1(
+    @PathVariable("id") String id
   ) {
     return assignment.unassign(context(), id);
   }
 
-  @Override
-  public ResponseEntity<TicketsControllerListAssignmentsV1200Response> ticketsControllerListAssignmentsV1(
-    String id
-  ) {
+  @GetMapping(
+    value = "/tickets/{id}/assignments",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "404" })
+  public ResponseEntity<
+    ApiResponse<List<AssignmentResponseDto>>
+  > ticketsControllerListAssignmentsV1(@PathVariable("id") String id) {
     return assignment.listAssignments(context(), id);
   }
 
-  @Override
-  public ResponseEntity<TicketsControllerMarkReadV1200Response> ticketsControllerMarkReadV1(
-    String id,
-    MarkTicketReadDto markTicketReadDto
+  @PostMapping(
+    value = "/tickets/{id}/read",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "404" })
+  public ResponseEntity<
+    ApiResponse<MarkTicketReadResponseDto>
+  > ticketsControllerMarkReadV1(
+    @PathVariable("id") String id,
+    @Valid @RequestBody MarkTicketReadDto markTicketReadDto
   ) {
     return assignment.markRead(context(), id, markTicketReadDto);
   }
 
-  @Override
-  public ResponseEntity<TicketsControllerListStatusChangesV1200Response> ticketsControllerListStatusChangesV1(
-    String id
-  ) {
+  @GetMapping(
+    value = "/tickets/{id}/history",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "404" })
+  public ResponseEntity<
+    ApiResponse<List<TicketStatusChangeResponseDto>>
+  > ticketsControllerListStatusChangesV1(@PathVariable("id") String id) {
     return assignment.listStatusChanges(context(), id);
   }
 
-  @Override
+  @PostMapping(
+    value = "/tickets/export",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403" })
+  @ResponseStatus(HttpStatus.ACCEPTED)
   @RequirePermission(PermissionCodesEnum.TICKET_EXPORT)
-  public ResponseEntity<TicketsControllerCreateExportV1202Response> ticketsControllerCreateExportV1(
-    CreateTicketExportDto createTicketExportDto
+  public ResponseEntity<
+    ApiResponse<ExportResponseDto>
+  > ticketsControllerCreateExportV1(
+    @Valid @RequestBody CreateTicketExportDto createTicketExportDto
   ) {
     return exportAndAi.createExport(context(), createTicketExportDto);
   }
 
-  @Override
+  @GetMapping(value = "/tickets/export/{id}", produces = { "application/json" })
+  @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.TICKET_EXPORT)
-  public ResponseEntity<TicketsControllerCreateExportV1202Response> ticketsControllerGetExportV1(
-    String id
-  ) {
+  public ResponseEntity<
+    ApiResponse<ExportResponseDto>
+  > ticketsControllerGetExportV1(@PathVariable("id") String id) {
     return exportAndAi.getExport(context(), id);
   }
 
-  @Override
+  @GetMapping(
+    value = "/tickets/{id}/similar",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.TICKET_READ_ALL)
-  public ResponseEntity<TicketsControllerListSimilarV1200Response> ticketsControllerListSimilarV1(
-    String id
-  ) {
+  public ResponseEntity<
+    ApiResponse<List<SimilarTicketResponseDto>>
+  > ticketsControllerListSimilarV1(@PathVariable("id") String id) {
     return exportAndAi.listSimilar(context(), id);
   }
 }

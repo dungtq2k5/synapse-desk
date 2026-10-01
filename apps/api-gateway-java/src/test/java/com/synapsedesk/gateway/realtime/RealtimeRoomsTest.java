@@ -12,7 +12,9 @@ class RealtimeRoomsTest {
     assertThat(RealtimeRooms.userRoom("u-1")).isEqualTo("user:u-1");
     assertThat(RealtimeRooms.orgRoom("o-1")).isEqualTo("org:o-1");
     assertThat(RealtimeRooms.ticketRoom("t-1")).isEqualTo("ticket:t-1");
-    assertThat(RealtimeRooms.ticketInternalRoom("t-1")).isEqualTo("ticket:t-1:internal");
+    assertThat(RealtimeRooms.ticketInternalRoom("t-1")).isEqualTo(
+      "ticket:t-1:internal"
+    );
     assertThat(RealtimeRooms.deptRoom("d-1")).isEqualTo("dept:d-1");
   }
 }

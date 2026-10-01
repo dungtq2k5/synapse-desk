@@ -3,23 +3,24 @@ package com.synapsedesk.gateway.chat;
 import com.synapsedesk.gateway.auth.CurrentRequest;
 import com.synapsedesk.gateway.auth.CurrentUser;
 import com.synapsedesk.gateway.auth.RequestContext;
-import com.synapsedesk.gateway.generated.api.ChatApi;
 import com.synapsedesk.gateway.generated.model.AttachmentResponseDto;
 import com.synapsedesk.gateway.generated.model.CitationResponseDto;
 import com.synapsedesk.gateway.generated.model.CreateMessageDto;
 import com.synapsedesk.gateway.generated.model.CreateMessageResponseDto;
-import com.synapsedesk.gateway.generated.model.InvitationsControllerListV1200ResponseDataMeta;
 import com.synapsedesk.gateway.generated.model.MessageResponseDto;
-import com.synapsedesk.gateway.generated.model.MessagesControllerCreateV1201Response;
-import com.synapsedesk.gateway.generated.model.MessagesControllerListV1200Response;
-import com.synapsedesk.gateway.generated.model.MessagesControllerListV1200ResponseData;
 import com.synapsedesk.gateway.generated.model.StartConversationDto;
 import com.synapsedesk.gateway.generated.model.TicketResponseDto;
-import com.synapsedesk.gateway.generated.model.TicketsControllerCreateV1201Response;
-import com.synapsedesk.gateway.generated.model.TicketsControllerListV1200Response;
-import com.synapsedesk.gateway.generated.model.TicketsControllerListV1200ResponseData;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
+import com.synapsedesk.gateway.openapi.ApiErrors;
+import com.synapsedesk.gateway.web.ApiPaths;
+import com.synapsedesk.gateway.web.ApiResponse;
+import com.synapsedesk.gateway.web.PageMeta;
+import com.synapsedesk.gateway.web.PagedData;
 import io.grpc.stub.MetadataUtils;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -29,8 +30,16 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.lang.Nullable;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
-import synapsedesk.auth.Common.PageMeta;
 import synapsedesk.auth.Common.PageRequest;
 import synapsedesk.auth.Common.SortOrder;
 import synapsedesk.ticket.Common.TicketPriority;
@@ -62,9 +71,15 @@ import synapsedesk.ticket.TicketServiceGrpc;
  * — never read from the body — because an end-user surface has no notion of an
  * agent-only note, and forwarding the flag would leave a permission check as
  * the only thing stopping a chat client from writing one.
+ *
+ * <p><b>Migrated off `ChatApi`.</b> `start`/`sendMessage` answer 201 —
+ * {@code @ResponseStatus} is what tells springdoc that.
  */
+@Tag(name = "Chat")
 @RestController
-public class ChatController implements ChatApi {
+@RequestMapping(ApiPaths.V1)
+@Validated
+public class ChatController {
 
   private static final long DEADLINE_SECONDS = 5;
 
@@ -102,9 +117,15 @@ public class ChatController implements ChatApi {
       );
   }
 
-  @Override
-  public ResponseEntity<TicketsControllerCreateV1201Response> chatControllerStartV1(
-    StartConversationDto startConversationDto
+  @PostMapping(
+    value = "/chat/conversations",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401" })
+  @ResponseStatus(HttpStatus.CREATED)
+  public ResponseEntity<ApiResponse<TicketResponseDto>> chatControllerStartV1(
+    @Valid @RequestBody StartConversationDto startConversationDto
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -124,29 +145,69 @@ public class ChatController implements ChatApi {
     TicketResponse response = ticketsWith(context).createTicket(wire.build());
 
     return new ResponseEntity<>(
-      new TicketsControllerCreateV1201Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(201))
-        .message("Conversation started")
-        .data(toTicketDto(response)),
+      ApiResponse.of(201, "Conversation started", toTicketDto(response)),
       HttpStatus.CREATED
     );
   }
 
-  @Override
-  public ResponseEntity<TicketsControllerListV1200Response> chatControllerListV1(
-    BigDecimal page,
-    BigDecimal limit,
-    String sortOrder,
-    String searchTerm,
-    String sortBy,
-    Boolean includeDeleted,
-    String status,
-    String priority,
-    String source,
-    UUID assigneeId,
-    UUID departmentId,
-    UUID authorId
+  @GetMapping(value = "/chat/conversations", produces = { "application/json" })
+  @ApiErrors({ "401" })
+  public ResponseEntity<
+    ApiResponse<PagedData<TicketResponseDto>>
+  > chatControllerListV1(
+    @DecimalMin(value = "1") @Valid @RequestParam(
+      value = "page",
+      required = false,
+      defaultValue = "1"
+    ) BigDecimal page,
+    @DecimalMin(value = "1") @DecimalMax(value = "100") @Valid @RequestParam(
+      value = "limit",
+      required = false,
+      defaultValue = "10"
+    ) BigDecimal limit,
+    @Valid @RequestParam(
+      value = "sortOrder",
+      required = false,
+      defaultValue = "ASC"
+    ) String sortOrder,
+    @Valid @RequestParam(
+      value = "searchTerm",
+      required = false
+    ) @Nullable String searchTerm,
+    @Valid @RequestParam(
+      value = "sortBy",
+      required = false,
+      defaultValue = "createdAt"
+    ) String sortBy,
+    @Valid @RequestParam(
+      value = "includeDeleted",
+      required = false,
+      defaultValue = "false"
+    ) Boolean includeDeleted,
+    @Valid @RequestParam(
+      value = "status",
+      required = false
+    ) @Nullable String status,
+    @Valid @RequestParam(
+      value = "priority",
+      required = false
+    ) @Nullable String priority,
+    @Valid @RequestParam(
+      value = "source",
+      required = false
+    ) @Nullable String source,
+    @Valid @RequestParam(
+      value = "assigneeId",
+      required = false
+    ) @Nullable UUID assigneeId,
+    @Valid @RequestParam(
+      value = "departmentId",
+      required = false
+    ) @Nullable UUID departmentId,
+    @Valid @RequestParam(
+      value = "authorId",
+      required = false
+    ) @Nullable UUID authorId
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -175,29 +236,25 @@ public class ChatController implements ChatApi {
 
     ListTicketsResponse response = ticketsWith(context).listTickets(wire);
 
-    TicketsControllerListV1200ResponseData data =
-      new TicketsControllerListV1200ResponseData()
-        .items(
-          response
-            .getItemsList()
-            .stream()
-            .map(ChatController::toTicketDto)
-            .toList()
-        )
-        .meta(toMetaDto(response.getMeta()));
-
-    return ResponseEntity.ok(
-      new TicketsControllerListV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(data)
+    PagedData<TicketResponseDto> data = new PagedData<>(
+      response
+        .getItemsList()
+        .stream()
+        .map(ChatController::toTicketDto)
+        .toList(),
+      PageMeta.from(response.getMeta())
     );
+
+    return ResponseEntity.ok(ApiResponse.of(200, "OK", data));
   }
 
-  @Override
-  public ResponseEntity<TicketsControllerCreateV1201Response> chatControllerGetV1(
-    String id
+  @GetMapping(
+    value = "/chat/conversations/{id}",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "404" })
+  public ResponseEntity<ApiResponse<TicketResponseDto>> chatControllerGetV1(
+    @PathVariable("id") String id
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -205,23 +262,42 @@ public class ChatController implements ChatApi {
       synapsedesk.ticket.Ticket.GetTicketRequest.newBuilder().setId(id).build()
     );
 
-    return ResponseEntity.ok(
-      new TicketsControllerCreateV1201Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(toTicketDto(response))
-    );
+    return ResponseEntity.ok(ApiResponse.of(200, "OK", toTicketDto(response)));
   }
 
-  @Override
-  public ResponseEntity<MessagesControllerListV1200Response> chatControllerListMessagesV1(
-    String id,
-    BigDecimal page,
-    BigDecimal limit,
-    String sortBy,
-    String sortOrder,
-    String searchTerm
+  @GetMapping(
+    value = "/chat/conversations/{id}/messages",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "404" })
+  public ResponseEntity<
+    ApiResponse<PagedData<MessageResponseDto>>
+  > chatControllerListMessagesV1(
+    @PathVariable("id") String id,
+    @DecimalMin(value = "1") @Valid @RequestParam(
+      value = "page",
+      required = false,
+      defaultValue = "1"
+    ) BigDecimal page,
+    @DecimalMin(value = "1") @DecimalMax(value = "100") @Valid @RequestParam(
+      value = "limit",
+      required = false,
+      defaultValue = "10"
+    ) BigDecimal limit,
+    @Valid @RequestParam(
+      value = "sortBy",
+      required = false,
+      defaultValue = "createdAt"
+    ) String sortBy,
+    @Valid @RequestParam(
+      value = "sortOrder",
+      required = false,
+      defaultValue = "ASC"
+    ) String sortOrder,
+    @Valid @RequestParam(
+      value = "searchTerm",
+      required = false
+    ) @Nullable String searchTerm
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -245,30 +321,30 @@ public class ChatController implements ChatApi {
         .build()
     );
 
-    MessagesControllerListV1200ResponseData data =
-      new MessagesControllerListV1200ResponseData()
-        .items(
-          response
-            .getItemsList()
-            .stream()
-            .map(ChatController::toMessageDto)
-            .toList()
-        )
-        .meta(toMetaDto(response.getMeta()));
-
-    return ResponseEntity.ok(
-      new MessagesControllerListV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(data)
+    PagedData<MessageResponseDto> data = new PagedData<>(
+      response
+        .getItemsList()
+        .stream()
+        .map(ChatController::toMessageDto)
+        .toList(),
+      PageMeta.from(response.getMeta())
     );
+
+    return ResponseEntity.ok(ApiResponse.of(200, "OK", data));
   }
 
-  @Override
-  public ResponseEntity<MessagesControllerCreateV1201Response> chatControllerSendMessageV1(
-    String id,
-    CreateMessageDto createMessageDto
+  @PostMapping(
+    value = "/chat/conversations/{id}/messages",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "404" })
+  @ResponseStatus(HttpStatus.CREATED)
+  public ResponseEntity<
+    ApiResponse<CreateMessageResponseDto>
+  > chatControllerSendMessageV1(
+    @PathVariable("id") String id,
+    @Valid @RequestBody CreateMessageDto createMessageDto
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -283,24 +359,25 @@ public class ChatController implements ChatApi {
 
     CreateMessageResponse response = messagesWith(context).createMessage(wire);
 
-    CreateMessageResponseDto data = new CreateMessageResponseDto()
-      .message(toMessageDto(response.getMessage()))
-      .skippedAttachments(response.getSkippedAttachmentsList());
+    CreateMessageResponseDto data = new CreateMessageResponseDto(
+      toMessageDto(response.getMessage()),
+      response.getSkippedAttachmentsList()
+    );
 
     return new ResponseEntity<>(
-      new MessagesControllerCreateV1201Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(201))
-        .message("Message sent")
-        .data(data),
+      ApiResponse.of(201, "Message sent", data),
       HttpStatus.CREATED
     );
   }
 
-  @Override
-  public ResponseEntity<TicketsControllerCreateV1201Response> chatControllerEscalateV1(
-    String id
-  ) {
+  @PostMapping(
+    value = "/chat/conversations/{id}/escalate",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "404" })
+  public ResponseEntity<
+    ApiResponse<TicketResponseDto>
+  > chatControllerEscalateV1(@PathVariable("id") String id) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     // `{}` and NOT a chat-specific reason — a literal alias of
@@ -310,11 +387,7 @@ public class ChatController implements ChatApi {
     );
 
     return ResponseEntity.ok(
-      new TicketsControllerCreateV1201Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("Handed off to an agent")
-        .data(toTicketDto(response))
+      ApiResponse.of(200, "Handed off to an agent", toTicketDto(response))
     );
   }
 
@@ -427,18 +500,6 @@ public class ChatController implements ChatApi {
           : null
       )
       .vectorPointId(citation.getVectorPointId());
-  }
-
-  private static InvitationsControllerListV1200ResponseDataMeta toMetaDto(
-    PageMeta meta
-  ) {
-    return new InvitationsControllerListV1200ResponseDataMeta(
-      BigDecimal.valueOf(meta.getTotalItems()),
-      BigDecimal.valueOf(meta.getItemCount()),
-      BigDecimal.valueOf(meta.getItemsPerPage()),
-      BigDecimal.valueOf(meta.getTotalPages()),
-      BigDecimal.valueOf(meta.getCurrentPage())
-    );
   }
 
   /** `TICKET_SOURCE_CHAT` -> `CHAT` — `fromValue` answers null for UNSPECIFIED, matching `fromProtoTicketSource`. */

@@ -44,6 +44,14 @@ public final class RouteThrottle {
   public static final long TWO_FACTOR_AUTHENTICATE_TTL_MS = 15 * 60_000;
   public static final int TWO_FACTOR_AUTHENTICATE_LIMIT = 10;
 
+  /** Token guessing here discloses the customer list. */
+  public static final long INVITATION_PREVIEW_TTL_MS = 60 * 60_000;
+  public static final int INVITATION_PREVIEW_LIMIT = 20;
+
+  /** Mail bomb aimed at one invitee. */
+  public static final long INVITATION_RESEND_TTL_MS = 60 * 60_000;
+  public static final int INVITATION_RESEND_LIMIT = 3;
+
   /** Reads Postgres and generates nothing — the `medium` tier's own default would already cover it; this pins the number. */
   public static final long KNOWLEDGE_SEARCH_TTL_MS = 60_000;
   public static final int KNOWLEDGE_SEARCH_LIMIT = 30;

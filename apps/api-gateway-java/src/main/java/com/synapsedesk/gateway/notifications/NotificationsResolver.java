@@ -17,7 +17,6 @@ import org.springframework.graphql.data.method.annotation.SchemaMapping;
 import org.springframework.stereotype.Controller;
 import synapsedesk.notification.Notification.ListNotificationsRequest;
 import synapsedesk.notification.Notification.ListNotificationsResponse;
-import synapsedesk.notification.Notification.MarkReadRequest;
 import synapsedesk.notification.Notification.MarkReadResponse;
 import synapsedesk.notification.Notification.NotificationIdRequest;
 import synapsedesk.notification.Notification.UnreadCountResponse;

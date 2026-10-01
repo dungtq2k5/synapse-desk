@@ -177,8 +177,9 @@ public class RealtimeGateway implements LeaseParticipant {
    * of connection setup (`CLIENT_EVENTS.ticketJoin` — a later group).
    */
   private void onConnect(SocketIOClient client) {
-    if (!wsThrottler.allowHandshake(SocketHandshakes.ip(client))) {
-      LOG.warn("Handshake budget exceeded for {}", SocketHandshakes.ip(client));
+    String handshakeIp = SocketHandshakes.ip(client);
+    if (!wsThrottler.allowHandshake(handshakeIp)) {
+      LOG.warn("Handshake budget exceeded for {}", handshakeIp);
       client.disconnect();
 
       return;
@@ -252,7 +253,10 @@ public class RealtimeGateway implements LeaseParticipant {
     }
 
     try {
-      String before = presence.read(principal.organizationId(), principal.sub());
+      String before = presence.read(
+        principal.organizationId(),
+        principal.sub()
+      );
       String state = presence.onConnect(
         principal.organizationId(),
         principal.sub()
@@ -308,7 +312,11 @@ public class RealtimeGateway implements LeaseParticipant {
         state
       );
       if (update.changed()) {
-        emitPresence(principal.organizationId(), principal.sub(), update.state());
+        emitPresence(
+          principal.organizationId(),
+          principal.sub(),
+          update.state()
+        );
       }
 
       ack.sendAckData(
@@ -323,7 +331,11 @@ public class RealtimeGateway implements LeaseParticipant {
   }
 
   /** Fanned to `org:{organizationId}` — not a ticket room, not a department room. */
-  private void emitPresence(String organizationId, String userId, String state) {
+  private void emitPresence(
+    String organizationId,
+    String userId,
+    String state
+  ) {
     broadcast.broadcastToRoom(
       RealtimeRooms.orgRoom(organizationId),
       RealtimeEvents.REALTIME_EVENTS_PRESENCE,
@@ -340,10 +352,12 @@ public class RealtimeGateway implements LeaseParticipant {
    */
   private void onTicketJoin(SocketIOClient client, TicketIdBody body) {
     JwtPrincipal principal = requireUser(client);
-    if (!wsThrottler.allowEvent(
-      RealtimeEvents.CLIENT_EVENTS_TICKET_JOIN,
-      principal.sub()
-    )) {
+    if (
+      !wsThrottler.allowEvent(
+        RealtimeEvents.CLIENT_EVENTS_TICKET_JOIN,
+        principal.sub()
+      )
+    ) {
       return;
     }
 
@@ -378,10 +392,12 @@ public class RealtimeGateway implements LeaseParticipant {
   /** No authorization check — leaving a room you are not in is a no-op. */
   private void onTicketLeave(SocketIOClient client, TicketIdBody body) {
     JwtPrincipal principal = requireUser(client);
-    if (!wsThrottler.allowEvent(
-      RealtimeEvents.CLIENT_EVENTS_TICKET_LEAVE,
-      principal.sub()
-    )) {
+    if (
+      !wsThrottler.allowEvent(
+        RealtimeEvents.CLIENT_EVENTS_TICKET_LEAVE,
+        principal.sub()
+      )
+    ) {
       return;
     }
 
@@ -452,9 +468,10 @@ public class RealtimeGateway implements LeaseParticipant {
         );
       }
 
-      CreateMessageResponse response = messagesWith(principal, client).createMessage(
-        wire.build()
-      );
+      CreateMessageResponse response = messagesWith(
+        principal,
+        client
+      ).createMessage(wire.build());
 
       String streamId = Boolean.TRUE.equals(body.invokeAi())
         ? startAnswerStream(

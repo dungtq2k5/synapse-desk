@@ -140,7 +140,9 @@ public class DocumentEventsConsumer implements LeaseParticipant {
    */
   private static List<String> audience(JsonNode event) {
     Set<String> rooms = new LinkedHashSet<>();
-    rooms.add(RealtimeRooms.userRoom(NatsEnvelope.stringField(event, "uploaderId")));
+    rooms.add(
+      RealtimeRooms.userRoom(NatsEnvelope.stringField(event, "uploaderId"))
+    );
 
     JsonNode organizationWide = event.get("isOrganizationWide");
     if (organizationWide != null && organizationWide.asBoolean()) {

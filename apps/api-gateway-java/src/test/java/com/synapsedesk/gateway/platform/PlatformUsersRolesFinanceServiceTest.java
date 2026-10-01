@@ -140,7 +140,7 @@ class PlatformUsersRolesFinanceServiceTest {
     FinanceRevenueResponseDto revenue = service
       .getFinanceSnapshot(context())
       .getBody()
-      .getData()
+      .data()
       .getRevenue();
 
     assertThat(revenue.getAvailable()).isFalse();

@@ -24,6 +24,7 @@
 
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { matchingBracketIndex } from './brackets';
 import { REPO_ROOT } from './gateway';
 import { compareAlphabetically } from '@synapsedesk/common';
 
@@ -90,10 +91,6 @@ export function pendingApis(): Set<string> {
  * nothing is the failure this harness exists to prevent.
  */
 export const SKIPPED_FOR_JAVA: Readonly<Record<string, string>> = {
-  'CORS exposes every rate-limit header':
-    'the CORS policy and the per-tier rate-limit headers (the throttler)',
-  'the helmet header set is on every response':
-    'the security-header middleware',
   '`/metrics` exports the job gauge':
     'a metric is registered on first use, so the job gauge appears only once a job has reported — the reporter arrives with the NATS consumer',
   'a DTO validation failure':
@@ -101,10 +98,6 @@ export const SKIPPED_FOR_JAVA: Readonly<Record<string, string>> = {
     'messages) — the per-field text is already ruled loose; this ' +
     'row asserts the exact Node string rather than the shape, and wants a ' +
     'second, shape-only row instead of a Java rewrite of this one',
-  'a preflight from an origin outside the list':
-    'the CORS policy — same subsystem as the rate-limit-header row above, not part of auth',
-  'the login tier refuses the sixth attempt':
-    'the throttler — rate limiting is its own subsystem, not part of auth',
   '**an explicit `dob: null` clears it**':
     '`openApiNullable` is off project-wide (pom.xml, deliberate), so the ' +
     'generated `UpdateUserDto.dob` cannot distinguish an explicit `null` ' +
@@ -170,6 +163,43 @@ export function rowFor(...tags: string[]): jest.It {
  * Direction, as ever: from the rows toward the interfaces. The reverse would
  * only confirm that the tags someone wrote down exist.
  */
+/**
+ * Every tag a `rowFor(...)` call in `source` names as a string literal.
+ *
+ * **Depth-matched, not `rowFor\(([^)]*)\)`.** A `[^)]*` scan stops at the
+ * FIRST `)`, so a call like `rowFor(tagsFor(x))` would silently contribute
+ * zero tags rather than the real ones — the same failure shape
+ * `graphql-permission-coverage`'s `@Query(...)` parsing hit, and
+ * `permission-coverage`'s nested `ResponseEntity<...>` hit again. This one
+ * is upstream of every guard that trusts {@link declaredTags}, so an
+ * under-count here checks fewer tags for typos WHILE STAYING GREEN, rather
+ * than failing on the row it missed — the highest-consequence of the three.
+ * Exported so the hostile shape can be pinned directly, without a fixture
+ * file on disk.
+ */
+export function tagsIn(source: string): string[] {
+  const tags: string[] = [];
+  let searchFrom = 0;
+
+  for (;;) {
+    const start = source.indexOf('rowFor(', searchFrom);
+    if (start < 0) break;
+
+    const openParen = start + 'rowFor'.length;
+    const closeParen = matchingBracketIndex(source, openParen, '(', ')');
+    if (closeParen < 0) break;
+
+    for (const literal of source
+      .slice(openParen + 1, closeParen)
+      .matchAll(/'([^']+)'/gu)) {
+      tags.push(literal[1]);
+    }
+    searchFrom = closeParen + 1;
+  }
+
+  return tags;
+}
+
 export function declaredTags(): string[] {
   const here = join(REPO_ROOT, 'test/gateway-contract');
   const tags = new Set<string>();
@@ -177,12 +207,8 @@ export function declaredTags(): string[] {
   for (const file of readdirSync(here).filter((name) =>
     name.endsWith('.contract-spec.ts'),
   )) {
-    const source = readFileSync(join(here, file), 'utf8');
-
-    for (const call of source.matchAll(/rowFor\(([^)]*)\)/gu)) {
-      for (const literal of call[1].matchAll(/'([^']+)'/gu)) {
-        tags.add(literal[1]);
-      }
+    for (const tag of tagsIn(readFileSync(join(here, file), 'utf8'))) {
+      tags.add(tag);
     }
   }
 

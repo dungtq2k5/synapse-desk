@@ -4,21 +4,24 @@ import com.synapsedesk.gateway.auth.CurrentRequest;
 import com.synapsedesk.gateway.auth.CurrentUser;
 import com.synapsedesk.gateway.auth.RequestContext;
 import com.synapsedesk.gateway.cache.CacheService;
-import com.synapsedesk.gateway.generated.api.RolesApi;
 import com.synapsedesk.gateway.generated.model.AssignRoleUsersDto;
-import com.synapsedesk.gateway.generated.model.AuthControllerForgotPasswordV1202Response;
 import com.synapsedesk.gateway.generated.model.CreateRoleDto;
 import com.synapsedesk.gateway.generated.model.CurrentUserResponseDto.PermissionCodesEnum;
-import com.synapsedesk.gateway.generated.model.InvitationsControllerListV1200ResponseDataMeta;
 import com.synapsedesk.gateway.generated.model.RoleResponseDto;
-import com.synapsedesk.gateway.generated.model.RolesControllerCreateV1201Response;
-import com.synapsedesk.gateway.generated.model.RolesControllerListV1200Response;
-import com.synapsedesk.gateway.generated.model.RolesControllerListV1200ResponseData;
 import com.synapsedesk.gateway.generated.model.SetRolePermissionsDto;
 import com.synapsedesk.gateway.generated.model.UpdateRoleDto;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
+import com.synapsedesk.gateway.openapi.ApiErrors;
 import com.synapsedesk.gateway.security.RequirePermission;
+import com.synapsedesk.gateway.web.ApiPaths;
+import com.synapsedesk.gateway.web.ApiResponse;
+import com.synapsedesk.gateway.web.PageMeta;
+import com.synapsedesk.gateway.web.PagedData;
 import io.grpc.stub.MetadataUtils;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -26,7 +29,21 @@ import java.time.ZoneOffset;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.lang.Nullable;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import synapsedesk.auth.Common.PageRequest;
 import synapsedesk.auth.Common.SortOrder;
@@ -60,9 +77,19 @@ import synapsedesk.auth.RoleServiceGrpc;
  * role list read through this gateway can serve a stale entry for up to the
  * route's TTL after a write, exactly as the gap describes for every other
  * `@Cacheable` route ported so far.
+ *
+ * <p><b>Migrated off `RolesApi`.</b> `create` answers 201 —
+ * `@ResponseStatus` is what tells springdoc that. `list`'s cache now goes
+ * through {@link CacheService}'s {@code TypeReference} overload: the
+ * generic `ApiResponse<PagedData<RoleResponseDto>>` envelope is the first
+ * cached shape this gateway has cached where a bare {@code Class<T>} would
+ * have erased `data` back to an untyped map on every cache HIT.
  */
+@Tag(name = "Roles")
 @RestController
-public class RolesController implements RolesApi {
+@RequestMapping(ApiPaths.V1)
+@Validated
+public class RolesController {
 
   private static final long DEADLINE_SECONDS = 5;
   private static final String CACHE_SCOPE = "roles";
@@ -82,15 +109,45 @@ public class RolesController implements RolesApi {
     this.cache = cache;
   }
 
-  @Override
+  @RequestMapping(
+    method = RequestMethod.GET,
+    value = "/roles",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "401", "403" })
   @RequirePermission(PermissionCodesEnum.ROLE_READ)
-  public ResponseEntity<RolesControllerListV1200Response> rolesControllerListV1(
-    BigDecimal page,
-    BigDecimal limit,
-    String sortOrder,
-    String searchTerm,
-    String sortBy,
-    Boolean includeSystem
+  public ResponseEntity<
+    ApiResponse<PagedData<RoleResponseDto>>
+  > rolesControllerListV1(
+    @DecimalMin(value = "1") @Valid @RequestParam(
+      value = "page",
+      required = false,
+      defaultValue = "1"
+    ) BigDecimal page,
+    @DecimalMin(value = "1") @DecimalMax(value = "100") @Valid @RequestParam(
+      value = "limit",
+      required = false,
+      defaultValue = "10"
+    ) BigDecimal limit,
+    @Valid @RequestParam(
+      value = "sortOrder",
+      required = false,
+      defaultValue = "ASC"
+    ) String sortOrder,
+    @Valid @RequestParam(
+      value = "searchTerm",
+      required = false
+    ) @Nullable String searchTerm,
+    @Valid @RequestParam(
+      value = "sortBy",
+      required = false,
+      defaultValue = "createdAt"
+    ) String sortBy,
+    @Valid @RequestParam(
+      value = "includeSystem",
+      required = false,
+      defaultValue = "false"
+    ) Boolean includeSystem
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -109,10 +166,12 @@ public class RolesController implements RolesApi {
       rawParams
     );
 
-    RolesControllerListV1200Response envelope = cache.wrap(
+    ApiResponse<PagedData<RoleResponseDto>> envelope = cache.wrapTyped(
       key,
       LIST_CACHE_TTL_SECONDS,
-      RolesControllerListV1200Response.class,
+      new tools.jackson.core.type.TypeReference<
+        ApiResponse<PagedData<RoleResponseDto>>
+      >() {},
       () -> {
         PageRequest.Builder pageRequest = PageRequest.newBuilder()
           .setPage(page.intValue())
@@ -134,32 +193,27 @@ public class RolesController implements RolesApi {
             .build()
         );
 
-        RolesControllerListV1200ResponseData data =
-          new RolesControllerListV1200ResponseData()
-            .items(
-              response
-                .getItemsList()
-                .stream()
-                .map(RolesController::toRoleResponseDto)
-                .toList()
-            )
-            .meta(toMetaDto(response.getMeta()));
+        PagedData<RoleResponseDto> data = new PagedData<>(
+          response
+            .getItemsList()
+            .stream()
+            .map(RolesController::toRoleResponseDto)
+            .toList(),
+          PageMeta.from(response.getMeta())
+        );
 
-        return new RolesControllerListV1200Response()
-          .success(true)
-          .statusCode(BigDecimal.valueOf(200))
-          .message("OK")
-          .data(data);
+        return ApiResponse.of(200, "OK", data);
       }
     );
 
     return ResponseEntity.ok(envelope);
   }
 
-  @Override
+  @GetMapping(value = "/roles/{id}", produces = { "application/json" })
+  @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.ROLE_READ)
-  public ResponseEntity<RolesControllerCreateV1201Response> rolesControllerGetV1(
-    String id
+  public ResponseEntity<ApiResponse<RoleResponseDto>> rolesControllerGetV1(
+    @PathVariable("id") String id
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -177,10 +231,16 @@ public class RolesController implements RolesApi {
    * WEAKEN the gate to "either one". The escalation risk is closed in
    * auth-service instead: an actor cannot grant what they do not hold.
    */
-  @Override
+  @PostMapping(
+    value = "/roles",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403" })
+  @ResponseStatus(HttpStatus.CREATED)
   @RequirePermission(PermissionCodesEnum.ROLE_CREATE)
-  public ResponseEntity<RolesControllerCreateV1201Response> rolesControllerCreateV1(
-    CreateRoleDto createRoleDto
+  public ResponseEntity<ApiResponse<RoleResponseDto>> rolesControllerCreateV1(
+    @Valid @RequestBody CreateRoleDto createRoleDto
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -202,11 +262,16 @@ public class RolesController implements RolesApi {
     return okRole(response, "OK", 201);
   }
 
-  @Override
+  @PatchMapping(
+    value = "/roles/{id}",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.ROLE_UPDATE)
-  public ResponseEntity<RolesControllerCreateV1201Response> rolesControllerUpdateV1(
-    String id,
-    UpdateRoleDto updateRoleDto
+  public ResponseEntity<ApiResponse<RoleResponseDto>> rolesControllerUpdateV1(
+    @PathVariable("id") String id,
+    @Valid @RequestBody UpdateRoleDto updateRoleDto
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -223,10 +288,11 @@ public class RolesController implements RolesApi {
     return okRole(response, "OK", 200);
   }
 
-  @Override
+  @DeleteMapping(value = "/roles/{id}", produces = { "application/json" })
+  @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.ROLE_DELETE)
-  public ResponseEntity<AuthControllerForgotPasswordV1202Response> rolesControllerRemoveV1(
-    String id
+  public ResponseEntity<ApiResponse<Void>> rolesControllerRemoveV1(
+    @PathVariable("id") String id
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -234,20 +300,21 @@ public class RolesController implements RolesApi {
       RoleIdRequest.newBuilder().setId(id).build()
     );
 
-    return ResponseEntity.ok(
-      new AuthControllerForgotPasswordV1202Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("Role deleted")
-        .data(null)
-    );
+    return ResponseEntity.ok(ApiResponse.of(200, "Role deleted", null));
   }
 
-  @Override
+  @PutMapping(
+    value = "/roles/{id}/permissions",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.ROLE_PERMISSION_ASSIGN)
-  public ResponseEntity<RolesControllerCreateV1201Response> rolesControllerSetPermissionsV1(
-    String id,
-    SetRolePermissionsDto setRolePermissionsDto
+  public ResponseEntity<
+    ApiResponse<RoleResponseDto>
+  > rolesControllerSetPermissionsV1(
+    @PathVariable("id") String id,
+    @Valid @RequestBody SetRolePermissionsDto setRolePermissionsDto
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -267,11 +334,18 @@ public class RolesController implements RolesApi {
     return okRole(response, "Permissions updated", 200);
   }
 
-  @Override
+  @PostMapping(
+    value = "/roles/{id}/users",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.USER_ROLE_ASSIGN)
-  public ResponseEntity<RolesControllerCreateV1201Response> rolesControllerAssignUsersV1(
-    String id,
-    AssignRoleUsersDto assignRoleUsersDto
+  public ResponseEntity<
+    ApiResponse<RoleResponseDto>
+  > rolesControllerAssignUsersV1(
+    @PathVariable("id") String id,
+    @Valid @RequestBody AssignRoleUsersDto assignRoleUsersDto
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -287,11 +361,17 @@ public class RolesController implements RolesApi {
     return okRole(response, "Role assigned", 200);
   }
 
-  @Override
+  @DeleteMapping(
+    value = "/roles/{id}/users/{userId}",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403", "404", "409" })
   @RequirePermission(PermissionCodesEnum.USER_ROLE_ASSIGN)
-  public ResponseEntity<RolesControllerCreateV1201Response> rolesControllerRevokeUserV1(
-    String id,
-    String userId
+  public ResponseEntity<
+    ApiResponse<RoleResponseDto>
+  > rolesControllerRevokeUserV1(
+    @PathVariable("id") String id,
+    @PathVariable("userId") String userId
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -302,17 +382,13 @@ public class RolesController implements RolesApi {
     return okRole(response, "Role revoked", 200);
   }
 
-  private static ResponseEntity<RolesControllerCreateV1201Response> okRole(
+  private static ResponseEntity<ApiResponse<RoleResponseDto>> okRole(
     RoleResponse response,
     String message,
     int status
   ) {
     return ResponseEntity.status(status).body(
-      new RolesControllerCreateV1201Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(status))
-        .message(message)
-        .data(toRoleResponseDto(response))
+      ApiResponse.of(status, message, toRoleResponseDto(response))
     );
   }
 
@@ -332,18 +408,6 @@ public class RolesController implements RolesApi {
       )
       .createdAt(toOffsetDateTime(role.getCreatedAt()))
       .updatedAt(toOffsetDateTime(role.getUpdatedAt()));
-  }
-
-  private static InvitationsControllerListV1200ResponseDataMeta toMetaDto(
-    synapsedesk.auth.Common.PageMeta meta
-  ) {
-    return new InvitationsControllerListV1200ResponseDataMeta(
-      BigDecimal.valueOf(meta.getTotalItems()),
-      BigDecimal.valueOf(meta.getItemCount()),
-      BigDecimal.valueOf(meta.getItemsPerPage()),
-      BigDecimal.valueOf(meta.getTotalPages()),
-      BigDecimal.valueOf(meta.getCurrentPage())
-    );
   }
 
   private static OffsetDateTime toOffsetDateTime(

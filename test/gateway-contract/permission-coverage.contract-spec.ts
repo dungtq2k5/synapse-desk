@@ -23,6 +23,7 @@
 
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { matchingBracketIndex } from './brackets';
 import { REPO_ROOT } from './gateway';
 import { apiNameFor, pendingApis } from './pending';
 
@@ -158,19 +159,58 @@ function nodeRequiredCodes(
   return classLevel ? codesIn(classLevel[1]) : null;
 }
 
+/**
+ * A generated wrapper class kept every return type flat
+ * (`ResponseEntity<FooV1200Response>`), which a single-level `[^>]*>` regex
+ * matched fine. The OpenAPI-ownership flip's own envelope nests
+ * (`ResponseEntity<ApiResponse<PagedData<T>>>`), and a flat pattern stops at
+ * the FIRST `>` — reading no method there at all, silently, for every
+ * migrated controller from here on. {@link matchingBracketIndex} is the
+ * fix, shared with the same problem in `graphql-permission-coverage`'s
+ * decorator parsing.
+ */
+function matchingAngleBracketEnd(source: string, start: number): number {
+  return matchingBracketIndex(source, start, '<', '>');
+}
+
 /** What Java requires for one generated method, or `null` for none. */
 function javaRequiredCodes(
   javaSources: string,
   methodName: string,
 ): string[] | null {
-  const pattern = new RegExp(
-    String.raw`((?:@[^\n]*\n)*)\s*(?:public\s+)?ResponseEntity<[^>]*>\s*${methodName}\s*\(`,
-    'u',
-  );
-  const match = pattern.exec(javaSources);
-  if (!match) return null;
+  const anchor = /ResponseEntity</gu;
+  let decorators: string | null = null;
 
-  const decorators = match[1];
+  for (
+    let found = anchor.exec(javaSources);
+    found;
+    found = anchor.exec(javaSources)
+  ) {
+    const openIndex = found.index + 'ResponseEntity'.length;
+    const closeIndex = matchingAngleBracketEnd(javaSources, openIndex);
+    if (closeIndex < 0) continue;
+
+    const afterType = javaSources.slice(closeIndex + 1);
+    const signature = new RegExp(String.raw`^\s*${methodName}\s*\(`, 'u').exec(
+      afterType,
+    );
+    if (!signature) continue;
+
+    // Bounded to the previous method's end, not the whole file up to here —
+    // `nodeRequiredCodes`'s own reasoning: whatever sits between the last
+    // `\n  }\n` and this signature IS this method's own decorator block, and
+    // searching only that window (rather than every prefix of a large file)
+    // keeps the match itself bounded too.
+    const beforeType = javaSources.slice(0, found.index);
+    const previousMethodEnd = beforeType.lastIndexOf('\n  }\n');
+    const window = beforeType.slice(previousMethodEnd + 1);
+    const decoratorMatch = /((?:@[^\n]*\n)*)\s*(?:public\s+)?$/u.exec(window);
+    decorators = decoratorMatch?.[1] ?? '';
+    break;
+  }
+
+  if (decorators === null) return null;
+
   const found = /@RequirePermission\(([^)]*)\)/u.exec(decorators);
   if (!found) return null;
 
@@ -255,4 +295,37 @@ describe('permission coverage — every gated Node operation stays gated in Java
       expect(new Set(javaCodes)).toEqual(new Set(nodeCodes));
     });
   }
+
+  it('javaRequiredCodes finds the right decorator block past a lambda that closes at two-space indent', () => {
+    // `javaRequiredCodes` bounds its decorator window at
+    // `lastIndexOf('\n  }\n')` — the previous method's own closing brace,
+    // at the class-body indent. A lambda argument whose OWN closing brace
+    // lands alone on a two-space-indent line (a reformatter's choice, not
+    // this codebase's convention, but not this scanner's to assume) is the
+    // shape that could be mistaken for that boundary. This pins that a
+    // lambda inside the PRECEDING method does not corrupt the window found
+    // for the FOLLOWING one — `lastIndexOf` always resolves to whichever
+    // `\n  }\n` sits CLOSEST to the target, and the true method boundary is
+    // always closer than anything nested inside an earlier method.
+    const hostile = `
+class Foo {
+
+  @RequirePermission(PermissionCodesEnum.TRAP_CODE)
+  public ResponseEntity<Void> other() {
+    someList.forEach(x ->
+  {
+      x.process();
+  }
+    );
+  }
+
+  @RequirePermission(PermissionCodesEnum.REAL_CODE)
+  public ResponseEntity<ApiResponse<Bar>> target() {
+    return null;
+  }
+}
+`;
+
+    expect(javaRequiredCodes(hostile, 'target')).toEqual(['real.code']);
+  });
 });

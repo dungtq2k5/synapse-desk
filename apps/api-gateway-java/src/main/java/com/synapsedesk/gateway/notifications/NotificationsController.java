@@ -3,25 +3,25 @@ package com.synapsedesk.gateway.notifications;
 import com.synapsedesk.gateway.auth.CurrentRequest;
 import com.synapsedesk.gateway.auth.CurrentUser;
 import com.synapsedesk.gateway.auth.RequestContext;
-import com.synapsedesk.gateway.generated.api.NotificationsApi;
 import com.synapsedesk.gateway.generated.model.DeviceTokenResponseDto;
 import com.synapsedesk.gateway.generated.model.MarkManyReadDto;
 import com.synapsedesk.gateway.generated.model.MarkReadResponseDto;
 import com.synapsedesk.gateway.generated.model.NotificationFeedResponseDto;
 import com.synapsedesk.gateway.generated.model.NotificationResponseDto;
-import com.synapsedesk.gateway.generated.model.NotificationsControllerListDevicesV1200Response;
-import com.synapsedesk.gateway.generated.model.NotificationsControllerListPreferencesV1200Response;
-import com.synapsedesk.gateway.generated.model.NotificationsControllerListV1200Response;
-import com.synapsedesk.gateway.generated.model.NotificationsControllerMarkManyReadV1200Response;
-import com.synapsedesk.gateway.generated.model.NotificationsControllerRegisterDeviceV1200Response;
-import com.synapsedesk.gateway.generated.model.NotificationsControllerUnreadCountV1200Response;
-import com.synapsedesk.gateway.generated.model.NotificationsControllerUpdatePreferenceV1200Response;
 import com.synapsedesk.gateway.generated.model.PreferenceResponseDto;
 import com.synapsedesk.gateway.generated.model.RegisterDeviceDto;
 import com.synapsedesk.gateway.generated.model.UnreadCountResponseDto;
 import com.synapsedesk.gateway.generated.model.UpdatePreferenceDto;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
+import com.synapsedesk.gateway.openapi.ApiErrors;
+import com.synapsedesk.gateway.web.ApiPaths;
+import com.synapsedesk.gateway.web.ApiResponse;
 import io.grpc.stub.MetadataUtils;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -30,7 +30,19 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.lang.Nullable;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import synapsedesk.notification.Notification.DeviceIdRequest;
 import synapsedesk.notification.Notification.DeviceTokenResponse;
@@ -63,11 +75,22 @@ import synapsedesk.notification.NotificationServiceGrpc;
  *
  * <p>Pays for the notification-service channel — the third peer after
  * ticket-service and ingestion-service.
+ *
+ * <p><b>Migrated off `NotificationsApi`.</b> {@code forgetDevice} answers
+ * 204 — {@code @ResponseStatus} is what tells springdoc that.
  */
+@Tag(name = "Notifications")
 @RestController
-public class NotificationsController implements NotificationsApi {
+@RequestMapping(ApiPaths.V1)
+@Validated
+public class NotificationsController {
 
   private static final long DEADLINE_SECONDS = 5;
+
+  /** Package-private: `NotificationsResolver` (GraphQL) reuses this same table. */
+  static final Map<NotificationType, String> TYPE_VALUES = new EnumMap<>(
+    NotificationType.class
+  );
 
   /**
    * `NOTIFICATION_TYPES` (`@synapsedesk/common`), reproduced — the wire enum's
@@ -76,11 +99,6 @@ public class NotificationsController implements NotificationsApi {
    * is an explicit table rather than the strip-the-prefix trick every other
    * enum bridge in this codebase uses.
    */
-  /** Package-private: `NotificationsResolver` (GraphQL) reuses this same table. */
-  static final Map<NotificationType, String> TYPE_VALUES = new EnumMap<>(
-    NotificationType.class
-  );
-
   static {
     TYPE_VALUES.put(
       NotificationType.NOTIFICATION_TYPE_TICKET_ASSIGNED,
@@ -148,13 +166,34 @@ public class NotificationsController implements NotificationsApi {
       );
   }
 
-  @Override
-  public ResponseEntity<NotificationsControllerListV1200Response> notificationsControllerListV1(
-    Boolean unreadOnly,
-    Boolean includeArchived,
-    BigDecimal limit,
-    String type,
-    String cursor
+  @GetMapping(value = "/notifications", produces = { "application/json" })
+  @ApiErrors({ "401" })
+  public ResponseEntity<
+    ApiResponse<NotificationFeedResponseDto>
+  > notificationsControllerListV1(
+    @Valid @RequestParam(
+      value = "unreadOnly",
+      required = false,
+      defaultValue = "false"
+    ) Boolean unreadOnly,
+    @Valid @RequestParam(
+      value = "includeArchived",
+      required = false,
+      defaultValue = "false"
+    ) Boolean includeArchived,
+    @DecimalMin(value = "1") @DecimalMax(value = "100") @Valid @RequestParam(
+      value = "limit",
+      required = false,
+      defaultValue = "20"
+    ) BigDecimal limit,
+    @Valid @RequestParam(
+      value = "type",
+      required = false
+    ) @Nullable String type,
+    @Size(max = 500) @Valid @RequestParam(
+      value = "cursor",
+      required = false
+    ) @Nullable String cursor
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -174,17 +213,17 @@ public class NotificationsController implements NotificationsApi {
       context
     ).listNotifications(wire.build());
 
-    return ResponseEntity.ok(
-      new NotificationsControllerListV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(toFeedDto(response))
-    );
+    return ResponseEntity.ok(ApiResponse.of(200, "OK", toFeedDto(response)));
   }
 
-  @Override
-  public ResponseEntity<NotificationsControllerUnreadCountV1200Response> notificationsControllerUnreadCountV1() {
+  @GetMapping(
+    value = "/notifications/unread-count",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "401" })
+  public ResponseEntity<
+    ApiResponse<UnreadCountResponseDto>
+  > notificationsControllerUnreadCountV1() {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     // Reuses `ListNotificationsRequest` — the recipient comes from metadata,
@@ -199,20 +238,24 @@ public class NotificationsController implements NotificationsApi {
     );
 
     return ResponseEntity.ok(
-      new NotificationsControllerUnreadCountV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(
-          new UnreadCountResponseDto().count(
-            BigDecimal.valueOf(response.getCount())
-          )
+      ApiResponse.of(
+        200,
+        "OK",
+        new UnreadCountResponseDto().count(
+          BigDecimal.valueOf(response.getCount())
         )
+      )
     );
   }
 
-  @Override
-  public ResponseEntity<NotificationsControllerListPreferencesV1200Response> notificationsControllerListPreferencesV1() {
+  @GetMapping(
+    value = "/notifications/preferences",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "401" })
+  public ResponseEntity<
+    ApiResponse<List<PreferenceResponseDto>>
+  > notificationsControllerListPreferencesV1() {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     List<PreferenceResponseDto> data = withMetadata(context)
@@ -222,18 +265,19 @@ public class NotificationsController implements NotificationsApi {
       .map(NotificationsController::toPreferenceDto)
       .toList();
 
-    return ResponseEntity.ok(
-      new NotificationsControllerListPreferencesV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(data)
-    );
+    return ResponseEntity.ok(ApiResponse.of(200, "OK", data));
   }
 
-  @Override
-  public ResponseEntity<NotificationsControllerUpdatePreferenceV1200Response> notificationsControllerUpdatePreferenceV1(
-    UpdatePreferenceDto updatePreferenceDto
+  @PatchMapping(
+    value = "/notifications/preferences",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401" })
+  public ResponseEntity<
+    ApiResponse<PreferenceResponseDto>
+  > notificationsControllerUpdatePreferenceV1(
+    @Valid @RequestBody UpdatePreferenceDto updatePreferenceDto
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -252,17 +296,20 @@ public class NotificationsController implements NotificationsApi {
     );
 
     return ResponseEntity.ok(
-      new NotificationsControllerUpdatePreferenceV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(toPreferenceDto(response))
+      ApiResponse.of(200, "OK", toPreferenceDto(response))
     );
   }
 
-  @Override
-  public ResponseEntity<NotificationsControllerRegisterDeviceV1200Response> notificationsControllerRegisterDeviceV1(
-    RegisterDeviceDto registerDeviceDto
+  @PostMapping(
+    value = "/notifications/devices",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401" })
+  public ResponseEntity<
+    ApiResponse<DeviceTokenResponseDto>
+  > notificationsControllerRegisterDeviceV1(
+    @Valid @RequestBody RegisterDeviceDto registerDeviceDto
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -277,17 +324,17 @@ public class NotificationsController implements NotificationsApi {
       wire.build()
     );
 
-    return ResponseEntity.ok(
-      new NotificationsControllerRegisterDeviceV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(toDeviceDto(response))
-    );
+    return ResponseEntity.ok(ApiResponse.of(200, "OK", toDeviceDto(response)));
   }
 
-  @Override
-  public ResponseEntity<NotificationsControllerListDevicesV1200Response> notificationsControllerListDevicesV1() {
+  @GetMapping(
+    value = "/notifications/devices",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "401" })
+  public ResponseEntity<
+    ApiResponse<List<DeviceTokenResponseDto>>
+  > notificationsControllerListDevicesV1() {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     List<DeviceTokenResponseDto> data = withMetadata(context)
@@ -299,17 +346,18 @@ public class NotificationsController implements NotificationsApi {
       .map(NotificationsController::toDeviceDto)
       .toList();
 
-    return ResponseEntity.ok(
-      new NotificationsControllerListDevicesV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(data)
-    );
+    return ResponseEntity.ok(ApiResponse.of(200, "OK", data));
   }
 
-  @Override
-  public ResponseEntity<Void> notificationsControllerForgetDeviceV1(String id) {
+  @DeleteMapping(
+    value = "/notifications/devices/{id}",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "401", "404" })
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  public ResponseEntity<Void> notificationsControllerForgetDeviceV1(
+    @PathVariable("id") String id
+  ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     withMetadata(context).forgetDevice(
@@ -319,9 +367,16 @@ public class NotificationsController implements NotificationsApi {
     return ResponseEntity.noContent().build();
   }
 
-  @Override
-  public ResponseEntity<NotificationsControllerMarkManyReadV1200Response> notificationsControllerMarkManyReadV1(
-    MarkManyReadDto markManyReadDto
+  @PostMapping(
+    value = "/notifications/read",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401" })
+  public ResponseEntity<
+    ApiResponse<MarkReadResponseDto>
+  > notificationsControllerMarkManyReadV1(
+    @Valid @RequestBody MarkManyReadDto markManyReadDto
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -342,18 +397,18 @@ public class NotificationsController implements NotificationsApi {
     );
 
     return ResponseEntity.ok(
-      new NotificationsControllerMarkManyReadV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(toMarkReadDto(response))
+      ApiResponse.of(200, "OK", toMarkReadDto(response))
     );
   }
 
-  @Override
-  public ResponseEntity<NotificationsControllerMarkManyReadV1200Response> notificationsControllerMarkReadV1(
-    String id
-  ) {
+  @PostMapping(
+    value = "/notifications/{id}/read",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "404" })
+  public ResponseEntity<
+    ApiResponse<MarkReadResponseDto>
+  > notificationsControllerMarkReadV1(@PathVariable("id") String id) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     MarkReadResponse response = withMetadata(context).markRead(
@@ -361,18 +416,18 @@ public class NotificationsController implements NotificationsApi {
     );
 
     return ResponseEntity.ok(
-      new NotificationsControllerMarkManyReadV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(toMarkReadDto(response))
+      ApiResponse.of(200, "OK", toMarkReadDto(response))
     );
   }
 
-  @Override
-  public ResponseEntity<NotificationsControllerMarkManyReadV1200Response> notificationsControllerArchiveV1(
-    String id
-  ) {
+  @PostMapping(
+    value = "/notifications/{id}/archive",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "404" })
+  public ResponseEntity<
+    ApiResponse<MarkReadResponseDto>
+  > notificationsControllerArchiveV1(@PathVariable("id") String id) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     MarkReadResponse response = withMetadata(context).archive(
@@ -380,11 +435,7 @@ public class NotificationsController implements NotificationsApi {
     );
 
     return ResponseEntity.ok(
-      new NotificationsControllerMarkManyReadV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(toMarkReadDto(response))
+      ApiResponse.of(200, "OK", toMarkReadDto(response))
     );
   }
 

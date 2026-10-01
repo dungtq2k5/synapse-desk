@@ -35,7 +35,9 @@ public final class WsEventLimits {
   public static Limit of(String event) {
     Limit limit = LIMITS.get(event);
     if (limit == null) {
-      throw new IllegalStateException("No WS event limit declared for " + event);
+      throw new IllegalStateException(
+        "No WS event limit declared for " + event
+      );
     }
 
     return limit;

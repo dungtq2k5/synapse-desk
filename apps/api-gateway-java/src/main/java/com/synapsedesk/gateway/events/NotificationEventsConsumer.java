@@ -124,7 +124,11 @@ public class NotificationEventsConsumer implements LeaseParticipant {
     );
 
     if (Subjects.NOTIFICATION_REALTIME_CREATED.equals(subject)) {
-      relay.relayToRoom(room, RealtimeEvents.REALTIME_EVENTS_NOTIFICATION_NEW, body);
+      relay.relayToRoom(
+        room,
+        RealtimeEvents.REALTIME_EVENTS_NOTIFICATION_NEW,
+        body
+      );
     } else if (Subjects.NOTIFICATION_REALTIME_UPDATED.equals(subject)) {
       relay.relayToRoom(
         room,
@@ -134,7 +138,11 @@ public class NotificationEventsConsumer implements LeaseParticipant {
     } else if (Subjects.NOTIFICATION_REALTIME_READ.equals(subject)) {
       // One subject, two emits on the SAME room: the raw event, then a
       // derived/reshaped unread-count payload — not a second raw forward.
-      relay.relayToRoom(room, RealtimeEvents.REALTIME_EVENTS_NOTIFICATION_READ, body);
+      relay.relayToRoom(
+        room,
+        RealtimeEvents.REALTIME_EVENTS_NOTIFICATION_READ,
+        body
+      );
       JsonNode unreadCount = event.get("unreadCount");
       if (unreadCount != null) {
         relay.relayToRoom(

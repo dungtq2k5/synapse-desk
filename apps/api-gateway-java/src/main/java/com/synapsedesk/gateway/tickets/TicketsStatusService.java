@@ -8,13 +8,11 @@ import com.synapsedesk.gateway.generated.model.BulkTicketStatusDto;
 import com.synapsedesk.gateway.generated.model.BulkTicketStatusResponseDto;
 import com.synapsedesk.gateway.generated.model.ChangeTicketStatusDto;
 import com.synapsedesk.gateway.generated.model.CurrentUserResponseDto.PermissionCodesEnum;
+import com.synapsedesk.gateway.generated.model.TicketResponseDto;
 import com.synapsedesk.gateway.generated.model.TicketStatusActionDto;
-import com.synapsedesk.gateway.generated.model.TicketsControllerBulkChangePriorityV1200Response;
-import com.synapsedesk.gateway.generated.model.TicketsControllerBulkChangeStatusV1200Response;
-import com.synapsedesk.gateway.generated.model.TicketsControllerCreateV1201Response;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
+import com.synapsedesk.gateway.web.ApiResponse;
 import io.grpc.stub.MetadataUtils;
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.springframework.http.HttpStatus;
@@ -69,10 +67,9 @@ public class TicketsStatusService {
     this.stub = stub;
   }
 
-  public ResponseEntity<TicketsControllerBulkChangeStatusV1200Response> bulkChangeStatus(
-    RequestContext context,
-    BulkTicketStatusDto dto
-  ) {
+  public ResponseEntity<
+    ApiResponse<BulkTicketStatusResponseDto>
+  > bulkChangeStatus(RequestContext context, BulkTicketStatusDto dto) {
     TicketsCrudService.requirePermission(
       context,
       PermissionCodesEnum.TICKET_UPDATE
@@ -95,28 +92,25 @@ public class TicketsStatusService {
     ).bulkChangeTicketStatus(wire.build());
 
     return ResponseEntity.ok(
-      new TicketsControllerBulkChangeStatusV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("Bulk status change processed")
-        .data(
-          new BulkTicketStatusResponseDto()
-            .updated(response.getUpdatedList())
-            .failed(
-              response
-                .getFailedList()
-                .stream()
-                .map(TicketsStatusService::toFailureDto)
-                .toList()
-            )
-        )
+      ApiResponse.of(
+        200,
+        "Bulk status change processed",
+        new BulkTicketStatusResponseDto()
+          .updated(response.getUpdatedList())
+          .failed(
+            response
+              .getFailedList()
+              .stream()
+              .map(TicketsStatusService::toFailureDto)
+              .toList()
+          )
+      )
     );
   }
 
-  public ResponseEntity<TicketsControllerBulkChangePriorityV1200Response> bulkChangePriority(
-    RequestContext context,
-    BulkTicketPriorityDto dto
-  ) {
+  public ResponseEntity<
+    ApiResponse<BulkTicketPriorityResponseDto>
+  > bulkChangePriority(RequestContext context, BulkTicketPriorityDto dto) {
     TicketsCrudService.requirePermission(
       context,
       PermissionCodesEnum.TICKET_UPDATE
@@ -137,25 +131,23 @@ public class TicketsStatusService {
     ).bulkChangeTicketPriority(wire);
 
     return ResponseEntity.ok(
-      new TicketsControllerBulkChangePriorityV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("Bulk priority change processed")
-        .data(
-          new BulkTicketPriorityResponseDto()
-            .updated(response.getUpdatedList())
-            .failed(
-              response
-                .getFailedList()
-                .stream()
-                .map(TicketsStatusService::toFailureDto)
-                .toList()
-            )
-        )
+      ApiResponse.of(
+        200,
+        "Bulk priority change processed",
+        new BulkTicketPriorityResponseDto()
+          .updated(response.getUpdatedList())
+          .failed(
+            response
+              .getFailedList()
+              .stream()
+              .map(TicketsStatusService::toFailureDto)
+              .toList()
+          )
+      )
     );
   }
 
-  public ResponseEntity<TicketsControllerCreateV1201Response> changeStatus(
+  public ResponseEntity<ApiResponse<TicketResponseDto>> changeStatus(
     RequestContext context,
     String id,
     ChangeTicketStatusDto dto
@@ -183,7 +175,7 @@ public class TicketsStatusService {
   }
 
   /** Not permission-gated — a correction, not an omission; see the class docblock family in {@link TicketsCrudService}. */
-  public ResponseEntity<TicketsControllerCreateV1201Response> escalate(
+  public ResponseEntity<ApiResponse<TicketResponseDto>> escalate(
     RequestContext context,
     String id,
     TicketStatusActionDto dto
@@ -195,7 +187,7 @@ public class TicketsStatusService {
     return ok(response, "Ticket escalated");
   }
 
-  public ResponseEntity<TicketsControllerCreateV1201Response> resolve(
+  public ResponseEntity<ApiResponse<TicketResponseDto>> resolve(
     RequestContext context,
     String id,
     TicketStatusActionDto dto
@@ -212,7 +204,7 @@ public class TicketsStatusService {
     return ok(response, "Ticket resolved");
   }
 
-  public ResponseEntity<TicketsControllerCreateV1201Response> reopen(
+  public ResponseEntity<ApiResponse<TicketResponseDto>> reopen(
     RequestContext context,
     String id,
     TicketStatusActionDto dto
@@ -229,7 +221,7 @@ public class TicketsStatusService {
     return ok(response, "Ticket reopened");
   }
 
-  public ResponseEntity<TicketsControllerCreateV1201Response> close(
+  public ResponseEntity<ApiResponse<TicketResponseDto>> close(
     RequestContext context,
     String id,
     TicketStatusActionDto dto
@@ -277,16 +269,16 @@ public class TicketsStatusService {
       .reason(failure.getReason());
   }
 
-  private static ResponseEntity<TicketsControllerCreateV1201Response> ok(
+  private static ResponseEntity<ApiResponse<TicketResponseDto>> ok(
     TicketResponse response,
     String message
   ) {
     return ResponseEntity.ok(
-      new TicketsControllerCreateV1201Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message(message)
-        .data(TicketsCrudService.toTicketResponseDto(response))
+      ApiResponse.of(
+        200,
+        message,
+        TicketsCrudService.toTicketResponseDto(response)
+      )
     );
   }
 

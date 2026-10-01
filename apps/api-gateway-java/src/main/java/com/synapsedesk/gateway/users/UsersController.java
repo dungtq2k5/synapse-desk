@@ -4,7 +4,6 @@ import com.synapsedesk.gateway.auth.CurrentRequest;
 import com.synapsedesk.gateway.auth.CurrentUser;
 import com.synapsedesk.gateway.auth.RequestContext;
 import com.synapsedesk.gateway.auth.UserMapper;
-import com.synapsedesk.gateway.generated.api.UsersApi;
 import com.synapsedesk.gateway.generated.model.ConfirmAvatarDto;
 import com.synapsedesk.gateway.generated.model.CurrentUserResponseDto;
 import com.synapsedesk.gateway.generated.model.CurrentUserResponseDto.PermissionCodesEnum;
@@ -12,11 +11,12 @@ import com.synapsedesk.gateway.generated.model.PresignAvatarDto;
 import com.synapsedesk.gateway.generated.model.PresignAvatarResponseDto;
 import com.synapsedesk.gateway.generated.model.UpdateOwnProfileDto;
 import com.synapsedesk.gateway.generated.model.UserResponseDto;
-import com.synapsedesk.gateway.generated.model.UsersControllerGetCurrentUserV1200Response;
-import com.synapsedesk.gateway.generated.model.UsersControllerPresignAvatarV1200Response;
-import com.synapsedesk.gateway.generated.model.UsersControllerUpdateOwnProfileV1200Response;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
-import java.math.BigDecimal;
+import com.synapsedesk.gateway.openapi.ApiErrors;
+import com.synapsedesk.gateway.web.ApiPaths;
+import com.synapsedesk.gateway.web.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -24,6 +24,13 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import synapsedesk.auth.Common.Gender;
 import synapsedesk.auth.User.ConfirmAvatarUploadRequest;
@@ -40,9 +47,14 @@ import synapsedesk.auth.UserServiceGrpc;
  * controller behind a session, and the one four existing harness rows already
  * exercise. All five methods are thin forwards to auth-service, exactly as
  * `users.service.ts` is.
+ *
+ * <p><b>Migrated off `UsersApi`.</b>
  */
+@Tag(name = "Users")
 @RestController
-public class UsersController implements UsersApi {
+@RequestMapping(ApiPaths.V1)
+@Validated
+public class UsersController {
 
   private static final long DEADLINE_SECONDS = 5;
 
@@ -69,8 +81,11 @@ public class UsersController implements UsersApi {
       );
   }
 
-  @Override
-  public ResponseEntity<UsersControllerGetCurrentUserV1200Response> usersControllerGetCurrentUserV1() {
+  @GetMapping(value = "/users/me", produces = { "application/json" })
+  @ApiErrors({ "401" })
+  public ResponseEntity<
+    ApiResponse<CurrentUserResponseDto>
+  > usersControllerGetCurrentUserV1() {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     CurrentUserResponse response = withMetadata(context).getCurrentUser(
@@ -93,18 +108,19 @@ public class UsersController implements UsersApi {
       .permissionCodes(permissions)
       .departmentIds(departments);
 
-    return ResponseEntity.ok(
-      new UsersControllerGetCurrentUserV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(data)
-    );
+    return ResponseEntity.ok(ApiResponse.of(200, "OK", data));
   }
 
-  @Override
-  public ResponseEntity<UsersControllerUpdateOwnProfileV1200Response> usersControllerUpdateOwnProfileV1(
-    UpdateOwnProfileDto updateOwnProfileDto
+  @PatchMapping(
+    value = "/users/me",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401" })
+  public ResponseEntity<
+    ApiResponse<UserResponseDto>
+  > usersControllerUpdateOwnProfileV1(
+    @Valid @RequestBody UpdateOwnProfileDto updateOwnProfileDto
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -127,9 +143,16 @@ public class UsersController implements UsersApi {
     return okUser(response, "Profile updated");
   }
 
-  @Override
-  public ResponseEntity<UsersControllerPresignAvatarV1200Response> usersControllerPresignAvatarV1(
-    PresignAvatarDto presignAvatarDto
+  @PostMapping(
+    value = "/users/me/avatar/upload-url",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401" })
+  public ResponseEntity<
+    ApiResponse<PresignAvatarResponseDto>
+  > usersControllerPresignAvatarV1(
+    @Valid @RequestBody PresignAvatarDto presignAvatarDto
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -148,18 +171,19 @@ public class UsersController implements UsersApi {
       .objectPath(response.getObjectPath())
       .expiresAt(toOffsetDateTime(response.getExpiresAt()));
 
-    return ResponseEntity.ok(
-      new UsersControllerPresignAvatarV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(data)
-    );
+    return ResponseEntity.ok(ApiResponse.of(200, "OK", data));
   }
 
-  @Override
-  public ResponseEntity<UsersControllerUpdateOwnProfileV1200Response> usersControllerConfirmAvatarV1(
-    ConfirmAvatarDto confirmAvatarDto
+  @PostMapping(
+    value = "/users/me/avatar/confirm",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401" })
+  public ResponseEntity<
+    ApiResponse<UserResponseDto>
+  > usersControllerConfirmAvatarV1(
+    @Valid @RequestBody ConfirmAvatarDto confirmAvatarDto
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -174,8 +198,11 @@ public class UsersController implements UsersApi {
     return okUser(response, "Avatar confirmed");
   }
 
-  @Override
-  public ResponseEntity<UsersControllerUpdateOwnProfileV1200Response> usersControllerDeleteAvatarV1() {
+  @DeleteMapping(value = "/users/me/avatar", produces = { "application/json" })
+  @ApiErrors({ "401" })
+  public ResponseEntity<
+    ApiResponse<UserResponseDto>
+  > usersControllerDeleteAvatarV1() {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     synapsedesk.auth.Common.UserResponse response = withMetadata(
@@ -185,18 +212,12 @@ public class UsersController implements UsersApi {
     return okUser(response, "Avatar deleted");
   }
 
-  private ResponseEntity<UsersControllerUpdateOwnProfileV1200Response> okUser(
+  private ResponseEntity<ApiResponse<UserResponseDto>> okUser(
     synapsedesk.auth.Common.UserResponse response,
     String message
   ) {
-    UserResponseDto data = UserMapper.toUserResponseDto(response);
-
     return ResponseEntity.ok(
-      new UsersControllerUpdateOwnProfileV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message(message)
-        .data(data)
+      ApiResponse.of(200, message, UserMapper.toUserResponseDto(response))
     );
   }
 

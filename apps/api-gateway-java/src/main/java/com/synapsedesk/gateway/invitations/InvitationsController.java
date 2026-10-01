@@ -7,31 +7,34 @@ import com.synapsedesk.gateway.auth.GuestCheck;
 import com.synapsedesk.gateway.auth.RequestContext;
 import com.synapsedesk.gateway.auth.RequestOrigin;
 import com.synapsedesk.gateway.auth.UserMapper;
-import com.synapsedesk.gateway.generated.api.InvitationsApi;
 import com.synapsedesk.gateway.generated.model.AcceptInvitationDto;
-import com.synapsedesk.gateway.generated.model.AuthControllerForgotPasswordV1202Response;
-import com.synapsedesk.gateway.generated.model.AuthControllerRefreshV1200Response;
 import com.synapsedesk.gateway.generated.model.CreateInvitationsDto;
 import com.synapsedesk.gateway.generated.model.CreateInvitationsResponseDto;
 import com.synapsedesk.gateway.generated.model.CurrentUserResponseDto.PermissionCodesEnum;
 import com.synapsedesk.gateway.generated.model.FailedInvitationResponseDto;
 import com.synapsedesk.gateway.generated.model.InvitationPreviewRowResponseDto;
 import com.synapsedesk.gateway.generated.model.InvitationResponseDto;
-import com.synapsedesk.gateway.generated.model.InvitationsControllerCreateV1201Response;
-import com.synapsedesk.gateway.generated.model.InvitationsControllerListV1200Response;
-import com.synapsedesk.gateway.generated.model.InvitationsControllerListV1200ResponseData;
-import com.synapsedesk.gateway.generated.model.InvitationsControllerListV1200ResponseDataMeta;
-import com.synapsedesk.gateway.generated.model.InvitationsControllerPreviewBatchV1200Response;
-import com.synapsedesk.gateway.generated.model.InvitationsControllerPreviewByTokenV1200Response;
-import com.synapsedesk.gateway.generated.model.InvitationsControllerResendV1200Response;
 import com.synapsedesk.gateway.generated.model.LoginResponseDto;
 import com.synapsedesk.gateway.generated.model.PreviewInvitationResponseDto;
 import com.synapsedesk.gateway.generated.model.PreviewInvitationsDto;
 import com.synapsedesk.gateway.generated.model.PreviewInvitationsResponseDto;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
+import com.synapsedesk.gateway.openapi.ApiErrors;
 import com.synapsedesk.gateway.security.RequirePermission;
+import com.synapsedesk.gateway.throttle.AuthThrottle;
+import com.synapsedesk.gateway.throttle.RouteThrottle;
+import com.synapsedesk.gateway.throttle.ThrottleOverride;
+import com.synapsedesk.gateway.throttle.ThrottlerTiers;
+import com.synapsedesk.gateway.web.ApiPaths;
+import com.synapsedesk.gateway.web.ApiResponse;
+import com.synapsedesk.gateway.web.PageMeta;
+import com.synapsedesk.gateway.web.PagedData;
 import io.grpc.stub.MetadataUtils;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -39,6 +42,16 @@ import java.time.ZoneOffset;
 import java.util.concurrent.TimeUnit;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.lang.Nullable;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 import synapsedesk.auth.Common.PageRequest;
@@ -74,9 +87,17 @@ import synapsedesk.auth.InvitationServiceGrpc;
  * GuestCheck}: signing in while already holding a live session would
  * silently replace it, the same reason {@code AuthController}'s login routes
  * carry the check.
+ *
+ * <p><b>Migrated off `InvitationsApi`.</b> {@code create} answers 201 on a
+ * clean batch or 207 when some invitations failed — the generated
+ * interface only ever documented 201, a pre-existing gap in the committed
+ * document this migration does not close.
  */
+@Tag(name = "Invitations")
 @RestController
-public class InvitationsController implements InvitationsApi {
+@RequestMapping(ApiPaths.V1)
+@Validated
+public class InvitationsController {
 
   private static final long DEADLINE_SECONDS = 5;
 
@@ -97,10 +118,18 @@ public class InvitationsController implements InvitationsApi {
     this.cookies = cookies;
   }
 
-  @Override
+  @PostMapping(
+    value = "/users/invitations",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403" })
+  @ResponseStatus(HttpStatus.CREATED)
   @RequirePermission(PermissionCodesEnum.USER_INVITE)
-  public ResponseEntity<InvitationsControllerCreateV1201Response> invitationsControllerCreateV1(
-    CreateInvitationsDto createInvitationsDto
+  public ResponseEntity<
+    ApiResponse<CreateInvitationsResponseDto>
+  > invitationsControllerCreateV1(
+    @Valid @RequestBody CreateInvitationsDto createInvitationsDto
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
     requireEmailVerified(context);
@@ -141,28 +170,51 @@ public class InvitationsController implements InvitationsApi {
     HttpStatus status = partial ? HttpStatus.MULTI_STATUS : HttpStatus.CREATED;
 
     return ResponseEntity.status(status).body(
-      new InvitationsControllerCreateV1201Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(status.value()))
-        .message("OK")
-        .warning(
-          partial
-            ? response.getFailedCount() + " invitation(s) could not be created"
-            : null
-        )
-        .data(data)
+      ApiResponse.of(
+        status.value(),
+        "OK",
+        partial
+          ? response.getFailedCount() + " invitation(s) could not be created"
+          : null,
+        data
+      )
     );
   }
 
-  @Override
+  @GetMapping(value = "/users/invitations", produces = { "application/json" })
+  @ApiErrors({ "401", "403" })
   @RequirePermission(PermissionCodesEnum.USER_READ)
-  public ResponseEntity<InvitationsControllerListV1200Response> invitationsControllerListV1(
-    BigDecimal page,
-    BigDecimal limit,
-    String sortOrder,
-    String searchTerm,
-    String sortBy,
-    String status
+  public ResponseEntity<
+    ApiResponse<PagedData<InvitationResponseDto>>
+  > invitationsControllerListV1(
+    @DecimalMin(value = "1") @Valid @RequestParam(
+      value = "page",
+      required = false,
+      defaultValue = "1"
+    ) BigDecimal page,
+    @DecimalMin(value = "1") @DecimalMax(value = "100") @Valid @RequestParam(
+      value = "limit",
+      required = false,
+      defaultValue = "10"
+    ) BigDecimal limit,
+    @Valid @RequestParam(
+      value = "sortOrder",
+      required = false,
+      defaultValue = "ASC"
+    ) String sortOrder,
+    @Valid @RequestParam(
+      value = "searchTerm",
+      required = false
+    ) @Nullable String searchTerm,
+    @Valid @RequestParam(
+      value = "sortBy",
+      required = false,
+      defaultValue = "createdAt"
+    ) String sortBy,
+    @Valid @RequestParam(
+      value = "status",
+      required = false
+    ) @Nullable String status
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -190,30 +242,33 @@ public class InvitationsController implements InvitationsApi {
       wire.build()
     );
 
-    InvitationsControllerListV1200ResponseData data =
-      new InvitationsControllerListV1200ResponseData(
-        response
-          .getItemsList()
-          .stream()
-          .map(InvitationsController::toInvitationResponseDto)
-          .toList(),
-        toMetaDto(response.getMeta())
-      );
-
-    return ResponseEntity.ok(
-      new InvitationsControllerListV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(data)
+    PagedData<InvitationResponseDto> data = new PagedData<>(
+      response
+        .getItemsList()
+        .stream()
+        .map(InvitationsController::toInvitationResponseDto)
+        .toList(),
+      PageMeta.from(response.getMeta())
     );
+
+    return ResponseEntity.ok(ApiResponse.of(200, "OK", data));
   }
 
-  @Override
+  @PostMapping(
+    value = "/users/invitations/{id}/resend",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403", "404" })
+  @AuthThrottle
+  @ThrottleOverride(
+    tier = ThrottlerTiers.AUTH,
+    ttlMs = RouteThrottle.INVITATION_RESEND_TTL_MS,
+    limit = RouteThrottle.INVITATION_RESEND_LIMIT
+  )
   @RequirePermission(PermissionCodesEnum.USER_INVITE)
-  public ResponseEntity<InvitationsControllerResendV1200Response> invitationsControllerResendV1(
-    String id
-  ) {
+  public ResponseEntity<
+    ApiResponse<InvitationResponseDto>
+  > invitationsControllerResendV1(@PathVariable("id") String id) {
     RequestContext context = currentUser.require(CurrentRequest.request());
     requireEmailVerified(context);
 
@@ -226,18 +281,22 @@ public class InvitationsController implements InvitationsApi {
     );
 
     return ResponseEntity.ok(
-      new InvitationsControllerResendV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("Invitation resent")
-        .data(toInvitationResponseDto(response))
+      ApiResponse.of(
+        200,
+        "Invitation resent",
+        toInvitationResponseDto(response)
+      )
     );
   }
 
-  @Override
+  @DeleteMapping(
+    value = "/users/invitations/{id}",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.USER_INVITE)
-  public ResponseEntity<AuthControllerForgotPasswordV1202Response> invitationsControllerRevokeV1(
-    String id
+  public ResponseEntity<ApiResponse<Void>> invitationsControllerRevokeV1(
+    @PathVariable("id") String id
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -249,19 +308,23 @@ public class InvitationsController implements InvitationsApi {
         .build()
     );
 
-    return ResponseEntity.ok(
-      new AuthControllerForgotPasswordV1202Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("Invitation revoked")
-        .data(null)
-    );
+    return ResponseEntity.ok(ApiResponse.of(200, "Invitation revoked", null));
   }
 
-  @Override
-  public ResponseEntity<InvitationsControllerPreviewByTokenV1200Response> invitationsControllerPreviewByTokenV1(
-    String token
-  ) {
+  @GetMapping(
+    value = "/users/invitations/token/{token}",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "401", "404" })
+  @AuthThrottle
+  @ThrottleOverride(
+    tier = ThrottlerTiers.AUTH,
+    ttlMs = RouteThrottle.INVITATION_PREVIEW_TTL_MS,
+    limit = RouteThrottle.INVITATION_PREVIEW_LIMIT
+  )
+  public ResponseEntity<
+    ApiResponse<PreviewInvitationResponseDto>
+  > invitationsControllerPreviewByTokenV1(@PathVariable("token") String token) {
     HttpServletRequest request = CurrentRequest.request();
 
     PreviewInvitationResponse response = withOriginMetadata(
@@ -271,30 +334,35 @@ public class InvitationsController implements InvitationsApi {
     );
 
     return ResponseEntity.ok(
-      new InvitationsControllerPreviewByTokenV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(
-          new PreviewInvitationResponseDto(
-            response.getValid(),
-            response.hasOrganizationName()
-              ? response.getOrganizationName()
-              : null,
-            response.hasInviterName() ? response.getInviterName() : null,
-            response.hasEmail() ? response.getEmail() : null,
-            response.getRoleNamesList(),
-            response.hasExpiresAt()
-              ? toOffsetDateTime(response.getExpiresAt())
-              : null
-          )
+      ApiResponse.of(
+        200,
+        "OK",
+        new PreviewInvitationResponseDto(
+          response.getValid(),
+          response.hasOrganizationName()
+            ? response.getOrganizationName()
+            : null,
+          response.hasInviterName() ? response.getInviterName() : null,
+          response.hasEmail() ? response.getEmail() : null,
+          response.getRoleNamesList(),
+          response.hasExpiresAt()
+            ? toOffsetDateTime(response.getExpiresAt())
+            : null
         )
+      )
     );
   }
 
-  @Override
-  public ResponseEntity<AuthControllerRefreshV1200Response> invitationsControllerAcceptV1(
-    AcceptInvitationDto acceptInvitationDto
+  @PostMapping(
+    value = "/users/invitations/accept",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401" })
+  public ResponseEntity<
+    ApiResponse<LoginResponseDto>
+  > invitationsControllerAcceptV1(
+    @Valid @RequestBody AcceptInvitationDto acceptInvitationDto
   ) {
     HttpServletRequest request = CurrentRequest.request();
     guestCheck.requireNoActiveSession(request);
@@ -323,29 +391,32 @@ public class InvitationsController implements InvitationsApi {
     boolean skipped = response.getSkippedCount() > 0;
 
     return ResponseEntity.ok(
-      new AuthControllerRefreshV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .warning(
-          skipped
-            ? response.getSkippedCount() +
-                " role/department assignment(s) no longer exist and were skipped"
-            : null
+      ApiResponse.of(
+        200,
+        "OK",
+        skipped
+          ? response.getSkippedCount() +
+              " role/department assignment(s) no longer exist and were skipped"
+          : null,
+        new LoginResponseDto(
+          UserMapper.toUserResponseDto(response.getUser()),
+          false
         )
-        .data(
-          new LoginResponseDto(
-            UserMapper.toUserResponseDto(response.getUser()),
-            false
-          )
-        )
+      )
     );
   }
 
-  @Override
+  @PostMapping(
+    value = "/users/invitations/preview",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403" })
   @RequirePermission(PermissionCodesEnum.USER_INVITE)
-  public ResponseEntity<InvitationsControllerPreviewBatchV1200Response> invitationsControllerPreviewBatchV1(
-    PreviewInvitationsDto previewInvitationsDto
+  public ResponseEntity<
+    ApiResponse<PreviewInvitationsResponseDto>
+  > invitationsControllerPreviewBatchV1(
+    @Valid @RequestBody PreviewInvitationsDto previewInvitationsDto
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -375,20 +446,18 @@ public class InvitationsController implements InvitationsApi {
       BigDecimal.valueOf(response.getSeatOverrun())
     );
 
-    return ResponseEntity.ok(
-      new InvitationsControllerPreviewBatchV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(data)
-    );
+    return ResponseEntity.ok(ApiResponse.of(200, "OK", data));
   }
 
-  @Override
+  @GetMapping(
+    value = "/users/invitations/{id}",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.USER_READ)
-  public ResponseEntity<InvitationsControllerResendV1200Response> invitationsControllerGetV1(
-    String id
-  ) {
+  public ResponseEntity<
+    ApiResponse<InvitationResponseDto>
+  > invitationsControllerGetV1(@PathVariable("id") String id) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     InvitationResponse response = withMetadata(context).getInvitation(
@@ -399,11 +468,7 @@ public class InvitationsController implements InvitationsApi {
     );
 
     return ResponseEntity.ok(
-      new InvitationsControllerResendV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(toInvitationResponseDto(response))
+      ApiResponse.of(200, "OK", toInvitationResponseDto(response))
     );
   }
 
@@ -447,8 +512,9 @@ public class InvitationsController implements InvitationsApi {
       .addAllDepartmentIds(
         draft.getDepartmentIds().stream().map(Object::toString).toList()
       );
-    if (draft.getPrimaryDepartmentId() != null) {
-      wire.setPrimaryDepartmentId(draft.getPrimaryDepartmentId().toString());
+    var primaryDepartmentId = draft.getPrimaryDepartmentId();
+    if (primaryDepartmentId != null) {
+      wire.setPrimaryDepartmentId(primaryDepartmentId.toString());
     }
     return wire.build();
   }
@@ -506,18 +572,6 @@ public class InvitationsController implements InvitationsApi {
     }
     return InvitationResponseDto.StatusEnum.fromValue(
       status.name().replace("INVITATION_STATUS_", "")
-    );
-  }
-
-  private static InvitationsControllerListV1200ResponseDataMeta toMetaDto(
-    synapsedesk.auth.Common.PageMeta meta
-  ) {
-    return new InvitationsControllerListV1200ResponseDataMeta(
-      BigDecimal.valueOf(meta.getTotalItems()),
-      BigDecimal.valueOf(meta.getItemCount()),
-      BigDecimal.valueOf(meta.getItemsPerPage()),
-      BigDecimal.valueOf(meta.getTotalPages()),
-      BigDecimal.valueOf(meta.getCurrentPage())
     );
   }
 

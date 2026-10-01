@@ -20,9 +20,7 @@ final class SocketRequestContext {
       principal.sub() == null ? "" : principal.sub(),
       principal.organizationId(),
       principal.isSuperAdmin(),
-      principal.departmentIds() == null
-        ? List.of()
-        : principal.departmentIds(),
+      principal.departmentIds() == null ? List.of() : principal.departmentIds(),
       principal.permissionCodes() == null
         ? List.of()
         : principal.permissionCodes(),

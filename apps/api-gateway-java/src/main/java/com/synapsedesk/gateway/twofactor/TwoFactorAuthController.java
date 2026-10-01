@@ -7,25 +7,26 @@ import com.synapsedesk.gateway.auth.JwtPrincipal;
 import com.synapsedesk.gateway.auth.RequestContext;
 import com.synapsedesk.gateway.auth.RequestOrigin;
 import com.synapsedesk.gateway.auth.UserMapper;
-import com.synapsedesk.gateway.generated.api.TwoFactorAuthApi;
 import com.synapsedesk.gateway.generated.model.ActivateTwoFactorDto;
-import com.synapsedesk.gateway.generated.model.AuthControllerForgotPasswordV1202Response;
 import com.synapsedesk.gateway.generated.model.AuthenticateTwoFactorDto;
 import com.synapsedesk.gateway.generated.model.BackupCodesResponseDto;
 import com.synapsedesk.gateway.generated.model.BackupCodesStatusResponseDto;
 import com.synapsedesk.gateway.generated.model.DisableTwoFactorDto;
 import com.synapsedesk.gateway.generated.model.GenerateTwoFactorResponseDto;
 import com.synapsedesk.gateway.generated.model.RegenerateBackupCodesDto;
-import com.synapsedesk.gateway.generated.model.TwoFactorAuthControllerActivateV1200Response;
-import com.synapsedesk.gateway.generated.model.TwoFactorAuthControllerAuthenticateV1200Response;
-import com.synapsedesk.gateway.generated.model.TwoFactorAuthControllerGenerateV1200Response;
-import com.synapsedesk.gateway.generated.model.TwoFactorAuthControllerGetBackupCodesStatusV1200Response;
 import com.synapsedesk.gateway.generated.model.TwoFactorAuthenticatedResponseDto;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
+import com.synapsedesk.gateway.openapi.ApiErrors;
 import com.synapsedesk.gateway.throttle.AuthThrottle;
 import com.synapsedesk.gateway.throttle.RouteThrottle;
+import com.synapsedesk.gateway.throttle.ThrottleOverride;
+import com.synapsedesk.gateway.throttle.ThrottlerTiers;
+import com.synapsedesk.gateway.web.ApiPaths;
+import com.synapsedesk.gateway.web.ApiResponse;
 import io.grpc.stub.MetadataUtils;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -34,6 +35,12 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 import synapsedesk.auth.Common.UserResponse;
@@ -76,10 +83,18 @@ import synapsedesk.auth.TwoFactorAuthServiceGrpc;
  * with no proof would make the gateway the only checkpoint rather than the
  * first one. The gateway's own verification here is a fast 401 at the edge,
  * nothing more.
+ *
+ * <p><b>Migrated off `TwoFactorAuthApi`.</b> `activate` and
+ * `regenerateBackupCodes` shared ONE generated response class for two
+ * different routes — the dedup this flip retires — and now each returns
+ * {@code ApiResponse<BackupCodesResponseDto>} on its own.
  */
+@Tag(name = "Two Factor Auth")
 @RestController
+@RequestMapping(ApiPaths.V1)
+@Validated
 @AuthThrottle
-public class TwoFactorAuthController implements TwoFactorAuthApi {
+public class TwoFactorAuthController {
 
   private static final long DEADLINE_SECONDS = 5;
   private static final String ENROLMENT_REFUSED =
@@ -102,8 +117,11 @@ public class TwoFactorAuthController implements TwoFactorAuthApi {
     this.cookies = cookies;
   }
 
-  @Override
-  public ResponseEntity<TwoFactorAuthControllerGenerateV1200Response> twoFactorAuthControllerGenerateV1() {
+  @PostMapping(value = "/auth/2fa/setup", produces = { "application/json" })
+  @ApiErrors({ "401" })
+  public ResponseEntity<
+    ApiResponse<GenerateTwoFactorResponseDto>
+  > twoFactorAuthControllerGenerateV1() {
     HttpServletRequest request = CurrentRequest.request();
     Enrollee enrollee = requireEnrollee(request);
 
@@ -114,22 +132,27 @@ public class TwoFactorAuthController implements TwoFactorAuthApi {
     );
 
     return ResponseEntity.ok(
-      new TwoFactorAuthControllerGenerateV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(
-          new GenerateTwoFactorResponseDto(
-            response.getOtpauthUri(),
-            response.getQrCodeDataUrl()
-          )
+      ApiResponse.of(
+        200,
+        "OK",
+        new GenerateTwoFactorResponseDto(
+          response.getOtpauthUri(),
+          response.getQrCodeDataUrl()
         )
+      )
     );
   }
 
-  @Override
-  public ResponseEntity<TwoFactorAuthControllerActivateV1200Response> twoFactorAuthControllerActivateV1(
-    ActivateTwoFactorDto activateTwoFactorDto
+  @PostMapping(
+    value = "/auth/2fa/enable",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401" })
+  public ResponseEntity<
+    ApiResponse<BackupCodesResponseDto>
+  > twoFactorAuthControllerActivateV1(
+    @Valid @RequestBody ActivateTwoFactorDto activateTwoFactorDto
   ) {
     HttpServletRequest request = CurrentRequest.request();
     Enrollee enrollee = requireEnrollee(request);
@@ -144,21 +167,29 @@ public class TwoFactorAuthController implements TwoFactorAuthApi {
     );
 
     return ResponseEntity.ok(
-      new TwoFactorAuthControllerActivateV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(new BackupCodesResponseDto(response.getBackupCodesList()))
+      ApiResponse.of(
+        200,
+        "OK",
+        new BackupCodesResponseDto(response.getBackupCodesList())
+      )
     );
   }
 
-  @Override
-  @AuthThrottle(
+  @PostMapping(
+    value = "/auth/2fa/authenticate",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401" })
+  @ThrottleOverride(
+    tier = ThrottlerTiers.AUTH,
     ttlMs = RouteThrottle.TWO_FACTOR_AUTHENTICATE_TTL_MS,
     limit = RouteThrottle.TWO_FACTOR_AUTHENTICATE_LIMIT
   )
-  public ResponseEntity<TwoFactorAuthControllerAuthenticateV1200Response> twoFactorAuthControllerAuthenticateV1(
-    AuthenticateTwoFactorDto authenticateTwoFactorDto
+  public ResponseEntity<
+    ApiResponse<TwoFactorAuthenticatedResponseDto>
+  > twoFactorAuthControllerAuthenticateV1(
+    @Valid @RequestBody AuthenticateTwoFactorDto authenticateTwoFactorDto
   ) {
     HttpServletRequest request = CurrentRequest.request();
     String twoFactorToken = requireTwoFactorToken(request);
@@ -204,22 +235,25 @@ public class TwoFactorAuthController implements TwoFactorAuthApi {
 
     UserResponse user = response.getUser();
     return ResponseEntity.ok(
-      new TwoFactorAuthControllerAuthenticateV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(
-          new TwoFactorAuthenticatedResponseDto(
-            UserMapper.toUserResponseDto(user),
-            response.hasWarning() ? response.getWarning() : null
-          )
+      ApiResponse.of(
+        200,
+        "OK",
+        new TwoFactorAuthenticatedResponseDto(
+          UserMapper.toUserResponseDto(user),
+          response.hasWarning() ? response.getWarning() : null
         )
+      )
     );
   }
 
-  @Override
-  public ResponseEntity<AuthControllerForgotPasswordV1202Response> twoFactorAuthControllerDisableV1(
-    DisableTwoFactorDto disableTwoFactorDto
+  @DeleteMapping(
+    value = "/auth/2fa",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401" })
+  public ResponseEntity<ApiResponse<Void>> twoFactorAuthControllerDisableV1(
+    @Valid @RequestBody DisableTwoFactorDto disableTwoFactorDto
   ) {
     HttpServletRequest request = CurrentRequest.request();
     RequestContext context = currentUser.require(request);
@@ -235,18 +269,19 @@ public class TwoFactorAuthController implements TwoFactorAuthApi {
     // auth-service just un-trusted every device; drop the now-meaningless cookie.
     cookies.clearDeviceToken(CurrentRequest.response());
 
-    return ResponseEntity.ok(
-      new AuthControllerForgotPasswordV1202Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(null)
-    );
+    return ResponseEntity.ok(ApiResponse.of(200, "OK", null));
   }
 
-  @Override
-  public ResponseEntity<TwoFactorAuthControllerActivateV1200Response> twoFactorAuthControllerRegenerateBackupCodesV1(
-    RegenerateBackupCodesDto regenerateBackupCodesDto
+  @PostMapping(
+    value = "/auth/2fa/backup-codes",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401" })
+  public ResponseEntity<
+    ApiResponse<BackupCodesResponseDto>
+  > twoFactorAuthControllerRegenerateBackupCodesV1(
+    @Valid @RequestBody RegenerateBackupCodesDto regenerateBackupCodesDto
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -260,16 +295,22 @@ public class TwoFactorAuthController implements TwoFactorAuthApi {
     );
 
     return ResponseEntity.ok(
-      new TwoFactorAuthControllerActivateV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(new BackupCodesResponseDto(response.getBackupCodesList()))
+      ApiResponse.of(
+        200,
+        "OK",
+        new BackupCodesResponseDto(response.getBackupCodesList())
+      )
     );
   }
 
-  @Override
-  public ResponseEntity<TwoFactorAuthControllerGetBackupCodesStatusV1200Response> twoFactorAuthControllerGetBackupCodesStatusV1() {
+  @GetMapping(
+    value = "/auth/2fa/backup-codes",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "401" })
+  public ResponseEntity<
+    ApiResponse<BackupCodesStatusResponseDto>
+  > twoFactorAuthControllerGetBackupCodesStatusV1() {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     BackupCodesStatusResponse response = withMetadata(
@@ -279,19 +320,17 @@ public class TwoFactorAuthController implements TwoFactorAuthApi {
     );
 
     return ResponseEntity.ok(
-      new TwoFactorAuthControllerGetBackupCodesStatusV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(
-          new BackupCodesStatusResponseDto(
-            BigDecimal.valueOf(response.getRemaining()),
-            BigDecimal.valueOf(response.getUsed()),
-            response.hasExpiresAt()
-              ? toOffsetDateTime(response.getExpiresAt())
-              : null
-          )
+      ApiResponse.of(
+        200,
+        "OK",
+        new BackupCodesStatusResponseDto(
+          BigDecimal.valueOf(response.getRemaining()),
+          BigDecimal.valueOf(response.getUsed()),
+          response.hasExpiresAt()
+            ? toOffsetDateTime(response.getExpiresAt())
+            : null
         )
+      )
     );
   }
 

@@ -6,6 +6,7 @@ import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -46,18 +47,20 @@ public class GatewayExceptionHandler {
     MethodArgumentNotValidException exception,
     HttpServletRequest request
   ) {
-    List<String> messages = new ArrayList<>();
+    // `field message` — the shape class-validator produces, so the FIELD
+    // NAME is present and first. The phrasing after it is Bean Validation's
+    // and is matched loosely.
+    List<String> messages = exception
+      .getBindingResult()
+      .getFieldErrors()
+      .stream()
+      .map(error -> error.getField() + " " + error.getDefaultMessage())
+      .collect(Collectors.toCollection(ArrayList::new));
 
-    for (var error : exception.getBindingResult().getFieldErrors()) {
-      // `field message` — the shape class-validator produces, so the FIELD
-      // NAME is present and first. The phrasing after it is Bean Validation's
-      // and is matched loosely.
-      messages.add(error.getField() + " " + error.getDefaultMessage());
-    }
-
-    for (var error : exception.getBindingResult().getGlobalErrors()) {
-      messages.add(error.getDefaultMessage());
-    }
+    exception
+      .getBindingResult()
+      .getGlobalErrors()
+      .forEach(error -> messages.add(error.getDefaultMessage()));
 
     return envelope(
       HttpStatus.BAD_REQUEST,

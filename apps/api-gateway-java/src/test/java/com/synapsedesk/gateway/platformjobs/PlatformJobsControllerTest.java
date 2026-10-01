@@ -125,7 +125,7 @@ class PlatformJobsControllerTest {
     JobHealthResponseDto data = controller
       .platformJobsControllerGetHealthV1()
       .getBody()
-      .getData();
+      .data();
 
     assertThat(data.getUnavailable()).containsExactly("ingestion-service");
     // ledger-hourly, ledger-daily, ingestion-reconcile, scope-reconcile are ingestion-owned.
@@ -145,7 +145,7 @@ class PlatformJobsControllerTest {
     JobHealthResponseDto data = controller
       .platformJobsControllerGetHealthV1()
       .getBody()
-      .getData();
+      .data();
 
     JobRunStatusResponseDto analytics = data
       .getItems()
@@ -169,7 +169,7 @@ class PlatformJobsControllerTest {
     JobHealthResponseDto data = controller
       .platformJobsControllerGetHealthV1()
       .getBody()
-      .getData();
+      .data();
 
     JobRunStatusResponseDto analytics = data
       .getItems()
@@ -199,7 +199,7 @@ class PlatformJobsControllerTest {
     JobHealthResponseDto data = controller
       .platformJobsControllerGetHealthV1()
       .getBody()
-      .getData();
+      .data();
 
     JobRunStatusResponseDto analytics = data
       .getItems()
@@ -229,7 +229,7 @@ class PlatformJobsControllerTest {
     JobHealthResponseDto data = controller
       .platformJobsControllerGetHealthV1()
       .getBody()
-      .getData();
+      .data();
 
     JobRunStatusResponseDto analytics = data
       .getItems()
@@ -259,7 +259,7 @@ class PlatformJobsControllerTest {
     JobHealthResponseDto data = controller
       .platformJobsControllerGetHealthV1()
       .getBody()
-      .getData();
+      .data();
 
     JobRunStatusResponseDto step = data
       .getItems()
@@ -295,8 +295,8 @@ class PlatformJobsControllerTest {
 
     var response = controller.platformJobsControllerRunV1("analytics-daily");
 
-    assertThat(response.getBody().getMessage()).isEqualTo("Job run complete");
-    assertThat(response.getBody().getData().getRows()).isEqualTo(
+    assertThat(response.getBody().message()).isEqualTo("Job run complete");
+    assertThat(response.getBody().data().getRows()).isEqualTo(
       java.math.BigDecimal.valueOf(8)
     );
   }

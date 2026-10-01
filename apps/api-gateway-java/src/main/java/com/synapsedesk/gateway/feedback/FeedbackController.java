@@ -3,27 +3,40 @@ package com.synapsedesk.gateway.feedback;
 import com.synapsedesk.gateway.auth.CurrentRequest;
 import com.synapsedesk.gateway.auth.CurrentUser;
 import com.synapsedesk.gateway.auth.RequestContext;
-import com.synapsedesk.gateway.generated.api.FeedbackApi;
-import com.synapsedesk.gateway.generated.model.AuthControllerForgotPasswordV1202Response;
 import com.synapsedesk.gateway.generated.model.CurrentUserResponseDto.PermissionCodesEnum;
-import com.synapsedesk.gateway.generated.model.FeedbackControllerListV1200Response;
-import com.synapsedesk.gateway.generated.model.FeedbackControllerListV1200ResponseData;
 import com.synapsedesk.gateway.generated.model.FeedbackResponseDto;
-import com.synapsedesk.gateway.generated.model.InvitationsControllerListV1200ResponseDataMeta;
-import com.synapsedesk.gateway.generated.model.MessageFeedbackControllerOwnV1200Response;
 import com.synapsedesk.gateway.generated.model.SubmitFeedbackDto;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
+import com.synapsedesk.gateway.openapi.ApiErrors;
 import com.synapsedesk.gateway.security.RequirePermission;
+import com.synapsedesk.gateway.web.ApiPaths;
+import com.synapsedesk.gateway.web.ApiResponse;
+import com.synapsedesk.gateway.web.PageMeta;
+import com.synapsedesk.gateway.web.PagedData;
 import io.grpc.stub.MetadataUtils;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.concurrent.TimeUnit;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.lang.Nullable;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
-import synapsedesk.auth.Common.PageMeta;
 import synapsedesk.auth.Common.PageRequest;
 import synapsedesk.auth.Common.SortOrder;
 import synapsedesk.ticket.Feedback.FeedbackResponse;
@@ -40,13 +53,16 @@ import synapsedesk.ticket.FeedbackServiceGrpc;
  * `FeedbackService`. The `Feedback` module pays for that channel
  * (`GrpcChannels.ticketServiceChannel`); `Chat` reuses it.
  *
- * <p><b>`withdraw` is a real 204 — no body.</b> A naive
- * {@code ResponseEntity.status(204).body(new AuthControllerForgotPasswordV1202Response())}
- * would serialize an envelope into a response the spec says has none, so this
- * builds the {@link ResponseEntity} with no body at all.
+ * <p><b>`withdraw` is a real 204 — no body.</b> `@ResponseStatus` is what
+ * tells springdoc that; without it the document would claim 200.
+ *
+ * <p><b>Migrated off `FeedbackApi`.</b>
  */
+@Tag(name = "Feedback")
 @RestController
-public class FeedbackController implements FeedbackApi {
+@RequestMapping(ApiPaths.V1)
+@Validated
+public class FeedbackController {
 
   private static final long DEADLINE_SECONDS = 5;
 
@@ -71,10 +87,17 @@ public class FeedbackController implements FeedbackApi {
       );
   }
 
-  @Override
-  public ResponseEntity<MessageFeedbackControllerOwnV1200Response> messageFeedbackControllerSubmitV1(
-    String messageId,
-    SubmitFeedbackDto submitFeedbackDto
+  @PostMapping(
+    value = "/messages/{messageId}/feedback",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "404" })
+  public ResponseEntity<
+    ApiResponse<FeedbackResponseDto>
+  > messageFeedbackControllerSubmitV1(
+    @PathVariable("messageId") String messageId,
+    @Valid @RequestBody SubmitFeedbackDto submitFeedbackDto
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -93,17 +116,19 @@ public class FeedbackController implements FeedbackApi {
     );
 
     return ResponseEntity.ok(
-      new MessageFeedbackControllerOwnV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("Feedback recorded")
-        .data(toDto(response))
+      ApiResponse.of(200, "Feedback recorded", toDto(response))
     );
   }
 
-  @Override
-  public ResponseEntity<MessageFeedbackControllerOwnV1200Response> messageFeedbackControllerOwnV1(
-    String messageId
+  @GetMapping(
+    value = "/messages/{messageId}/feedback",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "404" })
+  public ResponseEntity<
+    ApiResponse<FeedbackResponseDto>
+  > messageFeedbackControllerOwnV1(
+    @PathVariable("messageId") String messageId
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -115,18 +140,17 @@ public class FeedbackController implements FeedbackApi {
       ? toDto(response.getFeedback())
       : null;
 
-    return ResponseEntity.ok(
-      new MessageFeedbackControllerOwnV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(data)
-    );
+    return ResponseEntity.ok(ApiResponse.of(200, "OK", data));
   }
 
-  @Override
-  public ResponseEntity<AuthControllerForgotPasswordV1202Response> messageFeedbackControllerWithdrawV1(
-    String messageId
+  @DeleteMapping(
+    value = "/messages/{messageId}/feedback",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "404" })
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  public ResponseEntity<Void> messageFeedbackControllerWithdrawV1(
+    @PathVariable("messageId") String messageId
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -137,17 +161,46 @@ public class FeedbackController implements FeedbackApi {
     return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
   }
 
-  @Override
+  @GetMapping(value = "/feedback", produces = { "application/json" })
+  @ApiErrors({ "401", "403" })
   @RequirePermission(PermissionCodesEnum.ANALYTICS_READ)
-  public ResponseEntity<FeedbackControllerListV1200Response> feedbackControllerListV1(
-    BigDecimal page,
-    BigDecimal limit,
-    String sortBy,
-    String sortOrder,
-    String searchTerm,
-    Boolean citationAccurate,
-    OffsetDateTime from,
-    OffsetDateTime to
+  public ResponseEntity<
+    ApiResponse<PagedData<FeedbackResponseDto>>
+  > feedbackControllerListV1(
+    @DecimalMin(value = "1") @Valid @RequestParam(
+      value = "page",
+      required = false,
+      defaultValue = "1"
+    ) BigDecimal page,
+    @DecimalMin(value = "1") @DecimalMax(value = "100") @Valid @RequestParam(
+      value = "limit",
+      required = false,
+      defaultValue = "10"
+    ) BigDecimal limit,
+    @Valid @RequestParam(
+      value = "sortBy",
+      required = false,
+      defaultValue = "createdAt"
+    ) String sortBy,
+    @Valid @RequestParam(
+      value = "sortOrder",
+      required = false,
+      defaultValue = "ASC"
+    ) String sortOrder,
+    @Valid @RequestParam(
+      value = "searchTerm",
+      required = false
+    ) @Nullable String searchTerm,
+    @Valid @RequestParam(
+      value = "citationAccurate",
+      required = false
+    ) @Nullable Boolean citationAccurate,
+    @Valid @RequestParam(value = "from", required = false) @DateTimeFormat(
+      iso = DateTimeFormat.ISO.DATE_TIME
+    ) @Nullable OffsetDateTime from,
+    @Valid @RequestParam(value = "to", required = false) @DateTimeFormat(
+      iso = DateTimeFormat.ISO.DATE_TIME
+    ) @Nullable OffsetDateTime to
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -181,24 +234,12 @@ public class FeedbackController implements FeedbackApi {
       wire.build()
     );
 
-    FeedbackControllerListV1200ResponseData data =
-      new FeedbackControllerListV1200ResponseData()
-        .items(
-          response
-            .getItemsList()
-            .stream()
-            .map(FeedbackController::toDto)
-            .toList()
-        )
-        .meta(toMetaDto(response.getMeta()));
-
-    return ResponseEntity.ok(
-      new FeedbackControllerListV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(data)
+    PagedData<FeedbackResponseDto> data = new PagedData<>(
+      response.getItemsList().stream().map(FeedbackController::toDto).toList(),
+      PageMeta.from(response.getMeta())
     );
+
+    return ResponseEntity.ok(ApiResponse.of(200, "OK", data));
   }
 
   private static FeedbackResponseDto toDto(FeedbackResponse feedback) {
@@ -214,18 +255,6 @@ public class FeedbackController implements FeedbackApi {
       feedback.hasCitationAccurate() ? feedback.getCitationAccurate() : null,
       toOffsetDateTime(feedback.getCreatedAt()),
       toOffsetDateTime(feedback.getUpdatedAt())
-    );
-  }
-
-  private static InvitationsControllerListV1200ResponseDataMeta toMetaDto(
-    PageMeta meta
-  ) {
-    return new InvitationsControllerListV1200ResponseDataMeta(
-      BigDecimal.valueOf(meta.getTotalItems()),
-      BigDecimal.valueOf(meta.getItemCount()),
-      BigDecimal.valueOf(meta.getItemsPerPage()),
-      BigDecimal.valueOf(meta.getTotalPages()),
-      BigDecimal.valueOf(meta.getCurrentPage())
     );
   }
 

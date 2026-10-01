@@ -23,6 +23,7 @@ import {
   apiNameFor,
   declaredTags,
   pendingApis,
+  tagsIn,
 } from './pending';
 
 describe('the Java skip list', () => {
@@ -94,6 +95,28 @@ describe('the Java skip list', () => {
     // floor rises as the pending list shrinks, and it is here so an empty
     // `implemented` cannot report full coverage.
     expect(implemented.length).toBeGreaterThanOrEqual(12);
+  });
+
+  it('tagsIn survives a nested call inside the row helper', () => {
+    // The highest-consequence of the three regex-boundary rows found this
+    // batch: `declaredTags` is upstream of BOTH tests above, so an
+    // under-count here does not fail loudly — it makes them check fewer
+    // tags while staying green. `rowFor(tagsFor(x))` is not real code
+    // anywhere today; this pins that if it ever becomes real, the tag it
+    // names is still seen.
+    //
+    // Built from pieces, not a literal open-paren call: `declaredTags`
+    // scans this file's own raw TEXT for that exact substring, with no
+    // idea it is inside a fixture rather than a real declaration — a
+    // literal copy here would add "Nested" and "Plain" to the REAL tag
+    // universe and fail the row above.
+    const call = ['row', 'For'].join('');
+    const hostile = [
+      `${call}(tagsFor('Nested'))('a row inside a helper call', async () => {});`,
+      `${call}('Plain')('an ordinary row', async () => {});`,
+    ].join('\n');
+
+    expect(tagsIn(hostile)).toEqual(['Nested', 'Plain']);
   });
 
   it('the pending list is read from the Java build, not copied here', () => {

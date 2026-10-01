@@ -21,7 +21,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.web.server.ResponseStatusException;
-import synapsedesk.ticket.Assignment.AssignTicketRequest;
 import synapsedesk.ticket.Assignment.AssignTicketToSelfRequest;
 import synapsedesk.ticket.Assignment.AssignmentResponse;
 import synapsedesk.ticket.Assignment.ListAssignmentsResponse;
@@ -259,7 +258,7 @@ class TicketsAssignmentServiceTest {
       "ticket-1"
     );
 
-    assertThat(response.getBody().getData()).hasSize(1);
+    assertThat(response.getBody().data()).hasSize(1);
   }
 
   private static AssignTicketDto assignDto() {

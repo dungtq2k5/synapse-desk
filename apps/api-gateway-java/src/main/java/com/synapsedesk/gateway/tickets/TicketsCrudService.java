@@ -1,16 +1,14 @@
 package com.synapsedesk.gateway.tickets;
 
 import com.synapsedesk.gateway.auth.RequestContext;
-import com.synapsedesk.gateway.generated.model.AuthControllerForgotPasswordV1202Response;
 import com.synapsedesk.gateway.generated.model.CreateTicketDto;
 import com.synapsedesk.gateway.generated.model.CurrentUserResponseDto.PermissionCodesEnum;
-import com.synapsedesk.gateway.generated.model.InvitationsControllerListV1200ResponseDataMeta;
 import com.synapsedesk.gateway.generated.model.TicketResponseDto;
-import com.synapsedesk.gateway.generated.model.TicketsControllerCreateV1201Response;
-import com.synapsedesk.gateway.generated.model.TicketsControllerListV1200Response;
-import com.synapsedesk.gateway.generated.model.TicketsControllerListV1200ResponseData;
 import com.synapsedesk.gateway.generated.model.UpdateTicketDto;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
+import com.synapsedesk.gateway.web.ApiResponse;
+import com.synapsedesk.gateway.web.PageMeta;
+import com.synapsedesk.gateway.web.PagedData;
 import io.grpc.stub.MetadataUtils;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -84,7 +82,7 @@ public class TicketsCrudService {
     this.stub = stub;
   }
 
-  public ResponseEntity<TicketsControllerListV1200Response> list(
+  public ResponseEntity<ApiResponse<PagedData<TicketResponseDto>>> list(
     RequestContext context,
     BigDecimal page,
     BigDecimal limit,
@@ -127,26 +125,19 @@ public class TicketsCrudService {
 
     ListTicketsResponse response = withMetadata(context).listTickets(wire);
 
-    TicketsControllerListV1200ResponseData data =
-      new TicketsControllerListV1200ResponseData(
-        response
-          .getItemsList()
-          .stream()
-          .map(TicketsCrudService::toTicketResponseDto)
-          .toList(),
-        toMetaDto(response.getMeta())
-      );
-
-    return ResponseEntity.ok(
-      new TicketsControllerListV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(data)
+    PagedData<TicketResponseDto> data = new PagedData<>(
+      response
+        .getItemsList()
+        .stream()
+        .map(TicketsCrudService::toTicketResponseDto)
+        .toList(),
+      PageMeta.from(response.getMeta())
     );
+
+    return ResponseEntity.ok(ApiResponse.of(200, "OK", data));
   }
 
-  public ResponseEntity<TicketsControllerCreateV1201Response> getByNumber(
+  public ResponseEntity<ApiResponse<TicketResponseDto>> getByNumber(
     RequestContext context,
     BigDecimal ticketNumber
   ) {
@@ -159,7 +150,7 @@ public class TicketsCrudService {
     return ok(response, "OK", HttpStatus.OK);
   }
 
-  public ResponseEntity<TicketsControllerCreateV1201Response> get(
+  public ResponseEntity<ApiResponse<TicketResponseDto>> get(
     RequestContext context,
     String id
   ) {
@@ -170,27 +161,30 @@ public class TicketsCrudService {
     return ok(response, "OK", HttpStatus.OK);
   }
 
-  public ResponseEntity<TicketsControllerCreateV1201Response> create(
+  public ResponseEntity<ApiResponse<TicketResponseDto>> create(
     RequestContext context,
     CreateTicketDto dto
   ) {
     requirePermission(context, PermissionCodesEnum.TICKET_CREATE);
 
+    var priority = dto.getPriority();
+    var source = dto.getSource();
     CreateTicketRequest.Builder wire = CreateTicketRequest.newBuilder()
       .setTitle(dto.getTitle())
       .setDescription(dto.getDescription())
       .setPriority(
-        dto.getPriority() == null
+        priority == null
           ? TicketPriority.TICKET_PRIORITY_UNSPECIFIED
-          : toProtoTicketPriority(dto.getPriority().getValue())
+          : toProtoTicketPriority(priority.getValue())
       )
       .setSource(
-        dto.getSource() == null
+        source == null
           ? TicketSource.TICKET_SOURCE_UNSPECIFIED
-          : toProtoTicketSource(dto.getSource().getValue())
+          : toProtoTicketSource(source.getValue())
       );
-    if (dto.getAuthorId() != null) {
-      wire.setAuthorId(dto.getAuthorId().toString());
+    var authorId = dto.getAuthorId();
+    if (authorId != null) {
+      wire.setAuthorId(authorId.toString());
     }
 
     TicketResponse response = withMetadata(context).createTicket(wire.build());
@@ -198,7 +192,7 @@ public class TicketsCrudService {
     return ok(response, "Ticket created", HttpStatus.CREATED);
   }
 
-  public ResponseEntity<TicketsControllerCreateV1201Response> update(
+  public ResponseEntity<ApiResponse<TicketResponseDto>> update(
     RequestContext context,
     String id,
     UpdateTicketDto dto
@@ -208,8 +202,9 @@ public class TicketsCrudService {
     UpdateTicketRequest.Builder wire = UpdateTicketRequest.newBuilder().setId(
       id
     );
-    if (dto.getPriority() != null) {
-      wire.setPriority(toProtoTicketPriority(dto.getPriority().getValue()));
+    var updatedPriority = dto.getPriority();
+    if (updatedPriority != null) {
+      wire.setPriority(toProtoTicketPriority(updatedPriority.getValue()));
     }
     if (dto.getTitle() != null) {
       wire.setTitle(dto.getTitle());
@@ -223,7 +218,7 @@ public class TicketsCrudService {
     return ok(response, "Ticket updated", HttpStatus.OK);
   }
 
-  public ResponseEntity<AuthControllerForgotPasswordV1202Response> remove(
+  public ResponseEntity<ApiResponse<Void>> remove(
     RequestContext context,
     String id
   ) {
@@ -234,14 +229,11 @@ public class TicketsCrudService {
     );
 
     return ResponseEntity.status(HttpStatus.NO_CONTENT).body(
-      new AuthControllerForgotPasswordV1202Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(204))
-        .message("OK")
+      ApiResponse.of(204, "OK", null)
     );
   }
 
-  public ResponseEntity<TicketsControllerCreateV1201Response> restore(
+  public ResponseEntity<ApiResponse<TicketResponseDto>> restore(
     RequestContext context,
     String id
   ) {
@@ -302,17 +294,13 @@ public class TicketsCrudService {
     );
   }
 
-  private static ResponseEntity<TicketsControllerCreateV1201Response> ok(
+  private static ResponseEntity<ApiResponse<TicketResponseDto>> ok(
     TicketResponse response,
     String message,
     HttpStatus status
   ) {
     return ResponseEntity.status(status).body(
-      new TicketsControllerCreateV1201Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(status.value()))
-        .message(message)
-        .data(toTicketResponseDto(response))
+      ApiResponse.of(status.value(), message, toTicketResponseDto(response))
     );
   }
 
@@ -402,18 +390,6 @@ public class TicketsCrudService {
         ticket.hasDeletedAt() ? toOffsetDateTime(ticket.getDeletedAt()) : null
       )
       .deletedById(ticket.hasDeletedById() ? ticket.getDeletedById() : null);
-  }
-
-  private static InvitationsControllerListV1200ResponseDataMeta toMetaDto(
-    synapsedesk.auth.Common.PageMeta meta
-  ) {
-    return new InvitationsControllerListV1200ResponseDataMeta(
-      BigDecimal.valueOf(meta.getTotalItems()),
-      BigDecimal.valueOf(meta.getItemCount()),
-      BigDecimal.valueOf(meta.getItemsPerPage()),
-      BigDecimal.valueOf(meta.getTotalPages()),
-      BigDecimal.valueOf(meta.getCurrentPage())
-    );
   }
 
   static OffsetDateTime toOffsetDateTime(

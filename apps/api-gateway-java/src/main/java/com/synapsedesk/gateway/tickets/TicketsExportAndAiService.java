@@ -6,11 +6,11 @@ import com.synapsedesk.gateway.generated.model.CreateTicketExportDto;
 import com.synapsedesk.gateway.generated.model.CurrentUserResponseDto.PermissionCodesEnum;
 import com.synapsedesk.gateway.generated.model.ExportResponseDto;
 import com.synapsedesk.gateway.generated.model.SimilarTicketResponseDto;
-import com.synapsedesk.gateway.generated.model.TicketsControllerCreateExportV1202Response;
-import com.synapsedesk.gateway.generated.model.TicketsControllerListSimilarV1200Response;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
+import com.synapsedesk.gateway.web.ApiResponse;
 import io.grpc.stub.MetadataUtils;
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -71,7 +71,7 @@ public class TicketsExportAndAiService {
     this.json = json;
   }
 
-  public ResponseEntity<TicketsControllerCreateExportV1202Response> createExport(
+  public ResponseEntity<ApiResponse<ExportResponseDto>> createExport(
     RequestContext context,
     CreateTicketExportDto dto
   ) {
@@ -91,8 +91,9 @@ public class TicketsExportAndAiService {
           ? ""
           : json.writeValueAsString(dto.getFilters())
       );
-    if (dto.getDepartmentId() != null) {
-      wire.setDepartmentId(dto.getDepartmentId().toString());
+    var departmentId = dto.getDepartmentId();
+    if (departmentId != null) {
+      wire.setDepartmentId(departmentId.toString());
     }
 
     ExportResponse response = withAnalyticsMetadata(context).createExport(
@@ -100,16 +101,12 @@ public class TicketsExportAndAiService {
     );
 
     return new ResponseEntity<>(
-      new TicketsControllerCreateExportV1202Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(202))
-        .message("OK")
-        .data(toExportDto(response)),
+      ApiResponse.of(202, "OK", toExportDto(response)),
       HttpStatus.ACCEPTED
     );
   }
 
-  public ResponseEntity<TicketsControllerCreateExportV1202Response> getExport(
+  public ResponseEntity<ApiResponse<ExportResponseDto>> getExport(
     RequestContext context,
     String id
   ) {
@@ -122,19 +119,12 @@ public class TicketsExportAndAiService {
       GetExportRequest.newBuilder().setId(id).build()
     );
 
-    return ResponseEntity.ok(
-      new TicketsControllerCreateExportV1202Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(toExportDto(response))
-    );
+    return ResponseEntity.ok(ApiResponse.of(200, "OK", toExportDto(response)));
   }
 
-  public ResponseEntity<TicketsControllerListSimilarV1200Response> listSimilar(
-    RequestContext context,
-    String id
-  ) {
+  public ResponseEntity<
+    ApiResponse<List<SimilarTicketResponseDto>>
+  > listSimilar(RequestContext context, String id) {
     TicketsCrudService.requirePermission(
       context,
       PermissionCodesEnum.TICKET_READ_ALL
@@ -145,17 +135,15 @@ public class TicketsExportAndAiService {
     ).listSimilarTickets(TicketAiRequest.newBuilder().setTicketId(id).build());
 
     return ResponseEntity.ok(
-      new TicketsControllerListSimilarV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(
-          response
-            .getItemsList()
-            .stream()
-            .map(TicketsExportAndAiService::toSimilarTicketDto)
-            .toList()
-        )
+      ApiResponse.of(
+        200,
+        "OK",
+        response
+          .getItemsList()
+          .stream()
+          .map(TicketsExportAndAiService::toSimilarTicketDto)
+          .toList()
+      )
     );
   }
 
@@ -195,11 +183,11 @@ public class TicketsExportAndAiService {
       .downloadUrl(response.hasDownloadUrl() ? response.getDownloadUrl() : null)
       .error(response.hasError() ? response.getError() : null)
       .createdAt(
-        response.hasCreatedAt()
-          ? TicketsCrudService.toOffsetDateTime(response.getCreatedAt())
-          : TicketsCrudService.toOffsetDateTime(
-              com.google.protobuf.Timestamp.getDefaultInstance()
-            )
+        TicketsCrudService.toOffsetDateTime(
+          response.hasCreatedAt()
+            ? response.getCreatedAt()
+            : com.google.protobuf.Timestamp.getDefaultInstance()
+        )
       )
       .completedAt(
         response.hasCompletedAt()

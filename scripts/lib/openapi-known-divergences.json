@@ -1,0 +1,37 @@
+[
+  {
+    "route": "POST /api/v1/webhook-endpoints",
+    "kind": "success",
+    "node": ["200"],
+    "java": ["201"],
+    "reason": "Node's own runtime answers 201 (Nest's default for an unmarked POST) and the contract suite pins 201 on both arms; the committed document's 200 is the stale side. Java matches real behaviour."
+  },
+  {
+    "route": "POST /api/v1/webhook-endpoints/{id}/rotate-secret",
+    "kind": "success",
+    "node": ["200"],
+    "java": ["201"],
+    "reason": "Same as create: real behaviour is 201, the document says 200. Whether these action routes SHOULD be 200 is a separate, deferred decision on the Node side."
+  },
+  {
+    "route": "POST /api/v1/webhook-endpoints/{id}/test",
+    "kind": "success",
+    "node": ["200"],
+    "java": ["201"],
+    "reason": "Same as create: real behaviour is 201, the document says 200. Whether these action routes SHOULD be 200 is a separate, deferred decision on the Node side."
+  },
+  {
+    "route": "POST /api/v1/webhooks/email/resend",
+    "kind": "error",
+    "node": ["401", "500", "503"],
+    "java": ["401", "429", "500", "503"],
+    "reason": "Node exempts this intake from throttling; Java has no route-level throttle exemption, so 429 is genuinely possible and documented. Removing 429 from the document without a real runtime skip would make it describe behaviour the code lacks."
+  },
+  {
+    "route": "POST /api/v1/webhooks/stripe",
+    "kind": "error",
+    "node": ["400", "500"],
+    "java": ["400", "429", "500"],
+    "reason": "Same as the email intake: Java has no route-level throttle exemption, so 429 is genuinely possible and documented."
+  }
+]

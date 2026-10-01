@@ -5,17 +5,14 @@ import com.synapsedesk.gateway.auth.SuperAdminCheck;
 import com.synapsedesk.gateway.generated.model.ApplyPlanResponseDto;
 import com.synapsedesk.gateway.generated.model.CreatePlanDto;
 import com.synapsedesk.gateway.generated.model.DeletePlanResponseDto;
-import com.synapsedesk.gateway.generated.model.InvitationsControllerListV1200ResponseDataMeta;
 import com.synapsedesk.gateway.generated.model.PlanSubscriberProjectionResponseDto;
-import com.synapsedesk.gateway.generated.model.PlatformControllerApplyPlanV1200Response;
-import com.synapsedesk.gateway.generated.model.PlatformControllerCreatePlanV1201Response;
-import com.synapsedesk.gateway.generated.model.PlatformControllerDeletePlanV1200Response;
-import com.synapsedesk.gateway.generated.model.PlatformControllerListPlansV1200Response;
-import com.synapsedesk.gateway.generated.model.PlatformControllerListPlansV1200ResponseData;
 import com.synapsedesk.gateway.generated.model.SubscriptionPlanPriceResponseDto;
 import com.synapsedesk.gateway.generated.model.SubscriptionPlanResponseDto;
 import com.synapsedesk.gateway.generated.model.UpdatePlanDto;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
+import com.synapsedesk.gateway.web.ApiResponse;
+import com.synapsedesk.gateway.web.PageMeta;
+import com.synapsedesk.gateway.web.PagedData;
 import io.grpc.stub.MetadataUtils;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -109,7 +106,9 @@ public class PlatformPlansService {
     this.superAdminCheck = superAdminCheck;
   }
 
-  public ResponseEntity<PlatformControllerListPlansV1200Response> listPlans(
+  public ResponseEntity<
+    ApiResponse<PagedData<SubscriptionPlanResponseDto>>
+  > listPlans(
     RequestContext context,
     BigDecimal page,
     BigDecimal limit,
@@ -142,26 +141,19 @@ public class PlatformPlansService {
 
     ListPlansResponse response = withMetadata(context).listPlans(wire);
 
-    PlatformControllerListPlansV1200ResponseData data =
-      new PlatformControllerListPlansV1200ResponseData(
-        response
-          .getItemsList()
-          .stream()
-          .map(PlatformPlansService::toSubscriptionPlanResponseDto)
-          .toList(),
-        toMetaDto(response.getMeta())
-      );
-
-    return ResponseEntity.ok(
-      new PlatformControllerListPlansV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(data)
+    PagedData<SubscriptionPlanResponseDto> data = new PagedData<>(
+      response
+        .getItemsList()
+        .stream()
+        .map(PlatformPlansService::toSubscriptionPlanResponseDto)
+        .toList(),
+      PageMeta.from(response.getMeta())
     );
+
+    return ResponseEntity.ok(ApiResponse.of(200, "OK", data));
   }
 
-  public ResponseEntity<PlatformControllerCreatePlanV1201Response> createPlan(
+  public ResponseEntity<ApiResponse<SubscriptionPlanResponseDto>> createPlan(
     RequestContext context,
     CreatePlanDto dto
   ) {
@@ -202,15 +194,11 @@ public class PlatformPlansService {
     );
 
     return ResponseEntity.status(HttpStatus.CREATED).body(
-      new PlatformControllerCreatePlanV1201Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(201))
-        .message("OK")
-        .data(toSubscriptionPlanResponseDto(response))
+      ApiResponse.of(201, "OK", toSubscriptionPlanResponseDto(response))
     );
   }
 
-  public ResponseEntity<PlatformControllerCreatePlanV1201Response> getPlan(
+  public ResponseEntity<ApiResponse<SubscriptionPlanResponseDto>> getPlan(
     RequestContext context,
     String id
   ) {
@@ -223,7 +211,7 @@ public class PlatformPlansService {
     return okPlan(response, "OK");
   }
 
-  public ResponseEntity<PlatformControllerCreatePlanV1201Response> updatePlan(
+  public ResponseEntity<ApiResponse<SubscriptionPlanResponseDto>> updatePlan(
     RequestContext context,
     String id,
     UpdatePlanDto dto
@@ -241,29 +229,37 @@ public class PlatformPlansService {
     if (dto.getStripeProductId() != null) {
       wire.setStripeProductId(dto.getStripeProductId());
     }
-    if (dto.getMaxAgentSeats() != null) {
-      wire.setMaxAgentSeats(dto.getMaxAgentSeats().intValue());
+    BigDecimal maxAgentSeats = dto.getMaxAgentSeats();
+    if (maxAgentSeats != null) {
+      wire.setMaxAgentSeats(maxAgentSeats.intValue());
     }
-    if (dto.getMaxStorageBytes() != null) {
-      wire.setMaxStorageBytes(dto.getMaxStorageBytes().longValue());
+    BigDecimal maxStorageBytes = dto.getMaxStorageBytes();
+    if (maxStorageBytes != null) {
+      wire.setMaxStorageBytes(maxStorageBytes.longValue());
     }
-    if (dto.getMonthlyAiTokenBudget() != null) {
-      wire.setMonthlyAiTokenBudget(dto.getMonthlyAiTokenBudget().longValue());
+    BigDecimal monthlyAiTokenBudget = dto.getMonthlyAiTokenBudget();
+    if (monthlyAiTokenBudget != null) {
+      wire.setMonthlyAiTokenBudget(monthlyAiTokenBudget.longValue());
     }
-    if (dto.getAiModelTier() != null) {
-      wire.setAiModelTier(toProtoAiModelTier(dto.getAiModelTier().getValue()));
+    var aiModelTier = dto.getAiModelTier();
+    if (aiModelTier != null) {
+      wire.setAiModelTier(toProtoAiModelTier(aiModelTier.getValue()));
     }
-    if (dto.getMaxDocumentBytes() != null) {
-      wire.setMaxDocumentBytes(dto.getMaxDocumentBytes().longValue());
+    BigDecimal maxDocumentBytes = dto.getMaxDocumentBytes();
+    if (maxDocumentBytes != null) {
+      wire.setMaxDocumentBytes(maxDocumentBytes.longValue());
     }
-    if (dto.getMaxAttachmentBytes() != null) {
-      wire.setMaxAttachmentBytes(dto.getMaxAttachmentBytes().longValue());
+    BigDecimal maxAttachmentBytes = dto.getMaxAttachmentBytes();
+    if (maxAttachmentBytes != null) {
+      wire.setMaxAttachmentBytes(maxAttachmentBytes.longValue());
     }
-    if (dto.getMaxDocumentUploads() != null) {
-      wire.setMaxDocumentUploads(dto.getMaxDocumentUploads().intValue());
+    BigDecimal maxDocumentUploads = dto.getMaxDocumentUploads();
+    if (maxDocumentUploads != null) {
+      wire.setMaxDocumentUploads(maxDocumentUploads.intValue());
     }
-    if (dto.getMaxAnalyticsRangeDays() != null) {
-      wire.setMaxAnalyticsRangeDays(dto.getMaxAnalyticsRangeDays().intValue());
+    BigDecimal maxAnalyticsRangeDays = dto.getMaxAnalyticsRangeDays();
+    if (maxAnalyticsRangeDays != null) {
+      wire.setMaxAnalyticsRangeDays(maxAnalyticsRangeDays.intValue());
     }
     if (dto.getIsActive() != null) {
       wire.setIsActive(dto.getIsActive());
@@ -276,7 +272,7 @@ public class PlatformPlansService {
     return okPlan(response, "OK");
   }
 
-  public ResponseEntity<PlatformControllerDeletePlanV1200Response> deletePlan(
+  public ResponseEntity<ApiResponse<DeletePlanResponseDto>> deletePlan(
     RequestContext context,
     String id
   ) {
@@ -287,15 +283,15 @@ public class PlatformPlansService {
     );
 
     return ResponseEntity.ok(
-      new PlatformControllerDeletePlanV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(new DeletePlanResponseDto().deleted(response.getDeleted()))
+      ApiResponse.of(
+        200,
+        "OK",
+        new DeletePlanResponseDto().deleted(response.getDeleted())
+      )
     );
   }
 
-  public ResponseEntity<PlatformControllerApplyPlanV1200Response> applyPlan(
+  public ResponseEntity<ApiResponse<ApplyPlanResponseDto>> applyPlan(
     RequestContext context,
     String id,
     Boolean dryRun
@@ -320,13 +316,7 @@ public class PlatformPlansService {
     ApplyPlanResponseDto enriched =
       usage == null ? projection : enrichWithUsage(projection, usage);
 
-    return ResponseEntity.ok(
-      new PlatformControllerApplyPlanV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(enriched)
-    );
+    return ResponseEntity.ok(ApiResponse.of(200, "OK", enriched));
   }
 
   /** `null` is the failed leg (degrade); an empty map is a genuine zero-subscriber success. */
@@ -360,6 +350,9 @@ public class PlatformPlansService {
         );
     } catch (RuntimeException e) {
       LOG.warn("Usage leg 'ingestion-service' unavailable: {}", e.getMessage());
+      // `null`, not `Map.of()`, is deliberate: it is the signal the caller
+      // uses to skip enrichment entirely rather than enrich with no data —
+      // see `anUnreachableUsageLegDegradesTheProjectionRatherThanFailingTheCall`.
       return null;
     }
   }
@@ -467,16 +460,11 @@ public class PlatformPlansService {
     return AiModelTier.valueOf("AI_MODEL_TIER_" + value);
   }
 
-  private static ResponseEntity<PlatformControllerCreatePlanV1201Response> okPlan(
-    SubscriptionPlanResponse response,
-    String message
-  ) {
+  private static ResponseEntity<
+    ApiResponse<SubscriptionPlanResponseDto>
+  > okPlan(SubscriptionPlanResponse response, String message) {
     return ResponseEntity.ok(
-      new PlatformControllerCreatePlanV1201Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message(message)
-        .data(toSubscriptionPlanResponseDto(response))
+      ApiResponse.of(200, message, toSubscriptionPlanResponseDto(response))
     );
   }
 
@@ -563,18 +551,6 @@ public class PlatformPlansService {
       .skippedPinnedCount(BigDecimal.valueOf(response.getSkippedPinnedCount()))
       .overLimitCount(BigDecimal.valueOf(response.getOverLimitCount()))
       .evaluatedDimensions(response.getEvaluatedDimensionsList());
-  }
-
-  private static InvitationsControllerListV1200ResponseDataMeta toMetaDto(
-    synapsedesk.auth.Common.PageMeta meta
-  ) {
-    return new InvitationsControllerListV1200ResponseDataMeta(
-      BigDecimal.valueOf(meta.getTotalItems()),
-      BigDecimal.valueOf(meta.getItemCount()),
-      BigDecimal.valueOf(meta.getItemsPerPage()),
-      BigDecimal.valueOf(meta.getTotalPages()),
-      BigDecimal.valueOf(meta.getCurrentPage())
-    );
   }
 
   private static OffsetDateTime toOffsetDateTime(

@@ -9,7 +9,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
-import com.google.protobuf.Timestamp;
 import com.synapsedesk.gateway.auth.RequestContext;
 import com.synapsedesk.gateway.auth.SuperAdminCheck;
 import com.synapsedesk.gateway.generated.model.ApplyPlanResponseDto;
@@ -106,7 +105,7 @@ class PlatformPlansServiceTest {
     ApplyPlanResponseDto data = service
       .applyPlan(context(), "plan-1", true)
       .getBody()
-      .getData();
+      .data();
 
     // Never refused — the call still answers 200 with what auth-service alone computed.
     assertThat(data.getEvaluatedDimensions()).containsExactly("seats");
@@ -140,7 +139,7 @@ class PlatformPlansServiceTest {
     ApplyPlanResponseDto data = service
       .applyPlan(context(), "plan-1", true)
       .getBody()
-      .getData();
+      .data();
 
     assertThat(data.getEvaluatedDimensions()).contains(
       "seats",
@@ -181,7 +180,7 @@ class PlatformPlansServiceTest {
     ApplyPlanResponseDto data = service
       .applyPlan(context(), "plan-1", true)
       .getBody()
-      .getData();
+      .data();
 
     assertThat(data.getSubscribers().get(0).getOverLimit()).isEmpty();
   }
@@ -208,7 +207,7 @@ class PlatformPlansServiceTest {
     ApplyPlanResponseDto data = service
       .applyPlan(context(), "plan-1", true)
       .getBody()
-      .getData();
+      .data();
 
     // A limit gates the NEXT addition, not tenure at exactly the ceiling.
     assertThat(data.getSubscribers().get(0).getOverLimit()).isEmpty();

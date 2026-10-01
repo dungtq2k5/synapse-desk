@@ -35,7 +35,7 @@ import synapsedesk.auth.UserServiceGrpc;
  * <p><b>`Query.user` carries `@RequirePermission(USER_READ)`, `me` does
  * not</b> — reading your own profile is not an administrative act, matching
  * the REST route's own distinction. That is the entire reason the two exist
- * as separate fields rather than one parameterised query.
+ * as separate fields rather than one parameterized query.
  */
 @Controller
 public class UsersResolver {

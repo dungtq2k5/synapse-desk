@@ -93,7 +93,7 @@ class TicketsStatusServiceTest {
     );
 
     assertThat(response.getStatusCode().value()).isEqualTo(200);
-    BulkTicketStatusResponseDto data = response.getBody().getData();
+    BulkTicketStatusResponseDto data = response.getBody().data();
     assertThat(data.getUpdated()).containsExactly(
       "11111111-1111-4111-8111-111111111111"
     );

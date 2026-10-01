@@ -47,7 +47,10 @@ class TicketEventsConsumerTest {
   @Test
   void createdRelaysOnlyToTheOrgRoom() {
     consumer.onMessage(
-      message("ticket.created", "{\"ticketId\":\"t1\",\"organizationId\":\"o1\"}")
+      message(
+        "ticket.created",
+        "{\"ticketId\":\"t1\",\"organizationId\":\"o1\"}"
+      )
     );
 
     verify(relay).relayToRoom(
@@ -55,11 +58,7 @@ class TicketEventsConsumerTest {
       eq(RealtimeEvents.REALTIME_EVENTS_TICKET_CREATED),
       any()
     );
-    verify(relay, never()).relayToRoom(
-      eq("ticket:t1"),
-      any(),
-      any()
-    );
+    verify(relay, never()).relayToRoom(eq("ticket:t1"), any(), any());
   }
 
   @Test

@@ -211,6 +211,18 @@ describe('the CI contract', () => {
         script: 'test',
         why: 'the unit suites, including every contract spec in this directory',
       },
+      {
+        script: 'test:contract:java',
+        why: 'the Java gateway against the shared contract suite, on a clean runner — the only place it is ever proved off a laptop',
+      },
+      {
+        script: 'test:e2e:gateway-java',
+        why: '`mvnw verify` — surefire’s unit rows and failsafe’s ITs against a real Redis and NATS; unrun, the Java gateway’s own suites are laptop-only',
+      },
+      {
+        script: 'openapi:check:java',
+        why: 'the Java half of the OpenAPI check; Node’s own half runs in `build`, and only together do they hold the committed document from both sides',
+      },
     ];
 
     /**

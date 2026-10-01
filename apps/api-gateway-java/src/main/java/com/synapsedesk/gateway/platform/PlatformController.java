@@ -3,32 +3,49 @@ package com.synapsedesk.gateway.platform;
 import com.synapsedesk.gateway.auth.CurrentRequest;
 import com.synapsedesk.gateway.auth.CurrentUser;
 import com.synapsedesk.gateway.auth.RequestContext;
-import com.synapsedesk.gateway.generated.api.PlatformApi;
+import com.synapsedesk.gateway.generated.model.ApplyPlanResponseDto;
+import com.synapsedesk.gateway.generated.model.BillingEventsResponseDto;
 import com.synapsedesk.gateway.generated.model.CreateGlobalRoleDto;
 import com.synapsedesk.gateway.generated.model.CreatePlanDto;
 import com.synapsedesk.gateway.generated.model.CreatePlatformOrganizationDto;
+import com.synapsedesk.gateway.generated.model.CreatePlatformOrganizationResponseDto;
+import com.synapsedesk.gateway.generated.model.DeletePlanResponseDto;
+import com.synapsedesk.gateway.generated.model.FinanceSnapshotResponseDto;
 import com.synapsedesk.gateway.generated.model.OffboardOrganizationDto;
-import com.synapsedesk.gateway.generated.model.OrganizationsControllerRequestOffboardV1200Response;
-import com.synapsedesk.gateway.generated.model.PlatformControllerApplyPlanV1200Response;
-import com.synapsedesk.gateway.generated.model.PlatformControllerCreateOrganizationV1201Response;
-import com.synapsedesk.gateway.generated.model.PlatformControllerCreatePlanV1201Response;
-import com.synapsedesk.gateway.generated.model.PlatformControllerDeletePlanV1200Response;
-import com.synapsedesk.gateway.generated.model.PlatformControllerGetFinanceSnapshotV1200Response;
-import com.synapsedesk.gateway.generated.model.PlatformControllerGetMetricsV1200Response;
-import com.synapsedesk.gateway.generated.model.PlatformControllerGetOrganizationV1200Response;
-import com.synapsedesk.gateway.generated.model.PlatformControllerListBillingEventsV1200Response;
-import com.synapsedesk.gateway.generated.model.PlatformControllerListOrganizationsV1200Response;
-import com.synapsedesk.gateway.generated.model.PlatformControllerListPlansV1200Response;
-import com.synapsedesk.gateway.generated.model.PlatformControllerListUsersV1200Response;
+import com.synapsedesk.gateway.generated.model.OffboardResponseDto;
+import com.synapsedesk.gateway.generated.model.PlatformMetricsResponseDto;
+import com.synapsedesk.gateway.generated.model.PlatformOrganizationResponseDto;
+import com.synapsedesk.gateway.generated.model.PlatformUserResponseDto;
 import com.synapsedesk.gateway.generated.model.ResetBillingCycleDto;
-import com.synapsedesk.gateway.generated.model.RolesControllerCreateV1201Response;
-import com.synapsedesk.gateway.generated.model.RolesControllerListV1200Response;
+import com.synapsedesk.gateway.generated.model.RoleResponseDto;
 import com.synapsedesk.gateway.generated.model.SetOrganizationStatusDto;
+import com.synapsedesk.gateway.generated.model.SubscriptionPlanResponseDto;
 import com.synapsedesk.gateway.generated.model.UpdatePlanDto;
 import com.synapsedesk.gateway.generated.model.UpdatePlatformOrganizationDto;
+import com.synapsedesk.gateway.openapi.ApiErrors;
+import com.synapsedesk.gateway.web.ApiPaths;
+import com.synapsedesk.gateway.web.ApiResponse;
+import com.synapsedesk.gateway.web.PagedData;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 import java.util.UUID;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.lang.Nullable;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -37,14 +54,23 @@ import org.springframework.web.bind.annotation.RestController;
  * {@link PlatformOrganizationsService} (organizations CRUD/lifecycle, 8
  * ops), {@link PlatformUsersRolesFinanceService} (cross-tenant users,
  * global roles, metrics, finance, 6 ops), and {@link PlatformPlansService}
- * (the plan catalogue, 6 ops). {@code implements PlatformApi} lives here,
- * and only here, because a generated interface's 20 abstract methods all
- * need an implementation before Spring can register any route on it — the
- * three services above carried real, sabotage-tested logic with no route
- * attached until this class existed.
+ * (the plan catalogue, 6 ops). The hand-declared {@code @RequestMapping}s
+ * live here, and only here, because Spring registers a route on the bean
+ * whose method carries the annotation — the three services above carried
+ * real, sabotage-tested logic with no route attached until this class
+ * existed.
+ *
+ * <p><b>Migrated off `PlatformApi`.</b> {@code createOrganization},
+ * {@code createPlan}, {@code createGlobalRole} answer 201; {@code offboard}
+ * is a DELETE that still reads a body, matching the generated interface
+ * exactly rather than "fixing" it — that is a flip decision for its own
+ * pass, not something to decide inside this migration.
  */
+@Tag(name = "Platform")
 @RestController
-public class PlatformController implements PlatformApi {
+@RequestMapping(ApiPaths.V1)
+@Validated
+public class PlatformController {
 
   private final CurrentUser currentUser;
   private final PlatformOrganizationsService organizations;
@@ -67,15 +93,47 @@ public class PlatformController implements PlatformApi {
     return currentUser.require(CurrentRequest.request());
   }
 
-  @Override
-  public ResponseEntity<PlatformControllerListOrganizationsV1200Response> platformControllerListOrganizationsV1(
-    BigDecimal page,
-    BigDecimal limit,
-    String sortOrder,
-    String searchTerm,
-    String sortBy,
-    Boolean includeDeleted,
-    String status
+  @GetMapping(
+    value = "/platform/organizations",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "401" })
+  public ResponseEntity<
+    ApiResponse<PagedData<PlatformOrganizationResponseDto>>
+  > platformControllerListOrganizationsV1(
+    @DecimalMin(value = "1") @Valid @RequestParam(
+      value = "page",
+      required = false,
+      defaultValue = "1"
+    ) BigDecimal page,
+    @DecimalMin(value = "1") @DecimalMax(value = "100") @Valid @RequestParam(
+      value = "limit",
+      required = false,
+      defaultValue = "10"
+    ) BigDecimal limit,
+    @Valid @RequestParam(
+      value = "sortOrder",
+      required = false,
+      defaultValue = "ASC"
+    ) String sortOrder,
+    @Valid @RequestParam(
+      value = "searchTerm",
+      required = false
+    ) @Nullable String searchTerm,
+    @Valid @RequestParam(
+      value = "sortBy",
+      required = false,
+      defaultValue = "createdAt"
+    ) String sortBy,
+    @Valid @RequestParam(
+      value = "includeDeleted",
+      required = false,
+      defaultValue = "false"
+    ) Boolean includeDeleted,
+    @Valid @RequestParam(
+      value = "status",
+      required = false
+    ) @Nullable String status
   ) {
     return organizations.listOrganizations(
       context(),
@@ -89,9 +147,17 @@ public class PlatformController implements PlatformApi {
     );
   }
 
-  @Override
-  public ResponseEntity<PlatformControllerCreateOrganizationV1201Response> platformControllerCreateOrganizationV1(
-    CreatePlatformOrganizationDto createPlatformOrganizationDto
+  @PostMapping(
+    value = "/platform/organizations",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401" })
+  @ResponseStatus(HttpStatus.CREATED)
+  public ResponseEntity<
+    ApiResponse<CreatePlatformOrganizationResponseDto>
+  > platformControllerCreateOrganizationV1(
+    @Valid @RequestBody CreatePlatformOrganizationDto createPlatformOrganizationDto
   ) {
     return organizations.createOrganization(
       context(),
@@ -99,17 +165,28 @@ public class PlatformController implements PlatformApi {
     );
   }
 
-  @Override
-  public ResponseEntity<PlatformControllerGetOrganizationV1200Response> platformControllerGetOrganizationV1(
-    String id
-  ) {
+  @GetMapping(
+    value = "/platform/organizations/{id}",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "404" })
+  public ResponseEntity<
+    ApiResponse<PlatformOrganizationResponseDto>
+  > platformControllerGetOrganizationV1(@PathVariable("id") String id) {
     return organizations.getOrganization(context(), id);
   }
 
-  @Override
-  public ResponseEntity<PlatformControllerGetOrganizationV1200Response> platformControllerUpdateOrganizationV1(
-    String id,
-    UpdatePlatformOrganizationDto updatePlatformOrganizationDto
+  @PatchMapping(
+    value = "/platform/organizations/{id}",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "404" })
+  public ResponseEntity<
+    ApiResponse<PlatformOrganizationResponseDto>
+  > platformControllerUpdateOrganizationV1(
+    @PathVariable("id") String id,
+    @Valid @RequestBody UpdatePlatformOrganizationDto updatePlatformOrganizationDto
   ) {
     return organizations.updateOrganization(
       context(),
@@ -118,46 +195,100 @@ public class PlatformController implements PlatformApi {
     );
   }
 
-  @Override
-  public ResponseEntity<PlatformControllerGetOrganizationV1200Response> platformControllerSetStatusV1(
-    String id,
-    SetOrganizationStatusDto setOrganizationStatusDto
+  @PostMapping(
+    value = "/platform/organizations/{id}/status",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "404" })
+  public ResponseEntity<
+    ApiResponse<PlatformOrganizationResponseDto>
+  > platformControllerSetStatusV1(
+    @PathVariable("id") String id,
+    @Valid @RequestBody SetOrganizationStatusDto setOrganizationStatusDto
   ) {
     return organizations.setStatus(context(), id, setOrganizationStatusDto);
   }
 
-  @Override
-  public ResponseEntity<PlatformControllerGetOrganizationV1200Response> platformControllerResetBillingCycleV1(
-    String id,
-    ResetBillingCycleDto resetBillingCycleDto
+  @PostMapping(
+    value = "/platform/organizations/{id}/billing-cycle/reset",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "404" })
+  public ResponseEntity<
+    ApiResponse<PlatformOrganizationResponseDto>
+  > platformControllerResetBillingCycleV1(
+    @PathVariable("id") String id,
+    @Valid @RequestBody ResetBillingCycleDto resetBillingCycleDto
   ) {
     return organizations.resetBillingCycle(context(), id, resetBillingCycleDto);
   }
 
-  @Override
-  public ResponseEntity<OrganizationsControllerRequestOffboardV1200Response> platformControllerOffboardV1(
-    String id,
-    OffboardOrganizationDto offboardOrganizationDto
+  @DeleteMapping(
+    value = "/platform/organizations/{id}",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "404" })
+  public ResponseEntity<
+    ApiResponse<OffboardResponseDto>
+  > platformControllerOffboardV1(
+    @PathVariable("id") String id,
+    @Valid @RequestBody OffboardOrganizationDto offboardOrganizationDto
   ) {
     return organizations.offboard(context(), id, offboardOrganizationDto);
   }
 
-  @Override
-  public ResponseEntity<PlatformControllerGetOrganizationV1200Response> platformControllerRestoreV1(
-    String id
-  ) {
+  @PostMapping(
+    value = "/platform/organizations/{id}/restore",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "404" })
+  public ResponseEntity<
+    ApiResponse<PlatformOrganizationResponseDto>
+  > platformControllerRestoreV1(@PathVariable("id") String id) {
     return organizations.restore(context(), id);
   }
 
-  @Override
-  public ResponseEntity<PlatformControllerListUsersV1200Response> platformControllerListUsersV1(
-    BigDecimal page,
-    BigDecimal limit,
-    String sortOrder,
-    String searchTerm,
-    String sortBy,
-    Boolean includeDeleted,
-    UUID organizationId
+  @GetMapping(value = "/platform/users", produces = { "application/json" })
+  @ApiErrors({ "401" })
+  public ResponseEntity<
+    ApiResponse<PagedData<PlatformUserResponseDto>>
+  > platformControllerListUsersV1(
+    @DecimalMin(value = "1") @Valid @RequestParam(
+      value = "page",
+      required = false,
+      defaultValue = "1"
+    ) BigDecimal page,
+    @DecimalMin(value = "1") @DecimalMax(value = "100") @Valid @RequestParam(
+      value = "limit",
+      required = false,
+      defaultValue = "10"
+    ) BigDecimal limit,
+    @Valid @RequestParam(
+      value = "sortOrder",
+      required = false,
+      defaultValue = "ASC"
+    ) String sortOrder,
+    @Valid @RequestParam(
+      value = "searchTerm",
+      required = false
+    ) @Nullable String searchTerm,
+    @Valid @RequestParam(
+      value = "sortBy",
+      required = false,
+      defaultValue = "createdAt"
+    ) String sortBy,
+    @Valid @RequestParam(
+      value = "includeDeleted",
+      required = false,
+      defaultValue = "false"
+    ) Boolean includeDeleted,
+    @Valid @RequestParam(
+      value = "organizationId",
+      required = false
+    ) @Nullable UUID organizationId
   ) {
     return usersRolesFinance.listUsers(
       context(),
@@ -171,15 +302,44 @@ public class PlatformController implements PlatformApi {
     );
   }
 
-  @Override
-  public ResponseEntity<RolesControllerListV1200Response> platformControllerListGlobalRolesV1(
-    BigDecimal page,
-    BigDecimal limit,
-    String sortOrder,
-    String searchTerm,
-    String sortBy,
-    Boolean includeDeleted,
-    UUID organizationId
+  @GetMapping(value = "/platform/roles", produces = { "application/json" })
+  @ApiErrors({ "401" })
+  public ResponseEntity<
+    ApiResponse<PagedData<RoleResponseDto>>
+  > platformControllerListGlobalRolesV1(
+    @DecimalMin(value = "1") @Valid @RequestParam(
+      value = "page",
+      required = false,
+      defaultValue = "1"
+    ) BigDecimal page,
+    @DecimalMin(value = "1") @DecimalMax(value = "100") @Valid @RequestParam(
+      value = "limit",
+      required = false,
+      defaultValue = "10"
+    ) BigDecimal limit,
+    @Valid @RequestParam(
+      value = "sortOrder",
+      required = false,
+      defaultValue = "ASC"
+    ) String sortOrder,
+    @Valid @RequestParam(
+      value = "searchTerm",
+      required = false
+    ) @Nullable String searchTerm,
+    @Valid @RequestParam(
+      value = "sortBy",
+      required = false,
+      defaultValue = "createdAt"
+    ) String sortBy,
+    @Valid @RequestParam(
+      value = "includeDeleted",
+      required = false,
+      defaultValue = "false"
+    ) Boolean includeDeleted,
+    @Valid @RequestParam(
+      value = "organizationId",
+      required = false
+    ) @Nullable UUID organizationId
   ) {
     return usersRolesFinance.listGlobalRoles(
       context(),
@@ -193,40 +353,90 @@ public class PlatformController implements PlatformApi {
     );
   }
 
-  @Override
-  public ResponseEntity<RolesControllerCreateV1201Response> platformControllerCreateGlobalRoleV1(
-    CreateGlobalRoleDto createGlobalRoleDto
+  @PostMapping(
+    value = "/platform/roles",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401" })
+  @ResponseStatus(HttpStatus.CREATED)
+  public ResponseEntity<
+    ApiResponse<RoleResponseDto>
+  > platformControllerCreateGlobalRoleV1(
+    @Valid @RequestBody CreateGlobalRoleDto createGlobalRoleDto
   ) {
     return usersRolesFinance.createGlobalRole(context(), createGlobalRoleDto);
   }
 
-  @Override
-  public ResponseEntity<PlatformControllerGetMetricsV1200Response> platformControllerGetMetricsV1() {
+  @GetMapping(value = "/platform/metrics", produces = { "application/json" })
+  @ApiErrors({ "401" })
+  public ResponseEntity<
+    ApiResponse<PlatformMetricsResponseDto>
+  > platformControllerGetMetricsV1() {
     return usersRolesFinance.getMetrics(context());
   }
 
-  @Override
-  public ResponseEntity<PlatformControllerGetFinanceSnapshotV1200Response> platformControllerGetFinanceSnapshotV1() {
+  @GetMapping(value = "/platform/finance", produces = { "application/json" })
+  @ApiErrors({ "401" })
+  public ResponseEntity<
+    ApiResponse<FinanceSnapshotResponseDto>
+  > platformControllerGetFinanceSnapshotV1() {
     return usersRolesFinance.getFinanceSnapshot(context());
   }
 
-  @Override
-  public ResponseEntity<PlatformControllerListBillingEventsV1200Response> platformControllerListBillingEventsV1(
-    String from,
-    String to
+  @GetMapping(
+    value = "/platform/finance/events",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "400", "401" })
+  public ResponseEntity<
+    ApiResponse<BillingEventsResponseDto>
+  > platformControllerListBillingEventsV1(
+    @NotNull @Valid @RequestParam(value = "from", required = true) String from,
+    @NotNull @Valid @RequestParam(value = "to", required = true) String to
   ) {
     return usersRolesFinance.listBillingEvents(context(), from, to);
   }
 
-  @Override
-  public ResponseEntity<PlatformControllerListPlansV1200Response> platformControllerListPlansV1(
-    BigDecimal page,
-    BigDecimal limit,
-    String sortOrder,
-    String searchTerm,
-    String sortBy,
-    Boolean includeInactive,
-    Boolean includeDeleted
+  @GetMapping(value = "/platform/plans", produces = { "application/json" })
+  @ApiErrors({ "401" })
+  public ResponseEntity<
+    ApiResponse<PagedData<SubscriptionPlanResponseDto>>
+  > platformControllerListPlansV1(
+    @DecimalMin(value = "1") @Valid @RequestParam(
+      value = "page",
+      required = false,
+      defaultValue = "1"
+    ) BigDecimal page,
+    @DecimalMin(value = "1") @DecimalMax(value = "100") @Valid @RequestParam(
+      value = "limit",
+      required = false,
+      defaultValue = "10"
+    ) BigDecimal limit,
+    @Valid @RequestParam(
+      value = "sortOrder",
+      required = false,
+      defaultValue = "ASC"
+    ) String sortOrder,
+    @Valid @RequestParam(
+      value = "searchTerm",
+      required = false
+    ) @Nullable String searchTerm,
+    @Valid @RequestParam(
+      value = "sortBy",
+      required = false,
+      defaultValue = "createdAt"
+    ) String sortBy,
+    @Valid @RequestParam(
+      value = "includeInactive",
+      required = false,
+      defaultValue = "false"
+    ) Boolean includeInactive,
+    @Valid @RequestParam(
+      value = "includeDeleted",
+      required = false,
+      defaultValue = "false"
+    ) Boolean includeDeleted
   ) {
     return plans.listPlans(
       context(),
@@ -240,39 +450,69 @@ public class PlatformController implements PlatformApi {
     );
   }
 
-  @Override
-  public ResponseEntity<PlatformControllerCreatePlanV1201Response> platformControllerCreatePlanV1(
-    CreatePlanDto createPlanDto
+  @PostMapping(
+    value = "/platform/plans",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401" })
+  @ResponseStatus(HttpStatus.CREATED)
+  public ResponseEntity<
+    ApiResponse<SubscriptionPlanResponseDto>
+  > platformControllerCreatePlanV1(
+    @Valid @RequestBody CreatePlanDto createPlanDto
   ) {
     return plans.createPlan(context(), createPlanDto);
   }
 
-  @Override
-  public ResponseEntity<PlatformControllerCreatePlanV1201Response> platformControllerGetPlanV1(
-    String id
-  ) {
+  @GetMapping(value = "/platform/plans/{id}", produces = { "application/json" })
+  @ApiErrors({ "400", "401", "404" })
+  public ResponseEntity<
+    ApiResponse<SubscriptionPlanResponseDto>
+  > platformControllerGetPlanV1(@PathVariable("id") String id) {
     return plans.getPlan(context(), id);
   }
 
-  @Override
-  public ResponseEntity<PlatformControllerCreatePlanV1201Response> platformControllerUpdatePlanV1(
-    String id,
-    UpdatePlanDto updatePlanDto
+  @PatchMapping(
+    value = "/platform/plans/{id}",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "404" })
+  public ResponseEntity<
+    ApiResponse<SubscriptionPlanResponseDto>
+  > platformControllerUpdatePlanV1(
+    @PathVariable("id") String id,
+    @Valid @RequestBody UpdatePlanDto updatePlanDto
   ) {
     return plans.updatePlan(context(), id, updatePlanDto);
   }
 
-  @Override
-  public ResponseEntity<PlatformControllerDeletePlanV1200Response> platformControllerDeletePlanV1(
-    String id
-  ) {
+  @DeleteMapping(
+    value = "/platform/plans/{id}",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "404", "409" })
+  public ResponseEntity<
+    ApiResponse<DeletePlanResponseDto>
+  > platformControllerDeletePlanV1(@PathVariable("id") String id) {
     return plans.deletePlan(context(), id);
   }
 
-  @Override
-  public ResponseEntity<PlatformControllerApplyPlanV1200Response> platformControllerApplyPlanV1(
-    String id,
-    Boolean dryRun
+  @PostMapping(
+    value = "/platform/plans/{id}/apply",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "404" })
+  public ResponseEntity<
+    ApiResponse<ApplyPlanResponseDto>
+  > platformControllerApplyPlanV1(
+    @PathVariable("id") String id,
+    @Valid @RequestParam(
+      value = "dryRun",
+      required = false,
+      defaultValue = "false"
+    ) Boolean dryRun
   ) {
     return plans.applyPlan(context(), id, dryRun);
   }

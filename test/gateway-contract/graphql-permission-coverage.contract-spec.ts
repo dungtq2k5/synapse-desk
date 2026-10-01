@@ -22,6 +22,7 @@
 
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { matchingBracketIndex } from './brackets';
 import { REPO_ROOT } from './gateway';
 import { pendingGraphqlFields } from './pending';
 
@@ -52,30 +53,19 @@ function nodeResolverSources(): string[] {
 }
 
 /**
- * The index of the `)` matching the `(` at `openIndex`, tracking depth.
- *
- * **Required, not a nicety.** `@Query(() => DepartmentPageResponseGqlDto, {
- * name: 'departments', ... })` nests a real `(` `)` pair — the arrow
- * function's own empty parameter list — inside the decorator's argument
- * list. A `[^)]*` scan (this file's first version) stops at that INNER `)`,
- * never reaches `name: 'departments'`, and returns `null` for every
- * `@Query(() => Type, {...})` decorator in the codebase — which is all of
- * them. Measured the hard way: a sabotaged permission code on
- * `DepartmentsResolver` passed this guard clean, because `nodeRootFieldCodes`
- * had already given up and the per-field assertion's `nodeCodes === null`
- * branch returned before comparing anything.
+ * `@Query(() => DepartmentPageResponseGqlDto, { name: 'departments', ... })`
+ * nests a real `(` `)` pair — the arrow function's own empty parameter list
+ * — inside the decorator's argument list. A `[^)]*` scan (this file's first
+ * version) stops at that INNER `)`, never reaches `name: 'departments'`, and
+ * returns `null` for every `@Query(() => Type, {...})` decorator in the
+ * codebase — which is all of them. Measured the hard way: a sabotaged
+ * permission code on `DepartmentsResolver` passed this guard clean, because
+ * `nodeRootFieldCodes` had already given up and the per-field assertion's
+ * `nodeCodes === null` branch returned before comparing anything. {@link
+ * matchingBracketIndex} is the fix, shared rather than re-derived.
  */
 function matchingParenIndex(source: string, openIndex: number): number {
-  let depth = 0;
-  for (let i = openIndex; i < source.length; i++) {
-    if (source[i] === '(') depth++;
-    else if (source[i] === ')') {
-      depth--;
-      if (depth === 0) return i;
-    }
-  }
-
-  return -1;
+  return matchingBracketIndex(source, openIndex, '(', ')');
 }
 
 /**
@@ -180,27 +170,111 @@ function javaRootFieldCodes(
 }
 
 /** The `Query`/`Mutation` root fields the tracked schema declares. */
-function schemaRootFields(): { kind: 'Query' | 'Mutation'; name: string }[] {
-  const schema = readFileSync(
-    join(REPO_ROOT, 'apps/api-gateway/src/schema.gql'),
-    'utf8',
-  );
+/**
+ * The index of the `}` matching the `{` at `openIndex`, treating a
+ * `"""..."""` block comment as opaque.
+ *
+ * **{@link matchingBracketIndex} is not enough here.** That helper assumes
+ * every closing character is balanced by a real opening one — true of Java
+ * generics and decorator parens, where the LANGUAGE guarantees it. GraphQL
+ * SDL's `"""..."""` description is free text, and free text can contain an
+ * UNBALANCED `}` with no matching `{` at all — depth-counting hits it,
+ * drops to zero, and stops just as wrongly as the regex it replaced.
+ * Skipping description content entirely is the actual fix.
+ */
+function matchingBraceSkippingDescriptions(
+  source: string,
+  openIndex: number,
+): number {
+  let depth = 0;
+  for (let index = openIndex; index < source.length; index++) {
+    if (source.startsWith('"""', index)) {
+      const end = source.indexOf('"""', index + 3);
+      index = end < 0 ? source.length : end + 2;
+      continue;
+    }
+
+    if (source[index] === '{') depth++;
+    else if (source[index] === '}') {
+      depth--;
+      if (depth === 0) return index;
+    }
+  }
+
+  return -1;
+}
+
+/**
+ * `source` with every `"""..."""` span removed entirely — delimiters and
+ * content both.
+ *
+ * **The brace-matching fix alone is not enough.** It finds the right END of
+ * the type block, but the per-LINE field regex below still reads whatever
+ * text sits between those braces — and a description line can look exactly
+ * like a field (`  Example:` matches `/^ {2}(\w+)[:(]/` same as `  foo:
+ * String` does). The block has to come out before the lines are split, not
+ * just be bounded correctly.
+ */
+function withoutDescriptions(source: string): string {
+  let result = '';
+  let index = 0;
+
+  while (index < source.length) {
+    const start = source.indexOf('"""', index);
+    if (start < 0) {
+      result += source.slice(index);
+      break;
+    }
+
+    result += source.slice(index, start);
+    const end = source.indexOf('"""', start + 3);
+    index = end < 0 ? source.length : end + 3;
+  }
+
+  return result;
+}
+
+/**
+ * The `Query`/`Mutation` root fields a `schema.gql` SOURCE declares.
+ *
+ * **Not `\{\n([\s\S]*?)\n\}`.** The non-greedy body stops at the FIRST line
+ * that is bare `}` — which a multi-line field description (a `"""..."""`
+ * doc comment, ordinary GraphQL SDL) can contain as plain text. Measured: a
+ * description line reading `Example:` immediately before a stray `}` line
+ * inside the doc comment made this regex read `Example` as a field name and
+ * silently drop every real field after it — same failure shape as the other
+ * two guards in this directory, on a THIRD kind of bracket, and the one
+ * where naive depth-matching ALSO fails (see {@link
+ * matchingBraceSkippingDescriptions}). Takes the schema as a parameter so
+ * the hostile shape can be pinned directly.
+ */
+export function schemaFieldsIn(
+  schema: string,
+): { kind: 'Query' | 'Mutation'; name: string }[] {
   const fields: { kind: 'Query' | 'Mutation'; name: string }[] = [];
 
   for (const kind of ['Query', 'Mutation'] as const) {
-    const block = new RegExp(
-      String.raw`type ${kind} \{\n([\s\S]*?)\n\}`,
-      'u',
-    ).exec(schema);
-    if (!block) continue;
+    const openIndex = schema.indexOf(`type ${kind} {`);
+    if (openIndex < 0) continue;
 
-    for (const line of block[1].split('\n')) {
+    const braceIndex = openIndex + `type ${kind} `.length;
+    const closeIndex = matchingBraceSkippingDescriptions(schema, braceIndex);
+    if (closeIndex < 0) continue;
+
+    const body = withoutDescriptions(schema.slice(braceIndex + 1, closeIndex));
+    for (const line of body.split('\n')) {
       const field = /^ {2}(\w+)[:(]/.exec(line);
       if (field) fields.push({ kind, name: field[1] });
     }
   }
 
   return fields;
+}
+
+function schemaRootFields(): { kind: 'Query' | 'Mutation'; name: string }[] {
+  return schemaFieldsIn(
+    readFileSync(join(REPO_ROOT, 'apps/api-gateway/src/schema.gql'), 'utf8'),
+  );
 }
 
 /**
@@ -286,5 +360,36 @@ describe('GraphQL permission coverage — every gated Node field stays gated in 
     for (const key of DELIBERATELY_UNGATED.keys()) {
       expect(names.has(key)).toBe(true);
     }
+  });
+
+  it('schemaFieldsIn survives a doc comment containing a bare `}` line', () => {
+    // Measured against the PREVIOUS non-greedy `\{\n([\s\S]*?)\n\}`: a doc
+    // comment line reading `Example:` immediately above a stray `}` line
+    // (ordinary text inside a `"""..."""` description) made the block match
+    // end there — `Example` was read as a field name, and every real field
+    // after it silently vanished from `declaredTags`'s universe. Root
+    // fields going missing from THIS scan is the direction that matters
+    // (`skip-list.contract-spec.ts`'s own "a row DECLARES" vs "the field
+    // EXISTS" distinction) — the exact failure mode this guard exists to
+    // catch, now caused by the guard's own reader instead.
+    const hostile = `type Query {
+  """
+  Example:
+}
+  """
+  foo: String
+  bar: String
+}
+
+type Mutation {
+  baz: String
+}
+`;
+
+    expect(schemaFieldsIn(hostile)).toEqual([
+      { kind: 'Query', name: 'foo' },
+      { kind: 'Query', name: 'bar' },
+      { kind: 'Mutation', name: 'baz' },
+    ]);
   });
 });

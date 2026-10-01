@@ -28,7 +28,9 @@ class NatsEnvelopeTest {
   @Test
   void aNestEnvelopeWithPatternAndDataIsUnwrappedToItsDataField() {
     byte[] payload =
-        "{\"pattern\":\"ticket.created\",\"data\":{\"ticketId\":\"t-2\"}}".getBytes(StandardCharsets.UTF_8);
+      "{\"pattern\":\"ticket.created\",\"data\":{\"ticketId\":\"t-2\"}}".getBytes(
+        StandardCharsets.UTF_8
+      );
 
     JsonNode event = NatsEnvelope.unwrap(JSON, payload);
 
@@ -37,12 +39,17 @@ class NatsEnvelopeTest {
 
   @Test
   void malformedJsonUnwrapsToNullRatherThanThrowing() {
-    assertThat(NatsEnvelope.unwrap(JSON, "not json".getBytes(StandardCharsets.UTF_8))).isNull();
+    assertThat(
+      NatsEnvelope.unwrap(JSON, "not json".getBytes(StandardCharsets.UTF_8))
+    ).isNull();
   }
 
   @Test
   void organizationIdOfReadsTheStringField() {
-    JsonNode event = NatsEnvelope.unwrap(JSON, "{\"organizationId\":\"org-1\"}".getBytes(StandardCharsets.UTF_8));
+    JsonNode event = NatsEnvelope.unwrap(
+      JSON,
+      "{\"organizationId\":\"org-1\"}".getBytes(StandardCharsets.UTF_8)
+    );
 
     assertThat(NatsEnvelope.organizationIdOf(event)).isEqualTo("org-1");
   }
@@ -54,7 +61,10 @@ class NatsEnvelopeTest {
 
   @Test
   void stringFieldIsNullWhenTheFieldIsAbsentOrNotAString() {
-    JsonNode event = NatsEnvelope.unwrap(JSON, "{\"count\":5}".getBytes(StandardCharsets.UTF_8));
+    JsonNode event = NatsEnvelope.unwrap(
+      JSON,
+      "{\"count\":5}".getBytes(StandardCharsets.UTF_8)
+    );
 
     assertThat(NatsEnvelope.stringField(event, "missing")).isNull();
     assertThat(NatsEnvelope.stringField(event, "count")).isNull();

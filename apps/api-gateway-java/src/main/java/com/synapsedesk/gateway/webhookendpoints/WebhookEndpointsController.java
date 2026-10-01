@@ -3,7 +3,6 @@ package com.synapsedesk.gateway.webhookendpoints;
 import com.synapsedesk.gateway.auth.CurrentRequest;
 import com.synapsedesk.gateway.auth.CurrentUser;
 import com.synapsedesk.gateway.auth.RequestContext;
-import com.synapsedesk.gateway.generated.api.WebhookEndpointsApi;
 import com.synapsedesk.gateway.generated.model.CreateWebhookEndpointDto;
 import com.synapsedesk.gateway.generated.model.CurrentUserResponseDto.PermissionCodesEnum;
 import com.synapsedesk.gateway.generated.model.DeleteWebhookEndpointResponseDto;
@@ -13,19 +12,19 @@ import com.synapsedesk.gateway.generated.model.WebhookDeliveriesResponseDto;
 import com.synapsedesk.gateway.generated.model.WebhookDeliveryResponseDto;
 import com.synapsedesk.gateway.generated.model.WebhookEndpointResponseDto;
 import com.synapsedesk.gateway.generated.model.WebhookEndpointWithSecretResponseDto;
-import com.synapsedesk.gateway.generated.model.WebhookEndpointsControllerCreateV1200Response;
-import com.synapsedesk.gateway.generated.model.WebhookEndpointsControllerDeleteV1200Response;
-import com.synapsedesk.gateway.generated.model.WebhookEndpointsControllerGetV1200Response;
-import com.synapsedesk.gateway.generated.model.WebhookEndpointsControllerListDeliveriesV1200Response;
-import com.synapsedesk.gateway.generated.model.WebhookEndpointsControllerListEventTypesV1200Response;
-import com.synapsedesk.gateway.generated.model.WebhookEndpointsControllerListV1200Response;
-import com.synapsedesk.gateway.generated.model.WebhookEndpointsControllerTestV1200Response;
 import com.synapsedesk.gateway.generated.model.WebhookEndpointsResponseDto;
 import com.synapsedesk.gateway.generated.model.WebhookEventTypesResponseDto;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
+import com.synapsedesk.gateway.openapi.ApiErrors;
 import com.synapsedesk.gateway.security.RequirePermission;
+import com.synapsedesk.gateway.web.ApiPaths;
+import com.synapsedesk.gateway.web.ApiResponse;
 import com.synapsedesk.gateway.web.CachedBodyRequest;
 import io.grpc.stub.MetadataUtils;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -35,6 +34,16 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 import synapsedesk.notification.Notification.CreateWebhookEndpointRequest;
@@ -78,9 +87,17 @@ import tools.jackson.databind.ObjectMapper;
  * actually named the key — read via {@link CachedBodyRequest}, since the
  * bound DTO's {@code eventTypes} defaults to an empty list whether the key
  * was sent or not.
+ *
+ * <p><b>Migrated off `WebhookEndpointsApi`.</b> `create`, `rotateSecret` and
+ * `test` all answer 201, not the generated interface's documented default of
+ * 200 — {@code @ResponseStatus} is what tells springdoc that; this matches
+ * what the controller already returned at runtime before the flip.
  */
+@Tag(name = "Webhook endpoints")
 @RestController
-public class WebhookEndpointsController implements WebhookEndpointsApi {
+@RequestMapping(ApiPaths.V1)
+@Validated
+public class WebhookEndpointsController {
 
   private static final long DEADLINE_SECONDS = 5;
 
@@ -152,9 +169,12 @@ public class WebhookEndpointsController implements WebhookEndpointsApi {
     this.json = json;
   }
 
-  @Override
+  @GetMapping(value = "/webhook-endpoints", produces = { "application/json" })
+  @ApiErrors({ "401", "403" })
   @RequirePermission(PermissionCodesEnum.ORGANIZATION_READ)
-  public ResponseEntity<WebhookEndpointsControllerListV1200Response> webhookEndpointsControllerListV1() {
+  public ResponseEntity<
+    ApiResponse<WebhookEndpointsResponseDto>
+  > webhookEndpointsControllerListV1() {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     var response = withMetadata(context).listWebhookEndpoints(
@@ -169,18 +189,18 @@ public class WebhookEndpointsController implements WebhookEndpointsApi {
         .toList()
     );
 
-    return ResponseEntity.ok(
-      new WebhookEndpointsControllerListV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(data)
-    );
+    return ResponseEntity.ok(ApiResponse.of(200, "OK", data));
   }
 
-  @Override
+  @GetMapping(
+    value = "/webhook-endpoints/event-types",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "401", "403" })
   @RequirePermission(PermissionCodesEnum.ORGANIZATION_READ)
-  public ResponseEntity<WebhookEndpointsControllerListEventTypesV1200Response> webhookEndpointsControllerListEventTypesV1() {
+  public ResponseEntity<
+    ApiResponse<WebhookEventTypesResponseDto>
+  > webhookEndpointsControllerListEventTypesV1() {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     ListWebhookEventTypesResponse response = withMetadata(
@@ -196,39 +216,39 @@ public class WebhookEndpointsController implements WebhookEndpointsApi {
         .toList()
     );
 
-    return ResponseEntity.ok(
-      new WebhookEndpointsControllerListEventTypesV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(data)
-    );
+    return ResponseEntity.ok(ApiResponse.of(200, "OK", data));
   }
 
-  @Override
+  @GetMapping(
+    value = "/webhook-endpoints/{id}",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.ORGANIZATION_READ)
-  public ResponseEntity<WebhookEndpointsControllerGetV1200Response> webhookEndpointsControllerGetV1(
-    String id
-  ) {
+  public ResponseEntity<
+    ApiResponse<WebhookEndpointResponseDto>
+  > webhookEndpointsControllerGetV1(@PathVariable("id") String id) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     WebhookEndpointResponse response = withMetadata(context).getWebhookEndpoint(
       WebhookEndpointIdRequest.newBuilder().setEndpointId(id).build()
     );
 
-    return ResponseEntity.ok(
-      new WebhookEndpointsControllerGetV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(toDto(response))
-    );
+    return ResponseEntity.ok(ApiResponse.of(200, "OK", toDto(response)));
   }
 
-  @Override
+  @PostMapping(
+    value = "/webhook-endpoints",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403" })
+  @ResponseStatus(HttpStatus.CREATED)
   @RequirePermission(PermissionCodesEnum.ORGANIZATION_UPDATE)
-  public ResponseEntity<WebhookEndpointsControllerCreateV1200Response> webhookEndpointsControllerCreateV1(
-    CreateWebhookEndpointDto createWebhookEndpointDto
+  public ResponseEntity<
+    ApiResponse<WebhookEndpointWithSecretResponseDto>
+  > webhookEndpointsControllerCreateV1(
+    @Valid @RequestBody CreateWebhookEndpointDto createWebhookEndpointDto
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -251,26 +271,30 @@ public class WebhookEndpointsController implements WebhookEndpointsApi {
     ).createWebhookEndpoint(wire.build());
 
     return ResponseEntity.status(HttpStatus.CREATED).body(
-      new WebhookEndpointsControllerCreateV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(201))
-        .message("OK")
-        .data(toWithSecretDto(response))
+      ApiResponse.of(201, "OK", toWithSecretDto(response))
     );
   }
 
-  @Override
+  @PatchMapping(
+    value = "/webhook-endpoints/{id}",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.ORGANIZATION_UPDATE)
-  public ResponseEntity<WebhookEndpointsControllerGetV1200Response> webhookEndpointsControllerUpdateV1(
-    String id,
-    UpdateWebhookEndpointDto updateWebhookEndpointDto
+  public ResponseEntity<
+    ApiResponse<WebhookEndpointResponseDto>
+  > webhookEndpointsControllerUpdateV1(
+    @PathVariable("id") String id,
+    @Valid @RequestBody UpdateWebhookEndpointDto updateWebhookEndpointDto
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     UpdateWebhookEndpointRequest.Builder wire =
       UpdateWebhookEndpointRequest.newBuilder().setEndpointId(id);
-    if (updateWebhookEndpointDto.getUrl() != null) {
-      wire.setUrl(updateWebhookEndpointDto.getUrl().toString());
+    var url = updateWebhookEndpointDto.getUrl();
+    if (url != null) {
+      wire.setUrl(url.toString());
     }
     if (updateWebhookEndpointDto.getDescription() != null) {
       wire.setDescription(updateWebhookEndpointDto.getDescription());
@@ -304,20 +328,18 @@ public class WebhookEndpointsController implements WebhookEndpointsApi {
       context
     ).updateWebhookEndpoint(wire.build());
 
-    return ResponseEntity.ok(
-      new WebhookEndpointsControllerGetV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(toDto(response))
-    );
+    return ResponseEntity.ok(ApiResponse.of(200, "OK", toDto(response)));
   }
 
-  @Override
+  @DeleteMapping(
+    value = "/webhook-endpoints/{id}",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.ORGANIZATION_UPDATE)
-  public ResponseEntity<WebhookEndpointsControllerDeleteV1200Response> webhookEndpointsControllerDeleteV1(
-    String id
-  ) {
+  public ResponseEntity<
+    ApiResponse<DeleteWebhookEndpointResponseDto>
+  > webhookEndpointsControllerDeleteV1(@PathVariable("id") String id) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     DeleteWebhookEndpointResponse response = withMetadata(
@@ -327,19 +349,24 @@ public class WebhookEndpointsController implements WebhookEndpointsApi {
     );
 
     return ResponseEntity.ok(
-      new WebhookEndpointsControllerDeleteV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(new DeleteWebhookEndpointResponseDto(response.getDeleted()))
+      ApiResponse.of(
+        200,
+        "OK",
+        new DeleteWebhookEndpointResponseDto(response.getDeleted())
+      )
     );
   }
 
-  @Override
+  @PostMapping(
+    value = "/webhook-endpoints/{id}/rotate-secret",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403", "404" })
+  @ResponseStatus(HttpStatus.CREATED)
   @RequirePermission(PermissionCodesEnum.ORGANIZATION_UPDATE)
-  public ResponseEntity<WebhookEndpointsControllerCreateV1200Response> webhookEndpointsControllerRotateSecretV1(
-    String id
-  ) {
+  public ResponseEntity<
+    ApiResponse<WebhookEndpointWithSecretResponseDto>
+  > webhookEndpointsControllerRotateSecretV1(@PathVariable("id") String id) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     WebhookEndpointWithSecretResponse response = withMetadata(
@@ -349,19 +376,20 @@ public class WebhookEndpointsController implements WebhookEndpointsApi {
     );
 
     return ResponseEntity.status(HttpStatus.CREATED).body(
-      new WebhookEndpointsControllerCreateV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(201))
-        .message("OK")
-        .data(toWithSecretDto(response))
+      ApiResponse.of(201, "OK", toWithSecretDto(response))
     );
   }
 
-  @Override
+  @PostMapping(
+    value = "/webhook-endpoints/{id}/test",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403", "404" })
+  @ResponseStatus(HttpStatus.CREATED)
   @RequirePermission(PermissionCodesEnum.ORGANIZATION_UPDATE)
-  public ResponseEntity<WebhookEndpointsControllerTestV1200Response> webhookEndpointsControllerTestV1(
-    String id
-  ) {
+  public ResponseEntity<
+    ApiResponse<TestWebhookResponseDto>
+  > webhookEndpointsControllerTestV1(@PathVariable("id") String id) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     TestWebhookEndpointResponse response = withMetadata(
@@ -379,19 +407,25 @@ public class WebhookEndpointsController implements WebhookEndpointsApi {
     );
 
     return ResponseEntity.status(HttpStatus.CREATED).body(
-      new WebhookEndpointsControllerTestV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(201))
-        .message("OK")
-        .data(data)
+      ApiResponse.of(201, "OK", data)
     );
   }
 
-  @Override
+  @GetMapping(
+    value = "/webhook-endpoints/{id}/deliveries",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.ORGANIZATION_READ)
-  public ResponseEntity<WebhookEndpointsControllerListDeliveriesV1200Response> webhookEndpointsControllerListDeliveriesV1(
-    String id,
-    BigDecimal limit
+  public ResponseEntity<
+    ApiResponse<WebhookDeliveriesResponseDto>
+  > webhookEndpointsControllerListDeliveriesV1(
+    @PathVariable("id") String id,
+    @DecimalMin(value = "1") @DecimalMax(value = "100") @Valid @RequestParam(
+      value = "limit",
+      required = false,
+      defaultValue = "50"
+    ) BigDecimal limit
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -412,13 +446,7 @@ public class WebhookEndpointsController implements WebhookEndpointsApi {
         .toList()
     );
 
-    return ResponseEntity.ok(
-      new WebhookEndpointsControllerListDeliveriesV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(data)
-    );
+    return ResponseEntity.ok(ApiResponse.of(200, "OK", data));
   }
 
   private tools.jackson.databind.JsonNode rawBody() {

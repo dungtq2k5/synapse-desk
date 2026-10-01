@@ -5,25 +5,25 @@ import com.synapsedesk.gateway.auth.CurrentUser;
 import com.synapsedesk.gateway.auth.RequestContext;
 import com.synapsedesk.gateway.auth.UserMapper;
 import com.synapsedesk.gateway.cache.CacheService;
-import com.synapsedesk.gateway.generated.api.DepartmentsApi;
 import com.synapsedesk.gateway.generated.model.AddDepartmentMembersDto;
 import com.synapsedesk.gateway.generated.model.AddDepartmentMembersResponseDto;
-import com.synapsedesk.gateway.generated.model.AuthControllerForgotPasswordV1202Response;
 import com.synapsedesk.gateway.generated.model.CreateDepartmentDto;
 import com.synapsedesk.gateway.generated.model.CurrentUserResponseDto.PermissionCodesEnum;
 import com.synapsedesk.gateway.generated.model.DepartmentMemberResponseDto;
 import com.synapsedesk.gateway.generated.model.DepartmentResponseDto;
-import com.synapsedesk.gateway.generated.model.DepartmentsControllerAddMembersV1200Response;
-import com.synapsedesk.gateway.generated.model.DepartmentsControllerCreateV1201Response;
-import com.synapsedesk.gateway.generated.model.DepartmentsControllerListMembersV1200Response;
-import com.synapsedesk.gateway.generated.model.DepartmentsControllerListMembersV1200ResponseData;
-import com.synapsedesk.gateway.generated.model.DepartmentsControllerListV1200Response;
-import com.synapsedesk.gateway.generated.model.DepartmentsControllerListV1200ResponseData;
-import com.synapsedesk.gateway.generated.model.InvitationsControllerListV1200ResponseDataMeta;
 import com.synapsedesk.gateway.generated.model.UpdateDepartmentDto;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
+import com.synapsedesk.gateway.openapi.ApiErrors;
 import com.synapsedesk.gateway.security.RequirePermission;
+import com.synapsedesk.gateway.web.ApiPaths;
+import com.synapsedesk.gateway.web.ApiResponse;
+import com.synapsedesk.gateway.web.PageMeta;
+import com.synapsedesk.gateway.web.PagedData;
 import io.grpc.stub.MetadataUtils;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -34,6 +34,18 @@ import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.lang.Nullable;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 import synapsedesk.auth.Common.PageRequest;
@@ -64,15 +76,26 @@ import synapsedesk.auth.DepartmentServiceGrpc;
  * there is no interceptor to run ahead of here, {@code list}'s own body IS
  * the cache lookup — but the ORDER is the property that matters: this reads
  * the RAW query parameter and refuses BEFORE {@code cache.buildKey}/
- * {@code cache.wrap} ever run, so a caller without the permission can never
- * be served an entry a privileged caller's `?includeDeleted=true` warmed.
+ * {@code cache.wrapTyped} ever run, so a caller without the permission can
+ * never be served an entry a privileged caller's `?includeDeleted=true`
+ * warmed.
  *
  * <p>
  * No write here evicts the cache — known gap 42, same as every other
  * `@Cacheable` route ported so far.
+ *
+ * <p><b>Migrated off `DepartmentsApi`.</b> `create` answers 201 —
+ * {@code @ResponseStatus} is what tells springdoc that. `list`'s cache goes
+ * through {@link CacheService#wrapTyped}, the same generic-safe path
+ * `RolesController.list` established — a bare {@code Class<T>} would erase
+ * `ApiResponse<PagedData<DepartmentResponseDto>>`'s own type arguments on a
+ * cache HIT.
  */
+@Tag(name = "Departments")
 @RestController
-public class DepartmentsController implements DepartmentsApi {
+@RequestMapping(ApiPaths.V1)
+@Validated
+public class DepartmentsController {
 
   private static final long DEADLINE_SECONDS = 5;
   private static final String CACHE_SCOPE = "departments";
@@ -92,15 +115,41 @@ public class DepartmentsController implements DepartmentsApi {
     this.cache = cache;
   }
 
-  @Override
+  @GetMapping(value = "/departments", produces = { "application/json" })
+  @ApiErrors({ "401", "403" })
   @RequirePermission(PermissionCodesEnum.DEPARTMENT_READ)
-  public ResponseEntity<DepartmentsControllerListV1200Response> departmentsControllerListV1(
-    BigDecimal page,
-    BigDecimal limit,
-    String sortOrder,
-    String searchTerm,
-    String sortBy,
-    Boolean includeDeleted
+  public ResponseEntity<
+    ApiResponse<PagedData<DepartmentResponseDto>>
+  > departmentsControllerListV1(
+    @DecimalMin(value = "1") @Valid @RequestParam(
+      value = "page",
+      required = false,
+      defaultValue = "1"
+    ) BigDecimal page,
+    @DecimalMin(value = "1") @DecimalMax(value = "100") @Valid @RequestParam(
+      value = "limit",
+      required = false,
+      defaultValue = "10"
+    ) BigDecimal limit,
+    @Valid @RequestParam(
+      value = "sortOrder",
+      required = false,
+      defaultValue = "ASC"
+    ) String sortOrder,
+    @Valid @RequestParam(
+      value = "searchTerm",
+      required = false
+    ) @Nullable String searchTerm,
+    @Valid @RequestParam(
+      value = "sortBy",
+      required = false,
+      defaultValue = "createdAt"
+    ) String sortBy,
+    @Valid @RequestParam(
+      value = "includeDeleted",
+      required = false,
+      defaultValue = "false"
+    ) Boolean includeDeleted
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -135,10 +184,12 @@ public class DepartmentsController implements DepartmentsApi {
       rawParams
     );
 
-    DepartmentsControllerListV1200Response envelope = cache.wrap(
+    ApiResponse<PagedData<DepartmentResponseDto>> envelope = cache.wrapTyped(
       key,
       LIST_CACHE_TTL_SECONDS,
-      DepartmentsControllerListV1200Response.class,
+      new tools.jackson.core.type.TypeReference<
+        ApiResponse<PagedData<DepartmentResponseDto>>
+      >() {},
       () -> {
         PageRequest.Builder pageRequest = PageRequest.newBuilder()
           .setPage(page.intValue())
@@ -162,33 +213,28 @@ public class DepartmentsController implements DepartmentsApi {
             .build()
         );
 
-        DepartmentsControllerListV1200ResponseData data =
-          new DepartmentsControllerListV1200ResponseData()
-            .items(
-              response
-                .getItemsList()
-                .stream()
-                .map(DepartmentsController::toDepartmentResponseDto)
-                .toList()
-            )
-            .meta(toMetaDto(response.getMeta()));
+        PagedData<DepartmentResponseDto> data = new PagedData<>(
+          response
+            .getItemsList()
+            .stream()
+            .map(DepartmentsController::toDepartmentResponseDto)
+            .toList(),
+          PageMeta.from(response.getMeta())
+        );
 
-        return new DepartmentsControllerListV1200Response()
-          .success(true)
-          .statusCode(BigDecimal.valueOf(200))
-          .message("OK")
-          .data(data);
+        return ApiResponse.of(200, "OK", data);
       }
     );
 
     return ResponseEntity.ok(envelope);
   }
 
-  @Override
+  @GetMapping(value = "/departments/{id}", produces = { "application/json" })
+  @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.DEPARTMENT_READ)
-  public ResponseEntity<DepartmentsControllerCreateV1201Response> departmentsControllerGetV1(
-    String id
-  ) {
+  public ResponseEntity<
+    ApiResponse<DepartmentResponseDto>
+  > departmentsControllerGetV1(@PathVariable("id") String id) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     DepartmentResponse response = withMetadata(context).getDepartment(
@@ -198,10 +244,18 @@ public class DepartmentsController implements DepartmentsApi {
     return okDepartment(response, "OK", 200);
   }
 
-  @Override
+  @PostMapping(
+    value = "/departments",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403" })
+  @ResponseStatus(HttpStatus.CREATED)
   @RequirePermission(PermissionCodesEnum.DEPARTMENT_CREATE)
-  public ResponseEntity<DepartmentsControllerCreateV1201Response> departmentsControllerCreateV1(
-    CreateDepartmentDto createDepartmentDto
+  public ResponseEntity<
+    ApiResponse<DepartmentResponseDto>
+  > departmentsControllerCreateV1(
+    @Valid @RequestBody CreateDepartmentDto createDepartmentDto
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -220,11 +274,18 @@ public class DepartmentsController implements DepartmentsApi {
     return okDepartment(response, "OK", 201);
   }
 
-  @Override
+  @PatchMapping(
+    value = "/departments/{id}",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.DEPARTMENT_UPDATE)
-  public ResponseEntity<DepartmentsControllerCreateV1201Response> departmentsControllerUpdateV1(
-    String id,
-    UpdateDepartmentDto updateDepartmentDto
+  public ResponseEntity<
+    ApiResponse<DepartmentResponseDto>
+  > departmentsControllerUpdateV1(
+    @PathVariable("id") String id,
+    @Valid @RequestBody UpdateDepartmentDto updateDepartmentDto
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -244,10 +305,11 @@ public class DepartmentsController implements DepartmentsApi {
     return okDepartment(response, "OK", 200);
   }
 
-  @Override
+  @DeleteMapping(value = "/departments/{id}", produces = { "application/json" })
+  @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.DEPARTMENT_DELETE)
-  public ResponseEntity<AuthControllerForgotPasswordV1202Response> departmentsControllerRemoveV1(
-    String id
+  public ResponseEntity<ApiResponse<Void>> departmentsControllerRemoveV1(
+    @PathVariable("id") String id
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -255,20 +317,18 @@ public class DepartmentsController implements DepartmentsApi {
       DepartmentIdRequest.newBuilder().setId(id).build()
     );
 
-    return ResponseEntity.ok(
-      new AuthControllerForgotPasswordV1202Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("Department deleted")
-        .data(null)
-    );
+    return ResponseEntity.ok(ApiResponse.of(200, "Department deleted", null));
   }
 
-  @Override
+  @PostMapping(
+    value = "/departments/{id}/restore",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.DEPARTMENT_DELETE)
-  public ResponseEntity<DepartmentsControllerCreateV1201Response> departmentsControllerRestoreV1(
-    String id
-  ) {
+  public ResponseEntity<
+    ApiResponse<DepartmentResponseDto>
+  > departmentsControllerRestoreV1(@PathVariable("id") String id) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     DepartmentResponse response = withMetadata(context).restoreDepartment(
@@ -278,15 +338,40 @@ public class DepartmentsController implements DepartmentsApi {
     return okDepartment(response, "Department restored", 200);
   }
 
-  @Override
+  @GetMapping(
+    value = "/departments/{id}/members",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.DEPARTMENT_READ)
-  public ResponseEntity<DepartmentsControllerListMembersV1200Response> departmentsControllerListMembersV1(
-    String id,
-    BigDecimal page,
-    BigDecimal limit,
-    String sortOrder,
-    String searchTerm,
-    String sortBy
+  public ResponseEntity<
+    ApiResponse<PagedData<DepartmentMemberResponseDto>>
+  > departmentsControllerListMembersV1(
+    @PathVariable("id") String id,
+    @DecimalMin(value = "1") @Valid @RequestParam(
+      value = "page",
+      required = false,
+      defaultValue = "1"
+    ) BigDecimal page,
+    @DecimalMin(value = "1") @DecimalMax(value = "100") @Valid @RequestParam(
+      value = "limit",
+      required = false,
+      defaultValue = "10"
+    ) BigDecimal limit,
+    @Valid @RequestParam(
+      value = "sortOrder",
+      required = false,
+      defaultValue = "ASC"
+    ) String sortOrder,
+    @Valid @RequestParam(
+      value = "searchTerm",
+      required = false
+    ) @Nullable String searchTerm,
+    @Valid @RequestParam(
+      value = "sortBy",
+      required = false,
+      defaultValue = "assignedAt"
+    ) String sortBy
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -312,31 +397,30 @@ public class DepartmentsController implements DepartmentsApi {
         .build()
     );
 
-    DepartmentsControllerListMembersV1200ResponseData data =
-      new DepartmentsControllerListMembersV1200ResponseData()
-        .items(
-          response
-            .getItemsList()
-            .stream()
-            .map(DepartmentsController::toDepartmentMemberResponseDto)
-            .toList()
-        )
-        .meta(toMetaDto(response.getMeta()));
-
-    return ResponseEntity.ok(
-      new DepartmentsControllerListMembersV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(data)
+    PagedData<DepartmentMemberResponseDto> data = new PagedData<>(
+      response
+        .getItemsList()
+        .stream()
+        .map(DepartmentsController::toDepartmentMemberResponseDto)
+        .toList(),
+      PageMeta.from(response.getMeta())
     );
+
+    return ResponseEntity.ok(ApiResponse.of(200, "OK", data));
   }
 
-  @Override
+  @PostMapping(
+    value = "/departments/{id}/members",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.DEPARTMENT_MEMBER_ASSIGN)
-  public ResponseEntity<DepartmentsControllerAddMembersV1200Response> departmentsControllerAddMembersV1(
-    String id,
-    AddDepartmentMembersDto addDepartmentMembersDto
+  public ResponseEntity<
+    ApiResponse<AddDepartmentMembersResponseDto>
+  > departmentsControllerAddMembersV1(
+    @PathVariable("id") String id,
+    @Valid @RequestBody AddDepartmentMembersDto addDepartmentMembersDto
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -355,24 +439,26 @@ public class DepartmentsController implements DepartmentsApi {
     var response = withMetadata(context).addDepartmentMembers(wire);
 
     return ResponseEntity.ok(
-      new DepartmentsControllerAddMembersV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("Members assigned")
-        .data(
-          new AddDepartmentMembersResponseDto(
-            BigDecimal.valueOf(response.getAddedCount()),
-            BigDecimal.valueOf(response.getUpdatedCount())
-          )
+      ApiResponse.of(
+        200,
+        "Members assigned",
+        new AddDepartmentMembersResponseDto(
+          BigDecimal.valueOf(response.getAddedCount()),
+          BigDecimal.valueOf(response.getUpdatedCount())
         )
+      )
     );
   }
 
-  @Override
+  @DeleteMapping(
+    value = "/departments/{id}/members/{userId}",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.DEPARTMENT_MEMBER_ASSIGN)
-  public ResponseEntity<AuthControllerForgotPasswordV1202Response> departmentsControllerRemoveMemberV1(
-    String id,
-    String userId
+  public ResponseEntity<ApiResponse<Void>> departmentsControllerRemoveMemberV1(
+    @PathVariable("id") String id,
+    @PathVariable("userId") String userId
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -383,13 +469,7 @@ public class DepartmentsController implements DepartmentsApi {
         .build()
     );
 
-    return ResponseEntity.ok(
-      new AuthControllerForgotPasswordV1202Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("Member removed")
-        .data(null)
-    );
+    return ResponseEntity.ok(ApiResponse.of(200, "Member removed", null));
   }
 
   /**
@@ -414,17 +494,11 @@ public class DepartmentsController implements DepartmentsApi {
     );
   }
 
-  private static ResponseEntity<DepartmentsControllerCreateV1201Response> okDepartment(
-    DepartmentResponse response,
-    String message,
-    int status
-  ) {
+  private static ResponseEntity<
+    ApiResponse<DepartmentResponseDto>
+  > okDepartment(DepartmentResponse response, String message, int status) {
     return ResponseEntity.status(status).body(
-      new DepartmentsControllerCreateV1201Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(status))
-        .message(message)
-        .data(toDepartmentResponseDto(response))
+      ApiResponse.of(status, message, toDepartmentResponseDto(response))
     );
   }
 
@@ -458,18 +532,6 @@ public class DepartmentsController implements DepartmentsApi {
       member.getIsPrimary(),
       member.hasAssignedByName() ? member.getAssignedByName() : null,
       toOffsetDateTime(member.getAssignedAt())
-    );
-  }
-
-  private static InvitationsControllerListV1200ResponseDataMeta toMetaDto(
-    synapsedesk.auth.Common.PageMeta meta
-  ) {
-    return new InvitationsControllerListV1200ResponseDataMeta(
-      BigDecimal.valueOf(meta.getTotalItems()),
-      BigDecimal.valueOf(meta.getItemCount()),
-      BigDecimal.valueOf(meta.getItemsPerPage()),
-      BigDecimal.valueOf(meta.getTotalPages()),
-      BigDecimal.valueOf(meta.getCurrentPage())
     );
   }
 

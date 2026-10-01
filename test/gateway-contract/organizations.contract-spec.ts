@@ -385,10 +385,9 @@ describe('organizations', () => {
         .on('DocumentService/GetStorageUsage')
         .fail(GrpcStatus.UNAVAILABLE, 'ingestion unavailable');
 
-      const response = await new Session(gateway.baseUrl).get(
-        `${API}/organizations/current/usage`,
-        headers(['organization.read']),
-      );
+      const response = await new Session(gateway.baseUrl).get<{
+        data: { storage: { unavailableReason?: string } };
+      }>(`${API}/organizations/current/usage`, headers(['organization.read']));
 
       expect(response.status).toBe(200);
       expect(response.body).toMatchObject({

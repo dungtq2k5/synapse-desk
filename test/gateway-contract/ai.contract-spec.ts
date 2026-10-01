@@ -125,7 +125,9 @@ describe('ai', () => {
           '[http:402] Your AI allowance for this billing cycle is exhausted',
         );
 
-      const response = await new Session(gateway.baseUrl).post(
+      const response = await new Session(gateway.baseUrl).post<{
+        error: string;
+      }>(
         `${API}/tickets/${TICKET}/ai/summary`,
         undefined,
         headers(['ticket.ai.use']),

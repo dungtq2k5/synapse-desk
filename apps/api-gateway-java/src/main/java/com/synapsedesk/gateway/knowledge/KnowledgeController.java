@@ -3,22 +3,36 @@ package com.synapsedesk.gateway.knowledge;
 import com.synapsedesk.gateway.auth.CurrentRequest;
 import com.synapsedesk.gateway.auth.CurrentUser;
 import com.synapsedesk.gateway.auth.RequestContext;
-import com.synapsedesk.gateway.generated.api.KnowledgeApi;
+import com.synapsedesk.gateway.generated.model.KnowledgeArticleDetailResponseDto;
+import com.synapsedesk.gateway.generated.model.KnowledgeArticleResponseDto;
 import com.synapsedesk.gateway.generated.model.KnowledgeAskDto;
-import com.synapsedesk.gateway.generated.model.KnowledgeControllerAskV1200Response;
-import com.synapsedesk.gateway.generated.model.KnowledgeControllerGetArticleV1200Response;
-import com.synapsedesk.gateway.generated.model.KnowledgeControllerListArticlesV1200Response;
-import com.synapsedesk.gateway.generated.model.KnowledgeControllerListArticlesV1200ResponseData;
-import com.synapsedesk.gateway.generated.model.KnowledgeControllerSearchV1200Response;
+import com.synapsedesk.gateway.generated.model.KnowledgeAskResponseDto;
 import com.synapsedesk.gateway.generated.model.KnowledgeSearchDto;
+import com.synapsedesk.gateway.generated.model.KnowledgeSearchResponseDto;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
+import com.synapsedesk.gateway.openapi.ApiErrors;
 import com.synapsedesk.gateway.throttle.RouteThrottle;
 import com.synapsedesk.gateway.throttle.ThrottleOverride;
 import com.synapsedesk.gateway.throttle.ThrottlerTiers;
+import com.synapsedesk.gateway.web.ApiPaths;
+import com.synapsedesk.gateway.web.ApiResponse;
+import com.synapsedesk.gateway.web.PageMeta;
+import com.synapsedesk.gateway.web.PagedData;
 import io.grpc.stub.MetadataUtils;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import java.math.BigDecimal;
 import org.springframework.http.ResponseEntity;
 import org.springframework.lang.Nullable;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 import synapsedesk.auth.Common.PageRequest;
@@ -69,9 +83,16 @@ import synapsedesk.rag.RagServiceGrpc;
  * `ask` — {@link com.synapsedesk.gateway.error.GrpcStatusMapping} already
  * maps that marker generically, so nothing route-specific is needed here.
  * `search` instead returns 200 with {@code degraded: LEXICAL_ONLY} set.
+ *
+ * <p><b>Migrated off `KnowledgeApi`.</b> `listArticles`'s meta bypasses
+ * `KnowledgeMapper.toMetaDto` (the artifact-adjacent borrowed type) in
+ * favor of {@link PageMeta#from}.
  */
+@Tag(name = "Knowledge")
 @RestController
-public class KnowledgeController implements KnowledgeApi {
+@RequestMapping(ApiPaths.V1)
+@Validated
+public class KnowledgeController {
 
   private static final long DEADLINE_SECONDS = 5;
 
@@ -89,13 +110,35 @@ public class KnowledgeController implements KnowledgeApi {
     this.currentUser = currentUser;
   }
 
-  @Override
-  public ResponseEntity<KnowledgeControllerListArticlesV1200Response> knowledgeControllerListArticlesV1(
-    BigDecimal page,
-    BigDecimal limit,
-    String sortBy,
-    String sortOrder,
-    @Nullable String searchTerm
+  @GetMapping(value = "/knowledge/articles", produces = { "application/json" })
+  @ApiErrors({ "400", "401" })
+  public ResponseEntity<
+    ApiResponse<PagedData<KnowledgeArticleResponseDto>>
+  > knowledgeControllerListArticlesV1(
+    @DecimalMin(value = "1") @Valid @RequestParam(
+      value = "page",
+      required = false,
+      defaultValue = "1"
+    ) BigDecimal page,
+    @DecimalMin(value = "1") @DecimalMax(value = "100") @Valid @RequestParam(
+      value = "limit",
+      required = false,
+      defaultValue = "10"
+    ) BigDecimal limit,
+    @Valid @RequestParam(
+      value = "sortBy",
+      required = false,
+      defaultValue = "updatedAt"
+    ) String sortBy,
+    @Valid @RequestParam(
+      value = "sortOrder",
+      required = false,
+      defaultValue = "ASC"
+    ) String sortOrder,
+    @Valid @RequestParam(
+      value = "searchTerm",
+      required = false
+    ) @Nullable String searchTerm
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -118,31 +161,37 @@ public class KnowledgeController implements KnowledgeApi {
       ListKnowledgeArticlesRequest.newBuilder().setPage(pageRequest).build()
     );
 
-    KnowledgeControllerListArticlesV1200ResponseData data =
-      new KnowledgeControllerListArticlesV1200ResponseData()
-        .items(
-          response
-            .getItemsList()
-            .stream()
-            .map(KnowledgeMapper::toArticleDto)
-            .toList()
-        )
-        .meta(KnowledgeMapper.toMetaDto(response.getMeta()));
-
-    return ResponseEntity.ok(
-      new KnowledgeControllerListArticlesV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(data)
+    PagedData<KnowledgeArticleResponseDto> data = new PagedData<>(
+      response
+        .getItemsList()
+        .stream()
+        .map(KnowledgeMapper::toArticleDto)
+        .toList(),
+      PageMeta.from(response.getMeta())
     );
+
+    return ResponseEntity.ok(ApiResponse.of(200, "OK", data));
   }
 
-  @Override
-  public ResponseEntity<KnowledgeControllerGetArticleV1200Response> knowledgeControllerGetArticleV1(
-    String id,
-    BigDecimal page,
-    BigDecimal limit
+  @GetMapping(
+    value = "/knowledge/articles/{id}",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "404" })
+  public ResponseEntity<
+    ApiResponse<KnowledgeArticleDetailResponseDto>
+  > knowledgeControllerGetArticleV1(
+    @PathVariable("id") String id,
+    @DecimalMin(value = "1") @Valid @RequestParam(
+      value = "page",
+      required = false,
+      defaultValue = "1"
+    ) BigDecimal page,
+    @DecimalMin(value = "1") @DecimalMax(value = "100") @Valid @RequestParam(
+      value = "limit",
+      required = false,
+      defaultValue = "10"
+    ) BigDecimal limit
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -166,29 +215,34 @@ public class KnowledgeController implements KnowledgeApi {
     );
 
     return ResponseEntity.ok(
-      new KnowledgeControllerGetArticleV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(
-          KnowledgeMapper.toArticleDetailDto(
-            response.getArticle(),
-            response.getBlocksList(),
-            response.getMeta(),
-            response.getHasUnindexedPages()
-          )
+      ApiResponse.of(
+        200,
+        "OK",
+        KnowledgeMapper.toArticleDetailDto(
+          response.getArticle(),
+          response.getBlocksList(),
+          response.getMeta(),
+          response.getHasUnindexedPages()
         )
+      )
     );
   }
 
-  @Override
+  @PostMapping(
+    value = "/knowledge/ask",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "402" })
   @ThrottleOverride(
     tier = ThrottlerTiers.MEDIUM,
     ttlMs = RouteThrottle.KNOWLEDGE_ASK_TTL_MS,
     limit = RouteThrottle.KNOWLEDGE_ASK_LIMIT
   )
-  public ResponseEntity<KnowledgeControllerAskV1200Response> knowledgeControllerAskV1(
-    KnowledgeAskDto knowledgeAskDto
+  public ResponseEntity<
+    ApiResponse<KnowledgeAskResponseDto>
+  > knowledgeControllerAskV1(
+    @Valid @RequestBody KnowledgeAskDto knowledgeAskDto
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
     String message = requireNonBlank(knowledgeAskDto.getMessage(), "message");
@@ -204,29 +258,34 @@ public class KnowledgeController implements KnowledgeApi {
     ChatResponse response = withRagMetadata(context).ask(wire);
 
     return ResponseEntity.ok(
-      new KnowledgeControllerAskV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("Answer generated")
-        .data(
-          KnowledgeMapper.toAskDto(
-            response.getContent(),
-            response.getStatus(),
-            response.getCitationsList(),
-            response.getGenerationId()
-          )
+      ApiResponse.of(
+        200,
+        "Answer generated",
+        KnowledgeMapper.toAskDto(
+          response.getContent(),
+          response.getStatus(),
+          response.getCitationsList(),
+          response.getGenerationId()
         )
+      )
     );
   }
 
-  @Override
+  @PostMapping(
+    value = "/knowledge/search",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401" })
   @ThrottleOverride(
     tier = ThrottlerTiers.MEDIUM,
     ttlMs = RouteThrottle.KNOWLEDGE_SEARCH_TTL_MS,
     limit = RouteThrottle.KNOWLEDGE_SEARCH_LIMIT
   )
-  public ResponseEntity<KnowledgeControllerSearchV1200Response> knowledgeControllerSearchV1(
-    KnowledgeSearchDto knowledgeSearchDto
+  public ResponseEntity<
+    ApiResponse<KnowledgeSearchResponseDto>
+  > knowledgeControllerSearchV1(
+    @Valid @RequestBody KnowledgeSearchDto knowledgeSearchDto
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
     String query = requireNonBlank(knowledgeSearchDto.getQuery(), "query");
@@ -240,16 +299,14 @@ public class KnowledgeController implements KnowledgeApi {
     SearchResponse response = withRagMetadata(context).search(wire);
 
     return ResponseEntity.ok(
-      new KnowledgeControllerSearchV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("Search completed")
-        .data(
-          KnowledgeMapper.toSearchDto(
-            response.getChunksList(),
-            response.getDegraded()
-          )
+      ApiResponse.of(
+        200,
+        "Search completed",
+        KnowledgeMapper.toSearchDto(
+          response.getChunksList(),
+          response.getDegraded()
         )
+      )
     );
   }
 

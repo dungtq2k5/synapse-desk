@@ -14,6 +14,7 @@ import org.springframework.data.redis.core.Cursor;
 import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.DeserializationContext;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -171,6 +172,54 @@ public class CacheService {
     String key,
     long ttlSeconds,
     Class<T> type,
+    Supplier<T> produce
+  ) {
+    try {
+      String cached = redis.opsForValue().get(key);
+      if (cached != null) {
+        return json.readValue(cached, type);
+      }
+    } catch (RuntimeException cacheReadFailed) {
+      // Fails open: a cache outage makes the product slow, never down.
+    }
+
+    T value = produce.get();
+
+    try {
+      redis
+        .opsForValue()
+        .set(
+          key,
+          json.writeValueAsString(value),
+          java.time.Duration.ofSeconds(ttlSeconds)
+        );
+    } catch (RuntimeException cacheWriteFailed) {
+      // Same fail-open rule on the write side.
+    }
+
+    return value;
+  }
+
+  /**
+   * {@link #wrap}'s generic-type twin — a bare {@code Class<T>} erases a
+   * parameterized type's own arguments, so a cache HIT on {@code
+   * ApiResponse<PagedData<RoleResponseDto>>} would deserialize `data` as an
+   * untyped map rather than the real DTOs. Needed starting with the
+   * OpenAPI-ownership flip's generic envelope; every route cached before it
+   * used a concrete generated class, where {@code Class<T>} was exact.
+   *
+   * <p>A separate NAME, not an overload of {@link #wrap} — javac's overload
+   * resolution treats the two as ambiguous at every existing {@code
+   * wrap(key, ttl, Foo.class, () -> …)} call site the moment a lambda is
+   * the fourth argument, because it cannot commit to `Class<T>` over
+   * `TypeReference<T>` before the lambda body is checked. Measured: adding
+   * this as an overload broke five unrelated, already-compiling call sites
+   * across the codebase with "reference to wrap is ambiguous".
+   */
+  public <T> T wrapTyped(
+    String key,
+    long ttlSeconds,
+    TypeReference<T> type,
     Supplier<T> produce
   ) {
     try {

@@ -139,10 +139,20 @@ public class ThrottlerInterceptor implements HandlerInterceptor {
     );
   }
 
+  /**
+   * `Math.ceil(timeToBlockExpire)`, reproduced — millisecond precision,
+   * rounded UP. `TTL` (second precision, floored) reads 899 for a 900000ms
+   * window a few milliseconds after `EXPIRE` sets it, which the contract row
+   * catches exactly (measured: `retry-after` "899" against the promised
+   * "900"). `PTTL` avoids the false floor.
+   */
   private long remainingTtlSeconds(String key, long ttlMs) {
-    Long ttl = redis.getExpire(key, TimeUnit.SECONDS);
+    Long ttl = redis.getExpire(key, TimeUnit.MILLISECONDS);
 
-    return ttl == null || ttl < 0 ? Math.max(1, ttlMs / 1000) : ttl;
+    return Math.max(
+      1,
+      ttl == null || ttl < 0 ? ttlMs / 1000 : (ttl + 999) / 1000
+    );
   }
 
   private TierLimit resolveLimit(HandlerMethod handlerMethod, String tier) {

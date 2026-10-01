@@ -3,36 +3,46 @@ package com.synapsedesk.gateway.messages;
 import com.synapsedesk.gateway.auth.CurrentRequest;
 import com.synapsedesk.gateway.auth.CurrentUser;
 import com.synapsedesk.gateway.auth.RequestContext;
-import com.synapsedesk.gateway.generated.api.MessagesApi;
 import com.synapsedesk.gateway.generated.model.AttachmentResponseDto;
-import com.synapsedesk.gateway.generated.model.AuthControllerForgotPasswordV1202Response;
 import com.synapsedesk.gateway.generated.model.CitationResponseDto;
 import com.synapsedesk.gateway.generated.model.ConfirmAttachmentDto;
 import com.synapsedesk.gateway.generated.model.CreateMessageDto;
 import com.synapsedesk.gateway.generated.model.CreateMessageResponseDto;
 import com.synapsedesk.gateway.generated.model.CurrentUserResponseDto.PermissionCodesEnum;
-import com.synapsedesk.gateway.generated.model.InvitationsControllerListV1200ResponseDataMeta;
 import com.synapsedesk.gateway.generated.model.MessageResponseDto;
-import com.synapsedesk.gateway.generated.model.MessagesControllerConfirmAttachmentV1201Response;
-import com.synapsedesk.gateway.generated.model.MessagesControllerCreateV1201Response;
-import com.synapsedesk.gateway.generated.model.MessagesControllerListAttachmentsV1200Response;
-import com.synapsedesk.gateway.generated.model.MessagesControllerListV1200Response;
-import com.synapsedesk.gateway.generated.model.MessagesControllerListV1200ResponseData;
-import com.synapsedesk.gateway.generated.model.MessagesControllerRedactV1200Response;
 import com.synapsedesk.gateway.generated.model.UpdateMessageDto;
 import com.synapsedesk.gateway.generated.model.UploadAttachmentDto;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
+import com.synapsedesk.gateway.openapi.ApiErrors;
 import com.synapsedesk.gateway.security.RequirePermission;
+import com.synapsedesk.gateway.web.ApiPaths;
+import com.synapsedesk.gateway.web.ApiResponse;
+import com.synapsedesk.gateway.web.PageMeta;
+import com.synapsedesk.gateway.web.PagedData;
 import io.grpc.stub.MetadataUtils;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.lang.Nullable;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import synapsedesk.auth.Common.PageRequest;
 import synapsedesk.auth.Common.SortOrder;
@@ -71,16 +81,19 @@ import synapsedesk.ticket.MessageServiceGrpc;
  * at all, and none should ever gain one without the same reasoning Node's
  * controller docblock states.
  *
- * <p>
- * The two presign routes reuse the generic empty-data envelope
- * ({@code AuthControllerForgotPasswordV1202Response}) because no
- * {@code PresignAttachmentResponseDto} model type was generated for
- * {@code {uploadUrl, objectPath, expiresAt}} — a generator artifact, not a
- * real coupling to auth. The shape is built as a plain map, keyed exactly as
- * the Node DTO's fields.
+ * <p><b>Migrated off `MessagesApi`.</b> The two presign routes used to reuse
+ * the generic empty-data envelope ({@code AuthControllerForgotPasswordV1202Response})
+ * because no `PresignAttachmentResponseDto` model was generated for {@code
+ * {uploadUrl, objectPath, expiresAt}} — a generator artifact, not a real
+ * coupling to auth. {@link PresignAttachmentResponseDto} names that shape
+ * honestly instead. `create`/`confirmAttachment` answer 201 — {@code
+ * @ResponseStatus} is what tells springdoc that.
  */
+@Tag(name = "Messages")
 @RestController
-public class MessagesController implements MessagesApi {
+@RequestMapping(ApiPaths.V1)
+@Validated
+public class MessagesController {
 
   private static final long DEADLINE_SECONDS = 5;
 
@@ -95,14 +108,39 @@ public class MessagesController implements MessagesApi {
     this.currentUser = currentUser;
   }
 
-  @Override
-  public ResponseEntity<MessagesControllerListV1200Response> messagesControllerListV1(
-    String ticketId,
-    BigDecimal page,
-    BigDecimal limit,
-    String sortBy,
-    String sortOrder,
-    String searchTerm
+  @GetMapping(
+    value = "/tickets/{ticketId}/messages",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "404" })
+  public ResponseEntity<
+    ApiResponse<PagedData<MessageResponseDto>>
+  > messagesControllerListV1(
+    @PathVariable("ticketId") String ticketId,
+    @DecimalMin(value = "1") @Valid @RequestParam(
+      value = "page",
+      required = false,
+      defaultValue = "1"
+    ) BigDecimal page,
+    @DecimalMin(value = "1") @DecimalMax(value = "100") @Valid @RequestParam(
+      value = "limit",
+      required = false,
+      defaultValue = "10"
+    ) BigDecimal limit,
+    @Valid @RequestParam(
+      value = "sortBy",
+      required = false,
+      defaultValue = "createdAt"
+    ) String sortBy,
+    @Valid @RequestParam(
+      value = "sortOrder",
+      required = false,
+      defaultValue = "ASC"
+    ) String sortOrder,
+    @Valid @RequestParam(
+      value = "searchTerm",
+      required = false
+    ) @Nullable String searchTerm
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -126,29 +164,30 @@ public class MessagesController implements MessagesApi {
         .build()
     );
 
-    MessagesControllerListV1200ResponseData data =
-      new MessagesControllerListV1200ResponseData(
-        response
-          .getItemsList()
-          .stream()
-          .map(MessagesController::toMessageResponseDto)
-          .toList(),
-        toMetaDto(response.getMeta())
-      );
-
-    return ResponseEntity.ok(
-      new MessagesControllerListV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(data)
+    PagedData<MessageResponseDto> data = new PagedData<>(
+      response
+        .getItemsList()
+        .stream()
+        .map(MessagesController::toMessageResponseDto)
+        .toList(),
+      PageMeta.from(response.getMeta())
     );
+
+    return ResponseEntity.ok(ApiResponse.of(200, "OK", data));
   }
 
-  @Override
-  public ResponseEntity<MessagesControllerCreateV1201Response> messagesControllerCreateV1(
-    String ticketId,
-    CreateMessageDto createMessageDto
+  @PostMapping(
+    value = "/tickets/{ticketId}/messages",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "404" })
+  @ResponseStatus(HttpStatus.CREATED)
+  public ResponseEntity<
+    ApiResponse<CreateMessageResponseDto>
+  > messagesControllerCreateV1(
+    @PathVariable("ticketId") String ticketId,
+    @Valid @RequestBody CreateMessageDto createMessageDto
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -171,8 +210,9 @@ public class MessagesController implements MessagesApi {
           )
           .toList()
       );
-    if (createMessageDto.getGeneratedFromId() != null) {
-      wire.setGeneratedFromId(createMessageDto.getGeneratedFromId().toString());
+    var generatedFromId = createMessageDto.getGeneratedFromId();
+    if (generatedFromId != null) {
+      wire.setGeneratedFromId(generatedFromId.toString());
     }
 
     CreateMessageResponse response = withMetadata(context).createMessage(
@@ -185,19 +225,22 @@ public class MessagesController implements MessagesApi {
     );
 
     return ResponseEntity.status(HttpStatus.CREATED).body(
-      new MessagesControllerCreateV1201Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(201))
-        .message("Message posted")
-        .data(data)
+      ApiResponse.of(201, "Message posted", data)
     );
   }
 
-  @Override
-  public ResponseEntity<MessagesControllerRedactV1200Response> messagesControllerUpdateV1(
-    String ticketId,
-    String messageId,
-    UpdateMessageDto updateMessageDto
+  @PatchMapping(
+    value = "/tickets/{ticketId}/messages/{messageId}",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "404" })
+  public ResponseEntity<
+    ApiResponse<MessageResponseDto>
+  > messagesControllerUpdateV1(
+    @PathVariable("ticketId") String ticketId,
+    @PathVariable("messageId") String messageId,
+    @Valid @RequestBody UpdateMessageDto updateMessageDto
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -210,19 +253,21 @@ public class MessagesController implements MessagesApi {
     );
 
     return ResponseEntity.ok(
-      new MessagesControllerRedactV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("Message updated")
-        .data(toMessageResponseDto(response))
+      ApiResponse.of(200, "Message updated", toMessageResponseDto(response))
     );
   }
 
-  @Override
+  @DeleteMapping(
+    value = "/tickets/{ticketId}/messages/{messageId}",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.TICKET_MESSAGE_MODERATE)
-  public ResponseEntity<MessagesControllerRedactV1200Response> messagesControllerRedactV1(
-    String ticketId,
-    String messageId
+  public ResponseEntity<
+    ApiResponse<MessageResponseDto>
+  > messagesControllerRedactV1(
+    @PathVariable("ticketId") String ticketId,
+    @PathVariable("messageId") String messageId
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -234,18 +279,25 @@ public class MessagesController implements MessagesApi {
     );
 
     return ResponseEntity.ok(
-      new MessagesControllerRedactV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("Message redacted")
-        .data(toMessageResponseDto(response.getMessage()))
+      ApiResponse.of(
+        200,
+        "Message redacted",
+        toMessageResponseDto(response.getMessage())
+      )
     );
   }
 
-  @Override
-  public ResponseEntity<AuthControllerForgotPasswordV1202Response> messagesControllerPresignNewAttachmentV1(
-    String ticketId,
-    UploadAttachmentDto uploadAttachmentDto
+  @PostMapping(
+    value = "/tickets/{ticketId}/messages/attachments/upload-url",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "404" })
+  public ResponseEntity<
+    ApiResponse<PresignAttachmentResponseDto>
+  > messagesControllerPresignNewAttachmentV1(
+    @PathVariable("ticketId") String ticketId,
+    @Valid @RequestBody UploadAttachmentDto uploadAttachmentDto
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -259,19 +311,22 @@ public class MessagesController implements MessagesApi {
     );
 
     return ResponseEntity.ok(
-      new AuthControllerForgotPasswordV1202Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(toPresignData(response))
+      ApiResponse.of(200, "OK", toPresignData(response))
     );
   }
 
-  @Override
-  public ResponseEntity<AuthControllerForgotPasswordV1202Response> messagesControllerPresignAttachmentV1(
-    String ticketId,
-    String messageId,
-    UploadAttachmentDto uploadAttachmentDto
+  @PostMapping(
+    value = "/tickets/{ticketId}/messages/{messageId}/attachments/upload-url",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "404" })
+  public ResponseEntity<
+    ApiResponse<PresignAttachmentResponseDto>
+  > messagesControllerPresignAttachmentV1(
+    @PathVariable("ticketId") String ticketId,
+    @PathVariable("messageId") String messageId,
+    @Valid @RequestBody UploadAttachmentDto uploadAttachmentDto
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -286,19 +341,23 @@ public class MessagesController implements MessagesApi {
     );
 
     return ResponseEntity.ok(
-      new AuthControllerForgotPasswordV1202Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(toPresignData(response))
+      ApiResponse.of(200, "OK", toPresignData(response))
     );
   }
 
-  @Override
-  public ResponseEntity<MessagesControllerConfirmAttachmentV1201Response> messagesControllerConfirmAttachmentV1(
-    String ticketId,
-    String messageId,
-    ConfirmAttachmentDto confirmAttachmentDto
+  @PostMapping(
+    value = "/tickets/{ticketId}/messages/{messageId}/attachments/confirm",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "404" })
+  @ResponseStatus(HttpStatus.CREATED)
+  public ResponseEntity<
+    ApiResponse<AttachmentResponseDto>
+  > messagesControllerConfirmAttachmentV1(
+    @PathVariable("ticketId") String ticketId,
+    @PathVariable("messageId") String messageId,
+    @Valid @RequestBody ConfirmAttachmentDto confirmAttachmentDto
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -312,18 +371,20 @@ public class MessagesController implements MessagesApi {
     );
 
     return ResponseEntity.status(HttpStatus.CREATED).body(
-      new MessagesControllerConfirmAttachmentV1201Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(201))
-        .message("Attachment added")
-        .data(toAttachmentResponseDto(response))
+      ApiResponse.of(201, "Attachment added", toAttachmentResponseDto(response))
     );
   }
 
-  @Override
-  public ResponseEntity<MessagesControllerListAttachmentsV1200Response> messagesControllerListAttachmentsV1(
-    String ticketId,
-    String messageId
+  @GetMapping(
+    value = "/tickets/{ticketId}/messages/{messageId}/attachments",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "404" })
+  public ResponseEntity<
+    ApiResponse<List<AttachmentResponseDto>>
+  > messagesControllerListAttachmentsV1(
+    @PathVariable("ticketId") String ticketId,
+    @PathVariable("messageId") String messageId
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -335,28 +396,26 @@ public class MessagesController implements MessagesApi {
     );
 
     return ResponseEntity.ok(
-      new MessagesControllerListAttachmentsV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(
-          response
-            .getItemsList()
-            .stream()
-            .map(MessagesController::toAttachmentResponseDto)
-            .toList()
-        )
+      ApiResponse.of(
+        200,
+        "OK",
+        response
+          .getItemsList()
+          .stream()
+          .map(MessagesController::toAttachmentResponseDto)
+          .toList()
+      )
     );
   }
 
-  private static Map<String, Object> toPresignData(
+  private static PresignAttachmentResponseDto toPresignData(
     PresignAttachmentResponse response
   ) {
-    Map<String, Object> data = new LinkedHashMap<>();
-    data.put("uploadUrl", response.getUploadUrl());
-    data.put("objectPath", response.getObjectPath());
-    data.put("expiresAt", toOffsetDateTime(response.getExpiresAt()));
-    return data;
+    return new PresignAttachmentResponseDto(
+      response.getUploadUrl(),
+      response.getObjectPath(),
+      toOffsetDateTime(response.getExpiresAt())
+    );
   }
 
   private static MessageResponseDto toMessageResponseDto(
@@ -438,18 +497,6 @@ public class MessagesController implements MessagesApi {
       case MESSAGE_ANSWER_STATUS_REFUSED -> MessageResponseDto.AnswerStatusEnum.REFUSED;
       default -> null;
     };
-  }
-
-  private static InvitationsControllerListV1200ResponseDataMeta toMetaDto(
-    synapsedesk.auth.Common.PageMeta meta
-  ) {
-    return new InvitationsControllerListV1200ResponseDataMeta(
-      BigDecimal.valueOf(meta.getTotalItems()),
-      BigDecimal.valueOf(meta.getItemCount()),
-      BigDecimal.valueOf(meta.getItemsPerPage()),
-      BigDecimal.valueOf(meta.getTotalPages()),
-      BigDecimal.valueOf(meta.getCurrentPage())
-    );
   }
 
   private static OffsetDateTime toOffsetDateTime(

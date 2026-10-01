@@ -70,8 +70,8 @@ class RolesControllerTest {
         "test"
       )
     );
-    when(cache.wrap(any(), anyLong(), any(), any())).thenAnswer(invocation ->
-      ((Supplier<?>) invocation.getArgument(3)).get()
+    when(cache.wrapTyped(any(), anyLong(), any(), any())).thenAnswer(
+      invocation -> ((Supplier<?>) invocation.getArgument(3)).get()
     );
     RequestContextHolder.setRequestAttributes(
       new ServletRequestAttributes(mock(HttpServletRequest.class))
@@ -104,7 +104,7 @@ class RolesControllerTest {
       "ticket.read.all"
     );
     assertThat(response.getStatusCode().value()).isEqualTo(201);
-    assertThat(response.getBody().getData().getId()).isEqualTo("r1");
+    assertThat(response.getBody().data().getId()).isEqualTo("r1");
   }
 
   @Test

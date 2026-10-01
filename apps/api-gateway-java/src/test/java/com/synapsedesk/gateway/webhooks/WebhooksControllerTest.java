@@ -140,8 +140,8 @@ class WebhooksControllerTest {
     var response = controller.inboundEmailControllerResendV1();
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-    assertThat(response.getBody().getData()).isEqualTo(
-      java.util.Map.of("received", true, "outcome", "ignored_event")
+    assertThat(response.getBody().data()).isEqualTo(
+      new ResendWebhookAcknowledgementDto(true, "ignored_event")
     );
   }
 
@@ -238,8 +238,8 @@ class WebhooksControllerTest {
     var response = controller.webhooksControllerStripeV1("t=1,v1=abc");
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-    assertThat(response.getBody().getData()).isEqualTo(
-      java.util.Map.of("received", true, "status", "applied")
+    assertThat(response.getBody().data()).isEqualTo(
+      new StripeWebhookAcknowledgementDto(true, "applied")
     );
 
     org.mockito.ArgumentCaptor<StripeWebhookRequest> captor =

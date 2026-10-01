@@ -1,30 +1,26 @@
 package com.synapsedesk.gateway.ops;
 
 import com.synapsedesk.gateway.config.RuntimeProperties;
-import com.synapsedesk.gateway.generated.api.OpsApi;
-import com.synapsedesk.gateway.generated.model.HealthControllerLiveness200Response;
-import com.synapsedesk.gateway.generated.model.HealthControllerReadiness200Response;
 import com.synapsedesk.gateway.generated.model.LivenessResponseDto;
 import com.synapsedesk.gateway.generated.model.ReadinessDependenciesResponseDto;
 import com.synapsedesk.gateway.generated.model.ReadinessResponseDto;
-import com.synapsedesk.gateway.generated.model.VersionControllerVersion200Response;
 import com.synapsedesk.gateway.generated.model.VersionResponseDto;
-import java.math.BigDecimal;
+import com.synapsedesk.gateway.web.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
  * The three routes an orchestrator reads, OUTSIDE the API prefix.
  *
- * <p><b>It implements the GENERATED interface</b>, so the routes, the request
- * shapes and the response types come from the document both gateways share
- * rather than from this file. That is what makes the drift guarantee real: a
- * path added to the `ops` tag becomes an abstract method here, and the build
- * fails until it is answered — measured as J3, and only true because
- * `skipDefaultInterface` is set.
+ * <p><b>Migrated off `OpsApi`.</b> `@RequestMapping` used to arrive through
+ * the generated interface; it is declared directly on each method now.
  *
  * <p>Outside the prefix because an orchestrator is not an API client and
  * cannot follow a version migration: a probe configured for
@@ -36,14 +32,22 @@ import org.springframework.web.bind.annotation.RestController;
  * by — a liveness probe that failed then would restart a pod that is working.
  * `/health/ready` says "should traffic reach THIS instance", and is the one
  * that goes 503.
+ *
+ * <p><b>No `@ResponseStatus` on readiness, deliberately.</b> Its status is a
+ * RUNTIME decision (200 or 503 depending on `ready`), not a fixed one a
+ * single annotation could state — springdoc documents it as 200, the same
+ * as the committed document already did; 503 was never a declared success
+ * response there either.
  */
+@Tag(name = "Ops")
 @RestController
-public class OpsController implements OpsApi {
+@Validated
+public class OpsController {
 
   /** The envelope's `statusCode`, repeated in the body because clients read it there. */
-  private static final BigDecimal OK = BigDecimal.valueOf(200);
+  private static final int OK = 200;
 
-  private static final BigDecimal UNAVAILABLE = BigDecimal.valueOf(503);
+  private static final int UNAVAILABLE = 503;
 
   private final RuntimeProperties runtime;
   private final DrainState drain;
@@ -59,23 +63,21 @@ public class OpsController implements OpsApi {
     this.gates = gates;
   }
 
-  @Override
-  public ResponseEntity<HealthControllerLiveness200Response> healthControllerLiveness() {
+  @GetMapping(value = "/health", produces = { "application/json" })
+  public ResponseEntity<
+    ApiResponse<LivenessResponseDto>
+  > healthControllerLiveness() {
     LivenessResponseDto data = new LivenessResponseDto()
       .status("ok")
-      .timestamp(OffsetDateTime.now());
+      .timestamp(OffsetDateTime.now(ZoneOffset.UTC));
 
-    return ResponseEntity.ok(
-      new HealthControllerLiveness200Response()
-        .success(true)
-        .statusCode(OK)
-        .message("Healthy")
-        .data(data)
-    );
+    return ResponseEntity.ok(ApiResponse.of(OK, "Healthy", data));
   }
 
-  @Override
-  public ResponseEntity<HealthControllerReadiness200Response> healthControllerReadiness() {
+  @GetMapping(value = "/health/ready", produces = { "application/json" })
+  public ResponseEntity<
+    ApiResponse<ReadinessResponseDto>
+  > healthControllerReadiness() {
     boolean draining = drain.isDraining();
     ReadinessDependenciesResponseDto dependencies =
       new ReadinessDependenciesResponseDto();
@@ -92,14 +94,13 @@ public class OpsController implements OpsApi {
       .ready(ready)
       .draining(draining)
       .dependencies(dependencies)
-      .timestamp(OffsetDateTime.now());
+      .timestamp(OffsetDateTime.now(ZoneOffset.UTC));
 
-    HealthControllerReadiness200Response body =
-      new HealthControllerReadiness200Response()
-        .success(true)
-        .statusCode(ready ? OK : UNAVAILABLE)
-        .message(ready ? "Ready" : "Not ready")
-        .data(data);
+    ApiResponse<ReadinessResponseDto> body = ApiResponse.of(
+      ready ? OK : UNAVAILABLE,
+      ready ? "Ready" : "Not ready",
+      data
+    );
 
     // A probe reads the STATUS LINE; the body is for a human reading a log.
     return ready
@@ -107,19 +108,15 @@ public class OpsController implements OpsApi {
       : ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(body);
   }
 
-  @Override
-  public ResponseEntity<VersionControllerVersion200Response> versionControllerVersion() {
+  @GetMapping(value = "/version", produces = { "application/json" })
+  public ResponseEntity<
+    ApiResponse<VersionResponseDto>
+  > versionControllerVersion() {
     VersionResponseDto data = new VersionResponseDto()
       .version(runtime.appVersion())
       .sha(runtime.buildSha())
       .builtAt(runtime.buildTime());
 
-    return ResponseEntity.ok(
-      new VersionControllerVersion200Response()
-        .success(true)
-        .statusCode(OK)
-        .message("Version")
-        .data(data)
-    );
+    return ResponseEntity.ok(ApiResponse.of(OK, "Version", data));
   }
 }

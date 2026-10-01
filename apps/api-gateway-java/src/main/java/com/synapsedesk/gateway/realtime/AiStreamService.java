@@ -114,9 +114,10 @@ public class AiStreamService {
       principal,
       client
     );
-    AttachmentsResult attachments = messageId != null
-      ? aiAttachments(messageId, principal, client)
-      : new AttachmentsResult(List.of(), List.of());
+    AttachmentsResult attachments =
+      messageId != null
+        ? aiAttachments(messageId, principal, client)
+        : new AttachmentsResult(List.of(), List.of());
 
     if (!attachments.skipped().isEmpty()) {
       notifySkipped(client, ticketId, attachments.skipped());
@@ -132,10 +133,12 @@ public class AiStreamService {
       )
       .build();
 
-    Context.CancellableContext cancellable = Context.current()
-      .withCancellation();
+    Context.CancellableContext cancellable =
+      Context.current().withCancellation();
     streamsBySession
-      .computeIfAbsent(client.getSessionId(), ignored -> new ConcurrentHashMap<>())
+      .computeIfAbsent(client.getSessionId(), ignored ->
+        new ConcurrentHashMap<>()
+      )
       .put(streamId, new LiveStream(ticketId, cancellable));
 
     Thread.ofVirtual().start(() ->
@@ -177,9 +180,7 @@ public class AiStreamService {
     }
 
     for (LiveStream stream : forSocket.values()) {
-      stream
-        .context()
-        .cancel(new CancellationException("Socket disconnected"));
+      stream.context().cancel(new CancellationException("Socket disconnected"));
     }
   }
 
@@ -224,7 +225,12 @@ public class AiStreamService {
 
       if (!completed) {
         forget(client, streamId);
-        fail(client, streamId, ticketId, "The answer stream ended unexpectedly");
+        fail(
+          client,
+          streamId,
+          ticketId,
+          "The answer stream ended unexpectedly"
+        );
       }
     } catch (StatusRuntimeException grpcFailure) {
       if (grpcFailure.getStatus().getCode() == Status.Code.CANCELLED) {
@@ -321,21 +327,24 @@ public class AiStreamService {
       }
 
       List<Rag.Citation> citations = completion.getCitationsList();
-      AppendAiMessageRequest.Builder append = AppendAiMessageRequest.newBuilder()
-        .setTicketId(ticketId)
-        .setContent(content)
-        .setAnswerStatus(toMessageAnswerStatus(completion.getStatus()))
-        .setCitations(
-          MessageCitations.newBuilder()
-            .addAllItems(citations.stream().map(this::toDraftCitation).toList())
-        );
+      AppendAiMessageRequest.Builder append =
+        AppendAiMessageRequest.newBuilder()
+          .setTicketId(ticketId)
+          .setContent(content)
+          .setAnswerStatus(toMessageAnswerStatus(completion.getStatus()))
+          .setCitations(
+            MessageCitations.newBuilder().addAllItems(
+              citations.stream().map(this::toDraftCitation).toList()
+            )
+          );
       if (!completion.getGenerationId().isEmpty()) {
         append.setGenerationId(completion.getGenerationId());
       }
 
-      MessageResponse persisted = messagesWith(principal, client).appendAiMessage(
-        append.build()
-      );
+      MessageResponse persisted = messagesWith(
+        principal,
+        client
+      ).appendAiMessage(append.build());
 
       done(
         client,
@@ -453,7 +462,11 @@ public class AiStreamService {
   ) {
     client.sendEvent(
       RealtimeEvents.REALTIME_EVENTS_AI_STREAM_ERROR,
-      new WsResponse<>(false, message, new AiStreamErrorPayload(streamId, ticketId))
+      new WsResponse<>(
+        false,
+        message,
+        new AiStreamErrorPayload(streamId, ticketId)
+      )
     );
   }
 

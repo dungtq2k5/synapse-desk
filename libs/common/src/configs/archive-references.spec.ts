@@ -49,7 +49,7 @@ describe('nothing tracked cites the archive', () => {
   /**
    * A `FIXME` a language server or SonarLint wrote INTO the file, not one a
    * person typed. Measured: 26 of them across 12 tracked files, none
-   * authored — the same background tooling that reorganises imports
+   * authored — the same background tooling that reorganizes imports
    * mid-sabotage and contends with `target/` deletion, writing a diagnostic
    * into the source it was supposed to only report on.
    *

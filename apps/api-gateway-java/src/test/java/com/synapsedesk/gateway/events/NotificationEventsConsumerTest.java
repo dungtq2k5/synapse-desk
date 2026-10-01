@@ -53,10 +53,7 @@ class NotificationEventsConsumerTest {
   @Test
   void readEmitsBothTheRawEventAndTheDerivedUnreadCount() {
     consumer.onMessage(
-      message(
-        "notification.read",
-        "{\"recipientId\":\"u1\",\"unreadCount\":3}"
-      )
+      message("notification.read", "{\"recipientId\":\"u1\",\"unreadCount\":3}")
     );
 
     verify(relay).relayToRoom(

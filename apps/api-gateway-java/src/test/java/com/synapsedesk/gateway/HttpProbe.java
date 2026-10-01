@@ -21,11 +21,23 @@ public record HttpProbe(int status, String body) {
   private static final ObjectMapper JSON = new ObjectMapper();
 
   public static HttpProbe get(int port, String path) {
+    return get(port, path, Map.of());
+  }
+
+  /** A GET with extra headers — the rows that need to key a bucket or set a cookie. */
+  public static HttpProbe get(
+    int port,
+    String path,
+    Map<String, String> headers
+  ) {
     try {
+      HttpRequest.Builder builder = HttpRequest.newBuilder(
+        URI.create("http://127.0.0.1:" + port + path)
+      );
+      headers.forEach(builder::header);
+
       HttpResponse<String> response = CLIENT.send(
-        HttpRequest.newBuilder(
-          URI.create("http://127.0.0.1:" + port + path)
-        ).build(),
+        builder.build(),
         HttpResponse.BodyHandlers.ofString()
       );
 

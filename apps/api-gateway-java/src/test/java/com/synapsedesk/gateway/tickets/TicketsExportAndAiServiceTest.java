@@ -173,8 +173,8 @@ class TicketsExportAndAiServiceTest {
       "ticket-1"
     );
 
-    assertThat(response.getBody().getData()).hasSize(1);
-    assertThat(response.getBody().getData().get(0).getTicketId()).isEqualTo(
+    assertThat(response.getBody().data()).hasSize(1);
+    assertThat(response.getBody().data().get(0).getTicketId()).isEqualTo(
       "ticket-2"
     );
   }

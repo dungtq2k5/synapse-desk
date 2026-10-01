@@ -4,18 +4,22 @@ import com.synapsedesk.gateway.auth.CurrentRequest;
 import com.synapsedesk.gateway.auth.CurrentUser;
 import com.synapsedesk.gateway.auth.RequestContext;
 import com.synapsedesk.gateway.cache.CacheService;
-import com.synapsedesk.gateway.generated.api.PermissionsApi;
 import com.synapsedesk.gateway.generated.model.CurrentUserResponseDto.PermissionCodesEnum;
 import com.synapsedesk.gateway.generated.model.PermissionResponseDto;
-import com.synapsedesk.gateway.generated.model.PermissionsControllerListV1200Response;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
+import com.synapsedesk.gateway.openapi.ApiErrors;
 import com.synapsedesk.gateway.security.RequirePermission;
+import com.synapsedesk.gateway.web.ApiPaths;
+import com.synapsedesk.gateway.web.ApiResponse;
 import io.grpc.stub.MetadataUtils;
-import java.math.BigDecimal;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import synapsedesk.auth.Role.ListPermissionsRequest;
 import synapsedesk.auth.Role.ListPermissionsResponse;
@@ -33,8 +37,11 @@ import synapsedesk.auth.RoleServiceGrpc;
  * two surfaces silently stop sharing one entry. Change one only with the
  * other.
  */
+@Tag(name = "Permissions")
 @RestController
-public class PermissionsController implements PermissionsApi {
+@RequestMapping(ApiPaths.V1)
+@Validated
+public class PermissionsController {
 
   private static final long DEADLINE_SECONDS = 5;
   private static final long TTL_SECONDS = 60 * 60;
@@ -53,9 +60,12 @@ public class PermissionsController implements PermissionsApi {
     this.cache = cache;
   }
 
-  @Override
+  @GetMapping(value = "/permissions", produces = { "application/json" })
+  @ApiErrors({ "401", "403" })
   @RequirePermission(PermissionCodesEnum.ROLE_READ)
-  public ResponseEntity<PermissionsControllerListV1200Response> permissionsControllerListV1() {
+  public ResponseEntity<
+    ApiResponse<List<PermissionResponseDto>>
+  > permissionsControllerListV1() {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     String key = cache.buildKey(
@@ -79,13 +89,7 @@ public class PermissionsController implements PermissionsApi {
       }
     );
 
-    return ResponseEntity.ok(
-      new PermissionsControllerListV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(List.of(data))
-    );
+    return ResponseEntity.ok(ApiResponse.of(200, "OK", List.of(data)));
   }
 
   private static PermissionResponseDto toPermissionResponseDto(

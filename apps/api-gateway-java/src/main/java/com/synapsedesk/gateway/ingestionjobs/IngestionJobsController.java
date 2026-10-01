@@ -3,24 +3,36 @@ package com.synapsedesk.gateway.ingestionjobs;
 import com.synapsedesk.gateway.auth.CurrentRequest;
 import com.synapsedesk.gateway.auth.CurrentUser;
 import com.synapsedesk.gateway.auth.RequestContext;
-import com.synapsedesk.gateway.generated.api.IngestionJobsApi;
-import com.synapsedesk.gateway.generated.model.AuthControllerForgotPasswordV1202Response;
 import com.synapsedesk.gateway.generated.model.CurrentUserResponseDto.PermissionCodesEnum;
-import com.synapsedesk.gateway.generated.model.DocumentsControllerListIngestionJobsV1200Response;
-import com.synapsedesk.gateway.generated.model.DocumentsControllerListIngestionJobsV1200ResponseData;
-import com.synapsedesk.gateway.generated.model.DocumentsControllerReindexV1202Response;
-import com.synapsedesk.gateway.generated.model.InvitationsControllerListV1200ResponseDataMeta;
+import com.synapsedesk.gateway.generated.model.IngestionJobResponseDto;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
+import com.synapsedesk.gateway.openapi.ApiErrors;
 import com.synapsedesk.gateway.security.RequirePermission;
+import com.synapsedesk.gateway.web.ApiPaths;
+import com.synapsedesk.gateway.web.ApiResponse;
+import com.synapsedesk.gateway.web.PageMeta;
+import com.synapsedesk.gateway.web.PagedData;
 import io.grpc.stub.MetadataUtils;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import java.math.BigDecimal;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.lang.Nullable;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
-import synapsedesk.auth.Common.PageMeta;
 import synapsedesk.auth.Common.PageRequest;
 import synapsedesk.auth.Common.SortOrder;
 import synapsedesk.ingestion.Document.IngestionJobIdRequest;
@@ -46,9 +58,15 @@ import synapsedesk.ingestion.DocumentServiceGrpc;
  * `documentStatusOf`/`documentFileTypeOf` have this same generator-dropped
  * gap and do NOT guard it — a pre-existing, unaddressed asymmetry in an
  * already-shipped interface, not a precedent to copy forward here.
+ *
+ * <p><b>Migrated off `IngestionJobsApi`.</b> `cancel` answers 204 with an
+ * empty body — {@code @ResponseStatus} is what tells springdoc that.
  */
+@Tag(name = "Ingestion Jobs")
 @RestController
-public class IngestionJobsController implements IngestionJobsApi {
+@RequestMapping(ApiPaths.V1)
+@Validated
+public class IngestionJobsController {
 
   private static final long DEADLINE_SECONDS = 5;
 
@@ -63,15 +81,40 @@ public class IngestionJobsController implements IngestionJobsApi {
     this.currentUser = currentUser;
   }
 
-  @Override
+  @GetMapping(value = "/ingestion-jobs", produces = { "application/json" })
+  @ApiErrors({ "401", "403" })
   @RequirePermission(PermissionCodesEnum.DOCUMENT_READ)
-  public ResponseEntity<DocumentsControllerListIngestionJobsV1200Response> ingestionJobsControllerListV1(
-    BigDecimal page,
-    BigDecimal limit,
-    String sortBy,
-    String sortOrder,
-    @Nullable String status,
-    @Nullable UUID documentId
+  public ResponseEntity<
+    ApiResponse<PagedData<IngestionJobResponseDto>>
+  > ingestionJobsControllerListV1(
+    @DecimalMin(value = "1") @Valid @RequestParam(
+      value = "page",
+      required = false,
+      defaultValue = "1"
+    ) BigDecimal page,
+    @DecimalMin(value = "1") @DecimalMax(value = "100") @Valid @RequestParam(
+      value = "limit",
+      required = false,
+      defaultValue = "10"
+    ) BigDecimal limit,
+    @Valid @RequestParam(
+      value = "sortBy",
+      required = false,
+      defaultValue = "createdAt"
+    ) String sortBy,
+    @Valid @RequestParam(
+      value = "sortOrder",
+      required = false,
+      defaultValue = "ASC"
+    ) String sortOrder,
+    @Valid @RequestParam(
+      value = "status",
+      required = false
+    ) @Nullable String status,
+    @Valid @RequestParam(
+      value = "documentId",
+      required = false
+    ) @Nullable UUID documentId
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -99,31 +142,20 @@ public class IngestionJobsController implements IngestionJobsApi {
       context
     ).listIngestionJobs(wire.build());
 
-    DocumentsControllerListIngestionJobsV1200ResponseData data =
-      new DocumentsControllerListIngestionJobsV1200ResponseData()
-        .items(
-          response
-            .getItemsList()
-            .stream()
-            .map(IngestionJobMapper::toDto)
-            .toList()
-        )
-        .meta(toMetaDto(response.getMeta()));
-
-    return ResponseEntity.ok(
-      new DocumentsControllerListIngestionJobsV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(data)
+    PagedData<IngestionJobResponseDto> data = new PagedData<>(
+      response.getItemsList().stream().map(IngestionJobMapper::toDto).toList(),
+      PageMeta.from(response.getMeta())
     );
+
+    return ResponseEntity.ok(ApiResponse.of(200, "OK", data));
   }
 
-  @Override
+  @GetMapping(value = "/ingestion-jobs/{id}", produces = { "application/json" })
+  @ApiErrors({ "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.DOCUMENT_READ)
-  public ResponseEntity<DocumentsControllerReindexV1202Response> ingestionJobsControllerGetV1(
-    String id
-  ) {
+  public ResponseEntity<
+    ApiResponse<IngestionJobResponseDto>
+  > ingestionJobsControllerGetV1(@PathVariable("id") String id) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     var response = withMetadata(context).getIngestionJob(
@@ -131,19 +163,19 @@ public class IngestionJobsController implements IngestionJobsApi {
     );
 
     return ResponseEntity.ok(
-      new DocumentsControllerReindexV1202Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(IngestionJobMapper.toDto(response))
+      ApiResponse.of(200, "OK", IngestionJobMapper.toDto(response))
     );
   }
 
-  @Override
+  @PostMapping(
+    value = "/ingestion-jobs/{id}/retry",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.DOCUMENT_REINDEX)
-  public ResponseEntity<DocumentsControllerReindexV1202Response> ingestionJobsControllerRetryV1(
-    String id
-  ) {
+  public ResponseEntity<
+    ApiResponse<IngestionJobResponseDto>
+  > ingestionJobsControllerRetryV1(@PathVariable("id") String id) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     var response = withMetadata(context).retryIngestionJob(
@@ -151,18 +183,23 @@ public class IngestionJobsController implements IngestionJobsApi {
     );
 
     return ResponseEntity.ok(
-      new DocumentsControllerReindexV1202Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("Ingestion retry queued")
-        .data(IngestionJobMapper.toDto(response))
+      ApiResponse.of(
+        200,
+        "Ingestion retry queued",
+        IngestionJobMapper.toDto(response)
+      )
     );
   }
 
-  @Override
+  @DeleteMapping(
+    value = "/ingestion-jobs/{id}",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403", "404" })
+  @ResponseStatus(HttpStatus.NO_CONTENT)
   @RequirePermission(PermissionCodesEnum.DOCUMENT_REINDEX)
-  public ResponseEntity<AuthControllerForgotPasswordV1202Response> ingestionJobsControllerCancelV1(
-    String id
+  public ResponseEntity<ApiResponse<Void>> ingestionJobsControllerCancelV1(
+    @PathVariable("id") String id
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -181,22 +218,10 @@ public class IngestionJobsController implements IngestionJobsApi {
       return IngestionJobStatus.valueOf("INGESTION_JOB_STATUS_" + value);
     } catch (IllegalArgumentException e) {
       throw new ResponseStatusException(
-        org.springframework.http.HttpStatus.BAD_REQUEST,
+        HttpStatus.BAD_REQUEST,
         "status must be a recognized ingestion job status"
       );
     }
-  }
-
-  private static InvitationsControllerListV1200ResponseDataMeta toMetaDto(
-    PageMeta meta
-  ) {
-    return new InvitationsControllerListV1200ResponseDataMeta(
-      BigDecimal.valueOf(meta.getTotalItems()),
-      BigDecimal.valueOf(meta.getItemCount()),
-      BigDecimal.valueOf(meta.getItemsPerPage()),
-      BigDecimal.valueOf(meta.getTotalPages()),
-      BigDecimal.valueOf(meta.getCurrentPage())
-    );
   }
 
   private DocumentServiceGrpc.DocumentServiceBlockingStub withMetadata(

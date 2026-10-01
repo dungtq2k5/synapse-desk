@@ -155,7 +155,7 @@ class IngestionJobsControllerTest {
     var response = controller.ingestionJobsControllerRetryV1("job-1");
 
     assertThat(response.getStatusCode().value()).isEqualTo(200);
-    assertThat(response.getBody().getMessage()).isEqualTo(
+    assertThat(response.getBody().message()).isEqualTo(
       "Ingestion retry queued"
     );
   }

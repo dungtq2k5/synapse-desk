@@ -35,9 +35,7 @@ import org.springframework.test.context.ContextConfiguration;
  * Implemented means <b>a bean exposes a `@QueryMapping`/`@MutationMapping`
  * method for that field name</b>, not that a resolver class exists.
  */
-@SpringBootTest(
-  properties = { "management.server.port=0", "realtime.port=0" }
-)
+@SpringBootTest(properties = { "management.server.port=0", "realtime.port=0" })
 @ContextConfiguration(initializers = SharedEnvironmentInitializer.class)
 class GraphqlFieldCoverageTest {
 

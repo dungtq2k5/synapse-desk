@@ -7,7 +7,6 @@ package com.synapsedesk.gateway.realtime;
  * branch for which implementation answered it.
  */
 public record WsResponse<T>(boolean success, String message, T data) {
-
   public static <T> WsResponse<T> ok(String message, T data) {
     return new WsResponse<>(true, message, data);
   }

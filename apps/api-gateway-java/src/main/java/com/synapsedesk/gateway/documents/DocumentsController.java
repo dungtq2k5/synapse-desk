@@ -4,32 +4,16 @@ import com.synapsedesk.gateway.auth.CurrentRequest;
 import com.synapsedesk.gateway.auth.CurrentUser;
 import com.synapsedesk.gateway.auth.RequestContext;
 import com.synapsedesk.gateway.cache.CacheService;
-import com.synapsedesk.gateway.generated.api.DocumentsApi;
-import com.synapsedesk.gateway.generated.model.AuthControllerForgotPasswordV1202Response;
 import com.synapsedesk.gateway.generated.model.ConfirmDocumentDto;
 import com.synapsedesk.gateway.generated.model.CurrentUserResponseDto.PermissionCodesEnum;
 import com.synapsedesk.gateway.generated.model.DocumentChunkResponseDto;
 import com.synapsedesk.gateway.generated.model.DocumentDepartmentsResponseDto;
 import com.synapsedesk.gateway.generated.model.DocumentFlagResponseDto;
 import com.synapsedesk.gateway.generated.model.DocumentResponseDto;
-import com.synapsedesk.gateway.generated.model.DocumentsControllerConfirmV1201Response;
-import com.synapsedesk.gateway.generated.model.DocumentsControllerDownloadV1200Response;
-import com.synapsedesk.gateway.generated.model.DocumentsControllerGetChunkV1200Response;
-import com.synapsedesk.gateway.generated.model.DocumentsControllerGetFlagV1200Response;
-import com.synapsedesk.gateway.generated.model.DocumentsControllerListChunksV1200Response;
-import com.synapsedesk.gateway.generated.model.DocumentsControllerListChunksV1200ResponseData;
-import com.synapsedesk.gateway.generated.model.DocumentsControllerListDepartmentsV1200Response;
-import com.synapsedesk.gateway.generated.model.DocumentsControllerListFlagsV1200Response;
-import com.synapsedesk.gateway.generated.model.DocumentsControllerListFlagsV1200ResponseData;
-import com.synapsedesk.gateway.generated.model.DocumentsControllerListIngestionJobsV1200Response;
-import com.synapsedesk.gateway.generated.model.DocumentsControllerListIngestionJobsV1200ResponseData;
-import com.synapsedesk.gateway.generated.model.DocumentsControllerListV1200Response;
-import com.synapsedesk.gateway.generated.model.DocumentsControllerListV1200ResponseData;
-import com.synapsedesk.gateway.generated.model.DocumentsControllerPresignV1200Response;
-import com.synapsedesk.gateway.generated.model.DocumentsControllerReindexV1202Response;
-import com.synapsedesk.gateway.generated.model.DocumentsControllerStorageUsageV1200Response;
-import com.synapsedesk.gateway.generated.model.InvitationsControllerListV1200ResponseDataMeta;
+import com.synapsedesk.gateway.generated.model.DownloadDocumentResponseDto;
+import com.synapsedesk.gateway.generated.model.IngestionJobResponseDto;
 import com.synapsedesk.gateway.generated.model.PresignDocumentDto;
+import com.synapsedesk.gateway.generated.model.PresignDocumentResponseDto;
 import com.synapsedesk.gateway.generated.model.ReplaceDocumentDto;
 import com.synapsedesk.gateway.generated.model.ResolveDocumentFlagDto;
 import com.synapsedesk.gateway.generated.model.SetDocumentDepartmentsDto;
@@ -37,8 +21,17 @@ import com.synapsedesk.gateway.generated.model.StorageUsageResponseDto;
 import com.synapsedesk.gateway.generated.model.UpdateDocumentDto;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
 import com.synapsedesk.gateway.ingestionjobs.IngestionJobMapper;
+import com.synapsedesk.gateway.openapi.ApiErrors;
 import com.synapsedesk.gateway.security.RequirePermission;
+import com.synapsedesk.gateway.web.ApiPaths;
+import com.synapsedesk.gateway.web.ApiResponse;
+import com.synapsedesk.gateway.web.PageMeta;
+import com.synapsedesk.gateway.web.PagedData;
 import io.grpc.stub.MetadataUtils;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import java.math.BigDecimal;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -54,8 +47,20 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.lang.Nullable;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
-import synapsedesk.auth.Common.PageMeta;
 import synapsedesk.auth.Common.PageRequest;
 import synapsedesk.auth.Common.SortOrder;
 import synapsedesk.ingestion.Document.ConfirmDocumentRequest;
@@ -105,9 +110,20 @@ import synapsedesk.ingestion.DocumentServiceGrpc;
  * `request.query` before any default-filling, so keying off Java's
  * already-defaulted parameters would produce a different key for the same
  * logical request whenever a client omits a param.
+ *
+ * <p><b>Migrated off `DocumentsApi`.</b> {@code list}'s cache goes through
+ * {@link CacheService#wrapTyped} — a bare {@code Class<T>} would erase
+ * {@code ApiResponse<PagedData<DocumentResponseDto>>}'s own type arguments
+ * on a cache HIT, the same defect fixed in {@code RolesController.list}.
+ * {@code confirm} answers 201, {@code reindex}/{@code replace} answer 202,
+ * {@code deleteFlag}/{@code remove} answer 204 — {@code @ResponseStatus} is
+ * what tells springdoc that.
  */
+@Tag(name = "Documents")
 @RestController
-public class DocumentsController implements DocumentsApi {
+@RequestMapping(ApiPaths.V1)
+@Validated
+public class DocumentsController {
 
   private static final long DEADLINE_SECONDS = 5;
   private static final String CACHE_SCOPE = "documents";
@@ -137,17 +153,52 @@ public class DocumentsController implements DocumentsApi {
       );
   }
 
-  @Override
-  public ResponseEntity<DocumentsControllerListV1200Response> documentsControllerListV1(
-    BigDecimal page,
-    BigDecimal limit,
-    String sortBy,
-    String sortOrder,
-    String searchTerm,
-    Boolean includeDeleted,
-    String status,
-    UUID departmentId,
-    String fileType
+  @GetMapping(value = "/documents", produces = { "application/json" })
+  @ApiErrors({ "401" })
+  public ResponseEntity<
+    ApiResponse<PagedData<DocumentResponseDto>>
+  > documentsControllerListV1(
+    @DecimalMin(value = "1") @Valid @RequestParam(
+      value = "page",
+      required = false,
+      defaultValue = "1"
+    ) BigDecimal page,
+    @DecimalMin(value = "1") @DecimalMax(value = "100") @Valid @RequestParam(
+      value = "limit",
+      required = false,
+      defaultValue = "10"
+    ) BigDecimal limit,
+    @Valid @RequestParam(
+      value = "sortBy",
+      required = false,
+      defaultValue = "createdAt"
+    ) String sortBy,
+    @Valid @RequestParam(
+      value = "sortOrder",
+      required = false,
+      defaultValue = "ASC"
+    ) String sortOrder,
+    @Valid @RequestParam(
+      value = "searchTerm",
+      required = false
+    ) @Nullable String searchTerm,
+    @Valid @RequestParam(
+      value = "includeDeleted",
+      required = false,
+      defaultValue = "false"
+    ) Boolean includeDeleted,
+    @Valid @RequestParam(
+      value = "status",
+      required = false
+    ) @Nullable String status,
+    @Valid @RequestParam(
+      value = "departmentId",
+      required = false
+    ) @Nullable UUID departmentId,
+    @Valid @RequestParam(
+      value = "fileType",
+      required = false
+    ) @Nullable String fileType
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -167,10 +218,12 @@ public class DocumentsController implements DocumentsApi {
       rawParams
     );
 
-    DocumentsControllerListV1200Response envelope = cache.wrap(
+    ApiResponse<PagedData<DocumentResponseDto>> envelope = cache.wrapTyped(
       key,
       LIST_CACHE_TTL_SECONDS,
-      DocumentsControllerListV1200Response.class,
+      new tools.jackson.core.type.TypeReference<
+        ApiResponse<PagedData<DocumentResponseDto>>
+      >() {},
       () -> {
         PageRequest.Builder pageRequest = PageRequest.newBuilder()
           .setPage(page.intValue())
@@ -204,31 +257,28 @@ public class DocumentsController implements DocumentsApi {
           wire.build()
         );
 
-        DocumentsControllerListV1200ResponseData data =
-          new DocumentsControllerListV1200ResponseData()
-            .items(
-              response
-                .getItemsList()
-                .stream()
-                .map(DocumentsController::toDto)
-                .toList()
-            )
-            .meta(toMetaDto(response.getMeta()));
+        PagedData<DocumentResponseDto> data = new PagedData<>(
+          response
+            .getItemsList()
+            .stream()
+            .map(DocumentsController::toDto)
+            .toList(),
+          PageMeta.from(response.getMeta())
+        );
 
-        return new DocumentsControllerListV1200Response()
-          .success(true)
-          .statusCode(BigDecimal.valueOf(200))
-          .message("OK")
-          .data(data);
+        return ApiResponse.of(200, "OK", data);
       }
     );
 
     return ResponseEntity.ok(envelope);
   }
 
-  @Override
+  @GetMapping(value = "/documents/storage", produces = { "application/json" })
+  @ApiErrors({ "401", "403" })
   @RequirePermission(PermissionCodesEnum.DOCUMENT_READ)
-  public ResponseEntity<DocumentsControllerStorageUsageV1200Response> documentsControllerStorageUsageV1() {
+  public ResponseEntity<
+    ApiResponse<StorageUsageResponseDto>
+  > documentsControllerStorageUsageV1() {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     // Blank id, ignored server-side — a workspace total, not a per-document one.
@@ -237,31 +287,61 @@ public class DocumentsController implements DocumentsApi {
     );
 
     return ResponseEntity.ok(
-      new DocumentsControllerStorageUsageV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(
-          new StorageUsageResponseDto(
-            BigDecimal.valueOf(response.getUsedBytes()),
-            BigDecimal.valueOf(response.getLimitBytes()),
-            BigDecimal.valueOf(response.getDocumentCount())
-          )
+      ApiResponse.of(
+        200,
+        "OK",
+        new StorageUsageResponseDto(
+          BigDecimal.valueOf(response.getUsedBytes()),
+          BigDecimal.valueOf(response.getLimitBytes()),
+          BigDecimal.valueOf(response.getDocumentCount())
         )
+      )
     );
   }
 
-  @Override
+  @GetMapping(value = "/documents/flags", produces = { "application/json" })
+  @ApiErrors({ "401", "403" })
   @RequirePermission(PermissionCodesEnum.DOCUMENT_READ)
-  public ResponseEntity<DocumentsControllerListFlagsV1200Response> documentsControllerListFlagsV1(
-    BigDecimal page,
-    BigDecimal limit,
-    String sortBy,
-    String sortOrder,
-    List<String> type,
-    Boolean includeResolved,
-    String severity,
-    UUID documentId
+  public ResponseEntity<
+    ApiResponse<PagedData<DocumentFlagResponseDto>>
+  > documentsControllerListFlagsV1(
+    @DecimalMin(value = "1") @Valid @RequestParam(
+      value = "page",
+      required = false,
+      defaultValue = "1"
+    ) BigDecimal page,
+    @DecimalMin(value = "1") @DecimalMax(value = "100") @Valid @RequestParam(
+      value = "limit",
+      required = false,
+      defaultValue = "10"
+    ) BigDecimal limit,
+    @Valid @RequestParam(
+      value = "sortBy",
+      required = false,
+      defaultValue = "detectedAt"
+    ) String sortBy,
+    @Valid @RequestParam(
+      value = "sortOrder",
+      required = false,
+      defaultValue = "ASC"
+    ) String sortOrder,
+    @Valid @RequestParam(
+      value = "type",
+      required = false
+    ) @Nullable List<String> type,
+    @Valid @RequestParam(
+      value = "includeResolved",
+      required = false,
+      defaultValue = "false"
+    ) Boolean includeResolved,
+    @Valid @RequestParam(
+      value = "severity",
+      required = false
+    ) @Nullable String severity,
+    @Valid @RequestParam(
+      value = "documentId",
+      required = false
+    ) @Nullable UUID documentId
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -295,31 +375,27 @@ public class DocumentsController implements DocumentsApi {
       context
     ).listDocumentFlags(wire.build());
 
-    DocumentsControllerListFlagsV1200ResponseData data =
-      new DocumentsControllerListFlagsV1200ResponseData()
-        .items(
-          response
-            .getItemsList()
-            .stream()
-            .map(DocumentsController::toFlagDto)
-            .toList()
-        )
-        .meta(toMetaDto(response.getMeta()));
-
-    return ResponseEntity.ok(
-      new DocumentsControllerListFlagsV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(data)
+    PagedData<DocumentFlagResponseDto> data = new PagedData<>(
+      response
+        .getItemsList()
+        .stream()
+        .map(DocumentsController::toFlagDto)
+        .toList(),
+      PageMeta.from(response.getMeta())
     );
+
+    return ResponseEntity.ok(ApiResponse.of(200, "OK", data));
   }
 
-  @Override
+  @GetMapping(
+    value = "/documents/flags/{flagId}",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.DOCUMENT_READ)
-  public ResponseEntity<DocumentsControllerGetFlagV1200Response> documentsControllerGetFlagV1(
-    String flagId
-  ) {
+  public ResponseEntity<
+    ApiResponse<DocumentFlagResponseDto>
+  > documentsControllerGetFlagV1(@PathVariable("flagId") String flagId) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     DocumentFlagResponse response = withMetadata(context).getDocumentFlag(
@@ -329,11 +405,18 @@ public class DocumentsController implements DocumentsApi {
     return okFlag(response, "OK");
   }
 
-  @Override
+  @PostMapping(
+    value = "/documents/flags/{flagId}/dismiss",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.DOCUMENT_UPDATE)
-  public ResponseEntity<DocumentsControllerGetFlagV1200Response> documentsControllerDismissFlagV1(
-    String flagId,
-    ResolveDocumentFlagDto resolveDocumentFlagDto
+  public ResponseEntity<
+    ApiResponse<DocumentFlagResponseDto>
+  > documentsControllerDismissFlagV1(
+    @PathVariable("flagId") String flagId,
+    @Valid @RequestBody ResolveDocumentFlagDto resolveDocumentFlagDto
   ) {
     return resolveFlag(
       flagId,
@@ -343,11 +426,18 @@ public class DocumentsController implements DocumentsApi {
     );
   }
 
-  @Override
+  @PostMapping(
+    value = "/documents/flags/{flagId}/fixed",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.DOCUMENT_UPDATE)
-  public ResponseEntity<DocumentsControllerGetFlagV1200Response> documentsControllerFixFlagV1(
-    String flagId,
-    ResolveDocumentFlagDto resolveDocumentFlagDto
+  public ResponseEntity<
+    ApiResponse<DocumentFlagResponseDto>
+  > documentsControllerFixFlagV1(
+    @PathVariable("flagId") String flagId,
+    @Valid @RequestBody ResolveDocumentFlagDto resolveDocumentFlagDto
   ) {
     return resolveFlag(
       flagId,
@@ -357,11 +447,18 @@ public class DocumentsController implements DocumentsApi {
     );
   }
 
-  @Override
+  @PostMapping(
+    value = "/documents/flags/{flagId}/replaced",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.DOCUMENT_UPDATE)
-  public ResponseEntity<DocumentsControllerGetFlagV1200Response> documentsControllerReplaceFlagV1(
-    String flagId,
-    ResolveDocumentFlagDto resolveDocumentFlagDto
+  public ResponseEntity<
+    ApiResponse<DocumentFlagResponseDto>
+  > documentsControllerReplaceFlagV1(
+    @PathVariable("flagId") String flagId,
+    @Valid @RequestBody ResolveDocumentFlagDto resolveDocumentFlagDto
   ) {
     return resolveFlag(
       flagId,
@@ -371,7 +468,7 @@ public class DocumentsController implements DocumentsApi {
     );
   }
 
-  private ResponseEntity<DocumentsControllerGetFlagV1200Response> resolveFlag(
+  private ResponseEntity<ApiResponse<DocumentFlagResponseDto>> resolveFlag(
     String flagId,
     DocumentFlagResolution resolution,
     ResolveDocumentFlagDto dto,
@@ -394,23 +491,22 @@ public class DocumentsController implements DocumentsApi {
     return okFlag(response, message);
   }
 
-  private ResponseEntity<DocumentsControllerGetFlagV1200Response> okFlag(
+  private ResponseEntity<ApiResponse<DocumentFlagResponseDto>> okFlag(
     DocumentFlagResponse response,
     String message
   ) {
-    return ResponseEntity.ok(
-      new DocumentsControllerGetFlagV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message(message)
-        .data(toFlagDto(response))
-    );
+    return ResponseEntity.ok(ApiResponse.of(200, message, toFlagDto(response)));
   }
 
-  @Override
+  @DeleteMapping(
+    value = "/documents/flags/{flagId}",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403", "404" })
+  @ResponseStatus(HttpStatus.NO_CONTENT)
   @RequirePermission(PermissionCodesEnum.DOCUMENT_DELETE)
-  public ResponseEntity<AuthControllerForgotPasswordV1202Response> documentsControllerDeleteFlagV1(
-    String flagId
+  public ResponseEntity<Void> documentsControllerDeleteFlagV1(
+    @PathVariable("flagId") String flagId
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -423,10 +519,17 @@ public class DocumentsController implements DocumentsApi {
     return ResponseEntity.noContent().build();
   }
 
-  @Override
+  @PostMapping(
+    value = "/documents/presign",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403" })
   @RequirePermission(PermissionCodesEnum.DOCUMENT_CREATE)
-  public ResponseEntity<DocumentsControllerPresignV1200Response> documentsControllerPresignV1(
-    PresignDocumentDto presignDocumentDto
+  public ResponseEntity<
+    ApiResponse<PresignDocumentResponseDto>
+  > documentsControllerPresignV1(
+    @Valid @RequestBody PresignDocumentDto presignDocumentDto
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -439,24 +542,30 @@ public class DocumentsController implements DocumentsApi {
     );
 
     return ResponseEntity.ok(
-      new DocumentsControllerPresignV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(
-          new com.synapsedesk.gateway.generated.model.PresignDocumentResponseDto(
-            response.getUploadUrl(),
-            response.getObjectPath(),
-            toOffsetDateTime(response.getExpiresAt())
-          )
+      ApiResponse.of(
+        200,
+        "OK",
+        new PresignDocumentResponseDto(
+          response.getUploadUrl(),
+          response.getObjectPath(),
+          toOffsetDateTime(response.getExpiresAt())
         )
+      )
     );
   }
 
-  @Override
+  @PostMapping(
+    value = "/documents/confirm",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403" })
+  @ResponseStatus(HttpStatus.CREATED)
   @RequirePermission(PermissionCodesEnum.DOCUMENT_CREATE)
-  public ResponseEntity<DocumentsControllerConfirmV1201Response> documentsControllerConfirmV1(
-    ConfirmDocumentDto confirmDocumentDto
+  public ResponseEntity<
+    ApiResponse<DocumentResponseDto>
+  > documentsControllerConfirmV1(
+    @Valid @RequestBody ConfirmDocumentDto confirmDocumentDto
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -491,18 +600,15 @@ public class DocumentsController implements DocumentsApi {
     );
 
     return ResponseEntity.status(HttpStatus.CREATED).body(
-      new DocumentsControllerConfirmV1201Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(201))
-        .message("Document uploaded")
-        .data(toDto(response))
+      ApiResponse.of(201, "Document uploaded", toDto(response))
     );
   }
 
-  @Override
-  public ResponseEntity<DocumentsControllerConfirmV1201Response> documentsControllerGetV1(
-    String id
-  ) {
+  @GetMapping(value = "/documents/{id}", produces = { "application/json" })
+  @ApiErrors({ "400", "401", "404" })
+  public ResponseEntity<
+    ApiResponse<DocumentResponseDto>
+  > documentsControllerGetV1(@PathVariable("id") String id) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     DocumentResponse response = withMetadata(context).getDocument(
@@ -512,11 +618,18 @@ public class DocumentsController implements DocumentsApi {
     return okDocument(response, "OK", HttpStatus.OK);
   }
 
-  @Override
+  @PatchMapping(
+    value = "/documents/{id}",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.DOCUMENT_UPDATE)
-  public ResponseEntity<DocumentsControllerConfirmV1201Response> documentsControllerUpdateV1(
-    String id,
-    UpdateDocumentDto updateDocumentDto
+  public ResponseEntity<
+    ApiResponse<DocumentResponseDto>
+  > documentsControllerUpdateV1(
+    @PathVariable("id") String id,
+    @Valid @RequestBody UpdateDocumentDto updateDocumentDto
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -536,10 +649,12 @@ public class DocumentsController implements DocumentsApi {
     return okDocument(response, "Document updated", HttpStatus.OK);
   }
 
-  @Override
+  @DeleteMapping(value = "/documents/{id}", produces = { "application/json" })
+  @ApiErrors({ "400", "401", "403", "404" })
+  @ResponseStatus(HttpStatus.NO_CONTENT)
   @RequirePermission(PermissionCodesEnum.DOCUMENT_DELETE)
-  public ResponseEntity<AuthControllerForgotPasswordV1202Response> documentsControllerRemoveV1(
-    String id
+  public ResponseEntity<Void> documentsControllerRemoveV1(
+    @PathVariable("id") String id
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -550,11 +665,15 @@ public class DocumentsController implements DocumentsApi {
     return ResponseEntity.noContent().build();
   }
 
-  @Override
+  @PostMapping(
+    value = "/documents/{id}/restore",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.DOCUMENT_DELETE)
-  public ResponseEntity<DocumentsControllerConfirmV1201Response> documentsControllerRestoreV1(
-    String id
-  ) {
+  public ResponseEntity<
+    ApiResponse<DocumentResponseDto>
+  > documentsControllerRestoreV1(@PathVariable("id") String id) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     DocumentResponse response = withMetadata(context).restoreDocument(
@@ -564,11 +683,16 @@ public class DocumentsController implements DocumentsApi {
     return okDocument(response, "Document restored", HttpStatus.OK);
   }
 
-  @Override
+  @PostMapping(
+    value = "/documents/{id}/reindex",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403", "404" })
+  @ResponseStatus(HttpStatus.ACCEPTED)
   @RequirePermission(PermissionCodesEnum.DOCUMENT_REINDEX)
-  public ResponseEntity<DocumentsControllerReindexV1202Response> documentsControllerReindexV1(
-    String id
-  ) {
+  public ResponseEntity<
+    ApiResponse<IngestionJobResponseDto>
+  > documentsControllerReindexV1(@PathVariable("id") String id) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     IngestionJobResponse response = withMetadata(context).reindexDocument(
@@ -576,19 +700,23 @@ public class DocumentsController implements DocumentsApi {
     );
 
     return ResponseEntity.status(HttpStatus.ACCEPTED).body(
-      new DocumentsControllerReindexV1202Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(202))
-        .message("Reindex queued")
-        .data(IngestionJobMapper.toDto(response))
+      ApiResponse.of(202, "Reindex queued", IngestionJobMapper.toDto(response))
     );
   }
 
-  @Override
+  @PostMapping(
+    value = "/documents/{id}/replace",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403", "404", "409" })
+  @ResponseStatus(HttpStatus.ACCEPTED)
   @RequirePermission(PermissionCodesEnum.DOCUMENT_UPDATE)
-  public ResponseEntity<DocumentsControllerConfirmV1201Response> documentsControllerReplaceV1(
-    String id,
-    ReplaceDocumentDto replaceDocumentDto
+  public ResponseEntity<
+    ApiResponse<DocumentResponseDto>
+  > documentsControllerReplaceV1(
+    @PathVariable("id") String id,
+    @Valid @RequestBody ReplaceDocumentDto replaceDocumentDto
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -609,10 +737,14 @@ public class DocumentsController implements DocumentsApi {
     return okDocument(response, "Replacement queued", HttpStatus.ACCEPTED);
   }
 
-  @Override
-  public ResponseEntity<DocumentsControllerDownloadV1200Response> documentsControllerDownloadV1(
-    String id
-  ) {
+  @GetMapping(
+    value = "/documents/{id}/download",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "404" })
+  public ResponseEntity<
+    ApiResponse<DownloadDocumentResponseDto>
+  > documentsControllerDownloadV1(@PathVariable("id") String id) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     DownloadDocumentResponse response = withMetadata(context).downloadDocument(
@@ -620,55 +752,50 @@ public class DocumentsController implements DocumentsApi {
     );
 
     return ResponseEntity.ok(
-      new DocumentsControllerDownloadV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(
-          new com.synapsedesk.gateway.generated.model.DownloadDocumentResponseDto(
-            response.getDownloadUrl(),
-            toOffsetDateTime(response.getExpiresAt())
-          )
+      ApiResponse.of(
+        200,
+        "OK",
+        new DownloadDocumentResponseDto(
+          response.getDownloadUrl(),
+          toOffsetDateTime(response.getExpiresAt())
         )
+      )
     );
   }
 
-  @Override
+  @GetMapping(
+    value = "/documents/{id}/ingestion-jobs",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.DOCUMENT_READ)
-  public ResponseEntity<DocumentsControllerListIngestionJobsV1200Response> documentsControllerListIngestionJobsV1(
-    String id
-  ) {
+  public ResponseEntity<
+    ApiResponse<List<IngestionJobResponseDto>>
+  > documentsControllerListIngestionJobsV1(@PathVariable("id") String id) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     var response = withMetadata(context).listDocumentIngestionJobs(
       DocumentIdRequest.newBuilder().setId(id).build()
     );
 
-    DocumentsControllerListIngestionJobsV1200ResponseData data =
-      new DocumentsControllerListIngestionJobsV1200ResponseData()
-        .items(
-          response
-            .getItemsList()
-            .stream()
-            .map(IngestionJobMapper::toDto)
-            .toList()
-        )
-        .meta(toMetaDto(response.getMeta()));
+    List<IngestionJobResponseDto> data = response
+      .getItemsList()
+      .stream()
+      .map(IngestionJobMapper::toDto)
+      .toList();
 
-    return ResponseEntity.ok(
-      new DocumentsControllerListIngestionJobsV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(data)
-    );
+    return ResponseEntity.ok(ApiResponse.of(200, "OK", data));
   }
 
-  @Override
+  @GetMapping(
+    value = "/documents/{id}/departments",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.DOCUMENT_READ)
-  public ResponseEntity<DocumentsControllerListDepartmentsV1200Response> documentsControllerListDepartmentsV1(
-    String id
-  ) {
+  public ResponseEntity<
+    ApiResponse<DocumentDepartmentsResponseDto>
+  > documentsControllerListDepartmentsV1(@PathVariable("id") String id) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
     ListDocumentDepartmentsResponse response = withMetadata(
@@ -676,21 +803,26 @@ public class DocumentsController implements DocumentsApi {
     ).listDocumentDepartments(DocumentIdRequest.newBuilder().setId(id).build());
 
     return ResponseEntity.ok(
-      new DocumentsControllerListDepartmentsV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(
-          new DocumentDepartmentsResponseDto(response.getDepartmentIdsList())
-        )
+      ApiResponse.of(
+        200,
+        "OK",
+        new DocumentDepartmentsResponseDto(response.getDepartmentIdsList())
+      )
     );
   }
 
-  @Override
+  @PutMapping(
+    value = "/documents/{id}/departments",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.DOCUMENT_SHARE)
-  public ResponseEntity<DocumentsControllerConfirmV1201Response> documentsControllerSetDepartmentsV1(
-    String id,
-    SetDocumentDepartmentsDto setDocumentDepartmentsDto
+  public ResponseEntity<
+    ApiResponse<DocumentResponseDto>
+  > documentsControllerSetDepartmentsV1(
+    @PathVariable("id") String id,
+    @Valid @RequestBody SetDocumentDepartmentsDto setDocumentDepartmentsDto
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -716,19 +848,57 @@ public class DocumentsController implements DocumentsApi {
     return okDocument(response, "Document scoping updated", HttpStatus.OK);
   }
 
-  @Override
+  @GetMapping(
+    value = "/documents/{id}/chunks",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "403", "404" })
   @RequirePermission(PermissionCodesEnum.DOCUMENT_READ)
-  public ResponseEntity<DocumentsControllerListChunksV1200Response> documentsControllerListChunksV1(
-    String id,
-    BigDecimal page,
-    BigDecimal limit,
-    String sortBy,
-    String sortOrder,
-    String searchTerm,
-    Boolean includeDeleted,
-    String status,
-    UUID departmentId,
-    String fileType
+  public ResponseEntity<
+    ApiResponse<PagedData<DocumentChunkResponseDto>>
+  > documentsControllerListChunksV1(
+    @PathVariable("id") String id,
+    @DecimalMin(value = "1") @Valid @RequestParam(
+      value = "page",
+      required = false,
+      defaultValue = "1"
+    ) BigDecimal page,
+    @DecimalMin(value = "1") @DecimalMax(value = "100") @Valid @RequestParam(
+      value = "limit",
+      required = false,
+      defaultValue = "10"
+    ) BigDecimal limit,
+    @Valid @RequestParam(
+      value = "sortBy",
+      required = false,
+      defaultValue = "createdAt"
+    ) String sortBy,
+    @Valid @RequestParam(
+      value = "sortOrder",
+      required = false,
+      defaultValue = "ASC"
+    ) String sortOrder,
+    @Valid @RequestParam(
+      value = "searchTerm",
+      required = false
+    ) @Nullable String searchTerm,
+    @Valid @RequestParam(
+      value = "includeDeleted",
+      required = false,
+      defaultValue = "false"
+    ) Boolean includeDeleted,
+    @Valid @RequestParam(
+      value = "status",
+      required = false
+    ) @Nullable String status,
+    @Valid @RequestParam(
+      value = "departmentId",
+      required = false
+    ) @Nullable UUID departmentId,
+    @Valid @RequestParam(
+      value = "fileType",
+      required = false
+    ) @Nullable String fileType
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -755,30 +925,28 @@ public class DocumentsController implements DocumentsApi {
         .build()
     );
 
-    DocumentsControllerListChunksV1200ResponseData data =
-      new com.synapsedesk.gateway.generated.model.DocumentsControllerListChunksV1200ResponseData()
-        .items(
-          response
-            .getItemsList()
-            .stream()
-            .map(DocumentsController::toChunkDto)
-            .toList()
-        )
-        .meta(toMetaDto(response.getMeta()));
-
-    return ResponseEntity.ok(
-      new DocumentsControllerListChunksV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(data)
+    PagedData<DocumentChunkResponseDto> data = new PagedData<>(
+      response
+        .getItemsList()
+        .stream()
+        .map(DocumentsController::toChunkDto)
+        .toList(),
+      PageMeta.from(response.getMeta())
     );
+
+    return ResponseEntity.ok(ApiResponse.of(200, "OK", data));
   }
 
-  @Override
-  public ResponseEntity<DocumentsControllerGetChunkV1200Response> documentsControllerGetChunkV1(
-    String id,
-    String chunkId
+  @GetMapping(
+    value = "/documents/{id}/chunks/{chunkId}",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "404" })
+  public ResponseEntity<
+    ApiResponse<DocumentChunkResponseDto>
+  > documentsControllerGetChunkV1(
+    @PathVariable("id") String id,
+    @PathVariable("chunkId") String chunkId
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
 
@@ -789,26 +957,16 @@ public class DocumentsController implements DocumentsApi {
         .build()
     );
 
-    return ResponseEntity.ok(
-      new DocumentsControllerGetChunkV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(toChunkDto(response))
-    );
+    return ResponseEntity.ok(ApiResponse.of(200, "OK", toChunkDto(response)));
   }
 
-  private ResponseEntity<DocumentsControllerConfirmV1201Response> okDocument(
+  private ResponseEntity<ApiResponse<DocumentResponseDto>> okDocument(
     DocumentResponse response,
     String message,
     HttpStatus status
   ) {
     return ResponseEntity.status(status).body(
-      new DocumentsControllerConfirmV1201Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(status.value()))
-        .message(message)
-        .data(toDto(response))
+      ApiResponse.of(status.value(), message, toDto(response))
     );
   }
 
@@ -883,18 +1041,6 @@ public class DocumentsController implements DocumentsApi {
       BigDecimal.valueOf(chunk.getTokenCount()),
       chunk.hasVectorPointId() ? chunk.getVectorPointId() : null,
       toOffsetDateTime(chunk.getCreatedAt())
-    );
-  }
-
-  private static InvitationsControllerListV1200ResponseDataMeta toMetaDto(
-    PageMeta meta
-  ) {
-    return new InvitationsControllerListV1200ResponseDataMeta(
-      BigDecimal.valueOf(meta.getTotalItems()),
-      BigDecimal.valueOf(meta.getItemCount()),
-      BigDecimal.valueOf(meta.getItemsPerPage()),
-      BigDecimal.valueOf(meta.getTotalPages()),
-      BigDecimal.valueOf(meta.getCurrentPage())
     );
   }
 

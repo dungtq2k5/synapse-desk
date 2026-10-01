@@ -1,16 +1,5 @@
 package com.synapsedesk.gateway.auth;
 
-import com.synapsedesk.gateway.generated.api.AuthApi;
-import com.synapsedesk.gateway.generated.model.AuthControllerChangePasswordV1200Response;
-import com.synapsedesk.gateway.generated.model.AuthControllerForgotPasswordV1202Response;
-import com.synapsedesk.gateway.generated.model.AuthControllerLoginV1200Response;
-import com.synapsedesk.gateway.generated.model.AuthControllerLoginV1200ResponseData;
-import com.synapsedesk.gateway.generated.model.AuthControllerLogoutAllV1200Response;
-import com.synapsedesk.gateway.generated.model.AuthControllerLogoutV1200Response;
-import com.synapsedesk.gateway.generated.model.AuthControllerRefreshV1200Response;
-import com.synapsedesk.gateway.generated.model.AuthControllerRegisterV1201Response;
-import com.synapsedesk.gateway.generated.model.AuthControllerResetPasswordV1200Response;
-import com.synapsedesk.gateway.generated.model.AuthControllerValidatePasswordResetTokenV1200Response;
 import com.synapsedesk.gateway.generated.model.ChangePasswordDto;
 import com.synapsedesk.gateway.generated.model.ChangePasswordResponseDto;
 import com.synapsedesk.gateway.generated.model.ForgotPasswordDto;
@@ -30,16 +19,33 @@ import com.synapsedesk.gateway.generated.model.TenantSelectionResponseDto;
 import com.synapsedesk.gateway.generated.model.TwoFactorRequiredResponseDto;
 import com.synapsedesk.gateway.generated.model.ValidatePasswordResetTokenResponseDto;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
+import com.synapsedesk.gateway.openapi.ApiErrors;
 import com.synapsedesk.gateway.throttle.AuthThrottle;
 import com.synapsedesk.gateway.throttle.RouteThrottle;
+import com.synapsedesk.gateway.throttle.ThrottleOverride;
+import com.synapsedesk.gateway.throttle.ThrottlerTiers;
+import com.synapsedesk.gateway.web.ApiPaths;
+import com.synapsedesk.gateway.web.ApiResponse;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.media.SchemaProperty;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.math.BigDecimal;
+import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 import synapsedesk.auth.Auth.ChangePasswordRequest;
@@ -69,10 +75,37 @@ import synapsedesk.auth.AuthServiceGrpc;
  * peer's `StatusRuntimeException` is not caught here — it reaches
  * {@code GatewayExceptionHandler}, exactly as a peer failure does on every
  * other route.
+ *
+ * <p><b>Migrated off `AuthApi`</b> — the OpenAPI-ownership flip's first
+ * controller. `@RequestMapping` and `@Validated` used to arrive through
+ * `implements AuthApi`; both are now declared here directly, since
+ * springdoc (not a document Node exports) is this gateway's own document
+ * producer and there is no longer an interface to inherit either from. Every
+ * return type is {@link ApiResponse}, not a generated per-endpoint wrapper
+ * class — see its own docblock for why one generic type replaced ~150 of
+ * them.
+ *
+ * <p><b>`login`/`loginWithTenant`/`googleSignIn` still return {@code
+ * ApiResponse<Object>}</b> — Java's erasure gives the THREE-WAY union
+ * (`settleLogin`'s fresh session, 2FA challenge, or tenant picker) no
+ * sealed-interface equivalent to name as `T`, and this migration is not
+ * the place to introduce one. The document does not go unfixed for it,
+ * though: each of the three methods carries an explicit {@code
+ * @io.swagger.v3.oas.annotations.responses.ApiResponse} that overrides
+ * `data`'s inferred schema with the same three-way {@code oneOf} the
+ * committed document already declares (`LoginResponseDto` /
+ * `TwoFactorRequiredResponseDto` / `TenantSelectionResponseDto`) —
+ * `@SchemaProperty` replaces one property of springdoc's auto-inferred
+ * envelope schema rather than the whole schema, which is what lets the
+ * generic `T = Object` stay untyped in Java while the PUBLISHED document
+ * stays exactly as precise as before.
  */
+@Tag(name = "Auth")
 @RestController
+@RequestMapping(ApiPaths.V1)
+@Validated
 @AuthThrottle
-public class AuthController implements AuthApi {
+public class AuthController {
 
   private static final long DEADLINE_SECONDS = 5;
 
@@ -117,14 +150,26 @@ public class AuthController implements AuthApi {
       );
   }
 
-  @Override
-  @AuthThrottle(
+  @PostMapping(
+    value = "/auth/register",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401" })
+  // springdoc infers the documented status from `@ResponseStatus`, never
+  // from a runtime `ResponseEntity.status(...)` call — it does not execute
+  // the method. Every non-200 route needs this or the document says 200
+  // regardless of what actually goes on the wire (measured: absent here,
+  // this route documented as 200).
+  @ResponseStatus(HttpStatus.CREATED)
+  @ThrottleOverride(
+    tier = ThrottlerTiers.AUTH,
     ttlMs = RouteThrottle.REGISTER_TTL_MS,
     limit = RouteThrottle.REGISTER_LIMIT
   )
-  public ResponseEntity<AuthControllerRegisterV1201Response> authControllerRegisterV1(
-    RegisterDto registerDto
-  ) {
+  public ResponseEntity<
+    ApiResponse<RegisterResponseDto>
+  > authControllerRegisterV1(@Valid @RequestBody RegisterDto registerDto) {
     HttpServletRequest request = CurrentRequest.request();
     guestCheck.requireNoActiveSession(request);
 
@@ -144,21 +189,50 @@ public class AuthController implements AuthApi {
       .requiresEmailVerification(response.getRequiresEmailVerification());
 
     return ResponseEntity.status(HttpStatus.CREATED).body(
-      new AuthControllerRegisterV1201Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(201))
-        .message("Registered")
-        .data(data)
+      ApiResponse.of(201, "Registered", data)
     );
   }
 
-  @Override
-  @AuthThrottle(
+  @PostMapping(
+    value = "/auth/login",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401" })
+  @ThrottleOverride(
+    tier = ThrottlerTiers.AUTH,
     ttlMs = RouteThrottle.LOGIN_TTL_MS,
     limit = RouteThrottle.LOGIN_LIMIT
   )
-  public ResponseEntity<AuthControllerLoginV1200Response> authControllerLoginV1(
-    LoginDto loginDto
+  @io.swagger.v3.oas.annotations.responses.ApiResponse(
+    responseCode = "200",
+    content = @Content(
+      schemaProperties = {
+        @SchemaProperty(name = "success", schema = @Schema(type = "boolean")),
+        @SchemaProperty(
+          name = "statusCode",
+          schema = @Schema(type = "integer", format = "int32")
+        ),
+        @SchemaProperty(name = "message", schema = @Schema(type = "string")),
+        @SchemaProperty(
+          name = "warning",
+          schema = @Schema(types = { "string", "null" })
+        ),
+        @SchemaProperty(
+          name = "data",
+          schema = @Schema(
+            oneOf = {
+              LoginResponseDto.class,
+              TwoFactorRequiredResponseDto.class,
+              TenantSelectionResponseDto.class,
+            }
+          )
+        ),
+      }
+    )
+  )
+  public ResponseEntity<ApiResponse<Object>> authControllerLoginV1(
+    @Valid @RequestBody LoginDto loginDto
   ) {
     HttpServletRequest request = CurrentRequest.request();
     guestCheck.requireNoActiveSession(request);
@@ -174,17 +248,49 @@ public class AuthController implements AuthApi {
     LoginResponse response = withMetadata(request).login(wire.build());
 
     return ResponseEntity.ok(
-      new AuthControllerLoginV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(settleLogin(response, CurrentRequest.response()))
+      ApiResponse.of(
+        200,
+        "OK",
+        settleLogin(response, CurrentRequest.response())
+      )
     );
   }
 
-  @Override
-  public ResponseEntity<AuthControllerLoginV1200Response> authControllerLoginWithTenantV1(
-    LoginWithTenantDto loginWithTenantDto
+  @PostMapping(
+    value = "/auth/login/tenant",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401" })
+  @io.swagger.v3.oas.annotations.responses.ApiResponse(
+    responseCode = "200",
+    content = @Content(
+      schemaProperties = {
+        @SchemaProperty(name = "success", schema = @Schema(type = "boolean")),
+        @SchemaProperty(
+          name = "statusCode",
+          schema = @Schema(type = "integer", format = "int32")
+        ),
+        @SchemaProperty(name = "message", schema = @Schema(type = "string")),
+        @SchemaProperty(
+          name = "warning",
+          schema = @Schema(types = { "string", "null" })
+        ),
+        @SchemaProperty(
+          name = "data",
+          schema = @Schema(
+            oneOf = {
+              LoginResponseDto.class,
+              TwoFactorRequiredResponseDto.class,
+              TenantSelectionResponseDto.class,
+            }
+          )
+        ),
+      }
+    )
+  )
+  public ResponseEntity<ApiResponse<Object>> authControllerLoginWithTenantV1(
+    @Valid @RequestBody LoginWithTenantDto loginWithTenantDto
   ) {
     HttpServletRequest request = CurrentRequest.request();
     HttpServletResponse httpResponse = CurrentRequest.response();
@@ -216,17 +322,45 @@ public class AuthController implements AuthApi {
     cookies.clearTenantSelection(httpResponse);
 
     return ResponseEntity.ok(
-      new AuthControllerLoginV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(settleLogin(response, httpResponse))
+      ApiResponse.of(200, "OK", settleLogin(response, httpResponse))
     );
   }
 
-  @Override
-  public ResponseEntity<AuthControllerLoginV1200Response> authControllerGoogleSignInV1(
-    GoogleSignInDto googleSignInDto
+  @PostMapping(
+    value = "/auth/google",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401" })
+  @io.swagger.v3.oas.annotations.responses.ApiResponse(
+    responseCode = "200",
+    content = @Content(
+      schemaProperties = {
+        @SchemaProperty(name = "success", schema = @Schema(type = "boolean")),
+        @SchemaProperty(
+          name = "statusCode",
+          schema = @Schema(type = "integer", format = "int32")
+        ),
+        @SchemaProperty(name = "message", schema = @Schema(type = "string")),
+        @SchemaProperty(
+          name = "warning",
+          schema = @Schema(types = { "string", "null" })
+        ),
+        @SchemaProperty(
+          name = "data",
+          schema = @Schema(
+            oneOf = {
+              LoginResponseDto.class,
+              TwoFactorRequiredResponseDto.class,
+              TenantSelectionResponseDto.class,
+            }
+          )
+        ),
+      }
+    )
+  )
+  public ResponseEntity<ApiResponse<Object>> authControllerGoogleSignInV1(
+    @Valid @RequestBody GoogleSignInDto googleSignInDto
   ) {
     HttpServletRequest request = CurrentRequest.request();
     guestCheck.requireNoActiveSession(request);
@@ -241,11 +375,11 @@ public class AuthController implements AuthApi {
     LoginResponse response = withMetadata(request).googleSignIn(wire.build());
 
     return ResponseEntity.ok(
-      new AuthControllerLoginV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(settleLogin(response, CurrentRequest.response()))
+      ApiResponse.of(
+        200,
+        "OK",
+        settleLogin(response, CurrentRequest.response())
+      )
     );
   }
 
@@ -255,7 +389,7 @@ public class AuthController implements AuthApi {
    * BEFORE 2FA: 2FA policy is per-tenant, unanswerable until the tenant is
    * known.
    */
-  private AuthControllerLoginV1200ResponseData settleLogin(
+  private Object settleLogin(
     LoginResponse response,
     HttpServletResponse httpResponse
   ) {
@@ -299,9 +433,14 @@ public class AuthController implements AuthApi {
       .requiresTwoFactor(false);
   }
 
-  @Override
-  public ResponseEntity<AuthControllerLogoutV1200Response> authControllerLogoutV1(
-    LogoutDto logoutDto
+  @PostMapping(
+    value = "/auth/logout",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401" })
+  public ResponseEntity<ApiResponse<LogoutResponseDto>> authControllerLogoutV1(
+    @Valid @RequestBody LogoutDto logoutDto
   ) {
     HttpServletRequest request = CurrentRequest.request();
     HttpServletResponse httpResponse = CurrentRequest.response();
@@ -318,10 +457,12 @@ public class AuthController implements AuthApi {
         request
       ).logout(wire);
       data = new LogoutResponseDto().revokedSessionCount(
-        BigDecimal.valueOf(response.getRevokedSessionCount())
+        java.math.BigDecimal.valueOf(response.getRevokedSessionCount())
       );
     } else {
-      data = new LogoutResponseDto().revokedSessionCount(BigDecimal.ZERO);
+      data = new LogoutResponseDto().revokedSessionCount(
+        java.math.BigDecimal.ZERO
+      );
     }
 
     // Cleared unconditionally — the caller asked to be logged out and must
@@ -331,17 +472,14 @@ public class AuthController implements AuthApi {
       cookies.clearDeviceToken(httpResponse);
     }
 
-    return ResponseEntity.ok(
-      new AuthControllerLogoutV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(data)
-    );
+    return ResponseEntity.ok(ApiResponse.of(200, "OK", data));
   }
 
-  @Override
-  public ResponseEntity<AuthControllerLogoutAllV1200Response> authControllerLogoutAllV1() {
+  @PostMapping(value = "/auth/logout/all", produces = { "application/json" })
+  @ApiErrors({ "401" })
+  public ResponseEntity<
+    ApiResponse<LogoutAllResponseDto>
+  > authControllerLogoutAllV1() {
     HttpServletRequest request = CurrentRequest.request();
     HttpServletResponse httpResponse = CurrentRequest.response();
     RequestContext context = currentUser.require(request);
@@ -354,25 +492,31 @@ public class AuthController implements AuthApi {
     cookies.clearDeviceToken(httpResponse);
 
     return ResponseEntity.ok(
-      new AuthControllerLogoutAllV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("Signed out of all devices")
-        .data(
-          new LogoutAllResponseDto().revokedSessionCount(
-            BigDecimal.valueOf(response.getRevokedSessionCount())
-          )
+      ApiResponse.of(
+        200,
+        "Signed out of all devices",
+        new LogoutAllResponseDto().revokedSessionCount(
+          java.math.BigDecimal.valueOf(response.getRevokedSessionCount())
         )
+      )
     );
   }
 
-  @Override
-  @AuthThrottle(
+  @PatchMapping(
+    value = "/auth/password",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401" })
+  @ThrottleOverride(
+    tier = ThrottlerTiers.AUTH,
     ttlMs = RouteThrottle.CHANGE_PASSWORD_TTL_MS,
     limit = RouteThrottle.CHANGE_PASSWORD_LIMIT
   )
-  public ResponseEntity<AuthControllerChangePasswordV1200Response> authControllerChangePasswordV1(
-    ChangePasswordDto changePasswordDto
+  public ResponseEntity<
+    ApiResponse<ChangePasswordResponseDto>
+  > authControllerChangePasswordV1(
+    @Valid @RequestBody ChangePasswordDto changePasswordDto
   ) {
     HttpServletRequest request = CurrentRequest.request();
     RequestContext context = currentUser.require(request);
@@ -388,20 +532,21 @@ public class AuthController implements AuthApi {
     ).changePassword(wire.build());
 
     return ResponseEntity.ok(
-      new AuthControllerChangePasswordV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("Password changed")
-        .data(
-          new ChangePasswordResponseDto().revokedSessionCount(
-            BigDecimal.valueOf(response.getRevokedSessionCount())
-          )
+      ApiResponse.of(
+        200,
+        "Password changed",
+        new ChangePasswordResponseDto().revokedSessionCount(
+          java.math.BigDecimal.valueOf(response.getRevokedSessionCount())
         )
+      )
     );
   }
 
-  @Override
-  public ResponseEntity<AuthControllerRefreshV1200Response> authControllerRefreshV1() {
+  @PostMapping(value = "/auth/refresh", produces = { "application/json" })
+  @ApiErrors({ "401" })
+  public ResponseEntity<
+    ApiResponse<LoginResponseDto>
+  > authControllerRefreshV1() {
     HttpServletRequest request = CurrentRequest.request();
     HttpServletResponse httpResponse = CurrentRequest.response();
 
@@ -424,25 +569,30 @@ public class AuthController implements AuthApi {
     cookies.setRefreshToken(httpResponse, response.getRefreshToken());
 
     return ResponseEntity.ok(
-      new AuthControllerRefreshV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(
-          new LoginResponseDto()
-            .user(UserMapper.toUserResponseDto(response.getUser()))
-            .requiresTwoFactor(false)
-        )
+      ApiResponse.of(
+        200,
+        "OK",
+        new LoginResponseDto()
+          .user(UserMapper.toUserResponseDto(response.getUser()))
+          .requiresTwoFactor(false)
+      )
     );
   }
 
-  @Override
-  @AuthThrottle(
+  @PostMapping(
+    value = "/auth/password/forgot",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401" })
+  @ResponseStatus(HttpStatus.ACCEPTED)
+  @ThrottleOverride(
+    tier = ThrottlerTiers.AUTH,
     ttlMs = RouteThrottle.FORGOT_PASSWORD_TTL_MS,
     limit = RouteThrottle.FORGOT_PASSWORD_LIMIT
   )
-  public ResponseEntity<AuthControllerForgotPasswordV1202Response> authControllerForgotPasswordV1(
-    ForgotPasswordDto forgotPasswordDto
+  public ResponseEntity<ApiResponse<Void>> authControllerForgotPasswordV1(
+    @Valid @RequestBody ForgotPasswordDto forgotPasswordDto
   ) {
     HttpServletRequest request = CurrentRequest.request();
     withMetadata(request).forgotPassword(
@@ -454,16 +604,19 @@ public class AuthController implements AuthApi {
     // Always 202 — see `ForgotPasswordResponse`'s own note: it carries no
     // state, so this cannot become an account-enumeration oracle.
     return ResponseEntity.status(HttpStatus.ACCEPTED).body(
-      new AuthControllerForgotPasswordV1202Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(202))
-        .message("Accepted")
+      ApiResponse.of(202, "Accepted", null)
     );
   }
 
-  @Override
-  public ResponseEntity<AuthControllerValidatePasswordResetTokenV1200Response> authControllerValidatePasswordResetTokenV1(
-    String token
+  @GetMapping(
+    value = "/auth/password/reset/{token}",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "401", "404" })
+  public ResponseEntity<
+    ApiResponse<ValidatePasswordResetTokenResponseDto>
+  > authControllerValidatePasswordResetTokenV1(
+    @PathVariable("token") String token
   ) {
     HttpServletRequest request = CurrentRequest.request();
     ValidatePasswordResetTokenResponse response = withMetadata(
@@ -473,21 +626,26 @@ public class AuthController implements AuthApi {
     );
 
     return ResponseEntity.ok(
-      new AuthControllerValidatePasswordResetTokenV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(
-          new ValidatePasswordResetTokenResponseDto()
-            .valid(response.getValid())
-            .email(response.hasEmail() ? response.getEmail() : null)
-        )
+      ApiResponse.of(
+        200,
+        "OK",
+        new ValidatePasswordResetTokenResponseDto()
+          .valid(response.getValid())
+          .email(response.hasEmail() ? response.getEmail() : null)
+      )
     );
   }
 
-  @Override
-  public ResponseEntity<AuthControllerResetPasswordV1200Response> authControllerResetPasswordV1(
-    ResetPasswordDto resetPasswordDto
+  @PostMapping(
+    value = "/auth/password/reset",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401" })
+  public ResponseEntity<
+    ApiResponse<ResetPasswordResponseDto>
+  > authControllerResetPasswordV1(
+    @Valid @RequestBody ResetPasswordDto resetPasswordDto
   ) {
     HttpServletRequest request = CurrentRequest.request();
     HttpServletResponse httpResponse = CurrentRequest.response();
@@ -508,15 +666,13 @@ public class AuthController implements AuthApi {
     cookies.clearDeviceToken(httpResponse);
 
     return ResponseEntity.ok(
-      new AuthControllerResetPasswordV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(
-          new ResetPasswordResponseDto().revokedSessionCount(
-            BigDecimal.valueOf(response.getRevokedSessionCount())
-          )
+      ApiResponse.of(
+        200,
+        "OK",
+        new ResetPasswordResponseDto().revokedSessionCount(
+          java.math.BigDecimal.valueOf(response.getRevokedSessionCount())
         )
+      )
     );
   }
 }

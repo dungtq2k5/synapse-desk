@@ -144,9 +144,7 @@ class AiStreamServiceTest {
   void atCapEscalatesAndNeverPersistsAMessage() {
     SocketIOClient client = client();
     when(rag.chat(any())).thenReturn(
-      List.of(
-        completion(Rag.AnswerStatus.ANSWER_STATUS_AT_CAP, "")
-      ).iterator()
+      List.of(completion(Rag.AnswerStatus.ANSWER_STATUS_AT_CAP, "")).iterator()
     );
     when(tickets.escalateTicket(any())).thenReturn(
       Common.TicketResponse.getDefaultInstance()
@@ -175,7 +173,10 @@ class AiStreamServiceTest {
     SocketIOClient client = client();
     when(rag.chat(any())).thenReturn(
       List.of(
-        completion(Rag.AnswerStatus.ANSWER_STATUS_REFUSED, "I can't help with that")
+        completion(
+          Rag.AnswerStatus.ANSWER_STATUS_REFUSED,
+          "I can't help with that"
+        )
       ).iterator()
     );
     when(messages.appendAiMessage(any())).thenReturn(

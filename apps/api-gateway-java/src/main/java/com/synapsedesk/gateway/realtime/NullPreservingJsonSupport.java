@@ -22,6 +22,6 @@ public class NullPreservingJsonSupport extends JacksonJsonSupport {
   @Override
   protected void init(ObjectMapper objectMapper) {
     super.init(objectMapper);
-    objectMapper.setSerializationInclusion(Include.ALWAYS);
+    objectMapper.setDefaultPropertyInclusion(Include.ALWAYS);
   }
 }

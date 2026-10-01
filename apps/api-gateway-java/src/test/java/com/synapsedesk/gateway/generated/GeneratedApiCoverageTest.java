@@ -19,7 +19,7 @@ import org.springframework.test.context.ContextConfiguration;
 import com.synapsedesk.gateway.config.SharedEnvironmentInitializer;
 
 /**
- * Every generated `*Api` interface is implemented, or listed as pending.
+ * Every generated `*Api` interface is implemented, pending, or migrated.
  *
  * <p><b>This is the half the compiler cannot do.</b> `skipDefaultInterface`
  * makes a generated method abstract, so a path added to a tag that some
@@ -39,6 +39,14 @@ import com.synapsedesk.gateway.config.SharedEnvironmentInitializer;
  * <p>Implemented means <b>a bean in the container implements it</b>, not that
  * a class exists: a controller that is not a component serves nothing, and
  * that is exactly the mistake this would otherwise miss.
+ *
+ * <p><b>A third state, for the OpenAPI-ownership flip.</b> A controller that
+ * drops `implements XApi` (moving that interface's `@RequestMapping`s onto
+ * its own methods and returning `ApiResponse`/`PagedData` instead of the
+ * generated wrapper) also has no bean implementing `XApi` — same signal this
+ * class otherwise reads as a regression. {@code migrated-apis.txt} is how a
+ * deliberate migration is told from an accidental one, and a name can never
+ * be in both lists — {@link #noNameIsBothPendingAndMigrated} guards that.
  */
 @SpringBootTest(
   properties = { "management.server.port=0", "realtime.port=0" }
@@ -52,16 +60,18 @@ class GeneratedApiCoverageTest {
           "target/generated-sources/openapi/src/main/java/com/synapsedesk/gateway/generated/api");
 
   private static final Path PENDING = Path.of("src/test/resources/pending-apis.txt");
+  private static final Path MIGRATED = Path.of("src/test/resources/migrated-apis.txt");
 
   @Autowired private ApplicationContext context;
 
   @Test
-  void everyGeneratedApiIsImplementedOrPending() throws IOException {
+  void everyGeneratedApiIsImplementedOrPendingOrMigrated() throws IOException {
     Set<String> pending = pending();
+    Set<String> migrated = migrated();
     List<String> findings = new ArrayList<>();
 
     for (String name : generated()) {
-      if (pending.contains(name)) {
+      if (pending.contains(name) || migrated.contains(name)) {
         continue;
       }
 
@@ -74,11 +84,50 @@ class GeneratedApiCoverageTest {
       }
 
       if (context.getBeanNamesForType(api).length == 0) {
-        findings.add(name + ": no bean implements it, and it is not listed as pending");
+        findings.add(
+            name + ": no bean implements it, and it is not listed as pending or migrated");
       }
     }
 
     assertThat(findings).isEmpty();
+  }
+
+  @Test
+  void noNameIsBothPendingAndMigrated() throws IOException {
+    Set<String> both = new TreeSet<>(pending());
+    both.retainAll(migrated());
+
+    assertThat(both).isEmpty();
+  }
+
+  @Test
+  void theMigratedListHasNoStaleEntries() throws IOException {
+    // A migrated entry whose interface still has an implementing bean means
+    // the controller never actually dropped `implements XApi` — the line
+    // was added ahead of the code, or the migration was reverted without
+    // removing it.
+    Set<String> generated = generated();
+    List<String> stale = new ArrayList<>();
+
+    for (String name : migrated()) {
+      if (!generated.contains(name)) {
+        stale.add(name + ": listed as migrated, but the generator emits no such interface");
+        continue;
+      }
+
+      Class<?> api;
+      try {
+        api = Class.forName("com.synapsedesk.gateway.generated.api." + name);
+      } catch (ClassNotFoundException cause) {
+        continue;
+      }
+
+      if (context.getBeanNamesForType(api).length > 0) {
+        stale.add(name + ": a bean still implements it — this controller has not migrated");
+      }
+    }
+
+    assertThat(stale).isEmpty();
   }
 
   @Test
@@ -142,6 +191,14 @@ class GeneratedApiCoverageTest {
   /** The tracked list, comments and blank lines dropped. */
   private Set<String> pending() throws IOException {
     return Files.readAllLines(PENDING).stream()
+        .map(String::trim)
+        .filter(line -> !line.isEmpty() && !line.startsWith("#"))
+        .collect(java.util.stream.Collectors.toCollection(TreeSet::new));
+  }
+
+  /** The mirror list, comments and blank lines dropped — see {@link #MIGRATED}. */
+  private Set<String> migrated() throws IOException {
+    return Files.readAllLines(MIGRATED).stream()
         .map(String::trim)
         .filter(line -> !line.isEmpty() && !line.startsWith("#"))
         .collect(java.util.stream.Collectors.toCollection(TreeSet::new));

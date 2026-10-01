@@ -9,13 +9,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import com.google.protobuf.Timestamp;
 import com.synapsedesk.gateway.auth.CurrentUser;
 import com.synapsedesk.gateway.auth.RequestContext;
 import com.synapsedesk.gateway.cache.CacheService;
-import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
-import java.util.Map;
 import java.util.function.Supplier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,7 +21,6 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.server.ResponseStatusException;
-import synapsedesk.auth.Department.DepartmentResponse;
 import synapsedesk.auth.Department.ListDepartmentsRequest;
 import synapsedesk.auth.Department.ListDepartmentsResponse;
 import synapsedesk.auth.DepartmentServiceGrpc;
@@ -72,8 +68,8 @@ class DepartmentsControllerTest {
   void setUp() {
     when(stub.withDeadlineAfter(anyLong(), any())).thenReturn(stub);
     when(stub.withInterceptors(any())).thenReturn(stub);
-    when(cache.wrap(any(), anyLong(), any(), any())).thenAnswer(invocation ->
-      ((Supplier<?>) invocation.getArgument(3)).get()
+    when(cache.wrapTyped(any(), anyLong(), any(), any())).thenAnswer(
+      invocation -> ((Supplier<?>) invocation.getArgument(3)).get()
     );
     controller = new DepartmentsController(stub, currentUser, cache);
   }

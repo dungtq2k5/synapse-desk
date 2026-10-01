@@ -26,10 +26,12 @@ class PresenceServiceTest {
   private static final String USER = "user-1";
 
   private final StringRedisTemplate redis = mock(StringRedisTemplate.class);
+
   @SuppressWarnings("unchecked")
   private final ValueOperations<String, String> values = mock(
     ValueOperations.class
   );
+
   private final PresenceService presence = new PresenceService(redis, JSON);
 
   {
@@ -39,7 +41,11 @@ class PresenceServiceTest {
   @Test
   void onConnectSetsOnlineWhenNothingIsRecorded() {
     when(
-      values.setIfAbsent(eq("presence:org-1:user-1"), anyString(), any(Duration.class))
+      values.setIfAbsent(
+        eq("presence:org-1:user-1"),
+        anyString(),
+        any(Duration.class)
+      )
     ).thenReturn(true);
 
     assertThat(presence.onConnect(ORG, USER)).isEqualTo("online");
@@ -48,7 +54,11 @@ class PresenceServiceTest {
   @Test
   void onConnectPreservesAnExistingBusyAndRefreshesTtl() {
     when(
-      values.setIfAbsent(eq("presence:org-1:user-1"), anyString(), any(Duration.class))
+      values.setIfAbsent(
+        eq("presence:org-1:user-1"),
+        anyString(),
+        any(Duration.class)
+      )
     ).thenReturn(false);
     when(values.get("presence:org-1:user-1")).thenReturn(
       "{\"state\":\"busy\",\"updatedAt\":\"2026-01-01T00:00:00Z\"}"

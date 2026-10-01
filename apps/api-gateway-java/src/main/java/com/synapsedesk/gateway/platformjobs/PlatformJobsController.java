@@ -6,15 +6,17 @@ import com.synapsedesk.gateway.auth.IsoDateCheck;
 import com.synapsedesk.gateway.auth.RequestContext;
 import com.synapsedesk.gateway.auth.SuperAdminCheck;
 import com.synapsedesk.gateway.config.JsIsoFormat;
-import com.synapsedesk.gateway.generated.api.PlatformJobsApi;
 import com.synapsedesk.gateway.generated.model.BackfillJobDto;
 import com.synapsedesk.gateway.generated.model.JobHealthResponseDto;
 import com.synapsedesk.gateway.generated.model.JobRunResultResponseDto;
 import com.synapsedesk.gateway.generated.model.JobRunStatusResponseDto;
-import com.synapsedesk.gateway.generated.model.PlatformJobsControllerGetHealthV1200Response;
-import com.synapsedesk.gateway.generated.model.PlatformJobsControllerRunV1200Response;
 import com.synapsedesk.gateway.grpc.CallerMetadata;
+import com.synapsedesk.gateway.openapi.ApiErrors;
+import com.synapsedesk.gateway.web.ApiPaths;
+import com.synapsedesk.gateway.web.ApiResponse;
 import io.grpc.stub.MetadataUtils;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -29,6 +31,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 import synapsedesk.auth.Platform.AuthJobHealthRequest;
@@ -72,9 +80,16 @@ import synapsedesk.ticket.AnalyticsServiceGrpc;
  * equivalent to carry it forward as), so this controller checks via {@link
  * com.synapsedesk.gateway.auth.IsoDateCheck}, shared with every other DTO
  * the generator dropped it from.
+ *
+ * <p><b>Migrated off `PlatformJobsApi`.</b> No {@code @RequirePermission}
+ * here — {@link SuperAdminCheck} is the door, same as {@code
+ * PlatformAuditLogsController}.
  */
+@Tag(name = "Platform Jobs")
 @RestController
-public class PlatformJobsController implements PlatformJobsApi {
+@RequestMapping(ApiPaths.V1)
+@Validated
+public class PlatformJobsController {
 
   private static final Logger LOG = LoggerFactory.getLogger(
     PlatformJobsController.class
@@ -148,8 +163,11 @@ public class PlatformJobsController implements PlatformJobsApi {
     this.superAdminCheck = superAdminCheck;
   }
 
-  @Override
-  public ResponseEntity<PlatformJobsControllerGetHealthV1200Response> platformJobsControllerGetHealthV1() {
+  @GetMapping(value = "/platform/jobs", produces = { "application/json" })
+  @ApiErrors({ "401" })
+  public ResponseEntity<
+    ApiResponse<JobHealthResponseDto>
+  > platformJobsControllerGetHealthV1() {
     RequestContext context = currentUser.require(CurrentRequest.request());
     superAdminCheck.require(context);
 
@@ -221,41 +239,44 @@ public class PlatformJobsController implements PlatformJobsApi {
     boolean degraded = !verdicts.isEmpty() || !unavailable.isEmpty();
 
     return ResponseEntity.ok(
-      new PlatformJobsControllerGetHealthV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("OK")
-        .data(
-          new JobHealthResponseDto()
-            .items(items)
-            .degraded(degraded)
-            .unavailable(unavailable)
-        )
+      ApiResponse.of(
+        200,
+        "OK",
+        new JobHealthResponseDto()
+          .items(items)
+          .degraded(degraded)
+          .unavailable(unavailable)
+      )
     );
   }
 
-  @Override
-  public ResponseEntity<PlatformJobsControllerRunV1200Response> platformJobsControllerRunV1(
-    String name
-  ) {
+  @PostMapping(
+    value = "/platform/jobs/{name}/run",
+    produces = { "application/json" }
+  )
+  @ApiErrors({ "401", "404" })
+  public ResponseEntity<
+    ApiResponse<JobRunResultResponseDto>
+  > platformJobsControllerRunV1(@PathVariable("name") String name) {
     RequestContext context = currentUser.require(CurrentRequest.request());
     superAdminCheck.require(context);
 
     JobRunResultResponseDto data = dispatch(name, context, null, null);
 
-    return ResponseEntity.ok(
-      new PlatformJobsControllerRunV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("Job run complete")
-        .data(data)
-    );
+    return ResponseEntity.ok(ApiResponse.of(200, "Job run complete", data));
   }
 
-  @Override
-  public ResponseEntity<PlatformJobsControllerRunV1200Response> platformJobsControllerBackfillV1(
-    String name,
-    BackfillJobDto backfillJobDto
+  @PostMapping(
+    value = "/platform/jobs/{name}/backfill",
+    produces = { "application/json" },
+    consumes = { "application/json" }
+  )
+  @ApiErrors({ "400", "401", "404" })
+  public ResponseEntity<
+    ApiResponse<JobRunResultResponseDto>
+  > platformJobsControllerBackfillV1(
+    @PathVariable("name") String name,
+    @Valid @RequestBody BackfillJobDto backfillJobDto
   ) {
     RequestContext context = currentUser.require(CurrentRequest.request());
     superAdminCheck.require(context);
@@ -285,13 +306,7 @@ public class PlatformJobsController implements PlatformJobsApi {
       backfillJobDto.getTo()
     );
 
-    return ResponseEntity.ok(
-      new PlatformJobsControllerRunV1200Response()
-        .success(true)
-        .statusCode(BigDecimal.valueOf(200))
-        .message("Backfill complete")
-        .data(data)
-    );
+    return ResponseEntity.ok(ApiResponse.of(200, "Backfill complete", data));
   }
 
   private JobRunResultResponseDto dispatch(

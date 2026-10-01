@@ -106,7 +106,9 @@ describe('webhooks', () => {
         });
         const [call] = peers.auth.calls('BillingService/HandleStripeWebhook');
         expect(call.request.signature).toBe('t=1,v1=abc');
-        expect(Buffer.from(call.request.payload).toString('utf8')).toBe(body);
+        expect(
+          Buffer.from(call.request.payload as Uint8Array).toString('utf8'),
+        ).toBe(body);
       },
     );
 
