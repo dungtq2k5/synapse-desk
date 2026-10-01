@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.synapsedesk.gateway.HttpProbe;
 import com.synapsedesk.gateway.config.SharedEnvironmentInitializer;
+import com.synapsedesk.gateway.platformjobs.JobMetricsCollector;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -22,6 +23,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ContextConfiguration;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
  * P4: the series this gateway publishes are the series Node publishes.
@@ -63,6 +65,16 @@ class MetricsSeriesContractTest {
   @Autowired
   private GatewayMetrics metrics;
 
+  /**
+   * A scrape refreshes the job gauge from the owning services' heartbeats, which
+   * this test cannot reach, and the refresh REPLACES the gauge: left alone it would
+   * rightly empty the sample recorded below. This test compares names and labels,
+   * not heartbeats (see {@code JobMetricsCollectorTest} and the contract rows), so
+   * the refresh is stood down and the test keeps recording its own sample.
+   */
+  @MockitoBean
+  private JobMetricsCollector jobs;
+
   @Value("${local.management.port}")
   private int managementPort;
 
@@ -75,7 +87,15 @@ class MetricsSeriesContractTest {
     metrics.websocketEvent("ticket.created");
     metrics.inboundEmail("accepted");
     metrics.aiGeneration("summary", Duration.ofSeconds(2));
-    metrics.jobSucceeded("digest", "notification-service", 1_700_000_000L);
+    metrics.replaceJobSuccesses(
+      java.util.List.of(
+        new GatewayMetrics.JobSuccess(
+          "digest",
+          "notification-service",
+          1_700_000_000d
+        )
+      )
+    );
     metrics.socketOpened();
   }
 

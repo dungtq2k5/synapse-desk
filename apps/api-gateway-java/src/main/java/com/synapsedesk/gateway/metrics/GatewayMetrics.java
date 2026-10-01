@@ -3,10 +3,14 @@ package com.synapsedesk.gateway.metrics;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.MultiGauge;
+import io.micrometer.core.instrument.Tags;
 import io.micrometer.core.instrument.Timer;
 import java.time.Duration;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 import org.springframework.stereotype.Component;
 
 /**
@@ -28,7 +32,7 @@ public class GatewayMetrics {
 
   private final MeterRegistry registry;
   private final AtomicInteger websocketConnections = new AtomicInteger();
-  private final AtomicLong lastJobSuccess = new AtomicLong();
+  private final MultiGauge jobLastSuccess;
 
   public GatewayMetrics(MeterRegistry registry) {
     this.registry = registry;
@@ -39,6 +43,12 @@ public class GatewayMetrics {
       AtomicInteger::get
     )
       .description("Currently connected WebSocket clients on this instance.")
+      .register(registry);
+
+    this.jobLastSuccess = MultiGauge.builder(PublishedSeries.JOB_LAST_SUCCESS)
+      .description(
+        "Unix timestamp of the last successful run of a scheduled job."
+      )
       .register(registry);
   }
 
@@ -100,30 +110,65 @@ public class GatewayMetrics {
       .record(took);
   }
 
-  /**
-   * The last successful run of a scheduled job, as a Unix timestamp.
-   *
-   * <p>The series an alert selects on, which is why the labels are
-   * {@code scheduled_job} and {@code owner_service} rather than {@code job}
-   * and {@code service}: a scraper attaches its OWN {@code job} label, and
-   * Prometheus renames a colliding exported one to {@code exported_job} unless
-   * the scrape config sets {@code honor_labels}. The alert then selects on a
-   * label that is not there.
-   */
-  public void jobSucceeded(
+  /** One scheduled job's last success: who owns it, and when, as a Unix timestamp. */
+  public record JobSuccess(
     String scheduledJob,
     String ownerService,
-    long unixSeconds
-  ) {
-    lastJobSuccess.set(unixSeconds);
+    double unixSeconds
+  ) {}
 
-    Gauge.builder(
-      PublishedSeries.JOB_LAST_SUCCESS,
-      lastJobSuccess,
-      AtomicLong::doubleValue
-    )
-      .tags("scheduled_job", scheduledJob, "owner_service", ownerService)
-      .register(registry);
+  /**
+   * The last successful run of every scheduled job, as Unix timestamps — the series
+   * an alert selects on. Replaces the WHOLE set, as Node's gauge is reset and then
+   * set on every scrape.
+   *
+   * <p><b>One value per series.</b> Each job is its own row with its own number: a
+   * single shared cell would give every tag combination the same value, so two jobs
+   * reporting would both read the later timestamp, and a staleness alert on the one
+   * that stopped would never fire because an unrelated job kept refreshing it. The
+   * labels were right and the values collided behind them.
+   *
+   * <p><b>Replacing, not accumulating.</b> A job removed from the schedule would
+   * otherwise keep exporting its last value forever: a gauge for a job that no
+   * longer exists, permanently green, in the metric whose purpose is to notice
+   * absence. And a job that has never succeeded is simply not passed here: absent,
+   * not zero, because zero is 1970 and satisfies any {@code time() - x > threshold}
+   * rule as "catastrophically stale" rather than "unknown".
+   *
+   * <p>The labels are {@code scheduled_job} and {@code owner_service}, never
+   * {@code job}: a scraper attaches its OWN {@code job} label, and Prometheus
+   * renames a colliding exported one to {@code exported_job} unless the scrape
+   * config sets {@code honor_labels}, leaving the alert selecting on a label that
+   * is not there.
+   */
+  public void replaceJobSuccesses(List<JobSuccess> successes) {
+    // Later wins for a repeated pair, as setting a gauge twice does.
+    Map<List<String>, JobSuccess> byPair = new LinkedHashMap<>();
+    for (JobSuccess success : successes) {
+      byPair.put(
+        List.of(success.scheduledJob(), success.ownerService()),
+        success
+      );
+    }
+
+    jobLastSuccess.register(
+      byPair
+        .values()
+        .stream()
+        .map(success ->
+          MultiGauge.Row.of(
+            Tags.of(
+              "scheduled_job",
+              success.scheduledJob(),
+              "owner_service",
+              success.ownerService()
+            ),
+            success.unixSeconds()
+          )
+        )
+        .toList(),
+      true
+    );
   }
 
   /** Tracks the live socket count this instance is serving. */

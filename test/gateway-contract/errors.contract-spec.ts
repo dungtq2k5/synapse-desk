@@ -321,13 +321,33 @@ describe('the error envelope and the edges around it', () => {
       const body = await response.text();
 
       expect(response.status).toBe(200);
-      expect(body).toContain('http_requests_total');
-      expect(body).toContain(
-        `job_last_success_timestamp_seconds{scheduled_job="${SCHEDULED_JOBS.ANALYTICS_DAILY}"`,
+      // Label order carries no meaning to Prometheus; the label NAMES do.
+      expect(body).toMatch(
+        new RegExp(
+          `job_last_success_timestamp_seconds\\{[^}]*scheduled_job="${SCHEDULED_JOBS.ANALYTICS_DAILY}"`,
+          'u',
+        ),
       );
       expect(body).toContain('owner_service=');
       // The label Prometheus attaches itself must not be declared by the metric.
       expect(body).not.toMatch(/job_last_success_timestamp_seconds\{job=/u);
+    },
+  );
+
+  rowFor('Ops')(
+    '**`/metrics` counts the requests it served — `http_requests_total` by route template, method and status**',
+    async () => {
+      // A request that reaches a handler: the counter is recorded there, so a
+      // request a guard refuses first is not counted.
+      await fetch(`${gateway.baseUrl}/health/ready`);
+
+      const body = await (await fetch(`${gateway.metricsUrl}/metrics`)).text();
+
+      // Every dashboard and alert on traffic selects this series by these labels;
+      // the route is the TEMPLATE, never the resolved path.
+      expect(body).toMatch(
+        /http_requests_total\{(?=[^}]*route="\/health\/ready")(?=[^}]*method="GET")(?=[^}]*status="200")[^}]*\}\s+\d/u,
+      );
     },
   );
 });

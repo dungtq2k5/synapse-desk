@@ -1,8 +1,11 @@
 package com.synapsedesk.gateway.metrics;
 
+import com.synapsedesk.gateway.platformjobs.JobMetricsCollector;
 import io.micrometer.core.instrument.Meter;
 import io.micrometer.core.instrument.config.MeterFilter;
 import io.micrometer.core.instrument.distribution.DistributionStatisticConfig;
+import io.micrometer.prometheusmetrics.PrometheusConfig;
+import io.prometheus.metrics.model.registry.PrometheusRegistry;
 import java.time.Duration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -22,6 +25,23 @@ import org.springframework.context.annotation.Configuration;
  */
 @Configuration
 public class MetricsConfiguration {
+
+  /**
+   * The scrape endpoint that refreshes the job gauge first. Actuator's own bean is
+   * {@code @ConditionalOnMissingBean} and backs off.
+   */
+  @Bean
+  RefreshingScrapeEndpoint prometheusEndpoint(
+    PrometheusRegistry registry,
+    PrometheusConfig config,
+    JobMetricsCollector jobs
+  ) {
+    return new RefreshingScrapeEndpoint(
+      registry,
+      config.prometheusProperties(),
+      jobs
+    );
+  }
 
   /** Nothing outside {@link PublishedSeries} reaches the scrape. */
   @Bean

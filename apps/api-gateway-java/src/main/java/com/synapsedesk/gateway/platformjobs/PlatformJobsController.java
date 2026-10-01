@@ -19,14 +19,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -39,19 +33,11 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
-import synapsedesk.auth.Platform.AuthJobHealthRequest;
-import synapsedesk.auth.Platform.AuthJobHealthResponse;
 import synapsedesk.auth.PlatformServiceGrpc;
 import synapsedesk.ingestion.AiLedgerServiceGrpc;
-import synapsedesk.ingestion.Ledger.AiJobHealthRequest;
-import synapsedesk.ingestion.Ledger.AiJobHealthResponse;
 import synapsedesk.ingestion.Ledger.RunAiRollupRequest;
 import synapsedesk.ingestion.Ledger.RunAiRollupResponse;
-import synapsedesk.notification.Notification.NotificationJobHealthRequest;
-import synapsedesk.notification.Notification.NotificationJobHealthResponse;
 import synapsedesk.notification.NotificationServiceGrpc;
-import synapsedesk.ticket.Analytics.JobHealthRequest;
-import synapsedesk.ticket.Analytics.JobHealthResponse;
 import synapsedesk.ticket.Analytics.RunRollupRequest;
 import synapsedesk.ticket.Analytics.RunRollupResponse;
 import synapsedesk.ticket.AnalyticsServiceGrpc;
@@ -95,50 +81,10 @@ public class PlatformJobsController {
     PlatformJobsController.class
   );
 
-  private static final long DEADLINE_SECONDS = 5;
-  private static final long STALENESS_FACTOR = 2;
+  private static final long DEADLINE_SECONDS = JobHeartbeats.DEADLINE_SECONDS;
 
   private static final String ANALYTICS_DAILY = "analytics-daily";
   private static final String LEDGER_DAILY = "ledger-daily";
-
-  /** Every job this build expects — the list staleness is judged against, never the rows returned. */
-  private static final List<String> SCHEDULED_JOBS = List.of(
-    "ledger-hourly",
-    "ledger-daily",
-    "analytics-daily",
-    "auth-hourly",
-    "auth-daily",
-    "billing-snapshot",
-    "ingestion-reconcile",
-    "scope-reconcile",
-    "webhook-retention"
-  );
-
-  /** Which service owns each schedule — `JOB_SERVICE`, reproduced. */
-  private static final Map<String, String> JOB_SERVICE = Map.ofEntries(
-    Map.entry("ledger-hourly", "ingestion-service"),
-    Map.entry("ledger-daily", "ingestion-service"),
-    Map.entry("analytics-daily", "ticket-service"),
-    Map.entry("auth-hourly", "auth-service"),
-    Map.entry("auth-daily", "auth-service"),
-    Map.entry("billing-snapshot", "auth-service"),
-    Map.entry("ingestion-reconcile", "ingestion-service"),
-    Map.entry("scope-reconcile", "ingestion-service"),
-    Map.entry("webhook-retention", "notification-service")
-  );
-
-  /** Interval per job (ms), derived from its cron pattern — `INTERVAL_MS`, reproduced. */
-  private static final Map<String, Long> INTERVAL_MS = Map.ofEntries(
-    Map.entry("ledger-hourly", 60 * 60 * 1000L),
-    Map.entry("ledger-daily", 24 * 60 * 60 * 1000L),
-    Map.entry("analytics-daily", 24 * 60 * 60 * 1000L),
-    Map.entry("auth-hourly", 60 * 60 * 1000L),
-    Map.entry("auth-daily", 24 * 60 * 60 * 1000L),
-    Map.entry("billing-snapshot", 60 * 60 * 1000L),
-    Map.entry("ingestion-reconcile", 10 * 60 * 1000L),
-    Map.entry("scope-reconcile", 60 * 60 * 1000L),
-    Map.entry("webhook-retention", 24 * 60 * 60 * 1000L)
-  );
 
   private final AnalyticsServiceGrpc.AnalyticsServiceBlockingStub analyticsStub;
   private final AiLedgerServiceGrpc.AiLedgerServiceBlockingStub ledgerStub;
@@ -146,6 +92,7 @@ public class PlatformJobsController {
   private final NotificationServiceGrpc.NotificationServiceBlockingStub notificationStub;
   private final CurrentUser currentUser;
   private final SuperAdminCheck superAdminCheck;
+  private final JobHeartbeats heartbeats;
 
   public PlatformJobsController(
     AnalyticsServiceGrpc.AnalyticsServiceBlockingStub analyticsStub,
@@ -153,7 +100,8 @@ public class PlatformJobsController {
     PlatformServiceGrpc.PlatformServiceBlockingStub platformStub,
     NotificationServiceGrpc.NotificationServiceBlockingStub notificationStub,
     CurrentUser currentUser,
-    SuperAdminCheck superAdminCheck
+    SuperAdminCheck superAdminCheck,
+    JobHeartbeats heartbeats
   ) {
     this.analyticsStub = analyticsStub;
     this.ledgerStub = ledgerStub;
@@ -161,6 +109,7 @@ public class PlatformJobsController {
     this.notificationStub = notificationStub;
     this.currentUser = currentUser;
     this.superAdminCheck = superAdminCheck;
+    this.heartbeats = heartbeats;
   }
 
   @GetMapping(value = "/platform/jobs", produces = { "application/json" })
@@ -171,72 +120,15 @@ public class PlatformJobsController {
     RequestContext context = currentUser.require(CurrentRequest.request());
     superAdminCheck.require(context);
 
-    List<String> unavailable = new ArrayList<>();
-    List<HeartbeatRow> rows = new ArrayList<>();
-    rows.addAll(
-      tryLeg("ticket-service", unavailable, () -> ticketHeartbeats(context))
-    );
-    rows.addAll(
-      tryLeg("ingestion-service", unavailable, () ->
-        ingestionHeartbeats(context)
-      )
-    );
-    rows.addAll(
-      tryLeg("auth-service", unavailable, () -> authHeartbeats(context))
-    );
-    rows.addAll(
-      tryLeg("notification-service", unavailable, () ->
-        notificationHeartbeats(context)
-      )
-    );
+    JobHeartbeats.Report report = heartbeats.report(CallerMetadata.of(context));
 
-    List<String> reachable = SCHEDULED_JOBS.stream()
-      .filter(name -> !unavailable.contains(JOB_SERVICE.get(name)))
+    List<JobRunStatusResponseDto> items = report
+      .items()
+      .stream()
+      .map(item ->
+        toStatusDto(item.service(), item.jobName(), item.row(), item.health())
+      )
       .toList();
-
-    Map<String, HeartbeatRow> byName = new HashMap<>();
-    for (HeartbeatRow row : rows) {
-      byName.putIfAbsent(row.jobName(), row);
-    }
-
-    long now = System.currentTimeMillis();
-    Map<String, String> verdicts = new HashMap<>();
-    for (String name : reachable) {
-      HeartbeatRow row = byName.get(name);
-      if (row == null || row.lastSucceededAt() == null) {
-        verdicts.put(name, "never-ran");
-        continue;
-      }
-      long age = now - row.lastSucceededAt().toEpochMilli();
-      if (age > INTERVAL_MS.get(name) * STALENESS_FACTOR) {
-        verdicts.put(name, row.consecutiveFailures() > 0 ? "failing" : "stale");
-      }
-    }
-
-    List<JobRunStatusResponseDto> items = new ArrayList<>();
-    for (String name : reachable) {
-      HeartbeatRow row = byName.get(name);
-      items.add(
-        toStatusDto(
-          JOB_SERVICE.get(name),
-          name,
-          row,
-          verdicts.getOrDefault(name, "healthy")
-        )
-      );
-    }
-
-    // Per-step rows the schedulers also record — never judged for staleness,
-    // since a step only runs when its parent does.
-    Set<String> topLevel = new LinkedHashSet<>(SCHEDULED_JOBS);
-    for (HeartbeatRow row : rows) {
-      if (topLevel.contains(row.jobName())) {
-        continue;
-      }
-      items.add(toStatusDto(row.service(), row.jobName(), row, "step"));
-    }
-
-    boolean degraded = !verdicts.isEmpty() || !unavailable.isEmpty();
 
     return ResponseEntity.ok(
       ApiResponse.of(
@@ -244,8 +136,8 @@ public class PlatformJobsController {
         "OK",
         new JobHealthResponseDto()
           .items(items)
-          .degraded(degraded)
-          .unavailable(unavailable)
+          .degraded(report.degraded())
+          .unavailable(report.unavailable())
       )
     );
   }
@@ -365,122 +257,10 @@ public class PlatformJobsController {
     );
   }
 
-  private List<HeartbeatRow> tryLeg(
-    String source,
-    List<String> unavailable,
-    Supplier<List<HeartbeatRow>> leg
-  ) {
-    try {
-      return leg.get();
-    } catch (RuntimeException e) {
-      LOG.warn("{} leg failed: {}", source, e.getMessage());
-      unavailable.add(source);
-      return List.of();
-    }
-  }
-
-  private List<HeartbeatRow> ticketHeartbeats(RequestContext context) {
-    JobHealthResponse response = withAnalyticsMetadata(context).getJobHealth(
-      JobHealthRequest.getDefaultInstance()
-    );
-
-    return response
-      .getItemsList()
-      .stream()
-      .map(item ->
-        new HeartbeatRow(
-          "ticket-service",
-          item.getJobName(),
-          item.hasLastStartedAt() ? toInstant(item.getLastStartedAt()) : null,
-          item.hasLastSucceededAt()
-            ? toInstant(item.getLastSucceededAt())
-            : null,
-          item.hasLastDurationMs() ? item.getLastDurationMs() : null,
-          item.hasLastError() ? item.getLastError() : null,
-          item.getConsecutiveFailures()
-        )
-      )
-      .toList();
-  }
-
-  private List<HeartbeatRow> ingestionHeartbeats(RequestContext context) {
-    AiJobHealthResponse response = withLedgerMetadata(context).getAiJobHealth(
-      AiJobHealthRequest.getDefaultInstance()
-    );
-
-    return response
-      .getItemsList()
-      .stream()
-      .map(item ->
-        new HeartbeatRow(
-          "ingestion-service",
-          item.getJobName(),
-          item.hasLastStartedAt() ? toInstant(item.getLastStartedAt()) : null,
-          item.hasLastSucceededAt()
-            ? toInstant(item.getLastSucceededAt())
-            : null,
-          item.hasLastDurationMs() ? item.getLastDurationMs() : null,
-          item.hasLastError() ? item.getLastError() : null,
-          item.getConsecutiveFailures()
-        )
-      )
-      .toList();
-  }
-
-  private List<HeartbeatRow> authHeartbeats(RequestContext context) {
-    AuthJobHealthResponse response = withPlatformMetadata(
-      context
-    ).getAuthJobHealth(AuthJobHealthRequest.getDefaultInstance());
-
-    return response
-      .getItemsList()
-      .stream()
-      .map(item ->
-        new HeartbeatRow(
-          "auth-service",
-          item.getJobName(),
-          item.hasLastStartedAt() ? toInstant(item.getLastStartedAt()) : null,
-          item.hasLastSucceededAt()
-            ? toInstant(item.getLastSucceededAt())
-            : null,
-          item.hasLastDurationMs() ? item.getLastDurationMs() : null,
-          item.hasLastError() ? item.getLastError() : null,
-          item.getConsecutiveFailures()
-        )
-      )
-      .toList();
-  }
-
-  private List<HeartbeatRow> notificationHeartbeats(RequestContext context) {
-    NotificationJobHealthResponse response = withNotificationMetadata(
-      context
-    ).getNotificationJobHealth(
-      NotificationJobHealthRequest.getDefaultInstance()
-    );
-
-    return response
-      .getItemsList()
-      .stream()
-      .map(item ->
-        new HeartbeatRow(
-          "notification-service",
-          item.getJobName(),
-          item.hasLastStartedAt() ? toInstant(item.getLastStartedAt()) : null,
-          item.hasLastSucceededAt()
-            ? toInstant(item.getLastSucceededAt())
-            : null,
-          item.hasLastDurationMs() ? item.getLastDurationMs() : null,
-          item.hasLastError() ? item.getLastError() : null,
-          item.getConsecutiveFailures()
-        )
-      )
-      .toList();
-  }
-
   private static JobRunStatusResponseDto toStatusDto(
     String service,
     String jobName,
-    HeartbeatRow row,
+    JobHeartbeats.Heartbeat row,
     String health
   ) {
     return new JobRunStatusResponseDto()
@@ -551,15 +331,4 @@ public class PlatformJobsController {
         MetadataUtils.newAttachHeadersInterceptor(CallerMetadata.of(context))
       );
   }
-
-  /** One heartbeat row, service-agnostic — the four generated `*JobRunStatus` types collapse into this. */
-  private record HeartbeatRow(
-    String service,
-    String jobName,
-    Instant lastStartedAt,
-    Instant lastSucceededAt,
-    Integer lastDurationMs,
-    String lastError,
-    int consecutiveFailures
-  ) {}
 }

@@ -89,7 +89,13 @@ class PlatformJobsControllerTest {
       platformStub,
       notificationStub,
       currentUser,
-      new SuperAdminCheck()
+      new SuperAdminCheck(),
+      new JobHeartbeats(
+        analyticsStub,
+        ledgerStub,
+        platformStub,
+        notificationStub
+      )
     );
 
     // Every leg empty and reachable by default; individual tests override.
